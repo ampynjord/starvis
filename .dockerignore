@@ -1,0 +1,47 @@
+# Dependencies
+node_modules
+
+# Build artifacts
+dist
+
+# Version control
+.git
+.gitignore
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Cache (will be mounted as volume)
+cache
+
+# Development files
+src
+*.ts
+!server.ts
+tsconfig.json
+
+# Test files
+test-*.ts
+*-test.ts
+*.test.ts
+*.spec.ts
+
+# IDE
+.vscode
+.idea
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Documentation
+README.md
+*.md
+!README.md
+
+# Scripts
+*.ps1
+cleanup.ps1
