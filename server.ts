@@ -161,6 +161,13 @@ class ShipScraper {
 
       await page.goto(url, { waitUntil: "networkidle2", timeout: 30000 });
 
+      // Attendre que les éléments de prix se chargent
+      try {
+        await page.waitForSelector(".a-priceUnit__amount", { timeout: 5000 });
+      } catch (e) {
+        console.log("⚠️  Price selector not found, continuing anyway...");
+      }
+
       // Scroller la page pour déclencher le lazy loading du holoviewer
       await page.evaluate(() => {
         window.scrollTo(0, document.body.scrollHeight / 2);
@@ -283,6 +290,15 @@ class ShipScraper {
         );
       } else {
         console.log("⚠️  No 3D model found on page");
+      }
+
+      // Log du prix pour debug
+      if (shipData.price) {
+        console.log(
+          `💰 Price detected: ${shipData.price.amount} ${shipData.price.currency}`
+        );
+      } else {
+        console.log("⚠️  No price found on page");
       }
 
       return { success: true, data: shipData };
@@ -413,18 +429,38 @@ class ShipScraper {
   }
 
   private extractPrice($: cheerio.CheerioAPI): ShipPrice | undefined {
-    const priceText = $(".price").first().text().trim();
-    const match = priceText.match(/[\$€£]?\s*([\d,]+\.?\d*)/);
-    if (match) {
-      return {
-        amount: parseFloat(match[1].replace(/,/g, "")),
-        currency: priceText.includes("€")
-          ? "EUR"
-          : priceText.includes("£")
-          ? "GBP"
-          : "USD",
-      };
+    // Chercher le prix dans les différents sélecteurs possibles
+    const selectors = [
+      ".a-priceUnit__amount",
+      ".m-storeAction__priceNumber .a-priceUnit__amount",
+      '[data-cy-id="price_unit__value"]',
+      ".price",
+    ];
+
+    console.log("🔍 Attempting to extract price...");
+    for (const selector of selectors) {
+      const priceText = $(selector).first().text().trim();
+      console.log(`  Selector ${selector}: "${priceText}"`);
+      if (priceText) {
+        const match = priceText.match(/[\$€£]?\s*([\d,]+\.?\d*)/);
+        if (match) {
+          const result = {
+            amount: parseFloat(match[1].replace(/,/g, "")),
+            currency: priceText.includes("€")
+              ? "EUR"
+              : priceText.includes("£")
+              ? "GBP"
+              : "USD",
+          };
+          console.log(
+            `  ✅ Price extracted: ${result.amount} ${result.currency}`
+          );
+          return result;
+        }
+      }
     }
+
+    console.log("  ❌ No price found");
     return undefined;
   }
 
@@ -718,9 +754,18 @@ class ShipService {
     if (!dbPool) return null;
 
     try {
+      // Extract manufacturer and slug from cache key (format: "manufacturer-slug")
+      const parts = cacheKey.split("-");
+      if (parts.length < 2) return null;
+
+      // Le slug peut contenir des tirets, donc on prend le premier élément comme manufacturer
+      // et le reste comme slug
+      const manufacturerSlug = parts[0];
+      const slug = parts.slice(1).join("-");
+
       const [rows] = (await dbPool.execute(
-        'SELECT * FROM ships WHERE id = ? OR CONCAT(manufacturer, "-", slug) = ?',
-        [cacheKey, cacheKey]
+        "SELECT * FROM ships WHERE slug = ? ORDER BY scraped_at DESC LIMIT 1",
+        [slug]
       )) as any;
 
       if (rows.length === 0) return null;
