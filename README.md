@@ -2,6 +2,8 @@
 
 API REST pour récupérer les données des vaisseaux Star Citizen depuis robertsspaceindustries.com avec stockage MySQL et documentation Swagger.
 
+**Auteur** : ampynjord - Dawnstar
+
 ## 🎯 Fonctionnalités
 
 - ✅ Scraping des vaisseaux depuis robertsspaceindustries.com
