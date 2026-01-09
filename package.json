@@ -1,7 +1,7 @@
 {
-  "name": "star-citizen-ships-api",
+  "name": "starapi",
   "version": "1.0.0",
-  "description": "API REST pour scraper les données des vaisseaux de Star Citizen",
+  "description": "Starapi - API REST pour les vaisseaux Star Citizen",
   "main": "server.ts",
   "type": "module",
   "scripts": {

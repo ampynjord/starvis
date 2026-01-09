@@ -1,55 +1,47 @@
-# 🚀 Star Citizen Ships API
+# 🚀 Starapi
 
-API REST pour récupérer les données des vaisseaux Star Citizen depuis robertsspaceindustries.com avec stockage MySQL et documentation Swagger.
+**Auteur** : ampynjord pour la Dawnstar
 
-**Auteur** : ampynjord - Dawnstar
+API REST pour récupérer les informations des vaisseaux Star Citizen depuis le site officiel RSI.
 
 ## 🎯 Fonctionnalités
 
-- ✅ Scraping des vaisseaux depuis robertsspaceindustries.com
-- ✅ Stockage persistant dans MySQL 8.0
-- ✅ Cache 3-niveaux (mémoire → MySQL → scraping)
-- ✅ API REST complète avec 6 endpoints
-- ✅ Documentation interactive Swagger UI
-- ✅ Déploiement Docker Compose
-- ✅ Extraction automatique : spécifications techniques, images haute qualité
-- ⚠️ Modèles 3D : extraction limitée (chargement dynamique côté client)
+- **Scraping automatique** des pages RSI avec Puppeteer
+- **Cache intelligent** des données (fichiers JSON)
+- **Base de données MySQL** pour stockage persistant
+- **Images** : galeries et spécifications techniques
+- **Prix** en USD (extraction dynamique)
+- **API REST** documentée avec Swagger UI
 
-## 📦 Installation et Démarrage
+## 🚀 Démarrage rapide
 
-### Avec Docker (recommandé)
+### Prérequis
+
+- Docker & Docker Compose
+
+### Installation
 
 ```bash
-# Démarrer l''API + MySQL
+# Cloner le projet
+git clone https://github.com/ampynjord/starapi.git
+cd starapi
+
+# Créer le fichier .env (optionnel)
+cp .env.example .env
+
+# Lancer l'application
 docker-compose up -d
-
-# Scraper un vaisseau
-docker-compose exec api npx tsx server.ts scrape
-
-# Voir les logs
-docker-compose logs -f
-
-# Arrêter
-docker-compose down
 ```
 
-### Sans Docker
+### Accès
 
-```bash
-npm install
-
-# Configurer MySQL
-mysql -u root -p
-CREATE DATABASE starapi;
-CREATE USER ''starapi_user''@''localhost'' IDENTIFIED BY ''starapi_pass'';
-GRANT ALL PRIVILEGES ON starapi.* TO ''starapi_user''@''localhost'';
-
-# Créer .env
-cp .env.example .env
-# Éditer .env avec vos identifiants MySQL
+- **API** : http://localhost:3000
+- **Swagger UI** : http://localhost:3000/api-docs
+- **Health Check** : http://localhost:3000/health
 
 npm run dev
-```
+
+````
 
 ## � Documentation Swagger
 
@@ -90,7 +82,7 @@ Liste tous les vaisseaux stockés en base de données.
     }
   ]
 }
-```
+````
 
 ### `GET /api/ships/:manufacturer/:slug`
 

@@ -948,7 +948,7 @@ app.get("/api-docs.json", (req, res) => {
  */
 app.get("/", (req, res) =>
   res.json({
-    name: "Star Citizen Ships API",
+    name: "Starapi",
     version: "1.0.0",
     documentation: "/api-docs",
     endpoints: {
