@@ -43,7 +43,36 @@ docker-compose up -d
 - Équipage : min/max crew
 - Cargo : capacité SCU
 - **17 catégories de composants** : armes, boucliers, réacteurs, propulseurs...
-- Images : thumbnails, bannières, galerie
+- **49 formats d'images** via `mediaGallery` (voir ci-dessous)
+
+**Galerie d'images disponible :**
+
+Chaque vaisseau expose une `mediaGallery` avec **49 tailles d'images** générées dynamiquement :
+
+| Format                | Dimensions | Usage                |
+| --------------------- | ---------- | -------------------- |
+| `source`              | Original   | Image haute qualité  |
+| `wallpaper_3840x2160` | 3840×2160  | Fond d'écran 4K      |
+| `wallpaper_1920x1080` | 1920×1080  | Fond d'écran Full HD |
+| `store_hub_large`     | 1200×420   | Bannière store       |
+| `store_small`         | 351×210    | Thumbnail store      |
+| `slideshow_wide`      | 1200×800   | Diaporama            |
+| `icon`                | 45×45      | Icône                |
+| ...                   | ...        | 42 autres formats    |
+
+```json
+// Exemple de réponse
+"mediaGallery": [{
+  "sourceName": "StarCitizen_RSI_Aurora_ES_01",
+  "sourceUrl": "https://media.robertsspaceindustries.com/e1i4i2ixe6ouo/source.jpg",
+  "images": {
+    "source": "https://media.robertsspaceindustries.com/e1i4i2ixe6ouo/source.jpg",
+    "wallpaper_3840x2160": "https://media.robertsspaceindustries.com/e1i4i2ixe6ouo/wallpaper_3840x2160.jpg",
+    "wallpaper_1920x1080": "https://media.robertsspaceindustries.com/e1i4i2ixe6ouo/wallpaper_1920x1080.jpg",
+    // ... 46 autres URLs
+  }
+}]
+```
 
 **Statistiques globales :**
 
@@ -130,10 +159,12 @@ POST https://robertsspaceindustries.com/graphql
 | Specs           | ✅ Complet   | ✅ Complet       |
 | Composants      | ✅ Détaillés | ❌ Non           |
 | Images          | ✅ Multiples | ✅ Limitées      |
-| Modèle 3D (CTM) | ❌ Non       | ✅ Oui           |
+| Modèle 3D (CTM) | ❌ Non       | ⚠️ Instable      |
 | Prix            | ❌ Non       | ✅ Oui           |
 
-**Recommandation** : Ship-Matrix comme source principale, GraphQL pour enrichir (CTM/prix).
+> **Note sur les CTM** : L'API GraphQL RSI retourne fréquemment des erreurs internes pour les requêtes de modèles 3D. Les URLs CTM ne sont pas exposées publiquement de manière fiable.
+
+**Recommandation** : Ship-Matrix comme source principale, GraphQL pour enrichir (prix) quand disponible.
 
 ---
 

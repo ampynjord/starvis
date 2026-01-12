@@ -429,15 +429,34 @@ class ShipService {
               quantity: c.quantity,
               manufacturer: c.manufacturer,
             })),
-            mediaGallery: media.map((m: any) => ({
-              sourceName: m.source_name,
-              sourceUrl: m.source_url,
-              derivedData:
+            mediaGallery: media.map((m: any) => {
+              const derivedData =
                 typeof m.derived_data === "string"
                   ? JSON.parse(m.derived_data)
-                  : m.derived_data,
-            })),
+                  : m.derived_data;
+
+              // Générer toutes les URLs d'images à partir du source_url
+              const baseUrl = m.source_url?.replace(/\/[^/]+$/, "") || "";
+              const extension = m.source_url?.split(".").pop() || "jpg";
+              const allImages: Record<string, string> = {
+                source: m.source_url,
+              };
+
+              if (derivedData?.sizes) {
+                Object.keys(derivedData.sizes).forEach((size) => {
+                  allImages[size] = `${baseUrl}/${size}.${extension}`;
+                });
+              }
+
+              return {
+                sourceName: m.source_name,
+                sourceUrl: m.source_url,
+                images: allImages,
+              };
+            }),
             syncedAt: row.synced_at,
+            lastModified: row.synced_at,
+            chassisId: row.id,
           };
         }
       } catch (error) {
@@ -760,12 +779,10 @@ app.get("/api/ships", async (req, res) => {
 
     res.json({ success: true, count: ships.length, data: ships });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        success: false,
-        error: error instanceof Error ? error.message : "Error",
-      });
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Error",
+    });
   }
 });
 
@@ -797,12 +814,10 @@ app.get("/api/ships/search", async (req, res) => {
     const ships = await service.searchShips(query);
     res.json({ success: true, count: ships.length, data: ships });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        success: false,
-        error: error instanceof Error ? error.message : "Error",
-      });
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Error",
+    });
   }
 });
 
@@ -821,12 +836,10 @@ app.get("/api/ships/stats", async (req, res) => {
     const stats = await service.getStats();
     res.json({ success: true, data: stats });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        success: false,
-        error: error instanceof Error ? error.message : "Error",
-      });
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Error",
+    });
   }
 });
 
@@ -872,12 +885,10 @@ app.get("/api/ships/:id", async (req, res) => {
       res.status(404).json({ success: false, error: "Ship not found" });
     }
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        success: false,
-        error: error instanceof Error ? error.message : "Error",
-      });
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Error",
+    });
   }
 });
 
@@ -916,12 +927,10 @@ app.get("/api/ships/:manufacturer/:slug", async (req, res) => {
       res.status(404).json({ success: false, error: "Ship not found" });
     }
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        success: false,
-        error: error instanceof Error ? error.message : "Error",
-      });
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Error",
+    });
   }
 });
 
@@ -952,12 +961,10 @@ app.post("/api/ships/:id/enrich", async (req, res) => {
       res.status(404).json({ success: false, error: "Ship not found" });
     }
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        success: false,
-        error: error instanceof Error ? error.message : "Error",
-      });
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Error",
+    });
   }
 });
 
@@ -980,12 +987,10 @@ app.post("/admin/sync", async (req, res) => {
       data: stats,
     });
   } catch (error) {
-    res
-      .status(500)
-      .json({
-        success: false,
-        error: error instanceof Error ? error.message : "Error",
-      });
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Error",
+    });
   }
 });
 
