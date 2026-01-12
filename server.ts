@@ -1,885 +1,618 @@
-import * as cheerio from "cheerio";
 import cors from "cors";
-import * as crypto from "crypto";
-import "dotenv/config";
 import express from "express";
-import * as fs from "fs/promises";
-import mysql from "mysql2/promise";
-import * as path from "path";
-import puppeteer, { Browser } from "puppeteer";
+import type { Pool } from "mysql2/promise";
+import * as mysql from "mysql2/promise";
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
+import {
+  GRAPHQL_FILTER_OPTIONS,
+  GraphQLProvider,
+  ShipMatrixProvider,
+  TransformedShip,
+} from "./src/providers/rsi-providers.js";
 
-// ===== DATABASE =====
-const dbConfig = {
+// ===== CONFIGURATION =====
+const DB_CONFIG = {
   host: process.env.DB_HOST || "localhost",
   port: parseInt(process.env.DB_PORT || "3306"),
-  user: process.env.DB_USER || "root",
-  password: process.env.DB_PASSWORD || "",
+  user: process.env.DB_USER || "starapi",
+  password: process.env.DB_PASSWORD || "starapi",
   database: process.env.DB_NAME || "starapi",
+  waitForConnections: true,
+  connectionLimit: 10,
 };
 
-let dbPool: mysql.Pool | null = null;
+// ===== DATABASE =====
+let dbPool: Pool | null = null;
 
-async function initDatabase() {
+async function initDatabase(): Promise<void> {
   try {
-    dbPool = mysql.createPool(dbConfig);
-    await dbPool.execute(`
+    dbPool = mysql.createPool(DB_CONFIG);
+    const conn = await dbPool.getConnection();
+
+    // Créer les tables si elles n'existent pas
+    await conn.execute(`
       CREATE TABLE IF NOT EXISTS ships (
         id VARCHAR(255) PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
         manufacturer VARCHAR(255),
         slug VARCHAR(255),
-        url TEXT,
+        url VARCHAR(512),
         description TEXT,
-        price_amount DECIMAL(10,2),
-        price_currency VARCHAR(10),
         focus VARCHAR(255),
         production_status VARCHAR(100),
         size VARCHAR(50),
+        type VARCHAR(100),
         crew_min INT,
         crew_max INT,
-        model3d_viewer_url TEXT,
-        model3d_model_url TEXT,
-        scraped_at DATETIME,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        mass_kg BIGINT,
+        cargo_capacity INT,
+        length_m DECIMAL(10,2),
+        beam_m DECIMAL(10,2),
+        height_m DECIMAL(10,2),
+        scm_speed INT,
+        afterburner_speed INT,
+        pitch_max DECIMAL(10,2),
+        yaw_max DECIMAL(10,2),
+        roll_max DECIMAL(10,2),
+        x_axis_acceleration DECIMAL(10,2),
+        y_axis_acceleration DECIMAL(10,2),
+        z_axis_acceleration DECIMAL(10,2),
+        model3d_ctm_url TEXT,
+        model3d_angular_url TEXT,
+        price_usd DECIMAL(10,2),
+        pledge_url VARCHAR(512),
+        media_store_thumb VARCHAR(512),
+        media_store_banner VARCHAR(512),
+        data_source VARCHAR(50) DEFAULT 'ship-matrix',
+        synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_manufacturer (manufacturer),
-        INDEX idx_slug (slug)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        INDEX idx_size (size),
+        INDEX idx_type (type),
+        INDEX idx_production_status (production_status)
+      )
     `);
 
-    await dbPool.execute(`
-      CREATE TABLE IF NOT EXISTS ship_specifications (
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS ship_components (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        ship_id VARCHAR(255),
+        ship_id VARCHAR(255) NOT NULL,
+        category VARCHAR(100),
+        type VARCHAR(100),
         name VARCHAR(255),
-        value TEXT,
+        mounts INT,
+        component_size VARCHAR(50),
+        details TEXT,
+        quantity INT DEFAULT 1,
+        manufacturer VARCHAR(255),
         FOREIGN KEY (ship_id) REFERENCES ships(id) ON DELETE CASCADE,
-        INDEX idx_ship_id (ship_id)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+        INDEX idx_ship_id (ship_id),
+        INDEX idx_category (category)
+      )
     `);
 
-    await dbPool.execute(`
-      CREATE TABLE IF NOT EXISTS ship_images (
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS ship_media (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        ship_id VARCHAR(255),
-        url TEXT,
-        type VARCHAR(50),
-        alt VARCHAR(255),
+        ship_id VARCHAR(255) NOT NULL,
+        source_name VARCHAR(255),
+        source_url TEXT,
+        derived_data JSON,
         FOREIGN KEY (ship_id) REFERENCES ships(id) ON DELETE CASCADE,
         INDEX idx_ship_id (ship_id)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+      )
     `);
 
-    console.log("✅ Database initialized");
+    conn.release();
+    console.log("✅ Database connected and tables ready");
   } catch (error) {
     console.error(
       "❌ Database connection failed:",
       error instanceof Error ? error.message : error
     );
+    console.log("⚠️  Running without database - data won't be persisted");
   }
 }
 
-async function closeDatabase() {
-  if (dbPool) await dbPool.end();
-}
-
-// ===== TYPES =====
-interface ShipSpecification {
-  name: string;
-  value: string;
-}
-interface ShipImage {
-  url: string;
-  type: "thumbnail" | "gallery" | "blueprint" | "other";
-  alt?: string;
-}
-interface ShipPrice {
-  amount: number;
-  currency: string;
-  warbond?: number;
-}
-interface Ship3DModel {
-  viewerUrl?: string;
-  modelUrl?: string;
-}
-interface ShipData {
-  id: string;
-  name: string;
-  manufacturer: string;
-  slug: string;
-  url: string;
-  description?: string;
-  price?: ShipPrice;
-  specifications: ShipSpecification[];
-  images: ShipImage[];
-  model3d?: Ship3DModel;
-  focus?: string;
-  productionStatus?: string;
-  size?: string;
-  crew?: { min?: number; max?: number };
-  scrapedAt: Date;
-}
-interface ScrapeResult {
-  success: boolean;
-  data?: ShipData;
-  error?: string;
-}
-
-// ===== SCRAPER =====
-class ShipScraper {
-  private browser: Browser | null = null;
-
-  async init() {
-    this.browser = await puppeteer.launch({
-      headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox"],
-    });
-  }
-
-  async close() {
-    if (this.browser) await this.browser.close();
-  }
-
-  async scrapeShip(url: string): Promise<ScrapeResult> {
-    try {
-      if (!this.browser) await this.init();
-      const page = await this.browser!.newPage();
-
-      // Intercepter les requêtes pour capturer les URLs .ctm
-      const ctmRequests: string[] = [];
-      await page.setRequestInterception(true);
-      page.on("request", (request) => {
-        const url = request.url();
-        if (url.includes(".ctm") || url.includes("holoviewer")) {
-          ctmRequests.push(url);
-          console.log("🔍 Request intercepted:", url.substring(0, 100));
-        }
-        request.continue();
-      });
-
-      await page.goto(url, { waitUntil: "networkidle2", timeout: 30000 });
-
-      // Attendre que les éléments de prix se chargent
-      try {
-        await page.waitForSelector(".a-priceUnit__amount", { timeout: 5000 });
-      } catch (e) {
-        console.log("⚠️  Price selector not found, continuing anyway...");
-      }
-
-      // Scroller la page pour déclencher le lazy loading du holoviewer
-      await page.evaluate(() => {
-        window.scrollTo(0, document.body.scrollHeight / 2);
-      });
-      await new Promise((r) => setTimeout(r, 2000));
-
-      await page.evaluate(() => {
-        window.scrollTo(0, document.body.scrollHeight);
-      });
-      await new Promise((r) => setTimeout(r, 5000)); // Attendre plus longtemps pour le chargement du holoviewer
-
-      const model3dData = await page.evaluate(() => {
-        const doc = typeof document !== "undefined" ? document : null;
-        if (!doc) return null;
-
-        // 1. Chercher dans window object (données React/Vue)
-        const win = window as any;
-        if (win.__INITIAL_STATE__ || win.__NEXT_DATA__ || win.__NUXT__) {
-          const state =
-            win.__INITIAL_STATE__ || win.__NEXT_DATA__ || win.__NUXT__;
-          const stateStr = JSON.stringify(state);
-          const ctmMatch = stateStr.match(/([^"']*\.ctm[^"']*)/);
-          if (ctmMatch) {
-            console.log("CTM found in window state:", ctmMatch[1]);
-            return {
-              viewerUrl: undefined,
-              modelUrl: ctmMatch[1],
-            };
-          }
-        }
-
-        // 2. Chercher les iframes holoviewer
-        const iframes = Array.from(doc.querySelectorAll("iframe"));
-        for (const iframe of iframes) {
-          const src = (iframe as HTMLIFrameElement).src;
-          if (src && src.includes("holoviewer")) {
-            const ctmMatch = src.match(/ctm=([^&]+)/);
-            const modelUrl = ctmMatch ? decodeURIComponent(ctmMatch[1]) : null;
-
-            console.log("Holoviewer iframe found:", src);
-            if (modelUrl) console.log("Model URL extracted:", modelUrl);
-
-            return {
-              viewerUrl: src,
-              modelUrl: modelUrl || undefined,
-            };
-          }
-        }
-
-        // 3. Chercher les divs avec data-attributes
-        const holoElements = doc.querySelectorAll(
-          '[class*="holo"], [id*="holo"], [data-model], [data-ctm]'
-        );
-        for (const elem of Array.from(holoElements)) {
-          const attrs = (elem as HTMLElement).dataset;
-          if (attrs.model || attrs.ctm || attrs.source) {
-            const modelUrl = attrs.model || attrs.ctm || attrs.source;
-            console.log("Model found in data-attribute:", modelUrl);
-            return {
-              viewerUrl: undefined,
-              modelUrl: modelUrl,
-            };
-          }
-        }
-
-        // 4. Chercher dans tous les scripts
-        const scripts = Array.from(doc.querySelectorAll("script"));
-        for (const script of scripts) {
-          const content = script.textContent || "";
-          if (content.includes(".ctm")) {
-            // Chercher les URLs .ctm avec différents patterns
-            const patterns = [
-              /"([^"]+\.ctm[^"]*)"/g,
-              /'([^']+\.ctm[^']*)'/g,
-              /https?:\/\/[^\s"']+\.ctm[^\s"']*/g,
-              /\/[^\s"']+\.ctm[^\s"']*/g,
-            ];
-
-            for (const pattern of patterns) {
-              const matches = content.match(pattern);
-              if (matches && matches.length > 0) {
-                const ctmUrl = matches[0].replace(/['"]/g, "");
-                console.log("CTM found in script:", ctmUrl);
-                return {
-                  viewerUrl: undefined,
-                  modelUrl: ctmUrl,
-                };
-              }
-            }
-          }
-        }
-
-        return null;
-      });
-
-      const html = await page.content();
-
-      // Utiliser les URLs capturées par l'interception si aucune n'a été trouvée
-      let finalModel3dData = model3dData;
-      if (!finalModel3dData && ctmRequests.length > 0) {
-        const ctmUrl = ctmRequests.find((r) => r.includes(".ctm"));
-        if (ctmUrl) {
-          console.log("🎯 CTM found via network interception:", ctmUrl);
-          finalModel3dData = {
-            viewerUrl: ctmRequests.find((r) => r.includes("holoviewer")),
-            modelUrl: ctmUrl,
-          };
-        }
-      }
-
-      await page.close();
-
-      const shipData = this.parseHtml(html, url);
-      if (finalModel3dData) {
-        shipData.model3d = finalModel3dData;
-        console.log(
-          `🎨 Model 3D detected: viewer=${
-            finalModel3dData.viewerUrl?.substring(0, 50) || "N/A"
-          }..., model=${finalModel3dData.modelUrl?.substring(0, 50)}...`
-        );
-      } else {
-        console.log("⚠️  No 3D model found on page");
-      }
-
-      // Log du prix pour debug
-      if (shipData.price) {
-        console.log(
-          `💰 Price detected: ${shipData.price.amount} ${shipData.price.currency}`
-        );
-      } else {
-        console.log("⚠️  No price found on page");
-      }
-
-      return { success: true, data: shipData };
-    } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      };
-    }
-  }
-
-  async scrapeAllShips(): Promise<string[]> {
-    try {
-      if (!this.browser) await this.init();
-      const page = await this.browser!.newPage();
-      const allUrls: string[] = [];
-
-      await page.goto("https://robertsspaceindustries.com/pledge/ships", {
-        waitUntil: "networkidle2",
-        timeout: 30000,
-      });
-
-      const totalPages = await page.evaluate(() => {
-        const doc = typeof document !== "undefined" ? document : null;
-        if (!doc) return 1;
-        const nums = Array.from(
-          doc.querySelectorAll(".orion-c-pagination__item button")
-        )
-          .map((b: any) => parseInt(b.textContent?.trim() || "0"))
-          .filter((n) => !isNaN(n) && n > 0);
-        return nums.length > 0 ? Math.max(...nums) : 1;
-      });
-
-      for (let p = 1; p <= totalPages; p++) {
-        if (p > 1)
-          await page.goto(
-            `https://robertsspaceindustries.com/pledge/ships?page=${p}`,
-            { waitUntil: "networkidle2", timeout: 30000 }
-          );
-        const urls = await page.$$eval('a[href*="/pledge/ships/"]', (links) =>
-          links
-            .map((l) => (l as any).href)
-            .filter((h) => /\/pledge\/ships\/[^/]+\/[^/]+$/.test(h))
-        );
-        allUrls.push(...urls);
-        if (p < totalPages) await new Promise((r) => setTimeout(r, 1000));
-      }
-
-      await page.close();
-      return [...new Set(allUrls)];
-    } catch (error) {
-      return [];
-    }
-  }
-
-  private parseHtml(html: string, url: string): ShipData {
-    const $ = cheerio.load(html);
-    const match = url.match(/\/ships\/([^\/]+)\/([^\/\?]+)/);
-    const manufacturerSlug = match?.[1] || "";
-    const slug = match?.[2] || "";
-
-    const specifications = this.extractSpecifications($);
-    const getSpecValue = (name: string) =>
-      specifications.find((s) =>
-        s.name.toLowerCase().includes(name.toLowerCase())
-      )?.value;
-
-    const uuid = crypto
-      .createHash("sha1")
-      .update("6ba7b810-9dad-11d1-80b4-00c04fd430c8" + url)
-      .digest("hex");
-    const id = `${uuid.substring(0, 8)}-${uuid.substring(
-      8,
-      12
-    )}-5${uuid.substring(13, 16)}-${uuid.substring(16, 20)}-${uuid.substring(
-      20,
-      32
-    )}`;
-
-    const manufMap: Record<string, string> = {
-      aegis: "Aegis Dynamics",
-      anvil: "Anvil Aerospace",
-      argo: "Argo Astronautics",
-      crusader: "Crusader Industries",
-      drake: "Drake Interplanetary",
-      origin: "Origin Jumpworks",
-      rsi: "Roberts Space Industries",
-      misc: "Musashi Industrial & Starflight Concern",
-    };
-
-    // Extraction du manufacturer
-    const manufacturerKey = manufacturerSlug.split("-")[0];
-    const manufacturer =
-      getSpecValue("manufacturer") ||
-      manufMap[manufacturerKey] ||
-      manufacturerKey;
-
-    // Nom complet du vaisseau
-    const fullName = $("h1").first().text().trim() || slug;
-
-    return {
-      id,
-      slug,
-      url,
-      name: fullName,
-      manufacturer: manufacturer.trim(),
-      description: this.extractDescription($),
-      price: this.extractPrice($),
-      specifications,
-      images: this.extractImages($),
-      model3d: undefined,
-      focus: getSpecValue("focus"),
-      productionStatus:
-        getSpecValue("production state") || getSpecValue("in-game status"),
-      size: getSpecValue("size"),
-      crew: {
-        min: this.parseNumber(getSpecValue("min crew")),
-        max: this.parseNumber(getSpecValue("max crew")),
-      },
-      scrapedAt: new Date(),
-    };
-  }
-
-  private parseNumber(value?: string): number | undefined {
-    if (!value) return undefined;
-    const num = parseFloat(value.replace(/[^\d.]/g, ""));
-    return isNaN(num) ? undefined : num;
-  }
-
-  private extractPrice($: cheerio.CheerioAPI): ShipPrice | undefined {
-    // Chercher le prix dans les différents sélecteurs possibles
-    const selectors = [
-      ".a-priceUnit__amount",
-      ".m-storeAction__priceNumber .a-priceUnit__amount",
-      '[data-cy-id="price_unit__value"]',
-      ".price",
-    ];
-
-    console.log("🔍 Attempting to extract price...");
-    for (const selector of selectors) {
-      const priceText = $(selector).first().text().trim();
-      console.log(`  Selector ${selector}: "${priceText}"`);
-      if (priceText) {
-        const match = priceText.match(/[\$€£]?\s*([\d,]+\.?\d*)/);
-        if (match) {
-          const result = {
-            amount: parseFloat(match[1].replace(/,/g, "")),
-            currency: priceText.includes("€")
-              ? "EUR"
-              : priceText.includes("£")
-              ? "GBP"
-              : "USD",
-          };
-          console.log(
-            `  ✅ Price extracted: ${result.amount} ${result.currency}`
-          );
-          return result;
-        }
-      }
-    }
-
-    console.log("  ❌ No price found");
-    return undefined;
-  }
-
-  private extractSpecifications($: cheerio.CheerioAPI): ShipSpecification[] {
-    const specifications: ShipSpecification[] = [];
-    const seenKeys = new Set<string>();
-
-    $(".a-shipContentSpecification").each((_, elem) => {
-      const label = $(elem)
-        .find(".a-shipContentSpecification__label .a-fontStyle")
-        .first()
-        .text()
-        .trim();
-      const value = $(elem)
-        .find(
-          ".a-shipContentSpecification__value .a-fontStyle, .a-shipContentSpecification__values .a-fontStyle"
-        )
-        .first()
-        .text()
-        .trim();
-      const key = `${label}:${value}`;
-      if (label && value && !seenKeys.has(key)) {
-        seenKeys.add(key);
-        specifications.push({ name: label, value });
-      }
-    });
-
-    return specifications;
-  }
-
-  private extractImages($: cheerio.CheerioAPI): ShipImage[] {
-    const images: ShipImage[] = [];
-    const seen = new Set<string>();
-
-    // Filtres pour exclure les images non pertinentes
-    const excludePatterns = [
-      "base64",
-      "placeholder",
-      "cookiebot",
-      "tracking",
-      "analytics",
-      "pixel",
-      "1x1",
-      "tracker",
-      "beacon",
-      ".gif",
-      "logo",
-      "icon",
-      "favicon",
-      "imgsct.cookiebot.com",
-      "empty-ship",
-    ];
-
-    $("img").each((_, elem) => {
-      const src = $(elem).attr("src") || $(elem).attr("data-src");
-      const alt = $(elem).attr("alt") || "";
-
-      if (!src || seen.has(src)) return;
-
-      // Construire l'URL complète
-      const url = src.startsWith("http")
-        ? src
-        : src.startsWith("//")
-        ? `https:${src}`
-        : `https://robertsspaceindustries.com${src}`;
-
-      // Vérifier les patterns à exclure sur l'URL complète
-      const srcLower = src.toLowerCase();
-      const urlLower = url.toLowerCase();
-      const altLower = alt.toLowerCase();
-      if (
-        excludePatterns.some(
-          (pattern) =>
-            srcLower.includes(pattern) ||
-            urlLower.includes(pattern) ||
-            altLower.includes(pattern)
-        )
-      )
-        return;
-
-      // Ignorer les images trop petites (probablement des trackers)
-      const width = parseInt($(elem).attr("width") || "0");
-      const height = parseInt($(elem).attr("height") || "0");
-      if ((width > 0 && width < 50) || (height > 0 && height < 50)) return;
-
-      seen.add(src);
-
-      const type =
-        src.includes("blueprint") || alt.toLowerCase().includes("blueprint")
-          ? "blueprint"
-          : src.includes("thumb") || alt.toLowerCase().includes("thumbnail")
-          ? "thumbnail"
-          : url.includes("/i/") || alt.toLowerCase().includes("gallery")
-          ? "gallery"
-          : src.includes("store") || alt.toLowerCase().includes("store")
-          ? "store"
-          : "screenshot";
-
-      images.push({ url, type, alt });
-    });
-
-    return images;
-  }
-
-  private extractDescription($: cheerio.CheerioAPI): string {
-    let desc = $(".description").first().text().trim();
-    if (!desc) desc = $('[class*="description"]').first().text().trim();
-    if (!desc) {
-      desc = $(".a-shipContentSpecification")
-        .filter(
-          (_, el) =>
-            $(el).find(".a-shipContentSpecification__label").text().trim() ===
-            "Description"
-        )
-        .find(".a-shipContentSpecification__value")
-        .text()
-        .trim();
-    }
-    return desc;
+async function closeDatabase(): Promise<void> {
+  if (dbPool) {
+    await dbPool.end();
+    dbPool = null;
   }
 }
 
 // ===== SERVICE =====
 class ShipService {
-  private scraper = new ShipScraper();
-  private cache = new Map<string, { data: ShipData; expiresAt: number }>();
-  private cacheDir = "./cache";
-  private cacheDuration = 3600000;
+  private shipMatrixProvider = new ShipMatrixProvider();
+  private graphqlProvider = new GraphQLProvider();
+  private memoryCache: Map<string, TransformedShip> = new Map();
+  private lastSync: Date | null = null;
 
-  async init() {
-    await fs.mkdir(this.cacheDir, { recursive: true }).catch(() => {});
-    await this.loadFromCache();
-    await this.scraper.init();
-    await initDatabase();
-  }
+  async syncFromShipMatrix(): Promise<{
+    total: number;
+    synced: number;
+    errors: number;
+  }> {
+    console.log("🔄 Syncing ships from Ship-Matrix API...");
 
-  async close() {
-    await this.scraper.close();
-    await closeDatabase();
-  }
-
-  private async loadFromCache() {
-    try {
-      const files = await fs.readdir(this.cacheDir);
-      for (const file of files.filter((f) => f.endsWith(".json"))) {
-        const data = JSON.parse(
-          await fs.readFile(path.join(this.cacheDir, file), "utf-8")
-        );
-        if (Date.now() <= data.expiresAt)
-          this.cache.set(file.replace(".json", ""), data);
-      }
-    } catch {}
-  }
-
-  private async saveToCache(cacheKey: string, data: ShipData) {
-    const entry = { data, expiresAt: Date.now() + this.cacheDuration };
-    await fs
-      .writeFile(
-        path.join(this.cacheDir, `${cacheKey}.json`),
-        JSON.stringify(entry, null, 2)
-      )
-      .catch(() => {});
-  }
-
-  private async saveToDatabase(data: ShipData) {
-    if (!dbPool) return;
+    const stats = { total: 0, synced: 0, errors: 0 };
 
     try {
-      const conn = await dbPool.getConnection();
+      const ships = await this.shipMatrixProvider.getAllShips();
+      stats.total = ships.length;
 
-      try {
-        await conn.beginTransaction();
+      for (const ship of ships) {
+        try {
+          const transformed = this.shipMatrixProvider.transformShipData(ship);
 
-        // Insert/Update ship
-        await conn.execute(
-          `INSERT INTO ships (
-            id, name, manufacturer, slug, url, description,
-            price_amount, price_currency, focus, production_status, size,
-            crew_min, crew_max, model3d_viewer_url, model3d_model_url, scraped_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON DUPLICATE KEY UPDATE
-            name=VALUES(name), manufacturer=VALUES(manufacturer),
-            description=VALUES(description), price_amount=VALUES(price_amount),
-            price_currency=VALUES(price_currency), focus=VALUES(focus),
-            production_status=VALUES(production_status), size=VALUES(size),
-            crew_min=VALUES(crew_min), crew_max=VALUES(crew_max),
-            model3d_viewer_url=VALUES(model3d_viewer_url),
-            model3d_model_url=VALUES(model3d_model_url),
-            scraped_at=VALUES(scraped_at)`,
-          [
-            data.id,
-            data.name,
-            data.manufacturer,
-            data.slug,
-            data.url,
-            data.description || null,
-            data.price?.amount || null,
-            data.price?.currency || null,
-            data.focus || null,
-            data.productionStatus || null,
-            data.size || null,
-            data.crew?.min || null,
-            data.crew?.max || null,
-            data.model3d?.viewerUrl || null,
-            data.model3d?.modelUrl || null,
-            data.scrapedAt,
-          ]
-        );
+          // Save to memory cache
+          this.memoryCache.set(transformed.id, transformed);
 
-        // Delete old specifications and images
-        await conn.execute(
-          "DELETE FROM ship_specifications WHERE ship_id = ?",
-          [data.id]
-        );
-        await conn.execute("DELETE FROM ship_images WHERE ship_id = ?", [
-          data.id,
-        ]);
+          // Save to database if available
+          if (dbPool) {
+            await this.saveToDatabase(transformed, ship);
+          }
 
-        // Insert specifications
-        for (const spec of data.specifications) {
-          await conn.execute(
-            "INSERT INTO ship_specifications (ship_id, name, value) VALUES (?, ?, ?)",
-            [data.id, spec.name, spec.value]
+          stats.synced++;
+        } catch (error) {
+          console.error(
+            `❌ Error processing ${ship.name}:`,
+            error instanceof Error ? error.message : error
           );
+          stats.errors++;
         }
-
-        // Insert images
-        for (const img of data.images) {
-          await conn.execute(
-            "INSERT INTO ship_images (ship_id, url, type, alt) VALUES (?, ?, ?, ?)",
-            [data.id, img.url, img.type, img.alt]
-          );
-        }
-
-        await conn.commit();
-        console.log(`💾 Saved to database: ${data.name}`);
-      } catch (error) {
-        await conn.rollback();
-        throw error;
-      } finally {
-        conn.release();
       }
+
+      this.lastSync = new Date();
+      console.log(
+        `✅ Sync complete: ${stats.synced}/${stats.total} ships (${stats.errors} errors)`
+      );
     } catch (error) {
       console.error(
-        "Database save error:",
+        "❌ Sync failed:",
         error instanceof Error ? error.message : error
       );
+      throw error;
     }
+
+    return stats;
+  }
+
+  private async saveToDatabase(
+    ship: TransformedShip,
+    rawData: any
+  ): Promise<void> {
+    if (!dbPool) return;
+
+    const conn = await dbPool.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      // Insert/Update ship
+      await conn.execute(
+        `
+        INSERT INTO ships (
+          id, name, manufacturer, slug, url, description, focus,
+          production_status, size, type, crew_min, crew_max,
+          mass_kg, cargo_capacity, length_m, beam_m, height_m,
+          scm_speed, afterburner_speed, pitch_max, yaw_max, roll_max,
+          x_axis_acceleration, y_axis_acceleration, z_axis_acceleration,
+          pledge_url, media_store_thumb, media_store_banner, data_source, synced_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ship-matrix', NOW())
+        ON DUPLICATE KEY UPDATE
+          name=VALUES(name), manufacturer=VALUES(manufacturer), slug=VALUES(slug),
+          url=VALUES(url), description=VALUES(description), focus=VALUES(focus),
+          production_status=VALUES(production_status), size=VALUES(size), type=VALUES(type),
+          crew_min=VALUES(crew_min), crew_max=VALUES(crew_max), mass_kg=VALUES(mass_kg),
+          cargo_capacity=VALUES(cargo_capacity), length_m=VALUES(length_m),
+          beam_m=VALUES(beam_m), height_m=VALUES(height_m), scm_speed=VALUES(scm_speed),
+          afterburner_speed=VALUES(afterburner_speed), pitch_max=VALUES(pitch_max),
+          yaw_max=VALUES(yaw_max), roll_max=VALUES(roll_max),
+          x_axis_acceleration=VALUES(x_axis_acceleration),
+          y_axis_acceleration=VALUES(y_axis_acceleration),
+          z_axis_acceleration=VALUES(z_axis_acceleration),
+          pledge_url=VALUES(pledge_url), media_store_thumb=VALUES(media_store_thumb),
+          media_store_banner=VALUES(media_store_banner), synced_at=NOW()
+      `,
+        [
+          ship.id,
+          ship.name,
+          ship.manufacturer,
+          ship.slug,
+          ship.url,
+          ship.description,
+          ship.focus,
+          ship.productionStatus,
+          ship.size,
+          ship.type,
+          ship.crew?.min,
+          ship.crew?.max,
+          ship.mass,
+          ship.cargocapacity,
+          ship.length,
+          ship.beam,
+          ship.height,
+          ship.scmSpeed,
+          ship.afterburnerSpeed,
+          ship.pitchMax,
+          ship.yawMax,
+          ship.rollMax,
+          ship.xAxisAcceleration,
+          ship.yAxisAcceleration,
+          ship.zAxisAcceleration,
+          ship.pledgeUrl,
+          ship.media?.storeThumb,
+          ship.media?.storeBanner,
+        ]
+      );
+
+      // Delete old components
+      await conn.execute("DELETE FROM ship_components WHERE ship_id = ?", [
+        ship.id,
+      ]);
+
+      // Insert components from raw data
+      if (rawData.compiled) {
+        for (const [category, types] of Object.entries(rawData.compiled)) {
+          if (typeof types === "object" && types !== null) {
+            for (const [type, components] of Object.entries(types as object)) {
+              if (Array.isArray(components)) {
+                for (const comp of components) {
+                  await conn.execute(
+                    `
+                    INSERT INTO ship_components (ship_id, category, type, name, mounts, component_size, details, quantity, manufacturer)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  `,
+                    [
+                      ship.id,
+                      category,
+                      type,
+                      comp.name || null,
+                      comp.mounts || null,
+                      comp.component_size || comp.size || null,
+                      comp.details || null,
+                      comp.quantity || 1,
+                      comp.manufacturer || null,
+                    ]
+                  );
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Delete old media
+      await conn.execute("DELETE FROM ship_media WHERE ship_id = ?", [ship.id]);
+
+      // Insert media
+      if (rawData.media && Array.isArray(rawData.media)) {
+        for (const media of rawData.media) {
+          await conn.execute(
+            `
+            INSERT INTO ship_media (ship_id, source_name, source_url, derived_data)
+            VALUES (?, ?, ?, ?)
+          `,
+            [
+              ship.id,
+              media.source_name || null,
+              media.source_url || null,
+              media.derived_data ? JSON.stringify(media.derived_data) : null,
+            ]
+          );
+        }
+      }
+
+      await conn.commit();
+    } catch (error) {
+      await conn.rollback();
+      throw error;
+    } finally {
+      conn.release();
+    }
+  }
+
+  async getAllShips(): Promise<TransformedShip[]> {
+    // Try database first
+    if (dbPool) {
+      try {
+        const [rows] = (await dbPool.execute(`
+          SELECT * FROM ships ORDER BY manufacturer, name
+        `)) as any;
+
+        return rows.map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          manufacturer: row.manufacturer,
+          slug: row.slug,
+          url: row.url,
+          description: row.description,
+          focus: row.focus,
+          productionStatus: row.production_status,
+          size: row.size,
+          type: row.type,
+          crew: { min: row.crew_min, max: row.crew_max },
+          mass: row.mass_kg,
+          cargocapacity: row.cargo_capacity,
+          length: parseFloat(row.length_m),
+          beam: parseFloat(row.beam_m),
+          height: parseFloat(row.height_m),
+          scmSpeed: row.scm_speed,
+          afterburnerSpeed: row.afterburner_speed,
+          pitchMax: parseFloat(row.pitch_max),
+          yawMax: parseFloat(row.yaw_max),
+          rollMax: parseFloat(row.roll_max),
+          xAxisAcceleration: parseFloat(row.x_axis_acceleration),
+          yAxisAcceleration: parseFloat(row.y_axis_acceleration),
+          zAxisAcceleration: parseFloat(row.z_axis_acceleration),
+          pledgeUrl: row.pledge_url,
+          media: {
+            storeThumb: row.media_store_thumb,
+            storeBanner: row.media_store_banner,
+          },
+          syncedAt: row.synced_at,
+        }));
+      } catch (error) {
+        console.error("Database read error:", error);
+      }
+    }
+
+    // Fallback to memory cache
+    return Array.from(this.memoryCache.values());
+  }
+
+  async getShipById(id: string): Promise<TransformedShip | null> {
+    if (dbPool) {
+      try {
+        const [rows] = (await dbPool.execute(
+          "SELECT * FROM ships WHERE id = ?",
+          [id]
+        )) as any;
+
+        if (rows.length > 0) {
+          const row = rows[0];
+
+          // Get components
+          const [components] = (await dbPool.execute(
+            "SELECT * FROM ship_components WHERE ship_id = ?",
+            [id]
+          )) as any;
+
+          // Get media
+          const [media] = (await dbPool.execute(
+            "SELECT * FROM ship_media WHERE ship_id = ?",
+            [id]
+          )) as any;
+
+          return {
+            id: row.id,
+            name: row.name,
+            manufacturer: row.manufacturer,
+            slug: row.slug,
+            url: row.url,
+            description: row.description,
+            focus: row.focus,
+            productionStatus: row.production_status,
+            size: row.size,
+            type: row.type,
+            crew: { min: row.crew_min, max: row.crew_max },
+            mass: row.mass_kg,
+            cargocapacity: row.cargo_capacity,
+            length: parseFloat(row.length_m),
+            beam: parseFloat(row.beam_m),
+            height: parseFloat(row.height_m),
+            scmSpeed: row.scm_speed,
+            afterburnerSpeed: row.afterburner_speed,
+            pitchMax: parseFloat(row.pitch_max),
+            yawMax: parseFloat(row.yaw_max),
+            rollMax: parseFloat(row.roll_max),
+            xAxisAcceleration: parseFloat(row.x_axis_acceleration),
+            yAxisAcceleration: parseFloat(row.y_axis_acceleration),
+            zAxisAcceleration: parseFloat(row.z_axis_acceleration),
+            model3d: {
+              ctmUrl: row.model3d_ctm_url,
+              angularUrl: row.model3d_angular_url,
+            },
+            priceUSD: parseFloat(row.price_usd),
+            pledgeUrl: row.pledge_url,
+            media: {
+              storeThumb: row.media_store_thumb,
+              storeBanner: row.media_store_banner,
+            },
+            components: components.map((c: any) => ({
+              category: c.category,
+              type: c.type,
+              name: c.name,
+              mounts: c.mounts,
+              size: c.component_size,
+              details: c.details,
+              quantity: c.quantity,
+              manufacturer: c.manufacturer,
+            })),
+            mediaGallery: media.map((m: any) => ({
+              sourceName: m.source_name,
+              sourceUrl: m.source_url,
+              derivedData:
+                typeof m.derived_data === "string"
+                  ? JSON.parse(m.derived_data)
+                  : m.derived_data,
+            })),
+            syncedAt: row.synced_at,
+          };
+        }
+      } catch (error) {
+        console.error("Database read error:", error);
+      }
+    }
+
+    return this.memoryCache.get(id) || null;
   }
 
   async getShipBySlug(
-    manufacturer: string,
-    slug: string,
-    forceRefresh = false
-  ): Promise<ScrapeResult> {
-    const cacheKey = `${manufacturer}-${slug}`;
+    manufacturerSlug: string,
+    shipSlug: string
+  ): Promise<TransformedShip | null> {
+    if (dbPool) {
+      try {
+        const [rows] = (await dbPool.execute(
+          "SELECT * FROM ships WHERE slug = ?",
+          [shipSlug]
+        )) as any;
 
-    // Check memory cache first
-    if (!forceRefresh) {
-      const cached = this.cache.get(cacheKey);
-      if (cached && Date.now() <= cached.expiresAt)
-        return { success: true, data: cached.data };
-
-      // Check database if not in memory cache
-      const dbData = await this.getFromDatabase(cacheKey);
-      if (dbData) {
-        this.cache.set(cacheKey, {
-          data: dbData,
-          expiresAt: Date.now() + this.cacheDuration,
-        });
-        return { success: true, data: dbData };
+        if (rows.length > 0) {
+          return this.getShipById(rows[0].id);
+        }
+      } catch (error) {
+        console.error("Database read error:", error);
       }
     }
 
-    const url = `https://robertsspaceindustries.com/en/pledge/ships/${manufacturer}/${slug}`;
-    const result = await this.scraper.scrapeShip(url);
-
-    if (result.success && result.data) {
-      this.cache.set(cacheKey, {
-        data: result.data,
-        expiresAt: Date.now() + this.cacheDuration,
-      });
-      await this.saveToCache(cacheKey, result.data);
-      await this.saveToDatabase(result.data);
+    // Search in memory cache
+    for (const ship of this.memoryCache.values()) {
+      if (ship.slug === shipSlug) {
+        return ship;
+      }
     }
 
-    return result;
+    return null;
   }
 
-  private async getFromDatabase(cacheKey: string): Promise<ShipData | null> {
-    if (!dbPool) return null;
+  async enrichWithGraphQL(shipId: string): Promise<TransformedShip | null> {
+    const ship = await this.getShipById(shipId);
+    if (!ship) return null;
 
     try {
-      // Extract manufacturer and slug from cache key (format: "manufacturer-slug")
-      const parts = cacheKey.split("-");
-      if (parts.length < 2) return null;
+      // Get GraphQL data for CTM and price
+      const graphqlData = await this.graphqlProvider.getShipBySlug(ship.slug);
 
-      // Le slug peut contenir des tirets, donc on prend le premier élément comme manufacturer
-      // et le reste comme slug
-      const manufacturerSlug = parts[0];
-      const slug = parts.slice(1).join("-");
+      if (graphqlData && dbPool) {
+        // Update with CTM and price
+        await dbPool.execute(
+          `
+          UPDATE ships SET
+            model3d_ctm_url = ?,
+            model3d_angular_url = ?,
+            price_usd = ?
+          WHERE id = ?
+        `,
+          [
+            graphqlData.ctm?.url || null,
+            graphqlData.ctm?.angularUrl || null,
+            graphqlData.price?.amount || null,
+            shipId,
+          ]
+        );
 
-      const [rows] = (await dbPool.execute(
-        "SELECT * FROM ships WHERE slug = ? ORDER BY scraped_at DESC LIMIT 1",
-        [slug]
-      )) as any;
+        // Update memory cache
+        if (this.memoryCache.has(shipId)) {
+          const cached = this.memoryCache.get(shipId)!;
+          cached.model3d = {
+            ctmUrl: graphqlData.ctm?.url,
+            angularUrl: graphqlData.ctm?.angularUrl,
+          };
+          cached.priceUSD = graphqlData.price?.amount;
+        }
 
-      if (rows.length === 0) return null;
-
-      const ship = rows[0];
-
-      // Get specifications
-      const [specs] = (await dbPool.execute(
-        "SELECT name, value FROM ship_specifications WHERE ship_id = ?",
-        [ship.id]
-      )) as any;
-
-      // Get images
-      const [images] = (await dbPool.execute(
-        "SELECT url, type, alt FROM ship_images WHERE ship_id = ?",
-        [ship.id]
-      )) as any;
-
-      return {
-        id: ship.id,
-        name: ship.name,
-        manufacturer: ship.manufacturer,
-        slug: ship.slug,
-        url: ship.url,
-        description: ship.description,
-        price: ship.price_amount
-          ? {
-              amount: ship.price_amount,
-              currency: ship.price_currency,
-            }
-          : undefined,
-        specifications: specs,
-        images: images,
-        model3d: ship.model3d_viewer_url
-          ? {
-              viewerUrl: ship.model3d_viewer_url,
-              modelUrl: ship.model3d_model_url,
-            }
-          : undefined,
-        focus: ship.focus,
-        productionStatus: ship.production_status,
-        size: ship.size,
-        crew: {
-          min: ship.crew_min,
-          max: ship.crew_max,
-        },
-        scrapedAt: new Date(ship.scraped_at),
-      };
+        return this.getShipById(shipId);
+      }
     } catch (error) {
-      console.error(
-        "Database read error:",
-        error instanceof Error ? error.message : error
-      );
-      return null;
+      console.error(`Failed to enrich ship ${shipId} with GraphQL:`, error);
     }
+
+    return ship;
   }
 
-  async getAllShips(): Promise<ShipData[]> {
-    if (!dbPool) return this.getAllCachedShips();
+  async searchShips(query: string): Promise<TransformedShip[]> {
+    if (dbPool) {
+      try {
+        const searchTerm = `%${query}%`;
+        const [rows] = (await dbPool.execute(
+          `
+          SELECT * FROM ships 
+          WHERE name LIKE ? OR manufacturer LIKE ? OR description LIKE ?
+          ORDER BY manufacturer, name
+        `,
+          [searchTerm, searchTerm, searchTerm]
+        )) as any;
 
-    try {
-      const [rows] = (await dbPool.execute(
-        "SELECT id, name, manufacturer, slug, url, size, production_status FROM ships ORDER BY manufacturer, name"
-      )) as any;
-
-      return rows.map((ship: any) => ({
-        id: ship.id,
-        name: ship.name,
-        manufacturer: ship.manufacturer,
-        slug: ship.slug,
-        url: ship.url,
-        size: ship.size,
-        productionStatus: ship.production_status,
-        specifications: [],
-        images: [],
-        scrapedAt: new Date(),
-      }));
-    } catch (error) {
-      console.error(
-        "Database list error:",
-        error instanceof Error ? error.message : error
-      );
-      return this.getAllCachedShips();
+        return rows.map((row: any) => ({
+          id: row.id,
+          name: row.name,
+          manufacturer: row.manufacturer,
+          slug: row.slug,
+          size: row.size,
+          type: row.type,
+          productionStatus: row.production_status,
+          media: {
+            storeThumb: row.media_store_thumb,
+          },
+        }));
+      } catch (error) {
+        console.error("Search error:", error);
+      }
     }
+
+    // Fallback to memory search
+    const lowerQuery = query.toLowerCase();
+    return Array.from(this.memoryCache.values()).filter(
+      (ship) =>
+        ship.name.toLowerCase().includes(lowerQuery) ||
+        ship.manufacturer?.toLowerCase().includes(lowerQuery)
+    );
   }
 
-  async getShipByUrl(url: string, forceRefresh = false): Promise<ScrapeResult> {
-    const match = url.match(/\/ships\/([^\/]+)\/([^\/\?]+)/);
-    if (!match) return { success: false, error: "Invalid URL format" };
-    return this.getShipBySlug(match[1], match[2], forceRefresh);
+  async getStats(): Promise<{
+    totalShips: number;
+    byManufacturer: Record<string, number>;
+    bySize: Record<string, number>;
+    byStatus: Record<string, number>;
+    lastSync: Date | null;
+  }> {
+    const stats = {
+      totalShips: 0,
+      byManufacturer: {} as Record<string, number>,
+      bySize: {} as Record<string, number>,
+      byStatus: {} as Record<string, number>,
+      lastSync: this.lastSync,
+    };
+
+    if (dbPool) {
+      try {
+        const [total] = (await dbPool.execute(
+          "SELECT COUNT(*) as count FROM ships"
+        )) as any;
+        stats.totalShips = total[0].count;
+
+        const [byManu] = (await dbPool.execute(
+          "SELECT manufacturer, COUNT(*) as count FROM ships GROUP BY manufacturer"
+        )) as any;
+        for (const row of byManu) {
+          stats.byManufacturer[row.manufacturer || "Unknown"] = row.count;
+        }
+
+        const [bySize] = (await dbPool.execute(
+          "SELECT size, COUNT(*) as count FROM ships GROUP BY size"
+        )) as any;
+        for (const row of bySize) {
+          stats.bySize[row.size || "Unknown"] = row.count;
+        }
+
+        const [byStatus] = (await dbPool.execute(
+          "SELECT production_status, COUNT(*) as count FROM ships GROUP BY production_status"
+        )) as any;
+        for (const row of byStatus) {
+          stats.byStatus[row.production_status || "Unknown"] = row.count;
+        }
+      } catch (error) {
+        console.error("Stats error:", error);
+      }
+    }
+
+    return stats;
   }
 
-  async getAllCachedShips(): Promise<ShipData[]> {
-    return Array.from(this.cache.values())
-      .filter((e) => Date.now() <= e.expiresAt)
-      .map((e) => e.data);
-  }
-
-  async clearCache() {
-    this.cache.clear();
-    try {
-      const files = await fs.readdir(this.cacheDir);
-      await Promise.all(
-        files.map((f) => fs.unlink(path.join(this.cacheDir, f)))
-      );
-    } catch {}
-  }
-
-  async deleteCachedShip(manufacturer: string, slug: string) {
-    const cacheKey = `${manufacturer}-${slug}`;
-    this.cache.delete(cacheKey);
-    await fs
-      .unlink(path.join(this.cacheDir, `${cacheKey}.json`))
-      .catch(() => {});
+  getGraphQLFilters() {
+    return GRAPHQL_FILTER_OPTIONS;
   }
 }
 
@@ -894,31 +627,21 @@ const swaggerOptions = {
     openapi: "3.0.0",
     info: {
       title: "Star Citizen Ships API",
-      version: "1.0.0",
+      version: "2.0.0",
       description:
-        "API REST pour récupérer les données des vaisseaux Star Citizen",
-      contact: {
-        name: "API Support",
-      },
+        "API REST pour les données des vaisseaux Star Citizen (via Ship-Matrix API)",
+      contact: { name: "API Support" },
     },
     servers: [
-      {
-        url: "http://localhost:3000",
-        description: "Development server",
-      },
+      { url: `http://localhost:${port}`, description: "Development server" },
     ],
     tags: [
-      {
-        name: "Ships",
-        description: "Operations sur les vaisseaux",
-      },
-      {
-        name: "System",
-        description: "Operations système",
-      },
+      { name: "Ships", description: "Opérations sur les vaisseaux" },
+      { name: "System", description: "Opérations système" },
+      { name: "Admin", description: "Administration" },
     ],
   },
-  apis: ["./server.ts"],
+  apis: ["./server-new.ts"],
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
@@ -936,6 +659,7 @@ app.get("/api-docs.json", (req, res) => {
   res.setHeader("Content-Type", "application/json");
   res.send(swaggerSpec);
 });
+
 /**
  * @swagger
  * /:
@@ -949,13 +673,17 @@ app.get("/api-docs.json", (req, res) => {
 app.get("/", (req, res) =>
   res.json({
     name: "Starapi",
-    version: "1.0.0",
+    version: "2.0.0",
+    description: "Star Citizen Ships API - Powered by Ship-Matrix",
     documentation: "/api-docs",
     endpoints: {
       "GET /api/ships": "Liste tous les vaisseaux",
-      "GET /api/ships/:manufacturer/:slug": "Récupère un vaisseau",
-      "POST /api/ships/scrape": "Scrappe depuis URL",
-      "DELETE /api/ships/cache": "Vide le cache",
+      "GET /api/ships/:id": "Récupère un vaisseau par ID",
+      "GET /api/ships/search?q=": "Recherche de vaisseaux",
+      "GET /api/ships/stats": "Statistiques des vaisseaux",
+      "GET /api/ships/filters": "Options de filtrage GraphQL",
+      "POST /api/ships/:id/enrich": "Enrichit avec données GraphQL (CTM, prix)",
+      "POST /admin/sync": "Synchronise depuis Ship-Matrix",
     },
   })
 );
@@ -969,20 +697,13 @@ app.get("/", (req, res) =>
  *     responses:
  *       200:
  *         description: Status de l'API
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 status:
- *                   type: string
- *                   example: ok
- *                 uptime:
- *                   type: number
- *                   example: 123.45
  */
 app.get("/health", (req, res) =>
-  res.json({ status: "ok", uptime: process.uptime() })
+  res.json({
+    status: "ok",
+    uptime: process.uptime(),
+    database: dbPool ? "connected" : "disconnected",
+  })
 );
 
 /**
@@ -991,41 +712,172 @@ app.get("/health", (req, res) =>
  *   get:
  *     summary: Liste tous les vaisseaux
  *     tags: [Ships]
+ *     parameters:
+ *       - in: query
+ *         name: manufacturer
+ *         schema:
+ *           type: string
+ *         description: Filtrer par fabricant
+ *       - in: query
+ *         name: size
+ *         schema:
+ *           type: string
+ *         description: Filtrer par taille
+ *       - in: query
+ *         name: status
+ *         schema:
+ *           type: string
+ *         description: Filtrer par statut de production
  *     responses:
  *       200:
  *         description: Liste des vaisseaux
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 count:
- *                   type: number
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: string
- *                       name:
- *                         type: string
- *                       manufacturer:
- *                         type: string
- *                       size:
- *                         type: string
  */
 app.get("/api/ships", async (req, res) => {
   try {
-    const ships = await service.getAllShips();
+    let ships = await service.getAllShips();
+
+    // Apply filters
+    const { manufacturer, size, status, type } = req.query;
+    if (manufacturer)
+      ships = ships.filter((s) =>
+        s.manufacturer
+          ?.toLowerCase()
+          .includes((manufacturer as string).toLowerCase())
+      );
+    if (size)
+      ships = ships.filter(
+        (s) => s.size?.toLowerCase() === (size as string).toLowerCase()
+      );
+    if (status)
+      ships = ships.filter(
+        (s) =>
+          s.productionStatus?.toLowerCase() === (status as string).toLowerCase()
+      );
+    if (type)
+      ships = ships.filter(
+        (s) => s.type?.toLowerCase() === (type as string).toLowerCase()
+      );
+
     res.json({ success: true, count: ships.length, data: ships });
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : "Error",
-    });
+    res
+      .status(500)
+      .json({
+        success: false,
+        error: error instanceof Error ? error.message : "Error",
+      });
+  }
+});
+
+/**
+ * @swagger
+ * /api/ships/search:
+ *   get:
+ *     summary: Recherche de vaisseaux
+ *     tags: [Ships]
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Terme de recherche
+ *     responses:
+ *       200:
+ *         description: Résultats de recherche
+ */
+app.get("/api/ships/search", async (req, res) => {
+  try {
+    const query = req.query.q as string;
+    if (!query)
+      return res
+        .status(400)
+        .json({ success: false, error: "Query parameter 'q' required" });
+
+    const ships = await service.searchShips(query);
+    res.json({ success: true, count: ships.length, data: ships });
+  } catch (error) {
+    res
+      .status(500)
+      .json({
+        success: false,
+        error: error instanceof Error ? error.message : "Error",
+      });
+  }
+});
+
+/**
+ * @swagger
+ * /api/ships/stats:
+ *   get:
+ *     summary: Statistiques des vaisseaux
+ *     tags: [Ships]
+ *     responses:
+ *       200:
+ *         description: Statistiques
+ */
+app.get("/api/ships/stats", async (req, res) => {
+  try {
+    const stats = await service.getStats();
+    res.json({ success: true, data: stats });
+  } catch (error) {
+    res
+      .status(500)
+      .json({
+        success: false,
+        error: error instanceof Error ? error.message : "Error",
+      });
+  }
+});
+
+/**
+ * @swagger
+ * /api/ships/filters:
+ *   get:
+ *     summary: Options de filtrage disponibles (GraphQL)
+ *     tags: [Ships]
+ *     responses:
+ *       200:
+ *         description: Options de filtrage
+ */
+app.get("/api/ships/filters", (req, res) => {
+  res.json({ success: true, data: service.getGraphQLFilters() });
+});
+
+/**
+ * @swagger
+ * /api/ships/{id}:
+ *   get:
+ *     summary: Récupère un vaisseau par ID
+ *     tags: [Ships]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID du vaisseau
+ *     responses:
+ *       200:
+ *         description: Détails du vaisseau
+ *       404:
+ *         description: Vaisseau non trouvé
+ */
+app.get("/api/ships/:id", async (req, res) => {
+  try {
+    const ship = await service.getShipById(req.params.id);
+    if (ship) {
+      res.json({ success: true, data: ship });
+    } else {
+      res.status(404).json({ success: false, error: "Ship not found" });
+    }
+  } catch (error) {
+    res
+      .status(500)
+      .json({
+        success: false,
+        error: error instanceof Error ? error.message : "Error",
+      });
   }
 });
 
@@ -1041,180 +893,134 @@ app.get("/api/ships", async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
- *         description: Nom du manufacturer
  *       - in: path
  *         name: slug
  *         required: true
  *         schema:
  *           type: string
- *         description: Slug du vaisseau
- *       - in: query
- *         name: refresh
- *         schema:
- *           type: string
- *           enum: ["true", "false"]
- *         description: Force le rafraîchissement depuis le site
  *     responses:
  *       200:
  *         description: Détails du vaisseau
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: object
  *       404:
  *         description: Vaisseau non trouvé
  */
 app.get("/api/ships/:manufacturer/:slug", async (req, res) => {
   try {
-    const { manufacturer, slug } = req.params;
-    const result = await service.getShipBySlug(
-      manufacturer,
-      slug,
-      req.query.refresh === "true"
+    const ship = await service.getShipBySlug(
+      req.params.manufacturer,
+      req.params.slug
     );
-    if (result.success) {
-      res.json({ success: true, data: result.data });
+    if (ship) {
+      res.json({ success: true, data: ship });
     } else {
-      res
-        .status(404)
-        .json({ success: false, error: result.error || "Not found" });
+      res.status(404).json({ success: false, error: "Ship not found" });
     }
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : "Error",
-    });
+    res
+      .status(500)
+      .json({
+        success: false,
+        error: error instanceof Error ? error.message : "Error",
+      });
   }
 });
 
 /**
  * @swagger
- * /api/ships/scrape:
+ * /api/ships/{id}/enrich:
  *   post:
- *     summary: Scrappe un vaisseau depuis une URL
+ *     summary: Enrichit un vaisseau avec données GraphQL (CTM, prix)
  *     tags: [Ships]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - url
- *             properties:
- *               url:
- *                 type: string
- *                 description: URL du vaisseau sur robertsspaceindustries.com
- *                 example: https://robertsspaceindustries.com/pledge/ships/anvil-arrow/Arrow
- *               forceRefresh:
- *                 type: boolean
- *                 description: Force le scraping même si le cache existe
- *                 default: false
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
- *         description: Scraping réussi
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 data:
- *                   type: object
- *       400:
- *         description: Erreur de validation ou de scraping
+ *         description: Vaisseau enrichi
+ *       404:
+ *         description: Vaisseau non trouvé
  */
-app.post("/api/ships/scrape", async (req, res) => {
+app.post("/api/ships/:id/enrich", async (req, res) => {
   try {
-    const { url, forceRefresh } = req.body;
-    if (!url)
-      return res.status(400).json({ success: false, error: "URL required" });
-
-    const result = await service.getShipByUrl(url, forceRefresh);
-    if (result.success) {
-      res.json({ success: true, data: result.data });
+    const ship = await service.enrichWithGraphQL(req.params.id);
+    if (ship) {
+      res.json({ success: true, data: ship });
     } else {
-      res
-        .status(400)
-        .json({ success: false, error: result.error || "Scraping failed" });
+      res.status(404).json({ success: false, error: "Ship not found" });
     }
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : "Error",
-    });
+    res
+      .status(500)
+      .json({
+        success: false,
+        error: error instanceof Error ? error.message : "Error",
+      });
   }
 });
 
 /**
  * @swagger
- * /api/ships/cache:
- *   delete:
- *     summary: Vide le cache des vaisseaux
- *     tags: [Ships]
+ * /admin/sync:
+ *   post:
+ *     summary: Synchronise les données depuis Ship-Matrix API
+ *     tags: [Admin]
  *     responses:
  *       200:
- *         description: Cache vidé avec succès
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: Cache cleared
- *       500:
- *         description: Erreur serveur
+ *         description: Synchronisation terminée
  */
-app.delete("/api/ships/cache", async (req, res) => {
+app.post("/admin/sync", async (req, res) => {
   try {
-    await service.clearCache();
-    res.json({ success: true, message: "Cache cleared" });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      error: error instanceof Error ? error.message : "Error",
+    const stats = await service.syncFromShipMatrix();
+    res.json({
+      success: true,
+      message: `Synchronized ${stats.synced} ships`,
+      data: stats,
     });
+  } catch (error) {
+    res
+      .status(500)
+      .json({
+        success: false,
+        error: error instanceof Error ? error.message : "Error",
+      });
   }
 });
 
-// ===== CLI MODE =====
-const args = process.argv.slice(2);
-if (args[0] === "scrape") {
-  const scrapeUrl =
-    args[1] ||
-    "https://robertsspaceindustries.com/pledge/ships/anvil-arrow/Arrow";
-  console.log("🔄 Mode scraping - URL:", scrapeUrl);
+// ===== STARTUP =====
+async function start() {
+  await initDatabase();
 
-  (async () => {
-    await service.init();
-    const result = await service.getShipByUrl(scrapeUrl, true);
-    console.log(
-      result.success ? "✅ Scraping réussi" : "❌ Échec:",
-      result.error || ""
-    );
-    if (result.success && result.data) {
-      console.log("📦 Vaisseau:", result.data.name);
-      console.log("🏭 Manufacturer:", result.data.manufacturer);
-      if (result.data.model3d?.modelUrl)
-        console.log("🎮 Modèle 3D:", result.data.model3d.modelUrl);
+  // Initial sync if database is empty
+  if (dbPool) {
+    try {
+      const [rows] = (await dbPool.execute(
+        "SELECT COUNT(*) as count FROM ships"
+      )) as any;
+      if (rows[0].count === 0) {
+        console.log("📥 Database empty, performing initial sync...");
+        await service.syncFromShipMatrix();
+      } else {
+        console.log(`📊 Database has ${rows[0].count} ships`);
+      }
+    } catch (error) {
+      console.error("Startup check error:", error);
     }
-    await service.close();
-    process.exit(result.success ? 0 : 1);
-  })();
-} else {
-  // Server mode
-  app.listen(port, async () => {
-    await service.init();
-    console.log(`🚀 Server running on http://localhost:${port}`);
+  }
+
+  app.listen(port, () => {
+    console.log(`🚀 Starapi v2.0 running on http://localhost:${port}`);
+    console.log(`📚 Documentation: http://localhost:${port}/api-docs`);
   });
 }
+
+// Graceful shutdown
+process.on("SIGINT", async () => {
+  console.log("\n🛑 Shutting down...");
+  await closeDatabase();
+  process.exit(0);
+});
+
+start();

@@ -2,219 +2,141 @@
 
 **Auteur** : ampynjord pour la Dawnstar
 
-API REST pour récupérer les informations des vaisseaux Star Citizen depuis le site officiel RSI.
+API REST pour les vaisseaux Star Citizen — données synchronisées depuis l'API officielle RSI.
 
 ## 🎯 Fonctionnalités
 
-- **Scraping automatique** des pages RSI avec Puppeteer
-- **Cache intelligent** des données (fichiers JSON)
-- **Base de données MySQL** pour stockage persistant
-- **Images** : galeries et spécifications techniques
-- **Prix** en USD (extraction dynamique)
-- **API REST** documentée avec Swagger UI
+- **245 vaisseaux** synchronisés automatiquement depuis RSI
+- **Aucun scraping** : utilise l'API Ship-Matrix (sans authentification)
+- **Base MySQL** pour stockage persistant
+- **Données complètes** : specs, composants, images, dimensions
+- **Swagger UI** pour documentation interactive
 
 ## 🚀 Démarrage rapide
 
-### Prérequis
-
-- Docker & Docker Compose
-
-### Installation
-
 ```bash
-# Cloner le projet
 git clone https://github.com/ampynjord/starapi.git
 cd starapi
-
-# Créer le fichier .env (optionnel)
-cp .env.example .env
-
-# Lancer l'application
 docker-compose up -d
 ```
 
-### Accès
+**Accès** : http://localhost:3000 | **Swagger** : http://localhost:3000/api-docs
 
-- **API** : http://localhost:3000
-- **Swagger UI** : http://localhost:3000/api-docs
-- **Health Check** : http://localhost:3000/health
+## 🔧 Endpoints
 
-npm run dev
+| Méthode | Endpoint                     | Description                           |
+| ------- | ---------------------------- | ------------------------------------- |
+| GET     | `/api/ships`                 | Liste tous les vaisseaux              |
+| GET     | `/api/ships?size=large`      | Filtre par taille/manufacturer/status |
+| GET     | `/api/ships/search?q=aurora` | Recherche textuelle                   |
+| GET     | `/api/ships/stats`           | Statistiques                          |
+| GET     | `/api/ships/:id`             | Détail d'un vaisseau                  |
+| POST    | `/admin/sync`                | Re-synchroniser depuis RSI            |
 
-````
+## 📊 Données disponibles
 
-## � Documentation Swagger
+**Par vaisseau :**
 
-Interface interactive disponible sur :
-**http://localhost:3000/api-docs**
+- Infos : nom, fabricant, slug, description, focus, statut
+- Dimensions : longueur, largeur, hauteur, masse
+- Performance : vitesse SCM, afterburner, accélération
+- Équipage : min/max crew
+- Cargo : capacité SCU
+- **17 catégories de composants** : armes, boucliers, réacteurs, propulseurs...
+- Images : thumbnails, bannières, galerie
 
-Testez tous les endpoints directement depuis votre navigateur !
+**Statistiques globales :**
 
-Spécification OpenAPI 3.0 : http://localhost:3000/api-docs.json
+```
+245 vaisseaux | 19 fabricants | 3629 composants
+```
 
-## 🔧 API Endpoints
+## 📁 Structure
 
-### `GET /`
+```
+starapi/
+├── server.ts              # Serveur Express + API
+├── src/providers/
+│   └── rsi-providers.ts   # Ship-Matrix & GraphQL providers
+├── docker-compose.yml
+├── Dockerfile
+└── package.json
+```
 
-Page d'accueil de l'API avec liste des endpoints.
-
-### `GET /health`
-
-Health check de l'API.
-
-### `GET /api/ships`
-
-Liste tous les vaisseaux stockés en base de données.
-
-**Réponse :**
-
-```json
-{
-  "success": true,
-  "count": 2,
-  "data": [
-    {
-      "id": "...",
-      "name": "Avenger Stalker",
-      "manufacturer": "Aegis Dynamics",
-      "size": "Small",
-      "...": "..."
-    }
-  ]
-}
-````
-
-### `GET /api/ships/:manufacturer/:slug`
-
-Récupère un vaisseau spécifique avec toutes ses spécifications et images.
-
-**Exemple :**
+## 🛠️ Développement
 
 ```bash
-curl http://localhost:3000/api/ships/anvil/arrow
+npm install
+
+# MySQL local
+docker run -d --name mysql -p 3306:3306 \
+  -e MYSQL_ROOT_PASSWORD=root \
+  -e MYSQL_DATABASE=starapi \
+  -e MYSQL_USER=starapi \
+  -e MYSQL_PASSWORD=starapi \
+  mysql:8.0
+
+# Lancer le serveur
+npx tsx server.ts
 ```
 
-**Réponse :**
+---
 
-```json
-{
-  "success": true,
-  "data": {
-    "name": "Arrow",
-    "manufacturer": "Anvil Aerospace",
-    "specifications": [...],
-    "images": [...],
-    "model3d": {...}
-  }
-}
+## 📖 API RSI — Documentation technique
+
+### Ship-Matrix API (source principale)
+
+```
+GET https://robertsspaceindustries.com/ship-matrix/index
 ```
 
-### `POST /api/ships/scrape`
-
-Scrape un nouveau vaisseau depuis une URL.
-
-**Exemple :**
+**Aucune authentification requise** — Retourne tous les 245 vaisseaux avec specs complètes.
 
 ```bash
-curl -X POST http://localhost:3000/api/ships/scrape \
-  -H "Content-Type: application/json" \
-  -d '{"url": "https://robertsspaceindustries.com/pledge/ships/anvil-arrow/Arrow"}'
+curl -s "https://robertsspaceindustries.com/ship-matrix/index" | jq '.data | length'
+# 245
 ```
 
-### `DELETE /api/ships/cache`
+### GraphQL API (source secondaire)
 
-Vide le cache mémoire des vaisseaux.
-
-## 🐳 Commandes Docker
-
-```bash
-# Démarrer
-docker-compose up -d
-
-# Logs
-docker-compose logs -f api
-docker-compose logs -f mysql
-
-# Scraping
-docker-compose exec api npx tsx server.ts scrape [URL]
-
-# MySQL
-docker-compose exec mysql mysql -u starapi_user -pstarapi_pass starapi
+```
+POST https://robertsspaceindustries.com/graphql
 ```
 
-## ⚙️ Configuration
+**Requiert authentification** : tokens `x-csrf-token` et `Rsi-Token` (cookie).
 
-`.env` :
+**Opérations disponibles :**
 
-```env
-PORT=3000
-DB_HOST=localhost
-DB_USER=starapi_user
-DB_PASSWORD=starapi_pass
-DB_NAME=starapi
-```
+- `GetShipList` : liste des vaisseaux en vente (~30)
+- `GetShip` : détail avec CTM (modèle 3D) et prix
+- `GetManufacturers` : liste des fabricants
+- `GetShipSkus` : SKUs et variantes
 
-## 📊 Base de Données
+**Filtres GraphQL :**
 
-Tables MySQL auto-créées au démarrage :
+| Filtre         | Valeurs                                                                         |
+| -------------- | ------------------------------------------------------------------------------- |
+| classification | combat, transport, exploration, industrial, support, competition, ground, multi |
+| status         | flight-ready, in-concept                                                        |
+| size           | small, medium, large, capital, snub, vehicle                                    |
+| sale           | true (en vente), false                                                          |
 
-### `ships`
+### Comparaison des sources
 
-Colonnes principales : id, name, manufacturer, slug, url, description, price_amount, price_currency, focus, production_status, size, crew_min, crew_max, model3d_viewer_url, model3d_model_url, scraped_at, created_at, updated_at
+|                 | Ship-Matrix  | GraphQL          |
+| --------------- | ------------ | ---------------- |
+| Auth            | ❌ Non       | ✅ Tokens requis |
+| Vaisseaux       | 245 (tous)   | ~30 (en vente)   |
+| Specs           | ✅ Complet   | ✅ Complet       |
+| Composants      | ✅ Détaillés | ❌ Non           |
+| Images          | ✅ Multiples | ✅ Limitées      |
+| Modèle 3D (CTM) | ❌ Non       | ✅ Oui           |
+| Prix            | ❌ Non       | ✅ Oui           |
 
-### `ship_specifications`
+**Recommandation** : Ship-Matrix comme source principale, GraphQL pour enrichir (CTM/prix).
 
-Relation 1-N avec ships : id, ship_id (FK), name, value
+---
 
-### `ship_images`
+## 📄 License
 
-Relation 1-N avec ships : id, ship_id (FK), url, type, alt
-
-## 🔄 Cache 3-Niveaux
-
-1. **Mémoire** : Cache Map avec TTL 1h (performance maximale)
-2. **MySQL** : Base de données persistante
-3. **Scraping** : Extraction depuis robertsspaceindustries.com si absent
-
-## 🛠️ Stack Technique
-
-- **Runtime** : Node.js 20+ avec tsx
-- **API** : Express.js + CORS
-- **Base de données** : MySQL 8.0 (driver mysql2)
-- **Scraping** : Puppeteer (navigateur headless) + Cheerio (parsing HTML)
-- **Documentation** : Swagger UI (swagger-ui-express + swagger-jsdoc)
-- **Déploiement** : Docker + docker-compose
-- **Container** : Alpine Linux + Chromium
-
-## 🚀 Utilisation CLI
-
-```bash
-# Scraper un vaisseau spécifique
-npm run scrape https://robertsspaceindustries.com/pledge/ships/anvil/arrow
-
-# Scraper plusieurs vaisseaux (avec Docker)
-docker-compose exec api npx tsx server.ts scrape https://url1
-docker-compose exec api npx tsx server.ts scrape https://url2
-
-# Mode développement
-npm run dev
-
-# Mode production
-npm start
-```
-
-## 📝 Format des Données
-
-Chaque vaisseau contient :
-
-- **Informations générales** : nom, manufacturier, description, prix, focus
-- **Spécifications techniques** : ~35 specs (dimensions, masse, vitesse, armement, etc.)
-- **Images** : gallery, screenshots, blueprints (formats webp/jpg)
-  - Filtrage intelligent : exclusion des trackers, pixels analytics, logos
-  - Types : `gallery`, `screenshot`, `blueprint`, `thumbnail`, `store`
-  - En moyenne 4-6 images de qualité par vaisseau
-- **Modèle 3D** : ⚠️ Extraction limitée
-  - Le site utilise un chargement asynchrone via JavaScript
-  - Le holoviewer n'est pas toujours présent sur toutes les pages
-  - Code d'extraction mis en place (interception réseau, parsing de scripts, etc.)
-  - Fonctionne sur certains vaisseaux si le holoviewer est chargé
+MIT

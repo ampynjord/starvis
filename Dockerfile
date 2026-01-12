@@ -1,7 +1,7 @@
 # Multi-stage build pour optimisation
 FROM node:20-alpine AS base
 
-# Installer Chromium et dépendances système
+# Installer Chromium et dépendances système (incluant WebGL/Mesa)
 RUN apk add --no-cache \
     chromium \
     nss \
@@ -9,7 +9,10 @@ RUN apk add --no-cache \
     harfbuzz \
     ca-certificates \
     ttf-freefont \
-    wget
+    wget \
+    mesa-gl \
+    mesa-dri-gallium \
+    mesa-egl
 
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
