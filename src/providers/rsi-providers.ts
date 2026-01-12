@@ -4,10 +4,13 @@
 
 export interface RSIShipData {
   id: number;
+  chassis_id: number;
   name: string;
   slug: string;
   url: string;
   description: string;
+  time_modified: string;
+  "time_modified.unfiltered": string;
   type: string;
   focus: string;
   size: string;
@@ -279,8 +282,10 @@ export class ShipMatrixProvider {
 
     return {
       id: String(ship.id),
+      chassisId: ship.chassis_id,
       name: ship.name,
       manufacturer: ship.manufacturer?.name || "Unknown",
+      lastModified: ship["time_modified.unfiltered"],
       slug:
         ship.url?.split("/").pop() ||
         ship.name.toLowerCase().replace(/\s+/g, "-"),
@@ -321,7 +326,7 @@ export class ShipMatrixProvider {
           : undefined,
       },
       specifications,
-      images,
+      mediaGallery: images,
       syncedAt: new Date(),
       dataSource: "ship-matrix",
     };
@@ -547,6 +552,8 @@ export interface ShipComponent {
 }
 
 export interface TransformedShip {
+  lastModified: string | null;
+  chassisId: number | null;
   id: string;
   name: string;
   manufacturer: string;
