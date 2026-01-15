@@ -6,10 +6,6 @@ package-lock.json
 dist/
 *.tsbuildinfo
 
-# Cache directory
-cache/*.json
-!cache/.gitkeep
-
 # Data files
 ships-list.json
 

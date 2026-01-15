@@ -32,9 +32,7 @@ RUN npm ci --only=production && \
 
 # Copier le code source
 COPY server.ts .
-
-# Créer le dossier cache
-RUN mkdir -p /app/cache && chmod 777 /app/cache
+COPY src/ ./src/
 
 # Utiliser un utilisateur non-root
 RUN addgroup -g 1001 -S nodejs && \

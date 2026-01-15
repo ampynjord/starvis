@@ -42,8 +42,23 @@ docker-compose up -d
 - Performance : vitesse SCM, afterburner, accélération
 - Équipage : min/max crew
 - Cargo : capacité SCU
+- **Viewer 3D** : disponibilité du holoviewer RSI
 - **17 catégories de composants** : armes, boucliers, réacteurs, propulseurs...
 - **49 formats d'images** via `mediaGallery` (voir ci-dessous)
+
+**Holoviewer 3D :**
+
+**242 vaisseaux sur 245** disposent d'un holoviewer 3D interactif sur le site RSI.
+
+```json
+// Exemple de réponse
+"3dViewer": {
+  "available": true,
+  "viewerUrl": "https://robertsspaceindustries.com/pledge/ships/carrack/Carrack",
+  "viewerType": "rsi_holoviewer",
+  "lastChecked": "2025-01-27T10:30:00Z"
+}
+```
 
 **Galerie d'images disponible :**
 

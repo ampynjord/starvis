@@ -3,12 +3,12 @@ services:
     image: mysql:8.0
     container_name: star-citizen-mysql
     environment:
-      MYSQL_ROOT_PASSWORD: rootpassword
-      MYSQL_DATABASE: starapi
-      MYSQL_USER: starapi_user
-      MYSQL_PASSWORD: starapi_pass
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "3306:3306"
+      - "${DB_PORT}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     restart: unless-stopped
@@ -25,17 +25,15 @@ services:
       target: production
     container_name: star-citizen-api
     ports:
-      - "3000:3000"
+      - "${PORT}:3000"
     environment:
-      NODE_ENV: production
+      NODE_ENV: ${NODE_ENV}
       PORT: 3000
       DB_HOST: mysql
       DB_PORT: 3306
-      DB_USER: starapi_user
-      DB_PASSWORD: starapi_pass
-      DB_NAME: starapi
-    volumes:
-      - ./cache:/app/cache
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
     restart: unless-stopped
     depends_on:
       mysql:

@@ -14,9 +14,6 @@ build
 *.log
 logs
 
-# Cache (mounted as volume)
-cache
-
 # Environment
 .env
 .env.local

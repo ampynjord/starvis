@@ -2,6 +2,7 @@ import cors from "cors";
 import express from "express";
 import type { Pool } from "mysql2/promise";
 import * as mysql from "mysql2/promise";
+import puppeteer from "puppeteer";
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 import {
@@ -103,6 +104,18 @@ async function initDatabase(): Promise<void> {
       )
     `);
 
+    await conn.execute(`
+      CREATE TABLE IF NOT EXISTS ship_gallery (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        ship_id VARCHAR(255) NOT NULL,
+        image_url TEXT NOT NULL,
+        image_order INT DEFAULT 0,
+        scraped_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (ship_id) REFERENCES ships(id) ON DELETE CASCADE,
+        INDEX idx_ship_id (ship_id)
+      )
+    `);
+
     conn.release();
     console.log("✅ Database connected and tables ready");
   } catch (error) {
@@ -119,6 +132,62 @@ async function closeDatabase(): Promise<void> {
     await dbPool.end();
     dbPool = null;
   }
+}
+
+// ===== HELPERS =====
+function rowToShip(row: any): TransformedShip {
+  return {
+    id: row.id,
+    name: row.name,
+    manufacturer: row.manufacturer,
+    slug: row.slug,
+    url: row.url,
+    description: row.description,
+    focus: row.focus,
+    productionStatus: row.production_status,
+    size: row.size,
+    type: row.type,
+    crew: { min: row.crew_min, max: row.crew_max },
+    mass: row.mass_kg,
+    cargocapacity: row.cargo_capacity,
+    length: parseFloat(row.length_m) || 0,
+    beam: parseFloat(row.beam_m) || 0,
+    height: parseFloat(row.height_m) || 0,
+    scmSpeed: row.scm_speed,
+    afterburnerSpeed: row.afterburner_speed,
+    pitchMax: parseFloat(row.pitch_max) || 0,
+    yawMax: parseFloat(row.yaw_max) || 0,
+    rollMax: parseFloat(row.roll_max) || 0,
+    xAxisAcceleration: parseFloat(row.x_axis_acceleration) || 0,
+    yAxisAcceleration: parseFloat(row.y_axis_acceleration) || 0,
+    zAxisAcceleration: parseFloat(row.z_axis_acceleration) || 0,
+    model3d: {
+      ctmUrl: row.model3d_ctm_url,
+      angularUrl: row.model3d_angular_url,
+    },
+    priceUSD: parseFloat(row.price_usd) || undefined,
+    pledgeUrl: row.pledge_url,
+    media: {
+      storeThumb: row.media_store_thumb,
+      storeBanner: row.media_store_banner,
+    },
+    syncedAt: row.synced_at,
+    lastModified: row.synced_at,
+    chassisId: row.id,
+  };
+}
+
+function rowToShipSummary(row: any): Partial<TransformedShip> {
+  return {
+    id: row.id,
+    name: row.name,
+    manufacturer: row.manufacturer,
+    slug: row.slug,
+    size: row.size,
+    type: row.type,
+    productionStatus: row.production_status,
+    media: { storeThumb: row.media_store_thumb },
+  };
 }
 
 // ===== SERVICE =====
@@ -313,51 +382,16 @@ class ShipService {
   }
 
   async getAllShips(): Promise<TransformedShip[]> {
-    // Try database first
     if (dbPool) {
       try {
         const [rows] = (await dbPool.execute(`
           SELECT * FROM ships ORDER BY manufacturer, name
         `)) as any;
-
-        return rows.map((row: any) => ({
-          id: row.id,
-          name: row.name,
-          manufacturer: row.manufacturer,
-          slug: row.slug,
-          url: row.url,
-          description: row.description,
-          focus: row.focus,
-          productionStatus: row.production_status,
-          size: row.size,
-          type: row.type,
-          crew: { min: row.crew_min, max: row.crew_max },
-          mass: row.mass_kg,
-          cargocapacity: row.cargo_capacity,
-          length: parseFloat(row.length_m),
-          beam: parseFloat(row.beam_m),
-          height: parseFloat(row.height_m),
-          scmSpeed: row.scm_speed,
-          afterburnerSpeed: row.afterburner_speed,
-          pitchMax: parseFloat(row.pitch_max),
-          yawMax: parseFloat(row.yaw_max),
-          rollMax: parseFloat(row.roll_max),
-          xAxisAcceleration: parseFloat(row.x_axis_acceleration),
-          yAxisAcceleration: parseFloat(row.y_axis_acceleration),
-          zAxisAcceleration: parseFloat(row.z_axis_acceleration),
-          pledgeUrl: row.pledge_url,
-          media: {
-            storeThumb: row.media_store_thumb,
-            storeBanner: row.media_store_banner,
-          },
-          syncedAt: row.synced_at,
-        }));
+        return rows.map(rowToShip);
       } catch (error) {
         console.error("Database read error:", error);
       }
     }
-
-    // Fallback to memory cache
     return Array.from(this.memoryCache.values());
   }
 
@@ -370,100 +404,55 @@ class ShipService {
         )) as any;
 
         if (rows.length > 0) {
-          const row = rows[0];
+          const ship = rowToShip(rows[0]);
 
           // Get components
           const [components] = (await dbPool.execute(
             "SELECT * FROM ship_components WHERE ship_id = ?",
             [id]
           )) as any;
+          ship.components = components.map((c: any) => ({
+            category: c.category,
+            type: c.type,
+            name: c.name,
+            mounts: c.mounts,
+            size: c.component_size,
+            details: c.details,
+            quantity: c.quantity,
+            manufacturer: c.manufacturer,
+          }));
 
-          // Get media
+          // Get media gallery
           const [media] = (await dbPool.execute(
             "SELECT * FROM ship_media WHERE ship_id = ?",
             [id]
           )) as any;
+          ship.mediaGallery = media.map((m: any) => {
+            const derivedData =
+              typeof m.derived_data === "string"
+                ? JSON.parse(m.derived_data)
+                : m.derived_data;
+            const baseUrl = m.source_url?.replace(/\/[^/]+$/, "") || "";
+            const extension = m.source_url?.split(".").pop() || "jpg";
+            const allImages: Record<string, string> = { source: m.source_url };
+            if (derivedData?.sizes) {
+              Object.keys(derivedData.sizes).forEach((size) => {
+                allImages[size] = `${baseUrl}/${size}.${extension}`;
+              });
+            }
+            return {
+              sourceName: m.source_name,
+              sourceUrl: m.source_url,
+              images: allImages,
+            };
+          });
 
-          return {
-            id: row.id,
-            name: row.name,
-            manufacturer: row.manufacturer,
-            slug: row.slug,
-            url: row.url,
-            description: row.description,
-            focus: row.focus,
-            productionStatus: row.production_status,
-            size: row.size,
-            type: row.type,
-            crew: { min: row.crew_min, max: row.crew_max },
-            mass: row.mass_kg,
-            cargocapacity: row.cargo_capacity,
-            length: parseFloat(row.length_m),
-            beam: parseFloat(row.beam_m),
-            height: parseFloat(row.height_m),
-            scmSpeed: row.scm_speed,
-            afterburnerSpeed: row.afterburner_speed,
-            pitchMax: parseFloat(row.pitch_max),
-            yawMax: parseFloat(row.yaw_max),
-            rollMax: parseFloat(row.roll_max),
-            xAxisAcceleration: parseFloat(row.x_axis_acceleration),
-            yAxisAcceleration: parseFloat(row.y_axis_acceleration),
-            zAxisAcceleration: parseFloat(row.z_axis_acceleration),
-            model3d: {
-              ctmUrl: row.model3d_ctm_url,
-              angularUrl: row.model3d_angular_url,
-            },
-            priceUSD: parseFloat(row.price_usd),
-            pledgeUrl: row.pledge_url,
-            media: {
-              storeThumb: row.media_store_thumb,
-              storeBanner: row.media_store_banner,
-            },
-            components: components.map((c: any) => ({
-              category: c.category,
-              type: c.type,
-              name: c.name,
-              mounts: c.mounts,
-              size: c.component_size,
-              details: c.details,
-              quantity: c.quantity,
-              manufacturer: c.manufacturer,
-            })),
-            mediaGallery: media.map((m: any) => {
-              const derivedData =
-                typeof m.derived_data === "string"
-                  ? JSON.parse(m.derived_data)
-                  : m.derived_data;
-
-              // Générer toutes les URLs d'images à partir du source_url
-              const baseUrl = m.source_url?.replace(/\/[^/]+$/, "") || "";
-              const extension = m.source_url?.split(".").pop() || "jpg";
-              const allImages: Record<string, string> = {
-                source: m.source_url,
-              };
-
-              if (derivedData?.sizes) {
-                Object.keys(derivedData.sizes).forEach((size) => {
-                  allImages[size] = `${baseUrl}/${size}.${extension}`;
-                });
-              }
-
-              return {
-                sourceName: m.source_name,
-                sourceUrl: m.source_url,
-                images: allImages,
-              };
-            }),
-            syncedAt: row.synced_at,
-            lastModified: row.synced_at,
-            chassisId: row.id,
-          };
+          return ship;
         }
       } catch (error) {
         console.error("Database read error:", error);
       }
     }
-
     return this.memoryCache.get(id) || null;
   }
 
@@ -541,37 +530,21 @@ class ShipService {
     return ship;
   }
 
-  async searchShips(query: string): Promise<TransformedShip[]> {
+  async searchShips(query: string): Promise<Partial<TransformedShip>[]> {
     if (dbPool) {
       try {
         const searchTerm = `%${query}%`;
         const [rows] = (await dbPool.execute(
-          `
-          SELECT * FROM ships 
-          WHERE name LIKE ? OR manufacturer LIKE ? OR description LIKE ?
-          ORDER BY manufacturer, name
-        `,
+          `SELECT * FROM ships 
+           WHERE name LIKE ? OR manufacturer LIKE ? OR description LIKE ?
+           ORDER BY manufacturer, name`,
           [searchTerm, searchTerm, searchTerm]
         )) as any;
-
-        return rows.map((row: any) => ({
-          id: row.id,
-          name: row.name,
-          manufacturer: row.manufacturer,
-          slug: row.slug,
-          size: row.size,
-          type: row.type,
-          productionStatus: row.production_status,
-          media: {
-            storeThumb: row.media_store_thumb,
-          },
-        }));
+        return rows.map(rowToShipSummary);
       } catch (error) {
         console.error("Search error:", error);
       }
     }
-
-    // Fallback to memory search
     const lowerQuery = query.toLowerCase();
     return Array.from(this.memoryCache.values()).filter(
       (ship) =>
@@ -633,6 +606,119 @@ class ShipService {
   getGraphQLFilters() {
     return GRAPHQL_FILTER_OPTIONS;
   }
+
+  async scrapeGalleryImages(limit?: number): Promise<{
+    total: number;
+    scraped: number;
+    images: number;
+    errors: number;
+  }> {
+    if (!dbPool) {
+      throw new Error("Database not available");
+    }
+
+    console.log("🖼️ Scraping gallery images from pledge pages...");
+
+    // Get ships with their pledge URLs
+    const [ships] = (await dbPool.execute(`
+      SELECT id, name, url FROM ships 
+      WHERE url IS NOT NULL 
+      ORDER BY name
+      ${limit ? `LIMIT ${limit}` : ""}
+    `)) as any;
+
+    const stats = { total: ships.length, scraped: 0, images: 0, errors: 0 };
+
+    const browser = await puppeteer.launch({
+      headless: "new",
+      args: ["--no-sandbox", "--disable-setuid-sandbox"],
+    });
+
+    for (const ship of ships) {
+      const pledgeUrl = ship.url; // url is already complete
+      console.log(`  [${stats.scraped + 1}/${stats.total}] ${ship.name}`);
+
+      try {
+        const page = await browser.newPage();
+        const imageUrls: string[] = [];
+
+        // Intercept gallery images
+        page.on("response", (response) => {
+          const url = response.url();
+          if (
+            url.includes("source.webp") ||
+            url.includes("source.jpg") ||
+            url.includes("source.png")
+          ) {
+            if (!imageUrls.includes(url)) {
+              imageUrls.push(url);
+            }
+          }
+        });
+
+        await page.goto(pledgeUrl, {
+          waitUntil: "networkidle2",
+          timeout: 30000,
+        });
+
+        // Scroll to load lazy images
+        await page.evaluate("window.scrollTo(0, 1500)");
+        await page.waitForTimeout(2000);
+        await page.evaluate("window.scrollTo(0, 3000)");
+        await page.waitForTimeout(2000);
+
+        await page.close();
+
+        if (imageUrls.length > 0) {
+          // Delete old gallery images for this ship
+          await dbPool.execute("DELETE FROM ship_gallery WHERE ship_id = ?", [
+            ship.id,
+          ]);
+
+          // Insert new gallery images
+          for (let i = 0; i < imageUrls.length; i++) {
+            await dbPool.execute(
+              "INSERT INTO ship_gallery (ship_id, image_url, image_order) VALUES (?, ?, ?)",
+              [ship.id, imageUrls[i], i]
+            );
+          }
+
+          stats.images += imageUrls.length;
+          console.log(`    ✅ ${imageUrls.length} images`);
+        } else {
+          console.log(`    ⚠️ No images found`);
+        }
+
+        stats.scraped++;
+
+        // Small delay to avoid rate limiting
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      } catch (error) {
+        console.error(
+          `    ❌ Error: ${error instanceof Error ? error.message : error}`
+        );
+        stats.errors++;
+      }
+    }
+
+    await browser.close();
+
+    console.log(
+      `✅ Gallery scrape complete: ${stats.scraped}/${stats.total} ships, ${stats.images} images, ${stats.errors} errors`
+    );
+    return stats;
+  }
+
+  async getShipGallery(shipId: string): Promise<string[]> {
+    if (!dbPool) return [];
+
+    const [rows] = (await dbPool.execute(
+      "SELECT image_url FROM ship_gallery WHERE ship_id = ? ORDER BY image_order",
+      [shipId]
+    )) as any;
+
+    return rows.map((r: any) => r.image_url);
+  }
 }
 
 // ===== API SERVER =====
@@ -660,7 +746,7 @@ const swaggerOptions = {
       { name: "Admin", description: "Administration" },
     ],
   },
-  apis: ["./server-new.ts"],
+  apis: ["./server.ts"],
 };
 
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
@@ -701,8 +787,10 @@ app.get("/", (req, res) =>
       "GET /api/ships/search?q=": "Recherche de vaisseaux",
       "GET /api/ships/stats": "Statistiques des vaisseaux",
       "GET /api/ships/filters": "Options de filtrage GraphQL",
+      "GET /api/ships/:id/gallery": "Galerie d'images du vaisseau",
       "POST /api/ships/:id/enrich": "Enrichit avec données GraphQL (CTM, prix)",
       "POST /admin/sync": "Synchronise depuis Ship-Matrix",
+      "POST /admin/sync-galleries": "Scrape les galeries d'images (~40min)",
     },
   })
 );
@@ -859,6 +947,38 @@ app.get("/api/ships/filters", (req, res) => {
 
 /**
  * @swagger
+ * /api/ships/{id}/gallery:
+ *   get:
+ *     summary: Get gallery images for a ship
+ *     tags: [Ships]
+ *     parameters:
+ *       - name: id
+ *         in: path
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Liste des images de galerie
+ */
+app.get("/api/ships/:id/gallery", async (req, res) => {
+  try {
+    const images = await service.getShipGallery(req.params.id);
+    res.json({
+      success: true,
+      data: images,
+      count: images.length,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Error",
+    });
+  }
+});
+
+/**
+ * @swagger
  * /api/ships/{id}:
  *   get:
  *     summary: Récupère un vaisseau par ID
@@ -994,24 +1114,52 @@ app.post("/admin/sync", async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /admin/sync-galleries:
+ *   post:
+ *     summary: Scrape gallery images from pledge pages
+ *     tags: [Admin]
+ *     parameters:
+ *       - name: limit
+ *         in: query
+ *         description: Limit number of ships to scrape (for testing)
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Scraping terminé
+ */
+app.post("/admin/sync-galleries", async (req, res) => {
+  try {
+    const limit = req.query.limit
+      ? parseInt(req.query.limit as string)
+      : undefined;
+    const stats = await service.scrapeGalleryImages(limit);
+    res.json({
+      success: true,
+      message: `Scraped ${stats.images} images from ${stats.scraped} ships`,
+      data: stats,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : "Error",
+    });
+  }
+});
+
 // ===== STARTUP =====
 async function start() {
   await initDatabase();
 
-  // Initial sync if database is empty
+  // Initial sync on startup (always sync to get fresh data)
   if (dbPool) {
     try {
-      const [rows] = (await dbPool.execute(
-        "SELECT COUNT(*) as count FROM ships"
-      )) as any;
-      if (rows[0].count === 0) {
-        console.log("📥 Database empty, performing initial sync...");
-        await service.syncFromShipMatrix();
-      } else {
-        console.log(`📊 Database has ${rows[0].count} ships`);
-      }
+      console.log("📥 Syncing data from Ship-Matrix API...");
+      await service.syncFromShipMatrix();
     } catch (error) {
-      console.error("Startup check error:", error);
+      console.error("Startup sync error:", error);
     }
   }
 
