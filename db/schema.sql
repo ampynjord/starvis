@@ -28,7 +28,7 @@ INSERT INTO manufacturers (code, name, description, country) VALUES
   ('DRAK', 'Drake Interplanetary', 'Affordable, rugged ships', 'UEE'),
   ('ESPR', 'Esperia', 'Reproductions of alien ships (Vanduul)', 'UEE'),
   ('GAMA', 'Gatac Manufacture', 'Alien manufacturer (Tevarin) - Railen, Syulen', 'Tevarin'),
-  ('GREY', 'Greycat (alt)', 'Alternative code for Greycat', 'UEE'),
+  ('GREY', 'Grey''s Market', 'Underground manufacturer - Black market vehicles', 'Underground'),
   ('GRIN', 'Greycat Industrial', 'Ground vehicles and industrial equipment', 'UEE'),
   ('KRIG', 'Kruger Intergalactic', 'Snub fighters and small craft', 'UEE'),
   ('MIRA', 'Mirai', 'Light fighters and racing ships', 'UEE'),
