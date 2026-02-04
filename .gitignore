@@ -48,5 +48,29 @@ find-*.ts
 
 # Temporary files
 *.tmp
+
+# Cache directories
+.cache/
+.eslintcache
+.turbo/
+
+# Model cache (local downloads from P4K)
+model-cache/
+!model-cache/.gitkeep
+
+# Database backups
+*.sql.bak
+*.sql.backup
+db-backup/
+
+# Copilot temporary files
+.claude/
+
+# Coverage reports
+coverage/
+.nyc_output/
 *.temp
 .cache/
+
+# AI
+.claude/

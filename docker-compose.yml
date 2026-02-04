@@ -34,6 +34,12 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
+      # P4K file path (optional - for reading game data)
+      P4K_PATH: ${P4K_PATH:-}
+    volumes:
+      # Mount the Star Citizen game directory if P4K_PATH is set
+      # Example: P4K_PATH=/game/Data.p4k with volume /mnt/c/Program Files/Roberts Space Industries/StarCitizen/LIVE:/game:ro
+      - ${P4K_VOLUME:-/dev/null}:/game:ro
     restart: unless-stopped
     depends_on:
       mysql:
