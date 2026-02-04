@@ -1,188 +1,297 @@
-# 🚀 Starapi
+# 🚀 STARAPI
 
-**Auteur** : ampynjord pour la Dawnstar
+**API REST pour les données de vaisseaux Star Citizen**
 
-API REST pour les vaisseaux Star Citizen — données synchronisées depuis l'API officielle RSI.
+Agrégation des données **RSI Ship Matrix** + **P4K DataForge** avec UUIDs réels, pagination, filtres et rate limiting.
 
-## 🎯 Fonctionnalités
+---
 
-- **245 vaisseaux** synchronisés automatiquement depuis RSI
-- **Aucun scraping** : utilise l'API Ship-Matrix (sans authentification)
-- **Base MySQL** pour stockage persistant
-- **Données complètes** : specs, composants, images, dimensions
-- **Swagger UI** pour documentation interactive
+## ✨ Fonctionnalités
+
+- 🛸 **246 vaisseaux** avec UUIDs DataForge authentiques
+- 🔍 **Filtres avancés** : manufacturer, size, role, status, type
+- 📄 **Pagination** complète avec métadonnées
+- 🔐 **Rate Limiting** (100 req/min public, 30 req/min admin)
+- 📦 **P4K Integration** : extraction directe des fichiers de jeu
+- 📊 **Statistiques** par manufacturer, rôle, taille
+
+---
 
 ## 🚀 Démarrage rapide
 
+### Prérequis
+
+- Docker & Docker Compose
+- (Optionnel) Star Citizen installé pour l'enrichissement P4K
+
+### Installation
+
 ```bash
-git clone https://github.com/ampynjord/starapi.git
+# Clone
+git clone https://github.com/ampynjord/starapi
 cd starapi
-docker-compose up -d
+
+# Configuration
+cp .env.example .env
+# Éditer .env si nécessaire
+
+# Démarrer
+docker compose up -d
+
+# Vérifier
+curl http://localhost:3000/health
 ```
 
-**Accès** : http://localhost:3000 | **Swagger** : http://localhost:3000/api-docs
+### Variables d'environnement
 
-## 🔧 Endpoints
+```env
+# Base de données
+DB_HOST=mysql
+DB_PORT=3306
+DB_USER=starapi_user
+DB_PASSWORD=starapi_pass
+DB_NAME=starapi
+MYSQL_ROOT_PASSWORD=rootpassword
 
-| Méthode | Endpoint                     | Description                           |
-| ------- | ---------------------------- | ------------------------------------- |
-| GET     | `/api/ships`                 | Liste tous les vaisseaux              |
-| GET     | `/api/ships?size=large`      | Filtre par taille/manufacturer/status |
-| GET     | `/api/ships/search?q=aurora` | Recherche textuelle                   |
-| GET     | `/api/ships/stats`           | Statistiques                          |
-| GET     | `/api/ships/:id`             | Détail d'un vaisseau                  |
-| POST    | `/admin/sync`                | Re-synchroniser depuis RSI            |
+# API
+PORT=3000
+NODE_ENV=production
+ADMIN_API_KEY=your_secret_key
 
-## 📊 Données disponibles
-
-**Par vaisseau :**
-
-- Infos : nom, fabricant, slug, description, focus, statut
-- Dimensions : longueur, largeur, hauteur, masse
-- Performance : vitesse SCM, afterburner, accélération
-- Équipage : min/max crew
-- Cargo : capacité SCU
-- **Viewer 3D** : disponibilité du holoviewer RSI
-- **17 catégories de composants** : armes, boucliers, réacteurs, propulseurs...
-- **49 formats d'images** via `mediaGallery` (voir ci-dessous)
-
-**Holoviewer 3D :**
-
-**242 vaisseaux sur 245** disposent d'un holoviewer 3D interactif sur le site RSI.
-
-```json
-// Exemple de réponse
-"3dViewer": {
-  "available": true,
-  "viewerUrl": "https://robertsspaceindustries.com/pledge/ships/carrack/Carrack",
-  "viewerType": "rsi_holoviewer",
-  "lastChecked": "2025-01-27T10:30:00Z"
-}
-```
-
-**Galerie d'images disponible :**
-
-Chaque vaisseau expose une `mediaGallery` avec **49 tailles d'images** générées dynamiquement :
-
-| Format                | Dimensions | Usage                |
-| --------------------- | ---------- | -------------------- |
-| `source`              | Original   | Image haute qualité  |
-| `wallpaper_3840x2160` | 3840×2160  | Fond d'écran 4K      |
-| `wallpaper_1920x1080` | 1920×1080  | Fond d'écran Full HD |
-| `store_hub_large`     | 1200×420   | Bannière store       |
-| `store_small`         | 351×210    | Thumbnail store      |
-| `slideshow_wide`      | 1200×800   | Diaporama            |
-| `icon`                | 45×45      | Icône                |
-| ...                   | ...        | 42 autres formats    |
-
-```json
-// Exemple de réponse
-"mediaGallery": [{
-  "sourceName": "StarCitizen_RSI_Aurora_ES_01",
-  "sourceUrl": "https://media.robertsspaceindustries.com/e1i4i2ixe6ouo/source.jpg",
-  "images": {
-    "source": "https://media.robertsspaceindustries.com/e1i4i2ixe6ouo/source.jpg",
-    "wallpaper_3840x2160": "https://media.robertsspaceindustries.com/e1i4i2ixe6ouo/wallpaper_3840x2160.jpg",
-    "wallpaper_1920x1080": "https://media.robertsspaceindustries.com/e1i4i2ixe6ouo/wallpaper_1920x1080.jpg",
-    // ... 46 autres URLs
-  }
-}]
-```
-
-**Statistiques globales :**
-
-```
-245 vaisseaux | 19 fabricants | 3629 composants
-```
-
-## 📁 Structure
-
-```
-starapi/
-├── server.ts              # Serveur Express + API
-├── src/providers/
-│   └── rsi-providers.ts   # Ship-Matrix & GraphQL providers
-├── docker-compose.yml
-├── Dockerfile
-└── package.json
-```
-
-## 🛠️ Développement
-
-```bash
-npm install
-
-# MySQL local
-docker run -d --name mysql -p 3306:3306 \
-  -e MYSQL_ROOT_PASSWORD=root \
-  -e MYSQL_DATABASE=starapi \
-  -e MYSQL_USER=starapi \
-  -e MYSQL_PASSWORD=starapi \
-  mysql:8.0
-
-# Lancer le serveur
-npx tsx server.ts
+# P4K (optionnel)
+P4K_PATH=/game/Data.p4k
+P4K_VOLUME=/mnt/c/Program Files/Roberts Space Industries/StarCitizen/LIVE:/game:ro
 ```
 
 ---
 
-## 📖 API RSI — Documentation technique
+## 📚 API Endpoints
 
-### Ship-Matrix API (source principale)
-
-```
-GET https://robertsspaceindustries.com/ship-matrix/index
-```
-
-**Aucune authentification requise** — Retourne tous les 245 vaisseaux avec specs complètes.
+### Ships
 
 ```bash
-curl -s "https://robertsspaceindustries.com/ship-matrix/index" | jq '.data | length'
-# 245
+# Liste paginée avec filtres
+GET /api/v1/ships
+GET /api/v1/ships?page=1&limit=10&manufacturer=aegis&status=flight-ready&size=medium
+
+# Détails d'un vaisseau
+GET /api/v1/ships/:uuid
+
+# Comparaison de vaisseaux
+GET /api/v1/ships/compare?uuids=uuid1,uuid2,uuid3
+
+# Recherche par nom
+GET /api/v1/ships/search?q=hornet
 ```
 
-### GraphQL API (source secondaire)
+#### Paramètres de filtre
+
+| Paramètre | Description | Exemple |
+|-----------|-------------|---------|
+| `page` | Numéro de page | `1` |
+| `limit` | Résultats par page (max 100) | `20` |
+| `manufacturer` | Code fabricant | `aegis`, `anvl`, `rsi` |
+| `status` | Statut de production | `flight-ready`, `in-concept` |
+| `size` | Taille du vaisseau | `small`, `medium`, `large`, `capital` |
+| `role` | Rôle principal | `combat`, `transport`, `exploration` |
+| `type` | Type de véhicule | `spaceship`, `ground_vehicle`, `snub` |
+| `sort` | Champ de tri | `name`, `manufacturer`, `size` |
+| `order` | Ordre de tri | `asc`, `desc` |
+
+### Manufacturers
+
+```bash
+# Liste des fabricants avec stats
+GET /api/v1/manufacturers
+
+# Détails d'un fabricant
+GET /api/v1/manufacturers/:code
+
+# Vaisseaux d'un fabricant
+GET /api/v1/manufacturers/AEGS/ships
+```
+
+### Statistics
+
+```bash
+# Statistiques globales
+GET /api/v1/stats
+```
+
+### Admin (nécessite X-API-Key)
+
+```bash
+# Synchronisation complète (RSI + P4K)
+POST /admin/sync
+
+# Sync RSI Ship Matrix uniquement
+POST /admin/sync/rsi
+
+# Enrichissement P4K uniquement
+POST /admin/sync/p4k
+
+# Health check détaillé
+GET /admin/health
+```
+
+---
+
+## 🗄️ Base de données
+
+### Schéma
 
 ```
-POST https://robertsspaceindustries.com/graphql
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  manufacturers  │     │      ships      │     │   ship_specs    │
+├─────────────────┤     ├─────────────────┤     ├─────────────────┤
+│ code (PK)       │◄────│ manufacturer_   │     │ ship_uuid (PK)  │
+│ name            │     │   code (FK)     │────►│ length          │
+│ description     │     │ uuid (PK)       │     │ beam            │
+│ country         │     │ name            │     │ height          │
+└─────────────────┘     │ class_name      │     │ mass            │
+                        │ role            │     │ cargo_scu       │
+                        │ size            │     │ min_crew        │
+                        │ vehicle_type    │     │ max_crew        │
+                        │ production_     │     │ scm_speed       │
+                        │   status        │     │ max_speed       │
+                        │ is_flight_ready │     │ pitch/yaw/roll  │
+                        │ thumbnail_url   │     │ accelerations   │
+                        │ p4k_base_path   │     │ hull_hp         │
+                        │ enriched_at     │     │ shield_hp       │
+                        └─────────────────┘     └─────────────────┘
 ```
 
-**Requiert authentification** : tokens `x-csrf-token` et `Rsi-Token` (cookie).
+### Fabricants supportés (22)
 
-**Opérations disponibles :**
+| Code | Nom | Origine |
+|------|-----|---------|
+| AEGS | Aegis Dynamics | UEE |
+| ANVL | Anvil Aerospace | UEE |
+| AOPOA | Aopoa | Xi'an Empire |
+| ARGO | Argo Astronautics | UEE |
+| BANU | Banu | Banu Protectorate |
+| CNOU | Consolidated Outland | UEE |
+| CRUS | Crusader Industries | UEE |
+| DRAK | Drake Interplanetary | UEE |
+| ESPR | Esperia | UEE |
+| GAMA | Gatac Manufacture | Tevarin |
+| GRIN | Greycat Industrial | UEE |
+| KRIG | Kruger Intergalactic | UEE |
+| MIRA | Mirai | UEE |
+| MISC | MISC | UEE |
+| ORIG | Origin Jumpworks | UEE |
+| RSI | Roberts Space Industries | UEE |
+| TMBL | Tumbril Land Systems | UEE |
+| VNCL | Vanduul Clans | Vanduul |
 
-- `GetShipList` : liste des vaisseaux en vente (~30)
-- `GetShip` : détail avec CTM (modèle 3D) et prix
-- `GetManufacturers` : liste des fabricants
-- `GetShipSkus` : SKUs et variantes
+---
 
-**Filtres GraphQL :**
+## 🏗️ Architecture
 
-| Filtre         | Valeurs                                                                         |
-| -------------- | ------------------------------------------------------------------------------- |
-| classification | combat, transport, exploration, industrial, support, competition, ground, multi |
-| status         | flight-ready, in-concept                                                        |
-| size           | small, medium, large, capital, snub, vehicle                                    |
-| sale           | true (en vente), false                                                          |
+```
+starapi/
+├── server.ts              # Point d'entrée Express
+├── src/
+│   ├── routes.ts          # Définition des endpoints
+│   ├── services.ts        # Logique métier & sync
+│   ├── p4k-aliases.ts     # Mappings RSI ↔ P4K
+│   ├── middleware/        # Auth, rate-limit, logging
+│   ├── providers/
+│   │   ├── p4k-provider.ts       # Lecture fichiers P4K
+│   │   ├── dataforge-parser.ts   # Parser XML DataForge
+│   │   ├── cryengine-decrypt.ts  # Déchiffrement CryEngine
+│   │   └── rsi-providers.ts      # Scraping RSI
+│   ├── services/
+│   │   ├── p4k-service.ts        # Service P4K
+│   │   ├── p4k-enrichment-service.ts
+│   │   └── ship-service.ts
+│   └── utils/
+├── db/
+│   └── schema.sql         # Schéma MySQL
+├── docker-compose.yml
+├── Dockerfile
+└── .env
+```
 
-### Comparaison des sources
+### Stack technique
 
-|                 | Ship-Matrix  | GraphQL          |
-| --------------- | ------------ | ---------------- |
-| Auth            | ❌ Non       | ✅ Tokens requis |
-| Vaisseaux       | 245 (tous)   | ~30 (en vente)   |
-| Specs           | ✅ Complet   | ✅ Complet       |
-| Composants      | ✅ Détaillés | ❌ Non           |
-| Images          | ✅ Multiples | ✅ Limitées      |
-| Modèle 3D (CTM) | ❌ Non       | ⚠️ Instable      |
-| Prix            | ❌ Non       | ✅ Oui           |
+- **Runtime** : Node.js 20+ avec TypeScript
+- **Framework** : Express.js
+- **Base de données** : MySQL 8.0
+- **Conteneurisation** : Docker & Docker Compose
+- **Logging** : Winston
 
-> **Note sur les CTM** : L'API GraphQL RSI retourne fréquemment des erreurs internes pour les requêtes de modèles 3D. Les URLs CTM ne sont pas exposées publiquement de manière fiable.
+---
 
-**Recommandation** : Ship-Matrix comme source principale, GraphQL pour enrichir (prix) quand disponible.
+## 📖 Exemples
+
+### Lister les chasseurs Aegis
+
+```bash
+curl 'http://localhost:3000/api/v1/ships?manufacturer=aegs&role=combat&limit=5' | jq
+```
+
+### Obtenir les stats globales
+
+```bash
+curl http://localhost:3000/api/v1/stats | jq '.data.global'
+```
+
+```json
+{
+  "total_ships": 246,
+  "flight_ready_count": 214,
+  "in_concept_count": 32,
+  "manufacturer_count": 19
+}
+```
+
+### Comparer des vaisseaux
+
+```bash
+curl 'http://localhost:3000/api/v1/ships/compare?uuids=uuid1,uuid2' | jq
+```
+
+### Synchroniser (admin)
+
+```bash
+curl -X POST \
+  -H "X-API-Key: your_admin_key" \
+  http://localhost:3000/admin/sync
+```
+
+---
+
+## 🔧 Développement
+
+```bash
+# Mode développement avec hot-reload
+npm run dev
+
+# Compilation TypeScript
+npx tsc
+
+# Logs en temps réel
+docker compose logs -f api
+```
+
+---
+
+## 📝 Sources de données
+
+| Source | Description | Fréquence |
+|--------|-------------|-----------|
+| [RSI Ship Matrix](https://robertsspaceindustries.com/ship-matrix) | Liste officielle des vaisseaux | À la demande |
+| P4K DataForge | Fichiers de jeu (UUIDs, specs) | Enrichissement |
 
 ---
 
 ## 📄 License
 
-MIT
+MIT © [ampynjord](https://github.com/ampynjord)
+
+---
+
+<p align="center">
+  <i>Made with ☕ for the Star Citizen community</i>
+</p>
