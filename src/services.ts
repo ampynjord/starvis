@@ -683,7 +683,17 @@ export class ShipService {
           // Generate temp UUID - will be replaced by p4k_uuid during enrichment if ship is in game
           const tempUuid = generateTempUuid(ship.id, ship.name);
           const mfgTag = ship.manufacturer?.code || "UNKN";
+          const mfgName = ship.manufacturer?.name || "Unknown";
+          const mfgDesc = ship.manufacturer?.description || null;
           const thumb = ship.media?.[0]?.images?.store_small ? (ship.media[0].images.store_small.startsWith("http") ? ship.media[0].images.store_small : `https://robertsspaceindustries.com${ship.media[0].images.store_small}`) : null;
+          
+          // Auto-create manufacturer if not exists (using data from API)
+          await conn.execute(
+            `INSERT INTO manufacturers (code, name, description) VALUES (?, ?, ?)
+             ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description)`,
+            [mfgTag, mfgName, mfgDesc]
+          );
+          
           // Check if ship already exists (by name+manufacturer_code) to preserve UUID
           const [existing] = await conn.execute<any[]>("SELECT uuid FROM ships WHERE name=? AND manufacturer_code=? LIMIT 1", [ship.name, mfgTag]);
           const shipUuid = existing.length > 0 ? existing[0].uuid : tempUuid;

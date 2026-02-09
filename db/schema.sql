@@ -1,52 +1,35 @@
 -- ============================================================
 -- STARAPI v1.0 - DATABASE SCHEMA
--- Corporate API for Star Citizen ship data
--- Sources: RSI Ship Matrix + P4K DataForge
+-- REST API for Star Citizen ships and manufacturers
+-- Data Sources: RSI Ship Matrix + P4K DataForge enrichment
+-- Focus: Ships and Manufacturers only (simplified version)
+-- Last updated: February 9, 2026
 -- ============================================================
 
 -- ====================
--- MANUFACTURERS - Normalized manufacturer reference
+-- MANUFACTURERS - Auto-populated from Ship Matrix API
+-- Source: Ship Matrix API returns manufacturer.code, name, description
+-- Created automatically during first ship sync
 -- ====================
 CREATE TABLE IF NOT EXISTS manufacturers (
   code VARCHAR(10) PRIMARY KEY,
   name VARCHAR(100) NOT NULL UNIQUE,
   description TEXT,
-  country VARCHAR(50),
+  country VARCHAR(50) DEFAULT NULL COMMENT 'Not provided by API - can be added manually',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   INDEX idx_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Insert default manufacturers (all codes used in RSI Ship Matrix)
+-- Insert fallback manufacturer for ships without manufacturer data
 INSERT INTO manufacturers (code, name, description, country) VALUES
-  ('AEGS', 'Aegis Dynamics', 'Military-focused manufacturer known for combat ships', 'UEE'),
-  ('ANVL', 'Anvil Aerospace', 'Military and civilian ships, known for versatility', 'UEE'),
-  ('AOPOA', 'Aopoa', 'Alien manufacturer (Xi''an) with unique aesthetics', 'Xi''an Empire'),
-  ('ARGO', 'Argo Astronautics', 'Industrial and utility vehicles', 'UEE'),
-  ('BANU', 'Banu', 'Alien manufacturer (Banu) - Merchantman', 'Banu Protectorate'),
-  ('CNOU', 'Consolidated Outland', 'Innovative designs, focus on efficiency', 'UEE'),
-  ('CRUS', 'Crusader Industries', 'Large ships and military vessels', 'UEE'),
-  ('DRAK', 'Drake Interplanetary', 'Affordable, rugged ships', 'UEE'),
-  ('ESPR', 'Esperia', 'Reproductions of alien ships (Vanduul)', 'UEE'),
-  ('GAMA', 'Gatac Manufacture', 'Alien manufacturer (Tevarin) - Railen, Syulen', 'Tevarin'),
-  ('GREY', 'Grey''s Market', 'Underground manufacturer - Black market vehicles', 'Underground'),
-  ('GRIN', 'Greycat Industrial', 'Ground vehicles and industrial equipment', 'UEE'),
-  ('KRIG', 'Kruger Intergalactic', 'Snub fighters and small craft', 'UEE'),
-  ('MIRA', 'Mirai', 'Light fighters and racing ships', 'UEE'),
-  ('MRAI', 'Mirai (alt)', 'Alternative code for Mirai', 'UEE'),
-  ('MISC', 'Musashi Industrial & Starflight Concern', 'Versatile ships, Japanese-inspired', 'UEE'),
-  ('ORIG', 'Origin Jumpworks', 'Luxury ships, premium quality', 'UEE'),
-  ('RSI', 'Roberts Space Industries', 'Classic manufacturer, iconic ships', 'UEE'),
-  ('TMBL', 'Tumbril Land Systems', 'Ground combat vehicles', 'UEE'),
-  ('UNKN', 'Unknown', 'Unknown or Alien manufacturers', 'Unknown'),
-  ('VNCL', 'Vanduul Clans', 'Alien warships (Vanduul)', 'Vanduul'),
-  ('XNAA', 'Aopoa (alt)', 'Alternative code for Aopoa', 'Xi''an Empire')
-ON DUPLICATE KEY UPDATE name=VALUES(name), description=VALUES(description);
+  ('UNKN', 'Unknown', 'Fallback for ships without manufacturer information', NULL)
+ON DUPLICATE KEY UPDATE name=VALUES(name);
 
 -- ====================
--- SHIPS - Main table
+-- SHIPS - Main table (imported from RSI Ship Matrix, enriched from P4K)
 -- ====================
 CREATE TABLE IF NOT EXISTS ships (
-  uuid CHAR(36) PRIMARY KEY COMMENT 'DataForge UUID or derived UUID for variants',
+  uuid CHAR(36) PRIMARY KEY COMMENT 'DataForge UUID or temp UUID (ffffffff-*)',
   
   -- Identification
   name VARCHAR(255) NOT NULL,
@@ -66,7 +49,7 @@ CREATE TABLE IF NOT EXISTS ships (
   thumbnail_url TEXT,
   store_url TEXT,
   
-  -- P4K Data
+  -- P4K Data (enriched from game files)
   p4k_base_path TEXT,
   p4k_model_count INT DEFAULT 0,
   p4k_texture_count INT DEFAULT 0,
@@ -74,11 +57,12 @@ CREATE TABLE IF NOT EXISTS ships (
   -- Meta
   description TEXT,
   rsi_id INT,
-  synced_at TIMESTAMP NULL,
-  enriched_at TIMESTAMP NULL,
+  synced_at TIMESTAMP NULL COMMENT 'Last sync from RSI Ship Matrix',
+  enriched_at TIMESTAMP NULL COMMENT 'Last P4K enrichment',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   
+  -- Indexes
   INDEX idx_name (name),
   INDEX idx_manufacturer (manufacturer_code),
   INDEX idx_status (production_status),
@@ -86,11 +70,17 @@ CREATE TABLE IF NOT EXISTS ships (
   INDEX idx_role (role),
   INDEX idx_size (size),
   INDEX idx_type (vehicle_type),
-  INDEX idx_class_name (class_name)
+  INDEX idx_class_name (class_name),
+  INDEX idx_manufacturer_status (manufacturer_code, production_status),
+  INDEX idx_size_role (size, role),
+  
+  -- Foreign key
+  CONSTRAINT fk_ship_manufacturer FOREIGN KEY (manufacturer_code) 
+    REFERENCES manufacturers(code) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ====================
--- SHIP_SPECS - Technical specifications
+-- SHIP_SPECS - Technical specifications (from RSI Ship Matrix)
 -- ====================
 CREATE TABLE IF NOT EXISTS ship_specs (
   ship_uuid CHAR(36) PRIMARY KEY,
@@ -123,7 +113,7 @@ CREATE TABLE IF NOT EXISTS ship_specs (
   acceleration_vtol DECIMAL(10, 4),
   acceleration_maneuvering DECIMAL(10, 4),
   
-  -- Health (from P4K DataForge)
+  -- Health
   hull_hp INT,
   shield_hp INT,
   
@@ -131,12 +121,14 @@ CREATE TABLE IF NOT EXISTS ship_specs (
   quantum_fuel DECIMAL(10, 2) COMMENT 'Quantum fuel capacity',
   hydrogen_fuel DECIMAL(10, 2) COMMENT 'Hydrogen fuel capacity',
   
-  -- Weaponry (from P4K loadout XMLs)
+  -- Weaponry
   weapon_hardpoints TINYINT UNSIGNED COMMENT 'Number of weapon hardpoints',
   missile_racks TINYINT UNSIGNED COMMENT 'Number of missile racks',
   turrets TINYINT UNSIGNED COMMENT 'Number of turrets',
   
-  FOREIGN KEY (ship_uuid) REFERENCES ships(uuid) ON DELETE CASCADE,
-  INDEX idx_cargo (cargo_scu),
-  INDEX idx_crew (max_crew)
+  -- Foreign key & indexes
+  CONSTRAINT fk_spec_ship FOREIGN KEY (ship_uuid) 
+    REFERENCES ships(uuid) ON DELETE CASCADE,
+  INDEX idx_cargo_spec (cargo_scu),
+  INDEX idx_crew_spec (max_crew)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
