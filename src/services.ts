@@ -9,61 +9,15 @@ import type { Pool, PoolConnection } from "mysql2/promise";
 import path from "path";
 import { fileURLToPath } from "url";
 import { inflateRawSync } from "zlib";
-import { MANUFACTURER_CODES, RSI_TO_P4K_ALIASES } from "./p4k-aliases.js";
+import { DB_CONFIG, P4K_CONFIG } from "./utils/config.js";
+import { MANUFACTURER_CODES, RSI_TO_P4K_ALIASES } from "./utils/p4k-aliases.js";
+import type { P4KEntry, P4KVehicleData, TransformedShip } from "./utils/types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Re-export for backward compatibility
-export { MANUFACTURER_CODES };
-
-// =============== CONFIG ===============
-export const DB_CONFIG = {
-  host: process.env.DB_HOST || "localhost",
-  user: process.env.DB_USER || "starapi",
-  password: process.env.DB_PASSWORD || "starapi",
-  database: process.env.DB_NAME || "starapi",
-  waitForConnections: true,
-  connectionLimit: 10,
-};
-
-// =============== TYPES ===============
-export interface TransformedShip {
-  id: string; uuid?: string; chassisId?: number | null; name: string;
-  manufacturer?: string; manufacturerTag?: string; slug?: string; url?: string;
-  description?: string; focus?: string; role?: string; productionStatus?: string;
-  size?: string; type?: string; crew?: { min?: number; max?: number };
-  mass?: number; cargocapacity?: number; length?: number; beam?: number; height?: number;
-  scmSpeed?: number; afterburnerSpeed?: number; lastModified?: string | null;
-  media?: { storeThumb?: string; storeBanner?: string };
-  specifications?: Array<{ name: string; value: string }>;
-  mediaGallery?: any[]; syncedAt?: Date; dataSource?: string;
-  p4kData?: {
-    className: string;
-    manufacturerCode: string | null;
-    displayName: string;
-    basePath: string | null;
-    mainModel: string | null;
-    modelCount: number;
-    interiorModelCount: number;
-    exteriorModelCount: number;
-    textureCount: number;
-    models: { all: string[]; interior: string[]; exterior: string[] } | null;
-    enrichedAt: Date | null;
-  } | null;
-}
-
-export interface P4KEntry {
-  fileName: string; uncompressedSize: number; compressedSize: number;
-  compressionMethod: number; isDirectory: boolean; isEncrypted: boolean;
-  dataOffset: number; localHeaderOffset: number;
-}
-
-export interface P4KVehicleData {
-  uuid?: string; className: string; displayName: string;
-  manufacturer: string; manufacturerCode: string;
-  mainModel?: string; interiorModels: string[]; exteriorModels: string[];
-  allModels: string[]; texturePaths: string[]; basePath: string;
-}
+export { DB_CONFIG, MANUFACTURER_CODES, P4K_CONFIG };
+export type { P4KEntry, P4KVehicleData, TransformedShip };
 
 // =============== SCHEMA INIT ===============
 export async function initializeSchema(conn: PoolConnection): Promise<void> {
@@ -587,6 +541,116 @@ export class P4KService {
     if (!entry) return null;
     return this.provider.readFileFromEntry(entry);
   }
+
+  /**
+   * Extract vehicle stats from loadout XML files
+   * Returns: hull_hp, shield_hp, quantum_fuel, hydrogen_fuel, weapons, turrets
+   */
+  async extractVehicleStats(className: string): Promise<{
+    hull_hp?: number;
+    shield_hp?: number;
+    quantum_fuel?: number;
+    hydrogen_fuel?: number;
+    pitch_max?: number;
+    yaw_max?: number;
+    roll_max?: number;
+    acceleration_main?: number;
+    acceleration_retro?: number;
+    acceleration_vtol?: number;
+    acceleration_maneuvering?: number;
+    weapon_hardpoints?: number;
+    missile_racks?: number;
+    turrets?: number;
+  } | null> {
+    if (!this.provider) throw new Error("Not init");
+    
+    try {
+      // Find loadout XML files for this vehicle
+      const loadoutPattern = className.replace(/_/g, "").toLowerCase();
+      const xmlEntries = await this.findFiles(loadoutPattern, 50);
+      
+      // Look for loadout/vehicle XML files
+      const loadoutEntry = xmlEntries.find(entry => 
+        entry.fileName.toLowerCase().includes('defaultloadout') || 
+        entry.fileName.toLowerCase().includes('_loadout') ||
+        (entry.fileName.toLowerCase().includes(loadoutPattern) && entry.fileName.endsWith('.xml'))
+      );
+      
+      if (!loadoutEntry) {
+        console.log(`[P4K] No loadout XML found for ${className}`);
+        return null;
+      }
+      
+      console.log(`[P4K] Reading loadout: ${loadoutEntry.fileName}`);
+      const xmlBuffer = await this.provider.readFileFromEntry(loadoutEntry);
+      if (!xmlBuffer || xmlBuffer.length > 2000000) return null; // Skip files > 2MB
+      
+      const xmlStr = xmlBuffer.toString('utf-8');
+      const stats: any = {};
+      
+      // Extract shield HP
+      const shieldMatch = xmlStr.match(/MaxShieldHealth="([\d.]+)"/);
+      if (shieldMatch) stats.shield_hp = Math.round(parseFloat(shieldMatch[1]));
+      
+      // Extract hull HP (DamageResistances or Health components)
+      const hullMatches = xmlStr.matchAll(/Health="([\d.]+)"/g);
+      let maxHull = 0;
+      for (const match of hullMatches) {
+        const hp = parseFloat(match[1]);
+        if (hp > maxHull) maxHull = hp;
+      }
+      if (maxHull > 0) stats.hull_hp = Math.round(maxHull);
+      
+      // Extract quantum fuel capacity
+      const qfuelMatch = xmlStr.match(/<QuantumFuelTank[^>]*Capacity="([\d.]+)"/);
+      if (qfuelMatch) stats.quantum_fuel = parseFloat(qfuelMatch[1]);
+      
+      // Extract hydrogen fuel (all fuel tanks combined)
+      const fuelMatches = xmlStr.matchAll(/<FuelTank[^>]*Capacity="([\d.]+)"/g);
+      let totalFuel = 0;
+      for (const match of fuelMatches) {
+        totalFuel += parseFloat(match[1]);
+      }
+      if (totalFuel > 0) stats.hydrogen_fuel = totalFuel;
+      
+      // Extract maneuverability (IfcsParams)
+      const pitchMatch = xmlStr.match(/maxAngularVelocityPit="([\d.]+)"/);
+      const yawMatch = xmlStr.match(/maxAngularVelocityYaw="([\d.]+)"/);
+      const rollMatch = xmlStr.match(/maxAngularVelocityRol="([\d.]+)"/);
+      if (pitchMatch) stats.pitch_max = parseFloat(pitchMatch[1]);
+      if (yawMatch) stats.yaw_max = parseFloat(yawMatch[1]);
+      if (rollMatch) stats.roll_max = parseFloat(rollMatch[1]);
+      
+      // Extract accelerations
+      const accelMainMatch = xmlStr.match(/angleAccelMain="([\d.]+)"/);
+      const accelRetroMatch = xmlStr.match(/angleAccelRetro="([\d.]+)"/);
+      const accelVTOLMatch = xmlStr.match(/angleAccelVTOL="([\d.]+)"/);
+      const accelManeuveringMatch = xmlStr.match(/angleAccelManeuvering="([\d.]+)"/);
+      if (accelMainMatch) stats.acceleration_main = parseFloat(accelMainMatch[1]);
+      if (accelRetroMatch) stats.acceleration_retro = parseFloat(accelRetroMatch[1]);
+      if (accelVTOLMatch) stats.acceleration_vtol = parseFloat(accelVTOLMatch[1]);
+      if (accelManeuveringMatch) stats.acceleration_maneuvering = parseFloat(accelManeuveringMatch[1]);
+      
+      // Count weapon hardpoints
+      const weaponHardpoints = xmlStr.match(/hardpoint_weapon_/g);
+      if (weaponHardpoints) stats.weapon_hardpoints = weaponHardpoints.length;
+      
+      // Count missile racks
+      const missileRacks = xmlStr.match(/hardpoint_missile_/g);
+      if (missileRacks) stats.missile_racks = missileRacks.length;
+      
+      // Count turrets
+      const turrets = xmlStr.match(/<Turret[^>]*Name=/g);
+      if (turrets) stats.turrets = turrets.length;
+      
+      console.log(`[P4K] Extracted stats for ${className}:`, Object.keys(stats).length, 'properties');
+      return Object.keys(stats).length > 0 ? stats : null;
+      
+    } catch (err) {
+      console.error(`[P4K] Error extracting stats for ${className}:`, err);
+      return null;
+    }
+  }
 }
 
 // =============== SHIP SERVICE ===============
@@ -970,6 +1034,40 @@ export class P4KEnrichmentService {
           await this.pool.execute(`UPDATE ships SET class_name=?, p4k_base_path=?, p4k_model_count=?, p4k_texture_count=?, enriched_at=NOW() WHERE uuid=?`,
             [p4k.className, p4k.basePath || null, p4k.allModels.length, p4k.texturePaths.length, ship.uuid]);
         }
+        
+        // Extract and save advanced stats from loadout XML
+        try {
+          const stats = await this.p4kService.extractVehicleStats(p4k.className);
+          if (stats && Object.keys(stats).length > 0) {
+            // Build UPDATE query dynamically based on available stats
+            const updateFields: string[] = [];
+            const updateValues: any[] = [];
+            
+            if (stats.hull_hp !== undefined) { updateFields.push('hull_hp = ?'); updateValues.push(stats.hull_hp); }
+            if (stats.shield_hp !== undefined) { updateFields.push('shield_hp = ?'); updateValues.push(stats.shield_hp); }
+            if (stats.quantum_fuel !== undefined) { updateFields.push('quantum_fuel = ?'); updateValues.push(stats.quantum_fuel); }
+            if (stats.hydrogen_fuel !== undefined) { updateFields.push('hydrogen_fuel = ?'); updateValues.push(stats.hydrogen_fuel); }
+            if (stats.pitch_max !== undefined) { updateFields.push('pitch_max = ?'); updateValues.push(stats.pitch_max); }
+            if (stats.yaw_max !== undefined) { updateFields.push('yaw_max = ?'); updateValues.push(stats.yaw_max); }
+            if (stats.roll_max !== undefined) { updateFields.push('roll_max = ?'); updateValues.push(stats.roll_max); }
+            if (stats.acceleration_main !== undefined) { updateFields.push('acceleration_main = ?'); updateValues.push(stats.acceleration_main); }
+            if (stats.acceleration_retro !== undefined) { updateFields.push('acceleration_retro = ?'); updateValues.push(stats.acceleration_retro); }
+            if (stats.acceleration_vtol !== undefined) { updateFields.push('acceleration_vtol = ?'); updateValues.push(stats.acceleration_vtol); }
+            if (stats.acceleration_maneuvering !== undefined) { updateFields.push('acceleration_maneuvering = ?'); updateValues.push(stats.acceleration_maneuvering); }
+            
+            if (updateFields.length > 0) {
+              updateValues.push(finalUuid);
+              await this.pool.execute(
+                `UPDATE ship_specs SET ${updateFields.join(', ')} WHERE ship_uuid = ?`,
+                updateValues
+              );
+              console.log(`[Enrich] Updated ${updateFields.length} stats for ${ship.name}`);
+            }
+          }
+        } catch (err) {
+          console.warn(`[Enrich] Failed to extract stats for ${ship.name}:`, err);
+        }
+        
         enriched++;
       } else notFound++;
     }
