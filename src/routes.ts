@@ -3,22 +3,15 @@
  */
 import { Request, Response, Router } from "express";
 import type { Pool } from "mysql2/promise";
-import { authMiddleware } from "./middleware/auth.js";
-import { adminLimiter, publicLimiter } from "./middleware/rateLimiter.js";
+import { adminLimiter, authMiddleware, publicLimiter } from "./middleware/index.js";
 import type { P4KEnrichmentService, P4KService, ShipService } from "./services.js";
-import logger from "./utils/logger.js";
+import { getPagination, logger } from "./utils/index.js";
 
 export interface RouteDependencies {
   pool: Pool;
   shipService: ShipService;
   p4kService?: P4KService;
   p4kEnrichmentService?: P4KEnrichmentService;
-}
-
-interface PaginationQuery {
-  page?: string;
-  limit?: string;
-  offset?: string;
 }
 
 interface ShipFilters {
@@ -36,13 +29,6 @@ interface ShipFilters {
   search?: string;
   sort?: string;
   order?: string;
-}
-
-function getPagination(query: PaginationQuery) {
-  const page = parseInt(query.page || "1");
-  const limit = Math.min(parseInt(query.limit || "50"), 250); // Max 250 per page
-  const offset = query.offset ? parseInt(query.offset) : (page - 1) * limit;
-  return { page, limit, offset };
 }
 
 export function createRoutes(deps: RouteDependencies): Router {
@@ -360,7 +346,12 @@ export function createRoutes(deps: RouteDependencies): Router {
       logger.info("🔄 P4K enrichment starting...");
       await p4kEnrichmentService.enrichAllShips((m) => logger.info(`[P4K] ${m}`));
       logger.info("✅ P4K enrichment completed");
-      res.json({ success: true, message: "P4K sync completed", timestamp: new Date().toISOString() });
+      
+      res.json({ 
+        success: true, 
+        message: "P4K sync completed",
+        timestamp: new Date().toISOString() 
+      });
     } catch (e) {
       logger.error("Admin P4K sync error", { error: (e as Error).message });
       res.status(500).json({ success: false, error: (e as Error).message });

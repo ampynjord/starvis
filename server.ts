@@ -10,8 +10,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import { createRoutes } from "./src/routes.js";
-import { DB_CONFIG, initializeSchema, P4KEnrichmentService, P4KService, ShipService } from "./src/services.js";
-import logger from "./src/utils/logger.js";
+import { initializeSchema, P4KEnrichmentService, P4KService, ShipService } from "./src/services.js";
+import { DB_CONFIG, logger } from "./src/utils/index.js";
 
 const PORT = process.env.PORT || 3000;
 const P4K_PATH = process.env.P4K_PATH || "/mnt/c/Program Files/Roberts Space Industries/StarCitizen/LIVE/Data.p4k";

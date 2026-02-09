@@ -131,6 +131,11 @@ CREATE TABLE IF NOT EXISTS ship_specs (
   quantum_fuel DECIMAL(10, 2) COMMENT 'Quantum fuel capacity',
   hydrogen_fuel DECIMAL(10, 2) COMMENT 'Hydrogen fuel capacity',
   
+  -- Weaponry (from P4K loadout XMLs)
+  weapon_hardpoints TINYINT UNSIGNED COMMENT 'Number of weapon hardpoints',
+  missile_racks TINYINT UNSIGNED COMMENT 'Number of missile racks',
+  turrets TINYINT UNSIGNED COMMENT 'Number of turrets',
+  
   FOREIGN KEY (ship_uuid) REFERENCES ships(uuid) ON DELETE CASCADE,
   INDEX idx_cargo (cargo_scu),
   INDEX idx_crew (max_crew)
