@@ -34,7 +34,9 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
-      # P4K file path (optional - for reading game data)
+      ADMIN_API_KEY: ${ADMIN_API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
       P4K_PATH: ${P4K_PATH:-}
     volumes:
       # Mount the Star Citizen game directory if P4K_PATH is set

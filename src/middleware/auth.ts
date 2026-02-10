@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from "express";
 
-export const ADMIN_API_KEY = process.env.ADMIN_API_KEY || "starapi_admin_2024";
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
+if (!ADMIN_API_KEY) throw new Error("Missing required env var: ADMIN_API_KEY");
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const apiKey = req.headers["x-api-key"] || req.query.api_key;
