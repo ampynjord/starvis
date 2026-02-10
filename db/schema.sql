@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS ship_specs (
   -- Speed (m/s)
   scm_speed DECIMAL(10, 2),
   max_speed DECIMAL(10, 2),
+  afterburner_speed DECIMAL(10, 2) COMMENT 'Afterburner/boost forward speed from P4K',
   
   -- Maneuverability (deg/s)
   pitch_max DECIMAL(10, 2),
@@ -125,6 +126,14 @@ CREATE TABLE IF NOT EXISTS ship_specs (
   weapon_hardpoints TINYINT UNSIGNED COMMENT 'Number of weapon hardpoints',
   missile_racks TINYINT UNSIGNED COMMENT 'Number of missile racks',
   turrets TINYINT UNSIGNED COMMENT 'Number of turrets',
+  
+  -- P4K Advanced Stats  
+  actual_mass DECIMAL(15, 2) COMMENT 'Actual mass from P4K (kg)',
+  em_signature DECIMAL(10, 2) COMMENT 'EM signature (electromagnetic)',
+  ir_signature DECIMAL(10, 2) COMMENT 'IR signature (thermal)',
+  cs_signature DECIMAL(10, 2) COMMENT 'CS signature (cross-section radar)',
+  shield_faces TINYINT UNSIGNED COMMENT 'Number of shield faces',
+  radar_range DECIMAL(10, 2) COMMENT 'Radar detection range (m)',
   
   -- Foreign key & indexes
   CONSTRAINT fk_spec_ship FOREIGN KEY (ship_uuid) 
