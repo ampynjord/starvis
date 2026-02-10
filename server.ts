@@ -1,6 +1,9 @@
 /**
- * STARAPI - Star Citizen Ships API v1.0
- * Entry point with enhanced logging, rate limiting, and authentication
+ * STARAPI v1.0 - Star Citizen Ships & Components API
+ *
+ * Architecture:
+ *   ship_matrix table    ← ShipMatrixService  ← RSI Ship Matrix API
+ *   ships/components/etc ← GameDataService     ← DataForgeService ← P4K
  */
 import cors from "cors";
 import express from "express";
@@ -10,109 +13,125 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import { createRoutes } from "./src/routes.js";
-import { initializeSchema, P4KEnrichmentService, P4KService, ShipService } from "./src/services.js";
+import { DataForgeService, GameDataService, ShipMatrixService, initializeSchema } from "./src/services/index.js";
 import { DB_CONFIG, logger } from "./src/utils/index.js";
 
 const PORT = process.env.PORT || 3000;
-const P4K_PATH = process.env.P4K_PATH || "/mnt/c/Program Files/Roberts Space Industries/StarCitizen/LIVE/Data.p4k";
+const P4K_PATH = process.env.P4K_PATH || "/game/Data.p4k";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 let pool: mysql.Pool | null = null;
-let p4kService: P4KService | null = null;
-let p4kEnrichmentService: P4KEnrichmentService | null = null;
+let dfService: DataForgeService | null = null;
+let gameDataService: GameDataService | null = null;
 
 // ===== MIDDLEWARE =====
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || "*",
-  credentials: true
-}));
+app.use(cors({ origin: process.env.CORS_ORIGIN || "*", credentials: true }));
 app.use(express.json());
 
-// Request logging middleware
+// Request logging (skip /health to avoid noise)
 app.use((req, res, next) => {
+  if (req.path === "/health") return next();
   const start = Date.now();
   res.on("finish", () => {
-    const duration = Date.now() - start;
-    logger.info(`${req.method} ${req.path} ${res.statusCode} - ${duration}ms`);
+    const ms = Date.now() - start;
+    const status = res.statusCode;
+    const color = status >= 400 ? "warn" : "info";
+    logger[color](`${req.method} ${req.path} → ${status}`, { module: "HTTP", duration: `${ms}ms` });
   });
   next();
 });
 
-// ===== BASIC ROUTES =====
-app.get("/", (_, res) => res.json({ 
-  name: "Starapi", 
-  version: "1.0.0", 
+// ===== ROOT =====
+app.get("/", (_, res) => res.json({
+  name: "Starapi",
+  version: "1.0.0",
   endpoints: {
-    v1: "/api/v1/*",
-    legacy: "/api/*",
-    admin: "/admin/* (requires X-API-Key header)",
+    shipMatrix: "/api/v1/ship-matrix",
+    ships: "/api/v1/ships",
+    components: "/api/v1/components",
+    manufacturers: "/api/v1/manufacturers",
+    admin: "/admin/* (requires X-API-Key)",
     health: "/health",
-    docs: "https://github.com/ampynjord/starapi"
-  }
+  },
 }));
 
 // ===== STARTUP =====
 async function start() {
-  // Database connection with retry
+  // 1. Database connection with retry
   for (let i = 0; i < 30; i++) {
     try {
       pool = mysql.createPool(DB_CONFIG);
       const conn = await pool.getConnection();
       await initializeSchema(conn);
       conn.release();
-      logger.info("✅ Database ready");
+      logger.info("✅ Database ready", { module: "DB" });
       break;
     } catch (e) {
-      logger.warn(`⏳ DB retry ${i + 1}/30...`);
+      logger.warn(`DB retry ${i + 1}/30…`, { module: "DB" });
       await new Promise(r => setTimeout(r, 1000));
     }
   }
-  if (!pool) { 
-    logger.error("❌ Database failed"); 
-    process.exit(1); 
-  }
+  if (!pool) { logger.error("Database connection failed after 30 retries", { module: "DB" }); process.exit(1); }
 
-  // P4K service (optional)
+  // 2. Ship Matrix service (always available)
+  const shipMatrixService = new ShipMatrixService(pool);
+
+  // 3. DataForge / P4K service (optional)
   if (existsSync(P4K_PATH)) {
     try {
-      logger.info("🔧 Init P4K...");
-      p4kService = new P4KService(P4K_PATH);
-      await p4kService.init();
-      p4kEnrichmentService = new P4KEnrichmentService(pool, p4kService);
-      logger.info("✓ P4K ready");
-    } catch (e) { 
-      logger.info("ℹ️ P4K unavailable"); 
+      logger.info("Initializing DataForge…", { module: "P4K" });
+      dfService = new DataForgeService(P4K_PATH);
+      await dfService.init();
+      gameDataService = new GameDataService(pool, dfService);
+      logger.info("✅ DataForge ready", { module: "P4K" });
+    } catch (e) {
+      logger.warn("P4K/DataForge unavailable", { module: "P4K" });
+      logger.warn(String(e));
     }
+  } else {
+    logger.info("P4K not found — game data endpoints disabled", { module: "P4K" });
   }
 
-  // Services
-  const shipService = new ShipService(pool);
+  // 4. Mount routes
+  app.use("/", createRoutes({
+    pool,
+    shipMatrixService,
+    gameDataService: gameDataService || undefined,
+  }));
 
-  // Mount all routes
-  app.use("/", createRoutes({ pool, shipService, p4kService: p4kService || undefined, p4kEnrichmentService: p4kEnrichmentService || undefined }));
-
-  // Initial sync
+  // 5. Initial sync: Ship Matrix
   try {
-    logger.info("📡 Initial sync...");
-    await shipService.syncFromShipMatrix();
-  } catch (e) { 
-    logger.warn("⚠️ Sync warning:", e); 
+    logger.info("Syncing RSI Ship Matrix…", { module: "ShipMatrix" });
+    const smResult = await shipMatrixService.sync();
+    logger.info(`✅ Ship Matrix synced: ${smResult.synced}/${smResult.total}`, { module: "ShipMatrix" });
+  } catch (e) {
+    logger.warn("Ship Matrix sync failed", { module: "ShipMatrix" });
+    logger.warn(String(e));
   }
 
-  // P4K enrichment (background)
-  if (p4kEnrichmentService) {
-    p4kEnrichmentService.enrichAllShips(m => logger.info(`[P4K] ${m}`)).catch(e => logger.error("❌ P4K enrichment failed:", e));
+  // 6. Background: extract game data from P4K
+  if (gameDataService) {
+    (async () => {
+      try {
+        const stats = await gameDataService!.extractAll(msg => logger.info(msg, { module: "P4K" }));
+        logger.info(`✅ Game data ready: ${stats.ships} ships, ${stats.components} components, ${stats.manufacturers} manufacturers`, { module: "P4K" });
+      } catch (e) {
+        logger.error("Game data extraction failed", { module: "P4K" });
+        logger.error(String(e));
+      }
+    })();
   }
 
-  app.listen(PORT, () => logger.info(`🚀 Starapi v1.0 running on http://localhost:${PORT}`));
+  app.listen(PORT, () => logger.info(`✅ Starapi v1.0 listening on :${PORT}`, { module: "Server" }));
 }
 
 process.on("SIGINT", async () => {
-  logger.info("\n🛑 Shutting down...");
-  if (p4kService) await p4kService.close();
+  logger.info("Shutting down…", { module: "Server" });
+  if (dfService) await dfService.close();
   if (pool) await pool.end();
   process.exit(0);
 });
 
 start();
+

@@ -1,298 +1,391 @@
-# 🚀 STARAPI
+# STARAPI v1.0
 
 **API REST pour les données de vaisseaux Star Citizen**
 
-Agrégation des données **RSI Ship Matrix** + **P4K DataForge** avec UUIDs réels, pagination, filtres et rate limiting.
+Deux sources de données complémentaires :
+- **RSI Ship Matrix** — données officielles marketing (246 vaisseaux)
+- **P4K DataForge** — données de jeu réelles (474 vaisseaux, 1352 composants, ~38 600 ports de loadout)
 
 ---
 
-## ✨ Fonctionnalités
+## Fonctionnalités
 
-- 🛸 **246 vaisseaux** avec UUIDs DataForge authentiques
-- 🔍 **Filtres avancés** : manufacturer, size, role, status, type
-- 📄 **Pagination** complète avec métadonnées
-- 🔐 **Rate Limiting** (100 req/min public, 30 req/min admin)
-- 📦 **P4K Integration** : extraction directe des fichiers de jeu
-- 📊 **Statistiques** par manufacturer, rôle, taille
+- **Ship Matrix** : 246 vaisseaux depuis l'API RSI (données marketing, specs officielles)
+- **Game Data** : 474 vaisseaux extraits du P4K/DataForge avec stats réelles
+- **Components** : 1352 composants (armes, boucliers, quantum drives, coolers, missiles…)
+- **Manufacturers** : ~50 fabricants
+- **Loadouts** : ~38 600 ports d'équipement par défaut avec hiérarchie parent/enfant
+- **Cross-référence** automatique ships ↔ ship_matrix (~200 liés via alias + fuzzy matching)
+- **Filtres & tri** sur ships, components, manufacturers
 
 ---
 
-## 🚀 Démarrage rapide
+## Démarrage rapide
 
 ### Prérequis
 
 - Docker & Docker Compose
-- (Optionnel) Star Citizen installé pour l'enrichissement P4K
+- Star Citizen installé (pour les données P4K)
 
 ### Installation
 
 ```bash
-# Clone
 git clone https://github.com/ampynjord/starapi
 cd starapi
-
-# Configuration
-cp .env.example .env
-# Éditer .env si nécessaire
-
-# Démarrer
+cp .env.example .env    # puis éditer les mots de passe
 docker compose up -d
-
-# Vérifier
-curl http://localhost:3000/health
+curl http://localhost:3003/health
 ```
+
+> Le premier démarrage prend ~6 min (extraction de 474 vaisseaux depuis le P4K).
 
 ### Variables d'environnement
 
-```env
-# Base de données
-DB_HOST=mysql
-DB_PORT=3306
-DB_USER=starapi_user
-DB_PASSWORD=starapi_pass
-DB_NAME=starapi
-MYSQL_ROOT_PASSWORD=rootpassword
+Toute la configuration est dans `.env` (voir `.env.example`).
 
-# API
-PORT=3000
-NODE_ENV=production
-ADMIN_API_KEY=your_secret_key
-
-# P4K (optionnel)
-P4K_PATH=/game/Data.p4k
-P4K_VOLUME=/mnt/c/Program Files/Roberts Space Industries/StarCitizen/LIVE:/game:ro
-```
+| Variable | Description |
+|----------|-------------|
+| `PORT` | Port exposé sur l'hôte (défaut: 3003) |
+| `NODE_ENV` | Environnement (production/development) |
+| `LOG_LEVEL` | Niveau de log (debug/info/warn/error) |
+| `ADMIN_API_KEY` | Clé d'accès admin (**obligatoire**, pas de défaut) |
+| `CORS_ORIGIN` | Origine CORS (défaut: *) |
+| `DB_HOST` | Hôte MySQL (défaut: mysql) |
+| `DB_PORT` | Port MySQL interne (3306) |
+| `DB_EXTERNAL_PORT` | Port MySQL exposé (défaut: 3306) |
+| `DB_USER` | Utilisateur MySQL |
+| `DB_PASSWORD` | Mot de passe MySQL |
+| `DB_NAME` | Nom de la base (starapi) |
+| `MYSQL_ROOT_PASSWORD` | Mot de passe root MySQL |
+| `P4K_PATH` | Chemin vers Data.p4k dans le conteneur |
+| `P4K_VOLUME` | Chemin hôte vers le dossier LIVE de Star Citizen |
 
 ---
 
-## 📚 API Endpoints
+## API Endpoints
 
-### Ships
+### Ship Matrix (RSI)
+
+Données officielles RSI Ship Matrix — 246 vaisseaux.
 
 ```bash
-# Liste paginée avec filtres
-GET /api/v1/ships
-GET /api/v1/ships?page=1&limit=10&manufacturer=aegis&status=flight-ready&size=medium
+# Liste complète (ou avec recherche)
+GET /api/v1/ship-matrix
+GET /api/v1/ship-matrix?search=hornet
 
-# Détails d'un vaisseau
-GET /api/v1/ships/:uuid
+# Détails par ID RSI ou nom
+GET /api/v1/ship-matrix/123
+GET /api/v1/ship-matrix/Aurora%20MR
 
-# Comparaison de vaisseaux
-GET /api/v1/ships/compare?uuids=uuid1,uuid2,uuid3
-
-# Recherche par nom
-GET /api/v1/ships/search?q=hornet
+# Statistiques
+GET /api/v1/ship-matrix/stats
 ```
 
-#### Paramètres de filtre
+### Ships (Game Data)
+
+474 vaisseaux extraits du P4K/DataForge avec toutes les données de jeu réelles.
+
+```bash
+# Liste avec filtres
+GET /api/v1/ships
+GET /api/v1/ships?manufacturer=AEGS&role=combat&sort=mass&order=desc
+
+# Détails (par UUID ou class_name)
+GET /api/v1/ships/:uuid
+GET /api/v1/ships/AEGS_Gladius
+
+# Loadout par défaut (hiérarchique)
+GET /api/v1/ships/:uuid/loadout
+GET /api/v1/ships/AEGS_Gladius/loadout
+```
+
+#### Filtres ships
 
 | Paramètre | Description | Exemple |
 |-----------|-------------|---------|
-| `page` | Numéro de page | `1` |
-| `limit` | Résultats par page (max 100) | `20` |
-| `manufacturer` | Code fabricant | `aegis`, `anvl`, `rsi` |
-| `status` | Statut de production | `flight-ready`, `in-concept` |
-| `size` | Taille du vaisseau | `small`, `medium`, `large`, `capital` |
-| `role` | Rôle principal | `combat`, `transport`, `exploration` |
-| `type` | Type de véhicule | `spaceship`, `ground_vehicle`, `snub` |
-| `sort` | Champ de tri | `name`, `manufacturer`, `size` |
-| `order` | Ordre de tri | `asc`, `desc` |
+| `manufacturer` | Code fabricant | `AEGS`, `ANVL`, `RSI` |
+| `role` | Rôle | `combat`, `transport` |
+| `search` | Recherche nom/className | `Gladius` |
+| `sort` | Tri | `name`, `mass`, `scm_speed`, `total_hp` |
+| `order` | Ordre | `asc`, `desc` |
+
+### Components (Game Data)
+
+1352 composants SCItem extraits du DataForge.
+
+```bash
+# Liste avec filtres
+GET /api/v1/components
+GET /api/v1/components?type=WeaponGun&size=3&manufacturer=BEHR
+
+# Détails
+GET /api/v1/components/:uuid
+```
+
+#### Filtres components
+
+| Paramètre | Description | Exemple |
+|-----------|-------------|---------|
+| `type` | Type de composant | `WeaponGun`, `Shield`, `PowerPlant`, `QuantumDrive`, `Cooler`, `Missile` |
+| `size` | Taille (0-9) | `3` |
+| `manufacturer` | Code fabricant | `BEHR` |
+| `search` | Recherche nom/className | `Gatling` |
+| `sort` | Tri | `name`, `weapon_dps`, `shield_hp`, `qd_speed` |
 
 ### Manufacturers
 
+~50 fabricants (véhicules + composants).
+
 ```bash
-# Liste des fabricants avec stats
 GET /api/v1/manufacturers
-
-# Détails d'un fabricant
-GET /api/v1/manufacturers/:code
-
-# Vaisseaux d'un fabricant
-GET /api/v1/manufacturers/AEGS/ships
-```
-
-### Statistics
-
-```bash
-# Statistiques globales
-GET /api/v1/stats
 ```
 
 ### Admin (nécessite X-API-Key)
 
 ```bash
-# Synchronisation complète (RSI + P4K)
-POST /admin/sync
+# Sync RSI Ship Matrix
+curl -X POST -H "X-API-Key: $ADMIN_API_KEY" http://localhost:3003/admin/sync-ship-matrix
 
-# Sync RSI Ship Matrix uniquement
-POST /admin/sync/rsi
+# Extraction complète P4K/DataForge
+curl -X POST -H "X-API-Key: $ADMIN_API_KEY" http://localhost:3003/admin/extract-game-data
 
-# Enrichissement P4K uniquement
-POST /admin/sync/p4k
+# Statistiques BDD
+curl -H "X-API-Key: $ADMIN_API_KEY" http://localhost:3003/admin/stats
+```
 
-# Health check détaillé
-GET /admin/health
+### Health
+
+```bash
+GET /health
 ```
 
 ---
 
-## 🗄️ Base de données
+## Base de données
 
-### Schéma
+### Schéma (5 tables)
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  manufacturers  │     │      ships      │     │   ship_specs    │
-├─────────────────┤     ├─────────────────┤     ├─────────────────┤
-│ code (PK)       │◄────│ manufacturer_   │     │ ship_uuid (PK)  │
-│ name            │     │   code (FK)     │────►│ length          │
-│ description     │     │ uuid (PK)       │     │ beam            │
-│ country         │     │ name            │     │ height          │
-└─────────────────┘     │ class_name      │     │ mass            │
-                        │ role            │     │ cargo_scu       │
-                        │ size            │     │ min_crew        │
-                        │ vehicle_type    │     │ max_crew        │
-                        │ production_     │     │ scm_speed       │
-                        │   status        │     │ max_speed       │
-                        │ is_flight_ready │     │ pitch/yaw/roll  │
-                        │ thumbnail_url   │     │ accelerations   │
-                        │ p4k_base_path   │     │ hull_hp         │
-                        │ enriched_at     │     │ shield_hp       │
-                        └─────────────────┘     └─────────────────┘
+┌────────────────────┐
+│    ship_matrix     │  ← RSI Ship Matrix API (246 ships)
+├────────────────────┤
+│ id (PK)            │
+│ name               │
+│ manufacturer_code  │
+│ focus, type, size  │
+│ dimensions, specs  │
+│ media URLs         │
+│ compiled (JSON)    │
+│ synced_at          │
+└────────────────────┘
+         ▲
+         │ ship_matrix_id (FK)
+┌────────────────────┐     ┌────────────────────┐
+│      ships         │     │  manufacturers     │
+├────────────────────┤     ├────────────────────┤
+│ uuid (PK)          │     │ code (PK)          │
+│ class_name         │     │ name               │
+│ name               │     │ description        │
+│ manufacturer_code ─┼────►│ known_for          │
+│ role, career       │     └────────────────────┘
+│ mass, speeds, HP   │
+│ fuel, shield       │
+│ insurance          │
+│ game_data (JSON)   │
+└────────┬───────────┘
+         │ ship_uuid (FK)
+┌────────────────────────────┐     ┌────────────────────┐
+│     ships_loadouts         │     │    components       │
+├────────────────────────────┤     ├────────────────────┤
+│ id (PK)                    │     │ uuid (PK)          │
+│ ship_uuid (FK)             │     │ class_name         │
+│ port_name                  │     │ name, type, size   │
+│ port_type                  │     │ weapon stats       │
+│ component_class_name       │     │ shield stats       │
+│ component_uuid (FK) ───────┼────►│ QD stats           │
+│ parent_id (self-ref)       │     │ missile stats      │
+└────────────────────────────┘     │ power, thermal     │
+                                   └────────────────────┘
 ```
 
-### Fabricants supportés (22)
+### Données actuelles
 
-| Code | Nom | Origine |
-|------|-----|---------|
-| AEGS | Aegis Dynamics | UEE |
-| ANVL | Anvil Aerospace | UEE |
-| AOPOA | Aopoa | Xi'an Empire |
-| ARGO | Argo Astronautics | UEE |
-| BANU | Banu | Banu Protectorate |
-| CNOU | Consolidated Outland | UEE |
-| CRUS | Crusader Industries | UEE |
-| DRAK | Drake Interplanetary | UEE |
-| ESPR | Esperia | UEE |
-| GAMA | Gatac Manufacture | Tevarin |
-| GREY | Grey's Market | Underground |
-| GRIN | Greycat Industrial | UEE |
-| KRIG | Kruger Intergalactic | UEE |
-| MIRA | Mirai | UEE |
-| MISC | MISC | UEE |
-| ORIG | Origin Jumpworks | UEE |
-| RSI | Roberts Space Industries | UEE |
-| TMBL | Tumbril Land Systems | UEE |
-| VNCL | Vanduul Clans | Vanduul |
+| Table | Entrées |
+|-------|---------|
+| `ship_matrix` | 246 |
+| `ships` | 474 |
+| `components` | 1 352 |
+| `manufacturers` | ~50 |
+| `ships_loadouts` | ~38 600 ports |
+| Ships liés à Ship Matrix | ~200 |
+
+### Manufacturers principaux
+
+#### Véhicules (Ship Matrix + P4K)
+
+| Code | Nom |
+|------|-----|
+| AEGS | Aegis Dynamics |
+| ANVL | Anvil Aerospace |
+| ARGO | ARGO Astronautics |
+| BANU | Banu |
+| CNOU | Consolidated Outland |
+| CRUS | Crusader Industries |
+| DRAK | Drake Interplanetary |
+| ESPR | Esperia |
+| GAMA | Gatac Manufacture |
+| GLSN / GREY | Grey's Market |
+| GRIN | Greycat Industrial |
+| KRIG | Kruger Intergalactic |
+| MISC | Musashi Industrial & Starflight Concern |
+| MRAI | Mirai |
+| ORIG | Origin Jumpworks |
+| RSI | Roberts Space Industries |
+| TMBL | Tumbril Land Systems |
+| VNCL | Vanduul |
+| XIAN / XNAA | Aopoa |
+
+#### Composants (P4K uniquement)
+
+| Code | Nom |
+|------|-----|
+| AMRS | Amon & Reese Co. |
+| APAR | Apocalypse Arms |
+| BEHR | Behring Applied Technology |
+| GATS | Gallenson Tactical Systems |
+| HRST | Hurston Dynamics |
+| JOKR | Joker Engineering |
+| KBAR | KnightBridge Arms |
+| KLWE | Klaus & Werner |
+| KRON | Kroneg |
+| MXOX | MaxOx |
+| NOVP | Nova Pyrotechnik |
+| PRAR | Preacher Armaments |
+| TOAG | Thermyte Concern |
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 starapi/
-├── server.ts              # Point d'entrée Express
-├── src/
-│   ├── routes.ts          # Définition des endpoints
-│   ├── services.ts        # Logique métier & sync
-│   ├── p4k-aliases.ts     # Mappings RSI ↔ P4K
-│   ├── middleware/        # Auth, rate-limit, logging
-│   ├── providers/
-│   │   ├── p4k-provider.ts       # Lecture fichiers P4K
-│   │   ├── dataforge-parser.ts   # Parser XML DataForge
-│   │   ├── cryengine-decrypt.ts  # Déchiffrement CryEngine
-│   │   └── rsi-providers.ts      # Scraping RSI
-│   ├── services/
-│   │   ├── p4k-service.ts        # Service P4K
-│   │   ├── p4k-enrichment-service.ts
-│   │   └── ship-service.ts
-│   └── utils/
+├── server.ts                      # Point d'entrée Express
 ├── db/
-│   └── schema.sql         # Schéma MySQL
+│   └── schema.sql                 # Schéma MySQL (5 tables)
+├── src/
+│   ├── routes.ts                  # Endpoints API v1.0
+│   ├── middleware/
+│   │   └── auth.ts                # Auth X-API-Key
+│   ├── providers/
+│   │   └── p4k-provider.ts        # Lecture fichiers P4K (ZIP+AES)
+│   ├── services/
+│   │   ├── schema.ts              # Init schéma BDD + migrations
+│   │   ├── ship-matrix-service.ts # RSI API → ship_matrix
+│   │   ├── dataforge-service.ts   # P4K/DCB parser (~2000 lignes)
+│   │   └── game-data-service.ts   # DataForge → ships/components/loadouts
+│   └── utils/
+│       ├── config.ts              # Configuration centralisée
+│       ├── cryxml-parser.ts       # Parser CryXML binaire
+│       └── logger.ts              # Winston logger
+├── tests/
+│   └── test-all.mjs               # Tests API complets
 ├── docker-compose.yml
 ├── Dockerfile
-└── .env
+└── package.json
 ```
+
+### Pipeline de données
+
+```
+Au démarrage :
+  1. Init DB + schéma (5 tables) + migrations
+  2. ShipMatrixService.sync()        → 246 ships dans ship_matrix
+  3. DataForgeService.init()         → Ouverture P4K (284 MB, Game2.dcb)
+  4. GameDataService.extractAll()    → En background :
+     ├── saveManufacturersFromData() → ~50 manufacturers
+     ├── saveComponents()            → 1352 components
+     ├── saveShips() + loadouts      → 474 ships + ~38600 loadout ports
+     └── crossReferenceShipMatrix()  → ~200 ships liés (multi-pass + aliases)
+```
+
+Tous les endpoints GET lisent la base MySQL (pas d'accès direct aux sources P4K/RSI).
+L'écriture en BDD se fait uniquement au démarrage ou via les endpoints admin POST.
 
 ### Stack technique
 
-- **Runtime** : Node.js 20+ avec TypeScript
+- **Runtime** : Node.js 20+ avec TypeScript (tsx)
 - **Framework** : Express.js
 - **Base de données** : MySQL 8.0
 - **Conteneurisation** : Docker & Docker Compose
-- **Logging** : Winston
+- **Logging** : Winston (module tags, durées, filtrage)
 
 ---
 
-## 📖 Exemples
+## Tests
+
+```bash
+# Lancer les tests (nécessite l'API en cours d'exécution)
+node tests/test-all.mjs
+
+# Ou avec une URL custom
+node tests/test-all.mjs http://localhost:3003
+```
+
+---
+
+## Exemples
 
 ### Lister les chasseurs Aegis
 
 ```bash
-curl 'http://localhost:3000/api/v1/ships?manufacturer=aegs&role=combat&limit=5' | jq
+curl 'http://localhost:3003/api/v1/ships?manufacturer=AEGS&role=combat' | jq '.data[] | {name, mass, scm_speed}'
 ```
 
-### Obtenir les stats globales
+### Voir le loadout du Gladius
 
 ```bash
-curl http://localhost:3000/api/v1/stats | jq '.data.global'
+curl 'http://localhost:3003/api/v1/ships/AEGS_Gladius/loadout' | jq
 ```
 
-```json
-{
-  "total_ships": 246,
-  "flight_ready_count": 214,
-  "in_concept_count": 32,
-  "manufacturer_count": 19
-}
-```
-
-### Comparer des vaisseaux
+### Lister les armes S3+ par DPS
 
 ```bash
-curl 'http://localhost:3000/api/v1/ships/compare?uuids=uuid1,uuid2' | jq
+curl 'http://localhost:3003/api/v1/components?type=WeaponGun&size=3&sort=weapon_dps&order=desc' | jq
 ```
 
-### Synchroniser (admin)
+### Resync admin
 
 ```bash
-curl -X POST \
-  -H "X-API-Key: your_admin_key" \
-  http://localhost:3000/admin/sync
+curl -X POST -H "X-API-Key: $ADMIN_API_KEY" http://localhost:3003/admin/sync-ship-matrix | jq
+curl -X POST -H "X-API-Key: $ADMIN_API_KEY" http://localhost:3003/admin/extract-game-data | jq
 ```
 
 ---
 
-## 🔧 Développement
+## Développement
 
 ```bash
-# Mode développement avec hot-reload
+# Mode dev avec hot-reload
 npm run dev
 
-# Compilation TypeScript
-npx tsc
-
-# Logs en temps réel
+# Logs Docker en temps réel
 docker compose logs -f api
+
+# Rebuild complet (reset BDD)
+docker compose down -v && docker compose up --build -d
 ```
 
 ---
 
-## 📝 Sources de données
+## Sources de données
 
-| Source | Description | Fréquence |
-|--------|-------------|-----------|
-| [RSI Ship Matrix](https://robertsspaceindustries.com/ship-matrix) | Liste officielle des vaisseaux | À la demande |
-| P4K DataForge | Fichiers de jeu (UUIDs, specs) | Enrichissement |
+| Source | Description | Tables |
+|--------|-------------|--------|
+| [RSI Ship Matrix API](https://robertsspaceindustries.com/ship-matrix/index) | Liste officielle des vaisseaux (marketing) | `ship_matrix` |
+| P4K / DataForge (Game2.dcb) | Données de jeu réelles | `ships`, `components`, `ships_loadouts`, `manufacturers` |
 
 ---
 
-## 📄 License
+## License
 
 MIT © [ampynjord](https://github.com/ampynjord)
-
----
-
-<p align="center">
-  <i>Made with ☕ for the Star Citizen community</i>
-</p>
