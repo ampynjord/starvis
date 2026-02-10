@@ -56,6 +56,24 @@ export async function initializeSchema(conn: PoolConnection): Promise<void> {
     }
     
     console.log("✅ Schema initialized");
+    
+    // Migrations: add columns that may not exist yet
+    const migrations = [
+      "ALTER TABLE ship_specs ADD COLUMN afterburner_speed DECIMAL(10,2) COMMENT 'Afterburner/boost forward speed from P4K' AFTER max_speed",
+      "ALTER TABLE ship_specs ADD COLUMN weapon_hardpoints TINYINT UNSIGNED COMMENT 'Number of weapon hardpoints' AFTER hydrogen_fuel",
+      "ALTER TABLE ship_specs ADD COLUMN missile_racks TINYINT UNSIGNED COMMENT 'Number of missile racks' AFTER weapon_hardpoints",
+      "ALTER TABLE ship_specs ADD COLUMN turrets TINYINT UNSIGNED COMMENT 'Number of turrets' AFTER missile_racks",
+      "ALTER TABLE ship_specs ADD COLUMN actual_mass DECIMAL(15,2) COMMENT 'Actual mass from P4K (kg)' AFTER turrets",
+      "ALTER TABLE ship_specs ADD COLUMN em_signature DECIMAL(10,2) COMMENT 'EM signature (electromagnetic)' AFTER actual_mass",
+      "ALTER TABLE ship_specs ADD COLUMN ir_signature DECIMAL(10,2) COMMENT 'IR signature (thermal)' AFTER em_signature",
+      "ALTER TABLE ship_specs ADD COLUMN cs_signature DECIMAL(10,2) COMMENT 'CS signature (cross-section radar)' AFTER ir_signature",
+      "ALTER TABLE ship_specs ADD COLUMN shield_faces TINYINT UNSIGNED COMMENT 'Number of shield faces' AFTER cs_signature",
+      "ALTER TABLE ship_specs ADD COLUMN radar_range DECIMAL(10,2) COMMENT 'Radar detection range (m)' AFTER shield_faces",
+    ];
+    for (const sql of migrations) {
+      try { await conn.execute(sql); console.log(`✅ Migration: ${sql.substring(0, 60)}...`); }
+      catch (e: any) { if (e.code === 'ER_DUP_FIELDNAME') { /* column already exists */ } else console.warn(`⚠️ Migration skipped: ${e.message}`); }
+    }
   } catch (e) {
     console.error("❌ Schema error:", e);
     throw e;
@@ -196,7 +214,12 @@ export class P4KProvider {
     if (entry.compressionMethod === 93 || entry.compressionMethod === 100) {
       const z = await loadFzstd();
       if (!z) throw new Error("ZSTD unavailable");
-      return Buffer.from(z.decompress(new Uint8Array(comp)));
+      try {
+        return Buffer.from(z.decompress(new Uint8Array(comp)));
+      } catch (err) {
+        console.error(`ZSTD decompression failed for ${entry.fileName} (compressed: ${entry.compressedSize}, uncompressed: ${entry.uncompressedSize}, method: ${entry.compressionMethod}):`, err);
+        throw new Error(`invalid zstd data for ${entry.fileName}`);
+      }
     }
     throw new Error(`Unsupported compression: ${entry.compressionMethod}`);
   }
@@ -321,49 +344,77 @@ export class P4KService {
       });
     }
     
-    // Skip PropertyDefinitions (12 bytes each) and EnumDefinitions (8 bytes each) and DataMappings (8 bytes each)
-    off += header.propertyDefinitionCount * 12 + header.enumDefinitionCount * 8 + header.dataMappingCount * 8;
+    // PropertyDefinitions (each 12 bytes) - NOW PARSED!
+    const propertyDefs: any[] = [];
+    for (let i = 0; i < header.propertyDefinitionCount; i++) {
+      propertyDefs.push({
+        nameOffset: u32(),            // DataCoreStringId2 (4 bytes)
+        structIndex: u16(),           // Index/StructIndex for varClass (2 bytes)
+        dataType: u16(),              // EDataType (2 bytes)
+        conversionType: u16() & 0xFF, // EConversionType masked (2 bytes)
+        padding: u16()                // VariantIndex/Padding (2 bytes)
+      });
+    }
     
-    // RecordDefinitions - CORRECTED structure based on StarBreaker!
-    // Each record is 28 bytes: nameOffset(4) + fileNameOffset(4) + structIndex(4) + guid(16) + instanceIndex(2) + structSize(2) = 32 bytes
-    // Wait, let me recalculate: 4 + 4 + 4 + 16 + 2 + 2 = 32 bytes
+    // EnumDefinitions (each 8 bytes) - skip, not needed for value reading
+    off += header.enumDefinitionCount * 8;
+    
+    // DataMappings (v5+: 8 bytes each = structCount u32 + structIndex u32)
+    const dataMappings: { structCount: number; structIndex: number }[] = [];
+    for (let i = 0; i < header.dataMappingCount; i++) {
+      if (version >= 5) {
+        dataMappings.push({ structCount: u32(), structIndex: u32() });
+      } else {
+        dataMappings.push({ structCount: u16(), structIndex: u16() });
+      }
+    }
+    
+    // RecordDefinitions (each 32 bytes)
     const records: any[] = [];
     for (let i = 0; i < header.recordDefinitionCount; i++) {
       const nameOffset = i32();     // DataCoreStringId2 - 4 bytes
       const fileNameOffset = i32(); // DataCoreStringId - 4 bytes
       const structIndex = i32();    // int - 4 bytes
       const id = readGuid();        // CigGuid - 16 bytes (THIS IS THE UUID!)
-      const instanceIndex = u16();  // ushort - 2 bytes
+      const instanceIndex = u16();  // ushort - 2 bytes (variantIndex)
       const structSize = u16();     // ushort - 2 bytes
       records.push({ nameOffset, fileNameOffset, structIndex, id, instanceIndex, structSize });
     }
     
-    // Calculate valuesSize in EXACT read order from StarBreaker
-    const valuesSize = 
-      header.int8ValueCount * 1 +       // Int8Values (sbyte)
-      header.int16ValueCount * 2 +      // Int16Values (short)
-      header.int32ValueCount * 4 +      // Int32Values (int)
-      header.int64ValueCount * 8 +      // Int64Values (long)
-      header.uint8ValueCount * 1 +      // UInt8Values (byte)
-      header.uint16ValueCount * 2 +     // UInt16Values (ushort)
-      header.uint32ValueCount * 4 +     // UInt32Values (uint)
-      header.uint64ValueCount * 8 +     // UInt64Values (ulong)
-      header.booleanValueCount * 1 +    // BooleanValues (bool) - after uints, before singles!
-      header.singleValueCount * 4 +     // SingleValues (float)
-      header.doubleValueCount * 8 +     // DoubleValues (double)
-      header.guidValueCount * 16 +      // GuidValues (CigGuid = 16 bytes)
-      header.stringIdValueCount * 4 +   // StringIdValues (DataCoreStringId = 4 bytes)
-      header.localeValueCount * 4 +     // LocaleValues (DataCoreStringId = 4 bytes)
-      header.enumValueCount * 4 +       // EnumValues (DataCoreStringId = 4 bytes)
-      header.strongValueCount * 8 +     // StrongValues (DataCorePointer = 8 bytes: structIndex + instanceIndex)
-      header.weakValueCount * 8 +       // WeakValues (DataCorePointer = 8 bytes)
-      header.referenceValueCount * 20 + // ReferenceValues (DataCoreReference = 20 bytes: instanceIndex 4 + CigGuid 16)
-      header.enumOptionCount * 4;       // EnumOptions (DataCoreStringId2 = 4 bytes)
+    // Compute value array offsets (indexed arrays for ARRAY-type properties)
+    // Order: Int8, Int16, Int32, Int64, UInt8, UInt16, UInt32, UInt64, Boolean, Single, Double, Guid, StringId, Locale, Enum, Strong, Weak, Reference, EnumOption
+    const vaBase = off;
+    const valueArrayOffsets = {
+      int8:       vaBase,
+      int16:      vaBase + header.int8ValueCount * 1,
+      int32:      0, int64: 0, uint8: 0, uint16: 0, uint32: 0, uint64: 0,
+      boolean:    0, single: 0, double: 0, guid: 0, stringId: 0,
+      locale:     0, enum: 0, strong: 0, weak: 0, reference: 0, enumOption: 0
+    };
+    valueArrayOffsets.int32    = valueArrayOffsets.int16    + header.int16ValueCount * 2;
+    valueArrayOffsets.int64    = valueArrayOffsets.int32    + header.int32ValueCount * 4;
+    valueArrayOffsets.uint8    = valueArrayOffsets.int64    + header.int64ValueCount * 8;
+    valueArrayOffsets.uint16   = valueArrayOffsets.uint8    + header.uint8ValueCount * 1;
+    valueArrayOffsets.uint32   = valueArrayOffsets.uint16   + header.uint16ValueCount * 2;
+    valueArrayOffsets.uint64   = valueArrayOffsets.uint32   + header.uint32ValueCount * 4;
+    valueArrayOffsets.boolean  = valueArrayOffsets.uint64   + header.uint64ValueCount * 8;
+    valueArrayOffsets.single   = valueArrayOffsets.boolean  + header.booleanValueCount * 1;
+    valueArrayOffsets.double   = valueArrayOffsets.single   + header.singleValueCount * 4;
+    valueArrayOffsets.guid     = valueArrayOffsets.double   + header.doubleValueCount * 8;
+    valueArrayOffsets.stringId = valueArrayOffsets.guid     + header.guidValueCount * 16;
+    valueArrayOffsets.locale   = valueArrayOffsets.stringId + header.stringIdValueCount * 4;
+    valueArrayOffsets.enum     = valueArrayOffsets.locale   + header.localeValueCount * 4;
+    valueArrayOffsets.strong   = valueArrayOffsets.enum     + header.enumValueCount * 4;
+    valueArrayOffsets.weak     = valueArrayOffsets.strong   + header.strongValueCount * 8;
+    valueArrayOffsets.reference= valueArrayOffsets.weak     + header.weakValueCount * 8;
+    valueArrayOffsets.enumOption= valueArrayOffsets.reference + header.referenceValueCount * 20;
     
-    console.log(`[DF] Before values, off=${off}`);
-    off += valuesSize;
+    // Skip past all value arrays
+    off = valueArrayOffsets.enumOption + header.enumOptionCount * 4;
     
-    // String table 1 (fileNames)
+    console.log(`[DF] Value arrays: ${vaBase} -> ${off} (${off - vaBase} bytes)`);
+    
+    // String table 1 (text / fileNames)
     const st1Start = off;
     const st1 = new Map<number, string>();
     let sOff = 0, s = "";
@@ -373,7 +424,7 @@ export class P4KService {
       else s += String.fromCharCode(b); 
     }
     
-    // String table 2 (names, struct names) - version 6+
+    // String table 2 (blob / names, struct names) - version 6+
     const st2 = new Map<number, string>();
     if (header.version >= 6 && header.textLength2 > 0) { 
       const st2Start = off;
@@ -385,15 +436,326 @@ export class P4KService {
       }
     }
     
+    // DATA section starts right after string tables (struct instance data)
+    const dataOffset = off;
+    
+    // Build StructToDataOffsetMap from DataMappings (same algo as unp4k)
+    const structToDataOffsetMap = new Map<number, number>();
+    let lastOff = 0;
+    for (let i = 0; i < dataMappings.length; i++) {
+      const dm = dataMappings[i];
+      const structDef = structDefs[i]; // unp4k uses dataMappingIndex for struct lookup
+      if (!structToDataOffsetMap.has(dm.structIndex)) {
+        structToDataOffsetMap.set(dm.structIndex, lastOff);
+      }
+      lastOff += dm.structCount * (structDef?.structSize || 0);
+    }
+    
+    console.log(`[DF] Data section: offset=${dataOffset}, size=${lastOff}, endCheck=${dataOffset + lastOff === buf.length ? 'OK' : `MISMATCH (expected ${buf.length}, got ${dataOffset + lastOff})`}`);
+    
     // Resolve names
     const nameTable = header.version >= 6 ? st2 : st1;
     for (const sd of structDefs) sd.name = nameTable.get(sd.nameOffset) || `STRUCT_${sd.nameOffset}`;
+    for (const pd of propertyDefs) pd.name = nameTable.get(pd.nameOffset) || `PROP_${pd.nameOffset}`;
     for (const r of records) { 
       r.name = nameTable.get(r.nameOffset) || `RECORD_${r.nameOffset}`; 
       r.fileName = st1.get(r.fileNameOffset) || `FILE_${r.fileNameOffset}`; 
     }
     
-    return { header, structDefs, records, stringTable1: st1, stringTable2: st2 };
+    return { 
+      header, structDefs, propertyDefs, dataMappings, records, 
+      stringTable1: st1, stringTable2: st2,
+      valueArrayOffsets, dataOffset, structToDataOffsetMap
+    };
+  }
+
+  // ============ DataForge Instance Reader ============
+  
+  // EDataType constants (from unp4k Enums.cs)
+  private static readonly DT_BOOLEAN       = 0x0001;
+  private static readonly DT_INT8          = 0x0002;
+  private static readonly DT_INT16         = 0x0003;
+  private static readonly DT_INT32         = 0x0004;
+  private static readonly DT_INT64         = 0x0005;
+  private static readonly DT_UINT8         = 0x0006;
+  private static readonly DT_UINT16        = 0x0007;
+  private static readonly DT_UINT32        = 0x0008;
+  private static readonly DT_UINT64        = 0x0009;
+  private static readonly DT_STRING        = 0x000A;
+  private static readonly DT_SINGLE        = 0x000B;
+  private static readonly DT_DOUBLE        = 0x000C;
+  private static readonly DT_LOCALE        = 0x000D;
+  private static readonly DT_GUID          = 0x000E;
+  private static readonly DT_ENUM          = 0x000F;
+  private static readonly DT_CLASS         = 0x0010;
+  private static readonly DT_STRONG_PTR    = 0x0110;
+  private static readonly DT_WEAK_PTR      = 0x0210;
+  private static readonly DT_REFERENCE     = 0x0310;
+
+  /**
+   * Get all property definitions for a struct, including inherited from parent structs.
+   * Returns properties in hierarchy order (parent first, then self).
+   */
+  private getStructProperties(structIndex: number): any[] {
+    if (!this.dfData) return [];
+    const { structDefs, propertyDefs } = this.dfData;
+    const sd = structDefs[structIndex];
+    if (!sd) return [];
+    
+    // Build hierarchy: parent first, then self
+    const hierarchy: any[] = [];
+    const visited = new Set<number>();
+    const buildHierarchy = (idx: number) => {
+      if (visited.has(idx)) return;
+      visited.add(idx);
+      const s = structDefs[idx];
+      if (!s) return;
+      if (s.parentTypeIndex !== -1 && s.parentTypeIndex !== 0xFFFFFFFF) {
+        buildHierarchy(s.parentTypeIndex);
+      }
+      hierarchy.push(s);
+    };
+    buildHierarchy(structIndex);
+    
+    // Collect properties from all structs in hierarchy
+    const props: any[] = [];
+    for (const h of hierarchy) {
+      for (let pi = h.firstAttributeIndex; pi < h.firstAttributeIndex + h.attributeCount; pi++) {
+        if (propertyDefs[pi]) props.push(propertyDefs[pi]);
+      }
+    }
+    return props;
+  }
+
+  /**
+   * Read a struct instance from the DATA section of the DataForge file.
+   * @param structIndex - Which struct type
+   * @param variantIndex - Which instance of that type
+   * @param depth - Current recursion depth (for limiting nested reads)
+   * @param maxDepth - Maximum recursion depth
+   */
+  readInstance(structIndex: number, variantIndex: number, depth = 0, maxDepth = 3): Record<string, any> | null {
+    if (!this.dfData || !this.dcbBuffer) return null;
+    if (depth > maxDepth) return null;
+    
+    const buf = this.dcbBuffer;
+    const { structDefs, structToDataOffsetMap, dataOffset } = this.dfData;
+    
+    const mapOffset = structToDataOffsetMap.get(structIndex);
+    if (mapOffset === undefined) return null;
+    
+    const sd = structDefs[structIndex];
+    if (!sd) return null;
+    
+    const instancePos = dataOffset + mapOffset + variantIndex * sd.structSize;
+    if (instancePos + sd.structSize > buf.length) return null;
+    
+    const allProps = this.getStructProperties(structIndex);
+    const result: Record<string, any> = {};
+    result.__type = sd.name;
+    let pos = instancePos;
+    
+    for (const prop of allProps) {
+      if (prop.conversionType === 0) {
+        // Attribute: read value inline from DATA section
+        const [val, newPos] = this.readValueInline(buf, pos, prop, depth, maxDepth);
+        result[prop.name] = val;
+        pos = newPos;
+      } else {
+        // Array: read (count u32 + firstIndex u32) from inline, then elements from indexed arrays
+        if (pos + 8 > buf.length) break;
+        const count = buf.readUInt32LE(pos); pos += 4;
+        const firstIndex = buf.readUInt32LE(pos); pos += 4;
+        const arr: any[] = [];
+        const limit = Math.min(count, 200);
+        for (let i = 0; i < limit; i++) {
+          arr.push(this.readValueAtIndex(firstIndex + i, prop, depth, maxDepth));
+        }
+        result[prop.name] = arr;
+      }
+    }
+    
+    return result;
+  }
+
+  /**
+   * Read a single value inline from the DATA section (for ConversionType == Attribute).
+   */
+  private readValueInline(buf: Buffer, pos: number, prop: any, depth: number, maxDepth: number): [any, number] {
+    if (pos >= buf.length) return [null, pos];
+    const dt = prop.dataType;
+    
+    switch (dt) {
+      case P4KService.DT_BOOLEAN: return [buf.readUInt8(pos) !== 0, pos + 1];
+      case P4KService.DT_INT8:    return [buf.readInt8(pos), pos + 1];
+      case P4KService.DT_INT16:   return [buf.readInt16LE(pos), pos + 2];
+      case P4KService.DT_INT32:   return [buf.readInt32LE(pos), pos + 4];
+      case P4KService.DT_INT64:   return [Number(buf.readBigInt64LE(pos)), pos + 8];
+      case P4KService.DT_UINT8:   return [buf.readUInt8(pos), pos + 1];
+      case P4KService.DT_UINT16:  return [buf.readUInt16LE(pos), pos + 2];
+      case P4KService.DT_UINT32:  return [buf.readUInt32LE(pos), pos + 4];
+      case P4KService.DT_UINT64:  return [Number(buf.readBigUInt64LE(pos)), pos + 8];
+      case P4KService.DT_STRING: {
+        const strOff = buf.readUInt32LE(pos);
+        return [this.dfData!.stringTable1.get(strOff) ?? `STR_${strOff}`, pos + 4];
+      }
+      case P4KService.DT_SINGLE:  return [Math.round(buf.readFloatLE(pos) * 1e6) / 1e6, pos + 4];
+      case P4KService.DT_DOUBLE:  return [buf.readDoubleLE(pos), pos + 8];
+      case P4KService.DT_LOCALE: {
+        const locOff = buf.readUInt32LE(pos);
+        return [this.dfData!.stringTable1.get(locOff) ?? `LOC_${locOff}`, pos + 4];
+      }
+      case P4KService.DT_GUID: {
+        const g = this.readGuidAt(buf, pos);
+        return [g, pos + 16];
+      }
+      case P4KService.DT_ENUM: {
+        const enumOff = buf.readUInt32LE(pos);
+        return [this.dfData!.stringTable1.get(enumOff) ?? `ENUM_${enumOff}`, pos + 4];
+      }
+      case P4KService.DT_CLASS: {
+        // Nested struct inline - read properties from current position
+        const nestedIdx = prop.structIndex;
+        const nestedProps = this.getStructProperties(nestedIdx);
+        const nestedResult: Record<string, any> = {};
+        const sd = this.dfData!.structDefs[nestedIdx];
+        if (sd) nestedResult.__type = sd.name;
+        let curPos = pos;
+        if (depth < maxDepth) {
+          for (const np of nestedProps) {
+            if (np.conversionType === 0) {
+              const [v, np2] = this.readValueInline(buf, curPos, np, depth + 1, maxDepth);
+              nestedResult[np.name] = v;
+              curPos = np2;
+            } else {
+              if (curPos + 8 > buf.length) break;
+              const cnt = buf.readUInt32LE(curPos); curPos += 4;
+              const fi = buf.readUInt32LE(curPos); curPos += 4;
+              const arr: any[] = [];
+              for (let j = 0; j < Math.min(cnt, 200); j++) {
+                arr.push(this.readValueAtIndex(fi + j, np, depth + 1, maxDepth));
+              }
+              nestedResult[np.name] = arr;
+            }
+          }
+          return [nestedResult, curPos];
+        }
+        // At max depth, skip the struct data
+        return [{ __type: sd?.name, __skipped: true }, pos + (sd?.structSize || 0)];
+      }
+      case P4KService.DT_STRONG_PTR: {
+        const sIdx = buf.readUInt32LE(pos);
+        const vIdx = buf.readUInt16LE(pos + 4);
+        // padding 2 bytes
+        if (sIdx === 0xFFFFFFFF) return [null, pos + 8];
+        if (depth < maxDepth) {
+          const nested = this.readInstance(sIdx, vIdx, depth + 1, maxDepth);
+          return [nested, pos + 8];
+        }
+        const sName = this.dfData!.structDefs[sIdx]?.name || `S${sIdx}`;
+        return [{ __strongPtr: `${sName}[${vIdx}]` }, pos + 8];
+      }
+      case P4KService.DT_WEAK_PTR: {
+        const sIdx = buf.readUInt32LE(pos);
+        const vIdx = buf.readUInt16LE(pos + 4);
+        if (sIdx === 0xFFFFFFFF) return [null, pos + 8];
+        const sName = this.dfData!.structDefs[sIdx]?.name || `S${sIdx}`;
+        return [{ __weakPtr: `${sName}[${vIdx}]` }, pos + 8];
+      }
+      case P4KService.DT_REFERENCE: {
+        const rIdx = buf.readUInt32LE(pos);
+        const rGuid = this.readGuidAt(buf, pos + 4);
+        return [{ __ref: rGuid }, pos + 20];
+      }
+      default:
+        console.warn(`[DF] Unknown dataType: 0x${dt.toString(16)} for prop ${prop.name}`);
+        return [null, pos];
+    }
+  }
+
+  /**
+   * Read a value from the indexed value arrays (for ARRAY-type properties).
+   */
+  private readValueAtIndex(index: number, prop: any, depth: number, maxDepth: number): any {
+    if (!this.dfData || !this.dcbBuffer) return null;
+    const buf = this.dcbBuffer;
+    const va = this.dfData.valueArrayOffsets;
+    const dt = prop.dataType;
+    
+    switch (dt) {
+      case P4KService.DT_BOOLEAN: return buf.readUInt8(va.boolean + index) !== 0;
+      case P4KService.DT_INT8:    return buf.readInt8(va.int8 + index);
+      case P4KService.DT_INT16:   return buf.readInt16LE(va.int16 + index * 2);
+      case P4KService.DT_INT32:   return buf.readInt32LE(va.int32 + index * 4);
+      case P4KService.DT_INT64:   return Number(buf.readBigInt64LE(va.int64 + index * 8));
+      case P4KService.DT_UINT8:   return buf.readUInt8(va.uint8 + index);
+      case P4KService.DT_UINT16:  return buf.readUInt16LE(va.uint16 + index * 2);
+      case P4KService.DT_UINT32:  return buf.readUInt32LE(va.uint32 + index * 4);
+      case P4KService.DT_UINT64:  return Number(buf.readBigUInt64LE(va.uint64 + index * 8));
+      case P4KService.DT_STRING: {
+        const strOff = buf.readUInt32LE(va.stringId + index * 4);
+        return this.dfData.stringTable1.get(strOff) ?? '';
+      }
+      case P4KService.DT_SINGLE:  return Math.round(buf.readFloatLE(va.single + index * 4) * 1e6) / 1e6;
+      case P4KService.DT_DOUBLE:  return buf.readDoubleLE(va.double + index * 8);
+      case P4KService.DT_LOCALE: {
+        const locOff = buf.readUInt32LE(va.locale + index * 4);
+        return this.dfData.stringTable1.get(locOff) ?? '';
+      }
+      case P4KService.DT_GUID:    return this.readGuidAt(buf, va.guid + index * 16);
+      case P4KService.DT_ENUM: {
+        const enumOff = buf.readUInt32LE(va.enum + index * 4);
+        return this.dfData.stringTable1.get(enumOff) ?? '';
+      }
+      case P4KService.DT_STRONG_PTR: {
+        const off = va.strong + index * 8;
+        const sIdx = buf.readUInt32LE(off);
+        const vIdx = buf.readUInt16LE(off + 4);
+        if (sIdx === 0xFFFFFFFF) return null;
+        if (depth < maxDepth) return this.readInstance(sIdx, vIdx, depth + 1, maxDepth);
+        return { __strongPtr: `${this.dfData.structDefs[sIdx]?.name}[${vIdx}]` };
+      }
+      case P4KService.DT_WEAK_PTR: {
+        const off = va.weak + index * 8;
+        const sIdx = buf.readUInt32LE(off);
+        const vIdx = buf.readUInt16LE(off + 4);
+        if (sIdx === 0xFFFFFFFF) return null;
+        return { __weakPtr: `${this.dfData.structDefs[sIdx]?.name}[${vIdx}]` };
+      }
+      case P4KService.DT_REFERENCE: {
+        const off = va.reference + index * 20;
+        const rGuid = this.readGuidAt(buf, off + 4);
+        return { __ref: rGuid };
+      }
+      case P4KService.DT_CLASS: {
+        // Array of inline classes - read from data mapped area
+        const nestedIdx = prop.structIndex;
+        if (depth < maxDepth) return this.readInstance(nestedIdx, index, depth + 1, maxDepth);
+        return { __class: this.dfData.structDefs[nestedIdx]?.name };
+      }
+      default: return null;
+    }
+  }
+
+  /**
+   * Helper: read a CigGuid at a specific buffer offset
+   */
+  private readGuidAt(buf: Buffer, pos: number): string {
+    const d1 = buf.readUInt32LE(pos);
+    const d2 = buf.readUInt16LE(pos + 4);
+    const d3 = buf.readUInt16LE(pos + 6);
+    const d4 = buf.slice(pos + 8, pos + 16).toString("hex");
+    return `${d1.toString(16).padStart(8, "0")}-${d2.toString(16).padStart(4, "0")}-${d3.toString(16).padStart(4, "0")}-${d4.substring(0, 4)}-${d4.substring(4)}`;
+  }
+
+  /**
+   * Read a record's instance data by record index
+   */
+  readRecordInstance(recordIndex: number, maxDepth = 3): Record<string, any> | null {
+    if (!this.dfData) return null;
+    const rec = this.dfData.records[recordIndex];
+    if (!rec) return null;
+    return this.readInstance(rec.structIndex, rec.instanceIndex, 0, maxDepth);
   }
 
   // Build index of vehicle UUIDs from spaceships and groundvehicles records
@@ -431,6 +793,15 @@ export class P4KService {
     }
     
     console.log(`[DF] Built vehicle index: ${this.vehicleIndex.size} vehicles`);
+    
+    // Debug: dump struct type distribution
+    const structCounts = new Map<string, number>();
+    for (const r of this.dfData!.records) {
+      const sname = this.dfData!.structDefs[r.structIndex]?.name || `unknown(${r.structIndex})`;
+      structCounts.set(sname, (structCounts.get(sname) || 0) + 1);
+    }
+    const sorted = [...structCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 30);
+    console.log(`[DF] Top struct types in records: ${sorted.map(([k,v]) => `${k}=${v}`).join(', ')}`);
   }
 
   // Get vehicle UUID by class name (checks aliases too)
@@ -543,14 +914,17 @@ export class P4KService {
   }
 
   /**
-   * Extract vehicle stats from loadout XML files
-   * Returns: hull_hp, shield_hp, quantum_fuel, hydrogen_fuel, weapons, turrets
+   * Extract vehicle stats from DataForge by reading struct instance data.
+   * Navigates EntityClassDefinition -> Components -> specific component params.
    */
   async extractVehicleStats(className: string): Promise<{
     hull_hp?: number;
     shield_hp?: number;
     quantum_fuel?: number;
     hydrogen_fuel?: number;
+    scm_speed?: number;
+    max_speed?: number;
+    afterburner_speed?: number;
     pitch_max?: number;
     yaw_max?: number;
     roll_max?: number;
@@ -561,95 +935,197 @@ export class P4KService {
     weapon_hardpoints?: number;
     missile_racks?: number;
     turrets?: number;
+    actual_mass?: number;
+    em_signature?: number;
+    ir_signature?: number;
+    cs_signature?: number;
+    shield_faces?: number;
+    radar_range?: number;
+    crew_size?: number;
+    length?: number;
+    beam?: number;
+    height?: number;
   } | null> {
-    if (!this.provider) throw new Error("Not init");
+    if (!this.dfData || !this.dcbBuffer) return null;
     
     try {
-      // Find loadout XML files for this vehicle
-      const loadoutPattern = className.replace(/_/g, "").toLowerCase();
-      const xmlEntries = await this.findFiles(loadoutPattern, 50);
+      // Find EntityClassDefinition struct index
+      const entityClassIdx = this.dfData.structDefs.findIndex((s: any) => s.name === 'EntityClassDefinition');
+      if (entityClassIdx === -1) return null;
       
-      // Look for loadout/vehicle XML files
-      const loadoutEntry = xmlEntries.find(entry => 
-        entry.fileName.toLowerCase().includes('defaultloadout') || 
-        entry.fileName.toLowerCase().includes('_loadout') ||
-        (entry.fileName.toLowerCase().includes(loadoutPattern) && entry.fileName.endsWith('.xml'))
+      // Find the record matching this className
+      const record = this.dfData.records.find((r: any) =>
+        r.structIndex === entityClassIdx && 
+        (r.name?.replace('EntityClassDefinition.', '') === className ||
+         r.name === className)
       );
-      
-      if (!loadoutEntry) {
-        console.log(`[P4K] No loadout XML found for ${className}`);
-        return null;
+      if (!record) {
+        // Try case-insensitive
+        const lc = className.toLowerCase();
+        const rec2 = this.dfData.records.find((r: any) =>
+          r.structIndex === entityClassIdx && 
+          r.name?.toLowerCase().includes(lc)
+        );
+        if (!rec2) return null;
+        return this.extractStatsFromRecord(rec2);
       }
       
-      console.log(`[P4K] Reading loadout: ${loadoutEntry.fileName}`);
-      const xmlBuffer = await this.provider.readFileFromEntry(loadoutEntry);
-      if (!xmlBuffer || xmlBuffer.length > 2000000) return null; // Skip files > 2MB
-      
-      const xmlStr = xmlBuffer.toString('utf-8');
-      const stats: any = {};
-      
-      // Extract shield HP
-      const shieldMatch = xmlStr.match(/MaxShieldHealth="([\d.]+)"/);
-      if (shieldMatch) stats.shield_hp = Math.round(parseFloat(shieldMatch[1]));
-      
-      // Extract hull HP (DamageResistances or Health components)
-      const hullMatches = xmlStr.matchAll(/Health="([\d.]+)"/g);
-      let maxHull = 0;
-      for (const match of hullMatches) {
-        const hp = parseFloat(match[1]);
-        if (hp > maxHull) maxHull = hp;
-      }
-      if (maxHull > 0) stats.hull_hp = Math.round(maxHull);
-      
-      // Extract quantum fuel capacity
-      const qfuelMatch = xmlStr.match(/<QuantumFuelTank[^>]*Capacity="([\d.]+)"/);
-      if (qfuelMatch) stats.quantum_fuel = parseFloat(qfuelMatch[1]);
-      
-      // Extract hydrogen fuel (all fuel tanks combined)
-      const fuelMatches = xmlStr.matchAll(/<FuelTank[^>]*Capacity="([\d.]+)"/g);
-      let totalFuel = 0;
-      for (const match of fuelMatches) {
-        totalFuel += parseFloat(match[1]);
-      }
-      if (totalFuel > 0) stats.hydrogen_fuel = totalFuel;
-      
-      // Extract maneuverability (IfcsParams)
-      const pitchMatch = xmlStr.match(/maxAngularVelocityPit="([\d.]+)"/);
-      const yawMatch = xmlStr.match(/maxAngularVelocityYaw="([\d.]+)"/);
-      const rollMatch = xmlStr.match(/maxAngularVelocityRol="([\d.]+)"/);
-      if (pitchMatch) stats.pitch_max = parseFloat(pitchMatch[1]);
-      if (yawMatch) stats.yaw_max = parseFloat(yawMatch[1]);
-      if (rollMatch) stats.roll_max = parseFloat(rollMatch[1]);
-      
-      // Extract accelerations
-      const accelMainMatch = xmlStr.match(/angleAccelMain="([\d.]+)"/);
-      const accelRetroMatch = xmlStr.match(/angleAccelRetro="([\d.]+)"/);
-      const accelVTOLMatch = xmlStr.match(/angleAccelVTOL="([\d.]+)"/);
-      const accelManeuveringMatch = xmlStr.match(/angleAccelManeuvering="([\d.]+)"/);
-      if (accelMainMatch) stats.acceleration_main = parseFloat(accelMainMatch[1]);
-      if (accelRetroMatch) stats.acceleration_retro = parseFloat(accelRetroMatch[1]);
-      if (accelVTOLMatch) stats.acceleration_vtol = parseFloat(accelVTOLMatch[1]);
-      if (accelManeuveringMatch) stats.acceleration_maneuvering = parseFloat(accelManeuveringMatch[1]);
-      
-      // Count weapon hardpoints
-      const weaponHardpoints = xmlStr.match(/hardpoint_weapon_/g);
-      if (weaponHardpoints) stats.weapon_hardpoints = weaponHardpoints.length;
-      
-      // Count missile racks
-      const missileRacks = xmlStr.match(/hardpoint_missile_/g);
-      if (missileRacks) stats.missile_racks = missileRacks.length;
-      
-      // Count turrets
-      const turrets = xmlStr.match(/<Turret[^>]*Name=/g);
-      if (turrets) stats.turrets = turrets.length;
-      
-      console.log(`[P4K] Extracted stats for ${className}:`, Object.keys(stats).length, 'properties');
-      return Object.keys(stats).length > 0 ? stats : null;
-      
+      return this.extractStatsFromRecord(record);
     } catch (err) {
-      console.error(`[P4K] Error extracting stats for ${className}:`, err);
+      console.error(`[P4K] Error extracting DataForge stats for ${className}:`, err);
       return null;
     }
+  }
+
+  /**
+   * Extract stats from a resolved EntityClassDefinition record instance.
+   * Strategy: 
+   * 1. Read the EntityClassDef to get components (VehicleComponentParams, etc.)
+   * 2. Find the corresponding SCItem record (which has Mass, IFCS data, etc.)
+   * 3. Merge stats from both sources
+   */
+  private extractStatsFromRecord(record: any): Record<string, number> | null {
+    // Read EntityClassDef with greater depth to resolve component internals
+    const data = this.readInstance(record.structIndex, record.instanceIndex, 0, 5);
+    if (!data) return null;
+    
+    const stats: Record<string, number> = {};
+    
+    // Check StaticEntityClassData for physics controller (Mass)
+    const staticData = data.StaticEntityClassData;
+    if (Array.isArray(staticData)) {
+      for (const sd of staticData) {
+        if (!sd || typeof sd !== 'object') continue;
+        const sdType = sd.__type || '';
+        if (sdType === 'SEntitySpaceShipPhysicsControllerParams' || sdType.includes('PhysicsController')) {
+          const mass = sd.Mass;
+          if (typeof mass === 'number' && mass > 0) stats.actual_mass = Math.round(mass * 100) / 100;
+        }
+      }
+    }
+    
+    // === Extract from EntityClassDef Components (depth=5 already set) ===
+    const components = data.Components;
+    if (Array.isArray(components)) {
+      for (const comp of components) {
+        if (!comp || typeof comp !== 'object' || !comp.__type) continue;
+        const type = comp.__type as string;
+        
+        // VehicleComponentParams: crewSize, hull HP, bounding box
+        if (type === 'VehicleComponentParams') {
+          const crew = comp.crewSize;
+          if (typeof crew === 'number' && crew > 0) stats.crew_size = crew;
+          const hullHp = comp.vehicleHullDamageNormalizationValue;
+          if (typeof hullHp === 'number' && hullHp > 0) stats.hull_hp = Math.round(hullHp);
+          const bbox = comp.maxBoundingBoxSize;
+          if (bbox && typeof bbox === 'object') {
+            if (typeof bbox.x === 'number') stats.length = Math.round(bbox.x * 100) / 100;
+            if (typeof bbox.y === 'number') stats.beam = Math.round(bbox.y * 100) / 100;
+            if (typeof bbox.z === 'number') stats.height = Math.round(bbox.z * 100) / 100;
+          }
+        }
+        
+        // SEntityComponentDefaultLoadoutParams: follow loadout for flight controller
+        if (type === 'SEntityComponentDefaultLoadoutParams') {
+          const entries = comp.loadout?.entries;
+          if (Array.isArray(entries)) {
+            for (const entry of entries) {
+              const portName = (entry.itemPortName || '').toLowerCase();
+              const entClassName = entry.entityClassName || '';
+              
+              if (portName === 'hardpoint_controller_flight' && entClassName && this.dfData) {
+                const fcRecord = this.findEntityRecord(entClassName);
+                if (fcRecord) {
+                  const fcData = this.readInstance(fcRecord.structIndex, fcRecord.instanceIndex, 0, 5);
+                  if (fcData && Array.isArray(fcData.Components)) {
+                    for (const fcComp of fcData.Components) {
+                      if (!fcComp?.__type) continue;
+                      const fcType = fcComp.__type as string;
+                      
+                      // IFCSParams: speed, angular velocity
+                      if (fcType === 'IFCSParams') {
+                        const scmSpeed = fcComp.scmSpeed;
+                        if (typeof scmSpeed === 'number' && scmSpeed > 0) stats.scm_speed = Math.round(scmSpeed);
+                        const boostFwd = fcComp.boostSpeedForward;
+                        if (typeof boostFwd === 'number' && boostFwd > 0) stats.afterburner_speed = Math.round(boostFwd);
+                        const maxSpd = fcComp.maxSpeed;
+                        if (typeof maxSpd === 'number' && maxSpd > 0) stats.max_speed = Math.round(maxSpd);
+                        const maxAV = fcComp.maxAngularVelocity;
+                        if (maxAV && typeof maxAV === 'object') {
+                          if (typeof maxAV.x === 'number' && maxAV.x > 0) stats.pitch_max = Math.round(maxAV.x * 100) / 100;
+                          if (typeof maxAV.y === 'number' && maxAV.y > 0) stats.yaw_max = Math.round(maxAV.y * 100) / 100;
+                          if (typeof maxAV.z === 'number' && maxAV.z > 0) stats.roll_max = Math.round(maxAV.z * 100) / 100;
+                        }
+                      }
+                      
+                      // SEntitySpaceShipPhysicsControllerParams: Mass
+                      if (fcType === 'SEntitySpaceShipPhysicsControllerParams') {
+                        const mass = fcComp.Mass;
+                        if (typeof mass === 'number' && mass > 0) stats.actual_mass = Math.round(mass * 100) / 100;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        
+        // SHealthComponentParams
+        if (type === 'SHealthComponentParams') {
+          const hp = comp.Health;
+          if (typeof hp === 'number' && hp > 1) stats.health_multiplier = hp;
+        }
+        
+        // Any component with mass at top level
+        if (!stats.actual_mass) {
+          const mass = typeof comp.mass === 'number' ? comp.mass : (typeof comp.Mass === 'number' ? comp.Mass : undefined);
+          if (mass && mass > 10) stats.actual_mass = Math.round(mass * 100) / 100;
+        }
+      }
+    }
+    
+    return Object.keys(stats).length > 0 ? stats : null;
+  }
+
+  // Helper: find a numeric value by key in an object (recursive)
+  private findNumIn(obj: any, ...keys: string[]): number | undefined {
+    if (!obj || typeof obj !== 'object') return undefined;
+    for (const key of keys) {
+      const v = obj[key];
+      if (typeof v === 'number' && v !== 0 && isFinite(v)) return v;
+    }
+    for (const val of Object.values(obj)) {
+      if (val && typeof val === 'object' && !Array.isArray(val)) {
+        const found = this.findNumIn(val, ...keys);
+        if (found !== undefined) return found;
+      }
+    }
+    return undefined;
+  }
+
+  // Find an EntityClassDefinition record by entityClassName
+  private findEntityRecord(entityClassName: string): any | null {
+    if (!this.dfData) return null;
+    const entityClassIdx = this.dfData.structDefs.findIndex((s: any) => s.name === 'EntityClassDefinition');
+    if (entityClassIdx === -1) return null;
+    
+    // Try exact match first
+    for (const r of this.dfData.records) {
+      if (r.structIndex === entityClassIdx) {
+        const name = r.name?.replace('EntityClassDefinition.', '') || '';
+        if (name === entityClassName) return r;
+      }
+    }
+    // Try case-insensitive
+    const lc = entityClassName.toLowerCase();
+    for (const r of this.dfData.records) {
+      if (r.structIndex === entityClassIdx) {
+        const name = (r.name || '').toLowerCase();
+        if (name.includes(lc)) return r;
+      }
+    }
+    return null;
   }
 }
 
@@ -1057,6 +1533,9 @@ export class P4KEnrichmentService {
             if (stats.shield_hp !== undefined) { updateFields.push('shield_hp = ?'); updateValues.push(stats.shield_hp); }
             if (stats.quantum_fuel !== undefined) { updateFields.push('quantum_fuel = ?'); updateValues.push(stats.quantum_fuel); }
             if (stats.hydrogen_fuel !== undefined) { updateFields.push('hydrogen_fuel = ?'); updateValues.push(stats.hydrogen_fuel); }
+            if (stats.scm_speed !== undefined) { updateFields.push('scm_speed = ?'); updateValues.push(stats.scm_speed); }
+            if (stats.max_speed !== undefined) { updateFields.push('max_speed = ?'); updateValues.push(stats.max_speed); }
+            if (stats.afterburner_speed !== undefined) { updateFields.push('afterburner_speed = ?'); updateValues.push(stats.afterburner_speed); }
             if (stats.pitch_max !== undefined) { updateFields.push('pitch_max = ?'); updateValues.push(stats.pitch_max); }
             if (stats.yaw_max !== undefined) { updateFields.push('yaw_max = ?'); updateValues.push(stats.yaw_max); }
             if (stats.roll_max !== undefined) { updateFields.push('roll_max = ?'); updateValues.push(stats.roll_max); }
@@ -1064,6 +1543,19 @@ export class P4KEnrichmentService {
             if (stats.acceleration_retro !== undefined) { updateFields.push('acceleration_retro = ?'); updateValues.push(stats.acceleration_retro); }
             if (stats.acceleration_vtol !== undefined) { updateFields.push('acceleration_vtol = ?'); updateValues.push(stats.acceleration_vtol); }
             if (stats.acceleration_maneuvering !== undefined) { updateFields.push('acceleration_maneuvering = ?'); updateValues.push(stats.acceleration_maneuvering); }
+            if (stats.weapon_hardpoints !== undefined) { updateFields.push('weapon_hardpoints = ?'); updateValues.push(stats.weapon_hardpoints); }
+            if (stats.missile_racks !== undefined) { updateFields.push('missile_racks = ?'); updateValues.push(stats.missile_racks); }
+            if (stats.turrets !== undefined) { updateFields.push('turrets = ?'); updateValues.push(stats.turrets); }
+            if (stats.actual_mass !== undefined) { updateFields.push('actual_mass = ?'); updateValues.push(stats.actual_mass); }
+            if (stats.em_signature !== undefined) { updateFields.push('em_signature = ?'); updateValues.push(stats.em_signature); }
+            if (stats.ir_signature !== undefined) { updateFields.push('ir_signature = ?'); updateValues.push(stats.ir_signature); }
+            if (stats.cs_signature !== undefined) { updateFields.push('cs_signature = ?'); updateValues.push(stats.cs_signature); }
+            if (stats.shield_faces !== undefined) { updateFields.push('shield_faces = ?'); updateValues.push(stats.shield_faces); }
+            if (stats.radar_range !== undefined) { updateFields.push('radar_range = ?'); updateValues.push(stats.radar_range); }
+            if (stats.crew_size !== undefined) { updateFields.push('min_crew = ?'); updateValues.push(stats.crew_size); updateFields.push('max_crew = ?'); updateValues.push(stats.crew_size); }
+            if (stats.length !== undefined) { updateFields.push('length = ?'); updateValues.push(stats.length); }
+            if (stats.beam !== undefined) { updateFields.push('beam = ?'); updateValues.push(stats.beam); }
+            if (stats.height !== undefined) { updateFields.push('height = ?'); updateValues.push(stats.height); }
             
             if (updateFields.length > 0) {
               updateValues.push(finalUuid);
