@@ -2,7 +2,7 @@
  * STARAPI - Schema initialization
  * Reads and executes db/schema.sql
  */
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import type { PoolConnection } from "mysql2/promise";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -10,7 +10,11 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export async function initializeSchema(conn: PoolConnection): Promise<void> {
-  const schemaPath = path.join(__dirname, "..", "..", "db", "schema.sql");
+  // Docker: db/ is at ../../db (same level as src/)
+  // Monorepo CI/local: db/ is at ../../../db (one level above api/)
+  const candidate1 = path.join(__dirname, "..", "..", "db", "schema.sql");
+  const candidate2 = path.join(__dirname, "..", "..", "..", "db", "schema.sql");
+  const schemaPath = existsSync(candidate1) ? candidate1 : candidate2;
   console.log(`📄 Loading schema from: ${schemaPath}`);
   const schema = readFileSync(schemaPath, "utf-8");
 
