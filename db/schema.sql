@@ -1,5 +1,5 @@
 -- ============================================================
--- STARAPI v1.0 - DATABASE SCHEMA
+-- STARVIS v1.0 - DATABASE SCHEMA
 -- Last updated: June 2025
 -- 
 -- Tables:

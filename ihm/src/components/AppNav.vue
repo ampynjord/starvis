@@ -1,64 +1,79 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 
+const props = defineProps<{ open: boolean }>()
+const emit = defineEmits<{ (e: 'close'): void }>()
 const route = useRoute()
-const mobileOpen = ref(false)
 
-const navLinks = [
-  { to: '/', label: 'Accueil', icon: '🏠' },
-  { to: '/ships', label: 'Vaisseaux', icon: '🚀' },
-  { to: '/components', label: 'Composants', icon: '🔧' },
-  { to: '/compare', label: 'Comparer', icon: '⚖️' },
-  { to: '/shops', label: 'Shops', icon: '🛒' },
-  { to: '/loadout', label: 'Loadout', icon: '🎯' },
+const navSections = [
+  {
+    title: 'Base de données',
+    links: [
+      { to: '/ships', label: 'Vaisseaux', icon: '🚀' },
+      { to: '/components', label: 'Composants', icon: '⚙️' },
+      { to: '/shops', label: 'Boutiques', icon: '🏪' },
+    ],
+  },
+  {
+    title: 'Outils',
+    links: [
+      { to: '/compare', label: 'Comparer', icon: '⚖️' },
+      { to: '/loadout', label: 'Loadout', icon: '🎯' },
+      { to: '/hangar', label: 'Exec Hangar', icon: '🏛️' },
+    ],
+  },
 ]
+
+function isActive(to: string) {
+  if (to === '/') return route.path === '/'
+  return route.path === to || route.path.startsWith(to + '/')
+}
 </script>
 
 <template>
-  <nav class="sticky top-0 z-50 bg-sc-darker/95 backdrop-blur border-b border-sc-border">
-    <div class="container mx-auto max-w-7xl px-4">
-      <div class="flex items-center justify-between h-14">
-        <!-- Logo -->
-        <router-link to="/" class="flex items-center gap-2 text-sc-text-bright font-semibold text-lg">
-          <img src="/starapi-icon.svg" alt="" class="w-7 h-7" />
-          Starapi
-        </router-link>
+  <!-- Backdrop (mobile) -->
+  <div
+    v-if="props.open"
+    class="fixed inset-0 bg-black/60 z-40 lg:hidden"
+    @click="emit('close')"
+  />
 
-        <!-- Desktop nav -->
-        <div class="hidden md:flex items-center gap-1">
-          <router-link
-            v-for="link in navLinks"
-            :key="link.to"
-            :to="link.to"
-            class="px-3 py-1.5 rounded-lg text-sm transition-colors"
-            :class="route.path === link.to || (link.to !== '/' && route.path.startsWith(link.to))
-              ? 'bg-sc-accent/20 text-sc-accent font-medium'
-              : 'text-sc-muted hover:text-sc-text hover:bg-sc-border/50'"
-          >
-            {{ link.label }}
-          </router-link>
+  <!-- Sidebar -->
+  <aside
+    class="fixed top-0 left-0 z-50 h-full w-56 bg-sv-darker/95 backdrop-blur-xl border-r border-sv-border/40 flex flex-col transition-transform duration-200 lg:translate-x-0"
+    :class="props.open ? 'translate-x-0' : '-translate-x-full'"
+  >
+    <!-- Logo -->
+    <router-link to="/" class="flex items-center gap-2.5 px-5 h-14 border-b border-sv-border/30" @click="emit('close')">
+      <img src="/starvis-icon.svg" alt="" class="w-6 h-6" />
+      <span class="text-sv-text-bright font-semibold tracking-tight">Starvis</span>
+      <span class="ml-auto text-[10px] text-sv-muted font-mono">v1.0</span>
+    </router-link>
+
+    <!-- Nav sections -->
+    <nav class="flex-1 overflow-y-auto py-3 px-3 space-y-5">
+      <div v-for="section in navSections" :key="section.title">
+        <div class="text-[10px] uppercase tracking-[0.15em] text-sv-muted/60 font-semibold px-3 mb-1.5">
+          {{ section.title }}
         </div>
-
-        <!-- Mobile toggle -->
-        <button @click="mobileOpen = !mobileOpen" class="md:hidden btn-ghost p-2">
-          <span class="text-xl">{{ mobileOpen ? '✕' : '☰' }}</span>
-        </button>
-      </div>
-
-      <!-- Mobile nav -->
-      <div v-if="mobileOpen" class="md:hidden pb-4 space-y-1">
         <router-link
-          v-for="link in navLinks"
+          v-for="link in section.links"
           :key="link.to"
           :to="link.to"
-          class="block px-3 py-2 rounded-lg text-sm"
-          :class="route.path === link.to ? 'bg-sc-accent/20 text-sc-accent' : 'text-sc-muted hover:text-sc-text'"
-          @click="mobileOpen = false"
+          :class="isActive(link.to) ? 'nav-link-active' : 'nav-link'"
+          @click="emit('close')"
         >
-          {{ link.icon }} {{ link.label }}
+          <span class="text-base w-5 text-center">{{ link.icon }}</span>
+          <span>{{ link.label }}</span>
         </router-link>
       </div>
+    </nav>
+
+    <!-- Footer -->
+    <div class="border-t border-sv-border/30 px-4 py-3">
+      <div class="text-[10px] text-sv-muted/50 text-center">
+        API REST ouverte<br />Star Citizen Data
+      </div>
     </div>
-  </nav>
+  </aside>
 </template>

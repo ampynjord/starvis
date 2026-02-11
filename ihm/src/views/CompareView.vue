@@ -50,7 +50,7 @@ watch([ship1, ship2], () => { if (ship1.value && ship2.value) doCompare() }, { i
 function deltaColor(val: number) {
   if (val > 0) return 'text-emerald-400'
   if (val < 0) return 'text-red-400'
-  return 'text-sc-muted'
+  return 'text-sv-muted'
 }
 
 function fmt(v: any) {
@@ -81,70 +81,70 @@ const COMPARE_FIELDS = [
 </script>
 
 <template>
-  <div class="space-y-6">
-    <h1 class="text-2xl font-bold text-sc-text-bright">⚔️ Comparaison de vaisseaux</h1>
+  <div class="space-y-5">
+    <h1 class="section-title">Comparaison de vaisseaux</h1>
 
     <!-- Ship pickers -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div class="card p-4 relative">
-        <label class="stat-label mb-1 block">Vaisseau 1</label>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div class="card p-3 relative">
+        <label class="text-[11px] text-sv-muted uppercase tracking-wider mb-1 block">Vaisseau 1</label>
         <input
           v-model="ship1Query" @input="searchShips(ship1Query, 1)"
           class="input w-full" placeholder="Chercher un vaisseau…"
         />
-        <div v-if="ship1Results.length" class="absolute z-10 left-4 right-4 mt-1 bg-sc-panel border border-sc-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-          <div v-for="s in ship1Results" :key="s.uuid" @click="selectShip(s, 1)" class="px-3 py-2 hover:bg-sc-border/50 cursor-pointer text-sm">
-            <span class="text-sc-text-bright">{{ s.name }}</span>
-            <span class="text-sc-muted ml-2">{{ s.manufacturer_code }}</span>
+        <div v-if="ship1Results.length" class="absolute z-10 left-3 right-3 mt-1 bg-sv-panel border border-sv-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          <div v-for="s in ship1Results" :key="s.uuid" @click="selectShip(s, 1)" class="px-3 py-1.5 hover:bg-sv-panel-light/50 cursor-pointer text-xs">
+            <span class="text-sv-text-bright">{{ s.name }}</span>
+            <span class="text-sv-muted ml-2">{{ s.manufacturer_code }}</span>
           </div>
         </div>
       </div>
-      <div class="card p-4 relative">
-        <label class="stat-label mb-1 block">Vaisseau 2</label>
+      <div class="card p-3 relative">
+        <label class="text-[11px] text-sv-muted uppercase tracking-wider mb-1 block">Vaisseau 2</label>
         <input
           v-model="ship2Query" @input="searchShips(ship2Query, 2)"
           class="input w-full" placeholder="Chercher un vaisseau…"
         />
-        <div v-if="ship2Results.length" class="absolute z-10 left-4 right-4 mt-1 bg-sc-panel border border-sc-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-          <div v-for="s in ship2Results" :key="s.uuid" @click="selectShip(s, 2)" class="px-3 py-2 hover:bg-sc-border/50 cursor-pointer text-sm">
-            <span class="text-sc-text-bright">{{ s.name }}</span>
-            <span class="text-sc-muted ml-2">{{ s.manufacturer_code }}</span>
+        <div v-if="ship2Results.length" class="absolute z-10 left-3 right-3 mt-1 bg-sv-panel border border-sv-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+          <div v-for="s in ship2Results" :key="s.uuid" @click="selectShip(s, 2)" class="px-3 py-1.5 hover:bg-sv-panel-light/50 cursor-pointer text-xs">
+            <span class="text-sv-text-bright">{{ s.name }}</span>
+            <span class="text-sv-muted ml-2">{{ s.manufacturer_code }}</span>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Error -->
-    <div v-if="error" class="card border-red-500/50 p-4 text-red-400">{{ error }}</div>
+    <div v-if="error" class="card border-red-500/50 p-3 text-red-400 text-sm">{{ error }}</div>
 
     <!-- Comparison table -->
     <LoadingState :loading="loading">
       <div v-if="comparison" class="card overflow-x-auto">
-        <table class="w-full text-sm">
-          <thead class="border-b border-sc-border">
+        <table class="w-full text-xs">
+          <thead class="border-b border-sv-border">
             <tr>
-              <th class="py-3 px-4 text-left text-sc-muted">Stat</th>
-              <th class="py-3 px-4 text-right text-sc-accent">{{ comparison.ship1?.name }}</th>
-              <th class="py-3 px-4 text-center text-sc-muted">Δ</th>
-              <th class="py-3 px-4 text-left text-sc-gold">{{ comparison.ship2?.name }}</th>
+              <th class="py-2.5 px-3 text-left text-sv-muted">Stat</th>
+              <th class="py-2.5 px-3 text-right text-sv-accent">{{ comparison.ship1?.name }}</th>
+              <th class="py-2.5 px-3 text-center text-sv-muted w-20">Δ</th>
+              <th class="py-2.5 px-3 text-left text-sv-gold">{{ comparison.ship2?.name }}</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="f in COMPARE_FIELDS" :key="f.key" class="border-b border-sc-border/30 hover:bg-sc-border/10">
-              <td class="py-2 px-4 text-sc-muted">{{ f.label }}</td>
-              <td class="py-2 px-4 text-right text-sc-text-bright">{{ fmt(comparison.ship1?.[f.key]) }}</td>
-              <td class="py-2 px-4 text-center font-mono" :class="deltaColor((comparison.delta || {})[f.key])">
+            <tr v-for="f in COMPARE_FIELDS" :key="f.key" class="border-b border-sv-border/20 hover:bg-sv-panel-light/30">
+              <td class="py-1.5 px-3 text-sv-muted">{{ f.label }}</td>
+              <td class="py-1.5 px-3 text-right text-sv-text-bright">{{ fmt(comparison.ship1?.[f.key]) }}</td>
+              <td class="py-1.5 px-3 text-center font-mono" :class="deltaColor((comparison.delta || {})[f.key])">
                 <template v-if="comparison.delta?.[f.key] != null && comparison.delta[f.key] !== 0">
                   {{ comparison.delta[f.key] > 0 ? '+' : '' }}{{ fmt(comparison.delta[f.key]) }}
                 </template>
                 <template v-else>=</template>
               </td>
-              <td class="py-2 px-4 text-sc-text-bright">{{ fmt(comparison.ship2?.[f.key]) }}</td>
+              <td class="py-1.5 px-3 text-sv-text-bright">{{ fmt(comparison.ship2?.[f.key]) }}</td>
             </tr>
           </tbody>
         </table>
       </div>
-      <div v-else class="text-center py-12 text-sc-muted">
+      <div v-else class="text-center py-12 text-sv-muted text-sm">
         Sélectionnez deux vaisseaux pour les comparer
       </div>
     </LoadingState>

@@ -1,4 +1,4 @@
-# STARAPI v1.0
+# STARVIS v1.0
 
 **API REST + Interface Web pour les données de vaisseaux Star Citizen**
 
@@ -41,7 +41,7 @@ Deux sources de données complémentaires :
 ## Structure du projet
 
 ```
-starapi/
+starvis/
 ├── docker-compose.yml     # Orchestre les 3 services (mysql, api, ihm)
 ├── .env                   # Configuration (voir .env.example)
 ├── api/                   # Backend Express.js + TypeScript
@@ -72,8 +72,8 @@ starapi/
 ### Installation
 
 ```bash
-git clone https://github.com/ampynjord/starapi
-cd starapi
+git clone https://github.com/ampynjord/starvis
+cd starvis
 cp .env.example .env    # puis éditer les mots de passe et chemins
 docker compose up -d
 # API  → http://localhost:3003
@@ -103,7 +103,7 @@ Toute la configuration est dans `.env` (voir `.env.example`).
 | `DB_EXTERNAL_PORT` | Port MySQL exposé sur l'hôte | `3306` |
 | `DB_USER` | Utilisateur MySQL | — |
 | `DB_PASSWORD` | Mot de passe MySQL | — |
-| `DB_NAME` | Nom de la base | `starapi` |
+| `DB_NAME` | Nom de la base | `starvis` |
 | `MYSQL_ROOT_PASSWORD` | Mot de passe root MySQL | — |
 | `P4K_PATH` | Chemin vers Data.p4k dans le conteneur | `/game/Data.p4k` |
 | `P4K_VOLUME` | Chemin hôte vers le dossier LIVE de Star Citizen | — |
@@ -449,7 +449,7 @@ GET /health
 ## Architecture
 
 ```
-starapi/
+starvis/
 ├── server.ts                      # Point d'entrée Express
 ├── .github/
 │   └── workflows/

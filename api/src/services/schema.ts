@@ -1,5 +1,5 @@
 /**
- * STARAPI - Schema initialization
+ * STARVIS - Schema initialization
  * Reads and executes db/schema.sql
  */
 import { existsSync, readFileSync } from "fs";

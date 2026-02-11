@@ -51,8 +51,8 @@ jobs:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: testroot
-          MYSQL_DATABASE: starapi_test
-          MYSQL_USER: starapi_user
+          MYSQL_DATABASE: starvis_test
+          MYSQL_USER: starvis_user
           MYSQL_PASSWORD: testpass
         ports:
           - 3306:3306
@@ -65,9 +65,9 @@ jobs:
     env:
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
-      DB_USER: starapi_user
+      DB_USER: starvis_user
       DB_PASSWORD: testpass
-      DB_NAME: starapi_test
+      DB_NAME: starvis_test
       MYSQL_ROOT_PASSWORD: testroot
       ADMIN_API_KEY: ci_test_key
       PORT: 3000

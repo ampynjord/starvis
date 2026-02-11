@@ -735,33 +735,33 @@ export class GameDataService {
     page?: number;
     limit?: number;
   }): Promise<{ data: any[]; total: number; page: number; limit: number; pages: number }> {
-    let sql = "SELECT * FROM ships WHERE 1=1";
-    let countSql = "SELECT COUNT(*) as total FROM ships WHERE 1=1";
+    let sql = "SELECT s.*, sm.media_store_small as thumbnail, sm.media_store_large as thumbnail_large, sm.production_status, sm.description as sm_description, sm.url as store_url FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE 1=1";
+    let countSql = "SELECT COUNT(*) as total FROM ships s WHERE 1=1";
     const params: any[] = [];
     const countParams: any[] = [];
 
     if (filters?.manufacturer) {
-      sql += " AND manufacturer_code = ?";
-      countSql += " AND manufacturer_code = ?";
+      sql += " AND s.manufacturer_code = ?";
+      countSql += " AND s.manufacturer_code = ?";
       params.push(filters.manufacturer.toUpperCase());
       countParams.push(filters.manufacturer.toUpperCase());
     }
     if (filters?.role) {
-      sql += " AND role LIKE ?";
-      countSql += " AND role LIKE ?";
+      sql += " AND s.role LIKE ?";
+      countSql += " AND s.role LIKE ?";
       params.push(`%${filters.role}%`);
       countParams.push(`%${filters.role}%`);
     }
     if (filters?.search) {
-      sql += " AND (name LIKE ? OR class_name LIKE ?)";
-      countSql += " AND (name LIKE ? OR class_name LIKE ?)";
+      sql += " AND (s.name LIKE ? OR s.class_name LIKE ?)";
+      countSql += " AND (s.name LIKE ? OR s.class_name LIKE ?)";
       params.push(`%${filters.search}%`, `%${filters.search}%`);
       countParams.push(`%${filters.search}%`, `%${filters.search}%`);
     }
 
     const sortCol = this.validateSortColumn(filters?.sort || "name");
     const order = filters?.order?.toUpperCase() === "DESC" ? "DESC" : "ASC";
-    sql += ` ORDER BY ${sortCol} ${order}`;
+    sql += ` ORDER BY s.${sortCol} ${order}`;
 
     // Pagination — inline LIMIT/OFFSET (prepared stmt driver limitation)
     const page = Math.max(1, filters?.page || 1);
@@ -777,7 +777,7 @@ export class GameDataService {
 
   async getShipByUuid(uuid: string): Promise<any | null> {
     const [rows] = await this.pool.execute<any[]>(
-      "SELECT * FROM ships WHERE uuid = ?",
+      "SELECT s.*, sm.media_store_small as thumbnail, sm.media_store_large as thumbnail_large, sm.production_status, sm.description as sm_description, sm.url as store_url FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE s.uuid = ?",
       [uuid],
     );
     return rows[0] || null;
@@ -785,7 +785,7 @@ export class GameDataService {
 
   async getShipByClassName(className: string): Promise<any | null> {
     const [rows] = await this.pool.execute<any[]>(
-      "SELECT * FROM ships WHERE class_name = ?",
+      "SELECT s.*, sm.media_store_small as thumbnail, sm.media_store_large as thumbnail_large, sm.production_status, sm.description as sm_description, sm.url as store_url FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE s.class_name = ?",
       [className],
     );
     return rows[0] || null;

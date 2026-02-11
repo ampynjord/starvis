@@ -117,54 +117,54 @@ onMounted(() => { if (shipUuid.value) loadShipData() })
 </script>
 
 <template>
-  <div class="space-y-6">
-    <h1 class="text-2xl font-bold text-sc-text-bright">🔧 Simulateur de Loadout</h1>
+  <div class="space-y-5">
+    <h1 class="section-title">Simulateur de Loadout</h1>
 
     <!-- Ship picker -->
-    <div class="card p-4 relative">
-      <label class="stat-label mb-1 block">Vaisseau</label>
+    <div class="card p-3 relative">
+      <label class="text-[11px] text-sv-muted uppercase tracking-wider mb-1 block">Vaisseau</label>
       <input
         v-model="shipQuery" @input="searchShips(shipQuery)"
         class="input w-full" placeholder="Chercher un vaisseau…"
       />
-      <div v-if="shipResults.length" class="absolute z-10 left-4 right-4 mt-1 bg-sc-panel border border-sc-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
-        <div v-for="s in shipResults" :key="s.uuid" @click="selectShip(s)" class="px-3 py-2 hover:bg-sc-border/50 cursor-pointer text-sm">
-          <span class="text-sc-text-bright">{{ s.name }}</span>
-          <span class="text-sc-muted ml-2">{{ s.manufacturer_code }}</span>
+      <div v-if="shipResults.length" class="absolute z-10 left-3 right-3 mt-1 bg-sv-panel border border-sv-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
+        <div v-for="s in shipResults" :key="s.uuid" @click="selectShip(s)" class="px-3 py-1.5 hover:bg-sv-panel-light/50 cursor-pointer text-xs">
+          <span class="text-sv-text-bright">{{ s.name }}</span>
+          <span class="text-sv-muted ml-2">{{ s.manufacturer_code }}</span>
         </div>
       </div>
     </div>
 
     <LoadingState :loading="loading">
-      <div v-if="ship" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div v-if="ship" class="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <!-- Loadout editor -->
         <div class="lg:col-span-2 space-y-3">
           <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-sc-text-bright">Loadout — {{ ship.name }}</h2>
+            <h2 class="text-sm font-semibold text-sv-text-bright">Loadout — {{ ship.name }}</h2>
             <div class="flex gap-2">
-              <span v-if="swapCount > 0" class="badge-amber">{{ swapCount }} swap(s)</span>
-              <button v-if="swapCount > 0" @click="resetSwaps" class="btn-ghost text-xs">Reset</button>
+              <span v-if="swapCount > 0" class="badge-amber text-[10px]">{{ swapCount }} swap(s)</span>
+              <button v-if="swapCount > 0" @click="resetSwaps" class="btn-ghost text-[10px]">Reset</button>
             </div>
           </div>
 
-          <div v-if="loadout.length === 0" class="card p-8 text-center text-sc-muted">Aucun composant dans le loadout</div>
+          <div v-if="loadout.length === 0" class="card p-8 text-center text-sv-muted text-sm">Aucun composant dans le loadout</div>
           <div v-else class="space-y-1">
             <div v-for="item in loadout" :key="item.port_name"
-              class="card px-3 py-2 flex items-center justify-between gap-3"
+              class="card px-2.5 py-1.5 flex items-center justify-between gap-2"
             >
               <div class="flex-1 min-w-0">
-                <div class="text-sm font-medium text-sc-text-bright truncate">{{ item.component_name }}</div>
-                <div class="text-xs text-sc-muted">{{ item.port_name }} · {{ item.component_type }}</div>
+                <div class="text-xs font-medium text-sv-text-bright truncate">{{ item.component_name }}</div>
+                <div class="text-[10px] text-sv-muted">{{ item.port_name }} · {{ item.component_type }}</div>
               </div>
               <div class="relative">
                 <button
                   @click="editingPort = editingPort === item.port_name ? null : item.port_name; componentSearch = ''; componentResults = []"
-                  class="btn-ghost text-xs border border-sc-border"
+                  class="btn-ghost text-[10px] border border-sv-border px-2 py-0.5"
                 >
                   {{ editingPort === item.port_name ? '✕' : 'Swap' }}
                 </button>
                 <!-- Component picker dropdown -->
-                <div v-if="editingPort === item.port_name" class="absolute z-20 right-0 mt-1 w-72 bg-sc-panel border border-sc-border rounded-lg shadow-lg p-2">
+                <div v-if="editingPort === item.port_name" class="absolute z-20 right-0 mt-1 w-72 bg-sv-panel border border-sv-border rounded-lg shadow-lg p-2">
                   <input
                     v-model="componentSearch"
                     @input="searchComponents(componentSearch)"
@@ -172,17 +172,17 @@ onMounted(() => { if (shipUuid.value) loadShipData() })
                     placeholder="Chercher un composant…"
                     autofocus
                   />
-                  <div class="max-h-40 overflow-y-auto space-y-1">
+                  <div class="max-h-40 overflow-y-auto space-y-0.5">
                     <div
                       v-for="c in componentResults"
                       :key="c.uuid"
                       @click="swapComponent(item.port_name, c)"
-                      class="px-2 py-1.5 hover:bg-sc-border/50 rounded cursor-pointer text-xs"
+                      class="px-2 py-1 hover:bg-sv-panel-light/50 rounded cursor-pointer text-[11px]"
                     >
-                      <div class="text-sc-text-bright">{{ c.name }}</div>
-                      <div class="text-sc-muted">{{ c.type }} · S{{ c.size }} · {{ c.manufacturer_code }}</div>
+                      <div class="text-sv-text-bright">{{ c.name }}</div>
+                      <div class="text-sv-muted">{{ c.type }} · S{{ c.size }} · {{ c.manufacturer_code }}</div>
                     </div>
-                    <div v-if="componentSearch.length >= 2 && componentResults.length === 0" class="text-sc-muted text-center py-2 text-xs">Aucun résultat</div>
+                    <div v-if="componentSearch.length >= 2 && componentResults.length === 0" class="text-sv-muted text-center py-2 text-[11px]">Aucun résultat</div>
                   </div>
                 </div>
               </div>
@@ -192,12 +192,12 @@ onMounted(() => { if (shipUuid.value) loadShipData() })
 
         <!-- Stats panel -->
         <div class="space-y-3">
-          <h2 class="text-lg font-semibold text-sc-text-bright">Statistiques</h2>
+          <h2 class="text-sm font-semibold text-sv-text-bright">Statistiques</h2>
           <LoadingState :loading="calculating">
-            <div v-if="stats" class="space-y-3">
+            <div v-if="stats" class="space-y-2">
               <div class="card p-3">
-                <h3 class="stat-label mb-2">🎯 Armes</h3>
-                <div class="grid grid-cols-2 gap-2">
+                <h3 class="text-[10px] text-sv-accent uppercase tracking-wider font-semibold mb-2">Armes</h3>
+                <div class="grid grid-cols-2 gap-1.5">
                   <StatBlock label="Nombre" :value="String(stats.stats.weapons.count)" />
                   <StatBlock label="DPS Total" :value="stats.stats.weapons.total_dps.toLocaleString('fr-FR', { maximumFractionDigits: 1 })" color="red" />
                   <StatBlock label="Burst DPS" :value="stats.stats.weapons.total_burst_dps.toLocaleString('fr-FR', { maximumFractionDigits: 1 })" color="amber" />
@@ -205,36 +205,36 @@ onMounted(() => { if (shipUuid.value) loadShipData() })
                 </div>
               </div>
               <div class="card p-3">
-                <h3 class="stat-label mb-2">🛡️ Boucliers</h3>
-                <div class="grid grid-cols-2 gap-2">
+                <h3 class="text-[10px] text-sv-accent uppercase tracking-wider font-semibold mb-2">Boucliers</h3>
+                <div class="grid grid-cols-2 gap-1.5">
                   <StatBlock label="HP Total" :value="stats.stats.shields.total_hp.toLocaleString('fr-FR')" color="blue" />
                   <StatBlock label="Regen" :value="stats.stats.shields.total_regen.toLocaleString('fr-FR', { maximumFractionDigits: 1 })" unit="/s" color="blue" />
                 </div>
               </div>
               <div class="card p-3">
-                <h3 class="stat-label mb-2">🚀 Missiles</h3>
-                <div class="grid grid-cols-2 gap-2">
+                <h3 class="text-[10px] text-sv-accent uppercase tracking-wider font-semibold mb-2">Missiles</h3>
+                <div class="grid grid-cols-2 gap-1.5">
                   <StatBlock label="Nombre" :value="String(stats.stats.missiles.count)" />
                   <StatBlock label="Dégâts Total" :value="stats.stats.missiles.total_damage.toLocaleString('fr-FR')" color="red" />
                 </div>
               </div>
               <div class="card p-3">
-                <h3 class="stat-label mb-2">⚡ Énergie</h3>
-                <div class="grid grid-cols-2 gap-2">
+                <h3 class="text-[10px] text-sv-accent uppercase tracking-wider font-semibold mb-2">Énergie</h3>
+                <div class="grid grid-cols-2 gap-1.5">
                   <StatBlock label="Conso" :value="stats.stats.power.total_draw.toLocaleString('fr-FR', { maximumFractionDigits: 1 })" />
                   <StatBlock label="Output" :value="stats.stats.power.total_output.toLocaleString('fr-FR', { maximumFractionDigits: 1 })" color="green" />
                 </div>
-                <div class="mt-1 text-xs text-center" :class="stats.stats.power.balance >= 0 ? 'text-emerald-400' : 'text-red-400'">
+                <div class="mt-1 text-[10px] text-center" :class="stats.stats.power.balance >= 0 ? 'text-emerald-400' : 'text-red-400'">
                   Balance : {{ stats.stats.power.balance >= 0 ? '+' : '' }}{{ stats.stats.power.balance.toLocaleString('fr-FR', { maximumFractionDigits: 1 }) }}
                 </div>
               </div>
               <div class="card p-3">
-                <h3 class="stat-label mb-2">❄️ Thermique</h3>
-                <div class="grid grid-cols-2 gap-2">
+                <h3 class="text-[10px] text-sv-accent uppercase tracking-wider font-semibold mb-2">Thermique</h3>
+                <div class="grid grid-cols-2 gap-1.5">
                   <StatBlock label="Chaleur" :value="stats.stats.thermal.total_heat_generation.toLocaleString('fr-FR', { maximumFractionDigits: 1 })" />
                   <StatBlock label="Cooling" :value="stats.stats.thermal.total_cooling_rate.toLocaleString('fr-FR', { maximumFractionDigits: 1 })" color="blue" />
                 </div>
-                <div class="mt-1 text-xs text-center" :class="stats.stats.thermal.balance >= 0 ? 'text-emerald-400' : 'text-red-400'">
+                <div class="mt-1 text-[10px] text-center" :class="stats.stats.thermal.balance >= 0 ? 'text-emerald-400' : 'text-red-400'">
                   Balance : {{ stats.stats.thermal.balance >= 0 ? '+' : '' }}{{ stats.stats.thermal.balance.toLocaleString('fr-FR', { maximumFractionDigits: 1 }) }}
                 </div>
               </div>
