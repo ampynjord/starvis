@@ -777,6 +777,20 @@ export class DataForgeService {
 
   // ============ Index builders ============
 
+  /** Known manufacturer prefixes for ships/vehicles (all legit vehicles start with one of these) */
+  private static readonly KNOWN_VEHICLE_PREFIXES = new Set([
+    'AEGS', 'ANVL', 'ARGO', 'BANU', 'CNOU', 'CRUS', 'DRAK', 'ESPR',
+    'GAMA', 'GRIN', 'KRIG', 'MISC', 'MRAI', 'ORIG', 'RSI', 'TMBL',
+    'VNCL', 'XIAN', 'XNAA',
+  ]);
+
+  /** Explicit non-vehicle entity patterns to reject from the vehicle index */
+  private static readonly NON_VEHICLE_PATTERNS = [
+    /^ammobox/i, /^rotationsimple/i, /^storall/i, /^probe_/i,
+    /^vehicleitemdebris/i, /^eaobjectivedestructable/i, /^orbital_sentry/i,
+    /^softlock/i, /^npc\s/i, /^npc_/i, /^ammocrate/i,
+  ];
+
   private buildVehicleIndex() {
     if (!this.dfData) return;
     const entityClassDefIndex = this.dfData.structDefs.findIndex((s: any) => s.name === "EntityClassDefinition");
@@ -791,6 +805,14 @@ export class DataForgeService {
       const lowerName = className.toLowerCase();
       if (lowerName.includes('_ai_') || lowerName.includes('_test') || lowerName.includes('_template') ||
           lowerName.includes('_unmanned') || lowerName.includes('_indestructible') || lowerName.includes('_prison')) continue;
+
+      // Reject non-vehicle entities (debris, probes, ammo boxes, storage, etc.)
+      if (DataForgeService.NON_VEHICLE_PATTERNS.some(rx => rx.test(className))) continue;
+
+      // Require a known manufacturer prefix (all real ships/vehicles have one)
+      const prefixMatch = className.match(/^([A-Z]{2,5})_/);
+      if (!prefixMatch || !DataForgeService.KNOWN_VEHICLE_PREFIXES.has(prefixMatch[1])) continue;
+
       this.vehicleIndex.set(className.toLowerCase(), { uuid: r.id, name: r.name, className });
     }
     console.log(`[DF] Built vehicle index: ${this.vehicleIndex.size} vehicles`);
@@ -845,7 +867,17 @@ export class DataForgeService {
         const className = r.name?.replace('EntityClassDefinition.', '') || '';
         if (!className) continue;
         const lcName = className.toLowerCase();
-        if (lcName.includes('_test') || lcName.includes('_debug') || lcName.includes('_template') || lcName.includes('_indestructible') || lcName.includes('_npc_only')) continue;
+        if (lcName.includes('_test') || lcName.startsWith('test_') ||
+            lcName.includes('_debug') || lcName.includes('_template') ||
+            lcName.includes('_indestructible') || lcName.includes('_npc_only') ||
+            lcName.includes('_placeholder') || lcName.includes('contestedzonereward') ||
+            lcName.startsWith('display_')) continue;
+
+        // Skip FPS weapons (personal weapons, not ship components)
+        if (type === 'WeaponGun') {
+          const isFpsWeapon = /(?:^|\b|_)(rifles?|pistols?|smg|shotgun|sniper|multitool|lmg|grenade_launcher)(?:_|\b|$)/i.test(lcName);
+          if (isFpsWeapon) continue;
+        }
 
         const comp: any = { uuid: r.id, className, name: className.replace(/_/g, ' '), type };
         const comps = data.Components;
@@ -2319,135 +2351,116 @@ export class DataForgeService {
   //  SHOPS & PRICES EXTRACTION
   // ============================================================
 
+  /** Known shop names (LOC keys → readable names) */
+  private static readonly SHOP_LOC_NAMES: Record<string, string> = {
+    '@item_NameShop_CenterMass': 'CenterMass',
+    '@item_NameShop_CasabaOutlet': 'Casaba Outlet',
+    '@item_NameShop_DumpersDepot': "Dumper's Depot",
+    '@item_NameShop_AstroArmada': 'Astro Armada',
+    '@item_NameShop_NewDeal': 'New Deal',
+    '@item_NameShop_TeachsShipShop': "Teach's Ship Shop",
+    '@item_NameShop_CubbyBlast': 'Cubby Blast',
+    '@item_NameShop_PortOlisar': 'Port Olisar',
+    '@item_NameShop_GrimHex': 'GrimHEX',
+    '@item_NameShop_Regal': 'Regal Luxury Rentals',
+    '@item_NameShop_Cordrys': "Cordry's",
+    '@item_NameShop_Vantage': 'Vantage Rentals',
+    '@item_NameShop_FTL': 'FTL Transports',
+    '@item_NameShop_Shubin': 'Shubin Interstellar',
+    '@item_NameShop_TDD': 'Trade & Development Division',
+    '@item_NameShop_KCTrading': 'KC Trending',
+    '@item_NameShop_Traveler': 'Traveler Rentals',
+    '@item_NameShop_Aparelli': 'Aparelli',
+    '@item_NameShop_FactoryLine': 'Factory Line',
+    '@item_NameShop_TammanyAndSons': 'Tammany and Sons',
+    '@item_NameShop_Skutters': 'Skutters',
+    '@item_NameShop_ConscientiousObjects': 'Conscientious Objects',
+    '@item_NameShop_HurstonDynamics': 'Hurston Dynamics Showroom',
+    '@item_NameShop_Microtech': 'mTech',
+    '@item_NameShop_ArcCorp': 'ArcCorp',
+    '@item_NameShop_OmegaPro': 'Omega Pro',
+    '@item_NameShop_GarrityDefense': 'Garrity Defense',
+    '@item_NameShop_PlatinumBay': 'Platinum Bay',
+    '@item_NameShop_CousinCrows': "Cousin Crow's Custom Crafts",
+    '@item_NameShop_LiveFire': 'Live Fire Weapons',
+    '@item_NameShop_Refinery': 'Refinery',
+    '@item_NameShop_CrusaderIndustries': 'Crusader Industries',
+    '@item_NameShop_ProcyonCDF': 'Procyon CDF',
+    '@item_NameShop_MakauDefense': 'Makau Defense',
+    '@item_NameShop_KelTo': 'Kel-To',
+    '@item_NameShop_CrusaderProvidenceSurplus': 'Crusader Providence Surplus',
+    '@item_NameShop_FTA': 'Federal Trade Alliance',
+  };
+
   /**
    * Extract shop/vendor data from DataForge.
-   * Shops in SC DataForge are EntityClassDefinition records whose files match
-   * shop layout paths. Prices are attached to retail products.
+   * Real shops are SCItemManufacturer records in shopkiosk/ paths.
+   * Note: Per-shop inventory (what each shop sells) is server-managed
+   * and NOT available from P4K/DataForge data. shop_inventory will remain empty.
    */
   extractShops(): { shops: any[]; inventory: any[] } {
     if (!this.dfData || !this.dcbBuffer) return { shops: [], inventory: [] };
 
     const shops: any[] = [];
     const inventory: any[] = [];
-    const entityClassIdx = this.dfData.structDefs.findIndex((s: any) => s.name === 'EntityClassDefinition');
-    if (entityClassIdx === -1) return { shops: [], inventory: [] };
 
-    // Find all shop layout records
+    // Find SCItemManufacturer struct type (shop kiosk definitions)
+    const mfgStructIdx = this.dfData.structDefs.findIndex((s: any) => s.name === 'SCItemManufacturer');
+    if (mfgStructIdx === -1) {
+      console.log('[DF] SCItemManufacturer struct not found — skipping shop extraction');
+      return { shops: [], inventory: [] };
+    }
+
+    // Extract SCItemManufacturer records in shop kiosk paths
     for (const r of this.dfData.records) {
-      if (r.structIndex !== entityClassIdx) continue;
+      if (r.structIndex !== mfgStructIdx) continue;
       const fn = (r.fileName || '').toLowerCase();
-      if (!fn.includes('shop') && !fn.includes('retail') && !fn.includes('vendor')) continue;
-      // Skip test/debug shops
-      if (fn.includes('_test') || fn.includes('_debug') || fn.includes('_template')) continue;
+      // Only keep records in the shopkiosk path (real shop brands)
+      if (!fn.includes('shop/shopkiosk/') && !fn.includes('shop\\shopkiosk\\')) continue;
 
       try {
-        const data = this.readInstance(r.structIndex, r.instanceIndex, 0, 4);
-        if (!data || !Array.isArray(data.Components)) continue;
+        const data = this.readInstance(r.structIndex, r.instanceIndex, 0, 3);
+        if (!data) continue;
 
-        const className = r.name?.replace('EntityClassDefinition.', '') || '';
+        const className = r.name?.replace('SCItemManufacturer.', '') || '';
         if (!className) continue;
+        // Skip test/debug entries
+        if (className.toLowerCase().includes('_test') || className.toLowerCase().includes('_debug')) continue;
 
-        // Look for shop-related component params
-        let shopName = className.replace(/_/g, ' ');
-        let shopType: string | null = null;
-        let location: string | null = null;
-        let parentLocation: string | null = null;
+        // Resolve shop name from localization
+        const locKey = data.Localization?.Name || '';
+        let shopName = DataForgeService.SHOP_LOC_NAMES[locKey]
+          || (locKey.startsWith('@') ? className.replace(/_/g, ' ').replace('Shop ', '') : locKey)
+          || className.replace(/_/g, ' ');
 
-        for (const c of data.Components) {
-          if (!c || typeof c !== 'object') continue;
+        // Extract shop code
+        const shopCode = data.Code || '';
 
-          // SShopLayoutParams / Shop component
-          if (c.__type === 'SShopLayoutParams' || c.__type === 'SShopComponentParams') {
-            if (c.name) shopName = c.name;
-            if (c.ShopType) shopType = c.ShopType;
-            if (c.Location) location = c.Location;
-            if (c.ParentLocation) parentLocation = c.ParentLocation;
-          }
-
-          // SAttachableComponentParams - may contain localized name
-          if (c.__type === 'SAttachableComponentParams') {
-            const loc = c.AttachDef?.Localization;
-            if (loc?.Name && typeof loc.Name === 'string' && !loc.Name.startsWith('LOC_') && !loc.Name.startsWith('@')) {
-              shopName = loc.Name;
-            }
-          }
-
-          // Retail product list
-          if (c.__type === 'SRetailComponentParams' || c.__type === 'Retail') {
-            const items = c.items || c.inventoryItems || c.products || c.Items || c.InventoryItems;
-            if (Array.isArray(items)) {
-              for (const item of items) {
-                if (!item || typeof item !== 'object') continue;
-                const invEntry: any = {
-                  shopClassName: className,
-                  componentClassName: item.className || item.name || item.itemClassName || '',
-                  basePrice: item.basePrice ?? item.price ?? null,
-                  rentalPrice1d: item.rental_price_1d ?? item.rentalPrice1Day ?? null,
-                  rentalPrice3d: item.rental_price_3d ?? item.rentalPrice3Day ?? null,
-                  rentalPrice7d: item.rental_price_7d ?? item.rentalPrice7Day ?? null,
-                  rentalPrice30d: item.rental_price_30d ?? item.rentalPrice30Day ?? null,
-                };
-                if (invEntry.componentClassName) inventory.push(invEntry);
-              }
-            }
-          }
-        }
-
-        // Also extract pricing from nested data if present
-        if (data.DefaultShopData) {
-          const dsd = data.DefaultShopData;
-          if (dsd.ShopName) shopName = dsd.ShopName;
-          if (dsd.ShopType) shopType = dsd.ShopType;
-          if (dsd.Location) location = dsd.Location;
-          if (dsd.ParentLocation) parentLocation = dsd.ParentLocation;
-
-          const items = dsd.Inventory || dsd.Items || dsd.Products;
-          if (Array.isArray(items)) {
-            for (const item of items) {
-              if (!item || typeof item !== 'object') continue;
-              const invEntry: any = {
-                shopClassName: className,
-                componentClassName: item.ClassName || item.className || item.Name || '',
-                basePrice: item.BasePrice ?? item.Price ?? null,
-                rentalPrice1d: item.RentalPrice1Day ?? null,
-                rentalPrice3d: item.RentalPrice3Day ?? null,
-                rentalPrice7d: item.RentalPrice7Day ?? null,
-                rentalPrice30d: item.RentalPrice30Day ?? null,
-              };
-              if (invEntry.componentClassName) inventory.push(invEntry);
-            }
-          }
-        }
-
-        // Determine location from file path if not set
-        if (!location) {
-          const pathParts = (r.fileName || '').split(/[\/\\]/);
-          for (const part of pathParts) {
-            const lp = part.toLowerCase();
-            if (lp.includes('stanton') || lp.includes('pyro') || lp.includes('nyx')) {
-              parentLocation = part;
-            }
-            if (lp.includes('olisar') || lp.includes('lorville') || lp.includes('area18') ||
-                lp.includes('newbab') || lp.includes('grim') || lp.includes('levski') ||
-                lp.includes('microtech') || lp.includes('orison')) {
-              location = part.replace(/_/g, ' ');
-            }
-          }
-        }
+        // Determine shop type from className
+        const shopType = this.inferShopType(className);
 
         shops.push({
           className,
           name: shopName,
-          location,
-          parentLocation,
-          shopType: shopType || this.inferShopType(className),
+          location: null, // Location data is not available from DataForge
+          parentLocation: null,
+          shopType,
+          shopCode,
         });
       } catch (e) {
         // Skip problematic records
       }
     }
 
-    return { shops, inventory };
+    // Deduplicate shops by name + shopType (multiple kiosk instances per brand)
+    const shopMap = new Map<string, any>();
+    for (const s of shops) {
+      const key = `${s.name}::${s.shopType}`;
+      if (!shopMap.has(key)) shopMap.set(key, s);
+    }
+    const uniqueShops = Array.from(shopMap.values());
+    console.log(`[DF] Extracted ${uniqueShops.length} unique shops from ${shops.length} kiosk instances (inventory is server-managed, not available from P4K)`);
+    return { shops: uniqueShops, inventory };
   }
 
   private inferShopType(className: string): string {

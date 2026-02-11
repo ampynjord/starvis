@@ -61,6 +61,15 @@ export class GameDataService {
 
     const conn = await this.pool.getConnection();
     try {
+      // 1b. Clean stale data before fresh extraction (order matters for FK constraints)
+      onProgress?.("Cleaning stale data…");
+      await conn.execute("DELETE FROM shop_inventory");
+      await conn.execute("DELETE FROM shops");
+      await conn.execute("DELETE FROM ships_loadouts");
+      await conn.execute("DELETE FROM ships");
+      await conn.execute("DELETE FROM components");
+      // Note: manufacturers and ship_matrix are NOT cleaned (they persist across extractions)
+
       // 2. Collect & save manufacturers FIRST (before ships, due to FK constraint)
       onProgress?.("Saving manufacturers…");
       stats.manufacturers = await this.saveManufacturersFromData(conn);
