@@ -9,6 +9,7 @@
  *   components             → all SCItem components (weapons, shields, QD, etc.)
  *   ships_loadouts → default loadout ports per ship
  */
+import { createHash } from "crypto";
 import type { Pool, PoolConnection } from "mysql2/promise";
 import { logger } from "../utils/index.js";
 import { DataForgeService, MANUFACTURER_CODES, classifyPort } from "./dataforge-service.js";
@@ -20,12 +21,14 @@ export interface ExtractionStats {
   loadoutPorts: number;
   shipMatrixLinked: number;
   errors: string[];
+  extractionHash?: string;
+  durationMs?: number;
 }
 
 export class GameDataService {
   constructor(
     private pool: Pool,
-    private dfService: DataForgeService,
+    public dfService: DataForgeService,
   ) {}
 
   // ======================================================
@@ -33,6 +36,7 @@ export class GameDataService {
   // ======================================================
 
   async extractAll(onProgress?: (msg: string) => void): Promise<ExtractionStats> {
+    const startTime = Date.now();
     const stats: ExtractionStats = {
       manufacturers: 0,
       ships: 0,
@@ -48,6 +52,12 @@ export class GameDataService {
       const info = await this.dfService.loadDataForge(onProgress);
       onProgress?.(`DataForge loaded: ${info.vehicleCount} vehicles, v${info.version}`);
     }
+
+    // Compute extraction hash from DataForge metadata
+    const extractionHash = createHash('sha256')
+      .update(`${this.dfService.getVersion?.() || 'unknown'}-${Date.now()}`)
+      .digest('hex');
+    stats.extractionHash = extractionHash;
 
     const conn = await this.pool.getConnection();
     try {
@@ -68,6 +78,16 @@ export class GameDataService {
       // 5. Cross-reference with ship_matrix
       onProgress?.("Cross-referencing with Ship Matrix…");
       stats.shipMatrixLinked = await this.crossReferenceShipMatrix(conn);
+
+      // 6. Log extraction to extraction_log
+      stats.durationMs = Date.now() - startTime;
+      try {
+        await conn.execute(
+          `INSERT INTO extraction_log (extraction_hash, game_version, ships_count, components_count, manufacturers_count, loadout_ports_count, duration_ms, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [extractionHash, this.dfService.getVersion?.() || null, stats.ships, stats.components, stats.manufacturers, stats.loadoutPorts, stats.durationMs, 'success']
+        );
+      } catch (e) { /* extraction_log is non-critical */ }
 
       onProgress?.(`✅ Extraction complete: ${stats.ships} ships, ${stats.components} components, ${stats.manufacturers} manufacturers, ${stats.loadoutPorts} loadout ports, ${stats.shipMatrixLinked} linked to Ship Matrix`);
     } finally {
@@ -102,7 +122,10 @@ export class GameDataService {
             qd_speed, qd_spool_time, qd_cooldown, qd_fuel_rate, qd_range,
             qd_stage1_accel, qd_stage2_accel,
             missile_damage, missile_signal_type, missile_lock_time, missile_speed,
-            missile_range, missile_lock_range
+            missile_range, missile_lock_range,
+            thruster_max_thrust, thruster_type,
+            radar_range, cm_ammo_count,
+            fuel_capacity, fuel_intake_rate
           ) VALUES (
             ?, ?, ?, ?, ?, ?, ?, ?,
             ?, ?,
@@ -116,6 +139,9 @@ export class GameDataService {
             ?, ?, ?, ?, ?,
             ?, ?,
             ?, ?, ?, ?,
+            ?, ?,
+            ?, ?,
+            ?, ?,
             ?, ?
           ) ON DUPLICATE KEY UPDATE
             class_name=VALUES(class_name), name=VALUES(name), type=VALUES(type),
@@ -139,6 +165,9 @@ export class GameDataService {
             missile_damage=VALUES(missile_damage), missile_signal_type=VALUES(missile_signal_type),
             missile_lock_time=VALUES(missile_lock_time), missile_speed=VALUES(missile_speed),
             missile_range=VALUES(missile_range), missile_lock_range=VALUES(missile_lock_range),
+            thruster_max_thrust=VALUES(thruster_max_thrust), thruster_type=VALUES(thruster_type),
+            radar_range=VALUES(radar_range), cm_ammo_count=VALUES(cm_ammo_count),
+            fuel_capacity=VALUES(fuel_capacity), fuel_intake_rate=VALUES(fuel_intake_rate),
             updated_at=CURRENT_TIMESTAMP`,
           [
             c.uuid, c.className, c.name, c.type,
@@ -159,6 +188,9 @@ export class GameDataService {
             c.missileDamage ?? null, c.missileSignalType || null,
             c.missileLockTime ?? null, c.missileSpeed ?? null,
             c.missileRange ?? null, c.missileLockRange ?? null,
+            c.thrusterMaxThrust ?? null, c.thrusterType || null,
+            c.radarRange ?? null, c.cmAmmoCount ?? null,
+            c.fuelCapacity ?? null, c.fuelIntakeRate ?? null,
           ],
         );
         saved++;
@@ -182,11 +214,30 @@ export class GameDataService {
     const vehicles = this.dfService.getVehicleDefinitions();
     let savedShips = 0;
     let totalPorts = 0;
+    let skippedNonPlayable = 0;
 
     for (const [, veh] of vehicles) {
       try {
         const fullData = await this.dfService.extractFullShipData(veh.className);
         if (!fullData) continue;
+
+        // === FILTER: only keep playable/flyable ships ===
+        const lcName = veh.className.toLowerCase();
+        // Skip ammo boxes, test vehicles, debug entities, NPC-only, templates
+        if (lcName.startsWith('ambx_') || lcName.includes('_test') || lcName.includes('_debug') ||
+            lcName.includes('_template') || lcName.includes('_indestructible') ||
+            lcName.includes('_unmanned') || lcName.includes('_npc_only') ||
+            lcName.includes('_prison') || lcName.includes('_hijacked') ||
+            lcName.includes('_drug') || lcName.includes('_ai_only') ||
+            lcName.includes('_derelict') || lcName.includes('_wreck')) {
+          skippedNonPlayable++;
+          continue;
+        }
+        // Skip duplicate PU/AI variants (keep base entity only)
+        if (/_PU($|_)/i.test(veh.className) || /_AI_/i.test(veh.className)) {
+          skippedNonPlayable++;
+          continue;
+        }
 
         // Determine manufacturer code from className prefix
         const mfgMatch = veh.className.match(/^([A-Z]{3,5})_/);
@@ -197,12 +248,20 @@ export class GameDataService {
             uuid, class_name, name, manufacturer_code,
             role, career, dog_fight_enabled, crew_size, vehicle_definition,
             size_x, size_y, size_z,
-            mass, scm_speed, max_speed, total_hp,
+            mass, scm_speed, max_speed,
+            boost_speed_forward, boost_speed_backward,
+            pitch_max, yaw_max, roll_max,
+            total_hp,
             hydrogen_fuel_capacity, quantum_fuel_capacity,
             shield_hp,
+            armor_physical, armor_energy, armor_distortion,
+            armor_thermal, armor_biochemical, armor_stun,
+            armor_signal_ir, armor_signal_em, armor_signal_cs,
+            cross_section_x, cross_section_y, cross_section_z,
+            short_name, description, ship_grade, cargo_capacity,
             insurance_claim_time, insurance_expedite_cost,
             game_data
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           ON DUPLICATE KEY UPDATE
             class_name=VALUES(class_name), name=VALUES(name),
             manufacturer_code=VALUES(manufacturer_code),
@@ -211,10 +270,22 @@ export class GameDataService {
             vehicle_definition=VALUES(vehicle_definition),
             size_x=VALUES(size_x), size_y=VALUES(size_y), size_z=VALUES(size_z),
             mass=VALUES(mass), scm_speed=VALUES(scm_speed), max_speed=VALUES(max_speed),
+            boost_speed_forward=VALUES(boost_speed_forward),
+            boost_speed_backward=VALUES(boost_speed_backward),
+            pitch_max=VALUES(pitch_max), yaw_max=VALUES(yaw_max), roll_max=VALUES(roll_max),
             total_hp=VALUES(total_hp),
             hydrogen_fuel_capacity=VALUES(hydrogen_fuel_capacity),
             quantum_fuel_capacity=VALUES(quantum_fuel_capacity),
             shield_hp=VALUES(shield_hp),
+            armor_physical=VALUES(armor_physical), armor_energy=VALUES(armor_energy),
+            armor_distortion=VALUES(armor_distortion), armor_thermal=VALUES(armor_thermal),
+            armor_biochemical=VALUES(armor_biochemical), armor_stun=VALUES(armor_stun),
+            armor_signal_ir=VALUES(armor_signal_ir), armor_signal_em=VALUES(armor_signal_em),
+            armor_signal_cs=VALUES(armor_signal_cs),
+            cross_section_x=VALUES(cross_section_x), cross_section_y=VALUES(cross_section_y),
+            cross_section_z=VALUES(cross_section_z),
+            short_name=VALUES(short_name), description=VALUES(description),
+            ship_grade=VALUES(ship_grade), cargo_capacity=VALUES(cargo_capacity),
             insurance_claim_time=VALUES(insurance_claim_time),
             insurance_expedite_cost=VALUES(insurance_expedite_cost),
             game_data=VALUES(game_data),
@@ -235,10 +306,36 @@ export class GameDataService {
             fullData.hull?.mass || null,                        // mass
             fullData.ifcs?.scmSpeed || null,                    // scm_speed
             fullData.ifcs?.maxSpeed || null,                    // max_speed
+            fullData.ifcs?.boostSpeedForward || null,           // boost_speed_forward
+            fullData.ifcs?.boostSpeedBackward || null,          // boost_speed_backward
+            fullData.ifcs?.angularVelocity?.x || null,         // pitch_max
+            fullData.ifcs?.angularVelocity?.z || null,          // yaw_max
+            fullData.ifcs?.angularVelocity?.y || null,          // roll_max
             fullData.hull?.totalHp || null,                     // total_hp
             fullData.fuelCapacity || null,                      // hydrogen_fuel_capacity
             fullData.qtFuelCapacity || null,                    // quantum_fuel_capacity
-            fullData.shield?.maxHp || fullData.shield?.hp || null, // shield_hp
+            fullData.shield?.maxShieldHealth || fullData.shield?.maxHp || null, // shield_hp
+            // Armor damage multipliers
+            fullData.armor?.data?.armor?.damageMultiplier?.damagePhysical ?? null,
+            fullData.armor?.data?.armor?.damageMultiplier?.damageEnergy ?? null,
+            fullData.armor?.data?.armor?.damageMultiplier?.damageDistortion ?? null,
+            fullData.armor?.data?.armor?.damageMultiplier?.damageThermal ?? null,
+            fullData.armor?.data?.armor?.damageMultiplier?.damageBiochemical ?? null,
+            fullData.armor?.data?.armor?.damageMultiplier?.damageStun ?? null,
+            // Armor signals
+            fullData.armor?.data?.armor?.signalIR ?? null,
+            fullData.armor?.data?.armor?.signalEM ?? null,
+            fullData.armor?.data?.armor?.signalCS ?? null,
+            // Cross section
+            fullData.crossSection?.x || null,
+            fullData.crossSection?.y || null,
+            fullData.crossSection?.z || null,
+            // Metadata
+            fullData.shortName || null,                         // short_name
+            fullData.description || null,                       // description
+            fullData.grade || null,                             // ship_grade
+            fullData.cargo || null,                             // cargo_capacity
+            // Insurance
             fullData.insurance?.baseWaitTimeMinutes || null,    // insurance_claim_time
             fullData.insurance?.baseExpeditingFee || null,      // insurance_expedite_cost
             JSON.stringify(fullData),                           // game_data
@@ -260,7 +357,7 @@ export class GameDataService {
       }
     }
 
-    onProgress?.(`Ships: ${savedShips}/${vehicles.size}`);
+    onProgress?.(`Ships: ${savedShips}/${vehicles.size} (${skippedNonPlayable} non-playable skipped)`);
     return { ships: savedShips, loadoutPorts: totalPorts };
   }
 
@@ -438,15 +535,15 @@ export class GameDataService {
     // Drake
     "Dragonfly Black": "Dragonfly",
     "Dragonfly Yellowjacket": "Dragonfly Yellow",
-    // Editions / variants
+    // Editions / variants — BIS editions map to base ships (no separate game entity)
     "Mustang Alpha Vindicator": "Mustang Alpha",
     "Gladius Pirate Edition": "Gladius PIR",
     "Caterpillar Pirate Edition": "Caterpillar Pirate",
-    "Caterpillar Best In Show Edition 2949": "Caterpillar BIS2949",
-    "Cutlass Black Best In Show Edition 2949": "Cutlass Black BIS2949",
-    "Hammerhead Best In Show Edition 2949": "Hammerhead BIS2949",
-    "Reclaimer Best In Show Edition 2949": "Reclaimer BIS2949",
-    "Valkyrie Liberator Edition": "Valkyrie Liberator",
+    "Caterpillar Best In Show Edition 2949": "Caterpillar",
+    "Cutlass Black Best In Show Edition 2949": "Cutlass Black",
+    "Hammerhead Best In Show Edition 2949": "Hammerhead",
+    "Reclaimer Best In Show Edition 2949": "Reclaimer",
+    "Valkyrie Liberator Edition": "Valkyrie",
     "Argo Mole Carbon Edition": "MOLE Carbon",
     "Argo Mole Talus Edition": "MOLE Talus",
     "Nautilus Solstice Edition": "Nautilus Solstice",
@@ -457,8 +554,10 @@ export class GameDataService {
     // Nox / Aopoa (XNAA → XIAN in P4K)
     "Nox": "Nox",
     "Nox Kue": "Nox Kue",
-    "Khartu-Al": "Khartu Al",
+    "Khartu-Al": "Scout",
     "San'tok.y\u0101i": "Scout",
+    // ARGO CSV
+    "CSV-SM": "CSV Cargo",
     // Zeus
     "Zeus Mk II CL": "Zeus CL",
     "Zeus Mk II ES": "Zeus ES",
@@ -602,29 +701,47 @@ export class GameDataService {
     search?: string;
     sort?: string;
     order?: string;
-  }): Promise<any[]> {
+    page?: number;
+    limit?: number;
+  }): Promise<{ data: any[]; total: number; page: number; limit: number; pages: number }> {
     let sql = "SELECT * FROM ships WHERE 1=1";
+    let countSql = "SELECT COUNT(*) as total FROM ships WHERE 1=1";
     const params: any[] = [];
+    const countParams: any[] = [];
 
     if (filters?.manufacturer) {
       sql += " AND manufacturer_code = ?";
+      countSql += " AND manufacturer_code = ?";
       params.push(filters.manufacturer.toUpperCase());
+      countParams.push(filters.manufacturer.toUpperCase());
     }
     if (filters?.role) {
       sql += " AND role LIKE ?";
+      countSql += " AND role LIKE ?";
       params.push(`%${filters.role}%`);
+      countParams.push(`%${filters.role}%`);
     }
     if (filters?.search) {
       sql += " AND (name LIKE ? OR class_name LIKE ?)";
+      countSql += " AND (name LIKE ? OR class_name LIKE ?)";
       params.push(`%${filters.search}%`, `%${filters.search}%`);
+      countParams.push(`%${filters.search}%`, `%${filters.search}%`);
     }
 
     const sortCol = this.validateSortColumn(filters?.sort || "name");
     const order = filters?.order?.toUpperCase() === "DESC" ? "DESC" : "ASC";
     sql += ` ORDER BY ${sortCol} ${order}`;
 
+    // Pagination — inline LIMIT/OFFSET (prepared stmt driver limitation)
+    const page = Math.max(1, filters?.page || 1);
+    const limit = Math.min(200, Math.max(1, filters?.limit || 50));
+    const offset = (page - 1) * limit;
+    sql += ` LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
+
+    const [countRows] = await this.pool.execute(countSql, countParams);
+    const total = (countRows as any[])[0]?.total || 0;
     const [rows] = await this.pool.execute(sql, params);
-    return rows as any[];
+    return { data: rows as any[], total, page, limit, pages: Math.ceil(total / limit) };
   }
 
   async getShipByUuid(uuid: string): Promise<any | null> {
@@ -650,33 +767,53 @@ export class GameDataService {
     search?: string;
     sort?: string;
     order?: string;
-  }): Promise<any[]> {
+    page?: number;
+    limit?: number;
+  }): Promise<{ data: any[]; total: number; page: number; limit: number; pages: number }> {
     let sql = "SELECT * FROM components WHERE 1=1";
+    let countSql = "SELECT COUNT(*) as total FROM components WHERE 1=1";
     const params: any[] = [];
+    const countParams: any[] = [];
 
     if (filters?.type) {
       sql += " AND type = ?";
+      countSql += " AND type = ?";
       params.push(filters.type);
+      countParams.push(filters.type);
     }
     if (filters?.size) {
       sql += " AND size = ?";
+      countSql += " AND size = ?";
       params.push(parseInt(filters.size));
+      countParams.push(parseInt(filters.size));
     }
     if (filters?.manufacturer) {
       sql += " AND manufacturer_code = ?";
+      countSql += " AND manufacturer_code = ?";
       params.push(filters.manufacturer.toUpperCase());
+      countParams.push(filters.manufacturer.toUpperCase());
     }
     if (filters?.search) {
       sql += " AND (name LIKE ? OR class_name LIKE ?)";
+      countSql += " AND (name LIKE ? OR class_name LIKE ?)";
       params.push(`%${filters.search}%`, `%${filters.search}%`);
+      countParams.push(`%${filters.search}%`, `%${filters.search}%`);
     }
 
     const sortCol = this.validateComponentSortColumn(filters?.sort || "name");
     const order = filters?.order?.toUpperCase() === "DESC" ? "DESC" : "ASC";
     sql += ` ORDER BY ${sortCol} ${order}`;
 
+    // Pagination — inline LIMIT/OFFSET (prepared stmt driver limitation)
+    const page = Math.max(1, filters?.page || 1);
+    const limit = Math.min(200, Math.max(1, filters?.limit || 50));
+    const offset = (page - 1) * limit;
+    sql += ` LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
+
+    const [countRows] = await this.pool.execute(countSql, countParams);
+    const total = (countRows as any[])[0]?.total || 0;
     const [rows] = await this.pool.execute(sql, params);
-    return rows as any[];
+    return { data: rows as any[], total, page, limit, pages: Math.ceil(total / limit) };
   }
 
   async getComponentByUuid(uuid: string): Promise<any | null> {
@@ -725,12 +862,43 @@ export class GameDataService {
   // ======================================================
 
   private validateSortColumn(col: string): string {
-    const allowed = ["name", "class_name", "manufacturer_code", "mass", "scm_speed", "max_speed", "total_hp", "shield_hp", "crew_size"];
+    const allowed = [
+      "name", "class_name", "manufacturer_code", "mass", "scm_speed", "max_speed",
+      "total_hp", "shield_hp", "crew_size", "cargo_capacity",
+      "armor_physical", "armor_energy", "armor_distortion",
+      "cross_section_x", "cross_section_y", "cross_section_z",
+      "hydrogen_fuel_capacity", "quantum_fuel_capacity",
+      "boost_speed_forward", "pitch_max", "yaw_max", "roll_max",
+    ];
     return allowed.includes(col) ? col : "name";
   }
 
   private validateComponentSortColumn(col: string): string {
-    const allowed = ["name", "class_name", "type", "size", "grade", "manufacturer_code", "weapon_dps", "shield_hp", "qd_speed"];
+    const allowed = [
+      "name", "class_name", "type", "size", "grade", "manufacturer_code",
+      "weapon_dps", "weapon_damage", "weapon_fire_rate", "weapon_range",
+      "shield_hp", "shield_regen", "qd_speed", "qd_spool_time",
+      "power_output", "cooling_rate", "hp", "mass",
+      "thruster_max_thrust", "radar_range", "fuel_capacity",
+    ];
     return allowed.includes(col) ? col : "name";
+  }
+
+  // ======================================================
+  //  EXTRACTION LOG
+  // ======================================================
+
+  async getExtractionLog(): Promise<any[]> {
+    const [rows] = await this.pool.execute(
+      "SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 20"
+    );
+    return rows as any[];
+  }
+
+  async getLatestExtraction(): Promise<any | null> {
+    const [rows] = await this.pool.execute(
+      "SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 1"
+    );
+    return (rows as any[])[0] || null;
   }
 }

@@ -1,13 +1,14 @@
 -- ============================================================
 -- STARAPI v1.0 - DATABASE SCHEMA
--- Last updated: February 10, 2026
+-- Last updated: June 2025
 -- 
 -- Tables:
---   ship_matrix    → Raw data from RSI Ship Matrix API (external, 246 ships)
---   manufacturers  → All manufacturers from DataForge (ships + components)
---   ships          → Ships extracted from P4K/DataForge (game data only)
---   components     → All SCItem components from DataForge
---   ships_loadouts → Default loadout per ship (ports + equipped components)
+--   ship_matrix       → Raw data from RSI Ship Matrix API (external)
+--   manufacturers     → All manufacturers from DataForge (ships + components)
+--   ships             → Ships extracted from P4K/DataForge (game data only)
+--   components        → All SCItem components from DataForge
+--   ships_loadouts    → Default loadout per ship (ports + equipped components)
+--   extraction_log    → Extraction version history
 -- ============================================================
 
 -- ====================
@@ -111,6 +112,11 @@ CREATE TABLE IF NOT EXISTS ships (
   -- Flight (from IFCS / flight controller)
   scm_speed INT COMMENT 'Standard Combat Maneuvering speed',
   max_speed INT,
+  boost_speed_forward INT COMMENT 'Afterburner forward speed',
+  boost_speed_backward INT COMMENT 'Afterburner backward speed',
+  pitch_max DECIMAL(8,2) COMMENT 'Max pitch rate (deg/s)',
+  yaw_max DECIMAL(8,2) COMMENT 'Max yaw rate (deg/s)',
+  roll_max DECIMAL(8,2) COMMENT 'Max roll rate (deg/s)',
   
   -- Hull
   total_hp INT COMMENT 'Total hull hit points',
@@ -121,6 +127,28 @@ CREATE TABLE IF NOT EXISTS ships (
   
   -- Shield summary
   shield_hp INT,
+  
+  -- Armor damage multipliers (from SCItemVehicleArmorParams)
+  armor_physical DECIMAL(10,6) COMMENT 'Physical damage multiplier',
+  armor_energy DECIMAL(10,6) COMMENT 'Energy damage multiplier',
+  armor_distortion DECIMAL(10,6) COMMENT 'Distortion damage multiplier',
+  armor_thermal DECIMAL(10,6) COMMENT 'Thermal damage multiplier',
+  armor_biochemical DECIMAL(10,6) COMMENT 'Biochemical damage multiplier',
+  armor_stun DECIMAL(10,6) COMMENT 'Stun damage multiplier',
+  armor_signal_ir DECIMAL(10,6) COMMENT 'IR signature multiplier',
+  armor_signal_em DECIMAL(10,6) COMMENT 'EM signature multiplier',
+  armor_signal_cs DECIMAL(10,6) COMMENT 'Cross-section signature multiplier',
+  
+  -- Cross section (bounding box projections in m²)
+  cross_section_x DECIMAL(10,2) COMMENT 'Front profile area',
+  cross_section_y DECIMAL(10,2) COMMENT 'Side profile area',
+  cross_section_z DECIMAL(10,2) COMMENT 'Top profile area',
+  
+  -- Extra metadata (Erkul parity)
+  short_name VARCHAR(255) COMMENT 'Short display name',
+  description TEXT COMMENT 'In-game description',
+  ship_grade VARCHAR(10) COMMENT 'Grade (A, B, C...)',
+  cargo_capacity DECIMAL(10,2) COMMENT 'Total cargo SCU',
   
   -- Insurance
   insurance_claim_time DECIMAL(10,2) COMMENT 'Base wait time in minutes',
@@ -168,7 +196,7 @@ CREATE TABLE IF NOT EXISTS components (
   
   -- Thermal
   heat_generation DECIMAL(10,2),
-  cooling_rate DECIMAL(10,2),
+  cooling_rate DECIMAL(15,2),
   
   -- Signatures
   em_signature DECIMAL(10,2),
@@ -209,6 +237,22 @@ CREATE TABLE IF NOT EXISTS components (
   missile_speed DECIMAL(10,2),
   missile_range DECIMAL(10,2),
   missile_lock_range DECIMAL(10,2),
+  
+  -- Thruster stats
+  thruster_max_thrust DECIMAL(15,2) COMMENT 'Maximum thrust force (N)',
+  thruster_type VARCHAR(50) COMMENT 'Main, Retro, Maneuvering, VTOL',
+  
+  -- Radar stats
+  radar_range DECIMAL(15,2) COMMENT 'Detection range (m)',
+  
+  -- Countermeasure stats
+  cm_ammo_count INT COMMENT 'Countermeasure ammo count',
+  
+  -- Fuel tank stats
+  fuel_capacity DECIMAL(10,2) COMMENT 'Fuel capacity (L or SCU)',
+  
+  -- Fuel intake stats
+  fuel_intake_rate DECIMAL(10,4) COMMENT 'Fuel intake rate',
   
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -251,5 +295,26 @@ CREATE TABLE IF NOT EXISTS ships_loadouts (
   INDEX idx_port_type (port_type),
   INDEX idx_component (component_uuid),
   INDEX idx_parent (parent_id),
-  CONSTRAINT fk_loadout_ship FOREIGN KEY (ship_uuid) REFERENCES ships(uuid) ON DELETE CASCADE
+  CONSTRAINT fk_loadout_ship FOREIGN KEY (ship_uuid) REFERENCES ships(uuid) ON DELETE CASCADE,
+  CONSTRAINT fk_loadout_component FOREIGN KEY (component_uuid) REFERENCES components(uuid) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ====================
+-- EXTRACTION_LOG - Version history for game data extractions
+-- ====================
+CREATE TABLE IF NOT EXISTS extraction_log (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  extraction_hash CHAR(64) NOT NULL COMMENT 'SHA-256 of p4k metadata',
+  game_version VARCHAR(50) COMMENT 'Detected game version string',
+  ships_count INT DEFAULT 0,
+  components_count INT DEFAULT 0,
+  manufacturers_count INT DEFAULT 0,
+  loadout_ports_count INT DEFAULT 0,
+  duration_ms INT COMMENT 'Extraction duration in ms',
+  status ENUM('success', 'partial', 'failed') DEFAULT 'success',
+  error_message TEXT,
+  extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  
+  INDEX idx_hash (extraction_hash),
+  INDEX idx_extracted_at (extracted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
