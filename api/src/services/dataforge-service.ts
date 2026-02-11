@@ -2300,6 +2300,41 @@ export class DataForgeService {
       if (cType === 'SCItemCargoGridParams' || cType === 'SCargoGridParams') {
         if (typeof comp.SCU === 'number') result.cargo = (result.cargo || 0) + Math.round(comp.SCU * 100) / 100;
       }
+      // === Cargo from InventoryContainer (v6 DataForge) ===
+      if (cType === 'SCItemInventoryContainerComponentParams' || cType === 'SInventoryContainerComponentParams') {
+        // Only count cargo ports, not personal storage or other containers
+        if (lp.includes('cargo')) {
+          const containerRef = comp.containerParams?.__ref;
+          if (containerRef && containerRef !== '00000000-0000-0000-0000-000000000000') {
+            const container = this.readRecordByGuid(containerRef, 4);
+            if (container && container.__type === 'InventoryContainer') {
+              const invType = container.inventoryType;
+              if (invType) {
+                if (invType.__type === 'InventoryClosedContainerType') {
+                  // Closed containers have direct SCU value
+                  const scu = invType.capacity?.standardCargoUnits;
+                  if (typeof scu === 'number' && scu > 0) {
+                    result.cargo = (result.cargo || 0) + Math.round(scu * 100) / 100;
+                  }
+                } else if (invType.__type === 'InventoryOpenContainerType') {
+                  // Open containers: calculate SCU from interior dimensions
+                  // 1 SCU = 1.25m × 1.25m × 1.25m cube
+                  const dim = container.interiorDimensions;
+                  if (dim && typeof dim.x === 'number' && typeof dim.y === 'number' && typeof dim.z === 'number') {
+                    const scuX = Math.floor(dim.x / 1.25);
+                    const scuY = Math.floor(dim.y / 1.25);
+                    const scuZ = Math.floor(dim.z / 1.25);
+                    const scu = scuX * scuY * scuZ;
+                    if (scu > 0) {
+                      result.cargo = (result.cargo || 0) + scu;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
 
       // === Insurance ===
       if (cType === 'SInsuranceParams' || cType === 'VehicleInsuranceParams') {

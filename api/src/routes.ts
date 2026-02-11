@@ -687,6 +687,7 @@ export function createRoutes(deps: RouteDependencies): Router {
   router.post("/admin/extract-game-data", async (_req: Request, res: Response) => {
     try {
       if (!gameDataService) return res.status(503).json({ success: false, error: "Game data service not available (no P4K)" });
+      if (gameDataService.isExtracting) return res.status(409).json({ success: false, error: "Extraction already in progress" });
       const logs: string[] = [];
       const result = await gameDataService.extractAll((msg) => { logs.push(msg); logger.info(msg, { module: "Admin" }); });
       res.json({ success: true, data: { ...result, logs } });
@@ -727,12 +728,35 @@ export function createRoutes(deps: RouteDependencies): Router {
     }
   });
 
+  router.get("/admin/debug-extract/:className", async (req: Request, res: Response) => {
+    try {
+      if (!gameDataService) return res.status(503).json({ error: "Game data not available" });
+      const dfService = (gameDataService as any).dfService;
+      if (!dfService) return res.status(503).json({ error: "DataForge not loaded" });
+      const fullData = await dfService.extractFullShipData(req.params.className);
+      res.json(fullData);
+    } catch (e) {
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
   router.get("/admin/debug-component/:className", async (req: Request, res: Response) => {
     try {
       if (!gameDataService) return res.status(503).json({ error: "Game data not available" });
       const dfService = (gameDataService as any).dfService;
       if (!dfService) return res.status(503).json({ error: "DataForge not loaded" });
       res.json(dfService.debugComponent(req.params.className));
+    } catch (e) {
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
+  router.get("/admin/debug-guid/:guid", async (req: Request, res: Response) => {
+    try {
+      if (!gameDataService) return res.status(503).json({ error: "Game data not available" });
+      const dfService = (gameDataService as any).dfService;
+      if (!dfService) return res.status(503).json({ error: "DataForge not loaded" });
+      res.json(dfService.debugRecordByGuid(req.params.guid));
     } catch (e) {
       res.status(500).json({ error: (e as Error).message });
     }

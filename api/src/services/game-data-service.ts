@@ -26,16 +26,32 @@ export interface ExtractionStats {
 }
 
 export class GameDataService {
+  private _extracting = false;
+
   constructor(
     private pool: Pool,
     public dfService: DataForgeService,
   ) {}
+
+  get isExtracting(): boolean { return this._extracting; }
 
   // ======================================================
   //  FULL EXTRACTION PIPELINE
   // ======================================================
 
   async extractAll(onProgress?: (msg: string) => void): Promise<ExtractionStats> {
+    if (this._extracting) {
+      throw new Error("An extraction is already in progress");
+    }
+    this._extracting = true;
+    try {
+      return await this._doExtractAll(onProgress);
+    } finally {
+      this._extracting = false;
+    }
+  }
+
+  private async _doExtractAll(onProgress?: (msg: string) => void): Promise<ExtractionStats> {
     const startTime = Date.now();
     const stats: ExtractionStats = {
       manufacturers: 0,
@@ -61,7 +77,18 @@ export class GameDataService {
 
     const conn = await this.pool.getConnection();
     try {
-      // 1b. Clean stale data before fresh extraction (order matters for FK constraints)
+      // 1b. Snapshot current data BEFORE cleaning — for changelog comparison
+      onProgress?.("Snapshotting current data for changelog…");
+      const [oldShipsRaw] = await conn.execute<any[]>(
+        "SELECT uuid, class_name, name, manufacturer_code, role, career, mass, scm_speed, max_speed, total_hp, shield_hp, cargo_capacity, missile_damage_total, crew_size FROM ships"
+      );
+      const [oldCompsRaw] = await conn.execute<any[]>(
+        "SELECT uuid, class_name, name, type, sub_type, size, grade, manufacturer_code FROM components"
+      );
+      const oldShips = new Map(oldShipsRaw.map((s: any) => [s.class_name, s]));
+      const oldComps = new Map(oldCompsRaw.map((c: any) => [c.class_name, c]));
+
+      // 1c. Clean stale data before fresh extraction (order matters for FK constraints)
       onProgress?.("Cleaning stale data…");
       await conn.execute("DELETE FROM shop_inventory");
       await conn.execute("DELETE FROM shops");
@@ -69,7 +96,6 @@ export class GameDataService {
       await conn.execute("DELETE FROM ships_loadouts");
       await conn.execute("DELETE FROM ships");
       await conn.execute("DELETE FROM components");
-      await conn.execute("DELETE FROM changelog WHERE 1=1");
       // Note: manufacturers and ship_matrix are NOT cleaned (they persist across extractions)
 
       // 2. Collect & save manufacturers FIRST (before ships, due to FK constraint)
@@ -96,13 +122,25 @@ export class GameDataService {
 
       // 6. Log extraction to extraction_log
       stats.durationMs = Date.now() - startTime;
+      let extractionId: number | null = null;
       try {
-        await conn.execute(
+        const [logResult]: any = await conn.execute(
           `INSERT INTO extraction_log (extraction_hash, game_version, ships_count, components_count, manufacturers_count, loadout_ports_count, duration_ms, status)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
           [extractionHash, this.dfService.getVersion?.() || null, stats.ships, stats.components, stats.manufacturers, stats.loadoutPorts, stats.durationMs, 'success']
         );
+        extractionId = logResult.insertId;
       } catch (e) { /* extraction_log is non-critical */ }
+
+      // 7. Generate changelog by comparing old snapshot with new data
+      if (extractionId) {
+        try {
+          onProgress?.("Generating changelog…");
+          await this.generateChangelog(conn, extractionId, oldShips, oldComps);
+        } catch (e) {
+          logger.warn("Changelog generation failed", e);
+        }
+      }
 
       onProgress?.(`✅ Extraction complete: ${stats.ships} ships, ${stats.components} components, ${stats.manufacturers} manufacturers, ${stats.loadoutPorts} loadout ports, ${stats.shipMatrixLinked} linked to Ship Matrix`);
     } finally {
@@ -808,6 +846,95 @@ export class GameDataService {
   }
 
   // ======================================================
+  //  CHANGELOG GENERATION — compare old vs new data
+  // ======================================================
+
+  private async generateChangelog(
+    conn: PoolConnection,
+    extractionId: number,
+    oldShips: Map<string, any>,
+    oldComps: Map<string, any>,
+  ): Promise<void> {
+    // Get new ships and components from the freshly written DB
+    const [newShipsRaw] = await conn.execute<any[]>(
+      "SELECT uuid, class_name, name, manufacturer_code, role, career, mass, scm_speed, max_speed, total_hp, shield_hp, cargo_capacity, missile_damage_total, crew_size FROM ships"
+    );
+    const [newCompsRaw] = await conn.execute<any[]>(
+      "SELECT uuid, class_name, name, type, sub_type, size, grade, manufacturer_code FROM components"
+    );
+    const newShips = new Map(newShipsRaw.map((s: any) => [s.class_name, s]));
+    const newComps = new Map(newCompsRaw.map((c: any) => [c.class_name, c]));
+
+    const inserts: Array<[number, string, string, string, string, string | null, string | null, string | null]> = [];
+
+    // --- Ships changelog ---
+    // Added ships
+    for (const [cn, ship] of newShips) {
+      if (!oldShips.has(cn)) {
+        inserts.push([extractionId, 'ship', ship.uuid, ship.name || cn, 'added', null, null, null]);
+      }
+    }
+    // Removed ships
+    for (const [cn, ship] of oldShips) {
+      if (!newShips.has(cn)) {
+        inserts.push([extractionId, 'ship', ship.uuid, ship.name || cn, 'removed', null, null, null]);
+      }
+    }
+    // Modified ships — compare key numeric fields
+    const shipFields = ['mass', 'scm_speed', 'max_speed', 'total_hp', 'shield_hp', 'cargo_capacity', 'missile_damage_total', 'crew_size', 'role', 'career', 'name'];
+    for (const [cn, newShip] of newShips) {
+      const oldShip = oldShips.get(cn);
+      if (!oldShip) continue;
+      for (const field of shipFields) {
+        const oldVal = oldShip[field];
+        const newVal = newShip[field];
+        // Compare: treat null/undefined as equal, numbers with tolerance
+        if (oldVal == null && newVal == null) continue;
+        if (typeof oldVal === 'number' && typeof newVal === 'number') {
+          if (Math.abs(oldVal - newVal) < 0.01) continue;
+        } else if (String(oldVal) === String(newVal)) {
+          continue;
+        }
+        inserts.push([
+          extractionId, 'ship', newShip.uuid, newShip.name || cn, 'modified',
+          field, oldVal != null ? String(oldVal) : null, newVal != null ? String(newVal) : null,
+        ]);
+      }
+    }
+
+    // --- Components changelog ---
+    // Added components
+    for (const [cn, comp] of newComps) {
+      if (!oldComps.has(cn)) {
+        inserts.push([extractionId, 'component', comp.uuid, comp.name || cn, 'added', null, null, null]);
+      }
+    }
+    // Removed components
+    for (const [cn, comp] of oldComps) {
+      if (!newComps.has(cn)) {
+        inserts.push([extractionId, 'component', comp.uuid, comp.name || cn, 'removed', null, null, null]);
+      }
+    }
+
+    // Batch insert changelog entries
+    if (inserts.length > 0) {
+      const batchSize = 100;
+      for (let i = 0; i < inserts.length; i += batchSize) {
+        const batch = inserts.slice(i, i + batchSize);
+        const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+        const values = batch.flat();
+        await conn.execute(
+          `INSERT INTO changelog (extraction_id, entity_type, entity_uuid, entity_name, change_type, field_name, old_value, new_value) VALUES ${placeholders}`,
+          values,
+        );
+      }
+      logger.info(`[Changelog] Generated ${inserts.length} entries (ships: ${newShips.size - oldShips.size >= 0 ? '+' : ''}${newShips.size - oldShips.size}, components: ${newComps.size - oldComps.size >= 0 ? '+' : ''}${newComps.size - oldComps.size})`);
+    } else {
+      logger.info("[Changelog] No changes detected");
+    }
+  }
+
+  // ======================================================
   //  QUERY METHODS (used by routes)
   // ======================================================
 
@@ -1034,8 +1161,8 @@ export class GameDataService {
        LEFT JOIN extraction_log e ON c.extraction_id = e.id
        WHERE ${where}
        ORDER BY c.created_at DESC
-       LIMIT ? OFFSET ?`,
-      [...values, limit, offset],
+       LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
+      values,
     );
     const [countRes] = await this.pool.execute<any[]>(`SELECT COUNT(*) as total FROM changelog c WHERE ${where}`, values);
     return { data: rows as any[], total: countRes[0].total };
