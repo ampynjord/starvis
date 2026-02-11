@@ -29,11 +29,15 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: api/package-lock.json
 
-      - run: npm ci
+      - run: cd api && npm ci
 
-      - name: TypeScript type-check
-        run: npx tsc --noEmit
+      - name: TypeScript type-check (API)
+        run: cd api && npx tsc --noEmit
+
+      - name: Install & build IHM
+        run: cd ihm && npm ci && npm run build
 
   # ==========================================
   #  2. UNIT / INTEGRATION TESTS
@@ -77,8 +81,9 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
+          cache-dependency-path: api/package-lock.json
 
-      - run: npm ci
+      - run: cd api && npm ci
 
       - name: Wait for MySQL
         run: |
@@ -89,13 +94,13 @@ jobs:
 
       - name: Start API server
         run: |
-          npx tsx server.ts &
+          cd api && npx tsx server.ts &
           sleep 8
         env:
           P4K_PATH: ""
 
       - name: Run API tests
-        run: node tests/test-all.mjs http://localhost:3000
+        run: cd api && node tests/test-all.mjs http://localhost:3000
         env:
           ADMIN_API_KEY: ci_test_key
 
@@ -122,22 +127,43 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Docker meta
-        id: meta
+      - name: Docker meta (API)
+        id: meta-api
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api
           tags: |
             type=sha,prefix=
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - uses: docker/build-push-action@v5
+      - name: Docker meta (IHM)
+        id: meta-ihm
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-ihm
+          tags: |
+            type=sha,prefix=
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build & Push API image
+        uses: docker/build-push-action@v5
         with:
           context: .
+          file: api/Dockerfile
           target: production
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta-api.outputs.tags }}
+          labels: ${{ steps.meta-api.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build & Push IHM image
+        uses: docker/build-push-action@v5
+        with:
+          context: ihm
+          push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+          tags: ${{ steps.meta-ihm.outputs.tags }}
+          labels: ${{ steps.meta-ihm.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -153,7 +179,7 @@ jobs:
     steps:
       - name: Deploy notification
         run: |
-          echo "🚀 Image built and pushed to ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+          echo "🚀 Images built and pushed to ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
           echo "   Deploy to your server with:"
-          echo "   docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
-          echo "   docker compose up -d api"
+          echo "   docker compose pull"
+          echo "   docker compose up -d"

@@ -1,10 +1,15 @@
 # STARAPI v1.0
 
-**API REST pour les données de vaisseaux Star Citizen**
+**API REST + Interface Web pour les données de vaisseaux Star Citizen**
+
+Monorepo en 3 parties :
+- **api/** — Backend Express.js + TypeScript + MySQL
+- **db/** — Schéma SQL + scripts d'initialisation
+- **ihm/** — Frontend Vue 3 + Vite + Tailwind CSS
 
 Deux sources de données complémentaires :
 - **RSI Ship Matrix** — données officielles marketing (246 vaisseaux)
-- **P4K DataForge** — données de jeu réelles (~353 vaisseaux, ~1200+ composants, ~35 000 ports de loadout)
+- **P4K DataForge** — données de jeu réelles (~353 vaisseaux, ~2700+ composants, ~35 000 ports de loadout)
 
 ---
 
@@ -29,7 +34,31 @@ Deux sources de données complémentaires :
 - **Comparaison** de vaisseaux côte à côte avec deltas numériques
 - **Swagger / OpenAPI** docs interactives sur `/api-docs`
 - **Versioning d'extraction** avec journal d'extraction en base
-- **CI/CD** GitHub Actions (lint, tests, build Docker, push ghcr.io)
+- **CI/CD** GitHub Actions (lint, tests, build Docker API + IHM, push ghcr.io)
+
+---
+
+## Structure du projet
+
+```
+starapi/
+├── docker-compose.yml     # Orchestre les 3 services (mysql, api, ihm)
+├── .env                   # Configuration (voir .env.example)
+├── api/                   # Backend Express.js + TypeScript
+│   ├── Dockerfile
+│   ├── server.ts
+│   ├── package.json
+│   └── src/
+├── db/                    # Base de données
+│   ├── schema.sql
+│   └── init.sh
+├── ihm/                   # Frontend Vue 3 + Vite + Tailwind
+│   ├── Dockerfile
+│   ├── nginx.conf
+│   ├── package.json
+│   └── src/
+└── .github/workflows/     # CI/CD
+```
 
 ---
 
@@ -47,6 +76,9 @@ git clone https://github.com/ampynjord/starapi
 cd starapi
 cp .env.example .env    # puis éditer les mots de passe et chemins
 docker compose up -d
+# API  → http://localhost:3003
+# IHM  → http://localhost:8080
+# MySQL → localhost:3306
 curl http://localhost:3003/health
 ```
 
@@ -60,6 +92,7 @@ Toute la configuration est dans `.env` (voir `.env.example`).
 |----------|-------------|--------|
 | `API_PORT` | Port exposé sur l'hôte | `3003` |
 | `API_INTERNAL_PORT` | Port interne du container | `3000` |
+| `IHM_PORT` | Port de l'interface web | `8080` |
 | `NODE_ENV` | Environnement (production/development) | `production` |
 | `LOG_LEVEL` | Niveau de log (debug/info/warn/error) | `info` |
 | `ADMIN_API_KEY` | Clé d'accès admin (**obligatoire**) | — |
