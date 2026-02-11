@@ -75,7 +75,11 @@ export class GameDataService {
       stats.ships = shipResult.ships;
       stats.loadoutPorts = shipResult.loadoutPorts;
 
-      // 5. Cross-reference with ship_matrix
+      // 5. Extract & save shops/vendors
+      onProgress?.("Extracting shops & prices…");
+      const shopResult = await this.saveShopsData(conn, onProgress);
+
+      // 6. Cross-reference with ship_matrix
       onProgress?.("Cross-referencing with Ship Matrix…");
       stats.shipMatrixLinked = await this.crossReferenceShipMatrix(conn);
 
@@ -118,11 +122,15 @@ export class GameDataService {
             weapon_damage, weapon_damage_type, weapon_fire_rate, weapon_range, weapon_speed,
             weapon_ammo_count, weapon_pellets_per_shot, weapon_burst_size,
             weapon_alpha_damage, weapon_dps,
+            weapon_damage_physical, weapon_damage_energy, weapon_damage_distortion,
+            weapon_damage_thermal, weapon_damage_biochemical, weapon_damage_stun,
+            weapon_heat_per_shot, weapon_burst_dps, weapon_sustained_dps,
             shield_hp, shield_regen, shield_regen_delay, shield_hardening, shield_faces,
             qd_speed, qd_spool_time, qd_cooldown, qd_fuel_rate, qd_range,
             qd_stage1_accel, qd_stage2_accel,
             missile_damage, missile_signal_type, missile_lock_time, missile_speed,
             missile_range, missile_lock_range,
+            missile_damage_physical, missile_damage_energy, missile_damage_distortion,
             thruster_max_thrust, thruster_type,
             radar_range, cm_ammo_count,
             fuel_capacity, fuel_intake_rate
@@ -135,11 +143,14 @@ export class GameDataService {
             ?, ?, ?, ?, ?,
             ?, ?, ?,
             ?, ?,
+            ?, ?, ?, ?, ?, ?,
+            ?, ?, ?,
             ?, ?, ?, ?, ?,
             ?, ?, ?, ?, ?,
             ?, ?,
             ?, ?, ?, ?,
             ?, ?,
+            ?, ?, ?,
             ?, ?,
             ?, ?,
             ?, ?
@@ -155,6 +166,11 @@ export class GameDataService {
             weapon_speed=VALUES(weapon_speed), weapon_ammo_count=VALUES(weapon_ammo_count),
             weapon_pellets_per_shot=VALUES(weapon_pellets_per_shot), weapon_burst_size=VALUES(weapon_burst_size),
             weapon_alpha_damage=VALUES(weapon_alpha_damage), weapon_dps=VALUES(weapon_dps),
+            weapon_damage_physical=VALUES(weapon_damage_physical), weapon_damage_energy=VALUES(weapon_damage_energy),
+            weapon_damage_distortion=VALUES(weapon_damage_distortion), weapon_damage_thermal=VALUES(weapon_damage_thermal),
+            weapon_damage_biochemical=VALUES(weapon_damage_biochemical), weapon_damage_stun=VALUES(weapon_damage_stun),
+            weapon_heat_per_shot=VALUES(weapon_heat_per_shot),
+            weapon_burst_dps=VALUES(weapon_burst_dps), weapon_sustained_dps=VALUES(weapon_sustained_dps),
             shield_hp=VALUES(shield_hp), shield_regen=VALUES(shield_regen),
             shield_regen_delay=VALUES(shield_regen_delay), shield_hardening=VALUES(shield_hardening),
             shield_faces=VALUES(shield_faces),
@@ -165,6 +181,8 @@ export class GameDataService {
             missile_damage=VALUES(missile_damage), missile_signal_type=VALUES(missile_signal_type),
             missile_lock_time=VALUES(missile_lock_time), missile_speed=VALUES(missile_speed),
             missile_range=VALUES(missile_range), missile_lock_range=VALUES(missile_lock_range),
+            missile_damage_physical=VALUES(missile_damage_physical), missile_damage_energy=VALUES(missile_damage_energy),
+            missile_damage_distortion=VALUES(missile_damage_distortion),
             thruster_max_thrust=VALUES(thruster_max_thrust), thruster_type=VALUES(thruster_type),
             radar_range=VALUES(radar_range), cm_ammo_count=VALUES(cm_ammo_count),
             fuel_capacity=VALUES(fuel_capacity), fuel_intake_rate=VALUES(fuel_intake_rate),
@@ -180,6 +198,9 @@ export class GameDataService {
             c.weaponFireRate ?? null, c.weaponRange ?? null, c.weaponSpeed ?? null,
             c.weaponAmmoCount ?? null, c.weaponPelletsPerShot ?? 1, c.weaponBurstSize ?? null,
             c.weaponAlphaDamage ?? null, c.weaponDps ?? null,
+            c.weaponDamagePhysical ?? null, c.weaponDamageEnergy ?? null, c.weaponDamageDistortion ?? null,
+            c.weaponDamageThermal ?? null, c.weaponDamageBiochemical ?? null, c.weaponDamageStun ?? null,
+            c.weaponHeatPerShot ?? null, c.weaponBurstDps ?? null, c.weaponSustainedDps ?? null,
             c.shieldHp ?? null, c.shieldRegen ?? null,
             c.shieldRegenDelay ?? null, c.shieldHardening ?? null, c.shieldFaces ?? null,
             c.qdSpeed ?? null, c.qdSpoolTime ?? null,
@@ -188,6 +209,7 @@ export class GameDataService {
             c.missileDamage ?? null, c.missileSignalType || null,
             c.missileLockTime ?? null, c.missileSpeed ?? null,
             c.missileRange ?? null, c.missileLockRange ?? null,
+            c.missileDamagePhysical ?? null, c.missileDamageEnergy ?? null, c.missileDamageDistortion ?? null,
             c.thrusterMaxThrust ?? null, c.thrusterType || null,
             c.radarRange ?? null, c.cmAmmoCount ?? null,
             c.fuelCapacity ?? null, c.fuelIntakeRate ?? null,
@@ -858,6 +880,258 @@ export class GameDataService {
   }
 
   // ======================================================
+  //  SHOPS - Save & Query
+  // ======================================================
+
+  private async saveShopsData(conn: PoolConnection, onProgress?: (msg: string) => void): Promise<{ shops: number; inventory: number }> {
+    const { shops, inventory } = this.dfService.extractShops();
+    let savedShops = 0;
+    let savedInventory = 0;
+
+    for (const shop of shops) {
+      try {
+        await conn.execute(
+          `INSERT INTO shops (name, location, parent_location, shop_type, class_name)
+           VALUES (?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             name=VALUES(name), location=VALUES(location),
+             parent_location=VALUES(parent_location), shop_type=VALUES(shop_type),
+             updated_at=CURRENT_TIMESTAMP`,
+          [shop.name, shop.location || null, shop.parentLocation || null, shop.shopType || null, shop.className]
+        );
+        savedShops++;
+      } catch (e: any) {
+        logger.error(`[GameData] Shop ${shop.className}: ${e.message}`);
+      }
+    }
+
+    // Save inventory — resolve shop_id and component_uuid
+    for (const inv of inventory) {
+      try {
+        const [shopRows]: any = await conn.execute(
+          "SELECT id FROM shops WHERE class_name = ? LIMIT 1",
+          [inv.shopClassName]
+        );
+        if (!shopRows.length) continue;
+        const shopId = shopRows[0].id;
+
+        // Try to resolve component UUID
+        const [compRows]: any = await conn.execute(
+          "SELECT uuid FROM components WHERE class_name = ? LIMIT 1",
+          [inv.componentClassName]
+        );
+        const compUuid = compRows.length ? compRows[0].uuid : null;
+
+        await conn.execute(
+          `INSERT INTO shop_inventory (shop_id, component_uuid, component_class_name, base_price, rental_price_1d, rental_price_3d, rental_price_7d, rental_price_30d)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE
+             component_uuid=VALUES(component_uuid), base_price=VALUES(base_price),
+             rental_price_1d=VALUES(rental_price_1d), rental_price_3d=VALUES(rental_price_3d),
+             rental_price_7d=VALUES(rental_price_7d), rental_price_30d=VALUES(rental_price_30d),
+             updated_at=CURRENT_TIMESTAMP`,
+          [shopId, compUuid, inv.componentClassName, inv.basePrice ?? null,
+           inv.rentalPrice1d ?? null, inv.rentalPrice3d ?? null,
+           inv.rentalPrice7d ?? null, inv.rentalPrice30d ?? null]
+        );
+        savedInventory++;
+      } catch (e: any) {
+        // Skip duplicates or resolution failures silently
+      }
+    }
+
+    onProgress?.(`Shops: ${savedShops}/${shops.length}, Inventory: ${savedInventory}/${inventory.length}`);
+    return { shops: savedShops, inventory: savedInventory };
+  }
+
+  /**
+   * Get all shops (paginated)
+   */
+  async getShops(opts: { page?: number; limit?: number; location?: string; type?: string }): Promise<{ data: any[]; total: number; page: number; limit: number }> {
+    const page = Math.max(1, opts.page || 1);
+    const limit = Math.min(100, Math.max(1, opts.limit || 20));
+    const offset = (page - 1) * limit;
+
+    let where = "1=1";
+    const params: any[] = [];
+
+    if (opts.location) {
+      where += " AND (location LIKE ? OR parent_location LIKE ?)";
+      params.push(`%${opts.location}%`, `%${opts.location}%`);
+    }
+    if (opts.type) {
+      where += " AND shop_type = ?";
+      params.push(opts.type);
+    }
+
+    const [countRows]: any = await this.pool.execute(`SELECT COUNT(*) as count FROM shops WHERE ${where}`, params);
+    const total = countRows[0].count;
+
+    const [rows] = await this.pool.execute(
+      `SELECT * FROM shops WHERE ${where} ORDER BY name LIMIT ${limit} OFFSET ${offset}`,
+      params
+    );
+
+    return { data: rows as any[], total, page, limit };
+  }
+
+  /**
+   * Get inventory for a specific shop
+   */
+  async getShopInventory(shopId: number): Promise<any[]> {
+    const [rows] = await this.pool.execute(
+      `SELECT si.*, c.name as component_name, c.type as component_type, c.size as component_size
+       FROM shop_inventory si
+       LEFT JOIN components c ON si.component_uuid = c.uuid
+       WHERE si.shop_id = ?
+       ORDER BY c.type, c.name`,
+      [shopId]
+    );
+    return rows as any[];
+  }
+
+  /**
+   * Get buy locations for a specific component
+   */
+  async getComponentBuyLocations(uuid: string): Promise<any[]> {
+    const [rows] = await this.pool.execute(
+      `SELECT s.name as shop_name, s.location, s.parent_location, s.shop_type,
+              si.base_price, si.rental_price_1d, si.rental_price_3d, si.rental_price_7d, si.rental_price_30d
+       FROM shop_inventory si
+       JOIN shops s ON si.shop_id = s.id
+       WHERE si.component_uuid = ?
+       ORDER BY si.base_price`,
+      [uuid]
+    );
+    return rows as any[];
+  }
+
+  /**
+   * Loadout simulator - Calculate aggregated stats for a ship with component swaps
+   */
+  async calculateLoadout(shipUuid: string, swaps: { portName: string; componentUuid: string }[]): Promise<any> {
+    // 1. Get ship base data
+    const [shipRows]: any = await this.pool.execute("SELECT * FROM ships WHERE uuid = ?", [shipUuid]);
+    if (!shipRows.length) throw new Error("Ship not found");
+    const ship = shipRows[0];
+
+    // 2. Get default loadout
+    const [loadoutRows]: any = await this.pool.execute(
+      `SELECT sl.port_name, sl.port_type, sl.component_uuid, c.*
+       FROM ships_loadouts sl
+       LEFT JOIN components c ON sl.component_uuid = c.uuid
+       WHERE sl.ship_uuid = ?`,
+      [shipUuid]
+    );
+
+    // 3. Apply swaps
+    const loadout = loadoutRows.map((row: any) => ({ ...row }));
+    for (const swap of swaps) {
+      const idx = loadout.findIndex((l: any) => l.port_name === swap.portName);
+      if (idx !== -1) {
+        // Replace with new component data
+        loadout[idx]._swapped = true;
+        loadout[idx]._newComponentUuid = swap.componentUuid;
+      }
+    }
+
+    // Fetch swapped component data
+    for (const l of loadout) {
+      if (l._swapped && l._newComponentUuid) {
+        const [compRows]: any = await this.pool.execute("SELECT * FROM components WHERE uuid = ?", [l._newComponentUuid]);
+        if (compRows.length) {
+          const comp = compRows[0];
+          // Overwrite component fields
+          for (const key of Object.keys(comp)) {
+            if (key !== 'uuid' && key !== 'created_at' && key !== 'updated_at') {
+              l[key] = comp[key];
+            }
+          }
+          l.component_uuid = comp.uuid;
+        }
+      }
+    }
+
+    // 4. Calculate aggregated stats
+    let totalDps = 0;
+    let totalBurstDps = 0;
+    let totalSustainedDps = 0;
+    let totalShieldHp = 0;
+    let totalShieldRegen = 0;
+    let totalPowerDraw = 0;
+    let totalPowerOutput = 0;
+    let totalHeatGeneration = 0;
+    let totalCoolingRate = 0;
+    let totalMissileDamage = 0;
+    let weaponCount = 0;
+    let missileCount = 0;
+
+    for (const l of loadout) {
+      if (!l.component_uuid) continue;
+      const type = l.port_type || l.type || '';
+
+      if (type === 'WeaponGun' || l.type === 'WeaponGun') {
+        totalDps += parseFloat(l.weapon_dps) || 0;
+        totalBurstDps += parseFloat(l.weapon_burst_dps) || 0;
+        totalSustainedDps += parseFloat(l.weapon_sustained_dps) || 0;
+        weaponCount++;
+      }
+      if (type === 'Shield' || l.type === 'Shield') {
+        totalShieldHp += parseFloat(l.shield_hp) || 0;
+        totalShieldRegen += parseFloat(l.shield_regen) || 0;
+      }
+      if (l.type === 'Missile') {
+        totalMissileDamage += parseFloat(l.missile_damage) || 0;
+        missileCount++;
+      }
+
+      totalPowerDraw += parseFloat(l.power_draw) || 0;
+      if (l.type === 'PowerPlant') totalPowerOutput += parseFloat(l.power_output) || 0;
+      totalHeatGeneration += parseFloat(l.heat_generation) || 0;
+      if (l.type === 'Cooler') totalCoolingRate += parseFloat(l.cooling_rate) || 0;
+    }
+
+    return {
+      ship: { uuid: ship.uuid, name: ship.name, class_name: ship.class_name },
+      swaps: swaps.length,
+      stats: {
+        weapons: {
+          count: weaponCount,
+          total_dps: Math.round(totalDps * 100) / 100,
+          total_burst_dps: Math.round(totalBurstDps * 100) / 100,
+          total_sustained_dps: Math.round(totalSustainedDps * 100) / 100,
+        },
+        shields: {
+          total_hp: Math.round(totalShieldHp * 100) / 100,
+          total_regen: Math.round(totalShieldRegen * 100) / 100,
+        },
+        missiles: {
+          count: missileCount,
+          total_damage: Math.round(totalMissileDamage * 100) / 100,
+        },
+        power: {
+          total_draw: Math.round(totalPowerDraw * 100) / 100,
+          total_output: Math.round(totalPowerOutput * 100) / 100,
+          balance: Math.round((totalPowerOutput - totalPowerDraw) * 100) / 100,
+        },
+        thermal: {
+          total_heat_generation: Math.round(totalHeatGeneration * 100) / 100,
+          total_cooling_rate: Math.round(totalCoolingRate * 100) / 100,
+          balance: Math.round((totalCoolingRate - totalHeatGeneration) * 100) / 100,
+        },
+      },
+      loadout: loadout.map((l: any) => ({
+        port_name: l.port_name,
+        port_type: l.port_type,
+        component_uuid: l.component_uuid,
+        component_name: l.name,
+        component_type: l.type,
+        swapped: !!l._swapped,
+      })),
+    };
+  }
+
+  // ======================================================
   //  HELPERS
   // ======================================================
 
@@ -876,7 +1150,9 @@ export class GameDataService {
   private validateComponentSortColumn(col: string): string {
     const allowed = [
       "name", "class_name", "type", "size", "grade", "manufacturer_code",
-      "weapon_dps", "weapon_damage", "weapon_fire_rate", "weapon_range",
+      "weapon_dps", "weapon_burst_dps", "weapon_sustained_dps",
+      "weapon_damage", "weapon_fire_rate", "weapon_range",
+      "weapon_damage_physical", "weapon_damage_energy", "weapon_damage_distortion",
       "shield_hp", "shield_regen", "qd_speed", "qd_spool_time",
       "power_output", "cooling_rate", "hp", "mass",
       "thruster_max_thrust", "radar_range", "fuel_capacity",

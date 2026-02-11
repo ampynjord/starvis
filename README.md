@@ -12,12 +12,17 @@ Deux sources de données complémentaires :
 
 - **Ship Matrix** : 246 vaisseaux depuis l'API RSI (données marketing, specs officielles)
 - **Game Data** : ~353 vaisseaux jouables extraits du P4K/DataForge (filtrés, sans doublons/tests)
-- **Components** : ~1200+ composants en 12 types (armes, boucliers, power plants, coolers, quantum drives, missiles, thrusters, radars, countermeasures, fuel tanks, fuel intakes, life support)
-- **Manufacturers** : ~50 fabricants (véhicules + composants)
+- **Components** : ~2700+ composants en 12 types (armes, boucliers, power plants, coolers, quantum drives, missiles, thrusters, radars, countermeasures, fuel tanks, fuel intakes, life support)
+- **Weapon Damage Breakdown** : dégâts détaillés par type (physical, energy, distortion, thermal, biochemical, stun)
+- **Burst / Sustained DPS** : DPS instantané, en rafale (jusqu'à surchauffe), et soutenu (avec cycles de refroidissement)
+- **Missile Damage Breakdown** : dégâts missiles détaillés par type (physical, energy, distortion)
+- **Shops & Prix** : magasins in-game avec inventaire et prix d'achat/location
+- **Loadout Simulator** : calcul des stats agrégées (DPS total, boucliers, puissance, thermique) avec remplacement de composants
+- **Manufacturers** : ~55 fabricants (véhicules + composants)
 - **Loadouts** : ~35 000 ports d'équipement par défaut avec hiérarchie parent/enfant
-- **Cross-référence** automatique ships ↔ ship_matrix (~205 liés via alias + fuzzy matching)
+- **Cross-référence** automatique ships ↔ ship_matrix (~206 liés via alias + fuzzy matching)
 - **Pagination** sur tous les endpoints de liste (page, limit, total, pages)
-- **Filtres & tri** avancés sur ships, components, manufacturers
+- **Filtres & tri** avancés sur ships, components, manufacturers, shops
 - **Export CSV** sur tous les endpoints de liste (`?format=csv`)
 - **ETag / Cache** HTTP avec `Cache-Control` et `If-None-Match` (304)
 - **Rate limiting** configurable (200 req / 15 min par IP par défaut)
@@ -191,17 +196,62 @@ GET /api/v1/components/:uuid
 | `size` | Taille (0-9) | `3` |
 | `manufacturer` | Code fabricant | `BEHR` |
 | `search` | Recherche nom/className | `Gatling` |
-| `sort` | Tri | `name`, `weapon_dps`, `shield_hp`, `qd_speed`, `thruster_max_thrust`, `radar_range`, `fuel_capacity` |
+| `sort` | Tri | `name`, `weapon_dps`, `weapon_burst_dps`, `weapon_sustained_dps`, `shield_hp`, `qd_speed`, `thruster_max_thrust`, `radar_range`, `fuel_capacity` |
 | `page` | Page (1-based) | `1`, `2` |
 | `limit` | Items par page (max 200) | `10`, `50` |
 | `format` | Format de sortie | `json`, `csv` |
 
 ### Manufacturers
 
-~50 fabricants (véhicules + composants).
+~55 fabricants (véhicules + composants).
 
 ```bash
 GET /api/v1/manufacturers
+```
+
+### Shops & Prix
+
+Magasins in-game avec localisation, inventaire et prix.
+
+```bash
+# Liste des shops (paginated)
+GET /api/v1/shops
+GET /api/v1/shops?location=lorville&type=Weapons
+
+# Inventaire d'un shop
+GET /api/v1/shops/:id/inventory
+
+# Où acheter un composant (prix + shops)
+GET /api/v1/components/:uuid/buy-locations
+```
+
+### Loadout Simulator
+
+Calculateur de stats agrégées pour un loadout personnalisé.
+
+```bash
+# Stats par défaut (sans swap)
+curl -X POST http://localhost:3003/api/v1/loadout/calculate \
+  -H "Content-Type: application/json" \
+  -d '{"shipUuid": "...", "swaps": []}'
+
+# Avec remplacement de composants
+curl -X POST http://localhost:3003/api/v1/loadout/calculate \
+  -H "Content-Type: application/json" \
+  -d '{"shipUuid": "...", "swaps": [{"portName": "hardpoint_weapon_gun_left", "componentUuid": "..."}]}'
+```
+
+**Réponse** :
+```json
+{
+  "stats": {
+    "weapons": { "count": 3, "total_dps": 542.5, "total_burst_dps": 610.2, "total_sustained_dps": 480.1 },
+    "shields": { "total_hp": 5000, "total_regen": 120 },
+    "missiles": { "count": 4, "total_damage": 8400 },
+    "power": { "total_draw": 3200, "total_output": 4500, "balance": 1300 },
+    "thermal": { "total_heat_generation": 2800, "total_cooling_rate": 3500, "balance": 700 }
+  }
+}
 ```
 
 ### Version / Extraction
@@ -244,7 +294,7 @@ GET /health
 
 ## Base de données
 
-### Schéma (5 tables)
+### Schéma (7 tables)
 
 ```
 ┌────────────────────┐
@@ -292,6 +342,16 @@ GET /health
 │ parent_id (self-ref)       │     │ missile stats      │
 └────────────────────────────┘     │ power, thermal     │
                                    └────────────────────┘
+┌─────────────────────┐     ┌─────────────────────────┐
+│       shops         │     │   shop_inventory        │
+├─────────────────────┤     ├─────────────────────────┤
+│ id (PK)             │     │ id (PK)                 │
+│ name                │◄────┤ shop_id (FK)            │
+│ location            │     │ component_uuid (FK) ─────┼──► components
+│ parent_location     │     │ component_class_name    │
+│ shop_type           │     │ base_price              │
+│ class_name (UNIQUE) │     │ rental_price_1d/3d/7d.. │
+└─────────────────────┘     └─────────────────────────┘
 ```
 
 ### Données actuelles
@@ -300,10 +360,12 @@ GET /health
 |-------|---------|
 | `ship_matrix` | 246 |
 | `ships` | ~353 (vaisseaux jouables, filtrés) |
-| `components` | ~1200+ (12 types interchangeables) |
-| `manufacturers` | ~50 |
+| `components` | ~2700+ (12 types, 62 colonnes dont damage breakdown) |
+| `manufacturers` | ~55 |
 | `ships_loadouts` | ~35 000 ports |
-| Ships liés à Ship Matrix | ~205 |
+| `shops` | Variable (selon extraction) |
+| `shop_inventory` | Variable (prix d'achat/location) |
+| Ships liés à Ship Matrix | ~206 |
 
 ### Manufacturers principaux
 
