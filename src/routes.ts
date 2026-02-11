@@ -9,7 +9,11 @@
  *   GET /api/v1/ships/:id/compare/:id2 - Compare two ships
  *   GET /api/v1/components            - All DataForge components (paginated)
  *   GET /api/v1/components/:uuid      - Single component
+ *   GET /api/v1/components/:uuid/buy-locations - Where to buy a component
  *   GET /api/v1/manufacturers         - All manufacturers
+ *   GET /api/v1/shops                 - All shops/vendors (paginated)
+ *   GET /api/v1/shops/:id/inventory   - Shop inventory & prices
+ *   POST /api/v1/loadout/calculate    - Loadout simulator (aggregate stats)
  *   GET /api/v1/version               - Latest extraction version info
  *
  * Admin endpoints (require X-API-Key):
@@ -407,6 +411,122 @@ export function createRoutes(deps: RouteDependencies): Router {
       const etag = setETag(res, data);
       if (checkNotModified(req, res, etag)) return;
       sendCsvOrJson(req, res, data, { success: true, count: data.length, data });
+    } catch (e) {
+      res.status(500).json({ success: false, error: (e as Error).message });
+    }
+  });
+
+  // =========================================
+  //  PUBLIC - SHOPS & PRICES
+  // =========================================
+
+  /** @openapi
+   * /api/v1/shops:
+   *   get:
+   *     tags: [Shops]
+   *     summary: All shops/vendors (paginated)
+   *     parameters:
+   *       - in: query
+   *         name: page
+   *         schema: { type: integer, default: 1 }
+   *       - in: query
+   *         name: limit
+   *         schema: { type: integer, default: 20 }
+   *       - in: query
+   *         name: location
+   *         schema: { type: string }
+   *       - in: query
+   *         name: type
+   *         schema: { type: string }
+   */
+  router.get("/api/v1/shops", async (req: Request, res: Response) => {
+    try {
+      if (!gameDataService) return res.status(503).json({ success: false, error: "Game data not available" });
+      const result = await gameDataService.getShops({
+        page: parseInt(req.query.page as string) || 1,
+        limit: parseInt(req.query.limit as string) || 20,
+        location: req.query.location as string,
+        type: req.query.type as string,
+      });
+      const etag = setETag(res, result.data);
+      if (checkNotModified(req, res, etag)) return;
+      sendCsvOrJson(req, res, result.data, { success: true, ...result });
+    } catch (e) {
+      res.status(500).json({ success: false, error: (e as Error).message });
+    }
+  });
+
+  /** @openapi
+   * /api/v1/shops/{id}/inventory:
+   *   get:
+   *     tags: [Shops]
+   *     summary: Inventory of a specific shop
+   */
+  router.get("/api/v1/shops/:id/inventory", async (req: Request, res: Response) => {
+    try {
+      if (!gameDataService) return res.status(503).json({ success: false, error: "Game data not available" });
+      const shopId = parseInt(req.params.id);
+      if (isNaN(shopId)) return res.status(400).json({ success: false, error: "Invalid shop ID" });
+      const data = await gameDataService.getShopInventory(shopId);
+      const etag = setETag(res, data);
+      if (checkNotModified(req, res, etag)) return;
+      sendCsvOrJson(req, res, data, { success: true, count: data.length, data });
+    } catch (e) {
+      res.status(500).json({ success: false, error: (e as Error).message });
+    }
+  });
+
+  /** @openapi
+   * /api/v1/components/{uuid}/buy-locations:
+   *   get:
+   *     tags: [Components]
+   *     summary: Where to buy a component (shops & prices)
+   */
+  router.get("/api/v1/components/:uuid/buy-locations", async (req: Request, res: Response) => {
+    try {
+      if (!gameDataService) return res.status(503).json({ success: false, error: "Game data not available" });
+      const data = await gameDataService.getComponentBuyLocations(req.params.uuid);
+      const etag = setETag(res, data);
+      if (checkNotModified(req, res, etag)) return;
+      sendCsvOrJson(req, res, data, { success: true, count: data.length, data });
+    } catch (e) {
+      res.status(500).json({ success: false, error: (e as Error).message });
+    }
+  });
+
+  // =========================================
+  //  PUBLIC - LOADOUT SIMULATOR
+  // =========================================
+
+  /** @openapi
+   * /api/v1/loadout/calculate:
+   *   post:
+   *     tags: [Loadout]
+   *     summary: Calculate aggregated stats for a ship loadout with component swaps
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required: [shipUuid]
+   *             properties:
+   *               shipUuid: { type: string, description: "Ship UUID" }
+   *               swaps:
+   *                 type: array
+   *                 items:
+   *                   type: object
+   *                   properties:
+   *                     portName: { type: string }
+   *                     componentUuid: { type: string }
+   */
+  router.post("/api/v1/loadout/calculate", async (req: Request, res: Response) => {
+    try {
+      if (!gameDataService) return res.status(503).json({ success: false, error: "Game data not available" });
+      const { shipUuid, swaps } = req.body;
+      if (!shipUuid) return res.status(400).json({ success: false, error: "shipUuid is required" });
+      const result = await gameDataService.calculateLoadout(shipUuid, swaps || []);
+      res.json({ success: true, data: result });
     } catch (e) {
       res.status(500).json({ success: false, error: (e as Error).message });
     }

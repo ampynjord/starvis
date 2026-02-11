@@ -528,6 +528,124 @@ await test('Gladius HP = 6110 (Erkul reference)', async () => {
 });
 
 // ============================================================================
+section('💰 SHOPS & PRICES');
+
+await test('GET /shops → returns paginated list', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data, status } = await rawGet('/shops');
+  if (status === 503) skip('no game data service');
+  assert(data.success, 'Request failed');
+  assert(typeof data.total === 'number', 'Missing total');
+  assert(Array.isArray(data.data), 'data should be an array');
+  info(`${data.total} shops total, page ${data.page}`);
+});
+
+await test('GET /shops?location=... → filters by location', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data, status } = await rawGet('/shops?location=lor');
+  if (status === 503) skip('no game data service');
+  assert(data.success, 'Request failed');
+  assert(Array.isArray(data.data), 'data should be an array');
+  info(`${data.total} shops matching location filter`);
+});
+
+await test('GET /shops/:id/inventory → returns items', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data: shopList } = await rawGet('/shops?limit=1');
+  if (!shopList.data || shopList.data.length === 0) skip('no shops in DB');
+  const shopId = shopList.data[0].id;
+  const { data } = await rawGet(`/shops/${shopId}/inventory`);
+  assert(data.success, 'Request failed');
+  assert(Array.isArray(data.data), 'data should be an array');
+  info(`Shop #${shopId}: ${data.count} items`);
+});
+
+await test('GET /components/:uuid/buy-locations → returns locations', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data: comps } = await rawGet('/components?type=WeaponGun&limit=1');
+  if (!comps.data || comps.data.length === 0) skip('no weapons');
+  const uuid = comps.data[0].uuid;
+  const { data } = await rawGet(`/components/${uuid}/buy-locations`);
+  assert(data.success, 'Request failed');
+  assert(Array.isArray(data.data), 'data should be an array');
+  info(`${data.count} buy location(s) for ${comps.data[0].name}`);
+});
+
+// ============================================================================
+section('🔧 LOADOUT SIMULATOR');
+
+await test('POST /loadout/calculate → default loadout stats', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data: ships } = await rawGet('/ships?limit=1');
+  if (!ships.data || ships.data.length === 0) skip('no ships');
+  const shipUuid = ships.data[0].uuid;
+  const res = await fetch(`${API}/loadout/calculate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ shipUuid, swaps: [] })
+  });
+  const data = await res.json();
+  assert(data.success, `Request failed: ${data.error}`);
+  assert(data.data.stats, 'Missing stats object');
+  assert(data.data.stats.weapons !== undefined, 'Missing weapons stats');
+  assert(data.data.stats.shields !== undefined, 'Missing shields stats');
+  assert(data.data.stats.power !== undefined, 'Missing power stats');
+  assert(data.data.stats.thermal !== undefined, 'Missing thermal stats');
+  info(`Ship: ${data.data.ship.name}, DPS: ${data.data.stats.weapons.total_dps}, Shield HP: ${data.data.stats.shields.total_hp}`);
+});
+
+await test('POST /loadout/calculate → requires shipUuid', async () => {
+  const res = await fetch(`${API}/loadout/calculate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({})
+  });
+  const data = await res.json();
+  assert(!data.success, 'Should fail without shipUuid');
+  assert(res.status === 400, `Expected 400, got ${res.status}`);
+});
+
+// ============================================================================
+section('🔫 WEAPON DAMAGE BREAKDOWN');
+
+await test('Weapons have damage breakdown fields', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data } = await rawGet('/components?type=WeaponGun&limit=50');
+  assert(data.count > 0, 'No weapons');
+  // Check that at least some weapons have breakdown data
+  const withBreakdown = data.data.filter(w =>
+    w.weapon_damage_physical !== null || w.weapon_damage_energy !== null || w.weapon_damage_distortion !== null
+  ).length;
+  const pct = Math.round((withBreakdown / data.data.length) * 100);
+  info(`${pct}% weapons (${withBreakdown}/${data.data.length}) have damage breakdown`);
+  // At least some should have it after extraction
+  if (withBreakdown === 0) skip('damage breakdown not yet populated');
+});
+
+await test('Weapons have burst_dps and sustained_dps', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data } = await rawGet('/components?type=WeaponGun&limit=50');
+  const withDps = data.data.filter(w =>
+    w.weapon_burst_dps !== null || w.weapon_sustained_dps !== null
+  ).length;
+  const pct = Math.round((withDps / data.data.length) * 100);
+  info(`${pct}% weapons (${withDps}/${data.data.length}) have burst/sustained DPS`);
+  if (withDps === 0) skip('burst/sustained DPS not yet populated');
+});
+
+await test('Missiles have damage breakdown', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data } = await rawGet('/components?type=Missile&limit=50');
+  if (data.count === 0) skip('no missiles');
+  const withBreakdown = data.data.filter(m =>
+    m.missile_damage_physical !== null || m.missile_damage_energy !== null
+  ).length;
+  const pct = Math.round((withBreakdown / data.data.length) * 100);
+  info(`${pct}% missiles (${withBreakdown}/${data.data.length}) have damage breakdown`);
+  if (withBreakdown === 0) skip('missile damage breakdown not yet populated');
+});
+
+// ============================================================================
 // RESULTS
 console.log(`\n${C.blue}${'═'.repeat(60)}${C.reset}`);
 console.log(`${C.blue}  📈 RESULTS${C.reset}`);

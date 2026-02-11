@@ -213,6 +213,15 @@ CREATE TABLE IF NOT EXISTS components (
   weapon_burst_size TINYINT UNSIGNED,
   weapon_alpha_damage DECIMAL(10,4),
   weapon_dps DECIMAL(10,4),
+  weapon_damage_physical DECIMAL(10,4),
+  weapon_damage_energy DECIMAL(10,4),
+  weapon_damage_distortion DECIMAL(10,4),
+  weapon_damage_thermal DECIMAL(10,4),
+  weapon_damage_biochemical DECIMAL(10,4),
+  weapon_damage_stun DECIMAL(10,4),
+  weapon_heat_per_shot DECIMAL(10,5),
+  weapon_burst_dps DECIMAL(10,4),
+  weapon_sustained_dps DECIMAL(10,4),
   
   -- Shield stats
   shield_hp DECIMAL(15,2),
@@ -237,6 +246,9 @@ CREATE TABLE IF NOT EXISTS components (
   missile_speed DECIMAL(10,2),
   missile_range DECIMAL(10,2),
   missile_lock_range DECIMAL(10,2),
+  missile_damage_physical DECIMAL(10,2),
+  missile_damage_energy DECIMAL(10,2),
+  missile_damage_distortion DECIMAL(10,2),
   
   -- Thruster stats
   thruster_max_thrust DECIMAL(15,2) COMMENT 'Maximum thrust force (N)',
@@ -297,6 +309,46 @@ CREATE TABLE IF NOT EXISTS ships_loadouts (
   INDEX idx_parent (parent_id),
   CONSTRAINT fk_loadout_ship FOREIGN KEY (ship_uuid) REFERENCES ships(uuid) ON DELETE CASCADE,
   CONSTRAINT fk_loadout_component FOREIGN KEY (component_uuid) REFERENCES components(uuid) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ====================
+-- SHOPS - In-game shops / vendor locations
+-- ====================
+CREATE TABLE IF NOT EXISTS shops (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  location VARCHAR(255) COMMENT 'e.g. Port Olisar, Lorville',
+  parent_location VARCHAR(255) COMMENT 'e.g. Crusader, Hurston',
+  shop_type VARCHAR(50) COMMENT 'Weapon, Ship, Component, etc.',
+  class_name VARCHAR(255) UNIQUE NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  INDEX idx_location (location),
+  INDEX idx_type (shop_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ====================
+-- SHOP_INVENTORY - Items available for purchase / rental in shops
+-- ====================
+CREATE TABLE IF NOT EXISTS shop_inventory (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  shop_id INT NOT NULL,
+  component_uuid CHAR(36) COMMENT 'FK to components.uuid if resolved',
+  component_class_name VARCHAR(255) NOT NULL,
+  base_price DECIMAL(12,2),
+  rental_price_1d DECIMAL(12,2),
+  rental_price_3d DECIMAL(12,2),
+  rental_price_7d DECIMAL(12,2),
+  rental_price_30d DECIMAL(12,2),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  INDEX idx_shop (shop_id),
+  INDEX idx_component (component_uuid),
+  INDEX idx_class_name (component_class_name),
+  CONSTRAINT fk_inventory_shop FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
+  CONSTRAINT fk_inventory_component FOREIGN KEY (component_uuid) REFERENCES components(uuid) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ====================

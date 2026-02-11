@@ -948,6 +948,12 @@ export class DataForgeService {
                       const totalDmg = physical + energy + distortion + thermal + biochemical + stun;
                       if (totalDmg > 0) {
                         comp.weaponDamage = Math.round(totalDmg * 10000) / 10000;
+                        comp.weaponDamagePhysical = Math.round(physical * 10000) / 10000;
+                        comp.weaponDamageEnergy = Math.round(energy * 10000) / 10000;
+                        comp.weaponDamageDistortion = Math.round(distortion * 10000) / 10000;
+                        comp.weaponDamageThermal = Math.round(thermal * 10000) / 10000;
+                        comp.weaponDamageBiochemical = Math.round(biochemical * 10000) / 10000;
+                        comp.weaponDamageStun = Math.round(stun * 10000) / 10000;
                         const dt: [string, number][] = [['physical', physical], ['energy', energy], ['distortion', distortion], ['thermal', thermal], ['biochemical', biochemical], ['stun', stun]];
                         comp.weaponDamageType = dt.sort((a, b) => b[1] - a[1])[0][0];
                       }
@@ -1017,7 +1023,12 @@ export class DataForgeService {
                 const biochemical = typeof dmg.DamageBiochemical === 'number' ? dmg.DamageBiochemical : 0;
                 const stun = typeof dmg.DamageStun === 'number' ? dmg.DamageStun : 0;
                 const total = physical + energy + distortion + thermal + biochemical + stun;
-                if (total > 0) comp.missileDamage = Math.round(total * 100) / 100;
+                if (total > 0) {
+                  comp.missileDamage = Math.round(total * 100) / 100;
+                  comp.missileDamagePhysical = Math.round(physical * 100) / 100;
+                  comp.missileDamageEnergy = Math.round(energy * 100) / 100;
+                  comp.missileDamageDistortion = Math.round(distortion * 100) / 100;
+                }
               }
             }
             // Speed from GCSParams
@@ -1094,6 +1105,29 @@ export class DataForgeService {
           const pellets = comp.weaponPelletsPerShot || 1;
           comp.weaponAlphaDamage = Math.round(comp.weaponDamage * pellets * 10000) / 10000;
           comp.weaponDps = Math.round(comp.weaponAlphaDamage * (comp.weaponFireRate / 60) * 10000) / 10000;
+
+          // Burst DPS = DPS until overheat (if heat data available)
+          // Sustained DPS = DPS accounting for overheat + cooldown cycles
+          if (comp.weaponHeatPerShot && comp.weaponHeatPerShot > 0) {
+            // Assume overheat threshold ~= 1.0 (normalized) and cooling recovery ~3s
+            // Shots until overheat = 1.0 / heatPerShot
+            const shotsToOverheat = Math.floor(1.0 / comp.weaponHeatPerShot);
+            const timeToOverheat = shotsToOverheat / (comp.weaponFireRate / 60);
+            const burstDamage = comp.weaponAlphaDamage * shotsToOverheat;
+            if (timeToOverheat > 0) {
+              comp.weaponBurstDps = Math.round((burstDamage / timeToOverheat) * 10000) / 10000;
+            }
+            // Sustained: assume ~3s cooldown after overheat (conservative estimate)
+            const cooldownTime = 3.0;
+            const cycleTime = timeToOverheat + cooldownTime;
+            if (cycleTime > 0) {
+              comp.weaponSustainedDps = Math.round((burstDamage / cycleTime) * 10000) / 10000;
+            }
+          } else {
+            // No heat data = no overheat = burst DPS = sustained DPS = DPS
+            comp.weaponBurstDps = comp.weaponDps;
+            comp.weaponSustainedDps = comp.weaponDps;
+          }
         }
 
         // Manufacturer from className prefix
@@ -2279,6 +2313,152 @@ export class DataForgeService {
     if (lp.includes('personal_storage') || lc.includes('personalstorage') || lc.includes('inventory')) return 'personalStorage';
     if (lp.includes('utility') || lc.includes('utility') || lc.includes('tractor') || lc.includes('salvage')) return 'utilities';
     return null;
+  }
+
+  // ============================================================
+  //  SHOPS & PRICES EXTRACTION
+  // ============================================================
+
+  /**
+   * Extract shop/vendor data from DataForge.
+   * Shops in SC DataForge are EntityClassDefinition records whose files match
+   * shop layout paths. Prices are attached to retail products.
+   */
+  extractShops(): { shops: any[]; inventory: any[] } {
+    if (!this.dfData || !this.dcbBuffer) return { shops: [], inventory: [] };
+
+    const shops: any[] = [];
+    const inventory: any[] = [];
+    const entityClassIdx = this.dfData.structDefs.findIndex((s: any) => s.name === 'EntityClassDefinition');
+    if (entityClassIdx === -1) return { shops: [], inventory: [] };
+
+    // Find all shop layout records
+    for (const r of this.dfData.records) {
+      if (r.structIndex !== entityClassIdx) continue;
+      const fn = (r.fileName || '').toLowerCase();
+      if (!fn.includes('shop') && !fn.includes('retail') && !fn.includes('vendor')) continue;
+      // Skip test/debug shops
+      if (fn.includes('_test') || fn.includes('_debug') || fn.includes('_template')) continue;
+
+      try {
+        const data = this.readInstance(r.structIndex, r.instanceIndex, 0, 4);
+        if (!data || !Array.isArray(data.Components)) continue;
+
+        const className = r.name?.replace('EntityClassDefinition.', '') || '';
+        if (!className) continue;
+
+        // Look for shop-related component params
+        let shopName = className.replace(/_/g, ' ');
+        let shopType: string | null = null;
+        let location: string | null = null;
+        let parentLocation: string | null = null;
+
+        for (const c of data.Components) {
+          if (!c || typeof c !== 'object') continue;
+
+          // SShopLayoutParams / Shop component
+          if (c.__type === 'SShopLayoutParams' || c.__type === 'SShopComponentParams') {
+            if (c.name) shopName = c.name;
+            if (c.ShopType) shopType = c.ShopType;
+            if (c.Location) location = c.Location;
+            if (c.ParentLocation) parentLocation = c.ParentLocation;
+          }
+
+          // SAttachableComponentParams - may contain localized name
+          if (c.__type === 'SAttachableComponentParams') {
+            const loc = c.AttachDef?.Localization;
+            if (loc?.Name && typeof loc.Name === 'string' && !loc.Name.startsWith('LOC_') && !loc.Name.startsWith('@')) {
+              shopName = loc.Name;
+            }
+          }
+
+          // Retail product list
+          if (c.__type === 'SRetailComponentParams' || c.__type === 'Retail') {
+            const items = c.items || c.inventoryItems || c.products || c.Items || c.InventoryItems;
+            if (Array.isArray(items)) {
+              for (const item of items) {
+                if (!item || typeof item !== 'object') continue;
+                const invEntry: any = {
+                  shopClassName: className,
+                  componentClassName: item.className || item.name || item.itemClassName || '',
+                  basePrice: item.basePrice ?? item.price ?? null,
+                  rentalPrice1d: item.rental_price_1d ?? item.rentalPrice1Day ?? null,
+                  rentalPrice3d: item.rental_price_3d ?? item.rentalPrice3Day ?? null,
+                  rentalPrice7d: item.rental_price_7d ?? item.rentalPrice7Day ?? null,
+                  rentalPrice30d: item.rental_price_30d ?? item.rentalPrice30Day ?? null,
+                };
+                if (invEntry.componentClassName) inventory.push(invEntry);
+              }
+            }
+          }
+        }
+
+        // Also extract pricing from nested data if present
+        if (data.DefaultShopData) {
+          const dsd = data.DefaultShopData;
+          if (dsd.ShopName) shopName = dsd.ShopName;
+          if (dsd.ShopType) shopType = dsd.ShopType;
+          if (dsd.Location) location = dsd.Location;
+          if (dsd.ParentLocation) parentLocation = dsd.ParentLocation;
+
+          const items = dsd.Inventory || dsd.Items || dsd.Products;
+          if (Array.isArray(items)) {
+            for (const item of items) {
+              if (!item || typeof item !== 'object') continue;
+              const invEntry: any = {
+                shopClassName: className,
+                componentClassName: item.ClassName || item.className || item.Name || '',
+                basePrice: item.BasePrice ?? item.Price ?? null,
+                rentalPrice1d: item.RentalPrice1Day ?? null,
+                rentalPrice3d: item.RentalPrice3Day ?? null,
+                rentalPrice7d: item.RentalPrice7Day ?? null,
+                rentalPrice30d: item.RentalPrice30Day ?? null,
+              };
+              if (invEntry.componentClassName) inventory.push(invEntry);
+            }
+          }
+        }
+
+        // Determine location from file path if not set
+        if (!location) {
+          const pathParts = (r.fileName || '').split(/[\/\\]/);
+          for (const part of pathParts) {
+            const lp = part.toLowerCase();
+            if (lp.includes('stanton') || lp.includes('pyro') || lp.includes('nyx')) {
+              parentLocation = part;
+            }
+            if (lp.includes('olisar') || lp.includes('lorville') || lp.includes('area18') ||
+                lp.includes('newbab') || lp.includes('grim') || lp.includes('levski') ||
+                lp.includes('microtech') || lp.includes('orison')) {
+              location = part.replace(/_/g, ' ');
+            }
+          }
+        }
+
+        shops.push({
+          className,
+          name: shopName,
+          location,
+          parentLocation,
+          shopType: shopType || this.inferShopType(className),
+        });
+      } catch (e) {
+        // Skip problematic records
+      }
+    }
+
+    return { shops, inventory };
+  }
+
+  private inferShopType(className: string): string {
+    const lc = className.toLowerCase();
+    if (lc.includes('weapon') || lc.includes('gun')) return 'Weapons';
+    if (lc.includes('armor') || lc.includes('clothing')) return 'Armor';
+    if (lc.includes('ship') || lc.includes('vehicle')) return 'Ships';
+    if (lc.includes('component') || lc.includes('part')) return 'Components';
+    if (lc.includes('commodity') || lc.includes('cargo') || lc.includes('trade')) return 'Commodities';
+    if (lc.includes('food') || lc.includes('drink') || lc.includes('bar')) return 'Food & Drink';
+    return 'General';
   }
 }
 
