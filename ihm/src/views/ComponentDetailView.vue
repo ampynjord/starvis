@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { getComponent, getComponentBuyLocations, type Component } from '@/services/api'
 import LoadingState from '@/components/LoadingState.vue'
 import StatBlock from '@/components/StatBlock.vue'
+import { getComponent, getComponentBuyLocations, type Component } from '@/services/api'
+import { onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
 const router = useRouter()

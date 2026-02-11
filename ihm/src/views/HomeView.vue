@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { getVersion, getShips, getComponents, getManufacturers } from '@/services/api'
+import { getComponents, getManufacturers, getShips, getVersion } from '@/services/api'
+import { onMounted, ref } from 'vue'
 
 const stats = ref<any>(null)
 const loading = ref(true)

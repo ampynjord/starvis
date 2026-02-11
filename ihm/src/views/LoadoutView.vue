@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
-import { useRoute } from 'vue-router'
-import {
-  getShips, getShip, getShipLoadout, getComponents, calculateLoadout,
-  type Ship, type Component, type LoadoutStats,
-} from '@/services/api'
 import LoadingState from '@/components/LoadingState.vue'
 import StatBlock from '@/components/StatBlock.vue'
+import {
+    calculateLoadout,
+    getComponents,
+    getShip, getShipLoadout,
+    getShips,
+    type Component, type LoadoutStats,
+    type Ship,
+} from '@/services/api'
+import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 
 const route = useRoute()
 const shipUuid = ref((route.params.uuid as string) || '')

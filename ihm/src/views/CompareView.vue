@@ -1,8 +1,8 @@
 <script setup lang="ts">
+import LoadingState from '@/components/LoadingState.vue'
+import { compareShips, getShips, type Ship } from '@/services/api'
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getShips, compareShips, type Ship } from '@/services/api'
-import LoadingState from '@/components/LoadingState.vue'
 
 const route = useRoute()
 const router = useRouter()
