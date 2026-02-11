@@ -42,6 +42,11 @@ const router = createRouter({
       component: () => import('@/views/ShopsView.vue'),
     },
     {
+      path: '/manufacturers',
+      name: 'manufacturers',
+      component: () => import('@/views/ManufacturersView.vue'),
+    },
+    {
       path: '/loadout/:uuid?',
       name: 'loadout',
       component: () => import('@/views/LoadoutView.vue'),

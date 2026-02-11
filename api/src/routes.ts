@@ -511,7 +511,14 @@ export function createRoutes(deps: RouteDependencies): Router {
   router.get("/api/v1/components/:uuid/buy-locations", async (req: Request, res: Response) => {
     try {
       if (!gameDataService) return res.status(503).json({ success: false, error: "Game data not available" });
-      const data = await gameDataService.getComponentBuyLocations(req.params.uuid);
+      // Resolve class_name to uuid if needed
+      let uuid = req.params.uuid;
+      if (uuid.length !== 36) {
+        const comp = await gameDataService.getComponentByUuid(uuid);
+        if (!comp) return res.status(404).json({ success: false, error: "Component not found" });
+        uuid = comp.uuid;
+      }
+      const data = await gameDataService.getComponentBuyLocations(uuid);
       const etag = setETag(res, data);
       if (checkNotModified(req, res, etag)) return;
       sendCsvOrJson(req, res, data, { success: true, count: data.length, data });

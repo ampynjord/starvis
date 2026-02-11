@@ -793,7 +793,7 @@ export class GameDataService {
     page?: number;
     limit?: number;
   }): Promise<{ data: any[]; total: number; page: number; limit: number; pages: number }> {
-    let sql = "SELECT s.*, sm.media_store_small as thumbnail, sm.media_store_large as thumbnail_large, sm.production_status, sm.description as sm_description, sm.url as store_url FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE 1=1";
+    let sql = "SELECT s.*, m.name as manufacturer_name, sm.media_store_small as thumbnail, sm.media_store_large as thumbnail_large, sm.production_status, sm.description as sm_description, sm.url as store_url FROM ships s LEFT JOIN manufacturers m ON s.manufacturer_code = m.code LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE 1=1";
     let countSql = "SELECT COUNT(*) as total FROM ships s WHERE 1=1";
     const params: any[] = [];
     const countParams: any[] = [];
@@ -835,7 +835,7 @@ export class GameDataService {
 
   async getShipByUuid(uuid: string): Promise<any | null> {
     const [rows] = await this.pool.execute<any[]>(
-      "SELECT s.*, sm.media_store_small as thumbnail, sm.media_store_large as thumbnail_large, sm.production_status, sm.description as sm_description, sm.url as store_url FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE s.uuid = ?",
+      "SELECT s.*, m.name as manufacturer_name, sm.media_store_small as thumbnail, sm.media_store_large as thumbnail_large, sm.production_status, sm.description as sm_description, sm.url as store_url FROM ships s LEFT JOIN manufacturers m ON s.manufacturer_code = m.code LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE s.uuid = ?",
       [uuid],
     );
     return rows[0] || null;
@@ -843,7 +843,7 @@ export class GameDataService {
 
   async getShipByClassName(className: string): Promise<any | null> {
     const [rows] = await this.pool.execute<any[]>(
-      "SELECT s.*, sm.media_store_small as thumbnail, sm.media_store_large as thumbnail_large, sm.production_status, sm.description as sm_description, sm.url as store_url FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE s.class_name = ?",
+      "SELECT s.*, m.name as manufacturer_name, sm.media_store_small as thumbnail, sm.media_store_large as thumbnail_large, sm.production_status, sm.description as sm_description, sm.url as store_url FROM ships s LEFT JOIN manufacturers m ON s.manufacturer_code = m.code LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE s.class_name = ?",
       [className],
     );
     return rows[0] || null;
@@ -906,9 +906,10 @@ export class GameDataService {
   }
 
   async getComponentByUuid(uuid: string): Promise<any | null> {
+    // Try by UUID first, then by class_name
     const [rows] = await this.pool.execute<any[]>(
-      "SELECT * FROM components WHERE uuid = ?",
-      [uuid],
+      "SELECT * FROM components WHERE uuid = ? OR class_name = ? LIMIT 1",
+      [uuid, uuid],
     );
     return rows[0] || null;
   }
