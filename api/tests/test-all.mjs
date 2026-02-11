@@ -194,6 +194,7 @@ await test('GET /ships/AEGS_Gladius/loadout → by class_name', async () => {
 });
 
 await test('GET /ships/nonexistent → 404', async () => {
+  if (!hasGameData) skip('no game data');
   const { status } = await rawGet('/ships/00000000-0000-0000-0000-000000000000');
   assert(status === 404, `Expected 404, got ${status}`);
 });
@@ -245,6 +246,7 @@ await test('GET /components/:uuid → by UUID', async () => {
 });
 
 await test('GET /components/nonexistent → 404', async () => {
+  if (!hasGameData) skip('no game data');
   const { status } = await rawGet('/components/00000000-0000-0000-0000-000000000000');
   assert(status === 404, `Expected 404, got ${status}`);
 });
@@ -508,6 +510,7 @@ await test('Weapons have readable name (≠ class_name) (≥80%)', async () => {
 });
 
 await test('Cross-reference Ship Matrix ≥ 180 linked', async () => {
+  if (!hasGameData) skip('no game data');
   const { data } = await adminGet('/admin/stats');
   const linked = data.data.gameData?.shipsLinkedToMatrix || 0;
   const total = data.data.shipMatrix?.total || 0;
@@ -595,6 +598,7 @@ await test('POST /loadout/calculate → default loadout stats', async () => {
 });
 
 await test('POST /loadout/calculate → requires shipUuid', async () => {
+  if (!hasGameData) skip('no game data');
   const res = await fetch(`${API}/loadout/calculate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
