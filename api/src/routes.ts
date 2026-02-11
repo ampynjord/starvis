@@ -6,6 +6,7 @@
  *   GET /api/v1/ships                 - Game data ships (paginated)
  *   GET /api/v1/ships/:uuid           - Single ship with full game_data
  *   GET /api/v1/ships/:uuid/loadout   - Default loadout for a ship
+ *   GET /api/v1/ships/:uuid/modules   - Ship modules (Retaliator, Apollo…)
  *   GET /api/v1/ships/:id/compare/:id2 - Compare two ships
  *   GET /api/v1/components            - All DataForge components (paginated)
  *   GET /api/v1/components/:uuid      - Single component
@@ -14,6 +15,7 @@
  *   GET /api/v1/shops                 - All shops/vendors (paginated)
  *   GET /api/v1/shops/:id/inventory   - Shop inventory & prices
  *   POST /api/v1/loadout/calculate    - Loadout simulator (aggregate stats)
+ *   GET /api/v1/changelog             - Changelog between extractions
  *   GET /api/v1/version               - Latest extraction version info
  *
  * Admin endpoints (require X-API-Key):
@@ -275,6 +277,30 @@ export function createRoutes(deps: RouteDependencies): Router {
   });
 
   /** @openapi
+   * /api/v1/ships/{uuid}/modules:
+   *   get:
+   *     tags: [Ships]
+   *     summary: Get modular compartments for a ship (Retaliator, Apollo…)
+   */
+  router.get("/api/v1/ships/:uuid/modules", async (req: Request, res: Response) => {
+    try {
+      if (!gameDataService) return res.status(503).json({ success: false, error: "Game data not available" });
+      let uuid = req.params.uuid;
+      if (uuid.length !== 36) {
+        const ship = await gameDataService.getShipByClassName(uuid);
+        if (!ship) return res.status(404).json({ success: false, error: "Ship not found" });
+        uuid = ship.uuid;
+      }
+      const modules = await gameDataService.getShipModules(uuid);
+      const etag = setETag(res, modules);
+      if (checkNotModified(req, res, etag)) return;
+      sendCsvOrJson(req, res, modules, { success: true, data: modules });
+    } catch (e) {
+      res.status(500).json({ success: false, error: (e as Error).message });
+    }
+  });
+
+  /** @openapi
    * /api/v1/ships/{uuid}/compare/{uuid2}:
    *   get:
    *     tags: [Ships]
@@ -527,6 +553,46 @@ export function createRoutes(deps: RouteDependencies): Router {
       if (!shipUuid) return res.status(400).json({ success: false, error: "shipUuid is required" });
       const result = await gameDataService.calculateLoadout(shipUuid, swaps || []);
       res.json({ success: true, data: result });
+    } catch (e) {
+      res.status(500).json({ success: false, error: (e as Error).message });
+    }
+  });
+
+  // =========================================
+  //  PUBLIC - CHANGELOG
+  // =========================================
+
+  /** @openapi
+   * /api/v1/changelog:
+   *   get:
+   *     tags: [Changelog]
+   *     summary: Changes between extractions (added/removed/modified entities)
+   *     parameters:
+   *       - name: entity_type
+   *         in: query
+   *         schema: { type: string, enum: [ship, component, shop, module] }
+   *       - name: change_type
+   *         in: query
+   *         schema: { type: string, enum: [added, removed, modified] }
+   *       - name: limit
+   *         in: query
+   *         schema: { type: integer, default: 50 }
+   *       - name: offset
+   *         in: query
+   *         schema: { type: integer, default: 0 }
+   */
+  router.get("/api/v1/changelog", async (req: Request, res: Response) => {
+    try {
+      if (!gameDataService) return res.status(503).json({ success: false, error: "Game data not available" });
+      const result = await gameDataService.getChangelog({
+        limit: req.query.limit as string,
+        offset: req.query.offset as string,
+        entityType: req.query.entity_type as string,
+        changeType: req.query.change_type as string,
+      });
+      const etag = setETag(res, result.data);
+      if (checkNotModified(req, res, etag)) return;
+      res.json({ success: true, ...result });
     } catch (e) {
       res.status(500).json({ success: false, error: (e as Error).message });
     }

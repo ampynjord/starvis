@@ -312,6 +312,46 @@ CREATE TABLE IF NOT EXISTS ships_loadouts (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ====================
+-- SHIP_MODULES - Modular compartments for ships like Retaliator, Apollo, Caterpillar
+-- ====================
+CREATE TABLE IF NOT EXISTS ship_modules (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ship_uuid CHAR(36) NOT NULL COMMENT 'FK to ships.uuid — parent ship',
+  slot_name VARCHAR(100) NOT NULL COMMENT 'e.g. module_front, module_rear',
+  slot_display_name VARCHAR(100) COMMENT 'Human-readable slot name',
+  module_class_name VARCHAR(255) NOT NULL COMMENT 'DataForge className of the module entity',
+  module_name VARCHAR(255) COMMENT 'Display name of the module',
+  module_uuid CHAR(36) COMMENT 'DataForge UUID of the module',
+  is_default BOOLEAN DEFAULT FALSE COMMENT 'Whether this is the default module for this slot',
+  
+  INDEX idx_ship (ship_uuid),
+  INDEX idx_module_class (module_class_name),
+  CONSTRAINT fk_module_ship FOREIGN KEY (ship_uuid) REFERENCES ships(uuid) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ====================
+-- CHANGELOG - Track changes between game data extractions
+-- ====================
+CREATE TABLE IF NOT EXISTS changelog (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  extraction_id INT NOT NULL COMMENT 'FK to extraction_log.id',
+  entity_type ENUM('ship', 'component', 'shop', 'module') NOT NULL,
+  entity_uuid VARCHAR(255) NOT NULL COMMENT 'UUID or identifier of changed entity',
+  entity_name VARCHAR(255) COMMENT 'Name for display',
+  change_type ENUM('added', 'removed', 'modified') NOT NULL,
+  field_name VARCHAR(100) COMMENT 'Which field changed (for modifications)',
+  old_value TEXT COMMENT 'Previous value (JSON for complex)',
+  new_value TEXT COMMENT 'New value (JSON for complex)',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  
+  INDEX idx_extraction (extraction_id),
+  INDEX idx_entity_type (entity_type),
+  INDEX idx_change_type (change_type),
+  INDEX idx_created (created_at),
+  CONSTRAINT fk_changelog_extraction FOREIGN KEY (extraction_id) REFERENCES extraction_log(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ====================
 -- SHOPS - In-game shops / vendor locations
 -- ====================
 CREATE TABLE IF NOT EXISTS shops (

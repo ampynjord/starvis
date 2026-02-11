@@ -65,9 +65,11 @@ export class GameDataService {
       onProgress?.("Cleaning stale data…");
       await conn.execute("DELETE FROM shop_inventory");
       await conn.execute("DELETE FROM shops");
+      await conn.execute("DELETE FROM ship_modules");
       await conn.execute("DELETE FROM ships_loadouts");
       await conn.execute("DELETE FROM ships");
       await conn.execute("DELETE FROM components");
+      await conn.execute("DELETE FROM changelog WHERE 1=1");
       // Note: manufacturers and ship_matrix are NOT cleaned (they persist across extractions)
 
       // 2. Collect & save manufacturers FIRST (before ships, due to FK constraint)
@@ -382,6 +384,9 @@ export class GameDataService {
           totalPorts += await this.saveLoadout(conn, fullData.ref, loadout);
         }
 
+        // Detect & save modules (ports named *module* that reference other vehicle entities)
+        await this.detectAndSaveModules(conn, fullData, veh.className);
+
         if (savedShips % 20 === 0) onProgress?.(`Ships: ${savedShips}/${vehicles.size}…`);
       } catch (e: any) {
         logger.error(`[GameData] Ship ${veh.className}: ${e.message}`);
@@ -454,6 +459,59 @@ export class GameDataService {
       }
     }
     return count;
+  }
+
+  /**
+   * Detect modular compartments in ship data (Retaliator front/rear, Apollo medical, etc.)
+   * Modules are typically loadout ports whose componentClassName references another vehicle entity
+   * or ports with "module" in their name.
+   */
+  private async detectAndSaveModules(
+    conn: PoolConnection,
+    fullData: any,
+    shipClassName: string,
+  ): Promise<void> {
+    if (!fullData?.ref || !fullData?.game_data) return;
+    const gameData = typeof fullData.game_data === 'string' ? JSON.parse(fullData.game_data) : fullData;
+
+    // Known module slot patterns in Star Citizen
+    const MODULE_PATTERNS = [
+      /module/i,
+      /compartment/i,
+      /bay_section/i,
+    ];
+
+    // Scan loadout ports for module-like entries
+    const loadout = this.dfService.extractVehicleLoadout(shipClassName);
+    if (!loadout) return;
+
+    for (const port of loadout) {
+      const isModulePort = MODULE_PATTERNS.some(rx => rx.test(port.portName));
+      if (!isModulePort) continue;
+      if (!port.componentClassName) continue;
+
+      // Format a human-readable slot name
+      const slotDisplay = port.portName
+        .replace(/hardpoint_/i, '')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+
+      // Format module display name from className
+      const moduleName = port.componentClassName
+        .replace(/^[A-Z]{2,5}_/, '')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase());
+
+      try {
+        await conn.execute(
+          `INSERT INTO ship_modules (ship_uuid, slot_name, slot_display_name, module_class_name, module_name, is_default)
+           VALUES (?, ?, ?, ?, ?, TRUE)`,
+          [fullData.ref, port.portName, slotDisplay, port.componentClassName, moduleName],
+        );
+      } catch (e: any) {
+        logger.error(`[GameData] Module ${port.portName} on ${shipClassName}: ${e.message}`);
+      }
+    }
   }
 
   private async resolveComponentUuid(conn: PoolConnection, className: string): Promise<string | null> {
@@ -870,6 +928,40 @@ export class GameDataService {
       [shipUuid],
     );
     return rows as any[];
+  }
+
+  async getShipModules(shipUuid: string): Promise<any[]> {
+    const [rows] = await this.pool.execute(
+      `SELECT * FROM ship_modules WHERE ship_uuid = ? ORDER BY slot_name`,
+      [shipUuid],
+    );
+    return rows as any[];
+  }
+
+  // ======================================================
+  //  CHANGELOG - Track changes between extractions
+  // ======================================================
+
+  async getChangelog(params: { limit?: string; offset?: string; entityType?: string; changeType?: string }): Promise<{ data: any[]; total: number }> {
+    let where = '1=1';
+    const values: any[] = [];
+    if (params.entityType) { where += ' AND c.entity_type = ?'; values.push(params.entityType); }
+    if (params.changeType) { where += ' AND c.change_type = ?'; values.push(params.changeType); }
+
+    const limit = Math.min(parseInt(params.limit || '50', 10), 200);
+    const offset = parseInt(params.offset || '0', 10);
+
+    const [rows] = await this.pool.execute(
+      `SELECT c.*, e.game_version, e.extracted_at as extraction_date
+       FROM changelog c
+       LEFT JOIN extraction_log e ON c.extraction_id = e.id
+       WHERE ${where}
+       ORDER BY c.created_at DESC
+       LIMIT ? OFFSET ?`,
+      [...values, limit, offset],
+    );
+    const [countRes] = await this.pool.execute<any[]>(`SELECT COUNT(*) as total FROM changelog c WHERE ${where}`, values);
+    return { data: rows as any[], total: countRes[0].total };
   }
 
   async getStats(): Promise<any> {

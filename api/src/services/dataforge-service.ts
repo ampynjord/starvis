@@ -4,6 +4,7 @@
  */
 import { P4KProvider } from "../providers/p4k-provider.js";
 import { CryXmlNode, isCryXmlB, parseCryXml } from "../utils/cryxml-parser.js";
+import logger from "../utils/logger.js";
 
 /** Manufacturer code → full name mapping (from SC game data prefixes) */
 export const MANUFACTURER_CODES: Record<string, string> = {
@@ -62,10 +63,10 @@ export class DataForgeService {
   constructor(private p4kPath: string) {}
 
   async init(): Promise<void> {
-    console.log("🚀 Init P4K service...");
+    logger.info('Init P4K service...', { module: 'dataforge' });
     this.provider = new P4KProvider(this.p4kPath);
     await this.provider.open();
-    console.log("✅ P4K ready");
+    logger.info('P4K ready', { module: 'dataforge' });
   }
 
   async close(): Promise<void> {
@@ -575,7 +576,7 @@ export class DataForgeService {
       default:
         // RESILIENCE: skip unknown data types by estimating 4 bytes
         // This prevents corrupting all subsequent property reads
-        console.warn(`[DF] Unknown dataType: 0x${dt.toString(16)} for prop ${prop.name} — skipping 4 bytes`);
+        logger.warn(`Unknown dataType: 0x${dt.toString(16)} for prop ${prop.name} — skipping 4 bytes`, { module: 'dataforge' });
         return [null, pos + 4];
     }
   }
@@ -726,7 +727,7 @@ export class DataForgeService {
     valueArrayOffsets.enumOption= valueArrayOffsets.reference + header.referenceValueCount * 20;
     off = valueArrayOffsets.enumOption + header.enumOptionCount * 4;
 
-    console.log(`[DF] Value arrays: ${vaBase} -> ${off} (${off - vaBase} bytes)`);
+    logger.debug(`Value arrays: ${vaBase} -> ${off} (${off - vaBase} bytes)`, { module: 'dataforge' });
 
     // String tables
     const st1Start = off;
@@ -761,7 +762,7 @@ export class DataForgeService {
       lastOff += dm.structCount * (sd?.structSize || 0);
     }
 
-    console.log(`[DF] Data section: offset=${dataOffset}, size=${lastOff}, endCheck=${dataOffset + lastOff === buf.length ? 'OK' : 'MISMATCH'}`);
+    logger.debug(`Data section: offset=${dataOffset}, size=${lastOff}, endCheck=${dataOffset + lastOff === buf.length ? 'OK' : 'MISMATCH'}`, { module: 'dataforge' });
 
     // Resolve names
     const nameTable = header.version >= 6 ? st2 : st1;
@@ -815,7 +816,7 @@ export class DataForgeService {
 
       this.vehicleIndex.set(className.toLowerCase(), { uuid: r.id, name: r.name, className });
     }
-    console.log(`[DF] Built vehicle index: ${this.vehicleIndex.size} vehicles`);
+    logger.info(`Built vehicle index: ${this.vehicleIndex.size} vehicles`, { module: 'dataforge' });
 
     // GUID index for ALL records (weapons, ammo, gimbals, etc.)
     const ZERO_GUID = '00000000-0000-0000-0000-000000000000';
@@ -826,7 +827,7 @@ export class DataForgeService {
         this.guidIndex.set(r.id, className || r.name || `RECORD_${i}`);
       }
     }
-    console.log(`[DF] Built GUID index: ${this.guidIndex.size} record GUIDs`);
+    logger.info(`Built GUID index: ${this.guidIndex.size} record GUIDs`, { module: 'dataforge' });
   }
 
   // ============ Component extraction (from DataForge SCItem records) ============
@@ -1171,10 +1172,10 @@ export class DataForgeService {
         components.push(comp);
       } catch (e) {
         // Log to detect format changes from CIG patches
-        if (scanned % 500 === 0) console.warn(`[DF] Component extraction error at ${scanned}: ${(e as Error).message}`);
+        if (scanned % 500 === 0) logger.warn(`Component extraction error at ${scanned}: ${(e as Error).message}`, { module: 'dataforge' });
       }
     }
-    console.log(`[DF] Extracted ${components.length} components from ${scanned} SCItem records`);
+    logger.info(`Extracted ${components.length} components from ${scanned} SCItem records`, { module: 'dataforge' });
     return components;
   }
 
@@ -1340,7 +1341,7 @@ export class DataForgeService {
       if (!record) return null;
       return this.extractStatsFromRecord(record);
     } catch (err) {
-      console.error(`[DF] Error extracting stats for ${className}:`, err);
+      logger.error(`Error extracting stats for ${className}:`, err);
       return null;
     }
   }
@@ -2407,7 +2408,7 @@ export class DataForgeService {
     // Find SCItemManufacturer struct type (shop kiosk definitions)
     const mfgStructIdx = this.dfData.structDefs.findIndex((s: any) => s.name === 'SCItemManufacturer');
     if (mfgStructIdx === -1) {
-      console.log('[DF] SCItemManufacturer struct not found — skipping shop extraction');
+      logger.info('SCItemManufacturer struct not found — skipping shop extraction', { module: 'dataforge' });
       return { shops: [], inventory: [] };
     }
 
@@ -2459,7 +2460,7 @@ export class DataForgeService {
       if (!shopMap.has(key)) shopMap.set(key, s);
     }
     const uniqueShops = Array.from(shopMap.values());
-    console.log(`[DF] Extracted ${uniqueShops.length} unique shops from ${shops.length} kiosk instances (inventory is server-managed, not available from P4K)`);
+    logger.info(`Extracted ${uniqueShops.length} unique shops from ${shops.length} kiosk instances`, { module: 'dataforge' });
     return { shops: uniqueShops, inventory };
   }
 

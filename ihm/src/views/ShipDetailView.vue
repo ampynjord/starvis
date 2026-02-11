@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
 import StatBlock from '@/components/StatBlock.vue'
-import { getShip, getShipLoadout, type Ship } from '@/services/api'
+import { getShip, getShipLoadout, getShipModules, type Ship } from '@/services/api'
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -9,17 +9,20 @@ const route = useRoute()
 const router = useRouter()
 const ship = ref<Ship | null>(null)
 const loadout = ref<any[]>([])
+const modules = ref<any[]>([])
 const loading = ref(true)
 
 onMounted(async () => {
   try {
     const uuid = route.params.uuid as string
-    const [shipRes, loadoutRes] = await Promise.all([
+    const [shipRes, loadoutRes, modulesRes] = await Promise.all([
       getShip(uuid),
       getShipLoadout(uuid).catch(() => ({ data: [] })),
+      getShipModules(uuid).catch(() => ({ data: [] })),
     ])
     ship.value = shipRes.data
     loadout.value = loadoutRes.data || []
+    modules.value = modulesRes.data || []
   } finally {
     loading.value = false
   }
@@ -156,6 +159,26 @@ const armorStats = computed(() => {
       <div v-if="(ship as any).sm_description" class="card p-4">
         <h2 class="text-xs font-semibold text-sv-accent uppercase tracking-wider mb-2">Description RSI</h2>
         <p class="text-sv-muted text-sm leading-relaxed">{{ (ship as any).sm_description }}</p>
+      </div>
+
+      <!-- Modules (Retaliator, Apollo…) -->
+      <div v-if="modules.length > 0" class="card p-4">
+        <h2 class="text-xs font-semibold text-sv-accent uppercase tracking-wider mb-3">
+          Modules <span class="text-sv-muted font-normal">({{ modules.length }} emplacements)</span>
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
+          <div
+            v-for="mod in modules"
+            :key="mod.id"
+            class="flex items-center justify-between border border-sv-border/40 rounded px-2.5 py-1.5"
+          >
+            <div class="min-w-0">
+              <div class="text-xs font-medium text-sv-text-bright truncate">{{ mod.module_name || '—' }}</div>
+              <div class="text-[10px] text-sv-muted">{{ mod.slot_display_name || mod.slot_name }}</div>
+            </div>
+            <span v-if="mod.is_default" class="badge-green text-[10px] ml-2 shrink-0">Défaut</span>
+          </div>
+        </div>
       </div>
 
       <!-- Loadout -->

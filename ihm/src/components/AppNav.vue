@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { useRoute } from 'vue-router'
+import { useRoute } from 'vue-router';
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
@@ -20,6 +20,7 @@ const navSections = [
       { to: '/compare', label: 'Comparer', icon: '⚖️' },
       { to: '/loadout', label: 'Loadout', icon: '🎯' },
       { to: '/hangar', label: 'Exec Hangar', icon: '🏛️' },
+      { to: '/changelog', label: 'Changelog', icon: '📋' },
     ],
   },
 ]
