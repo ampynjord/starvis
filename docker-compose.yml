@@ -11,6 +11,7 @@ services:
       - "${DB_EXTERNAL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+      - ./db:/docker-entrypoint-initdb.d:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
@@ -21,7 +22,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: api/Dockerfile
       target: production
       args:
         API_INTERNAL_PORT: ${API_INTERNAL_PORT:-3000}
@@ -46,6 +47,17 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+
+  ihm:
+    build:
+      context: ihm
+      dockerfile: Dockerfile
+    container_name: starapi-ihm
+    ports:
+      - "${IHM_PORT:-8080}:80"
+    restart: unless-stopped
+    depends_on:
+      - api
 
 volumes:
   mysql_data:

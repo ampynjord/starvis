@@ -1,9 +1,11 @@
-# Dependencies
-node_modules
+# Dependencies (each subfolder has its own)
+**/node_modules
+**/.cache
 
 # Build artifacts
-dist
-build
+**/dist
+**/build
+**/.tsbuildinfo
 
 # Version control
 .git
@@ -12,40 +14,20 @@ build
 
 # Logs
 *.log
-logs
+**/logs
 
-# Environment
+# Environment (injected via docker-compose)
 .env
 .env.local
 .env.*.local
 
 # IDE
 .vscode
-.editorconfig
 .idea
 
 # Documentation
 *.md
-
-# Test files
-test-*.ts
-*-test.ts
-*.test.ts
-*.spec.ts
-
-# IDE
-.vscode
-.idea
 
 # OS files
 .DS_Store
 Thumbs.db
-
-# Documentation
-README.md
-*.md
-!README.md
-
-# Scripts
-*.ps1
-cleanup.ps1

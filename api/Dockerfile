@@ -1,5 +1,6 @@
 # ==============================================================
-# STARAPI — Multi-stage Dockerfile
+# STARAPI API — Multi-stage Dockerfile
+# Build context: project root (for access to db/)
 # Stages: deps → build → production
 # ==============================================================
 
@@ -9,15 +10,15 @@ WORKDIR /app
 
 # ---- Stage 2: dependencies ----
 FROM base AS deps
-COPY package*.json ./
+COPY api/package*.json ./
 # Install ALL deps (including devDependencies for type-check)
 RUN npm ci && npm cache clean --force
 
 # ---- Stage 3: build (TypeScript type-check) ----
 FROM deps AS build
-COPY tsconfig.json ./
-COPY server.ts ./
-COPY src/ ./src/
+COPY api/tsconfig.json ./
+COPY api/server.ts ./
+COPY api/src/ ./src/
 COPY db/ ./db/
 # Type-check only — tsx runs TS directly, no emit needed
 RUN npx tsc --noEmit || true
@@ -26,14 +27,14 @@ RUN npx tsc --noEmit || true
 FROM base AS production
 
 # Install production deps + tsx runtime
-COPY package*.json ./
+COPY api/package*.json ./
 RUN npm ci --omit=dev && \
     npm install tsx && \
     npm cache clean --force
 
 # Copy source
-COPY server.ts ./
-COPY src/ ./src/
+COPY api/server.ts ./
+COPY api/src/ ./src/
 COPY db/ ./db/
 
 # Non-root user
