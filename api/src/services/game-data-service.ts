@@ -271,6 +271,11 @@ export class GameDataService {
           skippedNonPlayable++;
           continue;
         }
+        // Skip module-tier config variants (Apollo Tier 1/2/3 etc. — these are module configs, not separate ships)
+        if (/_Tier_\d+$/i.test(veh.className)) {
+          skippedNonPlayable++;
+          continue;
+        }
 
         // Determine manufacturer code from className prefix
         const mfgMatch = veh.className.match(/^([A-Z]{3,5})_/);
@@ -367,7 +372,7 @@ export class GameDataService {
             fullData.shortName || null,                         // short_name
             fullData.description || null,                       // description
             fullData.grade || null,                             // ship_grade
-            fullData.cargo || null,                             // cargo_capacity
+            fullData.cargo ?? null,                             // cargo_capacity (use ?? to keep 0)
             // Insurance
             fullData.insurance?.baseWaitTimeMinutes || null,    // insurance_claim_time
             fullData.insurance?.baseExpeditingFee || null,      // insurance_expedite_cost
@@ -382,6 +387,9 @@ export class GameDataService {
           // Delete old loadout first (idempotent)
           await conn.execute("DELETE FROM ships_loadouts WHERE ship_uuid = ?", [fullData.ref]);
           totalPorts += await this.saveLoadout(conn, fullData.ref, loadout);
+
+          // Calculate missile_damage_total from loadout components
+          await this.computeAndStoreMissileDamage(conn, fullData.ref);
         }
 
         // Detect & save modules (ports named *module* that reference other vehicle entities)
@@ -459,6 +467,25 @@ export class GameDataService {
       }
     }
     return count;
+  }
+
+  /**
+   * After saving loadout, compute total missile damage from joined components and store it on the ship row.
+   */
+  private async computeAndStoreMissileDamage(conn: PoolConnection, shipUuid: string): Promise<void> {
+    try {
+      const [rows] = await conn.execute<any[]>(
+        `SELECT COALESCE(SUM(c.missile_damage), 0) as total
+         FROM ships_loadouts sl
+         JOIN components c ON sl.component_uuid = c.uuid
+         WHERE sl.ship_uuid = ? AND c.type IN ('Missile','WeaponMissile')`,
+        [shipUuid],
+      );
+      const total = parseFloat(rows[0]?.total) || 0;
+      await conn.execute("UPDATE ships SET missile_damage_total = ? WHERE uuid = ?", [total > 0 ? total : null, shipUuid]);
+    } catch {
+      // Non-critical — skip silently
+    }
   }
 
   /**
@@ -787,6 +814,8 @@ export class GameDataService {
   async getAllShips(filters?: {
     manufacturer?: string;
     role?: string;
+    career?: string;
+    status?: string;
     search?: string;
     sort?: string;
     order?: string;
@@ -794,7 +823,7 @@ export class GameDataService {
     limit?: number;
   }): Promise<{ data: any[]; total: number; page: number; limit: number; pages: number }> {
     let sql = "SELECT s.*, m.name as manufacturer_name, sm.media_store_small as thumbnail, sm.media_store_large as thumbnail_large, sm.production_status, sm.description as sm_description, sm.url as store_url FROM ships s LEFT JOIN manufacturers m ON s.manufacturer_code = m.code LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE 1=1";
-    let countSql = "SELECT COUNT(*) as total FROM ships s WHERE 1=1";
+    let countSql = "SELECT COUNT(*) as total FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE 1=1";
     const params: any[] = [];
     const countParams: any[] = [];
 
@@ -805,10 +834,31 @@ export class GameDataService {
       countParams.push(filters.manufacturer.toUpperCase());
     }
     if (filters?.role) {
-      sql += " AND s.role LIKE ?";
-      countSql += " AND s.role LIKE ?";
-      params.push(`%${filters.role}%`);
-      countParams.push(`%${filters.role}%`);
+      sql += " AND s.role = ?";
+      countSql += " AND s.role = ?";
+      params.push(filters.role);
+      countParams.push(filters.role);
+    }
+    if (filters?.career) {
+      sql += " AND s.career = ?";
+      countSql += " AND s.career = ?";
+      params.push(filters.career);
+      countParams.push(filters.career);
+    }
+    if (filters?.status) {
+      if (filters.status === 'flight-ready') {
+        sql += " AND sm.production_status = 'flight-ready'";
+        countSql += " AND sm.production_status = 'flight-ready'";
+      } else if (filters.status === 'in-concept') {
+        sql += " AND sm.production_status = 'in-concept'";
+        countSql += " AND sm.production_status = 'in-concept'";
+      } else if (filters.status === 'in-production') {
+        sql += " AND sm.production_status = 'in-production'";
+        countSql += " AND sm.production_status = 'in-production'";
+      } else if (filters.status === 'in-game-only') {
+        sql += " AND s.ship_matrix_id IS NULL";
+        countSql += " AND s.ship_matrix_id IS NULL";
+      }
     }
     if (filters?.search) {
       sql += " AND (s.name LIKE ? OR s.class_name LIKE ?)";
@@ -917,6 +967,32 @@ export class GameDataService {
   async getAllManufacturers(): Promise<any[]> {
     const [rows] = await this.pool.execute("SELECT * FROM manufacturers ORDER BY code");
     return rows as any[];
+  }
+
+  /** Get only manufacturers that have at least one ship */
+  async getShipManufacturers(): Promise<any[]> {
+    const [rows] = await this.pool.execute(
+      `SELECT m.*, COUNT(s.uuid) as ship_count
+       FROM manufacturers m
+       INNER JOIN ships s ON s.manufacturer_code = m.code
+       GROUP BY m.code
+       ORDER BY m.name`
+    );
+    return rows as any[];
+  }
+
+  /** Get distinct roles and careers used by ships */
+  async getShipFilters(): Promise<{ roles: string[]; careers: string[] }> {
+    const [roleRows] = await this.pool.execute<any[]>(
+      "SELECT DISTINCT role FROM ships WHERE role IS NOT NULL AND role != '' ORDER BY role"
+    );
+    const [careerRows] = await this.pool.execute<any[]>(
+      "SELECT DISTINCT career FROM ships WHERE career IS NOT NULL AND career != '' ORDER BY career"
+    );
+    return {
+      roles: roleRows.map((r: any) => r.role),
+      careers: careerRows.map((r: any) => r.career),
+    };
   }
 
   async getShipLoadout(shipUuid: string): Promise<any[]> {
@@ -1240,7 +1316,7 @@ export class GameDataService {
   private validateSortColumn(col: string): string {
     const allowed = [
       "name", "class_name", "manufacturer_code", "mass", "scm_speed", "max_speed",
-      "total_hp", "shield_hp", "crew_size", "cargo_capacity",
+      "total_hp", "shield_hp", "crew_size", "cargo_capacity", "missile_damage_total",
       "armor_physical", "armor_energy", "armor_distortion",
       "cross_section_x", "cross_section_y", "cross_section_z",
       "hydrogen_fuel_capacity", "quantum_fuel_capacity",

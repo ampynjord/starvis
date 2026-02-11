@@ -144,6 +144,23 @@ export async function compareShips(uuid1: string, uuid2: string) {
   return fetchJson<any>(`/ships/${uuid1}/compare/${uuid2}`)
 }
 
+export interface ShipManufacturer extends Manufacturer {
+  ship_count: number
+}
+
+export interface ShipFilters {
+  roles: string[]
+  careers: string[]
+}
+
+export async function getShipManufacturers() {
+  return fetchJson<{ success: boolean; count: number; data: ShipManufacturer[] }>('/ships/manufacturers')
+}
+
+export async function getShipFilters() {
+  return fetchJson<{ success: boolean; data: ShipFilters }>('/ships/filters')
+}
+
 // --------------- Components ---------------
 
 export async function getComponents(params: Record<string, string> = {}) {

@@ -1,28 +1,17 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
-import { getManufacturers, getShips, type Manufacturer } from '@/services/api'
+import { getShipManufacturers, type ShipManufacturer } from '@/services/api'
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const manufacturers = ref<(Manufacturer & { ship_count?: number })[]>([])
+const manufacturers = ref<ShipManufacturer[]>([])
 const loading = ref(true)
 
 onMounted(async () => {
   try {
-    const [mfgRes, shipsRes] = await Promise.all([
-      getManufacturers(),
-      getShips({ limit: '1000' }),
-    ])
-    // Count ships per manufacturer
-    const counts: Record<string, number> = {}
-    for (const s of shipsRes.data) {
-      const code = s.manufacturer_code
-      counts[code] = (counts[code] || 0) + 1
-    }
-    manufacturers.value = (mfgRes.data || [])
-      .map((m: Manufacturer) => ({ ...m, ship_count: counts[m.code] || 0 }))
-      .sort((a: any, b: any) => b.ship_count - a.ship_count)
+    const res = await getShipManufacturers()
+    manufacturers.value = (res.data || []).sort((a, b) => b.ship_count - a.ship_count)
   } finally {
     loading.value = false
   }
