@@ -6,6 +6,7 @@ import { existsSync, readFileSync } from "fs";
 import type { PoolConnection } from "mysql2/promise";
 import path from "path";
 import { fileURLToPath } from "url";
+import logger from "../utils/logger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -15,7 +16,7 @@ export async function initializeSchema(conn: PoolConnection): Promise<void> {
   const candidate1 = path.join(__dirname, "..", "..", "db", "schema.sql");
   const candidate2 = path.join(__dirname, "..", "..", "..", "db", "schema.sql");
   const schemaPath = existsSync(candidate1) ? candidate1 : candidate2;
-  console.log(`📄 Loading schema from: ${schemaPath}`);
+  logger.info(`Loading schema from: ${schemaPath}`, { module: 'schema' });
   const schema = readFileSync(schemaPath, "utf-8");
 
   // Migration: rename ships_default_loadouts → ships_loadouts if needed
@@ -24,11 +25,11 @@ export async function initializeSchema(conn: PoolConnection): Promise<void> {
       "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ships_default_loadouts'"
     );
     if (tables.length > 0) {
-      console.log("🔄 Renaming ships_default_loadouts → ships_loadouts");
+      logger.info('Renaming ships_default_loadouts → ships_loadouts', { module: 'schema' });
       await conn.execute("RENAME TABLE ships_default_loadouts TO ships_loadouts");
     }
   } catch (e: any) {
-    console.log(`⏭️  Migration skip: ${e.message}`);
+    logger.debug(`Migration skip: ${e.message}`, { module: 'schema' });
   }
 
   // Remove comments and split on semicolons
@@ -38,22 +39,22 @@ export async function initializeSchema(conn: PoolConnection): Promise<void> {
     .map((s) => s.trim())
     .filter((s) => s.length > 10);
 
-  console.log(`📝 Found ${statements.length} SQL statements to execute`);
+  logger.info(`Found ${statements.length} SQL statements to execute`, { module: 'schema' });
 
   for (const sql of statements) {
     try {
       const preview = sql.substring(0, 60).replace(/\s+/g, " ");
-      console.log(`⚙️  Executing: ${preview}...`);
+      logger.debug(`Executing: ${preview}...`, { module: 'schema' });
       await conn.execute(sql);
     } catch (e: any) {
       // Ignore "already exists" type errors
       if (e.code === "ER_TABLE_EXISTS_ERROR" || e.code === "ER_DUP_KEYNAME") {
-        console.log(`⏭️  Already exists, skipping`);
+        logger.debug('Already exists, skipping', { module: 'schema' });
       } else {
         throw e;
       }
     }
   }
 
-  console.log("✅ Schema initialized");
+  logger.info('Schema initialized', { module: 'schema' });
 }

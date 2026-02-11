@@ -51,6 +51,11 @@ const router = createRouter({
       name: 'hangar',
       component: () => import('@/views/HangarView.vue'),
     },
+    {
+      path: '/changelog',
+      name: 'changelog',
+      component: () => import('@/views/ChangelogView.vue'),
+    },
   ],
 })
 

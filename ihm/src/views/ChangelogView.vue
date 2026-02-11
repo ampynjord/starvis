@@ -1,0 +1,130 @@
+<script setup lang="ts">
+import LoadingState from '@/components/LoadingState.vue'
+import { getChangelog } from '@/services/api'
+import { onMounted, ref, watch } from 'vue'
+
+const entries = ref<any[]>([])
+const total = ref(0)
+const loading = ref(true)
+const page = ref(1)
+const perPage = 50
+const entityType = ref('')
+const changeType = ref('')
+
+async function load() {
+  loading.value = true
+  try {
+    const params: Record<string, string> = {
+      limit: String(perPage),
+      offset: String((page.value - 1) * perPage),
+    }
+    if (entityType.value) params.entity_type = entityType.value
+    if (changeType.value) params.change_type = changeType.value
+    const res = await getChangelog(params)
+    entries.value = res.data || []
+    total.value = res.total || 0
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(load)
+watch([entityType, changeType], () => { page.value = 1; load() })
+watch(page, load)
+
+const totalPages = () => Math.max(1, Math.ceil(total.value / perPage))
+
+function badgeClass(type: string) {
+  switch (type) {
+    case 'added': return 'badge-green'
+    case 'removed': return 'badge-red'
+    case 'modified': return 'badge-blue'
+    default: return 'badge-blue'
+  }
+}
+
+function entityIcon(type: string) {
+  switch (type) {
+    case 'ship': return '🚀'
+    case 'component': return '⚙️'
+    case 'shop': return '🏪'
+    case 'module': return '📦'
+    default: return '📄'
+  }
+}
+
+function fmtDate(d: string) {
+  if (!d) return '—'
+  return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+</script>
+
+<template>
+  <div class="max-w-5xl mx-auto space-y-4">
+    <h1 class="text-lg font-bold text-sv-text-bright">Changelog</h1>
+    <p class="text-xs text-sv-muted">Suivi des ajouts, suppressions et modifications entre extractions P4K/DataForge.</p>
+
+    <!-- Filters -->
+    <div class="flex flex-wrap gap-3 items-center">
+      <select v-model="entityType" class="input-dark text-xs">
+        <option value="">Tous les types</option>
+        <option value="ship">Vaisseaux</option>
+        <option value="component">Composants</option>
+        <option value="shop">Boutiques</option>
+        <option value="module">Modules</option>
+      </select>
+      <select v-model="changeType" class="input-dark text-xs">
+        <option value="">Tous les changements</option>
+        <option value="added">Ajoutés</option>
+        <option value="removed">Supprimés</option>
+        <option value="modified">Modifiés</option>
+      </select>
+      <span class="text-[11px] text-sv-muted ml-auto">{{ total }} entrée{{ total > 1 ? 's' : '' }}</span>
+    </div>
+
+    <LoadingState :loading="loading">
+      <div v-if="entries.length === 0" class="text-center py-12 text-sv-muted text-sm">
+        Aucun changement enregistré.
+      </div>
+      <div v-else class="space-y-1">
+        <div
+          v-for="e in entries"
+          :key="e.id"
+          class="card px-3 py-2 flex items-center gap-3 text-xs"
+        >
+          <span class="text-base shrink-0">{{ entityIcon(e.entity_type) }}</span>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2">
+              <span class="font-medium text-sv-text-bright truncate">{{ e.entity_name || e.entity_uuid }}</span>
+              <span :class="badgeClass(e.change_type)" class="text-[10px]">{{ e.change_type }}</span>
+            </div>
+            <div v-if="e.field_name" class="text-[10px] text-sv-muted mt-0.5">
+              <span class="font-mono">{{ e.field_name }}</span>:
+              <span class="text-red-400 line-through">{{ e.old_value || '∅' }}</span>
+              → <span class="text-green-400">{{ e.new_value || '∅' }}</span>
+            </div>
+          </div>
+          <div class="text-right shrink-0 text-[10px] text-sv-muted">
+            <div>{{ e.game_version || '—' }}</div>
+            <div>{{ fmtDate(e.created_at) }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div v-if="totalPages() > 1" class="flex items-center justify-center gap-2 pt-4">
+        <button
+          class="btn-outline text-xs"
+          :disabled="page <= 1"
+          @click="page--"
+        >← Préc.</button>
+        <span class="text-xs text-sv-muted">{{ page }} / {{ totalPages() }}</span>
+        <button
+          class="btn-outline text-xs"
+          :disabled="page >= totalPages()"
+          @click="page++"
+        >Suiv. →</button>
+      </div>
+    </LoadingState>
+  </div>
+</template>

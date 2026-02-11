@@ -136,6 +136,10 @@ export async function getShipLoadout(uuid: string) {
   return fetchJson<any>(`/ships/${uuid}/loadout`)
 }
 
+export async function getShipModules(uuid: string) {
+  return fetchJson<any>(`/ships/${uuid}/modules`)
+}
+
 export async function compareShips(uuid1: string, uuid2: string) {
   return fetchJson<any>(`/ships/${uuid1}/compare/${uuid2}`)
 }
@@ -179,6 +183,13 @@ export async function calculateLoadout(shipUuid: string, swaps: { portName: stri
     method: 'POST',
     body: JSON.stringify({ shipUuid, swaps }),
   })
+}
+
+// --------------- Changelog ---------------
+
+export async function getChangelog(params: Record<string, string> = {}) {
+  const qs = new URLSearchParams(params).toString()
+  return fetchJson<any>(`/changelog?${qs}`)
 }
 
 // --------------- Version ---------------

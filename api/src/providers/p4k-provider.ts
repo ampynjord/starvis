@@ -6,6 +6,7 @@ import { createDecipheriv } from "crypto";
 import { statSync } from "fs";
 import { FileHandle, open } from "fs/promises";
 import { inflateRawSync } from "zlib";
+import logger from "../utils/logger.js";
 
 export interface P4KEntry {
   fileName: string;
@@ -50,7 +51,7 @@ export class P4KProvider {
     this.fileSize = statSync(this.p4kPath).size;
     this.fd = await open(this.p4kPath, "r");
     await this.readEndOfCentralDirectory();
-    console.log(`📦 P4K opened: ${this.totalEntries.toLocaleString()} entries`);
+    logger.info(`P4K opened: ${this.totalEntries.toLocaleString()} entries`, { module: 'p4k' });
   }
 
   async close(): Promise<void> {
