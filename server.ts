@@ -4,12 +4,17 @@
  * Architecture:
  *   ship_matrix table    ← ShipMatrixService  ← RSI Ship Matrix API
  *   ships/components/etc ← GameDataService     ← DataForgeService ← P4K
+ *
+ * Features: Pagination, ETag caching, CSV export, Rate limiting, Swagger docs
  */
 import cors from "cors";
 import express from "express";
+import rateLimit from "express-rate-limit";
 import { existsSync } from "fs";
 import * as mysql from "mysql2/promise";
 import path from "path";
+import swaggerJsdoc from "swagger-jsdoc";
+import swaggerUi from "swagger-ui-express";
 import { fileURLToPath } from "url";
 
 import { createRoutes } from "./src/routes.js";
@@ -29,6 +34,16 @@ let gameDataService: GameDataService | null = null;
 app.use(cors({ origin: process.env.CORS_ORIGIN || "*", credentials: true }));
 app.use(express.json());
 
+// Rate limiting – 200 req / 15 min per IP
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: parseInt(process.env.RATE_LIMIT_MAX || "200"),
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: "Too many requests, please try again later" },
+});
+app.use("/api", limiter);
+
 // Request logging (skip /health to avoid noise)
 app.use((req, res, next) => {
   if (req.path === "/health") return next();
@@ -42,6 +57,21 @@ app.use((req, res, next) => {
   next();
 });
 
+// ===== SWAGGER / OPENAPI =====
+const swaggerSpec = swaggerJsdoc({
+  definition: {
+    openapi: "3.0.0",
+    info: {
+      title: "Starapi",
+      version: "1.0.0",
+      description: "Star Citizen Ships & Components API – powered by P4K/DataForge",
+    },
+    servers: [{ url: `http://localhost:${PORT}` }],
+  },
+  apis: ["./src/routes.ts", "./src/routes.js"],
+});
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
 // ===== ROOT =====
 app.get("/", (_, res) => res.json({
   name: "Starapi",
@@ -51,6 +81,9 @@ app.get("/", (_, res) => res.json({
     ships: "/api/v1/ships",
     components: "/api/v1/components",
     manufacturers: "/api/v1/manufacturers",
+    compare: "/api/v1/ships/:uuid/compare/:uuid2",
+    version: "/api/v1/version",
+    docs: "/api-docs",
     admin: "/admin/* (requires X-API-Key)",
     health: "/health",
   },

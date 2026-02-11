@@ -93,6 +93,10 @@ export class DataForgeService {
 
   isDataForgeLoaded() { return this.dfData !== null; }
 
+  getVersion(): string {
+    return this.dfData?.header?.version?.toString() || 'unknown';
+  }
+
   // ============ P4K file access ============
 
   async findFiles(pattern: string, limit = 100) {
@@ -179,6 +183,61 @@ export class DataForgeService {
   getStructTypes(): string[] {
     if (!this.dfData) throw new Error("DataForge not loaded");
     return this.dfData.structDefs.map((s: any) => s.name);
+  }
+
+  /** Debug: inspect struct property definitions with data types */
+  debugStructProperties(structName: string): any[] {
+    if (!this.dfData) throw new Error("DataForge not loaded");
+    const idx = this.dfData.structDefs.findIndex((s: any) => s.name === structName);
+    if (idx === -1) return [];
+    const props = this.getStructProperties(idx);
+    const DT_NAMES: Record<number, string> = {
+      0x0001: 'BOOLEAN', 0x0002: 'INT8', 0x0003: 'INT16', 0x0004: 'INT32', 0x0005: 'INT64',
+      0x0006: 'UINT8', 0x0007: 'UINT16', 0x0008: 'UINT32', 0x0009: 'UINT64',
+      0x000A: 'STRING', 0x000B: 'SINGLE', 0x000C: 'DOUBLE', 0x000D: 'LOCALE',
+      0x000E: 'GUID', 0x000F: 'ENUM', 0x0010: 'CLASS', 0x0110: 'STRONG_PTR',
+      0x0210: 'WEAK_PTR', 0x0310: 'REFERENCE'
+    };
+    return props.map((p: any) => ({
+      name: p.name,
+      dataType: DT_NAMES[p.dataType] || `0x${p.dataType.toString(16)}`,
+      conversionType: p.conversionType,
+      structIndex: p.structIndex,
+    }));
+  }
+
+  /** Debug: inspect a single entity's VehicleComponentParams */
+  debugVehicleParams(className: string): any {
+    if (!this.dfData || !this.dcbBuffer) return null;
+    const record = this.findEntityRecord(className);
+    if (!record) return { error: 'Entity not found' };
+    const data = this.readInstance(record.structIndex, record.instanceIndex, 0, 8);
+    if (!data?.Components) return { error: 'No Components' };
+    for (const comp of data.Components) {
+      if (comp?.__type === 'VehicleComponentParams') {
+        return { vehicleParams: comp, keys: Object.keys(comp) };
+      }
+    }
+    return { error: 'VehicleComponentParams not found', componentTypes: data.Components.map((c: any) => c?.__type).filter(Boolean) };
+  }
+
+  /** Debug: inspect a record by GUID at high depth */
+  debugRecordByGuid(guid: string): any {
+    return this.readRecordByGuid(guid, 8);
+  }
+
+  /** Debug: inspect a component SCItem by class_name */
+  debugComponent(className: string): any {
+    if (!this.dfData || !this.dcbBuffer) return null;
+    const entityClassIdx = this.dfData.structDefs.findIndex((s: any) => s.name === 'EntityClassDefinition');
+    for (const r of this.dfData.records) {
+      if (r.structIndex !== entityClassIdx) continue;
+      const name = r.name?.replace('EntityClassDefinition.', '') || '';
+      if (name.toLowerCase() === className.toLowerCase()) {
+        return this.readInstance(r.structIndex, r.instanceIndex, 0, 8);
+      }
+    }
+    return { error: 'Not found' };
   }
 
   findEntityRecord(entityClassName: string): any | null {
@@ -514,8 +573,10 @@ export class DataForgeService {
         return [{ __ref: rGuid }, pos + 20];
       }
       default:
-        console.warn(`[DF] Unknown dataType: 0x${dt.toString(16)} for prop ${prop.name}`);
-        return [null, pos];
+        // RESILIENCE: skip unknown data types by estimating 4 bytes
+        // This prevents corrupting all subsequent property reads
+        console.warn(`[DF] Unknown dataType: 0x${dt.toString(16)} for prop ${prop.name} — skipping 4 bytes`);
+        return [null, pos + 4];
     }
   }
 
@@ -760,17 +821,20 @@ export class DataForgeService {
       'PowerPlant':    /power_?plant[s]?[\/\\]|powerplant/i,
       'Cooler':        /cooler[s]?[\/\\]/i,
       'QuantumDrive':  /quantum_?drive[s]?[\/\\]|quantumdrive/i,
-      'MissileRack':   /missile_?rack[s]?[\/\\]|missile_launcher/i,
-      'Turret':        /turret[s]?[\/\\]/i,
       'Missile':       /missile[s]?[\/\\](?!rack|launcher|_rack)/i,
+      'Thruster':      /thruster[s]?[\/\\]/i,
       'Radar':         /radar[s]?[\/\\]/i,
+      'Countermeasure': /countermeasure[s]?[\/\\]|flare[s]?[\/\\]|noise[\/\\]/i,
+      'FuelIntake':    /fuel_?intake[s]?[\/\\]/i,
+      'FuelTank':      /fuel_?tank[s]?[\/\\](?!quantum)/i,
+      'LifeSupport':   /life_?support[s]?[\/\\]/i,
     };
 
     let scanned = 0;
     for (const r of this.dfData.records) {
       if (r.structIndex !== entityClassIdx) continue;
       const fn = (r.fileName || '').toLowerCase();
-      if (!fn.includes('scitem') && !fn.includes('/weapon/') && !fn.includes('/missile/')) continue;
+      if (!fn.includes('scitem') && !fn.includes('/weapon/') && !fn.includes('/missile/') && !fn.includes('/systems/')) continue;
       let type: string | null = null;
       for (const [t, rx] of Object.entries(componentPaths)) { if (rx.test(fn)) { type = t; break; } }
       if (!type) continue;
@@ -797,7 +861,14 @@ export class DataForgeService {
               if (typeof ad.Size === 'number') comp.size = ad.Size;
               if (typeof ad.Grade === 'number') comp.grade = String.fromCharCode(65 + ad.Grade);
               const loc = ad.Localization;
-              if (loc?.Name && typeof loc.Name === 'string' && !loc.Name.startsWith('LOC_') && !loc.Name.startsWith('@')) comp.name = loc.Name;
+              if (loc?.Name && typeof loc.Name === 'string') {
+                if (!loc.Name.startsWith('LOC_') && !loc.Name.startsWith('@')) {
+                  comp.name = loc.Name;
+                } else {
+                  // LOC key: resolve to a readable name from className
+                  comp.name = DataForgeService.resolveComponentName(className);
+                }
+              }
               if (typeof ad.Manufacturer === 'string' && ad.Manufacturer) comp.manufacturer = ad.Manufacturer;
             }
           }
@@ -885,7 +956,7 @@ export class DataForgeService {
                     if (typeof pp.lifetime === 'number' && comp.weaponSpeed) comp.weaponRange = Math.round(pp.lifetime * comp.weaponSpeed * 100) / 100;
                   }
                 }
-              } catch { /* skip ammo errors */ }
+              } catch (e) { /* ammo resolution — non-critical */ }
             }
           }
 
@@ -932,20 +1003,36 @@ export class DataForgeService {
             }
           }
 
-          // Missile
+          // Missile - extract from SCItemMissileParams (explosionParams.damage, GCSParams, targetingParams)
           if (cType === 'SCItemMissileParams') {
-            const d = c.explosionParams || c.damage;
-            if (d && typeof d === 'object') {
-              const total = (typeof d.physical === 'number' ? d.physical : 0) + (typeof d.energy === 'number' ? d.energy : 0) + (typeof d.distortion === 'number' ? d.distortion : 0);
-              if (total > 0) comp.missileDamage = Math.round(total * 100) / 100;
+            // Damage from explosionParams.damage (DamageInfo struct)
+            const ep = c.explosionParams;
+            if (ep && typeof ep === 'object') {
+              const dmg = ep.damage;
+              if (dmg && typeof dmg === 'object') {
+                const physical = typeof dmg.DamagePhysical === 'number' ? dmg.DamagePhysical : 0;
+                const energy = typeof dmg.DamageEnergy === 'number' ? dmg.DamageEnergy : 0;
+                const distortion = typeof dmg.DamageDistortion === 'number' ? dmg.DamageDistortion : 0;
+                const thermal = typeof dmg.DamageThermal === 'number' ? dmg.DamageThermal : 0;
+                const biochemical = typeof dmg.DamageBiochemical === 'number' ? dmg.DamageBiochemical : 0;
+                const stun = typeof dmg.DamageStun === 'number' ? dmg.DamageStun : 0;
+                const total = physical + energy + distortion + thermal + biochemical + stun;
+                if (total > 0) comp.missileDamage = Math.round(total * 100) / 100;
+              }
             }
-            if (typeof c.damage === 'number') comp.missileDamage = Math.round(c.damage * 100) / 100;
-          }
-          if (cType === 'SCItemMissileGuidanceParams' || cType === 'MissileGuidanceParams') {
-            if (typeof c.lockTime === 'number') comp.missileLockTime = Math.round(c.lockTime * 100) / 100;
-            if (typeof c.trackingSignalType === 'string') comp.missileSignalType = c.trackingSignalType;
-            if (typeof c.lockRangeMax === 'number') comp.missileLockRange = Math.round(c.lockRangeMax * 100) / 100;
-            if (typeof c.trackingDistanceMax === 'number') comp.missileRange = Math.round(c.trackingDistanceMax * 100) / 100;
+            // Speed from GCSParams
+            const gcs = c.GCSParams;
+            if (gcs && typeof gcs === 'object') {
+              if (typeof gcs.linearSpeed === 'number') comp.missileSpeed = Math.round(gcs.linearSpeed * 100) / 100;
+            }
+            // Targeting from targetingParams
+            const tp = c.targetingParams;
+            if (tp && typeof tp === 'object') {
+              if (typeof tp.lockTime === 'number') comp.missileLockTime = Math.round(tp.lockTime * 100) / 100;
+              if (typeof tp.trackingSignalType === 'string') comp.missileSignalType = tp.trackingSignalType;
+              if (typeof tp.lockRangeMax === 'number') comp.missileLockRange = Math.round(tp.lockRangeMax * 100) / 100;
+              if (typeof tp.lockRangeMin === 'number') comp.missileRange = Math.round(tp.lockRangeMin * 100) / 100;
+            }
           }
 
           // Projectile params
@@ -957,6 +1044,48 @@ export class DataForgeService {
             }
             if (typeof c.speed === 'number' && !comp.weaponSpeed) comp.weaponSpeed = Math.round(c.speed * 100) / 100;
             if (typeof c.lifetime === 'number' && comp.weaponSpeed) comp.weaponRange = Math.round(c.lifetime * comp.weaponSpeed * 100) / 100;
+          }
+
+          // Thruster
+          if (cType === 'SCItemThrusterParams' || cType === 'SItemThrusterParams') {
+            if (typeof c.thrustCapacity === 'number') comp.thrusterMaxThrust = Math.round(c.thrustCapacity * 100) / 100;
+            if (typeof c.ThrustCapacity === 'number' && !comp.thrusterMaxThrust) comp.thrusterMaxThrust = Math.round(c.ThrustCapacity * 100) / 100;
+            if (typeof c.maxThrustForce === 'number' && !comp.thrusterMaxThrust) comp.thrusterMaxThrust = Math.round(c.maxThrustForce * 100) / 100;
+            // Determine sub-type from port name pattern in fileName
+            const thrusterType = fn.includes('main') || fn.includes('retro') ? (fn.includes('retro') ? 'Retro' : 'Main') :
+              fn.includes('vtol') ? 'VTOL' : fn.includes('mav') || fn.includes('maneuver') ? 'Maneuvering' : 'Main';
+            comp.thrusterType = thrusterType;
+          }
+
+          // Radar
+          if (cType === 'SCItemRadarComponentParams' || cType === 'SRadarComponentParams') {
+            if (typeof c.detectionRange === 'number') comp.radarRange = Math.round(c.detectionRange * 100) / 100;
+            if (typeof c.DetectionLifetime === 'number') comp.radarRange = Math.round(c.DetectionLifetime * 100) / 100;
+            if (typeof c.trackingSignalAmplifier === 'number') comp.radarRange = Math.round(c.trackingSignalAmplifier * 100) / 100;
+          }
+
+          // Countermeasure
+          if (cType === 'SCItemCountermeasureParams' || cType === 'SCountermeasureParams') {
+            if (typeof c.ammoCount === 'number') comp.cmAmmoCount = c.ammoCount;
+          }
+          if (type === 'Countermeasure' && cType === 'SAmmoContainerComponentParams') {
+            if (typeof c.maxAmmoCount === 'number') comp.cmAmmoCount = c.maxAmmoCount;
+            if (typeof c.initialAmmoCount === 'number' && !comp.cmAmmoCount) comp.cmAmmoCount = c.initialAmmoCount;
+          }
+
+          // Fuel Tank
+          if (cType === 'SCItemFuelTankParams') {
+            if (typeof c.capacity === 'number') comp.fuelCapacity = Math.round(c.capacity * 100) / 100;
+          }
+          if (type === 'FuelTank' && cType === 'ResourceContainer') {
+            const cap = typeof c.capacity === 'object' ? (c.capacity?.standardCargoUnits || 0) : (typeof c.capacity === 'number' ? c.capacity : 0);
+            if (cap > 0) comp.fuelCapacity = Math.round(cap * 100) / 100;
+          }
+
+          // Fuel Intake
+          if (cType === 'SCItemFuelIntakeParams' || cType === 'SFuelIntakeParams') {
+            if (typeof c.fuelPushRate === 'number') comp.fuelIntakeRate = Math.round(c.fuelPushRate * 10000) / 10000;
+            if (typeof c.FuelPushRate === 'number' && !comp.fuelIntakeRate) comp.fuelIntakeRate = Math.round(c.FuelPushRate * 10000) / 10000;
           }
         }
 
@@ -974,7 +1103,10 @@ export class DataForgeService {
         }
 
         components.push(comp);
-      } catch { /* skip */ }
+      } catch (e) {
+        // Log to detect format changes from CIG patches
+        if (scanned % 500 === 0) console.warn(`[DF] Component extraction error at ${scanned}: ${(e as Error).message}`);
+      }
     }
     console.log(`[DF] Extracted ${components.length} components from ${scanned} SCItem records`);
     return components;
@@ -1122,7 +1254,7 @@ export class DataForgeService {
         if (map.size > 0) {
           return map;
         }
-      } catch { continue; }
+      } catch { continue; /* variant loadout not readable — non-critical */ }
     }
     return null;
   }
@@ -1402,9 +1534,16 @@ export class DataForgeService {
     result.loadout = extracted.loadout;
 
     // === Read Vehicle Implementation XML for mass & hull parts ===
-    // Try variant-specific XML first, then base class
+    // Try variant-specific XML first, then base class, then vehicleDefinition path
     const xmlNamesToTry = [entities.vehicleXmlName];
     if (entities.vehicleXmlName !== className) xmlNamesToTry.push(className);
+    // Also try the name from vehicleDefinition (e.g., "aegs_avenger" from "...aegs_avenger.xml")
+    if (result.vehicle?.vehicleDefinition) {
+      const vdMatch = result.vehicle.vehicleDefinition.match(/([^/\\]+)\.xml$/i);
+      if (vdMatch && !xmlNamesToTry.includes(vdMatch[1])) {
+        xmlNamesToTry.push(vdMatch[1]);
+      }
+    }
     
     let xmlUsedWasVariantSpecific = false;
     for (const xmlName of xmlNamesToTry) {
@@ -1470,7 +1609,8 @@ export class DataForgeService {
 
   /**
    * Recursively extract hull parts from vehicle implementation XML.
-   * Returns the tree of parts with hp (damageMax) and the sum total.
+   * Returns the tree of ALL parts with hp (damageMax) and the sum total.
+   * Counts all Part elements (not just AnimatedJoint) to match Erkul's total HP calculation.
    */
   private extractVehicleXmlParts(partNode: CryXmlNode): { totalHp: number; bodyHp: number; parts: any[] } {
     let totalHp = 0;
@@ -1487,22 +1627,22 @@ export class DataForgeService {
       const dmgMax = parseFloat(child.attributes?.damageMax || '0');
       const name = child.attributes?.name || '';
 
-      // Only count AnimatedJoint parts as hull parts (not ItemPort)
-      if (pClass === 'AnimatedJoint' || pClass === 'Animated') {
-        if (dmgMax > 0) {
-          totalHp += dmgMax;
-          // First major damageMax part is the body
-          if (name === 'Body' && bodyHp === 0) {
-            bodyHp = dmgMax;
-          }
+      // Count ALL part types with damageMax > 0 (AnimatedJoint, Animated, SubPart, etc.)
+      // Skip only ItemPort class parts (these are component mount points, not hull)
+      if (pClass === 'ItemPort') continue;
+
+      if (dmgMax > 0) {
+        totalHp += dmgMax;
+        if (name === 'Body' && bodyHp === 0) {
+          bodyHp = dmgMax;
         }
-        // Recurse into sub-parts
-        const sub = this.extractVehicleXmlParts(child);
-        totalHp += sub.totalHp;
-        const part: any = { hp: dmgMax, name };
-        if (sub.parts.length > 0) part.parts = sub.parts;
-        if (dmgMax > 0 || sub.parts.length > 0) parts.push(part);
       }
+      // Recurse into sub-parts
+      const sub = this.extractVehicleXmlParts(child);
+      totalHp += sub.totalHp;
+      const part: any = { hp: dmgMax, name };
+      if (sub.parts.length > 0) part.parts = sub.parts;
+      if (dmgMax > 0 || sub.parts.length > 0) parts.push(part);
     }
 
     return { totalHp, bodyHp, parts };
@@ -1533,8 +1673,14 @@ export class DataForgeService {
     if (!vp) return vehicle;
     if (typeof vp.crewSize === 'number') vehicle.crewSize = vp.crewSize;
     if (typeof vp.dogfightEnabled === 'boolean') vehicle.dogfightEnabled = vp.dogfightEnabled;
-    if (typeof vp.career === 'string') vehicle.career = vp.career;
-    if (typeof vp.role === 'string') vehicle.role = vp.role;
+    if (typeof vp.vehicleDefinition === 'string' && vp.vehicleDefinition.length > 0) {
+      vehicle.vehicleDefinition = vp.vehicleDefinition;
+    }
+
+    // Career/Role: stored as vehicleCareer/vehicleRole LOC keys like "@vehicle_focus_combat"
+    if (typeof vp.vehicleCareer === 'string') vehicle.career = DataForgeService.resolveLocKey(vp.vehicleCareer, 'career');
+    if (typeof vp.vehicleRole === 'string') vehicle.role = DataForgeService.resolveLocKey(vp.vehicleRole, 'role');
+
     const bbox = vp.maxBoundingBoxSize;
     if (bbox && typeof bbox === 'object') {
       vehicle.size = {
@@ -1547,6 +1693,126 @@ export class DataForgeService {
     if (typeof vp.fusePenetrationDamageMultiplier === 'number') vehicle.fusePenetrationDamageMultiplier = vp.fusePenetrationDamageMultiplier;
     if (typeof vp.componentPenetrationDamageMultiplier === 'number') vehicle.componentPenetrationDamageMultiplier = vp.componentPenetrationDamageMultiplier;
     return vehicle;
+  }
+
+  /** Resolve SC localization keys to display strings */
+  static resolveLocKey(locKey: string, type: 'career' | 'role'): string {
+    if (!locKey || !locKey.startsWith('@')) return locKey || '';
+
+    // Known career LOC keys → display names (matching Erkul)
+    const CAREER_MAP: Record<string, string> = {
+      '@vehicle_focus_combat': 'Combat',
+      '@vehicle_focus_transporter': 'Transporter',
+      '@vehicle_focus_industrial': 'Industrial',
+      '@vehicle_focus_competition': 'Competition',
+      '@vehicle_focus_exploration': 'Exploration',
+      '@vehicle_focus_support': 'Support',
+      '@vehicle_focus_gunship': 'Gunship',
+      '@vehicle_focus_multirole': 'Multi-Role',
+      '@vehicle_focus_starter': 'Starter',
+      '@vehicle_focus_ground': 'Ground',
+      '@vehicle_focus_groundcombat': 'Ground Combat',
+    };
+
+    // Known role LOC keys → display names (matching Erkul)
+    const ROLE_MAP: Record<string, string> = {
+      '@vehicle_class_lightfighter': 'Light Fighter',
+      '@vehicle_class_mediumfighter': 'Medium Fighter',
+      '@vehicle_class_heavyfighter': 'Heavy Fighter',
+      '@vehicle_class_heavyfighter_bomber': 'Heavy Fighter / Bomber',
+      '@vehicle_class_interceptor': 'Interceptor',
+      '@vehicle_class_stealthfighter': 'Stealth Fighter',
+      '@vehicle_class_stealthbomber': 'Stealth Bomber',
+      '@vehicle_class_bomber': 'Bomber',
+      '@vehicle_class_heavybomber': 'Heavy Bomber',
+      '@vehicle_class_snubfighter': 'Snub Fighter',
+      '@vehicle_class_gunship': 'Gunship',
+      '@vehicle_class_heavygunship': 'Heavy Gunship',
+      '@vehicle_class_dropship': 'Dropship',
+      '@vehicle_class_lightfreight': 'Light Freight',
+      '@vehicle_class_mediumfreight': 'Medium Freight',
+      '@vehicle_class_heavyfreight': 'Heavy Freight',
+      '@vehicle_class_lightfreight_mediumfighter': 'Light Freight / Medium Fighter',
+      '@vehicle_class_mediumfreight_gunship': 'Medium Freight / Gun Ship',
+      '@vehicle_class_mediumfreightgunshio': 'Medium Freight / Gun Ship', // CIG typo in data
+      '@vehicle_class_mediumfreightgunship': 'Medium Freight / Gun Ship',
+      '@vehicle_class_starter_lightfreight': 'Starter / Light Freight',
+      '@vehicle_class_starterlightfreight': 'Starter / Light Freight',
+      '@vehicle_class_starter_pathfinder': 'Starter / Pathfinder',
+      '@vehicle_class_starterpathfinder': 'Starter / Pathfinder',
+      '@vehicle_class_starter_lightmining': 'Starter / Light Mining',
+      '@vehicle_class_startermining': 'Starter / Mining',
+      '@vehicle_class_starter_lightsalvage': 'Starter / Light Salvage',
+      '@vehicle_class_startersalvage': 'Starter / Salvage',
+      '@vehicle_class_heavyfighterbomber': 'Heavy Fighter / Bomber',
+      '@vehicle_class_expedition': 'Expedition',
+      '@vehicle_class_pathfinder': 'Pathfinder',
+      '@vehicle_class_touring': 'Touring',
+      '@vehicle_class_luxurytouring': 'Luxury Touring',
+      '@vehicle_class_passenger': 'Passenger',
+      '@vehicle_class_modular': 'Modular',
+      '@vehicle_class_generalist': 'Generalist',
+      '@vehicle_class_racing': 'Racing',
+      '@vehicle_class_medical': 'Medical',
+      '@vehicle_class_recovery': 'Recovery',
+      '@vehicle_class_reporting': 'Reporting',
+      '@vehicle_class_combat': 'Combat',
+      '@vehicle_class_interdiction': 'Interdiction',
+      '@vehicle_class_lightsalvage': 'Light Salvage',
+      '@vehicle_class_heavysalvage': 'Heavy Salvage',
+      '@vehicle_class_lightmining': 'Light Mining',
+      '@vehicle_class_mediummining': 'Medium Mining',
+      '@vehicle_class_lightscience': 'Light Science',
+      '@vehicle_class_mediumdata': 'Medium Data',
+      '@vehicle_class_heavyrefuelling': 'Heavy Refuelling',
+      '@vehicle_class_frigate': 'Frigate',
+      '@vehicle_class_corvette': 'Corvette',
+      '@vehicle_class_antivehicle': 'Anti-Vehicle',
+      '@vehicle_class_antiair': 'Anti-Air',
+      '@vehicle_class_heavytank': 'Heavy Tank',
+      '@vehicle_class_lighttank': 'Light Tank',
+      // Also handle @item_ShipFocus_ prefix
+      '@item_shipfocus_heavygunship': 'Heavy Gunship',
+      '@item_shipfocus_lightfighter': 'Light Fighter',
+    };
+
+    const key = locKey.toLowerCase();
+    if (type === 'career' && CAREER_MAP[key]) return CAREER_MAP[key];
+    if (type === 'role' && ROLE_MAP[key]) return ROLE_MAP[key];
+
+    // Fallback: try to parse from key pattern
+    let raw = locKey;
+    // Strip common prefixes
+    for (const prefix of ['@vehicle_focus_', '@vehicle_class_', '@item_ShipFocus_', '@item_shipfocus_']) {
+      if (raw.toLowerCase().startsWith(prefix)) { raw = raw.substring(prefix.length); break; }
+    }
+    // Convert underscored/camel to spaced and capitalize
+    return raw.replace(/([a-z])([A-Z])/g, '$1 $2')
+      .replace(/_/g, ' ')
+      .split(' ')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ');
+  }
+
+  /**
+   * Convert a component className like "KLWE_LaserRepeater_S1" to a readable
+   * display name like "CF-117 Bulldog Repeater". Uses the className structure when
+   * localization data is unavailable.
+   * Format: strips _SCItem suffix, manufacturer prefix, and converts to spaced words.
+   */
+  static resolveComponentName(className: string): string {
+    let name = className;
+    // Strip common suffixes: _SCItem, _PIR, etc.
+    name = name.replace(/_SCItem$/i, '');
+    // Strip item category prefixes (POWR_, COOL_, SHLD_, QDRV_, MISL_, RADR_)
+    name = name.replace(/^(POWR|COOL|SHLD|QDRV|MISL|RADR|WEPN|TURR)_/i, '');
+    // Strip manufacturer code prefix (4-letter codes)
+    name = name.replace(/^[A-Z]{3,5}_/, '');
+    // Convert underscores to spaces
+    name = name.replace(/_/g, ' ');
+    // Insert spaces between camelCase: "LaserRepeater" → "Laser Repeater"
+    name = name.replace(/([a-z])([A-Z])/g, '$1 $2');
+    return name.trim();
   }
 
   private extractHullBlock(vp: any, entityData: any): Record<string, any> {

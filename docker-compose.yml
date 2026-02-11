@@ -1,14 +1,14 @@
 services:
   mysql:
     image: mysql:8.0
-    container_name: star-citizen-mysql
+    container_name: starapi-mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME}
       MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "${DB_EXTERNAL_PORT:-3307}:3306"
+      - "${DB_EXTERNAL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     restart: unless-stopped
@@ -23,12 +23,14 @@ services:
       context: .
       dockerfile: Dockerfile
       target: production
-    container_name: star-citizen-api
+      args:
+        API_INTERNAL_PORT: ${API_INTERNAL_PORT:-3000}
+    container_name: starapi-api
     ports:
-      - "${PORT}:3000"
+      - "${API_PORT:-3003}:${API_INTERNAL_PORT:-3000}"
     environment:
       NODE_ENV: ${NODE_ENV}
-      PORT: 3000
+      PORT: ${API_INTERNAL_PORT:-3000}
       DB_HOST: mysql
       DB_PORT: 3306
       DB_USER: ${DB_USER}
@@ -39,8 +41,6 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       P4K_PATH: ${P4K_PATH:-}
     volumes:
-      # Mount the Star Citizen game directory if P4K_PATH is set
-      # Example: P4K_PATH=/game/Data.p4k with volume /mnt/c/Program Files/Roberts Space Industries/StarCitizen/LIVE:/game:ro
       - ${P4K_VOLUME:-/dev/null}:/game:ro
     restart: unless-stopped
     depends_on:

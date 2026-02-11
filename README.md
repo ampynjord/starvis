@@ -4,19 +4,27 @@
 
 Deux sources de données complémentaires :
 - **RSI Ship Matrix** — données officielles marketing (246 vaisseaux)
-- **P4K DataForge** — données de jeu réelles (474 vaisseaux, 1352 composants, ~38 600 ports de loadout)
+- **P4K DataForge** — données de jeu réelles (~353 vaisseaux, ~1200+ composants, ~35 000 ports de loadout)
 
 ---
 
 ## Fonctionnalités
 
 - **Ship Matrix** : 246 vaisseaux depuis l'API RSI (données marketing, specs officielles)
-- **Game Data** : 474 vaisseaux extraits du P4K/DataForge avec stats réelles
-- **Components** : 1352 composants (armes, boucliers, quantum drives, coolers, missiles…)
-- **Manufacturers** : ~50 fabricants
-- **Loadouts** : ~38 600 ports d'équipement par défaut avec hiérarchie parent/enfant
-- **Cross-référence** automatique ships ↔ ship_matrix (~200 liés via alias + fuzzy matching)
-- **Filtres & tri** sur ships, components, manufacturers
+- **Game Data** : ~353 vaisseaux jouables extraits du P4K/DataForge (filtrés, sans doublons/tests)
+- **Components** : ~1200+ composants en 12 types (armes, boucliers, power plants, coolers, quantum drives, missiles, thrusters, radars, countermeasures, fuel tanks, fuel intakes, life support)
+- **Manufacturers** : ~50 fabricants (véhicules + composants)
+- **Loadouts** : ~35 000 ports d'équipement par défaut avec hiérarchie parent/enfant
+- **Cross-référence** automatique ships ↔ ship_matrix (~205 liés via alias + fuzzy matching)
+- **Pagination** sur tous les endpoints de liste (page, limit, total, pages)
+- **Filtres & tri** avancés sur ships, components, manufacturers
+- **Export CSV** sur tous les endpoints de liste (`?format=csv`)
+- **ETag / Cache** HTTP avec `Cache-Control` et `If-None-Match` (304)
+- **Rate limiting** configurable (200 req / 15 min par IP par défaut)
+- **Comparaison** de vaisseaux côte à côte avec deltas numériques
+- **Swagger / OpenAPI** docs interactives sur `/api-docs`
+- **Versioning d'extraction** avec journal d'extraction en base
+- **CI/CD** GitHub Actions (lint, tests, build Docker, push ghcr.io)
 
 ---
 
@@ -32,33 +40,35 @@ Deux sources de données complémentaires :
 ```bash
 git clone https://github.com/ampynjord/starapi
 cd starapi
-cp .env.example .env    # puis éditer les mots de passe
+cp .env.example .env    # puis éditer les mots de passe et chemins
 docker compose up -d
 curl http://localhost:3003/health
 ```
 
-> Le premier démarrage prend ~6 min (extraction de 474 vaisseaux depuis le P4K).
+> Le premier démarrage prend ~6 min (extraction de ~353 vaisseaux depuis le P4K).
 
 ### Variables d'environnement
 
 Toute la configuration est dans `.env` (voir `.env.example`).
 
-| Variable | Description |
-|----------|-------------|
-| `PORT` | Port exposé sur l'hôte (défaut: 3003) |
-| `NODE_ENV` | Environnement (production/development) |
-| `LOG_LEVEL` | Niveau de log (debug/info/warn/error) |
-| `ADMIN_API_KEY` | Clé d'accès admin (**obligatoire**, pas de défaut) |
-| `CORS_ORIGIN` | Origine CORS (défaut: *) |
-| `DB_HOST` | Hôte MySQL (défaut: mysql) |
-| `DB_PORT` | Port MySQL interne (3306) |
-| `DB_EXTERNAL_PORT` | Port MySQL exposé (défaut: 3306) |
-| `DB_USER` | Utilisateur MySQL |
-| `DB_PASSWORD` | Mot de passe MySQL |
-| `DB_NAME` | Nom de la base (starapi) |
-| `MYSQL_ROOT_PASSWORD` | Mot de passe root MySQL |
-| `P4K_PATH` | Chemin vers Data.p4k dans le conteneur |
-| `P4K_VOLUME` | Chemin hôte vers le dossier LIVE de Star Citizen |
+| Variable | Description | Défaut |
+|----------|-------------|--------|
+| `API_PORT` | Port exposé sur l'hôte | `3003` |
+| `API_INTERNAL_PORT` | Port interne du container | `3000` |
+| `NODE_ENV` | Environnement (production/development) | `production` |
+| `LOG_LEVEL` | Niveau de log (debug/info/warn/error) | `info` |
+| `ADMIN_API_KEY` | Clé d'accès admin (**obligatoire**) | — |
+| `CORS_ORIGIN` | Origine CORS | `*` |
+| `RATE_LIMIT_MAX` | Max requêtes / 15 min | `200` |
+| `DB_HOST` | Hôte MySQL | `mysql` |
+| `DB_PORT` | Port MySQL interne (réseau docker) | `3306` |
+| `DB_EXTERNAL_PORT` | Port MySQL exposé sur l'hôte | `3306` |
+| `DB_USER` | Utilisateur MySQL | — |
+| `DB_PASSWORD` | Mot de passe MySQL | — |
+| `DB_NAME` | Nom de la base | `starapi` |
+| `MYSQL_ROOT_PASSWORD` | Mot de passe root MySQL | — |
+| `P4K_PATH` | Chemin vers Data.p4k dans le conteneur | `/game/Data.p4k` |
+| `P4K_VOLUME` | Chemin hôte vers le dossier LIVE de Star Citizen | — |
 
 ---
 
@@ -83,12 +93,15 @@ GET /api/v1/ship-matrix/stats
 
 ### Ships (Game Data)
 
-474 vaisseaux extraits du P4K/DataForge avec toutes les données de jeu réelles.
+~353 vaisseaux jouables extraits du P4K/DataForge avec toutes les données de jeu réelles.
+Réponses paginées par défaut (50 items/page, max 200).
 
 ```bash
-# Liste avec filtres
+# Liste avec filtres + pagination
 GET /api/v1/ships
 GET /api/v1/ships?manufacturer=AEGS&role=combat&sort=mass&order=desc
+GET /api/v1/ships?page=2&limit=20
+GET /api/v1/ships?format=csv
 
 # Détails (par UUID ou class_name)
 GET /api/v1/ships/:uuid
@@ -97,7 +110,32 @@ GET /api/v1/ships/AEGS_Gladius
 # Loadout par défaut (hiérarchique)
 GET /api/v1/ships/:uuid/loadout
 GET /api/v1/ships/AEGS_Gladius/loadout
+
+# Comparaison côte à côte
+GET /api/v1/ships/AEGS_Gladius/compare/AEGS_Sabre
 ```
+
+#### Champs ships
+
+| Champ | Description |
+|-------|-------------|
+| `uuid`, `class_name`, `name` | Identifiants |
+| `manufacturer_code`, `career`, `role` | Classification |
+| `mass`, `total_hp` | Masse (kg), HP totaux (somme des parts) |
+| `scm_speed`, `max_speed` | Vitesse SCM et max (m/s) |
+| `boost_speed_forward/backward/left/right/up/down` | Vitesses boost directionnelles |
+| `pitch_max`, `yaw_max`, `roll_max` | Rotation max (°/s) |
+| `hydrogen_fuel`, `quantum_fuel` | Capacités carburant |
+| `cargo_capacity` | Capacité cargo (SCU) |
+| `armor_physical/energy/distortion` | Résistance blindage |
+| `armor_thermal/biochemical/stun` | Résistance blindage (suite) |
+| `armor_signal_ir/em/cs` | Signatures blindage |
+| `cross_section_x/y/z` | Section transversale |
+| `short_name`, `description` | Nom court et description |
+| `ship_grade` | Grade du vaisseau |
+| `shield_hp` | HP bouclier cumulés |
+| `missile_damage_total` | Dégâts missiles totaux (loadout par défaut) |
+| `ship_matrix_id` | ID Ship Matrix RSI (si lié) |
 
 #### Filtres ships
 
@@ -106,21 +144,44 @@ GET /api/v1/ships/AEGS_Gladius/loadout
 | `manufacturer` | Code fabricant | `AEGS`, `ANVL`, `RSI` |
 | `role` | Rôle | `combat`, `transport` |
 | `search` | Recherche nom/className | `Gladius` |
-| `sort` | Tri | `name`, `mass`, `scm_speed`, `total_hp` |
+| `sort` | Tri | `name`, `mass`, `scm_speed`, `total_hp`, `boost_speed_forward`, `cargo_capacity`, `armor_physical`, `cross_section_x` |
 | `order` | Ordre | `asc`, `desc` |
+| `page` | Page (1-based) | `1`, `2`, `3` |
+| `limit` | Items par page (max 200) | `10`, `50`, `200` |
+| `format` | Format de sortie | `json` (défaut), `csv` |
 
 ### Components (Game Data)
 
-1352 composants SCItem extraits du DataForge.
+~1200+ composants interchangeables extraits du DataForge, répartis en 12 types.
+Réponses paginées par défaut.
 
 ```bash
-# Liste avec filtres
+# Liste avec filtres + pagination
 GET /api/v1/components
 GET /api/v1/components?type=WeaponGun&size=3&manufacturer=BEHR
+GET /api/v1/components?page=2&limit=20
+GET /api/v1/components?format=csv
 
 # Détails
 GET /api/v1/components/:uuid
 ```
+
+#### Types de composants
+
+| Type | Description | Exemples |
+|------|-------------|----------|
+| `WeaponGun` | Armes (canons, gatlings, lasers, scatterguns) | Attrition, Mantis, Revenant |
+| `Shield` | Boucliers | Castra, Sukoran, Fortifier |
+| `PowerPlant` | Centrales électriques | Genoa, Fierell |
+| `Cooler` | Refroidisseurs | Bracer, NDB-28 |
+| `QuantumDrive` | Drives quantiques | Beacon, Atlas |
+| `Missile` | Missiles | Dominator, Arrester, Rattler |
+| `Thruster` | Propulseurs (main + maneuvering) | — |
+| `Radar` | Radars | — |
+| `Countermeasure` | Contre-mesures (flares, chaff) | — |
+| `FuelTank` | Réservoirs (hydrogène + quantum) | — |
+| `FuelIntake` | Prises de carburant (scooping) | — |
+| `LifeSupport` | Support de vie | — |
 
 #### Filtres components
 
@@ -130,7 +191,10 @@ GET /api/v1/components/:uuid
 | `size` | Taille (0-9) | `3` |
 | `manufacturer` | Code fabricant | `BEHR` |
 | `search` | Recherche nom/className | `Gatling` |
-| `sort` | Tri | `name`, `weapon_dps`, `shield_hp`, `qd_speed` |
+| `sort` | Tri | `name`, `weapon_dps`, `shield_hp`, `qd_speed`, `thruster_max_thrust`, `radar_range`, `fuel_capacity` |
+| `page` | Page (1-based) | `1`, `2` |
+| `limit` | Items par page (max 200) | `10`, `50` |
+| `format` | Format de sortie | `json`, `csv` |
 
 ### Manufacturers
 
@@ -138,6 +202,20 @@ GET /api/v1/components/:uuid
 
 ```bash
 GET /api/v1/manufacturers
+```
+
+### Version / Extraction
+
+```bash
+# Dernière extraction game data
+GET /api/v1/version
+```
+
+### Swagger / OpenAPI
+
+```bash
+# Documentation interactive
+GET /api-docs
 ```
 
 ### Admin (nécessite X-API-Key)
@@ -151,6 +229,9 @@ curl -X POST -H "X-API-Key: $ADMIN_API_KEY" http://localhost:3003/admin/extract-
 
 # Statistiques BDD
 curl -H "X-API-Key: $ADMIN_API_KEY" http://localhost:3003/admin/stats
+
+# Journal d'extractions
+curl -H "X-API-Key: $ADMIN_API_KEY" http://localhost:3003/admin/extraction-log
 ```
 
 ### Health
@@ -187,10 +268,15 @@ GET /health
 │ class_name         │     │ name               │
 │ name               │     │ description        │
 │ manufacturer_code ─┼────►│ known_for          │
-│ role, career       │     └────────────────────┘
-│ mass, speeds, HP   │
-│ fuel, shield       │
+│ career, role       │     └────────────────────┘
+│ mass, total_hp     │
+│ scm/max/boost speed│
+│ pitch/yaw/roll_max │
+│ fuels, shield_hp   │
+│ cargo_capacity     │
+│ missile_damage     │
 │ insurance          │
+│ armor, cross_section│
 │ game_data (JSON)   │
 └────────┬───────────┘
          │ ship_uuid (FK)
@@ -198,7 +284,7 @@ GET /health
 │     ships_loadouts         │     │    components       │
 ├────────────────────────────┤     ├────────────────────┤
 │ id (PK)                    │     │ uuid (PK)          │
-│ ship_uuid (FK)             │     │ class_name         │
+│ ship_uuid (FK) ────────────┤     │ class_name         │
 │ port_name                  │     │ name, type, size   │
 │ port_type                  │     │ weapon stats       │
 │ component_class_name       │     │ shield stats       │
@@ -213,11 +299,11 @@ GET /health
 | Table | Entrées |
 |-------|---------|
 | `ship_matrix` | 246 |
-| `ships` | 474 |
-| `components` | 1 352 |
+| `ships` | ~353 (vaisseaux jouables, filtrés) |
+| `components` | ~1200+ (12 types interchangeables) |
 | `manufacturers` | ~50 |
-| `ships_loadouts` | ~38 600 ports |
-| Ships liés à Ship Matrix | ~200 |
+| `ships_loadouts` | ~35 000 ports |
+| Ships liés à Ship Matrix | ~205 |
 
 ### Manufacturers principaux
 
@@ -270,10 +356,13 @@ GET /health
 ```
 starapi/
 ├── server.ts                      # Point d'entrée Express
+├── .github/
+│   └── workflows/
+│       └── ci.yml                 # CI/CD GitHub Actions (4 jobs)
 ├── db/
-│   └── schema.sql                 # Schéma MySQL (5 tables)
+│   └── schema.sql                 # Schéma MySQL (5 tables + FK)
 ├── src/
-│   ├── routes.ts                  # Endpoints API v1.0
+│   ├── routes.ts                  # Endpoints API v1.0 (pagination, ETag, CSV, compare)
 │   ├── middleware/
 │   │   └── auth.ts                # Auth X-API-Key
 │   ├── providers/
@@ -281,16 +370,16 @@ starapi/
 │   ├── services/
 │   │   ├── schema.ts              # Init schéma BDD + migrations
 │   │   ├── ship-matrix-service.ts # RSI API → ship_matrix
-│   │   ├── dataforge-service.ts   # P4K/DCB parser (~2000 lignes)
+│   │   ├── dataforge-service.ts   # P4K/DCB parser (~2300 lignes)
 │   │   └── game-data-service.ts   # DataForge → ships/components/loadouts
 │   └── utils/
 │       ├── config.ts              # Configuration centralisée
 │       ├── cryxml-parser.ts       # Parser CryXML binaire
 │       └── logger.ts              # Winston logger
 ├── tests/
-│   └── test-all.mjs               # Tests API complets
+│   └── test-all.mjs               # 50+ tests API (endpoints + data quality)
 ├── docker-compose.yml
-├── Dockerfile
+├── Dockerfile                     # Multi-stage (4 stages)
 └── package.json
 ```
 
@@ -303,9 +392,10 @@ Au démarrage :
   3. DataForgeService.init()         → Ouverture P4K (284 MB, Game2.dcb)
   4. GameDataService.extractAll()    → En background :
      ├── saveManufacturersFromData() → ~50 manufacturers
-     ├── saveComponents()            → 1352 components
-     ├── saveShips() + loadouts      → 474 ships + ~38600 loadout ports
-     └── crossReferenceShipMatrix()  → ~200 ships liés (multi-pass + aliases)
+     ├── saveComponents()            → ~1200+ components (12 types)
+     ├── saveShips() + loadouts      → ~353 ships + ~35000 loadout ports
+     ├── crossReferenceShipMatrix()  → ~205 ships liés (multi-pass + aliases)
+     └── INSERT extraction_log       → Hash SHA-256 + stats + durée
 ```
 
 Tous les endpoints GET lisent la base MySQL (pas d'accès direct aux sources P4K/RSI).
@@ -314,10 +404,43 @@ L'écriture en BDD se fait uniquement au démarrage ou via les endpoints admin P
 ### Stack technique
 
 - **Runtime** : Node.js 20+ avec TypeScript (tsx)
-- **Framework** : Express.js
+- **Framework** : Express.js + express-rate-limit
+- **Documentation** : Swagger / OpenAPI 3.0 (swagger-jsdoc + swagger-ui-express)
 - **Base de données** : MySQL 8.0
-- **Conteneurisation** : Docker & Docker Compose
+- **Conteneurisation** : Docker multi-stage & Docker Compose
+- **CI/CD** : GitHub Actions (lint → tests → build → deploy)
+- **Registry** : ghcr.io (GitHub Container Registry)
 - **Logging** : Winston (module tags, durées, filtrage)
+
+---
+
+## CI/CD
+
+Pipeline GitHub Actions (`.github/workflows/ci.yml`) en 4 étapes :
+
+| Job | Description | Déclencheur |
+|-----|-------------|-------------|
+| **Lint** | TypeScript type-check (`tsc --noEmit`) | push/PR sur `main` |
+| **Test** | Tests API avec MySQL (50+ tests) | après Lint |
+| **Build** | Build Docker + push ghcr.io | push sur `main` uniquement |
+| **Deploy** | Notification (placeholder pour déploiement) | après Test + Build |
+
+Les tests s'exécutent **sans P4K** en CI : les tests game-data sont automatiquement ignorés (SKIP) quand aucune extraction n'est disponible.
+
+---
+
+## Docker
+
+### Architecture multi-stage
+
+```
+Stage 1: base         → node:20-alpine, WORKDIR /app
+Stage 2: deps         → npm ci (toutes deps)
+Stage 3: build        → TypeScript type-check (tsc --noEmit)
+Stage 4: production   → npm ci --omit=dev + tsx, non-root user, healthcheck
+```
+
+Les ports sont configurables via `.env` (`API_PORT` pour l'hôte, `API_INTERNAL_PORT` pour le container).
 
 ---
 
@@ -351,6 +474,18 @@ curl 'http://localhost:3003/api/v1/ships/AEGS_Gladius/loadout' | jq
 
 ```bash
 curl 'http://localhost:3003/api/v1/components?type=WeaponGun&size=3&sort=weapon_dps&order=desc' | jq
+```
+
+### Comparer deux vaisseaux
+
+```bash
+curl 'http://localhost:3003/api/v1/ships/AEGS_Gladius/compare/AEGS_Sabre' | jq '.data.comparison'
+```
+
+### Exporter les composants en CSV
+
+```bash
+curl 'http://localhost:3003/api/v1/components?type=WeaponGun&format=csv' -o weapons.csv
 ```
 
 ### Resync admin
