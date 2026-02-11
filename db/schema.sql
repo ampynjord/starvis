@@ -149,6 +149,7 @@ CREATE TABLE IF NOT EXISTS ships (
   description TEXT COMMENT 'In-game description',
   ship_grade VARCHAR(10) COMMENT 'Grade (A, B, C...)',
   cargo_capacity DECIMAL(10,2) COMMENT 'Total cargo SCU',
+  missile_damage_total DECIMAL(10,2) COMMENT 'Sum of all default missile damage',
   
   -- Insurance
   insurance_claim_time DECIMAL(10,2) COMMENT 'Base wait time in minutes',

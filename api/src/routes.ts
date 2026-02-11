@@ -12,6 +12,8 @@
  *   GET /api/v1/components/:uuid      - Single component
  *   GET /api/v1/components/:uuid/buy-locations - Where to buy a component
  *   GET /api/v1/manufacturers         - All manufacturers
+ *   GET /api/v1/ships/filters          - Distinct roles, careers for filter dropdowns
+ *   GET /api/v1/ships/manufacturers    - Manufacturers that produce ships (with count)
  *   GET /api/v1/shops                 - All shops/vendors (paginated)
  *   GET /api/v1/shops/:id/inventory   - Shop inventory & prices
  *   POST /api/v1/loadout/calculate    - Loadout simulator (aggregate stats)
@@ -196,6 +198,8 @@ export function createRoutes(deps: RouteDependencies): Router {
       const filters = {
         manufacturer: req.query.manufacturer as string,
         role: req.query.role as string,
+        career: req.query.career as string,
+        status: req.query.status as string,
         search: req.query.search as string,
         sort: req.query.sort as string,
         order: req.query.order as string,
@@ -215,6 +219,46 @@ export function createRoutes(deps: RouteDependencies): Router {
       sendCsvOrJson(req, res, data, payload);
     } catch (e) {
       logger.error("GET /api/v1/ships error", e);
+      res.status(500).json({ success: false, error: (e as Error).message });
+    }
+  });
+
+  // =========================================
+  //  PUBLIC - SHIPS FILTERS & SHIP-MANUFACTURERS
+  // =========================================
+
+  /** @openapi
+   * /api/v1/ships/filters:
+   *   get:
+   *     tags: [Ships]
+   *     summary: Distinct roles, careers and statuses for filter dropdowns
+   */
+  router.get("/api/v1/ships/filters", async (req: Request, res: Response) => {
+    try {
+      if (!gameDataService) return res.status(503).json({ success: false, error: "Game data not available" });
+      const data = await gameDataService.getShipFilters();
+      const etag = setETag(res, data);
+      if (checkNotModified(req, res, etag)) return;
+      res.json({ success: true, data });
+    } catch (e) {
+      res.status(500).json({ success: false, error: (e as Error).message });
+    }
+  });
+
+  /** @openapi
+   * /api/v1/ships/manufacturers:
+   *   get:
+   *     tags: [Ships]
+   *     summary: Manufacturers that produce ships (with ship count)
+   */
+  router.get("/api/v1/ships/manufacturers", async (req: Request, res: Response) => {
+    try {
+      if (!gameDataService) return res.status(503).json({ success: false, error: "Game data not available" });
+      const data = await gameDataService.getShipManufacturers();
+      const etag = setETag(res, data);
+      if (checkNotModified(req, res, etag)) return;
+      sendCsvOrJson(req, res, data, { success: true, count: data.length, data });
+    } catch (e) {
       res.status(500).json({ success: false, error: (e as Error).message });
     }
   });
