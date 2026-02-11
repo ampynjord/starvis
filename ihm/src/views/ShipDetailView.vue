@@ -74,7 +74,7 @@ const armorStats = computed(() => {
               <div>
                 <h1 class="text-2xl font-bold text-sv-text-bright">{{ ship.name }}</h1>
                 <p class="text-sv-muted text-sm">
-                  {{ ship.manufacturer_code }}
+                  {{ (ship as any).manufacturer_name || ship.manufacturer_code }}
                   <span v-if="ship.career"> · {{ ship.career }}</span>
                   <span v-if="ship.role"> · {{ ship.role }}</span>
                 </p>
@@ -193,18 +193,20 @@ const armorStats = computed(() => {
               {{ group }} <span class="text-sv-muted font-normal">({{ items.length }})</span>
             </h3>
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
-              <router-link
+              <component
+                :is="item.component_uuid ? 'router-link' : 'div'"
                 v-for="item in items"
-                :key="item.component_uuid || item.uuid"
-                :to="`/components/${item.component_uuid || item.uuid}`"
-                class="flex items-center justify-between border border-sv-border/40 rounded px-2.5 py-1.5 hover:border-sv-accent/50 hover:bg-sv-panel-light/30 transition-colors"
+                :key="item.id || item.component_uuid || item.port_name"
+                v-bind="item.component_uuid ? { to: `/components/${item.component_uuid}` } : {}"
+                class="flex items-center justify-between border border-sv-border/40 rounded px-2.5 py-1.5 transition-colors"
+                :class="item.component_uuid ? 'hover:border-sv-accent/50 hover:bg-sv-panel-light/30 cursor-pointer' : 'opacity-60'"
               >
                 <div class="min-w-0">
-                  <div class="text-xs font-medium text-sv-text-bright truncate">{{ item.component_name || item.name }}</div>
-                  <div class="text-[10px] text-sv-muted">{{ item.port_name }} · S{{ item.size || '?' }}</div>
+                  <div class="text-xs font-medium text-sv-text-bright truncate">{{ item.component_name || item.component_class_name || '—' }}</div>
+                  <div class="text-[10px] text-sv-muted">{{ item.port_name }} · S{{ item.component_size || '?' }}</div>
                 </div>
-                <span class="badge-blue text-[10px] ml-2 shrink-0">{{ item.component_type || item.type }}</span>
-              </router-link>
+                <span class="badge-blue text-[10px] ml-2 shrink-0">{{ item.component_type || item.port_type || '?' }}</span>
+              </component>
             </div>
           </div>
         </div>

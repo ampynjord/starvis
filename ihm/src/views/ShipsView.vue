@@ -3,8 +3,9 @@ import LoadingState from '@/components/LoadingState.vue'
 import PaginationBar from '@/components/PaginationBar.vue'
 import { getManufacturers, getShips, type Manufacturer, type Ship } from '@/services/api'
 import { onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
+const route = useRoute()
 const router = useRouter()
 const ships = ref<Ship[]>([])
 const total = ref(0)
@@ -15,7 +16,7 @@ const manufacturers = ref<Manufacturer[]>([])
 
 // Filters
 const search = ref('')
-const manufacturer = ref('')
+const manufacturer = ref((route.query.manufacturer as string) || '')
 const sort = ref('name')
 const order = ref<'asc' | 'desc'>('asc')
 
@@ -69,7 +70,7 @@ function fmt(v: any) {
       <input v-model="search" class="input flex-1 min-w-[180px]" placeholder="Rechercher un vaisseau…" />
       <select v-model="manufacturer" class="input w-36">
         <option value="">Tous fabricants</option>
-        <option v-for="m in manufacturers" :key="m.code" :value="m.code">{{ m.code }}</option>
+        <option v-for="m in manufacturers" :key="m.code" :value="m.code">{{ m.name || m.code }}</option>
       </select>
       <select v-model="sort" class="input w-32">
         <option value="name">Nom</option>
@@ -119,7 +120,7 @@ function fmt(v: any) {
                 <h3 class="font-semibold text-sv-text-bright text-sm truncate group-hover:text-sv-accent transition-colors">
                   {{ ship.name }}
                 </h3>
-                <span class="text-[11px] text-sv-muted">{{ ship.manufacturer_code }}</span>
+                <span class="text-[11px] text-sv-muted">{{ (ship as any).manufacturer_name || ship.manufacturer_code }}</span>
               </div>
               <span v-if="ship.ship_matrix_id" class="badge-green text-[10px] ml-2 shrink-0">RSI</span>
             </div>
