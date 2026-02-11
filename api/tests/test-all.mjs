@@ -1,5 +1,5 @@
 /**
- * STARAPI v1.0 — Tests complets de l'API
+ * STARVIS v1.0 — Tests complets de l'API
  * Vérifie endpoints publics, admin, intégrité et qualité des données
  *
  * Usage: node tests/test-all.mjs [base_url]
@@ -12,7 +12,7 @@
 
 const BASE = (process.argv[2] || 'http://localhost:3003').replace(/\/$/, '');
 const API = `${BASE}/api/v1`;
-const ADMIN_KEY = process.env.ADMIN_API_KEY || 'starapi_admin_2024';
+const ADMIN_KEY = process.env.ADMIN_API_KEY || 'starvis_admin_2024';
 
 const C = {
   reset: '\x1b[0m', green: '\x1b[32m', red: '\x1b[31m',
@@ -82,7 +82,7 @@ section('🏥 HEALTH & ROOT');
 await test('GET / → API info', async () => {
   const res = await fetch(BASE);
   const data = await res.json();
-  assert(data.name === 'Starapi', `Expected name "Starapi", got "${data.name}"`);
+  assert(data.name === 'Starvis', `Expected name "Starvis", got "${data.name}"`);
   assert(data.version, 'Missing version');
   assert(data.endpoints, 'Missing endpoints');
 });

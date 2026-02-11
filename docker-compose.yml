@@ -1,7 +1,7 @@
 services:
   mysql:
     image: mysql:8.0
-    container_name: starapi-mysql
+    container_name: starvis-mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME}
@@ -26,7 +26,7 @@ services:
       target: production
       args:
         API_INTERNAL_PORT: ${API_INTERNAL_PORT:-3000}
-    container_name: starapi-api
+    container_name: starvis-api
     ports:
       - "${API_PORT:-3003}:${API_INTERNAL_PORT:-3000}"
     environment:
@@ -52,7 +52,7 @@ services:
     build:
       context: ihm
       dockerfile: Dockerfile
-    container_name: starapi-ihm
+    container_name: starvis-ihm
     ports:
       - "${IHM_PORT:-8080}:80"
     restart: unless-stopped

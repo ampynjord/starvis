@@ -1,5 +1,5 @@
 /**
- * STARAPI v1.0 - Star Citizen Ships & Components API
+ * STARVIS v1.0 - Star Citizen Ships & Components API
  *
  * Architecture:
  *   ship_matrix table    ← ShipMatrixService  ← RSI Ship Matrix API
@@ -62,7 +62,7 @@ const swaggerSpec = swaggerJsdoc({
   definition: {
     openapi: "3.0.0",
     info: {
-      title: "Starapi",
+      title: "Starvis",
       version: "1.0.0",
       description: "Star Citizen Ships & Components API – powered by P4K/DataForge",
     },
@@ -74,7 +74,7 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // ===== ROOT =====
 app.get("/", (_, res) => res.json({
-  name: "Starapi",
+  name: "Starvis",
   version: "1.0.0",
   endpoints: {
     shipMatrix: "/api/v1/ship-matrix",
@@ -156,7 +156,7 @@ async function start() {
     })();
   }
 
-  app.listen(PORT, () => logger.info(`✅ Starapi v1.0 listening on :${PORT}`, { module: "Server" }));
+  app.listen(PORT, () => logger.info(`✅ Starvis v1.0 listening on :${PORT}`, { module: "Server" }));
 }
 
 process.on("SIGINT", async () => {

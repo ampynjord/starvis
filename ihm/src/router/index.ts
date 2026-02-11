@@ -2,6 +2,9 @@ import { createRouter, createWebHistory } from 'vue-router'
 
 const router = createRouter({
   history: createWebHistory(),
+  scrollBehavior(_to, _from, savedPosition) {
+    return savedPosition || { top: 0 }
+  },
   routes: [
     {
       path: '/',
@@ -42,6 +45,11 @@ const router = createRouter({
       path: '/loadout/:uuid?',
       name: 'loadout',
       component: () => import('@/views/LoadoutView.vue'),
+    },
+    {
+      path: '/hangar',
+      name: 'hangar',
+      component: () => import('@/views/HangarView.vue'),
     },
   ],
 })

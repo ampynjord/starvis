@@ -3,7 +3,7 @@ defineProps<{
   label: string
   value: string | number | null | undefined
   unit?: string
-  color?: 'blue' | 'green' | 'amber' | 'red' | 'default'
+  color?: 'blue' | 'green' | 'amber' | 'red' | 'cyan' | 'purple' | 'default'
 }>()
 </script>
 
@@ -17,9 +17,11 @@ defineProps<{
         'text-emerald-400': color === 'green',
         'text-amber-400': color === 'amber',
         'text-red-400': color === 'red',
+        'text-cyan-400': color === 'cyan',
+        'text-purple-400': color === 'purple',
       }"
     >
-      {{ value ?? '—' }}<span v-if="unit && value != null" class="text-sm ml-0.5 text-sc-muted">{{ unit }}</span>
+      {{ value ?? '—' }}<span v-if="unit && value != null && value !== '—'" class="text-xs ml-0.5 text-sv-muted font-normal">{{ unit }}</span>
     </span>
   </div>
 </template>

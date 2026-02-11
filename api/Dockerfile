@@ -1,5 +1,5 @@
 # ==============================================================
-# STARAPI API — Multi-stage Dockerfile
+# STARVIS API — Multi-stage Dockerfile
 # Build context: project root (for access to db/)
 # Stages: deps → build → production
 # ==============================================================

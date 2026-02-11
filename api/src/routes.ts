@@ -1,5 +1,5 @@
 /**
- * STARAPI v1.0 - Routes
+ * STARVIS v1.0 - Routes
  *
  * Public endpoints:
  *   GET /api/v1/ship-matrix           - RSI Ship Matrix data

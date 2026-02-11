@@ -54,11 +54,11 @@ function fmt(v: any) {
 
 <template>
   <div class="space-y-4">
-    <h1 class="text-2xl font-bold text-sc-text-bright">🏪 Boutiques</h1>
+    <h1 class="section-title">Boutiques</h1>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
       <!-- Shop list -->
-      <div class="lg:col-span-1 space-y-3">
+      <div class="lg:col-span-1 space-y-2">
         <input v-model="search" class="input w-full" placeholder="Rechercher une boutique…" />
 
         <LoadingState :loading="loading">
@@ -66,15 +66,15 @@ function fmt(v: any) {
             <div
               v-for="shop in shops"
               :key="shop.id"
-              class="card px-3 py-2 cursor-pointer transition-colors"
-              :class="selectedShop?.id === shop.id ? 'border-sc-accent bg-sc-accent/10' : 'hover:border-sc-accent/30'"
+              class="card px-2.5 py-1.5 cursor-pointer transition-colors"
+              :class="selectedShop?.id === shop.id ? 'border-sv-accent bg-sv-accent/10' : 'hover:border-sv-accent/30'"
               @click="selectShop(shop)"
             >
-              <div class="font-medium text-sc-text-bright text-sm">{{ shop.name }}</div>
-              <div class="text-xs text-sc-muted">
+              <div class="font-medium text-sv-text-bright text-xs">{{ shop.name }}</div>
+              <div class="text-[10px] text-sv-muted">
                 {{ [shop.parent_location, shop.location].filter(Boolean).join(' · ') }}
               </div>
-              <span v-if="shop.shop_type" class="badge-blue text-xs mt-1">{{ shop.shop_type }}</span>
+              <span v-if="shop.shop_type" class="badge-blue text-[10px] mt-0.5">{{ shop.shop_type }}</span>
             </div>
           </div>
         </LoadingState>
@@ -84,41 +84,41 @@ function fmt(v: any) {
 
       <!-- Inventory -->
       <div class="lg:col-span-2">
-        <div v-if="!selectedShop" class="card p-8 text-center text-sc-muted">
+        <div v-if="!selectedShop" class="card p-8 text-center text-sv-muted text-sm">
           Sélectionnez une boutique pour voir son inventaire
         </div>
         <div v-else class="card p-4">
-          <h2 class="text-lg font-semibold text-sc-text-bright mb-1">{{ selectedShop.name }}</h2>
-          <p class="text-sm text-sc-muted mb-4">
+          <h2 class="text-sm font-semibold text-sv-text-bright mb-0.5">{{ selectedShop.name }}</h2>
+          <p class="text-xs text-sv-muted mb-3">
             {{ [selectedShop.parent_location, selectedShop.location].filter(Boolean).join(' · ') }}
           </p>
 
           <LoadingState :loading="loadingInventory">
-            <div v-if="inventory.length === 0" class="text-sc-muted text-center py-8">Inventaire vide</div>
+            <div v-if="inventory.length === 0" class="text-sv-muted text-center py-8 text-sm">Inventaire vide</div>
             <div v-else class="overflow-x-auto">
-              <table class="w-full text-sm">
-                <thead class="text-left text-sc-muted border-b border-sc-border">
+              <table class="w-full text-xs">
+                <thead class="text-left text-sv-muted border-b border-sv-border">
                   <tr>
-                    <th class="py-2 px-3">Composant</th>
-                    <th class="py-2 px-3">Type</th>
-                    <th class="py-2 px-3 text-center">Taille</th>
-                    <th class="py-2 px-3 text-right">Prix</th>
+                    <th class="py-1.5 px-2.5">Composant</th>
+                    <th class="py-1.5 px-2.5">Type</th>
+                    <th class="py-1.5 px-2.5 text-center">Taille</th>
+                    <th class="py-1.5 px-2.5 text-right">Prix</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr
                     v-for="item in inventory"
                     :key="item.component_uuid"
-                    class="border-b border-sc-border/30 hover:bg-sc-border/10"
+                    class="border-b border-sv-border/20 hover:bg-sv-panel-light/30"
                   >
-                    <td class="py-2 px-3">
-                      <router-link :to="`/components/${item.component_class_name || item.component_uuid}`" class="text-sc-accent hover:underline">
+                    <td class="py-1.5 px-2.5">
+                      <router-link :to="`/components/${item.component_class_name || item.component_uuid}`" class="text-sv-accent hover:underline">
                         {{ item.component_name }}
                       </router-link>
                     </td>
-                    <td class="py-2 px-3 text-sc-muted">{{ item.component_type }}</td>
-                    <td class="py-2 px-3 text-center">S{{ item.component_size }}</td>
-                    <td class="py-2 px-3 text-right font-semibold text-sc-gold">{{ fmt(item.base_price) }} aUEC</td>
+                    <td class="py-1.5 px-2.5 text-sv-muted">{{ item.component_type }}</td>
+                    <td class="py-1.5 px-2.5 text-center">S{{ item.component_size }}</td>
+                    <td class="py-1.5 px-2.5 text-right font-semibold text-sv-gold">{{ fmt(item.base_price) }} aUEC</td>
                   </tr>
                 </tbody>
               </table>

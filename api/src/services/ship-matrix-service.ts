@@ -21,7 +21,7 @@ export class ShipMatrixService {
     const stats = { total: 0, synced: 0, errors: 0 };
 
     const res = await fetch(RSI_SHIP_MATRIX_URL, {
-      headers: { "User-Agent": "StarAPI/1.0", Accept: "application/json" },
+      headers: { "User-Agent": "StarVis/1.0", Accept: "application/json" },
     });
     if (!res.ok) throw new Error(`RSI API error: ${res.status}`);
 
