@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { getComponents, getManufacturers, type Component, type Manufacturer } from '@/services/api'
 import LoadingState from '@/components/LoadingState.vue'
 import PaginationBar from '@/components/PaginationBar.vue'
+import { getComponents, getManufacturers, type Component, type Manufacturer } from '@/services/api'
+import { onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 
 const router = useRouter()
 const components = ref<Component[]>([])

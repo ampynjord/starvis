@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
-import { getShops, getShopInventory, type Shop } from '@/services/api'
 import LoadingState from '@/components/LoadingState.vue'
 import PaginationBar from '@/components/PaginationBar.vue'
+import { getShopInventory, getShops, type Shop } from '@/services/api'
+import { onMounted, ref, watch } from 'vue'
 
 const shops = ref<Shop[]>([])
 const total = ref(0)
