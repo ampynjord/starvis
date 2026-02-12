@@ -1,825 +1,839 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
-import StatBlock from '@/components/StatBlock.vue'
-import {
-  calculateLoadout,
-  getComponents,
-  getShip, getShipLoadout,
-  getShips,
-  type Component, type LoadoutStats,
-  type Ship,
-} from '@/services/api'
+import { calculateLoadout, getComponents, getShips, type Ship } from '@/services/api'
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
-const shipUuid = ref((route.params.uuid as string) || '')
+const router = useRouter()
 
-// Ship search
+// ── State ──
 const shipQuery = ref('')
 const shipResults = ref<Ship[]>([])
-const ship = ref<Ship | null>(null)
-
-// Loadout — hierarchical tree from API
-interface LoadoutNode {
-  id: number
-  port_name: string; port_type: string; component_uuid: string
-  component_name: string; component_type: string; size?: number
-  component_size?: number; parent_id?: number | null
-  children?: LoadoutNode[]
-}
-const loadout = ref<LoadoutNode[]>([])
-const swaps = ref<{ portName: string; componentUuid: string }[]>([])
-const stats = ref<LoadoutStats | null>(null)
-
-// Component picker
-const editingPort = ref<string | null>(null)
-const componentSearch = ref('')
-const componentResults = ref<Component[]>([])
+const selectedShip = ref<Ship | null>(null)
+const loadout = ref<any>(null)
 const loading = ref(false)
-const calculating = ref(false)
+const error = ref('')
+const swaps = ref<{ portName: string; componentUuid: string }[]>([])
 
-// Collapsed state for tree nodes
-const collapsedNodes = ref<Set<number>>(new Set())
+// Component swap search
+const swapTarget = ref<string | null>(null) // port_name being swapped
+const swapQuery = ref('')
+const swapResults = ref<any[]>([])
+const swapLoading = ref(false)
+const swapTargetType = ref<string>('') // component type filter
 
-function toggleNode(nodeId: number) {
-  if (collapsedNodes.value.has(nodeId)) collapsedNodes.value.delete(nodeId)
-  else collapsedNodes.value.add(nodeId)
+// ── Collapse state for sections ──
+const collapsedSections = ref<Set<string>>(new Set())
+function toggleSection(key: string) {
+  if (collapsedSections.value.has(key)) collapsedSections.value.delete(key)
+  else collapsedSections.value.add(key)
+}
+function isSectionOpen(key: string) { return !collapsedSections.value.has(key) }
+
+// ── Category mapping (Erkul-style) ──
+const CATEGORY_MAP: Record<string, { label: string; icon: string; color: string }> = {
+  WeaponGun:      { label: 'Weapons',        icon: '🔫', color: 'red' },
+  Shield:         { label: 'Shields',         icon: '🛡️', color: 'blue' },
+  Missile:        { label: 'Missiles',        icon: '🚀', color: 'orange' },
+  WeaponMissile:  { label: 'Missiles',        icon: '🚀', color: 'orange' },
+  MissileRack:    { label: 'Missile Racks',   icon: '📦', color: 'orange' },
+  PowerPlant:     { label: 'Power Plants',    icon: '⚡', color: 'yellow' },
+  Cooler:         { label: 'Coolers',          icon: '❄️', color: 'cyan' },
+  QuantumDrive:   { label: 'Quantum Drive',   icon: '💫', color: 'purple' },
+  Turret:         { label: 'Turrets',          icon: '🎯', color: 'red' },
+  TurretBase:     { label: 'Turret Bases',    icon: '🎯', color: 'red' },
+  Radar:          { label: 'Radar',            icon: '📡', color: 'green' },
+  FuelIntake:     { label: 'Fuel Intakes',    icon: '⛽', color: 'amber' },
+  FuelTank:       { label: 'Fuel Tanks',      icon: '⛽', color: 'amber' },
+  QuantumFuelTank:{ label: 'QT Fuel Tanks',   icon: '⛽', color: 'purple' },
+  Thruster:       { label: 'Thrusters',        icon: '🔥', color: 'rose' },
+  MainThruster:   { label: 'Main Thrusters',  icon: '🔥', color: 'rose' },
+  LifeSupport:    { label: 'Life Support',    icon: '🫁', color: 'teal' },
+  FlightController: { label: 'Flight Controller', icon: '🕹️', color: 'indigo' },
+  SelfDestruct:   { label: 'Self Destruct',   icon: '💥', color: 'red' },
+  Armor:          { label: 'Armor',            icon: '🛡️', color: 'slate' },
 }
 
-// ── Erkul-style categories (only player-meaningful) ──
-interface CategoryInfo { label: string; icon: string; color: string; order: number; swappable: boolean }
-const CATEGORY_MAP: Record<string, CategoryInfo> = {
-  'WeaponGun': { label: 'Weapons', icon: '🎯', color: 'red', order: 1, swappable: true },
-  'Weapon': { label: 'Weapons', icon: '🎯', color: 'red', order: 1, swappable: true },
-  'Gimbal': { label: 'Weapons', icon: '🎯', color: 'red', order: 1, swappable: false },
-  'TurretBase': { label: 'Turrets', icon: '🔫', color: 'red', order: 2, swappable: false },
-  'Turret': { label: 'Turrets', icon: '🔫', color: 'red', order: 2, swappable: false },
-  'MissileLauncher': { label: 'Missiles & Bombs', icon: '🚀', color: 'amber', order: 3, swappable: false },
-  'MissileRack': { label: 'Missiles & Bombs', icon: '🚀', color: 'amber', order: 3, swappable: false },
-  'WeaponMissile': { label: 'Missiles & Bombs', icon: '🚀', color: 'amber', order: 3, swappable: false },
-  'Missile': { label: 'Missiles & Bombs', icon: '🚀', color: 'amber', order: 3, swappable: false },
-  'Shield': { label: 'Shields', icon: '🛡️', color: 'blue', order: 4, swappable: true },
-  'ShieldGenerator': { label: 'Shields', icon: '🛡️', color: 'blue', order: 4, swappable: true },
-  'PowerPlant': { label: 'Power Plants', icon: '⚡', color: 'green', order: 5, swappable: true },
-  'Cooler': { label: 'Coolers', icon: '❄️', color: 'cyan', order: 6, swappable: true },
-  'QuantumDrive': { label: 'Quantum Drive', icon: '💫', color: 'purple', order: 7, swappable: true },
-  'Radar': { label: 'Radar', icon: '📡', color: 'blue', order: 8, swappable: true },
-  'EMP': { label: 'EMP', icon: '⚡', color: 'purple', order: 9, swappable: false },
-  'MainThruster': { label: 'Thrusters', icon: '🔥', color: 'amber', order: 10, swappable: false },
-  'ManneuverThruster': { label: 'Thrusters', icon: '🔥', color: 'amber', order: 10, swappable: false },
-  'Thruster': { label: 'Thrusters', icon: '🔥', color: 'amber', order: 10, swappable: false },
-  'QuantumInterdictionGenerator': { label: 'QED', icon: '🔒', color: 'purple', order: 11, swappable: false },
-  'Countermeasure': { label: 'Countermeasures', icon: '🎇', color: 'amber', order: 12, swappable: false },
-}
+const HIDDEN_PORT_TYPES = new Set(['Other'])
+const HIDDEN_PORT_PREFIXES = ['$slot', 'hardpoint_paint', 'hardpoint_cockpit_flair', 'hardpoint_relay',
+  'hardpoint_controller', 'hardpoint_avionics', 'hardpoint_air_traffic', 'hardpoint_fuel_port']
 
-// Types to HIDE from the loadout (not relevant to player)
-const HIDDEN_TYPES = new Set([
-  'FuelIntake', 'FuelTank', 'QuantumFuelTank', 'HydrogenFuelTank',
-  'LifeSupport', 'FlightController', 'SelfDestruct', 'Transponder',
-  'Scanner', 'Ping', 'Armor', 'Light', 'LandingGear', 'Door',
-  'Seat', 'Container', 'WeaponRack',
-])
-
-function getNodeType(node: LoadoutNode): string {
-  return node.component_type || node.port_type || ''
-}
-
-function isHiddenNode(node: LoadoutNode): boolean {
-  const type = getNodeType(node)
-  if (!type) return true
-  for (const hidden of HIDDEN_TYPES) {
-    if (type.toLowerCase().includes(hidden.toLowerCase())) return true
-  }
-  if (node.port_type === 'Other' && !CATEGORY_MAP[node.component_type]) return true
-  return false
-}
-
-function getCategoryInfo(node: LoadoutNode): CategoryInfo | null {
-  const type = getNodeType(node)
-  // Direct match on component_type first
-  if (node.component_type && CATEGORY_MAP[node.component_type]) return CATEGORY_MAP[node.component_type]
-  // Then port_type
-  if (node.port_type && CATEGORY_MAP[node.port_type]) return CATEGORY_MAP[node.port_type]
-  // Fuzzy match
-  for (const [key, info] of Object.entries(CATEGORY_MAP)) {
-    if (type.toLowerCase().includes(key.toLowerCase())) return info
-  }
-  const pt = (node.port_type || '').toLowerCase()
-  if (pt.includes('weapon') || pt.includes('gun')) return CATEGORY_MAP['WeaponGun']
-  if (pt.includes('turret') || pt === 'gimbal') return CATEGORY_MAP['TurretBase']
-  if (pt.includes('missile')) return CATEGORY_MAP['MissileLauncher']
-  if (pt.includes('shield')) return CATEGORY_MAP['Shield']
-  if (pt.includes('power')) return CATEGORY_MAP['PowerPlant']
-  if (pt.includes('cool')) return CATEGORY_MAP['Cooler']
-  if (pt.includes('quantum') || pt.includes('qd')) return CATEGORY_MAP['QuantumDrive']
-  if (pt.includes('thruster')) return CATEGORY_MAP['MainThruster']
-  if (pt.includes('radar')) return CATEGORY_MAP['Radar']
-  if (pt.includes('countermeasure')) return CATEGORY_MAP['Countermeasure']
-  return null
-}
-
-function isSwappable(node: LoadoutNode): boolean {
-  const info = getCategoryInfo(node)
-  return info?.swappable ?? false
-}
-
-// Group root nodes by category, filtering out hidden/irrelevant types
-const categorizedTree = computed(() => {
-  const groups: Map<string, { info: CategoryInfo; nodes: LoadoutNode[] }> = new Map()
-
-  for (const root of loadout.value) {
-    if (isHiddenNode(root)) continue
-    const info = getCategoryInfo(root)
-    if (!info) continue
-    const key = info.label
-    if (!groups.has(key)) groups.set(key, { info, nodes: [] })
-    groups.get(key)!.nodes.push(root)
-  }
-
-  return Array.from(groups.entries())
-    .sort((a, b) => a[1].info.order - b[1].info.order)
-    .map(([key, val]) => ({ key, ...val }))
-})
-
-// Count all items (root + children) in a category
-function categoryTotal(nodes: LoadoutNode[]): number {
-  return nodes.reduce((sum, n) => sum + 1 + (n.children?.length || 0), 0)
-}
-
+// ── Ship search ──
 async function searchShips(q: string) {
   if (q.length < 2) { shipResults.value = []; return }
   const res = await getShips({ search: q, limit: '8' })
   shipResults.value = res.data
 }
 
-async function selectShip(s: Ship) {
-  ship.value = s
-  shipUuid.value = s.class_name || s.uuid
-  shipQuery.value = s.name
+function selectShip(ship: Ship) {
+  selectedShip.value = ship
+  shipQuery.value = ship.name
   shipResults.value = []
-  await loadShipData()
+  swaps.value = []
+  router.replace({ params: { uuid: ship.uuid } })
+  fetchLoadout(ship.uuid)
 }
 
-async function loadShipData() {
-  if (!shipUuid.value) return
+async function fetchLoadout(uuid: string) {
   loading.value = true
+  error.value = ''
   try {
-    const [shipRes, loadoutRes] = await Promise.all([
-      getShip(shipUuid.value).catch(() => null),
-      getShipLoadout(shipUuid.value).catch(() => ({ data: [] })),
-    ])
-    if (shipRes) {
-      ship.value = shipRes.data
-      shipQuery.value = shipRes.data.name
-    }
-    loadout.value = loadoutRes.data || []
-    swaps.value = []
-    collapsedNodes.value = new Set()
-    await recalculate()
+    const res = await calculateLoadout(uuid, swaps.value)
+    loadout.value = res.data
+  } catch (e: any) {
+    error.value = e.message || 'Loadout error'
   } finally {
     loading.value = false
   }
 }
 
-async function recalculate() {
-  if (!shipUuid.value) return
-  calculating.value = true
+// ── Grouped loadout items (Erkul-style categories) ──
+const groupedLoadout = computed(() => {
+  if (!loadout.value?.loadout) return []
+  const groups: Record<string, { meta: any; items: any[] }> = {}
+
+  for (const item of loadout.value.loadout) {
+    // Hide empty/internal ports
+    if (!item.component_uuid && !item.component_name) continue
+    if (HIDDEN_PORT_TYPES.has(item.port_type)) continue
+    if (HIDDEN_PORT_PREFIXES.some(p => item.port_name.startsWith(p))) continue
+
+    const type = item.component_type || item.port_type || 'Other'
+    const meta = CATEGORY_MAP[type] || { label: type, icon: '📦', color: 'slate' }
+    const groupKey = meta.label
+
+    if (!groups[groupKey]) groups[groupKey] = { meta, items: [] }
+    groups[groupKey].items.push(item)
+  }
+
+  return Object.entries(groups).map(([key, val]) => ({
+    category: key,
+    ...val.meta,
+    items: val.items,
+  }))
+})
+
+// ── Swap component ──
+function startSwap(item: any) {
+  swapTarget.value = item.port_name
+  swapTargetType.value = item.component_type || ''
+  swapQuery.value = ''
+  swapResults.value = []
+}
+
+function cancelSwap() {
+  swapTarget.value = null
+  swapQuery.value = ''
+  swapResults.value = []
+}
+
+async function searchSwapComponents(q: string) {
+  if (q.length < 2) { swapResults.value = []; return }
+  swapLoading.value = true
   try {
-    const res = await calculateLoadout(shipUuid.value, swaps.value)
-    stats.value = res.data
-  } catch {
-    stats.value = null
+    const params: Record<string, string> = { search: q, limit: '10' }
+    if (swapTargetType.value) params.type = swapTargetType.value
+    const res = await getComponents(params)
+    swapResults.value = res.data
   } finally {
-    calculating.value = false
+    swapLoading.value = false
   }
 }
 
-async function searchComponents(q: string) {
-  if (q.length < 2) { componentResults.value = []; return }
-  const portItem = findPortInTree(editingPort.value!)
-  const params: Record<string, string> = { search: q, limit: '10' }
-  if (portItem?.component_type) params.type = portItem.component_type
-  const portSize = portItem?.component_size ?? portItem?.size
-  if (portSize != null) params.size = String(portSize)
-  const res = await getComponents(params)
-  componentResults.value = res.data
+async function applySwap(component: any) {
+  if (!swapTarget.value || !selectedShip.value) return
+  const existing = swaps.value.findIndex(s => s.portName === swapTarget.value)
+  if (existing !== -1) swaps.value[existing].componentUuid = component.uuid
+  else swaps.value.push({ portName: swapTarget.value, componentUuid: component.uuid })
+  cancelSwap()
+  await fetchLoadout(selectedShip.value.uuid)
 }
 
-function findPortInTree(portName: string): LoadoutNode | null {
-  for (const root of loadout.value) {
-    if (root.port_name === portName) return root
-    if (root.children) {
-      const child = root.children.find(c => c.port_name === portName)
-      if (child) return child
-    }
-  }
-  return null
-}
-
-function swapComponent(portName: string, comp: Component) {
-  const existing = swaps.value.findIndex(s => s.portName === portName)
-  if (existing >= 0) swaps.value[existing].componentUuid = comp.uuid
-  else swaps.value.push({ portName, componentUuid: comp.uuid })
-
-  // Update in tree
-  for (const root of loadout.value) {
-    if (root.port_name === portName) {
-      root.component_uuid = comp.uuid
-      root.component_name = comp.name
-      break
-    }
-    if (root.children) {
-      const child = root.children.find(c => c.port_name === portName)
-      if (child) {
-        child.component_uuid = comp.uuid
-        child.component_name = comp.name
-        break
-      }
-    }
-  }
-
-  editingPort.value = null
-  componentSearch.value = ''
-  componentResults.value = []
-  recalculate()
-}
-
-function resetSwaps() {
+async function resetSwaps() {
+  if (!selectedShip.value) return
   swaps.value = []
-  loadShipData()
+  await fetchLoadout(selectedShip.value.uuid)
 }
 
-const swapCount = computed(() => swaps.value.length)
-
-function fmt(v: any, digits = 1) {
-  if (v == null || v === 0) return '—'
-  if (typeof v === 'number') return v.toLocaleString('en-US', { maximumFractionDigits: digits })
-  return v
+function removeSwap(portName: string) {
+  swaps.value = swaps.value.filter(s => s.portName !== portName)
+  if (selectedShip.value) fetchLoadout(selectedShip.value.uuid)
 }
 
-function balanceIcon(v: number) {
-  return v >= 0 ? '✓' : '⚠'
+// ── Formatting helpers ──
+function fmt(v: any, decimals = 0) {
+  if (v == null || v === undefined) return '—'
+  const n = typeof v === 'number' ? v : parseFloat(v)
+  if (isNaN(n)) return '—'
+  if (n > 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
+  if (n > 10_000) return (n / 1_000).toFixed(1) + 'k'
+  return n.toLocaleString('en-US', { maximumFractionDigits: decimals })
 }
 
-function colorClass(color: string, type: 'text' | 'bg' | 'border') {
-  const map: Record<string, Record<string, string>> = {
-    'red': { text: 'text-red-400', bg: 'bg-red-500/5', border: 'border-red-500/20' },
-    'amber': { text: 'text-amber-400', bg: 'bg-amber-500/5', border: 'border-amber-500/20' },
-    'blue': { text: 'text-blue-400', bg: 'bg-blue-500/5', border: 'border-blue-500/20' },
-    'green': { text: 'text-green-400', bg: 'bg-green-500/5', border: 'border-green-500/20' },
-    'cyan': { text: 'text-cyan-400', bg: 'bg-cyan-500/5', border: 'border-cyan-500/20' },
-    'purple': { text: 'text-purple-400', bg: 'bg-purple-500/5', border: 'border-purple-500/20' },
-  }
-  return map[color]?.[type] || (type === 'text' ? 'text-sv-muted' : type === 'bg' ? 'bg-sv-darker/30' : 'border-sv-border/20')
+function pct(v: number) {
+  return Math.round(v * 100) + '%'
 }
 
-onMounted(() => { if (shipUuid.value) loadShipData() })
-watch(() => route.params.uuid, (newUuid) => {
-  if (newUuid && newUuid !== shipUuid.value) {
-    shipUuid.value = newUuid as string
-    loadShipData()
+function portLabel(name: string) {
+  return name
+    .replace(/^hardpoint_/i, '')
+    .replace(/^Hardpoint_/i, '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase())
+}
+
+// ── Init from URL ──
+onMounted(async () => {
+  const uuid = route.params.uuid as string
+  if (uuid) {
+    loading.value = true
+    try {
+      const res = await calculateLoadout(uuid, [])
+      loadout.value = res.data
+      if (res.data?.ship) {
+        selectedShip.value = { uuid: res.data.ship.uuid, name: res.data.ship.name } as Ship
+        shipQuery.value = res.data.ship.name
+      }
+    } catch (e: any) {
+      error.value = e.message
+    } finally {
+      loading.value = false
+    }
   }
 })
 </script>
 
 <template>
   <div class="space-y-4">
-    <!-- Header -->
-    <div class="flex items-center justify-between">
-      <h1 class="section-title">🎯 Loadout Manager</h1>
-      <div v-if="ship" class="flex items-center gap-2">
-        <span v-if="swapCount > 0" class="badge-amber text-[10px]">{{ swapCount }} change(s)</span>
-        <button v-if="swapCount > 0" @click="resetSwaps" class="btn-ghost text-[10px] border border-sv-border">↺ Reset</button>
-      </div>
-    </div>
 
-    <!-- Ship picker card -->
-    <div class="card p-4 relative z-10">
+    <!-- ═══ Ship Picker ═══ -->
+    <div class="card p-4 relative z-20">
       <div class="flex items-center gap-3">
-        <div class="text-2xl">🚀</div>
-        <div class="flex-1">
-          <label class="text-[10px] text-sv-muted uppercase tracking-wider font-semibold block mb-1">Ship</label>
+        <div class="flex-1 relative">
+          <div class="flex items-center gap-2 mb-1.5">
+            <span class="text-lg">🎯</span>
+            <h1 class="text-sm font-bold text-sv-text-bright uppercase tracking-wider">Loadout Manager</h1>
+          </div>
           <input
-            v-model="shipQuery" @input="searchShips(shipQuery)"
-            class="input w-full text-sm" placeholder="Search a ship…"
+            v-model="shipQuery"
+            @input="searchShips(shipQuery)"
+            class="input w-full"
+            placeholder="Search a ship…"
           />
-        </div>
-        <div v-if="ship" class="text-right hidden sm:block">
-          <div class="text-xs text-sv-muted">{{ (ship as any).manufacturer_name || ship.manufacturer_code }}</div>
-          <div class="text-[10px] text-sv-muted/60">{{ ship.class_name }}</div>
-        </div>
-      </div>
-      <div v-if="shipResults.length" class="absolute z-50 left-4 right-4 mt-2 bg-sv-panel border border-sv-border rounded-lg shadow-xl max-h-56 overflow-y-auto">
-        <div v-for="s in shipResults" :key="s.uuid" @click="selectShip(s)"
-          class="px-3 py-2 hover:bg-sv-accent/10 cursor-pointer text-xs flex items-center justify-between border-b border-sv-border/20 last:border-0">
-          <div>
-            <span class="text-sv-text-bright font-medium">{{ s.name }}</span>
-            <span class="text-sv-muted ml-2 text-[10px]">{{ (s as any).manufacturer_name || s.manufacturer_code }}</span>
+          <!-- Dropdown -->
+          <div v-if="shipResults.length" class="absolute z-50 left-0 right-0 mt-1 bg-sv-panel border border-sv-border rounded-lg shadow-2xl max-h-56 overflow-y-auto">
+            <div v-for="s in shipResults" :key="s.uuid" @click="selectShip(s)"
+              class="px-3 py-2.5 hover:bg-sv-accent/10 cursor-pointer text-xs border-b border-sv-border/20 last:border-0 flex items-center justify-between">
+              <div>
+                <span class="text-sv-text-bright font-medium">{{ s.name }}</span>
+                <span class="text-sv-muted ml-2 text-[10px]">{{ s.manufacturer_code }}</span>
+              </div>
+              <span class="text-[10px] text-sv-muted">{{ s.role }}</span>
+            </div>
           </div>
-          <span v-if="s.ship_matrix_id" class="badge-cyan text-[9px]">✓</span>
         </div>
+        <!-- Reset button -->
+        <button v-if="swaps.length" @click="resetSwaps"
+          class="px-3 py-2 text-xs bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition whitespace-nowrap">
+          ↺ Reset ({{ swaps.length }})
+        </button>
       </div>
     </div>
 
-    <!-- Ship quick stats bar -->
-    <div v-if="ship && !loading" class="grid grid-cols-3 sm:grid-cols-6 gap-1.5">
-      <div class="card p-2 text-center">
-        <div class="text-[9px] text-sv-muted uppercase">HP</div>
-        <div class="text-xs font-semibold text-sv-text-bright">{{ fmt(ship.total_hp, 0) }}</div>
-      </div>
-      <div class="card p-2 text-center">
-        <div class="text-[9px] text-sv-muted uppercase">Shield</div>
-        <div class="text-xs font-semibold text-blue-400">{{ fmt(ship.shield_hp, 0) }}</div>
-      </div>
-      <div class="card p-2 text-center">
-        <div class="text-[9px] text-sv-muted uppercase">SCM</div>
-        <div class="text-xs font-semibold text-sv-text-bright">{{ fmt(ship.scm_speed, 0) }} m/s</div>
-      </div>
-      <div class="card p-2 text-center">
-        <div class="text-[9px] text-sv-muted uppercase">Max</div>
-        <div class="text-xs font-semibold text-sv-text-bright">{{ fmt(ship.max_speed, 0) }} m/s</div>
-      </div>
-      <div class="card p-2 text-center">
-        <div class="text-[9px] text-sv-muted uppercase">Cargo</div>
-        <div class="text-xs font-semibold text-amber-400">{{ fmt(ship.cargo_capacity, 0) }} SCU</div>
-      </div>
-      <div class="card p-2 text-center">
-        <div class="text-[9px] text-sv-muted uppercase">Mass</div>
-        <div class="text-xs font-semibold text-sv-text-bright">{{ fmt(Math.round(ship.mass), 0) }} kg</div>
-      </div>
-    </div>
+    <!-- ═══ Error ═══ -->
+    <div v-if="error" class="card border-red-500/50 p-3 text-red-400 text-sm">{{ error }}</div>
 
+    <!-- ═══ Main Content ═══ -->
     <LoadingState :loading="loading">
-      <div v-if="ship" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <!-- LEFT: Tree view by category (2/3) -->
-        <div class="lg:col-span-2 space-y-3">
-          <div v-if="loadout.length === 0" class="card p-10 text-center text-sv-muted text-sm">
-            No components in this ship's loadout
+      <div v-if="loadout" class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+
+        <!-- ═══════════════ LEFT: Components Panel ═══════════════ -->
+        <div class="lg:col-span-7 xl:col-span-8 space-y-3">
+
+          <!-- Ship header bar -->
+          <div class="card p-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <h2 class="text-lg font-bold text-sv-text-bright">{{ loadout.ship.name }}</h2>
+                <div class="text-[10px] text-sv-muted font-mono">{{ loadout.ship.class_name }}</div>
+              </div>
+              <div class="flex gap-4 text-center">
+                <div>
+                  <div class="text-[10px] text-sv-muted uppercase">HP</div>
+                  <div class="text-sm font-bold text-emerald-400 font-mono">{{ fmt(loadout.stats.hull.total_hp) }}</div>
+                </div>
+                <div>
+                  <div class="text-[10px] text-sv-muted uppercase">Shield</div>
+                  <div class="text-sm font-bold text-blue-400 font-mono">{{ fmt(loadout.stats.shields.total_hp) }}</div>
+                </div>
+                <div>
+                  <div class="text-[10px] text-sv-muted uppercase">DPS</div>
+                  <div class="text-sm font-bold text-red-400 font-mono">{{ fmt(loadout.stats.weapons.total_dps) }}</div>
+                </div>
+                <div>
+                  <div class="text-[10px] text-sv-muted uppercase">SCM</div>
+                  <div class="text-sm font-bold text-sv-accent font-mono">{{ fmt(loadout.stats.mobility.scm_speed) }}</div>
+                </div>
+                <div class="hidden sm:block">
+                  <div class="text-[10px] text-sv-muted uppercase">Mass</div>
+                  <div class="text-sm font-bold text-sv-text font-mono">{{ fmt(loadout.stats.mobility.mass) }}</div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div v-for="cat in categorizedTree" :key="cat.key" class="card overflow-hidden">
+          <!-- Component categories (Erkul-style) -->
+          <div v-for="group in groupedLoadout" :key="group.category" class="card overflow-hidden">
             <!-- Category header -->
-            <div class="px-3 py-2 border-b border-sv-border/30 flex items-center gap-2"
-              :class="colorClass(cat.info.color, 'bg')">
-              <span class="text-sm">{{ cat.info.icon }}</span>
-              <span class="text-[11px] font-semibold uppercase tracking-wider" :class="colorClass(cat.info.color, 'text')">
-                {{ cat.info.label }}
-              </span>
-              <span class="text-[10px] text-sv-muted ml-auto">{{ categoryTotal(cat.nodes) }} item(s)</span>
-            </div>
+            <button @click="toggleSection(group.category)"
+              class="w-full flex items-center justify-between px-4 py-2.5 hover:bg-sv-panel-light/30 transition-colors"
+              :class="{
+                'bg-red-500/5': group.color === 'red',
+                'bg-blue-500/5': group.color === 'blue',
+                'bg-orange-500/5': group.color === 'orange',
+                'bg-yellow-500/5': group.color === 'yellow',
+                'bg-cyan-500/5': group.color === 'cyan',
+                'bg-purple-500/5': group.color === 'purple',
+                'bg-green-500/5': group.color === 'green',
+                'bg-amber-500/5': group.color === 'amber',
+                'bg-rose-500/5': group.color === 'rose',
+                'bg-teal-500/5': group.color === 'teal',
+                'bg-indigo-500/5': group.color === 'indigo',
+                'bg-slate-500/5': group.color === 'slate',
+              }">
+              <div class="flex items-center gap-2">
+                <span class="text-sm">{{ group.icon }}</span>
+                <span class="text-[11px] font-bold uppercase tracking-wider"
+                  :class="{
+                    'text-red-400': group.color === 'red',
+                    'text-blue-400': group.color === 'blue',
+                    'text-orange-400': group.color === 'orange',
+                    'text-yellow-400': group.color === 'yellow',
+                    'text-cyan-400': group.color === 'cyan',
+                    'text-purple-400': group.color === 'purple',
+                    'text-green-400': group.color === 'green',
+                    'text-amber-400': group.color === 'amber',
+                    'text-rose-400': group.color === 'rose',
+                    'text-teal-400': group.color === 'teal',
+                    'text-indigo-400': group.color === 'indigo',
+                    'text-slate-400': group.color === 'slate',
+                  }">
+                  {{ group.category }}
+                </span>
+                <span class="text-[10px] text-sv-muted bg-sv-darker/50 px-1.5 py-0.5 rounded">{{ group.items.length }}</span>
+              </div>
+              <svg class="w-3.5 h-3.5 text-sv-muted transition-transform" :class="{ 'rotate-180': isSectionOpen(group.category) }" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+              </svg>
+            </button>
 
-            <!-- Tree nodes -->
-            <div class="divide-y divide-sv-border/10">
-              <template v-for="root in cat.nodes" :key="root.port_name">
-                <!-- Root node -->
-                <div class="relative">
-                  <div class="px-3 py-2 flex items-center gap-2 hover:bg-sv-panel-light/20 transition-colors group">
-                    <!-- Expand/collapse toggle -->
-                    <button v-if="root.children && root.children.length > 0"
-                      @click="toggleNode(root.id)"
-                      class="w-4 h-4 flex items-center justify-center text-sv-muted hover:text-sv-text text-[10px] shrink-0">
-                      {{ collapsedNodes.has(root.id) ? '▶' : '▼' }}
-                    </button>
-                    <div v-else class="w-4 shrink-0"></div>
+            <!-- Components list -->
+            <div v-if="isSectionOpen(group.category)">
+              <div v-for="item in group.items" :key="item.port_name"
+                class="flex items-center gap-3 px-4 py-2 border-t border-sv-border/20 hover:bg-sv-panel-light/20 transition-colors group/item">
 
-                    <!-- Size badge -->
-                    <div class="w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-bold shrink-0"
-                      :class="`${colorClass(cat.info.color, 'bg')} ${colorClass(cat.info.color, 'text')}`"
-                      style="background-color: rgba(var(--cat-color), 0.15);">
-                      S{{ root.component_size || root.size || '?' }}
-                    </div>
-
-                    <!-- Component info -->
-                    <div class="flex-1 min-w-0">
-                      <div class="text-xs font-medium text-sv-text-bright truncate">
-                        {{ root.component_name || '— empty —' }}
-                      </div>
-                      <div class="text-[10px] text-sv-muted truncate">{{ root.port_name }}</div>
-                    </div>
-
-                    <!-- Children count badge -->
-                    <span v-if="root.children && root.children.length > 0"
-                      class="text-[9px] px-1.5 py-0.5 rounded-full bg-sv-darker text-sv-muted shrink-0">
-                      {{ root.children.length }}×
-                    </span>
-
-                    <!-- Type badge -->
-                    <span class="text-[9px] px-1.5 py-0.5 rounded bg-sv-darker text-sv-muted shrink-0 hidden sm:inline">
-                      {{ root.component_type || root.port_type }}
-                    </span>
-
-                    <!-- Swap button (only for swappable) -->
-                    <button v-if="isSwappable(root)"
-                      @click="editingPort = editingPort === root.port_name ? null : root.port_name; componentSearch = ''; componentResults = []"
-                      class="text-[10px] px-2 py-0.5 rounded-md border transition-all shrink-0"
-                      :class="editingPort === root.port_name
-                        ? 'border-red-500/50 text-red-400 bg-red-500/10'
-                        : 'border-sv-border/50 text-sv-muted hover:text-sv-accent hover:border-sv-accent/50 opacity-0 group-hover:opacity-100'"
-                    >
-                      {{ editingPort === root.port_name ? '✕' : '↔' }}
-                    </button>
-                    <!-- Lock icon for non-swappable -->
-                    <span v-else class="text-[10px] text-sv-muted/30 shrink-0" title="Fixed component">🔒</span>
-                  </div>
-
-                  <!-- Component picker for root -->
-                  <div v-if="editingPort === root.port_name && isSwappable(root)"
-                    class="mx-3 mb-2 bg-sv-darker/50 border border-sv-border/30 rounded-lg p-3">
-                    <input
-                      v-model="componentSearch"
-                      @input="searchComponents(componentSearch)"
-                      class="input w-full text-xs mb-2"
-                      placeholder="Search a compatible component…"
-                      autofocus
-                    />
-                    <div class="max-h-40 overflow-y-auto space-y-0.5">
-                      <div v-for="c in componentResults" :key="c.uuid" @click="swapComponent(root.port_name, c)"
-                        class="px-2.5 py-1.5 hover:bg-sv-accent/10 rounded-md cursor-pointer transition-colors">
-                        <div class="text-xs text-sv-text-bright font-medium">{{ c.name }}</div>
-                        <div class="text-[10px] text-sv-muted flex gap-2">
-                          <span>S{{ c.size }}</span>
-                          <span>{{ c.type }}</span>
-                          <span v-if="c.weapon_dps" class="text-red-400">{{ Math.round(c.weapon_dps) }} DPS</span>
-                          <span v-if="c.shield_hp" class="text-blue-400">{{ c.shield_hp }} HP</span>
-                        </div>
-                      </div>
-                      <div v-if="componentSearch.length >= 2 && componentResults.length === 0"
-                        class="text-sv-muted text-center py-2 text-[11px]">No component found</div>
-                      <div v-if="componentSearch.length < 2"
-                        class="text-sv-muted text-center py-2 text-[11px]">Type at least 2 characters…</div>
-                    </div>
-                  </div>
-
-                  <!-- Children (indented) -->
-                  <div v-if="root.children && root.children.length > 0 && !collapsedNodes.has(root.id)"
-                    class="border-t border-sv-border/10">
-                    <div v-for="child in root.children" :key="child.port_name"
-                      class="flex items-center gap-2 hover:bg-sv-panel-light/10 transition-colors group relative"
-                      style="padding: 6px 12px 6px 44px;">
-                      <!-- Tree connector line -->
-                      <div class="absolute left-6 top-0 bottom-0 w-px bg-sv-border/20"></div>
-                      <div class="absolute left-6 top-1/2 w-3 h-px bg-sv-border/20"></div>
-
-                      <!-- Size badge (smaller) -->
-                      <div class="w-6 h-6 rounded flex items-center justify-center text-[9px] font-bold shrink-0 bg-sv-darker/50"
-                        :class="colorClass(cat.info.color, 'text')">
-                        S{{ child.component_size || child.size || '?' }}
-                      </div>
-
-                      <!-- Component info -->
-                      <div class="flex-1 min-w-0">
-                        <div class="text-[11px] text-sv-text truncate">
-                          {{ child.component_name || '— empty —' }}
-                        </div>
-                        <div class="text-[9px] text-sv-muted/60 truncate">{{ child.port_name }}</div>
-                      </div>
-
-                      <!-- Type badge -->
-                      <span class="text-[9px] px-1 py-0.5 rounded bg-sv-darker/30 text-sv-muted/60 shrink-0 hidden sm:inline">
-                        {{ child.component_type || child.port_type }}
-                      </span>
-
-                      <!-- Swap button (only for swappable) -->
-                      <button v-if="isSwappable(child)"
-                        @click="editingPort = editingPort === child.port_name ? null : child.port_name; componentSearch = ''; componentResults = []"
-                        class="text-[10px] px-2 py-0.5 rounded-md border transition-all shrink-0"
-                        :class="editingPort === child.port_name
-                          ? 'border-red-500/50 text-red-400 bg-red-500/10'
-                          : 'border-sv-border/50 text-sv-muted hover:text-sv-accent hover:border-sv-accent/50 opacity-0 group-hover:opacity-100'"
-                      >
-                        {{ editingPort === child.port_name ? '✕' : '↔' }}
-                      </button>
-                      <span v-else class="text-[10px] text-sv-muted/30 shrink-0" title="Fixed component">🔒</span>
-                    </div>
-
-                    <!-- Component picker for child (if editing) -->
-                    <template v-for="child in root.children" :key="'picker-' + child.port_name">
-                      <div v-if="editingPort === child.port_name && isSwappable(child)"
-                        class="mx-3 mb-2 bg-sv-darker/50 border border-sv-border/30 rounded-lg p-3" style="margin-left: 44px;">
-                        <input
-                          v-model="componentSearch"
-                          @input="searchComponents(componentSearch)"
-                          class="input w-full text-xs mb-2"
-                          placeholder="Search a compatible component…"
-                          autofocus
-                        />
-                        <div class="max-h-40 overflow-y-auto space-y-0.5">
-                          <div v-for="c in componentResults" :key="c.uuid" @click="swapComponent(child.port_name, c)"
-                            class="px-2.5 py-1.5 hover:bg-sv-accent/10 rounded-md cursor-pointer transition-colors">
-                            <div class="text-xs text-sv-text-bright font-medium">{{ c.name }}</div>
-                            <div class="text-[10px] text-sv-muted flex gap-2">
-                              <span>S{{ c.size }}</span>
-                              <span>{{ c.type }}</span>
-                              <span v-if="c.weapon_dps" class="text-red-400">{{ Math.round(c.weapon_dps) }} DPS</span>
-                              <span v-if="c.shield_hp" class="text-blue-400">{{ c.shield_hp }} HP</span>
-                            </div>
-                          </div>
-                          <div v-if="componentSearch.length >= 2 && componentResults.length === 0"
-                            class="text-sv-muted text-center py-2 text-[11px]">No component found</div>
-                          <div v-if="componentSearch.length < 2"
-                            class="text-sv-muted text-center py-2 text-[11px]">Type at least 2 characters…</div>
-                        </div>
-                      </div>
-                    </template>
-                  </div>
+                <!-- Size badge -->
+                <div class="w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold shrink-0"
+                  :class="item.swapped ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'bg-sv-darker/60 text-sv-muted border border-sv-border/30'">
+                  S{{ item.component_size || '?' }}
                 </div>
-              </template>
+
+                <!-- Component info -->
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2">
+                    <span class="text-xs font-medium truncate" :class="item.swapped ? 'text-amber-300' : 'text-sv-text-bright'">
+                      {{ item.component_name || 'Empty' }}
+                    </span>
+                    <span v-if="item.grade" class="text-[9px] px-1 py-0.5 rounded bg-sv-darker/50 text-sv-muted border border-sv-border/20">
+                      {{ item.grade }}
+                    </span>
+                    <span v-if="item.swapped" class="text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-400">
+                      SWAP
+                    </span>
+                  </div>
+                  <div class="text-[10px] text-sv-muted truncate">{{ portLabel(item.port_name) }}</div>
+                </div>
+
+                <!-- Inline stats (type-specific) -->
+                <div class="hidden sm:flex items-center gap-3 text-[10px] text-sv-muted font-mono shrink-0">
+                  <template v-if="item.weapon_dps">
+                    <span class="text-red-400">{{ fmt(item.weapon_dps, 0) }} DPS</span>
+                    <span v-if="item.weapon_range">{{ fmt(item.weapon_range, 0) }}m</span>
+                  </template>
+                  <template v-if="item.shield_hp">
+                    <span class="text-blue-400">{{ fmt(item.shield_hp, 0) }} HP</span>
+                    <span class="text-blue-300">{{ fmt(item.shield_regen, 0) }}/s</span>
+                  </template>
+                  <template v-if="item.power_output">
+                    <span class="text-yellow-400">{{ fmt(item.power_output, 0) }} pwr</span>
+                  </template>
+                  <template v-if="item.cooling_rate">
+                    <span class="text-cyan-400">{{ fmt(item.cooling_rate, 0) }} cool</span>
+                  </template>
+                  <template v-if="item.qd_speed">
+                    <span class="text-purple-400">{{ fmt(item.qd_speed) }} m/s</span>
+                  </template>
+                </div>
+
+                <!-- Swap / Reset buttons -->
+                <div class="flex items-center gap-1 shrink-0">
+                  <button @click="startSwap(item)"
+                    class="opacity-0 group-hover/item:opacity-100 transition-opacity p-1 rounded hover:bg-sv-accent/10 text-sv-muted hover:text-sv-accent"
+                    title="Swap component">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                    </svg>
+                  </button>
+                  <button v-if="item.swapped" @click="removeSwap(item.port_name)"
+                    class="p-1 rounded hover:bg-red-500/10 text-sv-muted hover:text-red-400 transition"
+                    title="Restore original">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- RIGHT: Stats panel (1/3) -->
-        <div class="space-y-3">
-          <div class="flex items-center justify-between">
-            <h2 class="text-sm font-semibold text-sv-text-bright">📊 Statistics</h2>
-            <div v-if="calculating" class="text-[10px] text-sv-accent animate-pulse">Calculating…</div>
+        <!-- ═══════════════ RIGHT: Stats Sidebar ═══════════════ -->
+        <div class="lg:col-span-5 xl:col-span-4 space-y-3 lg:sticky lg:top-4 lg:self-start lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto scrollbar-thin">
+
+          <!-- Weapons breakdown -->
+          <div class="card overflow-hidden">
+            <div class="px-4 py-2 bg-red-500/5 border-b border-sv-border/30">
+              <span class="text-[11px] font-bold text-red-400 uppercase tracking-wider">🔫 Weapons</span>
+            </div>
+            <div class="p-3 space-y-2">
+              <div class="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <div class="text-[9px] text-sv-muted uppercase">DPS</div>
+                  <div class="text-sm font-bold text-red-400 font-mono">{{ fmt(loadout.stats.weapons.total_dps) }}</div>
+                </div>
+                <div>
+                  <div class="text-[9px] text-sv-muted uppercase">Burst</div>
+                  <div class="text-sm font-bold text-red-300 font-mono">{{ fmt(loadout.stats.weapons.total_burst_dps) }}</div>
+                </div>
+                <div>
+                  <div class="text-[9px] text-sv-muted uppercase">Sustained</div>
+                  <div class="text-sm font-bold text-red-200 font-mono">{{ fmt(loadout.stats.weapons.total_sustained_dps) }}</div>
+                </div>
+              </div>
+              <!-- Per-weapon detail table -->
+              <table v-if="loadout.stats.weapons.details?.length" class="w-full text-[10px] mt-2">
+                <thead>
+                  <tr class="text-sv-muted border-b border-sv-border/20">
+                    <th class="text-left py-1 font-medium">Name</th>
+                    <th class="text-center py-1 font-medium">S</th>
+                    <th class="text-right py-1 font-medium">DPS</th>
+                    <th class="text-right py-1 font-medium hidden sm:table-cell">Range</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(w, i) in loadout.stats.weapons.details" :key="i"
+                    class="border-b border-sv-border/10 hover:bg-sv-panel-light/20">
+                    <td class="py-1 text-sv-text-bright truncate max-w-[120px]">{{ w.name }}</td>
+                    <td class="py-1 text-center text-sv-muted">{{ w.size }}</td>
+                    <td class="py-1 text-right text-red-400 font-mono">{{ fmt(w.dps) }}</td>
+                    <td class="py-1 text-right text-sv-muted font-mono hidden sm:table-cell">{{ fmt(w.range) }}m</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          <template v-if="stats">
-            <!-- Weapons -->
-            <div class="card overflow-hidden">
-              <div class="px-3 py-1.5 bg-red-500/5 border-b border-sv-border/30">
-                <h3 class="text-[10px] text-red-400 uppercase tracking-wider font-semibold">🎯 Weapons</h3>
-              </div>
-              <div class="p-3 space-y-2">
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Count</span>
-                  <span class="text-xs text-sv-text-bright font-medium">{{ stats.stats.weapons.count }}</span>
-                </div>
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Total DPS</span>
-                  <span class="text-xs text-red-400 font-bold">{{ fmt(stats.stats.weapons.total_dps) }}</span>
-                </div>
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Burst DPS</span>
-                  <span class="text-xs text-amber-400 font-medium">{{ fmt(stats.stats.weapons.total_burst_dps) }}</span>
-                </div>
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Sustained DPS</span>
-                  <span class="text-xs text-amber-400 font-medium">{{ fmt(stats.stats.weapons.total_sustained_dps) }}</span>
-                </div>
-              </div>
+          <!-- Shields -->
+          <div class="card overflow-hidden">
+            <div class="px-4 py-2 bg-blue-500/5 border-b border-sv-border/30">
+              <span class="text-[11px] font-bold text-blue-400 uppercase tracking-wider">🛡️ Shields</span>
             </div>
-
-            <!-- Shields -->
-            <div class="card overflow-hidden">
-              <div class="px-3 py-1.5 bg-blue-500/5 border-b border-sv-border/30">
-                <h3 class="text-[10px] text-blue-400 uppercase tracking-wider font-semibold">🛡️ Shields</h3>
-              </div>
-              <div class="p-3 space-y-2">
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Total HP</span>
-                  <span class="text-xs text-blue-400 font-bold">{{ fmt(stats.stats.shields.total_hp, 0) }}</span>
+            <div class="p-3 space-y-2">
+              <div class="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <div class="text-[9px] text-sv-muted uppercase">Total HP</div>
+                  <div class="text-sm font-bold text-blue-400 font-mono">{{ fmt(loadout.stats.shields.total_hp) }}</div>
                 </div>
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Regeneration</span>
-                  <span class="text-xs text-blue-400 font-medium">{{ fmt(stats.stats.shields.total_regen) }} /s</span>
+                <div>
+                  <div class="text-[9px] text-sv-muted uppercase">Regen</div>
+                  <div class="text-sm font-bold text-blue-300 font-mono">{{ fmt(loadout.stats.shields.total_regen) }}/s</div>
+                </div>
+                <div>
+                  <div class="text-[9px] text-sv-muted uppercase">Charge</div>
+                  <div class="text-sm font-bold text-blue-200 font-mono">{{ loadout.stats.shields.time_to_charge || '—' }}s</div>
                 </div>
               </div>
+              <!-- Per-shield details -->
+              <table v-if="loadout.stats.shields.details?.length" class="w-full text-[10px] mt-2">
+                <thead>
+                  <tr class="text-sv-muted border-b border-sv-border/20">
+                    <th class="text-left py-1 font-medium">Name</th>
+                    <th class="text-center py-1 font-medium">S</th>
+                    <th class="text-right py-1 font-medium">HP</th>
+                    <th class="text-right py-1 font-medium">Regen</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(s, i) in loadout.stats.shields.details" :key="i"
+                    class="border-b border-sv-border/10 hover:bg-sv-panel-light/20">
+                    <td class="py-1 text-sv-text-bright truncate max-w-[120px]">{{ s.name }}</td>
+                    <td class="py-1 text-center text-sv-muted">{{ s.size }}</td>
+                    <td class="py-1 text-right text-blue-400 font-mono">{{ fmt(s.hp) }}</td>
+                    <td class="py-1 text-right text-blue-300 font-mono">{{ fmt(s.regen) }}/s</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
-
-            <!-- Missiles -->
-            <div class="card overflow-hidden">
-              <div class="px-3 py-1.5 bg-amber-500/5 border-b border-sv-border/30">
-                <h3 class="text-[10px] text-amber-400 uppercase tracking-wider font-semibold">🚀 Missiles</h3>
-              </div>
-              <div class="p-3 space-y-2">
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Count</span>
-                  <span class="text-xs text-sv-text-bright font-medium">{{ stats.stats.missiles.count }}</span>
-                </div>
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Total Damage</span>
-                  <span class="text-xs text-red-400 font-bold">{{ fmt(stats.stats.missiles.total_damage, 0) }}</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Hull & Armor -->
-            <div class="card overflow-hidden">
-              <div class="px-3 py-1.5 bg-emerald-500/5 border-b border-sv-border/30">
-                <h3 class="text-[10px] text-emerald-400 uppercase tracking-wider font-semibold">🛡️ Hull & Armor</h3>
-              </div>
-              <div class="p-3 space-y-2">
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Total HP</span>
-                  <span class="text-xs text-emerald-400 font-bold">{{ fmt(stats.stats.hull.total_hp, 0) }}</span>
-                </div>
-                <div class="pt-1 border-t border-sv-border/20 space-y-1">
-                  <div class="text-[9px] text-sv-muted uppercase tracking-wider">Damage Resistance</div>
-                  <div class="grid grid-cols-2 gap-x-3 gap-y-1">
-                    <div class="flex justify-between">
-                      <span class="text-[10px] text-sv-muted">Physical</span>
-                      <span class="text-[10px] font-medium" :class="stats.stats.armor.physical < 1 ? 'text-emerald-400' : 'text-sv-text'">
-                        {{ Math.round((1 - stats.stats.armor.physical) * 100) }}%
-                      </span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-[10px] text-sv-muted">Energy</span>
-                      <span class="text-[10px] font-medium" :class="stats.stats.armor.energy < 1 ? 'text-emerald-400' : 'text-sv-text'">
-                        {{ Math.round((1 - stats.stats.armor.energy) * 100) }}%
-                      </span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-[10px] text-sv-muted">Distortion</span>
-                      <span class="text-[10px] font-medium" :class="stats.stats.armor.distortion < 1 ? 'text-emerald-400' : 'text-sv-text'">
-                        {{ Math.round((1 - stats.stats.armor.distortion) * 100) }}%
-                      </span>
-                    </div>
-                    <div class="flex justify-between">
-                      <span class="text-[10px] text-sv-muted">Thermal</span>
-                      <span class="text-[10px] font-medium" :class="stats.stats.armor.thermal < 1 ? 'text-emerald-400' : 'text-sv-text'">
-                        {{ Math.round((1 - stats.stats.armor.thermal) * 100) }}%
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Mobility -->
-            <div class="card overflow-hidden">
-              <div class="px-3 py-1.5 bg-sky-500/5 border-b border-sv-border/30">
-                <h3 class="text-[10px] text-sky-400 uppercase tracking-wider font-semibold">✈️ Mobility</h3>
-              </div>
-              <div class="p-3 space-y-2">
-                <div class="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                  <div class="flex justify-between">
-                    <span class="text-[10px] text-sv-muted">SCM</span>
-                    <span class="text-xs text-sv-text-bright font-medium">{{ fmt(stats.stats.mobility.scm_speed, 0) }} m/s</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-[10px] text-sv-muted">Max</span>
-                    <span class="text-xs text-sv-text-bright font-medium">{{ fmt(stats.stats.mobility.max_speed, 0) }} m/s</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-[10px] text-sv-muted">Boost ▲</span>
-                    <span class="text-xs text-amber-400 font-medium">{{ fmt(stats.stats.mobility.boost_forward, 0) }} m/s</span>
-                  </div>
-                  <div class="flex justify-between">
-                    <span class="text-[10px] text-sv-muted">Boost ▼</span>
-                    <span class="text-xs text-sv-text font-medium">{{ fmt(stats.stats.mobility.boost_backward, 0) }} m/s</span>
-                  </div>
-                </div>
-                <div class="pt-1 border-t border-sv-border/20 grid grid-cols-3 gap-1.5">
-                  <div class="text-center">
-                    <div class="text-[9px] text-sv-muted">Pitch</div>
-                    <div class="text-xs text-sky-400 font-semibold">{{ fmt(stats.stats.mobility.pitch, 0) }}°/s</div>
-                  </div>
-                  <div class="text-center">
-                    <div class="text-[9px] text-sv-muted">Yaw</div>
-                    <div class="text-xs text-sky-400 font-semibold">{{ fmt(stats.stats.mobility.yaw, 0) }}°/s</div>
-                  </div>
-                  <div class="text-center">
-                    <div class="text-[9px] text-sv-muted">Roll</div>
-                    <div class="text-xs text-sky-400 font-semibold">{{ fmt(stats.stats.mobility.roll, 0) }}°/s</div>
-                  </div>
-                </div>
-                <div class="flex justify-between items-baseline pt-1 border-t border-sv-border/20">
-                  <span class="text-[10px] text-sv-muted">Mass</span>
-                  <span class="text-xs text-sv-text font-medium">{{ fmt(Math.round(stats.stats.mobility.mass), 0) }} kg</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Quantum Drive -->
-            <div class="card overflow-hidden">
-              <div class="px-3 py-1.5 bg-purple-500/5 border-b border-sv-border/30">
-                <h3 class="text-[10px] text-purple-400 uppercase tracking-wider font-semibold">💫 Quantum Drive</h3>
-              </div>
-              <div class="p-3 space-y-2">
-                <div v-if="stats.stats.quantum.drive_name" class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Drive</span>
-                  <span class="text-xs text-purple-400 font-medium">{{ stats.stats.quantum.drive_name }}</span>
-                </div>
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Speed</span>
-                  <span class="text-xs text-sv-text-bright font-medium">{{ fmt(stats.stats.quantum.speed, 0) }} m/s</span>
-                </div>
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Spool Time</span>
-                  <span class="text-xs text-sv-text font-medium">{{ fmt(stats.stats.quantum.spool_time) }}s</span>
-                </div>
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">QT Fuel</span>
-                  <span class="text-xs text-purple-400 font-medium">{{ fmt(stats.stats.quantum.fuel_capacity) }} L</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Signatures -->
-            <div class="card overflow-hidden">
-              <div class="px-3 py-1.5 bg-indigo-500/5 border-b border-sv-border/30">
-                <h3 class="text-[10px] text-indigo-400 uppercase tracking-wider font-semibold">📡 Signatures</h3>
-              </div>
-              <div class="p-3 space-y-2">
-                <div class="flex justify-between items-center">
-                  <span class="text-[10px] text-sv-muted">IR (Infrared)</span>
-                  <div class="flex items-center gap-2">
-                    <div class="w-16 h-1.5 rounded-full bg-sv-darker overflow-hidden">
-                      <div class="h-full rounded-full bg-red-400" :style="{ width: `${Math.min(stats.stats.signatures.ir * 80, 100)}%` }"></div>
-                    </div>
-                    <span class="text-[10px] text-red-400 font-medium w-8 text-right">{{ fmt(stats.stats.signatures.ir, 2) }}</span>
-                  </div>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-[10px] text-sv-muted">EM (Electromagnetic)</span>
-                  <div class="flex items-center gap-2">
-                    <div class="w-16 h-1.5 rounded-full bg-sv-darker overflow-hidden">
-                      <div class="h-full rounded-full bg-blue-400" :style="{ width: `${Math.min(stats.stats.signatures.em * 80, 100)}%` }"></div>
-                    </div>
-                    <span class="text-[10px] text-blue-400 font-medium w-8 text-right">{{ fmt(stats.stats.signatures.em, 2) }}</span>
-                  </div>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-[10px] text-sv-muted">CS (Cross Section)</span>
-                  <div class="flex items-center gap-2">
-                    <div class="w-16 h-1.5 rounded-full bg-sv-darker overflow-hidden">
-                      <div class="h-full rounded-full bg-amber-400" :style="{ width: `${Math.min(stats.stats.signatures.cs * 80, 100)}%` }"></div>
-                    </div>
-                    <span class="text-[10px] text-amber-400 font-medium w-8 text-right">{{ fmt(stats.stats.signatures.cs, 2) }}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Power -->
-            <div class="card overflow-hidden">
-              <div class="px-3 py-1.5 bg-green-500/5 border-b border-sv-border/30">
-                <h3 class="text-[10px] text-green-400 uppercase tracking-wider font-semibold">⚡ Power</h3>
-              </div>
-              <div class="p-3 space-y-2">
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Output</span>
-                  <span class="text-xs text-green-400 font-medium">{{ fmt(stats.stats.power.total_output) }}</span>
-                </div>
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Draw</span>
-                  <span class="text-xs text-sv-text-bright font-medium">{{ fmt(stats.stats.power.total_draw) }}</span>
-                </div>
-                <div class="pt-1 border-t border-sv-border/20 flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Balance</span>
-                  <span class="text-xs font-bold" :class="stats.stats.power.balance >= 0 ? 'text-emerald-400' : 'text-red-400'">
-                    {{ balanceIcon(stats.stats.power.balance) }} {{ stats.stats.power.balance >= 0 ? '+' : '' }}{{ fmt(stats.stats.power.balance) }}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Thermal -->
-            <div class="card overflow-hidden">
-              <div class="px-3 py-1.5 bg-cyan-500/5 border-b border-sv-border/30">
-                <h3 class="text-[10px] text-cyan-400 uppercase tracking-wider font-semibold">❄️ Thermal</h3>
-              </div>
-              <div class="p-3 space-y-2">
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Cooling</span>
-                  <span class="text-xs text-cyan-400 font-medium">{{ fmt(stats.stats.thermal.total_cooling_rate) }}</span>
-                </div>
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Heat Generated</span>
-                  <span class="text-xs text-sv-text-bright font-medium">{{ fmt(stats.stats.thermal.total_heat_generation) }}</span>
-                </div>
-                <div class="pt-1 border-t border-sv-border/20 flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Balance</span>
-                  <span class="text-xs font-bold" :class="stats.stats.thermal.balance >= 0 ? 'text-emerald-400' : 'text-red-400'">
-                    {{ balanceIcon(stats.stats.thermal.balance) }} {{ stats.stats.thermal.balance >= 0 ? '+' : '' }}{{ fmt(stats.stats.thermal.balance) }}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Fuel -->
-            <div class="card overflow-hidden">
-              <div class="px-3 py-1.5 bg-orange-500/5 border-b border-sv-border/30">
-                <h3 class="text-[10px] text-orange-400 uppercase tracking-wider font-semibold">⛽ Fuel</h3>
-              </div>
-              <div class="p-3 space-y-2">
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Hydrogen</span>
-                  <span class="text-xs text-orange-400 font-medium">{{ fmt(stats.stats.fuel.hydrogen) }} L</span>
-                </div>
-                <div class="flex justify-between items-baseline">
-                  <span class="text-[10px] text-sv-muted">Quantum</span>
-                  <span class="text-xs text-purple-400 font-medium">{{ fmt(stats.stats.fuel.quantum) }} L</span>
-                </div>
-              </div>
-            </div>
-          </template>
-
-          <div v-else-if="!calculating" class="card p-6 text-center text-sv-muted text-xs">
-            Statistics will appear once the loadout is loaded
           </div>
+
+          <!-- Missiles -->
+          <div class="card overflow-hidden">
+            <div class="px-4 py-2 bg-orange-500/5 border-b border-sv-border/30">
+              <span class="text-[11px] font-bold text-orange-400 uppercase tracking-wider">🚀 Missiles</span>
+            </div>
+            <div class="p-3">
+              <div class="grid grid-cols-2 gap-2 text-center">
+                <div>
+                  <div class="text-[9px] text-sv-muted uppercase">Count</div>
+                  <div class="text-sm font-bold text-orange-400 font-mono">{{ loadout.stats.missiles.count }}</div>
+                </div>
+                <div>
+                  <div class="text-[9px] text-sv-muted uppercase">Total Damage</div>
+                  <div class="text-sm font-bold text-orange-300 font-mono">{{ fmt(loadout.stats.missiles.total_damage) }}</div>
+                </div>
+              </div>
+              <table v-if="loadout.stats.missiles.details?.length" class="w-full text-[10px] mt-2">
+                <thead>
+                  <tr class="text-sv-muted border-b border-sv-border/20">
+                    <th class="text-left py-1 font-medium">Name</th>
+                    <th class="text-center py-1 font-medium">S</th>
+                    <th class="text-right py-1 font-medium">Damage</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(m, i) in loadout.stats.missiles.details" :key="i"
+                    class="border-b border-sv-border/10 hover:bg-sv-panel-light/20">
+                    <td class="py-1 text-sv-text-bright truncate max-w-[120px]">{{ m.name }}</td>
+                    <td class="py-1 text-center text-sv-muted">{{ m.size }}</td>
+                    <td class="py-1 text-right text-orange-400 font-mono">{{ fmt(m.damage) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Hull & Armor -->
+          <div class="card overflow-hidden">
+            <div class="px-4 py-2 bg-emerald-500/5 border-b border-sv-border/30">
+              <span class="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">💚 Hull & Armor</span>
+            </div>
+            <div class="p-3 space-y-2">
+              <div class="grid grid-cols-2 gap-2 text-center">
+                <div>
+                  <div class="text-[9px] text-sv-muted uppercase">Hull HP</div>
+                  <div class="text-sm font-bold text-emerald-400 font-mono">{{ fmt(loadout.stats.hull.total_hp) }}</div>
+                </div>
+                <div>
+                  <div class="text-[9px] text-sv-muted uppercase">EHP</div>
+                  <div class="text-sm font-bold text-emerald-300 font-mono">{{ fmt(loadout.stats.hull.ehp) }}</div>
+                </div>
+              </div>
+              <div class="space-y-1.5 mt-2">
+                <div class="flex items-center justify-between text-[10px]">
+                  <span class="text-sv-muted">Physical</span>
+                  <div class="flex items-center gap-2">
+                    <div class="w-16 h-1.5 bg-sv-darker rounded-full overflow-hidden">
+                      <div class="h-full bg-emerald-500 rounded-full" :style="{ width: pct(1 - (loadout.stats.armor.physical || 0)) }"></div>
+                    </div>
+                    <span class="text-emerald-400 font-mono w-10 text-right">{{ pct(1 - (loadout.stats.armor.physical || 0)) }}</span>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between text-[10px]">
+                  <span class="text-sv-muted">Energy</span>
+                  <div class="flex items-center gap-2">
+                    <div class="w-16 h-1.5 bg-sv-darker rounded-full overflow-hidden">
+                      <div class="h-full bg-blue-500 rounded-full" :style="{ width: pct(1 - (loadout.stats.armor.energy || 0)) }"></div>
+                    </div>
+                    <span class="text-blue-400 font-mono w-10 text-right">{{ pct(1 - (loadout.stats.armor.energy || 0)) }}</span>
+                  </div>
+                </div>
+                <div class="flex items-center justify-between text-[10px]">
+                  <span class="text-sv-muted">Distortion</span>
+                  <div class="flex items-center gap-2">
+                    <div class="w-16 h-1.5 bg-sv-darker rounded-full overflow-hidden">
+                      <div class="h-full bg-purple-500 rounded-full" :style="{ width: pct(1 - (loadout.stats.armor.distortion || 0)) }"></div>
+                    </div>
+                    <span class="text-purple-400 font-mono w-10 text-right">{{ pct(1 - (loadout.stats.armor.distortion || 0)) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mobility -->
+          <div class="card overflow-hidden">
+            <div class="px-4 py-2 bg-sv-accent/5 border-b border-sv-border/30">
+              <span class="text-[11px] font-bold text-sv-accent uppercase tracking-wider">🏎️ Mobility</span>
+            </div>
+            <div class="p-3">
+              <div class="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px]">
+                <div class="flex justify-between">
+                  <span class="text-sv-muted">SCM</span>
+                  <span class="text-sv-text-bright font-mono">{{ fmt(loadout.stats.mobility.scm_speed) }} m/s</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-sv-muted">Max</span>
+                  <span class="text-sv-text-bright font-mono">{{ fmt(loadout.stats.mobility.max_speed) }} m/s</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-sv-muted">Boost Fwd</span>
+                  <span class="text-sv-text-bright font-mono">{{ fmt(loadout.stats.mobility.boost_forward) }} m/s</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-sv-muted">Boost Bwd</span>
+                  <span class="text-sv-text-bright font-mono">{{ fmt(loadout.stats.mobility.boost_backward) }} m/s</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-sv-muted">Pitch</span>
+                  <span class="text-sv-text-bright font-mono">{{ fmt(loadout.stats.mobility.pitch) }}°/s</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-sv-muted">Yaw</span>
+                  <span class="text-sv-text-bright font-mono">{{ fmt(loadout.stats.mobility.yaw) }}°/s</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-sv-muted">Roll</span>
+                  <span class="text-sv-text-bright font-mono">{{ fmt(loadout.stats.mobility.roll) }}°/s</span>
+                </div>
+                <div class="flex justify-between">
+                  <span class="text-sv-muted">Mass</span>
+                  <span class="text-sv-text-bright font-mono">{{ fmt(loadout.stats.mobility.mass) }} kg</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Quantum Drive -->
+          <div class="card overflow-hidden">
+            <div class="px-4 py-2 bg-purple-500/5 border-b border-sv-border/30">
+              <span class="text-[11px] font-bold text-purple-400 uppercase tracking-wider">💫 Quantum Drive</span>
+            </div>
+            <div class="p-3">
+              <div class="text-xs text-sv-text-bright font-medium mb-2">{{ loadout.stats.quantum.drive_name || '—' }}</div>
+              <div class="grid grid-cols-3 gap-2 text-center text-[10px]">
+                <div>
+                  <div class="text-sv-muted">Speed</div>
+                  <div class="text-purple-400 font-mono font-medium">{{ fmt(loadout.stats.quantum.speed) }} m/s</div>
+                </div>
+                <div>
+                  <div class="text-sv-muted">Spool</div>
+                  <div class="text-purple-300 font-mono font-medium">{{ loadout.stats.quantum.spool_time }}s</div>
+                </div>
+                <div>
+                  <div class="text-sv-muted">Fuel</div>
+                  <div class="text-purple-200 font-mono font-medium">{{ loadout.stats.quantum.fuel_capacity }}L</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Signatures -->
+          <div class="card overflow-hidden">
+            <div class="px-4 py-2 bg-emerald-500/5 border-b border-sv-border/30">
+              <span class="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">📡 Signatures</span>
+            </div>
+            <div class="p-3 space-y-1.5">
+              <div class="flex items-center justify-between text-[10px]">
+                <span class="text-sv-muted">IR (Infrared)</span>
+                <div class="flex items-center gap-2">
+                  <div class="w-20 h-1.5 bg-sv-darker rounded-full overflow-hidden">
+                    <div class="h-full bg-red-500 rounded-full" :style="{ width: Math.min(100, (loadout.stats.signatures.ir || 0) * 50) + '%' }"></div>
+                  </div>
+                  <span class="text-red-400 font-mono w-8 text-right">{{ loadout.stats.signatures.ir?.toFixed(2) || '—' }}</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between text-[10px]">
+                <span class="text-sv-muted">EM (Electromag.)</span>
+                <div class="flex items-center gap-2">
+                  <div class="w-20 h-1.5 bg-sv-darker rounded-full overflow-hidden">
+                    <div class="h-full bg-blue-500 rounded-full" :style="{ width: Math.min(100, (loadout.stats.signatures.em || 0) * 50) + '%' }"></div>
+                  </div>
+                  <span class="text-blue-400 font-mono w-8 text-right">{{ loadout.stats.signatures.em?.toFixed(2) || '—' }}</span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between text-[10px]">
+                <span class="text-sv-muted">CS (Cross-section)</span>
+                <div class="flex items-center gap-2">
+                  <div class="w-20 h-1.5 bg-sv-darker rounded-full overflow-hidden">
+                    <div class="h-full bg-amber-500 rounded-full" :style="{ width: Math.min(100, (loadout.stats.signatures.cs || 0) * 50) + '%' }"></div>
+                  </div>
+                  <span class="text-amber-400 font-mono w-8 text-right">{{ loadout.stats.signatures.cs?.toFixed(2) || '—' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Power & Thermal -->
+          <div class="card overflow-hidden">
+            <div class="px-4 py-2 bg-yellow-500/5 border-b border-sv-border/30">
+              <span class="text-[11px] font-bold text-yellow-400 uppercase tracking-wider">⚡ Power & Thermal</span>
+            </div>
+            <div class="p-3 space-y-2">
+              <div class="grid grid-cols-2 gap-3 text-center text-[10px]">
+                <div>
+                  <div class="text-sv-muted">Power Output</div>
+                  <div class="text-yellow-400 font-mono font-medium text-sm">{{ fmt(loadout.stats.power.total_output) }}</div>
+                </div>
+                <div>
+                  <div class="text-sv-muted">Power Draw</div>
+                  <div class="text-yellow-300 font-mono font-medium text-sm">{{ fmt(loadout.stats.power.total_draw) }}</div>
+                </div>
+              </div>
+              <div class="flex items-center justify-between text-[10px] px-1">
+                <span class="text-sv-muted">Balance</span>
+                <span class="font-mono font-medium" :class="loadout.stats.power.balance >= 0 ? 'text-emerald-400' : 'text-red-400'">
+                  {{ loadout.stats.power.balance >= 0 ? '+' : '' }}{{ fmt(loadout.stats.power.balance) }}
+                </span>
+              </div>
+              <div class="border-t border-sv-border/20 pt-2 mt-2 grid grid-cols-2 gap-3 text-center text-[10px]">
+                <div>
+                  <div class="text-sv-muted">Cooling Rate</div>
+                  <div class="text-cyan-400 font-mono font-medium text-sm">{{ fmt(loadout.stats.thermal.total_cooling_rate) }}</div>
+                </div>
+                <div>
+                  <div class="text-sv-muted">Heat Gen.</div>
+                  <div class="text-cyan-300 font-mono font-medium text-sm">{{ fmt(loadout.stats.thermal.total_heat_generation) }}</div>
+                </div>
+              </div>
+              <div class="flex items-center justify-between text-[10px] px-1">
+                <span class="text-sv-muted">Thermal Balance</span>
+                <span class="font-mono font-medium" :class="loadout.stats.thermal.balance >= 0 ? 'text-emerald-400' : 'text-red-400'">
+                  {{ loadout.stats.thermal.balance >= 0 ? '+' : '' }}{{ fmt(loadout.stats.thermal.balance) }}
+                </span>
+              </div>
+              <!-- Power plant details -->
+              <table v-if="loadout.stats.power.details?.length" class="w-full text-[10px] mt-1">
+                <thead>
+                  <tr class="text-sv-muted border-b border-sv-border/20">
+                    <th class="text-left py-1 font-medium">Power Plant</th>
+                    <th class="text-right py-1 font-medium">Output</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(p, i) in loadout.stats.power.details" :key="i"
+                    class="border-b border-sv-border/10">
+                    <td class="py-1 text-sv-text-bright truncate">{{ p.name }}</td>
+                    <td class="py-1 text-right text-yellow-400 font-mono">{{ fmt(p.output) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <!-- Cooler details -->
+              <table v-if="loadout.stats.thermal.details?.length" class="w-full text-[10px] mt-1">
+                <thead>
+                  <tr class="text-sv-muted border-b border-sv-border/20">
+                    <th class="text-left py-1 font-medium">Cooler</th>
+                    <th class="text-right py-1 font-medium">Rate</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(c, i) in loadout.stats.thermal.details" :key="i"
+                    class="border-b border-sv-border/10">
+                    <td class="py-1 text-sv-text-bright truncate">{{ c.name }}</td>
+                    <td class="py-1 text-right text-cyan-400 font-mono">{{ fmt(c.cooling_rate) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Fuel -->
+          <div class="card overflow-hidden">
+            <div class="px-4 py-2 bg-amber-500/5 border-b border-sv-border/30">
+              <span class="text-[11px] font-bold text-amber-400 uppercase tracking-wider">⛽ Fuel</span>
+            </div>
+            <div class="p-3">
+              <div class="grid grid-cols-2 gap-3 text-center text-[10px]">
+                <div>
+                  <div class="text-sv-muted">Hydrogen</div>
+                  <div class="text-amber-400 font-mono font-medium text-sm">{{ loadout.stats.fuel.hydrogen }}L</div>
+                </div>
+                <div>
+                  <div class="text-sv-muted">Quantum</div>
+                  <div class="text-amber-300 font-mono font-medium text-sm">{{ loadout.stats.fuel.quantum }}L</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
-      <!-- Empty state -->
-      <div v-else class="card p-12 text-center">
-        <div class="text-4xl mb-3 opacity-40">🎯</div>
-        <h2 class="text-sv-text-bright font-semibold mb-1">Loadout Manager</h2>
-        <p class="text-sv-muted text-sm">Select a ship to manage its loadout,<br/>compare components and analyze statistics.</p>
+      <!-- ═══ Empty State ═══ -->
+      <div v-else class="card p-16 text-center">
+        <div class="text-5xl mb-4 opacity-30">🎯</div>
+        <h2 class="text-sv-text-bright font-semibold text-lg mb-2">Loadout Manager</h2>
+        <p class="text-sv-muted text-sm max-w-md mx-auto">
+          Select a ship above to view and modify its loadout.<br/>
+          Swap components and see real-time stat updates.
+        </p>
       </div>
     </LoadingState>
+
+    <!-- ═══ Component Swap Modal ═══ -->
+    <Teleport to="body">
+      <div v-if="swapTarget" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="cancelSwap">
+        <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div class="relative bg-sv-panel border border-sv-border rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+          <!-- Modal header -->
+          <div class="flex items-center justify-between p-4 border-b border-sv-border/40">
+            <div>
+              <h3 class="text-sm font-bold text-sv-text-bright">Swap Component</h3>
+              <div class="text-[10px] text-sv-muted mt-0.5">
+                Port: {{ portLabel(swapTarget) }}
+                <span v-if="swapTargetType" class="ml-1 text-sv-accent">({{ swapTargetType }})</span>
+              </div>
+            </div>
+            <button @click="cancelSwap" class="p-1 rounded hover:bg-sv-border/30 text-sv-muted hover:text-sv-text transition">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <!-- Search -->
+          <div class="p-4 border-b border-sv-border/20">
+            <input v-model="swapQuery" @input="searchSwapComponents(swapQuery)"
+              class="input w-full" placeholder="Search components…" autofocus />
+          </div>
+          <!-- Results -->
+          <div class="flex-1 overflow-y-auto">
+            <div v-if="swapLoading" class="p-8 text-center text-sv-muted text-sm">Searching…</div>
+            <div v-else-if="swapResults.length" class="divide-y divide-sv-border/20">
+              <div v-for="c in swapResults" :key="c.uuid" @click="applySwap(c)"
+                class="px-4 py-3 hover:bg-sv-accent/5 cursor-pointer transition-colors flex items-center justify-between">
+                <div>
+                  <div class="text-xs text-sv-text-bright font-medium">{{ c.name }}</div>
+                  <div class="text-[10px] text-sv-muted flex gap-2 mt-0.5">
+                    <span>S{{ c.size }}</span>
+                    <span v-if="c.grade">Grade {{ c.grade }}</span>
+                    <span>{{ c.manufacturer_code }}</span>
+                  </div>
+                </div>
+                <div class="text-[10px] font-mono text-sv-muted text-right">
+                  <template v-if="c.weapon_dps"><span class="text-red-400">{{ fmt(c.weapon_dps) }} DPS</span></template>
+                  <template v-if="c.shield_hp"><span class="text-blue-400">{{ fmt(c.shield_hp) }} HP</span></template>
+                  <template v-if="c.power_output"><span class="text-yellow-400">{{ fmt(c.power_output) }} pwr</span></template>
+                  <template v-if="c.cooling_rate"><span class="text-cyan-400">{{ fmt(c.cooling_rate) }} cool</span></template>
+                  <template v-if="c.qd_speed"><span class="text-purple-400">{{ fmt(c.qd_speed) }} m/s</span></template>
+                </div>
+              </div>
+            </div>
+            <div v-else-if="swapQuery.length >= 2" class="p-8 text-center text-sv-muted text-sm">No components found</div>
+            <div v-else class="p-8 text-center text-sv-muted text-sm">Type at least 2 characters</div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
   </div>
 </template>

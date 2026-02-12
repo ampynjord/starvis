@@ -1561,40 +1561,116 @@ export class GameDataService {
     let totalCoolingRate = 0;
     let totalMissileDamage = 0;
     let weaponCount = 0;
+    let shieldCount = 0;
     let missileCount = 0;
     let qdSpeed = 0;
     let qdSpoolTime = 0;
     let qdName = '';
+
+    // Per-component detail lists (Erkul/SPViewer style)
+    const weaponDetails: any[] = [];
+    const shieldDetails: any[] = [];
+    const missileDetails: any[] = [];
+    const powerPlants: any[] = [];
+    const coolers: any[] = [];
 
     for (const l of loadout) {
       if (!l.component_uuid) continue;
       const type = l.port_type || l.type || '';
 
       if (type === 'WeaponGun' || l.type === 'WeaponGun') {
-        totalDps += parseFloat(l.weapon_dps) || 0;
-        totalBurstDps += parseFloat(l.weapon_burst_dps) || 0;
-        totalSustainedDps += parseFloat(l.weapon_sustained_dps) || 0;
+        const dps = parseFloat(l.weapon_dps) || 0;
+        const burstDps = parseFloat(l.weapon_burst_dps) || 0;
+        const sustainedDps = parseFloat(l.weapon_sustained_dps) || 0;
+        totalDps += dps;
+        totalBurstDps += burstDps;
+        totalSustainedDps += sustainedDps;
         weaponCount++;
+        weaponDetails.push({
+          port_name: l.port_name,
+          name: l.name || '—',
+          size: parseInt(l.size) || 0,
+          grade: l.grade || '—',
+          manufacturer: l.manufacturer_code || '',
+          dps: Math.round(dps * 100) / 100,
+          alpha: Math.round((parseFloat(l.weapon_damage) || 0) * 100) / 100,
+          fire_rate: Math.round((parseFloat(l.weapon_fire_rate) || 0) * 100) / 100,
+          range: Math.round(parseFloat(l.weapon_range) || 0),
+          dmg_physical: Math.round((parseFloat(l.weapon_damage_physical) || 0) * 100) / 100,
+          dmg_energy: Math.round((parseFloat(l.weapon_damage_energy) || 0) * 100) / 100,
+          dmg_distortion: Math.round((parseFloat(l.weapon_damage_distortion) || 0) * 100) / 100,
+        });
       }
       if (type === 'Shield' || l.type === 'Shield') {
-        totalShieldHp += parseFloat(l.shield_hp) || 0;
-        totalShieldRegen += parseFloat(l.shield_regen) || 0;
+        const hp = parseFloat(l.shield_hp) || 0;
+        const regen = parseFloat(l.shield_regen) || 0;
+        totalShieldHp += hp;
+        totalShieldRegen += regen;
+        shieldCount++;
+        shieldDetails.push({
+          port_name: l.port_name,
+          name: l.name || '—',
+          size: parseInt(l.size) || 0,
+          grade: l.grade || '—',
+          manufacturer: l.manufacturer_code || '',
+          hp: Math.round(hp * 100) / 100,
+          regen: Math.round(regen * 100) / 100,
+          time_to_charge: regen > 0 ? Math.round((hp / regen) * 10) / 10 : 0,
+        });
       }
       if (l.type === 'Missile' || l.type === 'WeaponMissile') {
-        totalMissileDamage += parseFloat(l.missile_damage) || 0;
+        const dmg = parseFloat(l.missile_damage) || 0;
+        totalMissileDamage += dmg;
         missileCount++;
+        missileDetails.push({
+          port_name: l.port_name,
+          name: l.name || '—',
+          size: parseInt(l.size) || 0,
+          damage: Math.round(dmg * 100) / 100,
+          lock_signal: l.missile_lock_signal || '',
+        });
       }
       if (l.type === 'QuantumDrive') {
         qdSpeed = parseFloat(l.qd_speed) || 0;
         qdSpoolTime = parseFloat(l.qd_spool_time) || 0;
         qdName = l.name || '';
       }
+      if (l.type === 'PowerPlant') {
+        const output = parseFloat(l.power_output) || 0;
+        totalPowerOutput += output;
+        powerPlants.push({
+          port_name: l.port_name,
+          name: l.name || '—',
+          size: parseInt(l.size) || 0,
+          grade: l.grade || '—',
+          manufacturer: l.manufacturer_code || '',
+          output: Math.round(output * 100) / 100,
+        });
+      }
+      if (l.type === 'Cooler') {
+        const rate = parseFloat(l.cooling_rate) || 0;
+        totalCoolingRate += rate;
+        coolers.push({
+          port_name: l.port_name,
+          name: l.name || '—',
+          size: parseInt(l.size) || 0,
+          grade: l.grade || '—',
+          manufacturer: l.manufacturer_code || '',
+          cooling_rate: Math.round(rate * 100) / 100,
+        });
+      }
 
       totalPowerDraw += parseFloat(l.power_draw) || 0;
-      if (l.type === 'PowerPlant') totalPowerOutput += parseFloat(l.power_output) || 0;
       totalHeatGeneration += parseFloat(l.heat_generation) || 0;
-      if (l.type === 'Cooler') totalCoolingRate += parseFloat(l.cooling_rate) || 0;
     }
+
+    // Calculate EHP (Effective HP considering armor damage multipliers)
+    const hullHp = parseFloat(ship.total_hp) || 0;
+    const armorPhys = parseFloat(ship.armor_physical) || 1;
+    const armorEnergy = parseFloat(ship.armor_energy) || 1;
+    // Average armor factor for EHP (weighted physical/energy)
+    const avgArmor = (armorPhys + armorEnergy) / 2;
+    const ehp = avgArmor > 0 ? Math.round((totalShieldHp + hullHp / avgArmor) * 100) / 100 : totalShieldHp + hullHp;
 
     return {
       ship: { uuid: ship.uuid, name: ship.name, class_name: ship.class_name },
@@ -1605,24 +1681,31 @@ export class GameDataService {
           total_dps: Math.round(totalDps * 100) / 100,
           total_burst_dps: Math.round(totalBurstDps * 100) / 100,
           total_sustained_dps: Math.round(totalSustainedDps * 100) / 100,
+          details: weaponDetails,
         },
         shields: {
+          count: shieldCount,
           total_hp: Math.round(totalShieldHp * 100) / 100,
           total_regen: Math.round(totalShieldRegen * 100) / 100,
+          time_to_charge: totalShieldRegen > 0 ? Math.round((totalShieldHp / totalShieldRegen) * 10) / 10 : 0,
+          details: shieldDetails,
         },
         missiles: {
           count: missileCount,
           total_damage: Math.round(totalMissileDamage * 100) / 100,
+          details: missileDetails,
         },
         power: {
           total_draw: Math.round(totalPowerDraw * 100) / 100,
           total_output: Math.round(totalPowerOutput * 100) / 100,
           balance: Math.round((totalPowerOutput - totalPowerDraw) * 100) / 100,
+          details: powerPlants,
         },
         thermal: {
           total_heat_generation: Math.round(totalHeatGeneration * 100) / 100,
           total_cooling_rate: Math.round(totalCoolingRate * 100) / 100,
           balance: Math.round((totalCoolingRate - totalHeatGeneration) * 100) / 100,
+          details: coolers,
         },
         quantum: {
           drive_name: qdName,
@@ -1656,7 +1739,8 @@ export class GameDataService {
           quantum: parseFloat(ship.quantum_fuel_capacity) || 0,
         },
         hull: {
-          total_hp: parseFloat(ship.total_hp) || 0,
+          total_hp: hullHp,
+          ehp,
           cross_section_x: parseFloat(ship.cross_section_x) || 0,
           cross_section_y: parseFloat(ship.cross_section_y) || 0,
           cross_section_z: parseFloat(ship.cross_section_z) || 0,
@@ -1668,6 +1752,17 @@ export class GameDataService {
         component_uuid: l.component_uuid,
         component_name: l.name,
         component_type: l.type,
+        component_size: parseInt(l.size) || null,
+        grade: l.grade || null,
+        manufacturer_code: l.manufacturer_code || null,
+        // Type-specific stats inline
+        weapon_dps: l.type === 'WeaponGun' ? (parseFloat(l.weapon_dps) || null) : undefined,
+        weapon_range: l.type === 'WeaponGun' ? (parseFloat(l.weapon_range) || null) : undefined,
+        shield_hp: l.type === 'Shield' ? (parseFloat(l.shield_hp) || null) : undefined,
+        shield_regen: l.type === 'Shield' ? (parseFloat(l.shield_regen) || null) : undefined,
+        power_output: l.type === 'PowerPlant' ? (parseFloat(l.power_output) || null) : undefined,
+        cooling_rate: l.type === 'Cooler' ? (parseFloat(l.cooling_rate) || null) : undefined,
+        qd_speed: l.type === 'QuantumDrive' ? (parseFloat(l.qd_speed) || null) : undefined,
         swapped: !!l._swapped,
       })),
     };
