@@ -61,6 +61,11 @@ const router = createRouter({
       name: 'changelog',
       component: () => import('@/views/ChangelogView.vue'),
     },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      redirect: '/',
+    },
   ],
 })
 

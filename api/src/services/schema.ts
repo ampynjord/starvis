@@ -57,4 +57,30 @@ export async function initializeSchema(conn: PoolConnection): Promise<void> {
   }
 
   logger.info('Schema initialized', { module: 'schema' });
+
+  // Migration: add weapon_damage_total column if missing
+  try {
+    const [cols] = await conn.execute<any[]>(
+      "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ships' AND COLUMN_NAME = 'weapon_damage_total'"
+    );
+    if (cols.length === 0) {
+      logger.info('Adding weapon_damage_total column to ships', { module: 'schema' });
+      await conn.execute("ALTER TABLE ships ADD COLUMN weapon_damage_total DECIMAL(10,2) COMMENT 'Sum of all default weapon DPS (WeaponGun)' AFTER missile_damage_total");
+    }
+  } catch (e: any) {
+    logger.debug(`Migration weapon_damage_total skip: ${e.message}`, { module: 'schema' });
+  }
+
+  // Migration: add variant_type column if missing
+  try {
+    const [cols2] = await conn.execute<any[]>(
+      "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ships' AND COLUMN_NAME = 'variant_type'"
+    );
+    if (cols2.length === 0) {
+      logger.info('Adding variant_type column to ships', { module: 'schema' });
+      await conn.execute("ALTER TABLE ships ADD COLUMN variant_type VARCHAR(20) COMMENT 'Non-playable variant tag' AFTER weapon_damage_total");
+    }
+  } catch (e: any) {
+    logger.debug(`Migration variant_type skip: ${e.message}`, { module: 'schema' });
+  }
 }

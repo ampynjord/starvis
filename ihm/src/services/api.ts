@@ -53,6 +53,7 @@ export interface Ship {
   crew_size: number
   shield_hp: number
   missile_damage_total: number
+  weapon_damage_total: number
   armor_physical: number
   armor_energy: number
   armor_distortion: number

@@ -80,7 +80,7 @@ export class GameDataService {
       // 1b. Snapshot current data BEFORE cleaning — for changelog comparison
       onProgress?.("Snapshotting current data for changelog…");
       const [oldShipsRaw] = await conn.execute<any[]>(
-        "SELECT uuid, class_name, name, manufacturer_code, role, career, mass, scm_speed, max_speed, total_hp, shield_hp, cargo_capacity, missile_damage_total, crew_size FROM ships"
+        "SELECT uuid, class_name, name, manufacturer_code, role, career, mass, scm_speed, max_speed, total_hp, shield_hp, cargo_capacity, missile_damage_total, weapon_damage_total, crew_size FROM ships"
       );
       const [oldCompsRaw] = await conn.execute<any[]>(
         "SELECT uuid, class_name, name, type, sub_type, size, grade, manufacturer_code FROM components"
@@ -119,6 +119,12 @@ export class GameDataService {
       // 6. Cross-reference with ship_matrix
       onProgress?.("Cross-referencing with Ship Matrix…");
       stats.shipMatrixLinked = await this.crossReferenceShipMatrix(conn);
+
+      // 6a. Tag variant types for non-SM ships
+      await this.tagVariantTypes(conn);
+
+      // 6b. Hull series SCU fallback from Ship Matrix
+      await this.applyHullSeriesCargoFallback(conn);
 
       // 6. Log extraction to extraction_log
       stats.durationMs = Date.now() - startTime;
@@ -317,7 +323,19 @@ export class GameDataService {
 
         // Determine manufacturer code from className prefix
         const mfgMatch = veh.className.match(/^([A-Z]{3,5})_/);
-        const mfgCode = mfgMatch?.[1] || null;
+        let mfgCode = mfgMatch?.[1] || null;
+
+        // Override: Esperia-manufactured Vanduul replicas (Glaive, Blade, Stinger)
+        // Only Scythe remains a true Vanduul ship (VNCL)
+        const ESPERIA_OVERRIDES: Record<string, string> = {
+          'VNCL_Glaive': 'ESPR',
+          'VNCL_Blade': 'ESPR',
+          'VNCL_Blade_Swarm': 'ESPR',
+          'VNCL_Stinger': 'ESPR',
+        };
+        if (ESPERIA_OVERRIDES[veh.className]) {
+          mfgCode = ESPERIA_OVERRIDES[veh.className];
+        }
 
         await conn.execute(
           `INSERT INTO ships (
@@ -428,6 +446,9 @@ export class GameDataService {
 
           // Calculate missile_damage_total from loadout components
           await this.computeAndStoreMissileDamage(conn, fullData.ref);
+
+          // Calculate weapon_damage_total from loadout components
+          await this.computeAndStoreWeaponDamage(conn, fullData.ref);
         }
 
         // Detect & save modules (ports named *module* that reference other vehicle entities)
@@ -521,6 +542,25 @@ export class GameDataService {
       );
       const total = parseFloat(rows[0]?.total) || 0;
       await conn.execute("UPDATE ships SET missile_damage_total = ? WHERE uuid = ?", [total > 0 ? total : null, shipUuid]);
+    } catch {
+      // Non-critical — skip silently
+    }
+  }
+
+  /**
+   * After saving loadout, compute total weapon DPS from joined components and store it on the ship row.
+   */
+  private async computeAndStoreWeaponDamage(conn: PoolConnection, shipUuid: string): Promise<void> {
+    try {
+      const [rows] = await conn.execute<any[]>(
+        `SELECT COALESCE(SUM(c.weapon_dps), 0) as total_dps
+         FROM ships_loadouts sl
+         JOIN components c ON sl.component_uuid = c.uuid
+         WHERE sl.ship_uuid = ? AND c.type = 'WeaponGun'`,
+        [shipUuid],
+      );
+      const totalDps = parseFloat(rows[0]?.total_dps) || 0;
+      await conn.execute("UPDATE ships SET weapon_damage_total = ? WHERE uuid = ?", [totalDps > 0 ? totalDps : null, shipUuid]);
     } catch {
       // Non-critical — skip silently
     }
@@ -678,6 +718,7 @@ export class GameDataService {
     // MISC
     "Reliant Kore": "Reliant",
     "Expanse": "Starlancer Max",
+    "Fury MX": "Fury Miru",
     // Origin
     "890 Jump": "890Jump",
     "600i Explorer": "600i",
@@ -709,7 +750,8 @@ export class GameDataService {
     "Nox": "Nox",
     "Nox Kue": "Nox Kue",
     "Khartu-Al": "Scout",
-    "San'tok.y\u0101i": "Scout",
+    "San'tok.yāi": "SanTokYai",
+    "San'tok.y?i": "SanTokYai",
     // ARGO CSV
     "CSV-SM": "CSV Cargo",
     // Zeus
@@ -845,6 +887,59 @@ export class GameDataService {
     return results.length;
   }
 
+  /**
+   * Hull A/B/C/D/E have external cargo plates that DataForge doesn't parse as standard cargo.
+   * Fall back to Ship Matrix cargocapacity when our extracted value is 0 or null.
+   */
+  private async applyHullSeriesCargoFallback(conn: PoolConnection): Promise<void> {
+    try {
+      const [updated]: any = await conn.execute(
+        `UPDATE ships s
+         JOIN ship_matrix sm ON s.ship_matrix_id = sm.id
+         SET s.cargo_capacity = sm.cargocapacity
+         WHERE (s.cargo_capacity IS NULL OR s.cargo_capacity = 0)
+           AND sm.cargocapacity IS NOT NULL AND sm.cargocapacity > 0
+           AND s.class_name LIKE '%Hull_%'`
+      );
+      if (updated.affectedRows > 0) {
+        logger.info(`[GameData] Hull series cargo fallback applied to ${updated.affectedRows} ships`, { module: 'extract' });
+      }
+    } catch (e: any) {
+      logger.warn(`[GameData] Hull cargo fallback failed: ${e.message}`);
+    }
+  }
+
+  /**
+   * Tag ships not linked to Ship Matrix with a variant_type based on class_name patterns.
+   * Categories: exec, collector, bis_edition, tutorial, enemy_ai, military, event, pirate, arena_ai, special
+   */
+  private async tagVariantTypes(conn: PoolConnection): Promise<void> {
+    const rules: Array<{ type: string; patterns: string[] }> = [
+      { type: 'collector', patterns: ['%_Collector_%', '%_Collector'] },
+      { type: 'exec', patterns: ['%_Exec_%', '%_Exec'] },
+      { type: 'bis_edition', patterns: ['%_BIS%'] },
+      { type: 'tutorial', patterns: ['%_Teach%', '%Tutorial%'] },
+      { type: 'enemy_ai', patterns: ['%_EA_%', '%_EA'] },
+      { type: 'military', patterns: ['%_Military%', '%_UEE%', '%_Advocacy%'] },
+      { type: 'event', patterns: ['%Fleetweek%', '%_FW%', '%CitizenCon%', '%ShipShowdown%', '%Showdown%'] },
+      { type: 'pirate', patterns: ['%_PIR%', '%Pirate%'] },
+      { type: 'arena_ai', patterns: ['%_Swarm%'] },
+    ];
+
+    for (const rule of rules) {
+      const conditions = rule.patterns.map(() => 'class_name LIKE ?').join(' OR ');
+      await conn.execute(
+        `UPDATE ships SET variant_type = ? WHERE ship_matrix_id IS NULL AND variant_type IS NULL AND (${conditions})`,
+        [rule.type, ...rule.patterns]
+      );
+    }
+
+    // Tag remaining unmatched as 'special'
+    await conn.execute(
+      "UPDATE ships SET variant_type = 'special' WHERE ship_matrix_id IS NULL AND variant_type IS NULL"
+    );
+  }
+
   // ======================================================
   //  CHANGELOG GENERATION — compare old vs new data
   // ======================================================
@@ -857,7 +952,7 @@ export class GameDataService {
   ): Promise<void> {
     // Get new ships and components from the freshly written DB
     const [newShipsRaw] = await conn.execute<any[]>(
-      "SELECT uuid, class_name, name, manufacturer_code, role, career, mass, scm_speed, max_speed, total_hp, shield_hp, cargo_capacity, missile_damage_total, crew_size FROM ships"
+      "SELECT uuid, class_name, name, manufacturer_code, role, career, mass, scm_speed, max_speed, total_hp, shield_hp, cargo_capacity, missile_damage_total, weapon_damage_total, crew_size FROM ships"
     );
     const [newCompsRaw] = await conn.execute<any[]>(
       "SELECT uuid, class_name, name, type, sub_type, size, grade, manufacturer_code FROM components"
@@ -881,7 +976,7 @@ export class GameDataService {
       }
     }
     // Modified ships — compare key numeric fields
-    const shipFields = ['mass', 'scm_speed', 'max_speed', 'total_hp', 'shield_hp', 'cargo_capacity', 'missile_damage_total', 'crew_size', 'role', 'career', 'name'];
+    const shipFields = ['mass', 'scm_speed', 'max_speed', 'total_hp', 'shield_hp', 'cargo_capacity', 'missile_damage_total', 'weapon_damage_total', 'crew_size', 'role', 'career', 'name'];
     for (const [cn, newShip] of newShips) {
       const oldShip = oldShips.get(cn);
       if (!oldShip) continue;
@@ -994,20 +1089,107 @@ export class GameDataService {
       countParams.push(`%${filters.search}%`, `%${filters.search}%`);
     }
 
+    // By default, hide non-playable variant ships (tutorial, enemy AI, arena AI, etc.)
+    // unless explicitly searching or filtering by variant type
+    if (!filters?.search && !(filters as any)?.include_variants) {
+      const hiddenVariants = ['tutorial', 'enemy_ai', 'arena_ai', 'military'];
+      const placeholders = hiddenVariants.map(() => '?').join(',');
+      sql += ` AND (s.variant_type IS NULL OR s.variant_type NOT IN (${placeholders}))`;
+      countSql += ` AND (s.variant_type IS NULL OR s.variant_type NOT IN (${placeholders}))`;
+      params.push(...hiddenVariants);
+      countParams.push(...hiddenVariants);
+    }
+
     const sortCol = this.validateSortColumn(filters?.sort || "name");
     const order = filters?.order?.toUpperCase() === "DESC" ? "DESC" : "ASC";
     sql += ` ORDER BY s.${sortCol} ${order}`;
 
+    // ── Should we include Ship Matrix-only ships (in-concept, no game data)? ──
+    const includeSmOnly = !filters?.status || filters.status === 'in-concept';
+    // Exclude SM-only if filtering by a game-data-only field
+    const gameOnlyFilters = filters?.role || filters?.career || (filters?.status && filters.status !== 'in-concept');
+
+    // ── Count: add SM-only ships to total if applicable ──
+    let smOnlyCount = 0;
+    if (includeSmOnly && !gameOnlyFilters) {
+      let smCountSql = `SELECT COUNT(*) as total FROM ship_matrix sm2
+        WHERE sm2.id NOT IN (SELECT ship_matrix_id FROM ships WHERE ship_matrix_id IS NOT NULL)`;
+      const smCountParams: any[] = [];
+      if (filters?.manufacturer) {
+        smCountSql += " AND sm2.manufacturer_code = ?";
+        smCountParams.push(filters.manufacturer.toUpperCase());
+      }
+      if (filters?.search) {
+        smCountSql += " AND sm2.name LIKE ?";
+        smCountParams.push(`%${filters.search}%`);
+      }
+      const [smCountRows] = await this.pool.execute(smCountSql, smCountParams);
+      smOnlyCount = (smCountRows as any[])[0]?.total || 0;
+    }
+
     // Pagination — inline LIMIT/OFFSET (prepared stmt driver limitation)
     const page = Math.max(1, filters?.page || 1);
     const limit = Math.min(200, Math.max(1, filters?.limit || 50));
+
+    const [countRows] = await this.pool.execute(countSql, countParams);
+    const gameTotal = (countRows as any[])[0]?.total || 0;
+    const total = gameTotal + smOnlyCount;
+
     const offset = (page - 1) * limit;
     sql += ` LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
 
-    const [countRows] = await this.pool.execute(countSql, countParams);
-    const total = (countRows as any[])[0]?.total || 0;
     const [rows] = await this.pool.execute(sql, params);
-    return { data: rows as any[], total, page, limit, pages: Math.ceil(total / limit) };
+    let data = rows as any[];
+
+    // ── Append SM-only ships if there's room on this page ──
+    if (includeSmOnly && !gameOnlyFilters && smOnlyCount > 0) {
+      const gameOnPage = data.length;
+      const remainingSlots = limit - gameOnPage;
+      const smOffset = Math.max(0, offset - gameTotal);
+
+      if (remainingSlots > 0 && offset + gameOnPage >= gameTotal) {
+        let smSql = `SELECT
+          CONCAT('sm-', sm2.id) as uuid,
+          CONCAT('SM_', REPLACE(sm2.name, ' ', '_')) as class_name,
+          sm2.name as name,
+          sm2.manufacturer_code,
+          m2.name as manufacturer_name,
+          NULL as role, NULL as career,
+          NULL as mass, NULL as total_hp,
+          NULL as scm_speed, NULL as max_speed,
+          NULL as boost_speed_forward, NULL as boost_speed_backward,
+          NULL as pitch_max, NULL as yaw_max, NULL as roll_max,
+          NULL as hydrogen_fuel_capacity, NULL as quantum_fuel_capacity,
+          NULL as cargo_capacity, NULL as crew_size,
+          NULL as shield_hp, NULL as missile_damage_total, NULL as weapon_damage_total,
+          NULL as armor_physical, NULL as armor_energy, NULL as armor_distortion,
+          NULL as cross_section_x, NULL as cross_section_y, NULL as cross_section_z,
+          sm2.id as ship_matrix_id,
+          sm2.media_store_small as thumbnail,
+          sm2.media_store_large as thumbnail_large,
+          sm2.production_status,
+          sm2.description as sm_description,
+          sm2.url as store_url,
+          1 as is_concept_only
+        FROM ship_matrix sm2
+        LEFT JOIN manufacturers m2 ON sm2.manufacturer_code = m2.code
+        WHERE sm2.id NOT IN (SELECT ship_matrix_id FROM ships WHERE ship_matrix_id IS NOT NULL)`;
+        const smParams: any[] = [];
+        if (filters?.manufacturer) {
+          smSql += " AND sm2.manufacturer_code = ?";
+          smParams.push(filters.manufacturer.toUpperCase());
+        }
+        if (filters?.search) {
+          smSql += " AND sm2.name LIKE ?";
+          smParams.push(`%${filters.search}%`);
+        }
+        smSql += ` ORDER BY sm2.name ASC LIMIT ${Number(remainingSlots)} OFFSET ${Number(smOffset)}`;
+        const [smRows] = await this.pool.execute(smSql, smParams);
+        data = [...data, ...(smRows as any[])];
+      }
+    }
+
+    return { data, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
   async getShipByUuid(uuid: string): Promise<any | null> {
@@ -1092,7 +1274,13 @@ export class GameDataService {
   }
 
   async getAllManufacturers(): Promise<any[]> {
-    const [rows] = await this.pool.execute("SELECT * FROM manufacturers ORDER BY code");
+    const [rows] = await this.pool.execute(
+      `SELECT m.*,
+              (SELECT COUNT(*) FROM ships s WHERE s.manufacturer_code = m.code) as ship_count,
+              (SELECT COUNT(*) FROM components c WHERE c.manufacturer_code = m.code) as component_count
+       FROM manufacturers m
+       ORDER BY m.name`
+    );
     return rows as any[];
   }
 
@@ -1252,7 +1440,7 @@ export class GameDataService {
   /**
    * Get all shops (paginated)
    */
-  async getShops(opts: { page?: number; limit?: number; location?: string; type?: string }): Promise<{ data: any[]; total: number; page: number; limit: number }> {
+  async getShops(opts: { page?: number; limit?: number; location?: string; type?: string; search?: string }): Promise<{ data: any[]; total: number; page: number; limit: number }> {
     const page = Math.max(1, opts.page || 1);
     const limit = Math.min(100, Math.max(1, opts.limit || 20));
     const offset = (page - 1) * limit;
@@ -1260,6 +1448,10 @@ export class GameDataService {
     let where = "1=1";
     const params: any[] = [];
 
+    if (opts.search) {
+      where += " AND (name LIKE ? OR location LIKE ? OR parent_location LIKE ?)";
+      params.push(`%${opts.search}%`, `%${opts.search}%`, `%${opts.search}%`);
+    }
     if (opts.location) {
       where += " AND (location LIKE ? OR parent_location LIKE ?)";
       params.push(`%${opts.location}%`, `%${opts.location}%`);
@@ -1385,7 +1577,7 @@ export class GameDataService {
         totalShieldHp += parseFloat(l.shield_hp) || 0;
         totalShieldRegen += parseFloat(l.shield_regen) || 0;
       }
-      if (l.type === 'Missile') {
+      if (l.type === 'Missile' || l.type === 'WeaponMissile') {
         totalMissileDamage += parseFloat(l.missile_damage) || 0;
         missileCount++;
       }
@@ -1443,7 +1635,7 @@ export class GameDataService {
   private validateSortColumn(col: string): string {
     const allowed = [
       "name", "class_name", "manufacturer_code", "mass", "scm_speed", "max_speed",
-      "total_hp", "shield_hp", "crew_size", "cargo_capacity", "missile_damage_total",
+      "total_hp", "shield_hp", "crew_size", "cargo_capacity", "missile_damage_total", "weapon_damage_total",
       "armor_physical", "armor_energy", "armor_distortion",
       "cross_section_x", "cross_section_y", "cross_section_z",
       "hydrogen_fuel_capacity", "quantum_fuel_capacity",

@@ -781,7 +781,7 @@ export class DataForgeService {
   /** Known manufacturer prefixes for ships/vehicles (all legit vehicles start with one of these) */
   private static readonly KNOWN_VEHICLE_PREFIXES = new Set([
     'AEGS', 'ANVL', 'ARGO', 'BANU', 'CNOU', 'CRUS', 'DRAK', 'ESPR',
-    'GAMA', 'GRIN', 'KRIG', 'MISC', 'MRAI', 'ORIG', 'RSI', 'TMBL',
+    'GAMA', 'GLSN', 'GREY', 'GRIN', 'KRIG', 'MISC', 'MRAI', 'ORIG', 'RSI', 'TMBL',
     'VNCL', 'XIAN', 'XNAA',
   ]);
 

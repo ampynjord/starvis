@@ -62,7 +62,7 @@ watch(page, fetchShips)
 
 function fmt(v: any) {
   if (v == null) return '—'
-  if (typeof v === 'number') return v.toLocaleString('fr-FR')
+  if (typeof v === 'number') return v.toLocaleString('en-US')
   return v
 }
 
@@ -81,47 +81,48 @@ function statusLabel(ship: Ship) {
   if (ps === 'in-concept') return 'In Concept'
   if (ps === 'in-production') return 'In Production'
   if (!ship.ship_matrix_id) return 'In-Game'
-  return ps || 'Inconnu'
+  return ps || 'Unknown'
 }
 </script>
 
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <h1 class="section-title">Vaisseaux</h1>
-      <span class="text-sv-muted text-xs">{{ total.toLocaleString('fr-FR') }} résultats</span>
+      <h1 class="section-title">Ships</h1>
+      <span class="text-sv-muted text-xs">{{ total.toLocaleString('en-US') }} results</span>
     </div>
 
     <!-- Filters -->
     <div class="card p-3 flex flex-wrap gap-2">
-      <input v-model="search" class="input flex-1 min-w-[180px]" placeholder="Rechercher un vaisseau…" />
+      <input v-model="search" class="input flex-1 min-w-[180px]" placeholder="Search a ship…" />
       <select v-model="manufacturer" class="input w-40">
-        <option value="">Tous fabricants</option>
+        <option value="">All manufacturers</option>
         <option v-for="m in manufacturers" :key="m.code" :value="m.code">{{ m.name || m.code }} ({{ m.ship_count }})</option>
       </select>
       <select v-model="career" class="input w-36">
-        <option value="">Toutes carrières</option>
+        <option value="">All careers</option>
         <option v-for="c in filters.careers" :key="c" :value="c">{{ c }}</option>
       </select>
       <select v-model="role" class="input w-36">
-        <option value="">Tous rôles</option>
+        <option value="">All roles</option>
         <option v-for="r in filters.roles" :key="r" :value="r">{{ r }}</option>
       </select>
       <select v-model="status" class="input w-40">
-        <option value="">Tous statuts</option>
+        <option value="">All statuses</option>
         <option value="flight-ready">Flight Ready</option>
         <option value="in-concept">In Concept</option>
         <option value="in-production">In Production</option>
-        <option value="in-game-only">In-Game uniquement</option>
+        <option value="in-game-only">In-Game only</option>
       </select>
       <select v-model="sort" class="input w-32">
-        <option value="name">Nom</option>
+        <option value="name">Name</option>
         <option value="cargo_capacity">Cargo</option>
-        <option value="scm_speed">Vitesse SCM</option>
-        <option value="max_speed">Vitesse max</option>
-        <option value="total_hp">HP total</option>
+        <option value="scm_speed">SCM Speed</option>
+        <option value="max_speed">Max Speed</option>
+        <option value="total_hp">Total HP</option>
         <option value="missile_damage_total">Missiles</option>
-        <option value="mass">Masse</option>
+        <option value="weapon_damage_total">Weapons DPS</option>
+        <option value="mass">Mass</option>
       </select>
       <button @click="order = order === 'asc' ? 'desc' : 'asc'" class="btn-ghost px-2.5 text-sm">
         {{ order === 'asc' ? '↑ Asc' : '↓ Desc' }}
@@ -133,8 +134,9 @@ function statusLabel(ship: Ship) {
         <div
           v-for="ship in ships"
           :key="ship.uuid"
-          class="card-hover group cursor-pointer overflow-hidden"
-          @click="router.push(`/ships/${ship.class_name || ship.uuid}`)"
+          class="card-hover group overflow-hidden"
+          @click="!(ship as any).is_concept_only && router.push(`/ships/${ship.class_name || ship.uuid}`)"
+          :class="{ 'opacity-70 cursor-default': (ship as any).is_concept_only, 'cursor-pointer': !(ship as any).is_concept_only }"
         >
           <!-- Thumbnail -->
           <div class="relative h-32 bg-sv-darker overflow-hidden">
@@ -165,10 +167,10 @@ function statusLabel(ship: Ship) {
                 </h3>
                 <span class="text-[11px] text-sv-muted">{{ (ship as any).manufacturer_name || ship.manufacturer_code }}</span>
               </div>
-              <span v-if="ship.ship_matrix_id" class="badge-green text-[10px] ml-2 shrink-0">RSI</span>
+              <span v-if="ship.ship_matrix_id" class="badge-cyan text-[10px] ml-2 shrink-0" title="Linked to RSI Ship Matrix">✓ Matrix</span>
             </div>
 
-            <div class="grid grid-cols-3 gap-1.5 text-[11px] mt-2">
+            <div v-if="!(ship as any).is_concept_only" class="grid grid-cols-3 gap-1.5 text-[11px] mt-2">
               <div class="text-center p-1 rounded bg-sv-darker/50">
                 <div class="text-sv-muted mb-0.5">HP</div>
                 <div class="text-sv-text font-medium">{{ fmt(ship.total_hp) }}</div>
@@ -181,6 +183,9 @@ function statusLabel(ship: Ship) {
                 <div class="text-sv-muted mb-0.5">SCM</div>
                 <div class="text-sv-text font-medium">{{ fmt(ship.scm_speed) }}</div>
               </div>
+            </div>
+            <div v-else class="text-[11px] text-sv-muted italic mt-2 text-center py-2">
+              No game data available yet
             </div>
 
             <div class="flex gap-1.5 mt-2" v-if="ship.career || ship.role">
