@@ -199,6 +199,33 @@ await test('GET /ships/nonexistent → 404', async () => {
   assert(status === 404, `Expected 404, got ${status}`);
 });
 
+await test('GET /ships → weapon_damage_total field present', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data } = await rawGet('/ships/AEGS_Gladius');
+  assert(data.success, 'Request failed');
+  assert('weapon_damage_total' in data.data, 'weapon_damage_total field missing');
+  info(`Gladius weapon DPS: ${data.data.weapon_damage_total}`);
+});
+
+await test('GET /ships?sort=weapon_damage_total → sortable', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data } = await rawGet('/ships?sort=weapon_damage_total&order=desc&limit=10');
+  assert(data.success && data.count > 0, 'No results');
+  info(`Top weapon DPS ship: ${data.data[0]?.name} (${data.data[0]?.weapon_damage_total})`);
+});
+
+await test('GET /ships → no tutorial/enemy_ai/arena_ai variants by default', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data } = await rawGet('/ships?limit=200');
+  assert(data.success, 'Request failed');
+  const names = data.data.map(s => s.class_name);
+  const hasTutorial = names.some(n => n.includes('_Teach') || n.includes('Tutorial'));
+  const hasSwarm = names.some(n => n.includes('_Swarm'));
+  assert(!hasTutorial, 'Tutorial ships should be hidden by default');
+  assert(!hasSwarm, 'Arena AI (Swarm) ships should be hidden by default');
+  info(`${data.total} ships returned (variants filtered)`);
+});
+
 // ============================================================================
 section('🔧 COMPONENTS');
 

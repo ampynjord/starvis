@@ -150,6 +150,8 @@ CREATE TABLE IF NOT EXISTS ships (
   ship_grade VARCHAR(10) COMMENT 'Grade (A, B, C...)',
   cargo_capacity DECIMAL(10,2) COMMENT 'Total cargo SCU',
   missile_damage_total DECIMAL(10,2) COMMENT 'Sum of all default missile damage',
+  weapon_damage_total DECIMAL(10,2) COMMENT 'Sum of all default weapon DPS (WeaponGun)',
+  variant_type VARCHAR(20) COMMENT 'Non-playable variant tag: exec, collector, bis_edition, tutorial, enemy_ai, military, event, pirate, arena_ai, special',
   
   -- Insurance
   insurance_claim_time DECIMAL(10,2) COMMENT 'Base wait time in minutes',

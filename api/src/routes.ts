@@ -370,6 +370,7 @@ export function createRoutes(deps: RouteDependencies): Router {
         "hydrogen_fuel_capacity", "quantum_fuel_capacity", "crew_size",
         "armor_physical", "armor_energy", "armor_distortion",
         "cross_section_x", "cross_section_y", "cross_section_z", "cargo_capacity",
+        "missile_damage_total", "weapon_damage_total",
         "insurance_claim_time", "insurance_expedite_cost",
       ];
       const deltas: Record<string, any> = {};
@@ -515,6 +516,7 @@ export function createRoutes(deps: RouteDependencies): Router {
       const result = await gameDataService.getShops({
         page: parseInt(req.query.page as string) || 1,
         limit: parseInt(req.query.limit as string) || 20,
+        search: req.query.search as string,
         location: req.query.location as string,
         type: req.query.type as string,
       });
@@ -602,7 +604,14 @@ export function createRoutes(deps: RouteDependencies): Router {
       if (!gameDataService) return res.status(503).json({ success: false, error: "Game data not available" });
       const { shipUuid, swaps } = req.body;
       if (!shipUuid) return res.status(400).json({ success: false, error: "shipUuid is required" });
-      const result = await gameDataService.calculateLoadout(shipUuid, swaps || []);
+      // Resolve class_name to uuid if needed
+      let uuid = shipUuid;
+      if (uuid.length !== 36) {
+        const ship = await gameDataService.getShipByClassName(uuid);
+        if (!ship) return res.status(404).json({ success: false, error: "Ship not found" });
+        uuid = ship.uuid;
+      }
+      const result = await gameDataService.calculateLoadout(uuid, swaps || []);
       res.json({ success: true, data: result });
     } catch (e) {
       res.status(500).json({ success: false, error: (e as Error).message });
@@ -746,6 +755,18 @@ export function createRoutes(deps: RouteDependencies): Router {
       const dfService = (gameDataService as any).dfService;
       if (!dfService) return res.status(503).json({ error: "DataForge not loaded" });
       res.json(dfService.debugComponent(req.params.className));
+    } catch (e) {
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
+  router.get("/admin/debug-search/:pattern", async (req: Request, res: Response) => {
+    try {
+      if (!gameDataService) return res.status(503).json({ error: "Game data not available" });
+      const dfService = (gameDataService as any).dfService;
+      if (!dfService) return res.status(503).json({ error: "DataForge not loaded" });
+      const limit = parseInt(req.query.limit as string) || 50;
+      res.json(dfService.searchRecords(req.params.pattern, limit));
     } catch (e) {
       res.status(500).json({ error: (e as Error).message });
     }

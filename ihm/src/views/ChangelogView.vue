@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
 import { getChangelog } from '@/services/api'
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch, computed } from 'vue'
 
 const entries = ref<any[]>([])
 const total = ref(0)
@@ -32,7 +32,7 @@ onMounted(load)
 watch([entityType, changeType], () => { page.value = 1; load() })
 watch(page, load)
 
-const totalPages = () => Math.max(1, Math.ceil(total.value / perPage))
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / perPage)))
 
 function badgeClass(type: string) {
   switch (type) {
@@ -55,36 +55,36 @@ function entityIcon(type: string) {
 
 function fmtDate(d: string) {
   if (!d) return '—'
-  return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+  return new Date(d).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 </script>
 
 <template>
   <div class="max-w-5xl mx-auto space-y-4">
     <h1 class="text-lg font-bold text-sv-text-bright">Changelog</h1>
-    <p class="text-xs text-sv-muted">Suivi des ajouts, suppressions et modifications entre extractions P4K/DataForge.</p>
+    <p class="text-xs text-sv-muted">Tracking additions, removals and modifications between P4K/DataForge extractions.</p>
 
     <!-- Filters -->
     <div class="flex flex-wrap gap-3 items-center">
-      <select v-model="entityType" class="input-dark text-xs">
-        <option value="">Tous les types</option>
-        <option value="ship">Vaisseaux</option>
-        <option value="component">Composants</option>
-        <option value="shop">Boutiques</option>
+      <select v-model="entityType" class="input text-xs">
+        <option value="">All types</option>
+        <option value="ship">Ships</option>
+        <option value="component">Components</option>
+        <option value="shop">Shops</option>
         <option value="module">Modules</option>
       </select>
-      <select v-model="changeType" class="input-dark text-xs">
-        <option value="">Tous les changements</option>
-        <option value="added">Ajoutés</option>
-        <option value="removed">Supprimés</option>
-        <option value="modified">Modifiés</option>
+      <select v-model="changeType" class="input text-xs">
+        <option value="">All changes</option>
+        <option value="added">Added</option>
+        <option value="removed">Removed</option>
+        <option value="modified">Modified</option>
       </select>
-      <span class="text-[11px] text-sv-muted ml-auto">{{ total }} entrée{{ total > 1 ? 's' : '' }}</span>
+      <span class="text-[11px] text-sv-muted ml-auto">{{ total }} entr{{ total > 1 ? 'ies' : 'y' }}</span>
     </div>
 
     <LoadingState :loading="loading">
       <div v-if="entries.length === 0" class="text-center py-12 text-sv-muted text-sm">
-        Aucun changement enregistré.
+        No changes recorded.
       </div>
       <div v-else class="space-y-1">
         <div
@@ -112,18 +112,18 @@ function fmtDate(d: string) {
       </div>
 
       <!-- Pagination -->
-      <div v-if="totalPages() > 1" class="flex items-center justify-center gap-2 pt-4">
+      <div v-if="totalPages > 1" class="flex items-center justify-center gap-2 pt-4">
         <button
           class="btn-outline text-xs"
           :disabled="page <= 1"
           @click="page--"
-        >← Préc.</button>
-        <span class="text-xs text-sv-muted">{{ page }} / {{ totalPages() }}</span>
+        >← Prev.</button>
+        <span class="text-xs text-sv-muted">{{ page }} / {{ totalPages }}</span>
         <button
           class="btn-outline text-xs"
-          :disabled="page >= totalPages()"
+          :disabled="page >= totalPages"
           @click="page++"
-        >Suiv. →</button>
+        >Next →</button>
       </div>
     </LoadingState>
   </div>

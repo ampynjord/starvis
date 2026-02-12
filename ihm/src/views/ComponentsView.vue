@@ -14,9 +14,8 @@ const loading = ref(true)
 const manufacturers = ref<Manufacturer[]>([])
 
 const TYPES = [
-  'WeaponGun', 'WeaponMissile', 'Shield', 'QuantumDrive', 'PowerPlant',
-  'Cooler', 'Turret', 'TurretBase', 'MissileLauncher', 'Armor',
-  'WeaponMining', 'Radar',
+  'WeaponGun', 'Shield', 'QuantumDrive', 'PowerPlant',
+  'Cooler', 'Radar', 'Countermeasure', 'Thruster',
 ]
 
 // Filters
@@ -62,7 +61,7 @@ watch(page, fetchComponents)
 
 function fmt(v: any) {
   if (v == null || v === 0) return '—'
-  if (typeof v === 'number') return v.toLocaleString('fr-FR', { maximumFractionDigits: 1 })
+  if (typeof v === 'number') return v.toLocaleString('en-US', { maximumFractionDigits: 1 })
   return v
 }
 
@@ -79,31 +78,31 @@ function typeColor(t: string) {
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <h1 class="section-title">Composants</h1>
-      <span class="text-sv-muted text-xs">{{ total.toLocaleString('fr-FR') }} résultats</span>
+      <h1 class="section-title">Components</h1>
+      <span class="text-sv-muted text-xs">{{ total.toLocaleString('en-US') }} results</span>
     </div>
 
     <!-- Filters -->
     <div class="card p-3 flex flex-wrap gap-2">
-      <input v-model="search" class="input flex-1 min-w-[160px]" placeholder="Rechercher un composant…" />
+      <input v-model="search" class="input flex-1 min-w-[160px]" placeholder="Search a component…" />
       <select v-model="type" class="input w-36">
-        <option value="">Tous types</option>
+        <option value="">All types</option>
         <option v-for="t in TYPES" :key="t" :value="t">{{ t }}</option>
       </select>
       <select v-model="size" class="input w-20">
-        <option value="">Taille</option>
+        <option value="">Size</option>
         <option v-for="s in [0,1,2,3,4,5,6,7,8,9,10]" :key="s" :value="String(s)">S{{ s }}</option>
       </select>
       <select v-model="manufacturer" class="input w-32">
-        <option value="">Fabricant</option>
-        <option v-for="m in manufacturers" :key="m.code" :value="m.code">{{ m.code }}</option>
+        <option value="">Manufacturer</option>
+        <option v-for="m in manufacturers" :key="m.code" :value="m.code">{{ m.name || m.code }}</option>
       </select>
       <select v-model="sort" class="input w-28">
-        <option value="name">Nom</option>
+        <option value="name">Name</option>
         <option value="hp">HP</option>
         <option value="weapon_dps">DPS</option>
         <option value="shield_hp">Shield HP</option>
-        <option value="mass">Masse</option>
+        <option value="mass">Mass</option>
       </select>
       <button @click="order = order === 'asc' ? 'desc' : 'asc'" class="btn-ghost px-2.5 text-sm">
         {{ order === 'asc' ? '↑ Asc' : '↓ Desc' }}
@@ -115,14 +114,14 @@ function typeColor(t: string) {
         <table class="w-full text-xs">
           <thead class="text-left text-sv-muted border-b border-sv-border">
             <tr>
-              <th class="py-2 px-2.5">Nom</th>
+              <th class="py-2 px-2.5">Name</th>
               <th class="py-2 px-2.5">Type</th>
-              <th class="py-2 px-2.5 text-center">Taille</th>
+              <th class="py-2 px-2.5 text-center">Size</th>
               <th class="py-2 px-2.5">Grade</th>
               <th class="py-2 px-2.5 text-right">HP</th>
               <th class="py-2 px-2.5 text-right">DPS</th>
-              <th class="py-2 px-2.5 text-right">Bouclier</th>
-              <th class="py-2 px-2.5">Fabricant</th>
+              <th class="py-2 px-2.5 text-right">Shield</th>
+              <th class="py-2 px-2.5">Manufacturer</th>
             </tr>
           </thead>
           <tbody>

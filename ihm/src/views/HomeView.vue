@@ -26,12 +26,12 @@ onMounted(async () => {
 })
 
 const tools = [
-  { icon: '🚀', title: 'Vaisseaux', desc: '300+ vaisseaux avec stats directes des fichiers du jeu', to: '/ships', color: 'from-blue-500/10 to-transparent' },
-  { icon: '⚙️', title: 'Composants', desc: 'Armes, boucliers, power plants, coolers, QD et plus', to: '/components', color: 'from-emerald-500/10 to-transparent' },
-  { icon: '⚖️', title: 'Comparer', desc: 'Comparaison côte à côte avec deltas visuels', to: '/compare', color: 'from-purple-500/10 to-transparent' },
-  { icon: '🏪', title: 'Boutiques', desc: 'Boutiques in-game et inventaires', to: '/shops', color: 'from-amber-500/10 to-transparent' },
-  { icon: '🎯', title: 'Loadout', desc: 'Simulateur de loadout avec stats en temps réel', to: '/loadout', color: 'from-red-500/10 to-transparent' },
-  { icon: '🏛️', title: 'Exec Hangar', desc: 'Timer d\'ouverture du Hangar Exécutif', to: '/hangar', color: 'from-cyan-500/10 to-transparent' },
+  { icon: '🚀', title: 'Ships', desc: '300+ ships with stats extracted directly from game files', to: '/ships', color: 'from-blue-500/10 to-transparent' },
+  { icon: '⚙️', title: 'Components', desc: 'Weapons, shields, power plants, coolers, QD and more', to: '/components', color: 'from-emerald-500/10 to-transparent' },
+  { icon: '⚖️', title: 'Compare', desc: 'Side-by-side comparison with visual deltas', to: '/compare', color: 'from-purple-500/10 to-transparent' },
+  { icon: '🏪', title: 'Shops', desc: 'In-game shops and inventories', to: '/shops', color: 'from-amber-500/10 to-transparent' },
+  { icon: '🎯', title: 'Loadout', desc: 'Loadout simulator with real-time stats', to: '/loadout', color: 'from-red-500/10 to-transparent' },
+  { icon: '🏛️', title: 'Exec Hangar', desc: 'Executive Hangar opening timer', to: '/hangar', color: 'from-cyan-500/10 to-transparent' },
 ]
 </script>
 
@@ -43,28 +43,28 @@ const tools = [
         Starvis
       </h1>
       <p class="text-sv-muted max-w-xl mx-auto text-sm leading-relaxed">
-        Base de données complète Star Citizen — Vaisseaux, composants, shops et outils<br />
-        <span class="text-sv-muted/60">Données extraites directement des fichiers de jeu (P4K/DataForge)</span>
+        Complete Star Citizen database — Ships, components, shops and tools<br />
+        <span class="text-sv-muted/60">Data extracted directly from game files (P4K/DataForge)</span>
       </p>
     </div>
 
     <!-- Stats -->
     <div v-if="stats" class="grid grid-cols-2 md:grid-cols-4 gap-3">
       <div class="card p-4 text-center">
-        <div class="text-2xl font-bold text-sv-accent">{{ stats.ships.toLocaleString('fr-FR') }}</div>
-        <div class="text-sv-muted text-xs mt-0.5">Vaisseaux</div>
+        <div class="text-2xl font-bold text-sv-accent">{{ stats.ships.toLocaleString('en-US') }}</div>
+        <div class="text-sv-muted text-xs mt-0.5">Ships</div>
       </div>
       <div class="card p-4 text-center">
-        <div class="text-2xl font-bold text-emerald-400">{{ stats.components.toLocaleString('fr-FR') }}</div>
-        <div class="text-sv-muted text-xs mt-0.5">Composants</div>
+        <div class="text-2xl font-bold text-emerald-400">{{ stats.components.toLocaleString('en-US') }}</div>
+        <div class="text-sv-muted text-xs mt-0.5">Components</div>
       </div>
       <div class="card p-4 text-center">
         <div class="text-2xl font-bold text-amber-400">{{ stats.manufacturers }}</div>
-        <div class="text-sv-muted text-xs mt-0.5">Fabricants</div>
+        <div class="text-sv-muted text-xs mt-0.5">Manufacturers</div>
       </div>
       <div class="card p-4 text-center">
         <div class="text-2xl font-bold text-purple-400">v{{ stats.version }}</div>
-        <div class="text-sv-muted text-xs mt-0.5">Version du jeu</div>
+        <div class="text-sv-muted text-xs mt-0.5">Game version</div>
       </div>
     </div>
     <div v-else-if="loading" class="flex justify-center py-8">
@@ -92,7 +92,7 @@ const tools = [
 
     <!-- API info -->
     <div class="card p-5 text-center">
-      <h3 class="text-sm font-semibold text-sv-text-bright mb-1">API REST ouverte</h3>
+      <h3 class="text-sm font-semibold text-sv-text-bright mb-1">Open REST API</h3>
       <p class="text-xs text-sv-muted">
         Pagination, filtres, tri, CSV export, ETag caching — <code class="text-sv-accent text-[11px]">/api/v1/</code>
       </p>

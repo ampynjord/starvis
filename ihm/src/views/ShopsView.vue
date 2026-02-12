@@ -47,19 +47,19 @@ watch(page, fetchShops)
 
 function fmt(v: any) {
   if (v == null || v === 0) return '—'
-  if (typeof v === 'number') return v.toLocaleString('fr-FR')
+  if (typeof v === 'number') return v.toLocaleString('en-US')
   return v
 }
 </script>
 
 <template>
   <div class="space-y-4">
-    <h1 class="section-title">Boutiques</h1>
+    <h1 class="section-title">Shops</h1>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
       <!-- Shop list -->
       <div class="lg:col-span-1 space-y-2">
-        <input v-model="search" class="input w-full" placeholder="Rechercher une boutique…" />
+        <input v-model="search" class="input w-full" placeholder="Search a shop…" />
 
         <LoadingState :loading="loading">
           <div class="space-y-1 max-h-[70vh] overflow-y-auto pr-1">
@@ -85,7 +85,7 @@ function fmt(v: any) {
       <!-- Inventory -->
       <div class="lg:col-span-2">
         <div v-if="!selectedShop" class="card p-8 text-center text-sv-muted text-sm">
-          Sélectionnez une boutique pour voir son inventaire
+          Select a shop to view its inventory
         </div>
         <div v-else class="card p-4">
           <h2 class="text-sm font-semibold text-sv-text-bright mb-0.5">{{ selectedShop.name }}</h2>
@@ -94,15 +94,15 @@ function fmt(v: any) {
           </p>
 
           <LoadingState :loading="loadingInventory">
-            <div v-if="inventory.length === 0" class="text-sv-muted text-center py-8 text-sm">Inventaire vide</div>
+            <div v-if="inventory.length === 0" class="text-sv-muted text-center py-8 text-sm">Empty inventory</div>
             <div v-else class="overflow-x-auto">
               <table class="w-full text-xs">
                 <thead class="text-left text-sv-muted border-b border-sv-border">
                   <tr>
-                    <th class="py-1.5 px-2.5">Composant</th>
+                    <th class="py-1.5 px-2.5">Component</th>
                     <th class="py-1.5 px-2.5">Type</th>
-                    <th class="py-1.5 px-2.5 text-center">Taille</th>
-                    <th class="py-1.5 px-2.5 text-right">Prix</th>
+                    <th class="py-1.5 px-2.5 text-center">Size</th>
+                    <th class="py-1.5 px-2.5 text-right">Price</th>
                   </tr>
                 </thead>
                 <tbody>

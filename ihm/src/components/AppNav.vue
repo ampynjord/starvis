@@ -7,19 +7,19 @@ const route = useRoute()
 
 const navSections = [
   {
-    title: 'Base de données',
+    title: 'Database',
     links: [
-      { to: '/ships', label: 'Vaisseaux', icon: '🚀' },
-      { to: '/components', label: 'Composants', icon: '⚙️' },
-      { to: '/manufacturers', label: 'Fabricants', icon: '🏭' },
-      { to: '/shops', label: 'Boutiques', icon: '🏪' },
+      { to: '/ships', label: 'Ships', icon: '🚀' },
+      { to: '/components', label: 'Components', icon: '⚙️' },
+      { to: '/manufacturers', label: 'Manufacturers', icon: '🏭' },
+      { to: '/shops', label: 'Shops', icon: '🏪' },
     ],
   },
   {
-    title: 'Outils',
+    title: 'Tools',
     links: [
-      { to: '/compare', label: 'Comparer', icon: '⚖️' },
-      { to: '/loadout', label: 'Loadout', icon: '🎯' },
+      { to: '/compare', label: 'Compare', icon: '⚖️' },
+      { to: '/loadout', label: 'Loadout Manager', icon: '🎯' },
       { to: '/hangar', label: 'Exec Hangar', icon: '🏛️' },
       { to: '/changelog', label: 'Changelog', icon: '📋' },
     ],
@@ -74,7 +74,7 @@ function isActive(to: string) {
     <!-- Footer -->
     <div class="border-t border-sv-border/30 px-4 py-3">
       <div class="text-[10px] text-sv-muted/50 text-center">
-        API REST ouverte<br />Star Citizen Data
+        Open REST API<br />Star Citizen Data
       </div>
     </div>
   </aside>
