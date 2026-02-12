@@ -2,12 +2,12 @@
 import LoadingState from '@/components/LoadingState.vue'
 import StatBlock from '@/components/StatBlock.vue'
 import {
-    calculateLoadout,
-    getComponents,
-    getShip, getShipLoadout,
-    getShips,
-    type Component, type LoadoutStats,
-    type Ship,
+  calculateLoadout,
+  getComponents,
+  getShip, getShipLoadout,
+  getShips,
+  type Component, type LoadoutStats,
+  type Ship,
 } from '@/services/api'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
@@ -295,7 +295,7 @@ watch(() => route.params.uuid, (newUuid) => {
     </div>
 
     <!-- Ship picker card -->
-    <div class="card p-4 relative">
+    <div class="card p-4 relative z-10">
       <div class="flex items-center gap-3">
         <div class="text-2xl">🚀</div>
         <div class="flex-1">
@@ -596,6 +596,154 @@ watch(() => route.params.uuid, (newUuid) => {
               </div>
             </div>
 
+            <!-- Hull & Armor -->
+            <div class="card overflow-hidden">
+              <div class="px-3 py-1.5 bg-emerald-500/5 border-b border-sv-border/30">
+                <h3 class="text-[10px] text-emerald-400 uppercase tracking-wider font-semibold">🛡️ Hull & Armor</h3>
+              </div>
+              <div class="p-3 space-y-2">
+                <div class="flex justify-between items-baseline">
+                  <span class="text-[10px] text-sv-muted">Total HP</span>
+                  <span class="text-xs text-emerald-400 font-bold">{{ fmt(stats.stats.hull.total_hp, 0) }}</span>
+                </div>
+                <div class="pt-1 border-t border-sv-border/20 space-y-1">
+                  <div class="text-[9px] text-sv-muted uppercase tracking-wider">Damage Resistance</div>
+                  <div class="grid grid-cols-2 gap-x-3 gap-y-1">
+                    <div class="flex justify-between">
+                      <span class="text-[10px] text-sv-muted">Physical</span>
+                      <span class="text-[10px] font-medium" :class="stats.stats.armor.physical < 1 ? 'text-emerald-400' : 'text-sv-text'">
+                        {{ Math.round((1 - stats.stats.armor.physical) * 100) }}%
+                      </span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-[10px] text-sv-muted">Energy</span>
+                      <span class="text-[10px] font-medium" :class="stats.stats.armor.energy < 1 ? 'text-emerald-400' : 'text-sv-text'">
+                        {{ Math.round((1 - stats.stats.armor.energy) * 100) }}%
+                      </span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-[10px] text-sv-muted">Distortion</span>
+                      <span class="text-[10px] font-medium" :class="stats.stats.armor.distortion < 1 ? 'text-emerald-400' : 'text-sv-text'">
+                        {{ Math.round((1 - stats.stats.armor.distortion) * 100) }}%
+                      </span>
+                    </div>
+                    <div class="flex justify-between">
+                      <span class="text-[10px] text-sv-muted">Thermal</span>
+                      <span class="text-[10px] font-medium" :class="stats.stats.armor.thermal < 1 ? 'text-emerald-400' : 'text-sv-text'">
+                        {{ Math.round((1 - stats.stats.armor.thermal) * 100) }}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mobility -->
+            <div class="card overflow-hidden">
+              <div class="px-3 py-1.5 bg-sky-500/5 border-b border-sv-border/30">
+                <h3 class="text-[10px] text-sky-400 uppercase tracking-wider font-semibold">✈️ Mobility</h3>
+              </div>
+              <div class="p-3 space-y-2">
+                <div class="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                  <div class="flex justify-between">
+                    <span class="text-[10px] text-sv-muted">SCM</span>
+                    <span class="text-xs text-sv-text-bright font-medium">{{ fmt(stats.stats.mobility.scm_speed, 0) }} m/s</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-[10px] text-sv-muted">Max</span>
+                    <span class="text-xs text-sv-text-bright font-medium">{{ fmt(stats.stats.mobility.max_speed, 0) }} m/s</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-[10px] text-sv-muted">Boost ▲</span>
+                    <span class="text-xs text-amber-400 font-medium">{{ fmt(stats.stats.mobility.boost_forward, 0) }} m/s</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-[10px] text-sv-muted">Boost ▼</span>
+                    <span class="text-xs text-sv-text font-medium">{{ fmt(stats.stats.mobility.boost_backward, 0) }} m/s</span>
+                  </div>
+                </div>
+                <div class="pt-1 border-t border-sv-border/20 grid grid-cols-3 gap-1.5">
+                  <div class="text-center">
+                    <div class="text-[9px] text-sv-muted">Pitch</div>
+                    <div class="text-xs text-sky-400 font-semibold">{{ fmt(stats.stats.mobility.pitch, 0) }}°/s</div>
+                  </div>
+                  <div class="text-center">
+                    <div class="text-[9px] text-sv-muted">Yaw</div>
+                    <div class="text-xs text-sky-400 font-semibold">{{ fmt(stats.stats.mobility.yaw, 0) }}°/s</div>
+                  </div>
+                  <div class="text-center">
+                    <div class="text-[9px] text-sv-muted">Roll</div>
+                    <div class="text-xs text-sky-400 font-semibold">{{ fmt(stats.stats.mobility.roll, 0) }}°/s</div>
+                  </div>
+                </div>
+                <div class="flex justify-between items-baseline pt-1 border-t border-sv-border/20">
+                  <span class="text-[10px] text-sv-muted">Mass</span>
+                  <span class="text-xs text-sv-text font-medium">{{ fmt(Math.round(stats.stats.mobility.mass), 0) }} kg</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quantum Drive -->
+            <div class="card overflow-hidden">
+              <div class="px-3 py-1.5 bg-purple-500/5 border-b border-sv-border/30">
+                <h3 class="text-[10px] text-purple-400 uppercase tracking-wider font-semibold">💫 Quantum Drive</h3>
+              </div>
+              <div class="p-3 space-y-2">
+                <div v-if="stats.stats.quantum.drive_name" class="flex justify-between items-baseline">
+                  <span class="text-[10px] text-sv-muted">Drive</span>
+                  <span class="text-xs text-purple-400 font-medium">{{ stats.stats.quantum.drive_name }}</span>
+                </div>
+                <div class="flex justify-between items-baseline">
+                  <span class="text-[10px] text-sv-muted">Speed</span>
+                  <span class="text-xs text-sv-text-bright font-medium">{{ fmt(stats.stats.quantum.speed, 0) }} m/s</span>
+                </div>
+                <div class="flex justify-between items-baseline">
+                  <span class="text-[10px] text-sv-muted">Spool Time</span>
+                  <span class="text-xs text-sv-text font-medium">{{ fmt(stats.stats.quantum.spool_time) }}s</span>
+                </div>
+                <div class="flex justify-between items-baseline">
+                  <span class="text-[10px] text-sv-muted">QT Fuel</span>
+                  <span class="text-xs text-purple-400 font-medium">{{ fmt(stats.stats.quantum.fuel_capacity) }} L</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Signatures -->
+            <div class="card overflow-hidden">
+              <div class="px-3 py-1.5 bg-indigo-500/5 border-b border-sv-border/30">
+                <h3 class="text-[10px] text-indigo-400 uppercase tracking-wider font-semibold">📡 Signatures</h3>
+              </div>
+              <div class="p-3 space-y-2">
+                <div class="flex justify-between items-center">
+                  <span class="text-[10px] text-sv-muted">IR (Infrared)</span>
+                  <div class="flex items-center gap-2">
+                    <div class="w-16 h-1.5 rounded-full bg-sv-darker overflow-hidden">
+                      <div class="h-full rounded-full bg-red-400" :style="{ width: `${Math.min(stats.stats.signatures.ir * 80, 100)}%` }"></div>
+                    </div>
+                    <span class="text-[10px] text-red-400 font-medium w-8 text-right">{{ fmt(stats.stats.signatures.ir, 2) }}</span>
+                  </div>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-[10px] text-sv-muted">EM (Electromagnetic)</span>
+                  <div class="flex items-center gap-2">
+                    <div class="w-16 h-1.5 rounded-full bg-sv-darker overflow-hidden">
+                      <div class="h-full rounded-full bg-blue-400" :style="{ width: `${Math.min(stats.stats.signatures.em * 80, 100)}%` }"></div>
+                    </div>
+                    <span class="text-[10px] text-blue-400 font-medium w-8 text-right">{{ fmt(stats.stats.signatures.em, 2) }}</span>
+                  </div>
+                </div>
+                <div class="flex justify-between items-center">
+                  <span class="text-[10px] text-sv-muted">CS (Cross Section)</span>
+                  <div class="flex items-center gap-2">
+                    <div class="w-16 h-1.5 rounded-full bg-sv-darker overflow-hidden">
+                      <div class="h-full rounded-full bg-amber-400" :style="{ width: `${Math.min(stats.stats.signatures.cs * 80, 100)}%` }"></div>
+                    </div>
+                    <span class="text-[10px] text-amber-400 font-medium w-8 text-right">{{ fmt(stats.stats.signatures.cs, 2) }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <!-- Power -->
             <div class="card overflow-hidden">
               <div class="px-3 py-1.5 bg-green-500/5 border-b border-sv-border/30">
@@ -642,14 +790,20 @@ watch(() => route.params.uuid, (newUuid) => {
               </div>
             </div>
 
-            <!-- Survivability summary -->
+            <!-- Fuel -->
             <div class="card overflow-hidden">
-              <div class="px-3 py-1.5 bg-emerald-500/5 border-b border-sv-border/30">
-                <h3 class="text-[10px] text-emerald-400 uppercase tracking-wider font-semibold">💚 Survivability</h3>
+              <div class="px-3 py-1.5 bg-orange-500/5 border-b border-sv-border/30">
+                <h3 class="text-[10px] text-orange-400 uppercase tracking-wider font-semibold">⛽ Fuel</h3>
               </div>
-              <div class="p-3 grid grid-cols-2 gap-1.5">
-                <StatBlock label="Hull HP" :value="fmt(ship?.total_hp, 0)" color="green" />
-                <StatBlock label="Shield" :value="fmt(stats.stats.shields.total_hp, 0)" color="blue" />
+              <div class="p-3 space-y-2">
+                <div class="flex justify-between items-baseline">
+                  <span class="text-[10px] text-sv-muted">Hydrogen</span>
+                  <span class="text-xs text-orange-400 font-medium">{{ fmt(stats.stats.fuel.hydrogen) }} L</span>
+                </div>
+                <div class="flex justify-between items-baseline">
+                  <span class="text-[10px] text-sv-muted">Quantum</span>
+                  <span class="text-xs text-purple-400 font-medium">{{ fmt(stats.stats.fuel.quantum) }} L</span>
+                </div>
               </div>
             </div>
           </template>

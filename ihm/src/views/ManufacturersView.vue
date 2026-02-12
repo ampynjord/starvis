@@ -9,10 +9,38 @@ const manufacturers = ref<(Manufacturer & { ship_count?: number; component_count
 const loading = ref(true)
 const filter = ref<'all' | 'ships' | 'components'>('all')
 
+// Readable names for generic P4K category codes
+const CODE_DISPLAY_NAMES: Record<string, string> = {
+  'COOL': 'Coolers (Generic)',
+  'HTNK': 'Hydrogen Fuel Tanks',
+  'INTK': 'Fuel Intakes',
+  'POWR': 'Power Plants (Generic)',
+  'QDRV': 'Quantum Drives (Generic)',
+  'QTNK': 'Quantum Fuel Tanks',
+  'RADR': 'Radars (Generic)',
+  'SHLD': 'Shields (Generic)',
+  'MISL': 'Missiles (Generic)',
+  'GMISL': 'Guided Missiles',
+  'LFSP': 'Life Support',
+  'WEP': 'Weapons (Generic)',
+  'BOMB': 'Bombs',
+  'ASAD': 'ASAD Systems',
+  'INNK': 'INNK Systems',
+}
+// Manufacturers to hide (no real data)
+const HIDDEN_CODES = new Set(['NONE', 'AMBX', 'GMRCK', 'MRCK'])
+
+function displayName(m: Manufacturer & { ship_count?: number; component_count?: number }): string {
+  if (m.name && m.name !== m.code) return m.name
+  return CODE_DISPLAY_NAMES[m.code] || m.code
+}
+
 onMounted(async () => {
   try {
     const res = await getManufacturers()
-    manufacturers.value = (res.data || []).sort((a: any, b: any) => (b.ship_count || 0) + (b.component_count || 0) - (a.ship_count || 0) - (a.component_count || 0))
+    manufacturers.value = (res.data || [])
+      .filter((m: any) => !HIDDEN_CODES.has(m.code) && ((m.ship_count || 0) + (m.component_count || 0) > 0))
+      .sort((a: any, b: any) => (b.ship_count || 0) + (b.component_count || 0) - (a.ship_count || 0) - (a.component_count || 0))
   } finally {
     loading.value = false
   }
@@ -67,7 +95,7 @@ function goToManufacturer(code: string, hasShips: boolean) {
           <div class="flex items-start justify-between">
             <div class="min-w-0">
               <h3 class="font-semibold text-sv-text-bright text-sm group-hover:text-sv-accent transition-colors">
-                {{ m.name || m.code }}
+                {{ displayName(m) }}
               </h3>
               <span class="text-[11px] text-sv-muted font-mono">{{ m.code }}</span>
             </div>
@@ -75,7 +103,8 @@ function goToManufacturer(code: string, hasShips: boolean) {
               <span v-if="(m as any).ship_count" class="badge-blue text-[10px]">
                 {{ (m as any).ship_count }} ship{{ (m as any).ship_count > 1 ? 's' : '' }}
               </span>
-              <span v-if="(m as any).component_count" class="badge-green text-[10px]">
+              <!-- Only show component badge on component-only manufacturers -->
+              <span v-if="(m as any).component_count && !(m as any).ship_count" class="badge-green text-[10px]">
                 {{ (m as any).component_count }} component{{ (m as any).component_count > 1 ? 's' : '' }}
               </span>
             </div>
