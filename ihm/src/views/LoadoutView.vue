@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
 import { calculateLoadout, getComponents, getShips, type Ship } from '@/services/api'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
@@ -31,33 +31,20 @@ function toggleSection(key: string) {
 }
 function isSectionOpen(key: string) { return !collapsedSections.value.has(key) }
 
-// ── Category mapping (Erkul-style) ──
+// ── Category mapping (Erkul-style) ─ only real component types from DB ──
+const CATEGORY_ORDER = ['WeaponGun', 'Missile', 'Shield', 'PowerPlant', 'Cooler', 'QuantumDrive', 'Countermeasure', 'Radar']
 const CATEGORY_MAP: Record<string, { label: string; icon: string; color: string }> = {
-  WeaponGun:      { label: 'Weapons',        icon: '🔫', color: 'red' },
-  Shield:         { label: 'Shields',         icon: '🛡️', color: 'blue' },
-  Missile:        { label: 'Missiles',        icon: '🚀', color: 'orange' },
-  WeaponMissile:  { label: 'Missiles',        icon: '🚀', color: 'orange' },
-  MissileRack:    { label: 'Missile Racks',   icon: '📦', color: 'orange' },
-  PowerPlant:     { label: 'Power Plants',    icon: '⚡', color: 'yellow' },
-  Cooler:         { label: 'Coolers',          icon: '❄️', color: 'cyan' },
-  QuantumDrive:   { label: 'Quantum Drive',   icon: '💫', color: 'purple' },
-  Turret:         { label: 'Turrets',          icon: '🎯', color: 'red' },
-  TurretBase:     { label: 'Turret Bases',    icon: '🎯', color: 'red' },
-  Radar:          { label: 'Radar',            icon: '📡', color: 'green' },
-  FuelIntake:     { label: 'Fuel Intakes',    icon: '⛽', color: 'amber' },
-  FuelTank:       { label: 'Fuel Tanks',      icon: '⛽', color: 'amber' },
-  QuantumFuelTank:{ label: 'QT Fuel Tanks',   icon: '⛽', color: 'purple' },
-  Thruster:       { label: 'Thrusters',        icon: '🔥', color: 'rose' },
-  MainThruster:   { label: 'Main Thrusters',  icon: '🔥', color: 'rose' },
-  LifeSupport:    { label: 'Life Support',    icon: '🫁', color: 'teal' },
-  FlightController: { label: 'Flight Controller', icon: '🕹️', color: 'indigo' },
-  SelfDestruct:   { label: 'Self Destruct',   icon: '💥', color: 'red' },
-  Armor:          { label: 'Armor',            icon: '🛡️', color: 'slate' },
+  WeaponGun:      { label: 'Weapons',           icon: '🔫', color: 'red' },
+  Shield:         { label: 'Shields',            icon: '🛡️', color: 'blue' },
+  Missile:        { label: 'Missiles',           icon: '🚀', color: 'orange' },
+  PowerPlant:     { label: 'Power Plants',       icon: '⚡', color: 'yellow' },
+  Cooler:         { label: 'Coolers',             icon: '❄️', color: 'cyan' },
+  QuantumDrive:   { label: 'Quantum Drive',      icon: '💫', color: 'purple' },
+  Countermeasure: { label: 'Countermeasures',    icon: '🎯', color: 'emerald' },
+  Radar:          { label: 'Radar',              icon: '📡', color: 'green' },
 }
 
-const HIDDEN_PORT_TYPES = new Set(['Other'])
-const HIDDEN_PORT_PREFIXES = ['$slot', 'hardpoint_paint', 'hardpoint_cockpit_flair', 'hardpoint_relay',
-  'hardpoint_controller', 'hardpoint_avionics', 'hardpoint_air_traffic', 'hardpoint_fuel_port']
+// Backend now filters loadout to only relevant types, so minimal client filtering needed
 
 // ── Ship search ──
 async function searchShips(q: string) {
@@ -94,24 +81,27 @@ const groupedLoadout = computed(() => {
   const groups: Record<string, { meta: any; items: any[] }> = {}
 
   for (const item of loadout.value.loadout) {
-    // Hide empty/internal ports
+    // Items are already filtered by backend
     if (!item.component_uuid && !item.component_name) continue
-    if (HIDDEN_PORT_TYPES.has(item.port_type)) continue
-    if (HIDDEN_PORT_PREFIXES.some(p => item.port_name.startsWith(p))) continue
 
-    const type = item.component_type || item.port_type || 'Other'
-    const meta = CATEGORY_MAP[type] || { label: type, icon: '📦', color: 'slate' }
-    const groupKey = meta.label
+    const type = item.component_type || 'Other'
+    const meta = CATEGORY_MAP[type]
+    if (!meta) continue // Skip unknown types
+    const groupKey = type
 
     if (!groups[groupKey]) groups[groupKey] = { meta, items: [] }
     groups[groupKey].items.push(item)
   }
 
-  return Object.entries(groups).map(([key, val]) => ({
-    category: key,
-    ...val.meta,
-    items: val.items,
-  }))
+  // Sort by CATEGORY_ORDER
+  return CATEGORY_ORDER
+    .filter(key => groups[key])
+    .map(key => ({
+      category: groups[key].meta.label,
+      typeKey: key,
+      ...groups[key].meta,
+      items: groups[key].items,
+    }))
 })
 
 // ── Swap component ──
@@ -296,11 +286,7 @@ onMounted(async () => {
                 'bg-cyan-500/5': group.color === 'cyan',
                 'bg-purple-500/5': group.color === 'purple',
                 'bg-green-500/5': group.color === 'green',
-                'bg-amber-500/5': group.color === 'amber',
-                'bg-rose-500/5': group.color === 'rose',
-                'bg-teal-500/5': group.color === 'teal',
-                'bg-indigo-500/5': group.color === 'indigo',
-                'bg-slate-500/5': group.color === 'slate',
+                'bg-emerald-500/5': group.color === 'emerald',
               }">
               <div class="flex items-center gap-2">
                 <span class="text-sm">{{ group.icon }}</span>
@@ -313,11 +299,7 @@ onMounted(async () => {
                     'text-cyan-400': group.color === 'cyan',
                     'text-purple-400': group.color === 'purple',
                     'text-green-400': group.color === 'green',
-                    'text-amber-400': group.color === 'amber',
-                    'text-rose-400': group.color === 'rose',
-                    'text-teal-400': group.color === 'teal',
-                    'text-indigo-400': group.color === 'indigo',
-                    'text-slate-400': group.color === 'slate',
+                    'text-emerald-400': group.color === 'emerald',
                   }">
                   {{ group.category }}
                 </span>
@@ -343,7 +325,7 @@ onMounted(async () => {
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-2">
                     <span class="text-xs font-medium truncate" :class="item.swapped ? 'text-amber-300' : 'text-sv-text-bright'">
-                      {{ item.component_name || 'Empty' }}
+                      {{ item.display_name || item.component_name || 'Empty' }}
                     </span>
                     <span v-if="item.grade" class="text-[9px] px-1 py-0.5 rounded bg-sv-darker/50 text-sv-muted border border-sv-border/20">
                       {{ item.grade }}
@@ -373,6 +355,12 @@ onMounted(async () => {
                   </template>
                   <template v-if="item.qd_speed">
                     <span class="text-purple-400">{{ fmt(item.qd_speed) }} m/s</span>
+                  </template>
+                  <template v-if="item.cm_ammo">
+                    <span class="text-emerald-400">{{ item.cm_ammo }} rounds</span>
+                  </template>
+                  <template v-if="item.radar_range">
+                    <span class="text-green-400">{{ fmt(item.radar_range, 0) }}m</span>
                   </template>
                 </div>
 
@@ -523,6 +511,37 @@ onMounted(async () => {
             </div>
           </div>
 
+          <!-- Countermeasures -->
+          <div v-if="loadout.stats.countermeasures" class="card overflow-hidden">
+            <div class="px-4 py-2 bg-emerald-500/5 border-b border-sv-border/30">
+              <span class="text-[11px] font-bold text-emerald-400 uppercase tracking-wider">🎯 Countermeasures</span>
+            </div>
+            <div class="p-3">
+              <div class="grid grid-cols-2 gap-2 text-center">
+                <div>
+                  <div class="text-[9px] text-sv-muted uppercase">Flares</div>
+                  <div class="text-sm font-bold text-emerald-400 font-mono">{{ loadout.stats.countermeasures.flare_count }}</div>
+                </div>
+                <div>
+                  <div class="text-[9px] text-sv-muted uppercase">Chaff</div>
+                  <div class="text-sm font-bold text-emerald-300 font-mono">{{ loadout.stats.countermeasures.chaff_count }}</div>
+                </div>
+              </div>
+              <div v-if="loadout.stats.countermeasures.details?.length" class="mt-2 space-y-1">
+                <div v-for="(cm, i) in loadout.stats.countermeasures.details" :key="i"
+                  class="flex items-center justify-between text-[10px] px-1">
+                  <span class="text-sv-text-bright">{{ cm.name }}</span>
+                  <div class="flex items-center gap-2">
+                    <span class="text-[9px] px-1.5 py-0.5 rounded" :class="cm.type === 'Flare' ? 'bg-red-500/10 text-red-400' : 'bg-blue-500/10 text-blue-400'">
+                      {{ cm.type }}
+                    </span>
+                    <span class="text-sv-muted font-mono">{{ cm.ammo_count }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Hull & Armor -->
           <div class="card overflow-hidden">
             <div class="px-4 py-2 bg-emerald-500/5 border-b border-sv-border/30">
@@ -537,6 +556,22 @@ onMounted(async () => {
                 <div>
                   <div class="text-[9px] text-sv-muted uppercase">EHP</div>
                   <div class="text-sm font-bold text-emerald-300 font-mono">{{ fmt(loadout.stats.hull.ehp) }}</div>
+                </div>
+              </div>
+              <!-- Cross Section -->
+              <div v-if="loadout.stats.hull.cross_section_x || loadout.stats.hull.cross_section_y || loadout.stats.hull.cross_section_z"
+                class="grid grid-cols-3 gap-2 text-center mt-2 pt-2 border-t border-sv-border/20">
+                <div>
+                  <div class="text-[9px] text-sv-muted uppercase">Length</div>
+                  <div class="text-[11px] font-mono text-sv-text-bright">{{ fmt(loadout.stats.hull.cross_section_x, 1) }}m</div>
+                </div>
+                <div>
+                  <div class="text-[9px] text-sv-muted uppercase">Beam</div>
+                  <div class="text-[11px] font-mono text-sv-text-bright">{{ fmt(loadout.stats.hull.cross_section_y, 1) }}m</div>
+                </div>
+                <div>
+                  <div class="text-[9px] text-sv-muted uppercase">Height</div>
+                  <div class="text-[11px] font-mono text-sv-text-bright">{{ fmt(loadout.stats.hull.cross_section_z, 1) }}m</div>
                 </div>
               </div>
               <div class="space-y-1.5 mt-2">

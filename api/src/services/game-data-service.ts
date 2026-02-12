@@ -1512,6 +1512,21 @@ export class GameDataService {
     if (!shipRows.length) throw new Error("Ship not found");
     const ship = shipRows[0];
 
+    // Cross-section fallback from ship_matrix dimensions
+    let crossX = parseFloat(ship.cross_section_x) || 0;
+    let crossY = parseFloat(ship.cross_section_y) || 0;
+    let crossZ = parseFloat(ship.cross_section_z) || 0;
+    if (crossX === 0 && crossY === 0 && crossZ === 0 && ship.ship_matrix_id) {
+      const [smRows]: any = await this.pool.execute(
+        "SELECT length, beam, height FROM ship_matrix WHERE id = ?", [ship.ship_matrix_id]
+      );
+      if (smRows.length) {
+        crossX = parseFloat(smRows[0].length) || 0;
+        crossY = parseFloat(smRows[0].beam) || 0;
+        crossZ = parseFloat(smRows[0].height) || 0;
+      }
+    }
+
     // 2. Get default loadout
     const [loadoutRows]: any = await this.pool.execute(
       `SELECT sl.port_name, sl.port_type, sl.component_uuid, c.*
@@ -1573,13 +1588,22 @@ export class GameDataService {
     const missileDetails: any[] = [];
     const powerPlants: any[] = [];
     const coolers: any[] = [];
+    const cmDetails: any[] = [];
+    let cmFlareCount = 0;
+    let cmChaffCount = 0;
+
+    // Utility weapon filter (mining/tractor/salvage are typed WeaponGun but should not count)
+    const UTILITY_WEAPON_RX = /tractor|mining|salvage|repair|grin_tractor|grin_salvage/i;
 
     for (const l of loadout) {
       if (!l.component_uuid) continue;
       const type = l.port_type || l.type || '';
 
       if (type === 'WeaponGun' || l.type === 'WeaponGun') {
+        // Skip utility tools (mining, tractor, salvage)
+        if (UTILITY_WEAPON_RX.test(l.name || '') || UTILITY_WEAPON_RX.test(l.class_name || '')) continue;
         const dps = parseFloat(l.weapon_dps) || 0;
+        if (dps === 0) continue; // Skip zero-DPS entries (ammo crates, skins, etc.)
         const burstDps = parseFloat(l.weapon_burst_dps) || 0;
         const sustainedDps = parseFloat(l.weapon_sustained_dps) || 0;
         totalDps += dps;
@@ -1609,7 +1633,7 @@ export class GameDataService {
         shieldCount++;
         shieldDetails.push({
           port_name: l.port_name,
-          name: l.name || '—',
+          name: this.cleanComponentName(l.name, 'Shield'),
           size: parseInt(l.size) || 0,
           grade: l.grade || '—',
           manufacturer: l.manufacturer_code || '',
@@ -1624,7 +1648,7 @@ export class GameDataService {
         missileCount++;
         missileDetails.push({
           port_name: l.port_name,
-          name: l.name || '—',
+          name: this.cleanComponentName(l.name, 'Missile'),
           size: parseInt(l.size) || 0,
           damage: Math.round(dmg * 100) / 100,
           lock_signal: l.missile_lock_signal || '',
@@ -1640,7 +1664,7 @@ export class GameDataService {
         totalPowerOutput += output;
         powerPlants.push({
           port_name: l.port_name,
-          name: l.name || '—',
+          name: this.cleanComponentName(l.name, 'PowerPlant'),
           size: parseInt(l.size) || 0,
           grade: l.grade || '—',
           manufacturer: l.manufacturer_code || '',
@@ -1652,11 +1676,24 @@ export class GameDataService {
         totalCoolingRate += rate;
         coolers.push({
           port_name: l.port_name,
-          name: l.name || '—',
+          name: this.cleanComponentName(l.name, 'Cooler'),
           size: parseInt(l.size) || 0,
           grade: l.grade || '—',
           manufacturer: l.manufacturer_code || '',
           cooling_rate: Math.round(rate * 100) / 100,
+        });
+      }
+      if (l.type === 'Countermeasure') {
+        const ammo = parseInt(l.cm_ammo_count) || 0;
+        const isFlare = /flare|decoy/i.test(l.name || '');
+        const isChaff = /chaff|noise/i.test(l.name || '');
+        if (isFlare) cmFlareCount += ammo;
+        if (isChaff) cmChaffCount += ammo;
+        cmDetails.push({
+          port_name: l.port_name,
+          name: this.cleanComponentName(l.name, 'Countermeasure'),
+          type: isFlare ? 'Flare' : isChaff ? 'Chaff' : 'Other',
+          ammo_count: ammo,
         });
       }
 
@@ -1708,10 +1745,15 @@ export class GameDataService {
           details: coolers,
         },
         quantum: {
-          drive_name: qdName,
+          drive_name: this.cleanComponentName(qdName, 'QuantumDrive'),
           speed: Math.round(qdSpeed * 100) / 100,
           spool_time: Math.round(qdSpoolTime * 100) / 100,
           fuel_capacity: parseFloat(ship.quantum_fuel_capacity) || 0,
+        },
+        countermeasures: {
+          flare_count: cmFlareCount,
+          chaff_count: cmChaffCount,
+          details: cmDetails,
         },
         signatures: {
           ir: parseFloat(ship.armor_signal_ir) || 0,
@@ -1741,36 +1783,82 @@ export class GameDataService {
         hull: {
           total_hp: hullHp,
           ehp,
-          cross_section_x: parseFloat(ship.cross_section_x) || 0,
-          cross_section_y: parseFloat(ship.cross_section_y) || 0,
-          cross_section_z: parseFloat(ship.cross_section_z) || 0,
+          cross_section_x: crossX,
+          cross_section_y: crossY,
+          cross_section_z: crossZ,
         },
       },
-      loadout: loadout.map((l: any) => ({
-        port_name: l.port_name,
-        port_type: l.port_type,
-        component_uuid: l.component_uuid,
-        component_name: l.name,
-        component_type: l.type,
-        component_size: parseInt(l.size) || null,
-        grade: l.grade || null,
-        manufacturer_code: l.manufacturer_code || null,
-        // Type-specific stats inline
-        weapon_dps: l.type === 'WeaponGun' ? (parseFloat(l.weapon_dps) || null) : undefined,
-        weapon_range: l.type === 'WeaponGun' ? (parseFloat(l.weapon_range) || null) : undefined,
-        shield_hp: l.type === 'Shield' ? (parseFloat(l.shield_hp) || null) : undefined,
-        shield_regen: l.type === 'Shield' ? (parseFloat(l.shield_regen) || null) : undefined,
-        power_output: l.type === 'PowerPlant' ? (parseFloat(l.power_output) || null) : undefined,
-        cooling_rate: l.type === 'Cooler' ? (parseFloat(l.cooling_rate) || null) : undefined,
-        qd_speed: l.type === 'QuantumDrive' ? (parseFloat(l.qd_speed) || null) : undefined,
-        swapped: !!l._swapped,
-      })),
+      loadout: loadout
+        .filter((l: any) => {
+          // Only return relevant component types
+          const RELEVANT = new Set(['WeaponGun', 'Shield', 'PowerPlant', 'Cooler', 'QuantumDrive', 'Countermeasure', 'Missile', 'Radar']);
+          if (!l.component_uuid || !l.type) return false;
+          if (!RELEVANT.has(l.type)) return false;
+          // Skip controllers, helpers, sub-system ports
+          if (l.port_name?.includes('controller')) return false;
+          if (l.port_name === 'Radar' || l.port_name?.endsWith('_helper')) return false;
+          // Skip utility weapons (mining, tractor, salvage)
+          if (l.type === 'WeaponGun' && UTILITY_WEAPON_RX.test(l.name || l.class_name || '')) return false;
+          // Skip zero-DPS WeaponGun (ammo crates, skins)
+          if (l.type === 'WeaponGun' && !(parseFloat(l.weapon_dps) > 0)) return false;
+          return true;
+        })
+        .map((l: any) => ({
+          port_name: l.port_name,
+          port_type: l.port_type,
+          component_uuid: l.component_uuid,
+          component_name: l.name,
+          display_name: this.cleanComponentName(l.name, l.type),
+          component_type: l.type,
+          component_size: parseInt(l.size) || null,
+          grade: l.grade || null,
+          manufacturer_code: l.manufacturer_code || null,
+          // Type-specific stats inline
+          weapon_dps: l.type === 'WeaponGun' ? (parseFloat(l.weapon_dps) || null) : undefined,
+          weapon_range: l.type === 'WeaponGun' ? (parseFloat(l.weapon_range) || null) : undefined,
+          shield_hp: l.type === 'Shield' ? (parseFloat(l.shield_hp) || null) : undefined,
+          shield_regen: l.type === 'Shield' ? (parseFloat(l.shield_regen) || null) : undefined,
+          power_output: l.type === 'PowerPlant' ? (parseFloat(l.power_output) || null) : undefined,
+          cooling_rate: l.type === 'Cooler' ? (parseFloat(l.cooling_rate) || null) : undefined,
+          qd_speed: l.type === 'QuantumDrive' ? (parseFloat(l.qd_speed) || null) : undefined,
+          cm_ammo: l.type === 'Countermeasure' ? (parseInt(l.cm_ammo_count) || null) : undefined,
+          radar_range: l.type === 'Radar' ? (parseFloat(l.radar_range) || null) : undefined,
+          swapped: !!l._swapped,
+        })),
     };
   }
 
   // ======================================================
   //  HELPERS
   // ======================================================
+
+  /**
+   * Clean component names for display (Erkul-style):
+   * - Strip S0X size prefix from shields, QD, power plants, coolers, radar, missiles
+   * - Strip ship-specific prefix from countermeasures
+   * - Strip internal suffixes (_SCItem, _ResistGasclouds, etc.)
+   */
+  private cleanComponentName(name: string, type: string): string {
+    if (!name) return '—';
+    let cleaned = name;
+
+    // Strip S0X prefix for non-weapons
+    if (['Shield', 'QuantumDrive', 'PowerPlant', 'Cooler', 'Radar', 'Missile'].includes(type)) {
+      cleaned = cleaned.replace(/^S\d{2}\s+/, '');
+    }
+
+    // For CMs, strip ship-specific prefix: "Gladius CML Flare" → "CML Flare"
+    if (type === 'Countermeasure') {
+      const cmMatch = cleaned.match(/(CML\s+.+)/i);
+      if (cmMatch) cleaned = cmMatch[1];
+    }
+
+    // Strip _SCItem and internal suffixes
+    cleaned = cleaned.replace(/\s*SCItem.*$/i, '');
+    cleaned = cleaned.replace(/\s*_Resist.*$/i, '');
+
+    return cleaned.trim() || '—';
+  }
 
   private validateSortColumn(col: string): string {
     const allowed = [
