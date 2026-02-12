@@ -119,13 +119,14 @@ export interface LoadoutStats {
     power: { total_draw: number; total_output: number; balance: number }
     thermal: { total_heat_generation: number; total_cooling_rate: number; balance: number }
     quantum: { drive_name: string; speed: number; spool_time: number; fuel_capacity: number }
+    countermeasures: { flare_count: number; chaff_count: number; details: { port_name: string; name: string; type: string; ammo_count: number }[] }
     signatures: { ir: number; em: number; cs: number }
     armor: { physical: number; energy: number; distortion: number; thermal: number }
     mobility: { scm_speed: number; max_speed: number; boost_forward: number; boost_backward: number; pitch: number; yaw: number; roll: number; mass: number }
     fuel: { hydrogen: number; quantum: number }
-    hull: { total_hp: number; cross_section_x: number; cross_section_y: number; cross_section_z: number }
+    hull: { total_hp: number; ehp: number; cross_section_x: number; cross_section_y: number; cross_section_z: number }
   }
-  loadout: { port_name: string; port_type: string; component_uuid: string; component_name: string; component_type: string; swapped: boolean }[]
+  loadout: { port_name: string; port_type: string; component_uuid: string; component_name: string; display_name?: string; component_type: string; component_size?: number; grade?: string; manufacturer_code?: string; cm_ammo?: number; radar_range?: number; swapped: boolean }[]
 }
 
 // --------------- Ships ---------------
