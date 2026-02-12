@@ -133,7 +133,7 @@ const COMPARE_SECTIONS = [
 
     <!-- Ship pickers -->
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <div class="card p-4 relative">
+      <div class="card p-4 relative z-10">
         <div class="flex items-center gap-2 mb-2">
           <div class="w-6 h-6 rounded-md bg-sv-accent/15 flex items-center justify-center text-[10px] font-bold text-sv-accent">1</div>
           <label class="text-[10px] text-sv-muted uppercase tracking-wider font-semibold">Ship</label>
@@ -151,7 +151,7 @@ const COMPARE_SECTIONS = [
         </div>
         <div v-if="comparison?.ship1" class="mt-2 text-[11px] text-sv-accent font-medium">{{ comparison.ship1.name }}</div>
       </div>
-      <div class="card p-4 relative">
+      <div class="card p-4 relative z-10">
         <div class="flex items-center gap-2 mb-2">
           <div class="w-6 h-6 rounded-md bg-amber-500/15 flex items-center justify-center text-[10px] font-bold text-amber-400">2</div>
           <label class="text-[10px] text-sv-muted uppercase tracking-wider font-semibold">Ship</label>
