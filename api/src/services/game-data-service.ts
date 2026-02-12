@@ -1562,6 +1562,9 @@ export class GameDataService {
     let totalMissileDamage = 0;
     let weaponCount = 0;
     let missileCount = 0;
+    let qdSpeed = 0;
+    let qdSpoolTime = 0;
+    let qdName = '';
 
     for (const l of loadout) {
       if (!l.component_uuid) continue;
@@ -1580,6 +1583,11 @@ export class GameDataService {
       if (l.type === 'Missile' || l.type === 'WeaponMissile') {
         totalMissileDamage += parseFloat(l.missile_damage) || 0;
         missileCount++;
+      }
+      if (l.type === 'QuantumDrive') {
+        qdSpeed = parseFloat(l.qd_speed) || 0;
+        qdSpoolTime = parseFloat(l.qd_spool_time) || 0;
+        qdName = l.name || '';
       }
 
       totalPowerDraw += parseFloat(l.power_draw) || 0;
@@ -1615,6 +1623,43 @@ export class GameDataService {
           total_heat_generation: Math.round(totalHeatGeneration * 100) / 100,
           total_cooling_rate: Math.round(totalCoolingRate * 100) / 100,
           balance: Math.round((totalCoolingRate - totalHeatGeneration) * 100) / 100,
+        },
+        quantum: {
+          drive_name: qdName,
+          speed: Math.round(qdSpeed * 100) / 100,
+          spool_time: Math.round(qdSpoolTime * 100) / 100,
+          fuel_capacity: parseFloat(ship.quantum_fuel_capacity) || 0,
+        },
+        signatures: {
+          ir: parseFloat(ship.armor_signal_ir) || 0,
+          em: parseFloat(ship.armor_signal_em) || 0,
+          cs: parseFloat(ship.armor_signal_cs) || 0,
+        },
+        armor: {
+          physical: parseFloat(ship.armor_physical) || 0,
+          energy: parseFloat(ship.armor_energy) || 0,
+          distortion: parseFloat(ship.armor_distortion) || 0,
+          thermal: parseFloat(ship.armor_thermal) || 0,
+        },
+        mobility: {
+          scm_speed: parseFloat(ship.scm_speed) || 0,
+          max_speed: parseFloat(ship.max_speed) || 0,
+          boost_forward: parseFloat(ship.boost_speed_forward) || 0,
+          boost_backward: parseFloat(ship.boost_speed_backward) || 0,
+          pitch: parseFloat(ship.pitch_max) || 0,
+          yaw: parseFloat(ship.yaw_max) || 0,
+          roll: parseFloat(ship.roll_max) || 0,
+          mass: parseFloat(ship.mass) || 0,
+        },
+        fuel: {
+          hydrogen: parseFloat(ship.hydrogen_fuel_capacity) || 0,
+          quantum: parseFloat(ship.quantum_fuel_capacity) || 0,
+        },
+        hull: {
+          total_hp: parseFloat(ship.total_hp) || 0,
+          cross_section_x: parseFloat(ship.cross_section_x) || 0,
+          cross_section_y: parseFloat(ship.cross_section_y) || 0,
+          cross_section_z: parseFloat(ship.cross_section_z) || 0,
         },
       },
       loadout: loadout.map((l: any) => ({

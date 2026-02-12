@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
 import { getChangelog } from '@/services/api'
-import { onMounted, ref, watch, computed } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 
 const entries = ref<any[]>([])
 const total = ref(0)
