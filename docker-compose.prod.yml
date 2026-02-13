@@ -5,7 +5,7 @@
 
 services:
   api:
-    image: ghcr.io/ampynjord/starapi-api:latest
+    image: ghcr.io/ampynjord/starvis-api:latest
     build: !reset null
     ports: !reset []
     networks:
@@ -19,7 +19,7 @@ services:
       traefik.http.services.starvis-api.loadbalancer.server.port: "3000"
 
   ihm:
-    image: ghcr.io/ampynjord/starapi-ihm:latest
+    image: ghcr.io/ampynjord/starvis-ihm:latest
     build: !reset null
     ports: !reset []
     networks:
