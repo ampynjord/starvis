@@ -5,8 +5,8 @@
 import { CryXmlNode, isCryXmlB, parseCryXml } from "./cryxml-parser.js";
 import {
   type DataForgeData, DT_NAMES,
-  getStructProperties, parseDataForge, readGuidAt,
-  readInstance as readInstancePure,
+  getStructProperties, parseDataForge,
+  readInstance as readInstancePure
 } from "./dataforge-parser.js";
 import logger from "./logger.js";
 import { P4KProvider } from "./p4k-provider.js";
