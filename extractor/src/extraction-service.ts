@@ -26,11 +26,49 @@ export class ExtractionService {
   private _extracting = false;
   public locService: LocalizationService;
 
+  /** Default batch size for multi-row INSERT statements */
+  private static readonly BATCH_SIZE = 50;
+
   constructor(
     private pool: Pool,
     private dfService: DataForgeService,
   ) {
     this.locService = new LocalizationService();
+  }
+
+  // ── Batch INSERT helper ──
+
+  /**
+   * Execute a multi-row INSERT … ON DUPLICATE KEY UPDATE in batches.
+   * @param conn MySQL connection
+   * @param insertHead SQL before VALUES: "INSERT INTO tbl (c1, c2) VALUES"
+   * @param updateTail SQL after VALUES: "ON DUPLICATE KEY UPDATE c1=VALUES(c1), …"
+   * @param colCount Number of columns per row
+   * @param rows Array of flat parameter arrays (each length === colCount)
+   * @param batchSize Rows per batch (default: BATCH_SIZE)
+   * @returns Number of rows affected
+   */
+  private async batchUpsert(
+    conn: PoolConnection,
+    insertHead: string,
+    updateTail: string,
+    colCount: number,
+    rows: (string | number | null)[][],
+    batchSize = ExtractionService.BATCH_SIZE,
+  ): Promise<number> {
+    if (!rows.length) return 0;
+    const placeholder = `(${Array(colCount).fill("?").join(",")})`;
+    let affected = 0;
+
+    for (let i = 0; i < rows.length; i += batchSize) {
+      const batch = rows.slice(i, i + batchSize);
+      const sql = `${insertHead} ${batch.map(() => placeholder).join(",")} ${updateTail}`;
+      const params = batch.flat();
+      const [result] = await conn.execute<any>(sql, params);
+      affected += result.affectedRows ?? batch.length;
+    }
+
+    return affected;
   }
 
   get isExtracting(): boolean { return this._extracting; }
@@ -188,12 +226,7 @@ export class ExtractionService {
       onProgress?.(`Localized ${components.length} component names`);
     }
 
-    let saved = 0;
-    for (const c of components) {
-      try {
-        await conn.execute(
-          `INSERT INTO components (
-            uuid, class_name, name, type, sub_type, size, grade, manufacturer_code,
+    const COMP_COLS = `uuid, class_name, name, type, sub_type, size, grade, manufacturer_code,
             mass, hp,
             power_draw, power_base, power_output,
             heat_generation, cooling_rate,
@@ -216,32 +249,9 @@ export class ExtractionService {
             cm_ammo_count,
             fuel_capacity, fuel_intake_rate,
             emp_damage, emp_radius, emp_charge_time, emp_cooldown,
-            qig_jammer_range, qig_snare_radius, qig_charge_time, qig_cooldown
-          ) VALUES (
-            ?, ?, ?, ?, ?, ?, ?, ?,
-            ?, ?,
-            ?, ?, ?,
-            ?, ?,
-            ?, ?,
-            ?, ?, ?, ?, ?,
-            ?, ?, ?,
-            ?, ?,
-            ?, ?, ?, ?, ?, ?,
-            ?, ?, ?,
-            ?, ?, ?, ?, ?,
-            ?, ?, ?, ?, ?,
-            ?, ?,
-            ?, ?, ?,
-            ?, ?, ?, ?,
-            ?, ?,
-            ?, ?, ?,
-            ?, ?,
-            ?, ?, ?,
-            ?,
-            ?, ?,
-            ?, ?, ?, ?,
-            ?, ?, ?, ?
-          ) ON DUPLICATE KEY UPDATE
+            qig_jammer_range, qig_snare_radius, qig_charge_time, qig_cooldown`;
+
+    const COMP_UPDATE = `ON DUPLICATE KEY UPDATE
             class_name=VALUES(class_name), name=VALUES(name), type=VALUES(type),
             sub_type=VALUES(sub_type), size=VALUES(size), grade=VALUES(grade),
             manufacturer_code=VALUES(manufacturer_code),
@@ -282,47 +292,54 @@ export class ExtractionService {
             emp_charge_time=VALUES(emp_charge_time), emp_cooldown=VALUES(emp_cooldown),
             qig_jammer_range=VALUES(qig_jammer_range), qig_snare_radius=VALUES(qig_snare_radius),
             qig_charge_time=VALUES(qig_charge_time), qig_cooldown=VALUES(qig_cooldown),
-            updated_at=CURRENT_TIMESTAMP`,
-          [
-            c.uuid, c.className, c.name, c.type,
-            c.subType || null, c.size ?? null, c.grade || null, c.manufacturerCode || null,
-            c.mass ?? null, c.hp ?? null,
-            c.powerDraw ?? null, c.powerBase ?? null, c.powerOutput ?? null,
-            c.heatGeneration ?? null, c.coolingRate ?? null,
-            c.emSignature ?? null, c.irSignature ?? null,
-            c.weaponDamage ?? null, c.weaponDamageType || null,
-            c.weaponFireRate ?? null, c.weaponRange ?? null, c.weaponSpeed ?? null,
-            c.weaponAmmoCount ?? null, c.weaponPelletsPerShot ?? 1, c.weaponBurstSize ?? null,
-            c.weaponAlphaDamage ?? null, c.weaponDps ?? null,
-            c.weaponDamagePhysical ?? null, c.weaponDamageEnergy ?? null, c.weaponDamageDistortion ?? null,
-            c.weaponDamageThermal ?? null, c.weaponDamageBiochemical ?? null, c.weaponDamageStun ?? null,
-            c.weaponHeatPerShot ?? null, c.weaponBurstDps ?? null, c.weaponSustainedDps ?? null,
-            c.shieldHp ?? null, c.shieldRegen ?? null,
-            c.shieldRegenDelay ?? null, c.shieldHardening ?? null, c.shieldFaces ?? null,
-            c.qdSpeed ?? null, c.qdSpoolTime ?? null,
-            c.qdCooldown ?? null, c.qdFuelRate ?? null, c.qdRange ?? null,
-            c.qdStage1Accel ?? null, c.qdStage2Accel ?? null,
-            c.qdTuningRate ?? null, c.qdAlignmentRate ?? null, c.qdDisconnectRange ?? null,
-            c.missileDamage ?? null, c.missileSignalType || null,
-            c.missileLockTime ?? null, c.missileSpeed ?? null,
-            c.missileRange ?? null, c.missileLockRange ?? null,
-            c.missileDamagePhysical ?? null, c.missileDamageEnergy ?? null, c.missileDamageDistortion ?? null,
-            c.thrusterMaxThrust ?? null, c.thrusterType || null,
-            c.radarRange ?? null, c.radarDetectionLifetime ?? null, c.radarTrackingSignal ?? null,
-            c.cmAmmoCount ?? null,
-            c.fuelCapacity ?? null, c.fuelIntakeRate ?? null,
-            c.empDamage ?? null, c.empRadius ?? null, c.empChargeTime ?? null, c.empCooldown ?? null,
-            c.qigJammerRange ?? null, c.qigSnareRadius ?? null, c.qigChargeTime ?? null, c.qigCooldown ?? null,
-          ],
-        );
-        saved++;
-      } catch (e: any) {
-        logger.error(`Component ${c.className}: ${e.message}`);
-      }
-    }
+            updated_at=CURRENT_TIMESTAMP`;
 
-    onProgress?.(`Components: ${saved}/${components.length}`);
-    return saved;
+    const COL_COUNT = 76; // number of columns above
+
+    /** Map a component object to a flat array of values */
+    const toRow = (c: any): (string | number | null)[] => [
+      c.uuid, c.className, c.name, c.type,
+      c.subType || null, c.size ?? null, c.grade || null, c.manufacturerCode || null,
+      c.mass ?? null, c.hp ?? null,
+      c.powerDraw ?? null, c.powerBase ?? null, c.powerOutput ?? null,
+      c.heatGeneration ?? null, c.coolingRate ?? null,
+      c.emSignature ?? null, c.irSignature ?? null,
+      c.weaponDamage ?? null, c.weaponDamageType || null,
+      c.weaponFireRate ?? null, c.weaponRange ?? null, c.weaponSpeed ?? null,
+      c.weaponAmmoCount ?? null, c.weaponPelletsPerShot ?? 1, c.weaponBurstSize ?? null,
+      c.weaponAlphaDamage ?? null, c.weaponDps ?? null,
+      c.weaponDamagePhysical ?? null, c.weaponDamageEnergy ?? null, c.weaponDamageDistortion ?? null,
+      c.weaponDamageThermal ?? null, c.weaponDamageBiochemical ?? null, c.weaponDamageStun ?? null,
+      c.weaponHeatPerShot ?? null, c.weaponBurstDps ?? null, c.weaponSustainedDps ?? null,
+      c.shieldHp ?? null, c.shieldRegen ?? null,
+      c.shieldRegenDelay ?? null, c.shieldHardening ?? null, c.shieldFaces ?? null,
+      c.qdSpeed ?? null, c.qdSpoolTime ?? null,
+      c.qdCooldown ?? null, c.qdFuelRate ?? null, c.qdRange ?? null,
+      c.qdStage1Accel ?? null, c.qdStage2Accel ?? null,
+      c.qdTuningRate ?? null, c.qdAlignmentRate ?? null, c.qdDisconnectRange ?? null,
+      c.missileDamage ?? null, c.missileSignalType || null,
+      c.missileLockTime ?? null, c.missileSpeed ?? null,
+      c.missileRange ?? null, c.missileLockRange ?? null,
+      c.missileDamagePhysical ?? null, c.missileDamageEnergy ?? null, c.missileDamageDistortion ?? null,
+      c.thrusterMaxThrust ?? null, c.thrusterType || null,
+      c.radarRange ?? null, c.radarDetectionLifetime ?? null, c.radarTrackingSignal ?? null,
+      c.cmAmmoCount ?? null,
+      c.fuelCapacity ?? null, c.fuelIntakeRate ?? null,
+      c.empDamage ?? null, c.empRadius ?? null, c.empChargeTime ?? null, c.empCooldown ?? null,
+      c.qigJammerRange ?? null, c.qigSnareRadius ?? null, c.qigChargeTime ?? null, c.qigCooldown ?? null,
+    ];
+
+    const rows = components.map(toRow);
+    const saved = await this.batchUpsert(
+      conn,
+      `INSERT INTO components (${COMP_COLS}) VALUES`,
+      COMP_UPDATE,
+      COL_COUNT,
+      rows,
+    );
+
+    onProgress?.(`Components: ${saved}/${components.length} (batch INSERT)`);
+    return components.length; // all attempted
   }
 
   // ======================================================
@@ -647,6 +664,7 @@ export class ExtractionService {
 
     let saved = 0;
     let debugSamples = 0;
+    const paintRows: (string | number | null)[][] = [];
     await conn.execute("DELETE FROM ship_paints");
 
     for (const paint of paints) {
@@ -712,16 +730,14 @@ export class ExtractionService {
       }
 
       for (const shipUuid of shipUuids) {
-        try {
-          await conn.execute(
-            `INSERT INTO ship_paints (ship_uuid, paint_class_name, paint_name, paint_uuid)
-             VALUES (?, ?, ?, ?)`,
-            [shipUuid, paint.paintClassName, paint.paintName, paint.paintUuid],
-          );
-          saved++;
-        } catch { /* Duplicate or FK error — skip */ }
+        paintRows.push([shipUuid, paint.paintClassName, paint.paintName, paint.paintUuid]);
       }
     }
+
+    // Batch insert paints (ignore duplicates / FK errors)
+    const PAINT_INSERT = `INSERT IGNORE INTO ship_paints (ship_uuid, paint_class_name, paint_name, paint_uuid) VALUES `;
+    await this.batchUpsert(conn, PAINT_INSERT, '', 4, paintRows, ExtractionService.BATCH_SIZE);
+    saved = paintRows.length;
     onProgress?.(`Paints: ${saved}/${paints.length} saved (${paints.length - saved} unmatched)`);
   }
 

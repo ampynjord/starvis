@@ -102,7 +102,13 @@ jobs:
       - name: Start API server
         run: |
           cd api && npx tsx server.ts &
-          sleep 8
+          # Wait for server to be ready (up to 60 seconds)
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:3000/health > /dev/null 2>&1 && break
+            sleep 1
+          done
+          curl -sf http://localhost:3000/health || (echo "❌ Server failed to start" && exit 1)
+          echo "✅ Server ready"
         env:
           P4K_PATH: ""
 

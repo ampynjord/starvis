@@ -6,7 +6,10 @@ const LOG_DIR = process.env.LOG_DIR || "logs";
 const LOG_LEVEL = process.env.LOG_LEVEL || "info";
 
 // Ensure log directory exists
-if (!existsSync(LOG_DIR)) { try { mkdirSync(LOG_DIR, { recursive: true }); } catch { /* ignore */ } }
+if (!existsSync(LOG_DIR)) {
+  try { mkdirSync(LOG_DIR, { recursive: true }); }
+  catch (e) { console.warn(`[logger] Could not create log dir "${LOG_DIR}": ${(e as Error).message}`); }
+}
 
 const consoleFormat = winston.format.combine(
   winston.format.colorize(),

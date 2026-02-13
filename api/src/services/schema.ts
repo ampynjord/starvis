@@ -104,4 +104,25 @@ export async function initializeSchema(conn: PoolConnection): Promise<void> {
       logger.debug(`Migration index ${idxName} skip: ${e.message}`, { module: 'schema' });
     }
   }
+
+  // Migration: add UNIQUE constraint on shop_inventory (shop_id, component_class_name)
+  try {
+    const [existing] = await conn.execute<any[]>(
+      "SELECT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'shop_inventory' AND INDEX_NAME = 'uk_shop_component'"
+    );
+    if (existing.length === 0) {
+      // Remove duplicates first (keep latest by id)
+      await conn.execute(
+        `DELETE si FROM shop_inventory si
+         INNER JOIN (
+           SELECT shop_id, component_class_name, MAX(id) as keep_id
+           FROM shop_inventory GROUP BY shop_id, component_class_name HAVING COUNT(*) > 1
+         ) dups ON si.shop_id = dups.shop_id AND si.component_class_name = dups.component_class_name AND si.id != dups.keep_id`
+      );
+      logger.info('Adding UNIQUE constraint uk_shop_component on shop_inventory', { module: 'schema' });
+      await conn.execute('ALTER TABLE shop_inventory ADD UNIQUE KEY uk_shop_component (shop_id, component_class_name)');
+    }
+  } catch (e: any) {
+    logger.debug(`Migration uk_shop_component skip: ${e.message}`, { module: 'schema' });
+  }
 }

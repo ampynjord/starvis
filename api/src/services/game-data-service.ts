@@ -2,14 +2,27 @@
  * GameDataService — Read-only query service for game data stored in MySQL
  *
  * All extraction logic lives in the standalone extractor package.
- * This service only reads data from the database for the REST API.
+ * This service only reads data for the REST API.
  */
-import type { Pool } from "mysql2/promise";
+import type { Pool, RowDataPacket } from "mysql2/promise";
+
+// ── Types ─────────────────────────────────────────────────
+
+/** A single row returned by mysql2 queries */
+type Row = RowDataPacket & Record<string, unknown>;
+
+interface PaginatedResult {
+  data: Row[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
 
 // ── Helpers ───────────────────────────────────────────────
 
-const num = (v: any): number => parseFloat(v) || 0;
-const int = (v: any): number => parseInt(v) || 0;
+const num = (v: unknown): number => parseFloat(String(v)) || 0;
+const int = (v: unknown): number => parseInt(String(v)) || 0;
 const r2 = (v: number): number => Math.round(v * 100) / 100;
 const r4 = (v: number): number => Math.round(v * 10000) / 10000;
 const r6 = (v: number): number => Math.round(v * 1000000) / 1000000;
@@ -71,13 +84,13 @@ export class GameDataService {
   private async paginate(
     baseSql: string,
     countSql: string,
-    params: any[],
+    params: (string | number)[],
     opts: { sort?: string; order?: string; page?: number; limit?: number },
     sortCols: Set<string>,
     alias: string,
-  ): Promise<{ data: any[]; total: number; page: number; limit: number; pages: number }> {
-    const [countRows] = await this.pool.execute(countSql, params);
-    const total = (countRows as any[])[0]?.total ?? (countRows as any[])[0]?.count ?? 0;
+  ): Promise<PaginatedResult> {
+    const [countRows] = await this.pool.execute<Row[]>(countSql, params);
+    const total = countRows[0]?.total ?? countRows[0]?.count ?? 0;
 
     const sortCol = sortCols.has(opts.sort || "") ? opts.sort! : "name";
     const order = opts.order === "desc" ? "DESC" : "ASC";
@@ -86,8 +99,8 @@ export class GameDataService {
     const offset = (page - 1) * limit;
 
     const sql = `${baseSql} ORDER BY ${alias}.${sortCol} ${order} LIMIT ${limit} OFFSET ${offset}`;
-    const [rows] = await this.pool.execute(sql, params);
-    return { data: rows as any[], total, page, limit, pages: Math.ceil(total / limit) };
+    const [rows] = await this.pool.execute<Row[]>(sql, params);
+    return { data: rows, total: Number(total), page, limit, pages: Math.ceil(Number(total) / limit) };
   }
 
   // ── SHIPS ───────────────────────────────────────────────
@@ -96,9 +109,9 @@ export class GameDataService {
     manufacturer?: string; role?: string; career?: string; status?: string;
     vehicle_category?: string; search?: string;
     sort?: string; order?: string; page?: number; limit?: number;
-  }): Promise<{ data: any[]; total: number; page: number; limit: number; pages: number }> {
+  }): Promise<PaginatedResult> {
     const where: string[] = [];
-    const params: any[] = [];
+    const params: (string | number)[] = [];
 
     if (filters?.manufacturer) { where.push("s.manufacturer_code = ?"); params.push(filters.manufacturer.toUpperCase()); }
     if (filters?.role) { where.push("s.role = ?"); params.push(filters.role); }
@@ -117,18 +130,18 @@ export class GameDataService {
 
     const result = await this.paginate(baseSql, countSql, params, filters || {}, SHIP_SORT, "s");
     // Strip heavy game_data JSON from list view
-    result.data = result.data.map(({ game_data, ...rest }: any) => rest);
+    result.data = result.data.map(({ game_data, ...rest }) => rest as Row);
     return result;
   }
 
-  async getShipByUuid(uuid: string): Promise<any | null> {
-    const [rows] = await this.pool.execute(`SELECT ${SHIP_SELECT} ${SHIP_JOINS} WHERE s.uuid = ?`, [uuid]);
-    return (rows as any[])[0] || null;
+  async getShipByUuid(uuid: string): Promise<Row | null> {
+    const [rows] = await this.pool.execute<Row[]>(`SELECT ${SHIP_SELECT} ${SHIP_JOINS} WHERE s.uuid = ?`, [uuid]);
+    return rows[0] || null;
   }
 
-  async getShipByClassName(className: string): Promise<any | null> {
-    const [rows] = await this.pool.execute(`SELECT ${SHIP_SELECT} ${SHIP_JOINS} WHERE s.class_name = ?`, [className]);
-    return (rows as any[])[0] || null;
+  async getShipByClassName(className: string): Promise<Row | null> {
+    const [rows] = await this.pool.execute<Row[]>(`SELECT ${SHIP_SELECT} ${SHIP_JOINS} WHERE s.class_name = ?`, [className]);
+    return rows[0] || null;
   }
 
   // ── COMPONENTS ──────────────────────────────────────────
@@ -137,9 +150,9 @@ export class GameDataService {
     type?: string; sub_type?: string; size?: string; grade?: string;
     manufacturer?: string; search?: string;
     sort?: string; order?: string; page?: number; limit?: number;
-  }): Promise<{ data: any[]; total: number; page: number; limit: number; pages: number }> {
+  }): Promise<PaginatedResult> {
     const where: string[] = [];
-    const params: any[] = [];
+    const params: (string | number)[] = [];
 
     if (filters?.type) { where.push("c.type = ?"); params.push(filters.type); }
     if (filters?.sub_type) { where.push("c.sub_type = ?"); params.push(filters.sub_type); }
@@ -159,48 +172,48 @@ export class GameDataService {
     return this.paginate(baseSql, countSql, params, filters || {}, COMP_SORT, "c");
   }
 
-  async getComponentByUuid(uuid: string): Promise<any | null> {
-    const [rows] = await this.pool.execute(
+  async getComponentByUuid(uuid: string): Promise<Row | null> {
+    const [rows] = await this.pool.execute<Row[]>(
       "SELECT c.*, m.name as manufacturer_name FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code WHERE c.uuid = ?",
       [uuid],
     );
-    return (rows as any[])[0] || null;
+    return rows[0] || null;
   }
 
   // ── MANUFACTURERS ───────────────────────────────────────
 
-  async getAllManufacturers(): Promise<any[]> {
-    const [rows] = await this.pool.execute(
+  async getAllManufacturers(): Promise<Row[]> {
+    const [rows] = await this.pool.execute<Row[]>(
       `SELECT m.*, COUNT(DISTINCT c.uuid) as component_count, COUNT(DISTINCT s.uuid) as ship_count
        FROM manufacturers m LEFT JOIN components c ON m.code = c.manufacturer_code LEFT JOIN ships s ON m.code = s.manufacturer_code
        GROUP BY m.code ORDER BY m.name`,
     );
-    return rows as any[];
+    return rows;
   }
 
-  async getShipManufacturers(): Promise<any[]> {
-    const [rows] = await this.pool.execute(
+  async getShipManufacturers(): Promise<Row[]> {
+    const [rows] = await this.pool.execute<Row[]>(
       `SELECT m.code, m.name, COUNT(s.uuid) as ship_count
        FROM manufacturers m INNER JOIN ships s ON m.code = s.manufacturer_code
        GROUP BY m.code, m.name ORDER BY m.name`,
     );
-    return rows as any[];
+    return rows;
   }
 
   // ── FILTERS ─────────────────────────────────────────────
 
   async getShipFilters(): Promise<{ roles: string[]; careers: string[] }> {
-    const [roleRows] = await this.pool.execute("SELECT DISTINCT role FROM ships WHERE role IS NOT NULL AND role != '' ORDER BY role");
-    const [careerRows] = await this.pool.execute("SELECT DISTINCT career FROM ships WHERE career IS NOT NULL AND career != '' ORDER BY career");
+    const [roleRows] = await this.pool.execute<Row[]>("SELECT DISTINCT role FROM ships WHERE role IS NOT NULL AND role != '' ORDER BY role");
+    const [careerRows] = await this.pool.execute<Row[]>("SELECT DISTINCT career FROM ships WHERE career IS NOT NULL AND career != '' ORDER BY career");
     return {
-      roles: (roleRows as any[]).map((r) => r.role),
-      careers: (careerRows as any[]).map((r) => r.career),
+      roles: roleRows.map((r) => String(r.role)),
+      careers: careerRows.map((r) => String(r.career)),
     };
   }
 
   // ── LOADOUT ─────────────────────────────────────────────
 
-  async getShipLoadout(shipUuid: string): Promise<any[]> {
+  async getShipLoadout(shipUuid: string): Promise<Row[]> {
     const [rows] = await this.pool.execute(
       `SELECT sl.id, sl.port_name, sl.port_type, sl.component_class_name, sl.component_uuid,
               sl.port_min_size, sl.port_max_size, sl.parent_id,
@@ -215,47 +228,47 @@ export class GameDataService {
        WHERE sl.ship_uuid = ? ORDER BY sl.port_type, sl.port_name`,
       [shipUuid],
     );
-    return rows as any[];
+    return rows as Row[];
   }
 
-  async getShipModules(shipUuid: string): Promise<any[]> {
-    const [rows] = await this.pool.execute("SELECT * FROM ship_modules WHERE ship_uuid = ? ORDER BY slot_name", [shipUuid]);
-    return rows as any[];
+  async getShipModules(shipUuid: string): Promise<Row[]> {
+    const [rows] = await this.pool.execute<Row[]>("SELECT * FROM ship_modules WHERE ship_uuid = ? ORDER BY slot_name", [shipUuid]);
+    return rows;
   }
 
-  async getShipPaints(shipUuid: string): Promise<any[]> {
-    const [rows] = await this.pool.execute(
+  async getShipPaints(shipUuid: string): Promise<Row[]> {
+    const [rows] = await this.pool.execute<Row[]>(
       "SELECT paint_class_name, paint_name, paint_uuid FROM ship_paints WHERE ship_uuid = ? ORDER BY paint_name",
       [shipUuid],
     );
-    return rows as any[];
+    return rows;
   }
 
   // ── CHANGELOG ───────────────────────────────────────────
 
-  async getChangelog(params: { limit?: string; offset?: string; entityType?: string; changeType?: string }): Promise<{ data: any[]; total: number }> {
+  async getChangelog(params: { limit?: string; offset?: string; entityType?: string; changeType?: string }): Promise<{ data: Row[]; total: number }> {
     const where: string[] = [];
-    const p: any[] = [];
+    const p: (string | number)[] = [];
     if (params.entityType) { where.push("c.entity_type = ?"); p.push(params.entityType); }
     if (params.changeType) { where.push("c.change_type = ?"); p.push(params.changeType); }
 
     const w = where.length ? ` WHERE ${where.join(" AND ")}` : "";
-    const [countRows] = await this.pool.execute(`SELECT COUNT(*) as total FROM changelog c${w}`, p);
-    const total = (countRows as any[])[0]?.total || 0;
+    const [countRows] = await this.pool.execute<Row[]>(`SELECT COUNT(*) as total FROM changelog c${w}`, p);
+    const total = Number(countRows[0]?.total) || 0;
 
     const limit = Math.min(100, parseInt(params.limit || "50"));
     const offset = parseInt(params.offset || "0");
-    const [rows] = await this.pool.execute(
+    const [rows] = await this.pool.execute<Row[]>(
       `SELECT c.*, e.game_version, e.extracted_at as extraction_date FROM changelog c LEFT JOIN extraction_log e ON c.extraction_id = e.id${w} ORDER BY c.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
       p,
     );
-    return { data: rows as any[], total };
+    return { data: rows, total };
   }
 
   // ── STATS (single query instead of 7 sequential SELECTs) ──
 
-  async getStats(): Promise<any> {
-    const [rows]: any = await this.pool.execute(`
+  async getStats(): Promise<Record<string, unknown>> {
+    const [rows] = await this.pool.execute<Row[]>(`
       SELECT
         (SELECT COUNT(*) FROM ships) as ships,
         (SELECT COUNT(*) FROM components) as components,
@@ -270,9 +283,9 @@ export class GameDataService {
 
   // ── SHOPS ───────────────────────────────────────────────
 
-  async getShops(opts: { page?: number; limit?: number; location?: string; type?: string; search?: string }): Promise<{ data: any[]; total: number; page: number; limit: number }> {
+  async getShops(opts: { page?: number; limit?: number; location?: string; type?: string; search?: string }): Promise<{ data: Row[]; total: number; page: number; limit: number }> {
     const where: string[] = [];
-    const params: any[] = [];
+    const params: (string | number)[] = [];
 
     if (opts.search) { where.push("(name LIKE ? OR location LIKE ? OR parent_location LIKE ?)"); const t = `%${opts.search}%`; params.push(t, t, t); }
     if (opts.location) { where.push("(location LIKE ? OR parent_location LIKE ?)"); const t = `%${opts.location}%`; params.push(t, t); }
@@ -283,66 +296,66 @@ export class GameDataService {
     const limit = Math.min(100, Math.max(1, opts.limit || 20));
     const offset = (page - 1) * limit;
 
-    const [countRows]: any = await this.pool.execute(`SELECT COUNT(*) as count FROM shops${w}`, params);
-    const total = countRows[0].count;
-    const [rows] = await this.pool.execute(`SELECT * FROM shops${w} ORDER BY name LIMIT ${limit} OFFSET ${offset}`, params);
+    const [countRows] = await this.pool.execute<Row[]>(`SELECT COUNT(*) as count FROM shops${w}`, params);
+    const total = Number(countRows[0].count);
+    const [rows] = await this.pool.execute<Row[]>(`SELECT * FROM shops${w} ORDER BY name LIMIT ${limit} OFFSET ${offset}`, params);
 
-    return { data: rows as any[], total, page, limit };
+    return { data: rows, total, page, limit };
   }
 
-  async getShopInventory(shopId: number): Promise<any[]> {
-    const [rows] = await this.pool.execute(
+  async getShopInventory(shopId: number): Promise<Row[]> {
+    const [rows] = await this.pool.execute<Row[]>(
       `SELECT si.*, c.name as component_name, c.type as component_type, c.size as component_size
        FROM shop_inventory si LEFT JOIN components c ON si.component_uuid = c.uuid
        WHERE si.shop_id = ? ORDER BY c.type, c.name`,
       [shopId],
     );
-    return rows as any[];
+    return rows;
   }
 
-  async getComponentBuyLocations(uuid: string): Promise<any[]> {
-    const [rows] = await this.pool.execute(
+  async getComponentBuyLocations(uuid: string): Promise<Row[]> {
+    const [rows] = await this.pool.execute<Row[]>(
       `SELECT s.name as shop_name, s.location, s.parent_location, s.shop_type,
               si.base_price, si.rental_price_1d, si.rental_price_3d, si.rental_price_7d, si.rental_price_30d
        FROM shop_inventory si JOIN shops s ON si.shop_id = s.id
        WHERE si.component_uuid = ? ORDER BY si.base_price`,
       [uuid],
     );
-    return rows as any[];
+    return rows;
   }
 
   // ── LOADOUT CALCULATOR ──────────────────────────────────
 
-  async calculateLoadout(shipUuid: string, swaps: { portName: string; componentUuid: string }[]): Promise<any> {
+  async calculateLoadout(shipUuid: string, swaps: { portName: string; componentUuid: string }[]): Promise<Record<string, unknown>> {
     // 1. Load ship
-    const [shipRows]: any = await this.pool.execute("SELECT * FROM ships WHERE uuid = ?", [shipUuid]);
+    const [shipRows] = await this.pool.execute<Row[]>("SELECT * FROM ships WHERE uuid = ?", [shipUuid]);
     if (!shipRows.length) throw new Error("Ship not found");
     const ship = shipRows[0];
 
     // 2. Cross-section fallback from ship_matrix
     let crossX = num(ship.cross_section_x), crossY = num(ship.cross_section_y), crossZ = num(ship.cross_section_z);
     if (crossX === 0 && crossY === 0 && crossZ === 0 && ship.ship_matrix_id) {
-      const [smRows]: any = await this.pool.execute("SELECT length, beam, height FROM ship_matrix WHERE id = ?", [ship.ship_matrix_id]);
+      const [smRows] = await this.pool.execute<Row[]>("SELECT length, beam, height FROM ship_matrix WHERE id = ?", [ship.ship_matrix_id]);
       if (smRows.length) { crossX = num(smRows[0].length); crossY = num(smRows[0].beam); crossZ = num(smRows[0].height); }
     }
 
     // 3. Load loadout with components
-    const [loadoutRows]: any = await this.pool.execute(
+    const [loadoutRows] = await this.pool.execute<Row[]>(
       `SELECT sl.port_name, sl.port_type, sl.port_min_size, sl.port_max_size, sl.component_uuid, c.*
        FROM ships_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid WHERE sl.ship_uuid = ?`,
       [shipUuid],
     );
-    const loadout = loadoutRows.map((row: any) => ({ ...row }));
+    const loadout: Row[] = loadoutRows.map((row) => ({ ...row }) as Row);
 
     // 4. Apply swaps — batch load all swapped components (instead of N+1 queries)
     if (swaps.length) {
       const swapMap = new Map(swaps.map(s => [s.portName, s.componentUuid]));
       const swapUuids = [...new Set(swaps.map(s => s.componentUuid))];
-      const swapComponents = new Map<string, any>();
+      const swapComponents = new Map<string, Row>();
 
       if (swapUuids.length) {
         const ph = swapUuids.map(() => "?").join(",");
-        const [compRows]: any = await this.pool.execute(`SELECT * FROM components WHERE uuid IN (${ph})`, swapUuids);
+        const [compRows] = await this.pool.execute<Row[]>(`SELECT * FROM components WHERE uuid IN (${ph})`, swapUuids);
         for (const c of compRows) swapComponents.set(c.uuid, c);
       }
 
@@ -364,14 +377,14 @@ export class GameDataService {
 
     // 6. Build filtered loadout list
     const filteredLoadout = loadout
-      .filter((l: any) => {
+      .filter((l) => {
         if (!l.component_uuid || !l.type) return false;
-        if (!RELEVANT_TYPES.has(l.type)) return false;
-        if (l.port_name?.includes("controller") || l.port_name === "Radar" || l.port_name?.endsWith("_helper")) return false;
-        if (l.type === "WeaponGun" && (UTILITY_WEAPON_RX.test(l.name || l.class_name || "") || !(num(l.weapon_dps) > 0))) return false;
+        if (!RELEVANT_TYPES.has(String(l.type))) return false;
+        if (String(l.port_name)?.includes("controller") || l.port_name === "Radar" || String(l.port_name)?.endsWith("_helper")) return false;
+        if (l.type === "WeaponGun" && (UTILITY_WEAPON_RX.test(String(l.name || l.class_name || "")) || !(num(l.weapon_dps) > 0))) return false;
         return true;
       })
-      .map((l: any) => ({
+      .map((l) => ({
         port_name: l.port_name, port_type: l.port_type, component_uuid: l.component_uuid,
         component_name: l.name, display_name: cleanName(l.name, l.type),
         component_type: l.type, component_size: int(l.size) || null,
@@ -397,7 +410,7 @@ export class GameDataService {
   }
 
   /** Aggregate stats from a loadout array — extracted from calculateLoadout */
-  private aggregateLoadoutStats(loadout: any[], ship: any, crossX: number, crossY: number, crossZ: number): any {
+  private aggregateLoadoutStats(loadout: Row[], ship: Row, crossX: number, crossY: number, crossZ: number): Record<string, unknown> {
     let totalDps = 0, totalBurstDps = 0, totalSustainedDps = 0;
     let totalShieldHp = 0, totalShieldRegen = 0;
     let totalPowerDraw = 0, totalPowerOutput = 0;
@@ -407,9 +420,9 @@ export class GameDataService {
     let qdSpeed = 0, qdSpoolTime = 0, qdCooldown = 0, qdFuelRate = 0;
     let qdRange = 0, qdTuningRate = 0, qdAlignmentRate = 0, qdDisconnectRange = 0, qdName = "";
 
-    const weapons: any[] = [], shields: any[] = [], missiles: any[] = [];
-    const powerPlants: any[] = [], coolers: any[] = [];
-    const cms: any[] = [], emps: any[] = [], qigs: any[] = [];
+    const weapons: Record<string, unknown>[] = [], shields: Record<string, unknown>[] = [], missiles: Record<string, unknown>[] = [];
+    const powerPlants: Record<string, unknown>[] = [], coolers: Record<string, unknown>[] = [];
+    const cms: Record<string, unknown>[] = [], emps: Record<string, unknown>[] = [], qigs: Record<string, unknown>[] = [];
     let cmFlare = 0, cmChaff = 0;
 
     for (const l of loadout) {
@@ -527,13 +540,13 @@ export class GameDataService {
 
   // ── EXTRACTION LOG ──────────────────────────────────────
 
-  async getExtractionLog(): Promise<any[]> {
-    const [rows] = await this.pool.execute("SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 20");
-    return rows as any[];
+  async getExtractionLog(): Promise<Row[]> {
+    const [rows] = await this.pool.execute<Row[]>("SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 20");
+    return rows;
   }
 
-  async getLatestExtraction(): Promise<any | null> {
-    const [rows] = await this.pool.execute("SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 1");
-    return (rows as any[])[0] || null;
+  async getLatestExtraction(): Promise<Row | null> {
+    const [rows] = await this.pool.execute<Row[]>("SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 1");
+    return rows[0] || null;
   }
 }
