@@ -1,0 +1,41 @@
+# Production override — used on VPS behind Traefik
+# Pulls pre-built images from GHCR, routes via Traefik reverse proxy
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  api:
+    image: ghcr.io/ampynjord/starapi-api:latest
+    build: !reset null
+    ports: !reset []
+    networks:
+      - default
+      - traefik-network
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.starvis-api.rule: "Host(`starvis-api.ampynjord.bzh`)"
+      traefik.http.routers.starvis-api.entrypoints: "websecure"
+      traefik.http.routers.starvis-api.tls.certresolver: "letsencrypt"
+      traefik.http.services.starvis-api.loadbalancer.server.port: "3000"
+
+  ihm:
+    image: ghcr.io/ampynjord/starapi-ihm:latest
+    build: !reset null
+    ports: !reset []
+    networks:
+      - default
+      - traefik-network
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.starvis-ihm.rule: "Host(`starvis.ampynjord.bzh`)"
+      traefik.http.routers.starvis-ihm.entrypoints: "websecure"
+      traefik.http.routers.starvis-ihm.tls.certresolver: "letsencrypt"
+      traefik.http.services.starvis-ihm.loadbalancer.server.port: "80"
+
+  mysql:
+    # No Traefik — internal only, no exposed ports in prod
+    ports: !reset []
+
+networks:
+  traefik-network:
+    external: true
