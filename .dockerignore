@@ -7,6 +7,9 @@
 **/build
 **/.tsbuildinfo
 
+# Extractor (local PC only, never deployed)
+extractor/
+
 # Version control
 .git
 .gitignore
@@ -27,6 +30,10 @@
 
 # Documentation
 *.md
+
+# Tests
+**/tests
+**/coverage
 
 # OS files
 .DS_Store
