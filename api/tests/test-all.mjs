@@ -63,6 +63,15 @@ async function adminGet(path) {
 function assert(cond, msg) { if (!cond) throw new Error(msg); }
 function skip(msg) { throw new Error(`SKIP: ${msg}`); }
 
+// ─── Sanity: is the server reachable? ───────────────────────────────────────
+try {
+  await fetch(BASE, { signal: AbortSignal.timeout(5000) });
+} catch {
+  console.error(`\n${C.red}  ❌ Server unreachable at ${BASE}${C.reset}`);
+  console.error(`${C.red}     Make sure the API is running before executing tests.${C.reset}\n`);
+  process.exit(1);
+}
+
 // ─── Détection données de jeu ───────────────────────────────────────────────
 let hasGameData = false;
 let shipCount = 0;
@@ -74,6 +83,16 @@ try {
 } catch { /* pas de game data */ }
 if (!hasGameData) {
   console.log(`${C.yellow}  ⚠  Pas de données game (P4K) — les tests game-data seront skip${C.reset}`);
+}
+
+// ─── Détection Ship Matrix ──────────────────────────────────────────────────
+let hasShipMatrix = false;
+try {
+  const r = await rawGet('/ship-matrix/stats');
+  hasShipMatrix = r.ok && r.data.data?.total > 0;
+} catch { /* pas de ship matrix */ }
+if (!hasShipMatrix) {
+  console.log(`${C.yellow}  ⚠  Pas de données Ship Matrix — les tests ship-matrix seront skip${C.reset}`);
 }
 
 // ============================================================================
@@ -98,6 +117,7 @@ await test('GET /health → ok + database connected', async () => {
 section('📋 SHIP MATRIX (RSI)');
 
 await test('GET /ship-matrix → ≥200 ships', async () => {
+  if (!hasShipMatrix) skip('no ship matrix data');
   const { data } = await rawGet('/ship-matrix');
   assert(data.success, 'Request failed');
   assert(Array.isArray(data.data), 'Expected array');
@@ -106,23 +126,27 @@ await test('GET /ship-matrix → ≥200 ships', async () => {
 });
 
 await test('GET /ship-matrix?search=aurora → results', async () => {
+  if (!hasShipMatrix) skip('no ship matrix data');
   const { data } = await rawGet('/ship-matrix?search=aurora');
   assert(data.success && data.count > 0, 'No Auroras');
   info(`${data.count} Aurora variants`);
 });
 
 await test('GET /ship-matrix/stats', async () => {
+  if (!hasShipMatrix) skip('no ship matrix data');
   const { data } = await rawGet('/ship-matrix/stats');
   assert(data.success && data.data.total >= 200, `Total: ${data.data?.total}`);
 });
 
 await test('GET /ship-matrix/:id → by ID', async () => {
+  if (!hasShipMatrix) skip('no ship matrix data');
   const { data } = await rawGet('/ship-matrix/1');
   assert(data.success && data.data, 'Not found');
   info(`ID 1 = ${data.data.name}`);
 });
 
 await test('GET /ship-matrix/999999 → 404', async () => {
+  if (!hasShipMatrix) skip('no ship matrix data');
   const { status } = await rawGet('/ship-matrix/999999');
   assert(status === 404, `Expected 404, got ${status}`);
 });
@@ -391,6 +415,7 @@ await test('GET /admin/extraction-log → with auth', async () => {
 section('📤 CSV EXPORT');
 
 await test('GET /ship-matrix?format=csv → CSV output', async () => {
+  if (!hasShipMatrix) skip('no ship matrix data');
   const res = await fetch(`${API}/ship-matrix?format=csv`);
   const ct = res.headers.get('content-type');
   assert(ct && ct.includes('text/csv'), `Expected text/csv, got ${ct}`);
@@ -434,6 +459,7 @@ await test('GET /ships → If-None-Match → 304', async () => {
 });
 
 await test('GET /ship-matrix → Cache-Control header', async () => {
+  if (!hasShipMatrix) skip('no ship matrix data');
   const res = await fetch(`${API}/ship-matrix`);
   const cc = res.headers.get('cache-control');
   assert(cc && cc.includes('max-age'), `Missing/wrong Cache-Control: ${cc}`);

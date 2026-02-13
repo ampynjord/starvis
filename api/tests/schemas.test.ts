@@ -1,0 +1,294 @@
+/**
+ * STARVIS - API Unit Tests
+ * Tests zod schemas, route helpers, and asyncHandler
+ */
+import { describe, expect, it } from "vitest";
+import { z, ZodError } from "zod";
+
+// ── Re-create the schemas/helpers exactly as routes.ts defines them ──
+// (We import the logic rather than spinning up Express)
+
+const qStr = z.preprocess(
+  (v) => (Array.isArray(v) ? v[0] : v) || undefined,
+  z.string().optional(),
+);
+
+const qInt = (def: number, max?: number) =>
+  z.preprocess(
+    (v) => {
+      const s = Array.isArray(v) ? v[0] : v;
+      return s === undefined || s === "" ? undefined : s;
+    },
+    z.coerce
+      .number()
+      .int()
+      .min(1)
+      .pipe(max ? z.number().max(max) : z.number())
+      .catch(def),
+  );
+
+const ShipQuery = z
+  .object({
+    manufacturer: qStr, role: qStr, career: qStr, status: qStr,
+    vehicle_category: qStr, search: qStr,
+    sort: qStr, order: qStr,
+    page: qInt(1), limit: qInt(50, 200),
+    format: qStr,
+  })
+  .passthrough();
+
+const ComponentQuery = z
+  .object({
+    type: qStr, sub_type: qStr, size: qStr, grade: qStr,
+    manufacturer: qStr, search: qStr,
+    sort: qStr, order: qStr,
+    page: qInt(1), limit: qInt(50, 200),
+    format: qStr,
+  })
+  .passthrough();
+
+const LoadoutBody = z.object({
+  shipUuid: z.string().min(1, "shipUuid is required"),
+  swaps: z
+    .array(
+      z.object({
+        portName: z.string().min(1, "portName is required"),
+        componentUuid: z.string().min(1, "componentUuid is required"),
+      }),
+    )
+    .default([]),
+});
+
+// ── Tests ──
+
+describe("qStr", () => {
+  it("accepts undefined → undefined", () => {
+    expect(qStr.parse(undefined)).toBeUndefined();
+  });
+
+  it("accepts a plain string", () => {
+    expect(qStr.parse("AEGS")).toBe("AEGS");
+  });
+
+  it("picks first element from array (Express query array)", () => {
+    expect(qStr.parse(["AEGS", "RSI"])).toBe("AEGS");
+  });
+
+  it("coerces empty string to undefined", () => {
+    expect(qStr.parse("")).toBeUndefined();
+  });
+});
+
+describe("qInt", () => {
+  const page = qInt(1);
+  const limit = qInt(50, 200);
+
+  it("defaults to fallback for undefined", () => {
+    expect(page.parse(undefined)).toBe(1);
+    expect(limit.parse(undefined)).toBe(50);
+  });
+
+  it("parses valid string numbers", () => {
+    expect(page.parse("3")).toBe(3);
+    expect(limit.parse("100")).toBe(100);
+  });
+
+  it("defaults for non-numeric input", () => {
+    expect(page.parse("abc")).toBe(1);
+    expect(limit.parse("")).toBe(50);
+  });
+
+  it("clamps to min(1)", () => {
+    // negative → catch → default
+    expect(page.parse("-1")).toBe(1);
+    expect(page.parse("0")).toBe(1);
+  });
+
+  it("clamps to max when specified", () => {
+    // 300 exceeds max=200 → catch → default
+    expect(limit.parse("300")).toBe(50);
+  });
+
+  it("handles array input (Express multi-value)", () => {
+    expect(page.parse(["5", "10"])).toBe(5);
+  });
+});
+
+describe("ShipQuery", () => {
+  it("parses empty query with defaults", () => {
+    const result = ShipQuery.parse({});
+    expect(result.page).toBe(1);
+    expect(result.limit).toBe(50);
+    expect(result.manufacturer).toBeUndefined();
+  });
+
+  it("parses a full query", () => {
+    const result = ShipQuery.parse({
+      manufacturer: "AEGS",
+      role: "Light Fighter",
+      career: "Combat",
+      page: "2",
+      limit: "10",
+      sort: "name",
+      order: "desc",
+    });
+    expect(result.manufacturer).toBe("AEGS");
+    expect(result.page).toBe(2);
+    expect(result.limit).toBe(10);
+    expect(result.sort).toBe("name");
+    expect(result.order).toBe("desc");
+  });
+
+  it("passes through unknown keys (passthrough)", () => {
+    const result = ShipQuery.parse({ custom: "value" });
+    expect((result as Record<string, unknown>).custom).toBe("value");
+  });
+});
+
+describe("ComponentQuery", () => {
+  it("parses empty query with defaults", () => {
+    const result = ComponentQuery.parse({});
+    expect(result.page).toBe(1);
+    expect(result.limit).toBe(50);
+  });
+
+  it("handles component-specific filters", () => {
+    const result = ComponentQuery.parse({
+      type: "WeaponGun",
+      sub_type: "Laser",
+      size: "3",
+      grade: "A",
+      manufacturer: "BEHR",
+    });
+    expect(result.type).toBe("WeaponGun");
+    expect(result.sub_type).toBe("Laser");
+    expect(result.size).toBe("3");
+    expect(result.grade).toBe("A");
+    expect(result.manufacturer).toBe("BEHR");
+  });
+});
+
+describe("LoadoutBody", () => {
+  it("requires shipUuid", () => {
+    expect(() => LoadoutBody.parse({})).toThrow(ZodError);
+    expect(() => LoadoutBody.parse({ shipUuid: "" })).toThrow(ZodError);
+  });
+
+  it("defaults swaps to empty array", () => {
+    const result = LoadoutBody.parse({
+      shipUuid: "abc-123-def-456",
+    });
+    expect(result.swaps).toEqual([]);
+  });
+
+  it("parses full body with swaps", () => {
+    const result = LoadoutBody.parse({
+      shipUuid: "abc-123-def-456",
+      swaps: [
+        { portName: "hardpoint_weapon_gun_class3_left", componentUuid: "comp-uuid-1" },
+        { portName: "hardpoint_weapon_gun_class3_right", componentUuid: "comp-uuid-2" },
+      ],
+    });
+    expect(result.swaps).toHaveLength(2);
+    expect(result.swaps[0].portName).toBe("hardpoint_weapon_gun_class3_left");
+  });
+
+  it("rejects empty portName or componentUuid in swaps", () => {
+    expect(() =>
+      LoadoutBody.parse({
+        shipUuid: "abc",
+        swaps: [{ portName: "", componentUuid: "xyz" }],
+      }),
+    ).toThrow(ZodError);
+  });
+});
+
+describe("arrayToCsv", () => {
+  // Re-implement the minimal CSV helper for testing
+  function arrayToCsv(data: Record<string, unknown>[]): string {
+    if (!data.length) return "";
+    const headers = Object.keys(data[0]);
+    const lines = [headers.join(",")];
+    for (const row of data) {
+      lines.push(
+        headers
+          .map((h) => {
+            const val = row[h];
+            if (val === null || val === undefined) return "";
+            const str = typeof val === "object" ? JSON.stringify(val) : String(val);
+            return str.includes(",") || str.includes('"') || str.includes("\n")
+              ? `"${str.replace(/"/g, '""')}"`
+              : str;
+          })
+          .join(","),
+      );
+    }
+    return lines.join("\n");
+  }
+
+  it("returns empty string for empty array", () => {
+    expect(arrayToCsv([])).toBe("");
+  });
+
+  it("generates valid CSV with headers", () => {
+    const csv = arrayToCsv([
+      { name: "Aurora", manufacturer: "RSI" },
+      { name: "Gladius", manufacturer: "AEGS" },
+    ]);
+    const lines = csv.split("\n");
+    expect(lines[0]).toBe("name,manufacturer");
+    expect(lines[1]).toBe("Aurora,RSI");
+    expect(lines[2]).toBe("Gladius,AEGS");
+  });
+
+  it("quotes fields with commas", () => {
+    const csv = arrayToCsv([{ name: "Cutlass Black, Drake" }]);
+    expect(csv).toContain('"Cutlass Black, Drake"');
+  });
+
+  it("escapes double quotes", () => {
+    const csv = arrayToCsv([{ desc: 'He said "hello"' }]);
+    expect(csv).toContain('"He said ""hello"""');
+  });
+
+  it("handles null values as empty", () => {
+    const csv = arrayToCsv([{ name: "Aurora", value: null }]);
+    expect(csv).toBe("name,value\nAurora,");
+  });
+});
+
+describe("cleanName", () => {
+  // Re-implement for testing
+  function cleanName(name: string, type: string): string {
+    if (!name) return "—";
+    let c = name;
+    if (["Shield", "QuantumDrive", "PowerPlant", "Cooler", "Radar", "Missile"].includes(type))
+      c = c.replace(/^S\d{2}\s+/, "");
+    if (type === "Countermeasure") {
+      const m = c.match(/(CML\s+.+)/i);
+      if (m) c = m[1];
+    }
+    c = c.replace(/\s*SCItem.*$/i, "").replace(/\s*_Resist.*$/i, "");
+    return c.trim() || "—";
+  }
+
+  it("returns — for empty name", () => {
+    expect(cleanName("", "WeaponGun")).toBe("—");
+  });
+
+  it("strips size prefix for shields", () => {
+    expect(cleanName("S03 Shimmer Shield", "Shield")).toBe("Shimmer Shield");
+  });
+
+  it("strips SCItem suffix", () => {
+    expect(cleanName("Behring Laser SCItem_V2", "WeaponGun")).toBe("Behring Laser");
+  });
+
+  it("extracts CML prefix for countermeasures", () => {
+    expect(cleanName("ORIG Pioneer CML Noise Chaff", "Countermeasure")).toBe("CML Noise Chaff");
+  });
+
+  it("keeps weapon names intact", () => {
+    expect(cleanName("CF-117 Bulldog", "WeaponGun")).toBe("CF-117 Bulldog");
+  });
+});

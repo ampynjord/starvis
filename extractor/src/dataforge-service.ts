@@ -3,6 +3,11 @@
  * Handles: binary parsing, struct/property resolution, GUID indexing, instance reading
  */
 import { CryXmlNode, isCryXmlB, parseCryXml } from "./cryxml-parser.js";
+import {
+  type DataForgeData, DT_NAMES,
+  getStructProperties, parseDataForge, readGuidAt,
+  readInstance as readInstancePure,
+} from "./dataforge-parser.js";
 import logger from "./logger.js";
 import { P4KProvider } from "./p4k-provider.js";
 
@@ -51,7 +56,7 @@ export const MANUFACTURER_CODES: Record<string, string> = {
 export class DataForgeService {
   private provider: P4KProvider | null = null;
   private dcbBuffer: Buffer | null = null;
-  private dfData: any = null;
+  private dfData: DataForgeData | null = null;
   private vehicleIndex = new Map<string, { uuid: string; name: string; className: string }>();
   private guidIndex = new Map<string, string>();
 
@@ -77,7 +82,7 @@ export class DataForgeService {
     onProgress?.(`Game2.dcb found (${(dcbEntry.uncompressedSize / 1024 / 1024).toFixed(1)} MB)`);
     this.dcbBuffer = await this.provider.readFileFromEntry(dcbEntry);
     onProgress?.("Parsing DataForge...");
-    this.dfData = this.parseDataForge(this.dcbBuffer);
+    this.dfData = parseDataForge(this.dcbBuffer);
     this.buildVehicleIndex();
     return {
       version: this.dfData.header.version,
@@ -178,14 +183,7 @@ export class DataForgeService {
     if (!this.dfData) throw new Error("DataForge not loaded");
     const idx = this.dfData.structDefs.findIndex((s: any) => s.name === structName);
     if (idx === -1) return [];
-    const props = this.getStructProperties(idx);
-    const DT_NAMES: Record<number, string> = {
-      0x0001: 'BOOLEAN', 0x0002: 'INT8', 0x0003: 'INT16', 0x0004: 'INT32', 0x0005: 'INT64',
-      0x0006: 'UINT8', 0x0007: 'UINT16', 0x0008: 'UINT32', 0x0009: 'UINT64',
-      0x000A: 'STRING', 0x000B: 'SINGLE', 0x000C: 'DOUBLE', 0x000D: 'LOCALE',
-      0x000E: 'GUID', 0x000F: 'ENUM', 0x0010: 'CLASS', 0x0110: 'STRONG_PTR',
-      0x0210: 'WEAK_PTR', 0x0310: 'REFERENCE'
-    };
+    const props = getStructProperties(this.dfData, idx);
     return props.map((p: any) => ({
       name: p.name,
       dataType: DT_NAMES[p.dataType] || `0x${p.dataType.toString(16)}`,
@@ -410,357 +408,11 @@ export class DataForgeService {
     return this.readInstance(rec.structIndex, rec.instanceIndex, 0, maxDepth);
   }
 
-  // ============ DataForge Instance Reader ============
-
-  private static readonly DT_BOOLEAN       = 0x0001;
-  private static readonly DT_INT8          = 0x0002;
-  private static readonly DT_INT16         = 0x0003;
-  private static readonly DT_INT32         = 0x0004;
-  private static readonly DT_INT64         = 0x0005;
-  private static readonly DT_UINT8         = 0x0006;
-  private static readonly DT_UINT16        = 0x0007;
-  private static readonly DT_UINT32        = 0x0008;
-  private static readonly DT_UINT64        = 0x0009;
-  private static readonly DT_STRING        = 0x000A;
-  private static readonly DT_SINGLE        = 0x000B;
-  private static readonly DT_DOUBLE        = 0x000C;
-  private static readonly DT_LOCALE        = 0x000D;
-  private static readonly DT_GUID          = 0x000E;
-  private static readonly DT_ENUM          = 0x000F;
-  private static readonly DT_CLASS         = 0x0010;
-  private static readonly DT_STRONG_PTR    = 0x0110;
-  private static readonly DT_WEAK_PTR      = 0x0210;
-  private static readonly DT_REFERENCE     = 0x0310;
-
-  private getStructProperties(structIndex: number): any[] {
-    if (!this.dfData) return [];
-    const { structDefs, propertyDefs } = this.dfData;
-    const sd = structDefs[structIndex];
-    if (!sd) return [];
-    const hierarchy: any[] = [];
-    const visited = new Set<number>();
-    const buildHierarchy = (idx: number) => {
-      if (visited.has(idx)) return;
-      visited.add(idx);
-      const s = structDefs[idx];
-      if (!s) return;
-      if (s.parentTypeIndex !== -1 && s.parentTypeIndex !== 0xFFFFFFFF) buildHierarchy(s.parentTypeIndex);
-      hierarchy.push(s);
-    };
-    buildHierarchy(structIndex);
-    const props: any[] = [];
-    for (const h of hierarchy) {
-      for (let pi = h.firstAttributeIndex; pi < h.firstAttributeIndex + h.attributeCount; pi++) {
-        if (propertyDefs[pi]) props.push(propertyDefs[pi]);
-      }
-    }
-    return props;
-  }
+  // ============ DataForge Instance Reader (delegated to dataforge-parser.ts) ============
 
   readInstance(structIndex: number, variantIndex: number, depth = 0, maxDepth = 3): Record<string, any> | null {
     if (!this.dfData || !this.dcbBuffer) return null;
-    if (depth > maxDepth) return null;
-    const buf = this.dcbBuffer;
-    const { structDefs, structToDataOffsetMap, dataOffset } = this.dfData;
-    const mapOffset = structToDataOffsetMap.get(structIndex);
-    if (mapOffset === undefined) return null;
-    const sd = structDefs[structIndex];
-    if (!sd) return null;
-    const instancePos = dataOffset + mapOffset + variantIndex * sd.structSize;
-    if (instancePos + sd.structSize > buf.length) return null;
-    const allProps = this.getStructProperties(structIndex);
-    const result: Record<string, any> = { __type: sd.name };
-    let pos = instancePos;
-    for (const prop of allProps) {
-      if (prop.conversionType === 0) {
-        const [val, newPos] = this.readValueInline(buf, pos, prop, depth, maxDepth);
-        result[prop.name] = val;
-        pos = newPos;
-      } else {
-        if (pos + 8 > buf.length) break;
-        const count = buf.readUInt32LE(pos); pos += 4;
-        const firstIndex = buf.readUInt32LE(pos); pos += 4;
-        const arr: any[] = [];
-        const limit = Math.min(count, 200);
-        for (let i = 0; i < limit; i++) arr.push(this.readValueAtIndex(firstIndex + i, prop, depth, maxDepth));
-        result[prop.name] = arr;
-      }
-    }
-    return result;
-  }
-
-  private readValueInline(buf: Buffer, pos: number, prop: any, depth: number, maxDepth: number): [any, number] {
-    if (pos >= buf.length) return [null, pos];
-    const dt = prop.dataType;
-    switch (dt) {
-      case DataForgeService.DT_BOOLEAN: return [buf.readUInt8(pos) !== 0, pos + 1];
-      case DataForgeService.DT_INT8:    return [buf.readInt8(pos), pos + 1];
-      case DataForgeService.DT_INT16:   return [buf.readInt16LE(pos), pos + 2];
-      case DataForgeService.DT_INT32:   return [buf.readInt32LE(pos), pos + 4];
-      case DataForgeService.DT_INT64:   return [Number(buf.readBigInt64LE(pos)), pos + 8];
-      case DataForgeService.DT_UINT8:   return [buf.readUInt8(pos), pos + 1];
-      case DataForgeService.DT_UINT16:  return [buf.readUInt16LE(pos), pos + 2];
-      case DataForgeService.DT_UINT32:  return [buf.readUInt32LE(pos), pos + 4];
-      case DataForgeService.DT_UINT64:  return [Number(buf.readBigUInt64LE(pos)), pos + 8];
-      case DataForgeService.DT_STRING: {
-        const strOff = buf.readUInt32LE(pos);
-        return [this.dfData!.stringTable1.get(strOff) ?? `STR_${strOff}`, pos + 4];
-      }
-      case DataForgeService.DT_SINGLE:  return [Math.round(buf.readFloatLE(pos) * 1e6) / 1e6, pos + 4];
-      case DataForgeService.DT_DOUBLE:  return [buf.readDoubleLE(pos), pos + 8];
-      case DataForgeService.DT_LOCALE: {
-        const locOff = buf.readUInt32LE(pos);
-        return [this.dfData!.stringTable1.get(locOff) ?? `LOC_${locOff}`, pos + 4];
-      }
-      case DataForgeService.DT_GUID:    return [this.readGuidAt(buf, pos), pos + 16];
-      case DataForgeService.DT_ENUM: {
-        const enumOff = buf.readUInt32LE(pos);
-        return [this.dfData!.stringTable1.get(enumOff) ?? `ENUM_${enumOff}`, pos + 4];
-      }
-      case DataForgeService.DT_CLASS: {
-        const nestedIdx = prop.structIndex;
-        const nestedProps = this.getStructProperties(nestedIdx);
-        const nestedResult: Record<string, any> = {};
-        const sd = this.dfData!.structDefs[nestedIdx];
-        if (sd) nestedResult.__type = sd.name;
-        let curPos = pos;
-        if (depth < maxDepth) {
-          for (const np of nestedProps) {
-            if (np.conversionType === 0) {
-              const [v, np2] = this.readValueInline(buf, curPos, np, depth + 1, maxDepth);
-              nestedResult[np.name] = v;
-              curPos = np2;
-            } else {
-              if (curPos + 8 > buf.length) break;
-              const cnt = buf.readUInt32LE(curPos); curPos += 4;
-              const fi = buf.readUInt32LE(curPos); curPos += 4;
-              const arr: any[] = [];
-              for (let j = 0; j < Math.min(cnt, 200); j++) arr.push(this.readValueAtIndex(fi + j, np, depth + 1, maxDepth));
-              nestedResult[np.name] = arr;
-            }
-          }
-          return [nestedResult, curPos];
-        }
-        return [{ __type: sd?.name, __skipped: true }, pos + (sd?.structSize || 0)];
-      }
-      case DataForgeService.DT_STRONG_PTR: {
-        const sIdx = buf.readUInt32LE(pos);
-        const vIdx = buf.readUInt16LE(pos + 4);
-        if (sIdx === 0xFFFFFFFF) return [null, pos + 8];
-        if (depth < maxDepth) return [this.readInstance(sIdx, vIdx, depth + 1, maxDepth), pos + 8];
-        return [{ __strongPtr: `${this.dfData!.structDefs[sIdx]?.name || `S${sIdx}`}[${vIdx}]` }, pos + 8];
-      }
-      case DataForgeService.DT_WEAK_PTR: {
-        const sIdx = buf.readUInt32LE(pos);
-        const vIdx = buf.readUInt16LE(pos + 4);
-        if (sIdx === 0xFFFFFFFF) return [null, pos + 8];
-        return [{ __weakPtr: `${this.dfData!.structDefs[sIdx]?.name || `S${sIdx}`}[${vIdx}]` }, pos + 8];
-      }
-      case DataForgeService.DT_REFERENCE: {
-        const rGuid = this.readGuidAt(buf, pos + 4);
-        return [{ __ref: rGuid }, pos + 20];
-      }
-      default:
-        // RESILIENCE: skip unknown data types by estimating 4 bytes
-        // This prevents corrupting all subsequent property reads
-        logger.warn(`Unknown dataType: 0x${dt.toString(16)} for prop ${prop.name} — skipping 4 bytes`, { module: 'dataforge' });
-        return [null, pos + 4];
-    }
-  }
-
-  private readValueAtIndex(index: number, prop: any, depth: number, maxDepth: number): any {
-    if (!this.dfData || !this.dcbBuffer) return null;
-    const buf = this.dcbBuffer;
-    const va = this.dfData.valueArrayOffsets;
-    const dt = prop.dataType;
-    switch (dt) {
-      case DataForgeService.DT_BOOLEAN: return buf.readUInt8(va.boolean + index) !== 0;
-      case DataForgeService.DT_INT8:    return buf.readInt8(va.int8 + index);
-      case DataForgeService.DT_INT16:   return buf.readInt16LE(va.int16 + index * 2);
-      case DataForgeService.DT_INT32:   return buf.readInt32LE(va.int32 + index * 4);
-      case DataForgeService.DT_INT64:   return Number(buf.readBigInt64LE(va.int64 + index * 8));
-      case DataForgeService.DT_UINT8:   return buf.readUInt8(va.uint8 + index);
-      case DataForgeService.DT_UINT16:  return buf.readUInt16LE(va.uint16 + index * 2);
-      case DataForgeService.DT_UINT32:  return buf.readUInt32LE(va.uint32 + index * 4);
-      case DataForgeService.DT_UINT64:  return Number(buf.readBigUInt64LE(va.uint64 + index * 8));
-      case DataForgeService.DT_STRING: {
-        const strOff = buf.readUInt32LE(va.stringId + index * 4);
-        return this.dfData.stringTable1.get(strOff) ?? '';
-      }
-      case DataForgeService.DT_SINGLE:  return Math.round(buf.readFloatLE(va.single + index * 4) * 1e6) / 1e6;
-      case DataForgeService.DT_DOUBLE:  return buf.readDoubleLE(va.double + index * 8);
-      case DataForgeService.DT_LOCALE: {
-        const locOff = buf.readUInt32LE(va.locale + index * 4);
-        return this.dfData.stringTable1.get(locOff) ?? '';
-      }
-      case DataForgeService.DT_GUID:    return this.readGuidAt(buf, va.guid + index * 16);
-      case DataForgeService.DT_ENUM: {
-        const enumOff = buf.readUInt32LE(va.enum + index * 4);
-        return this.dfData.stringTable1.get(enumOff) ?? '';
-      }
-      case DataForgeService.DT_STRONG_PTR: {
-        const off = va.strong + index * 8;
-        const sIdx = buf.readUInt32LE(off);
-        const vIdx = buf.readUInt16LE(off + 4);
-        if (sIdx === 0xFFFFFFFF) return null;
-        if (depth < maxDepth) return this.readInstance(sIdx, vIdx, depth + 1, maxDepth);
-        return { __strongPtr: `${this.dfData.structDefs[sIdx]?.name}[${vIdx}]` };
-      }
-      case DataForgeService.DT_WEAK_PTR: {
-        const off = va.weak + index * 8;
-        const sIdx = buf.readUInt32LE(off);
-        const vIdx = buf.readUInt16LE(off + 4);
-        if (sIdx === 0xFFFFFFFF) return null;
-        return { __weakPtr: `${this.dfData.structDefs[sIdx]?.name}[${vIdx}]` };
-      }
-      case DataForgeService.DT_REFERENCE: {
-        const off = va.reference + index * 20;
-        const rGuid = this.readGuidAt(buf, off + 4);
-        return { __ref: rGuid };
-      }
-      case DataForgeService.DT_CLASS: {
-        const nestedIdx = prop.structIndex;
-        if (depth < maxDepth) return this.readInstance(nestedIdx, index, depth + 1, maxDepth);
-        return { __class: this.dfData.structDefs[nestedIdx]?.name };
-      }
-      default: return null;
-    }
-  }
-
-  private readGuidAt(buf: Buffer, pos: number): string {
-    const d1 = buf.readUInt32LE(pos);
-    const d2 = buf.readUInt16LE(pos + 4);
-    const d3 = buf.readUInt16LE(pos + 6);
-    const d4 = buf.slice(pos + 8, pos + 16).toString("hex");
-    return `${d1.toString(16).padStart(8, "0")}-${d2.toString(16).padStart(4, "0")}-${d3.toString(16).padStart(4, "0")}-${d4.substring(0, 4)}-${d4.substring(4)}`;
-  }
-
-  // ============ DataForge Binary Parser ============
-
-  private parseDataForge(buf: Buffer) {
-    let off = 0;
-    const i32 = () => { const v = buf.readInt32LE(off); off += 4; return v; };
-    const u16 = () => { const v = buf.readUInt16LE(off); off += 2; return v; };
-    const u32 = () => { const v = buf.readUInt32LE(off); off += 4; return v; };
-    const readGuid = () => {
-      const d1 = buf.readUInt32LE(off); const d2 = buf.readUInt16LE(off + 4);
-      const d3 = buf.readUInt16LE(off + 6); const d4 = buf.slice(off + 8, off + 16).toString("hex");
-      off += 16;
-      return `${d1.toString(16).padStart(8, "0")}-${d2.toString(16).padStart(4, "0")}-${d3.toString(16).padStart(4, "0")}-${d4.substring(0, 4)}-${d4.substring(4)}`;
-    };
-
-    off += 4; // skip signature
-    const version = u32();
-    off += 8; // skip unknown fields
-
-    const header = {
-      version,
-      structDefinitionCount: i32(), propertyDefinitionCount: i32(), enumDefinitionCount: i32(),
-      dataMappingCount: i32(), recordDefinitionCount: i32(),
-      booleanValueCount: i32(), int8ValueCount: i32(), int16ValueCount: i32(),
-      int32ValueCount: i32(), int64ValueCount: i32(),
-      uint8ValueCount: i32(), uint16ValueCount: i32(), uint32ValueCount: i32(), uint64ValueCount: i32(),
-      singleValueCount: i32(), doubleValueCount: i32(),
-      guidValueCount: i32(), stringIdValueCount: i32(), localeValueCount: i32(), enumValueCount: i32(),
-      strongValueCount: i32(), weakValueCount: i32(), referenceValueCount: i32(), enumOptionCount: i32(),
-      textLength: u32(), textLength2: 0 as number
-    };
-    header.textLength2 = version >= 6 ? u32() : 0;
-
-    const structDefs: any[] = [];
-    for (let i = 0; i < header.structDefinitionCount; i++) {
-      structDefs.push({ nameOffset: i32(), parentTypeIndex: i32(), attributeCount: u16(), firstAttributeIndex: u16(), structSize: u32() });
-    }
-
-    const propertyDefs: any[] = [];
-    for (let i = 0; i < header.propertyDefinitionCount; i++) {
-      propertyDefs.push({ nameOffset: u32(), structIndex: u16(), dataType: u16(), conversionType: u16() & 0xFF, padding: u16() });
-    }
-
-    off += header.enumDefinitionCount * 8; // skip enums
-
-    const dataMappings: { structCount: number; structIndex: number }[] = [];
-    for (let i = 0; i < header.dataMappingCount; i++) {
-      dataMappings.push(version >= 5 ? { structCount: u32(), structIndex: u32() } : { structCount: u16(), structIndex: u16() });
-    }
-
-    const records: any[] = [];
-    for (let i = 0; i < header.recordDefinitionCount; i++) {
-      const nameOffset = i32(); const fileNameOffset = i32(); const structIndex = i32();
-      const id = readGuid(); const instanceIndex = u16(); const structSize = u16();
-      records.push({ nameOffset, fileNameOffset, structIndex, id, instanceIndex, structSize });
-    }
-
-    // Value array offsets
-    const vaBase = off;
-    const valueArrayOffsets: Record<string, number> = { int8: vaBase };
-    valueArrayOffsets.int16     = valueArrayOffsets.int8    + header.int8ValueCount * 1;
-    valueArrayOffsets.int32     = valueArrayOffsets.int16   + header.int16ValueCount * 2;
-    valueArrayOffsets.int64     = valueArrayOffsets.int32   + header.int32ValueCount * 4;
-    valueArrayOffsets.uint8     = valueArrayOffsets.int64   + header.int64ValueCount * 8;
-    valueArrayOffsets.uint16    = valueArrayOffsets.uint8   + header.uint8ValueCount * 1;
-    valueArrayOffsets.uint32    = valueArrayOffsets.uint16  + header.uint16ValueCount * 2;
-    valueArrayOffsets.uint64    = valueArrayOffsets.uint32  + header.uint32ValueCount * 4;
-    valueArrayOffsets.boolean   = valueArrayOffsets.uint64  + header.uint64ValueCount * 8;
-    valueArrayOffsets.single    = valueArrayOffsets.boolean + header.booleanValueCount * 1;
-    valueArrayOffsets.double    = valueArrayOffsets.single  + header.singleValueCount * 4;
-    valueArrayOffsets.guid      = valueArrayOffsets.double  + header.doubleValueCount * 8;
-    valueArrayOffsets.stringId  = valueArrayOffsets.guid    + header.guidValueCount * 16;
-    valueArrayOffsets.locale    = valueArrayOffsets.stringId + header.stringIdValueCount * 4;
-    valueArrayOffsets.enum      = valueArrayOffsets.locale  + header.localeValueCount * 4;
-    valueArrayOffsets.strong    = valueArrayOffsets.enum    + header.enumValueCount * 4;
-    valueArrayOffsets.weak      = valueArrayOffsets.strong  + header.strongValueCount * 8;
-    valueArrayOffsets.reference = valueArrayOffsets.weak    + header.weakValueCount * 8;
-    valueArrayOffsets.enumOption= valueArrayOffsets.reference + header.referenceValueCount * 20;
-    off = valueArrayOffsets.enumOption + header.enumOptionCount * 4;
-
-    logger.debug(`Value arrays: ${vaBase} -> ${off} (${off - vaBase} bytes)`, { module: 'dataforge' });
-
-    // String tables
-    const st1Start = off;
-    const st1 = new Map<number, string>();
-    let sOff = 0, s = "";
-    while (off < st1Start + header.textLength) {
-      const b = buf[off++];
-      if (b === 0) { st1.set(sOff, s); sOff = off - st1Start; s = ""; }
-      else s += String.fromCharCode(b);
-    }
-
-    const st2 = new Map<number, string>();
-    if (header.version >= 6 && header.textLength2 > 0) {
-      const st2Start = off;
-      sOff = 0; s = "";
-      while (off < st2Start + header.textLength2) {
-        const b = buf[off++];
-        if (b === 0) { st2.set(sOff, s); sOff = off - st2Start; s = ""; }
-        else s += String.fromCharCode(b);
-      }
-    }
-
-    const dataOffset = off;
-
-    // StructToDataOffsetMap
-    const structToDataOffsetMap = new Map<number, number>();
-    let lastOff = 0;
-    for (let i = 0; i < dataMappings.length; i++) {
-      const dm = dataMappings[i];
-      const sd = structDefs[i];
-      if (!structToDataOffsetMap.has(dm.structIndex)) structToDataOffsetMap.set(dm.structIndex, lastOff);
-      lastOff += dm.structCount * (sd?.structSize || 0);
-    }
-
-    logger.debug(`Data section: offset=${dataOffset}, size=${lastOff}, endCheck=${dataOffset + lastOff === buf.length ? 'OK' : 'MISMATCH'}`, { module: 'dataforge' });
-
-    // Resolve names
-    const nameTable = header.version >= 6 ? st2 : st1;
-    for (const sd of structDefs) sd.name = nameTable.get(sd.nameOffset) || `STRUCT_${sd.nameOffset}`;
-    for (const pd of propertyDefs) pd.name = nameTable.get(pd.nameOffset) || `PROP_${pd.nameOffset}`;
-    for (const r of records) {
-      r.name = nameTable.get(r.nameOffset) || `RECORD_${r.nameOffset}`;
-      r.fileName = st1.get(r.fileNameOffset) || `FILE_${r.fileNameOffset}`;
-    }
-
-    return { header, structDefs, propertyDefs, dataMappings, records, stringTable1: st1, stringTable2: st2, valueArrayOffsets, dataOffset, structToDataOffsetMap };
+    return readInstancePure(this.dfData, this.dcbBuffer, structIndex, variantIndex, depth, maxDepth);
   }
 
   // ============ Index builders ============

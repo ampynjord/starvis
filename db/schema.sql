@@ -371,6 +371,27 @@ CREATE TABLE IF NOT EXISTS ship_paints (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ====================
+-- EXTRACTION_LOG - Version history for game data extractions
+-- (must come before changelog which references it via FK)
+-- ====================
+CREATE TABLE IF NOT EXISTS extraction_log (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  extraction_hash CHAR(64) NOT NULL COMMENT 'SHA-256 of p4k metadata',
+  game_version VARCHAR(50) COMMENT 'Detected game version string',
+  ships_count INT DEFAULT 0,
+  components_count INT DEFAULT 0,
+  manufacturers_count INT DEFAULT 0,
+  loadout_ports_count INT DEFAULT 0,
+  duration_ms INT COMMENT 'Extraction duration in ms',
+  status ENUM('success', 'partial', 'failed') DEFAULT 'success',
+  error_message TEXT,
+  extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  
+  INDEX idx_hash (extraction_hash),
+  INDEX idx_extracted_at (extracted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ====================
 -- CHANGELOG - Track changes between game data extractions
 -- ====================
 CREATE TABLE IF NOT EXISTS changelog (
@@ -428,26 +449,7 @@ CREATE TABLE IF NOT EXISTS shop_inventory (
   INDEX idx_shop (shop_id),
   INDEX idx_component (component_uuid),
   INDEX idx_class_name (component_class_name),
+  UNIQUE KEY uk_shop_component (shop_id, component_class_name),
   CONSTRAINT fk_inventory_shop FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
   CONSTRAINT fk_inventory_component FOREIGN KEY (component_uuid) REFERENCES components(uuid) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ====================
--- EXTRACTION_LOG - Version history for game data extractions
--- ====================
-CREATE TABLE IF NOT EXISTS extraction_log (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  extraction_hash CHAR(64) NOT NULL COMMENT 'SHA-256 of p4k metadata',
-  game_version VARCHAR(50) COMMENT 'Detected game version string',
-  ships_count INT DEFAULT 0,
-  components_count INT DEFAULT 0,
-  manufacturers_count INT DEFAULT 0,
-  loadout_ports_count INT DEFAULT 0,
-  duration_ms INT COMMENT 'Extraction duration in ms',
-  status ENUM('success', 'partial', 'failed') DEFAULT 'success',
-  error_message TEXT,
-  extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  
-  INDEX idx_hash (extraction_hash),
-  INDEX idx_extracted_at (extracted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

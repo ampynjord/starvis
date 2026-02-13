@@ -75,7 +75,9 @@ export interface Ship {
   sm_description: string | null
   store_url: string | null
   vehicle_category: string | null
-  [key: string]: any
+  insurance_claim_time: number | null
+  insurance_expedite_cost: number | null
+  game_data: Record<string, unknown> | null
 }
 
 export interface Component {
@@ -104,7 +106,25 @@ export interface Component {
   qd_spool_time: number | null
   power_output: number | null
   cooling_rate: number | null
-  [key: string]: any
+  missile_damage: number | null
+  missile_signal_type: string | null
+  missile_lock_time: number | null
+  missile_speed: number | null
+  missile_range: number | null
+  missile_damage_physical: number | null
+  missile_damage_energy: number | null
+  missile_damage_distortion: number | null
+  thruster_max_thrust: number | null
+  radar_range: number | null
+  cm_ammo_count: number | null
+  fuel_capacity: number | null
+  emp_damage: number | null
+  emp_radius: number | null
+  qd_cooldown: number | null
+  qd_fuel_rate: number | null
+  qd_range: number | null
+  power_draw: number | null
+  heat_generation: number | null
 }
 
 export interface Shop {
@@ -147,6 +167,97 @@ export interface LoadoutStats {
 
 // --------------- Ships ---------------
 
+export interface LoadoutPort {
+  id: number
+  port_name: string
+  port_type: string
+  component_class_name: string | null
+  component_uuid: string | null
+  component_name: string | null
+  component_type: string | null
+  sub_type: string | null
+  component_size: number | null
+  grade: string | null
+  manufacturer_code: string | null
+  parent_id: number | null
+  children?: LoadoutPort[]
+}
+
+export interface ShipModule {
+  id: number
+  ship_uuid: string
+  slot_name: string
+  slot_display_name: string | null
+  module_class_name: string
+  module_name: string | null
+  module_uuid: string | null
+  is_default: boolean
+}
+
+export interface ShipPaint {
+  paint_class_name: string
+  paint_name: string | null
+  paint_uuid: string | null
+}
+
+export interface CompareResult {
+  ship1: { uuid: string; name: string; class_name: string; manufacturer_code: string }
+  ship2: { uuid: string; name: string; class_name: string; manufacturer_code: string }
+  comparison: Record<string, { ship1: number; ship2: number; diff: number; pct: string }>
+  full: { ship1: Ship; ship2: Ship }
+}
+
+export interface BuyLocation {
+  shop_name: string
+  location: string | null
+  parent_location: string | null
+  shop_type: string | null
+  base_price: number | null
+  rental_price_1d: number | null
+  rental_price_3d: number | null
+  rental_price_7d: number | null
+  rental_price_30d: number | null
+}
+
+export interface ShopInventoryItem {
+  id: number
+  shop_id: number
+  component_uuid: string | null
+  component_class_name: string
+  component_name: string | null
+  component_type: string | null
+  component_size: number | null
+  base_price: number | null
+}
+
+export interface ChangelogEntry {
+  id: number
+  extraction_id: number
+  entity_type: string
+  entity_uuid: string
+  entity_name: string | null
+  change_type: string
+  field_name: string | null
+  old_value: string | null
+  new_value: string | null
+  created_at: string
+  game_version: string | null
+  extraction_date: string | null
+}
+
+export interface VersionInfo {
+  id: number
+  extraction_hash: string
+  game_version: string | null
+  ships_count: number
+  components_count: number
+  manufacturers_count: number
+  loadout_ports_count: number
+  duration_ms: number | null
+  status: string
+  extracted_at: string
+}
+
 export async function getShips(params: Record<string, string> = {}) {
   const qs = new URLSearchParams(params).toString()
   return fetchJson<PaginatedResponse<Ship>>(`/ships?${qs}`)
@@ -157,19 +268,19 @@ export async function getShip(uuid: string) {
 }
 
 export async function getShipLoadout(uuid: string) {
-  return fetchJson<any>(`/ships/${uuid}/loadout`)
+  return fetchJson<{ success: boolean; data: LoadoutPort[] }>(`/ships/${uuid}/loadout`)
 }
 
 export async function getShipModules(uuid: string) {
-  return fetchJson<any>(`/ships/${uuid}/modules`)
+  return fetchJson<{ success: boolean; data: ShipModule[] }>(`/ships/${uuid}/modules`)
 }
 
 export async function getShipPaints(uuid: string) {
-  return fetchJson<any>(`/ships/${uuid}/paints`)
+  return fetchJson<{ success: boolean; data: ShipPaint[] }>(`/ships/${uuid}/paints`)
 }
 
 export async function compareShips(uuid1: string, uuid2: string) {
-  return fetchJson<any>(`/ships/${uuid1}/compare/${uuid2}`)
+  return fetchJson<{ success: boolean; data: CompareResult }>(`/ships/${uuid1}/compare/${uuid2}`)
 }
 
 export interface ShipManufacturer extends Manufacturer {
@@ -201,7 +312,7 @@ export async function getComponent(uuid: string) {
 }
 
 export async function getComponentBuyLocations(uuid: string) {
-  return fetchJson<any>(`/components/${uuid}/buy-locations`)
+  return fetchJson<{ success: boolean; count: number; data: BuyLocation[] }>(`/components/${uuid}/buy-locations`)
 }
 
 // --------------- Shops ---------------
@@ -212,7 +323,7 @@ export async function getShops(params: Record<string, string> = {}) {
 }
 
 export async function getShopInventory(shopId: number) {
-  return fetchJson<any>(`/shops/${shopId}/inventory`)
+  return fetchJson<{ success: boolean; count: number; data: ShopInventoryItem[] }>(`/shops/${shopId}/inventory`)
 }
 
 // --------------- Manufacturers ---------------
@@ -234,11 +345,11 @@ export async function calculateLoadout(shipUuid: string, swaps: { portName: stri
 
 export async function getChangelog(params: Record<string, string> = {}) {
   const qs = new URLSearchParams(params).toString()
-  return fetchJson<any>(`/changelog?${qs}`)
+  return fetchJson<{ success: boolean; data: ChangelogEntry[]; total: number }>(`/changelog?${qs}`)
 }
 
 // --------------- Version ---------------
 
 export async function getVersion() {
-  return fetchJson<any>('/version')
+  return fetchJson<{ success: boolean; data: VersionInfo }>('/version')
 }

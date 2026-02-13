@@ -23,6 +23,7 @@ const PORT = process.env.PORT || 3000;
 const app = express();
 let pool: mysql.Pool | null = null;
 let gameDataService: GameDataService | null = null;
+let httpServer: ReturnType<typeof app.listen> | null = null;
 
 // ===== MIDDLEWARE =====
 app.use(cors({ origin: process.env.CORS_ORIGIN || "*", credentials: true }));
@@ -62,7 +63,7 @@ const swaggerSpec = swaggerJsdoc({
     },
     servers: [{ url: `http://localhost:${PORT}` }],
   },
-  apis: ["./src/routes.ts", "./src/routes.js"],
+  apis: ["./src/routes.ts"],
 });
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
@@ -110,24 +111,30 @@ async function start() {
   // 4. Mount routes
   app.use("/", createRoutes({ pool, shipMatrixService, gameDataService }));
 
-  // 5. Initial sync: Ship Matrix
+  // 5. Start listening BEFORE non-critical sync (so /health is immediately available)
+  httpServer = app.listen(PORT, () => logger.info(`✅ Starvis v1.0 listening on :${PORT}`, { module: "Server" }));
+
+  // 6. Non-critical sync: Ship Matrix (don't block server startup)
   try {
     logger.info("Syncing RSI Ship Matrix…", { module: "ShipMatrix" });
     const smResult = await shipMatrixService.sync();
     logger.info(`✅ Ship Matrix synced: ${smResult.synced}/${smResult.total}`, { module: "ShipMatrix" });
   } catch (e) {
-    logger.warn("Ship Matrix sync failed", { module: "ShipMatrix" });
+    logger.warn("Ship Matrix sync failed (non-blocking)", { module: "ShipMatrix" });
     logger.warn(String(e));
   }
-
-  app.listen(PORT, () => logger.info(`✅ Starvis v1.0 listening on :${PORT}`, { module: "Server" }));
 }
 
-process.on("SIGINT", async () => {
-  logger.info("Shutting down…", { module: "Server" });
+// Graceful shutdown: close HTTP server + DB pool
+async function shutdown(signal: string) {
+  logger.info(`${signal} received — shutting down…`, { module: "Server" });
+  if (httpServer) httpServer.close();
   if (pool) await pool.end();
   process.exit(0);
-});
+}
+
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
 
 start();
 
