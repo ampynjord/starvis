@@ -44,6 +44,12 @@ jobs:
       - name: Install & build IHM
         run: cd ihm && npm ci && npm run build
 
+      - name: Audit API dependencies
+        run: cd api && npm audit --audit-level=high || true
+
+      - name: Audit IHM dependencies
+        run: cd ihm && npm audit --audit-level=high || true
+
   # ==========================================
   #  2. UNIT / INTEGRATION TESTS
   # ==========================================
@@ -62,7 +68,7 @@ jobs:
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h localhost"
+          --health-cmd="mysqladmin ping -h localhost -u root -ptestroot"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=5
@@ -208,12 +214,23 @@ jobs:
             set -e
             cd /starvis
 
-            # Pull latest code (docker-compose files, db/schema.sql, .env stays local)
+            # Reset tracked files to avoid merge conflicts (local edits like chmod)
+            git reset --hard HEAD
             git pull --ff-only origin main
 
-            # Public repo → no login needed for GHCR
+            # Pull pre-built images from GHCR (public repo, no auth needed)
             docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
             docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+
+            # Wait for API health check
+            echo "⏳ Waiting for API health..."
+            for i in $(seq 1 30); do
+              docker exec starvis-api wget -qO- http://localhost:3000/health > /dev/null 2>&1 && break
+              sleep 2
+            done
+
+            # Verify deployment
+            docker exec starvis-api wget -qO- http://localhost:3000/health || echo "⚠️ API health check failed"
 
             # Cleanup old images
             docker image prune -f
