@@ -145,8 +145,8 @@ curl http://localhost:3003/health
 
 ```bash
 # Sur le VPS
-git clone https://github.com/ampynjord/starvis /starvis
-cd /starvis
+git clone https://github.com/ampynjord/starvis /home/ubuntu/docker/starvis
+cd /home/ubuntu/docker/starvis
 cp .env.example .env    # configurer les secrets de production
 
 # Démarrer avec l'override Traefik
@@ -669,13 +669,13 @@ Backup automatisé MySQL avec script `db/backup.sh` :
 
 ```bash
 # Cron configuré sur le VPS
-0 3 * * * /starvis/db/backup.sh >> /starvis/backups/backup.log 2>&1
+0 3 * * * /home/ubuntu/docker/starvis/db/backup.sh >> /home/ubuntu/docker/starvis/backups/backup.log 2>&1
 
 # Backup manuel
-bash /starvis/db/backup.sh
+bash /home/ubuntu/docker/starvis/db/backup.sh
 
 # Restauration
-gunzip < /starvis/backups/starvis_YYYY-MM-DD_HHMM.sql.gz | \
+gunzip < /home/ubuntu/docker/starvis/backups/starvis_YYYY-MM-DD_HHMM.sql.gz | \
   docker exec -i starvis-mysql mysql -u root -p"$MYSQL_ROOT_PASSWORD" starvis
 ```
 
@@ -788,11 +788,11 @@ GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'%';
 **Fix** :
 ```bash
 # Vérifier le contenu sur le VPS
-cat /starvis/docker-compose.prod.yml
+cat /home/ubuntu/docker/starvis/docker-compose.prod.yml
 # Doit contenir ~42 lignes avec labels Traefik
 
 # Si vide, restaurer depuis git
-cd /starvis && git reset --hard HEAD && git pull origin main
+cd /home/ubuntu/docker/starvis && git reset --hard HEAD && git pull origin main
 ```
 
 ### CD deploy échoue : "cannot fast-forward"
@@ -803,7 +803,7 @@ cd /starvis && git reset --hard HEAD && git pull origin main
 
 **Solution** : Le script de deploy fait `git reset --hard HEAD` avant le pull. Si le problème persiste :
 ```bash
-cd /starvis
+cd /home/ubuntu/docker/starvis
 git reset --hard HEAD
 git pull origin main
 ```
