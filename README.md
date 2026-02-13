@@ -643,6 +643,65 @@ docker compose down -v && docker compose up --build -d
 
 ---
 
+## Troubleshooting
+
+### MySQL health check fails in CI/CD
+
+**Symptom**: Container `starvis-mysql` is unhealthy, deployment fails with "dependency failed to start"
+
+**Cause**: Health check command `mysqladmin ping -h localhost` fails when MySQL requires password authentication
+
+**Solution**: Use authenticated health check in [docker-compose.yml](docker-compose.yml#L21):
+```yaml
+healthcheck:
+  test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD || exit 1"]
+```
+Note: `$$MYSQL_ROOT_PASSWORD` with double `$$` (compose escapes it to single `$`)
+
+### Extractor cannot connect to production MySQL
+
+**Symptom**: `Access denied for user 'starvis_user'@'172.18.0.1' (using password: YES)`
+
+**Cause**: Docker MySQL creates user with `localhost` host only. External connections (from Docker network or exposed port) come from different IPs.
+
+**Solution**: [db/init.sh](db/init.sh) now creates user with `'%'` (all hosts) permissions:
+```bash
+CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
+GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'%';
+```
+
+### Production deployment uses empty docker-compose.prod.yml
+
+**Symptom**: API/IHM return 404, containers don't have Traefik labels
+
+**Cause**: File transfer issue or git not pulling the prod override file
+
+**Fix**:
+```bash
+# On VPS, verify file exists and has content
+cat /starvis/docker-compose.prod.yml
+# Should show ~42 lines with Traefik labels, not empty
+
+# If empty, restore from git
+cd /starvis && git pull origin main --force
+```
+
+### Extractor via SSH tunnel fails with "Access denied"
+
+**Symptom**: Connection via `localhost:3307` tunnel fails even with correct password
+
+**Cause**: User doesn't have permission for the source IP (Docker network IP `172.18.0.1` instead of `localhost`)
+
+**Solution**: Use direct connection with exposed port instead:
+```bash
+# In extractor/.env
+DB_HOST=ampynjord.bzh
+DB_PORT=3306
+# Temporarily expose MySQL port in docker-compose.prod.yml
+```
+
+---
+
 ## License
 
 MIT © [ampynjord](https://github.com/ampynjord)
