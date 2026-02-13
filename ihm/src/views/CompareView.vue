@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
 import { compareShips, getShips, type Ship } from '@/services/api'
+import { debounce, fmt, useClickOutside } from '@/utils/formatters'
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -16,6 +17,15 @@ const ship2 = ref<string>((route.query.ship2 as string) || '')
 const comparison = ref<any>(null)
 const loading = ref(false)
 const error = ref('')
+
+// Click-outside refs
+const dropdown1 = ref<HTMLElement | null>(null)
+const dropdown2 = ref<HTMLElement | null>(null)
+useClickOutside(dropdown1, () => { ship1Results.value = [] })
+useClickOutside(dropdown2, () => { ship2Results.value = [] })
+
+const debouncedSearch1 = debounce((q: string) => searchShips(q, 1), 300)
+const debouncedSearch2 = debounce((q: string) => searchShips(q, 2), 300)
 
 async function searchShips(query: string, target: 1 | 2) {
   if (query.length < 2) { target === 1 ? ship1Results.value = [] : ship2Results.value = []; return }
@@ -50,12 +60,6 @@ async function doCompare() {
 
 watch([ship1, ship2], () => { if (ship1.value && ship2.value) doCompare() }, { immediate: true })
 
-function fmt(v: any) {
-  if (v == null) return '—'
-  if (typeof v === 'number') return v.toLocaleString('en-US', { maximumFractionDigits: 1 })
-  return v
-}
-
 function getVal(ship: any, field: string) {
   if (!ship) return null
   const v = parseFloat(ship[field])
@@ -66,9 +70,17 @@ function getDelta(field: string) {
   return comparison.value?.comparison?.[field]?.diff ?? null
 }
 
-function deltaColor(d: number | null) {
+/** Stats where a lower value is better (armor multipliers, mass, cross-section) */
+const LOWER_IS_BETTER = new Set([
+  'mass', 'armor_physical', 'armor_energy', 'armor_distortion',
+  'cross_section_x', 'cross_section_y', 'cross_section_z',
+])
+
+function deltaColor(d: number | null, field: string) {
   if (d == null || d === 0) return ''
-  return d > 0 ? 'text-emerald-400' : 'text-red-400'
+  const invert = LOWER_IS_BETTER.has(field)
+  const isPositive = invert ? d < 0 : d > 0
+  return isPositive ? 'text-emerald-400' : 'text-red-400'
 }
 
 function deltaIcon(d: number | null) {
@@ -133,38 +145,38 @@ const COMPARE_SECTIONS = [
 
     <!-- Ship pickers -->
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <div class="card p-4 relative z-10">
+      <div class="card p-4 relative z-10" ref="dropdown1">
         <div class="flex items-center gap-2 mb-2">
           <div class="w-6 h-6 rounded-md bg-sv-accent/15 flex items-center justify-center text-[10px] font-bold text-sv-accent">1</div>
           <label class="text-[10px] text-sv-muted uppercase tracking-wider font-semibold">Ship</label>
         </div>
         <input
-          v-model="ship1Query" @input="searchShips(ship1Query, 1)"
+          v-model="ship1Query" @input="debouncedSearch1(ship1Query)"
           class="input w-full" placeholder="Search a ship…"
         />
         <div v-if="ship1Results.length" class="absolute z-50 left-4 right-4 mt-1 bg-sv-panel border border-sv-border rounded-lg shadow-xl max-h-48 overflow-y-auto">
           <div v-for="s in ship1Results" :key="s.uuid" @click="selectShip(s, 1)"
             class="px-3 py-2 hover:bg-sv-accent/10 cursor-pointer text-xs border-b border-sv-border/20 last:border-0">
             <span class="text-sv-text-bright font-medium">{{ s.name }}</span>
-            <span class="text-sv-muted ml-2 text-[10px]">{{ (s as any).manufacturer_name || s.manufacturer_code }}</span>
+            <span class="text-sv-muted ml-2 text-[10px]">{{ s.manufacturer_name || s.manufacturer_code }}</span>
           </div>
         </div>
         <div v-if="comparison?.ship1" class="mt-2 text-[11px] text-sv-accent font-medium">{{ comparison.ship1.name }}</div>
       </div>
-      <div class="card p-4 relative z-10">
+      <div class="card p-4 relative z-10" ref="dropdown2">
         <div class="flex items-center gap-2 mb-2">
           <div class="w-6 h-6 rounded-md bg-amber-500/15 flex items-center justify-center text-[10px] font-bold text-amber-400">2</div>
           <label class="text-[10px] text-sv-muted uppercase tracking-wider font-semibold">Ship</label>
         </div>
         <input
-          v-model="ship2Query" @input="searchShips(ship2Query, 2)"
+          v-model="ship2Query" @input="debouncedSearch2(ship2Query)"
           class="input w-full" placeholder="Search a ship…"
         />
         <div v-if="ship2Results.length" class="absolute z-50 left-4 right-4 mt-1 bg-sv-panel border border-sv-border rounded-lg shadow-xl max-h-48 overflow-y-auto">
           <div v-for="s in ship2Results" :key="s.uuid" @click="selectShip(s, 2)"
             class="px-3 py-2 hover:bg-sv-accent/10 cursor-pointer text-xs border-b border-sv-border/20 last:border-0">
             <span class="text-sv-text-bright font-medium">{{ s.name }}</span>
-            <span class="text-sv-muted ml-2 text-[10px]">{{ (s as any).manufacturer_name || s.manufacturer_code }}</span>
+            <span class="text-sv-muted ml-2 text-[10px]">{{ s.manufacturer_name || s.manufacturer_code }}</span>
           </div>
         </div>
         <div v-if="comparison?.ship2" class="mt-2 text-[11px] text-amber-400 font-medium">{{ comparison.ship2.name }}</div>
@@ -227,7 +239,7 @@ const COMPARE_SECTIONS = [
                   {{ fmt(getVal(comparison.full?.ship1, f.key)) }}
                   <span v-if="f.unit && getVal(comparison.full?.ship1, f.key) != null" class="text-sv-muted text-[10px] ml-0.5">{{ f.unit }}</span>
                 </td>
-                <td class="py-2 px-4 text-center w-16 font-mono text-[11px]" :class="deltaColor(getDelta(f.key))">
+                <td class="py-2 px-4 text-center w-16 font-mono text-[11px]" :class="deltaColor(getDelta(f.key), f.key)">
                   <template v-if="getDelta(f.key) != null && getDelta(f.key) !== 0">
                     {{ deltaIcon(getDelta(f.key)) }}
                     {{ getDelta(f.key) > 0 ? '+' : '' }}{{ fmt(getDelta(f.key)) }}

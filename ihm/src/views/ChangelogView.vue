@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
+import PaginationBar from '@/components/PaginationBar.vue'
 import { getChangelog } from '@/services/api'
 import { computed, onMounted, ref, watch } from 'vue'
 
@@ -112,19 +113,7 @@ function fmtDate(d: string) {
       </div>
 
       <!-- Pagination -->
-      <div v-if="totalPages > 1" class="flex items-center justify-center gap-2 pt-4">
-        <button
-          class="btn-outline text-xs"
-          :disabled="page <= 1"
-          @click="page--"
-        >← Prev.</button>
-        <span class="text-xs text-sv-muted">{{ page }} / {{ totalPages }}</span>
-        <button
-          class="btn-outline text-xs"
-          :disabled="page >= totalPages"
-          @click="page++"
-        >Next →</button>
-      </div>
+      <PaginationBar v-if="totalPages > 1" :page="page" :pages="totalPages" :total="total" @update:page="page = $event" />
     </LoadingState>
   </div>
 </template>

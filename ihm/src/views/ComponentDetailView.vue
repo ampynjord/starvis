@@ -2,6 +2,7 @@
 import LoadingState from '@/components/LoadingState.vue'
 import StatBlock from '@/components/StatBlock.vue'
 import { getComponent, getComponentBuyLocations, type Component } from '@/services/api'
+import { fmt } from '@/utils/formatters'
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -32,11 +33,7 @@ watch(() => route.params.uuid, (newUuid, oldUuid) => {
   if (newUuid && newUuid !== oldUuid) loadData()
 })
 
-function fmt(v: any, unit = '') {
-  if (v == null || v === 0) return '—'
-  const n = typeof v === 'number' ? v.toLocaleString('en-US', { maximumFractionDigits: 1 }) : v
-  return unit ? `${n} ${unit}` : n
-}
+// fmt imported from @/utils/formatters
 </script>
 
 <template>

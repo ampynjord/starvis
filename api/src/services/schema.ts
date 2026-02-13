@@ -83,4 +83,25 @@ export async function initializeSchema(conn: PoolConnection): Promise<void> {
   } catch (e: any) {
     logger.debug(`Migration variant_type skip: ${e.message}`, { module: 'schema' });
   }
+
+  // Migration: add missing indexes for common filter columns
+  const desiredIndexes: [string, string, string][] = [
+    ['ships', 'idx_role', 'role'],
+    ['ships', 'idx_career', 'career'],
+    ['ships', 'idx_vehicle_category', 'vehicle_category'],
+  ];
+  for (const [table, idxName, col] of desiredIndexes) {
+    try {
+      const [existing] = await conn.execute<any[]>(
+        "SELECT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?",
+        [table, idxName]
+      );
+      if (existing.length === 0) {
+        logger.info(`Adding index ${idxName} on ${table}.${col}`, { module: 'schema' });
+        await conn.execute(`ALTER TABLE ${table} ADD INDEX ${idxName} (${col})`);
+      }
+    } catch (e: any) {
+      logger.debug(`Migration index ${idxName} skip: ${e.message}`, { module: 'schema' });
+    }
+  }
 }

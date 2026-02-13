@@ -17,8 +17,3 @@ export const DB_CONFIG = {
   waitForConnections: true,
   connectionLimit: 10,
 };
-
-export const P4K_CONFIG = {
-  path: process.env.P4K_PATH || "/game/Data.p4k",
-  chunkSize: 64 * 1024 * 1024, // 64MB
-};

@@ -152,6 +152,7 @@ CREATE TABLE IF NOT EXISTS ships (
   missile_damage_total DECIMAL(10,2) COMMENT 'Sum of all default missile damage',
   weapon_damage_total DECIMAL(10,2) COMMENT 'Sum of all default weapon DPS (WeaponGun)',
   variant_type VARCHAR(20) COMMENT 'Non-playable variant tag: exec, collector, bis_edition, tutorial, enemy_ai, military, event, pirate, arena_ai, special',
+  vehicle_category VARCHAR(20) DEFAULT 'ship' COMMENT 'ship, ground, gravlev — vehicle classification',
   
   -- Insurance
   insurance_claim_time DECIMAL(10,2) COMMENT 'Base wait time in minutes',
@@ -169,6 +170,9 @@ CREATE TABLE IF NOT EXISTS ships (
   INDEX idx_name (name),
   INDEX idx_manufacturer (manufacturer_code),
   INDEX idx_ship_matrix (ship_matrix_id),
+  INDEX idx_role (role),
+  INDEX idx_career (career),
+  INDEX idx_vehicle_category (vehicle_category),
   CONSTRAINT fk_ship_manufacturer FOREIGN KEY (manufacturer_code) 
     REFERENCES manufacturers(code) ON DELETE SET NULL,
   CONSTRAINT fk_ship_matrix FOREIGN KEY (ship_matrix_id) 
@@ -259,6 +263,8 @@ CREATE TABLE IF NOT EXISTS components (
   
   -- Radar stats
   radar_range DECIMAL(15,2) COMMENT 'Detection range (m)',
+  radar_detection_lifetime DECIMAL(10,2) COMMENT 'How long a detected signal persists (s)',
+  radar_tracking_signal DECIMAL(10,4) COMMENT 'Tracking signal amplifier multiplier',
   
   -- Countermeasure stats
   cm_ammo_count INT COMMENT 'Countermeasure ammo count',
@@ -268,6 +274,23 @@ CREATE TABLE IF NOT EXISTS components (
   
   -- Fuel intake stats
   fuel_intake_rate DECIMAL(10,4) COMMENT 'Fuel intake rate',
+  
+  -- EMP stats
+  emp_damage DECIMAL(10,2) COMMENT 'EMP distortion damage',
+  emp_radius DECIMAL(10,2) COMMENT 'EMP max effect radius (m)',
+  emp_charge_time DECIMAL(10,2) COMMENT 'EMP charge duration (s)',
+  emp_cooldown DECIMAL(10,2) COMMENT 'EMP cooldown time (s)',
+  
+  -- Quantum Interdiction Generator (QIG/QED) stats
+  qig_jammer_range DECIMAL(15,2) COMMENT 'QIG jammer range (m)',
+  qig_snare_radius DECIMAL(15,2) COMMENT 'QIG quantum snare radius (m)',
+  qig_charge_time DECIMAL(10,2) COMMENT 'QIG charge time (s)',
+  qig_cooldown DECIMAL(10,2) COMMENT 'QIG cooldown time (s)',
+  
+  -- Quantum Drive extended stats (spline jump)
+  qd_tuning_rate DECIMAL(10,4) COMMENT 'QD spline jump tuning rate',
+  qd_alignment_rate DECIMAL(10,4) COMMENT 'QD spline jump alignment rate',
+  qd_disconnect_range DECIMAL(15,2) COMMENT 'QD disconnect range (m)',
   
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -330,6 +353,21 @@ CREATE TABLE IF NOT EXISTS ship_modules (
   INDEX idx_ship (ship_uuid),
   INDEX idx_module_class (module_class_name),
   CONSTRAINT fk_module_ship FOREIGN KEY (ship_uuid) REFERENCES ships(uuid) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ====================
+-- SHIP_PAINTS - Available paints/liveries per ship
+-- ====================
+CREATE TABLE IF NOT EXISTS ship_paints (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  ship_uuid CHAR(36) NOT NULL COMMENT 'FK to ships.uuid — parent ship',
+  paint_class_name VARCHAR(255) NOT NULL COMMENT 'DataForge className of paint entity',
+  paint_name VARCHAR(255) COMMENT 'Display name of the paint/livery',
+  paint_uuid CHAR(36) COMMENT 'DataForge entity UUID of the paint',
+  
+  INDEX idx_ship (ship_uuid),
+  INDEX idx_paint_class (paint_class_name),
+  CONSTRAINT fk_paint_ship FOREIGN KEY (ship_uuid) REFERENCES ships(uuid) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ====================

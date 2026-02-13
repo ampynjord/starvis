@@ -2,14 +2,15 @@
 
 **REST API + Web Interface for Star Citizen ship data**
 
-3-part monorepo:
-- **api/** — Backend Express.js + TypeScript + MySQL
+4-part monorepo:
+- **api/** — Backend Express.js + TypeScript + MySQL (deployed on VPS)
+- **extractor/** — Standalone P4K/DataForge extraction CLI (runs locally)
 - **db/** — SQL schema + initialization scripts
 - **ihm/** — Frontend Vue 3 + Vite + Tailwind CSS
 
 Two complementary data sources:
-- **RSI Ship Matrix** — official marketing data (246 ships)
-- **P4K DataForge** — actual game data (~353 ships, ~2700+ components, ~35,000 loadout ports)
+- **RSI Ship Matrix** — official marketing data (246 ships), synced by the API
+- **P4K DataForge** — actual game data (~353 ships, ~2700+ components, ~35,000 loadout ports), extracted locally by the CLI
 
 ---
 
@@ -44,11 +45,21 @@ Two complementary data sources:
 starvis/
 ├── docker-compose.yml     # Orchestrates 3 services (mysql, api, ihm)
 ├── .env                   # Configuration (see .env.example)
-├── api/                   # Backend Express.js + TypeScript
+├── api/                   # Backend Express.js + TypeScript (VPS)
 │   ├── Dockerfile
 │   ├── server.ts
 │   ├── package.json
 │   └── src/
+├── extractor/             # P4K/DataForge extraction CLI (local PC)
+│   ├── extract.ts         # CLI entry point
+│   ├── package.json
+│   └── src/
+│       ├── dataforge-service.ts
+│       ├── extraction-service.ts
+│       ├── p4k-provider.ts
+│       ├── cryxml-parser.ts
+│       ├── localization-service.ts
+│       └── logger.ts
 ├── db/                    # Database
 │   ├── schema.sql
 │   └── init.sh
@@ -66,15 +77,16 @@ starvis/
 
 ### Prerequisites
 
-- Docker & Docker Compose
-- Star Citizen installed (for P4K data)
+- Docker & Docker Compose (for VPS deployment)
+- Star Citizen installed (for local P4K extraction)
+- Node.js 22+ (for running the extractor locally)
 
-### Installation
+### VPS Deployment (API + IHM + MySQL)
 
 ```bash
 git clone https://github.com/ampynjord/starvis
 cd starvis
-cp .env.example .env    # then edit passwords and paths
+cp .env.example .env    # then edit passwords
 docker compose up -d
 # API  → http://localhost:3003
 # IHM  → http://localhost:8080
@@ -82,7 +94,17 @@ docker compose up -d
 curl http://localhost:3003/health
 ```
 
-> First startup takes ~6 min (extracting ~353 ships from P4K).
+### Local Extraction (from your PC with Star Citizen)
+
+```bash
+cd extractor
+npm install
+# Set DB connection to your VPS MySQL (or use .env file)
+export DB_HOST=your-vps-ip DB_USER=starvis_user DB_PASSWORD=your_pass DB_NAME=starvis
+npx tsx extract.ts --p4k "/path/to/StarCitizen/LIVE/Data.p4k"
+```
+
+> Extraction takes ~5 min and populates the remote database with ~353 ships, ~2700 components, ~35,000 loadout ports.
 
 ### Environment Variables
 
@@ -105,8 +127,6 @@ All configuration is in `.env` (see `.env.example`).
 | `DB_PASSWORD` | MySQL password | — |
 | `DB_NAME` | Database name | `starvis` |
 | `MYSQL_ROOT_PASSWORD` | MySQL root password | — |
-| `P4K_PATH` | Path to Data.p4k in container | `/game/Data.p4k` |
-| `P4K_VOLUME` | Host path to Star Citizen LIVE folder | — |
 
 ---
 
@@ -131,7 +151,7 @@ GET /api/v1/ship-matrix/stats
 
 ### Ships (Game Data)
 
-~353 playable ships extracted from P4K/DataForge with all actual game data.
+~353 playable ships extracted from P4K/DataForge, stored in MySQL.
 Paginated responses by default (50 items/page, max 200).
 
 ```bash
@@ -307,9 +327,6 @@ GET /api-docs
 # Sync RSI Ship Matrix
 curl -X POST -H "X-API-Key: $ADMIN_API_KEY" http://localhost:3003/admin/sync-ship-matrix
 
-# Full P4K/DataForge extraction
-curl -X POST -H "X-API-Key: $ADMIN_API_KEY" http://localhost:3003/admin/extract-game-data
-
 # DB statistics
 curl -H "X-API-Key: $ADMIN_API_KEY" http://localhost:3003/admin/stats
 
@@ -450,47 +467,54 @@ GET /health
 
 ```
 starvis/
-├── server.ts                      # Express entry point
-├── .github/
-│   └── workflows/
-│       └── ci.yml                 # CI/CD GitHub Actions (4 jobs)
-├── db/
-│   └── schema.sql                 # MySQL schema (5 tables + FK)
-├── src/
-│   ├── routes.ts                  # API v1.0 endpoints (pagination, ETag, CSV, compare)
-│   ├── middleware/
-│   │   └── auth.ts                # X-API-Key auth
-│   ├── providers/
-│   │   └── p4k-provider.ts        # P4K file reader (ZIP+AES)
-│   ├── services/
-│   │   ├── schema.ts              # DB schema init + migrations
-│   │   ├── ship-matrix-service.ts # RSI API → ship_matrix
-│   │   ├── dataforge-service.ts   # P4K/DCB parser (~2300 lines)
-│   │   └── game-data-service.ts   # DataForge → ships/components/loadouts
-│   └── utils/
-│       ├── config.ts              # Centralized configuration
+├── api/                           # Backend Express.js (VPS)
+│   ├── server.ts                  # Entry point
+│   ├── Dockerfile                 # Multi-stage (4 stages)
+│   ├── package.json
+│   └── src/
+│       ├── routes.ts              # 25 endpoints (pagination, ETag, CSV)
+│       ├── middleware/
+│       │   └── auth.ts            # X-API-Key auth (timing-safe)
+│       ├── services/
+│       │   ├── schema.ts          # DB schema init + migrations
+│       │   ├── ship-matrix-service.ts  # RSI API → ship_matrix
+│       │   └── game-data-service.ts    # Read-only queries → REST API
+│       └── utils/
+│           ├── config.ts          # Centralized configuration
+│           └── logger.ts          # Winston logger
+├── extractor/                     # Standalone P4K extraction CLI (local PC)
+│   ├── extract.ts                 # CLI entry point
+│   └── src/
+│       ├── extraction-service.ts  # Ships/components/loadouts → MySQL
+│       ├── dataforge-service.ts   # P4K/DCB parser
+│       ├── p4k-provider.ts        # P4K file reader (ZIP+AES)
 │       ├── cryxml-parser.ts       # Binary CryXML parser
-│       └── logger.ts              # Winston logger
-├── tests/
-│   └── test-all.mjs               # 50+ API tests (endpoints + data quality)
+│       ├── localization-service.ts # Game text localization
+│       └── logger.ts
+├── ihm/                           # Frontend Vue 3 + Vite + Tailwind
+├── db/
+│   └── schema.sql                 # MySQL schema (10 tables + FKs + indexes)
 ├── docker-compose.yml
-├── Dockerfile                     # Multi-stage (4 stages)
-└── package.json
+└── .github/workflows/ci.yml       # CI/CD (4 jobs)
 ```
 
 ### Data Pipeline
 
 ```
-On startup:
-  1. Init DB + schema (5 tables) + migrations
+VPS (API — always running):
+  1. Init DB + schema (10 tables) + auto-migrations
   2. ShipMatrixService.sync()        → 246 ships in ship_matrix
-  3. DataForgeService.init()         → Open P4K (284 MB, Game2.dcb)
-  4. GameDataService.extractAll()    → In background:
-     ├── saveManufacturersFromData() → ~50 manufacturers
-     ├── saveComponents()            → ~1200+ components (12 types)
-     ├── saveShips() + loadouts      → ~353 ships + ~35000 loadout ports
-     ├── crossReferenceShipMatrix()  → ~205 ships linked (multi-pass + aliases)
-     └── INSERT extraction_log       → SHA-256 hash + stats + duration
+  3. GameDataService(pool)           → Read-only queries for REST API
+  4. Mount routes, listen on :3000
+
+Local PC (Extractor — run manually):
+  npx tsx extract.ts --p4k "C:/StarCitizen/LIVE/Data.p4k"
+  ├── Parse P4K + DataForge (Game2.dcb)
+  ├── saveManufacturers()            → ~55 manufacturers
+  ├── saveComponents()               → ~2700+ components (12 types)
+  ├── saveShips() + loadouts         → ~353 ships + ~35000 loadout ports
+  ├── crossReferenceShipMatrix()     → ~206 ships linked
+  └── INSERT extraction_log          → SHA-256 hash + stats + duration
 ```
 
 All GET endpoints read from MySQL (no direct P4K/RSI source access).
@@ -498,7 +522,7 @@ DB writes only occur at startup or via admin POST endpoints.
 
 ### Tech Stack
 
-- **Runtime**: Node.js 20+ with TypeScript (tsx)
+- **Runtime**: Node.js 22+ with TypeScript (tsx — direct TS execution)
 - **Framework**: Express.js + express-rate-limit
 - **Documentation**: Swagger / OpenAPI 3.0 (swagger-jsdoc + swagger-ui-express)
 - **Database**: MySQL 8.0
@@ -529,10 +553,10 @@ Tests run **without P4K** in CI: game-data tests are automatically skipped (SKIP
 ### Multi-stage Architecture
 
 ```
-Stage 1: base         → node:20-alpine, WORKDIR /app
+Stage 1: base         → node:22-alpine, WORKDIR /app
 Stage 2: deps         → npm ci (all deps)
 Stage 3: build        → TypeScript type-check (tsc --noEmit)
-Stage 4: production   → npm ci --omit=dev + tsx, non-root user, healthcheck
+Stage 4: production   → npm ci --omit=dev, non-root user, healthcheck
 ```
 
 Ports are configurable via `.env` (`API_PORT` for host, `API_INTERNAL_PORT` for container).
@@ -586,8 +610,11 @@ curl 'http://localhost:3003/api/v1/components?type=WeaponGun&format=csv' -o weap
 ### Resync admin
 
 ```bash
+# Sync Ship Matrix (on VPS)
 curl -X POST -H "X-API-Key: $ADMIN_API_KEY" http://localhost:3003/admin/sync-ship-matrix | jq
-curl -X POST -H "X-API-Key: $ADMIN_API_KEY" http://localhost:3003/admin/extract-game-data | jq
+
+# Re-extract game data (on local PC with Star Citizen)
+cd extractor && npx tsx extract.ts --p4k "/path/to/Data.p4k"
 ```
 
 ---

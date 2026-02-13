@@ -2,6 +2,7 @@
 import LoadingState from '@/components/LoadingState.vue'
 import PaginationBar from '@/components/PaginationBar.vue'
 import { getShopInventory, getShops, type Shop } from '@/services/api'
+import { debounce, fmt } from '@/utils/formatters'
 import { computed, onMounted, ref, watch } from 'vue'
 
 const shops = ref<Shop[]>([])
@@ -54,14 +55,9 @@ async function selectShop(shop: Shop) {
 }
 
 onMounted(fetchShops)
-watch([search], () => { page.value = 1; fetchShops() })
+const debouncedFetch = debounce(() => { page.value = 1; fetchShops() }, 300)
+watch(search, debouncedFetch)
 watch(page, fetchShops)
-
-function fmt(v: any) {
-  if (v == null || v === 0) return '—'
-  if (typeof v === 'number') return v.toLocaleString('en-US')
-  return v
-}
 
 function shopIcon(type: string | null): string {
   if (!type) return '🏪'

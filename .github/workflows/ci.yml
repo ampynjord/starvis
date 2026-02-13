@@ -107,7 +107,7 @@ jobs:
           P4K_PATH: ""
 
       - name: Run API tests
-        run: cd api && node tests/test-all.mjs http://localhost:3000
+        run: cd api && npm test -- http://localhost:3000
         env:
           ADMIN_API_KEY: ci_test_key
 
@@ -190,7 +190,5 @@ jobs:
     steps:
       - name: Deploy notification
         run: |
-          echo "🚀 Images built and pushed to ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
-          echo "   Deploy to your server with:"
-          echo "   docker compose pull"
-          echo "   docker compose up -d"
+          echo "🚀 Images pushed to ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          echo "   Deploy: ssh your-server 'cd starvis && docker compose pull && docker compose up -d'"

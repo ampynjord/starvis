@@ -6,7 +6,7 @@ import { createDecipheriv } from "crypto";
 import { statSync } from "fs";
 import { FileHandle, open } from "fs/promises";
 import { inflateRawSync } from "zlib";
-import logger from "../utils/logger.js";
+import logger from "./logger.js";
 
 export interface P4KEntry {
   fileName: string;

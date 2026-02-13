@@ -22,6 +22,7 @@ export class ShipMatrixService {
 
     const res = await fetch(RSI_SHIP_MATRIX_URL, {
       headers: { "User-Agent": "StarVis/1.0", Accept: "application/json" },
+      signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) throw new Error(`RSI API error: ${res.status}`);
 
@@ -147,10 +148,10 @@ export class ShipMatrixService {
     return rows[0] || null;
   }
 
-  /** Get a single ship_matrix entry by name (case insensitive) */
+  /** Get a single ship_matrix entry by name (collation is case-insensitive) */
   async getByName(name: string): Promise<any | null> {
     const [rows] = await this.pool.execute<any[]>(
-      "SELECT * FROM ship_matrix WHERE LOWER(name) = LOWER(?)",
+      "SELECT * FROM ship_matrix WHERE name = ?",
       [name]
     );
     return rows[0] || null;

@@ -2,6 +2,7 @@
 import LoadingState from '@/components/LoadingState.vue'
 import PaginationBar from '@/components/PaginationBar.vue'
 import { getShipFilters, getShipManufacturers, getShips, type Ship, type ShipFilters, type ShipManufacturer } from '@/services/api'
+import { debounce, fmt } from '@/utils/formatters'
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -12,6 +13,7 @@ const total = ref(0)
 const page = ref(1)
 const pages = ref(1)
 const loading = ref(true)
+const error = ref('')
 const manufacturers = ref<ShipManufacturer[]>([])
 const filters = ref<ShipFilters>({ roles: [], careers: [] })
 
@@ -21,11 +23,13 @@ const manufacturer = ref((route.query.manufacturer as string) || '')
 const career = ref('')
 const role = ref('')
 const status = ref('')
+const vehicleCategory = ref('')
 const sort = ref('name')
 const order = ref<'asc' | 'desc'>('asc')
 
 async function fetchShips() {
   loading.value = true
+  error.value = ''
   try {
     const params: Record<string, string> = {
       page: String(page.value),
@@ -38,10 +42,13 @@ async function fetchShips() {
     if (career.value) params.career = career.value
     if (role.value) params.role = role.value
     if (status.value) params.status = status.value
+    if (vehicleCategory.value) params.vehicle_category = vehicleCategory.value
     const res = await getShips(params)
     ships.value = res.data
     total.value = res.total
     pages.value = Math.ceil(res.total / 30)
+  } catch (e: any) {
+    error.value = e.message || 'Failed to load ships'
   } finally {
     loading.value = false
   }
@@ -57,17 +64,15 @@ onMounted(async () => {
   filters.value = flt.data
 })
 
-watch([search, manufacturer, career, role, status, sort, order], () => { page.value = 1; fetchShips() })
+const debouncedFetch = debounce(() => { page.value = 1; fetchShips() }, 300)
+watch(search, debouncedFetch)
+watch([manufacturer, career, role, status, vehicleCategory, sort, order], () => { page.value = 1; fetchShips() })
 watch(page, fetchShips)
 
-function fmt(v: any) {
-  if (v == null) return '—'
-  if (typeof v === 'number') return v.toLocaleString('en-US')
-  return v
-}
+// fmt imported from @/utils/formatters
 
 function statusClass(ship: Ship) {
-  const ps = (ship as any).production_status
+  const ps = ship.production_status
   if (ps === 'flight-ready') return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
   if (ps === 'in-concept') return 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
   if (ps === 'in-production') return 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
@@ -76,7 +81,7 @@ function statusClass(ship: Ship) {
 }
 
 function statusLabel(ship: Ship) {
-  const ps = (ship as any).production_status
+  const ps = ship.production_status
   if (ps === 'flight-ready') return 'Flight Ready'
   if (ps === 'in-concept') return 'In Concept'
   if (ps === 'in-production') return 'In Production'
@@ -114,6 +119,12 @@ function statusLabel(ship: Ship) {
         <option value="in-production">In Production</option>
         <option value="in-game-only">In-Game only</option>
       </select>
+      <select v-model="vehicleCategory" class="input w-36">
+        <option value="">All types</option>
+        <option value="ship">Ships</option>
+        <option value="ground">Ground</option>
+        <option value="gravlev">Gravlev</option>
+      </select>
       <select v-model="sort" class="input w-32">
         <option value="name">Name</option>
         <option value="cargo_capacity">Cargo</option>
@@ -129,20 +140,23 @@ function statusLabel(ship: Ship) {
       </button>
     </div>
 
+    <!-- Error -->
+    <div v-if="error" class="card border-red-500/50 p-3 text-red-400 text-sm">{{ error }}</div>
+
     <LoadingState :loading="loading">
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         <div
           v-for="ship in ships"
           :key="ship.uuid"
           class="card-hover group overflow-hidden"
-          @click="!(ship as any).is_concept_only && router.push(`/ships/${ship.class_name || ship.uuid}`)"
-          :class="{ 'opacity-70 cursor-default': (ship as any).is_concept_only, 'cursor-pointer': !(ship as any).is_concept_only }"
+          @click="!ship.is_concept_only && router.push(`/ships/${ship.class_name || ship.uuid}`)"
+          :class="{ 'opacity-70 cursor-default': ship.is_concept_only, 'cursor-pointer': !ship.is_concept_only }"
         >
           <!-- Thumbnail -->
           <div class="relative h-32 bg-sv-darker overflow-hidden">
             <img
-              v-if="(ship as any).thumbnail"
-              :src="(ship as any).thumbnail"
+              v-if="ship.thumbnail"
+              :src="ship.thumbnail"
               :alt="ship.name"
               class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               loading="lazy"
@@ -165,12 +179,12 @@ function statusLabel(ship: Ship) {
                 <h3 class="font-semibold text-sv-text-bright text-sm truncate group-hover:text-sv-accent transition-colors">
                   {{ ship.name }}
                 </h3>
-                <span class="text-[11px] text-sv-muted">{{ (ship as any).manufacturer_name || ship.manufacturer_code }}</span>
+                <span class="text-[11px] text-sv-muted">{{ ship.manufacturer_name || ship.manufacturer_code }}</span>
               </div>
               <span v-if="ship.ship_matrix_id" class="badge-cyan text-[10px] ml-2 shrink-0" title="Linked to RSI Ship Matrix">✓ Matrix</span>
             </div>
 
-            <div v-if="!(ship as any).is_concept_only" class="grid grid-cols-3 gap-1.5 text-[11px] mt-2">
+            <div v-if="!ship.is_concept_only" class="grid grid-cols-3 gap-1.5 text-[11px] mt-2">
               <div class="text-center p-1 rounded bg-sv-darker/50">
                 <div class="text-sv-muted mb-0.5">HP</div>
                 <div class="text-sv-text font-medium">{{ fmt(ship.total_hp) }}</div>

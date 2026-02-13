@@ -25,7 +25,7 @@ const sidebarOpen = ref(false);
 
       <main class="flex-1 px-4 lg:px-6 py-5 max-w-[1400px] w-full mx-auto">
         <router-view v-slot="{ Component, route }">
-          <component :is="Component" :key="route.fullPath" />
+          <component :is="Component" :key="route.path" />
         </router-view>
       </main>
 
@@ -35,14 +35,3 @@ const sidebarOpen = ref(false);
     </div>
   </div>
 </template>
-
-<style>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.12s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-</style>
