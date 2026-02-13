@@ -10,6 +10,8 @@
 import cors from "cors";
 import express from "express";
 import rateLimit from "express-rate-limit";
+import slowDown from "express-slow-down";
+import helmet from "helmet";
 import * as mysql from "mysql2/promise";
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
@@ -26,18 +28,59 @@ let gameDataService: GameDataService | null = null;
 let httpServer: ReturnType<typeof app.listen> | null = null;
 
 // ===== MIDDLEWARE =====
-app.use(cors({ origin: process.env.CORS_ORIGIN || "*", credentials: true }));
-app.use(express.json());
 
-// Rate limiting – 200 req / 15 min per IP
-const limiter = rateLimit({
+// Trust proxy (Traefik/nginx in front)
+app.set("trust proxy", 1);
+
+// Security headers (XSS, clickjacking, MIME sniffing, etc.)
+app.use(helmet({
+  contentSecurityPolicy: false, // API returns JSON, not HTML
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
+
+app.use(cors({ origin: process.env.CORS_ORIGIN || "*", credentials: true }));
+app.use(express.json({ limit: "1mb" }));
+
+// ── Rate limiting (multi-layer) ──────────────────────────
+
+// Layer 1: Speed limiter — after 100 req/15min, add 500ms delay per request
+const speedLimiter = slowDown({
+  windowMs: 15 * 60 * 1000,
+  delayAfter: 100,
+  delayMs: (hits) => (hits - 100) * 500,
+  maxDelayMs: 20_000,
+});
+
+// Layer 2: Hard rate limit — 200 req/15min per IP (then 429)
+const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: parseInt(process.env.RATE_LIMIT_MAX || "200"),
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: "Too many requests, please try again later" },
+  skipSuccessfulRequests: false,
 });
-app.use("/api", limiter);
+
+// Layer 3: Strict limit on admin endpoints — 20 req/15min
+const adminLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: "Admin rate limit exceeded" },
+});
+
+// Layer 4: Burst protection — 30 req/min max (prevents hammering)
+const burstLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  standardHeaders: false,
+  legacyHeaders: false,
+  message: { success: false, error: "Too many requests per minute, slow down" },
+});
+
+app.use("/api", burstLimiter, speedLimiter, apiLimiter);
+app.use("/admin", adminLimiter);
 
 // Request logging (skip /health to avoid noise)
 app.use((req, res, next) => {
