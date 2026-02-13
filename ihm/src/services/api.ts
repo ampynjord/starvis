@@ -5,9 +5,14 @@
 const BASE = import.meta.env.VITE_API_URL || '/api/v1'
 
 async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { ...init?.headers as Record<string, string> }
+  // Only set Content-Type for requests with a body
+  if (init?.body) {
+    headers['Content-Type'] = 'application/json'
+  }
   const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
     ...init,
+    headers,
   })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText }))
@@ -37,6 +42,7 @@ export interface Ship {
   class_name: string
   name: string
   manufacturer_code: string
+  manufacturer_name: string | null
   career: string
   role: string
   mass: number
@@ -44,6 +50,7 @@ export interface Ship {
   scm_speed: number
   max_speed: number
   boost_speed_forward: number
+  boost_speed_backward: number
   pitch_max: number
   yaw_max: number
   roll_max: number
@@ -61,6 +68,13 @@ export interface Ship {
   cross_section_y: number
   cross_section_z: number
   ship_matrix_id: number | null
+  thumbnail: string | null
+  thumbnail_large: string | null
+  production_status: string | null
+  is_concept_only: boolean
+  sm_description: string | null
+  store_url: string | null
+  vehicle_category: string | null
   [key: string]: any
 }
 
@@ -118,8 +132,10 @@ export interface LoadoutStats {
     missiles: { count: number; total_damage: number }
     power: { total_draw: number; total_output: number; balance: number }
     thermal: { total_heat_generation: number; total_cooling_rate: number; balance: number }
-    quantum: { drive_name: string; speed: number; spool_time: number; fuel_capacity: number }
+    quantum: { drive_name: string; speed: number; spool_time: number; cooldown: number; fuel_rate: number; range: number; tuning_rate: number; alignment_rate: number; disconnect_range: number; fuel_capacity: number }
     countermeasures: { flare_count: number; chaff_count: number; details: { port_name: string; name: string; type: string; ammo_count: number }[] }
+    emp: { count: number; details: { port_name: string; name: string; size: number; damage: number; radius: number; charge_time: number; cooldown: number }[] }
+    quantum_interdiction: { count: number; details: { port_name: string; name: string; size: number; jammer_range: number; snare_radius: number; charge_time: number; cooldown: number }[] }
     signatures: { ir: number; em: number; cs: number }
     armor: { physical: number; energy: number; distortion: number; thermal: number }
     mobility: { scm_speed: number; max_speed: number; boost_forward: number; boost_backward: number; pitch: number; yaw: number; roll: number; mass: number }
@@ -146,6 +162,10 @@ export async function getShipLoadout(uuid: string) {
 
 export async function getShipModules(uuid: string) {
   return fetchJson<any>(`/ships/${uuid}/modules`)
+}
+
+export async function getShipPaints(uuid: string) {
+  return fetchJson<any>(`/ships/${uuid}/paints`)
 }
 
 export async function compareShips(uuid1: string, uuid2: string) {

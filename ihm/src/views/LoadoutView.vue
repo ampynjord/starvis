@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
 import { calculateLoadout, getComponents, getShips, type Ship } from '@/services/api'
-import { computed, onMounted, ref } from 'vue'
+import { LOADOUT_CATEGORY_ORDER, getCategoryInfo } from '@/utils/constants'
+import { debounce, fmt, pct, portLabel, useClickOutside } from '@/utils/formatters'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 const route = useRoute()
@@ -22,6 +24,13 @@ const swapQuery = ref('')
 const swapResults = ref<any[]>([])
 const swapLoading = ref(false)
 const swapTargetType = ref<string>('') // component type filter
+const swapTargetMinSize = ref<number>(0) // port min size
+const swapTargetMaxSize = ref<number>(0) // port max size
+const swapCurrentComponent = ref<any>(null) // current component for delta preview
+
+// Click-outside for ship search dropdown
+const shipSearchRef = ref<HTMLElement | null>(null)
+useClickOutside(shipSearchRef, () => { shipResults.value = [] })
 
 // ── Collapse state for sections ──
 const collapsedSections = ref<Set<string>>(new Set())
@@ -32,17 +41,7 @@ function toggleSection(key: string) {
 function isSectionOpen(key: string) { return !collapsedSections.value.has(key) }
 
 // ── Category mapping (Erkul-style) ─ only real component types from DB ──
-const CATEGORY_ORDER = ['WeaponGun', 'Missile', 'Shield', 'PowerPlant', 'Cooler', 'QuantumDrive', 'Countermeasure', 'Radar']
-const CATEGORY_MAP: Record<string, { label: string; icon: string; color: string }> = {
-  WeaponGun:      { label: 'Weapons',           icon: '🔫', color: 'red' },
-  Shield:         { label: 'Shields',            icon: '🛡️', color: 'blue' },
-  Missile:        { label: 'Missiles',           icon: '🚀', color: 'orange' },
-  PowerPlant:     { label: 'Power Plants',       icon: '⚡', color: 'yellow' },
-  Cooler:         { label: 'Coolers',             icon: '❄️', color: 'cyan' },
-  QuantumDrive:   { label: 'Quantum Drive',      icon: '💫', color: 'purple' },
-  Countermeasure: { label: 'Countermeasures',    icon: '🎯', color: 'emerald' },
-  Radar:          { label: 'Radar',              icon: '📡', color: 'green' },
-}
+// Now imported from @/utils/constants
 
 // Backend now filters loadout to only relevant types, so minimal client filtering needed
 
@@ -52,6 +51,7 @@ async function searchShips(q: string) {
   const res = await getShips({ search: q, limit: '8' })
   shipResults.value = res.data
 }
+const debouncedShipSearch = debounce((q: string) => searchShips(q), 300)
 
 function selectShip(ship: Ship) {
   selectedShip.value = ship
@@ -85,21 +85,23 @@ const groupedLoadout = computed(() => {
     if (!item.component_uuid && !item.component_name) continue
 
     const type = item.component_type || 'Other'
-    const meta = CATEGORY_MAP[type]
-    if (!meta) continue // Skip unknown types
+    const meta = getCategoryInfo(type)
+    if (meta.order >= 99) continue // Skip unknown types
     const groupKey = type
 
     if (!groups[groupKey]) groups[groupKey] = { meta, items: [] }
     groups[groupKey].items.push(item)
   }
 
-  // Sort by CATEGORY_ORDER
-  return CATEGORY_ORDER
+  // Sort by LOADOUT_CATEGORY_ORDER
+  return LOADOUT_CATEGORY_ORDER
     .filter(key => groups[key])
     .map(key => ({
       category: groups[key].meta.label,
       typeKey: key,
-      ...groups[key].meta,
+      icon: groups[key].meta.icon,
+      color: groups[key].meta.color,
+      label: groups[key].meta.label,
       items: groups[key].items,
     }))
 })
@@ -108,6 +110,9 @@ const groupedLoadout = computed(() => {
 function startSwap(item: any) {
   swapTarget.value = item.port_name
   swapTargetType.value = item.component_type || ''
+  swapTargetMinSize.value = item.port_min_size || item.size || 0
+  swapTargetMaxSize.value = item.port_max_size || item.size || 0
+  swapCurrentComponent.value = item
   swapQuery.value = ''
   swapResults.value = []
 }
@@ -116,20 +121,25 @@ function cancelSwap() {
   swapTarget.value = null
   swapQuery.value = ''
   swapResults.value = []
+  swapCurrentComponent.value = null
 }
 
 async function searchSwapComponents(q: string) {
   if (q.length < 2) { swapResults.value = []; return }
   swapLoading.value = true
   try {
-    const params: Record<string, string> = { search: q, limit: '10' }
+    const params: Record<string, string> = { search: q, limit: '20' }
     if (swapTargetType.value) params.type = swapTargetType.value
+    // Filter by port-compatible sizes
+    if (swapTargetMinSize.value > 0) params.min_size = String(swapTargetMinSize.value)
+    if (swapTargetMaxSize.value > 0) params.max_size = String(swapTargetMaxSize.value)
     const res = await getComponents(params)
     swapResults.value = res.data
   } finally {
     swapLoading.value = false
   }
 }
+const debouncedSwapSearch = debounce((q: string) => searchSwapComponents(q), 300)
 
 async function applySwap(component: any) {
   if (!swapTarget.value || !selectedShip.value) return
@@ -151,27 +161,52 @@ function removeSwap(portName: string) {
   if (selectedShip.value) fetchLoadout(selectedShip.value.uuid)
 }
 
-// ── Formatting helpers ──
-function fmt(v: any, decimals = 0) {
-  if (v == null || v === undefined) return '—'
-  const n = typeof v === 'number' ? v : parseFloat(v)
-  if (isNaN(n)) return '—'
-  if (n > 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
-  if (n > 10_000) return (n / 1_000).toFixed(1) + 'k'
-  return n.toLocaleString('en-US', { maximumFractionDigits: decimals })
+// ── Formatting helpers (from shared utils) ──
+// fmt, pct, portLabel imported from @/utils/formatters
+
+/** Compute delta between swap candidate and current component for a given stat */
+function delta(candidate: any, field: string): string {
+  if (!swapCurrentComponent.value) return ''
+  const oldVal = parseFloat(swapCurrentComponent.value[field]) || 0
+  const newVal = parseFloat(candidate[field]) || 0
+  const diff = newVal - oldVal
+  if (Math.abs(diff) < 0.01) return ''
+  const sign = diff > 0 ? '+' : ''
+  return `${sign}${fmt(diff, 1)}`
 }
 
-function pct(v: number) {
-  return Math.round(v * 100) + '%'
+function deltaClass(candidate: any, field: string, higherIsBetter = true): string {
+  if (!swapCurrentComponent.value) return ''
+  const oldVal = parseFloat(swapCurrentComponent.value[field]) || 0
+  const newVal = parseFloat(candidate[field]) || 0
+  const diff = newVal - oldVal
+  if (Math.abs(diff) < 0.01) return 'text-sv-muted'
+  if (higherIsBetter) return diff > 0 ? 'text-green-400' : 'text-red-400'
+  return diff < 0 ? 'text-green-400' : 'text-red-400'
 }
 
-function portLabel(name: string) {
-  return name
-    .replace(/^hardpoint_/i, '')
-    .replace(/^Hardpoint_/i, '')
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, c => c.toUpperCase())
+// ── URL swap persistence ──
+function encodeSwapsToQuery(): string {
+  if (swaps.value.length === 0) return ''
+  return swaps.value.map(s => `${s.portName}:${s.componentUuid}`).join(',')
 }
+
+function decodeSwapsFromQuery(encoded: string): { portName: string; componentUuid: string }[] {
+  if (!encoded) return []
+  return encoded.split(',').map(pair => {
+    const [portName, componentUuid] = pair.split(':')
+    return { portName, componentUuid }
+  }).filter(s => s.portName && s.componentUuid)
+}
+
+// Sync swaps to URL query params
+watch(swaps, () => {
+  const swapStr = encodeSwapsToQuery()
+  const query = { ...route.query }
+  if (swapStr) query.swaps = swapStr
+  else delete query.swaps
+  router.replace({ query })
+}, { deep: true })
 
 // ── Init from URL ──
 onMounted(async () => {
@@ -179,7 +214,13 @@ onMounted(async () => {
   if (uuid) {
     loading.value = true
     try {
-      const res = await calculateLoadout(uuid, [])
+      // Restore swaps from URL query params
+      const swapStr = route.query.swaps as string
+      if (swapStr) {
+        swaps.value = decodeSwapsFromQuery(swapStr)
+      }
+
+      const res = await calculateLoadout(uuid, swaps.value)
       loadout.value = res.data
       if (res.data?.ship) {
         selectedShip.value = { uuid: res.data.ship.uuid, name: res.data.ship.name } as Ship
@@ -198,7 +239,7 @@ onMounted(async () => {
   <div class="space-y-4">
 
     <!-- ═══ Ship Picker ═══ -->
-    <div class="card p-4 relative z-20">
+    <div class="card p-4 relative z-20" ref="shipSearchRef">
       <div class="flex items-center gap-3">
         <div class="flex-1 relative">
           <div class="flex items-center gap-2 mb-1.5">
@@ -207,7 +248,7 @@ onMounted(async () => {
           </div>
           <input
             v-model="shipQuery"
-            @input="searchShips(shipQuery)"
+            @input="debouncedShipSearch(shipQuery)"
             class="input w-full"
             placeholder="Search a ship…"
           />
@@ -362,6 +403,14 @@ onMounted(async () => {
                   <template v-if="item.radar_range">
                     <span class="text-green-400">{{ fmt(item.radar_range, 0) }}m</span>
                   </template>
+                  <template v-if="item.emp_damage">
+                    <span class="text-purple-400">{{ fmt(item.emp_damage, 0) }} dmg</span>
+                    <span v-if="item.emp_radius" class="text-purple-300">{{ fmt(item.emp_radius, 0) }}m</span>
+                  </template>
+                  <template v-if="item.qig_jammer_range">
+                    <span class="text-purple-400">{{ fmt(item.qig_jammer_range, 0) }}m</span>
+                    <span v-if="item.qig_snare_radius" class="text-purple-300">⌀{{ fmt(item.qig_snare_radius, 0) }}m</span>
+                  </template>
                 </div>
 
                 <!-- Swap / Reset buttons -->
@@ -460,6 +509,8 @@ onMounted(async () => {
                     <th class="text-center py-1 font-medium">S</th>
                     <th class="text-right py-1 font-medium">HP</th>
                     <th class="text-right py-1 font-medium">Regen</th>
+                    <th class="text-right py-1 font-medium hidden sm:table-cell">Delay</th>
+                    <th class="text-right py-1 font-medium hidden sm:table-cell">Hard.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -469,6 +520,8 @@ onMounted(async () => {
                     <td class="py-1 text-center text-sv-muted">{{ s.size }}</td>
                     <td class="py-1 text-right text-blue-400 font-mono">{{ fmt(s.hp) }}</td>
                     <td class="py-1 text-right text-blue-300 font-mono">{{ fmt(s.regen) }}/s</td>
+                    <td class="py-1 text-right text-blue-200 font-mono hidden sm:table-cell">{{ s.regen_delay ? fmt(s.regen_delay, 1) + 's' : '—' }}</td>
+                    <td class="py-1 text-right text-blue-200 font-mono hidden sm:table-cell">{{ s.hardening ? pct(s.hardening) : '—' }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -497,14 +550,20 @@ onMounted(async () => {
                     <th class="text-left py-1 font-medium">Name</th>
                     <th class="text-center py-1 font-medium">S</th>
                     <th class="text-right py-1 font-medium">Damage</th>
+                    <th class="text-right py-1 font-medium hidden sm:table-cell">Speed</th>
+                    <th class="text-right py-1 font-medium hidden sm:table-cell">Range</th>
+                    <th class="text-right py-1 font-medium hidden sm:table-cell">Lock</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="(m, i) in loadout.stats.missiles.details" :key="i"
                     class="border-b border-sv-border/10 hover:bg-sv-panel-light/20">
-                    <td class="py-1 text-sv-text-bright truncate max-w-[120px]">{{ m.name }}</td>
+                    <td class="py-1 text-sv-text-bright truncate max-w-[100px]">{{ m.name }}</td>
                     <td class="py-1 text-center text-sv-muted">{{ m.size }}</td>
                     <td class="py-1 text-right text-orange-400 font-mono">{{ fmt(m.damage) }}</td>
+                    <td class="py-1 text-right text-sv-muted font-mono hidden sm:table-cell">{{ m.speed ? fmt(m.speed, 0) + ' m/s' : '—' }}</td>
+                    <td class="py-1 text-right text-sv-muted font-mono hidden sm:table-cell">{{ m.range ? fmt(m.range, 0) + 'm' : '—' }}</td>
+                    <td class="py-1 text-right text-sv-muted font-mono hidden sm:table-cell">{{ m.lock_time ? fmt(m.lock_time, 1) + 's' : '—' }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -666,8 +725,36 @@ onMounted(async () => {
                   <div class="text-purple-300 font-mono font-medium">{{ loadout.stats.quantum.spool_time }}s</div>
                 </div>
                 <div>
-                  <div class="text-sv-muted">Fuel</div>
+                  <div class="text-sv-muted">Fuel Cap.</div>
                   <div class="text-purple-200 font-mono font-medium">{{ loadout.stats.quantum.fuel_capacity }}L</div>
+                </div>
+              </div>
+              <!-- Extended QD stats -->
+              <div v-if="loadout.stats.quantum.cooldown || loadout.stats.quantum.fuel_rate || loadout.stats.quantum.range || loadout.stats.quantum.tuning_rate || loadout.stats.quantum.alignment_rate || loadout.stats.quantum.disconnect_range"
+                class="grid grid-cols-3 gap-2 text-center text-[10px] mt-2 pt-2 border-t border-sv-border/20">
+                <div v-if="loadout.stats.quantum.cooldown">
+                  <div class="text-sv-muted">Cooldown</div>
+                  <div class="text-purple-300 font-mono font-medium">{{ fmt(loadout.stats.quantum.cooldown, 1) }}s</div>
+                </div>
+                <div v-if="loadout.stats.quantum.fuel_rate">
+                  <div class="text-sv-muted">Fuel Rate</div>
+                  <div class="text-purple-300 font-mono font-medium">{{ fmt(loadout.stats.quantum.fuel_rate) }}/s</div>
+                </div>
+                <div v-if="loadout.stats.quantum.range">
+                  <div class="text-sv-muted">Range</div>
+                  <div class="text-purple-300 font-mono font-medium">{{ fmt(loadout.stats.quantum.range / 1000000, 1) }} Gm</div>
+                </div>
+                <div v-if="loadout.stats.quantum.tuning_rate">
+                  <div class="text-sv-muted">Tuning</div>
+                  <div class="text-purple-200 font-mono font-medium">{{ fmt(loadout.stats.quantum.tuning_rate, 2) }}</div>
+                </div>
+                <div v-if="loadout.stats.quantum.alignment_rate">
+                  <div class="text-sv-muted">Alignment</div>
+                  <div class="text-purple-200 font-mono font-medium">{{ fmt(loadout.stats.quantum.alignment_rate, 2) }}</div>
+                </div>
+                <div v-if="loadout.stats.quantum.disconnect_range">
+                  <div class="text-sv-muted">Disconnect</div>
+                  <div class="text-purple-200 font-mono font-medium">{{ fmt(loadout.stats.quantum.disconnect_range / 1000, 0) }} km</div>
                 </div>
               </div>
             </div>
@@ -801,6 +888,100 @@ onMounted(async () => {
             </div>
           </div>
 
+          <!-- EMP -->
+          <div v-if="loadout.stats.emp?.count" class="card overflow-hidden">
+            <div class="px-4 py-2 bg-purple-500/5 border-b border-sv-border/30">
+              <span class="text-[11px] font-bold text-purple-400 uppercase tracking-wider">⚡ EMP</span>
+            </div>
+            <div class="p-3">
+              <div class="text-[10px] text-sv-muted mb-2">{{ loadout.stats.emp.count }} device{{ loadout.stats.emp.count > 1 ? 's' : '' }}</div>
+              <table class="w-full text-[10px]">
+                <thead>
+                  <tr class="text-sv-muted border-b border-sv-border/20">
+                    <th class="text-left py-1 font-medium">Name</th>
+                    <th class="text-center py-1 font-medium">S</th>
+                    <th class="text-right py-1 font-medium">Damage</th>
+                    <th class="text-right py-1 font-medium">Radius</th>
+                    <th class="text-right py-1 font-medium hidden sm:table-cell">Charge</th>
+                    <th class="text-right py-1 font-medium hidden sm:table-cell">CD</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(e, i) in loadout.stats.emp.details" :key="i"
+                    class="border-b border-sv-border/10 hover:bg-sv-panel-light/20">
+                    <td class="py-1 text-sv-text-bright truncate max-w-[100px]">{{ e.name }}</td>
+                    <td class="py-1 text-center text-sv-muted">{{ e.size }}</td>
+                    <td class="py-1 text-right text-purple-400 font-mono">{{ fmt(e.damage) }}</td>
+                    <td class="py-1 text-right text-purple-300 font-mono">{{ fmt(e.radius, 0) }}m</td>
+                    <td class="py-1 text-right text-sv-muted font-mono hidden sm:table-cell">{{ e.charge_time ? fmt(e.charge_time, 1) + 's' : '—' }}</td>
+                    <td class="py-1 text-right text-sv-muted font-mono hidden sm:table-cell">{{ e.cooldown ? fmt(e.cooldown, 1) + 's' : '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Quantum Interdiction (QED) -->
+          <div v-if="loadout.stats.quantum_interdiction?.count" class="card overflow-hidden">
+            <div class="px-4 py-2 bg-purple-500/5 border-b border-sv-border/30">
+              <span class="text-[11px] font-bold text-purple-400 uppercase tracking-wider">🔒 Quantum Interdiction</span>
+            </div>
+            <div class="p-3">
+              <div class="text-[10px] text-sv-muted mb-2">{{ loadout.stats.quantum_interdiction.count }} device{{ loadout.stats.quantum_interdiction.count > 1 ? 's' : '' }}</div>
+              <table class="w-full text-[10px]">
+                <thead>
+                  <tr class="text-sv-muted border-b border-sv-border/20">
+                    <th class="text-left py-1 font-medium">Name</th>
+                    <th class="text-center py-1 font-medium">S</th>
+                    <th class="text-right py-1 font-medium">Jammer</th>
+                    <th class="text-right py-1 font-medium">Snare</th>
+                    <th class="text-right py-1 font-medium hidden sm:table-cell">Charge</th>
+                    <th class="text-right py-1 font-medium hidden sm:table-cell">CD</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(q, i) in loadout.stats.quantum_interdiction.details" :key="i"
+                    class="border-b border-sv-border/10 hover:bg-sv-panel-light/20">
+                    <td class="py-1 text-sv-text-bright truncate max-w-[100px]">{{ q.name }}</td>
+                    <td class="py-1 text-center text-sv-muted">{{ q.size }}</td>
+                    <td class="py-1 text-right text-purple-400 font-mono">{{ q.jammer_range ? fmt(q.jammer_range, 0) + 'm' : '—' }}</td>
+                    <td class="py-1 text-right text-purple-300 font-mono">{{ q.snare_radius ? fmt(q.snare_radius, 0) + 'm' : '—' }}</td>
+                    <td class="py-1 text-right text-sv-muted font-mono hidden sm:table-cell">{{ q.charge_time ? fmt(q.charge_time, 1) + 's' : '—' }}</td>
+                    <td class="py-1 text-right text-sv-muted font-mono hidden sm:table-cell">{{ q.cooldown ? fmt(q.cooldown, 1) + 's' : '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Modules -->
+          <div v-if="loadout.modules?.length" class="card overflow-hidden">
+            <div class="px-4 py-2 bg-indigo-500/5 border-b border-sv-border/30">
+              <span class="text-[11px] font-bold text-indigo-400 uppercase tracking-wider">🧩 Modules</span>
+            </div>
+            <div class="p-3 space-y-1">
+              <div v-for="(mod, i) in loadout.modules" :key="i"
+                class="flex items-center justify-between text-[10px] px-1 py-0.5">
+                <span class="text-sv-text-bright">{{ mod.module_name || mod.name || '—' }}</span>
+                <span class="text-sv-muted font-mono">{{ mod.module_type || mod.type || '' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Paints -->
+          <div v-if="loadout.paints?.length" class="card overflow-hidden">
+            <div class="px-4 py-2 bg-pink-500/5 border-b border-sv-border/30">
+              <span class="text-[11px] font-bold text-pink-400 uppercase tracking-wider">🎨 Paints</span>
+            </div>
+            <div class="p-3 space-y-1">
+              <div v-for="(paint, i) in loadout.paints" :key="i"
+                class="flex items-center justify-between text-[10px] px-1 py-0.5">
+                <span class="text-sv-text-bright">{{ paint.paint_name || paint.paint_class_name || '—' }}</span>
+              </div>
+              <div v-if="!loadout.paints.length" class="text-[10px] text-sv-muted text-center py-2">No paints available</div>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -827,6 +1008,12 @@ onMounted(async () => {
               <div class="text-[10px] text-sv-muted mt-0.5">
                 Port: {{ portLabel(swapTarget) }}
                 <span v-if="swapTargetType" class="ml-1 text-sv-accent">({{ swapTargetType }})</span>
+                <span v-if="swapTargetMinSize || swapTargetMaxSize" class="ml-1 text-sv-accent">
+                  S{{ swapTargetMinSize }}<template v-if="swapTargetMinSize !== swapTargetMaxSize">–S{{ swapTargetMaxSize }}</template>
+                </span>
+              </div>
+              <div v-if="swapCurrentComponent" class="text-[10px] text-sv-muted mt-0.5">
+                Current: <span class="text-sv-text">{{ swapCurrentComponent.name || swapCurrentComponent.component_name || '—' }}</span>
               </div>
             </div>
             <button @click="cancelSwap" class="p-1 rounded hover:bg-sv-border/30 text-sv-muted hover:text-sv-text transition">
@@ -837,7 +1024,7 @@ onMounted(async () => {
           </div>
           <!-- Search -->
           <div class="p-4 border-b border-sv-border/20">
-            <input v-model="swapQuery" @input="searchSwapComponents(swapQuery)"
+            <input v-model="swapQuery" @input="debouncedSwapSearch(swapQuery)"
               class="input w-full" placeholder="Search components…" autofocus />
           </div>
           <!-- Results -->
@@ -854,12 +1041,37 @@ onMounted(async () => {
                     <span>{{ c.manufacturer_code }}</span>
                   </div>
                 </div>
-                <div class="text-[10px] font-mono text-sv-muted text-right">
-                  <template v-if="c.weapon_dps"><span class="text-red-400">{{ fmt(c.weapon_dps) }} DPS</span></template>
-                  <template v-if="c.shield_hp"><span class="text-blue-400">{{ fmt(c.shield_hp) }} HP</span></template>
-                  <template v-if="c.power_output"><span class="text-yellow-400">{{ fmt(c.power_output) }} pwr</span></template>
-                  <template v-if="c.cooling_rate"><span class="text-cyan-400">{{ fmt(c.cooling_rate) }} cool</span></template>
-                  <template v-if="c.qd_speed"><span class="text-purple-400">{{ fmt(c.qd_speed) }} m/s</span></template>
+                <div class="text-[10px] font-mono text-right space-y-0.5">
+                  <!-- Weapon stats + delta -->
+                  <template v-if="c.weapon_dps">
+                    <div class="text-red-400">{{ fmt(c.weapon_dps) }} DPS
+                      <span v-if="delta(c, 'weapon_dps')" :class="deltaClass(c, 'weapon_dps')"> ({{ delta(c, 'weapon_dps') }})</span>
+                    </div>
+                  </template>
+                  <!-- Shield stats + delta -->
+                  <template v-if="c.shield_hp">
+                    <div class="text-blue-400">{{ fmt(c.shield_hp) }} HP
+                      <span v-if="delta(c, 'shield_hp')" :class="deltaClass(c, 'shield_hp')"> ({{ delta(c, 'shield_hp') }})</span>
+                    </div>
+                  </template>
+                  <!-- Power output + delta -->
+                  <template v-if="c.power_output">
+                    <div class="text-yellow-400">{{ fmt(c.power_output) }} pwr
+                      <span v-if="delta(c, 'power_output')" :class="deltaClass(c, 'power_output')"> ({{ delta(c, 'power_output') }})</span>
+                    </div>
+                  </template>
+                  <!-- Cooling rate + delta -->
+                  <template v-if="c.cooling_rate">
+                    <div class="text-cyan-400">{{ fmt(c.cooling_rate) }} cool
+                      <span v-if="delta(c, 'cooling_rate')" :class="deltaClass(c, 'cooling_rate')"> ({{ delta(c, 'cooling_rate') }})</span>
+                    </div>
+                  </template>
+                  <!-- QD speed + delta -->
+                  <template v-if="c.qd_speed">
+                    <div class="text-purple-400">{{ fmt(c.qd_speed) }} m/s
+                      <span v-if="delta(c, 'qd_speed')" :class="deltaClass(c, 'qd_speed')"> ({{ delta(c, 'qd_speed') }})</span>
+                    </div>
+                  </template>
                 </div>
               </div>
             </div>

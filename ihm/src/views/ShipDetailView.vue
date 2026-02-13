@@ -2,6 +2,8 @@
 import LoadingState from '@/components/LoadingState.vue'
 import StatBlock from '@/components/StatBlock.vue'
 import { getShip, getShipLoadout, getShipModules, type Ship } from '@/services/api'
+import { CATEGORY_MAP, HIDDEN_PORT_TYPES } from '@/utils/constants'
+import { fmt } from '@/utils/formatters'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -35,52 +37,20 @@ watch(() => route.params.uuid, (newUuid, oldUuid) => {
   if (newUuid && newUuid !== oldUuid) loadData()
 })
 
-function fmt(v: any, unit = '') {
-  if (v == null || v === 0) return '—'
-  const n = typeof v === 'number' ? v.toLocaleString('en-US', { maximumFractionDigits: 1 }) : v
-  return unit ? `${n} ${unit}` : n
-}
+// fmt imported from @/utils/formatters
 
 const groupedLoadout = computed(() => {
   // Group root loadout nodes by port_type for tree display (Erkul-style categories)
   const groups: Record<string, { label: string; icon: string; color: string; order: number; nodes: any[] }> = {}
-  const typeMap: Record<string, { label: string; icon: string; color: string; order: number }> = {
-    'WeaponGun': { label: 'Weapons', icon: '🎯', color: 'text-red-400', order: 1 },
-    'Weapon': { label: 'Weapons', icon: '🎯', color: 'text-red-400', order: 1 },
-    'Gimbal': { label: 'Weapons', icon: '🎯', color: 'text-red-400', order: 1 },
-    'TurretBase': { label: 'Turrets', icon: '🔫', color: 'text-red-400', order: 2 },
-    'Turret': { label: 'Turrets', icon: '🔫', color: 'text-red-400', order: 2 },
-    'MissileLauncher': { label: 'Missiles & Bombs', icon: '🚀', color: 'text-amber-400', order: 3 },
-    'MissileRack': { label: 'Missiles & Bombs', icon: '🚀', color: 'text-amber-400', order: 3 },
-    'Shield': { label: 'Shields', icon: '🛡️', color: 'text-blue-400', order: 4 },
-    'ShieldGenerator': { label: 'Shields', icon: '🛡️', color: 'text-blue-400', order: 4 },
-    'PowerPlant': { label: 'Power Plants', icon: '⚡', color: 'text-green-400', order: 5 },
-    'Cooler': { label: 'Coolers', icon: '❄️', color: 'text-cyan-400', order: 6 },
-    'QuantumDrive': { label: 'Quantum Drive', icon: '💫', color: 'text-purple-400', order: 7 },
-    'Radar': { label: 'Radar', icon: '📡', color: 'text-blue-400', order: 8 },
-    'EMP': { label: 'EMP', icon: '⚡', color: 'text-purple-400', order: 9 },
-    'MainThruster': { label: 'Thrusters', icon: '🔥', color: 'text-amber-400', order: 10 },
-    'ManneuverThruster': { label: 'Thrusters', icon: '🔥', color: 'text-amber-400', order: 10 },
-    'Thruster': { label: 'Thrusters', icon: '🔥', color: 'text-amber-400', order: 10 },
-    'QuantumInterdictionGenerator': { label: 'QED', icon: '🔒', color: 'text-purple-400', order: 11 },
-    'Countermeasure': { label: 'Countermeasures', icon: '🎇', color: 'text-amber-400', order: 12 },
-  }
-
-  const hiddenTypes = new Set([
-    'FuelIntake', 'FuelTank', 'QuantumFuelTank', 'HydrogenFuelTank',
-    'LifeSupport', 'FlightController', 'SelfDestruct', 'Transponder',
-    'Scanner', 'Ping', 'Armor', 'Light', 'LandingGear', 'Door',
-    'Seat', 'Container', 'WeaponRack',
-  ])
 
   for (const item of loadout.value) {
     const type = item.component_type || item.port_type || 'Other'
     // Skip hidden types
-    const isHidden = Array.from(hiddenTypes).some(h => type.toLowerCase().includes(h.toLowerCase()))
+    const isHidden = Array.from(HIDDEN_PORT_TYPES).some(h => type.toLowerCase().includes(h.toLowerCase()))
     if (isHidden) continue
-    if (type === 'Other' && !Object.keys(typeMap).some(k => (item.component_type || '').toLowerCase().includes(k.toLowerCase()))) continue
+    if (type === 'Other' && !Object.keys(CATEGORY_MAP).some(k => (item.component_type || '').toLowerCase().includes(k.toLowerCase()))) continue
 
-    const info = Object.entries(typeMap).find(([k]) => type.toLowerCase().includes(k.toLowerCase()))?.[1]
+    const info = Object.entries(CATEGORY_MAP).find(([k]) => type.toLowerCase().includes(k.toLowerCase()))?.[1]
     if (!info) continue // Hide unknown types
     const key = info.label
     if (!groups[key]) groups[key] = { ...info, nodes: [] }
@@ -107,28 +77,28 @@ const armorStats = computed(() => {
       <!-- Header with thumbnail -->
       <div class="card overflow-hidden">
         <div class="relative">
-          <div v-if="(ship as any).thumbnail_large || (ship as any).thumbnail" class="h-48 sm:h-64 overflow-hidden">
+          <div v-if="ship.thumbnail_large || ship.thumbnail" class="h-48 sm:h-64 overflow-hidden">
             <img
-              :src="(ship as any).thumbnail_large || (ship as any).thumbnail"
+              :src="ship.thumbnail_large || ship.thumbnail || undefined"
               :alt="ship.name"
               class="w-full h-full object-cover"
             />
             <div class="absolute inset-0 bg-gradient-to-t from-sv-panel via-transparent to-transparent" />
           </div>
-          <div class="relative p-4" :class="{ '-mt-16': (ship as any).thumbnail_large || (ship as any).thumbnail }">
-            <button @click="router.back()" class="btn-ghost text-xs mb-2">← Back</button>
+          <div class="relative p-4" :class="{ '-mt-16': ship.thumbnail_large || ship.thumbnail }">
+            <button @click="router.push('/ships')" class="btn-ghost text-xs mb-2">← Ships</button>
             <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
               <div>
                 <h1 class="text-2xl font-bold text-sv-text-bright">{{ ship.name }}</h1>
                 <p class="text-sv-muted text-sm">
-                  {{ (ship as any).manufacturer_name || ship.manufacturer_code }}
+                  {{ ship.manufacturer_name || ship.manufacturer_code }}
                   <span v-if="ship.career"> · {{ ship.career }}</span>
                   <span v-if="ship.role"> · {{ ship.role }}</span>
                 </p>
               </div>
               <div class="flex gap-2 shrink-0">
-                <span v-if="(ship as any).production_status" class="badge-purple text-[10px]">
-                  {{ (ship as any).production_status }}
+                <span v-if="ship.production_status" class="badge-purple text-[10px]">
+                  {{ ship.production_status }}
                 </span>
                 <span v-if="ship.ship_matrix_id" class="badge-cyan text-[10px]" title="Linked to RSI Ship Matrix">✓ Matrix</span>
                 <router-link :to="`/compare?ship1=${ship.class_name || ship.uuid}`" class="btn-primary text-xs">
@@ -137,7 +107,7 @@ const armorStats = computed(() => {
                 <router-link :to="`/loadout/${ship.class_name || ship.uuid}`" class="btn-outline text-xs">
                   Loadout Manager
                 </router-link>
-                <a v-if="(ship as any).store_url" :href="'https://robertsspaceindustries.com' + (ship as any).store_url" target="_blank" class="btn-ghost text-xs border border-sv-border">
+                <a v-if="ship.store_url" :href="'https://robertsspaceindustries.com' + ship.store_url" target="_blank" class="btn-ghost text-xs border border-sv-border">
                   RSI ↗
                 </a>
               </div>
@@ -204,9 +174,9 @@ const armorStats = computed(() => {
       </div>
 
       <!-- Ship Matrix description -->
-      <div v-if="(ship as any).sm_description" class="card p-4">
+      <div v-if="ship.sm_description" class="card p-4">
         <h2 class="text-xs font-semibold text-sv-accent uppercase tracking-wider mb-2">RSI Description</h2>
-        <p class="text-sv-muted text-sm leading-relaxed">{{ (ship as any).sm_description }}</p>
+        <p class="text-sv-muted text-sm leading-relaxed">{{ ship.sm_description }}</p>
       </div>
 
       <!-- Modules (Retaliator, Apollo…) -->

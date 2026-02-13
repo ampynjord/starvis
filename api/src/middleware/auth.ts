@@ -1,15 +1,20 @@
+import { timingSafeEqual } from "crypto";
 import { NextFunction, Request, Response } from "express";
 
-const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
-if (!ADMIN_API_KEY) throw new Error("Missing required env var: ADMIN_API_KEY");
-
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
-  const apiKey = req.headers["x-api-key"] || req.query.api_key;
+  const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
+  if (!ADMIN_API_KEY) {
+    return res.status(500).json({ error: "Server misconfiguration", message: "ADMIN_API_KEY not set" });
+  }
 
-  if (!apiKey || apiKey !== ADMIN_API_KEY) {
+  const apiKey = String(req.headers["x-api-key"] || req.query.api_key || "");
+  const keyBuf = Buffer.from(apiKey);
+  const expectedBuf = Buffer.from(ADMIN_API_KEY);
+
+  if (!apiKey || keyBuf.length !== expectedBuf.length || !timingSafeEqual(keyBuf, expectedBuf)) {
     return res.status(401).json({
       error: "Unauthorized",
-      message: "Valid API key required. Use X-API-Key header or ?api_key= query parameter"
+      message: "Valid API key required. Use X-API-Key header or ?api_key= query parameter",
     });
   }
 

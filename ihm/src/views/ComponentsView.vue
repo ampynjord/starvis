@@ -2,32 +2,34 @@
 import LoadingState from '@/components/LoadingState.vue'
 import PaginationBar from '@/components/PaginationBar.vue'
 import { getComponents, getManufacturers, type Component, type Manufacturer } from '@/services/api'
+import { COMPONENT_TYPES } from '@/utils/constants'
+import { debounce, fmt } from '@/utils/formatters'
 import { onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 
+const route = useRoute()
 const router = useRouter()
 const components = ref<Component[]>([])
 const total = ref(0)
 const page = ref(1)
 const pages = ref(1)
 const loading = ref(true)
+const error = ref('')
 const manufacturers = ref<Manufacturer[]>([])
 
-const TYPES = [
-  'WeaponGun', 'Shield', 'QuantumDrive', 'PowerPlant',
-  'Cooler', 'Radar', 'Countermeasure', 'Thruster',
-]
+const TYPES = COMPONENT_TYPES
 
-// Filters
-const search = ref('')
-const type = ref('')
-const size = ref('')
-const manufacturer = ref('')
+// Filters — initialize from route query params
+const search = ref((route.query.search as string) || '')
+const type = ref((route.query.type as string) || '')
+const size = ref((route.query.size as string) || '')
+const manufacturer = ref((route.query.manufacturer as string) || '')
 const sort = ref('name')
 const order = ref<'asc' | 'desc'>('asc')
 
 async function fetchComponents() {
   loading.value = true
+  error.value = ''
   try {
     const params: Record<string, string> = {
       page: String(page.value),
@@ -43,6 +45,8 @@ async function fetchComponents() {
     components.value = res.data
     total.value = res.total
     pages.value = Math.ceil(res.total / 30)
+  } catch (e: any) {
+    error.value = e.message || 'Failed to load components'
   } finally {
     loading.value = false
   }
@@ -56,14 +60,12 @@ onMounted(async () => {
   manufacturers.value = mfg.data
 })
 
-watch([search, type, size, manufacturer, sort, order], () => { page.value = 1; fetchComponents() })
+const debouncedFetch = debounce(() => { page.value = 1; fetchComponents() }, 300)
+watch(search, debouncedFetch)
+watch([type, size, manufacturer, sort, order], () => { page.value = 1; fetchComponents() })
 watch(page, fetchComponents)
 
-function fmt(v: any) {
-  if (v == null || v === 0) return '—'
-  if (typeof v === 'number') return v.toLocaleString('en-US', { maximumFractionDigits: 1 })
-  return v
-}
+// fmt imported from @/utils/formatters
 
 function typeColor(t: string) {
   const colors: Record<string, string> = {
@@ -108,6 +110,9 @@ function typeColor(t: string) {
         {{ order === 'asc' ? '↑ Asc' : '↓ Desc' }}
       </button>
     </div>
+
+    <!-- Error -->
+    <div v-if="error" class="card border-red-500/50 p-3 text-red-400 text-sm">{{ error }}</div>
 
     <LoadingState :loading="loading">
       <div class="overflow-x-auto">

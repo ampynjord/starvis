@@ -40,9 +40,6 @@ services:
       ADMIN_API_KEY: ${ADMIN_API_KEY}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
-      P4K_PATH: ${P4K_PATH:-}
-    volumes:
-      - ${P4K_VOLUME:-/dev/null}:/game:ro
     restart: unless-stopped
     depends_on:
       mysql:

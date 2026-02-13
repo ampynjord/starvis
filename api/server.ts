@@ -3,31 +3,25 @@
  *
  * Architecture:
  *   ship_matrix table    ← ShipMatrixService  ← RSI Ship Matrix API
- *   ships/components/etc ← GameDataService     ← DataForgeService ← P4K
+ *   ships/components/etc ← GameDataService     ← MySQL (fed by standalone extractor)
  *
  * Features: Pagination, ETag caching, CSV export, Rate limiting, Swagger docs
  */
 import cors from "cors";
 import express from "express";
 import rateLimit from "express-rate-limit";
-import { existsSync } from "fs";
 import * as mysql from "mysql2/promise";
-import path from "path";
 import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
-import { fileURLToPath } from "url";
 
 import { createRoutes } from "./src/routes.js";
-import { DataForgeService, GameDataService, ShipMatrixService, initializeSchema } from "./src/services/index.js";
+import { GameDataService, ShipMatrixService, initializeSchema } from "./src/services/index.js";
 import { DB_CONFIG, logger } from "./src/utils/index.js";
 
 const PORT = process.env.PORT || 3000;
-const P4K_PATH = process.env.P4K_PATH || "/game/Data.p4k";
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const app = express();
 let pool: mysql.Pool | null = null;
-let dfService: DataForgeService | null = null;
 let gameDataService: GameDataService | null = null;
 
 // ===== MIDDLEWARE =====
@@ -64,7 +58,7 @@ const swaggerSpec = swaggerJsdoc({
     info: {
       title: "Starvis",
       version: "1.0.0",
-      description: "Star Citizen Ships & Components API – powered by P4K/DataForge",
+      description: "Star Citizen Ships & Components API",
     },
     servers: [{ url: `http://localhost:${PORT}` }],
   },
@@ -110,28 +104,11 @@ async function start() {
   // 2. Ship Matrix service (always available)
   const shipMatrixService = new ShipMatrixService(pool);
 
-  // 3. DataForge / P4K service (optional)
-  if (existsSync(P4K_PATH)) {
-    try {
-      logger.info("Initializing DataForge…", { module: "P4K" });
-      dfService = new DataForgeService(P4K_PATH);
-      await dfService.init();
-      gameDataService = new GameDataService(pool, dfService);
-      logger.info("✅ DataForge ready", { module: "P4K" });
-    } catch (e) {
-      logger.warn("P4K/DataForge unavailable", { module: "P4K" });
-      logger.warn(String(e));
-    }
-  } else {
-    logger.info("P4K not found — game data endpoints disabled", { module: "P4K" });
-  }
+  // 3. GameDataService (reads from MySQL — fed by standalone extractor)
+  gameDataService = new GameDataService(pool);
 
   // 4. Mount routes
-  app.use("/", createRoutes({
-    pool,
-    shipMatrixService,
-    gameDataService: gameDataService || undefined,
-  }));
+  app.use("/", createRoutes({ pool, shipMatrixService, gameDataService }));
 
   // 5. Initial sync: Ship Matrix
   try {
@@ -143,25 +120,11 @@ async function start() {
     logger.warn(String(e));
   }
 
-  // 6. Background: extract game data from P4K
-  if (gameDataService) {
-    (async () => {
-      try {
-        const stats = await gameDataService!.extractAll(msg => logger.info(msg, { module: "P4K" }));
-        logger.info(`✅ Game data ready: ${stats.ships} ships, ${stats.components} components, ${stats.manufacturers} manufacturers`, { module: "P4K" });
-      } catch (e) {
-        logger.error("Game data extraction failed", { module: "P4K" });
-        logger.error(String(e));
-      }
-    })();
-  }
-
   app.listen(PORT, () => logger.info(`✅ Starvis v1.0 listening on :${PORT}`, { module: "Server" }));
 }
 
 process.on("SIGINT", async () => {
   logger.info("Shutting down…", { module: "Server" });
-  if (dfService) await dfService.close();
   if (pool) await pool.end();
   process.exit(0);
 });

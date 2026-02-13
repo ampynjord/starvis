@@ -4,6 +4,7 @@ import { onMounted, ref } from 'vue'
 
 const stats = ref<any>(null)
 const loading = ref(true)
+const error = ref('')
 
 onMounted(async () => {
   try {
@@ -20,6 +21,11 @@ onMounted(async () => {
       version: v?.data?.game_version || '?',
       lastExtraction: v?.data?.extracted_at || null,
     }
+    if (!s && !c && !m) {
+      error.value = 'Unable to reach the API. Is the backend running?'
+    }
+  } catch (e: any) {
+    error.value = e.message || 'Connection error'
   } finally {
     loading.value = false
   }
@@ -47,6 +53,9 @@ const tools = [
         <span class="text-sv-muted/60">Data extracted directly from game files (P4K/DataForge)</span>
       </p>
     </div>
+
+    <!-- Error -->
+    <div v-if="error" class="card border-red-500/50 p-3 text-red-400 text-sm text-center">{{ error }}</div>
 
     <!-- Stats -->
     <div v-if="stats" class="grid grid-cols-2 md:grid-cols-4 gap-3">

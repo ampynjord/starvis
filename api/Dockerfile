@@ -21,16 +21,14 @@ COPY api/server.ts ./
 COPY api/src/ ./src/
 COPY db/ ./db/
 # Type-check only — tsx runs TS directly, no emit needed
-RUN npx tsc --noEmit || true
+RUN npx tsc --noEmit
 
 # ---- Stage 4: production ----
 FROM base AS production
 
-# Install production deps + tsx runtime
+# Install production deps (tsx is now in dependencies)
 COPY api/package*.json ./
-RUN npm ci --omit=dev && \
-    npm install tsx && \
-    npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy source
 COPY api/server.ts ./

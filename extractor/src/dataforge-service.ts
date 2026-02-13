@@ -2,9 +2,9 @@
  * DataForge Service - Parses Star Citizen Game2.dcb binary DataForge files
  * Handles: binary parsing, struct/property resolution, GUID indexing, instance reading
  */
-import { P4KProvider } from "../providers/p4k-provider.js";
-import { CryXmlNode, isCryXmlB, parseCryXml } from "../utils/cryxml-parser.js";
-import logger from "../utils/logger.js";
+import { CryXmlNode, isCryXmlB, parseCryXml } from "./cryxml-parser.js";
+import logger from "./logger.js";
+import { P4KProvider } from "./p4k-provider.js";
 
 /** Manufacturer code → full name mapping (from SC game data prefixes) */
 export const MANUFACTURER_CODES: Record<string, string> = {
@@ -46,11 +46,6 @@ export const MANUFACTURER_CODES: Record<string, string> = {
   PRAR: "Preacher Armaments",
   TALN: "Talon",
   TOAG: "Thermyte Concern",
-};
-
-/** RSI Ship Matrix names → P4K className aliases (for name mismatches) */
-export const RSI_TO_P4K_ALIASES: Record<string, string> = {
-  // Add entries when RSI name ≠ DataForge className
 };
 
 export class DataForgeService {
@@ -122,15 +117,7 @@ export class DataForgeService {
 
   getVehicleUUID(className: string): string | undefined {
     const lowerName = className.toLowerCase();
-    let entry = this.vehicleIndex.get(lowerName);
-    if (entry) return entry.uuid;
-    const aliasKey = Object.keys(RSI_TO_P4K_ALIASES).find(k => k.toLowerCase() === lowerName);
-    if (aliasKey) {
-      const p4kName = RSI_TO_P4K_ALIASES[aliasKey];
-      entry = this.vehicleIndex.get(p4kName.toLowerCase());
-      if (entry) return entry.uuid;
-    }
-    return undefined;
+    return this.vehicleIndex.get(lowerName)?.uuid;
   }
 
   getVehicleDefinitions(): Map<string, { uuid: string; name: string; className: string }> {
@@ -851,6 +838,8 @@ export class DataForgeService {
       'FuelIntake':    /fuel_?intake[s]?[\/\\]/i,
       'FuelTank':      /fuel_?tank[s]?[\/\\](?!quantum)/i,
       'LifeSupport':   /life_?support[s]?[\/\\]/i,
+      'EMP':           /emp[\/\\]|distortion_?charge[\/\\]|emp_?generator/i,
+      'QuantumInterdictionGenerator': /quantum_?interdiction[\/\\]|qig[\/\\]|quantum_?enforcement/i,
     };
 
     let scanned = 0;
@@ -968,31 +957,59 @@ export class DataForgeService {
               try {
                 const ammoData = this.readRecordByGuid(ammoGuid, 5);
                 if (ammoData) {
+                  // SC 4.x: speed and lifetime are TOP-LEVEL on ammoData, not inside projectileParams
+                  if (typeof ammoData.speed === 'number' && !comp.weaponSpeed) comp.weaponSpeed = Math.round(ammoData.speed * 100) / 100;
+                  if (typeof ammoData.lifetime === 'number' && comp.weaponSpeed) comp.weaponRange = Math.round(ammoData.lifetime * comp.weaponSpeed * 100) / 100;
+
                   const pp = ammoData.projectileParams;
                   if (pp && typeof pp === 'object') {
+                    // Direct hit damage from projectileParams.damage
                     const dmg = pp.damage;
+                    let physical = 0, energy = 0, distortion = 0, thermal = 0, biochemical = 0, stun = 0;
                     if (dmg && typeof dmg === 'object') {
-                      const physical = typeof dmg.DamagePhysical === 'number' ? dmg.DamagePhysical : 0;
-                      const energy = typeof dmg.DamageEnergy === 'number' ? dmg.DamageEnergy : 0;
-                      const distortion = typeof dmg.DamageDistortion === 'number' ? dmg.DamageDistortion : 0;
-                      const thermal = typeof dmg.DamageThermal === 'number' ? dmg.DamageThermal : 0;
-                      const biochemical = typeof dmg.DamageBiochemical === 'number' ? dmg.DamageBiochemical : 0;
-                      const stun = typeof dmg.DamageStun === 'number' ? dmg.DamageStun : 0;
-                      const totalDmg = physical + energy + distortion + thermal + biochemical + stun;
-                      if (totalDmg > 0) {
-                        comp.weaponDamage = Math.round(totalDmg * 10000) / 10000;
-                        comp.weaponDamagePhysical = Math.round(physical * 10000) / 10000;
-                        comp.weaponDamageEnergy = Math.round(energy * 10000) / 10000;
-                        comp.weaponDamageDistortion = Math.round(distortion * 10000) / 10000;
-                        comp.weaponDamageThermal = Math.round(thermal * 10000) / 10000;
-                        comp.weaponDamageBiochemical = Math.round(biochemical * 10000) / 10000;
-                        comp.weaponDamageStun = Math.round(stun * 10000) / 10000;
-                        const dt: [string, number][] = [['physical', physical], ['energy', energy], ['distortion', distortion], ['thermal', thermal], ['biochemical', biochemical], ['stun', stun]];
-                        comp.weaponDamageType = dt.sort((a, b) => b[1] - a[1])[0][0];
-                      }
+                      physical = typeof dmg.DamagePhysical === 'number' ? dmg.DamagePhysical : 0;
+                      energy = typeof dmg.DamageEnergy === 'number' ? dmg.DamageEnergy : 0;
+                      distortion = typeof dmg.DamageDistortion === 'number' ? dmg.DamageDistortion : 0;
+                      thermal = typeof dmg.DamageThermal === 'number' ? dmg.DamageThermal : 0;
+                      biochemical = typeof dmg.DamageBiochemical === 'number' ? dmg.DamageBiochemical : 0;
+                      stun = typeof dmg.DamageStun === 'number' ? dmg.DamageStun : 0;
                     }
+
+                    // SC 4.x: Distortion/explosive weapons store real damage in detonationParams.explosionParams.damage
+                    // (direct hit damage is often 0 or 0.0001 placeholder)
+                    const detDmg = pp.detonationParams?.explosionParams?.damage;
+                    if (detDmg && typeof detDmg === 'object') {
+                      const dp = typeof detDmg.DamagePhysical === 'number' ? detDmg.DamagePhysical : 0;
+                      const de = typeof detDmg.DamageEnergy === 'number' ? detDmg.DamageEnergy : 0;
+                      const dd = typeof detDmg.DamageDistortion === 'number' ? detDmg.DamageDistortion : 0;
+                      const dt = typeof detDmg.DamageThermal === 'number' ? detDmg.DamageThermal : 0;
+                      const db = typeof detDmg.DamageBiochemical === 'number' ? detDmg.DamageBiochemical : 0;
+                      const ds = typeof detDmg.DamageStun === 'number' ? detDmg.DamageStun : 0;
+                      // Use the higher value for each damage type (detonation replaces placeholder direct hit)
+                      physical = Math.max(physical, dp);
+                      energy = Math.max(energy, de);
+                      distortion = Math.max(distortion, dd);
+                      thermal = Math.max(thermal, dt);
+                      biochemical = Math.max(biochemical, db);
+                      stun = Math.max(stun, ds);
+                    }
+
+                    const totalDmg = physical + energy + distortion + thermal + biochemical + stun;
+                    if (totalDmg > 0) {
+                      comp.weaponDamage = Math.round(totalDmg * 10000) / 10000;
+                      comp.weaponDamagePhysical = Math.round(physical * 10000) / 10000;
+                      comp.weaponDamageEnergy = Math.round(energy * 10000) / 10000;
+                      comp.weaponDamageDistortion = Math.round(distortion * 10000) / 10000;
+                      comp.weaponDamageThermal = Math.round(thermal * 10000) / 10000;
+                      comp.weaponDamageBiochemical = Math.round(biochemical * 10000) / 10000;
+                      comp.weaponDamageStun = Math.round(stun * 10000) / 10000;
+                      const dtypes: [string, number][] = [['physical', physical], ['energy', energy], ['distortion', distortion], ['thermal', thermal], ['biochemical', biochemical], ['stun', stun]];
+                      comp.weaponDamageType = dtypes.sort((a, b) => b[1] - a[1])[0][0];
+                    }
+
+                    // Fallback: speed/lifetime from projectileParams (older format)
                     if (typeof pp.speed === 'number' && !comp.weaponSpeed) comp.weaponSpeed = Math.round(pp.speed * 100) / 100;
-                    if (typeof pp.lifetime === 'number' && comp.weaponSpeed) comp.weaponRange = Math.round(pp.lifetime * comp.weaponSpeed * 100) / 100;
+                    if (typeof pp.lifetime === 'number' && comp.weaponSpeed && !comp.weaponRange) comp.weaponRange = Math.round(pp.lifetime * comp.weaponSpeed * 100) / 100;
                   }
                 }
               } catch (e) { /* ammo resolution — non-critical */ }
@@ -1024,21 +1041,39 @@ export class DataForgeService {
 
           // Quantum drive
           if (cType === 'SCItemQuantumDriveParams') {
-            if (typeof c.driveSpeed === 'number') comp.qdSpeed = Math.round(c.driveSpeed * 100) / 100;
-            if (typeof c.spoolUpTime === 'number') comp.qdSpoolTime = Math.round(c.spoolUpTime * 100) / 100;
-            if (typeof c.cooldownTime === 'number') comp.qdCooldown = Math.round(c.cooldownTime * 100) / 100;
+            // Top-level properties (SC 4.x structure: params nested under c.params)
             if (typeof c.quantumFuelRequirement === 'number') comp.qdFuelRate = c.quantumFuelRequirement;
-            if (typeof c.maxJumpRange === 'number') comp.qdRange = Math.round(c.maxJumpRange * 100) / 100;
+            if (typeof c.disconnectRange === 'number') comp.qdDisconnectRange = Math.round(c.disconnectRange * 100) / 100;
+            // jumpRange is often Float.MAX (3.4e38) = unlimited, skip if too large
+            if (typeof c.jumpRange === 'number' && c.jumpRange < 1e30) comp.qdRange = Math.round(c.jumpRange * 100) / 100;
+
+            // Main drive params are nested under c.params (SQuantumDriveParams)
             const params = c.params;
             if (params && typeof params === 'object') {
-              if (typeof params.driveSpeed === 'number' && !comp.qdSpeed) comp.qdSpeed = Math.round(params.driveSpeed * 100) / 100;
-              if (typeof params.spoolUpTime === 'number' && !comp.qdSpoolTime) comp.qdSpoolTime = Math.round(params.spoolUpTime * 100) / 100;
-              if (typeof params.cooldownTime === 'number' && !comp.qdCooldown) comp.qdCooldown = Math.round(params.cooldownTime * 100) / 100;
+              if (typeof params.driveSpeed === 'number') comp.qdSpeed = Math.round(params.driveSpeed * 100) / 100;
+              if (typeof params.spoolUpTime === 'number') comp.qdSpoolTime = Math.round(params.spoolUpTime * 100) / 100;
+              if (typeof params.cooldownTime === 'number') comp.qdCooldown = Math.round(params.cooldownTime * 100) / 100;
+              if (typeof params.stageOneAccelRate === 'number') comp.qdStage1Accel = Math.round(params.stageOneAccelRate * 100) / 100;
+              if (typeof params.stageTwoAccelRate === 'number') comp.qdStage2Accel = Math.round(params.stageTwoAccelRate * 100) / 100;
             }
+            // Fallback: flat properties (older DataForge format)
+            if (typeof c.driveSpeed === 'number' && !comp.qdSpeed) comp.qdSpeed = Math.round(c.driveSpeed * 100) / 100;
+            if (typeof c.spoolUpTime === 'number' && !comp.qdSpoolTime) comp.qdSpoolTime = Math.round(c.spoolUpTime * 100) / 100;
+            if (typeof c.cooldownTime === 'number' && !comp.qdCooldown) comp.qdCooldown = Math.round(c.cooldownTime * 100) / 100;
+
+            // Jump params (alternate structure)
             const jp = c.jumpParams || c.JumpParams;
             if (jp && typeof jp === 'object') {
-              if (typeof jp.Stage1AccelerationRate === 'number') comp.qdStage1Accel = Math.round(jp.Stage1AccelerationRate * 100) / 100;
-              if (typeof jp.Stage2AccelerationRate === 'number') comp.qdStage2Accel = Math.round(jp.Stage2AccelerationRate * 100) / 100;
+              if (typeof jp.Stage1AccelerationRate === 'number' && !comp.qdStage1Accel) comp.qdStage1Accel = Math.round(jp.Stage1AccelerationRate * 100) / 100;
+              if (typeof jp.Stage2AccelerationRate === 'number' && !comp.qdStage2Accel) comp.qdStage2Accel = Math.round(jp.Stage2AccelerationRate * 100) / 100;
+            }
+            // Spline jump params (separate drive params for spline travel mode)
+            // Note: tuningRate/alignmentRate don't exist in current DataForge; splineJumpParams is just another SQuantumDriveParams
+            const sjp = c.splineJumpParams || c.SplineJumpParams;
+            if (sjp && typeof sjp === 'object') {
+              // splineJumpParams.driveSpeed = spline mode speed (lower than main QD speed)
+              if (typeof sjp.driveSpeed === 'number') comp.qdTuningRate = Math.round(sjp.driveSpeed * 100) / 100;
+              if (typeof sjp.stageOneAccelRate === 'number') comp.qdAlignmentRate = Math.round(sjp.stageOneAccelRate * 100) / 100;
             }
           }
 
@@ -1101,11 +1136,28 @@ export class DataForgeService {
             comp.thrusterType = thrusterType;
           }
 
-          // Radar
+          // Radar — SC 4.x structure: signatureDetection[] with sensitivity/piercing per signal type
           if (cType === 'SCItemRadarComponentParams' || cType === 'SRadarComponentParams') {
-            if (typeof c.detectionRange === 'number') comp.radarRange = Math.round(c.detectionRange * 100) / 100;
-            if (typeof c.DetectionLifetime === 'number') comp.radarRange = Math.round(c.DetectionLifetime * 100) / 100;
-            if (typeof c.trackingSignalAmplifier === 'number') comp.radarRange = Math.round(c.trackingSignalAmplifier * 100) / 100;
+            // signatureDetection array: entries for different signal types (EM, IR, CS, etc.)
+            // Use the first entry's sensitivity as the general radar sensitivity metric
+            const sigDet = c.signatureDetection;
+            if (Array.isArray(sigDet) && sigDet.length > 0) {
+              // Average sensitivity across active detection modes
+              const activeSensitivities = sigDet.filter((s: any) => s?.permitPassiveDetection === true && typeof s?.sensitivity === 'number');
+              if (activeSensitivities.length > 0) {
+                const avgSensitivity = activeSensitivities.reduce((sum: number, s: any) => sum + s.sensitivity, 0) / activeSensitivities.length;
+                comp.radarTrackingSignal = Math.round(avgSensitivity * 10000) / 10000;
+              }
+              // Max piercing value (ability to detect stealthy targets)
+              const piercingValues = sigDet.filter((s: any) => typeof s?.piercing === 'number').map((s: any) => s.piercing);
+              if (piercingValues.length > 0) {
+                comp.radarDetectionLifetime = Math.round(Math.max(...piercingValues) * 10000) / 10000;
+              }
+            }
+            // Ping cooldown
+            if (c.pingProperties && typeof c.pingProperties.cooldownTime === 'number') {
+              comp.radarRange = c.pingProperties.cooldownTime;
+            }
           }
 
           // Countermeasure
@@ -1131,6 +1183,49 @@ export class DataForgeService {
             if (typeof c.fuelPushRate === 'number') comp.fuelIntakeRate = Math.round(c.fuelPushRate * 10000) / 10000;
             if (typeof c.FuelPushRate === 'number' && !comp.fuelIntakeRate) comp.fuelIntakeRate = Math.round(c.FuelPushRate * 10000) / 10000;
           }
+
+          // EMP — SCItemEMPParams
+          if (cType === 'SCItemEMPParams' || cType === 'SEMPParams') {
+            if (typeof c.distortionDamage === 'number') comp.empDamage = Math.round(c.distortionDamage * 100) / 100;
+            if (typeof c.DistortionDamage === 'number' && !comp.empDamage) comp.empDamage = Math.round(c.DistortionDamage * 100) / 100;
+            // empRadius is the actual DataForge property name
+            if (typeof c.empRadius === 'number') comp.empRadius = Math.round(c.empRadius * 100) / 100;
+            if (typeof c.maximumRadius === 'number' && !comp.empRadius) comp.empRadius = Math.round(c.maximumRadius * 100) / 100;
+            if (typeof c.chargeTime === 'number') comp.empChargeTime = Math.round(c.chargeTime * 100) / 100;
+            if (typeof c.ChargeTime === 'number' && !comp.empChargeTime) comp.empChargeTime = Math.round(c.ChargeTime * 100) / 100;
+            // cooldownTime is the actual cooldown; unleashTime is the burst duration
+            if (typeof c.cooldownTime === 'number') comp.empCooldown = Math.round(c.cooldownTime * 100) / 100;
+            if (typeof c.CooldownTime === 'number' && !comp.empCooldown) comp.empCooldown = Math.round(c.CooldownTime * 100) / 100;
+            // Also try damage from nested damageInfo/damage struct
+            const empDmg = c.damage || c.damageInfo;
+            if (empDmg && typeof empDmg === 'object') {
+              const dist = typeof empDmg.DamageDistortion === 'number' ? empDmg.DamageDistortion : 0;
+              if (dist > 0 && !comp.empDamage) comp.empDamage = Math.round(dist * 100) / 100;
+            }
+          }
+
+          // Quantum Interdiction Generator — SCItemQuantumInterdictionGeneratorParams
+          // Data is nested: jammerSettings.jammerRange, quantumInterdictionPulseSettings.{chargeTimeSecs, cooldownTimeSecs, radiusMeters}
+          if (cType === 'SCItemQuantumInterdictionGeneratorParams' || cType === 'SQuantumInterdictionGeneratorParams') {
+            // Jammer range from nested jammerSettings
+            const js = c.jammerSettings;
+            if (js && typeof js === 'object') {
+              if (typeof js.jammerRange === 'number') comp.qigJammerRange = Math.round(js.jammerRange * 100) / 100;
+            }
+            // Fallback flat properties
+            if (typeof c.jammerRange === 'number' && !comp.qigJammerRange) comp.qigJammerRange = Math.round(c.jammerRange * 100) / 100;
+
+            // Pulse settings (snare radius, charge time, cooldown) from nested quantumInterdictionPulseSettings
+            const ps = c.quantumInterdictionPulseSettings;
+            if (ps && typeof ps === 'object') {
+              if (typeof ps.radiusMeters === 'number') comp.qigSnareRadius = Math.round(ps.radiusMeters * 100) / 100;
+              if (typeof ps.chargeTimeSecs === 'number') comp.qigChargeTime = Math.round(ps.chargeTimeSecs * 100) / 100;
+              if (typeof ps.cooldownTimeSecs === 'number') comp.qigCooldown = Math.round(ps.cooldownTimeSecs * 100) / 100;
+            }
+            // Fallback flat properties
+            if (typeof c.chargeTime === 'number' && !comp.qigChargeTime) comp.qigChargeTime = Math.round(c.chargeTime * 100) / 100;
+            if (typeof c.cooldownTime === 'number' && !comp.qigCooldown) comp.qigCooldown = Math.round(c.cooldownTime * 100) / 100;
+          }
         }
 
         // Derived stats
@@ -1139,20 +1234,29 @@ export class DataForgeService {
           comp.weaponAlphaDamage = Math.round(comp.weaponDamage * pellets * 10000) / 10000;
           comp.weaponDps = Math.round(comp.weaponAlphaDamage * (comp.weaponFireRate / 60) * 10000) / 10000;
 
-          // Burst DPS = DPS until overheat (if heat data available)
-          // Sustained DPS = DPS accounting for overheat + cooldown cycles
+          // Burst DPS = DPS during the burst window (before overheat)
+          // Sustained DPS = average DPS over full fire+cooldown cycle
           if (comp.weaponHeatPerShot && comp.weaponHeatPerShot > 0) {
-            // Assume overheat threshold ~= 1.0 (normalized) and cooling recovery ~3s
-            // Shots until overheat = 1.0 / heatPerShot
-            const shotsToOverheat = Math.floor(1.0 / comp.weaponHeatPerShot);
+            // Shots until overheat: threshold is normalized to 1.0
+            const shotsToOverheat = Math.max(1, Math.floor(1.0 / comp.weaponHeatPerShot));
             const timeToOverheat = shotsToOverheat / (comp.weaponFireRate / 60);
             const burstDamage = comp.weaponAlphaDamage * shotsToOverheat;
+
             if (timeToOverheat > 0) {
               comp.weaponBurstDps = Math.round((burstDamage / timeToOverheat) * 10000) / 10000;
             }
-            // Sustained: assume ~3s cooldown after overheat (conservative estimate)
-            const cooldownTime = 3.0;
-            const cycleTime = timeToOverheat + cooldownTime;
+
+            // Sustained DPS: use thermal-based cooldown estimation
+            // Heat generated per second at full fire = heatPerShot * (fireRate/60)
+            // When overheated, cooling takes ~(1.0 / coolingRate) seconds
+            // Average weapon cooling rate is ~0.15-0.3 /s → ~3-7s cooldown
+            // We use the heat generation rate to estimate more accurately
+            const heatPerSecond = comp.weaponHeatPerShot * (comp.weaponFireRate / 60);
+            // Effective cooling rate during cooldown: weapons typically cool 2-3x faster when overheated
+            // Conservative estimate: cooldownTime = overheatThreshold(1.0) / (heatPerSecond * 0.5)
+            // This gives a cycle-aware sustained DPS
+            const estimatedCooldown = Math.max(1.0, 1.0 / (heatPerSecond * 0.4));
+            const cycleTime = timeToOverheat + estimatedCooldown;
             if (cycleTime > 0) {
               comp.weaponSustainedDps = Math.round((burstDamage / cycleTime) * 10000) / 10000;
             }
@@ -1183,6 +1287,7 @@ export class DataForgeService {
 
   extractVehicleLoadout(className: string): Array<{
     portName: string; portType?: string; componentClassName?: string;
+    minSize?: number; maxSize?: number;
     children?: Array<{ portName: string; componentClassName?: string }>;
   }> | null {
     if (!this.dfData || !this.dcbBuffer) return null;
@@ -1190,6 +1295,23 @@ export class DataForgeService {
     if (!record) return null;
     const data = this.readInstance(record.structIndex, record.instanceIndex, 0, 6);
     if (!data || !Array.isArray(data.Components)) return null;
+
+    // Build port metadata map for min/max size from SItemPortContainerComponentParams
+    const portMetaMap = new Map<string, { minSize: number; maxSize: number }>();
+    for (const comp of data.Components) {
+      if (!comp || (comp.__type !== 'SItemPortContainerComponentParams' && comp.__type !== 'VehicleComponentParams')) continue;
+      const ports = comp.Ports || comp.ports;
+      if (!Array.isArray(ports)) continue;
+      for (const portDef of ports) {
+        if (!portDef || typeof portDef !== 'object') continue;
+        const pName = (portDef.Name || portDef.name || '').toLowerCase();
+        if (!pName) continue;
+        portMetaMap.set(pName, {
+          minSize: typeof portDef.MinSize === 'number' ? portDef.MinSize : 0,
+          maxSize: typeof portDef.MaxSize === 'number' ? portDef.MaxSize : 0,
+        });
+      }
+    }
 
     const mainEntries = this.extractLoadoutEntries(data);
     const emptyPorts = mainEntries.filter(e => !e.entityClassName && e.portName);
@@ -1201,6 +1323,12 @@ export class DataForgeService {
 
     const processEntry = (portName: string, entClassName: string, inlineChildren?: Array<{ portName: string; entityClassName: string }>): any => {
       const item: any = { portName, componentClassName: entClassName || null, portType: classifyPort(portName, entClassName) };
+      // Attach port size constraints
+      const meta = portMetaMap.get(portName.toLowerCase());
+      if (meta) {
+        item.minSize = meta.minSize;
+        item.maxSize = meta.maxSize;
+      }
       const children: any[] = [];
       if (inlineChildren && inlineChildren.length > 0) {
         for (const child of inlineChildren) {
@@ -1341,7 +1469,7 @@ export class DataForgeService {
       if (!record) return null;
       return this.extractStatsFromRecord(record);
     } catch (err) {
-      logger.error(`Error extracting stats for ${className}:`, err);
+      logger.error(`Error extracting stats for ${className}:`, err as Record<string, unknown>);
       return null;
     }
   }
@@ -2499,6 +2627,85 @@ export class DataForgeService {
     return { shops: uniqueShops, inventory };
   }
 
+  // ============ PAINT / LIVERY EXTRACTION ============
+
+  /**
+   * Extract all ship paint/livery records from DataForge.
+   * Paints are EntityClassDefinition records in scitem paths with "paint" in the filename.
+   * Returns { shipClassName, paintClassName, paintName, paintUuid }[]
+   */
+  extractPaints(): Array<{ shipShortName: string; paintClassName: string; paintName: string; paintUuid: string }> {
+    if (!this.dfData || !this.dcbBuffer) return [];
+    const entityClassIdx = this.dfData.structDefs.findIndex((s: any) => s.name === 'EntityClassDefinition');
+    if (entityClassIdx === -1) return [];
+
+    const paints: Array<{ shipShortName: string; paintClassName: string; paintName: string; paintUuid: string }> = [];
+
+    for (const r of this.dfData.records) {
+      if (r.structIndex !== entityClassIdx) continue;
+      const fn = (r.fileName || '').toLowerCase();
+      if (!fn.includes('paint') && !fn.includes('skin')) continue;
+      if (!fn.includes('scitem') && !fn.includes('entities')) continue;
+
+      const className = r.name?.replace('EntityClassDefinition.', '') || '';
+      if (!className) continue;
+      const lcName = className.toLowerCase();
+      if (lcName.includes('_test') || lcName.includes('_debug') || lcName.includes('_template')) continue;
+
+      let paintDisplayName = className.replace(/_/g, ' ');
+      let shipShortName = '';
+
+      // Try to read entity for localization name
+      try {
+        const data = this.readInstance(r.structIndex, r.instanceIndex, 0, 3);
+        if (data?.Components) {
+          for (const comp of data.Components) {
+            if (!comp || typeof comp !== 'object') continue;
+            if (comp.__type === 'SAttachableComponentParams') {
+              const loc = comp.AttachDef?.Localization;
+              if (loc?.Name && typeof loc.Name === 'string' && !loc.Name.startsWith('@') && !loc.Name.startsWith('LOC_')) {
+                paintDisplayName = loc.Name;
+              }
+            }
+          }
+        }
+      } catch { /* non-critical */ }
+
+      // Paint classNames follow "Paint_<ShipName>_<Event/Color>" pattern
+      // Strip "Paint_" prefix and extract the ship part
+      if (className.startsWith('Paint_')) {
+        const afterPaint = className.substring(6); // Remove "Paint_"
+        // The ship name is everything before the event/color suffix
+        // Known event/color patterns to split on
+        const eventPattern = /_(BIS\d{4}|IAE|ILW|Invictus|PirateWeek|Pirate|Holiday|Penumbra|Showdown|Citizencon|Star_Kitten|Stormbringer|Timberline|Ghoulish|Metallic|Black|White|Grey|Red|Blue|Green|Orange|Purple|Tan|Crimson|Gold|Silver|Carbon|Camo|Digital|Paint|Skin|Livery|Pack|FreeWeekend|FW\d+|NovemberAnniversary|FleetWeek|StarKitten|ValentinesDay|LunarNewYear|JumpTown)/i;
+        const match = afterPaint.match(eventPattern);
+        if (match && match.index && match.index > 0) {
+          shipShortName = afterPaint.substring(0, match.index);
+        } else {
+          // No event pattern found — use the whole afterPaint as ship name
+          // (some paints might be "Paint_ShipName" with no suffix)
+          shipShortName = afterPaint;
+        }
+      } else {
+        // Non-Paint_ prefix: try to extract from known patterns like MNFR_Ship_Skin_Name
+        const skinMatch = className.match(/^([A-Z]{2,5}_[A-Za-z0-9_]+?)_(Paint|Skin|Livery)/i);
+        if (skinMatch) shipShortName = skinMatch[1];
+      }
+
+      if (shipShortName) {
+        paints.push({
+          shipShortName,
+          paintClassName: className,
+          paintName: paintDisplayName,
+          paintUuid: r.id,
+        });
+      }
+    }
+
+    logger.info(`Extracted ${paints.length} paint/livery records`, { module: 'dataforge' });
+    return paints;
+  }
+
   private inferShopType(className: string): string {
     const lc = className.toLowerCase();
     if (lc.includes('weapon') || lc.includes('gun')) return 'Weapons';
@@ -2535,12 +2742,19 @@ export function classifyPort(portName: string, compClassName: string): string {
   if (lp.includes('shield')) return 'Shield';
   if (lp.includes('power_plant') || lp.includes('powerplant')) return 'PowerPlant';
   if (lp.includes('cooler')) return 'Cooler';
-  if (lp.includes('quantum') || lp.includes('qd') || lp.includes('quantum_drive')) return 'QuantumDrive';
+  if (lp.includes('quantum') && !lp.includes('interdiction') && !lp.includes('qed') || lp.includes('quantum_drive')) return 'QuantumDrive';
   if (lp.includes('missile') || lp.includes('pylon')) return 'MissileRack';
   if (lp.includes('radar')) return 'Radar';
   if (lp.includes('countermeasure')) return 'Countermeasure';
   if (lp.includes('controller_flight')) return 'FlightController';
   if (lp.includes('thruster')) return 'Thruster';
+  // EMP: match port name containing 'emp' OR component class containing 'emp_device' / 'emp_generator'
+  // Avoid false positives: only match EMP when port or component clearly indicates EMP device
+  if (lp.includes('emp_device') || lp.includes('emp_generator') || (lp.includes('emp') && !lp.includes('temp') && !lp.match(/seat|access|dashboard|hud|inventory|weapon_?port/i))) return 'EMP';
+  if (cc.includes('emp_device') || cc.includes('emp_generator') || cc.includes('emp_s')) return 'EMP';
+  // QIG/QED: match interdiction ports (not just quantum_interdiction) and QED/QIG component classnames
+  if (lp.includes('interdiction') || lp.includes('qig') || lp.includes('qed')) return 'QuantumInterdictionGenerator';
+  if (cc.includes('quantuminterdiction') || cc.includes('qig_') || cc.includes('qed_') || cc.includes('qdmp_')) return 'QuantumInterdictionGenerator';
   if (lp.includes('weapon_rack') || lp.includes('weaponrack') || lp.includes('weapon_locker') || lp.includes('weaponlocker') || lp.includes('weapon_cabinet')) return 'WeaponRack';
   if (lp.includes('weapon') && (lp.includes('controller') || lp.includes('cockpit') || lp.includes('locker'))) return 'Other';
   if (lp.includes('weapon') && !lp.includes('rack')) return 'Weapon';
