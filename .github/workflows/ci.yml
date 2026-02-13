@@ -212,7 +212,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
-            cd /starvis
+            cd /home/ubuntu/docker/starvis
 
             # Reset tracked files to avoid merge conflicts (local edits like chmod)
             git reset --hard HEAD
