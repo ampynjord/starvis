@@ -122,7 +122,7 @@ jobs:
           P4K_PATH: ""
 
       - name: Run API tests
-        run: cd api && npm test -- http://localhost:3000
+        run: cd api && npm run test:e2e -- http://localhost:3000
         env:
           ADMIN_API_KEY: ci_test_key
 
