@@ -824,6 +824,12 @@ Le rate limiting est configurable à plusieurs niveaux :
 
 ---
 
+## Disclaimer
+
+This is an **unofficial** fan-made project and is not affiliated with, endorsed, or sponsored by Cloud Imperium Games (CIG) or Roberts Space Industries (RSI). *Star Citizen*, the Star Citizen logo, and all related marks, logos, ships, and assets are trademarks and/or copyrights of Cloud Imperium Rights LLC and Cloud Imperium Rights Ltd. All game data, ship specifications, and related content extracted or displayed by this project remain the property of Cloud Imperium Games.
+
+---
+
 ## License
 
 MIT © [ampynjord](https://github.com/ampynjord)
