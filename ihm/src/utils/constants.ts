@@ -78,6 +78,17 @@ export const HIDDEN_PORT_TYPES = new Set([
 ])
 
 /**
+ * Port names to hide from loadout displays (internal/structural ports).
+ */
+export const HIDDEN_PORT_NAMES = new Set([
+  'controller', 'display', 'screen', 'mfd', 'seat', 'door',
+  'elevator', 'ramp', 'light', 'flair', 'paint', 'docking',
+  'helper', 'landing', 'fuelport', 'relay', 'skylight',
+  'annunciator', 'emergency', 'cargo', 'engineering',
+  'air_traffic', 'cockpit_flair', 'slot_fuse', '$slot',
+])
+
+/**
  * Get category info for a component type, with fallback.
  */
 export function getCategoryInfo(type: string): CategoryInfo {

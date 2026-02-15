@@ -180,6 +180,21 @@ export class GameDataService {
     return rows[0] || null;
   }
 
+  async getComponentByClassName(className: string): Promise<Row | null> {
+    const [rows] = await this.pool.execute<Row[]>(
+      "SELECT c.*, m.name as manufacturer_name FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code WHERE c.class_name = ?",
+      [className],
+    );
+    return rows[0] || null;
+  }
+
+  /** Resolve UUID or class_name → component */
+  async resolveComponent(id: string): Promise<Row | null> {
+    return id.length === 36
+      ? await this.getComponentByUuid(id)
+      : await this.getComponentByClassName(id);
+  }
+
   // ── MANUFACTURERS ───────────────────────────────────────
 
   async getAllManufacturers(): Promise<Row[]> {

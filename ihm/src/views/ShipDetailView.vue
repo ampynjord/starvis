@@ -2,7 +2,7 @@
 import LoadingState from '@/components/LoadingState.vue'
 import StatBlock from '@/components/StatBlock.vue'
 import { getShip, getShipLoadout, getShipModules, getShipPaints, type Ship, type ShipPaint } from '@/services/api'
-import { CATEGORY_MAP, HIDDEN_PORT_TYPES } from '@/utils/constants'
+import { CATEGORY_MAP, HIDDEN_PORT_NAMES, HIDDEN_PORT_TYPES } from '@/utils/constants'
 import { fmt } from '@/utils/formatters'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -51,6 +51,11 @@ const groupedLoadout = computed(() => {
     // Skip hidden types
     const isHidden = Array.from(HIDDEN_PORT_TYPES).some(h => type.toLowerCase().includes(h.toLowerCase()))
     if (isHidden) continue
+    // Skip internal port names (controllers, screens, doors, etc.)
+    const portName = (item.port_name || '').toLowerCase()
+    const isInternalPort = Array.from(HIDDEN_PORT_NAMES).some(h => portName.includes(h))
+    if (isInternalPort && !item.component_uuid) continue // Keep if it has a real component link
+    if (isInternalPort && type === 'Other') continue
     if (type === 'Other' && !Object.keys(CATEGORY_MAP).some(k => (item.component_type || '').toLowerCase().includes(k.toLowerCase()))) continue
 
     const info = Object.entries(CATEGORY_MAP).find(([k]) => type.toLowerCase().includes(k.toLowerCase()))?.[1]
