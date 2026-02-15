@@ -12,58 +12,21 @@ import { createHash } from "crypto";
 import type { NextFunction, Request, Response } from "express";
 import { Router } from "express";
 import type { Pool } from "mysql2/promise";
-import { z, ZodError } from "zod";
+import { ZodError } from "zod";
 import { authMiddleware } from "./middleware/index.js";
+import {
+  arrayToCsv, ChangelogQuery, ComponentQuery, LoadoutBody,
+  SearchQuery, ShipQuery, ShopQuery,
+} from "./schemas.js";
 import type { GameDataService } from "./services/game-data-service.js";
 import type { ShipMatrixService } from "./services/ship-matrix-service.js";
 import { logger } from "./utils/index.js";
 
-// ── Zod schemas ───────────────────────────────────────────
-
-/** Coerce Express query param (string | string[] | undefined) → string | undefined */
-const qStr = z.preprocess(v => (Array.isArray(v) ? v[0] : v) || undefined, z.string().optional());
-const qInt = (def: number, max?: number) =>
-  z.preprocess(
-    v => { const s = Array.isArray(v) ? v[0] : v; return s === undefined || s === "" ? undefined : s; },
-    z.coerce.number().int().min(1).pipe(max ? z.number().max(max) : z.number()).catch(def),
-  );
-
-const ShipQuery = z.object({
-  manufacturer: qStr, role: qStr, career: qStr, status: qStr,
-  vehicle_category: qStr, search: qStr,
-  sort: qStr, order: qStr,
-  page: qInt(1), limit: qInt(50, 200),
-  format: qStr,
-}).passthrough();
-
-const ComponentQuery = z.object({
-  type: qStr, sub_type: qStr, size: qStr, grade: qStr,
-  manufacturer: qStr, search: qStr,
-  sort: qStr, order: qStr,
-  page: qInt(1), limit: qInt(50, 200),
-  format: qStr,
-}).passthrough();
-
-const ShopQuery = z.object({
-  search: qStr, location: qStr, type: qStr,
-  page: qInt(1), limit: qInt(20, 100),
-  format: qStr,
-}).passthrough();
-
-const ChangelogQuery = z.object({
-  limit: qStr, offset: qStr,
-  entity_type: qStr, change_type: qStr,
-}).passthrough();
-
-const LoadoutBody = z.object({
-  shipUuid: z.string().min(1, "shipUuid is required"),
-  swaps: z.array(z.object({
-    portName: z.string().min(1, "portName is required"),
-    componentUuid: z.string().min(1, "componentUuid is required"),
-  })).default([]),
-});
-
-const SearchQuery = z.object({ search: qStr, format: qStr }).passthrough();
+// Re-export schemas so existing consumers are unaffected
+export {
+  arrayToCsv, ChangelogQuery, ComponentQuery, LoadoutBody,
+  qInt, qStr, SearchQuery, ShipQuery, ShopQuery,
+} from "./schemas.js";
 
 // ── Helpers ───────────────────────────────────────────────
 
@@ -80,39 +43,35 @@ function asyncHandler(fn: (req: Request, res: Response) => Promise<void>) {
       }
       const err = e instanceof Error ? e : new Error(String(e));
       logger.error(`${req.method} ${req.path} error`, err);
-      res.status(500).json({ success: false, error: err.message });
+      const isProduction = process.env.NODE_ENV === "production";
+      res.status(500).json({ success: false, error: isProduction ? "Internal server error" : err.message });
     });
   };
 }
 
-function setETag(res: Response, data: unknown): string {
-  const hash = createHash("md5").update(JSON.stringify(data)).digest("hex").slice(0, 16);
+function setETag(res: Response, jsonStr: string): string {
+  const hash = createHash("md5").update(jsonStr).digest("hex").slice(0, 16);
   const etag = `"${hash}"`;
   res.setHeader("ETag", etag);
   res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
   return etag;
 }
 
-/** Returns true if client cache is still valid (304 sent) */
-function notModified(req: Request, res: Response, data: unknown): boolean {
-  const etag = setETag(res, data);
+/** Returns true if client cache is still valid (304 sent). If not, sends the pre-serialized JSON. */
+function sendOrNotModified(req: Request, res: Response, data: unknown): boolean {
+  const jsonStr = JSON.stringify(data);
+  const etag = setETag(res, jsonStr);
   if (req.headers["if-none-match"] === etag) { res.status(304).end(); return true; }
   return false;
 }
 
-function arrayToCsv(data: Record<string, unknown>[]): string {
-  if (!data.length) return "";
-  const headers = Object.keys(data[0]);
-  const lines = [headers.join(",")];
-  for (const row of data) {
-    lines.push(headers.map(h => {
-      const val = row[h];
-      if (val === null || val === undefined) return "";
-      const str = typeof val === "object" ? JSON.stringify(val) : String(val);
-      return str.includes(",") || str.includes('"') || str.includes("\n") ? `"${str.replace(/"/g, '""')}"` : str;
-    }).join(","));
-  }
-  return lines.join("\n");
+/** Serialize once, check ETag, and send — avoids double JSON.stringify */
+function sendWithETag(req: Request, res: Response, payload: unknown): void {
+  const jsonStr = JSON.stringify(payload);
+  const etag = setETag(res, jsonStr);
+  if (req.headers["if-none-match"] === etag) { res.status(304).end(); return; }
+  res.setHeader("Content-Type", "application/json");
+  res.send(jsonStr);
 }
 
 function sendCsvOrJson(req: Request, res: Response, data: Record<string, unknown>[], jsonPayload: unknown): void {
@@ -158,27 +117,26 @@ export function createRoutes(deps: RouteDependencies): Router {
 
   router.get("/api/v1/ship-matrix/stats", asyncHandler(async (req, res) => {
     const stats = await shipMatrixService.getStats();
-    if (notModified(req, res, stats)) return;
-    res.json({ success: true, data: stats });
+    sendWithETag(req, res, { success: true, data: stats });
   }));
 
   router.get("/api/v1/ship-matrix", asyncHandler(async (req, res) => {
     const t = Date.now();
     const { search } = SearchQuery.parse(req.query);
     const data = search ? await shipMatrixService.search(search) : await shipMatrixService.getAll();
-    if (notModified(req, res, data)) return;
-    sendCsvOrJson(req, res, data as Record<string, unknown>[], {
+    const payload = {
       success: true, count: data.length, data,
       meta: { source: "RSI Ship Matrix", responseTime: `${Date.now() - t}ms` },
-    });
+    };
+    if (req.query.format === "csv") return void sendCsvOrJson(req, res, data as Record<string, unknown>[], payload);
+    sendWithETag(req, res, payload);
   }));
 
   router.get("/api/v1/ship-matrix/:id", asyncHandler(async (req, res) => {
     const id = parseInt(req.params.id);
     const ship = Number.isNaN(id) ? await shipMatrixService.getByName(req.params.id) : await shipMatrixService.getById(id);
     if (!ship) return void res.status(404).json({ success: false, error: "Not found" });
-    if (notModified(req, res, ship)) return;
-    res.json({ success: true, data: ship });
+    sendWithETag(req, res, { success: true, data: ship });
   }));
 
   // ── SHIPS ───────────────────────────────────────────────
@@ -187,32 +145,31 @@ export function createRoutes(deps: RouteDependencies): Router {
     const t = Date.now();
     const filters = ShipQuery.parse(req.query);
     const result = await gameDataService!.getAllShips(filters);
-    if (notModified(req, res, result.data)) return;
-    sendCsvOrJson(req, res, result.data as Record<string, unknown>[], {
+    const payload = {
       success: true, count: result.data.length, total: result.total,
       page: result.page, limit: result.limit, pages: result.pages, data: result.data,
       meta: { source: "Game Data", responseTime: `${Date.now() - t}ms` },
-    });
+    };
+    if (req.query.format === "csv") return void sendCsvOrJson(req, res, result.data as Record<string, unknown>[], payload);
+    sendWithETag(req, res, payload);
   }));
 
   router.get("/api/v1/ships/filters", requireGameData, asyncHandler(async (req, res) => {
     const data = await gameDataService!.getShipFilters();
-    if (notModified(req, res, data)) return;
-    res.json({ success: true, data });
+    sendWithETag(req, res, { success: true, data });
   }));
 
   router.get("/api/v1/ships/manufacturers", requireGameData, asyncHandler(async (req, res) => {
     const data = await gameDataService!.getShipManufacturers();
-    if (notModified(req, res, data)) return;
-    sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
+    if (req.query.format === "csv") return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
+    sendWithETag(req, res, { success: true, count: data.length, data });
   }));
 
   router.get("/api/v1/ships/:uuid", requireGameData, asyncHandler(async (req, res) => {
     const ship = await resolveShip(req.params.uuid);
     if (!ship) return void res.status(404).json({ success: false, error: "Ship not found" });
     if (ship.game_data && typeof ship.game_data === "string") try { ship.game_data = JSON.parse(ship.game_data as string); } catch { /* keep raw */ }
-    if (notModified(req, res, ship)) return;
-    res.json({ success: true, data: ship });
+    sendWithETag(req, res, { success: true, data: ship });
   }));
 
   router.get("/api/v1/ships/:uuid/loadout", requireGameData, asyncHandler(async (req, res) => {
@@ -231,24 +188,23 @@ export function createRoutes(deps: RouteDependencies): Router {
       }
     }
     const hierarchical = rootPorts.map((p: Record<string, unknown>) => ({ ...p, children: childMap.get(p.id as number) || [] }));
-    if (notModified(req, res, hierarchical)) return;
-    res.json({ success: true, data: hierarchical });
+    sendWithETag(req, res, { success: true, data: hierarchical });
   }));
 
   router.get("/api/v1/ships/:uuid/modules", requireGameData, asyncHandler(async (req, res) => {
     const uuid = await resolveShipUuid(req.params.uuid);
     if (!uuid) return void res.status(404).json({ success: false, error: "Ship not found" });
     const modules = await gameDataService!.getShipModules(uuid);
-    if (notModified(req, res, modules)) return;
-    sendCsvOrJson(req, res, modules as Record<string, unknown>[], { success: true, data: modules });
+    if (req.query.format === "csv") return void sendCsvOrJson(req, res, modules as Record<string, unknown>[], { success: true, data: modules });
+    sendWithETag(req, res, { success: true, data: modules });
   }));
 
   router.get("/api/v1/ships/:uuid/paints", requireGameData, asyncHandler(async (req, res) => {
     const uuid = await resolveShipUuid(req.params.uuid);
     if (!uuid) return void res.status(404).json({ success: false, error: "Ship not found" });
     const paints = await gameDataService!.getShipPaints(uuid);
-    if (notModified(req, res, paints)) return;
-    sendCsvOrJson(req, res, paints as Record<string, unknown>[], { success: true, data: paints });
+    if (req.query.format === "csv") return void sendCsvOrJson(req, res, paints as Record<string, unknown>[], { success: true, data: paints });
+    sendWithETag(req, res, { success: true, data: paints });
   }));
 
   router.get("/api/v1/ships/:uuid/compare/:uuid2", requireGameData, asyncHandler(async (req, res) => {
@@ -292,19 +248,19 @@ export function createRoutes(deps: RouteDependencies): Router {
     const t = Date.now();
     const filters = ComponentQuery.parse(req.query);
     const result = await gameDataService!.getAllComponents(filters);
-    if (notModified(req, res, result.data)) return;
-    sendCsvOrJson(req, res, result.data as Record<string, unknown>[], {
+    const payload = {
       success: true, count: result.data.length, total: result.total,
       page: result.page, limit: result.limit, pages: result.pages, data: result.data,
       meta: { source: "Game Data", responseTime: `${Date.now() - t}ms` },
-    });
+    };
+    if (req.query.format === "csv") return void sendCsvOrJson(req, res, result.data as Record<string, unknown>[], payload);
+    sendWithETag(req, res, payload);
   }));
 
   router.get("/api/v1/components/:uuid", requireGameData, asyncHandler(async (req, res) => {
     const comp = await gameDataService!.getComponentByUuid(req.params.uuid);
     if (!comp) return void res.status(404).json({ success: false, error: "Component not found" });
-    if (notModified(req, res, comp)) return;
-    res.json({ success: true, data: comp });
+    sendWithETag(req, res, { success: true, data: comp });
   }));
 
   router.get("/api/v1/components/:uuid/buy-locations", requireGameData, asyncHandler(async (req, res) => {
@@ -315,16 +271,16 @@ export function createRoutes(deps: RouteDependencies): Router {
       uuid = comp.uuid;
     }
     const data = await gameDataService!.getComponentBuyLocations(uuid);
-    if (notModified(req, res, data)) return;
-    sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
+    if (req.query.format === "csv") return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
+    sendWithETag(req, res, { success: true, count: data.length, data });
   }));
 
   // ── MANUFACTURERS ───────────────────────────────────────
 
   router.get("/api/v1/manufacturers", requireGameData, asyncHandler(async (req, res) => {
     const data = await gameDataService!.getAllManufacturers();
-    if (notModified(req, res, data)) return;
-    sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
+    if (req.query.format === "csv") return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
+    sendWithETag(req, res, { success: true, count: data.length, data });
   }));
 
   // ── SHOPS ───────────────────────────────────────────────
@@ -332,16 +288,16 @@ export function createRoutes(deps: RouteDependencies): Router {
   router.get("/api/v1/shops", requireGameData, asyncHandler(async (req, res) => {
     const filters = ShopQuery.parse(req.query);
     const result = await gameDataService!.getShops(filters);
-    if (notModified(req, res, result.data)) return;
-    sendCsvOrJson(req, res, result.data as Record<string, unknown>[], { success: true, ...result });
+    if (req.query.format === "csv") return void sendCsvOrJson(req, res, result.data as Record<string, unknown>[], { success: true, ...result });
+    sendWithETag(req, res, { success: true, ...result });
   }));
 
   router.get("/api/v1/shops/:id/inventory", requireGameData, asyncHandler(async (req, res) => {
     const shopId = parseInt(req.params.id);
     if (isNaN(shopId)) return void res.status(400).json({ success: false, error: "Invalid shop ID" });
     const data = await gameDataService!.getShopInventory(shopId);
-    if (notModified(req, res, data)) return;
-    sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
+    if (req.query.format === "csv") return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
+    sendWithETag(req, res, { success: true, count: data.length, data });
   }));
 
   // ── LOADOUT SIMULATOR ──────────────────────────────────
@@ -364,8 +320,7 @@ export function createRoutes(deps: RouteDependencies): Router {
       entityType: filters.entity_type,
       changeType: filters.change_type,
     });
-    if (notModified(req, res, result.data)) return;
-    res.json({ success: true, ...result });
+    sendWithETag(req, res, { success: true, ...result });
   }));
 
   // ── VERSION ─────────────────────────────────────────────

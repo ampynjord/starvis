@@ -138,6 +138,10 @@ export class ExtractionService {
       const oldShips = new Map(oldShipsRaw.map((s: any) => [s.class_name, s]));
       const oldComps = new Map(oldCompsRaw.map((c: any) => [c.class_name, c]));
 
+      // Wrap the entire extraction in a transaction — if anything fails,
+      // the old data remains intact (no downtime with empty tables)
+      await conn.beginTransaction();
+
       // 1c. Clean stale data before fresh extraction (order matters for FK constraints)
       onProgress?.("Cleaning stale data…");
       await conn.execute("DELETE FROM shop_inventory");
@@ -203,6 +207,15 @@ export class ExtractionService {
       }
 
       onProgress?.(`✅ Extraction complete: ${stats.ships} ships, ${stats.components} components, ${stats.manufacturers} manufacturers, ${stats.loadoutPorts} loadout ports, ${stats.shipMatrixLinked} linked to Ship Matrix`);
+
+      // Commit the transaction — all data is now atomically visible
+      await conn.commit();
+      onProgress?.("Transaction committed successfully");
+    } catch (e) {
+      // Rollback on any error — old data remains intact
+      try { await conn.rollback(); } catch { /* rollback best-effort */ }
+      onProgress?.("❌ Extraction failed — transaction rolled back, old data preserved");
+      throw e;
     } finally {
       conn.release();
     }
@@ -355,6 +368,12 @@ export class ExtractionService {
     let totalPorts = 0;
     let skippedNonPlayable = 0;
 
+    // Pre-load all component class_name → uuid mappings to avoid N+1 queries in saveLoadout
+    const [compRows] = await conn.execute<any[]>("SELECT class_name, uuid FROM components");
+    const componentUuidCache = new Map<string, string>();
+    for (const row of compRows) componentUuidCache.set(row.class_name, row.uuid);
+    onProgress?.(`Component UUID cache loaded: ${componentUuidCache.size} entries`);
+
     for (const [, veh] of vehicles) {
       try {
         const fullData = await this.dfService.extractFullShipData(veh.className);
@@ -501,7 +520,7 @@ export class ExtractionService {
         const loadout = this.dfService.extractVehicleLoadout(veh.className);
         if (loadout && loadout.length > 0) {
           await conn.execute("DELETE FROM ships_loadouts WHERE ship_uuid = ?", [fullData.ref]);
-          totalPorts += await this.saveLoadout(conn, fullData.ref, loadout);
+          totalPorts += await this.saveLoadout(conn, fullData.ref, loadout, componentUuidCache);
           await this.computeAndStoreMissileDamage(conn, fullData.ref);
           await this.computeAndStoreWeaponDamage(conn, fullData.ref);
         }
@@ -530,13 +549,14 @@ export class ExtractionService {
       maxSize?: number;
       children?: Array<{ portName: string; componentClassName?: string }>;
     }>,
+    componentUuidCache: Map<string, string>,
   ): Promise<number> {
     let count = 0;
 
     for (const port of loadout) {
       try {
         const compUuid = port.componentClassName
-          ? await this.resolveComponentUuid(conn, port.componentClassName)
+          ? (componentUuidCache.get(port.componentClassName) || null)
           : null;
 
         const [result] = await conn.execute<any>(
@@ -551,7 +571,7 @@ export class ExtractionService {
         if (port.children && port.children.length > 0) {
           for (const child of port.children) {
             const childCompUuid = child.componentClassName
-              ? await this.resolveComponentUuid(conn, child.componentClassName)
+              ? (componentUuidCache.get(child.componentClassName) || null)
               : null;
 
             await conn.execute(

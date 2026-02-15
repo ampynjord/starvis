@@ -95,10 +95,11 @@ export class GameDataService {
     const sortCol = sortCols.has(opts.sort || "") ? opts.sort! : "name";
     const order = opts.order === "desc" ? "DESC" : "ASC";
     const page = Math.max(1, opts.page || 1);
-    const limit = Math.min(100, Math.max(1, opts.limit || 20));
+    const limit = Math.min(200, Math.max(1, opts.limit || 50));
     const offset = (page - 1) * limit;
 
-    const sql = `${baseSql} ORDER BY ${alias}.${sortCol} ${order} LIMIT ${limit} OFFSET ${offset}`;
+    const sql = `${baseSql} ORDER BY ${alias}.${sortCol} ${order} LIMIT ? OFFSET ?`;
+    params.push(limit, offset);
     const [rows] = await this.pool.execute<Row[]>(sql, params);
     return { data: rows, total: Number(total), page, limit, pages: Math.ceil(Number(total) / limit) };
   }
@@ -259,8 +260,8 @@ export class GameDataService {
     const limit = Math.min(100, parseInt(params.limit || "50"));
     const offset = parseInt(params.offset || "0");
     const [rows] = await this.pool.execute<Row[]>(
-      `SELECT c.*, e.game_version, e.extracted_at as extraction_date FROM changelog c LEFT JOIN extraction_log e ON c.extraction_id = e.id${w} ORDER BY c.created_at DESC LIMIT ${limit} OFFSET ${offset}`,
-      p,
+      `SELECT c.*, e.game_version, e.extracted_at as extraction_date FROM changelog c LEFT JOIN extraction_log e ON c.extraction_id = e.id${w} ORDER BY c.created_at DESC LIMIT ? OFFSET ?`,
+      [...p, limit, offset],
     );
     return { data: rows, total };
   }
@@ -298,7 +299,7 @@ export class GameDataService {
 
     const [countRows] = await this.pool.execute<Row[]>(`SELECT COUNT(*) as count FROM shops${w}`, params);
     const total = Number(countRows[0].count);
-    const [rows] = await this.pool.execute<Row[]>(`SELECT * FROM shops${w} ORDER BY name LIMIT ${limit} OFFSET ${offset}`, params);
+    const [rows] = await this.pool.execute<Row[]>(`SELECT * FROM shops${w} ORDER BY name LIMIT ? OFFSET ?`, [...params, limit, offset]);
 
     return { data: rows, total, page, limit };
   }

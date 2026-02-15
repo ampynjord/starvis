@@ -107,7 +107,7 @@ const armorStats = computed(() => {
                 <router-link :to="`/loadout/${ship.class_name || ship.uuid}`" class="btn-outline text-xs">
                   Loadout Manager
                 </router-link>
-                <a v-if="ship.store_url" :href="'https://robertsspaceindustries.com' + ship.store_url" target="_blank" class="btn-ghost text-xs border border-sv-border">
+                <a v-if="ship.store_url" :href="'https://robertsspaceindustries.com' + ship.store_url" target="_blank" rel="noopener noreferrer" class="btn-ghost text-xs border border-sv-border">
                   RSI ↗
                 </a>
               </div>

@@ -3,61 +3,8 @@
  * Tests zod schemas, route helpers, and asyncHandler
  */
 import { describe, expect, it } from "vitest";
-import { z, ZodError } from "zod";
-
-// ── Re-create the schemas/helpers exactly as routes.ts defines them ──
-// (We import the logic rather than spinning up Express)
-
-const qStr = z.preprocess(
-  (v) => (Array.isArray(v) ? v[0] : v) || undefined,
-  z.string().optional(),
-);
-
-const qInt = (def: number, max?: number) =>
-  z.preprocess(
-    (v) => {
-      const s = Array.isArray(v) ? v[0] : v;
-      return s === undefined || s === "" ? undefined : s;
-    },
-    z.coerce
-      .number()
-      .int()
-      .min(1)
-      .pipe(max ? z.number().max(max) : z.number())
-      .catch(def),
-  );
-
-const ShipQuery = z
-  .object({
-    manufacturer: qStr, role: qStr, career: qStr, status: qStr,
-    vehicle_category: qStr, search: qStr,
-    sort: qStr, order: qStr,
-    page: qInt(1), limit: qInt(50, 200),
-    format: qStr,
-  })
-  .passthrough();
-
-const ComponentQuery = z
-  .object({
-    type: qStr, sub_type: qStr, size: qStr, grade: qStr,
-    manufacturer: qStr, search: qStr,
-    sort: qStr, order: qStr,
-    page: qInt(1), limit: qInt(50, 200),
-    format: qStr,
-  })
-  .passthrough();
-
-const LoadoutBody = z.object({
-  shipUuid: z.string().min(1, "shipUuid is required"),
-  swaps: z
-    .array(
-      z.object({
-        portName: z.string().min(1, "portName is required"),
-        componentUuid: z.string().min(1, "componentUuid is required"),
-      }),
-    )
-    .default([]),
-});
+import { ZodError } from "zod";
+import { qStr, qInt, ShipQuery, ComponentQuery, LoadoutBody, arrayToCsv } from "../src/schemas.js";
 
 // ── Tests ──
 
@@ -204,28 +151,6 @@ describe("LoadoutBody", () => {
 });
 
 describe("arrayToCsv", () => {
-  // Re-implement the minimal CSV helper for testing
-  function arrayToCsv(data: Record<string, unknown>[]): string {
-    if (!data.length) return "";
-    const headers = Object.keys(data[0]);
-    const lines = [headers.join(",")];
-    for (const row of data) {
-      lines.push(
-        headers
-          .map((h) => {
-            const val = row[h];
-            if (val === null || val === undefined) return "";
-            const str = typeof val === "object" ? JSON.stringify(val) : String(val);
-            return str.includes(",") || str.includes('"') || str.includes("\n")
-              ? `"${str.replace(/"/g, '""')}"`
-              : str;
-          })
-          .join(","),
-      );
-    }
-    return lines.join("\n");
-  }
-
   it("returns empty string for empty array", () => {
     expect(arrayToCsv([])).toBe("");
   });
@@ -258,7 +183,8 @@ describe("arrayToCsv", () => {
 });
 
 describe("cleanName", () => {
-  // Re-implement for testing
+  // Import from service would be ideal, but cleanName is a private module-scope function
+  // in game-data-service.ts — re-implement for isolated testing
   function cleanName(name: string, type: string): string {
     if (!name) return "—";
     let c = name;

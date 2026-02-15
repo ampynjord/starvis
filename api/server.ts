@@ -157,11 +157,16 @@ async function start() {
   // 5. Start listening BEFORE non-critical sync (so /health is immediately available)
   httpServer = app.listen(PORT, () => logger.info(`✅ Starvis v1.0 listening on :${PORT}`, { module: "Server" }));
 
-  // 6. Non-critical sync: Ship Matrix (don't block server startup)
+  // 6. Non-critical sync: Ship Matrix (don't block server startup, skip if <24h old)
   try {
-    logger.info("Syncing RSI Ship Matrix…", { module: "ShipMatrix" });
-    const smResult = await shipMatrixService.sync();
-    logger.info(`✅ Ship Matrix synced: ${smResult.synced}/${smResult.total}`, { module: "ShipMatrix" });
+    const needsSync = await shipMatrixService.isSyncNeeded();
+    if (needsSync) {
+      logger.info("Syncing RSI Ship Matrix (data stale or missing)…", { module: "ShipMatrix" });
+      const smResult = await shipMatrixService.sync();
+      logger.info(`✅ Ship Matrix synced: ${smResult.synced}/${smResult.total}`, { module: "ShipMatrix" });
+    } else {
+      logger.info("Ship Matrix sync skipped (last sync <24h ago)", { module: "ShipMatrix" });
+    }
   } catch (e) {
     logger.warn("Ship Matrix sync failed (non-blocking)", { module: "ShipMatrix" });
     logger.warn(String(e));
