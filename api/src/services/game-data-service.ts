@@ -28,10 +28,40 @@ const r4 = (v: number): number => Math.round(v * 10000) / 10000;
 const r6 = (v: number): number => Math.round(v * 1000000) / 1000000;
 const r1 = (v: number): number => Math.round(v * 10) / 10;
 
-const SHIP_SELECT = `s.*, m.name as manufacturer_name,
+const SHIP_SELECT = `s.uuid, s.class_name, s.name, s.manufacturer_code, m.name as manufacturer_name,
+  s.career, s.role, s.mass, s.total_hp,
+  s.scm_speed, s.max_speed, s.boost_speed_forward, s.boost_speed_backward,
+  s.pitch_max, s.yaw_max, s.roll_max,
+  s.hydrogen_fuel_capacity, s.quantum_fuel_capacity,
+  s.cargo_capacity, s.crew_size, s.shield_hp,
+  s.missile_damage_total, s.weapon_damage_total,
+  s.armor_physical, s.armor_energy, s.armor_distortion,
+  s.cross_section_x, s.cross_section_y, s.cross_section_z,
+  s.ship_matrix_id,
   sm.media_store_small as thumbnail, sm.media_store_large as thumbnail_large,
   sm.production_status, sm.description as sm_description,
-  sm.url as store_url, sm.cargocapacity as sm_cargo`;
+  sm.url as store_url, sm.cargocapacity as sm_cargo,
+  s.vehicle_category, s.insurance_claim_time, s.insurance_expedite_cost,
+  s.short_name, s.variant_type, s.game_data`;
+
+/** Concept-only columns: ship_matrix entries without P4K data */
+const CONCEPT_SELECT = `CONCAT('concept-', sm2.id) as uuid, LOWER(REPLACE(REPLACE(sm2.name, ' ', '_'), '''', '')) as class_name,
+  sm2.name, sm2.manufacturer_code, sm2.manufacturer_name as manufacturer_name,
+  NULL as career, NULL as role, sm2.mass, NULL as total_hp,
+  sm2.scm_speed, sm2.afterburner_speed as max_speed,
+  NULL as boost_speed_forward, NULL as boost_speed_backward,
+  sm2.pitch_max, sm2.yaw_max, sm2.roll_max,
+  NULL as hydrogen_fuel_capacity, NULL as quantum_fuel_capacity,
+  sm2.cargocapacity as cargo_capacity, sm2.min_crew as crew_size, NULL as shield_hp,
+  NULL as missile_damage_total, NULL as weapon_damage_total,
+  NULL as armor_physical, NULL as armor_energy, NULL as armor_distortion,
+  NULL as cross_section_x, NULL as cross_section_y, NULL as cross_section_z,
+  sm2.id as ship_matrix_id,
+  sm2.media_store_small as thumbnail, sm2.media_store_large as thumbnail_large,
+  sm2.production_status, sm2.description as sm_description,
+  sm2.url as store_url, sm2.cargocapacity as sm_cargo,
+  NULL as vehicle_category, NULL as insurance_claim_time, NULL as insurance_expedite_cost,
+  NULL as short_name, NULL as variant_type, NULL as game_data`;
 
 const SHIP_JOINS = `FROM ships s
   LEFT JOIN manufacturers m ON s.manufacturer_code = m.code
@@ -113,11 +143,21 @@ export class GameDataService {
     const where: string[] = [];
     const params: (string | number)[] = [];
 
+    // Build WHERE conditions for the main (P4K) ships query
     if (filters?.manufacturer) { where.push("s.manufacturer_code = ?"); params.push(filters.manufacturer.toUpperCase()); }
     if (filters?.role) { where.push("s.role = ?"); params.push(filters.role); }
     if (filters?.career) { where.push("s.career = ?"); params.push(filters.career); }
     if (filters?.vehicle_category) { where.push("s.vehicle_category = ?"); params.push(filters.vehicle_category); }
-    if (filters?.status) { where.push("sm.production_status = ?"); params.push(filters.status); }
+
+    // Status filter — special handling
+    const wantConceptOnly = filters?.status === "in-concept";
+    const wantInGameOnly = filters?.status === "in-game-only";
+    const wantFlightReady = filters?.status === "flight-ready";
+    const excludeConcept = wantInGameOnly || wantFlightReady;
+
+    if (wantFlightReady) { where.push("sm.production_status = ?"); params.push("flight-ready"); }
+    if (wantInGameOnly) { where.push("s.ship_matrix_id IS NULL"); }
+
     if (filters?.search) {
       where.push("(s.name LIKE ? OR s.class_name LIKE ? OR s.short_name LIKE ?)");
       const t = `%${filters.search}%`;
@@ -125,22 +165,88 @@ export class GameDataService {
     }
 
     const w = where.length ? ` WHERE ${where.join(" AND ")}` : "";
-    const baseSql = `SELECT ${SHIP_SELECT} ${SHIP_JOINS}${w}`;
-    const countSql = `SELECT COUNT(*) as total FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id${w}`;
 
-    const result = await this.paginate(baseSql, countSql, params, filters || {}, SHIP_SORT, "s");
-    // Strip heavy game_data JSON from list view
-    result.data = result.data.map(({ game_data, ...rest }) => rest as Row);
-    return result;
+    // --- Concept-only ships (ship_matrix entries without P4K data) ---
+    // Include them unless filtering by a P4K-specific status or vehicle_category
+    const includeConceptShips = !excludeConcept && !filters?.vehicle_category;
+
+    // Concept WHERE clause
+    const conceptWhere: string[] = ["sm2.id NOT IN (SELECT ship_matrix_id FROM ships WHERE ship_matrix_id IS NOT NULL)"];
+    const conceptParams: (string | number)[] = [];
+    if (wantConceptOnly) {
+      // Only concept ships
+    }
+    if (filters?.manufacturer) { conceptWhere.push("sm2.manufacturer_code = ?"); conceptParams.push(filters.manufacturer.toUpperCase()); }
+    if (filters?.search) {
+      conceptWhere.push("(sm2.name LIKE ? OR sm2.manufacturer_name LIKE ?)");
+      const t = `%${filters.search}%`;
+      conceptParams.push(t, t);
+    }
+    const cw = ` WHERE ${conceptWhere.join(" AND ")}`;
+
+    // Count
+    let totalCount = 0;
+    if (!wantConceptOnly) {
+      const [countRows] = await this.pool.execute<Row[]>(`SELECT COUNT(*) as total FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id${w}`, params);
+      totalCount += Number(countRows[0]?.total) || 0;
+    }
+    if (includeConceptShips || wantConceptOnly) {
+      const [conceptCount] = await this.pool.execute<Row[]>(`SELECT COUNT(*) as total FROM ship_matrix sm2${cw}`, conceptParams);
+      totalCount += Number(conceptCount[0]?.total) || 0;
+    }
+
+    const sortCol = SHIP_SORT.has(filters?.sort || "") ? filters!.sort! : "name";
+    const order = filters?.order === "desc" ? "DESC" : "ASC";
+    const page = Math.max(1, filters?.page || 1);
+    const limit = Math.min(200, Math.max(1, filters?.limit || 50));
+    const offset = (page - 1) * limit;
+
+    // Use UNION ALL to merge P4K ships + concept-only ship_matrix entries
+    let sql: string;
+    let allParams: (string | number)[];
+
+    if (wantConceptOnly) {
+      // Only concept ships
+      sql = `SELECT ${CONCEPT_SELECT}, TRUE as is_concept_only
+        FROM ship_matrix sm2${cw}
+        ORDER BY sm2.name ${order} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
+      allParams = [...conceptParams];
+    } else if (includeConceptShips) {
+      // Both P4K ships and concept ships
+      sql = `(SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS}${w})
+        UNION ALL
+        (SELECT ${CONCEPT_SELECT}, TRUE as is_concept_only
+          FROM ship_matrix sm2${cw})
+        ORDER BY name ${order} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
+      allParams = [...params, ...conceptParams];
+    } else {
+      // P4K ships only (flight-ready or in-game-only filters)
+      sql = `SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS}${w}
+        ORDER BY s.${sortCol} ${order} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
+      allParams = [...params];
+    }
+
+    const [rows] = await this.pool.execute<Row[]>(sql, allParams);
+    const data = rows.map(({ game_data, ...rest }) => rest as Row);
+    return { data, total: totalCount, page, limit, pages: Math.ceil(totalCount / limit) };
   }
 
   async getShipByUuid(uuid: string): Promise<Row | null> {
-    const [rows] = await this.pool.execute<Row[]>(`SELECT ${SHIP_SELECT} ${SHIP_JOINS} WHERE s.uuid = ?`, [uuid]);
+    // Handle concept-only ships (uuid = "concept-{sm_id}")
+    if (uuid.startsWith("concept-")) {
+      const smId = uuid.replace("concept-", "");
+      const [rows] = await this.pool.execute<Row[]>(
+        `SELECT ${CONCEPT_SELECT}, TRUE as is_concept_only FROM ship_matrix sm2 WHERE sm2.id = ? AND sm2.id NOT IN (SELECT ship_matrix_id FROM ships WHERE ship_matrix_id IS NOT NULL)`,
+        [smId],
+      );
+      return rows[0] || null;
+    }
+    const [rows] = await this.pool.execute<Row[]>(`SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS} WHERE s.uuid = ?`, [uuid]);
     return rows[0] || null;
   }
 
   async getShipByClassName(className: string): Promise<Row | null> {
-    const [rows] = await this.pool.execute<Row[]>(`SELECT ${SHIP_SELECT} ${SHIP_JOINS} WHERE s.class_name = ?`, [className]);
+    const [rows] = await this.pool.execute<Row[]>(`SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS} WHERE s.class_name = ?`, [className]);
     return rows[0] || null;
   }
 
@@ -260,7 +366,18 @@ export class GameDataService {
   }
 
   async getShipModules(shipUuid: string): Promise<Row[]> {
-    const [rows] = await this.pool.execute<Row[]>("SELECT * FROM ship_modules WHERE ship_uuid = ? ORDER BY slot_name", [shipUuid]);
+    // Filter out noise modules (cargo grids, AI modules, dashboards, seats, nacelles, etc.)
+    // Keep only real swappable modules (Retaliator front/rear, Apollo rooms, Cyclone attach, etc.)
+    const NOISE_PATTERNS = [
+      'cargogrid_module', 'pdc_aimodule', 'module_dashboard',
+      'module_seat', 'thruster_module', 'power_plant_commandmodule',
+      'cargo_module', 'modular_bed',
+    ];
+    const noiseClauses = NOISE_PATTERNS.map(p => `slot_name NOT LIKE '%${p}%'`).join(' AND ');
+    const [rows] = await this.pool.execute<Row[]>(
+      `SELECT * FROM ship_modules WHERE ship_uuid = ? AND ${noiseClauses} ORDER BY slot_name`,
+      [shipUuid],
+    );
     return rows;
   }
 

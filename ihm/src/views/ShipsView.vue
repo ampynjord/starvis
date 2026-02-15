@@ -72,21 +72,21 @@ watch(page, fetchShips)
 // fmt imported from @/utils/formatters
 
 function statusClass(ship: Ship) {
+  if (ship.is_concept_only) return 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
   const ps = ship.production_status
   if (ps === 'flight-ready') return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
   if (ps === 'in-concept') return 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-  if (ps === 'in-production') return 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
   if (!ship.ship_matrix_id) return 'bg-sv-darker text-sv-muted border border-sv-border'
-  return 'bg-sv-darker text-sv-muted border border-sv-border'
+  return 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
 }
 
 function statusLabel(ship: Ship) {
+  if (ship.is_concept_only) return 'In Concept'
   const ps = ship.production_status
   if (ps === 'flight-ready') return 'Flight Ready'
   if (ps === 'in-concept') return 'In Concept'
-  if (ps === 'in-production') return 'In Production'
   if (!ship.ship_matrix_id) return 'In-Game'
-  return ps || 'Unknown'
+  return 'Flight Ready'
 }
 </script>
 
@@ -116,7 +116,6 @@ function statusLabel(ship: Ship) {
         <option value="">All statuses</option>
         <option value="flight-ready">Flight Ready</option>
         <option value="in-concept">In Concept</option>
-        <option value="in-production">In Production</option>
         <option value="in-game-only">In-Game only</option>
       </select>
       <select v-model="vehicleCategory" class="input w-36">
@@ -149,8 +148,8 @@ function statusLabel(ship: Ship) {
           v-for="ship in ships"
           :key="ship.uuid"
           class="card-hover group overflow-hidden"
-          @click="!ship.is_concept_only && router.push(`/ships/${ship.class_name || ship.uuid}`)"
-          :class="{ 'opacity-70 cursor-default': ship.is_concept_only, 'cursor-pointer': !ship.is_concept_only }"
+          @click="router.push(`/ships/${ship.is_concept_only ? ship.uuid : (ship.class_name || ship.uuid)}`)"
+          class="cursor-pointer"
         >
           <!-- Thumbnail -->
           <div class="relative h-32 bg-sv-darker overflow-hidden">
