@@ -1,9 +1,42 @@
 <script setup lang="ts">
-import { useRoute } from 'vue-router';
+import { getComponents, getShips, type Component, type Ship } from '@/services/api';
+import { debounce } from '@/utils/formatters';
+import { ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
 const props = defineProps<{ open: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void }>()
 const route = useRoute()
+const router = useRouter()
+
+// ── Global search ──
+const searchQuery = ref('')
+const searchResults = ref<{ type: 'ship' | 'component'; name: string; uuid: string; extra: string }[]>([])
+const searchOpen = ref(false)
+
+async function doSearch(q: string) {
+  if (q.length < 2) { searchResults.value = []; searchOpen.value = false; return }
+  const [ships, comps] = await Promise.all([
+    getShips({ search: q, limit: '5' }).catch(() => ({ data: [] as Ship[] })),
+    getComponents({ search: q, limit: '5' }).catch(() => ({ data: [] as Component[] })),
+  ])
+  const results: typeof searchResults.value = []
+  for (const s of ships.data) results.push({ type: 'ship', name: s.name, uuid: s.uuid, extra: s.manufacturer_code || '' })
+  for (const c of comps.data) results.push({ type: 'component', name: c.name || c.class_name, uuid: c.uuid, extra: c.type || '' })
+  searchResults.value = results
+  searchOpen.value = results.length > 0
+}
+const debouncedSearch = debounce((q: string) => doSearch(q), 250)
+watch(searchQuery, (q) => debouncedSearch(q))
+
+function goToResult(r: typeof searchResults.value[number]) {
+  searchOpen.value = false
+  searchQuery.value = ''
+  searchResults.value = []
+  emit('close')
+  if (r.type === 'ship') router.push(`/ships/${r.uuid}`)
+  else router.push(`/components/${r.uuid}`)
+}
 
 const navSections = [
   {
@@ -52,6 +85,29 @@ function isActive(to: string) {
       <span class="text-sv-text-bright font-semibold tracking-tight">Starvis</span>
       <span class="ml-auto text-[10px] text-sv-muted font-mono">v1.0</span>
     </router-link>
+
+    <!-- Global Search -->
+    <div class="px-3 pt-3 pb-1 relative">
+      <input
+        v-model="searchQuery"
+        type="text"
+        placeholder="Search ships & components…"
+        class="w-full bg-sv-dark/80 border border-sv-border/40 rounded-md px-3 py-1.5 text-xs text-sv-text placeholder-sv-muted/50 focus:outline-none focus:border-sv-accent/50 transition-colors"
+        @focus="searchOpen = searchResults.length > 0"
+        @blur="searchOpen = false"
+      />
+      <div v-if="searchOpen" class="absolute left-3 right-3 top-full mt-0.5 bg-sv-darker border border-sv-border/50 rounded-md shadow-xl z-50 max-h-64 overflow-y-auto">
+        <button
+          v-for="r in searchResults" :key="r.type + r.uuid"
+          class="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-sv-border/30 text-left transition-colors"
+          @mousedown.prevent="goToResult(r)"
+        >
+          <span class="w-4 text-center">{{ r.type === 'ship' ? '🚀' : '⚙️' }}</span>
+          <span class="text-sv-text-bright truncate flex-1">{{ r.name }}</span>
+          <span class="text-sv-muted text-[10px]">{{ r.extra }}</span>
+        </button>
+      </div>
+    </div>
 
     <!-- Nav sections -->
     <nav class="flex-1 overflow-y-auto py-3 px-3 space-y-5">

@@ -52,12 +52,12 @@ export function portLabel(name: string): string {
  * Debounce a function call by `delay` ms.
  * Returns a wrapper that resets the timer on each call.
  */
-export function debounce<T extends (...args: any[]) => void>(fn: T, delay = 300): T & { cancel: () => void } {
+export function debounce<Args extends unknown[]>(fn: (...args: Args) => void, delay = 300): ((...args: Args) => void) & { cancel: () => void } {
   let timer: ReturnType<typeof setTimeout> | null = null
-  const debounced = ((...args: any[]) => {
+  const debounced = ((...args: Args) => {
     if (timer) clearTimeout(timer)
     timer = setTimeout(() => fn(...args), delay)
-  }) as T & { cancel: () => void }
+  }) as ((...args: Args) => void) & { cancel: () => void }
   debounced.cancel = () => { if (timer) clearTimeout(timer) }
   return debounced
 }

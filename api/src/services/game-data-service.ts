@@ -504,6 +504,16 @@ export class GameDataService {
     return rows;
   }
 
+  async getComponentShips(uuid: string): Promise<Row[]> {
+    const [rows] = await this.pool.execute<Row[]>(
+      `SELECT DISTINCT s.uuid, s.name, s.class_name, s.manufacturer_code, s.manufacturer_name
+       FROM ships_loadouts sl JOIN ships s ON sl.ship_uuid = s.uuid
+       WHERE sl.component_uuid = ? ORDER BY s.name`,
+      [uuid],
+    );
+    return rows;
+  }
+
   // ── LOADOUT CALCULATOR ──────────────────────────────────
 
   async calculateLoadout(shipUuid: string, swaps: { portName: string; componentUuid: string }[]): Promise<Record<string, unknown>> {

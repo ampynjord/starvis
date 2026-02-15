@@ -2,7 +2,15 @@
 import { getComponents, getManufacturers, getShips, getVersion } from '@/services/api'
 import { onMounted, ref } from 'vue'
 
-const stats = ref<any>(null)
+interface HomeStats {
+  ships: number
+  components: number
+  manufacturers: number
+  version: string
+  lastExtraction: string | null
+}
+
+const stats = ref<HomeStats | null>(null)
 const loading = ref(true)
 const error = ref('')
 
@@ -24,8 +32,8 @@ onMounted(async () => {
     if (!s && !c && !m) {
       error.value = 'Unable to reach the API. Is the backend running?'
     }
-  } catch (e: any) {
-    error.value = e.message || 'Connection error'
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'Connection error'
   } finally {
     loading.value = false
   }

@@ -8,6 +8,8 @@ services:
     image: ghcr.io/ampynjord/starvis-api:latest
     build: !reset null
     ports: !reset []
+    environment:
+      CORS_ORIGIN: "https://starvis.ampynjord.bzh"
     networks:
       - default
       - traefik-network

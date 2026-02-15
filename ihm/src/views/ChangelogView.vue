@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
 import PaginationBar from '@/components/PaginationBar.vue'
-import { getChangelog } from '@/services/api'
+import { getChangelog, type ChangelogEntry } from '@/services/api'
 import { computed, onMounted, ref, watch } from 'vue'
 
-const entries = ref<any[]>([])
+const entries = ref<ChangelogEntry[]>([])
 const total = ref(0)
 const loading = ref(true)
 const page = ref(1)
