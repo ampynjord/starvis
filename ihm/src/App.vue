@@ -14,7 +14,7 @@ const sidebarOpen = ref(false);
     <div class="flex-1 flex flex-col min-h-screen lg:ml-56">
       <!-- Mobile header -->
       <header class="lg:hidden sticky top-0 z-40 glass border-b border-sv-border/40 px-4 h-12 flex items-center gap-3">
-        <button @click="sidebarOpen = true" class="text-sv-muted hover:text-sv-text p-1">
+        <button @click="sidebarOpen = true" class="text-sv-muted hover:text-sv-text p-1" aria-label="Open navigation menu">
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
         </button>
         <router-link to="/" class="flex items-center gap-2 text-sv-text-bright font-semibold text-sm">

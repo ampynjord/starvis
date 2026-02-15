@@ -13,6 +13,23 @@ export class ShipMatrixService {
   constructor(private pool: Pool) {}
 
   /**
+   * Check if a sync is needed (no data or last sync > 24h ago).
+   */
+  async isSyncNeeded(): Promise<boolean> {
+    try {
+      const [rows] = await this.pool.execute<any[]>(
+        "SELECT MAX(synced_at) as last_sync FROM ship_matrix"
+      );
+      if (!rows[0]?.last_sync) return true;
+      const lastSync = new Date(rows[0].last_sync).getTime();
+      const hoursSince = (Date.now() - lastSync) / (1000 * 60 * 60);
+      return hoursSince > 24;
+    } catch {
+      return true;
+    }
+  }
+
+  /**
    * Sync all ships from RSI Ship Matrix API into ship_matrix table.
    * Uses INSERT ... ON DUPLICATE KEY UPDATE to be idempotent.
    */
@@ -38,43 +55,21 @@ export class ShipMatrixService {
     try {
       await conn.beginTransaction();
 
-      for (const ship of body.data) {
-        try {
-          const mfg = ship.manufacturer || {};
-          const media = ship.media?.[0] || {};
-          const images = media.images || {};
+      // Batch insert — build multi-row VALUES for better performance
+      const BATCH_SIZE = 50;
+      for (let i = 0; i < body.data.length; i += BATCH_SIZE) {
+        const batch = body.data.slice(i, i + BATCH_SIZE);
+        const placeholders: string[] = [];
+        const values: any[] = [];
 
-          await conn.execute(
-            `INSERT INTO ship_matrix (
-              id, name, chassis_id,
-              manufacturer_id, manufacturer_code, manufacturer_name,
-              focus, type, description, production_status, production_note, size, url,
-              length, beam, height, mass, cargocapacity, min_crew, max_crew,
-              scm_speed, afterburner_speed, pitch_max, yaw_max, roll_max,
-              xaxis_acceleration, yaxis_acceleration, zaxis_acceleration,
-              media_source_url, media_store_small, media_store_large,
-              compiled, time_modified, time_modified_unfiltered
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON DUPLICATE KEY UPDATE
-              name=VALUES(name), chassis_id=VALUES(chassis_id),
-              manufacturer_id=VALUES(manufacturer_id), manufacturer_code=VALUES(manufacturer_code),
-              manufacturer_name=VALUES(manufacturer_name),
-              focus=VALUES(focus), type=VALUES(type), description=VALUES(description),
-              production_status=VALUES(production_status), production_note=VALUES(production_note),
-              size=VALUES(size), url=VALUES(url),
-              length=VALUES(length), beam=VALUES(beam), height=VALUES(height),
-              mass=VALUES(mass), cargocapacity=VALUES(cargocapacity),
-              min_crew=VALUES(min_crew), max_crew=VALUES(max_crew),
-              scm_speed=VALUES(scm_speed), afterburner_speed=VALUES(afterburner_speed),
-              pitch_max=VALUES(pitch_max), yaw_max=VALUES(yaw_max), roll_max=VALUES(roll_max),
-              xaxis_acceleration=VALUES(xaxis_acceleration), yaxis_acceleration=VALUES(yaxis_acceleration),
-              zaxis_acceleration=VALUES(zaxis_acceleration),
-              media_source_url=VALUES(media_source_url), media_store_small=VALUES(media_store_small),
-              media_store_large=VALUES(media_store_large),
-              compiled=VALUES(compiled), time_modified=VALUES(time_modified),
-              time_modified_unfiltered=VALUES(time_modified_unfiltered),
-              synced_at=CURRENT_TIMESTAMP`,
-            [
+        for (const ship of batch) {
+          try {
+            const mfg = ship.manufacturer || {};
+            const media = ship.media?.[0] || {};
+            const images = media.images || {};
+
+            placeholders.push("(" + Array(34).fill("?").join(",") + ")");
+            values.push(
               ship.id,
               ship.name,
               ship.chassis_id || null,
@@ -109,13 +104,47 @@ export class ShipMatrixService {
               ship.compiled ? JSON.stringify(ship.compiled) : null,
               ship.time_modified || null,
               ship["time_modified.unfiltered"] ? new Date(ship["time_modified.unfiltered"]) : null,
-            ]
-          );
+            );
+            stats.synced++;
+          } catch (e: any) {
+            logger.error(`[ShipMatrix] ❌ ${ship.name}: ${e.message}`);
+            stats.errors++;
+          }
+        }
 
-          stats.synced++;
-        } catch (e: any) {
-          logger.error(`[ShipMatrix] ❌ ${ship.name}: ${e.message}`);
-          stats.errors++;
+        if (placeholders.length > 0) {
+          await conn.execute(
+            `INSERT INTO ship_matrix (
+              id, name, chassis_id,
+              manufacturer_id, manufacturer_code, manufacturer_name,
+              focus, type, description, production_status, production_note, size, url,
+              length, beam, height, mass, cargocapacity, min_crew, max_crew,
+              scm_speed, afterburner_speed, pitch_max, yaw_max, roll_max,
+              xaxis_acceleration, yaxis_acceleration, zaxis_acceleration,
+              media_source_url, media_store_small, media_store_large,
+              compiled, time_modified, time_modified_unfiltered
+            ) VALUES ${placeholders.join(",")}
+            ON DUPLICATE KEY UPDATE
+              name=VALUES(name), chassis_id=VALUES(chassis_id),
+              manufacturer_id=VALUES(manufacturer_id), manufacturer_code=VALUES(manufacturer_code),
+              manufacturer_name=VALUES(manufacturer_name),
+              focus=VALUES(focus), type=VALUES(type), description=VALUES(description),
+              production_status=VALUES(production_status), production_note=VALUES(production_note),
+              size=VALUES(size), url=VALUES(url),
+              length=VALUES(length), beam=VALUES(beam), height=VALUES(height),
+              mass=VALUES(mass), cargocapacity=VALUES(cargocapacity),
+              min_crew=VALUES(min_crew), max_crew=VALUES(max_crew),
+              scm_speed=VALUES(scm_speed), afterburner_speed=VALUES(afterburner_speed),
+              pitch_max=VALUES(pitch_max), yaw_max=VALUES(yaw_max), roll_max=VALUES(roll_max),
+              xaxis_acceleration=VALUES(xaxis_acceleration), yaxis_acceleration=VALUES(yaxis_acceleration),
+              zaxis_acceleration=VALUES(zaxis_acceleration),
+              media_source_url=VALUES(media_source_url), media_store_small=VALUES(media_store_small),
+              media_store_large=VALUES(media_store_large),
+              compiled=VALUES(compiled), time_modified=VALUES(time_modified),
+              time_modified_unfiltered=VALUES(time_modified_unfiltered),
+              synced_at=CURRENT_TIMESTAMP`,
+            values
+          );
         }
       }
 

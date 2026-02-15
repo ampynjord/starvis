@@ -4,7 +4,7 @@ import { NextFunction, Request, Response } from "express";
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
   if (!ADMIN_API_KEY) {
-    return res.status(500).json({ error: "Server misconfiguration", message: "ADMIN_API_KEY not set" });
+    return res.status(500).json({ error: "Server misconfiguration" });
   }
 
   const apiKey = String(req.headers["x-api-key"] || "");
