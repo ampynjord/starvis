@@ -73,13 +73,17 @@ try {
 }
 
 // ─── Détection données de jeu ───────────────────────────────────────────────
+// Use /components (P4K-only) instead of /ships (which now includes concept ships via UNION ALL)
 let hasGameData = false;
 let shipCount = 0;
 let compCount = 0;
 try {
-  const r = await rawGet('/ships');
-  hasGameData = r.ok && (r.data.count > 0 || r.data.total > 0);
-  shipCount = r.data.total || r.data.count || 0;
+  const r = await rawGet('/components?limit=1');
+  hasGameData = r.ok && ((r.data.total || r.data.count || 0) > 0);
+  if (hasGameData) {
+    const s = await rawGet('/ships?limit=1');
+    shipCount = s.data.total || s.data.count || 0;
+  }
 } catch { /* pas de game data */ }
 if (!hasGameData) {
   console.log(`${C.yellow}  ⚠  Pas de données game (P4K) — les tests game-data seront skip${C.reset}`);
@@ -163,7 +167,7 @@ await test('GET /ships → ≥200 ships (post-cleanup)', async () => {
   assert(data.success, 'Request failed');
   assert(total >= 200, `Only ${total} ships (expected ≥200)`);
   assert(total <= 500, `Too many ships: ${total} (cleanup filter issue?)`);
-  shipUuid = data.data[0]?.uuid;
+  shipUuid = (data.data.find(s => !s.is_concept_only) || data.data[0])?.uuid;
   info(`${total} ships total, page 1: ${data.count} items`);
 });
 
@@ -497,47 +501,51 @@ section('�📊 DATA QUALITY');
 await test('Ships have career/role (≥80%)', async () => {
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/ships?limit=200');
-  const total = data.total || data.count;
-  const withCareer = data.data.filter(s => s.career && s.career !== '').length;
-  const pct = Math.round((withCareer / data.count) * 100);
-  assert(pct >= 80, `Only ${pct}% have career (${withCareer}/${data.count})`);
-  info(`${pct}% (${withCareer}/${data.count})`);
+  const p4k = data.data.filter(s => !s.is_concept_only);
+  const withCareer = p4k.filter(s => s.career && s.career !== '').length;
+  const pct = Math.round((withCareer / p4k.length) * 100);
+  assert(pct >= 80, `Only ${pct}% have career (${withCareer}/${p4k.length})`);
+  info(`${pct}% (${withCareer}/${p4k.length})`);
 });
 
 await test('Ships have mass (≥80%)', async () => {
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/ships?limit=200');
-  const withMass = data.data.filter(s => s.mass && Number(s.mass) > 0).length;
-  const pct = Math.round((withMass / data.count) * 100);
+  const p4k = data.data.filter(s => !s.is_concept_only);
+  const withMass = p4k.filter(s => s.mass && Number(s.mass) > 0).length;
+  const pct = Math.round((withMass / p4k.length) * 100);
   assert(pct >= 80, `Only ${pct}% have mass`);
-  info(`${pct}% (${withMass}/${data.count})`);
+  info(`${pct}% (${withMass}/${p4k.length})`);
 });
 
 await test('Ships have total_hp (≥80%)', async () => {
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/ships?limit=200');
-  const withHp = data.data.filter(s => s.total_hp && Number(s.total_hp) > 0).length;
-  const pct = Math.round((withHp / data.count) * 100);
+  const p4k = data.data.filter(s => !s.is_concept_only);
+  const withHp = p4k.filter(s => s.total_hp && Number(s.total_hp) > 0).length;
+  const pct = Math.round((withHp / p4k.length) * 100);
   assert(pct >= 80, `Only ${pct}% have HP`);
-  info(`${pct}% (${withHp}/${data.count})`);
+  info(`${pct}% (${withHp}/${p4k.length})`);
 });
 
 await test('Ships have boost_speed_forward (≥70%)', async () => {
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/ships?limit=200');
-  const withBoost = data.data.filter(s => s.boost_speed_forward && Number(s.boost_speed_forward) > 0).length;
-  const pct = Math.round((withBoost / data.count) * 100);
+  const p4k = data.data.filter(s => !s.is_concept_only);
+  const withBoost = p4k.filter(s => s.boost_speed_forward && Number(s.boost_speed_forward) > 0).length;
+  const pct = Math.round((withBoost / p4k.length) * 100);
   assert(pct >= 70, `Only ${pct}% have boost speed`);
-  info(`${pct}% (${withBoost}/${data.count})`);
+  info(`${pct}% (${withBoost}/${p4k.length})`);
 });
 
 await test('Ships have pitch/yaw/roll (≥70%)', async () => {
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/ships?limit=200');
-  const withRot = data.data.filter(s => s.pitch_max && s.yaw_max && s.roll_max).length;
-  const pct = Math.round((withRot / data.count) * 100);
+  const p4k = data.data.filter(s => !s.is_concept_only);
+  const withRot = p4k.filter(s => s.pitch_max && s.yaw_max && s.roll_max).length;
+  const pct = Math.round((withRot / p4k.length) * 100);
   assert(pct >= 70, `Only ${pct}% have rotation data`);
-  info(`${pct}% (${withRot}/${data.count})`);
+  info(`${pct}% (${withRot}/${p4k.length})`);
 });
 
 await test('Missiles have damage, speed, lock_time, signal_type', async () => {
@@ -632,9 +640,11 @@ section('🔧 LOADOUT SIMULATOR');
 
 await test('POST /loadout/calculate → default loadout stats', async () => {
   if (!hasGameData) skip('no game data');
-  const { data: ships } = await rawGet('/ships?limit=1');
+  const { data: ships } = await rawGet('/ships?limit=20');
   if (!ships.data || ships.data.length === 0) skip('no ships');
-  const shipUuid = ships.data[0].uuid;
+  const realShip = ships.data.find(s => !s.is_concept_only);
+  if (!realShip) skip('no P4K ships for loadout');
+  const shipUuid = realShip.uuid;
   const res = await fetch(`${API}/loadout/calculate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

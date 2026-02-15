@@ -40,7 +40,9 @@ app.use(helmet({
 app.use(cors({ origin: process.env.CORS_ORIGIN || "*", credentials: true }));
 app.use(express.json({ limit: "1mb" }));
 
-// ── Rate limiting (multi-layer) ──────────────────────────
+// ── Rate limiting (multi-layer, disabled in test) ────────
+
+const isTest = process.env.NODE_ENV === "test";
 
 // Layer 1: Speed limiter — after 100 req/15min, add 500ms delay per request
 const speedLimiter = slowDown({
@@ -48,6 +50,7 @@ const speedLimiter = slowDown({
   delayAfter: 100,
   delayMs: (hits) => (hits - 100) * 500,
   maxDelayMs: 20_000,
+  skip: () => isTest,
 });
 
 // Layer 2: Hard rate limit — 200 req/15min per IP (then 429)
@@ -58,6 +61,7 @@ const apiLimiter = rateLimit({
   legacyHeaders: false,
   message: { success: false, error: "Too many requests, please try again later" },
   skipSuccessfulRequests: false,
+  skip: () => isTest,
 });
 
 // Layer 3: Strict limit on admin endpoints — 20 req/15min
@@ -67,6 +71,7 @@ const adminLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: "Admin rate limit exceeded" },
+  skip: () => isTest,
 });
 
 // Layer 4: Burst protection — 30 req/min max (prevents hammering)
@@ -76,6 +81,7 @@ const burstLimiter = rateLimit({
   standardHeaders: false,
   legacyHeaders: false,
   message: { success: false, error: "Too many requests per minute, slow down" },
+  skip: () => isTest,
 });
 
 app.use("/api", burstLimiter, speedLimiter, apiLimiter);
