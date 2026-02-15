@@ -1,8 +1,8 @@
 /**
  * STARVIS v1.0 - Routes
  *
- * Public (21): ship-matrix(3), ships(8), components(3), manufacturers(1),
- *              shops(2), loadout(1), changelog(1), version(1)
+ * Public (24): ship-matrix(3), ships(8), components(4), manufacturers(1),
+ *              paints(1), shops(2), loadout(1), changelog(1), version(1)
  * Admin (3):   sync(1), stats(1), extraction-log(1)
  * System (1):  health
  *
@@ -16,7 +16,7 @@ import { ZodError } from "zod";
 import { authMiddleware } from "./middleware/index.js";
 import {
     arrayToCsv, ChangelogQuery, ComponentQuery, LoadoutBody,
-    SearchQuery, ShipQuery, ShopQuery,
+    PaintQuery, SearchQuery, ShipQuery, ShopQuery,
 } from "./schemas.js";
 import type { GameDataService } from "./services/game-data-service.js";
 import type { ShipMatrixService } from "./services/ship-matrix-service.js";
@@ -25,7 +25,7 @@ import { logger } from "./utils/index.js";
 // Re-export schemas so existing consumers are unaffected
 export {
     arrayToCsv, ChangelogQuery, ComponentQuery, LoadoutBody,
-    qInt, qStr, SearchQuery, ShipQuery, ShopQuery
+    PaintQuery, qInt, qStr, SearchQuery, ShipQuery, ShopQuery
 } from "./schemas.js";
 
 // ── Helpers ───────────────────────────────────────────────
@@ -257,6 +257,11 @@ export function createRoutes(deps: RouteDependencies): Router {
     sendWithETag(req, res, payload);
   }));
 
+  router.get("/api/v1/components/filters", requireGameData, asyncHandler(async (req, res) => {
+    const data = await gameDataService!.getComponentFilters();
+    sendWithETag(req, res, { success: true, data });
+  }));
+
   router.get("/api/v1/components/:uuid", requireGameData, asyncHandler(async (req, res) => {
     const comp = await gameDataService!.getComponentByUuid(req.params.uuid);
     if (!comp) return void res.status(404).json({ success: false, error: "Component not found" });
@@ -281,6 +286,21 @@ export function createRoutes(deps: RouteDependencies): Router {
     const data = await gameDataService!.getAllManufacturers();
     if (req.query.format === "csv") return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
     sendWithETag(req, res, { success: true, count: data.length, data });
+  }));
+
+  // ── PAINTS ───────────────────────────────────────────────
+
+  router.get("/api/v1/paints", requireGameData, asyncHandler(async (req, res) => {
+    const t = Date.now();
+    const filters = PaintQuery.parse(req.query);
+    const result = await gameDataService!.getAllPaints(filters);
+    const payload = {
+      success: true, count: result.data.length, total: result.total,
+      page: result.page, limit: result.limit, pages: result.pages, data: result.data,
+      meta: { source: "Game Data", responseTime: `${Date.now() - t}ms` },
+    };
+    if (req.query.format === "csv") return void sendCsvOrJson(req, res, result.data as Record<string, unknown>[], payload);
+    sendWithETag(req, res, payload);
   }));
 
   // ── SHOPS ───────────────────────────────────────────────

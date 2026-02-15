@@ -12,6 +12,7 @@ const navSections = [
       { to: '/ships', label: 'Ships', icon: '🚀' },
       { to: '/components', label: 'Components', icon: '⚙️' },
       { to: '/manufacturers', label: 'Manufacturers', icon: '🏭' },
+      { to: '/paints', label: 'Paints', icon: '🎨' },
       { to: '/shops', label: 'Shops', icon: '🏪' },
     ],
   },

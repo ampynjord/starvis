@@ -56,6 +56,12 @@ export const LoadoutBody = z.object({
 
 export const SearchQuery = z.object({ search: qStr, format: qStr }).passthrough();
 
+export const PaintQuery = z.object({
+  search: qStr, ship_uuid: qStr,
+  page: qInt(1), limit: qInt(50, 200),
+  format: qStr,
+}).passthrough();
+
 // ── Pure helpers ──────────────────────────────────────────
 
 export function arrayToCsv(data: Record<string, unknown>[]): string {

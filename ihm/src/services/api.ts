@@ -200,6 +200,18 @@ export interface ShipPaint {
   paint_uuid: string | null
 }
 
+export interface Paint {
+  id: number
+  ship_uuid: string
+  paint_class_name: string
+  paint_name: string | null
+  paint_uuid: string | null
+  ship_name: string | null
+  ship_class_name: string | null
+  manufacturer_name: string | null
+  manufacturer_code: string | null
+}
+
 export interface CompareResult {
   ship1: { uuid: string; name: string; class_name: string; manufacturer_code: string }
   ship2: { uuid: string; name: string; class_name: string; manufacturer_code: string }
@@ -313,6 +325,24 @@ export async function getComponent(uuid: string) {
 
 export async function getComponentBuyLocations(uuid: string) {
   return fetchJson<{ success: boolean; count: number; data: BuyLocation[] }>(`/components/${uuid}/buy-locations`)
+}
+
+export interface ComponentFilters {
+  types: string[]
+  sub_types: string[]
+  sizes: number[]
+  grades: string[]
+}
+
+export async function getComponentFilters() {
+  return fetchJson<{ success: boolean; data: ComponentFilters }>('/components/filters')
+}
+
+// --------------- Paints ---------------
+
+export async function getPaints(params: Record<string, string> = {}) {
+  const qs = new URLSearchParams(params).toString()
+  return fetchJson<PaginatedResponse<Paint>>(`/paints?${qs}`)
 }
 
 // --------------- Shops ---------------

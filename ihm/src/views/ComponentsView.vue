@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
 import PaginationBar from '@/components/PaginationBar.vue'
-import { getComponents, getManufacturers, type Component, type Manufacturer } from '@/services/api'
-import { COMPONENT_TYPES } from '@/utils/constants'
+import { getComponentFilters, getComponents, getManufacturers, type Component, type ComponentFilters, type Manufacturer } from '@/services/api'
 import { debounce, fmt } from '@/utils/formatters'
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -16,8 +15,7 @@ const pages = ref(1)
 const loading = ref(true)
 const error = ref('')
 const manufacturers = ref<Manufacturer[]>([])
-
-const TYPES = COMPONENT_TYPES
+const filters = ref<ComponentFilters>({ types: [], sub_types: [], sizes: [], grades: [] })
 
 // Filters — initialize from route query params
 const search = ref((route.query.search as string) || '')
@@ -53,11 +51,13 @@ async function fetchComponents() {
 }
 
 onMounted(async () => {
-  const [, mfg] = await Promise.all([
+  const [, mfg, flt] = await Promise.all([
     fetchComponents(),
     getManufacturers().catch(() => ({ data: [] })),
+    getComponentFilters().catch(() => ({ data: { types: [], sub_types: [], sizes: [], grades: [] } })),
   ])
   manufacturers.value = mfg.data
+  filters.value = flt.data
 })
 
 const debouncedFetch = debounce(() => { page.value = 1; fetchComponents() }, 300)
@@ -89,11 +89,11 @@ function typeColor(t: string) {
       <input v-model="search" class="input flex-1 min-w-[160px]" placeholder="Search a component…" />
       <select v-model="type" class="input w-36">
         <option value="">All types</option>
-        <option v-for="t in TYPES" :key="t" :value="t">{{ t }}</option>
+        <option v-for="t in filters.types" :key="t" :value="t">{{ t }}</option>
       </select>
       <select v-model="size" class="input w-20">
         <option value="">Size</option>
-        <option v-for="s in [0,1,2,3,4,5,6,7,8,9,10]" :key="s" :value="String(s)">S{{ s }}</option>
+        <option v-for="s in filters.sizes" :key="s" :value="String(s)">S{{ s }}</option>
       </select>
       <select v-model="manufacturer" class="input w-32">
         <option value="">Manufacturer</option>
