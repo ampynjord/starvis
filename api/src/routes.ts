@@ -15,8 +15,8 @@ import type { Pool } from "mysql2/promise";
 import { ZodError } from "zod";
 import { authMiddleware } from "./middleware/index.js";
 import {
-  arrayToCsv, ChangelogQuery, ComponentQuery, LoadoutBody,
-  SearchQuery, ShipQuery, ShopQuery,
+    arrayToCsv, ChangelogQuery, ComponentQuery, LoadoutBody,
+    SearchQuery, ShipQuery, ShopQuery,
 } from "./schemas.js";
 import type { GameDataService } from "./services/game-data-service.js";
 import type { ShipMatrixService } from "./services/ship-matrix-service.js";
@@ -24,8 +24,8 @@ import { logger } from "./utils/index.js";
 
 // Re-export schemas so existing consumers are unaffected
 export {
-  arrayToCsv, ChangelogQuery, ComponentQuery, LoadoutBody,
-  qInt, qStr, SearchQuery, ShipQuery, ShopQuery,
+    arrayToCsv, ChangelogQuery, ComponentQuery, LoadoutBody,
+    qInt, qStr, SearchQuery, ShipQuery, ShopQuery
 } from "./schemas.js";
 
 // ── Helpers ───────────────────────────────────────────────
