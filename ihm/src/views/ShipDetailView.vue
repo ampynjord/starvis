@@ -20,11 +20,12 @@ async function loadData() {
   ship.value = null
   try {
     const uuid = route.params.uuid as string
+    const isConcept = uuid.startsWith('concept-')
     const [shipRes, loadoutRes, modulesRes, paintsRes] = await Promise.all([
       getShip(uuid),
-      getShipLoadout(uuid).catch(() => ({ data: [] })),
-      getShipModules(uuid).catch(() => ({ data: [] })),
-      getShipPaints(uuid).catch(() => ({ data: [] })),
+      isConcept ? Promise.resolve({ data: [] }) : getShipLoadout(uuid).catch(() => ({ data: [] })),
+      isConcept ? Promise.resolve({ data: [] }) : getShipModules(uuid).catch(() => ({ data: [] })),
+      isConcept ? Promise.resolve({ data: [] }) : getShipPaints(uuid).catch(() => ({ data: [] })),
     ])
     ship.value = shipRes.data
     loadout.value = loadoutRes.data || []
@@ -105,16 +106,19 @@ const armorStats = computed(() => {
                 </p>
               </div>
               <div class="flex gap-2 shrink-0">
-                <span v-if="ship.production_status" class="badge-purple text-[10px]">
+                <span v-if="ship.is_concept_only" class="badge-amber text-[10px]">In Concept</span>
+                <span v-else-if="ship.production_status" class="badge-purple text-[10px]">
                   {{ ship.production_status }}
                 </span>
                 <span v-if="ship.ship_matrix_id" class="badge-cyan text-[10px]" title="RSI page available">✓ RSI Page</span>
-                <router-link :to="`/compare?ship1=${ship.class_name || ship.uuid}`" class="btn-primary text-xs">
-                  Compare
-                </router-link>
-                <router-link :to="`/loadout/${ship.class_name || ship.uuid}`" class="btn-outline text-xs">
-                  Loadout Manager
-                </router-link>
+                <template v-if="!ship.is_concept_only">
+                  <router-link :to="`/compare?ship1=${ship.class_name || ship.uuid}`" class="btn-primary text-xs">
+                    Compare
+                  </router-link>
+                  <router-link :to="`/loadout/${ship.class_name || ship.uuid}`" class="btn-outline text-xs">
+                    Loadout Manager
+                  </router-link>
+                </template>
                 <a v-if="ship.store_url" :href="'https://robertsspaceindustries.com' + ship.store_url" target="_blank" rel="noopener noreferrer" class="btn-ghost text-xs border border-sv-border">
                   RSI ↗
                 </a>
@@ -124,20 +128,31 @@ const armorStats = computed(() => {
         </div>
       </div>
 
-      <!-- Stats principales -->
-      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-        <StatBlock label="Total HP" :value="fmt(ship.total_hp)" color="green" />
-        <StatBlock label="Shield" :value="fmt(ship.shield_hp)" color="blue" />
-        <StatBlock label="Mass" :value="fmt(Math.round(ship.mass))" unit="kg" />
-        <StatBlock label="SCM Speed" :value="fmt(ship.scm_speed)" unit="m/s" />
-        <StatBlock label="Max Speed" :value="fmt(ship.max_speed)" unit="m/s" />
-        <StatBlock label="Cargo" :value="fmt(ship.cargo_capacity)" unit="SCU" color="amber" />
-        <StatBlock label="Weapons" :value="fmt(ship.weapon_damage_total)" unit="dps" color="red" />
-        <StatBlock label="Missiles" :value="fmt(ship.missile_damage_total)" unit="dmg" color="red" />
+      <!-- Concept-only banner -->
+      <div v-if="ship.is_concept_only" class="card border-amber-500/30 p-4 text-center">
+        <div class="text-amber-400 text-sm font-medium mb-1">🚧 In Concept</div>
+        <p class="text-sv-muted text-xs">This ship is not yet available in-game. Only RSI Ship Matrix data is shown below.</p>
       </div>
 
-      <!-- Détails en colonnes -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      <!-- Stats principales -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+        <StatBlock label="Mass" :value="fmt(Math.round(ship.mass || 0))" unit="kg" />
+        <StatBlock label="Cargo" :value="fmt(ship.cargo_capacity)" unit="SCU" color="amber" />
+        <StatBlock label="SCM Speed" :value="fmt(ship.scm_speed)" unit="m/s" />
+        <StatBlock label="Max Speed" :value="fmt(ship.max_speed)" unit="m/s" />
+        <template v-if="!ship.is_concept_only">
+          <StatBlock label="Total HP" :value="fmt(ship.total_hp)" color="green" />
+          <StatBlock label="Shield" :value="fmt(ship.shield_hp)" color="blue" />
+          <StatBlock label="Weapons" :value="fmt(ship.weapon_damage_total)" unit="dps" color="red" />
+          <StatBlock label="Missiles" :value="fmt(ship.missile_damage_total)" unit="dmg" color="red" />
+        </template>
+        <template v-else>
+          <StatBlock label="Crew" :value="`${ship.crew_size || '?'}`" />
+        </template>
+      </div>
+
+      <!-- Détails en colonnes (game data only) -->
+      <div v-if="!ship.is_concept_only" class="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <!-- Mobilité -->
         <div class="card p-4">
           <h2 class="text-xs font-semibold text-sv-accent uppercase tracking-wider mb-3">Mobility</h2>
@@ -172,7 +187,7 @@ const armorStats = computed(() => {
       </div>
 
       <!-- Cross-section -->
-      <div class="card p-4">
+      <div v-if="!ship.is_concept_only" class="card p-4">
         <h2 class="text-xs font-semibold text-sv-accent uppercase tracking-wider mb-3">Cross-Section</h2>
         <div class="grid grid-cols-3 gap-4 text-center text-sm">
           <div><div class="text-sv-muted text-xs">X</div><div class="text-sv-text font-medium">{{ fmt(ship.cross_section_x) }} m</div></div>
@@ -187,22 +202,28 @@ const armorStats = computed(() => {
         <p class="text-sv-muted text-sm leading-relaxed">{{ ship.sm_description }}</p>
       </div>
 
-      <!-- Modules (Retaliator, Apollo…) -->
+      <!-- Modules (Retaliator, Apollo, Cyclone…) – Erkul-style -->
       <div v-if="modules.length > 0" class="card p-4">
         <h2 class="text-xs font-semibold text-sv-accent uppercase tracking-wider mb-3">
           Modules <span class="text-sv-muted font-normal">({{ modules.length }} slots)</span>
         </h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
+        <div class="space-y-2">
           <div
             v-for="mod in modules"
             :key="mod.id"
-            class="flex items-center justify-between border border-sv-border/40 rounded px-2.5 py-1.5"
+            class="flex items-center gap-3 bg-sv-darker/40 border border-sv-border/30 rounded-lg px-3 py-2.5"
           >
-            <div class="min-w-0">
-              <div class="text-xs font-medium text-sv-text-bright truncate">{{ mod.module_name || '—' }}</div>
-              <div class="text-[10px] text-sv-muted">{{ mod.slot_display_name || mod.slot_name }}</div>
+            <!-- Slot icon -->
+            <div class="flex items-center justify-center w-8 h-8 rounded bg-sv-accent/10 text-sv-accent shrink-0">
+              <span class="text-sm">🔧</span>
             </div>
-            <span v-if="mod.is_default" class="badge-green text-[10px] ml-2 shrink-0">Default</span>
+            <!-- Slot info -->
+            <div class="min-w-0 flex-1">
+              <div class="text-[11px] text-sv-muted uppercase tracking-wide">{{ mod.slot_display_name || mod.slot_name }}</div>
+              <div class="text-sm font-medium text-sv-text-bright truncate">{{ mod.module_name || '—' }}</div>
+            </div>
+            <!-- Default badge -->
+            <span v-if="mod.is_default" class="badge-green text-[10px] shrink-0">Default</span>
           </div>
         </div>
       </div>

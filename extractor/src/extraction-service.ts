@@ -620,6 +620,12 @@ export class ExtractionService {
     if (!fullData?.ref) return;
 
     const MODULE_PATTERNS = [/module/i, /modular/i, /compartment/i, /bay_section/i];
+    // Noise slot patterns — these contain "module" but are not real swappable modules
+    const NOISE_SLOT_PATTERNS = [
+      /cargogrid_module/i, /pdc_aimodule/i, /module_dashboard/i,
+      /module_seat/i, /thruster_module/i, /power_plant_commandmodule/i,
+      /cargo_module/i, /modular_bed/i,
+    ];
     const loadout = this.dfService.extractVehicleLoadout(shipClassName);
     if (!loadout) return;
 
@@ -629,6 +635,9 @@ export class ExtractionService {
     for (const port of loadout) {
       const isModulePort = MODULE_PATTERNS.some(rx => rx.test(port.portName));
       if (!isModulePort || !port.componentClassName) continue;
+      // Skip noise modules (cargo grids, AI modules, dashboards, seats, nacelles, etc.)
+      const isNoise = NOISE_SLOT_PATTERNS.some(rx => rx.test(port.portName));
+      if (isNoise) continue;
 
       const slotDisplay = port.portName
         .replace(/hardpoint_/i, '')
