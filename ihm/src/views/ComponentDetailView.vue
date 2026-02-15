@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
 import StatBlock from '@/components/StatBlock.vue'
-import { getComponent, getComponentBuyLocations, type Component } from '@/services/api'
+import { getComponent, getComponentBuyLocations, getComponentShips, type BuyLocation, type Component, type ComponentShip } from '@/services/api'
 import { fmt } from '@/utils/formatters'
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -9,7 +9,8 @@ import { useRoute, useRouter } from 'vue-router'
 const route = useRoute()
 const router = useRouter()
 const comp = ref<Component | null>(null)
-const buyLocations = ref<any[]>([])
+const buyLocations = ref<BuyLocation[]>([])
+const installedOnShips = ref<ComponentShip[]>([])
 const loading = ref(true)
 
 async function loadData() {
@@ -17,12 +18,14 @@ async function loadData() {
   comp.value = null
   try {
     const uuid = route.params.uuid as string
-    const [compRes, locRes] = await Promise.all([
+    const [compRes, locRes, shipsRes] = await Promise.all([
       getComponent(uuid),
       getComponentBuyLocations(uuid).catch(() => ({ data: [] })),
+      getComponentShips(uuid).catch(() => ({ data: [] })),
     ])
     comp.value = compRes.data
     buyLocations.value = locRes.data || []
+    installedOnShips.value = shipsRes.data || []
   } finally {
     loading.value = false
   }
@@ -122,7 +125,7 @@ watch(() => route.params.uuid, (newUuid, oldUuid) => {
         <div v-else class="space-y-1.5">
           <div
             v-for="loc in buyLocations"
-            :key="loc.shop_id"
+            :key="loc.shop_name"
             class="flex items-center justify-between border border-sv-border/40 rounded px-2.5 py-1.5 hover:bg-sv-panel-light/30 transition-colors"
           >
             <div>
@@ -134,6 +137,26 @@ watch(() => route.params.uuid, (newUuid, oldUuid) => {
               <div class="text-[10px] text-sv-muted">{{ loc.shop_type || 'Shop' }}</div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Installed on ships -->
+      <div class="card p-4">
+        <h2 class="text-xs font-semibold text-sv-accent uppercase tracking-wider mb-3">
+          Installed On
+          <span v-if="installedOnShips.length" class="text-sv-muted font-normal ml-1">({{ installedOnShips.length }})</span>
+        </h2>
+        <div v-if="installedOnShips.length === 0" class="text-sv-muted text-center py-4 text-sm">Not installed on any ship</div>
+        <div v-else class="flex flex-wrap gap-1.5">
+          <router-link
+            v-for="ship in installedOnShips" :key="ship.uuid"
+            :to="`/ships/${ship.uuid}`"
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-sv-border/40 hover:bg-sv-border/30 hover:border-sv-accent/30 transition-colors text-xs"
+          >
+            <span>🚀</span>
+            <span class="text-sv-text-bright">{{ ship.name }}</span>
+            <span class="text-sv-muted text-[10px]">{{ ship.manufacturer_code }}</span>
+          </router-link>
         </div>
       </div>
     </div>

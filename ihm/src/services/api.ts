@@ -4,21 +4,32 @@
 
 const BASE = import.meta.env.VITE_API_URL || '/api/v1'
 
-async function fetchJson<T>(path: string, init?: RequestInit): Promise<T> {
+async function fetchJson<T>(path: string, init?: RequestInit, retries = 2): Promise<T> {
   const headers: Record<string, string> = { ...init?.headers as Record<string, string> }
   // Only set Content-Type for requests with a body
   if (init?.body) {
     headers['Content-Type'] = 'application/json'
   }
-  const res = await fetch(`${BASE}${path}`, {
-    ...init,
-    headers,
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }))
-    throw new Error(err.error || `HTTP ${res.status}`)
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(`${BASE}${path}`, {
+        ...init,
+        headers,
+        signal: init?.signal ?? AbortSignal.timeout(15_000),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }))
+        throw new Error(err.error || `HTTP ${res.status}`)
+      }
+      return res.json()
+    } catch (e) {
+      if (attempt === retries) throw e
+      // Only retry on network / timeout errors, not on 4xx
+      if (e instanceof Error && e.message.startsWith('HTTP ')) throw e
+      await new Promise(r => setTimeout(r, 500 * (attempt + 1)))
+    }
   }
-  return res.json()
+  throw new Error('Unexpected fetch error') // unreachable
 }
 
 // --------------- Types ---------------
@@ -147,11 +158,11 @@ export interface LoadoutStats {
   ship: { uuid: string; name: string; class_name: string }
   swaps: number
   stats: {
-    weapons: { count: number; total_dps: number; total_burst_dps: number; total_sustained_dps: number }
-    shields: { total_hp: number; total_regen: number }
-    missiles: { count: number; total_damage: number }
-    power: { total_draw: number; total_output: number; balance: number }
-    thermal: { total_heat_generation: number; total_cooling_rate: number; balance: number }
+    weapons: { count: number; total_dps: number; total_burst_dps: number; total_sustained_dps: number; details: Record<string, unknown>[] }
+    shields: { total_hp: number; total_regen: number; time_to_charge?: number; details: Record<string, unknown>[] }
+    missiles: { count: number; total_damage: number; details: Record<string, unknown>[] }
+    power: { total_draw: number; total_output: number; balance: number; details: Record<string, unknown>[] }
+    thermal: { total_heat_generation: number; total_cooling_rate: number; balance: number; details: Record<string, unknown>[] }
     quantum: { drive_name: string; speed: number; spool_time: number; cooldown: number; fuel_rate: number; range: number; tuning_rate: number; alignment_rate: number; disconnect_range: number; fuel_capacity: number }
     countermeasures: { flare_count: number; chaff_count: number; details: { port_name: string; name: string; type: string; ammo_count: number }[] }
     emp: { count: number; details: { port_name: string; name: string; size: number; damage: number; radius: number; charge_time: number; cooldown: number }[] }
@@ -162,7 +173,24 @@ export interface LoadoutStats {
     fuel: { hydrogen: number; quantum: number }
     hull: { total_hp: number; ehp: number; cross_section_x: number; cross_section_y: number; cross_section_z: number }
   }
-  loadout: { port_name: string; port_type: string; component_uuid: string; component_name: string; display_name?: string; component_type: string; component_size?: number; grade?: string; manufacturer_code?: string; cm_ammo?: number; radar_range?: number; swapped: boolean }[]
+  loadout: LoadoutItem[]
+  modules?: { module_name?: string; name?: string; module_type?: string; type?: string }[]
+  paints?: { paint_name?: string; paint_class_name?: string }[]
+}
+
+export interface LoadoutItem {
+  port_name: string; port_type: string; component_uuid: string; component_name: string
+  display_name?: string; component_type: string; component_size?: number
+  grade?: string; manufacturer_code?: string; swapped: boolean
+  // Conditional fields per component type
+  weapon_dps?: number | null; weapon_range?: number | null
+  shield_hp?: number | null; shield_regen?: number | null
+  power_output?: number | null; cooling_rate?: number | null; qd_speed?: number | null
+  cm_ammo?: number | null; radar_range?: number | null
+  emp_damage?: number | null; emp_radius?: number | null
+  qig_jammer_range?: number | null; qig_snare_radius?: number | null
+  port_min_size?: number; port_max_size?: number; size?: number
+  [key: string]: unknown
 }
 
 // --------------- Ships ---------------
@@ -325,6 +353,18 @@ export async function getComponent(uuid: string) {
 
 export async function getComponentBuyLocations(uuid: string) {
   return fetchJson<{ success: boolean; count: number; data: BuyLocation[] }>(`/components/${uuid}/buy-locations`)
+}
+
+export interface ComponentShip {
+  uuid: string
+  name: string
+  class_name: string
+  manufacturer_code: string
+  manufacturer_name: string | null
+}
+
+export async function getComponentShips(uuid: string) {
+  return fetchJson<{ success: boolean; count: number; data: ComponentShip[] }>(`/components/${uuid}/ships`)
 }
 
 export interface ComponentFilters {

@@ -4,9 +4,6 @@ import PaginationBar from '@/components/PaginationBar.vue'
 import { getPaints, type Paint } from '@/services/api'
 import { debounce } from '@/utils/formatters'
 import { onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
-
-const router = useRouter()
 const paints = ref<Paint[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -29,8 +26,8 @@ async function fetchPaints() {
     paints.value = res.data
     total.value = res.total
     pages.value = Math.ceil(res.total / 50)
-  } catch (e: any) {
-    error.value = e.message || 'Failed to load paints'
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'Failed to load paints'
   } finally {
     loading.value = false
   }

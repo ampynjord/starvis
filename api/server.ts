@@ -7,6 +7,7 @@
  *
  * Features: Pagination, ETag caching, CSV export, Rate limiting, Swagger docs
  */
+import compression from "compression";
 import cors from "cors";
 import express from "express";
 import rateLimit from "express-rate-limit";
@@ -38,6 +39,7 @@ app.use(helmet({
 }));
 
 app.use(cors({ origin: process.env.CORS_ORIGIN || "*", credentials: true }));
+app.use(compression());
 app.use(express.json({ limit: "1mb" }));
 
 // ── Rate limiting (multi-layer, disabled in test) ────────

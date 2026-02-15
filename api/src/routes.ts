@@ -276,6 +276,13 @@ export function createRoutes(deps: RouteDependencies): Router {
     sendWithETag(req, res, { success: true, count: data.length, data });
   }));
 
+  router.get("/api/v1/components/:uuid/ships", requireGameData, asyncHandler(async (req, res) => {
+    const comp = await gameDataService!.resolveComponent(req.params.uuid);
+    if (!comp) return void res.status(404).json({ success: false, error: "Component not found" });
+    const data = await gameDataService!.getComponentShips(comp.uuid);
+    sendWithETag(req, res, { success: true, count: data.length, data });
+  }));
+
   // ── MANUFACTURERS ───────────────────────────────────────
 
   router.get("/api/v1/manufacturers", requireGameData, asyncHandler(async (req, res) => {

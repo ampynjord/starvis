@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
 import StatBlock from '@/components/StatBlock.vue'
-import { getShip, getShipLoadout, getShipModules, getShipPaints, type Ship, type ShipPaint } from '@/services/api'
+import { getShip, getShipLoadout, getShipModules, getShipPaints, type LoadoutPort, type Ship, type ShipModule, type ShipPaint } from '@/services/api'
 import { CATEGORY_MAP, HIDDEN_PORT_NAMES, HIDDEN_PORT_TYPES } from '@/utils/constants'
 import { fmt } from '@/utils/formatters'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -10,8 +10,8 @@ import { useRoute, useRouter } from 'vue-router'
 const route = useRoute()
 const router = useRouter()
 const ship = ref<Ship | null>(null)
-const loadout = ref<any[]>([])
-const modules = ref<any[]>([])
+const loadout = ref<LoadoutPort[]>([])
+const modules = ref<ShipModule[]>([])
 const paints = ref<ShipPaint[]>([])
 const loading = ref(true)
 
@@ -45,7 +45,7 @@ watch(() => route.params.uuid, (newUuid, oldUuid) => {
 
 const groupedLoadout = computed(() => {
   // Group root loadout nodes by port_type for tree display (Erkul-style categories)
-  const groups: Record<string, { label: string; icon: string; color: string; order: number; nodes: any[] }> = {}
+  const groups: Record<string, { label: string; icon: string; color: string; order: number; nodes: LoadoutPort[] }> = {}
 
   for (const item of loadout.value) {
     const type = item.component_type || item.port_type || 'Other'

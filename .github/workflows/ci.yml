@@ -44,11 +44,17 @@ jobs:
       - name: Install & build IHM
         run: cd ihm && npm ci && npm run build
 
+      - name: Lint IHM
+        run: cd ihm && npm run lint
+
+      - name: Test IHM
+        run: cd ihm && npm run test
+
       - name: Audit API dependencies
-        run: cd api && npm audit --audit-level=high || true
+        run: cd api && npm audit --audit-level=high
 
       - name: Audit IHM dependencies
-        run: cd ihm && npm audit --audit-level=high || true
+        run: cd ihm && npm audit --audit-level=high
 
   # ==========================================
   #  2. UNIT / INTEGRATION TESTS

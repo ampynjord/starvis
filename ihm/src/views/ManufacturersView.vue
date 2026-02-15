@@ -5,7 +5,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
-const manufacturers = ref<(Manufacturer & { ship_count?: number; component_count?: number })[]>([])
+type MfgRow = Manufacturer & { ship_count?: number; component_count?: number }
+const manufacturers = ref<MfgRow[]>([])
 const loading = ref(true)
 const filter = ref<'all' | 'ships' | 'components'>('all')
 
@@ -30,7 +31,7 @@ const CODE_DISPLAY_NAMES: Record<string, string> = {
 // Manufacturers to hide (no real data)
 const HIDDEN_CODES = new Set(['NONE', 'AMBX', 'GMRCK', 'MRCK'])
 
-function displayName(m: Manufacturer & { ship_count?: number; component_count?: number }): string {
+function displayName(m: MfgRow): string {
   if (m.name && m.name !== m.code) return m.name
   return CODE_DISPLAY_NAMES[m.code] || m.code
 }
@@ -39,16 +40,16 @@ onMounted(async () => {
   try {
     const res = await getManufacturers()
     manufacturers.value = (res.data || [])
-      .filter((m: any) => !HIDDEN_CODES.has(m.code) && ((m.ship_count || 0) + (m.component_count || 0) > 0))
-      .sort((a: any, b: any) => (b.ship_count || 0) + (b.component_count || 0) - (a.ship_count || 0) - (a.component_count || 0))
+      .filter((m: MfgRow) => !HIDDEN_CODES.has(m.code) && ((m.ship_count || 0) + (m.component_count || 0) > 0))
+      .sort((a: MfgRow, b: MfgRow) => (b.ship_count || 0) + (b.component_count || 0) - (a.ship_count || 0) - (a.component_count || 0))
   } finally {
     loading.value = false
   }
 })
 
 const filteredManufacturers = computed(() => {
-  if (filter.value === 'ships') return manufacturers.value.filter((m: any) => m.ship_count > 0)
-  if (filter.value === 'components') return manufacturers.value.filter((m: any) => m.component_count > 0 && !m.ship_count)
+  if (filter.value === 'ships') return manufacturers.value.filter((m) => (m.ship_count ?? 0) > 0)
+  if (filter.value === 'components') return manufacturers.value.filter((m) => (m.component_count ?? 0) > 0 && !m.ship_count)
   return manufacturers.value
 })
 

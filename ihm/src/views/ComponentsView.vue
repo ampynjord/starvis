@@ -43,8 +43,8 @@ async function fetchComponents() {
     components.value = res.data
     total.value = res.total
     pages.value = Math.ceil(res.total / 30)
-  } catch (e: any) {
-    error.value = e.message || 'Failed to load components'
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'Failed to load components'
   } finally {
     loading.value = false
   }

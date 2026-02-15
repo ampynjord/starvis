@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
-import { calculateLoadout, getComponents, getShips, type Ship } from '@/services/api'
+import { calculateLoadout, getComponents, getShips, type Component, type LoadoutItem, type LoadoutStats, type Ship } from '@/services/api'
 import { LOADOUT_CATEGORY_ORDER, getCategoryInfo } from '@/utils/constants'
 import { debounce, fmt, pct, portLabel, useClickOutside } from '@/utils/formatters'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -13,7 +13,7 @@ const router = useRouter()
 const shipQuery = ref('')
 const shipResults = ref<Ship[]>([])
 const selectedShip = ref<Ship | null>(null)
-const loadout = ref<any>(null)
+const loadout = ref<LoadoutStats | null>(null)
 const loading = ref(false)
 const error = ref('')
 const swaps = ref<{ portName: string; componentUuid: string }[]>([])
@@ -21,12 +21,12 @@ const swaps = ref<{ portName: string; componentUuid: string }[]>([])
 // Component swap search
 const swapTarget = ref<string | null>(null) // port_name being swapped
 const swapQuery = ref('')
-const swapResults = ref<any[]>([])
+const swapResults = ref<Component[]>([])
 const swapLoading = ref(false)
 const swapTargetType = ref<string>('') // component type filter
 const swapTargetMinSize = ref<number>(0) // port min size
 const swapTargetMaxSize = ref<number>(0) // port max size
-const swapCurrentComponent = ref<any>(null) // current component for delta preview
+const swapCurrentComponent = ref<Record<string, unknown> | null>(null) // current component for delta preview
 
 // Click-outside for ship search dropdown
 const shipSearchRef = ref<HTMLElement | null>(null)
@@ -68,8 +68,8 @@ async function fetchLoadout(uuid: string) {
   try {
     const res = await calculateLoadout(uuid, swaps.value)
     loadout.value = res.data
-  } catch (e: any) {
-    error.value = e.message || 'Loadout error'
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'Loadout error'
   } finally {
     loading.value = false
   }
@@ -78,7 +78,7 @@ async function fetchLoadout(uuid: string) {
 // ── Grouped loadout items (Erkul-style categories) ──
 const groupedLoadout = computed(() => {
   if (!loadout.value?.loadout) return []
-  const groups: Record<string, { meta: any; items: any[] }> = {}
+  const groups: Record<string, { meta: ReturnType<typeof getCategoryInfo>; items: LoadoutItem[] }> = {}
 
   for (const item of loadout.value.loadout) {
     // Items are already filtered by backend
@@ -107,7 +107,7 @@ const groupedLoadout = computed(() => {
 })
 
 // ── Swap component ──
-function startSwap(item: any) {
+function startSwap(item: LoadoutItem) {
   swapTarget.value = item.port_name
   swapTargetType.value = item.component_type || ''
   swapTargetMinSize.value = item.port_min_size || item.size || 0
@@ -141,7 +141,7 @@ async function searchSwapComponents(q: string) {
 }
 const debouncedSwapSearch = debounce((q: string) => searchSwapComponents(q), 300)
 
-async function applySwap(component: any) {
+async function applySwap(component: Component) {
   if (!swapTarget.value || !selectedShip.value) return
   const existing = swaps.value.findIndex(s => s.portName === swapTarget.value)
   if (existing !== -1) swaps.value[existing].componentUuid = component.uuid
@@ -165,20 +165,20 @@ function removeSwap(portName: string) {
 // fmt, pct, portLabel imported from @/utils/formatters
 
 /** Compute delta between swap candidate and current component for a given stat */
-function delta(candidate: any, field: string): string {
+function delta(candidate: Record<string, unknown>, field: string): string {
   if (!swapCurrentComponent.value) return ''
-  const oldVal = parseFloat(swapCurrentComponent.value[field]) || 0
-  const newVal = parseFloat(candidate[field]) || 0
+  const oldVal = parseFloat(String(swapCurrentComponent.value[field])) || 0
+  const newVal = parseFloat(String(candidate[field])) || 0
   const diff = newVal - oldVal
   if (Math.abs(diff) < 0.01) return ''
   const sign = diff > 0 ? '+' : ''
   return `${sign}${fmt(diff, 1)}`
 }
 
-function deltaClass(candidate: any, field: string, higherIsBetter = true): string {
+function deltaClass(candidate: Record<string, unknown>, field: string, higherIsBetter = true): string {
   if (!swapCurrentComponent.value) return ''
-  const oldVal = parseFloat(swapCurrentComponent.value[field]) || 0
-  const newVal = parseFloat(candidate[field]) || 0
+  const oldVal = parseFloat(String(swapCurrentComponent.value[field])) || 0
+  const newVal = parseFloat(String(candidate[field])) || 0
   const diff = newVal - oldVal
   if (Math.abs(diff) < 0.01) return 'text-sv-muted'
   if (higherIsBetter) return diff > 0 ? 'text-green-400' : 'text-red-400'
@@ -226,8 +226,8 @@ onMounted(async () => {
         selectedShip.value = { uuid: res.data.ship.uuid, name: res.data.ship.name } as Ship
         shipQuery.value = res.data.ship.name
       }
-    } catch (e: any) {
-      error.value = e.message
+    } catch (e: unknown) {
+      error.value = e instanceof Error ? e.message : 'Loadout error'
     } finally {
       loading.value = false
     }
@@ -521,7 +521,7 @@ onMounted(async () => {
                     <td class="py-1 text-right text-blue-400 font-mono">{{ fmt(s.hp) }}</td>
                     <td class="py-1 text-right text-blue-300 font-mono">{{ fmt(s.regen) }}/s</td>
                     <td class="py-1 text-right text-blue-200 font-mono hidden sm:table-cell">{{ s.regen_delay ? fmt(s.regen_delay, 1) + 's' : '—' }}</td>
-                    <td class="py-1 text-right text-blue-200 font-mono hidden sm:table-cell">{{ s.hardening ? pct(s.hardening) : '—' }}</td>
+                    <td class="py-1 text-right text-blue-200 font-mono hidden sm:table-cell">{{ s.hardening ? pct(Number(s.hardening)) : '—' }}</td>
                   </tr>
                 </tbody>
               </table>

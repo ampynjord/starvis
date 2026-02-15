@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
 import PaginationBar from '@/components/PaginationBar.vue'
-import { getShopInventory, getShops, type Shop } from '@/services/api'
+import { getShopInventory, getShops, type Shop, type ShopInventoryItem } from '@/services/api'
 import { debounce, fmt } from '@/utils/formatters'
 import { computed, onMounted, ref, watch } from 'vue'
 
@@ -15,7 +15,7 @@ const search = ref('')
 const typeFilter = ref('')
 
 const selectedShop = ref<Shop | null>(null)
-const inventory = ref<any[]>([])
+const inventory = ref<ShopInventoryItem[]>([])
 const loadingInventory = ref(false)
 
 // Unique shop types for filter tabs
@@ -169,7 +169,7 @@ function shopIcon(type: string | null): string {
             <tbody>
               <tr
                 v-for="item in inventory"
-                :key="item.component_uuid"
+                :key="item.id"
                 class="border-b border-sv-border/20 hover:bg-sv-panel-light/30"
               >
                 <td class="py-1.5 px-2.5">

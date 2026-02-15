@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
-import { compareShips, getShips, type Ship } from '@/services/api'
+import { compareShips, getShips, type CompareResult, type Ship } from '@/services/api'
 import { debounce, fmt, useClickOutside } from '@/utils/formatters'
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -14,7 +14,7 @@ const ship1Results = ref<Ship[]>([])
 const ship2Results = ref<Ship[]>([])
 const ship1 = ref<string>((route.query.ship1 as string) || '')
 const ship2 = ref<string>((route.query.ship2 as string) || '')
-const comparison = ref<any>(null)
+const comparison = ref<CompareResult | null>(null)
 const loading = ref(false)
 const error = ref('')
 
@@ -51,8 +51,8 @@ async function doCompare() {
     const c = comparison.value
     if (c?.ship1?.name && !ship1Query.value) ship1Query.value = c.ship1.name
     if (c?.ship2?.name && !ship2Query.value) ship2Query.value = c.ship2.name
-  } catch (e: any) {
-    error.value = e.message || 'Comparison error'
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'Comparison error'
   } finally {
     loading.value = false
   }
@@ -60,14 +60,14 @@ async function doCompare() {
 
 watch([ship1, ship2], () => { if (ship1.value && ship2.value) doCompare() }, { immediate: true })
 
-function getVal(ship: any, field: string) {
+function getVal(ship: Record<string, unknown>, field: string) {
   if (!ship) return null
-  const v = parseFloat(ship[field])
+  const v = parseFloat(String(ship[field]))
   return isNaN(v) ? null : v
 }
 
-function getDelta(field: string) {
-  return comparison.value?.comparison?.[field]?.diff ?? null
+function getDelta(field: string): number {
+  return comparison.value?.comparison?.[field]?.diff ?? 0
 }
 
 /** Stats where a lower value is better (armor multipliers, mass, cross-section) */

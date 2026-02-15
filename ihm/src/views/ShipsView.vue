@@ -47,8 +47,8 @@ async function fetchShips() {
     ships.value = res.data
     total.value = res.total
     pages.value = Math.ceil(res.total / 30)
-  } catch (e: any) {
-    error.value = e.message || 'Failed to load ships'
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : 'Failed to load ships'
   } finally {
     loading.value = false
   }
