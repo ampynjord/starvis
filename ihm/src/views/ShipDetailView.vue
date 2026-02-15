@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
 import StatBlock from '@/components/StatBlock.vue'
-import { getShip, getShipLoadout, getShipModules, type Ship } from '@/services/api'
+import { getShip, getShipLoadout, getShipModules, getShipPaints, type Ship, type ShipPaint } from '@/services/api'
 import { CATEGORY_MAP, HIDDEN_PORT_TYPES } from '@/utils/constants'
 import { fmt } from '@/utils/formatters'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -12,6 +12,7 @@ const router = useRouter()
 const ship = ref<Ship | null>(null)
 const loadout = ref<any[]>([])
 const modules = ref<any[]>([])
+const paints = ref<ShipPaint[]>([])
 const loading = ref(true)
 
 async function loadData() {
@@ -19,14 +20,16 @@ async function loadData() {
   ship.value = null
   try {
     const uuid = route.params.uuid as string
-    const [shipRes, loadoutRes, modulesRes] = await Promise.all([
+    const [shipRes, loadoutRes, modulesRes, paintsRes] = await Promise.all([
       getShip(uuid),
       getShipLoadout(uuid).catch(() => ({ data: [] })),
       getShipModules(uuid).catch(() => ({ data: [] })),
+      getShipPaints(uuid).catch(() => ({ data: [] })),
     ])
     ship.value = shipRes.data
     loadout.value = loadoutRes.data || []
     modules.value = modulesRes.data || []
+    paints.value = paintsRes.data || []
   } finally {
     loading.value = false
   }
@@ -100,7 +103,7 @@ const armorStats = computed(() => {
                 <span v-if="ship.production_status" class="badge-purple text-[10px]">
                   {{ ship.production_status }}
                 </span>
-                <span v-if="ship.ship_matrix_id" class="badge-cyan text-[10px]" title="Linked to RSI Ship Matrix">✓ Matrix</span>
+                <span v-if="ship.ship_matrix_id" class="badge-cyan text-[10px]" title="RSI page available">✓ RSI Page</span>
                 <router-link :to="`/compare?ship1=${ship.class_name || ship.uuid}`" class="btn-primary text-xs">
                   Compare
                 </router-link>
@@ -195,6 +198,26 @@ const armorStats = computed(() => {
               <div class="text-[10px] text-sv-muted">{{ mod.slot_display_name || mod.slot_name }}</div>
             </div>
             <span v-if="mod.is_default" class="badge-green text-[10px] ml-2 shrink-0">Default</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Paints -->
+      <div v-if="paints.length > 0" class="card p-4">
+        <h2 class="text-xs font-semibold text-sv-accent uppercase tracking-wider mb-3">
+          Paints <span class="text-sv-muted font-normal">({{ paints.length }})</span>
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5">
+          <div
+            v-for="paint in paints"
+            :key="paint.paint_class_name"
+            class="flex items-center gap-2.5 border border-sv-border/40 rounded px-2.5 py-1.5"
+          >
+            <span class="text-lg opacity-50">🎨</span>
+            <div class="min-w-0 flex-1">
+              <div class="text-xs font-medium text-sv-text-bright truncate">{{ paint.paint_name || paint.paint_class_name }}</div>
+              <div class="text-[10px] text-sv-muted truncate font-mono">{{ paint.paint_class_name }}</div>
+            </div>
           </div>
         </div>
       </div>

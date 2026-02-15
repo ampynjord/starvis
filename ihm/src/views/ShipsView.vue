@@ -181,7 +181,7 @@ function statusLabel(ship: Ship) {
                 </h3>
                 <span class="text-[11px] text-sv-muted">{{ ship.manufacturer_name || ship.manufacturer_code }}</span>
               </div>
-              <span v-if="ship.ship_matrix_id" class="badge-cyan text-[10px] ml-2 shrink-0" title="Linked to RSI Ship Matrix">✓ Matrix</span>
+              <span v-if="ship.ship_matrix_id" class="badge-cyan text-[10px] ml-2 shrink-0" title="RSI page available">✓ RSI Page</span>
             </div>
 
             <div v-if="!ship.is_concept_only" class="grid grid-cols-3 gap-1.5 text-[11px] mt-2">

@@ -211,6 +211,19 @@ export class GameDataService {
     };
   }
 
+  async getComponentFilters(): Promise<{ types: string[]; sub_types: string[]; sizes: number[]; grades: string[] }> {
+    const [typeRows] = await this.pool.execute<Row[]>("SELECT DISTINCT type FROM components WHERE type IS NOT NULL AND type != '' ORDER BY type");
+    const [subTypeRows] = await this.pool.execute<Row[]>("SELECT DISTINCT sub_type FROM components WHERE sub_type IS NOT NULL AND sub_type != '' ORDER BY sub_type");
+    const [sizeRows] = await this.pool.execute<Row[]>("SELECT DISTINCT size FROM components ORDER BY size");
+    const [gradeRows] = await this.pool.execute<Row[]>("SELECT DISTINCT grade FROM components WHERE grade IS NOT NULL AND grade != '' ORDER BY grade");
+    return {
+      types: typeRows.map((r) => String(r.type)),
+      sub_types: subTypeRows.map((r) => String(r.sub_type)),
+      sizes: sizeRows.map((r) => Number(r.size)),
+      grades: gradeRows.map((r) => String(r.grade)),
+    };
+  }
+
   // ── LOADOUT ─────────────────────────────────────────────
 
   async getShipLoadout(shipUuid: string): Promise<Row[]> {
@@ -242,6 +255,41 @@ export class GameDataService {
       [shipUuid],
     );
     return rows;
+  }
+
+  // ── PAINTS (global listing) ─────────────────────────────
+
+  async getAllPaints(opts: {
+    search?: string; ship_uuid?: string;
+    page?: number; limit?: number;
+  }): Promise<PaginatedResult> {
+    const where: string[] = [];
+    const params: (string | number)[] = [];
+
+    if (opts.search) {
+      where.push("(sp.paint_name LIKE ? OR sp.paint_class_name LIKE ? OR s.name LIKE ?)");
+      const t = `%${opts.search}%`;
+      params.push(t, t, t);
+    }
+    if (opts.ship_uuid) {
+      where.push("sp.ship_uuid = ?");
+      params.push(opts.ship_uuid);
+    }
+
+    const w = where.length ? ` WHERE ${where.join(" AND ")}` : "";
+    const baseSql = `SELECT sp.id, sp.ship_uuid, sp.paint_class_name, sp.paint_name, sp.paint_uuid, s.name as ship_name, s.class_name as ship_class_name, m.name as manufacturer_name, m.code as manufacturer_code FROM ship_paints sp LEFT JOIN ships s ON sp.ship_uuid = s.uuid LEFT JOIN manufacturers m ON s.manufacturer_code = m.code${w}`;
+    const countSql = `SELECT COUNT(*) as total FROM ship_paints sp LEFT JOIN ships s ON sp.ship_uuid = s.uuid${w}`;
+
+    const [countRows] = await this.pool.execute<Row[]>(countSql, params);
+    const total = Number(countRows[0]?.total) || 0;
+
+    const page = Math.max(1, opts.page || 1);
+    const limit = Math.min(200, Math.max(1, opts.limit || 50));
+    const offset = (page - 1) * limit;
+
+    const sql = `${baseSql} ORDER BY s.name, sp.paint_name LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
+    const [rows] = await this.pool.execute<Row[]>(sql, params);
+    return { data: rows, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
   // ── CHANGELOG ───────────────────────────────────────────

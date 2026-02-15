@@ -49,6 +49,12 @@ const router = createRouter({
       meta: { title: 'Shops — Starvis' },
     },
     {
+      path: '/paints',
+      name: 'paints',
+      component: () => import('@/views/PaintsView.vue'),
+      meta: { title: 'Paints — Starvis' },
+    },
+    {
       path: '/manufacturers',
       name: 'manufacturers',
       component: () => import('@/views/ManufacturersView.vue'),
