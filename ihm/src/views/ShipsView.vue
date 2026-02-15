@@ -147,9 +147,8 @@ function statusLabel(ship: Ship) {
         <div
           v-for="ship in ships"
           :key="ship.uuid"
-          class="card-hover group overflow-hidden"
+          class="card-hover group overflow-hidden cursor-pointer"
           @click="router.push(`/ships/${ship.is_concept_only ? ship.uuid : (ship.class_name || ship.uuid)}`)"
-          class="cursor-pointer"
         >
           <!-- Thumbnail -->
           <div class="relative h-32 bg-sv-darker overflow-hidden">
