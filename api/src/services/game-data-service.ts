@@ -98,8 +98,7 @@ export class GameDataService {
     const limit = Math.min(200, Math.max(1, opts.limit || 50));
     const offset = (page - 1) * limit;
 
-    const sql = `${baseSql} ORDER BY ${alias}.${sortCol} ${order} LIMIT ? OFFSET ?`;
-    params.push(limit, offset);
+    const sql = `${baseSql} ORDER BY ${alias}.${sortCol} ${order} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
     const [rows] = await this.pool.execute<Row[]>(sql, params);
     return { data: rows, total: Number(total), page, limit, pages: Math.ceil(Number(total) / limit) };
   }
@@ -260,8 +259,8 @@ export class GameDataService {
     const limit = Math.min(100, parseInt(params.limit || "50"));
     const offset = parseInt(params.offset || "0");
     const [rows] = await this.pool.execute<Row[]>(
-      `SELECT c.*, e.game_version, e.extracted_at as extraction_date FROM changelog c LEFT JOIN extraction_log e ON c.extraction_id = e.id${w} ORDER BY c.created_at DESC LIMIT ? OFFSET ?`,
-      [...p, limit, offset],
+      `SELECT c.*, e.game_version, e.extracted_at as extraction_date FROM changelog c LEFT JOIN extraction_log e ON c.extraction_id = e.id${w} ORDER BY c.created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
+      p,
     );
     return { data: rows, total };
   }
@@ -299,7 +298,7 @@ export class GameDataService {
 
     const [countRows] = await this.pool.execute<Row[]>(`SELECT COUNT(*) as count FROM shops${w}`, params);
     const total = Number(countRows[0].count);
-    const [rows] = await this.pool.execute<Row[]>(`SELECT * FROM shops${w} ORDER BY name LIMIT ? OFFSET ?`, [...params, limit, offset]);
+    const [rows] = await this.pool.execute<Row[]>(`SELECT * FROM shops${w} ORDER BY name LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params);
 
     return { data: rows, total, page, limit };
   }

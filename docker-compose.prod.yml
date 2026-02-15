@@ -22,6 +22,13 @@ services:
     image: ghcr.io/ampynjord/starvis-ihm:latest
     build: !reset null
     ports: !reset []
+    # Override healthcheck to use 127.0.0.1 (Alpine resolves localhost to IPv6)
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/"]
+      interval: 30s
+      timeout: 3s
+      start_period: 5s
+      retries: 3
     networks:
       - default
       - traefik-network
