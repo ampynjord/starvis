@@ -263,19 +263,15 @@ export function createRoutes(deps: RouteDependencies): Router {
   }));
 
   router.get("/api/v1/components/:uuid", requireGameData, asyncHandler(async (req, res) => {
-    const comp = await gameDataService!.getComponentByUuid(req.params.uuid);
+    const comp = await gameDataService!.resolveComponent(req.params.uuid);
     if (!comp) return void res.status(404).json({ success: false, error: "Component not found" });
     sendWithETag(req, res, { success: true, data: comp });
   }));
 
   router.get("/api/v1/components/:uuid/buy-locations", requireGameData, asyncHandler(async (req, res) => {
-    let uuid = req.params.uuid;
-    if (uuid.length !== 36) {
-      const comp = await gameDataService!.getComponentByUuid(uuid);
-      if (!comp) return void res.status(404).json({ success: false, error: "Component not found" });
-      uuid = comp.uuid;
-    }
-    const data = await gameDataService!.getComponentBuyLocations(uuid);
+    const comp = await gameDataService!.resolveComponent(req.params.uuid);
+    if (!comp) return void res.status(404).json({ success: false, error: "Component not found" });
+    const data = await gameDataService!.getComponentBuyLocations(comp.uuid);
     if (req.query.format === "csv") return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
     sendWithETag(req, res, { success: true, count: data.length, data });
   }));

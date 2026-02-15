@@ -619,16 +619,34 @@ export class ExtractionService {
   private async detectAndSaveModules(conn: PoolConnection, fullData: any, shipClassName: string): Promise<void> {
     if (!fullData?.ref) return;
 
-    const MODULE_PATTERNS = [/module/i, /compartment/i, /bay_section/i];
+    const MODULE_PATTERNS = [/module/i, /modular/i, /compartment/i, /bay_section/i];
     const loadout = this.dfService.extractVehicleLoadout(shipClassName);
     if (!loadout) return;
+
+    // Extract ship short name to clean module names (e.g., "Retaliator" from "AEGS_Retaliator")
+    const shipShort = shipClassName.replace(/^[A-Z]{2,5}_/, '').replace(/_/g, ' ');
 
     for (const port of loadout) {
       const isModulePort = MODULE_PATTERNS.some(rx => rx.test(port.portName));
       if (!isModulePort || !port.componentClassName) continue;
 
-      const slotDisplay = port.portName.replace(/hardpoint_/i, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-      const moduleName = port.componentClassName.replace(/^[A-Z]{2,5}_/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      const slotDisplay = port.portName
+        .replace(/hardpoint_/i, '')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase())
+        .trim();
+
+      let moduleName = port.componentClassName
+        .replace(/^[A-Z]{2,5}_/, '')
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, c => c.toUpperCase())
+        .trim();
+      // Remove ship name prefix from module name for cleaner display
+      const shipShortTitle = shipShort.replace(/\b\w/g, c => c.toUpperCase());
+      if (moduleName.startsWith(shipShortTitle)) {
+        moduleName = moduleName.slice(shipShortTitle.length).trim();
+      }
+      moduleName = moduleName || port.componentClassName;
 
       try {
         await conn.execute(
