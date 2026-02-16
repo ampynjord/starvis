@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { LoadoutPort } from '@/services/api'
+import type { LoadoutPort } from '@/services/api';
 
 defineProps<{
   node: LoadoutPort
