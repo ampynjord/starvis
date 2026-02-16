@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
-import { calculateLoadout, getComponents, getShips, type Component, type LoadoutItem, type LoadoutStats, type Ship } from '@/services/api'
-import { LOADOUT_CATEGORY_ORDER, getCategoryInfo } from '@/utils/constants'
+import { calculateLoadout, getComponents, getShips, type Component, type Hardpoint, type HardpointComponent, type LoadoutStats, type Ship } from '@/services/api'
+import { HARDPOINT_CATEGORIES, MOUNT_TYPE_LABELS } from '@/utils/constants'
 import { debounce, fmt, pct, portLabel, useClickOutside } from '@/utils/formatters'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -16,17 +16,13 @@ const selectedShip = ref<Ship | null>(null)
 const loadout = ref<LoadoutStats | null>(null)
 const loading = ref(false)
 const error = ref('')
-const swaps = ref<{ portName: string; componentUuid: string }[]>([])
+const swaps = ref<{ portId: number; componentUuid: string }[]>([])
 
 // Component swap search
-const swapTarget = ref<string | null>(null) // port_name being swapped
+const swapTarget = ref<{ portId: number; portName: string; type: string; maxSize: number; current: Record<string, unknown> | null } | null>(null)
 const swapQuery = ref('')
 const swapResults = ref<Component[]>([])
 const swapLoading = ref(false)
-const swapTargetType = ref<string>('') // component type filter
-const swapTargetMinSize = ref<number>(0) // port min size
-const swapTargetMaxSize = ref<number>(0) // port max size
-const swapCurrentComponent = ref<Record<string, unknown> | null>(null) // current component for delta preview
 
 // Click-outside for ship search dropdown
 const shipSearchRef = ref<HTMLElement | null>(null)
@@ -39,11 +35,6 @@ function toggleSection(key: string) {
   else collapsedSections.value.add(key)
 }
 function isSectionOpen(key: string) { return !collapsedSections.value.has(key) }
-
-// ── Category mapping (Erkul-style) ─ only real component types from DB ──
-// Now imported from @/utils/constants
-
-// Backend now filters loadout to only relevant types, so minimal client filtering needed
 
 // ── Ship search ──
 async function searchShips(q: string) {
@@ -75,44 +66,32 @@ async function fetchLoadout(uuid: string) {
   }
 }
 
-// ── Grouped loadout items (Erkul-style categories) ──
-const groupedLoadout = computed(() => {
-  if (!loadout.value?.loadout) return []
-  const groups: Record<string, { meta: ReturnType<typeof getCategoryInfo>; items: LoadoutItem[] }> = {}
+// ── Grouped hardpoints by category ──
+const groupedHardpoints = computed(() => {
+  if (!loadout.value?.hardpoints) return []
+  const groups: Record<string, { meta: (typeof HARDPOINT_CATEGORIES)[string]; items: Hardpoint[] }> = {}
 
-  for (const item of loadout.value.loadout) {
-    // Items are already filtered by backend
-    if (!item.component_uuid && !item.component_name) continue
-
-    const type = item.component_type || 'Other'
-    const meta = getCategoryInfo(type)
-    if (meta.order >= 99) continue // Skip unknown types
-    const groupKey = type
-
-    if (!groups[groupKey]) groups[groupKey] = { meta, items: [] }
-    groups[groupKey].items.push(item)
+  for (const hp of loadout.value.hardpoints) {
+    const cat = hp.category
+    const meta = HARDPOINT_CATEGORIES[cat]
+    if (!meta) continue
+    if (!groups[cat]) groups[cat] = { meta, items: [] }
+    groups[cat].items.push(hp)
   }
 
-  // Sort by LOADOUT_CATEGORY_ORDER
-  return LOADOUT_CATEGORY_ORDER
-    .filter(key => groups[key])
-    .map(key => ({
-      category: groups[key].meta.label,
-      typeKey: key,
-      icon: groups[key].meta.icon,
-      color: groups[key].meta.color,
-      label: groups[key].meta.label,
-      items: groups[key].items,
+  return Object.entries(groups)
+    .sort(([, a], [, b]) => a.meta.order - b.meta.order)
+    .map(([key, val]) => ({
+      category: key,
+      ...val.meta,
+      items: val.items,
+      totalCount: val.items.reduce((n, hp) => n + Math.max(hp.items.length, hp.component ? 1 : 0), 0),
     }))
 })
 
 // ── Swap component ──
-function startSwap(item: LoadoutItem) {
-  swapTarget.value = item.port_name
-  swapTargetType.value = item.component_type || ''
-  swapTargetMinSize.value = item.port_min_size || item.size || 0
-  swapTargetMaxSize.value = item.port_max_size || item.size || 0
-  swapCurrentComponent.value = item
+function startSwap(portId: number, portName: string, type: string, maxSize: number, current: Record<string, unknown> | null) {
+  swapTarget.value = { portId, portName, type, maxSize, current }
   swapQuery.value = ''
   swapResults.value = []
 }
@@ -121,18 +100,15 @@ function cancelSwap() {
   swapTarget.value = null
   swapQuery.value = ''
   swapResults.value = []
-  swapCurrentComponent.value = null
 }
 
 async function searchSwapComponents(q: string) {
-  if (q.length < 2) { swapResults.value = []; return }
+  if (q.length < 2 || !swapTarget.value) { swapResults.value = []; return }
   swapLoading.value = true
   try {
     const params: Record<string, string> = { search: q, limit: '20' }
-    if (swapTargetType.value) params.type = swapTargetType.value
-    // Filter by port-compatible sizes
-    if (swapTargetMinSize.value > 0) params.min_size = String(swapTargetMinSize.value)
-    if (swapTargetMaxSize.value > 0) params.max_size = String(swapTargetMaxSize.value)
+    if (swapTarget.value.type) params.type = swapTarget.value.type
+    if (swapTarget.value.maxSize > 0) params.max_size = String(swapTarget.value.maxSize)
     const res = await getComponents(params)
     swapResults.value = res.data
   } finally {
@@ -143,9 +119,9 @@ const debouncedSwapSearch = debounce((q: string) => searchSwapComponents(q), 300
 
 async function applySwap(component: Component) {
   if (!swapTarget.value || !selectedShip.value) return
-  const existing = swaps.value.findIndex(s => s.portName === swapTarget.value)
+  const existing = swaps.value.findIndex(s => s.portId === swapTarget.value!.portId)
   if (existing !== -1) swaps.value[existing].componentUuid = component.uuid
-  else swaps.value.push({ portName: swapTarget.value, componentUuid: component.uuid })
+  else swaps.value.push({ portId: swapTarget.value.portId, componentUuid: component.uuid })
   cancelSwap()
   await fetchLoadout(selectedShip.value.uuid)
 }
@@ -156,18 +132,15 @@ async function resetSwaps() {
   await fetchLoadout(selectedShip.value.uuid)
 }
 
-function removeSwap(portName: string) {
-  swaps.value = swaps.value.filter(s => s.portName !== portName)
+function removeSwap(portId: number) {
+  swaps.value = swaps.value.filter(s => s.portId !== portId)
   if (selectedShip.value) fetchLoadout(selectedShip.value.uuid)
 }
 
-// ── Formatting helpers (from shared utils) ──
-// fmt, pct, portLabel imported from @/utils/formatters
-
-/** Compute delta between swap candidate and current component for a given stat */
+// ── Formatting helpers ──
 function delta(candidate: Record<string, unknown>, field: string): string {
-  if (!swapCurrentComponent.value) return ''
-  const oldVal = parseFloat(String(swapCurrentComponent.value[field])) || 0
+  if (!swapTarget.value?.current) return ''
+  const oldVal = parseFloat(String(swapTarget.value.current[field])) || 0
   const newVal = parseFloat(String(candidate[field])) || 0
   const diff = newVal - oldVal
   if (Math.abs(diff) < 0.01) return ''
@@ -176,8 +149,8 @@ function delta(candidate: Record<string, unknown>, field: string): string {
 }
 
 function deltaClass(candidate: Record<string, unknown>, field: string, higherIsBetter = true): string {
-  if (!swapCurrentComponent.value) return ''
-  const oldVal = parseFloat(String(swapCurrentComponent.value[field])) || 0
+  if (!swapTarget.value?.current) return ''
+  const oldVal = parseFloat(String(swapTarget.value.current[field])) || 0
   const newVal = parseFloat(String(candidate[field])) || 0
   const diff = newVal - oldVal
   if (Math.abs(diff) < 0.01) return 'text-sv-muted'
@@ -185,18 +158,42 @@ function deltaClass(candidate: Record<string, unknown>, field: string, higherIsB
   return diff < 0 ? 'text-green-400' : 'text-red-400'
 }
 
-// ── URL swap persistence ──
-function encodeSwapsToQuery(): string {
-  if (swaps.value.length === 0) return ''
-  return swaps.value.map(s => `${s.portName}:${s.componentUuid}`).join(',')
+function mountLabel(type: string | null): string {
+  if (!type) return ''
+  return MOUNT_TYPE_LABELS[type]?.short || type
 }
 
-function decodeSwapsFromQuery(encoded: string): { portName: string; componentUuid: string }[] {
+function swapTypeForHp(hp: Hardpoint, comp: HardpointComponent | null): string {
+  if (comp?.type) return comp.type
+  const map: Record<string, string> = {
+    'Weapons': 'WeaponGun', 'Missiles': 'Missile', 'Shields': 'Shield',
+    'Power Plants': 'PowerPlant', 'Coolers': 'Cooler', 'Quantum Drive': 'QuantumDrive',
+    'Radar': 'Radar', 'Countermeasures': 'Countermeasure', 'EMP': 'EMP',
+    'QED': 'QuantumInterdictionGenerator',
+  }
+  return map[hp.category] || ''
+}
+
+function swapMaxSize(hp: Hardpoint, comp: HardpointComponent | null): number {
+  if (hp.port_max_size && hp.port_max_size > 0) return hp.port_max_size
+  if (hp.mount_size && hp.mount_size > 0) return hp.mount_size
+  if (comp?.size && comp.size > 0) return comp.size
+  return 0
+}
+
+// ── URL swap persistence (portId-based) ──
+function encodeSwapsToQuery(): string {
+  if (swaps.value.length === 0) return ''
+  return swaps.value.map(s => `${s.portId}:${s.componentUuid}`).join(',')
+}
+
+function decodeSwapsFromQuery(encoded: string): { portId: number; componentUuid: string }[] {
   if (!encoded) return []
   return encoded.split(',').map(pair => {
-    const [portName, componentUuid] = pair.split(':')
-    return { portName, componentUuid }
-  }).filter(s => s.portName && s.componentUuid)
+    const [id, componentUuid] = pair.split(':')
+    const portId = parseInt(id)
+    return { portId, componentUuid }
+  }).filter(s => !isNaN(s.portId) && s.componentUuid)
 }
 
 // Sync swaps to URL query params
@@ -214,7 +211,6 @@ onMounted(async () => {
   if (uuid) {
     loading.value = true
     try {
-      // Restore swaps from URL query params
       const swapStr = route.query.swaps as string
       if (swapStr) {
         swaps.value = decodeSwapsFromQuery(swapStr)
@@ -314,8 +310,8 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Component categories (Erkul-style) -->
-          <div v-for="group in groupedLoadout" :key="group.category" class="card overflow-hidden">
+          <!-- ══ Hardpoint Groups (Erkul-style categories) ══ -->
+          <div v-for="group in groupedHardpoints" :key="group.category" class="card overflow-hidden">
             <!-- Category header -->
             <button @click="toggleSection(group.category)"
               class="w-full flex items-center justify-between px-4 py-2.5 hover:bg-sv-panel-light/30 transition-colors"
@@ -332,7 +328,6 @@ onMounted(async () => {
                 'bg-lime-500/5': group.color === 'lime',
                 'bg-sky-500/5': group.color === 'sky',
                 'bg-teal-500/5': group.color === 'teal',
-                'bg-gray-500/5': group.color === 'gray',
               }">
               <div class="flex items-center gap-2">
                 <span class="text-sm">{{ group.icon }}</span>
@@ -350,96 +345,177 @@ onMounted(async () => {
                     'text-lime-400': group.color === 'lime',
                     'text-sky-400': group.color === 'sky',
                     'text-teal-400': group.color === 'teal',
-                    'text-gray-400': group.color === 'gray',
                   }">
-                  {{ group.category }}
+                  {{ group.label }}
                 </span>
-                <span class="text-[10px] text-sv-muted bg-sv-darker/50 px-1.5 py-0.5 rounded">{{ group.items.length }}</span>
+                <span class="text-[10px] text-sv-muted bg-sv-darker/50 px-1.5 py-0.5 rounded">{{ group.totalCount }}</span>
               </div>
               <svg class="w-3.5 h-3.5 text-sv-muted transition-transform" :class="{ 'rotate-180': isSectionOpen(group.category) }" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
               </svg>
             </button>
 
-            <!-- Components list -->
+            <!-- Hardpoints list -->
             <div v-if="isSectionOpen(group.category)">
-              <div v-for="item in group.items" :key="item.port_name"
-                class="flex items-center gap-3 px-4 py-2 border-t border-sv-border/20 hover:bg-sv-panel-light/20 transition-colors group/item">
+              <div v-for="hp in group.items" :key="hp.port_id" class="border-t border-sv-border/20">
 
-                <!-- Size badge -->
-                <div class="w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold shrink-0"
-                  :class="item.swapped ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'bg-sv-darker/60 text-sv-muted border border-sv-border/30'">
-                  S{{ item.component_size || '?' }}
-                </div>
-
-                <!-- Component info -->
-                <div class="flex-1 min-w-0">
-                  <div class="flex items-center gap-2">
-                    <span class="text-xs font-medium truncate" :class="item.swapped ? 'text-amber-300' : 'text-sv-text-bright'">
-                      {{ item.display_name || item.component_name || 'Empty' }}
+                <!-- ── Hierarchical hardpoint (mount → children) ── -->
+                <template v-if="hp.items.length > 0">
+                  <!-- Hardpoint header with mount info -->
+                  <div class="px-4 py-1.5 bg-sv-darker/20 flex items-center gap-2 text-[10px]">
+                    <span v-if="hp.port_max_size" class="w-5 h-5 rounded flex items-center justify-center text-[9px] font-bold bg-sv-darker/60 text-sv-muted border border-sv-border/30">
+                      S{{ hp.port_max_size }}
                     </span>
-                    <span v-if="item.grade" class="text-[9px] px-1 py-0.5 rounded bg-sv-darker/50 text-sv-muted border border-sv-border/20">
-                      {{ item.grade }}
+                    <span v-if="hp.mount_type" class="text-[8px] px-1.5 py-0.5 rounded font-bold"
+                      :class="MOUNT_TYPE_LABELS[hp.mount_type]?.badge || 'bg-gray-500/20 text-gray-400'">
+                      {{ mountLabel(hp.mount_type) }}
                     </span>
-                    <span v-if="item.swapped" class="text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-400">
-                      SWAP
-                    </span>
+                    <span class="text-sv-muted truncate">{{ hp.display_name }}</span>
+                    <span v-if="hp.swapped" class="text-[8px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-400">SWAP</span>
                   </div>
-                  <div class="text-[10px] text-sv-muted truncate">{{ portLabel(item.port_name) }}</div>
-                </div>
 
-                <!-- Inline stats (type-specific) -->
-                <div class="hidden sm:flex items-center gap-3 text-[10px] text-sv-muted font-mono shrink-0">
-                  <template v-if="item.weapon_dps">
-                    <span class="text-red-400">{{ fmt(item.weapon_dps, 0) }} DPS</span>
-                    <span v-if="item.weapon_range">{{ fmt(item.weapon_range, 0) }}m</span>
-                  </template>
-                  <template v-if="item.shield_hp">
-                    <span class="text-blue-400">{{ fmt(item.shield_hp, 0) }} HP</span>
-                    <span class="text-blue-300">{{ fmt(item.shield_regen, 0) }}/s</span>
-                  </template>
-                  <template v-if="item.power_output">
-                    <span class="text-yellow-400">{{ fmt(item.power_output, 0) }} pwr</span>
-                  </template>
-                  <template v-if="item.cooling_rate">
-                    <span class="text-cyan-400">{{ fmt(item.cooling_rate, 0) }} cool</span>
-                  </template>
-                  <template v-if="item.qd_speed">
-                    <span class="text-purple-400">{{ fmt(item.qd_speed) }} m/s</span>
-                  </template>
-                  <template v-if="item.cm_ammo">
-                    <span class="text-emerald-400">{{ item.cm_ammo }} rounds</span>
-                  </template>
-                  <template v-if="item.radar_range">
-                    <span class="text-green-400">{{ fmt(item.radar_range, 0) }}m</span>
-                  </template>
-                  <template v-if="item.emp_damage">
-                    <span class="text-purple-400">{{ fmt(item.emp_damage, 0) }} dmg</span>
-                    <span v-if="item.emp_radius" class="text-purple-300">{{ fmt(item.emp_radius, 0) }}m</span>
-                  </template>
-                  <template v-if="item.qig_jammer_range">
-                    <span class="text-purple-400">{{ fmt(item.qig_jammer_range, 0) }}m</span>
-                    <span v-if="item.qig_snare_radius" class="text-purple-300">⌀{{ fmt(item.qig_snare_radius, 0) }}m</span>
-                  </template>
-                </div>
+                  <!-- Child items -->
+                  <div v-for="item in hp.items" :key="item.port_id"
+                    class="flex items-center gap-3 px-4 py-2 pl-8 hover:bg-sv-panel-light/20 transition-colors group/item">
+                    <div class="w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold shrink-0"
+                      :class="item.swapped ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'bg-sv-darker/60 text-sv-muted border border-sv-border/30'">
+                      S{{ item.size || '?' }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-medium truncate" :class="item.swapped ? 'text-amber-300' : 'text-sv-text-bright'">
+                          {{ item.display_name || item.name || 'Empty' }}
+                        </span>
+                        <span v-if="item.grade" class="text-[9px] px-1 py-0.5 rounded bg-sv-darker/50 text-sv-muted border border-sv-border/20">
+                          {{ item.grade }}
+                        </span>
+                        <span v-if="item.swapped" class="text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-400">SWAP</span>
+                      </div>
+                      <!-- Sub-items (e.g., weapons on turret gimbals) -->
+                      <div v-if="item.sub_items?.length" class="mt-0.5">
+                        <div v-for="sub in item.sub_items" :key="sub.port_id" class="text-[10px] text-sv-muted flex items-center gap-1 ml-2">
+                          <span class="text-sv-border">└</span>
+                          <span v-if="sub.size" class="font-mono text-[9px]">S{{ sub.size }}</span>
+                          <span :class="sub.swapped ? 'text-amber-300' : 'text-sv-text'">{{ sub.display_name || sub.name || 'Empty' }}</span>
+                          <span v-if="sub.weapon_dps" class="text-red-400 font-mono">{{ fmt(sub.weapon_dps, 0) }} DPS</span>
+                          <span v-if="sub.missile_damage" class="text-orange-400 font-mono">{{ fmt(sub.missile_damage, 0) }} dmg</span>
+                        </div>
+                      </div>
+                      <div v-if="!item.sub_items?.length" class="text-[10px] text-sv-muted truncate">{{ portLabel(item.port_name) }}</div>
+                    </div>
+                    <!-- Inline stats -->
+                    <div class="hidden sm:flex items-center gap-3 text-[10px] text-sv-muted font-mono shrink-0">
+                      <template v-if="item.weapon_dps">
+                        <span class="text-red-400">{{ fmt(item.weapon_dps, 0) }} DPS</span>
+                        <span v-if="item.weapon_range">{{ fmt(item.weapon_range, 0) }}m</span>
+                      </template>
+                      <template v-if="item.missile_damage">
+                        <span class="text-orange-400">{{ fmt(item.missile_damage, 0) }} dmg</span>
+                        <span v-if="item.missile_speed">{{ fmt(item.missile_speed, 0) }} m/s</span>
+                      </template>
+                      <template v-if="item.shield_hp">
+                        <span class="text-blue-400">{{ fmt(item.shield_hp, 0) }} HP</span>
+                      </template>
+                    </div>
+                    <!-- Swap/Reset buttons -->
+                    <div class="flex items-center gap-1 shrink-0">
+                      <button v-if="item.uuid" @click="startSwap(item.port_id, item.port_name, swapTypeForHp(hp, item), swapMaxSize(hp, item), item as Record<string, unknown>)"
+                        class="opacity-0 group-hover/item:opacity-100 transition-opacity p-1 rounded hover:bg-sv-accent/10 text-sv-muted hover:text-sv-accent"
+                        title="Swap component">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                        </svg>
+                      </button>
+                      <button v-if="item.swapped" @click="removeSwap(item.port_id)"
+                        class="p-1 rounded hover:bg-red-500/10 text-sv-muted hover:text-red-400 transition"
+                        title="Restore original">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </template>
 
-                <!-- Swap / Reset buttons -->
-                <div class="flex items-center gap-1 shrink-0">
-                  <button @click="startSwap(item)"
-                    class="opacity-0 group-hover/item:opacity-100 transition-opacity p-1 rounded hover:bg-sv-accent/10 text-sv-muted hover:text-sv-accent"
-                    title="Swap component">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                    </svg>
-                  </button>
-                  <button v-if="item.swapped" @click="removeSwap(item.port_name)"
-                    class="p-1 rounded hover:bg-red-500/10 text-sv-muted hover:text-red-400 transition"
-                    title="Restore original">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
+                <!-- ── Direct component (no mount hierarchy) ── -->
+                <template v-else-if="hp.component">
+                  <div class="flex items-center gap-3 px-4 py-2 hover:bg-sv-panel-light/20 transition-colors group/item">
+                    <div class="w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold shrink-0"
+                      :class="hp.component.swapped ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'bg-sv-darker/60 text-sv-muted border border-sv-border/30'">
+                      S{{ hp.component.size || '?' }}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2">
+                        <span class="text-xs font-medium truncate" :class="hp.component.swapped ? 'text-amber-300' : 'text-sv-text-bright'">
+                          {{ hp.component.display_name || hp.component.name || 'Empty' }}
+                        </span>
+                        <span v-if="hp.component.grade" class="text-[9px] px-1 py-0.5 rounded bg-sv-darker/50 text-sv-muted border border-sv-border/20">
+                          {{ hp.component.grade }}
+                        </span>
+                        <span v-if="hp.component.swapped" class="text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-400">SWAP</span>
+                      </div>
+                      <div class="text-[10px] text-sv-muted truncate">{{ hp.display_name }}</div>
+                      <!-- Sub-items for QD → jump drive -->
+                      <div v-if="hp.component.sub_items?.length" class="mt-0.5">
+                        <div v-for="sub in hp.component.sub_items" :key="sub.port_id" class="text-[10px] text-sv-muted flex items-center gap-1 ml-2">
+                          <span class="text-sv-border">└</span>
+                          <span class="text-sv-text">{{ sub.display_name || sub.name || 'Empty slot' }}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- Inline stats -->
+                    <div class="hidden sm:flex items-center gap-3 text-[10px] text-sv-muted font-mono shrink-0">
+                      <template v-if="hp.component.weapon_dps">
+                        <span class="text-red-400">{{ fmt(hp.component.weapon_dps, 0) }} DPS</span>
+                        <span v-if="hp.component.weapon_range">{{ fmt(hp.component.weapon_range, 0) }}m</span>
+                      </template>
+                      <template v-if="hp.component.shield_hp">
+                        <span class="text-blue-400">{{ fmt(hp.component.shield_hp, 0) }} HP</span>
+                        <span class="text-blue-300">{{ fmt(hp.component.shield_regen, 0) }}/s</span>
+                      </template>
+                      <template v-if="hp.component.power_output">
+                        <span class="text-yellow-400">{{ fmt(hp.component.power_output, 0) }} pwr</span>
+                      </template>
+                      <template v-if="hp.component.cooling_rate">
+                        <span class="text-cyan-400">{{ fmt(hp.component.cooling_rate, 0) }} cool</span>
+                      </template>
+                      <template v-if="hp.component.qd_speed">
+                        <span class="text-purple-400">{{ fmt(hp.component.qd_speed) }} m/s</span>
+                      </template>
+                      <template v-if="hp.component.cm_ammo">
+                        <span class="text-emerald-400">{{ hp.component.cm_ammo }} rounds</span>
+                      </template>
+                      <template v-if="hp.component.radar_range">
+                        <span class="text-green-400">{{ fmt(hp.component.radar_range, 0) }}m</span>
+                      </template>
+                      <template v-if="hp.component.emp_damage">
+                        <span class="text-purple-400">{{ fmt(hp.component.emp_damage, 0) }} dmg</span>
+                        <span v-if="hp.component.emp_radius" class="text-purple-300">{{ fmt(hp.component.emp_radius, 0) }}m</span>
+                      </template>
+                      <template v-if="hp.component.qig_jammer_range">
+                        <span class="text-purple-400">{{ fmt(hp.component.qig_jammer_range, 0) }}m</span>
+                      </template>
+                    </div>
+                    <!-- Swap/Reset buttons -->
+                    <div class="flex items-center gap-1 shrink-0">
+                      <button @click="startSwap(hp.component.port_id, hp.component.port_name, swapTypeForHp(hp, hp.component), swapMaxSize(hp, hp.component), hp.component as Record<string, unknown>)"
+                        class="opacity-0 group-hover/item:opacity-100 transition-opacity p-1 rounded hover:bg-sv-accent/10 text-sv-muted hover:text-sv-accent"
+                        title="Swap component">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                        </svg>
+                      </button>
+                      <button v-if="hp.component.swapped" @click="removeSwap(hp.component.port_id)"
+                        class="p-1 rounded hover:bg-red-500/10 text-sv-muted hover:text-red-400 transition"
+                        title="Restore original">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                </template>
+
               </div>
             </div>
           </div>
@@ -1055,14 +1131,12 @@ onMounted(async () => {
             <div>
               <h3 class="text-sm font-bold text-sv-text-bright">Swap Component</h3>
               <div class="text-[10px] text-sv-muted mt-0.5">
-                Port: {{ portLabel(swapTarget) }}
-                <span v-if="swapTargetType" class="ml-1 text-sv-accent">({{ swapTargetType }})</span>
-                <span v-if="swapTargetMinSize || swapTargetMaxSize" class="ml-1 text-sv-accent">
-                  S{{ swapTargetMinSize }}<template v-if="swapTargetMinSize !== swapTargetMaxSize">–S{{ swapTargetMaxSize }}</template>
-                </span>
+                Port: {{ portLabel(swapTarget.portName) }}
+                <span v-if="swapTarget.type" class="ml-1 text-sv-accent">({{ swapTarget.type }})</span>
+                <span v-if="swapTarget.maxSize > 0" class="ml-1 text-sv-accent">max S{{ swapTarget.maxSize }}</span>
               </div>
-              <div v-if="swapCurrentComponent" class="text-[10px] text-sv-muted mt-0.5">
-                Current: <span class="text-sv-text">{{ swapCurrentComponent.name || swapCurrentComponent.component_name || '—' }}</span>
+              <div v-if="swapTarget.current" class="text-[10px] text-sv-muted mt-0.5">
+                Current: <span class="text-sv-text">{{ swapTarget.current.name || swapTarget.current.display_name || '—' }}</span>
               </div>
             </div>
             <button @click="cancelSwap" class="p-1 rounded hover:bg-sv-border/30 text-sv-muted hover:text-sv-text transition">
