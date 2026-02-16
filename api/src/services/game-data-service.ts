@@ -28,7 +28,7 @@ const r4 = (v: number): number => Math.round(v * 10000) / 10000;
 const r6 = (v: number): number => Math.round(v * 1000000) / 1000000;
 const r1 = (v: number): number => Math.round(v * 10) / 10;
 
-const SHIP_SELECT = `s.uuid, s.class_name, s.name, s.manufacturer_code, m.name as manufacturer_name,
+const SHIP_SELECT = `s.uuid, s.class_name, COALESCE(sm.name, s.name) as name, s.manufacturer_code, m.name as manufacturer_name,
   s.career, s.role, s.mass, s.total_hp,
   s.scm_speed, s.max_speed, s.boost_speed_forward, s.boost_speed_backward,
   s.pitch_max, s.yaw_max, s.roll_max,
@@ -90,6 +90,16 @@ const RELEVANT_TYPES = new Set([
   "WeaponGun", "Shield", "PowerPlant", "Cooler", "QuantumDrive",
   "Countermeasure", "Missile", "Radar", "EMP", "QuantumInterdictionGenerator",
 ]);
+
+/** Detect utility weapon sub-type from name/class_name */
+function detectUtilityType(name: string, className: string): string {
+  const s = `${name} ${className}`.toLowerCase();
+  if (/mining|orion_mining/i.test(s)) return "MiningLaser";
+  if (/salvage|reclaim/i.test(s)) return "SalvageHead";
+  if (/tractor|grin_tractor/i.test(s)) return "TractorBeam";
+  if (/repair/i.test(s)) return "RepairBeam";
+  return "UtilityWeapon";
+}
 
 function cleanName(name: string, type: string): string {
   if (!name) return "—";
@@ -159,9 +169,9 @@ export class GameDataService {
     if (wantInGameOnly) { where.push("s.ship_matrix_id IS NULL"); }
 
     if (filters?.search) {
-      where.push("(s.name LIKE ? OR s.class_name LIKE ? OR s.short_name LIKE ?)");
+      where.push("(s.name LIKE ? OR s.class_name LIKE ? OR s.short_name LIKE ? OR sm.name LIKE ?)");
       const t = `%${filters.search}%`;
-      params.push(t, t, t);
+      params.push(t, t, t, t);
     }
 
     const w = where.length ? ` WHERE ${where.join(" AND ")}` : "";
@@ -518,7 +528,10 @@ export class GameDataService {
 
   async calculateLoadout(shipUuid: string, swaps: { portName: string; componentUuid: string }[]): Promise<Record<string, unknown>> {
     // 1. Load ship
-    const [shipRows] = await this.pool.execute<Row[]>("SELECT * FROM ships WHERE uuid = ?", [shipUuid]);
+    const [shipRows] = await this.pool.execute<Row[]>(
+      "SELECT s.*, COALESCE(sm.name, s.name) as display_name FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE s.uuid = ?",
+      [shipUuid],
+    );
     if (!shipRows.length) throw new Error("Ship not found");
     const ship = shipRows[0];
 
@@ -571,28 +584,34 @@ export class GameDataService {
         if (!l.component_uuid || !l.type) return false;
         if (!RELEVANT_TYPES.has(String(l.type))) return false;
         if (String(l.port_name)?.includes("controller") || l.port_name === "Radar" || String(l.port_name)?.endsWith("_helper")) return false;
-        if (l.type === "WeaponGun" && (UTILITY_WEAPON_RX.test(String(l.name || l.class_name || "")) || !(num(l.weapon_dps) > 0))) return false;
+        const isUtility = l.type === "WeaponGun" && UTILITY_WEAPON_RX.test(String(l.name || l.class_name || ""));
+        if (l.type === "WeaponGun" && !isUtility && !(num(l.weapon_dps) > 0)) return false;
         return true;
       })
-      .map((l) => ({
-        port_name: l.port_name, port_type: l.port_type, component_uuid: l.component_uuid,
-        component_name: l.name, display_name: cleanName(l.name, l.type),
-        component_type: l.type, component_size: int(l.size) || null,
-        grade: l.grade || null, manufacturer_code: l.manufacturer_code || null,
-        ...(l.type === "WeaponGun" && { weapon_dps: num(l.weapon_dps) || null, weapon_range: num(l.weapon_range) || null }),
-        ...(l.type === "Shield" && { shield_hp: num(l.shield_hp) || null, shield_regen: num(l.shield_regen) || null }),
-        ...(l.type === "PowerPlant" && { power_output: num(l.power_output) || null }),
-        ...(l.type === "Cooler" && { cooling_rate: num(l.cooling_rate) || null }),
-        ...(l.type === "QuantumDrive" && { qd_speed: num(l.qd_speed) || null }),
-        ...(l.type === "Countermeasure" && { cm_ammo: int(l.cm_ammo_count) || null }),
-        ...(l.type === "Radar" && { radar_range: num(l.radar_range) || null }),
-        ...(l.type === "EMP" && { emp_damage: num(l.emp_damage) || null, emp_radius: num(l.emp_radius) || null }),
-        ...(l.type === "QuantumInterdictionGenerator" && { qig_jammer_range: num(l.qig_jammer_range) || null, qig_snare_radius: num(l.qig_snare_radius) || null }),
-        swapped: !!l._swapped,
-      }));
+      .map((l) => {
+        const isUtility = l.type === "WeaponGun" && UTILITY_WEAPON_RX.test(String(l.name || l.class_name || ""));
+        const effectiveType = isUtility ? detectUtilityType(l.name || "", l.class_name || "") : l.type;
+        return {
+          port_name: l.port_name, port_type: l.port_type, component_uuid: l.component_uuid,
+          component_name: l.name, display_name: cleanName(l.name, l.type),
+          component_type: effectiveType, component_size: int(l.size) || null,
+          grade: l.grade || null, manufacturer_code: l.manufacturer_code || null,
+          ...(l.type === "WeaponGun" && !isUtility && { weapon_dps: num(l.weapon_dps) || null, weapon_range: num(l.weapon_range) || null }),
+          ...(isUtility && { weapon_dps: num(l.weapon_dps) || null, weapon_damage: num(l.weapon_damage) || null, weapon_range: num(l.weapon_range) || null }),
+          ...(l.type === "Shield" && { shield_hp: num(l.shield_hp) || null, shield_regen: num(l.shield_regen) || null }),
+          ...(l.type === "PowerPlant" && { power_output: num(l.power_output) || null }),
+          ...(l.type === "Cooler" && { cooling_rate: num(l.cooling_rate) || null }),
+          ...(l.type === "QuantumDrive" && { qd_speed: num(l.qd_speed) || null }),
+          ...(l.type === "Countermeasure" && { cm_ammo: int(l.cm_ammo_count) || null }),
+          ...(l.type === "Radar" && { radar_range: num(l.radar_range) || null }),
+          ...(l.type === "EMP" && { emp_damage: num(l.emp_damage) || null, emp_radius: num(l.emp_radius) || null }),
+          ...(l.type === "QuantumInterdictionGenerator" && { qig_jammer_range: num(l.qig_jammer_range) || null, qig_snare_radius: num(l.qig_snare_radius) || null }),
+          swapped: !!l._swapped,
+        };
+      });
 
     return {
-      ship: { uuid: ship.uuid, name: ship.name, class_name: ship.class_name },
+      ship: { uuid: ship.uuid, name: ship.display_name || ship.name, class_name: ship.class_name },
       swaps: swaps.length,
       stats,
       loadout: filteredLoadout,
@@ -613,13 +632,23 @@ export class GameDataService {
     const weapons: Record<string, unknown>[] = [], shields: Record<string, unknown>[] = [], missiles: Record<string, unknown>[] = [];
     const powerPlants: Record<string, unknown>[] = [], coolers: Record<string, unknown>[] = [];
     const cms: Record<string, unknown>[] = [], emps: Record<string, unknown>[] = [], qigs: Record<string, unknown>[] = [];
+    const utilityWeapons: Record<string, unknown>[] = [];
     let cmFlare = 0, cmChaff = 0;
 
     for (const l of loadout) {
       if (!l.component_uuid) continue;
 
       if (l.type === "WeaponGun") {
-        if (UTILITY_WEAPON_RX.test(l.name || "") || UTILITY_WEAPON_RX.test(l.class_name || "")) continue;
+        if (UTILITY_WEAPON_RX.test(l.name || "") || UTILITY_WEAPON_RX.test(l.class_name || "")) {
+          // Collect utility weapons (mining, salvage, tractor, repair) separately
+          const uType = detectUtilityType(l.name || "", l.class_name || "");
+          utilityWeapons.push({
+            port_name: l.port_name, name: l.name || "—", size: int(l.size),
+            utility_type: uType, dps: r2(num(l.weapon_dps)), damage: r2(num(l.weapon_damage)),
+            fire_rate: r2(num(l.weapon_fire_rate)), range: Math.round(num(l.weapon_range)),
+          });
+          continue;
+        }
         const dps = num(l.weapon_dps);
         if (dps === 0) continue;
         totalDps += dps; totalBurstDps += num(l.weapon_burst_dps); totalSustainedDps += num(l.weapon_sustained_dps); weaponCount++;
@@ -716,6 +745,7 @@ export class GameDataService {
       countermeasures: { flare_count: cmFlare, chaff_count: cmChaff, details: cms },
       emp: { count: emps.length, details: emps },
       quantum_interdiction: { count: qigs.length, details: qigs },
+      utility: { count: utilityWeapons.length, details: utilityWeapons },
       signatures: { ir: num(ship.armor_signal_ir), em: num(ship.armor_signal_em), cs: num(ship.armor_signal_cs) },
       armor: { physical: num(ship.armor_physical), energy: num(ship.armor_energy), distortion: num(ship.armor_distortion), thermal: num(ship.armor_thermal) },
       mobility: {

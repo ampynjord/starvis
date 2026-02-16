@@ -167,6 +167,7 @@ export interface LoadoutStats {
     countermeasures: { flare_count: number; chaff_count: number; details: { port_name: string; name: string; type: string; ammo_count: number }[] }
     emp: { count: number; details: { port_name: string; name: string; size: number; damage: number; radius: number; charge_time: number; cooldown: number }[] }
     quantum_interdiction: { count: number; details: { port_name: string; name: string; size: number; jammer_range: number; snare_radius: number; charge_time: number; cooldown: number }[] }
+    utility: { count: number; details: { port_name: string; name: string; size: number; utility_type: string; dps: number; damage: number; fire_rate: number; range: number }[] }
     signatures: { ir: number; em: number; cs: number }
     armor: { physical: number; energy: number; distortion: number; thermal: number }
     mobility: { scm_speed: number; max_speed: number; boost_forward: number; boost_backward: number; pitch: number; yaw: number; roll: number; mass: number }
@@ -208,7 +209,7 @@ export interface LoadoutPort {
   grade: string | null
   manufacturer_code: string | null
   parent_id: number | null
-  children?: LoadoutPort[]
+  children?: LoadoutPort[]  // recursive tree structure
 }
 
 export interface ShipModule {

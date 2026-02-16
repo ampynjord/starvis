@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import LoadingState from '@/components/LoadingState.vue'
+import LoadoutTreeNode from '@/components/LoadoutTreeNode.vue'
 import StatBlock from '@/components/StatBlock.vue'
 import { getShip, getShipLoadout, getShipModules, getShipPaints, type LoadoutPort, type Ship, type ShipModule, type ShipPaint } from '@/services/api'
 import { CATEGORY_MAP, HIDDEN_PORT_NAMES, HIDDEN_PORT_TYPES } from '@/utils/constants'
@@ -78,6 +79,11 @@ const armorStats = computed(() => {
     { label: 'Distortion', value: ship.value.armor_distortion },
   ]
 })
+
+/** Recursively count all nodes in a loadout tree */
+function countNodes(nodes: LoadoutPort[]): number {
+  return nodes.reduce((sum, n) => sum + 1 + (n.children ? countNodes(n.children) : 0), 0)
+}
 </script>
 
 <template>
@@ -251,7 +257,7 @@ const armorStats = computed(() => {
       <!-- Loadout -->
       <div class="card p-4">
         <h2 class="text-xs font-semibold text-sv-accent uppercase tracking-wider mb-3">
-          Loadout <span class="text-sv-muted font-normal">({{ loadout.reduce((s: number, n: any) => s + 1 + (n.children?.length || 0), 0) }} components)</span>
+          Loadout <span class="text-sv-muted font-normal">({{ countNodes(loadout) }} components)</span>
         </h2>
         <div v-if="loadout.length === 0" class="text-sv-muted text-center py-4 text-sm">No attached components</div>
         <div v-else class="space-y-4">
@@ -263,48 +269,13 @@ const armorStats = computed(() => {
               <span class="text-sv-muted font-normal">({{ group.nodes.length }})</span>
             </h3>
             <div class="space-y-0.5">
-              <template v-for="item in group.nodes" :key="item.id || item.port_name">
-                <!-- Root node -->
-                <component
-                  :is="item.component_uuid ? 'router-link' : 'div'"
-                  v-bind="item.component_uuid ? { to: `/components/${item.component_uuid}` } : {}"
-                  class="flex items-center gap-2 border border-sv-border/40 rounded px-2.5 py-1.5 transition-colors"
-                  :class="item.component_uuid ? 'hover:border-sv-accent/50 hover:bg-sv-panel-light/30 cursor-pointer' : 'opacity-60'"
-                >
-                  <span class="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sv-darker/50 shrink-0" :class="group.color">
-                    S{{ item.component_size || '?' }}
-                  </span>
-                  <div class="min-w-0 flex-1">
-                    <div class="text-xs font-medium text-sv-text-bright truncate">{{ item.component_name || item.component_class_name || '—' }}</div>
-                    <div class="text-[10px] text-sv-muted truncate">{{ item.port_name }}</div>
-                  </div>
-                  <span v-if="item.children && item.children.length > 0"
-                    class="text-[9px] px-1.5 py-0.5 rounded-full bg-sv-darker text-sv-muted shrink-0">
-                    {{ item.children.length }}×
-                  </span>
-                  <span class="badge-blue text-[10px] ml-1 shrink-0">{{ item.component_type || item.port_type || '?' }}</span>
-                </component>
-                <!-- Children (indented) -->
-                <div v-if="item.children && item.children.length > 0" class="ml-6 space-y-0.5">
-                  <component
-                    v-for="child in item.children"
-                    :key="child.id || child.port_name"
-                    :is="child.component_uuid ? 'router-link' : 'div'"
-                    v-bind="child.component_uuid ? { to: `/components/${child.component_uuid}` } : {}"
-                    class="flex items-center gap-2 border border-sv-border/20 rounded px-2 py-1 text-[11px] relative transition-colors"
-                    :class="child.component_uuid ? 'hover:border-sv-accent/50 hover:bg-sv-panel-light/20 cursor-pointer' : 'opacity-50'"
-                  >
-                    <div class="absolute -left-3 top-1/2 w-3 h-px bg-sv-border/30"></div>
-                    <span class="text-[9px] font-bold px-1 py-0.5 rounded bg-sv-darker/30 shrink-0" :class="group.color">
-                      S{{ child.component_size || '?' }}
-                    </span>
-                    <div class="min-w-0 flex-1">
-                      <span class="text-sv-text truncate">{{ child.component_name || child.component_class_name || '—' }}</span>
-                    </div>
-                    <span class="text-[9px] px-1 py-0.5 rounded bg-sv-darker/20 text-sv-muted/60 shrink-0">{{ child.component_type || child.port_type }}</span>
-                  </component>
-                </div>
-              </template>
+              <LoadoutTreeNode
+                v-for="item in group.nodes"
+                :key="item.id || item.port_name"
+                :node="item"
+                :color="group.color"
+                :depth="0"
+              />
             </div>
           </div>
         </div>
