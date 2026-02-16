@@ -206,22 +206,41 @@ export interface HardpointComponent {
   name: string | null
   display_name: string
   type: string
+  sub_type?: string | null
   size: number | null
   grade: string | null
   manufacturer_code: string | null
+  hp?: number | null
+  power_draw?: number | null
+  heat_generation?: number | null
+  // Weapon stats
   weapon_dps?: number | null
   weapon_burst_dps?: number | null
   weapon_sustained_dps?: number | null
+  weapon_fire_rate?: number | null
   weapon_range?: number | null
+  weapon_damage_physical?: number | null
+  weapon_damage_energy?: number | null
+  weapon_damage_distortion?: number | null
+  // Shield
   shield_hp?: number | null
   shield_regen?: number | null
+  // Power & Cooling
   power_output?: number | null
   cooling_rate?: number | null
+  // Quantum
   qd_speed?: number | null
   qd_spool_time?: number | null
+  qd_cooldown?: number | null
+  qd_fuel_rate?: number | null
+  qd_range?: number | null
+  // Missile
   missile_damage?: number | null
   missile_signal_type?: string | null
   missile_speed?: number | null
+  missile_range?: number | null
+  missile_lock_time?: number | null
+  // Other
   cm_ammo?: number | null
   radar_range?: number | null
   emp_damage?: number | null
@@ -242,12 +261,25 @@ export interface HardpointSubItem {
   name: string | null
   display_name: string
   type: string
+  sub_type?: string | null
   size: number | null
   grade: string | null
+  manufacturer_code?: string | null
+  hp?: number | null
+  power_draw?: number | null
+  // Weapon
   weapon_dps?: number | null
+  weapon_burst_dps?: number | null
+  weapon_sustained_dps?: number | null
+  weapon_fire_rate?: number | null
   weapon_range?: number | null
+  // Missile
   missile_damage?: number | null
+  missile_signal_type?: string | null
+  missile_speed?: number | null
+  missile_range?: number | null
   swapped: boolean
+  [key: string]: unknown
 }
 
 export interface Hardpoint {

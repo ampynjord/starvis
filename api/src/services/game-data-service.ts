@@ -889,6 +889,7 @@ export class GameDataService {
       const cIsMountItem = !c.component_uuid && c.component_class_name;
       const cMountName = cIsMountItem ? this.cleanMountName(String(c.component_class_name)) : "";
       const cMountSize = cIsMountItem ? (String(c.component_class_name).match(/[Ss](\d+)/) || [])[1] : null;
+      const cType = String(c.type || c.port_type || "");
       return {
         port_id: c.id,
         port_name: c.port_name,
@@ -896,13 +897,35 @@ export class GameDataService {
         port_min_size: int(c.port_min_size) || null,
         uuid: c.component_uuid || null,
         name: c.name || (cIsMountItem ? c.component_class_name : null),
-        display_name: c.name ? cleanName(c.name || "", String(c.type || "")) : cMountName,
-        type: String(c.type || c.port_type || ""),
+        display_name: c.name ? cleanName(c.name || "", cType) : cMountName,
+        type: cType,
+        sub_type: c.sub_type || null,
         size: int(c.size) || (cMountSize ? parseInt(cMountSize) : null),
         grade: c.grade || null,
-        weapon_dps: num(c.weapon_dps) || null,
-        weapon_range: num(c.weapon_range) || null,
-        missile_damage: num(c.missile_damage) || null,
+        manufacturer_code: c.manufacturer_code || null,
+        hp: r2(num(c.hp)) || null,
+        // Weapon stats
+        ...(cType === "WeaponGun" && {
+          weapon_dps: r2(num(c.weapon_dps)) || null,
+          weapon_burst_dps: r2(num(c.weapon_burst_dps)) || null,
+          weapon_sustained_dps: r2(num(c.weapon_sustained_dps)) || null,
+          weapon_fire_rate: r2(num(c.weapon_fire_rate)) || null,
+          weapon_range: Math.round(num(c.weapon_range)) || null,
+          power_draw: r2(num(c.power_draw)) || null,
+        }),
+        // Missile stats
+        ...(cType === "Missile" && {
+          missile_damage: r2(num(c.missile_damage)) || null,
+          missile_signal_type: c.missile_signal_type || null,
+          missile_speed: r2(num(c.missile_speed)) || null,
+          missile_range: Math.round(num(c.missile_range)) || null,
+        }),
+        // Fallback for non-typed (keep compat)
+        ...(cType !== "WeaponGun" && cType !== "Missile" && {
+          weapon_dps: num(c.weapon_dps) || null,
+          weapon_range: num(c.weapon_range) || null,
+          missile_damage: num(c.missile_damage) || null,
+        }),
         swapped: !!c._swapped,
       };
     });
@@ -920,11 +943,18 @@ export class GameDataService {
       grade: row.grade || null,
       manufacturer_code: row.manufacturer_code || null,
       // Stats
+      hp: r2(num(row.hp)) || null,
+      power_draw: r2(num(row.power_draw)) || null,
+      heat_generation: r2(num(row.heat_generation)) || null,
       ...(type === "WeaponGun" && !isUtility && {
         weapon_dps: r2(num(row.weapon_dps)) || null,
         weapon_burst_dps: r2(num(row.weapon_burst_dps)) || null,
         weapon_sustained_dps: r2(num(row.weapon_sustained_dps)) || null,
+        weapon_fire_rate: r2(num(row.weapon_fire_rate)) || null,
         weapon_range: Math.round(num(row.weapon_range)) || null,
+        weapon_damage_physical: r2(num(row.weapon_damage_physical)) || null,
+        weapon_damage_energy: r2(num(row.weapon_damage_energy)) || null,
+        weapon_damage_distortion: r2(num(row.weapon_damage_distortion)) || null,
       }),
       ...(isUtility && {
         weapon_dps: r2(num(row.weapon_dps)) || null,
@@ -939,11 +969,16 @@ export class GameDataService {
       ...(type === "QuantumDrive" && {
         qd_speed: r2(num(row.qd_speed)) || null,
         qd_spool_time: r2(num(row.qd_spool_time)) || null,
+        qd_cooldown: r2(num(row.qd_cooldown)) || null,
+        qd_fuel_rate: r2(num(row.qd_fuel_rate)) || null,
+        qd_range: r2(num(row.qd_range)) || null,
       }),
       ...(type === "Missile" && {
         missile_damage: r2(num(row.missile_damage)) || null,
         missile_signal_type: row.missile_signal_type || null,
         missile_speed: r2(num(row.missile_speed)) || null,
+        missile_range: Math.round(num(row.missile_range)) || null,
+        missile_lock_time: r2(num(row.missile_lock_time)) || null,
       }),
       ...(type === "Countermeasure" && { cm_ammo: int(row.cm_ammo_count) || null }),
       ...(type === "Radar" && { radar_range: r2(num(row.radar_range)) || null }),
