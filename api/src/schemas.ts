@@ -21,7 +21,7 @@ export const qInt = (def: number, max?: number) =>
 
 export const ShipQuery = z.object({
   manufacturer: qStr, role: qStr, career: qStr, status: qStr,
-  vehicle_category: qStr, search: qStr,
+  vehicle_category: qStr, variant_type: qStr, search: qStr,
   sort: qStr, order: qStr,
   page: qInt(1), limit: qInt(50, 200),
   format: qStr,
