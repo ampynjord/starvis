@@ -698,18 +698,20 @@ export class GameDataService {
     }
 
     const RELEVANT_ROOT = new Set([
-      "Gimbal", "Turret", "MissileRack", "WeaponGun", "Weapon",
+      "Gimbal", "Turret", "TurretBase", "MissileRack", "WeaponGun", "Weapon",
       "Shield", "PowerPlant", "Cooler", "QuantumDrive",
       "Radar", "Countermeasure", "EMP", "QuantumInterdictionGenerator",
       "WeaponRack",
     ]);
+
+    const MOUNT_PORT_TYPES = new Set(["Gimbal", "Turret", "TurretBase", "MissileRack", "WeaponRack"]);
 
     const hardpoints: Record<string, unknown>[] = [];
 
     for (const root of rootPorts) {
       const portType = String(root.port_type || "");
       const portName = String(root.port_name || "");
-      const children = childMap.get(root.id as number) || [];
+      const allChildren = childMap.get(root.id as number) || [];
 
       // Skip controller/noise ports
       if (portName.includes("controller") || portName.endsWith("_helper")) continue;
@@ -717,7 +719,17 @@ export class GameDataService {
       if (portName.includes("paint") || portName.includes("self_destruct")) continue;
       if (portName.includes("landing") || portName.includes("relay")) continue;
 
-      const hasRelevantChildren = children.some(c => c.component_uuid && c.type);
+      // Filter children to only relevant ones (skip screens, displays, MFDs, etc.)
+      const children = allChildren.filter(c => {
+        const cn = String(c.port_name || "");
+        if (cn.startsWith("Screen_") || cn.startsWith("Display_") || cn.startsWith("Annunciator")) return false;
+        if (cn.includes("_MFD") || cn.includes("dashboard") || cn.includes("HUD")) return false;
+        const cpt = String(c.port_type || "");
+        // Include if has component data, or is a mount/weapon port type, or has a component_class_name
+        return (c.component_uuid && c.type) || RELEVANT_ROOT.has(cpt) || c.component_class_name;
+      });
+
+      const hasRelevantChildren = children.length > 0;
 
       // Skip ports that aren't relevant and have no children
       if (!RELEVANT_ROOT.has(portType) && !hasRelevantChildren) continue;
@@ -727,27 +739,51 @@ export class GameDataService {
       let mountSize: number | null = null;
       const compCls = String(root.component_class_name || "");
 
-      if (portType === "Gimbal" || portType === "Turret" || portType === "MissileRack") {
-        if (/gimbal/i.test(compCls)) mountType = "Gimbal";
+      if (MOUNT_PORT_TYPES.has(portType)) {
+        if (/turret/i.test(compCls) || portType === "Turret" || portType === "TurretBase") mountType = "Turret";
+        else if (/gimbal/i.test(compCls)) mountType = "Gimbal";
         else if (/fixed/i.test(compCls)) mountType = "Fixed";
-        else if (/turret/i.test(compCls)) mountType = "Turret";
-        else if (/mrck|missilerack/i.test(compCls)) mountType = "Rack";
-        else mountType = portType === "Turret" ? "Turret" : portType === "MissileRack" ? "Rack" : "Gimbal";
+        else if (/mrck|missilerack/i.test(compCls) || portType === "MissileRack") mountType = "Rack";
+        else mountType = portType === "Turret" || portType === "TurretBase" ? "Turret" : portType === "MissileRack" ? "Rack" : "Gimbal";
 
         const sizeMatch = compCls.match(/[Ss](\d+)/);
         if (sizeMatch) mountSize = parseInt(sizeMatch[1]);
       }
 
-      // Determine category
-      let category = this.portCategory(portType);
+      // Determine category — use actual component type when available (more accurate than port_type)
+      const componentType = String(root.type || ""); // from JOIN with components table
+      let category: string;
+
+      if (componentType && this.portCategory(componentType) !== "Other") {
+        // Component type is more accurate (e.g., EMP on MissileRack port)
+        category = this.portCategory(componentType);
+      } else {
+        category = this.portCategory(portType);
+      }
+
+      // For mount ports with children, check if children override the category
+      if (hasRelevantChildren && MOUNT_PORT_TYPES.has(portType)) {
+        const childCompTypes = children.map(c => String(c.type || "")).filter(Boolean);
+        if (childCompTypes.length > 0) {
+          const childCat = this.portCategory(childCompTypes[0]);
+          if (childCat !== "Other") {
+            // If all children are EMP, override to EMP (not Missiles)
+            if (childCompTypes.every(t => t === "EMP")) category = "EMP";
+            // If children are WeaponGun and port is Turret → keep Turrets
+            // If children are Gimbal (mount) → keep current category based on port_type
+          }
+        }
+      }
+
       if (category === "Other" && hasRelevantChildren) {
-        const firstChildType = String(children.find(c => c.type)?.type || "");
+        const firstChildType = String(children.find(c => c.type)?.type || children.find(c => c.port_type)?.port_type || "");
         category = this.portCategory(firstChildType);
       }
       if (category === "Other") continue;
 
       // Detect utility weapon at root
-      const isRootUtility = root.type === "WeaponGun" && UTILITY_WEAPON_RX.test(String(root.name || root.class_name || ""));
+      const componentTypeStr = componentType || String(root.type || "");
+      const isRootUtility = (componentTypeStr === "WeaponGun" || root.type === "WeaponGun") && UTILITY_WEAPON_RX.test(String(root.name || root.class_name || ""));
       if (isRootUtility) {
         category = this.portCategory(detectUtilityType(root.name || "", root.class_name || ""));
       }
@@ -755,9 +791,8 @@ export class GameDataService {
       // Determine the effective port max size
       const effectiveMaxSize = int(root.port_max_size) || mountSize || int(root.size) || null;
 
-      // Build component info for children
+      // Build component info for relevant children (includes mounts without component_uuid)
       const items = children
-        .filter(c => c.component_uuid || c.type)
         .map(c => this.buildComponentInfo(c, childMap));
 
       // For ports with children (gimbals→weapons, racks→missiles, turrets→gimbals)
@@ -776,8 +811,8 @@ export class GameDataService {
           items,
           swapped: !!root._swapped,
         });
-      } else if (root.component_uuid && root.type) {
-        // Direct component (shield, power plant, cooler, QD, CM, radar, etc.)
+      } else if (root.component_uuid && (root.type || componentType)) {
+        // Direct component (shield, power plant, cooler, QD, CM, radar, EMP, etc.)
         hardpoints.push({
           port_id: root.id,
           port_name: portName,
@@ -806,37 +841,78 @@ export class GameDataService {
     return hardpoints;
   }
 
+  /** Parse mount display name from component_class_name (e.g., "Mount_Gimbal_S3" → "Gimbal S3") */
+  private cleanMountName(className: string): string {
+    if (!className) return "";
+    // Remove common prefixes: Mount_, MRCK_, SCItem_, ANVL_, RSI_, etc.
+    let name = className
+      .replace(/^(Mount_|MRCK_|SCItem_|Vehicle_)/i, "")
+      .replace(/_SCItem_.*/i, "")
+      .replace(/^[A-Z]{3,4}_\w+_/, ""); // Remove manufacturer prefix like RSI_Constellation_
+    // Parse size
+    const sizeMatch = name.match(/[Ss](\d+)/);
+    const size = sizeMatch ? ` S${sizeMatch[1]}` : "";
+    // Clean the base name
+    name = name
+      .replace(/[Ss]\d+/g, "")
+      .replace(/_+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!name) {
+      // Fallback: use the whole className
+      const parts = className.split("_");
+      name = parts.length > 1 ? parts[1] : parts[0];
+    }
+    return `${name}${size}`.trim();
+  }
+
   /** Build component info for a single loadout row */
   private buildComponentInfo(row: Row, childMap: Map<number, Row[]>): Record<string, unknown> {
     const type = String(row.type || row.port_type || "");
     const isUtility = type === "WeaponGun" && UTILITY_WEAPON_RX.test(String(row.name || row.class_name || ""));
     const effectiveType = isUtility ? detectUtilityType(row.name || "", row.class_name || "") : type;
 
+    // For mount items (gimbals, racks, turrets) without component data, derive info from class name
+    const isMountItem = !row.component_uuid && row.component_class_name;
+    const mountDisplayName = isMountItem ? this.cleanMountName(String(row.component_class_name)) : "";
+    const mountSize = isMountItem ? (String(row.component_class_name).match(/[Ss](\d+)/) || [])[1] : null;
+
     // Check for sub-children (e.g., turret → gimbal → weapons)
     const subChildren = childMap.get(row.id as number) || [];
-    const subItems = subChildren.filter(c => c.component_uuid || c.type).map(c => ({
-      port_id: c.id,
-      port_name: c.port_name,
-      uuid: c.component_uuid || null,
-      name: c.name || null,
-      display_name: cleanName(c.name || "", String(c.type || "")),
-      type: String(c.type || ""),
-      size: int(c.size) || null,
-      grade: c.grade || null,
-      weapon_dps: num(c.weapon_dps) || null,
-      weapon_range: num(c.weapon_range) || null,
-      missile_damage: num(c.missile_damage) || null,
-      swapped: !!c._swapped,
-    }));
+    const relevantSubChildren = subChildren.filter(c => {
+      const cn = String(c.port_name || "");
+      if (cn.startsWith("Screen_") || cn.startsWith("Display_") || cn.startsWith("Annunciator")) return false;
+      if (cn.includes("_MFD") || cn.includes("dashboard") || cn.includes("HUD")) return false;
+      return c.component_uuid || c.type || c.component_class_name;
+    });
+    const subItems = relevantSubChildren.map(c => {
+      const cIsMountItem = !c.component_uuid && c.component_class_name;
+      const cMountName = cIsMountItem ? this.cleanMountName(String(c.component_class_name)) : "";
+      const cMountSize = cIsMountItem ? (String(c.component_class_name).match(/[Ss](\d+)/) || [])[1] : null;
+      return {
+        port_id: c.id,
+        port_name: c.port_name,
+        uuid: c.component_uuid || null,
+        name: c.name || (cIsMountItem ? c.component_class_name : null),
+        display_name: c.name ? cleanName(c.name || "", String(c.type || "")) : cMountName,
+        type: String(c.type || c.port_type || ""),
+        size: int(c.size) || (cMountSize ? parseInt(cMountSize) : null),
+        grade: c.grade || null,
+        weapon_dps: num(c.weapon_dps) || null,
+        weapon_range: num(c.weapon_range) || null,
+        missile_damage: num(c.missile_damage) || null,
+        swapped: !!c._swapped,
+      };
+    });
 
     return {
       port_id: row.id,
       port_name: row.port_name,
       uuid: row.component_uuid || null,
-      name: row.name || null,
-      display_name: cleanName(row.name || "", type),
+      name: row.name || (isMountItem ? row.component_class_name : null),
+      display_name: row.name ? cleanName(row.name || "", type) : mountDisplayName,
       type: effectiveType,
-      size: int(row.size) || null,
+      size: int(row.size) || (mountSize ? parseInt(mountSize) : null),
       grade: row.grade || null,
       manufacturer_code: row.manufacturer_code || null,
       // Stats
