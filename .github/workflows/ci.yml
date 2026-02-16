@@ -238,14 +238,6 @@ jobs:
             # Verify deployment
             docker exec starvis-api wget -qO- http://localhost:3000/health || echo "⚠️ API health check failed"
 
-            # Import database dump if present (one-shot migration)
-            if [ -f db/starvis-dump.sql.gz ]; then
-              echo "📦 Importing database dump..."
-              source .env
-              gunzip < db/starvis-dump.sql.gz | docker exec -i starvis-mysql mysql -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME"
-              echo "✅ Database import complete"
-            fi
-
             # Cleanup old images
             docker image prune -f
 
