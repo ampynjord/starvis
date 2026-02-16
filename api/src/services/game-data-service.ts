@@ -256,7 +256,18 @@ export class GameDataService {
       return rows[0] || null;
     }
     const [rows] = await this.pool.execute<Row[]>(`SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS} WHERE s.uuid = ?`, [uuid]);
-    return rows[0] || null;
+    if (!rows[0]) return null;
+    const ship = rows[0];
+    // Cross-section fallback from ship_matrix dimensions
+    if (!ship.cross_section_x && !ship.cross_section_y && !ship.cross_section_z && ship.ship_matrix_id) {
+      const [smRows] = await this.pool.execute<Row[]>("SELECT length, beam, height FROM ship_matrix WHERE id = ?", [ship.ship_matrix_id]);
+      if (smRows.length) {
+        ship.cross_section_x = num(smRows[0].length);
+        ship.cross_section_y = num(smRows[0].beam);
+        ship.cross_section_z = num(smRows[0].height);
+      }
+    }
+    return ship;
   }
 
   async getShipByClassName(className: string): Promise<Row | null> {
@@ -268,6 +279,7 @@ export class GameDataService {
 
   async getAllComponents(filters?: {
     type?: string; sub_type?: string; size?: string; grade?: string;
+    min_size?: string; max_size?: string;
     manufacturer?: string; search?: string;
     sort?: string; order?: string; page?: number; limit?: number;
   }): Promise<PaginatedResult> {
@@ -277,6 +289,8 @@ export class GameDataService {
     if (filters?.type) { where.push("c.type = ?"); params.push(filters.type); }
     if (filters?.sub_type) { where.push("c.sub_type = ?"); params.push(filters.sub_type); }
     if (filters?.size) { where.push("c.size = ?"); params.push(parseInt(filters.size)); }
+    if (filters?.min_size) { where.push("c.size >= ?"); params.push(parseInt(filters.min_size)); }
+    if (filters?.max_size) { where.push("c.size <= ?"); params.push(parseInt(filters.max_size)); }
     if (filters?.grade) { where.push("c.grade = ?"); params.push(filters.grade); }
     if (filters?.manufacturer) { where.push("c.manufacturer_code = ?"); params.push(filters.manufacturer.toUpperCase()); }
     if (filters?.search) {
@@ -532,7 +546,7 @@ export class GameDataService {
 
   // ── LOADOUT CALCULATOR ──────────────────────────────────
 
-  async calculateLoadout(shipUuid: string, swaps: { portName: string; componentUuid: string }[]): Promise<Record<string, unknown>> {
+  async calculateLoadout(shipUuid: string, swaps: { portId?: number; portName?: string; componentUuid: string }[]): Promise<Record<string, unknown>> {
     // 1. Load ship
     const [shipRows] = await this.pool.execute<Row[]>(
       "SELECT s.*, COALESCE(sm.name, s.name) as display_name FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE s.uuid = ?",
@@ -548,17 +562,21 @@ export class GameDataService {
       if (smRows.length) { crossX = num(smRows[0].length); crossY = num(smRows[0].beam); crossZ = num(smRows[0].height); }
     }
 
-    // 3. Load loadout with components
+    // 3. Load ALL loadout ports with hierarchy info
     const [loadoutRows] = await this.pool.execute<Row[]>(
-      `SELECT sl.port_name, sl.port_type, sl.port_min_size, sl.port_max_size, sl.component_uuid, c.*
-       FROM ships_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid WHERE sl.ship_uuid = ?`,
+      `SELECT sl.id, sl.port_name, sl.port_type, sl.port_min_size, sl.port_max_size,
+              sl.parent_id, sl.component_uuid, sl.component_class_name, sl.port_editable,
+              c.*
+       FROM ships_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
+       WHERE sl.ship_uuid = ?`,
       [shipUuid],
     );
     const loadout: Row[] = loadoutRows.map((row) => ({ ...row }) as Row);
 
-    // 4. Apply swaps — batch load all swapped components (instead of N+1 queries)
+    // 4. Apply swaps — supports both portId and portName
     if (swaps.length) {
-      const swapMap = new Map(swaps.map(s => [s.portName, s.componentUuid]));
+      const swapByIdMap = new Map(swaps.filter(s => s.portId).map(s => [s.portId!, s.componentUuid]));
+      const swapByNameMap = new Map(swaps.filter(s => s.portName && !s.portId).map(s => [s.portName!, s.componentUuid]));
       const swapUuids = [...new Set(swaps.map(s => s.componentUuid))];
       const swapComponents = new Map<string, Row>();
 
@@ -569,7 +587,7 @@ export class GameDataService {
       }
 
       for (const l of loadout) {
-        const newUuid = swapMap.get(l.port_name);
+        const newUuid = swapByIdMap.get(l.id as number) || swapByNameMap.get(l.port_name as string);
         if (!newUuid) continue;
         const comp = swapComponents.get(newUuid);
         if (!comp) continue;
@@ -581,10 +599,13 @@ export class GameDataService {
       }
     }
 
-    // 5. Aggregate stats
+    // 5. Aggregate stats (from flat loadout — unchanged)
     const stats = this.aggregateLoadoutStats(loadout, ship, crossX, crossY, crossZ);
 
-    // 6. Build filtered loadout list
+    // 6. Build hierarchical hardpoints (Erkul-style)
+    const hardpoints = this.buildHardpoints(loadout);
+
+    // 7. Build legacy filtered loadout (backward compat)
     const filteredLoadout = loadout
       .filter((l) => {
         if (!l.component_uuid || !l.type) return false;
@@ -598,10 +619,11 @@ export class GameDataService {
         const isUtility = l.type === "WeaponGun" && UTILITY_WEAPON_RX.test(String(l.name || l.class_name || ""));
         const effectiveType = isUtility ? detectUtilityType(l.name || "", l.class_name || "") : l.type;
         return {
-          port_name: l.port_name, port_type: l.port_type, component_uuid: l.component_uuid,
+          port_id: l.id, port_name: l.port_name, port_type: l.port_type, component_uuid: l.component_uuid,
           component_name: l.name, display_name: cleanName(l.name, l.type),
           component_type: effectiveType, component_size: int(l.size) || null,
           grade: l.grade || null, manufacturer_code: l.manufacturer_code || null,
+          port_min_size: l.port_min_size || null, port_max_size: l.port_max_size || null,
           ...(l.type === "WeaponGun" && !isUtility && { weapon_dps: num(l.weapon_dps) || null, weapon_range: num(l.weapon_range) || null }),
           ...(isUtility && { weapon_dps: num(l.weapon_dps) || null, weapon_damage: num(l.weapon_damage) || null, weapon_range: num(l.weapon_range) || null }),
           ...(l.type === "Shield" && { shield_hp: num(l.shield_hp) || null, shield_regen: num(l.shield_regen) || null }),
@@ -616,12 +638,255 @@ export class GameDataService {
         };
       });
 
+    // 8. Load modules & paints
+    const modules = await this.getShipModules(shipUuid);
+    const paints = await this.getShipPaints(shipUuid);
+
     return {
       ship: { uuid: ship.uuid, name: ship.display_name || ship.name, class_name: ship.class_name },
       swaps: swaps.length,
       stats,
+      hardpoints,
       loadout: filteredLoadout,
+      modules,
+      paints,
     };
+  }
+
+  // ── Hardpoint category mapping ──
+
+  private portCategory(portType: string): string {
+    const map: Record<string, string> = {
+      WeaponGun: "Weapons", Weapon: "Weapons", Gimbal: "Weapons",
+      Turret: "Turrets", TurretBase: "Turrets",
+      MissileRack: "Missiles", Missile: "Missiles", MissileLauncher: "Missiles",
+      Shield: "Shields", ShieldGenerator: "Shields",
+      PowerPlant: "Power Plants",
+      Cooler: "Coolers",
+      QuantumDrive: "Quantum Drive",
+      Radar: "Radar",
+      EMP: "EMP",
+      QuantumInterdictionGenerator: "QED",
+      Countermeasure: "Countermeasures",
+      MiningLaser: "Mining", SalvageHead: "Salvage",
+      TractorBeam: "Tractor", RepairBeam: "Repair",
+    };
+    return map[portType] || "Other";
+  }
+
+  private static readonly CAT_ORDER: Record<string, number> = {
+    Weapons: 1, Turrets: 2, Missiles: 3, Shields: 4,
+    "Power Plants": 5, Coolers: 6, "Quantum Drive": 7,
+    Radar: 8, EMP: 9, QED: 10, Countermeasures: 11,
+    Mining: 12, Salvage: 13, Tractor: 14, Repair: 15,
+  };
+
+  // ── Build Erkul-style hierarchical hardpoints from flat loadout ──
+
+  private buildHardpoints(loadout: Row[]): Record<string, unknown>[] {
+    // 1. Build parent→child map
+    const childMap = new Map<number, Row[]>();
+    const rootPorts: Row[] = [];
+
+    for (const port of loadout) {
+      if (port.parent_id) {
+        if (!childMap.has(port.parent_id as number)) childMap.set(port.parent_id as number, []);
+        childMap.get(port.parent_id as number)!.push(port);
+      } else {
+        rootPorts.push(port);
+      }
+    }
+
+    const RELEVANT_ROOT = new Set([
+      "Gimbal", "Turret", "MissileRack", "WeaponGun", "Weapon",
+      "Shield", "PowerPlant", "Cooler", "QuantumDrive",
+      "Radar", "Countermeasure", "EMP", "QuantumInterdictionGenerator",
+      "WeaponRack",
+    ]);
+
+    const hardpoints: Record<string, unknown>[] = [];
+
+    for (const root of rootPorts) {
+      const portType = String(root.port_type || "");
+      const portName = String(root.port_name || "");
+      const children = childMap.get(root.id as number) || [];
+
+      // Skip controller/noise ports
+      if (portName.includes("controller") || portName.endsWith("_helper")) continue;
+      if (portName.includes("seat") || portName.includes("dashboard")) continue;
+      if (portName.includes("paint") || portName.includes("self_destruct")) continue;
+      if (portName.includes("landing") || portName.includes("relay")) continue;
+
+      const hasRelevantChildren = children.some(c => c.component_uuid && c.type);
+
+      // Skip ports that aren't relevant and have no children
+      if (!RELEVANT_ROOT.has(portType) && !hasRelevantChildren) continue;
+
+      // Detect mount type and size from component class_name
+      let mountType: string | null = null;
+      let mountSize: number | null = null;
+      const compCls = String(root.component_class_name || "");
+
+      if (portType === "Gimbal" || portType === "Turret" || portType === "MissileRack") {
+        if (/gimbal/i.test(compCls)) mountType = "Gimbal";
+        else if (/fixed/i.test(compCls)) mountType = "Fixed";
+        else if (/turret/i.test(compCls)) mountType = "Turret";
+        else if (/mrck|missilerack/i.test(compCls)) mountType = "Rack";
+        else mountType = portType === "Turret" ? "Turret" : portType === "MissileRack" ? "Rack" : "Gimbal";
+
+        const sizeMatch = compCls.match(/[Ss](\d+)/);
+        if (sizeMatch) mountSize = parseInt(sizeMatch[1]);
+      }
+
+      // Determine category
+      let category = this.portCategory(portType);
+      if (category === "Other" && hasRelevantChildren) {
+        const firstChildType = String(children.find(c => c.type)?.type || "");
+        category = this.portCategory(firstChildType);
+      }
+      if (category === "Other") continue;
+
+      // Detect utility weapon at root
+      const isRootUtility = root.type === "WeaponGun" && UTILITY_WEAPON_RX.test(String(root.name || root.class_name || ""));
+      if (isRootUtility) {
+        category = this.portCategory(detectUtilityType(root.name || "", root.class_name || ""));
+      }
+
+      // Determine the effective port max size
+      const effectiveMaxSize = int(root.port_max_size) || mountSize || int(root.size) || null;
+
+      // Build component info for children
+      const items = children
+        .filter(c => c.component_uuid || c.type)
+        .map(c => this.buildComponentInfo(c, childMap));
+
+      // For ports with children (gimbals→weapons, racks→missiles, turrets→gimbals)
+      if (hasRelevantChildren || (mountType && children.length > 0)) {
+        hardpoints.push({
+          port_id: root.id,
+          port_name: portName,
+          display_name: this.cleanPortName(portName),
+          category,
+          port_min_size: int(root.port_min_size) || null,
+          port_max_size: effectiveMaxSize,
+          mount_type: mountType,
+          mount_class_name: compCls || null,
+          mount_size: mountSize,
+          component: null,
+          items,
+          swapped: !!root._swapped,
+        });
+      } else if (root.component_uuid && root.type) {
+        // Direct component (shield, power plant, cooler, QD, CM, radar, etc.)
+        hardpoints.push({
+          port_id: root.id,
+          port_name: portName,
+          display_name: this.cleanPortName(portName),
+          category,
+          port_min_size: int(root.port_min_size) || null,
+          port_max_size: effectiveMaxSize,
+          mount_type: null,
+          mount_class_name: null,
+          mount_size: null,
+          component: this.buildComponentInfo(root, childMap),
+          items: [],
+          swapped: !!root._swapped,
+        });
+      }
+    }
+
+    // Sort by category order, then by port_name within category
+    hardpoints.sort((a, b) => {
+      const orderA = GameDataService.CAT_ORDER[a.category as string] || 99;
+      const orderB = GameDataService.CAT_ORDER[b.category as string] || 99;
+      if (orderA !== orderB) return orderA - orderB;
+      return (a.port_name as string).localeCompare(b.port_name as string);
+    });
+
+    return hardpoints;
+  }
+
+  /** Build component info for a single loadout row */
+  private buildComponentInfo(row: Row, childMap: Map<number, Row[]>): Record<string, unknown> {
+    const type = String(row.type || row.port_type || "");
+    const isUtility = type === "WeaponGun" && UTILITY_WEAPON_RX.test(String(row.name || row.class_name || ""));
+    const effectiveType = isUtility ? detectUtilityType(row.name || "", row.class_name || "") : type;
+
+    // Check for sub-children (e.g., turret → gimbal → weapons)
+    const subChildren = childMap.get(row.id as number) || [];
+    const subItems = subChildren.filter(c => c.component_uuid || c.type).map(c => ({
+      port_id: c.id,
+      port_name: c.port_name,
+      uuid: c.component_uuid || null,
+      name: c.name || null,
+      display_name: cleanName(c.name || "", String(c.type || "")),
+      type: String(c.type || ""),
+      size: int(c.size) || null,
+      grade: c.grade || null,
+      weapon_dps: num(c.weapon_dps) || null,
+      weapon_range: num(c.weapon_range) || null,
+      missile_damage: num(c.missile_damage) || null,
+      swapped: !!c._swapped,
+    }));
+
+    return {
+      port_id: row.id,
+      port_name: row.port_name,
+      uuid: row.component_uuid || null,
+      name: row.name || null,
+      display_name: cleanName(row.name || "", type),
+      type: effectiveType,
+      size: int(row.size) || null,
+      grade: row.grade || null,
+      manufacturer_code: row.manufacturer_code || null,
+      // Stats
+      ...(type === "WeaponGun" && !isUtility && {
+        weapon_dps: r2(num(row.weapon_dps)) || null,
+        weapon_burst_dps: r2(num(row.weapon_burst_dps)) || null,
+        weapon_sustained_dps: r2(num(row.weapon_sustained_dps)) || null,
+        weapon_range: Math.round(num(row.weapon_range)) || null,
+      }),
+      ...(isUtility && {
+        weapon_dps: r2(num(row.weapon_dps)) || null,
+        weapon_range: Math.round(num(row.weapon_range)) || null,
+      }),
+      ...(type === "Shield" && {
+        shield_hp: r2(num(row.shield_hp)) || null,
+        shield_regen: r2(num(row.shield_regen)) || null,
+      }),
+      ...(type === "PowerPlant" && { power_output: r2(num(row.power_output)) || null }),
+      ...(type === "Cooler" && { cooling_rate: r2(num(row.cooling_rate)) || null }),
+      ...(type === "QuantumDrive" && {
+        qd_speed: r2(num(row.qd_speed)) || null,
+        qd_spool_time: r2(num(row.qd_spool_time)) || null,
+      }),
+      ...(type === "Missile" && {
+        missile_damage: r2(num(row.missile_damage)) || null,
+        missile_signal_type: row.missile_signal_type || null,
+        missile_speed: r2(num(row.missile_speed)) || null,
+      }),
+      ...(type === "Countermeasure" && { cm_ammo: int(row.cm_ammo_count) || null }),
+      ...(type === "Radar" && { radar_range: r2(num(row.radar_range)) || null }),
+      ...(type === "EMP" && {
+        emp_damage: r2(num(row.emp_damage)) || null,
+        emp_radius: r2(num(row.emp_radius)) || null,
+      }),
+      ...(type === "QuantumInterdictionGenerator" && {
+        qig_jammer_range: r2(num(row.qig_jammer_range)) || null,
+        qig_snare_radius: r2(num(row.qig_snare_radius)) || null,
+      }),
+      sub_items: subItems.length ? subItems : undefined,
+      swapped: !!row._swapped,
+    };
+  }
+
+  /** Clean port name for display (remove hardpoint_ prefix, underscores → spaces, title case) */
+  private cleanPortName(name: string): string {
+    return name
+      .replace(/^hardpoint_/i, "")
+      .replace(/^Hardpoint_/i, "")
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, c => c.toUpperCase());
   }
 
   /** Aggregate stats from a loadout array — extracted from calculateLoadout */

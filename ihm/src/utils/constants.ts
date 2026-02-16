@@ -121,6 +121,45 @@ export const HIDDEN_PORT_NAMES = new Set([
 ])
 
 /**
+ * Hardpoint category display metadata (Erkul-style grouping).
+ * Maps API category strings → display info.
+ */
+export interface HardpointCategoryInfo {
+  label: string
+  icon: string
+  color: string
+  order: number
+}
+
+export const HARDPOINT_CATEGORIES: Record<string, HardpointCategoryInfo> = {
+  'Weapons':        { label: 'Weapons',         icon: '🎯', color: 'red',     order: 1 },
+  'Turrets':        { label: 'Turrets',         icon: '🔫', color: 'red',     order: 2 },
+  'Missiles':       { label: 'Missiles',        icon: '🚀', color: 'orange',  order: 3 },
+  'Shields':        { label: 'Shields',         icon: '🛡️', color: 'blue',    order: 4 },
+  'Power Plants':   { label: 'Power Plants',    icon: '⚡', color: 'yellow',  order: 5 },
+  'Coolers':        { label: 'Coolers',         icon: '❄️', color: 'cyan',    order: 6 },
+  'Quantum Drive':  { label: 'Quantum Drive',   icon: '💫', color: 'purple',  order: 7 },
+  'Radar':          { label: 'Radar',           icon: '📡', color: 'green',   order: 8 },
+  'EMP':            { label: 'EMP',             icon: '⚡', color: 'purple',  order: 9 },
+  'QED':            { label: 'QED',             icon: '🔒', color: 'purple',  order: 10 },
+  'Countermeasures':{ label: 'Countermeasures', icon: '🎇', color: 'emerald', order: 11 },
+  'Mining':         { label: 'Mining Lasers',   icon: '⛏️', color: 'amber',   order: 12 },
+  'Salvage':        { label: 'Salvage Heads',   icon: '♻️', color: 'lime',    order: 13 },
+  'Tractor':        { label: 'Tractor Beams',   icon: '🧲', color: 'sky',     order: 14 },
+  'Repair':         { label: 'Repair Beams',    icon: '🔧', color: 'teal',    order: 15 },
+}
+
+/**
+ * Mount type labels for display.
+ */
+export const MOUNT_TYPE_LABELS: Record<string, { label: string; short: string; badge: string }> = {
+  'Gimbal': { label: 'Gimbal Mount',     short: 'GBL', badge: 'bg-blue-500/20 text-blue-400' },
+  'Fixed':  { label: 'Fixed Mount',      short: 'FXD', badge: 'bg-gray-500/20 text-gray-400' },
+  'Turret': { label: 'Turret',           short: 'TRT', badge: 'bg-red-500/20 text-red-400' },
+  'Rack':   { label: 'Missile Rack',     short: 'RCK', badge: 'bg-orange-500/20 text-orange-400' },
+}
+
+/**
  * Get category info for a component type, with fallback.
  */
 export function getCategoryInfo(type: string): CategoryInfo {

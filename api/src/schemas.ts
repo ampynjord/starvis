@@ -29,6 +29,7 @@ export const ShipQuery = z.object({
 
 export const ComponentQuery = z.object({
   type: qStr, sub_type: qStr, size: qStr, grade: qStr,
+  min_size: qStr, max_size: qStr,
   manufacturer: qStr, search: qStr,
   sort: qStr, order: qStr,
   page: qInt(1), limit: qInt(50, 200),
@@ -49,9 +50,10 @@ export const ChangelogQuery = z.object({
 export const LoadoutBody = z.object({
   shipUuid: z.string().min(1, "shipUuid is required"),
   swaps: z.array(z.object({
-    portName: z.string().min(1, "portName is required"),
+    portId: z.number().int().positive().optional(),
+    portName: z.string().min(1).optional(),
     componentUuid: z.string().min(1, "componentUuid is required"),
-  })).default([]),
+  }).refine(s => s.portId || s.portName, { message: "portId or portName required" })).default([]),
 });
 
 export const SearchQuery = z.object({ search: qStr, format: qStr }).passthrough();

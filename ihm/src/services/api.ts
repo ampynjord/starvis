@@ -176,13 +176,14 @@ export interface LoadoutStats {
     fuel: { hydrogen: number; quantum: number }
     hull: { total_hp: number; ehp: number; cross_section_x: number; cross_section_y: number; cross_section_z: number }
   }
+  hardpoints: Hardpoint[]
   loadout: LoadoutItem[]
   modules?: { module_name?: string; name?: string; module_type?: string; type?: string }[]
   paints?: { paint_name?: string; paint_class_name?: string }[]
 }
 
 export interface LoadoutItem {
-  port_name: string; port_type: string; component_uuid: string; component_name: string
+  port_id: number; port_name: string; port_type: string; component_uuid: string; component_name: string
   display_name?: string; component_type: string; component_size?: number
   grade?: string; manufacturer_code?: string; swapped: boolean
   // Conditional fields per component type
@@ -194,6 +195,70 @@ export interface LoadoutItem {
   qig_jammer_range?: number | null; qig_snare_radius?: number | null
   port_min_size?: number; port_max_size?: number; size?: number
   [key: string]: unknown
+}
+
+export interface HardpointComponent {
+  port_id: number
+  port_name: string
+  uuid: string | null
+  name: string | null
+  display_name: string
+  type: string
+  size: number | null
+  grade: string | null
+  manufacturer_code: string | null
+  weapon_dps?: number | null
+  weapon_burst_dps?: number | null
+  weapon_sustained_dps?: number | null
+  weapon_range?: number | null
+  shield_hp?: number | null
+  shield_regen?: number | null
+  power_output?: number | null
+  cooling_rate?: number | null
+  qd_speed?: number | null
+  qd_spool_time?: number | null
+  missile_damage?: number | null
+  missile_signal_type?: string | null
+  missile_speed?: number | null
+  cm_ammo?: number | null
+  radar_range?: number | null
+  emp_damage?: number | null
+  emp_radius?: number | null
+  qig_jammer_range?: number | null
+  qig_snare_radius?: number | null
+  sub_items?: HardpointSubItem[]
+  swapped: boolean
+  [key: string]: unknown
+}
+
+export interface HardpointSubItem {
+  port_id: number
+  port_name: string
+  uuid: string | null
+  name: string | null
+  display_name: string
+  type: string
+  size: number | null
+  grade: string | null
+  weapon_dps?: number | null
+  weapon_range?: number | null
+  missile_damage?: number | null
+  swapped: boolean
+}
+
+export interface Hardpoint {
+  port_id: number
+  port_name: string
+  display_name: string
+  category: string
+  port_min_size: number | null
+  port_max_size: number | null
+  mount_type: string | null // 'Gimbal', 'Fixed', 'Turret', 'Rack'
+  mount_class_name: string | null
+  mount_size: number | null
+  component: HardpointComponent | null // For direct mounts (shield, power, etc.)
+  items: HardpointComponent[] // For hierarchical mounts (weapons on gimbals, missiles on racks)
+  swapped: boolean
 }
 
 // --------------- Ships ---------------
@@ -408,7 +473,7 @@ export async function getManufacturers() {
 
 // --------------- Loadout Simulator ---------------
 
-export async function calculateLoadout(shipUuid: string, swaps: { portName: string; componentUuid: string }[] = []) {
+export async function calculateLoadout(shipUuid: string, swaps: { portId?: number; portName?: string; componentUuid: string }[] = []) {
   return fetchJson<SingleResponse<LoadoutStats>>('/loadout/calculate', {
     method: 'POST',
     body: JSON.stringify({ shipUuid, swaps }),
