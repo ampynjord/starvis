@@ -892,6 +892,8 @@ export class GameDataService {
       return {
         port_id: c.id,
         port_name: c.port_name,
+        port_max_size: int(c.port_max_size) || null,
+        port_min_size: int(c.port_min_size) || null,
         uuid: c.component_uuid || null,
         name: c.name || (cIsMountItem ? c.component_class_name : null),
         display_name: c.name ? cleanName(c.name || "", String(c.type || "")) : cMountName,
@@ -913,6 +915,8 @@ export class GameDataService {
       display_name: row.name ? cleanName(row.name || "", type) : mountDisplayName,
       type: effectiveType,
       size: int(row.size) || (mountSize ? parseInt(mountSize) : null),
+      port_max_size: int(row.port_max_size) || null,
+      port_min_size: int(row.port_min_size) || null,
       grade: row.grade || null,
       manufacturer_code: row.manufacturer_code || null,
       // Stats

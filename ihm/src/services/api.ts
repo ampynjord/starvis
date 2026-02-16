@@ -200,6 +200,8 @@ export interface LoadoutItem {
 export interface HardpointComponent {
   port_id: number
   port_name: string
+  port_max_size: number | null
+  port_min_size: number | null
   uuid: string | null
   name: string | null
   display_name: string
@@ -234,6 +236,8 @@ export interface HardpointComponent {
 export interface HardpointSubItem {
   port_id: number
   port_name: string
+  port_max_size: number | null
+  port_min_size: number | null
   uuid: string | null
   name: string | null
   display_name: string
