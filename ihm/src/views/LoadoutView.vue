@@ -17,6 +17,7 @@ const loadout = ref<LoadoutStats | null>(null)
 const loading = ref(false)
 const error = ref('')
 const swaps = ref<{ portId: number; componentUuid: string }[]>([])
+const mountOverrides = ref<Record<number, string>>({})
 
 // Component swap search
 const swapTarget = ref<{ portId: number; portName: string; type: string; maxSize: number; current: Record<string, unknown> | null } | null>(null)
@@ -129,6 +130,7 @@ async function applySwap(component: Component) {
 async function resetSwaps() {
   if (!selectedShip.value) return
   swaps.value = []
+  mountOverrides.value = {}
   await fetchLoadout(selectedShip.value.uuid)
 }
 
@@ -163,6 +165,29 @@ function mountLabel(type: string | null): string {
   return MOUNT_TYPE_LABELS[type]?.short || type
 }
 
+/** Get effective mount type for a hardpoint (with override) */
+function getMountType(hp: Hardpoint): string | null {
+  if (mountOverrides.value[hp.port_id]) return mountOverrides.value[hp.port_id]
+  return hp.mount_type
+}
+
+/** Toggle mount between Gimbal and Fixed */
+function toggleMount(hp: Hardpoint) {
+  const current = getMountType(hp)
+  const next = current === 'Gimbal' ? 'Fixed' : 'Gimbal'
+  mountOverrides.value[hp.port_id] = next
+}
+
+/** Is mount type overridden from default? */
+function isMountOverridden(hp: Hardpoint): boolean {
+  return !!mountOverrides.value[hp.port_id] && mountOverrides.value[hp.port_id] !== hp.mount_type
+}
+
+/** Reset mount override for a hardpoint */
+function resetMount(hp: Hardpoint) {
+  delete mountOverrides.value[hp.port_id]
+}
+
 function swapTypeForHp(hp: Hardpoint, comp: HardpointComponent | null): string {
   if (comp?.type) return comp.type
   const map: Record<string, string> = {
@@ -175,16 +200,37 @@ function swapTypeForHp(hp: Hardpoint, comp: HardpointComponent | null): string {
 }
 
 function swapMaxSize(hp: Hardpoint, comp: HardpointComponent | null): number {
+  // For items with their own port_max_size, use that (most accurate)
+  if (comp?.port_max_size && comp.port_max_size > 0) return comp.port_max_size
+  // For mount hardpoints, adjust based on mount type
+  const mountType = getMountType(hp)
+  const baseSize = hp.port_max_size || hp.mount_size || 0
+  if (mountType === 'Fixed') return baseSize // Fixed = full hardpoint size
+  if (mountType === 'Gimbal') return Math.max(baseSize - 1, 1) // Gimbal = -1 size
+  // Fallback
   if (hp.port_max_size && hp.port_max_size > 0) return hp.port_max_size
   if (hp.mount_size && hp.mount_size > 0) return hp.mount_size
   if (comp?.size && comp.size > 0) return comp.size
   return 0
 }
 
+/** Get swap max size for a sub_item (turret weapon) */
+function subItemMaxSize(hp: Hardpoint, item: HardpointComponent, sub: { port_max_size?: number | null; size?: number | null }): number {
+  if (sub.port_max_size && sub.port_max_size > 0) return sub.port_max_size
+  if (sub.size && sub.size > 0) return sub.size
+  return swapMaxSize(hp, item)
+}
+
 // ── URL swap persistence (portId-based) ──
 function encodeSwapsToQuery(): string {
   if (swaps.value.length === 0) return ''
   return swaps.value.map(s => `${s.portId}:${s.componentUuid}`).join(',')
+}
+
+function encodeMountsToQuery(): string {
+  const entries = Object.entries(mountOverrides.value)
+  if (entries.length === 0) return ''
+  return entries.map(([id, type]) => `${id}:${type}`).join(',')
 }
 
 function decodeSwapsFromQuery(encoded: string): { portId: number; componentUuid: string }[] {
@@ -196,12 +242,26 @@ function decodeSwapsFromQuery(encoded: string): { portId: number; componentUuid:
   }).filter(s => !isNaN(s.portId) && s.componentUuid)
 }
 
-// Sync swaps to URL query params
-watch(swaps, () => {
-  const swapStr = encodeSwapsToQuery()
+function decodeMountsFromQuery(encoded: string): Record<number, string> {
+  if (!encoded) return {}
+  const result: Record<number, string> = {}
+  for (const pair of encoded.split(',')) {
+    const [id, type] = pair.split(':')
+    const portId = parseInt(id)
+    if (!isNaN(portId) && type) result[portId] = type
+  }
+  return result
+}
+
+// Sync swaps + mount overrides to URL query params
+watch([swaps, mountOverrides], () => {
   const query = { ...route.query }
+  const swapStr = encodeSwapsToQuery()
   if (swapStr) query.swaps = swapStr
   else delete query.swaps
+  const mountStr = encodeMountsToQuery()
+  if (mountStr) query.mounts = mountStr
+  else delete query.mounts
   router.replace({ query })
 }, { deep: true })
 
@@ -214,6 +274,10 @@ onMounted(async () => {
       const swapStr = route.query.swaps as string
       if (swapStr) {
         swaps.value = decodeSwapsFromQuery(swapStr)
+      }
+      const mountStr = route.query.mounts as string
+      if (mountStr) {
+        mountOverrides.value = decodeMountsFromQuery(mountStr)
       }
 
       const res = await calculateLoadout(uuid, swaps.value)
@@ -366,11 +430,31 @@ onMounted(async () => {
                     <span v-if="hp.port_max_size" class="w-5 h-5 rounded flex items-center justify-center text-[9px] font-bold bg-sv-darker/60 text-sv-muted border border-sv-border/30">
                       S{{ hp.port_max_size }}
                     </span>
-                    <span v-if="hp.mount_type" class="text-[8px] px-1.5 py-0.5 rounded font-bold"
+                    <!-- Mount type toggle (Gimbal ↔ Fixed) — clickable like Erkul -->
+                    <template v-if="hp.mount_type && (hp.mount_type === 'Gimbal' || hp.mount_type === 'Fixed' || getMountType(hp) === 'Gimbal' || getMountType(hp) === 'Fixed')">
+                      <div class="flex items-center gap-0.5">
+                        <button @click="toggleMount(hp)"
+                          class="text-[8px] px-1.5 py-0.5 rounded font-bold cursor-pointer transition-all hover:ring-1 hover:ring-sv-accent/50"
+                          :class="[
+                            MOUNT_TYPE_LABELS[getMountType(hp) || '']?.badge || 'bg-gray-500/20 text-gray-400',
+                            isMountOverridden(hp) ? 'ring-1 ring-amber-500/50' : ''
+                          ]"
+                          :title="`Cliquer pour basculer en ${getMountType(hp) === 'Gimbal' ? 'Fixed' : 'Gimbal'}`">
+                          {{ mountLabel(getMountType(hp)) }}
+                        </button>
+                        <button v-if="isMountOverridden(hp)" @click="resetMount(hp)"
+                          class="text-[8px] px-0.5 py-0.5 rounded hover:bg-red-500/10 text-amber-400 hover:text-red-400 transition"
+                          title="Rétablir le type de montage d'origine">
+                          ✕
+                        </button>
+                      </div>
+                    </template>
+                    <span v-else-if="hp.mount_type" class="text-[8px] px-1.5 py-0.5 rounded font-bold"
                       :class="MOUNT_TYPE_LABELS[hp.mount_type]?.badge || 'bg-gray-500/20 text-gray-400'">
                       {{ mountLabel(hp.mount_type) }}
                     </span>
                     <span class="text-sv-muted truncate">{{ hp.display_name }}</span>
+                    <span v-if="isMountOverridden(hp)" class="text-[8px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-400">MOUNT</span>
                     <span v-if="hp.swapped" class="text-[8px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-400">SWAP</span>
                   </div>
 
@@ -391,14 +475,31 @@ onMounted(async () => {
                         </span>
                         <span v-if="item.swapped" class="text-[9px] px-1 py-0.5 rounded bg-amber-500/15 text-amber-400">SWAP</span>
                       </div>
-                      <!-- Sub-items (e.g., weapons on turret gimbals) -->
+                      <!-- Sub-items (e.g., weapons on turret gimbals) — swappable -->
                       <div v-if="item.sub_items?.length" class="mt-0.5">
-                        <div v-for="sub in item.sub_items" :key="sub.port_id" class="text-[10px] text-sv-muted flex items-center gap-1 ml-2">
+                        <div v-for="sub in item.sub_items" :key="sub.port_id"
+                          class="text-[10px] text-sv-muted flex items-center gap-1 ml-2 py-0.5 group/sub hover:bg-sv-panel-light/10 rounded px-1 -mx-1">
                           <span class="text-sv-border">└</span>
                           <span v-if="sub.size" class="font-mono text-[9px]">S{{ sub.size }}</span>
-                          <span :class="sub.swapped ? 'text-amber-300' : 'text-sv-text'">{{ sub.display_name || sub.name || 'Empty' }}</span>
+                          <span class="flex-1" :class="sub.swapped ? 'text-amber-300' : 'text-sv-text'">{{ sub.display_name || sub.name || 'Empty' }}</span>
                           <span v-if="sub.weapon_dps" class="text-red-400 font-mono">{{ fmt(sub.weapon_dps, 0) }} DPS</span>
                           <span v-if="sub.missile_damage" class="text-orange-400 font-mono">{{ fmt(sub.missile_damage, 0) }} dmg</span>
+                          <span v-if="sub.swapped" class="text-[8px] px-0.5 rounded bg-amber-500/15 text-amber-400">SWAP</span>
+                          <!-- Swap/Reset buttons for sub-items -->
+                          <button v-if="sub.uuid" @click="startSwap(sub.port_id, sub.port_name, sub.type || 'WeaponGun', subItemMaxSize(hp, item, sub), sub as unknown as Record<string, unknown>)"
+                            class="opacity-0 group-hover/sub:opacity-100 transition-opacity p-0.5 rounded hover:bg-sv-accent/10 text-sv-muted hover:text-sv-accent"
+                            title="Swap">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                            </svg>
+                          </button>
+                          <button v-if="sub.swapped" @click="removeSwap(sub.port_id)"
+                            class="p-0.5 rounded hover:bg-red-500/10 text-sv-muted hover:text-red-400 transition"
+                            title="Rétablir">
+                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
                         </div>
                       </div>
                       <div v-if="!item.sub_items?.length" class="text-[10px] text-sv-muted truncate">{{ portLabel(item.port_name) }}</div>
@@ -421,7 +522,7 @@ onMounted(async () => {
                     <div class="flex items-center gap-1 shrink-0">
                       <button v-if="item.uuid" @click="startSwap(item.port_id, item.port_name, swapTypeForHp(hp, item), swapMaxSize(hp, item), item as Record<string, unknown>)"
                         class="opacity-0 group-hover/item:opacity-100 transition-opacity p-1 rounded hover:bg-sv-accent/10 text-sv-muted hover:text-sv-accent"
-                        title="Swap component">
+                        :title="`Swap (max S${swapMaxSize(hp, item)})`">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                         </svg>
