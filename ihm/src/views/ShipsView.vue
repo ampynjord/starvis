@@ -2,6 +2,7 @@
 import LoadingState from '@/components/LoadingState.vue'
 import PaginationBar from '@/components/PaginationBar.vue'
 import { getShipFilters, getShipManufacturers, getShips, type Ship, type ShipFilters, type ShipManufacturer } from '@/services/api'
+import { getVariantInfo } from '@/utils/constants'
 import { debounce, fmt } from '@/utils/formatters'
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -15,7 +16,7 @@ const pages = ref(1)
 const loading = ref(true)
 const error = ref('')
 const manufacturers = ref<ShipManufacturer[]>([])
-const filters = ref<ShipFilters>({ roles: [], careers: [] })
+const filters = ref<ShipFilters>({ roles: [], careers: [], variant_types: [] })
 
 // Filters
 const search = ref('')
@@ -24,6 +25,7 @@ const career = ref('')
 const role = ref('')
 const status = ref('')
 const vehicleCategory = ref('')
+const variantType = ref('')
 const sort = ref('name')
 const order = ref<'asc' | 'desc'>('asc')
 
@@ -43,6 +45,7 @@ async function fetchShips() {
     if (role.value) params.role = role.value
     if (status.value) params.status = status.value
     if (vehicleCategory.value) params.vehicle_category = vehicleCategory.value
+    if (variantType.value) params.variant_type = variantType.value
     const res = await getShips(params)
     ships.value = res.data
     total.value = res.total
@@ -58,7 +61,7 @@ onMounted(async () => {
   const [, mfg, flt] = await Promise.all([
     fetchShips(),
     getShipManufacturers().catch(() => ({ data: [] })),
-    getShipFilters().catch(() => ({ data: { roles: [], careers: [] } })),
+    getShipFilters().catch(() => ({ data: { roles: [], careers: [], variant_types: [] } })),
   ])
   manufacturers.value = mfg.data
   filters.value = flt.data
@@ -66,7 +69,7 @@ onMounted(async () => {
 
 const debouncedFetch = debounce(() => { page.value = 1; fetchShips() }, 300)
 watch(search, debouncedFetch)
-watch([manufacturer, career, role, status, vehicleCategory, sort, order], () => { page.value = 1; fetchShips() })
+watch([manufacturer, career, role, status, vehicleCategory, variantType, sort, order], () => { page.value = 1; fetchShips() })
 watch(page, fetchShips)
 
 // fmt imported from @/utils/formatters
@@ -124,6 +127,13 @@ function statusLabel(ship: Ship) {
         <option value="ground">Ground</option>
         <option value="gravlev">Gravlev</option>
       </select>
+      <select v-model="variantType" class="input w-36">
+        <option value="">All variants</option>
+        <option value="none">Standard only</option>
+        <option v-for="vt in filters.variant_types" :key="vt" :value="vt">
+          {{ getVariantInfo(vt)?.label || vt }}
+        </option>
+      </select>
       <select v-model="sort" class="input w-32">
         <option value="name">Name</option>
         <option value="cargo_capacity">Cargo</option>
@@ -162,8 +172,11 @@ function statusLabel(ship: Ship) {
             <div v-else class="thumb-placeholder h-full flex items-center justify-center">
               <span class="text-3xl opacity-30">🚀</span>
             </div>
-            <!-- Status badge -->
+            <!-- Status badge + variant badge -->
             <div class="absolute top-2 right-2 flex gap-1">
+              <span v-if="getVariantInfo(ship.variant_type)" :class="getVariantInfo(ship.variant_type)!.badge" class="text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm">
+                {{ getVariantInfo(ship.variant_type)!.icon }} {{ getVariantInfo(ship.variant_type)!.label }}
+              </span>
               <span :class="statusClass(ship)" class="text-[10px] px-1.5 py-0.5 rounded backdrop-blur-sm">
                 {{ statusLabel(ship) }}
               </span>

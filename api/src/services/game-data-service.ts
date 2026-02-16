@@ -147,7 +147,7 @@ export class GameDataService {
 
   async getAllShips(filters?: {
     manufacturer?: string; role?: string; career?: string; status?: string;
-    vehicle_category?: string; search?: string;
+    vehicle_category?: string; variant_type?: string; search?: string;
     sort?: string; order?: string; page?: number; limit?: number;
   }): Promise<PaginatedResult> {
     const where: string[] = [];
@@ -158,6 +158,10 @@ export class GameDataService {
     if (filters?.role) { where.push("s.role = ?"); params.push(filters.role); }
     if (filters?.career) { where.push("s.career = ?"); params.push(filters.career); }
     if (filters?.vehicle_category) { where.push("s.vehicle_category = ?"); params.push(filters.vehicle_category); }
+    if (filters?.variant_type) {
+      if (filters.variant_type === "none") { where.push("s.variant_type IS NULL"); }
+      else { where.push("s.variant_type = ?"); params.push(filters.variant_type); }
+    }
 
     // Status filter — special handling
     const wantConceptOnly = filters?.status === "in-concept";
@@ -333,12 +337,14 @@ export class GameDataService {
 
   // ── FILTERS ─────────────────────────────────────────────
 
-  async getShipFilters(): Promise<{ roles: string[]; careers: string[] }> {
+  async getShipFilters(): Promise<{ roles: string[]; careers: string[]; variant_types: string[] }> {
     const [roleRows] = await this.pool.execute<Row[]>("SELECT DISTINCT role FROM ships WHERE role IS NOT NULL AND role != '' ORDER BY role");
     const [careerRows] = await this.pool.execute<Row[]>("SELECT DISTINCT career FROM ships WHERE career IS NOT NULL AND career != '' ORDER BY career");
+    const [variantRows] = await this.pool.execute<Row[]>("SELECT DISTINCT variant_type FROM ships WHERE variant_type IS NOT NULL AND variant_type != '' ORDER BY variant_type");
     return {
       roles: roleRows.map((r) => String(r.role)),
       careers: careerRows.map((r) => String(r.career)),
+      variant_types: variantRows.map((r) => String(r.variant_type)),
     };
   }
 

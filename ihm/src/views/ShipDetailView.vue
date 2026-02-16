@@ -3,7 +3,7 @@ import LoadingState from '@/components/LoadingState.vue'
 import LoadoutTreeNode from '@/components/LoadoutTreeNode.vue'
 import StatBlock from '@/components/StatBlock.vue'
 import { getShip, getShipLoadout, getShipModules, getShipPaints, type LoadoutPort, type Ship, type ShipModule, type ShipPaint } from '@/services/api'
-import { CATEGORY_MAP, HIDDEN_PORT_NAMES, HIDDEN_PORT_TYPES } from '@/utils/constants'
+import { CATEGORY_MAP, getVariantInfo, HIDDEN_PORT_NAMES, HIDDEN_PORT_TYPES } from '@/utils/constants'
 import { fmt } from '@/utils/formatters'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -80,6 +80,21 @@ const armorStats = computed(() => {
   ]
 })
 
+/** Group modules by slot for display */
+const groupedModules = computed(() => {
+  const groups: Record<string, { displayName: string; modules: typeof modules.value }> = {}
+  for (const mod of modules.value) {
+    const key = mod.slot_name
+    if (!groups[key]) groups[key] = { displayName: mod.slot_display_name || mod.slot_name, modules: [] }
+    groups[key].modules.push(mod)
+  }
+  // Sort: default first within each group
+  for (const g of Object.values(groups)) {
+    g.modules.sort((a, b) => (b.is_default ? 1 : 0) - (a.is_default ? 1 : 0))
+  }
+  return Object.values(groups)
+})
+
 /** Recursively count all nodes in a loadout tree */
 function countNodes(nodes: LoadoutPort[]): number {
   return nodes.reduce((sum, n) => sum + 1 + (n.children ? countNodes(n.children) : 0), 0)
@@ -112,6 +127,9 @@ function countNodes(nodes: LoadoutPort[]): number {
                 </p>
               </div>
               <div class="flex gap-2 shrink-0">
+                <span v-if="getVariantInfo(ship.variant_type)" :class="getVariantInfo(ship.variant_type)!.badge" class="text-[10px] px-1.5 py-0.5 rounded">
+                  {{ getVariantInfo(ship.variant_type)!.icon }} {{ getVariantInfo(ship.variant_type)!.label }}
+                </span>
                 <span v-if="ship.is_concept_only" class="badge-amber text-[10px]">In Concept</span>
                 <span v-else-if="ship.production_status" class="badge-purple text-[10px]">
                   {{ ship.production_status }}
@@ -208,28 +226,34 @@ function countNodes(nodes: LoadoutPort[]): number {
         <p class="text-sv-muted text-sm leading-relaxed">{{ ship.sm_description }}</p>
       </div>
 
-      <!-- Modules (Retaliator, Apollo, Cyclone…) – Erkul-style -->
+      <!-- Modules (Retaliator, Apollo, Cyclone…) – grouped by slot -->
       <div v-if="modules.length > 0" class="card p-4">
         <h2 class="text-xs font-semibold text-sv-accent uppercase tracking-wider mb-3">
-          Modules <span class="text-sv-muted font-normal">({{ modules.length }} slots)</span>
+          Modules <span class="text-sv-muted font-normal">({{ modules.length }} options)</span>
         </h2>
-        <div class="space-y-2">
-          <div
-            v-for="mod in modules"
-            :key="mod.id"
-            class="flex items-center gap-3 bg-sv-darker/40 border border-sv-border/30 rounded-lg px-3 py-2.5"
-          >
-            <!-- Slot icon -->
-            <div class="flex items-center justify-center w-8 h-8 rounded bg-sv-accent/10 text-sv-accent shrink-0">
-              <span class="text-sm">🔧</span>
+        <div class="space-y-4">
+          <div v-for="group in groupedModules" :key="group.displayName">
+            <h3 class="text-[11px] font-semibold uppercase tracking-wider mb-1.5 text-sv-muted">{{ group.displayName }}</h3>
+            <div class="space-y-1.5">
+              <div
+                v-for="mod in group.modules"
+                :key="mod.id"
+                class="flex items-center gap-3 bg-sv-darker/40 border border-sv-border/30 rounded-lg px-3 py-2.5"
+                :class="{ 'border-sv-accent/30': mod.is_default }"
+              >
+                <!-- Slot icon -->
+                <div class="flex items-center justify-center w-8 h-8 rounded bg-sv-accent/10 text-sv-accent shrink-0">
+                  <span class="text-sm">🔧</span>
+                </div>
+                <!-- Module info -->
+                <div class="min-w-0 flex-1">
+                  <div class="text-sm font-medium text-sv-text-bright truncate">{{ mod.module_name || '—' }}</div>
+                </div>
+                <!-- Default badge -->
+                <span v-if="mod.is_default" class="badge-green text-[10px] shrink-0">Default</span>
+                <span v-else class="text-[10px] text-sv-muted shrink-0">Option</span>
+              </div>
             </div>
-            <!-- Slot info -->
-            <div class="min-w-0 flex-1">
-              <div class="text-[11px] text-sv-muted uppercase tracking-wide">{{ mod.slot_display_name || mod.slot_name }}</div>
-              <div class="text-sm font-medium text-sv-text-bright truncate">{{ mod.module_name || '—' }}</div>
-            </div>
-            <!-- Default badge -->
-            <span v-if="mod.is_default" class="badge-green text-[10px] shrink-0">Default</span>
           </div>
         </div>
       </div>

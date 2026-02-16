@@ -11,6 +11,31 @@ export interface CategoryInfo {
 }
 
 /**
+ * Variant type display labels and badge styles.
+ * Maps DB variant_type values → human-readable labels + badge CSS.
+ */
+export const VARIANT_TYPE_MAP: Record<string, { label: string; badge: string; icon: string }> = {
+  collector:   { label: 'Collector',     badge: 'bg-amber-500/20 text-amber-400 border border-amber-500/30',       icon: '🏆' },
+  exec:        { label: 'Executive',     badge: 'bg-violet-500/20 text-violet-400 border border-violet-500/30',     icon: '👔' },
+  bis_edition: { label: 'BIS Edition',   badge: 'bg-sky-500/20 text-sky-400 border border-sky-500/30',              icon: '🌟' },
+  tutorial:    { label: 'Tutorial',      badge: 'bg-teal-500/20 text-teal-400 border border-teal-500/30',           icon: '📘' },
+  enemy_ai:    { label: 'NPC',           badge: 'bg-red-500/20 text-red-400 border border-red-500/30',              icon: '🤖' },
+  military:    { label: 'Military',      badge: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30',  icon: '🎖️' },
+  event:       { label: 'Event',         badge: 'bg-pink-500/20 text-pink-400 border border-pink-500/30',           icon: '🎉' },
+  pirate:      { label: 'Pirate',        badge: 'bg-orange-500/20 text-orange-400 border border-orange-500/30',     icon: '☠️' },
+  arena_ai:    { label: 'Arena AI',      badge: 'bg-red-500/20 text-red-400 border border-red-500/30',              icon: '🤖' },
+  special:     { label: 'Special',       badge: 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30',     icon: '✨' },
+}
+
+/**
+ * Get variant type display info with fallback.
+ */
+export function getVariantInfo(variantType: string | null | undefined): { label: string; badge: string; icon: string } | null {
+  if (!variantType) return null
+  return VARIANT_TYPE_MAP[variantType] || { label: variantType, badge: 'bg-gray-500/20 text-gray-400 border border-gray-500/30', icon: '🏷️' }
+}
+
+/**
  * Comprehensive component type → category mapping.
  * Covers all known P4K component types and their display metadata.
  */

@@ -86,6 +86,8 @@ export interface Ship {
   sm_description: string | null
   store_url: string | null
   vehicle_category: string | null
+  short_name: string | null
+  variant_type: string | null
   insurance_claim_time: number | null
   insurance_expedite_cost: number | null
   game_data: Record<string, unknown> | null
@@ -331,6 +333,7 @@ export interface ShipManufacturer extends Manufacturer {
 export interface ShipFilters {
   roles: string[]
   careers: string[]
+  variant_types: string[]
 }
 
 export async function getShipManufacturers() {
