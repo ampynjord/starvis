@@ -328,6 +328,11 @@ onMounted(async () => {
                 'bg-purple-500/5': group.color === 'purple',
                 'bg-green-500/5': group.color === 'green',
                 'bg-emerald-500/5': group.color === 'emerald',
+                'bg-amber-500/5': group.color === 'amber',
+                'bg-lime-500/5': group.color === 'lime',
+                'bg-sky-500/5': group.color === 'sky',
+                'bg-teal-500/5': group.color === 'teal',
+                'bg-gray-500/5': group.color === 'gray',
               }">
               <div class="flex items-center gap-2">
                 <span class="text-sm">{{ group.icon }}</span>
@@ -341,6 +346,11 @@ onMounted(async () => {
                     'text-purple-400': group.color === 'purple',
                     'text-green-400': group.color === 'green',
                     'text-emerald-400': group.color === 'emerald',
+                    'text-amber-400': group.color === 'amber',
+                    'text-lime-400': group.color === 'lime',
+                    'text-sky-400': group.color === 'sky',
+                    'text-teal-400': group.color === 'teal',
+                    'text-gray-400': group.color === 'gray',
                   }">
                   {{ group.category }}
                 </span>
@@ -948,6 +958,45 @@ onMounted(async () => {
                     <td class="py-1 text-right text-purple-300 font-mono">{{ q.snare_radius ? fmt(q.snare_radius, 0) + 'm' : '—' }}</td>
                     <td class="py-1 text-right text-sv-muted font-mono hidden sm:table-cell">{{ q.charge_time ? fmt(q.charge_time, 1) + 's' : '—' }}</td>
                     <td class="py-1 text-right text-sv-muted font-mono hidden sm:table-cell">{{ q.cooldown ? fmt(q.cooldown, 1) + 's' : '—' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Utility Weapons (Mining, Salvage, Tractor, Repair) -->
+          <div v-if="loadout.stats.utility?.count" class="card overflow-hidden">
+            <div class="px-4 py-2 bg-amber-500/5 border-b border-sv-border/30">
+              <span class="text-[11px] font-bold text-amber-400 uppercase tracking-wider">⛏️ Utility Equipment</span>
+            </div>
+            <div class="p-3">
+              <div class="text-[10px] text-sv-muted mb-2">{{ loadout.stats.utility.count }} device{{ loadout.stats.utility.count > 1 ? 's' : '' }}</div>
+              <table class="w-full text-[10px]">
+                <thead>
+                  <tr class="text-sv-muted border-b border-sv-border/20">
+                    <th class="text-left py-1 font-medium">Name</th>
+                    <th class="text-center py-1 font-medium">S</th>
+                    <th class="text-left py-1 font-medium">Type</th>
+                    <th class="text-right py-1 font-medium hidden sm:table-cell">Range</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(u, i) in loadout.stats.utility.details" :key="i"
+                    class="border-b border-sv-border/10 hover:bg-sv-panel-light/20">
+                    <td class="py-1 text-sv-text-bright truncate max-w-[100px]">{{ u.name }}</td>
+                    <td class="py-1 text-center text-sv-muted">{{ u.size }}</td>
+                    <td class="py-1 text-left">
+                      <span class="text-[9px] px-1.5 py-0.5 rounded"
+                        :class="{
+                          'bg-amber-500/10 text-amber-400': u.utility_type === 'MiningLaser',
+                          'bg-lime-500/10 text-lime-400': u.utility_type === 'SalvageHead',
+                          'bg-sky-500/10 text-sky-400': u.utility_type === 'TractorBeam',
+                          'bg-teal-500/10 text-teal-400': u.utility_type === 'RepairBeam',
+                        }">
+                        {{ u.utility_type === 'MiningLaser' ? 'Mining' : u.utility_type === 'SalvageHead' ? 'Salvage' : u.utility_type === 'TractorBeam' ? 'Tractor' : u.utility_type === 'RepairBeam' ? 'Repair' : 'Utility' }}
+                      </span>
+                    </td>
+                    <td class="py-1 text-right text-sv-muted font-mono hidden sm:table-cell">{{ u.range ? fmt(u.range, 0) + 'm' : '—' }}</td>
                   </tr>
                 </tbody>
               </table>

@@ -177,7 +177,7 @@ export function createRoutes(deps: RouteDependencies): Router {
     if (!uuid) return void res.status(404).json({ success: false, error: "Ship not found" });
     const loadout = await gameDataService!.getShipLoadout(uuid);
     if (!loadout.length) return void res.status(404).json({ success: false, error: "No loadout found" });
-    // Build hierarchical tree
+    // Build recursive hierarchical tree (supports turret→gimbal→weapon 3+ levels)
     const rootPorts = loadout.filter((p: Record<string, unknown>) => !p.parent_id);
     const childMap = new Map<number, Record<string, unknown>[]>();
     for (const p of loadout) {
@@ -187,7 +187,11 @@ export function createRoutes(deps: RouteDependencies): Router {
         childMap.get(parentId)!.push(p);
       }
     }
-    const hierarchical = rootPorts.map((p: Record<string, unknown>) => ({ ...p, children: childMap.get(p.id as number) || [] }));
+    function buildTree(node: Record<string, unknown>): Record<string, unknown> {
+      const children = childMap.get(node.id as number) || [];
+      return { ...node, children: children.map(buildTree) };
+    }
+    const hierarchical = rootPorts.map(buildTree);
     sendWithETag(req, res, { success: true, data: hierarchical });
   }));
 

@@ -48,6 +48,12 @@ export const CATEGORY_MAP: Record<string, CategoryInfo> = {
                     { label: 'QED',             icon: '🔒', color: 'purple', tailwindColor: 'text-purple-400', order: 11 },
   // Countermeasures
   Countermeasure:   { label: 'Countermeasures', icon: '🎇', color: 'emerald',tailwindColor: 'text-emerald-400',order: 12 },
+  // Utility weapons (mining, salvage, tractor, repair)
+  MiningLaser:      { label: 'Mining Lasers',   icon: '⛏️', color: 'amber',  tailwindColor: 'text-amber-400',  order: 13 },
+  SalvageHead:      { label: 'Salvage Heads',   icon: '♻️', color: 'lime',   tailwindColor: 'text-lime-400',   order: 14 },
+  TractorBeam:      { label: 'Tractor Beams',   icon: '🧲', color: 'sky',    tailwindColor: 'text-sky-400',    order: 15 },
+  RepairBeam:       { label: 'Repair Beams',    icon: '🔧', color: 'teal',   tailwindColor: 'text-teal-400',   order: 16 },
+  UtilityWeapon:    { label: 'Utility',         icon: '🔧', color: 'gray',   tailwindColor: 'text-gray-400',   order: 17 },
 }
 
 /**
@@ -57,6 +63,7 @@ export const LOADOUT_CATEGORY_ORDER = [
   'WeaponGun', 'Turret', 'TurretBase', 'MissileLauncher', 'MissileRack',
   'Missile', 'Shield', 'PowerPlant', 'Cooler', 'QuantumDrive',
   'Radar', 'EMP', 'QuantumInterdictionGenerator', 'Countermeasure',
+  'MiningLaser', 'SalvageHead', 'TractorBeam', 'RepairBeam', 'UtilityWeapon',
 ]
 
 /**
