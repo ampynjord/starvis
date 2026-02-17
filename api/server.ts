@@ -76,10 +76,10 @@ const adminLimiter = rateLimit({
   skip: () => isTest,
 });
 
-// Layer 4: Burst protection — 30 req/min max (prevents hammering)
+// Layer 4: Burst protection — configurable req/min max (prevents hammering)
 const burstLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 30,
+  max: parseInt(process.env.RATE_LIMIT_BURST || "30"),
   standardHeaders: false,
   legacyHeaders: false,
   message: { success: false, error: "Too many requests per minute, slow down" },

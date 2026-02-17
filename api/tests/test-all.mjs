@@ -13,6 +13,10 @@
 const BASE = (process.argv[2] || 'http://localhost:3003').replace(/\/$/, '');
 const API = `${BASE}/api/v1`;
 const ADMIN_KEY = process.env.ADMIN_API_KEY || 'starvis_admin_2024';
+const isRemote = !BASE.includes('localhost') && !BASE.includes('127.0.0.1');
+const DELAY_MS = isRemote ? 400 : 0;  // throttle on remote to avoid rate limiting
+
+const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
 const C = {
   reset: '\x1b[0m', green: '\x1b[32m', red: '\x1b[31m',
@@ -30,6 +34,7 @@ function section(title) {
 function info(msg) { console.log(`${C.dim}     ${msg}${C.reset}`); }
 
 async function test(name, fn) {
+  if (DELAY_MS > 0) await delay(DELAY_MS);
   stats.total++;
   try {
     await fn();
@@ -47,21 +52,45 @@ async function test(name, fn) {
   }
 }
 
-/** fetch + json, retourne {status, ok, data} sans throw */
-async function rawGet(path) {
+/** fetch + json, retourne {status, ok, data} sans throw. Retry on 429. */
+async function rawGet(path, retries = 3) {
   const res = await fetch(`${API}${path}`);
+  if (res.status === 429 && retries > 0) {
+    const wait = parseInt(res.headers.get('retry-after') || '3') * 1000;
+    info(`⏳ 429 rate limited, waiting ${wait}ms...`);
+    await delay(wait);
+    return rawGet(path, retries - 1);
+  }
   const data = await res.json();
   return { status: res.status, ok: res.ok, data };
 }
 
-/** fetch + json avec auth admin */
-async function adminGet(path) {
+/** fetch + json avec auth admin. Retry on 429. */
+async function adminGet(path, retries = 3) {
   const res = await fetch(`${BASE}${path}`, { headers: { 'X-API-Key': ADMIN_KEY } });
+  if (res.status === 429 && retries > 0) {
+    const wait = parseInt(res.headers.get('retry-after') || '3') * 1000;
+    info(`⏳ 429 rate limited, waiting ${wait}ms...`);
+    await delay(wait);
+    return adminGet(path, retries - 1);
+  }
   return { status: res.status, ok: res.ok, data: await res.json() };
 }
 
 function assert(cond, msg) { if (!cond) throw new Error(msg); }
 function skip(msg) { throw new Error(`SKIP: ${msg}`); }
+
+/** Raw fetch with 429 retry (for CSV, ETag tests that don't use rawGet) */
+async function apiFetch(url, opts = {}, retries = 3) {
+  const res = await fetch(url, opts);
+  if (res.status === 429 && retries > 0) {
+    const wait = parseInt(res.headers.get('retry-after') || '3') * 1000;
+    info(`⏳ 429 rate limited, waiting ${wait}ms...`);
+    await delay(wait);
+    return apiFetch(url, opts, retries - 1);
+  }
+  return res;
+}
 
 // ─── Sanity: is the server reachable? ───────────────────────────────────────
 try {
@@ -420,7 +449,7 @@ section('📤 CSV EXPORT');
 
 await test('GET /ship-matrix?format=csv → CSV output', async () => {
   if (!hasShipMatrix) skip('no ship matrix data');
-  const res = await fetch(`${API}/ship-matrix?format=csv`);
+  const res = await apiFetch(`${API}/ship-matrix?format=csv`);
   const ct = res.headers.get('content-type');
   assert(ct && ct.includes('text/csv'), `Expected text/csv, got ${ct}`);
   const text = await res.text();
@@ -432,7 +461,7 @@ await test('GET /ship-matrix?format=csv → CSV output', async () => {
 
 await test('GET /ships?format=csv → CSV output', async () => {
   if (!hasGameData) skip('no game data');
-  const res = await fetch(`${API}/ships?format=csv&limit=10`);
+  const res = await apiFetch(`${API}/ships?format=csv&limit=10`);
   const ct = res.headers.get('content-type');
   assert(ct && ct.includes('text/csv'), `Expected text/csv, got ${ct}`);
   const text = await res.text();
@@ -446,7 +475,7 @@ section('🏷️ ETAG / CACHE');
 
 await test('GET /ships → returns ETag header', async () => {
   if (!hasGameData) skip('no game data');
-  const res = await fetch(`${API}/ships?limit=5`);
+  const res = await apiFetch(`${API}/ships?limit=5`);
   const etag = res.headers.get('etag');
   assert(etag, 'Missing ETag header');
   info(`ETag: ${etag}`);
@@ -454,17 +483,17 @@ await test('GET /ships → returns ETag header', async () => {
 
 await test('GET /ships → If-None-Match → 304', async () => {
   if (!hasGameData) skip('no game data');
-  const res1 = await fetch(`${API}/ships?limit=5`);
+  const res1 = await apiFetch(`${API}/ships?limit=5`);
   const etag = res1.headers.get('etag');
   assert(etag, 'No ETag on first request');
-  const res2 = await fetch(`${API}/ships?limit=5`, { headers: { 'If-None-Match': etag } });
+  const res2 = await apiFetch(`${API}/ships?limit=5`, { headers: { 'If-None-Match': etag } });
   assert(res2.status === 304, `Expected 304, got ${res2.status}`);
   info('304 Not Modified confirmed');
 });
 
 await test('GET /ship-matrix → Cache-Control header', async () => {
   if (!hasShipMatrix) skip('no ship matrix data');
-  const res = await fetch(`${API}/ship-matrix`);
+  const res = await apiFetch(`${API}/ship-matrix`);
   const cc = res.headers.get('cache-control');
   assert(cc && cc.includes('max-age'), `Missing/wrong Cache-Control: ${cc}`);
   info(`Cache-Control: ${cc}`);
@@ -645,7 +674,7 @@ await test('POST /loadout/calculate → default loadout stats', async () => {
   const realShip = ships.data.find(s => !s.is_concept_only);
   if (!realShip) skip('no P4K ships for loadout');
   const shipUuid = realShip.uuid;
-  const res = await fetch(`${API}/loadout/calculate`, {
+  const res = await apiFetch(`${API}/loadout/calculate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ shipUuid, swaps: [] })
@@ -662,7 +691,7 @@ await test('POST /loadout/calculate → default loadout stats', async () => {
 
 await test('POST /loadout/calculate → requires shipUuid', async () => {
   if (!hasGameData) skip('no game data');
-  const res = await fetch(`${API}/loadout/calculate`, {
+  const res = await apiFetch(`${API}/loadout/calculate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({})
