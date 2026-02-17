@@ -376,6 +376,29 @@ function groupItems(items: HardpointComponent[]): GroupedItem[] {
   }
   return groups
 }
+
+interface GroupedSubItem {
+  item: HardpointSubItem
+  count: number
+  allPortIds: number[]
+}
+function groupSubItems(items: HardpointSubItem[]): GroupedSubItem[] {
+  const groups: GroupedSubItem[] = []
+  for (const sub of items) {
+    const key = sub.uuid || sub.name || sub.display_name || ''
+    const existing = groups.find(g => {
+      const gKey = g.item.uuid || g.item.name || g.item.display_name || ''
+      return gKey === key && key !== ''
+    })
+    if (existing) {
+      existing.count++
+      existing.allPortIds.push(sub.port_id)
+    } else {
+      groups.push({ item: sub, count: 1, allPortIds: [sub.port_id] })
+    }
+  }
+  return groups
+}
 </script>
 
 <template>
@@ -466,35 +489,35 @@ function groupItems(items: HardpointComponent[]): GroupedItem[] {
                         class="text-[9px] text-amber-400 hover:text-red-400 transition" title="Rétablir">✕</button>
                     </div>
 
-                    <!-- Sub-items (actual weapons inside gimbals) -->
+                    <!-- Sub-items (grouped: weapons inside gimbals, missiles in racks) -->
                     <template v-if="item.sub_items?.length">
-                      <div v-for="sub in item.sub_items" :key="sub.port_id"
+                      <div v-for="g in groupSubItems(item.sub_items)" :key="g.item.port_id"
                         class="px-3 py-1 pl-10 flex items-center gap-2 cursor-pointer transition-colors group/sub"
                         :class="[
-                          selectorTarget?.portId === sub.port_id ? 'bg-sv-accent/10 ring-1 ring-inset ring-sv-accent/30' : 'hover:bg-sv-panel-light/10',
-                          sub.swapped ? 'bg-amber-500/5' : ''
+                          selectorTarget?.portId === g.item.port_id ? 'bg-sv-accent/10 ring-1 ring-inset ring-sv-accent/30' : 'hover:bg-sv-panel-light/10',
+                          g.item.swapped ? 'bg-amber-500/5' : ''
                         ]"
-                        @click="clickSubSlot(hp, item, sub)">
-                        <span class="inline-flex items-center justify-center w-5 h-4 rounded text-[8px] font-bold border border-sv-border/30" :class="sub.swapped ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-sv-darker/60 text-sv-muted'">S{{ sub.size || '?' }}</span>
-                        <span class="text-[10px]">⚡</span>
-                        <span class="text-[10px] font-medium flex-1 truncate" :class="sub.swapped ? 'text-amber-300' : 'text-amber-400'">{{ sub.display_name || sub.name || 'Empty' }}</span>
-                        <span v-if="sub.sub_type || sub.type" class="text-[8px] text-sv-muted italic hidden sm:inline">{{ sub.sub_type || '' }}</span>
-                        <!-- Weapon inline stats -->
+                        @click="clickSubSlot(hp, item, g.item)">
+                        <span class="inline-flex items-center justify-center w-5 h-4 rounded text-[8px] font-bold border border-sv-border/30" :class="g.item.swapped ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-sv-darker/60 text-sv-muted'">S{{ g.item.size || '?' }}</span>
+                        <span v-if="g.count > 1" class="text-[9px] text-sv-muted font-bold">×{{ g.count }}</span>
+                        <span class="text-[10px] font-medium flex-1 truncate" :class="g.item.swapped ? 'text-amber-300' : 'text-amber-400'">{{ g.item.display_name || g.item.name || 'Empty' }}</span>
+                        <span v-if="g.item.sub_type || g.item.type" class="text-[8px] text-sv-muted italic hidden sm:inline">{{ g.item.sub_type || '' }}</span>
+                        <!-- Weapon/missile inline stats -->
                         <div class="hidden sm:flex items-center gap-3 text-[9px] font-mono shrink-0">
-                          <span v-if="sub.weapon_dps" class="text-amber-400">{{ fmt(sub.weapon_dps, 0) }} <span class="text-sv-muted">dps</span></span>
-                          <span v-if="sub.missile_damage" class="text-amber-400">{{ fmt(sub.missile_damage, 0) }} <span class="text-sv-muted">dmg</span></span>
+                          <span v-if="g.item.weapon_dps" class="text-amber-400">{{ fmt(g.item.weapon_dps, 0) }} <span class="text-sv-muted">dps</span></span>
+                          <span v-if="g.item.missile_damage" class="text-amber-400">{{ fmt(g.item.missile_damage, 0) }} <span class="text-sv-muted">dmg</span></span>
                         </div>
-                        <button v-if="sub.swapped" @click.stop="removeSwap(sub.port_id)"
+                        <button v-if="g.item.swapped" @click.stop="removeSwap(g.item.port_id)"
                           class="opacity-0 group-hover/sub:opacity-100 text-[9px] text-amber-400 hover:text-red-400 transition" title="Rétablir">✕</button>
                       </div>
 
-                      <!-- Sub-weapon extra stats row -->
-                      <div v-for="sub in item.sub_items.slice(0, 1)" :key="'stats-' + sub.port_id"
+                      <!-- Sub-item extra stats row (first item only) -->
+                      <div v-if="item.sub_items[0] && (item.sub_items[0].weapon_range || item.sub_items[0].weapon_fire_rate || item.sub_items[0].missile_speed)"
                         class="px-3 py-0.5 pl-10 flex items-center gap-3 text-[8px] font-mono text-sv-muted">
-                        <template v-if="sub.weapon_range"><span>range <span class="text-amber-400/80">{{ fmt(sub.weapon_range, 0) }}</span></span></template>
-                        <template v-if="sub.weapon_fire_rate"><span>fire rate <span class="text-amber-400/80">{{ fmt(sub.weapon_fire_rate, 0) }}</span></span></template>
-                        <template v-if="sub.missile_speed"><span>speed <span class="text-amber-400/80">{{ fmt(sub.missile_speed, 0) }}</span> m/s</span></template>
-                        <template v-if="sub.missile_range"><span>range <span class="text-amber-400/80">{{ fmt(sub.missile_range, 0) }}</span> m</span></template>
+                        <template v-if="item.sub_items[0].weapon_range"><span>range <span class="text-amber-400/80">{{ fmt(item.sub_items[0].weapon_range, 0) }}</span></span></template>
+                        <template v-if="item.sub_items[0].weapon_fire_rate"><span>fire rate <span class="text-amber-400/80">{{ fmt(item.sub_items[0].weapon_fire_rate, 0) }}</span></span></template>
+                        <template v-if="item.sub_items[0].missile_speed"><span>speed <span class="text-amber-400/80">{{ fmt(item.sub_items[0].missile_speed, 0) }}</span> m/s</span></template>
+                        <template v-if="item.sub_items[0].missile_range"><span>range <span class="text-amber-400/80">{{ fmt(item.sub_items[0].missile_range, 0) }}</span> m</span></template>
                       </div>
                     </template>
 
@@ -614,20 +637,15 @@ function groupItems(items: HardpointComponent[]): GroupedItem[] {
                       class="opacity-0 group-hover/slot:opacity-100 text-[9px] text-amber-400 hover:text-red-400 transition" title="Rétablir">✕</button>
                   </div>
                   <!-- Extra stats row for shields -->
-                  <div v-if="hp.component.shield_hp" class="px-3 py-0.5 pl-8 flex items-center gap-3 text-[8px] font-mono text-sv-muted">
-                    <span>⚡{{ hp.component.power_draw || '?' }}</span>
-                    <span>🛡️{{ hp.component.shield_hp ? 'faces ' + (hp.component.type === 'Shield' ? '—' : '') : '' }}</span>
-                    <span v-if="hp.component.shield_regen">full charge in <span class="text-amber-400/80">{{ loadout.stats.shields.time_to_charge || '—' }}</span> s</span>
+                  <div v-if="hp.component.shield_hp && hp.component.shield_regen" class="px-3 py-0.5 pl-8 flex items-center gap-3 text-[8px] font-mono text-sv-muted">
+                    <span>regen <span class="text-amber-400/80">{{ fmt(hp.component.shield_regen, 1) }}/s</span></span>
+                    <span>charge <span class="text-amber-400/80">{{ Math.round((hp.component.shield_hp || 0) / (hp.component.shield_regen || 1)) }}s</span></span>
                   </div>
                   <!-- Extra stats row for QD -->
                   <div v-if="hp.component.qd_speed" class="px-3 py-0.5 pl-8 flex items-center gap-3 text-[8px] font-mono text-sv-muted">
                     <template v-if="hp.component.qd_fuel_rate"><span>fuel rate <span class="text-amber-400/80">{{ hp.component.qd_fuel_rate }}</span></span></template>
                     <template v-if="hp.component.qd_range"><span>max distance <span class="text-amber-400/80">{{ fmt(hp.component.qd_range) }}</span></span></template>
                     <template v-if="hp.component.qd_cooldown"><span>cooldown <span class="text-amber-400/80">{{ hp.component.qd_cooldown }}s</span></span></template>
-                  </div>
-                  <!-- Power plant extra -->
-                  <div v-if="hp.component.power_output" class="px-3 py-0.5 pl-8 flex items-center gap-3 text-[8px] font-mono text-sv-muted">
-                    <span>⚡{{ hp.component.power_draw || '?' }}</span>
                   </div>
 
                   <!-- Inline selector for direct component -->
@@ -713,14 +731,10 @@ function groupItems(items: HardpointComponent[]): GroupedItem[] {
                     <button v-if="hp.component.swapped" @click.stop="removeSwap(hp.component.port_id)"
                       class="opacity-0 group-hover/slot:opacity-100 text-[9px] text-amber-400 hover:text-red-400 transition">✕</button>
                   </div>
-                  <!-- Extra stats -->
-                  <div v-if="hp.component.shield_hp || hp.component.shield_regen" class="px-3 py-0.5 pl-8 flex items-center gap-3 text-[8px] font-mono text-sv-muted">
-                    <span>⚡{{ hp.component.power_draw || '?' }}</span>
-                    <span>🛡️ {{ hp.component.shield_regen ? fmt(hp.component.shield_regen, 1) + '/s' : '' }}</span>
-                    <span v-if="hp.component.shield_regen && hp.component.shield_hp">full charge in <span class="text-amber-400/80">{{ Math.round((hp.component.shield_hp || 0) / (hp.component.shield_regen || 1)) }}</span> s</span>
-                  </div>
-                  <div v-if="hp.component.power_output" class="px-3 py-0.5 pl-8 flex items-center gap-3 text-[8px] font-mono text-sv-muted">
-                    <span>⚡{{ hp.component.power_draw || '?' }}</span>
+                  <!-- Shield extra stats -->
+                  <div v-if="hp.component.shield_regen" class="px-3 py-0.5 pl-8 flex items-center gap-3 text-[8px] font-mono text-sv-muted">
+                    <span>regen <span class="text-amber-400/80">{{ fmt(hp.component.shield_regen, 1) }}/s</span></span>
+                    <span v-if="hp.component.shield_hp">charge <span class="text-amber-400/80">{{ Math.round((hp.component.shield_hp || 0) / (hp.component.shield_regen || 1)) }}s</span></span>
                   </div>
 
                   <!-- Selector -->
