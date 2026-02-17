@@ -6,13 +6,13 @@ Monorepo en 4 modules :
 - **api/** — Backend Express.js + TypeScript + MySQL (déployé sur VPS)
 - **extractor/** — CLI d'extraction P4K/DataForge (exécuté localement)
 - **db/** — Schéma SQL, initialisation, backup
-- **ihm/** — Frontend Vue 3 + Vite + Tailwind CSS (déployé sur VPS)
+- **ihm/** — Page placeholder statique (IHM en cours de développement)
 
 Deux sources de données complémentaires :
 - **RSI Ship Matrix** — données marketing officielles (246 vaisseaux), synchronisées par l'API
 - **P4K DataForge** — données réelles du jeu (~309 vaisseaux, ~2 459 composants, ~33 957 ports de loadout, ~1 791 paints), extraites localement par le CLI
 
-Production : **[starvis.ampynjord.bzh](https://starvis.ampynjord.bzh)** (IHM) / **[starvis-api.ampynjord.bzh](https://starvis-api.ampynjord.bzh)** (API)
+Production : **[starvis-api.ampynjord.bzh](https://starvis-api.ampynjord.bzh)** (API) — IHM en cours de développement
 
 ---
 
@@ -100,21 +100,10 @@ starvis/
 │   └── tests/
 │       ├── classifyPort.test.ts       # 28 tests
 │       └── dataforge-helpers.test.ts  # 16 tests
-├── ihm/                        # Frontend Vue 3 + Vite + Tailwind CSS
-│   ├── Dockerfile
-│   ├── nginx.conf              # Nginx hardened (rate limiting, headers)
-│   ├── package.json
-│   ├── vite.config.ts
-│   └── src/
-│       ├── App.vue
-│       ├── main.ts
-│       ├── router/index.ts     # 13 routes
-│       ├── services/api.ts     # Client HTTP API
-│       ├── utils/
-│       │   ├── constants.ts    # Types, ports cachés, configuration
-│       │   └── formatters.ts   # Formateurs d'affichage
-│       ├── views/              # 13 vues (Ships, Components, Paints, Loadout, Compare…)
-│       └── components/         # AppNav, PaginationBar, StatBlock, LoadingState
+├── ihm/                        # Page placeholder (IHM en développement)
+│   ├── Dockerfile              # Nginx Alpine simple
+│   ├── nginx.conf
+│   └── index.html              # Page "coming soon"
 ├── db/
 │   ├── schema.sql              # 11 tables MySQL + FK + index
 │   ├── init.sh                 # Initialisation DB (permissions % host)
