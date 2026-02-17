@@ -750,8 +750,12 @@ export class GameDataService {
         if (sizeMatch) mountSize = parseInt(sizeMatch[1]);
       }
 
-      // Determine category — use actual component type when available (more accurate than port_type)
+      // Skip fuel tanks, fuel intakes, flight controllers — not user-swappable
       const componentType = String(root.type || ""); // from JOIN with components table
+      const SKIP_TYPES = new Set(["FuelTank", "FuelIntake", "FlightController", "HydrogenFuelTank", "QuantumFuelTank"]);
+      if (SKIP_TYPES.has(componentType)) continue;
+
+      // Determine category — use actual component type when available (more accurate than port_type)
       let category: string;
 
       if (componentType && this.portCategory(componentType) !== "Other") {
