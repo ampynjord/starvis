@@ -352,6 +352,30 @@ const catBg: Record<string, string> = {
 }
 
 const totalMods = computed(() => swaps.value.length + Object.keys(mountOverrides.value).length)
+
+// ── Group identical sub-items (missiles, etc.) ──
+interface GroupedItem {
+  item: HardpointComponent
+  count: number
+  allPortIds: number[]
+}
+function groupItems(items: HardpointComponent[]): GroupedItem[] {
+  const groups: GroupedItem[] = []
+  for (const item of items) {
+    const key = item.uuid || item.name || item.display_name || ''
+    const existing = groups.find(g => {
+      const gKey = g.item.uuid || g.item.name || g.item.display_name || ''
+      return gKey === key && key !== ''
+    })
+    if (existing) {
+      existing.count++
+      existing.allPortIds.push(item.port_id)
+    } else {
+      groups.push({ item, count: 1, allPortIds: [item.port_id] })
+    }
+  }
+  return groups
+}
 </script>
 
 <template>
