@@ -161,6 +161,9 @@ export class GameDataService {
     if (filters?.variant_type) {
       if (filters.variant_type === "none") { where.push("s.variant_type IS NULL"); }
       else { where.push("s.variant_type = ?"); params.push(filters.variant_type); }
+    } else {
+      // By default, hide tutorial/AI/arena ships (non-player variants)
+      where.push("(s.variant_type IS NULL OR s.variant_type NOT IN ('tutorial', 'enemy_ai', 'arena_ai', 'competition'))");
     }
 
     // Status filter — special handling
@@ -219,11 +222,16 @@ export class GameDataService {
     let sql: string;
     let allParams: (string | number)[];
 
+    // NULL-safe ORDER BY: push NULLs last for DESC, first for ASC (natural)
+    const nullSafeOrder = order === "DESC"
+      ? `${sortCol} IS NULL, ${sortCol} ${order}`
+      : `${sortCol} IS NULL, ${sortCol} ${order}`;
+
     if (wantConceptOnly) {
       // Only concept ships
       sql = `SELECT ${CONCEPT_SELECT}, TRUE as is_concept_only
         FROM ship_matrix sm2${cw}
-        ORDER BY sm2.name ${order} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
+        ORDER BY ${nullSafeOrder} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
       allParams = [...conceptParams];
     } else if (includeConceptShips) {
       // Both P4K ships and concept ships
@@ -231,12 +239,12 @@ export class GameDataService {
         UNION ALL
         (SELECT ${CONCEPT_SELECT}, TRUE as is_concept_only
           FROM ship_matrix sm2${cw})
-        ORDER BY name ${order} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
+        ORDER BY ${nullSafeOrder} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
       allParams = [...params, ...conceptParams];
     } else {
       // P4K ships only (flight-ready or in-game-only filters)
       sql = `SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS}${w}
-        ORDER BY s.${sortCol} ${order} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
+        ORDER BY ${sortCol} IS NULL, s.${sortCol} ${order} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
       allParams = [...params];
     }
 
@@ -485,7 +493,8 @@ export class GameDataService {
         (SELECT COUNT(*) FROM manufacturers) as manufacturers,
         (SELECT COUNT(*) FROM ships_loadouts) as loadoutPorts,
         (SELECT COUNT(*) FROM ship_paints) as paints,
-        (SELECT COUNT(*) FROM shops) as shops
+        (SELECT COUNT(*) FROM shops) as shops,
+        (SELECT COUNT(*) FROM ships WHERE ship_matrix_id IS NOT NULL) as shipsLinkedToMatrix
     `);
     const latest = await this.getLatestExtraction();
     return { ...rows[0], latestExtraction: latest };
@@ -493,7 +502,7 @@ export class GameDataService {
 
   // ── SHOPS ───────────────────────────────────────────────
 
-  async getShops(opts: { page?: number; limit?: number; location?: string; type?: string; search?: string }): Promise<{ data: Row[]; total: number; page: number; limit: number }> {
+  async getShops(opts: { page?: number; limit?: number; location?: string; type?: string; search?: string }): Promise<{ data: Row[]; total: number; page: number; limit: number; pages: number }> {
     const where: string[] = [];
     const params: (string | number)[] = [];
 
@@ -510,7 +519,7 @@ export class GameDataService {
     const total = Number(countRows[0].count);
     const [rows] = await this.pool.execute<Row[]>(`SELECT * FROM shops${w} ORDER BY name LIMIT ${Number(limit)} OFFSET ${Number(offset)}`, params);
 
-    return { data: rows, total, page, limit };
+    return { data: rows, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
   async getShopInventory(shopId: number): Promise<Row[]> {

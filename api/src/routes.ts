@@ -65,13 +65,18 @@ function sendOrNotModified(req: Request, res: Response, data: unknown): boolean 
   return false;
 }
 
-/** Serialize once, check ETag, and send — avoids double JSON.stringify */
-function sendWithETag(req: Request, res: Response, payload: unknown): void {
-  const jsonStr = JSON.stringify(payload);
-  const etag = setETag(res, jsonStr);
+/** Serialize once, check ETag, and send — avoids double JSON.stringify.
+ *  ETag is computed without volatile fields (meta.responseTime). */
+function sendWithETag(req: Request, res: Response, payload: Record<string, unknown>): void {
+  // Compute ETag from stable content only (strip meta.responseTime)
+  const { meta, ...stable } = payload;
+  const stableStr = JSON.stringify(stable);
+  const etag = setETag(res, stableStr);
   if (req.headers["if-none-match"] === etag) { res.status(304).end(); return; }
+  // Send the full payload (including meta) as JSON
+  const fullStr = JSON.stringify(payload);
   res.setHeader("Content-Type", "application/json");
-  res.send(jsonStr);
+  res.send(fullStr);
 }
 
 function sendCsvOrJson(req: Request, res: Response, data: Record<string, unknown>[], jsonPayload: unknown): void {
