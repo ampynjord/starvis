@@ -1,30 +1,297 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Starvis — En construction</title>
+  <title>STARVIS — Tactical Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;500;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet">
   <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0b0f19;color:#c8ccd4;font-family:'Segoe UI',system-ui,-apple-system,sans-serif}
-    .container{text-align:center;padding:2rem;max-width:480px}
-    .icon{font-size:4rem;margin-bottom:1.5rem;animation:pulse 3s ease-in-out infinite}
-    @keyframes pulse{0%,100%{opacity:.4;transform:scale(1)}50%{opacity:1;transform:scale(1.05)}}
-    h1{font-size:1.8rem;font-weight:700;color:#e5c07b;margin-bottom:.5rem;letter-spacing:.05em}
-    .sub{font-size:.85rem;color:#636d83;margin-bottom:2rem}
-    p{font-size:1rem;line-height:1.6;color:#8891a5}
-    .bar{margin:2rem auto 0;width:200px;height:4px;border-radius:2px;background:#1a1f2e;overflow:hidden}
-    .bar::after{content:'';display:block;width:40%;height:100%;border-radius:2px;background:linear-gradient(90deg,#e5c07b,#d19a66);animation:slide 1.8s ease-in-out infinite}
-    @keyframes slide{0%{transform:translateX(-100%)}100%{transform:translateX(350%)}}
+    :root {
+      --bg-deep: #020509;
+      --bg-card: #0a1420;
+      --accent-cyan: #00d4ff;
+      --accent-gold: #f0a500;
+      --text-primary: #cce8f4;
+      --text-secondary: #5a8099;
+      --text-muted: #2a3d4d;
+      --border: rgba(0, 180, 230, 0.18);
+      --border-bright: rgba(0, 212, 255, 0.5);
+      --glow-gold: 0 0 16px rgba(240, 165, 0, 0.3);
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      background: var(--bg-deep);
+      color: var(--text-primary);
+      font-family: 'Rajdhani', sans-serif;
+      overflow: hidden;
+      position: relative;
+    }
+
+    canvas#stars { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+    .grid-overlay {
+      position: fixed; inset: 0; z-index: 1;
+      background-image:
+        linear-gradient(rgba(0,180,230,0.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,180,230,0.025) 1px, transparent 1px);
+      background-size: 60px 60px; pointer-events: none;
+    }
+    .scanline {
+      position: fixed; left: 0; right: 0; height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(0,212,255,0.05), rgba(0,212,255,0.1), rgba(0,212,255,0.05), transparent);
+      z-index: 2; animation: scanDown 9s linear infinite; pointer-events: none;
+    }
+    @keyframes scanDown { from{top:-2px} to{top:100vh} }
+    .vignette {
+      position: fixed; inset: 0; z-index: 2;
+      background: radial-gradient(ellipse at center, transparent 35%, rgba(2,5,9,0.9) 100%);
+      pointer-events: none;
+    }
+    .bracket { position: fixed; width: 60px; height: 60px; z-index: 3; opacity: 0.35; }
+    .bracket::before, .bracket::after { content:''; position:absolute; background:var(--accent-cyan); }
+    .bracket::before { width:2px; height:100%; }
+    .bracket::after  { width:100%; height:2px; }
+    .bracket.tl { top:18px; left:18px; }
+    .bracket.tl::before { top:0; left:0; }
+    .bracket.tl::after  { top:0; left:0; }
+    .bracket.tr { top:18px; right:18px; transform:scaleX(-1); }
+    .bracket.bl { bottom:18px; left:18px; transform:scaleY(-1); }
+    .bracket.br { bottom:18px; right:18px; transform:scale(-1); }
+
+    .status-bar {
+      position: fixed; top: 18px; left: 50%; transform: translateX(-50%);
+      z-index: 10; display: flex; align-items: center; gap: 20px;
+      font-family: 'Share Tech Mono', monospace; font-size: 10px;
+      color: var(--text-muted); letter-spacing: 0.12em; white-space: nowrap;
+    }
+    .status-dot { width:5px; height:5px; border-radius:50%; background:var(--accent-cyan); box-shadow:0 0 6px var(--accent-cyan); animation:blink 2.5s ease-in-out infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.15} }
+
+    .main {
+      position: relative; z-index: 6;
+      width: 100vw; height: 100vh;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+
+    .emblem-wrap {
+      position: relative; width: 100px; height: 100px;
+      margin-bottom: 32px;
+      opacity: 0; animation: reveal 0.9s ease forwards 0.2s;
+    }
+    @keyframes reveal { from{opacity:0;transform:scale(0.75)} to{opacity:1;transform:scale(1)} }
+    .hex-ring {
+      position: absolute; inset: 0;
+      border: 1.5px solid var(--accent-cyan);
+      clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+      animation: hexSpin 14s linear infinite;
+    }
+    .hex-ring.outer {
+      inset: -12px; border-color: rgba(0,212,255,0.2);
+      animation: hexSpinR 20s linear infinite;
+    }
+    @keyframes hexSpin  { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+    @keyframes hexSpinR { from{transform:rotate(0)} to{transform:rotate(-360deg)} }
+    .emblem-inner {
+      position: absolute; inset: 14px;
+      display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(circle, rgba(0,212,255,0.07) 0%, transparent 70%);
+      clip-path: polygon(50% 0%, 93% 25%, 93% 75%, 50% 100%, 7% 75%, 7% 25%);
+    }
+    .emblem-icon { font-size: 30px; filter: drop-shadow(0 0 10px var(--accent-cyan)); animation: iconFloat 4s ease-in-out infinite; }
+    @keyframes iconFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-3px)} }
+
+    .title-block { text-align: center; opacity:0; animation: reveal 0.8s ease forwards 0.5s; }
+    .title-eyebrow {
+      font-family: 'Share Tech Mono', monospace; font-size: 10px;
+      letter-spacing: 0.45em; color: var(--accent-gold); text-transform: uppercase; margin-bottom: 10px;
+    }
+    .title-main {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(48px, 7vw, 88px); font-weight: 900;
+      letter-spacing: 0.14em; line-height: 1;
+      color: transparent;
+      background: linear-gradient(175deg, #e8f8ff 0%, #72d0ee 45%, var(--accent-cyan) 100%);
+      -webkit-background-clip: text; background-clip: text;
+    }
+    .title-sub {
+      font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 500;
+      letter-spacing: 0.55em; color: var(--text-secondary);
+      text-transform: uppercase; margin-top: 10px;
+    }
+
+    .divider {
+      width: 300px; max-width: 70vw; height: 1px; margin: 30px auto;
+      position: relative; opacity:0; animation: reveal 0.8s ease forwards 0.9s;
+    }
+    .divider::before {
+      content:''; position:absolute; inset:0;
+      background: linear-gradient(90deg, transparent, var(--accent-cyan), var(--accent-gold), var(--accent-cyan), transparent);
+    }
+    .divider-diamond {
+      position:absolute; left:50%; top:50%;
+      transform: translate(-50%,-50%) rotate(45deg);
+      width:7px; height:7px; background:var(--accent-gold); box-shadow:var(--glow-gold);
+    }
+
+    .tagline {
+      text-align: center; max-width: 420px; padding: 0 24px;
+      opacity:0; animation: reveal 0.8s ease forwards 1s;
+    }
+    .tagline p {
+      font-family: 'Rajdhani', sans-serif; font-size: 16px;
+      font-weight: 400; letter-spacing: 0.04em;
+      color: var(--text-secondary); line-height: 1.8;
+    }
+    .tagline .em { color: var(--text-primary); font-weight: 600; }
+
+    .api-badge {
+      margin-top: 36px;
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 20px;
+      border: 1px solid rgba(0,212,255,0.25);
+      background: rgba(0,212,255,0.04);
+      opacity:0; animation: reveal 0.8s ease forwards 1.3s;
+      text-decoration: none; transition: border-color 0.25s, background 0.25s;
+    }
+    .api-badge:hover { border-color: var(--border-bright); background: rgba(0,212,255,0.08); }
+    .api-badge-label {
+      font-family: 'Share Tech Mono', monospace; font-size: 9px;
+      letter-spacing: 0.2em; color: var(--text-muted); text-transform: uppercase; margin-bottom: 3px;
+    }
+    .api-badge-url {
+      font-family: 'Share Tech Mono', monospace; font-size: 12px;
+      color: var(--accent-cyan); letter-spacing: 0.05em;
+    }
+    .api-badge-arrow { font-size: 14px; color: var(--accent-gold); margin-left: 4px; }
+
+    .signature {
+      margin-top: 40px;
+      opacity:0; animation: reveal 0.8s ease forwards 1.6s;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .sig-line { width: 40px; height: 1px; background: var(--text-muted); }
+    .sig-text {
+      font-family: 'Share Tech Mono', monospace; font-size: 10px;
+      letter-spacing: 0.2em; color: var(--text-muted); text-transform: uppercase;
+    }
+    .sig-text a {
+      color: var(--accent-gold); text-decoration: none;
+      transition: color 0.2s, text-shadow 0.2s;
+    }
+    .sig-text a:hover { color: #ffc840; text-shadow: 0 0 10px rgba(240,165,0,0.5); }
+
+    .bottom-bar {
+      position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+      z-index: 10; font-family: 'Share Tech Mono', monospace; font-size: 9px;
+      letter-spacing: 0.18em; color: var(--text-muted);
+      display: flex; gap: 28px; align-items: center; white-space: nowrap;
+    }
+    .online-dot { width:5px; height:5px; border-radius:50%; background:#00ff88; box-shadow:0 0 6px #00ff88; animation:blink 3s ease-in-out infinite; display:inline-block; margin-right:6px; }
+
+    @media (max-width: 600px) {
+      .bottom-bar { gap: 14px; }
+      .status-bar { font-size: 9px; gap: 12px; }
+    }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="icon">🚀</div>
-    <h1>Starvis</h1>
-    <div class="sub">Star Citizen Ship Database</div>
-    <p>L'interface est en cours de développement<br>et arrivera prochainement.</p>
-    <div class="bar"></div>
+
+<canvas id="stars"></canvas>
+<div class="grid-overlay"></div>
+<div class="scanline"></div>
+<div class="vignette"></div>
+
+<div class="bracket tl"></div>
+<div class="bracket tr"></div>
+<div class="bracket bl"></div>
+<div class="bracket br"></div>
+
+<div class="status-bar">
+  <span>SYS:ONLINE</span>
+  <div class="status-dot"></div>
+  <span id="clock">00:00:00 UTC</span>
+  <div class="status-dot"></div>
+  <span>BUILD v1.0-alpha</span>
+</div>
+
+<div class="main">
+
+  <div class="emblem-wrap">
+    <div class="hex-ring outer"></div>
+    <div class="hex-ring"></div>
+    <div class="emblem-inner">
+      <div class="emblem-icon">✦</div>
+    </div>
   </div>
+
+  <div class="title-block">
+    <div class="title-eyebrow">// Star Citizen Toolbox //</div>
+    <div class="title-main">STARVIS</div>
+    <div class="title-sub">Intelligence · Navigation · Combat</div>
+  </div>
+
+  <div class="divider"><div class="divider-diamond"></div></div>
+
+  <div class="tagline">
+    <p>The interface is being deployed.<br>
+    <span class="em">Stand by.</span></p>
+  </div>
+
+  <a class="api-badge" href="https://starvis-api.ampynjord.bzh/api-docs" target="_blank" rel="noopener">
+    <div>
+      <div class="api-badge-label">Public API — available now</div>
+      <div class="api-badge-url">starvis-api.ampynjord.bzh</div>
+    </div>
+    <div class="api-badge-arrow">→</div>
+  </a>
+
+  <div class="signature">
+    <div class="sig-line"></div>
+    <div class="sig-text">crafted by <a href="https://github.com/ampynjord" target="_blank" rel="noopener">ampynjord</a></div>
+    <div class="sig-line"></div>
+  </div>
+
+</div>
+
+<div class="bottom-bar">
+  <span><span class="online-dot"></span>API ONLINE</span>
+  <span>RSI UNIVERSE — LIVE</span>
+  <span>UEE 2956</span>
+</div>
+
+<script>
+  function tick() {
+    const d = new Date(), p = n => String(n).padStart(2,'0');
+    document.getElementById('clock').textContent = p(d.getUTCHours())+':'+p(d.getUTCMinutes())+':'+p(d.getUTCSeconds())+' UTC';
+  }
+  setInterval(tick, 1000); tick();
+
+  const canvas = document.getElementById('stars');
+  const ctx = canvas.getContext('2d');
+  let stars = [];
+  function resize() { canvas.width = innerWidth; canvas.height = innerHeight; }
+  resize(); window.addEventListener('resize', () => { resize(); init(); });
+  function init() {
+    stars = [];
+    const n = Math.floor(canvas.width * canvas.height / 4500);
+    for (let i = 0; i < n; i++) stars.push({
+      x: Math.random()*canvas.width, y: Math.random()*canvas.height,
+      r: Math.random()*1.1, a: Math.random()*0.6+0.1, ph: Math.random()*Math.PI*2
+    });
+  }
+  init();
+  let t = 0;
+  (function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height); t += 0.007;
+    stars.forEach(s => {
+      const a = s.a * (0.4 + 0.6*Math.sin(t+s.ph));
+      ctx.beginPath(); ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
+      ctx.fillStyle = `rgba(180,220,255,${a})`; ctx.fill();
+    });
+    requestAnimationFrame(draw);
+  })();
+</script>
 </body>
 </html>

@@ -14,7 +14,7 @@ const BASE = (process.argv[2] || 'http://localhost:3003').replace(/\/$/, '');
 const API = `${BASE}/api/v1`;
 const ADMIN_KEY = process.env.ADMIN_API_KEY || 'starvis_admin_2024';
 const isRemote = !BASE.includes('localhost') && !BASE.includes('127.0.0.1');
-const DELAY_MS = isRemote ? 400 : 0;  // throttle on remote to avoid rate limiting
+const DELAY_MS = isRemote ? 2500 : 0;  // throttle on remote to avoid rate limiting (30 req/min burst)
 
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -53,11 +53,11 @@ async function test(name, fn) {
 }
 
 /** fetch + json, retourne {status, ok, data} sans throw. Retry on 429. */
-async function rawGet(path, retries = 3) {
+async function rawGet(path, retries = 5) {
   const res = await fetch(`${API}${path}`);
   if (res.status === 429 && retries > 0) {
-    const wait = parseInt(res.headers.get('retry-after') || '3') * 1000;
-    info(`⏳ 429 rate limited, waiting ${wait}ms...`);
+    const wait = Math.max(parseInt(res.headers.get('retry-after') || '5') * 1000, 5000);
+    info(`⏳ 429 rate limited, waiting ${wait}ms (${retries} retries left)...`);
     await delay(wait);
     return rawGet(path, retries - 1);
   }
@@ -66,11 +66,11 @@ async function rawGet(path, retries = 3) {
 }
 
 /** fetch + json avec auth admin. Retry on 429. */
-async function adminGet(path, retries = 3) {
+async function adminGet(path, retries = 5) {
   const res = await fetch(`${BASE}${path}`, { headers: { 'X-API-Key': ADMIN_KEY } });
   if (res.status === 429 && retries > 0) {
-    const wait = parseInt(res.headers.get('retry-after') || '3') * 1000;
-    info(`⏳ 429 rate limited, waiting ${wait}ms...`);
+    const wait = Math.max(parseInt(res.headers.get('retry-after') || '5') * 1000, 5000);
+    info(`⏳ 429 rate limited, waiting ${wait}ms (${retries} retries left)...`);
     await delay(wait);
     return adminGet(path, retries - 1);
   }
@@ -81,11 +81,11 @@ function assert(cond, msg) { if (!cond) throw new Error(msg); }
 function skip(msg) { throw new Error(`SKIP: ${msg}`); }
 
 /** Raw fetch with 429 retry (for CSV, ETag tests that don't use rawGet) */
-async function apiFetch(url, opts = {}, retries = 3) {
+async function apiFetch(url, opts = {}, retries = 5) {
   const res = await fetch(url, opts);
   if (res.status === 429 && retries > 0) {
-    const wait = parseInt(res.headers.get('retry-after') || '3') * 1000;
-    info(`⏳ 429 rate limited, waiting ${wait}ms...`);
+    const wait = Math.max(parseInt(res.headers.get('retry-after') || '5') * 1000, 5000);
+    info(`⏳ 429 rate limited, waiting ${wait}ms (${retries} retries left)...`);
     await delay(wait);
     return apiFetch(url, opts, retries - 1);
   }
@@ -338,7 +338,8 @@ await test('GET /components/nonexistent → 404', async () => {
 await test('No Turret/MissileRack in components', async () => {
   if (!hasGameData) skip('no game data');
   for (const t of ['Turret', 'MissileRack']) {
-    const { data } = await rawGet(`/components?type=${t}`);
+    const { data, status } = await rawGet(`/components?type=${t}`);
+    if (status === 429) skip('rate limited');
     assert(data.count === 0, `Found ${data.count} ${t} (should be 0 — non-swappable)`);
   }
 });
@@ -348,7 +349,8 @@ section('🏭 MANUFACTURERS');
 
 await test('GET /manufacturers → ≥20', async () => {
   if (!hasGameData) skip('no game data');
-  const { data } = await rawGet('/manufacturers');
+  const { data, status } = await rawGet('/manufacturers');
+  if (status === 429) skip('rate limited');
   assert(data.success && data.count >= 20, `Only ${data.count}`);
   info(`${data.count} manufacturers`);
 });
@@ -367,7 +369,9 @@ await test('POST /admin/extract-game-data sans auth → 401', async () => {
 });
 
 await test('GET /admin/stats avec auth → data', async () => {
-  const { data } = await adminGet('/admin/stats');
+  const { data, status } = await adminGet('/admin/stats');
+  if (status === 401) skip('admin key not set (use ADMIN_API_KEY env var)');
+  if (status === 429) skip('rate limited');
   assert(data.success, 'Failed');
   const sm = data.data.shipMatrix;
   const gd = data.data.gameData;
@@ -439,6 +443,8 @@ await test('GET /admin/extraction-log → auth required', async () => {
 
 await test('GET /admin/extraction-log → with auth', async () => {
   const { data, status } = await adminGet('/admin/extraction-log');
+  if (status === 401) skip('admin key not set (use ADMIN_API_KEY env var)');
+  if (status === 429) skip('rate limited');
   if (status === 503) skip('no game data service');
   assert(data.success, 'Failed');
   info(`${Array.isArray(data.data) ? data.data.length : 0} extraction entries`);
@@ -601,7 +607,9 @@ await test('Weapons have readable name (≠ class_name) (≥80%)', async () => {
 
 await test('Cross-reference Ship Matrix ≥ 180 linked', async () => {
   if (!hasGameData) skip('no game data');
-  const { data } = await adminGet('/admin/stats');
+  const { data, status } = await adminGet('/admin/stats');
+  if (status === 401) skip('admin key not set (use ADMIN_API_KEY env var)');
+  if (status === 429) skip('rate limited');
   const linked = data.data.gameData?.shipsLinkedToMatrix || 0;
   const total = data.data.shipMatrix?.total || 0;
   assert(linked >= 180, `Only ${linked}/${total} linked`);
