@@ -216,6 +216,14 @@ export function createRoutes(deps: RouteDependencies): Router {
     sendWithETag(req, res, { success: true, data: paints });
   }));
 
+  router.get("/api/v1/ships/:uuid/stats", requireGameData, asyncHandler(async (req, res) => {
+    const uuid = await resolveShipUuid(req.params.uuid);
+    if (!uuid) return void res.status(404).json({ success: false, error: "Ship not found" });
+    const stats = await gameDataService!.getShipStats(uuid);
+    if (!stats) return void res.status(404).json({ success: false, error: "Ship not found" });
+    sendWithETag(req, res, { success: true, data: stats });
+  }));
+
   router.get("/api/v1/ships/:uuid/compare/:uuid2", requireGameData, asyncHandler(async (req, res) => {
     const [ship1, ship2] = await Promise.all([resolveShip(req.params.uuid), resolveShip(req.params.uuid2)]);
     if (!ship1) return void res.status(404).json({ success: false, error: `Ship '${req.params.uuid}' not found` });

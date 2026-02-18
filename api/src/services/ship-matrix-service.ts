@@ -106,8 +106,8 @@ export class ShipMatrixService {
               ship["time_modified.unfiltered"] ? new Date(ship["time_modified.unfiltered"]) : null,
             );
             stats.synced++;
-          } catch (e: any) {
-            logger.error(`[ShipMatrix] ❌ ${ship.name}: ${e.message}`);
+          } catch (e: unknown) {
+            logger.error(`[ShipMatrix] ❌ ${ship.name}: ${e instanceof Error ? e.message : String(e)}`);
             stats.errors++;
           }
         }
@@ -123,25 +123,25 @@ export class ShipMatrixService {
               xaxis_acceleration, yaxis_acceleration, zaxis_acceleration,
               media_source_url, media_store_small, media_store_large,
               compiled, time_modified, time_modified_unfiltered
-            ) VALUES ${placeholders.join(",")}
+            ) VALUES ${placeholders.join(",")} AS new
             ON DUPLICATE KEY UPDATE
-              name=VALUES(name), chassis_id=VALUES(chassis_id),
-              manufacturer_id=VALUES(manufacturer_id), manufacturer_code=VALUES(manufacturer_code),
-              manufacturer_name=VALUES(manufacturer_name),
-              focus=VALUES(focus), type=VALUES(type), description=VALUES(description),
-              production_status=VALUES(production_status), production_note=VALUES(production_note),
-              size=VALUES(size), url=VALUES(url),
-              length=VALUES(length), beam=VALUES(beam), height=VALUES(height),
-              mass=VALUES(mass), cargocapacity=VALUES(cargocapacity),
-              min_crew=VALUES(min_crew), max_crew=VALUES(max_crew),
-              scm_speed=VALUES(scm_speed), afterburner_speed=VALUES(afterburner_speed),
-              pitch_max=VALUES(pitch_max), yaw_max=VALUES(yaw_max), roll_max=VALUES(roll_max),
-              xaxis_acceleration=VALUES(xaxis_acceleration), yaxis_acceleration=VALUES(yaxis_acceleration),
-              zaxis_acceleration=VALUES(zaxis_acceleration),
-              media_source_url=VALUES(media_source_url), media_store_small=VALUES(media_store_small),
-              media_store_large=VALUES(media_store_large),
-              compiled=VALUES(compiled), time_modified=VALUES(time_modified),
-              time_modified_unfiltered=VALUES(time_modified_unfiltered),
+              name=new.name, chassis_id=new.chassis_id,
+              manufacturer_id=new.manufacturer_id, manufacturer_code=new.manufacturer_code,
+              manufacturer_name=new.manufacturer_name,
+              focus=new.focus, type=new.type, description=new.description,
+              production_status=new.production_status, production_note=new.production_note,
+              size=new.size, url=new.url,
+              length=new.length, beam=new.beam, height=new.height,
+              mass=new.mass, cargocapacity=new.cargocapacity,
+              min_crew=new.min_crew, max_crew=new.max_crew,
+              scm_speed=new.scm_speed, afterburner_speed=new.afterburner_speed,
+              pitch_max=new.pitch_max, yaw_max=new.yaw_max, roll_max=new.roll_max,
+              xaxis_acceleration=new.xaxis_acceleration, yaxis_acceleration=new.yaxis_acceleration,
+              zaxis_acceleration=new.zaxis_acceleration,
+              media_source_url=new.media_source_url, media_store_small=new.media_store_small,
+              media_store_large=new.media_store_large,
+              compiled=new.compiled, time_modified=new.time_modified,
+              time_modified_unfiltered=new.time_modified_unfiltered,
               synced_at=CURRENT_TIMESTAMP`,
             values
           );

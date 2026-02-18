@@ -1,59 +1,25 @@
 /**
  * DataForge Service - Parses Star Citizen Game2.dcb binary DataForge files
  * Handles: binary parsing, struct/property resolution, GUID indexing, instance reading
+ *
+ * Extraction logic (components, shops, paints) is delegated to dedicated modules.
  */
+import { extractAllComponents as _extractAllComponents } from "./component-extractor.js";
 import { CryXmlNode, isCryXmlB, parseCryXml } from "./cryxml-parser.js";
 import {
-  type DataForgeData, DT_NAMES,
-  getStructProperties, parseDataForge,
-  readInstance as readInstancePure
+    type DataForgeData, type RecordDef, DT_NAMES,
+    getStructProperties, parseDataForge,
+    readInstance as readInstancePure
 } from "./dataforge-parser.js";
+import { type DataForgeContext, classifyPort, resolveLocKey } from "./dataforge-utils.js";
 import logger from "./logger.js";
 import { P4KProvider } from "./p4k-provider.js";
+import { extractPaints as _extractPaints, extractShops as _extractShops } from "./shop-paint-extractor.js";
 
-/** Manufacturer code → full name mapping (from SC game data prefixes) */
-export const MANUFACTURER_CODES: Record<string, string> = {
-  // Vehicle manufacturers (ship_matrix + P4K)
-  AEGS: "Aegis Dynamics",
-  ANVL: "Anvil Aerospace",
-  ARGO: "ARGO Astronautics",
-  BANU: "Banu",
-  CNOU: "Consolidated Outland",
-  CRUS: "Crusader Industries",
-  DRAK: "Drake Interplanetary",
-  ESPR: "Esperia",
-  GAMA: "Gatac Manufacture",
-  GLSN: "Grey's Market",
-  GREY: "Grey's Market",
-  GRIN: "Greycat Industrial",
-  KRIG: "Kruger Intergalactic",
-  MISC: "Musashi Industrial & Starflight Concern",
-  MRAI: "Mirai",
-  ORIG: "Origin Jumpworks",
-  RSI:  "Roberts Space Industries",
-  TMBL: "Tumbril Land Systems",
-  VNCL: "Vanduul",
-  XIAN: "Aopoa",
-  XNAA: "Aopoa",
-  // Component manufacturers (P4K only)
-  AMRS: "Amon & Reese Co.",
-  APAR: "Apocalypse Arms",
-  BEHR: "Behring Applied Technology",
-  BRRA: "Basilisk",
-  GATS: "Gallenson Tactical Systems",
-  HRST: "Hurston Dynamics",
-  JOKR: "Joker Engineering",
-  KBAR: "KnightBridge Arms",
-  KLWE: "Klaus & Werner",
-  KRON: "Kroneg",
-  MXOX: "MaxOx",
-  NOVP: "Nova Pyrotechnik",
-  PRAR: "Preacher Armaments",
-  TALN: "Talon",
-  TOAG: "Thermyte Concern",
-};
+// Re-export for backward compatibility (extraction-service.ts imports these from here)
+export { MANUFACTURER_CODES, classifyPort } from "./dataforge-utils.js";
 
-export class DataForgeService {
+export class DataForgeService implements DataForgeContext {
   private provider: P4KProvider | null = null;
   private dcbBuffer: Buffer | null = null;
   private dfData: DataForgeData | null = null;
@@ -61,6 +27,14 @@ export class DataForgeService {
   private guidIndex = new Map<string, string>();
 
   constructor(private p4kPath: string) {}
+
+  // ============ DataForgeContext implementation ============
+
+  /** Expose parsed DataForge data for extraction modules */
+  getDfData(): DataForgeData | null { return this.dfData; }
+
+  /** Expose P4K provider (replaces the old `(svc as any).provider` hack) */
+  getProvider(): P4KProvider | null { return this.provider; }
 
   async init(): Promise<void> {
     logger.info('Init P4K service...', { module: 'dataforge' });
@@ -136,7 +110,7 @@ export class DataForgeService {
 
   readRecordByGuid(guid: string, maxDepth = 4): Record<string, any> | null {
     if (!this.dfData || !this.dcbBuffer || !guid || guid === '00000000-0000-0000-0000-000000000000') return null;
-    const record = this.dfData.records.find((r: any) => r.id === guid);
+    const record = this.dfData.records.find(r => r.id === guid);
     if (!record) return null;
     return this.readInstance(record.structIndex, record.instanceIndex, 0, maxDepth);
   }
@@ -175,16 +149,16 @@ export class DataForgeService {
 
   getStructTypes(): string[] {
     if (!this.dfData) throw new Error("DataForge not loaded");
-    return this.dfData.structDefs.map((s: any) => s.name);
+    return this.dfData.structDefs.map(s => s.name);
   }
 
   /** Debug: inspect struct property definitions with data types */
   debugStructProperties(structName: string): any[] {
     if (!this.dfData) throw new Error("DataForge not loaded");
-    const idx = this.dfData.structDefs.findIndex((s: any) => s.name === structName);
+    const idx = this.dfData.structDefs.findIndex(s => s.name === structName);
     if (idx === -1) return [];
     const props = getStructProperties(this.dfData, idx);
-    return props.map((p: any) => ({
+    return props.map(p => ({
       name: p.name,
       dataType: DT_NAMES[p.dataType] || `0x${p.dataType.toString(16)}`,
       conversionType: p.conversionType,
@@ -215,7 +189,7 @@ export class DataForgeService {
   /** Debug: inspect a component SCItem by class_name */
   debugComponent(className: string): any {
     if (!this.dfData || !this.dcbBuffer) return null;
-    const entityClassIdx = this.dfData.structDefs.findIndex((s: any) => s.name === 'EntityClassDefinition');
+    const entityClassIdx = this.dfData.structDefs.findIndex(s => s.name === 'EntityClassDefinition');
     for (const r of this.dfData.records) {
       if (r.structIndex !== entityClassIdx) continue;
       const name = r.name?.replace('EntityClassDefinition.', '') || '';
@@ -226,9 +200,9 @@ export class DataForgeService {
     return { error: 'Not found' };
   }
 
-  findEntityRecord(entityClassName: string): any | null {
+  findEntityRecord(entityClassName: string): RecordDef | null {
     if (!this.dfData) return null;
-    const entityClassIdx = this.dfData.structDefs.findIndex((s: any) => s.name === 'EntityClassDefinition');
+    const entityClassIdx = this.dfData.structDefs.findIndex(s => s.name === 'EntityClassDefinition');
     if (entityClassIdx === -1) return null;
     for (const r of this.dfData.records) {
       if (r.structIndex === entityClassIdx) {
@@ -255,7 +229,7 @@ export class DataForgeService {
    */
   findVariantPUEntities(className: string): string[] {
     if (!this.dfData) return [];
-    const entityClassIdx = this.dfData.structDefs.findIndex((s: any) => s.name === 'EntityClassDefinition');
+    const entityClassIdx = this.dfData.structDefs.findIndex(s => s.name === 'EntityClassDefinition');
     if (entityClassIdx === -1) return [];
     const prefix = className + '_';
     // Regex to find _PU as a segment: _PU at end or _PU_ followed by more
@@ -433,7 +407,7 @@ export class DataForgeService {
 
   private buildVehicleIndex() {
     if (!this.dfData) return;
-    const entityClassDefIndex = this.dfData.structDefs.findIndex((s: any) => s.name === "EntityClassDefinition");
+    const entityClassDefIndex = this.dfData.structDefs.findIndex(s => s.name === "EntityClassDefinition");
 
     for (const r of this.dfData.records) {
       if (r.structIndex !== entityClassDefIndex) continue;
@@ -469,470 +443,10 @@ export class DataForgeService {
     logger.info(`Built GUID index: ${this.guidIndex.size} record GUIDs`, { module: 'dataforge' });
   }
 
-  // ============ Component extraction (from DataForge SCItem records) ============
+  // ============ Component extraction (delegated to component-extractor.ts) ============
 
   extractAllComponents(): any[] {
-    if (!this.dfData || !this.dcbBuffer) return [];
-    const components: any[] = [];
-    const entityClassIdx = this.dfData.structDefs.findIndex((s: any) => s.name === 'EntityClassDefinition');
-    if (entityClassIdx === -1) return [];
-
-    const componentPaths: Record<string, RegExp> = {
-      'WeaponGun':     /scitem.*weapons\/[^\/\\]+$/i,
-      'Shield':        /shield_?generator[s]?[\/\\]|shield[s]?[\/\\]/i,
-      'PowerPlant':    /power_?plant[s]?[\/\\]|powerplant/i,
-      'Cooler':        /cooler[s]?[\/\\]/i,
-      'QuantumDrive':  /quantum_?drive[s]?[\/\\]|quantumdrive/i,
-      'Missile':       /missile[s]?[\/\\](?!rack|launcher|_rack)/i,
-      'Thruster':      /thruster[s]?[\/\\]/i,
-      'Radar':         /radar[s]?[\/\\]/i,
-      'Countermeasure': /countermeasure[s]?[\/\\]|flare[s]?[\/\\]|noise[\/\\]/i,
-      'FuelIntake':    /fuel_?intake[s]?[\/\\]/i,
-      'FuelTank':      /fuel_?tank[s]?[\/\\](?!quantum)/i,
-      'LifeSupport':   /life_?support[s]?[\/\\]/i,
-      'EMP':           /emp[\/\\]|distortion_?charge[\/\\]|emp_?generator/i,
-      'QuantumInterdictionGenerator': /quantum_?interdiction[\/\\]|qig[\/\\]|quantum_?enforcement/i,
-    };
-
-    let scanned = 0;
-    for (const r of this.dfData.records) {
-      if (r.structIndex !== entityClassIdx) continue;
-      const fn = (r.fileName || '').toLowerCase();
-      if (!fn.includes('scitem') && !fn.includes('/weapon/') && !fn.includes('/missile/') && !fn.includes('/systems/')) continue;
-      let type: string | null = null;
-      for (const [t, rx] of Object.entries(componentPaths)) { if (rx.test(fn)) { type = t; break; } }
-      if (!type) continue;
-      scanned++;
-      try {
-        const data = this.readInstance(r.structIndex, r.instanceIndex, 0, 4);
-        if (!data) continue;
-        const className = r.name?.replace('EntityClassDefinition.', '') || '';
-        if (!className) continue;
-        const lcName = className.toLowerCase();
-        if (lcName.includes('_test') || lcName.startsWith('test_') ||
-            lcName.includes('_debug') || lcName.includes('_template') ||
-            lcName.includes('_indestructible') || lcName.includes('_npc_only') ||
-            lcName.includes('_placeholder') || lcName.includes('contestedzonereward') ||
-            lcName.startsWith('display_')) continue;
-
-        // Skip FPS weapons (personal weapons, not ship components)
-        if (type === 'WeaponGun') {
-          const isFpsWeapon = /(?:^|\b|_)(rifles?|pistols?|smg|shotgun|sniper|multitool|lmg|grenade_launcher)(?:_|\b|$)/i.test(lcName);
-          if (isFpsWeapon) continue;
-        }
-
-        const comp: any = { uuid: r.id, className, name: className.replace(/_/g, ' '), type };
-        const comps = data.Components;
-        if (!Array.isArray(comps)) continue;
-
-        for (const c of comps) {
-          if (!c || typeof c !== 'object' || !c.__type) continue;
-          const cType = c.__type as string;
-
-          if (cType === 'SAttachableComponentParams') {
-            const ad = c.AttachDef;
-            if (ad && typeof ad === 'object') {
-              if (typeof ad.Size === 'number') comp.size = ad.Size;
-              if (typeof ad.Grade === 'number') comp.grade = String.fromCharCode(65 + ad.Grade);
-              const loc = ad.Localization;
-              if (loc?.Name && typeof loc.Name === 'string') {
-                if (!loc.Name.startsWith('LOC_') && !loc.Name.startsWith('@')) {
-                  comp.name = loc.Name;
-                } else {
-                  // LOC key: resolve to a readable name from className
-                  comp.name = DataForgeService.resolveComponentName(className);
-                }
-              }
-              if (typeof ad.Manufacturer === 'string' && ad.Manufacturer) comp.manufacturer = ad.Manufacturer;
-            }
-          }
-          if (cType === 'EntityComponentPowerConnection') {
-            if (typeof c.PowerBase === 'number') comp.powerBase = Math.round(c.PowerBase * 100) / 100;
-            if (typeof c.PowerDraw === 'number') {
-              if (type === 'PowerPlant') comp.powerOutput = Math.round(c.PowerDraw * 100) / 100;
-              comp.powerDraw = Math.round(c.PowerDraw * 100) / 100;
-            }
-          }
-          if (cType === 'EntityComponentHeatConnection') {
-            if (typeof c.ThermalEnergyBase === 'number') comp.heatGeneration = Math.round(c.ThermalEnergyBase * 100) / 100;
-            if (typeof c.ThermalEnergyDraw === 'number') comp.heatGeneration = Math.round(c.ThermalEnergyDraw * 100) / 100;
-          }
-          if (cType === 'SHealthComponentParams') {
-            if (typeof c.Health === 'number' && c.Health > 0) comp.hp = Math.round(c.Health);
-          }
-
-          // Weapon fire rate
-          if (cType === 'SCItemWeaponComponentParams') {
-            const fireActions = c.fireActions;
-            if (Array.isArray(fireActions) && fireActions.length > 0) {
-              const pa = fireActions[0];
-              if (pa && typeof pa === 'object') {
-                if (typeof pa.fireRate === 'number') comp.weaponFireRate = Math.round(pa.fireRate * 100) / 100;
-                if (typeof pa.heatPerShot === 'number') comp.weaponHeatPerShot = Math.round(pa.heatPerShot * 100000) / 100000;
-                const lp = pa.launchParams;
-                if (lp && typeof lp === 'object') {
-                  if (typeof lp.pelletCount === 'number') comp.weaponPelletsPerShot = lp.pelletCount;
-                }
-                // Sequence fire actions
-                if (!comp.weaponFireRate && Array.isArray(pa.sequenceEntries)) {
-                  let totalFR = 0;
-                  for (const se of pa.sequenceEntries) {
-                    const wa = se?.weaponAction;
-                    if (wa && typeof wa.fireRate === 'number') totalFR += wa.fireRate;
-                    if (!comp.weaponHeatPerShot && typeof wa?.heatPerShot === 'number') comp.weaponHeatPerShot = Math.round(wa.heatPerShot * 100000) / 100000;
-                    if (!comp.weaponPelletsPerShot && wa?.launchParams?.pelletCount) comp.weaponPelletsPerShot = wa.launchParams.pelletCount;
-                  }
-                  if (totalFR > 0) comp.weaponFireRate = Math.round(totalFR * 100) / 100;
-                }
-              }
-            }
-            // Legacy
-            if (c.weaponAction && typeof c.weaponAction === 'object' && !comp.weaponFireRate) {
-              if (typeof c.weaponAction.fireRate === 'number') comp.weaponFireRate = Math.round(c.weaponAction.fireRate * 100) / 100;
-            }
-          }
-
-          if (cType === 'SCItemWeaponGunParams' || cType === 'SCItemGunParams') {
-            if (typeof c.ammoContainerRecord === 'string') {
-              if (c.ammoContainerRecord.toLowerCase().includes('ballistic')) comp.subType = 'Ballistic';
-              else if (c.ammoContainerRecord.toLowerCase().includes('energy')) comp.subType = 'Energy';
-              else if (c.ammoContainerRecord.toLowerCase().includes('distortion')) comp.subType = 'Distortion';
-            }
-          }
-
-          // Ammo damage resolution via GUID
-          if (cType === 'SAmmoContainerComponentParams') {
-            if (typeof c.maxAmmoCount === 'number') comp.weaponAmmoCount = c.maxAmmoCount;
-            if (typeof c.initialAmmoCount === 'number' && !comp.weaponAmmoCount) comp.weaponAmmoCount = c.initialAmmoCount;
-            const ammoGuid = c.ammoParamsRecord?.__ref;
-            if (ammoGuid) {
-              try {
-                const ammoData = this.readRecordByGuid(ammoGuid, 5);
-                if (ammoData) {
-                  // SC 4.x: speed and lifetime are TOP-LEVEL on ammoData, not inside projectileParams
-                  if (typeof ammoData.speed === 'number' && !comp.weaponSpeed) comp.weaponSpeed = Math.round(ammoData.speed * 100) / 100;
-                  if (typeof ammoData.lifetime === 'number' && comp.weaponSpeed) comp.weaponRange = Math.round(ammoData.lifetime * comp.weaponSpeed * 100) / 100;
-
-                  const pp = ammoData.projectileParams;
-                  if (pp && typeof pp === 'object') {
-                    // Direct hit damage from projectileParams.damage
-                    const dmg = pp.damage;
-                    let physical = 0, energy = 0, distortion = 0, thermal = 0, biochemical = 0, stun = 0;
-                    if (dmg && typeof dmg === 'object') {
-                      physical = typeof dmg.DamagePhysical === 'number' ? dmg.DamagePhysical : 0;
-                      energy = typeof dmg.DamageEnergy === 'number' ? dmg.DamageEnergy : 0;
-                      distortion = typeof dmg.DamageDistortion === 'number' ? dmg.DamageDistortion : 0;
-                      thermal = typeof dmg.DamageThermal === 'number' ? dmg.DamageThermal : 0;
-                      biochemical = typeof dmg.DamageBiochemical === 'number' ? dmg.DamageBiochemical : 0;
-                      stun = typeof dmg.DamageStun === 'number' ? dmg.DamageStun : 0;
-                    }
-
-                    // SC 4.x: Distortion/explosive weapons store real damage in detonationParams.explosionParams.damage
-                    // (direct hit damage is often 0 or 0.0001 placeholder)
-                    const detDmg = pp.detonationParams?.explosionParams?.damage;
-                    if (detDmg && typeof detDmg === 'object') {
-                      const dp = typeof detDmg.DamagePhysical === 'number' ? detDmg.DamagePhysical : 0;
-                      const de = typeof detDmg.DamageEnergy === 'number' ? detDmg.DamageEnergy : 0;
-                      const dd = typeof detDmg.DamageDistortion === 'number' ? detDmg.DamageDistortion : 0;
-                      const dt = typeof detDmg.DamageThermal === 'number' ? detDmg.DamageThermal : 0;
-                      const db = typeof detDmg.DamageBiochemical === 'number' ? detDmg.DamageBiochemical : 0;
-                      const ds = typeof detDmg.DamageStun === 'number' ? detDmg.DamageStun : 0;
-                      // Use the higher value for each damage type (detonation replaces placeholder direct hit)
-                      physical = Math.max(physical, dp);
-                      energy = Math.max(energy, de);
-                      distortion = Math.max(distortion, dd);
-                      thermal = Math.max(thermal, dt);
-                      biochemical = Math.max(biochemical, db);
-                      stun = Math.max(stun, ds);
-                    }
-
-                    const totalDmg = physical + energy + distortion + thermal + biochemical + stun;
-                    if (totalDmg > 0) {
-                      comp.weaponDamage = Math.round(totalDmg * 10000) / 10000;
-                      comp.weaponDamagePhysical = Math.round(physical * 10000) / 10000;
-                      comp.weaponDamageEnergy = Math.round(energy * 10000) / 10000;
-                      comp.weaponDamageDistortion = Math.round(distortion * 10000) / 10000;
-                      comp.weaponDamageThermal = Math.round(thermal * 10000) / 10000;
-                      comp.weaponDamageBiochemical = Math.round(biochemical * 10000) / 10000;
-                      comp.weaponDamageStun = Math.round(stun * 10000) / 10000;
-                      const dtypes: [string, number][] = [['physical', physical], ['energy', energy], ['distortion', distortion], ['thermal', thermal], ['biochemical', biochemical], ['stun', stun]];
-                      comp.weaponDamageType = dtypes.sort((a, b) => b[1] - a[1])[0][0];
-                    }
-
-                    // Fallback: speed/lifetime from projectileParams (older format)
-                    if (typeof pp.speed === 'number' && !comp.weaponSpeed) comp.weaponSpeed = Math.round(pp.speed * 100) / 100;
-                    if (typeof pp.lifetime === 'number' && comp.weaponSpeed && !comp.weaponRange) comp.weaponRange = Math.round(pp.lifetime * comp.weaponSpeed * 100) / 100;
-                  }
-                }
-              } catch (e) { /* ammo resolution — non-critical */ }
-            }
-          }
-
-          // Shield
-          if (cType === 'SCItemShieldGeneratorParams') {
-            if (typeof c.MaxShieldHealth === 'number') comp.shieldHp = Math.round(c.MaxShieldHealth * 100) / 100;
-            if (typeof c.MaxShieldRegen === 'number') comp.shieldRegen = Math.round(c.MaxShieldRegen * 10000) / 10000;
-            if (typeof c.DamagedRegenDelay === 'number') comp.shieldRegenDelay = Math.round(c.DamagedRegenDelay * 100) / 100;
-            if (typeof c.Hardening === 'number') comp.shieldHardening = Math.round(c.Hardening * 10000) / 10000;
-            if (typeof c.MaxReallocation === 'number') comp.shieldFaces = c.MaxReallocation > 0 ? 6 : 2;
-            if (typeof c.ShieldMaxHealth === 'number' && !comp.shieldHp) comp.shieldHp = Math.round(c.ShieldMaxHealth * 100) / 100;
-            if (typeof c.ShieldRegenRate === 'number' && !comp.shieldRegen) comp.shieldRegen = Math.round(c.ShieldRegenRate * 10000) / 10000;
-          }
-
-          // Power plant
-          if (cType === 'SCItemPowerPlantParams') {
-            if (typeof c.MaxPower === 'number') comp.powerOutput = Math.round(c.MaxPower * 100) / 100;
-            if (typeof c.PowerOutput === 'number' && !comp.powerOutput) comp.powerOutput = Math.round(c.PowerOutput * 100) / 100;
-          }
-
-          // Cooler
-          if (cType === 'SCItemCoolerParams') {
-            if (typeof c.CoolingRate === 'number') comp.coolingRate = Math.round(c.CoolingRate * 100) / 100;
-            if (typeof c.MaxCoolingRate === 'number' && !comp.coolingRate) comp.coolingRate = Math.round(c.MaxCoolingRate * 100) / 100;
-          }
-
-          // Quantum drive
-          if (cType === 'SCItemQuantumDriveParams') {
-            // Top-level properties (SC 4.x structure: params nested under c.params)
-            if (typeof c.quantumFuelRequirement === 'number') comp.qdFuelRate = c.quantumFuelRequirement;
-            if (typeof c.disconnectRange === 'number') comp.qdDisconnectRange = Math.round(c.disconnectRange * 100) / 100;
-            // jumpRange is often Float.MAX (3.4e38) = unlimited, skip if too large
-            if (typeof c.jumpRange === 'number' && c.jumpRange < 1e30) comp.qdRange = Math.round(c.jumpRange * 100) / 100;
-
-            // Main drive params are nested under c.params (SQuantumDriveParams)
-            const params = c.params;
-            if (params && typeof params === 'object') {
-              if (typeof params.driveSpeed === 'number') comp.qdSpeed = Math.round(params.driveSpeed * 100) / 100;
-              if (typeof params.spoolUpTime === 'number') comp.qdSpoolTime = Math.round(params.spoolUpTime * 100) / 100;
-              if (typeof params.cooldownTime === 'number') comp.qdCooldown = Math.round(params.cooldownTime * 100) / 100;
-              if (typeof params.stageOneAccelRate === 'number') comp.qdStage1Accel = Math.round(params.stageOneAccelRate * 100) / 100;
-              if (typeof params.stageTwoAccelRate === 'number') comp.qdStage2Accel = Math.round(params.stageTwoAccelRate * 100) / 100;
-            }
-            // Fallback: flat properties (older DataForge format)
-            if (typeof c.driveSpeed === 'number' && !comp.qdSpeed) comp.qdSpeed = Math.round(c.driveSpeed * 100) / 100;
-            if (typeof c.spoolUpTime === 'number' && !comp.qdSpoolTime) comp.qdSpoolTime = Math.round(c.spoolUpTime * 100) / 100;
-            if (typeof c.cooldownTime === 'number' && !comp.qdCooldown) comp.qdCooldown = Math.round(c.cooldownTime * 100) / 100;
-
-            // Jump params (alternate structure)
-            const jp = c.jumpParams || c.JumpParams;
-            if (jp && typeof jp === 'object') {
-              if (typeof jp.Stage1AccelerationRate === 'number' && !comp.qdStage1Accel) comp.qdStage1Accel = Math.round(jp.Stage1AccelerationRate * 100) / 100;
-              if (typeof jp.Stage2AccelerationRate === 'number' && !comp.qdStage2Accel) comp.qdStage2Accel = Math.round(jp.Stage2AccelerationRate * 100) / 100;
-            }
-            // Spline jump params (separate drive params for spline travel mode)
-            // Note: tuningRate/alignmentRate don't exist in current DataForge; splineJumpParams is just another SQuantumDriveParams
-            const sjp = c.splineJumpParams || c.SplineJumpParams;
-            if (sjp && typeof sjp === 'object') {
-              // splineJumpParams.driveSpeed = spline mode speed (lower than main QD speed)
-              if (typeof sjp.driveSpeed === 'number') comp.qdTuningRate = Math.round(sjp.driveSpeed * 100) / 100;
-              if (typeof sjp.stageOneAccelRate === 'number') comp.qdAlignmentRate = Math.round(sjp.stageOneAccelRate * 100) / 100;
-            }
-          }
-
-          // Missile - extract from SCItemMissileParams (explosionParams.damage, GCSParams, targetingParams)
-          if (cType === 'SCItemMissileParams') {
-            // Damage from explosionParams.damage (DamageInfo struct)
-            const ep = c.explosionParams;
-            if (ep && typeof ep === 'object') {
-              const dmg = ep.damage;
-              if (dmg && typeof dmg === 'object') {
-                const physical = typeof dmg.DamagePhysical === 'number' ? dmg.DamagePhysical : 0;
-                const energy = typeof dmg.DamageEnergy === 'number' ? dmg.DamageEnergy : 0;
-                const distortion = typeof dmg.DamageDistortion === 'number' ? dmg.DamageDistortion : 0;
-                const thermal = typeof dmg.DamageThermal === 'number' ? dmg.DamageThermal : 0;
-                const biochemical = typeof dmg.DamageBiochemical === 'number' ? dmg.DamageBiochemical : 0;
-                const stun = typeof dmg.DamageStun === 'number' ? dmg.DamageStun : 0;
-                const total = physical + energy + distortion + thermal + biochemical + stun;
-                if (total > 0) {
-                  comp.missileDamage = Math.round(total * 100) / 100;
-                  comp.missileDamagePhysical = Math.round(physical * 100) / 100;
-                  comp.missileDamageEnergy = Math.round(energy * 100) / 100;
-                  comp.missileDamageDistortion = Math.round(distortion * 100) / 100;
-                }
-              }
-            }
-            // Speed from GCSParams
-            const gcs = c.GCSParams;
-            if (gcs && typeof gcs === 'object') {
-              if (typeof gcs.linearSpeed === 'number') comp.missileSpeed = Math.round(gcs.linearSpeed * 100) / 100;
-            }
-            // Targeting from targetingParams
-            const tp = c.targetingParams;
-            if (tp && typeof tp === 'object') {
-              if (typeof tp.lockTime === 'number') comp.missileLockTime = Math.round(tp.lockTime * 100) / 100;
-              if (typeof tp.trackingSignalType === 'string') comp.missileSignalType = tp.trackingSignalType;
-              if (typeof tp.lockRangeMax === 'number') comp.missileLockRange = Math.round(tp.lockRangeMax * 100) / 100;
-              if (typeof tp.lockRangeMin === 'number') comp.missileRange = Math.round(tp.lockRangeMin * 100) / 100;
-            }
-          }
-
-          // Projectile params
-          if (cType === 'SProjectile' || cType === 'SCItemProjectileParams') {
-            const bDmg = c.bulletImpactDamage || c.damage;
-            if (bDmg && typeof bDmg === 'object') {
-              const dt = Object.entries(bDmg).find(([k, v]) => typeof v === 'number' && (v as number) > 0);
-              if (dt) { comp.weaponDamage = Math.round(dt[1] as number * 10000) / 10000; comp.weaponDamageType = dt[0]; }
-            }
-            if (typeof c.speed === 'number' && !comp.weaponSpeed) comp.weaponSpeed = Math.round(c.speed * 100) / 100;
-            if (typeof c.lifetime === 'number' && comp.weaponSpeed) comp.weaponRange = Math.round(c.lifetime * comp.weaponSpeed * 100) / 100;
-          }
-
-          // Thruster
-          if (cType === 'SCItemThrusterParams' || cType === 'SItemThrusterParams') {
-            if (typeof c.thrustCapacity === 'number') comp.thrusterMaxThrust = Math.round(c.thrustCapacity * 100) / 100;
-            if (typeof c.ThrustCapacity === 'number' && !comp.thrusterMaxThrust) comp.thrusterMaxThrust = Math.round(c.ThrustCapacity * 100) / 100;
-            if (typeof c.maxThrustForce === 'number' && !comp.thrusterMaxThrust) comp.thrusterMaxThrust = Math.round(c.maxThrustForce * 100) / 100;
-            // Determine sub-type from port name pattern in fileName
-            const thrusterType = fn.includes('main') || fn.includes('retro') ? (fn.includes('retro') ? 'Retro' : 'Main') :
-              fn.includes('vtol') ? 'VTOL' : fn.includes('mav') || fn.includes('maneuver') ? 'Maneuvering' : 'Main';
-            comp.thrusterType = thrusterType;
-          }
-
-          // Radar — SC 4.x structure: signatureDetection[] with sensitivity/piercing per signal type
-          if (cType === 'SCItemRadarComponentParams' || cType === 'SRadarComponentParams') {
-            // signatureDetection array: entries for different signal types (EM, IR, CS, etc.)
-            // Use the first entry's sensitivity as the general radar sensitivity metric
-            const sigDet = c.signatureDetection;
-            if (Array.isArray(sigDet) && sigDet.length > 0) {
-              // Average sensitivity across active detection modes
-              const activeSensitivities = sigDet.filter((s: any) => s?.permitPassiveDetection === true && typeof s?.sensitivity === 'number');
-              if (activeSensitivities.length > 0) {
-                const avgSensitivity = activeSensitivities.reduce((sum: number, s: any) => sum + s.sensitivity, 0) / activeSensitivities.length;
-                comp.radarTrackingSignal = Math.round(avgSensitivity * 10000) / 10000;
-              }
-              // Max piercing value (ability to detect stealthy targets)
-              const piercingValues = sigDet.filter((s: any) => typeof s?.piercing === 'number').map((s: any) => s.piercing);
-              if (piercingValues.length > 0) {
-                comp.radarDetectionLifetime = Math.round(Math.max(...piercingValues) * 10000) / 10000;
-              }
-            }
-            // Ping cooldown
-            if (c.pingProperties && typeof c.pingProperties.cooldownTime === 'number') {
-              comp.radarRange = c.pingProperties.cooldownTime;
-            }
-          }
-
-          // Countermeasure
-          if (cType === 'SCItemCountermeasureParams' || cType === 'SCountermeasureParams') {
-            if (typeof c.ammoCount === 'number') comp.cmAmmoCount = c.ammoCount;
-          }
-          if (type === 'Countermeasure' && cType === 'SAmmoContainerComponentParams') {
-            if (typeof c.maxAmmoCount === 'number') comp.cmAmmoCount = c.maxAmmoCount;
-            if (typeof c.initialAmmoCount === 'number' && !comp.cmAmmoCount) comp.cmAmmoCount = c.initialAmmoCount;
-          }
-
-          // Fuel Tank
-          if (cType === 'SCItemFuelTankParams') {
-            if (typeof c.capacity === 'number') comp.fuelCapacity = Math.round(c.capacity * 100) / 100;
-          }
-          if (type === 'FuelTank' && cType === 'ResourceContainer') {
-            const cap = typeof c.capacity === 'object' ? (c.capacity?.standardCargoUnits || 0) : (typeof c.capacity === 'number' ? c.capacity : 0);
-            if (cap > 0) comp.fuelCapacity = Math.round(cap * 100) / 100;
-          }
-
-          // Fuel Intake
-          if (cType === 'SCItemFuelIntakeParams' || cType === 'SFuelIntakeParams') {
-            if (typeof c.fuelPushRate === 'number') comp.fuelIntakeRate = Math.round(c.fuelPushRate * 10000) / 10000;
-            if (typeof c.FuelPushRate === 'number' && !comp.fuelIntakeRate) comp.fuelIntakeRate = Math.round(c.FuelPushRate * 10000) / 10000;
-          }
-
-          // EMP — SCItemEMPParams
-          if (cType === 'SCItemEMPParams' || cType === 'SEMPParams') {
-            if (typeof c.distortionDamage === 'number') comp.empDamage = Math.round(c.distortionDamage * 100) / 100;
-            if (typeof c.DistortionDamage === 'number' && !comp.empDamage) comp.empDamage = Math.round(c.DistortionDamage * 100) / 100;
-            // empRadius is the actual DataForge property name
-            if (typeof c.empRadius === 'number') comp.empRadius = Math.round(c.empRadius * 100) / 100;
-            if (typeof c.maximumRadius === 'number' && !comp.empRadius) comp.empRadius = Math.round(c.maximumRadius * 100) / 100;
-            if (typeof c.chargeTime === 'number') comp.empChargeTime = Math.round(c.chargeTime * 100) / 100;
-            if (typeof c.ChargeTime === 'number' && !comp.empChargeTime) comp.empChargeTime = Math.round(c.ChargeTime * 100) / 100;
-            // cooldownTime is the actual cooldown; unleashTime is the burst duration
-            if (typeof c.cooldownTime === 'number') comp.empCooldown = Math.round(c.cooldownTime * 100) / 100;
-            if (typeof c.CooldownTime === 'number' && !comp.empCooldown) comp.empCooldown = Math.round(c.CooldownTime * 100) / 100;
-            // Also try damage from nested damageInfo/damage struct
-            const empDmg = c.damage || c.damageInfo;
-            if (empDmg && typeof empDmg === 'object') {
-              const dist = typeof empDmg.DamageDistortion === 'number' ? empDmg.DamageDistortion : 0;
-              if (dist > 0 && !comp.empDamage) comp.empDamage = Math.round(dist * 100) / 100;
-            }
-          }
-
-          // Quantum Interdiction Generator — SCItemQuantumInterdictionGeneratorParams
-          // Data is nested: jammerSettings.jammerRange, quantumInterdictionPulseSettings.{chargeTimeSecs, cooldownTimeSecs, radiusMeters}
-          if (cType === 'SCItemQuantumInterdictionGeneratorParams' || cType === 'SQuantumInterdictionGeneratorParams') {
-            // Jammer range from nested jammerSettings
-            const js = c.jammerSettings;
-            if (js && typeof js === 'object') {
-              if (typeof js.jammerRange === 'number') comp.qigJammerRange = Math.round(js.jammerRange * 100) / 100;
-            }
-            // Fallback flat properties
-            if (typeof c.jammerRange === 'number' && !comp.qigJammerRange) comp.qigJammerRange = Math.round(c.jammerRange * 100) / 100;
-
-            // Pulse settings (snare radius, charge time, cooldown) from nested quantumInterdictionPulseSettings
-            const ps = c.quantumInterdictionPulseSettings;
-            if (ps && typeof ps === 'object') {
-              if (typeof ps.radiusMeters === 'number') comp.qigSnareRadius = Math.round(ps.radiusMeters * 100) / 100;
-              if (typeof ps.chargeTimeSecs === 'number') comp.qigChargeTime = Math.round(ps.chargeTimeSecs * 100) / 100;
-              if (typeof ps.cooldownTimeSecs === 'number') comp.qigCooldown = Math.round(ps.cooldownTimeSecs * 100) / 100;
-            }
-            // Fallback flat properties
-            if (typeof c.chargeTime === 'number' && !comp.qigChargeTime) comp.qigChargeTime = Math.round(c.chargeTime * 100) / 100;
-            if (typeof c.cooldownTime === 'number' && !comp.qigCooldown) comp.qigCooldown = Math.round(c.cooldownTime * 100) / 100;
-          }
-        }
-
-        // Derived stats
-        if (comp.weaponDamage && comp.weaponFireRate) {
-          const pellets = comp.weaponPelletsPerShot || 1;
-          comp.weaponAlphaDamage = Math.round(comp.weaponDamage * pellets * 10000) / 10000;
-          comp.weaponDps = Math.round(comp.weaponAlphaDamage * (comp.weaponFireRate / 60) * 10000) / 10000;
-
-          // Burst DPS = DPS during the burst window (before overheat)
-          // Sustained DPS = average DPS over full fire+cooldown cycle
-          if (comp.weaponHeatPerShot && comp.weaponHeatPerShot > 0) {
-            // Shots until overheat: threshold is normalized to 1.0
-            const shotsToOverheat = Math.max(1, Math.floor(1.0 / comp.weaponHeatPerShot));
-            const timeToOverheat = shotsToOverheat / (comp.weaponFireRate / 60);
-            const burstDamage = comp.weaponAlphaDamage * shotsToOverheat;
-
-            if (timeToOverheat > 0) {
-              comp.weaponBurstDps = Math.round((burstDamage / timeToOverheat) * 10000) / 10000;
-            }
-
-            // Sustained DPS: use thermal-based cooldown estimation
-            // Heat generated per second at full fire = heatPerShot * (fireRate/60)
-            // When overheated, cooling takes ~(1.0 / coolingRate) seconds
-            // Average weapon cooling rate is ~0.15-0.3 /s → ~3-7s cooldown
-            // We use the heat generation rate to estimate more accurately
-            const heatPerSecond = comp.weaponHeatPerShot * (comp.weaponFireRate / 60);
-            // Effective cooling rate during cooldown: weapons typically cool 2-3x faster when overheated
-            // Conservative estimate: cooldownTime = overheatThreshold(1.0) / (heatPerSecond * 0.5)
-            // This gives a cycle-aware sustained DPS
-            const estimatedCooldown = Math.max(1.0, 1.0 / (heatPerSecond * 0.4));
-            const cycleTime = timeToOverheat + estimatedCooldown;
-            if (cycleTime > 0) {
-              comp.weaponSustainedDps = Math.round((burstDamage / cycleTime) * 10000) / 10000;
-            }
-          } else {
-            // No heat data = no overheat = burst DPS = sustained DPS = DPS
-            comp.weaponBurstDps = comp.weaponDps;
-            comp.weaponSustainedDps = comp.weaponDps;
-          }
-        }
-
-        // Manufacturer from className prefix
-        if (!comp.manufacturerCode) {
-          const mfgMatch = className.match(/^([A-Z]{3,5})_/);
-          if (mfgMatch) { comp.manufacturerCode = mfgMatch[1]; comp.manufacturer = MANUFACTURER_CODES[mfgMatch[1]] || mfgMatch[1]; }
-        }
-
-        components.push(comp);
-      } catch (e) {
-        // Log to detect format changes from CIG patches
-        if (scanned % 500 === 0) logger.warn(`Component extraction error at ${scanned}: ${(e as Error).message}`, { module: 'dataforge' });
-      }
-    }
-    logger.info(`Extracted ${components.length} components from ${scanned} SCItem records`, { module: 'dataforge' });
-    return components;
+    return _extractAllComponents(this);
   }
 
   // ============ Vehicle loadout extraction ============
@@ -1062,7 +576,7 @@ export class DataForgeService {
   private findVariantLoadoutMap(className: string): Map<string, string> | null {
     if (!this.dfData || !this.dcbBuffer) return null;
     const suffixes = ['_PU_AI_UEE', '_PU_AI_SEC', '_PU_AI_CIV', '_PU_AI', '_PU', '_Template'];
-    const entityClassIdx = this.dfData.structDefs.findIndex((s: any) => s.name === 'EntityClassDefinition');
+    const entityClassIdx = this.dfData.structDefs.findIndex(s => s.name === 'EntityClassDefinition');
     if (entityClassIdx === -1) return null;
     for (const suffix of suffixes) {
       const variantName = className + suffix;
@@ -1111,12 +625,12 @@ export class DataForgeService {
   async extractVehicleStats(className: string): Promise<Record<string, number> | null> {
     if (!this.dfData || !this.dcbBuffer) return null;
     try {
-      const entityClassIdx = this.dfData.structDefs.findIndex((s: any) => s.name === 'EntityClassDefinition');
+      const entityClassIdx = this.dfData.structDefs.findIndex(s => s.name === 'EntityClassDefinition');
       if (entityClassIdx === -1) return null;
-      let record = this.dfData.records.find((r: any) => r.structIndex === entityClassIdx && (r.name?.replace('EntityClassDefinition.', '') === className || r.name === className));
+      let record = this.dfData.records.find(r => r.structIndex === entityClassIdx && (r.name?.replace('EntityClassDefinition.', '') === className || r.name === className));
       if (!record) {
         const lc = className.toLowerCase();
-        record = this.dfData.records.find((r: any) => r.structIndex === entityClassIdx && r.name?.toLowerCase().includes(lc));
+        record = this.dfData.records.find(r => r.structIndex === entityClassIdx && r.name?.toLowerCase().includes(lc));
       }
       if (!record) return null;
       return this.extractStatsFromRecord(record);
@@ -1525,8 +1039,8 @@ export class DataForgeService {
     }
 
     // Career/Role: stored as vehicleCareer/vehicleRole LOC keys like "@vehicle_focus_combat"
-    if (typeof vp.vehicleCareer === 'string') vehicle.career = DataForgeService.resolveLocKey(vp.vehicleCareer, 'career');
-    if (typeof vp.vehicleRole === 'string') vehicle.role = DataForgeService.resolveLocKey(vp.vehicleRole, 'role');
+    if (typeof vp.vehicleCareer === 'string') vehicle.career = resolveLocKey(vp.vehicleCareer, 'career');
+    if (typeof vp.vehicleRole === 'string') vehicle.role = resolveLocKey(vp.vehicleRole, 'role');
 
     const bbox = vp.maxBoundingBoxSize;
     if (bbox && typeof bbox === 'object') {
@@ -1540,126 +1054,6 @@ export class DataForgeService {
     if (typeof vp.fusePenetrationDamageMultiplier === 'number') vehicle.fusePenetrationDamageMultiplier = vp.fusePenetrationDamageMultiplier;
     if (typeof vp.componentPenetrationDamageMultiplier === 'number') vehicle.componentPenetrationDamageMultiplier = vp.componentPenetrationDamageMultiplier;
     return vehicle;
-  }
-
-  /** Resolve SC localization keys to display strings */
-  static resolveLocKey(locKey: string, type: 'career' | 'role'): string {
-    if (!locKey || !locKey.startsWith('@')) return locKey || '';
-
-    // Known career LOC keys → display names (matching Erkul)
-    const CAREER_MAP: Record<string, string> = {
-      '@vehicle_focus_combat': 'Combat',
-      '@vehicle_focus_transporter': 'Transporter',
-      '@vehicle_focus_industrial': 'Industrial',
-      '@vehicle_focus_competition': 'Competition',
-      '@vehicle_focus_exploration': 'Exploration',
-      '@vehicle_focus_support': 'Support',
-      '@vehicle_focus_gunship': 'Gunship',
-      '@vehicle_focus_multirole': 'Multi-Role',
-      '@vehicle_focus_starter': 'Starter',
-      '@vehicle_focus_ground': 'Ground',
-      '@vehicle_focus_groundcombat': 'Ground Combat',
-    };
-
-    // Known role LOC keys → display names (matching Erkul)
-    const ROLE_MAP: Record<string, string> = {
-      '@vehicle_class_lightfighter': 'Light Fighter',
-      '@vehicle_class_mediumfighter': 'Medium Fighter',
-      '@vehicle_class_heavyfighter': 'Heavy Fighter',
-      '@vehicle_class_heavyfighter_bomber': 'Heavy Fighter / Bomber',
-      '@vehicle_class_interceptor': 'Interceptor',
-      '@vehicle_class_stealthfighter': 'Stealth Fighter',
-      '@vehicle_class_stealthbomber': 'Stealth Bomber',
-      '@vehicle_class_bomber': 'Bomber',
-      '@vehicle_class_heavybomber': 'Heavy Bomber',
-      '@vehicle_class_snubfighter': 'Snub Fighter',
-      '@vehicle_class_gunship': 'Gunship',
-      '@vehicle_class_heavygunship': 'Heavy Gunship',
-      '@vehicle_class_dropship': 'Dropship',
-      '@vehicle_class_lightfreight': 'Light Freight',
-      '@vehicle_class_mediumfreight': 'Medium Freight',
-      '@vehicle_class_heavyfreight': 'Heavy Freight',
-      '@vehicle_class_lightfreight_mediumfighter': 'Light Freight / Medium Fighter',
-      '@vehicle_class_mediumfreight_gunship': 'Medium Freight / Gun Ship',
-      '@vehicle_class_mediumfreightgunshio': 'Medium Freight / Gun Ship', // CIG typo in data
-      '@vehicle_class_mediumfreightgunship': 'Medium Freight / Gun Ship',
-      '@vehicle_class_starter_lightfreight': 'Starter / Light Freight',
-      '@vehicle_class_starterlightfreight': 'Starter / Light Freight',
-      '@vehicle_class_starter_pathfinder': 'Starter / Pathfinder',
-      '@vehicle_class_starterpathfinder': 'Starter / Pathfinder',
-      '@vehicle_class_starter_lightmining': 'Starter / Light Mining',
-      '@vehicle_class_startermining': 'Starter / Mining',
-      '@vehicle_class_starter_lightsalvage': 'Starter / Light Salvage',
-      '@vehicle_class_startersalvage': 'Starter / Salvage',
-      '@vehicle_class_heavyfighterbomber': 'Heavy Fighter / Bomber',
-      '@vehicle_class_expedition': 'Expedition',
-      '@vehicle_class_pathfinder': 'Pathfinder',
-      '@vehicle_class_touring': 'Touring',
-      '@vehicle_class_luxurytouring': 'Luxury Touring',
-      '@vehicle_class_passenger': 'Passenger',
-      '@vehicle_class_modular': 'Modular',
-      '@vehicle_class_generalist': 'Generalist',
-      '@vehicle_class_racing': 'Racing',
-      '@vehicle_class_medical': 'Medical',
-      '@vehicle_class_recovery': 'Recovery',
-      '@vehicle_class_reporting': 'Reporting',
-      '@vehicle_class_combat': 'Combat',
-      '@vehicle_class_interdiction': 'Interdiction',
-      '@vehicle_class_lightsalvage': 'Light Salvage',
-      '@vehicle_class_heavysalvage': 'Heavy Salvage',
-      '@vehicle_class_lightmining': 'Light Mining',
-      '@vehicle_class_mediummining': 'Medium Mining',
-      '@vehicle_class_lightscience': 'Light Science',
-      '@vehicle_class_mediumdata': 'Medium Data',
-      '@vehicle_class_heavyrefuelling': 'Heavy Refuelling',
-      '@vehicle_class_frigate': 'Frigate',
-      '@vehicle_class_corvette': 'Corvette',
-      '@vehicle_class_antivehicle': 'Anti-Vehicle',
-      '@vehicle_class_antiair': 'Anti-Air',
-      '@vehicle_class_heavytank': 'Heavy Tank',
-      '@vehicle_class_lighttank': 'Light Tank',
-      // Also handle @item_ShipFocus_ prefix
-      '@item_shipfocus_heavygunship': 'Heavy Gunship',
-      '@item_shipfocus_lightfighter': 'Light Fighter',
-    };
-
-    const key = locKey.toLowerCase();
-    if (type === 'career' && CAREER_MAP[key]) return CAREER_MAP[key];
-    if (type === 'role' && ROLE_MAP[key]) return ROLE_MAP[key];
-
-    // Fallback: try to parse from key pattern
-    let raw = locKey;
-    // Strip common prefixes
-    for (const prefix of ['@vehicle_focus_', '@vehicle_class_', '@item_ShipFocus_', '@item_shipfocus_']) {
-      if (raw.toLowerCase().startsWith(prefix)) { raw = raw.substring(prefix.length); break; }
-    }
-    // Convert underscored/camel to spaced and capitalize
-    return raw.replace(/([a-z])([A-Z])/g, '$1 $2')
-      .replace(/_/g, ' ')
-      .split(' ')
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-      .join(' ');
-  }
-
-  /**
-   * Convert a component className like "KLWE_LaserRepeater_S1" to a readable
-   * display name like "CF-117 Bulldog Repeater". Uses the className structure when
-   * localization data is unavailable.
-   * Format: strips _SCItem suffix, manufacturer prefix, and converts to spaced words.
-   */
-  static resolveComponentName(className: string): string {
-    let name = className;
-    // Strip common suffixes: _SCItem, _PIR, etc.
-    name = name.replace(/_SCItem$/i, '');
-    // Strip item category prefixes (POWR_, COOL_, SHLD_, QDRV_, MISL_, RADR_)
-    name = name.replace(/^(POWR|COOL|SHLD|QDRV|MISL|RADR|WEPN|TURR)_/i, '');
-    // Strip manufacturer code prefix (4-letter codes)
-    name = name.replace(/^[A-Z]{3,5}_/, '');
-    // Convert underscores to spaces
-    name = name.replace(/_/g, ' ');
-    // Insert spaces between camelCase: "LaserRepeater" → "Laser Repeater"
-    name = name.replace(/([a-z])([A-Z])/g, '$1 $2');
-    return name.trim();
   }
 
   private extractHullBlock(vp: any, entityData: any): Record<string, any> {
@@ -2163,252 +1557,13 @@ export class DataForgeService {
     return null;
   }
 
-  // ============================================================
-  //  SHOPS & PRICES EXTRACTION
-  // ============================================================
+  // ============ Shops & Paints (delegated to shop-paint-extractor.ts) ============
 
-  /** Known shop names (LOC keys → readable names) */
-  private static readonly SHOP_LOC_NAMES: Record<string, string> = {
-    '@item_NameShop_CenterMass': 'CenterMass',
-    '@item_NameShop_CasabaOutlet': 'Casaba Outlet',
-    '@item_NameShop_DumpersDepot': "Dumper's Depot",
-    '@item_NameShop_AstroArmada': 'Astro Armada',
-    '@item_NameShop_NewDeal': 'New Deal',
-    '@item_NameShop_TeachsShipShop': "Teach's Ship Shop",
-    '@item_NameShop_CubbyBlast': 'Cubby Blast',
-    '@item_NameShop_PortOlisar': 'Port Olisar',
-    '@item_NameShop_GrimHex': 'GrimHEX',
-    '@item_NameShop_Regal': 'Regal Luxury Rentals',
-    '@item_NameShop_Cordrys': "Cordry's",
-    '@item_NameShop_Vantage': 'Vantage Rentals',
-    '@item_NameShop_FTL': 'FTL Transports',
-    '@item_NameShop_Shubin': 'Shubin Interstellar',
-    '@item_NameShop_TDD': 'Trade & Development Division',
-    '@item_NameShop_KCTrading': 'KC Trending',
-    '@item_NameShop_Traveler': 'Traveler Rentals',
-    '@item_NameShop_Aparelli': 'Aparelli',
-    '@item_NameShop_FactoryLine': 'Factory Line',
-    '@item_NameShop_TammanyAndSons': 'Tammany and Sons',
-    '@item_NameShop_Skutters': 'Skutters',
-    '@item_NameShop_ConscientiousObjects': 'Conscientious Objects',
-    '@item_NameShop_HurstonDynamics': 'Hurston Dynamics Showroom',
-    '@item_NameShop_Microtech': 'mTech',
-    '@item_NameShop_ArcCorp': 'ArcCorp',
-    '@item_NameShop_OmegaPro': 'Omega Pro',
-    '@item_NameShop_GarrityDefense': 'Garrity Defense',
-    '@item_NameShop_PlatinumBay': 'Platinum Bay',
-    '@item_NameShop_CousinCrows': "Cousin Crow's Custom Crafts",
-    '@item_NameShop_LiveFire': 'Live Fire Weapons',
-    '@item_NameShop_Refinery': 'Refinery',
-    '@item_NameShop_CrusaderIndustries': 'Crusader Industries',
-    '@item_NameShop_ProcyonCDF': 'Procyon CDF',
-    '@item_NameShop_MakauDefense': 'Makau Defense',
-    '@item_NameShop_KelTo': 'Kel-To',
-    '@item_NameShop_CrusaderProvidenceSurplus': 'Crusader Providence Surplus',
-    '@item_NameShop_FTA': 'Federal Trade Alliance',
-  };
-
-  /**
-   * Extract shop/vendor data from DataForge.
-   * Real shops are SCItemManufacturer records in shopkiosk/ paths.
-   * Note: Per-shop inventory (what each shop sells) is server-managed
-   * and NOT available from P4K/DataForge data. shop_inventory will remain empty.
-   */
   extractShops(): { shops: any[]; inventory: any[] } {
-    if (!this.dfData || !this.dcbBuffer) return { shops: [], inventory: [] };
-
-    const shops: any[] = [];
-    const inventory: any[] = [];
-
-    // Find SCItemManufacturer struct type (shop kiosk definitions)
-    const mfgStructIdx = this.dfData.structDefs.findIndex((s: any) => s.name === 'SCItemManufacturer');
-    if (mfgStructIdx === -1) {
-      logger.info('SCItemManufacturer struct not found — skipping shop extraction', { module: 'dataforge' });
-      return { shops: [], inventory: [] };
-    }
-
-    // Extract SCItemManufacturer records in shop kiosk paths
-    for (const r of this.dfData.records) {
-      if (r.structIndex !== mfgStructIdx) continue;
-      const fn = (r.fileName || '').toLowerCase();
-      // Only keep records in the shopkiosk path (real shop brands)
-      if (!fn.includes('shop/shopkiosk/') && !fn.includes('shop\\shopkiosk\\')) continue;
-
-      try {
-        const data = this.readInstance(r.structIndex, r.instanceIndex, 0, 3);
-        if (!data) continue;
-
-        const className = r.name?.replace('SCItemManufacturer.', '') || '';
-        if (!className) continue;
-        // Skip test/debug entries
-        if (className.toLowerCase().includes('_test') || className.toLowerCase().includes('_debug')) continue;
-
-        // Resolve shop name from localization
-        const locKey = data.Localization?.Name || '';
-        let shopName = DataForgeService.SHOP_LOC_NAMES[locKey]
-          || (locKey.startsWith('@') ? className.replace(/_/g, ' ').replace('Shop ', '') : locKey)
-          || className.replace(/_/g, ' ');
-
-        // Extract shop code
-        const shopCode = data.Code || '';
-
-        // Determine shop type from className
-        const shopType = this.inferShopType(className);
-
-        shops.push({
-          className,
-          name: shopName,
-          location: null, // Location data is not available from DataForge
-          parentLocation: null,
-          shopType,
-          shopCode,
-        });
-      } catch (e) {
-        // Skip problematic records
-      }
-    }
-
-    // Deduplicate shops by name + shopType (multiple kiosk instances per brand)
-    const shopMap = new Map<string, any>();
-    for (const s of shops) {
-      const key = `${s.name}::${s.shopType}`;
-      if (!shopMap.has(key)) shopMap.set(key, s);
-    }
-    const uniqueShops = Array.from(shopMap.values());
-    logger.info(`Extracted ${uniqueShops.length} unique shops from ${shops.length} kiosk instances`, { module: 'dataforge' });
-    return { shops: uniqueShops, inventory };
+    return _extractShops(this);
   }
 
-  // ============ PAINT / LIVERY EXTRACTION ============
-
-  /**
-   * Extract all ship paint/livery records from DataForge.
-   * Paints are EntityClassDefinition records in scitem paths with "paint" in the filename.
-   * Returns { shipClassName, paintClassName, paintName, paintUuid }[]
-   */
   extractPaints(): Array<{ shipShortName: string; paintClassName: string; paintName: string; paintUuid: string }> {
-    if (!this.dfData || !this.dcbBuffer) return [];
-    const entityClassIdx = this.dfData.structDefs.findIndex((s: any) => s.name === 'EntityClassDefinition');
-    if (entityClassIdx === -1) return [];
-
-    const paints: Array<{ shipShortName: string; paintClassName: string; paintName: string; paintUuid: string }> = [];
-
-    for (const r of this.dfData.records) {
-      if (r.structIndex !== entityClassIdx) continue;
-      const fn = (r.fileName || '').toLowerCase();
-      if (!fn.includes('paint') && !fn.includes('skin')) continue;
-      if (!fn.includes('scitem') && !fn.includes('entities')) continue;
-
-      const className = r.name?.replace('EntityClassDefinition.', '') || '';
-      if (!className) continue;
-      const lcName = className.toLowerCase();
-      if (lcName.includes('_test') || lcName.includes('_debug') || lcName.includes('_template')) continue;
-
-      let paintDisplayName = className.replace(/_/g, ' ');
-      let shipShortName = '';
-
-      // Try to read entity for localization name
-      try {
-        const data = this.readInstance(r.structIndex, r.instanceIndex, 0, 3);
-        if (data?.Components) {
-          for (const comp of data.Components) {
-            if (!comp || typeof comp !== 'object') continue;
-            if (comp.__type === 'SAttachableComponentParams') {
-              const loc = comp.AttachDef?.Localization;
-              if (loc?.Name && typeof loc.Name === 'string' && !loc.Name.startsWith('@') && !loc.Name.startsWith('LOC_')) {
-                paintDisplayName = loc.Name;
-              }
-            }
-          }
-        }
-      } catch { /* non-critical */ }
-
-      // Paint classNames follow "Paint_<ShipName>_<Event/Color>" pattern
-      // Strip "Paint_" prefix and extract the ship part
-      if (className.startsWith('Paint_')) {
-        const afterPaint = className.substring(6); // Remove "Paint_"
-        // The ship name is everything before the event/color suffix
-        // Known event/color patterns to split on
-        const eventPattern = /_(BIS\d{4}|IAE|ILW|Invictus|PirateWeek|Pirate|Holiday|Penumbra|Showdown|Citizencon|Star_Kitten|Stormbringer|Timberline|Ghoulish|Metallic|Black|White|Grey|Red|Blue|Green|Orange|Purple|Tan|Crimson|Gold|Silver|Carbon|Camo|Digital|Paint|Skin|Livery|Pack|FreeWeekend|FW\d+|NovemberAnniversary|FleetWeek|StarKitten|ValentinesDay|LunarNewYear|JumpTown)/i;
-        const match = afterPaint.match(eventPattern);
-        if (match && match.index && match.index > 0) {
-          shipShortName = afterPaint.substring(0, match.index);
-        } else {
-          // No event pattern found — use the whole afterPaint as ship name
-          // (some paints might be "Paint_ShipName" with no suffix)
-          shipShortName = afterPaint;
-        }
-      } else {
-        // Non-Paint_ prefix: try to extract from known patterns like MNFR_Ship_Skin_Name
-        const skinMatch = className.match(/^([A-Z]{2,5}_[A-Za-z0-9_]+?)_(Paint|Skin|Livery)/i);
-        if (skinMatch) shipShortName = skinMatch[1];
-      }
-
-      if (shipShortName) {
-        paints.push({
-          shipShortName,
-          paintClassName: className,
-          paintName: paintDisplayName,
-          paintUuid: r.id,
-        });
-      }
-    }
-
-    logger.info(`Extracted ${paints.length} paint/livery records`, { module: 'dataforge' });
-    return paints;
+    return _extractPaints(this);
   }
-
-  private inferShopType(className: string): string {
-    const lc = className.toLowerCase();
-    if (lc.includes('weapon') || lc.includes('gun')) return 'Weapons';
-    if (lc.includes('armor') || lc.includes('clothing')) return 'Armor';
-    if (lc.includes('ship') || lc.includes('vehicle')) return 'Ships';
-    if (lc.includes('component') || lc.includes('part')) return 'Components';
-    if (lc.includes('commodity') || lc.includes('cargo') || lc.includes('trade')) return 'Commodities';
-    if (lc.includes('food') || lc.includes('drink') || lc.includes('bar')) return 'Food & Drink';
-    return 'General';
-  }
-}
-
-// ============ Port type classifier (standalone function) ============
-
-export function classifyPort(portName: string, compClassName: string): string {
-  const lp = portName.toLowerCase();
-  const cc = (compClassName || '').toLowerCase();
-
-  // Component-based classification
-  if (cc) {
-    if (cc.includes('cannon_s') || cc.includes('repeater_s') || cc.includes('gatling_s') ||
-        cc.includes('scattergun_s') || cc.includes('machinegun_s') || cc.includes('neutrongun_s') ||
-        cc.includes('laser_beak_') || cc.includes('tarantula') ||
-        (cc.includes('weapon') && cc.match(/_s\d/) && !cc.includes('rack') && !cc.includes('turret') && !cc.includes('mount'))) return 'WeaponGun';
-    if (cc.includes('mount_gimbal_') || cc.includes('mount_fixed_')) return 'Gimbal';
-    if (cc.includes('turret_') || cc.startsWith('vtol_')) return 'Turret';
-    if (cc.includes('mrck_') || cc.includes('missilerack')) return 'MissileRack';
-  }
-
-  if ((lp.includes('_gun_') || lp.includes('weapon_gun')) && !lp.includes('gunner') && !lp.includes('gunrack') && !lp.includes('seat') && !lp.includes('inventory')) return 'WeaponGun';
-  if (lp.match(/hardpoint_weapon(_|$)/) && !lp.includes('locker') && !lp.includes('cabinet') && !lp.includes('controller') && !lp.includes('missile') && !lp.includes('rack') && !lp.includes('mount') && !lp.includes('cockpit') && !lp.includes('salvage') && !lp.includes('tractor')) return 'WeaponGun';
-  if (lp.match(/hardpoint_weapon_wing/)) return 'WeaponGun';
-  if (lp.includes('turret')) return 'Turret';
-  if (lp.includes('shield')) return 'Shield';
-  if (lp.includes('power_plant') || lp.includes('powerplant')) return 'PowerPlant';
-  if (lp.includes('cooler')) return 'Cooler';
-  if (lp.includes('quantum') && !lp.includes('interdiction') && !lp.includes('qed') || lp.includes('quantum_drive')) return 'QuantumDrive';
-  if (lp.includes('missile') || lp.includes('pylon')) return 'MissileRack';
-  if (lp.includes('radar')) return 'Radar';
-  if (lp.includes('countermeasure')) return 'Countermeasure';
-  if (lp.includes('controller_flight')) return 'FlightController';
-  if (lp.includes('thruster')) return 'Thruster';
-  // EMP: match port name containing 'emp' OR component class containing 'emp_device' / 'emp_generator'
-  // Avoid false positives: only match EMP when port or component clearly indicates EMP device
-  if (lp.includes('emp_device') || lp.includes('emp_generator') || (lp.includes('emp') && !lp.includes('temp') && !lp.match(/seat|access|dashboard|hud|inventory|weapon_?port/i))) return 'EMP';
-  if (cc.includes('emp_device') || cc.includes('emp_generator') || cc.includes('emp_s')) return 'EMP';
-  // QIG/QED: match interdiction ports (not just quantum_interdiction) and QED/QIG component classnames
-  if (lp.includes('interdiction') || lp.includes('qig') || lp.includes('qed')) return 'QuantumInterdictionGenerator';
-  if (cc.includes('quantuminterdiction') || cc.includes('qig_') || cc.includes('qed_') || cc.includes('qdmp_')) return 'QuantumInterdictionGenerator';
-  if (lp.includes('weapon_rack') || lp.includes('weaponrack') || lp.includes('weapon_locker') || lp.includes('weaponlocker') || lp.includes('weapon_cabinet')) return 'WeaponRack';
-  if (lp.includes('weapon') && (lp.includes('controller') || lp.includes('cockpit') || lp.includes('locker'))) return 'Other';
-  if (lp.includes('weapon') && !lp.includes('rack')) return 'Weapon';
-  return 'Other';
 }
