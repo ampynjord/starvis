@@ -42,7 +42,7 @@ export class ExtractionService {
    * Execute a multi-row INSERT … ON DUPLICATE KEY UPDATE in batches.
    * @param conn MySQL connection
    * @param insertHead SQL before VALUES: "INSERT INTO tbl (c1, c2) VALUES"
-   * @param updateTail SQL after VALUES: "ON DUPLICATE KEY UPDATE c1=VALUES(c1), …"
+   * @param updateTail SQL after VALUES: "ON DUPLICATE KEY UPDATE c1=new.c1, …"
    * @param colCount Number of columns per row
    * @param rows Array of flat parameter arrays (each length === colCount)
    * @param batchSize Rows per batch (default: BATCH_SIZE)
@@ -62,7 +62,7 @@ export class ExtractionService {
 
     for (let i = 0; i < rows.length; i += batchSize) {
       const batch = rows.slice(i, i + batchSize);
-      const sql = `${insertHead} ${batch.map(() => placeholder).join(",")} ${updateTail}`;
+      const sql = `${insertHead} ${batch.map(() => placeholder).join(",")} AS new ${updateTail}`;
       const params = batch.flat();
       const [result] = await conn.execute<any>(sql, params);
       affected += result.affectedRows ?? batch.length;
@@ -108,10 +108,11 @@ export class ExtractionService {
     }
 
     // 1a. Load localization from P4K (global.ini)
-    if (!this.locService.isLoaded && (this.dfService as any).provider) {
+    const provider = this.dfService.getProvider();
+    if (!this.locService.isLoaded && provider) {
       onProgress?.("Loading localization (global.ini)…");
       try {
-        const locCount = await this.locService.loadFromP4K((this.dfService as any).provider, onProgress);
+        const locCount = await this.locService.loadFromP4K(provider, onProgress);
         onProgress?.(`Localization loaded: ${locCount} entries`);
       } catch (e) {
         onProgress?.(`Localization loading failed (fallback mode): ${(e as Error).message}`);
@@ -265,46 +266,46 @@ export class ExtractionService {
             qig_jammer_range, qig_snare_radius, qig_charge_time, qig_cooldown`;
 
     const COMP_UPDATE = `ON DUPLICATE KEY UPDATE
-            class_name=VALUES(class_name), name=VALUES(name), type=VALUES(type),
-            sub_type=VALUES(sub_type), size=VALUES(size), grade=VALUES(grade),
-            manufacturer_code=VALUES(manufacturer_code),
-            mass=VALUES(mass), hp=VALUES(hp),
-            power_draw=VALUES(power_draw), power_base=VALUES(power_base), power_output=VALUES(power_output),
-            heat_generation=VALUES(heat_generation), cooling_rate=VALUES(cooling_rate),
-            weapon_damage=VALUES(weapon_damage), weapon_damage_type=VALUES(weapon_damage_type),
-            weapon_fire_rate=VALUES(weapon_fire_rate), weapon_range=VALUES(weapon_range),
-            weapon_speed=VALUES(weapon_speed), weapon_ammo_count=VALUES(weapon_ammo_count),
-            weapon_pellets_per_shot=VALUES(weapon_pellets_per_shot), weapon_burst_size=VALUES(weapon_burst_size),
-            weapon_alpha_damage=VALUES(weapon_alpha_damage), weapon_dps=VALUES(weapon_dps),
-            weapon_damage_physical=VALUES(weapon_damage_physical), weapon_damage_energy=VALUES(weapon_damage_energy),
-            weapon_damage_distortion=VALUES(weapon_damage_distortion), weapon_damage_thermal=VALUES(weapon_damage_thermal),
-            weapon_damage_biochemical=VALUES(weapon_damage_biochemical), weapon_damage_stun=VALUES(weapon_damage_stun),
-            weapon_heat_per_shot=VALUES(weapon_heat_per_shot),
-            weapon_burst_dps=VALUES(weapon_burst_dps), weapon_sustained_dps=VALUES(weapon_sustained_dps),
-            shield_hp=VALUES(shield_hp), shield_regen=VALUES(shield_regen),
-            shield_regen_delay=VALUES(shield_regen_delay), shield_hardening=VALUES(shield_hardening),
-            shield_faces=VALUES(shield_faces),
-            qd_speed=VALUES(qd_speed), qd_spool_time=VALUES(qd_spool_time),
-            qd_cooldown=VALUES(qd_cooldown), qd_fuel_rate=VALUES(qd_fuel_rate),
-            qd_range=VALUES(qd_range), qd_stage1_accel=VALUES(qd_stage1_accel),
-            qd_stage2_accel=VALUES(qd_stage2_accel),
-            qd_tuning_rate=VALUES(qd_tuning_rate), qd_alignment_rate=VALUES(qd_alignment_rate),
-            qd_disconnect_range=VALUES(qd_disconnect_range),
-            missile_damage=VALUES(missile_damage), missile_signal_type=VALUES(missile_signal_type),
-            missile_lock_time=VALUES(missile_lock_time), missile_speed=VALUES(missile_speed),
-            missile_range=VALUES(missile_range), missile_lock_range=VALUES(missile_lock_range),
-            missile_damage_physical=VALUES(missile_damage_physical), missile_damage_energy=VALUES(missile_damage_energy),
-            missile_damage_distortion=VALUES(missile_damage_distortion),
-            thruster_max_thrust=VALUES(thruster_max_thrust), thruster_type=VALUES(thruster_type),
-            radar_range=VALUES(radar_range),
-            radar_detection_lifetime=VALUES(radar_detection_lifetime),
-            radar_tracking_signal=VALUES(radar_tracking_signal),
-            cm_ammo_count=VALUES(cm_ammo_count),
-            fuel_capacity=VALUES(fuel_capacity), fuel_intake_rate=VALUES(fuel_intake_rate),
-            emp_damage=VALUES(emp_damage), emp_radius=VALUES(emp_radius),
-            emp_charge_time=VALUES(emp_charge_time), emp_cooldown=VALUES(emp_cooldown),
-            qig_jammer_range=VALUES(qig_jammer_range), qig_snare_radius=VALUES(qig_snare_radius),
-            qig_charge_time=VALUES(qig_charge_time), qig_cooldown=VALUES(qig_cooldown),
+            class_name=new.class_name, name=new.name, type=new.type,
+            sub_type=new.sub_type, size=new.size, grade=new.grade,
+            manufacturer_code=new.manufacturer_code,
+            mass=new.mass, hp=new.hp,
+            power_draw=new.power_draw, power_base=new.power_base, power_output=new.power_output,
+            heat_generation=new.heat_generation, cooling_rate=new.cooling_rate,
+            weapon_damage=new.weapon_damage, weapon_damage_type=new.weapon_damage_type,
+            weapon_fire_rate=new.weapon_fire_rate, weapon_range=new.weapon_range,
+            weapon_speed=new.weapon_speed, weapon_ammo_count=new.weapon_ammo_count,
+            weapon_pellets_per_shot=new.weapon_pellets_per_shot, weapon_burst_size=new.weapon_burst_size,
+            weapon_alpha_damage=new.weapon_alpha_damage, weapon_dps=new.weapon_dps,
+            weapon_damage_physical=new.weapon_damage_physical, weapon_damage_energy=new.weapon_damage_energy,
+            weapon_damage_distortion=new.weapon_damage_distortion, weapon_damage_thermal=new.weapon_damage_thermal,
+            weapon_damage_biochemical=new.weapon_damage_biochemical, weapon_damage_stun=new.weapon_damage_stun,
+            weapon_heat_per_shot=new.weapon_heat_per_shot,
+            weapon_burst_dps=new.weapon_burst_dps, weapon_sustained_dps=new.weapon_sustained_dps,
+            shield_hp=new.shield_hp, shield_regen=new.shield_regen,
+            shield_regen_delay=new.shield_regen_delay, shield_hardening=new.shield_hardening,
+            shield_faces=new.shield_faces,
+            qd_speed=new.qd_speed, qd_spool_time=new.qd_spool_time,
+            qd_cooldown=new.qd_cooldown, qd_fuel_rate=new.qd_fuel_rate,
+            qd_range=new.qd_range, qd_stage1_accel=new.qd_stage1_accel,
+            qd_stage2_accel=new.qd_stage2_accel,
+            qd_tuning_rate=new.qd_tuning_rate, qd_alignment_rate=new.qd_alignment_rate,
+            qd_disconnect_range=new.qd_disconnect_range,
+            missile_damage=new.missile_damage, missile_signal_type=new.missile_signal_type,
+            missile_lock_time=new.missile_lock_time, missile_speed=new.missile_speed,
+            missile_range=new.missile_range, missile_lock_range=new.missile_lock_range,
+            missile_damage_physical=new.missile_damage_physical, missile_damage_energy=new.missile_damage_energy,
+            missile_damage_distortion=new.missile_damage_distortion,
+            thruster_max_thrust=new.thruster_max_thrust, thruster_type=new.thruster_type,
+            radar_range=new.radar_range,
+            radar_detection_lifetime=new.radar_detection_lifetime,
+            radar_tracking_signal=new.radar_tracking_signal,
+            cm_ammo_count=new.cm_ammo_count,
+            fuel_capacity=new.fuel_capacity, fuel_intake_rate=new.fuel_intake_rate,
+            emp_damage=new.emp_damage, emp_radius=new.emp_radius,
+            emp_charge_time=new.emp_charge_time, emp_cooldown=new.emp_cooldown,
+            qig_jammer_range=new.qig_jammer_range, qig_snare_radius=new.qig_snare_radius,
+            qig_charge_time=new.qig_charge_time, qig_cooldown=new.qig_cooldown,
             updated_at=CURRENT_TIMESTAMP`;
 
     const COL_COUNT = 76; // number of columns above
@@ -455,35 +456,35 @@ export class ExtractionService {
             insurance_claim_time, insurance_expedite_cost,
             vehicle_category,
             game_data
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) AS new
           ON DUPLICATE KEY UPDATE
-            class_name=VALUES(class_name), name=VALUES(name),
-            manufacturer_code=VALUES(manufacturer_code),
-            role=VALUES(role), career=VALUES(career),
-            dog_fight_enabled=VALUES(dog_fight_enabled), crew_size=VALUES(crew_size),
-            vehicle_definition=VALUES(vehicle_definition),
-            size_x=VALUES(size_x), size_y=VALUES(size_y), size_z=VALUES(size_z),
-            mass=VALUES(mass), scm_speed=VALUES(scm_speed), max_speed=VALUES(max_speed),
-            boost_speed_forward=VALUES(boost_speed_forward),
-            boost_speed_backward=VALUES(boost_speed_backward),
-            pitch_max=VALUES(pitch_max), yaw_max=VALUES(yaw_max), roll_max=VALUES(roll_max),
-            total_hp=VALUES(total_hp),
-            hydrogen_fuel_capacity=VALUES(hydrogen_fuel_capacity),
-            quantum_fuel_capacity=VALUES(quantum_fuel_capacity),
-            shield_hp=VALUES(shield_hp),
-            armor_physical=VALUES(armor_physical), armor_energy=VALUES(armor_energy),
-            armor_distortion=VALUES(armor_distortion), armor_thermal=VALUES(armor_thermal),
-            armor_biochemical=VALUES(armor_biochemical), armor_stun=VALUES(armor_stun),
-            armor_signal_ir=VALUES(armor_signal_ir), armor_signal_em=VALUES(armor_signal_em),
-            armor_signal_cs=VALUES(armor_signal_cs),
-            cross_section_x=VALUES(cross_section_x), cross_section_y=VALUES(cross_section_y),
-            cross_section_z=VALUES(cross_section_z),
-            short_name=VALUES(short_name), description=VALUES(description),
-            ship_grade=VALUES(ship_grade), cargo_capacity=VALUES(cargo_capacity),
-            insurance_claim_time=VALUES(insurance_claim_time),
-            insurance_expedite_cost=VALUES(insurance_expedite_cost),
-            vehicle_category=VALUES(vehicle_category),
-            game_data=VALUES(game_data),
+            class_name=new.class_name, name=new.name,
+            manufacturer_code=new.manufacturer_code,
+            role=new.role, career=new.career,
+            dog_fight_enabled=new.dog_fight_enabled, crew_size=new.crew_size,
+            vehicle_definition=new.vehicle_definition,
+            size_x=new.size_x, size_y=new.size_y, size_z=new.size_z,
+            mass=new.mass, scm_speed=new.scm_speed, max_speed=new.max_speed,
+            boost_speed_forward=new.boost_speed_forward,
+            boost_speed_backward=new.boost_speed_backward,
+            pitch_max=new.pitch_max, yaw_max=new.yaw_max, roll_max=new.roll_max,
+            total_hp=new.total_hp,
+            hydrogen_fuel_capacity=new.hydrogen_fuel_capacity,
+            quantum_fuel_capacity=new.quantum_fuel_capacity,
+            shield_hp=new.shield_hp,
+            armor_physical=new.armor_physical, armor_energy=new.armor_energy,
+            armor_distortion=new.armor_distortion, armor_thermal=new.armor_thermal,
+            armor_biochemical=new.armor_biochemical, armor_stun=new.armor_stun,
+            armor_signal_ir=new.armor_signal_ir, armor_signal_em=new.armor_signal_em,
+            armor_signal_cs=new.armor_signal_cs,
+            cross_section_x=new.cross_section_x, cross_section_y=new.cross_section_y,
+            cross_section_z=new.cross_section_z,
+            short_name=new.short_name, description=new.description,
+            ship_grade=new.ship_grade, cargo_capacity=new.cargo_capacity,
+            insurance_claim_time=new.insurance_claim_time,
+            insurance_expedite_cost=new.insurance_expedite_cost,
+            vehicle_category=new.vehicle_category,
+            game_data=new.game_data,
             extracted_at=CURRENT_TIMESTAMP`,
           [
             fullData.ref, veh.className, shipDisplayName, mfgCode,
@@ -529,8 +530,8 @@ export class ExtractionService {
         await this.detectAndSaveModules(conn, fullData, veh.className);
 
         if (savedShips % 20 === 0) onProgress?.(`Ships: ${savedShips}/${vehicles.size}…`);
-      } catch (e: any) {
-        logger.error(`Ship ${veh.className}: ${e.message}`);
+      } catch (e: unknown) {
+        logger.error(`Ship ${veh.className}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
 
@@ -583,8 +584,8 @@ export class ExtractionService {
             count++;
           }
         }
-      } catch (e: any) {
-        logger.error(`Loadout port ${port.portName}: ${e.message}`);
+      } catch (e: unknown) {
+        logger.error(`Loadout port ${port.portName}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
     return count;
@@ -663,8 +664,8 @@ export class ExtractionService {
            VALUES (?, ?, ?, ?, ?, TRUE)`,
           [fullData.ref, port.portName, slotDisplay, port.componentClassName, moduleName],
         );
-      } catch (e: any) {
-        logger.error(`Module ${port.portName} on ${shipClassName}: ${e.message}`);
+      } catch (e: unknown) {
+        logger.error(`Module ${port.portName} on ${shipClassName}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
   }
@@ -815,12 +816,12 @@ export class ExtractionService {
       const name = MANUFACTURER_CODES[code] || code;
       try {
         await conn.execute(
-          `INSERT INTO manufacturers (code, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE name=VALUES(name)`,
+          `INSERT INTO manufacturers (code, name) VALUES (?, ?) AS new ON DUPLICATE KEY UPDATE name=new.name`,
           [code, name],
         );
         saved++;
-      } catch (e: any) {
-        logger.error(`Manufacturer ${code}: ${e.message}`);
+      } catch (e: unknown) {
+        logger.error(`Manufacturer ${code}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
     return saved;
@@ -1015,8 +1016,8 @@ export class ExtractionService {
       if (updated.affectedRows > 0) {
         logger.info(`Hull series cargo fallback applied to ${updated.affectedRows} ships`);
       }
-    } catch (e: any) {
-      logger.warn(`Hull cargo fallback failed: ${e.message}`);
+    } catch (e: unknown) {
+      logger.warn(`Hull cargo fallback failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
@@ -1057,16 +1058,16 @@ export class ExtractionService {
       try {
         await conn.execute(
           `INSERT INTO shops (name, location, parent_location, shop_type, class_name)
-           VALUES (?, ?, ?, ?, ?)
+           VALUES (?, ?, ?, ?, ?) AS new
            ON DUPLICATE KEY UPDATE
-             name=VALUES(name), location=VALUES(location),
-             parent_location=VALUES(parent_location), shop_type=VALUES(shop_type),
+             name=new.name, location=new.location,
+             parent_location=new.parent_location, shop_type=new.shop_type,
              updated_at=CURRENT_TIMESTAMP`,
           [shop.name, shop.location || null, shop.parentLocation || null, shop.shopType || null, shop.className]
         );
         savedShops++;
-      } catch (e: any) {
-        logger.error(`Shop ${shop.className}: ${e.message}`);
+      } catch (e: unknown) {
+        logger.error(`Shop ${shop.className}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
 
@@ -1081,11 +1082,11 @@ export class ExtractionService {
 
         await conn.execute(
           `INSERT INTO shop_inventory (shop_id, component_uuid, component_class_name, base_price, rental_price_1d, rental_price_3d, rental_price_7d, rental_price_30d)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?) AS new
            ON DUPLICATE KEY UPDATE
-             component_uuid=VALUES(component_uuid), base_price=VALUES(base_price),
-             rental_price_1d=VALUES(rental_price_1d), rental_price_3d=VALUES(rental_price_3d),
-             rental_price_7d=VALUES(rental_price_7d), rental_price_30d=VALUES(rental_price_30d),
+             component_uuid=new.component_uuid, base_price=new.base_price,
+             rental_price_1d=new.rental_price_1d, rental_price_3d=new.rental_price_3d,
+             rental_price_7d=new.rental_price_7d, rental_price_30d=new.rental_price_30d,
              updated_at=CURRENT_TIMESTAMP`,
           [shopId, compUuid, inv.componentClassName, inv.basePrice ?? null,
            inv.rentalPrice1d ?? null, inv.rentalPrice3d ?? null,

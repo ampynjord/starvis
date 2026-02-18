@@ -39,6 +39,42 @@ export const DT_NAMES: Record<number, string> = {
 
 // ── Types ────────────────────────────────────────────────
 
+/** Binary struct definition parsed from Game2.dcb */
+export interface StructDef {
+  nameOffset: number;
+  parentTypeIndex: number;
+  attributeCount: number;
+  firstAttributeIndex: number;
+  structSize: number;
+  /** Resolved after parsing from string table */
+  name: string;
+}
+
+/** Binary property definition parsed from Game2.dcb */
+export interface PropertyDef {
+  nameOffset: number;
+  structIndex: number;
+  dataType: number;
+  conversionType: number;
+  padding: number;
+  /** Resolved after parsing from string table */
+  name: string;
+}
+
+/** Binary record definition parsed from Game2.dcb */
+export interface RecordDef {
+  nameOffset: number;
+  fileNameOffset: number;
+  structIndex: number;
+  id: string;
+  instanceIndex: number;
+  structSize: number;
+  /** Resolved after parsing from string table */
+  name: string;
+  /** Resolved after parsing from string table */
+  fileName: string;
+}
+
 export interface DataForgeData {
   header: {
     version: number;
@@ -55,10 +91,10 @@ export interface DataForgeData {
     strongValueCount: number; weakValueCount: number; referenceValueCount: number; enumOptionCount: number;
     textLength: number; textLength2: number;
   };
-  structDefs: any[];
-  propertyDefs: any[];
+  structDefs: StructDef[];
+  propertyDefs: PropertyDef[];
   dataMappings: { structCount: number; structIndex: number }[];
-  records: any[];
+  records: RecordDef[];
   stringTable1: Map<number, string>;
   stringTable2: Map<number, string>;
   valueArrayOffsets: Record<string, number>;
@@ -78,11 +114,11 @@ export function readGuidAt(buf: Buffer, pos: number): string {
 
 // ── Struct property resolver ─────────────────────────────
 
-export function getStructProperties(dfData: DataForgeData, structIndex: number): any[] {
+export function getStructProperties(dfData: DataForgeData, structIndex: number): PropertyDef[] {
   const { structDefs, propertyDefs } = dfData;
   const sd = structDefs[structIndex];
   if (!sd) return [];
-  const hierarchy: any[] = [];
+  const hierarchy: StructDef[] = [];
   const visited = new Set<number>();
   const buildHierarchy = (idx: number) => {
     if (visited.has(idx)) return;
@@ -93,7 +129,7 @@ export function getStructProperties(dfData: DataForgeData, structIndex: number):
     hierarchy.push(s);
   };
   buildHierarchy(structIndex);
-  const props: any[] = [];
+  const props: PropertyDef[] = [];
   for (const h of hierarchy) {
     for (let pi = h.firstAttributeIndex; pi < h.firstAttributeIndex + h.attributeCount; pi++) {
       if (propertyDefs[pi]) props.push(propertyDefs[pi]);
@@ -141,7 +177,7 @@ export function readInstance(
 
 function readValueInline(
   dfData: DataForgeData, dcbBuffer: Buffer,
-  buf: Buffer, pos: number, prop: any,
+  buf: Buffer, pos: number, prop: PropertyDef,
   depth: number, maxDepth: number,
 ): [any, number] {
   if (pos >= buf.length) return [null, pos];
@@ -222,9 +258,9 @@ function readValueInline(
 
 function readValueAtIndex(
   dfData: DataForgeData, dcbBuffer: Buffer,
-  index: number, prop: any,
+  index: number, prop: PropertyDef,
   depth: number, maxDepth: number,
-): any {
+): unknown {
   const buf = dcbBuffer;
   const va = dfData.valueArrayOffsets;
   const dt = prop.dataType;
@@ -314,14 +350,14 @@ export function parseDataForge(buf: Buffer): DataForgeData {
   };
   header.textLength2 = version >= 6 ? u32() : 0;
 
-  const structDefs: any[] = [];
+  const structDefs: StructDef[] = [];
   for (let i = 0; i < header.structDefinitionCount; i++) {
-    structDefs.push({ nameOffset: i32(), parentTypeIndex: i32(), attributeCount: u16(), firstAttributeIndex: u16(), structSize: u32() });
+    structDefs.push({ nameOffset: i32(), parentTypeIndex: i32(), attributeCount: u16(), firstAttributeIndex: u16(), structSize: u32(), name: '' });
   }
 
-  const propertyDefs: any[] = [];
+  const propertyDefs: PropertyDef[] = [];
   for (let i = 0; i < header.propertyDefinitionCount; i++) {
-    propertyDefs.push({ nameOffset: u32(), structIndex: u16(), dataType: u16(), conversionType: u16() & 0xFF, padding: u16() });
+    propertyDefs.push({ nameOffset: u32(), structIndex: u16(), dataType: u16(), conversionType: u16() & 0xFF, padding: u16(), name: '' });
   }
 
   off += header.enumDefinitionCount * 8; // skip enums
@@ -331,11 +367,11 @@ export function parseDataForge(buf: Buffer): DataForgeData {
     dataMappings.push(version >= 5 ? { structCount: u32(), structIndex: u32() } : { structCount: u16(), structIndex: u16() });
   }
 
-  const records: any[] = [];
+  const records: RecordDef[] = [];
   for (let i = 0; i < header.recordDefinitionCount; i++) {
     const nameOffset = i32(); const fileNameOffset = i32(); const structIndex = i32();
     const id = readGuid(); const instanceIndex = u16(); const structSize = u16();
-    records.push({ nameOffset, fileNameOffset, structIndex, id, instanceIndex, structSize });
+    records.push({ nameOffset, fileNameOffset, structIndex, id, instanceIndex, structSize, name: '', fileName: '' });
   }
 
   // Value array offsets
