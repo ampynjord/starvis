@@ -15,7 +15,10 @@ export interface ExtractionStats {
   manufacturers: number;
   ships: number;
   components: number;
+  items: number;
+  commodities: number;
   loadoutPorts: number;
+  shops: number;
   shipMatrixLinked: number;
   errors: string[];
   extractionHash?: string;
@@ -95,7 +98,10 @@ export class ExtractionService {
       manufacturers: 0,
       ships: 0,
       components: 0,
+      items: 0,
+      commodities: 0,
       loadoutPorts: 0,
+      shops: 0,
       shipMatrixLinked: 0,
       errors: [],
     };
@@ -152,6 +158,8 @@ export class ExtractionService {
       await conn.execute("DELETE FROM ship_paints WHERE 1=1");
       await conn.execute("DELETE FROM ships");
       await conn.execute("DELETE FROM components");
+      await conn.execute("DELETE FROM items");
+      await conn.execute("DELETE FROM commodities");
 
       // 2. Collect & save manufacturers FIRST (before ships, due to FK constraint)
       onProgress?.("Saving manufacturers…");
@@ -160,6 +168,12 @@ export class ExtractionService {
       // 3. Extract & save components
       onProgress?.("Extracting components…");
       stats.components = await this.saveComponents(conn, onProgress);
+
+      // 3b. Extract & save items (FPS weapons, armor, clothing, gadgets)
+      onProgress?.("Extracting items (FPS, armor, clothing)…");
+      const itemResult = await this.saveItems(conn, onProgress);
+      stats.items = itemResult.items;
+      stats.commodities = itemResult.commodities;
 
       // 4. Extract & save ships + loadouts
       onProgress?.("Extracting ships…");
@@ -190,9 +204,9 @@ export class ExtractionService {
       let extractionId: number | null = null;
       try {
         const [logResult]: any = await conn.execute(
-          `INSERT INTO extraction_log (extraction_hash, game_version, ships_count, components_count, manufacturers_count, loadout_ports_count, duration_ms, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [extractionHash, this.dfService.getVersion?.() || null, stats.ships, stats.components, stats.manufacturers, stats.loadoutPorts, stats.durationMs, 'success']
+          `INSERT INTO extraction_log (extraction_hash, game_version, ships_count, components_count, items_count, commodities_count, manufacturers_count, loadout_ports_count, shops_count, duration_ms, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [extractionHash, this.dfService.getVersion?.() || null, stats.ships, stats.components, stats.items, stats.commodities, stats.manufacturers, stats.loadoutPorts, stats.shops, stats.durationMs, 'success']
         );
         extractionId = logResult.insertId;
       } catch { /* extraction_log is non-critical */ }
@@ -207,7 +221,7 @@ export class ExtractionService {
         }
       }
 
-      onProgress?.(`✅ Extraction complete: ${stats.ships} ships, ${stats.components} components, ${stats.manufacturers} manufacturers, ${stats.loadoutPorts} loadout ports, ${stats.shipMatrixLinked} linked to Ship Matrix`);
+      onProgress?.(`✅ Extraction complete: ${stats.ships} ships, ${stats.components} components, ${stats.items} items, ${stats.commodities} commodities, ${stats.manufacturers} manufacturers, ${stats.loadoutPorts} loadout ports, ${stats.shops} shops, ${stats.shipMatrixLinked} linked to Ship Matrix`);
 
       // Commit the transaction — all data is now atomically visible
       await conn.commit();
@@ -263,7 +277,12 @@ export class ExtractionService {
             cm_ammo_count,
             fuel_capacity, fuel_intake_rate,
             emp_damage, emp_radius, emp_charge_time, emp_cooldown,
-            qig_jammer_range, qig_snare_radius, qig_charge_time, qig_cooldown`;
+            qig_jammer_range, qig_snare_radius, qig_charge_time, qig_cooldown,
+            mining_speed, mining_range, mining_resistance, mining_instability,
+            tractor_max_force, tractor_max_range,
+            salvage_speed, salvage_radius,
+            gimbal_type,
+            rack_count, rack_missile_size`;
 
     const COMP_UPDATE = `ON DUPLICATE KEY UPDATE
             class_name=new.class_name, name=new.name, type=new.type,
@@ -306,9 +325,15 @@ export class ExtractionService {
             emp_charge_time=new.emp_charge_time, emp_cooldown=new.emp_cooldown,
             qig_jammer_range=new.qig_jammer_range, qig_snare_radius=new.qig_snare_radius,
             qig_charge_time=new.qig_charge_time, qig_cooldown=new.qig_cooldown,
+            mining_speed=new.mining_speed, mining_range=new.mining_range,
+            mining_resistance=new.mining_resistance, mining_instability=new.mining_instability,
+            tractor_max_force=new.tractor_max_force, tractor_max_range=new.tractor_max_range,
+            salvage_speed=new.salvage_speed, salvage_radius=new.salvage_radius,
+            gimbal_type=new.gimbal_type,
+            rack_count=new.rack_count, rack_missile_size=new.rack_missile_size,
             updated_at=CURRENT_TIMESTAMP`;
 
-    const COL_COUNT = 76; // number of columns above
+    const COL_COUNT = 87; // number of columns above
 
     /** Map a component object to a flat array of values */
     const toRow = (c: any): (string | number | null)[] => [
@@ -341,6 +366,11 @@ export class ExtractionService {
       c.fuelCapacity ?? null, c.fuelIntakeRate ?? null,
       c.empDamage ?? null, c.empRadius ?? null, c.empChargeTime ?? null, c.empCooldown ?? null,
       c.qigJammerRange ?? null, c.qigSnareRadius ?? null, c.qigChargeTime ?? null, c.qigCooldown ?? null,
+      c.miningSpeed ?? null, c.miningRange ?? null, c.miningResistance ?? null, c.miningInstability ?? null,
+      c.tractorMaxForce ?? null, c.tractorMaxRange ?? null,
+      c.salvageSpeed ?? null, c.salvageRadius ?? null,
+      c.gimbalType || null,
+      c.rackCount ?? null, c.rackMissileSize ?? null,
     ];
 
     const rows = components.map(toRow);
@@ -1046,6 +1076,97 @@ export class ExtractionService {
   }
 
   // ======================================================
+  //  ITEMS + COMMODITIES → items + commodities tables
+  // ======================================================
+
+  private async saveItems(
+    conn: PoolConnection,
+    onProgress?: (msg: string) => void,
+  ): Promise<{ items: number; commodities: number }> {
+    const { items, commodities } = this.dfService.extractItems();
+    let savedItems = 0;
+    let savedCommodities = 0;
+
+    // ── Batch upsert items ──
+    if (items.length > 0) {
+      const ITEM_COLS = [
+        'uuid','class_name','name','type','sub_type','size','grade',
+        'manufacturer_code','mass','hp',
+        'weapon_damage','weapon_damage_type','weapon_fire_rate','weapon_range',
+        'weapon_speed','weapon_ammo_count','weapon_dps',
+        'armor_damage_reduction','armor_temp_min','armor_temp_max',
+        'data_json',
+      ];
+      const ITEM_UPDATE = ITEM_COLS.filter(c => c !== 'uuid')
+        .map(c => `${c}=new.${c}`)
+        .join(', ');
+      const ITEM_PH = ITEM_COLS.map(() => '?').join(', ');
+
+      const batchSize = 200;
+      for (let i = 0; i < items.length; i += batchSize) {
+        const batch = items.slice(i, i + batchSize);
+        const placeholders = batch.map(() => `(${ITEM_PH})`).join(', ');
+        const values: unknown[] = [];
+
+        for (const it of batch) {
+          values.push(
+            it.uuid, it.className, it.name, it.type, it.subType,
+            it.size, it.grade, it.manufacturerCode,
+            it.mass, it.hp,
+            it.weaponDamage, it.weaponDamageType, it.weaponFireRate,
+            it.weaponRange, it.weaponSpeed, it.weaponAmmoCount, it.weaponDps,
+            it.armorDamageReduction, it.armorTempMin, it.armorTempMax,
+            it.dataJson ? JSON.stringify(it.dataJson) : null,
+          );
+        }
+
+        await conn.execute(
+          `INSERT INTO items (${ITEM_COLS.join(', ')}) VALUES ${placeholders} AS new
+           ON DUPLICATE KEY UPDATE ${ITEM_UPDATE}, updated_at=CURRENT_TIMESTAMP`,
+          values,
+        );
+        savedItems += batch.length;
+      }
+    }
+
+    // ── Batch upsert commodities ──
+    if (commodities.length > 0) {
+      const COMM_COLS = [
+        'uuid','class_name','name','type','sub_type','symbol','occupancy_scu','data_json',
+      ];
+      const COMM_UPDATE = COMM_COLS.filter(c => c !== 'uuid')
+        .map(c => `${c}=new.${c}`)
+        .join(', ');
+      const COMM_PH = COMM_COLS.map(() => '?').join(', ');
+
+      const batchSize = 200;
+      for (let i = 0; i < commodities.length; i += batchSize) {
+        const batch = commodities.slice(i, i + batchSize);
+        const placeholders = batch.map(() => `(${COMM_PH})`).join(', ');
+        const values: unknown[] = [];
+
+        for (const cm of batch) {
+          values.push(
+            cm.uuid, cm.className, cm.name, cm.type, cm.subType,
+            cm.symbol, cm.occupancyScu,
+            cm.dataJson ? JSON.stringify(cm.dataJson) : null,
+          );
+        }
+
+        await conn.execute(
+          `INSERT INTO commodities (${COMM_COLS.join(', ')}) VALUES ${placeholders} AS new
+           ON DUPLICATE KEY UPDATE ${COMM_UPDATE}, updated_at=CURRENT_TIMESTAMP`,
+          values,
+        );
+        savedCommodities += batch.length;
+      }
+    }
+
+    onProgress?.(`Items: ${savedItems}, Commodities: ${savedCommodities}`);
+    return { items: savedItems, commodities: savedCommodities };
+  }
+
+  // ======================================================
   //  SHOPS → shops + shop_inventory tables
   // ======================================================
 
@@ -1057,13 +1178,15 @@ export class ExtractionService {
     for (const shop of shops) {
       try {
         await conn.execute(
-          `INSERT INTO shops (name, location, parent_location, shop_type, class_name)
-           VALUES (?, ?, ?, ?, ?) AS new
+          `INSERT INTO shops (name, location, parent_location, \`system\`, planet_moon, city, shop_type, class_name)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?) AS new
            ON DUPLICATE KEY UPDATE
              name=new.name, location=new.location,
-             parent_location=new.parent_location, shop_type=new.shop_type,
+             parent_location=new.parent_location,
+             \`system\`=new.\`system\`, planet_moon=new.planet_moon, city=new.city,
+             shop_type=new.shop_type,
              updated_at=CURRENT_TIMESTAMP`,
-          [shop.name, shop.location || null, shop.parentLocation || null, shop.shopType || null, shop.className]
+          [shop.name, shop.location || null, shop.parentLocation || null, shop.system || null, shop.planetMoon || null, shop.city || null, shop.shopType || null, shop.className]
         );
         savedShops++;
       } catch (e: unknown) {

@@ -335,12 +335,13 @@ await test('GET /components/nonexistent → 404', async () => {
   assert(status === 404, `Expected 404, got ${status}`);
 });
 
-await test('No Turret/MissileRack in components', async () => {
+await test('Turret/MissileRack/Gimbal in components', async () => {
   if (!hasGameData) skip('no game data');
-  for (const t of ['Turret', 'MissileRack']) {
+  for (const t of ['Turret', 'MissileRack', 'Gimbal']) {
     const { data, status } = await rawGet(`/components?type=${t}`);
     if (status === 429) skip('rate limited');
-    assert(data.count === 0, `Found ${data.count} ${t} (should be 0 — non-swappable)`);
+    assert(data.count > 0, `No ${t} found (should exist)`);
+    info(`${data.count} ${t}`);
   }
 });
 
@@ -673,6 +674,90 @@ await test('GET /components/:uuid/buy-locations → returns locations', async ()
 });
 
 // ============================================================================
+section('🎯 ITEMS (FPS Weapons, Armor, Clothing)');
+
+await test('GET /items → paginated list', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data, status } = await rawGet('/items?limit=10');
+  if (status === 503) skip('no game data service');
+  assert(data.success, 'Request failed');
+  assert(data.total >= 1000, `Expected ≥1000 items, got ${data.total}`);
+  assert(Array.isArray(data.data) && data.data.length === 10, 'Should return 10 items');
+  info(`${data.total} items total`);
+});
+
+await test('GET /items?type=FPS_Weapon → filter by type', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data, status } = await rawGet('/items?type=FPS_Weapon&limit=5');
+  if (status === 429) skip('rate limited');
+  assert(data.success && data.total > 0, 'No FPS weapons found');
+  assert(data.data.every(i => i.type === 'FPS_Weapon'), 'Non-weapon in results');
+  info(`${data.total} FPS weapons`);
+});
+
+await test('GET /items/:uuid → single item', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data: list } = await rawGet('/items?type=FPS_Weapon&limit=1');
+  if (!list.data || list.data.length === 0) skip('no items');
+  const uuid = list.data[0].uuid;
+  const { data } = await rawGet(`/items/${uuid}`);
+  assert(data.success && data.data.uuid === uuid, 'Item not found');
+  info(`${data.data.name} (${data.data.type})`);
+});
+
+await test('GET /items/types → item type breakdown', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data } = await rawGet('/items/types');
+  assert(data.success && Array.isArray(data.types), 'Missing types');
+  assert(data.types.length >= 5, `Only ${data.types.length} types`);
+  info(`${data.types.length} item types: ${data.types.map(t => t.type).join(', ')}`);
+});
+
+await test('GET /items/filters → available filters', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data } = await rawGet('/items/filters');
+  assert(data.success && data.data.types.length > 0, 'No types in filters');
+  info(`${data.data.types.length} types, ${data.data.sub_types.length} sub_types`);
+});
+
+// ============================================================================
+section('📦 COMMODITIES');
+
+await test('GET /commodities → paginated list', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data, status } = await rawGet('/commodities?limit=10');
+  if (status === 503) skip('no game data service');
+  assert(data.success, 'Request failed');
+  assert(data.total >= 100, `Expected ≥100 commodities, got ${data.total}`);
+  info(`${data.total} commodities total`);
+});
+
+await test('GET /commodities?type=Food → filter', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data } = await rawGet('/commodities?type=Food');
+  assert(data.success && data.total > 0, 'No food commodities');
+  info(`${data.total} food commodities`);
+});
+
+await test('GET /commodities/:uuid → single commodity', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data: list } = await rawGet('/commodities?limit=1');
+  if (!list.data || list.data.length === 0) skip('no commodities');
+  const uuid = list.data[0].uuid;
+  const { data } = await rawGet(`/commodities/${uuid}`);
+  assert(data.success && data.data.uuid === uuid, 'Commodity not found');
+  info(`${data.data.name} (${data.data.type})`);
+});
+
+await test('GET /commodities/types → type breakdown', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data } = await rawGet('/commodities/types');
+  assert(data.success && Array.isArray(data.types), 'Missing types');
+  assert(data.types.length >= 10, `Only ${data.types.length} types`);
+  info(`${data.types.length} commodity types`);
+});
+
+// ============================================================================
 section('🔧 LOADOUT SIMULATOR');
 
 await test('POST /loadout/calculate → default loadout stats', async () => {
@@ -707,6 +792,116 @@ await test('POST /loadout/calculate → requires shipUuid', async () => {
   const data = await res.json();
   assert(!data.success, 'Should fail without shipUuid');
   assert(res.status === 400, `Expected 400, got ${res.status}`);
+});
+
+// ============================================================================
+section('🏭 MANUFACTURER DETAIL');
+
+await test('GET /manufacturers/:code → manufacturer detail', async () => {
+  if (!hasGameData) skip('no game data');
+  const { status, data } = await rawGet('/manufacturers/AEGS');
+  assert(status === 200, `Expected 200, got ${status}`);
+  assert(data.data.code === 'AEGS', 'Expected AEGS code');
+  assert(data.data.ship_count > 0, 'Expected ship_count > 0');
+  info(`AEGS: ${data.data.ship_count} ships, ${data.data.component_count} components`);
+});
+
+await test('GET /manufacturers/:code → 404 on unknown', async () => {
+  if (!hasGameData) skip('no game data');
+  const { status } = await rawGet('/manufacturers/ZZZZZ');
+  assert(status === 404, `Expected 404, got ${status}`);
+});
+
+await test('GET /manufacturers/:code/ships → list ships', async () => {
+  if (!hasGameData) skip('no game data');
+  const { status, data } = await rawGet('/manufacturers/AEGS/ships');
+  assert(status === 200, `Expected 200, got ${status}`);
+  assert(data.count > 0, 'Expected ships');
+  info(`AEGS has ${data.count} ships`);
+  assert(data.data.every(s => s.manufacturer_code === 'AEGS'), 'All ships should be AEGS');
+});
+
+await test('GET /manufacturers/:code/components → list components', async () => {
+  if (!hasGameData) skip('no game data');
+  const { status, data } = await rawGet('/manufacturers/AEGS/components');
+  assert(status === 200, `Expected 200, got ${status}`);
+  info(`AEGS has ${data.count} components`);
+});
+
+// ============================================================================
+section('🔍 SHIPS SEARCH & DISCOVERY');
+
+await test('GET /ships/search?search=glad → autocomplete', async () => {
+  if (!hasGameData) skip('no game data');
+  const { status, data } = await rawGet('/ships/search?search=glad');
+  assert(status === 200, `Expected 200, got ${status}`);
+  assert(data.count > 0, 'Expected results for gladius');
+  info(`"glad" → ${data.count} result(s): ${data.data.map(s => s.name).join(', ')}`);
+});
+
+await test('GET /ships/search?search=a → 400 (too short)', async () => {
+  if (!hasGameData) skip('no game data');
+  const { status } = await rawGet('/ships/search?search=a');
+  assert(status === 400, `Expected 400, got ${status}`);
+});
+
+await test('GET /ships/random → returns a ship', async () => {
+  if (!hasGameData) skip('no game data');
+  const { status, data } = await rawGet('/ships/random');
+  assert(status === 200, `Expected 200, got ${status}`);
+  assert(data.data.uuid, 'Expected uuid');
+  assert(data.data.name, 'Expected name');
+  info(`Random: ${data.data.name}`);
+});
+
+await test('GET /ships/:uuid/similar → similar ships', async () => {
+  if (!hasGameData) skip('no game data');
+  // Get Gladius UUID first
+  const { data: gladius } = await rawGet('/ships/AEGS_Gladius');
+  assert(gladius.data?.uuid, 'Gladius not found');
+  const { status, data } = await rawGet(`/ships/${gladius.data.uuid}/similar`);
+  assert(status === 200, `Expected 200, got ${status}`);
+  info(`${data.count} similar ships to Gladius`);
+});
+
+await test('GET /ships/:uuid/hardpoints → hardpoint tree', async () => {
+  if (!hasGameData) skip('no game data');
+  const { data: gladius } = await rawGet('/ships/AEGS_Gladius');
+  assert(gladius.data?.uuid, 'Gladius not found');
+  const { status, data } = await rawGet(`/ships/${gladius.data.uuid}/hardpoints`);
+  assert(status === 200, `Expected 200, got ${status}`);
+  assert(data.count > 0, 'Expected hardpoints');
+  info(`Gladius has ${data.count} hardpoint groups`);
+});
+
+// ============================================================================
+section('📊 COMPONENT TYPES & PUBLIC STATS');
+
+await test('GET /components/types → list of types', async () => {
+  if (!hasGameData) skip('no game data');
+  const { status, data } = await rawGet('/components/types');
+  assert(status === 200, `Expected 200, got ${status}`);
+  assert(data.data.types.length > 5, `Expected ≥5 types, got ${data.data.types.length}`);
+  info(`${data.data.types.length} component types: ${data.data.types.map(t => t.type).join(', ')}`);
+});
+
+await test('GET /stats/overview → public stats', async () => {
+  if (!hasGameData) skip('no game data');
+  const { status, data } = await rawGet('/stats/overview');
+  assert(status === 200, `Expected 200, got ${status}`);
+  assert(data.data.ships > 0, 'Expected ships > 0');
+  assert(data.data.components > 0, 'Expected components > 0');
+  assert(data.data.flyable_ships > 0, 'Expected flyable_ships > 0');
+  info(`${data.data.flyable_ships} flyable ships, ${data.data.components} components, v${data.data.game_version}`);
+});
+
+await test('GET /changelog/summary → changelog summary', async () => {
+  if (!hasGameData) skip('no game data');
+  const { status, data } = await rawGet('/changelog/summary');
+  assert(status === 200, `Expected 200, got ${status}`);
+  assert(data.data.total > 0, 'Expected total > 0');
+  assert(data.data.recent.length > 0, 'Expected recent changes');
+  info(`${data.data.total} total changes, ${data.data.recent.length} recent`);
 });
 
 // ============================================================================

@@ -1,14 +1,19 @@
 -- ============================================================
--- STARVIS v1.0 - DATABASE SCHEMA
+-- STARVIS v2.0 - DATABASE SCHEMA
 -- Last updated: June 2025
 -- 
 -- Tables:
 --   ship_matrix       → Raw data from RSI Ship Matrix API (external)
 --   manufacturers     → All manufacturers from DataForge (ships + components)
 --   ships             → Ships extracted from P4K/DataForge (game data only)
---   components        → All SCItem components from DataForge
+--   components        → All SCItem components from DataForge (ship + vehicle)
 --   ships_loadouts    → Default loadout per ship (ports + equipped components)
+--   items             → FPS weapons, armor, clothing, attachments, consumables
+--   commodities       → Tradeable/mineable goods (metals, gas, food, etc.)
+--   shops             → In-game shops / vendor locations
+--   shop_inventory    → Items available in shops
 --   extraction_log    → Extraction version history
+--   changelog         → Track changes between extractions
 -- ============================================================
 
 -- ====================
@@ -292,6 +297,27 @@ CREATE TABLE IF NOT EXISTS components (
   qd_alignment_rate DECIMAL(10,4) COMMENT 'QD spline jump alignment rate',
   qd_disconnect_range DECIMAL(15,2) COMMENT 'QD disconnect range (m)',
   
+  -- Mining laser stats
+  mining_speed DECIMAL(10,4) COMMENT 'Mining extraction rate',
+  mining_range DECIMAL(10,2) COMMENT 'Mining optimal range (m)',
+  mining_resistance DECIMAL(10,4) COMMENT 'Mining resistance modifier',
+  mining_instability DECIMAL(10,4) COMMENT 'Mining instability modifier',
+  
+  -- Tractor beam stats
+  tractor_max_force DECIMAL(15,2) COMMENT 'Max tractor beam force (N)',
+  tractor_max_range DECIMAL(10,2) COMMENT 'Max tractor beam range (m)',
+  
+  -- Salvage stats
+  salvage_speed DECIMAL(10,4) COMMENT 'Salvage extraction rate',
+  salvage_radius DECIMAL(10,2) COMMENT 'Salvage extraction radius',
+  
+  -- Gimbal / Mount stats
+  gimbal_type VARCHAR(20) COMMENT 'Fixed, Gimbal',
+  
+  -- Missile rack stats
+  rack_count TINYINT UNSIGNED COMMENT 'Number of missile slots on rack',
+  rack_missile_size TINYINT UNSIGNED COMMENT 'Size of missiles the rack holds',
+  
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   
@@ -356,6 +382,72 @@ CREATE TABLE IF NOT EXISTS ship_modules (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ====================
+-- ITEMS - FPS weapons, personal armor, clothing, attachments, gadgets, consumables
+-- ====================
+CREATE TABLE IF NOT EXISTS items (
+  uuid CHAR(36) PRIMARY KEY COMMENT 'DataForge entity UUID',
+  class_name VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  type VARCHAR(50) NOT NULL COMMENT 'FPS_Weapon, Armor_Helmet, Armor_Torso, Armor_Arms, Armor_Legs, Armor_Backpack, Undersuit, Clothing, Attachment, Magazine, Consumable, Gadget, Tool, Grenade, Knife',
+  sub_type VARCHAR(100) COMMENT 'e.g. Assault Rifle, Pistol, SMG, Sniper, LMG, Shotgun, Light, Medium, Heavy',
+  size TINYINT UNSIGNED,
+  grade VARCHAR(10),
+  manufacturer_code VARCHAR(10),
+  
+  -- Physical
+  mass DECIMAL(10,2),
+  hp INT,
+  
+  -- FPS Weapon stats
+  weapon_damage DECIMAL(10,4) COMMENT 'Per-shot damage',
+  weapon_damage_type VARCHAR(50) COMMENT 'physical, energy, distortion',
+  weapon_fire_rate DECIMAL(10,4) COMMENT 'Rounds per minute',
+  weapon_range DECIMAL(10,2) COMMENT 'Effective range (m)',
+  weapon_speed DECIMAL(10,2) COMMENT 'Projectile speed (m/s)',
+  weapon_ammo_count INT COMMENT 'Magazine capacity',
+  weapon_dps DECIMAL(10,4) COMMENT 'Damage per second',
+  
+  -- Armor stats
+  armor_damage_reduction DECIMAL(10,4) COMMENT 'Damage reduction %',
+  armor_temp_min DECIMAL(10,2) COMMENT 'Min temp resistance (°C)',
+  armor_temp_max DECIMAL(10,2) COMMENT 'Max temp resistance (°C)',
+  
+  -- Extended data (type-specific JSON blob)
+  data_json JSON COMMENT 'Extended type-specific data',
+  
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  INDEX idx_type (type),
+  INDEX idx_sub_type (sub_type),
+  INDEX idx_manufacturer (manufacturer_code),
+  INDEX idx_class_name (class_name),
+  INDEX idx_type_sub (type, sub_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ====================
+-- COMMODITIES - Tradeable and mineable goods (metals, gas, minerals, food, etc.)
+-- ====================
+CREATE TABLE IF NOT EXISTS commodities (
+  uuid CHAR(36) PRIMARY KEY COMMENT 'DataForge entity UUID',
+  class_name VARCHAR(255) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  type VARCHAR(50) NOT NULL COMMENT 'Metal, Gas, Mineral, Food, Vice, Consumer Goods, etc.',
+  sub_type VARCHAR(100) COMMENT 'Specific commodity (Aluminum, Titanium, etc.)',
+  symbol VARCHAR(20) COMMENT 'Chemical/trade symbol (Al, Ti, etc.)',
+  occupancy_scu DECIMAL(10,4) COMMENT 'Size in micro-SCU',
+  
+  data_json JSON COMMENT 'Extended commodity data',
+  
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  
+  INDEX idx_type (type),
+  INDEX idx_sub_type (sub_type),
+  INDEX idx_class_name (class_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ====================
 -- SHIP_PAINTS - Available paints/liveries per ship
 -- ====================
 CREATE TABLE IF NOT EXISTS ship_paints (
@@ -380,8 +472,11 @@ CREATE TABLE IF NOT EXISTS extraction_log (
   game_version VARCHAR(50) COMMENT 'Detected game version string',
   ships_count INT DEFAULT 0,
   components_count INT DEFAULT 0,
+  items_count INT DEFAULT 0,
+  commodities_count INT DEFAULT 0,
   manufacturers_count INT DEFAULT 0,
   loadout_ports_count INT DEFAULT 0,
+  shops_count INT DEFAULT 0,
   duration_ms INT COMMENT 'Extraction duration in ms',
   status ENUM('success', 'partial', 'failed') DEFAULT 'success',
   error_message TEXT,
@@ -397,7 +492,7 @@ CREATE TABLE IF NOT EXISTS extraction_log (
 CREATE TABLE IF NOT EXISTS changelog (
   id INT AUTO_INCREMENT PRIMARY KEY,
   extraction_id INT NOT NULL COMMENT 'FK to extraction_log.id',
-  entity_type ENUM('ship', 'component', 'shop', 'module') NOT NULL,
+  entity_type ENUM('ship', 'component', 'item', 'commodity', 'shop', 'module') NOT NULL,
   entity_uuid VARCHAR(255) NOT NULL COMMENT 'UUID or identifier of changed entity',
   entity_name VARCHAR(255) COMMENT 'Name for display',
   change_type ENUM('added', 'removed', 'modified') NOT NULL,
@@ -421,13 +516,18 @@ CREATE TABLE IF NOT EXISTS shops (
   name VARCHAR(255) NOT NULL,
   location VARCHAR(255) COMMENT 'e.g. Port Olisar, Lorville',
   parent_location VARCHAR(255) COMMENT 'e.g. Crusader, Hurston',
+  `system` VARCHAR(50) COMMENT 'Star system (Stanton, Pyro, Nyx)',
+  planet_moon VARCHAR(100) COMMENT 'Planet or moon name',
+  city VARCHAR(100) COMMENT 'City or station name',
   shop_type VARCHAR(50) COMMENT 'Weapon, Ship, Component, etc.',
   class_name VARCHAR(255) UNIQUE NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   
   INDEX idx_location (location),
-  INDEX idx_type (shop_type)
+  INDEX idx_type (shop_type),
+  INDEX idx_system (`system`),
+  INDEX idx_city (city)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ====================
@@ -437,6 +537,7 @@ CREATE TABLE IF NOT EXISTS shop_inventory (
   id INT AUTO_INCREMENT PRIMARY KEY,
   shop_id INT NOT NULL,
   component_uuid CHAR(36) COMMENT 'FK to components.uuid if resolved',
+  item_uuid CHAR(36) COMMENT 'FK to items.uuid if FPS item',
   component_class_name VARCHAR(255) NOT NULL,
   base_price DECIMAL(12,2),
   rental_price_1d DECIMAL(12,2),
@@ -448,8 +549,10 @@ CREATE TABLE IF NOT EXISTS shop_inventory (
   
   INDEX idx_shop (shop_id),
   INDEX idx_component (component_uuid),
+  INDEX idx_item (item_uuid),
   INDEX idx_class_name (component_class_name),
   UNIQUE KEY uk_shop_component (shop_id, component_class_name),
   CONSTRAINT fk_inventory_shop FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
-  CONSTRAINT fk_inventory_component FOREIGN KEY (component_uuid) REFERENCES components(uuid) ON DELETE SET NULL
+  CONSTRAINT fk_inventory_component FOREIGN KEY (component_uuid) REFERENCES components(uuid) ON DELETE SET NULL,
+  CONSTRAINT fk_inventory_item FOREIGN KEY (item_uuid) REFERENCES items(uuid) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

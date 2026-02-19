@@ -36,13 +36,21 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
     'LifeSupport':   /life_?support[s]?[\/\\]/i,
     'EMP':           /emp[\/\\]|distortion_?charge[\/\\]|emp_?generator/i,
     'QuantumInterdictionGenerator': /quantum_?interdiction[\/\\]|qig[\/\\]|quantum_?enforcement/i,
+    'Gimbal':        /weapon_mounts\/gimbal[\/\\]|mount_?fixed[\/\\]/i,
+    'Turret':        /ships\/turret[\/\\](?!.*unmanned)/i,
+    'TurretUnmanned': /turret_?unmanned[\/\\]/i,
+    'MissileRack':   /missile_?racks?[\/\\]/i,
+    'MiningLaser':   /utility\/mining\/miningarm[\/\\]|mining_?laser[\/\\]|miningsubitems[\/\\]/i,
+    'SalvageHead':   /utility\/salvage\/salvagehead[\/\\]/i,
+    'SelfDestruct':  /ships\/selfdestruct[\/\\]/i,
+    'TractorBeam':   /utility\/tractorbeam[\/\\]/i,
   };
 
   let scanned = 0;
   for (const r of dfData.records) {
     if (r.structIndex !== entityClassIdx) continue;
     const fn = (r.fileName || '').toLowerCase();
-    if (!fn.includes('scitem') && !fn.includes('/weapon/') && !fn.includes('/missile/') && !fn.includes('/systems/')) continue;
+    if (!fn.includes('scitem/ships/') && !fn.includes('scitem') && !fn.includes('/weapon/') && !fn.includes('/missile/') && !fn.includes('/systems/')) continue;
     let type: string | null = null;
     for (const [t, rx] of Object.entries(componentPaths)) { if (rx.test(fn)) { type = t; break; } }
     if (!type) continue;
@@ -386,6 +394,56 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           }
           if (typeof c.chargeTime === 'number' && !comp.qigChargeTime) comp.qigChargeTime = Math.round(c.chargeTime * 100) / 100;
           if (typeof c.cooldownTime === 'number' && !comp.qigCooldown) comp.qigCooldown = Math.round(c.cooldownTime * 100) / 100;
+        }
+
+        // Mining laser
+        if (cType === 'SCItemMiningLaserParams' || cType === 'SMiningLaserParams') {
+          if (typeof c.miningExtractionLaserPower === 'number') comp.miningSpeed = Math.round(c.miningExtractionLaserPower * 10000) / 10000;
+          if (typeof c.MiningExtractionLaserPower === 'number' && !comp.miningSpeed) comp.miningSpeed = Math.round(c.MiningExtractionLaserPower * 10000) / 10000;
+          if (typeof c.laserInstability === 'number') comp.miningInstability = Math.round(c.laserInstability * 10000) / 10000;
+          if (typeof c.LaserInstability === 'number' && !comp.miningInstability) comp.miningInstability = Math.round(c.LaserInstability * 10000) / 10000;
+          if (typeof c.resistanceModifier === 'number') comp.miningResistance = Math.round(c.resistanceModifier * 10000) / 10000;
+          if (typeof c.optimalRange === 'number') comp.miningRange = Math.round(c.optimalRange * 100) / 100;
+          if (typeof c.OptimalRange === 'number' && !comp.miningRange) comp.miningRange = Math.round(c.OptimalRange * 100) / 100;
+        }
+
+        // Tractor beam
+        if (cType === 'SCItemTractorBeamParams' || cType === 'STractorBeamParams') {
+          if (typeof c.maxForce === 'number') comp.tractorMaxForce = Math.round(c.maxForce * 100) / 100;
+          if (typeof c.MaxForce === 'number' && !comp.tractorMaxForce) comp.tractorMaxForce = Math.round(c.MaxForce * 100) / 100;
+          if (typeof c.maxRange === 'number') comp.tractorMaxRange = Math.round(c.maxRange * 100) / 100;
+          if (typeof c.MaxRange === 'number' && !comp.tractorMaxRange) comp.tractorMaxRange = Math.round(c.MaxRange * 100) / 100;
+        }
+
+        // Salvage
+        if (cType === 'SCItemSalvageParams' || cType === 'SSalvageParams' || cType === 'SCItemSalvageModifierParams') {
+          if (typeof c.salvageSpeed === 'number') comp.salvageSpeed = Math.round(c.salvageSpeed * 10000) / 10000;
+          if (typeof c.SalvageSpeed === 'number' && !comp.salvageSpeed) comp.salvageSpeed = Math.round(c.SalvageSpeed * 10000) / 10000;
+          if (typeof c.radius === 'number') comp.salvageRadius = Math.round(c.radius * 100) / 100;
+          if (typeof c.Radius === 'number' && !comp.salvageRadius) comp.salvageRadius = Math.round(c.Radius * 100) / 100;
+        }
+
+        // Gimbal / mount type detection
+        if (type === 'Gimbal') {
+          if (fn.includes('gimbal')) comp.gimbalType = 'Gimbal';
+          else if (fn.includes('fixed')) comp.gimbalType = 'Fixed';
+          else comp.gimbalType = 'Gimbal';
+        }
+
+        // Missile rack: count sub-ports
+        if ((type === 'MissileRack') && cType === 'SItemPortContainerComponentParams') {
+          const ports = c.Ports;
+          if (Array.isArray(ports)) {
+            comp.rackCount = ports.length;
+            // Try to get missile size from first port
+            for (const port of ports) {
+              if (port && typeof port === 'object') {
+                if (typeof port.MinSize === 'number') comp.rackMissileSize = port.MinSize;
+                else if (typeof port.MaxSize === 'number') comp.rackMissileSize = port.MaxSize;
+                break;
+              }
+            }
+          }
         }
       }
 

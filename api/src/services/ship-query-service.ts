@@ -150,4 +150,83 @@ export class ShipQueryService {
     );
     return rows;
   }
+
+  async getManufacturerByCode(code: string): Promise<Row | null> {
+    const [rows] = await this.pool.execute<Row[]>(
+      `SELECT m.*, COUNT(DISTINCT s.uuid) as ship_count, COUNT(DISTINCT c.uuid) as component_count
+       FROM manufacturers m
+       LEFT JOIN ships s ON m.code = s.manufacturer_code
+       LEFT JOIN components c ON m.code = c.manufacturer_code
+       WHERE m.code = ?
+       GROUP BY m.code`,
+      [code.toUpperCase()],
+    );
+    return rows[0] || null;
+  }
+
+  async getManufacturerShips(code: string): Promise<Row[]> {
+    const [rows] = await this.pool.execute<Row[]>(
+      `SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS}
+       WHERE s.manufacturer_code = ? AND (s.variant_type IS NULL OR s.variant_type NOT IN ('tutorial','enemy_ai','arena_ai','competition'))
+       ORDER BY s.name`,
+      [code.toUpperCase()],
+    );
+    return rows.map(({ game_data, ...rest }) => rest as Row);
+  }
+
+  async getManufacturerComponents(code: string): Promise<Row[]> {
+    const [rows] = await this.pool.execute<Row[]>(
+      `SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade, c.manufacturer_code,
+              m.name as manufacturer_name
+       FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code
+       WHERE c.manufacturer_code = ? ORDER BY c.type, c.size, c.name`,
+      [code.toUpperCase()],
+    );
+    return rows;
+  }
+
+  async searchShipsAutocomplete(q: string, limit = 10): Promise<Row[]> {
+    const t = `%${q}%`;
+    const [rows] = await this.pool.execute<Row[]>(
+      `SELECT s.uuid, COALESCE(sm.name, s.name) as name, s.class_name, s.manufacturer_code,
+              m.name as manufacturer_name, sm.media_store_small as thumbnail,
+              s.vehicle_category
+       ${SHIP_JOINS}
+       WHERE (s.name LIKE ? OR s.class_name LIKE ? OR s.short_name LIKE ? OR sm.name LIKE ?)
+         AND (s.variant_type IS NULL OR s.variant_type NOT IN ('tutorial','enemy_ai','arena_ai','competition'))
+       ORDER BY s.name LIMIT ${Number(Math.min(limit, 20))}`,
+      [t, t, t, t],
+    );
+    return rows;
+  }
+
+  async getRandomShip(): Promise<Row | null> {
+    const [rows] = await this.pool.execute<Row[]>(
+      `SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS}
+       WHERE s.variant_type IS NULL AND s.vehicle_category = 'ship'
+       ORDER BY RAND() LIMIT 1`,
+    );
+    if (!rows[0]) return null;
+    const { game_data, ...rest } = rows[0];
+    return rest as Row;
+  }
+
+  async getSimilarShips(uuid: string, limit = 5): Promise<Row[]> {
+    const [shipRows] = await this.pool.execute<Row[]>(
+      "SELECT role, vehicle_category, manufacturer_code FROM ships WHERE uuid = ?", [uuid],
+    );
+    if (!shipRows[0]) return [];
+    const ship = shipRows[0];
+
+    const [rows] = await this.pool.execute<Row[]>(
+      `SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS}
+       WHERE s.uuid != ? AND s.variant_type IS NULL
+         AND s.vehicle_category = ?
+         AND (s.role = ? OR s.manufacturer_code = ?)
+       ORDER BY (s.role = ?) DESC, s.name
+       LIMIT ${Number(Math.min(limit, 10))}`,
+      [uuid, ship.vehicle_category, ship.role, ship.manufacturer_code, ship.role],
+    );
+    return rows.map(({ game_data, ...rest }) => rest as Row);
+  }
 }

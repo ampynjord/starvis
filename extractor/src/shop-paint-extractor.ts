@@ -8,6 +8,88 @@ import type { DataForgeContext } from "./dataforge-utils.js";
 import { SHOP_LOC_NAMES } from "./dataforge-utils.js";
 import logger from "./logger.js";
 
+// ============ Shop location reference data ============
+
+/**
+ * Hardcoded shop → location mapping.
+ * Locations are NOT in DataForge DCB; this is derived from in-game knowledge.
+ * System hierarchy: System → Planet/Moon → City/Station
+ */
+const SHOP_LOCATIONS: Record<string, { system: string; planetMoon: string; city: string }> = {
+  // ── Stanton → Hurston → Lorville ──
+  'NewDeal':                  { system: 'Stanton', planetMoon: 'Hurston', city: 'Lorville' },
+  'HurstonDynamics':          { system: 'Stanton', planetMoon: 'Hurston', city: 'Lorville' },
+  'TammanyandSons':           { system: 'Stanton', planetMoon: 'Hurston', city: 'Lorville' },
+  'Shop_LiveFireWeapons':     { system: 'Stanton', planetMoon: 'Hurston', city: 'Lorville' },
+  'Shop_Armor':               { system: 'Stanton', planetMoon: 'Hurston', city: 'Lorville' },
+  // ── Stanton → ArcCorp → Area18 ──
+  'CenterMass':               { system: 'Stanton', planetMoon: 'ArcCorp', city: 'Area18' },
+  'CubbyBlast':               { system: 'Stanton', planetMoon: 'ArcCorp', city: 'Area18' },
+  'AstroArmada':              { system: 'Stanton', planetMoon: 'ArcCorp', city: 'Area18' },
+  'Casaba':                   { system: 'Stanton', planetMoon: 'ArcCorp', city: 'Area18' },
+  'Shop_DumpersDepot':        { system: 'Stanton', planetMoon: 'ArcCorp', city: 'Area18' },
+  'ArcCorp':                  { system: 'Stanton', planetMoon: 'ArcCorp', city: 'Area18' },
+  // ── Stanton → Crusader → Orison ──
+  'Shop_CrusaderIndustries':  { system: 'Stanton', planetMoon: 'Crusader', city: 'Orison' },
+  'Shop_CousinCrows':         { system: 'Stanton', planetMoon: 'Crusader', city: 'Orison' },
+  'Shop_CrusaderProvidenceSurplus': { system: 'Stanton', planetMoon: 'Crusader', city: 'Orison' },
+  // ── Stanton → microTech → New Babbage ──
+  'OmegaPro':                 { system: 'Stanton', planetMoon: 'microTech', city: 'New Babbage' },
+  'FactoryLine':              { system: 'Stanton', planetMoon: 'microTech', city: 'New Babbage' },
+  'Microtech':                { system: 'Stanton', planetMoon: 'microTech', city: 'New Babbage' },
+  'Aparelli':                 { system: 'Stanton', planetMoon: 'microTech', city: 'New Babbage' },
+  // ── Stanton → Yela (Crusader moon) → GrimHEX ──
+  'GrimHex':                  { system: 'Stanton', planetMoon: 'Yela', city: 'GrimHEX' },
+  'Skutters':                 { system: 'Stanton', planetMoon: 'Yela', city: 'GrimHEX' },
+  'Shop_GarrityDefense':      { system: 'Stanton', planetMoon: 'Yela', city: 'GrimHEX' },
+  'Shop_Klescher':            { system: 'Stanton', planetMoon: 'Aberdeen', city: 'Klescher' },
+  // ── Stanton orbital stations ──
+  'PortOlisar':               { system: 'Stanton', planetMoon: 'Crusader', city: 'Port Olisar' },
+  'Shop_PlatinumBay':         { system: 'Stanton', planetMoon: 'Crusader', city: 'Port Olisar' },
+  'TeachsRentals':            { system: 'Stanton', planetMoon: 'Crusader', city: 'Port Olisar' },
+  'Teachs':                   { system: 'Stanton', planetMoon: 'Crusader', city: 'Port Olisar' },
+  // ── Stanton → Everus Harbor (Hurston orbital) ──
+  'Shop_Makau':               { system: 'Stanton', planetMoon: 'Hurston', city: 'Everus Harbor' },
+  // ── Stanton → Baijini Point (ArcCorp orbital) ──
+  'Shop_KelTo':               { system: 'Stanton', planetMoon: 'ArcCorp', city: 'Baijini Point' },
+  // ── Stanton → Port Tressler (microTech orbital) ──
+  'Cordrys':                  { system: 'Stanton', planetMoon: 'microTech', city: 'Port Tressler' },
+  // ── Stanton → Delamar ──
+  'Levski2':                  { system: 'Stanton', planetMoon: 'Delamar', city: 'Levski' },
+  // ── Cross-location generic shops ──
+  'Shop_GenericClothing':     { system: 'Stanton', planetMoon: '', city: '' },
+  'Shop_GenericShipWeapons':  { system: 'Stanton', planetMoon: '', city: '' },
+  'Shop_GenericFPSWeapons':   { system: 'Stanton', planetMoon: '', city: '' },
+  'Shop_GenericArmor':        { system: 'Stanton', planetMoon: '', city: '' },
+  'Shop_GenericPharmacy':     { system: 'Stanton', planetMoon: '', city: '' },
+  'Shop_UniversalGeneric':    { system: 'Stanton', planetMoon: '', city: '' },
+  'Shop_CommodityKiosk':      { system: 'Stanton', planetMoon: '', city: '' },
+  'Shop_CargoDepot':          { system: 'Stanton', planetMoon: '', city: '' },
+  'Shop_Refinery':            { system: 'Stanton', planetMoon: '', city: '' },
+  'Shop_OreSales':            { system: 'Stanton', planetMoon: '', city: '' },
+  'Shop_Weapons':             { system: 'Stanton', planetMoon: '', city: '' },
+  'Shop_WeaponHD':            { system: 'Stanton', planetMoon: '', city: '' },
+  // ── Lorville specific ──
+  'Regal':                    { system: 'Stanton', planetMoon: 'Hurston', city: 'Lorville' },
+  'KCTrading':                { system: 'Stanton', planetMoon: 'Hurston', city: 'Lorville' },
+  'ProcyonCDF':               { system: 'Stanton', planetMoon: 'Hurston', city: 'Lorville' },
+  'ConscientiousObjects':     { system: 'Stanton', planetMoon: 'Crusader', city: 'Orison' },
+  'Vantage':                  { system: 'Stanton', planetMoon: 'ArcCorp', city: 'Area18' },
+  'Traveler':                 { system: 'Stanton', planetMoon: 'microTech', city: 'New Babbage' },
+  'FTA':                      { system: 'Stanton', planetMoon: '', city: '' },
+  'Shubin':                   { system: 'Stanton', planetMoon: '', city: '' },
+  'TDD':                      { system: 'Stanton', planetMoon: '', city: '' },
+  'FTL':                      { system: 'Stanton', planetMoon: '', city: '' },
+  // ── Pyro ──
+  'Shop_UniversalGeneric_Pyro': { system: 'Pyro', planetMoon: '', city: '' },
+  // ── Generic shop types ──
+  'Shop_LO_C_ShipWeapons':   { system: 'Stanton', planetMoon: '', city: '' },
+  'Shop_LO_C_Armor':         { system: 'Stanton', planetMoon: '', city: '' },
+  'Shop_LO_C_FPSWeapons':    { system: 'Stanton', planetMoon: '', city: '' },
+  'Shop_LO_C_Clothing':      { system: 'Stanton', planetMoon: '', city: '' },
+  'Shop_ConscientiousObjects': { system: 'Stanton', planetMoon: 'Crusader', city: 'Orison' },
+};
+
 // ============ Shop extraction ============
 
 function inferShopType(className: string): string {
@@ -61,11 +143,17 @@ export function extractShops(ctx: DataForgeContext): { shops: any[]; inventory: 
       const shopCode = data.Code || '';
       const shopType = inferShopType(className);
 
+      // Resolve location from hardcoded map
+      const loc = SHOP_LOCATIONS[className];
+
       shops.push({
         className,
         name: shopName,
-        location: null,
-        parentLocation: null,
+        location: loc?.city || null,
+        parentLocation: loc?.planetMoon || null,
+        system: loc?.system || null,
+        planetMoon: loc?.planetMoon || null,
+        city: loc?.city || null,
         shopType,
         shopCode,
       });
