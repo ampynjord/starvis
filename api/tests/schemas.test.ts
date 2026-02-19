@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-import { arrayToCsv, ComponentQuery, CommodityQuery, ItemQuery, LoadoutBody, qInt, qStr, ShipQuery } from "../src/schemas.js";
+import { arrayToCsv, CommodityQuery, ComponentQuery, ItemQuery, LoadoutBody, qInt, qStr, ShipQuery } from "../src/schemas.js";
 
 // ── Tests ──
 

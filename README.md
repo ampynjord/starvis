@@ -6,13 +6,13 @@ Monorepo en 4 modules :
 - **api/** — Backend Express.js + TypeScript + MySQL (déployé sur VPS)
 - **extractor/** — CLI d'extraction P4K/DataForge (exécuté localement)
 - **db/** — Schéma SQL, initialisation, backup
-- **ihm/** — Frontend Vue 3 + Tailwind CSS (SPA)
+- **ihm/** — Page placeholder statique (IHM en cours de développement)
 
 Deux sources de données complémentaires :
 - **RSI Ship Matrix** — données marketing officielles (246 vaisseaux), synchronisées par l'API
 - **P4K DataForge** — données réelles du jeu (~309 vaisseaux, ~3 023 composants, ~5 237 items FPS, ~237 commodités, ~33 957 ports de loadout, ~1 791 paints), extraites localement par le CLI
 
-Production : **[starvis-api.ampynjord.bzh](https://starvis-api.ampynjord.bzh)** (API) | **[starvis.ampynjord.bzh](https://starvis.ampynjord.bzh)** (IHM)
+Production : **[starvis-api.ampynjord.bzh](https://starvis-api.ampynjord.bzh)** (API) — IHM en cours de développement
 
 ---
 
@@ -114,11 +114,10 @@ starvis/
 │   └── tests/
 │       ├── classifyPort.test.ts       # 30 tests
 │       └── dataforge-helpers.test.ts  # 14 tests
-├── ihm/                        # Frontend Vue 3 + Tailwind CSS
-│   ├── Dockerfile              # Nginx Alpine multi-stage
-│   ├── nginx.conf              # Reverse proxy + rate limiting
-│   ├── index.html
-│   └── src/                    # Vue 3 SPA (13 routes)
+├── ihm/                        # Page placeholder (IHM en développement)
+│   ├── Dockerfile              # Nginx Alpine simple
+│   ├── nginx.conf
+│   └── index.html              # Page "coming soon"
 ├── db/
 │   ├── schema.sql              # 13 tables MySQL + FK + index
 │   ├── init.sh                 # Initialisation DB (permissions % host)
@@ -451,25 +450,7 @@ GET /health
 
 ## Frontend (IHM)
 
-Interface web Vue 3 avec 13 routes :
-
-| Route | Vue | Description |
-|-------|-----|-------------|
-| `/` | HomeView | Page d'accueil |
-| `/ships` | ShipsView | Liste des vaisseaux avec filtres et pagination |
-| `/ships/:uuid` | ShipDetailView | Détails d'un vaisseau (loadout, modules, paints) |
-| `/components` | ComponentsView | Liste des composants avec filtres dynamiques |
-| `/components/:uuid` | ComponentDetailView | Détails d'un composant |
-| `/compare` | CompareView | Comparaison côte à côte |
-| `/shops` | ShopsView | Magasins in-game |
-| `/paints` | PaintsView | Liste des peintures/livrées |
-| `/manufacturers` | ManufacturersView | Liste des fabricants |
-| `/loadout/:uuid?` | LoadoutView | Simulateur de loadout |
-| `/hangar` | HangarView | Hangar personnel |
-| `/changelog` | ChangelogView | Historique des changements |
-| `/:pathMatch(.*)*` | NotFoundView | Page 404 |
-
-Composants communs : `AppNav`, `PaginationBar`, `StatBlock`, `LoadingState`.
+IHM en cours de développement. Page placeholder statique servie par Nginx.
 
 ---
 
