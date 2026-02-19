@@ -12,12 +12,13 @@ import {
     readInstance as readInstancePure
 } from "./dataforge-parser.js";
 import { type DataForgeContext, classifyPort, resolveLocKey } from "./dataforge-utils.js";
+import { extractItems as _extractItems } from "./item-extractor.js";
 import logger from "./logger.js";
 import { P4KProvider } from "./p4k-provider.js";
 import { extractPaints as _extractPaints, extractShops as _extractShops } from "./shop-paint-extractor.js";
 
 // Re-export for backward compatibility (extraction-service.ts imports these from here)
-export { MANUFACTURER_CODES, classifyPort } from "./dataforge-utils.js";
+export { classifyPort, MANUFACTURER_CODES } from "./dataforge-utils.js";
 
 export class DataForgeService implements DataForgeContext {
   private provider: P4KProvider | null = null;
@@ -1565,5 +1566,9 @@ export class DataForgeService implements DataForgeContext {
 
   extractPaints(): Array<{ shipShortName: string; paintClassName: string; paintName: string; paintUuid: string }> {
     return _extractPaints(this);
+  }
+
+  extractItems(): { items: any[]; commodities: any[] } {
+    return _extractItems(this);
   }
 }

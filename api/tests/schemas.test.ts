@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-import { arrayToCsv, ComponentQuery, LoadoutBody, qInt, qStr, ShipQuery } from "../src/schemas.js";
+import { arrayToCsv, ComponentQuery, CommodityQuery, ItemQuery, LoadoutBody, qInt, qStr, ShipQuery } from "../src/schemas.js";
 
 // ── Tests ──
 
@@ -112,6 +112,69 @@ describe("ComponentQuery", () => {
     expect(result.size).toBe("3");
     expect(result.grade).toBe("A");
     expect(result.manufacturer).toBe("BEHR");
+  });
+});
+
+describe("ItemQuery", () => {
+  it("parses empty query with defaults", () => {
+    const result = ItemQuery.parse({});
+    expect(result.page).toBe(1);
+    expect(result.limit).toBe(50);
+    expect(result.type).toBeUndefined();
+    expect(result.sub_type).toBeUndefined();
+  });
+
+  it("parses a full query", () => {
+    const result = ItemQuery.parse({
+      type: "FPS_Weapon",
+      sub_type: "Assault_Rifle",
+      manufacturer: "BEHR",
+      search: "laser",
+      sort: "name",
+      order: "asc",
+      page: "3",
+      limit: "25",
+    });
+    expect(result.type).toBe("FPS_Weapon");
+    expect(result.sub_type).toBe("Assault_Rifle");
+    expect(result.manufacturer).toBe("BEHR");
+    expect(result.search).toBe("laser");
+    expect(result.page).toBe(3);
+    expect(result.limit).toBe(25);
+  });
+
+  it("passes through unknown keys", () => {
+    const result = ItemQuery.parse({ extra: "value" });
+    expect((result as Record<string, unknown>).extra).toBe("value");
+  });
+});
+
+describe("CommodityQuery", () => {
+  it("parses empty query with defaults", () => {
+    const result = CommodityQuery.parse({});
+    expect(result.page).toBe(1);
+    expect(result.limit).toBe(50);
+    expect(result.type).toBeUndefined();
+  });
+
+  it("parses a full query", () => {
+    const result = CommodityQuery.parse({
+      type: "Food",
+      search: "rice",
+      sort: "name",
+      order: "desc",
+      page: "2",
+      limit: "100",
+    });
+    expect(result.type).toBe("Food");
+    expect(result.search).toBe("rice");
+    expect(result.page).toBe(2);
+    expect(result.limit).toBe(100);
+  });
+
+  it("passes through unknown keys", () => {
+    const result = CommodityQuery.parse({ custom: "test" });
+    expect((result as Record<string, unknown>).custom).toBe("test");
   });
 });
 

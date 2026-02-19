@@ -6,29 +6,37 @@
  *   ComponentQueryService  — component CRUD, filters, buy locations
  *   LoadoutService         — loadout calculator, hardpoints, stats
  *   ShopService            — shop listing, inventory
+ *   ItemQueryService       — FPS weapons, armor, clothing, gadgets
+ *   CommodityQueryService  — tradeable/mineable goods
  *
  * This facade keeps the same public API so routes.ts is untouched.
  */
 import type { Pool } from "mysql2/promise";
-import type { Row, PaginatedResult } from "./shared.js";
-import { ShipQueryService }      from "./ship-query-service.js";
+import { CommodityQueryService } from "./commodity-query-service.js";
 import { ComponentQueryService } from "./component-query-service.js";
-import { LoadoutService }        from "./loadout-service.js";
-import { ShopService }           from "./shop-service.js";
+import { ItemQueryService } from "./item-query-service.js";
+import { LoadoutService } from "./loadout-service.js";
+import type { PaginatedResult, Row } from "./shared.js";
+import { ShipQueryService } from "./ship-query-service.js";
+import { ShopService } from "./shop-service.js";
 
-export type { Row, PaginatedResult };
+export type { PaginatedResult, Row };
 
 export class GameDataService {
   private ships: ShipQueryService;
   private components: ComponentQueryService;
   private loadouts: LoadoutService;
   private shopsSvc: ShopService;
+  private itemsSvc: ItemQueryService;
+  private commoditiesSvc: CommodityQueryService;
 
   constructor(private pool: Pool) {
     this.ships       = new ShipQueryService(pool);
     this.components  = new ComponentQueryService(pool);
     this.loadouts    = new LoadoutService(pool);
     this.shopsSvc    = new ShopService(pool);
+    this.itemsSvc    = new ItemQueryService(pool);
+    this.commoditiesSvc = new CommodityQueryService(pool);
   }
 
   // ── Ships (delegated) ───────────────────────────────────
@@ -46,6 +54,12 @@ export class GameDataService {
   getShipFilters() { return this.ships.getShipFilters(); }
   getAllManufacturers() { return this.ships.getAllManufacturers(); }
   getShipManufacturers() { return this.ships.getShipManufacturers(); }
+  getManufacturerByCode(code: string) { return this.ships.getManufacturerByCode(code); }
+  getManufacturerShips(code: string) { return this.ships.getManufacturerShips(code); }
+  getManufacturerComponents(code: string) { return this.ships.getManufacturerComponents(code); }
+  searchShipsAutocomplete(q: string, limit?: number) { return this.ships.searchShipsAutocomplete(q, limit); }
+  getRandomShip() { return this.ships.getRandomShip(); }
+  getSimilarShips(uuid: string, limit?: number) { return this.ships.getSimilarShips(uuid, limit); }
 
   // ── Components (delegated) ──────────────────────────────
 
@@ -64,6 +78,7 @@ export class GameDataService {
   getComponentFilters() { return this.components.getComponentFilters(); }
   getComponentBuyLocations(uuid: string) { return this.components.getComponentBuyLocations(uuid); }
   getComponentShips(uuid: string) { return this.components.getComponentShips(uuid); }
+  getComponentTypes() { return this.components.getComponentTypes(); }
 
   // ── Loadout (delegated) ─────────────────────────────────
 
@@ -73,11 +88,33 @@ export class GameDataService {
   getAllPaints(opts: { search?: string; ship_uuid?: string; page?: number; limit?: number }) { return this.loadouts.getAllPaints(opts); }
   calculateLoadout(shipUuid: string, swaps: { portId?: number; portName?: string; componentUuid: string }[]) { return this.loadouts.calculateLoadout(shipUuid, swaps); }
   getShipStats(shipUuid: string) { return this.loadouts.getShipStats(shipUuid); }
+  getShipHardpoints(shipUuid: string) { return this.loadouts.getShipHardpoints(shipUuid); }
 
   // ── Shops (delegated) ───────────────────────────────────
 
   getShops(opts: { page?: number; limit?: number; location?: string; type?: string; search?: string }) { return this.shopsSvc.getShops(opts); }
   getShopInventory(shopId: number) { return this.shopsSvc.getShopInventory(shopId); }
+
+  // ── Items (delegated) ──────────────────────────────────
+
+  getAllItems(filters?: {
+    type?: string; sub_type?: string; manufacturer?: string; search?: string;
+    sort?: string; order?: string; page?: number; limit?: number;
+  }) { return this.itemsSvc.getAllItems(filters); }
+  getItemByUuid(uuid: string) { return this.itemsSvc.getItemByUuid(uuid); }
+  getItemByClassName(className: string) { return this.itemsSvc.getItemByClassName(className); }
+  resolveItem(id: string) { return this.itemsSvc.resolveItem(id); }
+  getItemFilters() { return this.itemsSvc.getItemFilters(); }
+  getItemTypes() { return this.itemsSvc.getItemTypes(); }
+
+  // ── Commodities (delegated) ─────────────────────────────
+
+  getAllCommodities(filters?: {
+    type?: string; search?: string;
+    sort?: string; order?: string; page?: number; limit?: number;
+  }) { return this.commoditiesSvc.getAllCommodities(filters); }
+  getCommodityByUuid(uuid: string) { return this.commoditiesSvc.getCommodityByUuid(uuid); }
+  getCommodityTypes() { return this.commoditiesSvc.getCommodityTypes(); }
 
   // ── Changelog & stats (kept locally — small) ────────────
 
@@ -105,6 +142,8 @@ export class GameDataService {
       SELECT
         (SELECT COUNT(*) FROM ships) as ships,
         (SELECT COUNT(*) FROM components) as components,
+        (SELECT COUNT(*) FROM items) as items,
+        (SELECT COUNT(*) FROM commodities) as commodities,
         (SELECT COUNT(*) FROM manufacturers) as manufacturers,
         (SELECT COUNT(*) FROM ships_loadouts) as loadoutPorts,
         (SELECT COUNT(*) FROM ship_paints) as paints,
@@ -123,5 +162,46 @@ export class GameDataService {
   async getLatestExtraction(): Promise<Row | null> {
     const [rows] = await this.pool.execute<Row[]>("SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 1");
     return rows[0] || null;
+  }
+
+  async getPublicStats(): Promise<Record<string, unknown>> {
+    const [rows] = await this.pool.execute<Row[]>(`
+      SELECT
+        (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL) as ships,
+        (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL AND vehicle_category = 'ship') as flyable_ships,
+        (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL AND vehicle_category = 'ground') as ground_vehicles,
+        (SELECT COUNT(*) FROM components) as components,
+        (SELECT COUNT(*) FROM items) as items,
+        (SELECT COUNT(*) FROM commodities) as commodities,
+        (SELECT COUNT(*) FROM manufacturers) as manufacturers,
+        (SELECT COUNT(*) FROM ship_paints) as paints,
+        (SELECT COUNT(*) FROM shops) as shops,
+        (SELECT COUNT(DISTINCT type) FROM components) as component_types,
+        (SELECT COUNT(DISTINCT type) FROM items) as item_types
+    `);
+    const latest = await this.getLatestExtraction();
+    return {
+      ...rows[0],
+      game_version: latest?.game_version || null,
+      last_extraction: latest?.extracted_at || null,
+    };
+  }
+
+  async getChangelogSummary(): Promise<Record<string, unknown>> {
+    const [byType] = await this.pool.execute<Row[]>(
+      `SELECT entity_type, change_type, COUNT(*) as count
+       FROM changelog GROUP BY entity_type, change_type ORDER BY entity_type, change_type`,
+    );
+    const [recent] = await this.pool.execute<Row[]>(
+      `SELECT c.*, e.game_version FROM changelog c
+       LEFT JOIN extraction_log e ON c.extraction_id = e.id
+       ORDER BY c.created_at DESC LIMIT 10`,
+    );
+    const [total] = await this.pool.execute<Row[]>("SELECT COUNT(*) as total FROM changelog");
+    return {
+      total: Number(total[0]?.total) || 0,
+      by_type: byType,
+      recent,
+    };
   }
 }

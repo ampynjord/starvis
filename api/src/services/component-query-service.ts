@@ -92,4 +92,11 @@ export class ComponentQueryService {
     );
     return rows;
   }
+
+  async getComponentTypes(): Promise<{ types: { type: string; count: number }[] }> {
+    const [rows] = await this.pool.execute<Row[]>(
+      "SELECT type, COUNT(*) as count FROM components GROUP BY type ORDER BY count DESC",
+    );
+    return { types: rows.map(r => ({ type: String(r.type), count: Number(r.count) })) };
+  }
 }

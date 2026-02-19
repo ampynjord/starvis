@@ -18,6 +18,7 @@ RUN npm ci && npm cache clean --force
 FROM deps AS build
 COPY api/tsconfig.json ./
 COPY api/server.ts ./
+COPY api/openapi.json ./
 COPY api/src/ ./src/
 COPY db/ ./db/
 # Type-check only — tsx runs TS directly, no emit needed
@@ -32,6 +33,7 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy source
 COPY api/server.ts ./
+COPY api/openapi.json ./
 COPY api/src/ ./src/
 COPY db/ ./db/
 

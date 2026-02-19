@@ -1,8 +1,9 @@
 /**
- * STARVIS v1.0 - Routes
+ * STARVIS v2.0 - Routes
  *
- * Public (24): ship-matrix(3), ships(8), components(4), manufacturers(1),
- *              paints(1), shops(2), loadout(1), changelog(1), version(1)
+ * Public (44): ship-matrix(3), ships(12), components(6), manufacturers(4),
+ *              paints(1), shops(2), items(4), commodities(3),
+ *              loadout(1), changelog(2), stats(1), version(1)
  * Admin (3):   sync(1), stats(1), extraction-log(1)
  * System (1):  health
  *
@@ -15,7 +16,7 @@ import type { Pool } from "mysql2/promise";
 import { ZodError } from "zod";
 import { authMiddleware } from "./middleware/index.js";
 import {
-    arrayToCsv, ChangelogQuery, ComponentQuery, LoadoutBody,
+    arrayToCsv, ChangelogQuery, CommodityQuery, ComponentQuery, ItemQuery, LoadoutBody,
     PaintQuery, SearchQuery, ShipQuery, ShopQuery,
 } from "./schemas.js";
 import type { GameDataService } from "./services/game-data-service.js";
@@ -24,7 +25,7 @@ import { logger } from "./utils/index.js";
 
 // Re-export schemas so existing consumers are unaffected
 export {
-    arrayToCsv, ChangelogQuery, ComponentQuery, LoadoutBody,
+    arrayToCsv, ChangelogQuery, CommodityQuery, ComponentQuery, ItemQuery, LoadoutBody,
     PaintQuery, qInt, qStr, SearchQuery, ShipQuery, ShopQuery
 } from "./schemas.js";
 
@@ -164,6 +165,20 @@ export function createRoutes(deps: RouteDependencies): Router {
     sendWithETag(req, res, { success: true, data });
   }));
 
+  router.get("/api/v1/ships/search", requireGameData, asyncHandler(async (req, res) => {
+    const { search } = SearchQuery.parse(req.query);
+    if (!search || search.length < 2) return void res.status(400).json({ success: false, error: "Query 'search' must be at least 2 characters" });
+    const limit = Math.min(20, Math.max(1, parseInt(String(req.query.limit)) || 10));
+    const data = await gameDataService!.searchShipsAutocomplete(search, limit);
+    sendWithETag(req, res, { success: true, count: data.length, data });
+  }));
+
+  router.get("/api/v1/ships/random", requireGameData, asyncHandler(async (req, res) => {
+    const ship = await gameDataService!.getRandomShip();
+    if (!ship) return void res.status(404).json({ success: false, error: "No ships available" });
+    sendWithETag(req, res, { success: true, data: ship });
+  }));
+
   router.get("/api/v1/ships/manufacturers", requireGameData, asyncHandler(async (req, res) => {
     const data = await gameDataService!.getShipManufacturers();
     if (req.query.format === "csv") return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
@@ -224,6 +239,22 @@ export function createRoutes(deps: RouteDependencies): Router {
     sendWithETag(req, res, { success: true, data: stats });
   }));
 
+  router.get("/api/v1/ships/:uuid/hardpoints", requireGameData, asyncHandler(async (req, res) => {
+    const uuid = await resolveShipUuid(req.params.uuid);
+    if (!uuid) return void res.status(404).json({ success: false, error: "Ship not found" });
+    const hardpoints = await gameDataService!.getShipHardpoints(uuid);
+    if (!hardpoints) return void res.status(404).json({ success: false, error: "Ship not found" });
+    sendWithETag(req, res, { success: true, count: hardpoints.length, data: hardpoints });
+  }));
+
+  router.get("/api/v1/ships/:uuid/similar", requireGameData, asyncHandler(async (req, res) => {
+    const uuid = await resolveShipUuid(req.params.uuid);
+    if (!uuid) return void res.status(404).json({ success: false, error: "Ship not found" });
+    const limit = Math.min(10, Math.max(1, parseInt(String(req.query.limit)) || 5));
+    const data = await gameDataService!.getSimilarShips(uuid, limit);
+    sendWithETag(req, res, { success: true, count: data.length, data });
+  }));
+
   router.get("/api/v1/ships/:uuid/compare/:uuid2", requireGameData, asyncHandler(async (req, res) => {
     const [ship1, ship2] = await Promise.all([resolveShip(req.params.uuid), resolveShip(req.params.uuid2)]);
     if (!ship1) return void res.status(404).json({ success: false, error: `Ship '${req.params.uuid}' not found` });
@@ -260,7 +291,10 @@ export function createRoutes(deps: RouteDependencies): Router {
   }));
 
   // ── COMPONENTS ──────────────────────────────────────────
-
+  router.get("/api/v1/components/types", requireGameData, asyncHandler(async (req, res) => {
+    const data = await gameDataService!.getComponentTypes();
+    sendWithETag(req, res, { success: true, data });
+  }));
   router.get("/api/v1/components", requireGameData, asyncHandler(async (req, res) => {
     const t = Date.now();
     const filters = ComponentQuery.parse(req.query);
@@ -308,6 +342,28 @@ export function createRoutes(deps: RouteDependencies): Router {
     sendWithETag(req, res, { success: true, count: data.length, data });
   }));
 
+  router.get("/api/v1/manufacturers/:code", requireGameData, asyncHandler(async (req, res) => {
+    const mfr = await gameDataService!.getManufacturerByCode(req.params.code);
+    if (!mfr) return void res.status(404).json({ success: false, error: "Manufacturer not found" });
+    sendWithETag(req, res, { success: true, data: mfr });
+  }));
+
+  router.get("/api/v1/manufacturers/:code/ships", requireGameData, asyncHandler(async (req, res) => {
+    const mfr = await gameDataService!.getManufacturerByCode(req.params.code);
+    if (!mfr) return void res.status(404).json({ success: false, error: "Manufacturer not found" });
+    const data = await gameDataService!.getManufacturerShips(req.params.code);
+    if (req.query.format === "csv") return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
+    sendWithETag(req, res, { success: true, count: data.length, data });
+  }));
+
+  router.get("/api/v1/manufacturers/:code/components", requireGameData, asyncHandler(async (req, res) => {
+    const mfr = await gameDataService!.getManufacturerByCode(req.params.code);
+    if (!mfr) return void res.status(404).json({ success: false, error: "Manufacturer not found" });
+    const data = await gameDataService!.getManufacturerComponents(req.params.code);
+    if (req.query.format === "csv") return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
+    sendWithETag(req, res, { success: true, count: data.length, data });
+  }));
+
   // ── PAINTS ───────────────────────────────────────────────
 
   router.get("/api/v1/paints", requireGameData, asyncHandler(async (req, res) => {
@@ -340,6 +396,63 @@ export function createRoutes(deps: RouteDependencies): Router {
     sendWithETag(req, res, { success: true, count: data.length, data });
   }));
 
+  // ── ITEMS (FPS weapons, armor, clothing, gadgets) ──────
+
+  router.get("/api/v1/items/types", requireGameData, asyncHandler(async (req, res) => {
+    const data = await gameDataService!.getItemTypes();
+    sendWithETag(req, res, { success: true, ...data });
+  }));
+
+  router.get("/api/v1/items/filters", requireGameData, asyncHandler(async (req, res) => {
+    const data = await gameDataService!.getItemFilters();
+    sendWithETag(req, res, { success: true, data });
+  }));
+
+  router.get("/api/v1/items", requireGameData, asyncHandler(async (req, res) => {
+    const t = Date.now();
+    const filters = ItemQuery.parse(req.query);
+    const result = await gameDataService!.getAllItems(filters);
+    const payload = {
+      success: true, count: result.data.length, total: result.total,
+      page: result.page, limit: result.limit, pages: result.pages, data: result.data,
+      meta: { source: "Game Data", responseTime: `${Date.now() - t}ms` },
+    };
+    if (req.query.format === "csv") return void sendCsvOrJson(req, res, result.data as Record<string, unknown>[], payload);
+    sendWithETag(req, res, payload);
+  }));
+
+  router.get("/api/v1/items/:uuid", requireGameData, asyncHandler(async (req, res) => {
+    const item = await gameDataService!.resolveItem(req.params.uuid);
+    if (!item) return void res.status(404).json({ success: false, error: "Item not found" });
+    sendWithETag(req, res, { success: true, data: item });
+  }));
+
+  // ── COMMODITIES (tradeable goods) ──────────────────────
+
+  router.get("/api/v1/commodities/types", requireGameData, asyncHandler(async (req, res) => {
+    const data = await gameDataService!.getCommodityTypes();
+    sendWithETag(req, res, { success: true, ...data });
+  }));
+
+  router.get("/api/v1/commodities", requireGameData, asyncHandler(async (req, res) => {
+    const t = Date.now();
+    const filters = CommodityQuery.parse(req.query);
+    const result = await gameDataService!.getAllCommodities(filters);
+    const payload = {
+      success: true, count: result.data.length, total: result.total,
+      page: result.page, limit: result.limit, pages: result.pages, data: result.data,
+      meta: { source: "Game Data", responseTime: `${Date.now() - t}ms` },
+    };
+    if (req.query.format === "csv") return void sendCsvOrJson(req, res, result.data as Record<string, unknown>[], payload);
+    sendWithETag(req, res, payload);
+  }));
+
+  router.get("/api/v1/commodities/:uuid", requireGameData, asyncHandler(async (req, res) => {
+    const commodity = await gameDataService!.getCommodityByUuid(req.params.uuid);
+    if (!commodity) return void res.status(404).json({ success: false, error: "Commodity not found" });
+    sendWithETag(req, res, { success: true, data: commodity });
+  }));
+
   // ── LOADOUT SIMULATOR ──────────────────────────────────
 
   router.post("/api/v1/loadout/calculate", requireGameData, asyncHandler(async (req, res) => {
@@ -352,6 +465,11 @@ export function createRoutes(deps: RouteDependencies): Router {
 
   // ── CHANGELOG ───────────────────────────────────────────
 
+  router.get("/api/v1/changelog/summary", requireGameData, asyncHandler(async (req, res) => {
+    const data = await gameDataService!.getChangelogSummary();
+    sendWithETag(req, res, { success: true, data });
+  }));
+
   router.get("/api/v1/changelog", requireGameData, asyncHandler(async (req, res) => {
     const filters = ChangelogQuery.parse(req.query);
     const result = await gameDataService!.getChangelog({
@@ -361,6 +479,13 @@ export function createRoutes(deps: RouteDependencies): Router {
       changeType: filters.change_type,
     });
     sendWithETag(req, res, { success: true, ...result });
+  }));
+
+  // ── STATS (public) ──────────────────────────────────────
+
+  router.get("/api/v1/stats/overview", requireGameData, asyncHandler(async (req, res) => {
+    const data = await gameDataService!.getPublicStats();
+    sendWithETag(req, res, { success: true, data });
   }));
 
   // ── VERSION ─────────────────────────────────────────────

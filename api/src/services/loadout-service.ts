@@ -228,6 +228,26 @@ export class LoadoutService {
     };
   }
 
+  // ── Ship Hardpoints (standalone, no stat aggregation) ───
+
+  async getShipHardpoints(shipUuid: string): Promise<Record<string, unknown>[] | null> {
+    const [shipRows] = await this.pool.execute<Row[]>(
+      "SELECT uuid FROM ships WHERE uuid = ?", [shipUuid],
+    );
+    if (!shipRows.length) return null;
+
+    const [loadoutRows] = await this.pool.execute<Row[]>(
+      `SELECT sl.id, sl.port_name, sl.port_type, sl.port_min_size, sl.port_max_size,
+              sl.parent_id, sl.component_uuid, sl.component_class_name, sl.port_editable,
+              c.*
+       FROM ships_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
+       WHERE sl.ship_uuid = ?`,
+      [shipUuid],
+    );
+
+    return this.buildHardpoints(loadoutRows as Row[]);
+  }
+
   // ── Hardpoint category mapping ──────────────────────────
 
   private portCategory(portType: string): string {

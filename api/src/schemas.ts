@@ -64,6 +64,20 @@ export const PaintQuery = z.object({
   format: qStr,
 }).passthrough();
 
+export const ItemQuery = z.object({
+  type: qStr, sub_type: qStr, manufacturer: qStr, search: qStr,
+  sort: qStr, order: qStr,
+  page: qInt(1), limit: qInt(50, 200),
+  format: qStr,
+}).passthrough();
+
+export const CommodityQuery = z.object({
+  type: qStr, search: qStr,
+  sort: qStr, order: qStr,
+  page: qInt(1), limit: qInt(50, 200),
+  format: qStr,
+}).passthrough();
+
 // ── Pure helpers ──────────────────────────────────────────
 
 export function arrayToCsv(data: Record<string, unknown>[]): string {
