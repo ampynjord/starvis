@@ -6,13 +6,13 @@ Monorepo en 4 modules :
 - **api/** — Backend Express.js + TypeScript + MySQL (déployé sur VPS)
 - **extractor/** — CLI d'extraction P4K/DataForge (exécuté localement)
 - **db/** — Schéma SQL, initialisation, backup
-- **ihm/** — Page placeholder statique (IHM en cours de développement)
+- **ihm/** — Frontend Vue 3 + Tailwind CSS (SPA)
 
 Deux sources de données complémentaires :
 - **RSI Ship Matrix** — données marketing officielles (246 vaisseaux), synchronisées par l'API
-- **P4K DataForge** — données réelles du jeu (~309 vaisseaux, ~2 459 composants, ~33 957 ports de loadout, ~1 791 paints), extraites localement par le CLI
+- **P4K DataForge** — données réelles du jeu (~309 vaisseaux, ~3 023 composants, ~5 237 items FPS, ~237 commodités, ~33 957 ports de loadout, ~1 791 paints), extraites localement par le CLI
 
-Production : **[starvis-api.ampynjord.bzh](https://starvis-api.ampynjord.bzh)** (API) — IHM en cours de développement
+Production : **[starvis-api.ampynjord.bzh](https://starvis-api.ampynjord.bzh)** (API) | **[starvis.ampynjord.bzh](https://starvis.ampynjord.bzh)** (IHM)
 
 ---
 
@@ -20,11 +20,13 @@ Production : **[starvis-api.ampynjord.bzh](https://starvis-api.ampynjord.bzh)** 
 
 - **Ship Matrix** : 246 vaisseaux provenant de l'API RSI (données marketing, spécifications officielles)
 - **Game Data** : ~309 vaisseaux jouables extraits de P4K/DataForge (filtrés, sans doublons/tests)
-- **Components** : ~2 459 composants répartis en 12 types (armes, boucliers, centrales, refroidisseurs, drives quantiques, missiles, propulseurs, radars, contre-mesures, réservoirs, intakes, support de vie)
+- **Components** : ~3 023 composants répartis en 22 types (armes, boucliers, centrales, refroidisseurs, drives quantiques, missiles, propulseurs, radars, contre-mesures, réservoirs, intakes, support de vie, gimbals, tourelles, lance-missiles, bras de minage, têtes de récupération, tracteurs, autodestruction, armure, gravité, ping)
 - **Paints** : ~1 791 peintures/livrées extraites et liées aux vaisseaux
 - **Weapon Damage Breakdown** : dommages détaillés par type (physical, energy, distortion, thermal, biochemical, stun)
 - **Burst / Sustained DPS** : DPS instantané, burst (jusqu'à surchauffe) et sustained (avec cycles de refroidissement)
 - **Missile Damage Breakdown** : dommages de missiles détaillés par type
+- **Items** : ~5 237 items FPS répartis en 15 types (armes FPS, armures, sous-combinaisons, vêtements, attachments, magazines, consommables, gadgets, outils, grenades, couteaux…)
+- **Commodities** : ~237 commodités échangeables (métaux, gaz, minéraux, nourriture, vices, biens de consommation…)
 - **Shops & Prices** : magasins in-game avec inventaire et prix achat/location
 - **Loadout Simulator** : calcul de stats agrégées (DPS total, boucliers, puissance, thermique) avec échange de composants
 - **Modular Ships** : détection automatique des modules (Retaliator, Apollo, etc.) avec ports `module`/`modular`
@@ -37,7 +39,7 @@ Production : **[starvis-api.ampynjord.bzh](https://starvis-api.ampynjord.bzh)** 
 - **CSV Export** sur tous les endpoints de liste (`?format=csv`)
 - **ETag / Cache** HTTP avec `Cache-Control` et `If-None-Match` (304)
 - **Comparison** : comparaison côte à côte de vaisseaux avec deltas numériques
-- **Swagger / OpenAPI 3.0** : spec inline complète (26 endpoints documentés) à `/api-docs`
+- **Swagger / OpenAPI 3.0** : spec inline complète (42 endpoints documentés) à `/api-docs`
 - **Extraction versioning** avec log d'extraction et changelog automatique en base de données
 - **CI/CD** GitHub Actions (lint → tests → build Docker → deploy SSH)
 
@@ -69,7 +71,7 @@ starvis/
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── src/
-│       ├── routes.ts           # 26 endpoints (pagination, ETag, CSV)
+│       ├── routes.ts           # 45 endpoints (pagination, ETag, CSV)
 │       ├── middleware/
 │       │   ├── auth.ts         # X-API-Key auth (timing-safe)
 │       │   └── index.ts
@@ -77,13 +79,21 @@ starvis/
 │       │   ├── schema.ts       # Init DB schema + auto-migrations
 │       │   ├── ship-matrix-service.ts  # RSI API → ship_matrix
 │       │   ├── game-data-service.ts    # Read-only queries → REST API
+│       │   ├── ship-query-service.ts   # Ships queries
+│       │   ├── component-query-service.ts  # Components queries
+│       │   ├── item-query-service.ts       # Items queries
+│       │   ├── commodity-query-service.ts  # Commodities queries
+│       │   ├── shop-service.ts         # Shops queries
+│       │   ├── loadout-service.ts      # Loadout calculator
+│       │   ├── shared.ts              # Shared query utilities
 │       │   └── index.ts
 │       └── utils/
 │           ├── config.ts       # Configuration centralisée
 │           ├── logger.ts       # Winston (module tags, durées)
 │           └── index.ts
 │   └── tests/
-│       ├── schemas.test.ts     # 29 tests unitaires (Vitest)
+│       ├── schemas.test.ts     # 35 tests unitaires (Vitest)
+│       ├── loadout.test.ts     # 17 tests loadout (Vitest)
 │       └── test-all.mjs        # Tests e2e API
 ├── extractor/                  # CLI d'extraction P4K (PC local)
 │   ├── extract.ts              # Point d'entrée CLI
@@ -91,21 +101,26 @@ starvis/
 │   ├── tsconfig.json
 │   └── src/
 │       ├── extraction-service.ts   # Ships/components/loadouts/paints/modules → MySQL
+│       ├── item-extractor.ts       # Items FPS + commodities → MySQL
+│       ├── component-extractor.ts  # Components extraction logic
+│       ├── shop-paint-extractor.ts # Shops + paints extraction
 │       ├── dataforge-service.ts    # DataForge DCB orchestrator
 │       ├── dataforge-parser.ts     # Binary DataForge parser
+│       ├── dataforge-utils.ts      # DataForge helper utilities
 │       ├── p4k-provider.ts         # P4K file reader (ZIP + AES)
 │       ├── cryxml-parser.ts        # Binary CryXML parser
 │       ├── localization-service.ts # Localisation du jeu
 │       └── logger.ts
 │   └── tests/
-│       ├── classifyPort.test.ts       # 28 tests
-│       └── dataforge-helpers.test.ts  # 16 tests
-├── ihm/                        # Page placeholder (IHM en développement)
-│   ├── Dockerfile              # Nginx Alpine simple
-│   ├── nginx.conf
-│   └── index.html              # Page "coming soon"
+│       ├── classifyPort.test.ts       # 30 tests
+│       └── dataforge-helpers.test.ts  # 14 tests
+├── ihm/                        # Frontend Vue 3 + Tailwind CSS
+│   ├── Dockerfile              # Nginx Alpine multi-stage
+│   ├── nginx.conf              # Reverse proxy + rate limiting
+│   ├── index.html
+│   └── src/                    # Vue 3 SPA (13 routes)
 ├── db/
-│   ├── schema.sql              # 11 tables MySQL + FK + index
+│   ├── schema.sql              # 13 tables MySQL + FK + index
 │   ├── init.sh                 # Initialisation DB (permissions % host)
 │   └── backup.sh               # Backup automatisé (mysqldump, gzip, 7j rétention)
 └── .github/workflows/
@@ -161,7 +176,7 @@ cp .env.example .env   # configurer DB_HOST, DB_USER, DB_PASSWORD
 npx tsx extract.ts --p4k "/path/to/StarCitizen/LIVE/Data.p4k"
 ```
 
-> L'extraction prend ~5-25 min et peuple la base MySQL avec ~309 vaisseaux, ~2 459 composants, ~33 957 ports de loadout, ~1 791 peintures.
+> L'extraction prend ~5-25 min et peuple la base MySQL avec ~309 vaisseaux, ~3 023 composants, ~5 237 items, ~237 commodités, ~33 957 ports de loadout, ~1 791 peintures.
 
 ### Variables d'environnement
 
@@ -211,6 +226,8 @@ GET /api/v1/ships?page=2&limit=20&format=csv
 
 GET /api/v1/ships/filters                 # Filtres dynamiques (manufacturers, roles, careers)
 GET /api/v1/ships/manufacturers           # Fabricants de vaisseaux (codes + noms)
+GET /api/v1/ships/search                  # Recherche full-text (?q=gladius)
+GET /api/v1/ships/random                  # Vaisseau aléatoire (?role=combat)
 
 GET /api/v1/ships/:uuid                   # Détails (par UUID ou class_name)
 GET /api/v1/ships/AEGS_Gladius
@@ -218,6 +235,9 @@ GET /api/v1/ships/AEGS_Gladius
 GET /api/v1/ships/:uuid/loadout           # Loadout par défaut (hiérarchique)
 GET /api/v1/ships/:uuid/modules           # Modules (vaisseaux modulaires)
 GET /api/v1/ships/:uuid/paints            # Peintures associées
+GET /api/v1/ships/:uuid/stats             # Stats agrégées (DPS, boucliers, puissance)
+GET /api/v1/ships/:uuid/hardpoints        # Liste des hardpoints avec composants
+GET /api/v1/ships/:uuid/similar           # Vaisseaux similaires (même rôle/taille)
 GET /api/v1/ships/:uuid/compare/:uuid2    # Comparaison côte à côte
 ```
 
@@ -254,7 +274,7 @@ GET /api/v1/ships/:uuid/compare/:uuid2    # Comparaison côte à côte
 
 ### Components (Game Data)
 
-~2 459 composants répartis en 12 types. Réponses paginées.
+~3 023 composants répartis en 22 types. Réponses paginées.
 La résolution accepte UUID ou `class_name` pour l'identification.
 
 ```bash
@@ -262,9 +282,11 @@ GET /api/v1/components                     # Liste avec filtres + pagination
 GET /api/v1/components?type=WeaponGun&size=3&manufacturer=BEHR
 GET /api/v1/components?format=csv
 
+GET /api/v1/components/types              # Liste des types de composants
 GET /api/v1/components/filters            # Filtres dynamiques (types, sub_types, sizes, grades)
 GET /api/v1/components/:uuid              # Détails (par UUID ou class_name)
 GET /api/v1/components/:uuid/buy-locations # Où acheter (prix + magasins)
+GET /api/v1/components/:uuid/ships        # Vaisseaux utilisant ce composant
 ```
 
 #### Types de composants
@@ -283,6 +305,16 @@ GET /api/v1/components/:uuid/buy-locations # Où acheter (prix + magasins)
 | `FuelTank` | Réservoirs de carburant (hydrogène + quantique) |
 | `FuelIntake` | Prises de carburant (scooping) |
 | `LifeSupport` | Support de vie |
+| `Gimbal` | Gimbals (supports rotatifs pour armes) |
+| `Turret` | Tourelles (tourelles habitées/automatiques) |
+| `MissileRack` | Lance-missiles |
+| `MiningArm` | Bras de minage |
+| `SalvageHead` | Têtes de récupération/salvage |
+| `TractorBeam` | Rayons tracteurs |
+| `SelfDestruct` | Autodestruction |
+| `Armor` | Plaques d'armure |
+| `Gravity` | Générateurs de gravité |
+| `Ping` | Modules de détection/ping |
 
 #### Filtres composants
 
@@ -301,7 +333,10 @@ GET /api/v1/components/:uuid/buy-locations # Où acheter (prix + magasins)
 ~55 fabricants (véhicules + composants).
 
 ```bash
-GET /api/v1/manufacturers
+GET /api/v1/manufacturers                  # Liste complète
+GET /api/v1/manufacturers/:code           # Détails d'un fabricant
+GET /api/v1/manufacturers/:code/ships     # Vaisseaux du fabricant (paginé)
+GET /api/v1/manufacturers/:code/components # Composants du fabricant (paginé)
 ```
 
 ### Paints
@@ -321,6 +356,32 @@ Magasins in-game avec localisation, inventaire et prix.
 GET /api/v1/shops                          # Liste (paginée)
 GET /api/v1/shops?location=lorville&type=Weapons
 GET /api/v1/shops/:id/inventory           # Inventaire d'un magasin
+```
+
+### Items (Game Data)
+
+~5 237 items FPS extraits de P4K/DataForge, répartis en 15 types. Réponses paginées.
+
+```bash
+GET /api/v1/items                          # Liste avec filtres + pagination
+GET /api/v1/items?type=FPS_Weapon&sub_type=Assault%20Rifle&sort=weapon_dps&order=desc
+GET /api/v1/items?format=csv
+
+GET /api/v1/items/types                   # Liste des types d'items
+GET /api/v1/items/filters                 # Filtres dynamiques (types, sub_types, sizes, grades)
+GET /api/v1/items/:uuid                   # Détails (par UUID ou class_name)
+```
+
+### Commodities (Game Data)
+
+~237 commodités échangeables extraites de P4K/DataForge. Réponses paginées.
+
+```bash
+GET /api/v1/commodities                    # Liste avec filtres + pagination
+GET /api/v1/commodities?type=Metal&sort=name
+
+GET /api/v1/commodities/types             # Liste des types de commodités
+GET /api/v1/commodities/:uuid             # Détails (par UUID ou class_name)
 ```
 
 ### Loadout Simulator
@@ -357,6 +418,8 @@ curl -X POST https://starvis-api.ampynjord.bzh/api/v1/loadout/calculate \
 ```bash
 GET /api/v1/version                       # Dernière extraction de données
 GET /api/v1/changelog                     # Historique des changements
+GET /api/v1/changelog/summary             # Résumé du dernier changelog
+GET /api/v1/stats/overview                # Vue d'ensemble des stats (nombre de vaisseaux, composants, items…)
 ```
 
 ### Swagger / OpenAPI
@@ -412,7 +475,7 @@ Composants communs : `AppNav`, `PaginationBar`, `StatBlock`, `LoadingState`.
 
 ## Database
 
-### Schéma (11 tables)
+### Schéma (13 tables)
 
 ```
 ┌────────────────────┐
@@ -475,10 +538,27 @@ Composants communs : `AppNav`, `PaginationBar`, `StatBlock`, `LoadingState`.
 │ id (PK)             │     │ id (PK)                 │
 │ name                │◄────┤ shop_id (FK)            │
 │ location            │     │ component_uuid (FK) ────┼──► components
-│ parent_location     │     │ component_class_name    │
-│ shop_type           │     │ base_price              │
-│ class_name (UNIQUE) │     │ rental_price_1d/3d/7d   │
-└─────────────────────┘     └─────────────────────────┘
+│ parent_location     │     │ item_uuid (FK) ─────────┼──► items
+│ system              │     │ component_class_name    │
+│ planet_moon         │     │ base_price              │
+│ city                │     │ rental_price_1d/3d/7d   │
+│ shop_type           │     │ rental_price_30d        │
+│ class_name (UNIQUE) │     └─────────────────────────┘
+└─────────────────────┘
+
+┌────────────────────┐     ┌────────────────────┐
+│      items         │     │   commodities      │
+├────────────────────┤     ├────────────────────┤
+│ uuid (PK)          │     │ uuid (PK)          │
+│ class_name         │     │ class_name         │
+│ name, type, size   │     │ name, type         │
+│ sub_type, grade    │     │ sub_type, symbol   │
+│ manufacturer_code  │     │ occupancy_scu      │
+│ mass, hp           │     │ data_json (JSON)   │
+│ weapon stats       │     └────────────────────┘
+│ armor stats        │
+│ data_json (JSON)   │
+└────────────────────┘
 
 ┌────────────────────┐     ┌────────────────────┐
 │  extraction_log    │     │    changelog       │
@@ -497,7 +577,9 @@ Composants communs : `AppNav`, `PaginationBar`, `StatBlock`, `LoadingState`.
 |-------|---------|
 | `ship_matrix` | 246 |
 | `ships` | 309 |
-| `components` | 2 459 |
+| `components` | 3 023 |
+| `items` | 5 237 |
+| `commodities` | 237 |
 | `manufacturers` | 55 |
 | `ships_loadouts` | 33 957 |
 | `ship_modules` | Variable |
@@ -559,7 +641,7 @@ Composants communs : `AppNav`, `PaginationBar`, `StatBlock`, `LoadingState`.
 
 ```
 VPS (API — toujours actif) :
-  1. Init DB (11 tables) + auto-migrations
+  1. Init DB (13 tables) + auto-migrations
   2. ShipMatrixService.sync()        → 246 vaisseaux dans ship_matrix
   3. GameDataService(pool)           → Requêtes read-only pour l'API REST
   4. Mount routes, listen :3000
@@ -568,10 +650,13 @@ PC local (Extractor — exécution manuelle) :
   npx tsx extract.ts --p4k "C:/StarCitizen/LIVE/Data.p4k"
   ├── Parse P4K + DataForge (Game2.dcb)
   ├── saveManufacturers()            → ~55 fabricants
-  ├── saveComponents()               → ~2 459 composants (batch INSERT, 12 types)
+  ├── saveComponents()               → ~3 023 composants (batch INSERT, 22 types)
   ├── saveShips() + loadouts         → ~309 vaisseaux + ~33 957 ports
   ├── detectAndSaveModules()         → modules des vaisseaux modulaires (Retaliator, Apollo…)
   ├── savePaints()                   → ~1 791 peintures/livrées
+  ├── saveItems()                    → ~5 237 items FPS (15 types)
+  ├── saveCommodities()              → ~237 commodités échangeables
+  ├── saveShops()                    → ~18 magasins + inventaire
   ├── crossReferenceShipMatrix()     → ~209 vaisseaux liés
   └── INSERT extraction_log          → SHA-256 hash + stats + durée
 ```
@@ -586,7 +671,7 @@ Les écritures en DB ne se font qu'au démarrage ou via les endpoints admin POST
 | **Runtime** | Node.js 22+ avec TypeScript (tsx) |
 | **API** | Express.js, express-rate-limit, express-slow-down, helmet |
 | **Validation** | Zod 4 |
-| **Documentation** | Swagger / OpenAPI 3.0 (spec inline + swagger-ui-express) |
+| **Documentation** | OpenAPI 3.0 (spec pré-générée + swagger-ui-express) |
 | **Base de données** | MySQL 8.0 (utf8mb4_unicode_ci) |
 | **Frontend** | Vue 3, Vue Router, Tailwind CSS |
 | **Build frontend** | Vite 6 |
@@ -605,8 +690,8 @@ Pipeline GitHub Actions (`.github/workflows/ci.yml`) en 4 jobs :
 
 | Job | Description | Déclencheur |
 |-----|-------------|-------------|
-| **🔍 Lint** | Type-check TypeScript (`tsc --noEmit`) API + build IHM + `npm audit` | push/PR sur `main` |
-| **🧪 Test** | Tests unitaires Vitest (29 tests) + tests e2e API avec MySQL | après Lint |
+| **🔍 Lint** | Type-check TypeScript (`tsc --noEmit`) API + Extractor + build IHM + `npm audit` | push/PR sur `main` |
+| **🧪 Test** | Tests unitaires Vitest (96 tests : 52 API + 44 Extractor) + tests e2e API avec MySQL | après Lint |
 | **🐳 Build** | Build Docker + push sur ghcr.io (API + IHM) | push sur `main` uniquement |
 | **🚀 Deploy** | SSH sur VPS : `git pull`, `docker compose pull/up`, health check | après Test + Build |
 
@@ -655,13 +740,13 @@ Le fichier `docker-compose.prod.yml` surcharge la config de base :
 ### Tests unitaires (Vitest)
 
 ```bash
-# API — 29 tests (schémas Zod, validation)
+# API — 52 tests (schémas Zod, validation, loadout)
 cd api && npx vitest run
 
 # Extractor — 44 tests (classifyPort, dataforge helpers)
 cd extractor && npx vitest run
 
-# Total : 73 tests
+# Total : 96 tests
 ```
 
 ### Tests e2e (API)
@@ -763,7 +848,7 @@ docker compose down -v && docker compose up --build -d
 | Source | Description | Tables |
 |--------|-------------|--------|
 | [RSI Ship Matrix API](https://robertsspaceindustries.com/ship-matrix/index) | Liste officielle des vaisseaux (marketing) | `ship_matrix` |
-| P4K / DataForge (Game2.dcb) | Données réelles du jeu | `ships`, `components`, `ships_loadouts`, `manufacturers`, `ship_modules`, `ship_paints` |
+| P4K / DataForge (Game2.dcb) | Données réelles du jeu | `ships`, `components`, `items`, `commodities`, `ships_loadouts`, `manufacturers`, `ship_modules`, `ship_paints`, `shops`, `shop_inventory` |
 
 ---
 

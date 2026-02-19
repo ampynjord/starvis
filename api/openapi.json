@@ -3,245 +3,346 @@
   "info": {
     "title": "Starvis API",
     "version": "1.0.0",
-    "description": "Star Citizen Ships & Components API — Extracted from P4K game data and RSI Ship Matrix."
+    "description": "Star Citizen Ships, Components, Items & Commodities API — Extracted from P4K game data and RSI Ship Matrix."
   },
   "tags": [
     { "name": "Ships", "description": "Ship database (game data + RSI)" },
-    { "name": "Components", "description": "Component database" },
+    { "name": "Components", "description": "Ship component database (weapons, shields, drives, etc.)" },
+    { "name": "Items", "description": "FPS items (weapons, armor, clothing, gadgets, consumables)" },
+    { "name": "Commodities", "description": "Tradeable commodities" },
     { "name": "Paints", "description": "Ship paint/livery database" },
     { "name": "Shops", "description": "In-game shop definitions" },
     { "name": "Manufacturers", "description": "Ship & component manufacturers" },
     { "name": "Ship Matrix", "description": "RSI Ship Matrix mirror" },
     { "name": "Loadout", "description": "Loadout simulator" },
     { "name": "Changelog", "description": "Data change tracking" },
+    { "name": "Stats", "description": "Database statistics" },
     { "name": "System", "description": "Health & version" }
   ],
   "paths": {
     "/api/v1/ships": {
       "get": {
-        "tags": ["Ships"],
-        "summary": "List ships (paginated)",
-        "operationId": "getShips",
+        "tags": ["Ships"], "summary": "List ships (paginated)", "operationId": "getShips",
         "parameters": [
           { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Search by name or class_name" },
-          { "name": "manufacturer", "in": "query", "schema": { "type": "string" }, "description": "Filter by manufacturer code" },
-          { "name": "career", "in": "query", "schema": { "type": "string" } },
-          { "name": "role", "in": "query", "schema": { "type": "string" } },
+          { "name": "manufacturer", "in": "query", "schema": { "type": "string" }, "description": "Filter by manufacturer code (e.g. AEGS, RSI)" },
+          { "name": "career", "in": "query", "schema": { "type": "string" }, "description": "Filter by career (Combat, Transport, etc.)" },
+          { "name": "role", "in": "query", "schema": { "type": "string" }, "description": "Filter by role (Light Fighter, Medium Freight, etc.)" },
           { "name": "status", "in": "query", "schema": { "type": "string" }, "description": "flight-ready, in-concept, in-production, in-game-only" },
           { "name": "vehicle_category", "in": "query", "schema": { "type": "string" }, "description": "ship, ground, gravlev" },
+          { "name": "variant_type", "in": "query", "schema": { "type": "string" }, "description": "Filter by variant type" },
+          { "name": "sort", "in": "query", "schema": { "type": "string", "default": "name" } },
+          { "name": "order", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"], "default": "asc" } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50, "maximum": 200 } },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] } }
+        ],
+        "responses": { "200": { "description": "Paginated ship list" }, "503": { "description": "Game data not available" } }
+      }
+    },
+    "/api/v1/ships/filters": {
+      "get": { "tags": ["Ships"], "summary": "Get available ship filter values", "operationId": "getShipFilters",
+        "description": "Returns distinct roles, careers, statuses and vehicle categories",
+        "responses": { "200": { "description": "Filter values" } } }
+    },
+    "/api/v1/ships/search": {
+      "get": { "tags": ["Ships"], "summary": "Autocomplete ship search", "operationId": "searchShips",
+        "parameters": [
+          { "name": "search", "in": "query", "required": true, "schema": { "type": "string", "minLength": 2 }, "description": "Search query (min 2 chars)" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10, "maximum": 20 } }
+        ],
+        "responses": { "200": { "description": "Matching ships (lightweight)" }, "400": { "description": "Search query too short" } } }
+    },
+    "/api/v1/ships/random": {
+      "get": { "tags": ["Ships"], "summary": "Get a random ship", "operationId": "getRandomShip",
+        "responses": { "200": { "description": "Random ship" }, "404": { "description": "No ships available" } } }
+    },
+    "/api/v1/ships/manufacturers": {
+      "get": { "tags": ["Ships"], "summary": "Get manufacturers that have ships", "operationId": "getShipManufacturers",
+        "parameters": [{ "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] } }],
+        "responses": { "200": { "description": "Manufacturer list with ship count" } } }
+    },
+    "/api/v1/ships/{uuid}": {
+      "get": { "tags": ["Ships"], "summary": "Get ship by UUID or class_name", "operationId": "getShipByUuid",
+        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Ship UUID or class_name" }],
+        "responses": { "200": { "description": "Ship details" }, "404": { "description": "Ship not found" } } }
+    },
+    "/api/v1/ships/{uuid}/loadout": {
+      "get": { "tags": ["Ships"], "summary": "Get ship loadout (hierarchical component tree)", "operationId": "getShipLoadout",
+        "description": "Returns recursive port tree with resolved components (turret→gimbal→weapon, etc.)",
+        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Hierarchical loadout tree" }, "404": { "description": "Ship or loadout not found" } } }
+    },
+    "/api/v1/ships/{uuid}/modules": {
+      "get": { "tags": ["Ships"], "summary": "Get ship modules (Retaliator, Apollo, etc.)", "operationId": "getShipModules",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] } }
+        ],
+        "responses": { "200": { "description": "Module list" } } }
+    },
+    "/api/v1/ships/{uuid}/paints": {
+      "get": { "tags": ["Ships"], "summary": "Get available paints for a ship", "operationId": "getShipPaints",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] } }
+        ],
+        "responses": { "200": { "description": "Paint list" } } }
+    },
+    "/api/v1/ships/{uuid}/stats": {
+      "get": { "tags": ["Ships"], "summary": "Get aggregated stats for a ship", "operationId": "getShipStats",
+        "description": "Aggregated weapon DPS, shield HP, power draw, cooling, etc.",
+        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Aggregated ship stats" }, "404": { "description": "Ship not found" } } }
+    },
+    "/api/v1/ships/{uuid}/hardpoints": {
+      "get": { "tags": ["Ships"], "summary": "Get ship hardpoints", "operationId": "getShipHardpoints",
+        "description": "Returns all hardpoint/port info for a ship (type, size, equipped component)",
+        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Hardpoint list" }, "404": { "description": "Ship not found" } } }
+    },
+    "/api/v1/ships/{uuid}/similar": {
+      "get": { "tags": ["Ships"], "summary": "Get similar ships", "operationId": "getSimilarShips",
+        "description": "Returns ships with the same role/career, sorted by similarity",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 5, "maximum": 10 } }
+        ],
+        "responses": { "200": { "description": "Similar ship list" }, "404": { "description": "Ship not found" } } }
+    },
+    "/api/v1/ships/{uuid}/compare/{uuid2}": {
+      "get": { "tags": ["Ships"], "summary": "Compare two ships", "operationId": "compareShips",
+        "description": "Returns side-by-side numeric comparison with deltas and percentages",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" }, "description": "First ship UUID or class_name" },
+          { "name": "uuid2", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Second ship UUID or class_name" }
+        ],
+        "responses": { "200": { "description": "Comparison result with deltas" }, "404": { "description": "One or both ships not found" } } }
+    },
+    "/api/v1/components": {
+      "get": { "tags": ["Components"], "summary": "List components (paginated)", "operationId": "getComponents",
+        "parameters": [
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "type", "in": "query", "schema": { "type": "string" }, "description": "WeaponGun, Shield, QuantumDrive, PowerPlant, Cooler, Gimbal, Turret, MissileRack, MiningArm, SalvageHead, TractorBeam, etc." },
+          { "name": "sub_type", "in": "query", "schema": { "type": "string" } },
+          { "name": "size", "in": "query", "schema": { "type": "integer" } },
+          { "name": "min_size", "in": "query", "schema": { "type": "integer" }, "description": "Minimum size filter" },
+          { "name": "max_size", "in": "query", "schema": { "type": "integer" }, "description": "Maximum size filter" },
+          { "name": "grade", "in": "query", "schema": { "type": "string" } },
+          { "name": "manufacturer", "in": "query", "schema": { "type": "string" } },
           { "name": "sort", "in": "query", "schema": { "type": "string", "default": "name" } },
           { "name": "order", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"] } },
           { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
           { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50, "maximum": 200 } },
           { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] } }
         ],
-        "responses": { "200": { "description": "Paginated ship list" } }
-      }
+        "responses": { "200": { "description": "Paginated component list" } } }
     },
-    "/api/v1/ships/filters": {
-      "get": { "tags": ["Ships"], "summary": "Get available ship filter values (roles, careers)", "responses": { "200": { "description": "Filter values" } } }
+    "/api/v1/components/types": {
+      "get": { "tags": ["Components"], "summary": "Get component type breakdown", "operationId": "getComponentTypes",
+        "description": "Returns all component types with count per type",
+        "responses": { "200": { "description": "Type list with counts" } } }
     },
-    "/api/v1/ships/manufacturers": {
-      "get": { "tags": ["Ships"], "summary": "Get manufacturers that have ships", "responses": { "200": { "description": "Manufacturer list with ship count" } } }
+    "/api/v1/components/filters": {
+      "get": { "tags": ["Components"], "summary": "Get available component filter values", "operationId": "getComponentFilters",
+        "description": "Returns distinct types, sub_types, sizes, grades",
+        "responses": { "200": { "description": "Filter values" } } }
     },
-    "/api/v1/ships/{uuid}": {
-      "get": {
-        "tags": ["Ships"],
-        "summary": "Get ship by UUID or class_name",
-        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Ship details" }, "404": { "description": "Not found" } }
-      }
+    "/api/v1/components/{uuid}": {
+      "get": { "tags": ["Components"], "summary": "Get component by UUID or class_name", "operationId": "getComponentByUuid",
+        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Component UUID or class_name" }],
+        "responses": { "200": { "description": "Component details" }, "404": { "description": "Component not found" } } }
     },
-    "/api/v1/ships/{uuid}/loadout": {
-      "get": {
-        "tags": ["Ships"],
-        "summary": "Get ship loadout (hierarchical component tree)",
-        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Loadout tree" } }
-      }
-    },
-    "/api/v1/ships/{uuid}/modules": {
-      "get": {
-        "tags": ["Ships"],
-        "summary": "Get ship modules (Retaliator, Apollo, etc.)",
-        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Module list" } }
-      }
-    },
-    "/api/v1/ships/{uuid}/paints": {
-      "get": {
-        "tags": ["Ships"],
-        "summary": "Get available paints for a ship",
-        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Paint list" } }
-      }
-    },
-    "/api/v1/ships/{uuid}/compare/{uuid2}": {
-      "get": {
-        "tags": ["Ships"],
-        "summary": "Compare two ships",
+    "/api/v1/components/{uuid}/buy-locations": {
+      "get": { "tags": ["Components"], "summary": "Get shops selling a component", "operationId": "getComponentBuyLocations",
         "parameters": [
           { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
-          { "name": "uuid2", "in": "path", "required": true, "schema": { "type": "string" } }
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] } }
         ],
-        "responses": { "200": { "description": "Comparison result" } }
-      }
+        "responses": { "200": { "description": "Buy locations with prices" }, "404": { "description": "Component not found" } } }
     },
-    "/api/v1/ships/{uuid}/stats": {
-      "get": {
-        "tags": ["Ships"],
-        "summary": "Get aggregated stats for a ship (weapons, shields, power, etc.)",
+    "/api/v1/components/{uuid}/ships": {
+      "get": { "tags": ["Components"], "summary": "Get ships using a component by default", "operationId": "getComponentShips",
         "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Aggregated ship stats" }, "404": { "description": "Not found" } }
-      }
+        "responses": { "200": { "description": "Ship list using this component" }, "404": { "description": "Component not found" } } }
     },
-    "/api/v1/components": {
-      "get": {
-        "tags": ["Components"],
-        "summary": "List components (paginated)",
+    "/api/v1/items": {
+      "get": { "tags": ["Items"], "summary": "List items (paginated)", "operationId": "getItems",
+        "description": "FPS weapons, armor, clothing, attachments, gadgets, consumables",
         "parameters": [
           { "name": "search", "in": "query", "schema": { "type": "string" } },
-          { "name": "type", "in": "query", "schema": { "type": "string" }, "description": "WeaponGun, Shield, QuantumDrive, etc." },
-          { "name": "sub_type", "in": "query", "schema": { "type": "string" } },
-          { "name": "size", "in": "query", "schema": { "type": "integer" } },
-          { "name": "grade", "in": "query", "schema": { "type": "string" } },
+          { "name": "type", "in": "query", "schema": { "type": "string" }, "description": "FPS_Weapon, Armor_Torso, Armor_Arms, Clothing, Gadget, Consumable, etc." },
+          { "name": "sub_type", "in": "query", "schema": { "type": "string" }, "description": "Assault_Rifle, Pistol, Shotgun, SMG, Sniper, etc." },
           { "name": "manufacturer", "in": "query", "schema": { "type": "string" } },
           { "name": "sort", "in": "query", "schema": { "type": "string", "default": "name" } },
           { "name": "order", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"] } },
           { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
-          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50, "maximum": 200 } }
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50, "maximum": 200 } },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] } }
         ],
-        "responses": { "200": { "description": "Paginated component list" } }
-      }
+        "responses": { "200": { "description": "Paginated item list" } } }
     },
-    "/api/v1/components/filters": {
-      "get": { "tags": ["Components"], "summary": "Get available component filter values", "responses": { "200": { "description": "types, sub_types, sizes, grades" } } }
+    "/api/v1/items/types": {
+      "get": { "tags": ["Items"], "summary": "Get item type breakdown", "operationId": "getItemTypes",
+        "description": "Returns all item types with count per type",
+        "responses": { "200": { "description": "Type list with counts" } } }
     },
-    "/api/v1/components/{uuid}": {
-      "get": {
-        "tags": ["Components"],
-        "summary": "Get component by UUID or class_name",
+    "/api/v1/items/filters": {
+      "get": { "tags": ["Items"], "summary": "Get available item filter values", "operationId": "getItemFilters",
+        "description": "Returns distinct types, sub_types, manufacturers",
+        "responses": { "200": { "description": "Filter values" } } }
+    },
+    "/api/v1/items/{uuid}": {
+      "get": { "tags": ["Items"], "summary": "Get item by UUID or class_name", "operationId": "getItemByUuid",
+        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Item UUID or class_name" }],
+        "responses": { "200": { "description": "Item details" }, "404": { "description": "Item not found" } } }
+    },
+    "/api/v1/commodities": {
+      "get": { "tags": ["Commodities"], "summary": "List commodities (paginated)", "operationId": "getCommodities",
+        "description": "Tradeable goods: metals, gases, food, drugs, minerals, scrap, etc.",
+        "parameters": [
+          { "name": "search", "in": "query", "schema": { "type": "string" } },
+          { "name": "type", "in": "query", "schema": { "type": "string" }, "description": "Metal, Gas, Food, Drug, Mineral, Scrap, etc." },
+          { "name": "sort", "in": "query", "schema": { "type": "string", "default": "name" } },
+          { "name": "order", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"] } },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50, "maximum": 200 } },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] } }
+        ],
+        "responses": { "200": { "description": "Paginated commodity list" } } }
+    },
+    "/api/v1/commodities/types": {
+      "get": { "tags": ["Commodities"], "summary": "Get commodity type breakdown", "operationId": "getCommodityTypes",
+        "description": "Returns all commodity types with count per type",
+        "responses": { "200": { "description": "Type list with counts" } } }
+    },
+    "/api/v1/commodities/{uuid}": {
+      "get": { "tags": ["Commodities"], "summary": "Get commodity by UUID", "operationId": "getCommodityByUuid",
         "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Component details" }, "404": { "description": "Not found" } }
-      }
-    },
-    "/api/v1/components/{uuid}/buy-locations": {
-      "get": {
-        "tags": ["Components"],
-        "summary": "Get shops selling a component",
-        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Buy locations with prices" } }
-      }
-    },
-    "/api/v1/components/{uuid}/ships": {
-      "get": {
-        "tags": ["Components"],
-        "summary": "Get ships using a component by default",
-        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Ship list" } }
-      }
+        "responses": { "200": { "description": "Commodity details" }, "404": { "description": "Commodity not found" } } }
     },
     "/api/v1/paints": {
-      "get": {
-        "tags": ["Paints"],
-        "summary": "List all paints (paginated)",
+      "get": { "tags": ["Paints"], "summary": "List all paints (paginated)", "operationId": "getPaints",
         "parameters": [
           { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Search by paint or ship name" },
           { "name": "ship_uuid", "in": "query", "schema": { "type": "string" }, "description": "Filter by ship UUID" },
           { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
-          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50, "maximum": 200 } }
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50, "maximum": 200 } },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] } }
         ],
-        "responses": { "200": { "description": "Paginated paint list" } }
-      }
+        "responses": { "200": { "description": "Paginated paint list" } } }
     },
     "/api/v1/shops": {
-      "get": {
-        "tags": ["Shops"],
-        "summary": "List shops (paginated)",
+      "get": { "tags": ["Shops"], "summary": "List shops (paginated)", "operationId": "getShops",
         "parameters": [
           { "name": "search", "in": "query", "schema": { "type": "string" } },
           { "name": "location", "in": "query", "schema": { "type": "string" } },
           { "name": "type", "in": "query", "schema": { "type": "string" } },
           { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
-          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20, "maximum": 100 } }
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20, "maximum": 100 } },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] } }
         ],
-        "responses": { "200": { "description": "Paginated shop list" } }
-      }
+        "responses": { "200": { "description": "Paginated shop list" } } }
     },
     "/api/v1/shops/{id}/inventory": {
-      "get": {
-        "tags": ["Shops"],
-        "summary": "Get shop inventory",
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
-        "responses": { "200": { "description": "Inventory items" } }
-      }
+      "get": { "tags": ["Shops"], "summary": "Get shop inventory", "operationId": "getShopInventory",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] } }
+        ],
+        "responses": { "200": { "description": "Inventory items" }, "400": { "description": "Invalid shop ID" } } }
     },
     "/api/v1/manufacturers": {
-      "get": { "tags": ["Manufacturers"], "summary": "List all manufacturers", "responses": { "200": { "description": "Manufacturer list" } } }
+      "get": { "tags": ["Manufacturers"], "summary": "List all manufacturers", "operationId": "getManufacturers",
+        "parameters": [{ "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] } }],
+        "responses": { "200": { "description": "Manufacturer list" } } }
+    },
+    "/api/v1/manufacturers/{code}": {
+      "get": { "tags": ["Manufacturers"], "summary": "Get manufacturer by code", "operationId": "getManufacturerByCode",
+        "parameters": [{ "name": "code", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Manufacturer code (e.g. AEGS, RSI, DRAK)" }],
+        "responses": { "200": { "description": "Manufacturer details" }, "404": { "description": "Manufacturer not found" } } }
+    },
+    "/api/v1/manufacturers/{code}/ships": {
+      "get": { "tags": ["Manufacturers"], "summary": "Get ships by manufacturer", "operationId": "getManufacturerShips",
+        "parameters": [
+          { "name": "code", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] } }
+        ],
+        "responses": { "200": { "description": "Ship list for this manufacturer" }, "404": { "description": "Manufacturer not found" } } }
+    },
+    "/api/v1/manufacturers/{code}/components": {
+      "get": { "tags": ["Manufacturers"], "summary": "Get components by manufacturer", "operationId": "getManufacturerComponents",
+        "parameters": [
+          { "name": "code", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] } }
+        ],
+        "responses": { "200": { "description": "Component list for this manufacturer" }, "404": { "description": "Manufacturer not found" } } }
     },
     "/api/v1/ship-matrix": {
-      "get": { "tags": ["Ship Matrix"], "summary": "Get all RSI Ship Matrix entries", "responses": { "200": { "description": "Ship Matrix entries" } } }
+      "get": { "tags": ["Ship Matrix"], "summary": "Get all RSI Ship Matrix entries", "operationId": "getShipMatrix",
+        "parameters": [
+          { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Search by name" },
+          { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] } }
+        ],
+        "responses": { "200": { "description": "Ship Matrix entries" } } }
     },
     "/api/v1/ship-matrix/stats": {
-      "get": { "tags": ["Ship Matrix"], "summary": "Ship Matrix statistics", "responses": { "200": { "description": "Stats" } } }
+      "get": { "tags": ["Ship Matrix"], "summary": "Ship Matrix statistics", "operationId": "getShipMatrixStats",
+        "responses": { "200": { "description": "Stats (total, flyable, etc.)" } } }
     },
     "/api/v1/ship-matrix/{id}": {
-      "get": {
-        "tags": ["Ship Matrix"],
-        "summary": "Get Ship Matrix entry by ID or name",
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Entry" }, "404": { "description": "Not found" } }
-      }
+      "get": { "tags": ["Ship Matrix"], "summary": "Get Ship Matrix entry by ID or name", "operationId": "getShipMatrixById",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Ship Matrix ID (numeric) or ship name" }],
+        "responses": { "200": { "description": "Ship Matrix entry" }, "404": { "description": "Not found" } } }
     },
     "/api/v1/loadout/calculate": {
-      "post": {
-        "tags": ["Loadout"],
-        "summary": "Calculate loadout stats with optional component swaps",
+      "post": { "tags": ["Loadout"], "summary": "Calculate loadout stats with optional component swaps", "operationId": "calculateLoadout",
         "requestBody": {
           "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
+          "content": { "application/json": { "schema": {
+            "type": "object", "required": ["shipUuid"],
+            "properties": {
+              "shipUuid": { "type": "string", "description": "Ship UUID or class_name" },
+              "swaps": { "type": "array", "description": "Component swap list", "items": {
                 "type": "object",
-                "required": ["shipUuid"],
                 "properties": {
-                  "shipUuid": { "type": "string" },
-                  "swaps": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "portName": { "type": "string" },
-                        "componentUuid": { "type": "string" }
-                      }
-                    }
-                  }
-                }
-              }
+                  "portId": { "type": "integer", "description": "Port ID (alternative to portName)" },
+                  "portName": { "type": "string", "description": "Port name (alternative to portId)" },
+                  "componentUuid": { "type": "string", "description": "New component UUID" }
+                }, "required": ["componentUuid"]
+              }}
             }
-          }
+          }}}
         },
-        "responses": { "200": { "description": "Calculated loadout stats" } }
-      }
+        "responses": { "200": { "description": "Calculated loadout stats" }, "404": { "description": "Ship not found" } } }
     },
     "/api/v1/changelog": {
-      "get": {
-        "tags": ["Changelog"],
-        "summary": "Get data changelog",
+      "get": { "tags": ["Changelog"], "summary": "Get data changelog", "operationId": "getChangelog",
         "parameters": [
-          { "name": "entity_type", "in": "query", "schema": { "type": "string" } },
-          { "name": "change_type", "in": "query", "schema": { "type": "string" } },
+          { "name": "entity_type", "in": "query", "schema": { "type": "string" }, "description": "Filter by entity type (ship, component, item, etc.)" },
+          { "name": "change_type", "in": "query", "schema": { "type": "string" }, "description": "Filter by change type (added, modified, removed)" },
           { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 } },
           { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
         ],
-        "responses": { "200": { "description": "Changelog entries" } }
-      }
+        "responses": { "200": { "description": "Changelog entries" } } }
+    },
+    "/api/v1/changelog/summary": {
+      "get": { "tags": ["Changelog"], "summary": "Get changelog summary", "operationId": "getChangelogSummary",
+        "description": "Returns aggregated counts by entity_type and change_type",
+        "responses": { "200": { "description": "Changelog summary" } } }
+    },
+    "/api/v1/stats/overview": {
+      "get": { "tags": ["Stats"], "summary": "Get public database statistics", "operationId": "getStatsOverview",
+        "description": "Returns counts of ships, components, items, commodities, manufacturers, etc.",
+        "responses": { "200": { "description": "Database statistics overview" } } }
     },
     "/api/v1/version": {
-      "get": { "tags": ["System"], "summary": "Get latest extraction info", "responses": { "200": { "description": "Version info" } } }
+      "get": { "tags": ["System"], "summary": "Get latest extraction info", "operationId": "getVersion",
+        "responses": { "200": { "description": "Latest extraction metadata (game version, date, counts)" } } }
     },
     "/health": {
-      "get": { "tags": ["System"], "summary": "Health check", "responses": { "200": { "description": "OK" } } }
+      "get": { "tags": ["System"], "summary": "Health check", "operationId": "healthCheck",
+        "responses": { "200": { "description": "OK — database connected, game data status" } } }
     }
   }
 }
