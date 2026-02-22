@@ -117,7 +117,9 @@ describe('ComponentQueryService', () => {
 
   describe('getComponentShips', () => {
     it('joins manufacturers to provide manufacturer_name safely', async () => {
-      const pool = createMockPool([[[row({ uuid: 'ship-1', name: 'Gladius', class_name: 'AEGS_Gladius', manufacturer_code: 'AEGS' })], []]]);
+      const pool = createMockPool([
+        [[row({ uuid: 'ship-1', name: 'Gladius', class_name: 'AEGS_Gladius', manufacturer_code: 'AEGS' })], []],
+      ]);
       const svc = new ComponentQueryService(pool);
       const result = await svc.getComponentShips('component-uuid');
 
