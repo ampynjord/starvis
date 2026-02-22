@@ -1,44 +1,73 @@
 /**
  * ComponentQueryService — Component listing, filters, buy locations, ships
  */
-import type { Pool } from "mysql2/promise";
-import { type PaginatedResult, type Row, COMP_SORT, paginate } from "./shared.js";
+import type { Pool } from 'mysql2/promise';
+import { COMP_SORT, type PaginatedResult, paginate, type Row } from './shared.js';
 
 export class ComponentQueryService {
   constructor(private pool: Pool) {}
 
   async getAllComponents(filters?: {
-    type?: string; sub_type?: string; size?: string; grade?: string;
-    min_size?: string; max_size?: string;
-    manufacturer?: string; search?: string;
-    sort?: string; order?: string; page?: number; limit?: number;
+    type?: string;
+    sub_type?: string;
+    size?: string;
+    grade?: string;
+    min_size?: string;
+    max_size?: string;
+    manufacturer?: string;
+    search?: string;
+    sort?: string;
+    order?: string;
+    page?: number;
+    limit?: number;
   }): Promise<PaginatedResult> {
     const where: string[] = [];
     const params: (string | number)[] = [];
 
-    if (filters?.type) { where.push("c.type = ?"); params.push(filters.type); }
-    if (filters?.sub_type) { where.push("c.sub_type = ?"); params.push(filters.sub_type); }
-    if (filters?.size) { where.push("c.size = ?"); params.push(parseInt(filters.size)); }
-    if (filters?.min_size) { where.push("c.size >= ?"); params.push(parseInt(filters.min_size)); }
-    if (filters?.max_size) { where.push("c.size <= ?"); params.push(parseInt(filters.max_size)); }
-    if (filters?.grade) { where.push("c.grade = ?"); params.push(filters.grade); }
-    if (filters?.manufacturer) { where.push("c.manufacturer_code = ?"); params.push(filters.manufacturer.toUpperCase()); }
+    if (filters?.type) {
+      where.push('c.type = ?');
+      params.push(filters.type);
+    }
+    if (filters?.sub_type) {
+      where.push('c.sub_type = ?');
+      params.push(filters.sub_type);
+    }
+    if (filters?.size) {
+      where.push('c.size = ?');
+      params.push(parseInt(filters.size));
+    }
+    if (filters?.min_size) {
+      where.push('c.size >= ?');
+      params.push(parseInt(filters.min_size));
+    }
+    if (filters?.max_size) {
+      where.push('c.size <= ?');
+      params.push(parseInt(filters.max_size));
+    }
+    if (filters?.grade) {
+      where.push('c.grade = ?');
+      params.push(filters.grade);
+    }
+    if (filters?.manufacturer) {
+      where.push('c.manufacturer_code = ?');
+      params.push(filters.manufacturer.toUpperCase());
+    }
     if (filters?.search) {
-      where.push("(c.name LIKE ? OR c.class_name LIKE ?)");
+      where.push('(c.name LIKE ? OR c.class_name LIKE ?)');
       const t = `%${filters.search}%`;
       params.push(t, t);
     }
 
-    const w = where.length ? ` WHERE ${where.join(" AND ")}` : "";
+    const w = where.length ? ` WHERE ${where.join(' AND ')}` : '';
     const baseSql = `SELECT c.*, m.name as manufacturer_name FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code${w}`;
     const countSql = `SELECT COUNT(*) as total FROM components c${w}`;
 
-    return paginate(this.pool, baseSql, countSql, params, filters || {}, COMP_SORT, "c");
+    return paginate(this.pool, baseSql, countSql, params, filters || {}, COMP_SORT, 'c');
   }
 
   async getComponentByUuid(uuid: string): Promise<Row | null> {
     const [rows] = await this.pool.execute<Row[]>(
-      "SELECT c.*, m.name as manufacturer_name FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code WHERE c.uuid = ?",
+      'SELECT c.*, m.name as manufacturer_name FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code WHERE c.uuid = ?',
       [uuid],
     );
     return rows[0] || null;
@@ -46,7 +75,7 @@ export class ComponentQueryService {
 
   async getComponentByClassName(className: string): Promise<Row | null> {
     const [rows] = await this.pool.execute<Row[]>(
-      "SELECT c.*, m.name as manufacturer_name FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code WHERE c.class_name = ?",
+      'SELECT c.*, m.name as manufacturer_name FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code WHERE c.class_name = ?',
       [className],
     );
     return rows[0] || null;
@@ -54,16 +83,14 @@ export class ComponentQueryService {
 
   /** Resolve UUID or class_name → component */
   async resolveComponent(id: string): Promise<Row | null> {
-    return id.length === 36
-      ? await this.getComponentByUuid(id)
-      : await this.getComponentByClassName(id);
+    return id.length === 36 ? await this.getComponentByUuid(id) : await this.getComponentByClassName(id);
   }
 
   async getComponentFilters(): Promise<{ types: string[]; sub_types: string[]; sizes: number[]; grades: string[] }> {
     const [[typeRows], [subTypeRows], [sizeRows], [gradeRows]] = await Promise.all([
       this.pool.execute<Row[]>("SELECT DISTINCT type FROM components WHERE type IS NOT NULL AND type != '' ORDER BY type"),
       this.pool.execute<Row[]>("SELECT DISTINCT sub_type FROM components WHERE sub_type IS NOT NULL AND sub_type != '' ORDER BY sub_type"),
-      this.pool.execute<Row[]>("SELECT DISTINCT size FROM components ORDER BY size"),
+      this.pool.execute<Row[]>('SELECT DISTINCT size FROM components ORDER BY size'),
       this.pool.execute<Row[]>("SELECT DISTINCT grade FROM components WHERE grade IS NOT NULL AND grade != '' ORDER BY grade"),
     ]);
     return {
@@ -96,9 +123,7 @@ export class ComponentQueryService {
   }
 
   async getComponentTypes(): Promise<{ types: { type: string; count: number }[] }> {
-    const [rows] = await this.pool.execute<Row[]>(
-      "SELECT type, COUNT(*) as count FROM components GROUP BY type ORDER BY count DESC",
-    );
-    return { types: rows.map(r => ({ type: String(r.type), count: Number(r.count) })) };
+    const [rows] = await this.pool.execute<Row[]>('SELECT type, COUNT(*) as count FROM components GROUP BY type ORDER BY count DESC');
+    return { types: rows.map((r) => ({ type: String(r.type), count: Number(r.count) })) };
   }
 }

@@ -1,65 +1,96 @@
 /**
  * ShipQueryService — Ship listing, search, filters, manufacturers
  */
-import type { Pool } from "mysql2/promise";
-import {
-    type PaginatedResult, type Row,
-    CONCEPT_SELECT, SHIP_JOINS, SHIP_SELECT, SHIP_SORT,
-    num,
-} from "./shared.js";
+import type { Pool } from 'mysql2/promise';
+import { CONCEPT_SELECT, num, type PaginatedResult, type Row, SHIP_JOINS, SHIP_SELECT, SHIP_SORT } from './shared.js';
 
 export class ShipQueryService {
   constructor(private pool: Pool) {}
 
   async getAllShips(filters?: {
-    manufacturer?: string; role?: string; career?: string; status?: string;
-    vehicle_category?: string; variant_type?: string; search?: string;
-    sort?: string; order?: string; page?: number; limit?: number;
+    manufacturer?: string;
+    role?: string;
+    career?: string;
+    status?: string;
+    vehicle_category?: string;
+    variant_type?: string;
+    search?: string;
+    sort?: string;
+    order?: string;
+    page?: number;
+    limit?: number;
   }): Promise<PaginatedResult> {
     const where: string[] = [];
     const params: (string | number)[] = [];
 
-    if (filters?.manufacturer) { where.push("s.manufacturer_code = ?"); params.push(filters.manufacturer.toUpperCase()); }
-    if (filters?.role) { where.push("s.role = ?"); params.push(filters.role); }
-    if (filters?.career) { where.push("s.career = ?"); params.push(filters.career); }
-    if (filters?.vehicle_category) { where.push("s.vehicle_category = ?"); params.push(filters.vehicle_category); }
+    if (filters?.manufacturer) {
+      where.push('s.manufacturer_code = ?');
+      params.push(filters.manufacturer.toUpperCase());
+    }
+    if (filters?.role) {
+      where.push('s.role = ?');
+      params.push(filters.role);
+    }
+    if (filters?.career) {
+      where.push('s.career = ?');
+      params.push(filters.career);
+    }
+    if (filters?.vehicle_category) {
+      where.push('s.vehicle_category = ?');
+      params.push(filters.vehicle_category);
+    }
     if (filters?.variant_type) {
-      if (filters.variant_type === "none") { where.push("s.variant_type IS NULL"); }
-      else { where.push("s.variant_type = ?"); params.push(filters.variant_type); }
+      if (filters.variant_type === 'none') {
+        where.push('s.variant_type IS NULL');
+      } else {
+        where.push('s.variant_type = ?');
+        params.push(filters.variant_type);
+      }
     } else {
       where.push("(s.variant_type IS NULL OR s.variant_type NOT IN ('tutorial', 'enemy_ai', 'arena_ai', 'competition'))");
     }
 
-    const wantConceptOnly = filters?.status === "in-concept";
-    const wantInGameOnly = filters?.status === "in-game-only";
-    const wantFlightReady = filters?.status === "flight-ready";
+    const wantConceptOnly = filters?.status === 'in-concept';
+    const wantInGameOnly = filters?.status === 'in-game-only';
+    const wantFlightReady = filters?.status === 'flight-ready';
     const excludeConcept = wantInGameOnly || wantFlightReady;
 
-    if (wantFlightReady) { where.push("sm.production_status = ?"); params.push("flight-ready"); }
-    if (wantInGameOnly) { where.push("s.ship_matrix_id IS NULL"); }
+    if (wantFlightReady) {
+      where.push('sm.production_status = ?');
+      params.push('flight-ready');
+    }
+    if (wantInGameOnly) {
+      where.push('s.ship_matrix_id IS NULL');
+    }
 
     if (filters?.search) {
-      where.push("(s.name LIKE ? OR s.class_name LIKE ? OR s.short_name LIKE ? OR sm.name LIKE ?)");
+      where.push('(s.name LIKE ? OR s.class_name LIKE ? OR s.short_name LIKE ? OR sm.name LIKE ?)');
       const t = `%${filters.search}%`;
       params.push(t, t, t, t);
     }
 
-    const w = where.length ? ` WHERE ${where.join(" AND ")}` : "";
+    const w = where.length ? ` WHERE ${where.join(' AND ')}` : '';
     const includeConceptShips = !excludeConcept && !filters?.vehicle_category;
 
-    const conceptWhere: string[] = ["sm2.id NOT IN (SELECT ship_matrix_id FROM ships WHERE ship_matrix_id IS NOT NULL)"];
+    const conceptWhere: string[] = ['sm2.id NOT IN (SELECT ship_matrix_id FROM ships WHERE ship_matrix_id IS NOT NULL)'];
     const conceptParams: (string | number)[] = [];
-    if (filters?.manufacturer) { conceptWhere.push("sm2.manufacturer_code = ?"); conceptParams.push(filters.manufacturer.toUpperCase()); }
+    if (filters?.manufacturer) {
+      conceptWhere.push('sm2.manufacturer_code = ?');
+      conceptParams.push(filters.manufacturer.toUpperCase());
+    }
     if (filters?.search) {
-      conceptWhere.push("(sm2.name LIKE ? OR sm2.manufacturer_name LIKE ?)");
+      conceptWhere.push('(sm2.name LIKE ? OR sm2.manufacturer_name LIKE ?)');
       const t = `%${filters.search}%`;
       conceptParams.push(t, t);
     }
-    const cw = ` WHERE ${conceptWhere.join(" AND ")}`;
+    const cw = ` WHERE ${conceptWhere.join(' AND ')}`;
 
     let totalCount = 0;
     if (!wantConceptOnly) {
-      const [countRows] = await this.pool.execute<Row[]>(`SELECT COUNT(*) as total FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id${w}`, params);
+      const [countRows] = await this.pool.execute<Row[]>(
+        `SELECT COUNT(*) as total FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id${w}`,
+        params,
+      );
       totalCount += Number(countRows[0]?.total) || 0;
     }
     if (includeConceptShips || wantConceptOnly) {
@@ -67,8 +98,8 @@ export class ShipQueryService {
       totalCount += Number(conceptCount[0]?.total) || 0;
     }
 
-    const sortCol = SHIP_SORT.has(filters?.sort || "") ? filters!.sort! : "name";
-    const order = filters?.order === "desc" ? "DESC" : "ASC";
+    const sortCol = SHIP_SORT.has(filters?.sort || '') ? filters!.sort! : 'name';
+    const order = filters?.order === 'desc' ? 'DESC' : 'ASC';
     const page = Math.max(1, filters?.page || 1);
     const limit = Math.min(200, Math.max(1, filters?.limit || 50));
     const offset = (page - 1) * limit;
@@ -95,8 +126,8 @@ export class ShipQueryService {
   }
 
   async getShipByUuid(uuid: string): Promise<Row | null> {
-    if (uuid.startsWith("concept-")) {
-      const smId = uuid.replace("concept-", "");
+    if (uuid.startsWith('concept-')) {
+      const smId = uuid.replace('concept-', '');
       const [rows] = await this.pool.execute<Row[]>(
         `SELECT ${CONCEPT_SELECT}, TRUE as is_concept_only FROM ship_matrix sm2 WHERE sm2.id = ? AND sm2.id NOT IN (SELECT ship_matrix_id FROM ships WHERE ship_matrix_id IS NOT NULL)`,
         [smId],
@@ -107,7 +138,7 @@ export class ShipQueryService {
     if (!rows[0]) return null;
     const ship = rows[0];
     if (!ship.cross_section_x && !ship.cross_section_y && !ship.cross_section_z && ship.ship_matrix_id) {
-      const [smRows] = await this.pool.execute<Row[]>("SELECT length, beam, height FROM ship_matrix WHERE id = ?", [ship.ship_matrix_id]);
+      const [smRows] = await this.pool.execute<Row[]>('SELECT length, beam, height FROM ship_matrix WHERE id = ?', [ship.ship_matrix_id]);
       if (smRows.length) {
         ship.cross_section_x = num(smRows[0].length);
         ship.cross_section_y = num(smRows[0].beam);
@@ -118,7 +149,9 @@ export class ShipQueryService {
   }
 
   async getShipByClassName(className: string): Promise<Row | null> {
-    const [rows] = await this.pool.execute<Row[]>(`SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS} WHERE s.class_name = ?`, [className]);
+    const [rows] = await this.pool.execute<Row[]>(`SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS} WHERE s.class_name = ?`, [
+      className,
+    ]);
     return rows[0] || null;
   }
 
@@ -126,7 +159,9 @@ export class ShipQueryService {
     const [[roleRows], [careerRows], [variantRows]] = await Promise.all([
       this.pool.execute<Row[]>("SELECT DISTINCT role FROM ships WHERE role IS NOT NULL AND role != '' ORDER BY role"),
       this.pool.execute<Row[]>("SELECT DISTINCT career FROM ships WHERE career IS NOT NULL AND career != '' ORDER BY career"),
-      this.pool.execute<Row[]>("SELECT DISTINCT variant_type FROM ships WHERE variant_type IS NOT NULL AND variant_type != '' ORDER BY variant_type"),
+      this.pool.execute<Row[]>(
+        "SELECT DISTINCT variant_type FROM ships WHERE variant_type IS NOT NULL AND variant_type != '' ORDER BY variant_type",
+      ),
     ]);
     return {
       roles: roleRows.map((r) => String(r.role)),
@@ -214,9 +249,7 @@ export class ShipQueryService {
   }
 
   async getSimilarShips(uuid: string, limit = 5): Promise<Row[]> {
-    const [shipRows] = await this.pool.execute<Row[]>(
-      "SELECT role, vehicle_category, manufacturer_code FROM ships WHERE uuid = ?", [uuid],
-    );
+    const [shipRows] = await this.pool.execute<Row[]>('SELECT role, vehicle_category, manufacturer_code FROM ships WHERE uuid = ?', [uuid]);
     if (!shipRows[0]) return [];
     const ship = shipRows[0];
 

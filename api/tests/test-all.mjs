@@ -14,13 +14,18 @@ const BASE = (process.argv[2] || 'http://localhost:3003').replace(/\/$/, '');
 const API = `${BASE}/api/v1`;
 const ADMIN_KEY = process.env.ADMIN_API_KEY || 'starvis_admin_2024';
 const isRemote = !BASE.includes('localhost') && !BASE.includes('127.0.0.1');
-const DELAY_MS = isRemote ? 2500 : 0;  // throttle on remote to avoid rate limiting (30 req/min burst)
+const DELAY_MS = isRemote ? 2500 : 0; // throttle on remote to avoid rate limiting (30 req/min burst)
 
-const delay = (ms) => new Promise(r => setTimeout(r, ms));
+const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const C = {
-  reset: '\x1b[0m', green: '\x1b[32m', red: '\x1b[31m',
-  yellow: '\x1b[33m', blue: '\x1b[34m', cyan: '\x1b[36m', dim: '\x1b[2m',
+  reset: '\x1b[0m',
+  green: '\x1b[32m',
+  red: '\x1b[31m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  cyan: '\x1b[36m',
+  dim: '\x1b[2m',
 };
 
 const stats = { total: 0, passed: 0, failed: 0, skipped: 0 };
@@ -31,7 +36,9 @@ function section(title) {
   console.log(`${C.blue}${'═'.repeat(60)}${C.reset}\n`);
 }
 
-function info(msg) { console.log(`${C.dim}     ${msg}${C.reset}`); }
+function info(msg) {
+  console.log(`${C.dim}     ${msg}${C.reset}`);
+}
 
 async function test(name, fn) {
   if (DELAY_MS > 0) await delay(DELAY_MS);
@@ -77,8 +84,12 @@ async function adminGet(path, retries = 5) {
   return { status: res.status, ok: res.ok, data: await res.json() };
 }
 
-function assert(cond, msg) { if (!cond) throw new Error(msg); }
-function skip(msg) { throw new Error(`SKIP: ${msg}`); }
+function assert(cond, msg) {
+  if (!cond) throw new Error(msg);
+}
+function skip(msg) {
+  throw new Error(`SKIP: ${msg}`);
+}
 
 /** Raw fetch with 429 retry (for CSV, ETag tests that don't use rawGet) */
 async function apiFetch(url, opts = {}, retries = 5) {
@@ -108,12 +119,14 @@ let shipCount = 0;
 let compCount = 0;
 try {
   const r = await rawGet('/components?limit=1');
-  hasGameData = r.ok && ((r.data.total || r.data.count || 0) > 0);
+  hasGameData = r.ok && (r.data.total || r.data.count || 0) > 0;
   if (hasGameData) {
     const s = await rawGet('/ships?limit=1');
     shipCount = s.data.total || s.data.count || 0;
   }
-} catch { /* pas de game data */ }
+} catch {
+  /* pas de game data */
+}
 if (!hasGameData) {
   console.log(`${C.yellow}  ⚠  Pas de données game (P4K) — les tests game-data seront skip${C.reset}`);
 }
@@ -123,7 +136,9 @@ let hasShipMatrix = false;
 try {
   const r = await rawGet('/ship-matrix/stats');
   hasShipMatrix = r.ok && r.data.data?.total > 0;
-} catch { /* pas de ship matrix */ }
+} catch {
+  /* pas de ship matrix */
+}
 if (!hasShipMatrix) {
   console.log(`${C.yellow}  ⚠  Pas de données Ship Matrix — les tests ship-matrix seront skip${C.reset}`);
 }
@@ -196,7 +211,7 @@ await test('GET /ships → ≥200 ships (post-cleanup)', async () => {
   assert(data.success, 'Request failed');
   assert(total >= 200, `Only ${total} ships (expected ≥200)`);
   assert(total <= 500, `Too many ships: ${total} (cleanup filter issue?)`);
-  shipUuid = (data.data.find(s => !s.is_concept_only) || data.data[0])?.uuid;
+  shipUuid = (data.data.find((s) => !s.is_concept_only) || data.data[0])?.uuid;
   info(`${total} ships total, page 1: ${data.count} items`);
 });
 
@@ -204,7 +219,10 @@ await test('GET /ships?manufacturer=AEGS → filter works', async () => {
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/ships?manufacturer=AEGS');
   assert(data.success && data.count > 0, 'No AEGS ships');
-  assert(data.data.every(s => s.manufacturer_code === 'AEGS'), 'Wrong manufacturer in results');
+  assert(
+    data.data.every((s) => s.manufacturer_code === 'AEGS'),
+    'Wrong manufacturer in results',
+  );
   info(`${data.count} Aegis ships`);
 });
 
@@ -217,7 +235,7 @@ await test('GET /ships?search=gladius → search works', async () => {
 await test('GET /ships?sort=mass&order=desc → sorting', async () => {
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/ships?sort=mass&order=desc');
-  const masses = data.data.filter(s => s.mass).map(s => Number(s.mass));
+  const masses = data.data.filter((s) => s.mass).map((s) => Number(s.mass));
   for (let i = 1; i < Math.min(masses.length, 10); i++) {
     assert(masses[i] <= masses[i - 1], 'Not sorted desc by mass');
   }
@@ -275,9 +293,9 @@ await test('GET /ships → no tutorial/enemy_ai/arena_ai variants by default', a
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/ships?limit=200');
   assert(data.success, 'Request failed');
-  const names = data.data.map(s => s.class_name);
-  const hasTutorial = names.some(n => n.includes('_Teach') || n.includes('Tutorial'));
-  const hasSwarm = names.some(n => n.includes('_Swarm'));
+  const names = data.data.map((s) => s.class_name);
+  const hasTutorial = names.some((n) => n.includes('_Teach') || n.includes('Tutorial'));
+  const hasSwarm = names.some((n) => n.includes('_Swarm'));
   assert(!hasTutorial, 'Tutorial ships should be hidden by default');
   assert(!hasSwarm, 'Arena AI (Swarm) ships should be hidden by default');
   info(`${data.total} ships returned (variants filtered)`);
@@ -299,7 +317,10 @@ await test('GET /components?type=WeaponGun → filter', async () => {
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/components?type=WeaponGun');
   assert(data.success && data.count > 0, 'No weapons');
-  assert(data.data.every(c => c.type === 'WeaponGun'), 'Wrong type in results');
+  assert(
+    data.data.every((c) => c.type === 'WeaponGun'),
+    'Wrong type in results',
+  );
   info(`${data.count} weapons`);
 });
 
@@ -314,7 +335,7 @@ await test('GET /components?sort=weapon_dps&order=desc → sort by DPS', async (
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/components?type=WeaponGun&sort=weapon_dps&order=desc');
   assert(data.success, 'Request failed');
-  const dps = data.data.filter(c => c.weapon_dps).map(c => Number(c.weapon_dps));
+  const dps = data.data.filter((c) => c.weapon_dps).map((c) => Number(c.weapon_dps));
   for (let i = 1; i < Math.min(dps.length, 10); i++) {
     assert(dps[i] <= dps[i - 1], 'Not sorted desc by DPS');
   }
@@ -519,7 +540,7 @@ await test('Thruster components exist', async () => {
 await test('Countermeasure components exist', async () => {
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/components?type=Countermeasure');
-  // CMs may be 0 depending on extraction — skip if not applicable 
+  // CMs may be 0 depending on extraction — skip if not applicable
   if (data.count === 0) skip('No countermeasures extracted');
   info(`${data.count} countermeasures`);
 });
@@ -537,8 +558,8 @@ section('�📊 DATA QUALITY');
 await test('Ships have career/role (≥80%)', async () => {
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/ships?limit=200');
-  const p4k = data.data.filter(s => !s.is_concept_only);
-  const withCareer = p4k.filter(s => s.career && s.career !== '').length;
+  const p4k = data.data.filter((s) => !s.is_concept_only);
+  const withCareer = p4k.filter((s) => s.career && s.career !== '').length;
   const pct = Math.round((withCareer / p4k.length) * 100);
   assert(pct >= 80, `Only ${pct}% have career (${withCareer}/${p4k.length})`);
   info(`${pct}% (${withCareer}/${p4k.length})`);
@@ -547,8 +568,8 @@ await test('Ships have career/role (≥80%)', async () => {
 await test('Ships have mass (≥80%)', async () => {
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/ships?limit=200');
-  const p4k = data.data.filter(s => !s.is_concept_only);
-  const withMass = p4k.filter(s => s.mass && Number(s.mass) > 0).length;
+  const p4k = data.data.filter((s) => !s.is_concept_only);
+  const withMass = p4k.filter((s) => s.mass && Number(s.mass) > 0).length;
   const pct = Math.round((withMass / p4k.length) * 100);
   assert(pct >= 80, `Only ${pct}% have mass`);
   info(`${pct}% (${withMass}/${p4k.length})`);
@@ -557,8 +578,8 @@ await test('Ships have mass (≥80%)', async () => {
 await test('Ships have total_hp (≥80%)', async () => {
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/ships?limit=200');
-  const p4k = data.data.filter(s => !s.is_concept_only);
-  const withHp = p4k.filter(s => s.total_hp && Number(s.total_hp) > 0).length;
+  const p4k = data.data.filter((s) => !s.is_concept_only);
+  const withHp = p4k.filter((s) => s.total_hp && Number(s.total_hp) > 0).length;
   const pct = Math.round((withHp / p4k.length) * 100);
   assert(pct >= 80, `Only ${pct}% have HP`);
   info(`${pct}% (${withHp}/${p4k.length})`);
@@ -567,8 +588,8 @@ await test('Ships have total_hp (≥80%)', async () => {
 await test('Ships have boost_speed_forward (≥70%)', async () => {
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/ships?limit=200');
-  const p4k = data.data.filter(s => !s.is_concept_only);
-  const withBoost = p4k.filter(s => s.boost_speed_forward && Number(s.boost_speed_forward) > 0).length;
+  const p4k = data.data.filter((s) => !s.is_concept_only);
+  const withBoost = p4k.filter((s) => s.boost_speed_forward && Number(s.boost_speed_forward) > 0).length;
   const pct = Math.round((withBoost / p4k.length) * 100);
   assert(pct >= 70, `Only ${pct}% have boost speed`);
   info(`${pct}% (${withBoost}/${p4k.length})`);
@@ -577,8 +598,8 @@ await test('Ships have boost_speed_forward (≥70%)', async () => {
 await test('Ships have pitch/yaw/roll (≥70%)', async () => {
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/ships?limit=200');
-  const p4k = data.data.filter(s => !s.is_concept_only);
-  const withRot = p4k.filter(s => s.pitch_max && s.yaw_max && s.roll_max).length;
+  const p4k = data.data.filter((s) => !s.is_concept_only);
+  const withRot = p4k.filter((s) => s.pitch_max && s.yaw_max && s.roll_max).length;
   const pct = Math.round((withRot / p4k.length) * 100);
   assert(pct >= 70, `Only ${pct}% have rotation data`);
   info(`${pct}% (${withRot}/${p4k.length})`);
@@ -589,8 +610,8 @@ await test('Missiles have damage, speed, lock_time, signal_type', async () => {
   const { data } = await rawGet('/components?type=Missile&limit=200');
   const total = data.total || data.count;
   assert(total >= 50, `Only ${total} missiles`);
-  const complete = data.data.filter(m =>
-    m.missile_damage > 0 && m.missile_speed > 0 && m.missile_lock_time >= 0 && m.missile_signal_type
+  const complete = data.data.filter(
+    (m) => m.missile_damage > 0 && m.missile_speed > 0 && m.missile_lock_time >= 0 && m.missile_signal_type,
   ).length;
   const pct = Math.round((complete / data.count) * 100);
   assert(pct >= 90, `Only ${pct}% missiles fully populated`);
@@ -600,7 +621,7 @@ await test('Missiles have damage, speed, lock_time, signal_type', async () => {
 await test('Weapons have readable name (≠ class_name) (≥80%)', async () => {
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/components?type=WeaponGun');
-  const named = data.data.filter(c => c.name && c.name !== c.class_name).length;
+  const named = data.data.filter((c) => c.name && c.name !== c.class_name).length;
   const pct = Math.round((named / data.count) * 100);
   assert(pct >= 80, `Only ${pct}% weapons have readable names`);
   info(`${pct}% (${named}/${data.count})`);
@@ -691,7 +712,10 @@ await test('GET /items?type=FPS_Weapon → filter by type', async () => {
   const { data, status } = await rawGet('/items?type=FPS_Weapon&limit=5');
   if (status === 429) skip('rate limited');
   assert(data.success && data.total > 0, 'No FPS weapons found');
-  assert(data.data.every(i => i.type === 'FPS_Weapon'), 'Non-weapon in results');
+  assert(
+    data.data.every((i) => i.type === 'FPS_Weapon'),
+    'Non-weapon in results',
+  );
   info(`${data.total} FPS weapons`);
 });
 
@@ -710,7 +734,7 @@ await test('GET /items/types → item type breakdown', async () => {
   const { data } = await rawGet('/items/types');
   assert(data.success && Array.isArray(data.types), 'Missing types');
   assert(data.types.length >= 5, `Only ${data.types.length} types`);
-  info(`${data.types.length} item types: ${data.types.map(t => t.type).join(', ')}`);
+  info(`${data.types.length} item types: ${data.types.map((t) => t.type).join(', ')}`);
 });
 
 await test('GET /items/filters → available filters', async () => {
@@ -764,13 +788,13 @@ await test('POST /loadout/calculate → default loadout stats', async () => {
   if (!hasGameData) skip('no game data');
   const { data: ships } = await rawGet('/ships?limit=20');
   if (!ships.data || ships.data.length === 0) skip('no ships');
-  const realShip = ships.data.find(s => !s.is_concept_only);
+  const realShip = ships.data.find((s) => !s.is_concept_only);
   if (!realShip) skip('no P4K ships for loadout');
   const shipUuid = realShip.uuid;
   const res = await apiFetch(`${API}/loadout/calculate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ shipUuid, swaps: [] })
+    body: JSON.stringify({ shipUuid, swaps: [] }),
   });
   const data = await res.json();
   assert(data.success, `Request failed: ${data.error}`);
@@ -787,7 +811,7 @@ await test('POST /loadout/calculate → requires shipUuid', async () => {
   const res = await apiFetch(`${API}/loadout/calculate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({})
+    body: JSON.stringify({}),
   });
   const data = await res.json();
   assert(!data.success, 'Should fail without shipUuid');
@@ -818,7 +842,10 @@ await test('GET /manufacturers/:code/ships → list ships', async () => {
   assert(status === 200, `Expected 200, got ${status}`);
   assert(data.count > 0, 'Expected ships');
   info(`AEGS has ${data.count} ships`);
-  assert(data.data.every(s => s.manufacturer_code === 'AEGS'), 'All ships should be AEGS');
+  assert(
+    data.data.every((s) => s.manufacturer_code === 'AEGS'),
+    'All ships should be AEGS',
+  );
 });
 
 await test('GET /manufacturers/:code/components → list components', async () => {
@@ -836,7 +863,7 @@ await test('GET /ships/search?search=glad → autocomplete', async () => {
   const { status, data } = await rawGet('/ships/search?search=glad');
   assert(status === 200, `Expected 200, got ${status}`);
   assert(data.count > 0, 'Expected results for gladius');
-  info(`"glad" → ${data.count} result(s): ${data.data.map(s => s.name).join(', ')}`);
+  info(`"glad" → ${data.count} result(s): ${data.data.map((s) => s.name).join(', ')}`);
 });
 
 await test('GET /ships/search?search=a → 400 (too short)', async () => {
@@ -882,7 +909,7 @@ await test('GET /components/types → list of types', async () => {
   const { status, data } = await rawGet('/components/types');
   assert(status === 200, `Expected 200, got ${status}`);
   assert(data.data.types.length > 5, `Expected ≥5 types, got ${data.data.types.length}`);
-  info(`${data.data.types.length} component types: ${data.data.types.map(t => t.type).join(', ')}`);
+  info(`${data.data.types.length} component types: ${data.data.types.map((t) => t.type).join(', ')}`);
 });
 
 await test('GET /stats/overview → public stats', async () => {
@@ -912,8 +939,8 @@ await test('Weapons have damage breakdown fields', async () => {
   const { data } = await rawGet('/components?type=WeaponGun&limit=50');
   assert(data.count > 0, 'No weapons');
   // Check that at least some weapons have breakdown data
-  const withBreakdown = data.data.filter(w =>
-    w.weapon_damage_physical !== null || w.weapon_damage_energy !== null || w.weapon_damage_distortion !== null
+  const withBreakdown = data.data.filter(
+    (w) => w.weapon_damage_physical !== null || w.weapon_damage_energy !== null || w.weapon_damage_distortion !== null,
   ).length;
   const pct = Math.round((withBreakdown / data.data.length) * 100);
   info(`${pct}% weapons (${withBreakdown}/${data.data.length}) have damage breakdown`);
@@ -924,9 +951,7 @@ await test('Weapons have damage breakdown fields', async () => {
 await test('Weapons have burst_dps and sustained_dps', async () => {
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/components?type=WeaponGun&limit=50');
-  const withDps = data.data.filter(w =>
-    w.weapon_burst_dps !== null || w.weapon_sustained_dps !== null
-  ).length;
+  const withDps = data.data.filter((w) => w.weapon_burst_dps !== null || w.weapon_sustained_dps !== null).length;
   const pct = Math.round((withDps / data.data.length) * 100);
   info(`${pct}% weapons (${withDps}/${data.data.length}) have burst/sustained DPS`);
   if (withDps === 0) skip('burst/sustained DPS not yet populated');
@@ -936,9 +961,7 @@ await test('Missiles have damage breakdown', async () => {
   if (!hasGameData) skip('no game data');
   const { data } = await rawGet('/components?type=Missile&limit=50');
   if (data.count === 0) skip('no missiles');
-  const withBreakdown = data.data.filter(m =>
-    m.missile_damage_physical !== null || m.missile_damage_energy !== null
-  ).length;
+  const withBreakdown = data.data.filter((m) => m.missile_damage_physical !== null || m.missile_damage_energy !== null).length;
   const pct = Math.round((withBreakdown / data.data.length) * 100);
   info(`${pct}% missiles (${withBreakdown}/${data.data.length}) have damage breakdown`);
   if (withBreakdown === 0) skip('missile damage breakdown not yet populated');

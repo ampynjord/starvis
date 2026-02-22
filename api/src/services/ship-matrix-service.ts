@@ -1,13 +1,13 @@
 /**
  * ShipMatrixService - Synchronizes RSI Ship Matrix API → ship_matrix table
- * 
+ *
  * This service ONLY handles external RSI data. No game data here.
  * All 246 ships are stored as-is from the Ship Matrix API.
  */
-import type { Pool } from "mysql2/promise";
-import { logger } from "../utils/index.js";
+import type { Pool } from 'mysql2/promise';
+import { logger } from '../utils/index.js';
 
-const RSI_SHIP_MATRIX_URL = "https://robertsspaceindustries.com/ship-matrix/index";
+const RSI_SHIP_MATRIX_URL = 'https://robertsspaceindustries.com/ship-matrix/index';
 
 export class ShipMatrixService {
   constructor(private pool: Pool) {}
@@ -17,9 +17,7 @@ export class ShipMatrixService {
    */
   async isSyncNeeded(): Promise<boolean> {
     try {
-      const [rows] = await this.pool.execute<any[]>(
-        "SELECT MAX(synced_at) as last_sync FROM ship_matrix"
-      );
+      const [rows] = await this.pool.execute<any[]>('SELECT MAX(synced_at) as last_sync FROM ship_matrix');
       if (!rows[0]?.last_sync) return true;
       const lastSync = new Date(rows[0].last_sync).getTime();
       const hoursSince = (Date.now() - lastSync) / (1000 * 60 * 60);
@@ -34,18 +32,18 @@ export class ShipMatrixService {
    * Uses INSERT ... ON DUPLICATE KEY UPDATE to be idempotent.
    */
   async sync(): Promise<{ total: number; synced: number; errors: number }> {
-    logger.info("[ShipMatrix] Syncing from RSI Ship Matrix...");
+    logger.info('[ShipMatrix] Syncing from RSI Ship Matrix...');
     const stats = { total: 0, synced: 0, errors: 0 };
 
     const res = await fetch(RSI_SHIP_MATRIX_URL, {
-      headers: { "User-Agent": "StarVis/1.0", Accept: "application/json" },
+      headers: { 'User-Agent': 'StarVis/1.0', Accept: 'application/json' },
       signal: AbortSignal.timeout(30_000),
     });
     if (!res.ok) throw new Error(`RSI API error: ${res.status}`);
 
     const body = (await res.json()) as { success: number; data: any[] };
     if (body.success !== 1 || !Array.isArray(body.data)) {
-      throw new Error("Invalid RSI Ship Matrix response");
+      throw new Error('Invalid RSI Ship Matrix response');
     }
 
     stats.total = body.data.length;
@@ -68,7 +66,7 @@ export class ShipMatrixService {
             const media = ship.media?.[0] || {};
             const images = media.images || {};
 
-            placeholders.push("(" + Array(34).fill("?").join(",") + ")");
+            placeholders.push('(' + Array(34).fill('?').join(',') + ')');
             values.push(
               ship.id,
               ship.name,
@@ -99,11 +97,19 @@ export class ShipMatrixService {
               ship.yaxis_acceleration || null,
               ship.zaxis_acceleration || null,
               media.source_url || null,
-              images.store_small ? (images.store_small.startsWith("http") ? images.store_small : `https://robertsspaceindustries.com${images.store_small}`) : null,
-              images.store_large ? (images.store_large.startsWith("http") ? images.store_large : `https://robertsspaceindustries.com${images.store_large}`) : null,
+              images.store_small
+                ? images.store_small.startsWith('http')
+                  ? images.store_small
+                  : `https://robertsspaceindustries.com${images.store_small}`
+                : null,
+              images.store_large
+                ? images.store_large.startsWith('http')
+                  ? images.store_large
+                  : `https://robertsspaceindustries.com${images.store_large}`
+                : null,
               ship.compiled ? JSON.stringify(ship.compiled) : null,
               ship.time_modified || null,
-              ship["time_modified.unfiltered"] ? new Date(ship["time_modified.unfiltered"]) : null,
+              ship['time_modified.unfiltered'] ? new Date(ship['time_modified.unfiltered']) : null,
             );
             stats.synced++;
           } catch (e: unknown) {
@@ -123,7 +129,7 @@ export class ShipMatrixService {
               xaxis_acceleration, yaxis_acceleration, zaxis_acceleration,
               media_source_url, media_store_small, media_store_large,
               compiled, time_modified, time_modified_unfiltered
-            ) VALUES ${placeholders.join(",")} AS new
+            ) VALUES ${placeholders.join(',')} AS new
             ON DUPLICATE KEY UPDATE
               name=new.name, chassis_id=new.chassis_id,
               manufacturer_id=new.manufacturer_id, manufacturer_code=new.manufacturer_code,
@@ -143,7 +149,7 @@ export class ShipMatrixService {
               compiled=new.compiled, time_modified=new.time_modified,
               time_modified_unfiltered=new.time_modified_unfiltered,
               synced_at=CURRENT_TIMESTAMP`,
-            values
+            values,
           );
         }
       }
@@ -162,27 +168,19 @@ export class ShipMatrixService {
 
   /** Get all ship_matrix entries */
   async getAll(): Promise<any[]> {
-    const [rows] = await this.pool.execute(
-      "SELECT * FROM ship_matrix ORDER BY name"
-    );
+    const [rows] = await this.pool.execute('SELECT * FROM ship_matrix ORDER BY name');
     return rows as any[];
   }
 
   /** Get a single ship_matrix entry by RSI id */
   async getById(id: number): Promise<any | null> {
-    const [rows] = await this.pool.execute<any[]>(
-      "SELECT * FROM ship_matrix WHERE id = ?",
-      [id]
-    );
+    const [rows] = await this.pool.execute<any[]>('SELECT * FROM ship_matrix WHERE id = ?', [id]);
     return rows[0] || null;
   }
 
   /** Get a single ship_matrix entry by name (collation is case-insensitive) */
   async getByName(name: string): Promise<any | null> {
-    const [rows] = await this.pool.execute<any[]>(
-      "SELECT * FROM ship_matrix WHERE name = ?",
-      [name]
-    );
+    const [rows] = await this.pool.execute<any[]>('SELECT * FROM ship_matrix WHERE name = ?', [name]);
     return rows[0] || null;
   }
 
@@ -193,7 +191,7 @@ export class ShipMatrixService {
       `SELECT * FROM ship_matrix 
        WHERE name LIKE ? OR manufacturer_name LIKE ? OR focus LIKE ?
        ORDER BY name`,
-      [pattern, pattern, pattern]
+      [pattern, pattern, pattern],
     );
     return rows as any[];
   }

@@ -1,34 +1,32 @@
 /**
  * ShopService — Shop & inventory queries
  */
-import type { Pool } from "mysql2/promise";
-import type { PaginatedResult, Row } from "./shared.js";
+import type { Pool } from 'mysql2/promise';
+import type { PaginatedResult, Row } from './shared.js';
 
 export class ShopService {
   constructor(private pool: Pool) {}
 
-  async getShops(opts: {
-    page?: number; limit?: number; location?: string; type?: string; search?: string;
-  }): Promise<PaginatedResult> {
+  async getShops(opts: { page?: number; limit?: number; location?: string; type?: string; search?: string }): Promise<PaginatedResult> {
     const where: string[] = [];
     const params: (string | number)[] = [];
 
     if (opts.search) {
-      where.push("(name LIKE ? OR location LIKE ? OR parent_location LIKE ?)");
+      where.push('(name LIKE ? OR location LIKE ? OR parent_location LIKE ?)');
       const t = `%${opts.search}%`;
       params.push(t, t, t);
     }
     if (opts.location) {
-      where.push("(location LIKE ? OR parent_location LIKE ?)");
+      where.push('(location LIKE ? OR parent_location LIKE ?)');
       const t = `%${opts.location}%`;
       params.push(t, t);
     }
     if (opts.type) {
-      where.push("shop_type = ?");
+      where.push('shop_type = ?');
       params.push(opts.type);
     }
 
-    const w = where.length ? ` WHERE ${where.join(" AND ")}` : "";
+    const w = where.length ? ` WHERE ${where.join(' AND ')}` : '';
     const page = Math.max(1, opts.page || 1);
     const limit = Math.min(100, Math.max(1, opts.limit || 20));
     const offset = (page - 1) * limit;

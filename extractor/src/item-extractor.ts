@@ -6,9 +6,9 @@
  *   - items[]      → FPS weapons, armor, clothing, attachments, gadgets, consumables
  *   - commodities[] → Tradeable goods (metals, minerals, gas, food, etc.)
  */
-import type { DataForgeContext } from "./dataforge-utils.js";
-import { MANUFACTURER_CODES, resolveComponentName } from "./dataforge-utils.js";
-import logger from "./logger.js";
+import type { DataForgeContext } from './dataforge-utils.js';
+import { MANUFACTURER_CODES, resolveComponentName } from './dataforge-utils.js';
+import logger from './logger.js';
 
 // ── Type classification helpers ──
 
@@ -129,14 +129,24 @@ function classifyCommodity(filePath: string): string | null {
 
 function shouldSkipItem(className: string): boolean {
   const lc = className.toLowerCase();
-  return lc.includes('_test') || lc.startsWith('test_') ||
-    lc.includes('_debug') || lc.includes('_template') ||
-    lc.includes('_indestructible') || lc.includes('_placeholder') ||
-    lc.startsWith('display_') || lc.includes('_display_') ||
-    lc.includes('_prop_') || lc.endsWith('_prop') ||
-    lc.includes('weapon_rack') || lc.includes('weaponrack') ||
-    lc.includes('shopdisplay') || lc.includes('shop_display') ||
-    lc.includes('ammocrate') || lc.includes('ammo_crate');
+  return (
+    lc.includes('_test') ||
+    lc.startsWith('test_') ||
+    lc.includes('_debug') ||
+    lc.includes('_template') ||
+    lc.includes('_indestructible') ||
+    lc.includes('_placeholder') ||
+    lc.startsWith('display_') ||
+    lc.includes('_display_') ||
+    lc.includes('_prop_') ||
+    lc.endsWith('_prop') ||
+    lc.includes('weapon_rack') ||
+    lc.includes('weaponrack') ||
+    lc.includes('shopdisplay') ||
+    lc.includes('shop_display') ||
+    lc.includes('ammocrate') ||
+    lc.includes('ammo_crate')
+  );
 }
 
 // ── Main extraction function ──
@@ -147,7 +157,7 @@ function shouldSkipItem(className: string): boolean {
 export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; commodities: CommodityRecord[] } {
   const dfData = ctx.getDfData();
   if (!dfData) return { items: [], commodities: [] };
-  const entityClassIdx = dfData.structDefs.findIndex(s => s.name === 'EntityClassDefinition');
+  const entityClassIdx = dfData.structDefs.findIndex((s) => s.name === 'EntityClassDefinition');
   if (entityClassIdx === -1) return { items: [], commodities: [] };
 
   const items: ItemRecord[] = [];
@@ -209,7 +219,9 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
         }
 
         commodities.push(comm);
-      } catch { /* skip */ }
+      } catch {
+        /* skip */
+      }
       continue;
     }
 
@@ -339,22 +351,25 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
                   const total = physical + energy + distortion;
                   if (total > 0) {
                     item.weaponDamage = Math.round(total * 10000) / 10000;
-                    item.weaponDamageType = physical >= energy && physical >= distortion ? 'physical' :
-                      energy >= distortion ? 'energy' : 'distortion';
+                    item.weaponDamageType =
+                      physical >= energy && physical >= distortion ? 'physical' : energy >= distortion ? 'energy' : 'distortion';
                     extData.damagePhysical = Math.round(physical * 10000) / 10000;
                     extData.damageEnergy = Math.round(energy * 10000) / 10000;
                     extData.damageDistortion = Math.round(distortion * 10000) / 10000;
                   }
                 }
               }
-            } catch { /* non-critical */ }
+            } catch {
+              /* non-critical */
+            }
           }
         }
 
         // Armor stats
         if (cType === 'SCItemSuitArmorParams' || cType === 'SArmorParams') {
           if (typeof c.damageMultiplier === 'number') item.armorDamageReduction = Math.round((1 - c.damageMultiplier) * 10000) / 10000;
-          if (typeof c.DamageMultiplier === 'number' && !item.armorDamageReduction) item.armorDamageReduction = Math.round((1 - c.DamageMultiplier) * 10000) / 10000;
+          if (typeof c.DamageMultiplier === 'number' && !item.armorDamageReduction)
+            item.armorDamageReduction = Math.round((1 - c.DamageMultiplier) * 10000) / 10000;
         }
 
         // Temperature resistance
@@ -397,6 +412,9 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
     }
   }
 
-  logger.info(`Extracted ${items.length} items from ${scannedItems} records, ${commodities.length} commodities from ${scannedCommodities} records`, { module: 'dataforge' });
+  logger.info(
+    `Extracted ${items.length} items from ${scannedItems} records, ${commodities.length} commodities from ${scannedCommodities} records`,
+    { module: 'dataforge' },
+  );
   return { items, commodities };
 }

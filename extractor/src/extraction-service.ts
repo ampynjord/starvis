@@ -5,12 +5,12 @@
  * It parses binary game data, extracts ships/components/paints/shops,
  * and writes everything to the remote MySQL database.
  */
-import { createHash } from "crypto";
-import type { Pool, PoolConnection } from "mysql2/promise";
-import { applyHullSeriesCargoFallback, crossReferenceShipMatrix, tagVariantTypes } from "./crossref.js";
-import { DataForgeService, MANUFACTURER_CODES, classifyPort } from "./dataforge-service.js";
-import { LocalizationService } from "./localization-service.js";
-import logger from "./logger.js";
+import { createHash } from 'crypto';
+import type { Pool, PoolConnection } from 'mysql2/promise';
+import { applyHullSeriesCargoFallback, crossReferenceShipMatrix, tagVariantTypes } from './crossref.js';
+import { classifyPort, type DataForgeService, MANUFACTURER_CODES } from './dataforge-service.js';
+import { LocalizationService } from './localization-service.js';
+import logger from './logger.js';
 
 export interface ExtractionStats {
   manufacturers: number;
@@ -61,12 +61,12 @@ export class ExtractionService {
     batchSize = ExtractionService.BATCH_SIZE,
   ): Promise<number> {
     if (!rows.length) return 0;
-    const placeholder = `(${Array(colCount).fill("?").join(",")})`;
+    const placeholder = `(${Array(colCount).fill('?').join(',')})`;
     let affected = 0;
 
     for (let i = 0; i < rows.length; i += batchSize) {
       const batch = rows.slice(i, i + batchSize);
-      const sql = `${insertHead} ${batch.map(() => placeholder).join(",")} AS new ${updateTail}`;
+      const sql = `${insertHead} ${batch.map(() => placeholder).join(',')} AS new ${updateTail}`;
       const params = batch.flat();
       const [result] = await conn.execute<any>(sql, params);
       affected += result.affectedRows ?? batch.length;
@@ -75,7 +75,9 @@ export class ExtractionService {
     return affected;
   }
 
-  get isExtracting(): boolean { return this._extracting; }
+  get isExtracting(): boolean {
+    return this._extracting;
+  }
 
   // ======================================================
   //  FULL EXTRACTION PIPELINE
@@ -83,7 +85,7 @@ export class ExtractionService {
 
   async extractAll(onProgress?: (msg: string) => void): Promise<ExtractionStats> {
     if (this._extracting) {
-      throw new Error("An extraction is already in progress");
+      throw new Error('An extraction is already in progress');
     }
     this._extracting = true;
     try {
@@ -109,7 +111,7 @@ export class ExtractionService {
 
     // 1. Load DataForge if needed
     if (!this.dfService.isDataForgeLoaded()) {
-      onProgress?.("Loading DataForge…");
+      onProgress?.('Loading DataForge…');
       const info = await this.dfService.loadDataForge(onProgress);
       onProgress?.(`DataForge loaded: ${info.vehicleCount} vehicles, v${info.version}`);
     }
@@ -117,7 +119,7 @@ export class ExtractionService {
     // 1a. Load localization from P4K (global.ini)
     const provider = this.dfService.getProvider();
     if (!this.locService.isLoaded && provider) {
-      onProgress?.("Loading localization (global.ini)…");
+      onProgress?.('Loading localization (global.ini)…');
       try {
         const locCount = await this.locService.loadFromP4K(provider, onProgress);
         onProgress?.(`Localization loaded: ${locCount} entries`);
@@ -136,22 +138,18 @@ export class ExtractionService {
     const conn = await this.pool.getConnection();
     try {
       // 1b. Snapshot current data BEFORE cleaning — for changelog comparison
-      onProgress?.("Snapshotting current data for changelog…");
+      onProgress?.('Snapshotting current data for changelog…');
       const [oldShipsRaw] = await conn.execute<any[]>(
-        "SELECT uuid, class_name, name, manufacturer_code, role, career, mass, scm_speed, max_speed, total_hp, shield_hp, cargo_capacity, missile_damage_total, weapon_damage_total, crew_size FROM ships"
+        'SELECT uuid, class_name, name, manufacturer_code, role, career, mass, scm_speed, max_speed, total_hp, shield_hp, cargo_capacity, missile_damage_total, weapon_damage_total, crew_size FROM ships',
       );
       const [oldCompsRaw] = await conn.execute<any[]>(
-        "SELECT uuid, class_name, name, type, sub_type, size, grade, manufacturer_code FROM components"
+        'SELECT uuid, class_name, name, type, sub_type, size, grade, manufacturer_code FROM components',
       );
       const oldShips = new Map(oldShipsRaw.map((s: any) => [s.class_name, s]));
       const oldComps = new Map(oldCompsRaw.map((c: any) => [c.class_name, c]));
 
-      const [oldItemsRaw] = await conn.execute<any[]>(
-        "SELECT uuid, class_name, name, type, sub_type, manufacturer_code FROM items"
-      );
-      const [oldCommoditiesRaw] = await conn.execute<any[]>(
-        "SELECT uuid, class_name, name, type FROM commodities"
-      );
+      const [oldItemsRaw] = await conn.execute<any[]>('SELECT uuid, class_name, name, type, sub_type, manufacturer_code FROM items');
+      const [oldCommoditiesRaw] = await conn.execute<any[]>('SELECT uuid, class_name, name, type FROM commodities');
       const oldItems = new Map(oldItemsRaw.map((i: any) => [i.class_name, i]));
       const oldCommodities = new Map(oldCommoditiesRaw.map((c: any) => [c.class_name, c]));
 
@@ -160,47 +158,47 @@ export class ExtractionService {
       await conn.beginTransaction();
 
       // 1c. Clean stale data before fresh extraction (order matters for FK constraints)
-      onProgress?.("Cleaning stale data…");
-      await conn.execute("DELETE FROM shop_inventory");
-      await conn.execute("DELETE FROM shops");
-      await conn.execute("DELETE FROM ship_modules");
-      await conn.execute("DELETE FROM ships_loadouts");
-      await conn.execute("DELETE FROM ship_paints WHERE 1=1");
-      await conn.execute("DELETE FROM ships");
-      await conn.execute("DELETE FROM components");
-      await conn.execute("DELETE FROM items");
-      await conn.execute("DELETE FROM commodities");
+      onProgress?.('Cleaning stale data…');
+      await conn.execute('DELETE FROM shop_inventory');
+      await conn.execute('DELETE FROM shops');
+      await conn.execute('DELETE FROM ship_modules');
+      await conn.execute('DELETE FROM ships_loadouts');
+      await conn.execute('DELETE FROM ship_paints WHERE 1=1');
+      await conn.execute('DELETE FROM ships');
+      await conn.execute('DELETE FROM components');
+      await conn.execute('DELETE FROM items');
+      await conn.execute('DELETE FROM commodities');
 
       // 2. Collect & save manufacturers FIRST (before ships, due to FK constraint)
-      onProgress?.("Saving manufacturers…");
+      onProgress?.('Saving manufacturers…');
       stats.manufacturers = await this.saveManufacturersFromData(conn);
 
       // 3. Extract & save components
-      onProgress?.("Extracting components…");
+      onProgress?.('Extracting components…');
       stats.components = await this.saveComponents(conn, onProgress);
 
       // 3b. Extract & save items (FPS weapons, armor, clothing, gadgets)
-      onProgress?.("Extracting items (FPS, armor, clothing)…");
+      onProgress?.('Extracting items (FPS, armor, clothing)…');
       const itemResult = await this.saveItems(conn, onProgress);
       stats.items = itemResult.items;
       stats.commodities = itemResult.commodities;
 
       // 4. Extract & save ships + loadouts
-      onProgress?.("Extracting ships…");
+      onProgress?.('Extracting ships…');
       const shipResult = await this.saveShips(conn, onProgress);
       stats.ships = shipResult.ships;
       stats.loadoutPorts = shipResult.loadoutPorts;
 
       // 5. Extract & save shops/vendors
-      onProgress?.("Extracting shops & prices…");
+      onProgress?.('Extracting shops & prices…');
       await this.saveShopsData(conn, onProgress);
 
       // 5b. Extract & save paints/liveries
-      onProgress?.("Extracting paints…");
+      onProgress?.('Extracting paints…');
       await this.savePaints(conn, onProgress);
 
       // 6. Cross-reference with ship_matrix
-      onProgress?.("Cross-referencing with Ship Matrix…");
+      onProgress?.('Cross-referencing with Ship Matrix…');
       stats.shipMatrixLinked = await crossReferenceShipMatrix(conn);
 
       // 6a. Tag variant types for non-SM ships
@@ -216,22 +214,38 @@ export class ExtractionService {
         const [logResult]: any = await conn.execute(
           `INSERT INTO extraction_log (extraction_hash, game_version, ships_count, components_count, items_count, commodities_count, manufacturers_count, loadout_ports_count, shops_count, duration_ms, status)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [extractionHash, this.dfService.getVersion?.() || null, stats.ships, stats.components, stats.items, stats.commodities, stats.manufacturers, stats.loadoutPorts, stats.shops, stats.durationMs, 'success']
+          [
+            extractionHash,
+            this.dfService.getVersion?.() || null,
+            stats.ships,
+            stats.components,
+            stats.items,
+            stats.commodities,
+            stats.manufacturers,
+            stats.loadoutPorts,
+            stats.shops,
+            stats.durationMs,
+            'success',
+          ],
         );
         extractionId = logResult.insertId;
-      } catch { /* extraction_log is non-critical */ }
+      } catch {
+        /* extraction_log is non-critical */
+      }
 
       // 7. Generate changelog by comparing old snapshot with new data
       if (extractionId) {
         try {
-          onProgress?.("Generating changelog…");
+          onProgress?.('Generating changelog…');
           await this.generateChangelog(conn, extractionId, oldShips, oldComps, oldItems, oldCommodities);
         } catch (e) {
-          logger.warn("Changelog generation failed", { error: String(e) });
+          logger.warn('Changelog generation failed', { error: String(e) });
         }
       }
 
-      onProgress?.(`✅ Extraction complete: ${stats.ships} ships, ${stats.components} components, ${stats.items} items, ${stats.commodities} commodities, ${stats.manufacturers} manufacturers, ${stats.loadoutPorts} loadout ports, ${stats.shops} shops, ${stats.shipMatrixLinked} linked to Ship Matrix`);
+      onProgress?.(
+        `✅ Extraction complete: ${stats.ships} ships, ${stats.components} components, ${stats.items} items, ${stats.commodities} commodities, ${stats.manufacturers} manufacturers, ${stats.loadoutPorts} loadout ports, ${stats.shops} shops, ${stats.shipMatrixLinked} linked to Ship Matrix`,
+      );
 
       // ── Sanity check — abort if data dropped by >50% ──
       const oldCounts = { ships: oldShipsRaw.length, components: oldCompsRaw.length };
@@ -252,11 +266,15 @@ export class ExtractionService {
 
       // Commit the transaction — all data is now atomically visible
       await conn.commit();
-      onProgress?.("Transaction committed successfully");
+      onProgress?.('Transaction committed successfully');
     } catch (e) {
       // Rollback on any error — old data remains intact
-      try { await conn.rollback(); } catch { /* rollback best-effort */ }
-      onProgress?.("❌ Extraction failed — transaction rolled back, old data preserved");
+      try {
+        await conn.rollback();
+      } catch {
+        /* rollback best-effort */
+      }
+      onProgress?.('❌ Extraction failed — transaction rolled back, old data preserved');
       throw e;
     } finally {
       conn.release();
@@ -364,50 +382,97 @@ export class ExtractionService {
 
     /** Map a component object to a flat array of values */
     const toRow = (c: any): (string | number | null)[] => [
-      c.uuid, c.className, c.name, c.type,
-      c.subType || null, c.size ?? null, c.grade || null, c.manufacturerCode || null,
-      c.mass ?? null, c.hp ?? null,
-      c.powerDraw ?? null, c.powerBase ?? null, c.powerOutput ?? null,
-      c.heatGeneration ?? null, c.coolingRate ?? null,
-      c.emSignature ?? null, c.irSignature ?? null,
-      c.weaponDamage ?? null, c.weaponDamageType || null,
-      c.weaponFireRate ?? null, c.weaponRange ?? null, c.weaponSpeed ?? null,
-      c.weaponAmmoCount ?? null, c.weaponPelletsPerShot ?? 1, c.weaponBurstSize ?? null,
-      c.weaponAlphaDamage ?? null, c.weaponDps ?? null,
-      c.weaponDamagePhysical ?? null, c.weaponDamageEnergy ?? null, c.weaponDamageDistortion ?? null,
-      c.weaponDamageThermal ?? null, c.weaponDamageBiochemical ?? null, c.weaponDamageStun ?? null,
-      c.weaponHeatPerShot ?? null, c.weaponBurstDps ?? null, c.weaponSustainedDps ?? null,
-      c.shieldHp ?? null, c.shieldRegen ?? null,
-      c.shieldRegenDelay ?? null, c.shieldHardening ?? null, c.shieldFaces ?? null,
-      c.qdSpeed ?? null, c.qdSpoolTime ?? null,
-      c.qdCooldown ?? null, c.qdFuelRate ?? null, c.qdRange ?? null,
-      c.qdStage1Accel ?? null, c.qdStage2Accel ?? null,
-      c.qdTuningRate ?? null, c.qdAlignmentRate ?? null, c.qdDisconnectRange ?? null,
-      c.missileDamage ?? null, c.missileSignalType || null,
-      c.missileLockTime ?? null, c.missileSpeed ?? null,
-      c.missileRange ?? null, c.missileLockRange ?? null,
-      c.missileDamagePhysical ?? null, c.missileDamageEnergy ?? null, c.missileDamageDistortion ?? null,
-      c.thrusterMaxThrust ?? null, c.thrusterType || null,
-      c.radarRange ?? null, c.radarDetectionLifetime ?? null, c.radarTrackingSignal ?? null,
+      c.uuid,
+      c.className,
+      c.name,
+      c.type,
+      c.subType || null,
+      c.size ?? null,
+      c.grade || null,
+      c.manufacturerCode || null,
+      c.mass ?? null,
+      c.hp ?? null,
+      c.powerDraw ?? null,
+      c.powerBase ?? null,
+      c.powerOutput ?? null,
+      c.heatGeneration ?? null,
+      c.coolingRate ?? null,
+      c.emSignature ?? null,
+      c.irSignature ?? null,
+      c.weaponDamage ?? null,
+      c.weaponDamageType || null,
+      c.weaponFireRate ?? null,
+      c.weaponRange ?? null,
+      c.weaponSpeed ?? null,
+      c.weaponAmmoCount ?? null,
+      c.weaponPelletsPerShot ?? 1,
+      c.weaponBurstSize ?? null,
+      c.weaponAlphaDamage ?? null,
+      c.weaponDps ?? null,
+      c.weaponDamagePhysical ?? null,
+      c.weaponDamageEnergy ?? null,
+      c.weaponDamageDistortion ?? null,
+      c.weaponDamageThermal ?? null,
+      c.weaponDamageBiochemical ?? null,
+      c.weaponDamageStun ?? null,
+      c.weaponHeatPerShot ?? null,
+      c.weaponBurstDps ?? null,
+      c.weaponSustainedDps ?? null,
+      c.shieldHp ?? null,
+      c.shieldRegen ?? null,
+      c.shieldRegenDelay ?? null,
+      c.shieldHardening ?? null,
+      c.shieldFaces ?? null,
+      c.qdSpeed ?? null,
+      c.qdSpoolTime ?? null,
+      c.qdCooldown ?? null,
+      c.qdFuelRate ?? null,
+      c.qdRange ?? null,
+      c.qdStage1Accel ?? null,
+      c.qdStage2Accel ?? null,
+      c.qdTuningRate ?? null,
+      c.qdAlignmentRate ?? null,
+      c.qdDisconnectRange ?? null,
+      c.missileDamage ?? null,
+      c.missileSignalType || null,
+      c.missileLockTime ?? null,
+      c.missileSpeed ?? null,
+      c.missileRange ?? null,
+      c.missileLockRange ?? null,
+      c.missileDamagePhysical ?? null,
+      c.missileDamageEnergy ?? null,
+      c.missileDamageDistortion ?? null,
+      c.thrusterMaxThrust ?? null,
+      c.thrusterType || null,
+      c.radarRange ?? null,
+      c.radarDetectionLifetime ?? null,
+      c.radarTrackingSignal ?? null,
       c.cmAmmoCount ?? null,
-      c.fuelCapacity ?? null, c.fuelIntakeRate ?? null,
-      c.empDamage ?? null, c.empRadius ?? null, c.empChargeTime ?? null, c.empCooldown ?? null,
-      c.qigJammerRange ?? null, c.qigSnareRadius ?? null, c.qigChargeTime ?? null, c.qigCooldown ?? null,
-      c.miningSpeed ?? null, c.miningRange ?? null, c.miningResistance ?? null, c.miningInstability ?? null,
-      c.tractorMaxForce ?? null, c.tractorMaxRange ?? null,
-      c.salvageSpeed ?? null, c.salvageRadius ?? null,
+      c.fuelCapacity ?? null,
+      c.fuelIntakeRate ?? null,
+      c.empDamage ?? null,
+      c.empRadius ?? null,
+      c.empChargeTime ?? null,
+      c.empCooldown ?? null,
+      c.qigJammerRange ?? null,
+      c.qigSnareRadius ?? null,
+      c.qigChargeTime ?? null,
+      c.qigCooldown ?? null,
+      c.miningSpeed ?? null,
+      c.miningRange ?? null,
+      c.miningResistance ?? null,
+      c.miningInstability ?? null,
+      c.tractorMaxForce ?? null,
+      c.tractorMaxRange ?? null,
+      c.salvageSpeed ?? null,
+      c.salvageRadius ?? null,
       c.gimbalType || null,
-      c.rackCount ?? null, c.rackMissileSize ?? null,
+      c.rackCount ?? null,
+      c.rackMissileSize ?? null,
     ];
 
     const rows = components.map(toRow);
-    const saved = await ExtractionService.batchUpsert(
-      conn,
-      `INSERT INTO components (${COMP_COLS}) VALUES`,
-      COMP_UPDATE,
-      COL_COUNT,
-      rows,
-    );
+    const saved = await ExtractionService.batchUpsert(conn, `INSERT INTO components (${COMP_COLS}) VALUES`, COMP_UPDATE, COL_COUNT, rows);
 
     onProgress?.(`Components: ${saved}/${components.length} (batch INSERT)`);
     return components.length; // all attempted
@@ -417,17 +482,14 @@ export class ExtractionService {
   //  SHIPS → ships + ships_loadouts tables
   // ======================================================
 
-  private async saveShips(
-    conn: PoolConnection,
-    onProgress?: (msg: string) => void,
-  ): Promise<{ ships: number; loadoutPorts: number }> {
+  private async saveShips(conn: PoolConnection, onProgress?: (msg: string) => void): Promise<{ ships: number; loadoutPorts: number }> {
     const vehicles = this.dfService.getVehicleDefinitions();
     let savedShips = 0;
     let totalPorts = 0;
     let skippedNonPlayable = 0;
 
     // Pre-load all component class_name → uuid mappings to avoid N+1 queries in saveLoadout
-    const [compRows] = await conn.execute<any[]>("SELECT class_name, uuid FROM components");
+    const [compRows] = await conn.execute<any[]>('SELECT class_name, uuid FROM components');
     const componentUuidCache = new Map<string, string>();
     for (const row of compRows) componentUuidCache.set(row.class_name, row.uuid);
     onProgress?.(`Component UUID cache loaded: ${componentUuidCache.size} entries`);
@@ -439,12 +501,21 @@ export class ExtractionService {
 
         // === FILTER: only keep playable/flyable ships ===
         const lcName = veh.className.toLowerCase();
-        if (lcName.startsWith('ambx_') || lcName.includes('_test') || lcName.includes('_debug') ||
-            lcName.includes('_template') || lcName.includes('_indestructible') ||
-            lcName.includes('_unmanned') || lcName.includes('_npc_only') ||
-            lcName.includes('_prison') || lcName.includes('_hijacked') ||
-            lcName.includes('_drug') || lcName.includes('_ai_only') ||
-            lcName.includes('_derelict') || lcName.includes('_wreck')) {
+        if (
+          lcName.startsWith('ambx_') ||
+          lcName.includes('_test') ||
+          lcName.includes('_debug') ||
+          lcName.includes('_template') ||
+          lcName.includes('_indestructible') ||
+          lcName.includes('_unmanned') ||
+          lcName.includes('_npc_only') ||
+          lcName.includes('_prison') ||
+          lcName.includes('_hijacked') ||
+          lcName.includes('_drug') ||
+          lcName.includes('_ai_only') ||
+          lcName.includes('_derelict') ||
+          lcName.includes('_wreck')
+        ) {
           skippedNonPlayable++;
           continue;
         }
@@ -467,7 +538,8 @@ export class ExtractionService {
 
         // Classify vehicle category
         let vehicleCategory = 'ship';
-        const GROUND_PATTERNS = /(?:^|\b|_)(cyclone|ursa|rover|spartan|ballista|tonk|nova|centurion|storm|lynx|roc|mule|ptv|greycat|buggy|tumbril|cart)(?:_|\b|$)/i;
+        const GROUND_PATTERNS =
+          /(?:^|\b|_)(cyclone|ursa|rover|spartan|ballista|tonk|nova|centurion|storm|lynx|roc|mule|ptv|greycat|buggy|tumbril|cart)(?:_|\b|$)/i;
         const GRAVLEV_PATTERNS = /(?:^|\b|_)(dragonfly|nox|x1|ranger|hex|pulse|hoverquad)(?:_|\b|$)/i;
         if (GROUND_PATTERNS.test(veh.className)) vehicleCategory = 'ground';
         else if (GRAVLEV_PATTERNS.test(veh.className)) vehicleCategory = 'gravlev';
@@ -478,10 +550,10 @@ export class ExtractionService {
 
         // Override Esperia-manufactured Vanduul replicas
         const ESPERIA_OVERRIDES: Record<string, string> = {
-          'VNCL_Glaive': 'ESPR',
-          'VNCL_Blade': 'ESPR',
-          'VNCL_Blade_Swarm': 'ESPR',
-          'VNCL_Stinger': 'ESPR',
+          VNCL_Glaive: 'ESPR',
+          VNCL_Blade: 'ESPR',
+          VNCL_Blade_Swarm: 'ESPR',
+          VNCL_Stinger: 'ESPR',
         };
         if (ESPERIA_OVERRIDES[veh.className]) {
           mfgCode = ESPERIA_OVERRIDES[veh.className];
@@ -544,16 +616,29 @@ export class ExtractionService {
             game_data=new.game_data,
             extracted_at=CURRENT_TIMESTAMP`,
           [
-            fullData.ref, veh.className, shipDisplayName, mfgCode,
-            fullData.vehicle?.role || null, fullData.vehicle?.career || null,
-            fullData.vehicle?.dogfightEnabled ?? true, fullData.vehicle?.crewSize || 1,
+            fullData.ref,
+            veh.className,
+            shipDisplayName,
+            mfgCode,
+            fullData.vehicle?.role || null,
+            fullData.vehicle?.career || null,
+            fullData.vehicle?.dogfightEnabled ?? true,
+            fullData.vehicle?.crewSize || 1,
             fullData.vehicle?.vehicleDefinition || veh.className,
-            fullData.vehicle?.size?.x || null, fullData.vehicle?.size?.y || null, fullData.vehicle?.size?.z || null,
-            fullData.hull?.mass || null, fullData.ifcs?.scmSpeed || null, fullData.ifcs?.maxSpeed || null,
-            fullData.ifcs?.boostSpeedForward || null, fullData.ifcs?.boostSpeedBackward || null,
-            fullData.ifcs?.angularVelocity?.x || null, fullData.ifcs?.angularVelocity?.z || null, fullData.ifcs?.angularVelocity?.y || null,
+            fullData.vehicle?.size?.x || null,
+            fullData.vehicle?.size?.y || null,
+            fullData.vehicle?.size?.z || null,
+            fullData.hull?.mass || null,
+            fullData.ifcs?.scmSpeed || null,
+            fullData.ifcs?.maxSpeed || null,
+            fullData.ifcs?.boostSpeedForward || null,
+            fullData.ifcs?.boostSpeedBackward || null,
+            fullData.ifcs?.angularVelocity?.x || null,
+            fullData.ifcs?.angularVelocity?.z || null,
+            fullData.ifcs?.angularVelocity?.y || null,
             fullData.hull?.totalHp || null,
-            fullData.fuelCapacity || null, fullData.qtFuelCapacity || null,
+            fullData.fuelCapacity || null,
+            fullData.qtFuelCapacity || null,
             fullData.shield?.maxShieldHealth || fullData.shield?.maxHp || null,
             fullData.armor?.data?.armor?.damageMultiplier?.damagePhysical ?? null,
             fullData.armor?.data?.armor?.damageMultiplier?.damageEnergy ?? null,
@@ -564,10 +649,15 @@ export class ExtractionService {
             fullData.armor?.data?.armor?.signalIR ?? null,
             fullData.armor?.data?.armor?.signalEM ?? null,
             fullData.armor?.data?.armor?.signalCS ?? null,
-            fullData.crossSection?.x || null, fullData.crossSection?.y || null, fullData.crossSection?.z || null,
-            fullData.shortName || null, fullData.description || null,
-            fullData.grade || null, fullData.cargo ?? null,
-            fullData.insurance?.baseWaitTimeMinutes || null, fullData.insurance?.baseExpeditingFee || null,
+            fullData.crossSection?.x || null,
+            fullData.crossSection?.y || null,
+            fullData.crossSection?.z || null,
+            fullData.shortName || null,
+            fullData.description || null,
+            fullData.grade || null,
+            fullData.cargo ?? null,
+            fullData.insurance?.baseWaitTimeMinutes || null,
+            fullData.insurance?.baseExpeditingFee || null,
             vehicleCategory,
             JSON.stringify(fullData),
           ],
@@ -577,7 +667,7 @@ export class ExtractionService {
         // Extract & save loadout
         const loadout = this.dfService.extractVehicleLoadout(veh.className);
         if (loadout && loadout.length > 0) {
-          await conn.execute("DELETE FROM ships_loadouts WHERE ship_uuid = ?", [fullData.ref]);
+          await conn.execute('DELETE FROM ships_loadouts WHERE ship_uuid = ?', [fullData.ref]);
           totalPorts += await this.saveLoadout(conn, fullData.ref, loadout, componentUuidCache);
           await this.computeAndStoreMissileDamage(conn, fullData.ref);
           await this.computeAndStoreWeaponDamage(conn, fullData.ref);
@@ -614,28 +704,35 @@ export class ExtractionService {
 
     for (const port of loadout) {
       try {
-        const compUuid = port.componentClassName
-          ? (componentUuidCache.get(port.componentClassName) || null)
-          : null;
+        const compUuid = port.componentClassName ? componentUuidCache.get(port.componentClassName) || null : null;
 
         const [result] = await conn.execute<any>(
           `INSERT INTO ships_loadouts
             (ship_uuid, port_name, port_type, component_class_name, component_uuid, port_min_size, port_max_size)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [shipUuid, port.portName, port.portType || null, port.componentClassName || null, compUuid, port.minSize ?? null, port.maxSize ?? null],
+          [
+            shipUuid,
+            port.portName,
+            port.portType || null,
+            port.componentClassName || null,
+            compUuid,
+            port.minSize ?? null,
+            port.maxSize ?? null,
+          ],
         );
         const parentId = result.insertId;
         count++;
 
         if (port.children && port.children.length > 0) {
           for (const child of port.children) {
-            const childCompUuid = child.componentClassName
-              ? (componentUuidCache.get(child.componentClassName) || null)
-              : null;
+            const childCompUuid = child.componentClassName ? componentUuidCache.get(child.componentClassName) || null : null;
             childRows.push([
-              shipUuid, child.portName,
-              classifyPort(child.portName, child.componentClassName || ""),
-              child.componentClassName || null, childCompUuid, parentId,
+              shipUuid,
+              child.portName,
+              classifyPort(child.portName, child.componentClassName || ''),
+              child.componentClassName || null,
+              childCompUuid,
+              parentId,
             ]);
           }
         }
@@ -668,8 +765,10 @@ export class ExtractionService {
         [shipUuid],
       );
       const total = parseFloat(rows[0]?.total) || 0;
-      await conn.execute("UPDATE ships SET missile_damage_total = ? WHERE uuid = ?", [total > 0 ? total : null, shipUuid]);
-    } catch { /* Non-critical */ }
+      await conn.execute('UPDATE ships SET missile_damage_total = ? WHERE uuid = ?', [total > 0 ? total : null, shipUuid]);
+    } catch {
+      /* Non-critical */
+    }
   }
 
   private async computeAndStoreWeaponDamage(conn: PoolConnection, shipUuid: string): Promise<void> {
@@ -681,8 +780,10 @@ export class ExtractionService {
         [shipUuid],
       );
       const totalDps = parseFloat(rows[0]?.total_dps) || 0;
-      await conn.execute("UPDATE ships SET weapon_damage_total = ? WHERE uuid = ?", [totalDps > 0 ? totalDps : null, shipUuid]);
-    } catch { /* Non-critical */ }
+      await conn.execute('UPDATE ships SET weapon_damage_total = ? WHERE uuid = ?', [totalDps > 0 ? totalDps : null, shipUuid]);
+    } catch {
+      /* Non-critical */
+    }
   }
 
   private async detectAndSaveModules(conn: PoolConnection, fullData: any, shipClassName: string): Promise<void> {
@@ -691,9 +792,14 @@ export class ExtractionService {
     const MODULE_PATTERNS = [/module/i, /modular/i, /compartment/i, /bay_section/i];
     // Noise slot patterns — these contain "module" but are not real swappable modules
     const NOISE_SLOT_PATTERNS = [
-      /cargogrid_module/i, /pdc_aimodule/i, /module_dashboard/i,
-      /module_seat/i, /thruster_module/i, /power_plant_commandmodule/i,
-      /cargo_module/i, /modular_bed/i,
+      /cargogrid_module/i,
+      /pdc_aimodule/i,
+      /module_dashboard/i,
+      /module_seat/i,
+      /thruster_module/i,
+      /power_plant_commandmodule/i,
+      /cargo_module/i,
+      /modular_bed/i,
     ];
     const loadout = this.dfService.extractVehicleLoadout(shipClassName);
     if (!loadout) return;
@@ -702,25 +808,25 @@ export class ExtractionService {
     const shipShort = shipClassName.replace(/^[A-Z]{2,5}_/, '').replace(/_/g, ' ');
 
     for (const port of loadout) {
-      const isModulePort = MODULE_PATTERNS.some(rx => rx.test(port.portName));
+      const isModulePort = MODULE_PATTERNS.some((rx) => rx.test(port.portName));
       if (!isModulePort || !port.componentClassName) continue;
       // Skip noise modules (cargo grids, AI modules, dashboards, seats, nacelles, etc.)
-      const isNoise = NOISE_SLOT_PATTERNS.some(rx => rx.test(port.portName));
+      const isNoise = NOISE_SLOT_PATTERNS.some((rx) => rx.test(port.portName));
       if (isNoise) continue;
 
       const slotDisplay = port.portName
         .replace(/hardpoint_/i, '')
         .replace(/_/g, ' ')
-        .replace(/\b\w/g, c => c.toUpperCase())
+        .replace(/\b\w/g, (c) => c.toUpperCase())
         .trim();
 
       let moduleName = port.componentClassName
         .replace(/^[A-Z]{2,5}_/, '')
         .replace(/_/g, ' ')
-        .replace(/\b\w/g, c => c.toUpperCase())
+        .replace(/\b\w/g, (c) => c.toUpperCase())
         .trim();
       // Remove ship name prefix from module name for cleaner display
-      const shipShortTitle = shipShort.replace(/\b\w/g, c => c.toUpperCase());
+      const shipShortTitle = shipShort.replace(/\b\w/g, (c) => c.toUpperCase());
       if (moduleName.startsWith(shipShortTitle)) {
         moduleName = moduleName.slice(shipShortTitle.length).trim();
       }
@@ -740,12 +846,11 @@ export class ExtractionService {
 
   private async resolveComponentUuid(conn: PoolConnection, className: string): Promise<string | null> {
     try {
-      const [rows] = await conn.execute<any[]>(
-        "SELECT uuid FROM components WHERE class_name = ? LIMIT 1",
-        [className],
-      );
+      const [rows] = await conn.execute<any[]>('SELECT uuid FROM components WHERE class_name = ? LIMIT 1', [className]);
       return rows[0]?.uuid || null;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
 
   // ======================================================
@@ -755,9 +860,12 @@ export class ExtractionService {
 
   private async savePaints(conn: PoolConnection, onProgress?: (msg: string) => void): Promise<void> {
     const paints = this.dfService.extractPaints();
-    if (!paints.length) { onProgress?.("No paints found"); return; }
+    if (!paints.length) {
+      onProgress?.('No paints found');
+      return;
+    }
 
-    const [shipRows] = await conn.execute<any[]>("SELECT uuid, name, class_name FROM ships");
+    const [shipRows] = await conn.execute<any[]>('SELECT uuid, name, class_name FROM ships');
     const nameMap = new Map<string, string>();
     const classMap = new Map<string, string>();
     // Also build a reverse index: ships whose name CONTAINS a keyword
@@ -781,7 +889,7 @@ export class ExtractionService {
     let saved = 0;
     let debugSamples = 0;
     const paintRows: (string | number | null)[][] = [];
-    await conn.execute("DELETE FROM ship_paints");
+    await conn.execute('DELETE FROM ship_paints');
 
     for (const paint of paints) {
       const shortName = paint.shipShortName.toLowerCase().replace(/_/g, ' ');
@@ -883,10 +991,10 @@ export class ExtractionService {
     for (const code of codes) {
       const name = MANUFACTURER_CODES[code] || code;
       try {
-        await conn.execute(
-          `INSERT INTO manufacturers (code, name) VALUES (?, ?) AS new ON DUPLICATE KEY UPDATE name=new.name`,
-          [code, name],
-        );
+        await conn.execute(`INSERT INTO manufacturers (code, name) VALUES (?, ?) AS new ON DUPLICATE KEY UPDATE name=new.name`, [
+          code,
+          name,
+        ]);
         saved++;
       } catch (e: unknown) {
         logger.error(`Manufacturer ${code}: ${e instanceof Error ? e.message : String(e)}`);
@@ -899,10 +1007,7 @@ export class ExtractionService {
   //  ITEMS + COMMODITIES → items + commodities tables
   // ======================================================
 
-  private async saveItems(
-    conn: PoolConnection,
-    onProgress?: (msg: string) => void,
-  ): Promise<{ items: number; commodities: number }> {
+  private async saveItems(conn: PoolConnection, onProgress?: (msg: string) => void): Promise<{ items: number; commodities: number }> {
     const { items, commodities } = this.dfService.extractItems();
     let savedItems = 0;
     let savedCommodities = 0;
@@ -910,15 +1015,30 @@ export class ExtractionService {
     // ── Batch upsert items ──
     if (items.length > 0) {
       const ITEM_COLS = [
-        'uuid','class_name','name','type','sub_type','size','grade',
-        'manufacturer_code','mass','hp',
-        'weapon_damage','weapon_damage_type','weapon_fire_rate','weapon_range',
-        'weapon_speed','weapon_ammo_count','weapon_dps',
-        'armor_damage_reduction','armor_temp_min','armor_temp_max',
+        'uuid',
+        'class_name',
+        'name',
+        'type',
+        'sub_type',
+        'size',
+        'grade',
+        'manufacturer_code',
+        'mass',
+        'hp',
+        'weapon_damage',
+        'weapon_damage_type',
+        'weapon_fire_rate',
+        'weapon_range',
+        'weapon_speed',
+        'weapon_ammo_count',
+        'weapon_dps',
+        'armor_damage_reduction',
+        'armor_temp_min',
+        'armor_temp_max',
         'data_json',
       ];
-      const ITEM_UPDATE = ITEM_COLS.filter(c => c !== 'uuid')
-        .map(c => `${c}=new.${c}`)
+      const ITEM_UPDATE = ITEM_COLS.filter((c) => c !== 'uuid')
+        .map((c) => `${c}=new.${c}`)
         .join(', ');
       const ITEM_PH = ITEM_COLS.map(() => '?').join(', ');
 
@@ -930,12 +1050,26 @@ export class ExtractionService {
 
         for (const it of batch) {
           values.push(
-            it.uuid, it.className, it.name, it.type, it.subType,
-            it.size, it.grade, it.manufacturerCode,
-            it.mass, it.hp,
-            it.weaponDamage, it.weaponDamageType, it.weaponFireRate,
-            it.weaponRange, it.weaponSpeed, it.weaponAmmoCount, it.weaponDps,
-            it.armorDamageReduction, it.armorTempMin, it.armorTempMax,
+            it.uuid,
+            it.className,
+            it.name,
+            it.type,
+            it.subType,
+            it.size,
+            it.grade,
+            it.manufacturerCode,
+            it.mass,
+            it.hp,
+            it.weaponDamage,
+            it.weaponDamageType,
+            it.weaponFireRate,
+            it.weaponRange,
+            it.weaponSpeed,
+            it.weaponAmmoCount,
+            it.weaponDps,
+            it.armorDamageReduction,
+            it.armorTempMin,
+            it.armorTempMax,
             it.dataJson ? JSON.stringify(it.dataJson) : null,
           );
         }
@@ -951,11 +1085,9 @@ export class ExtractionService {
 
     // ── Batch upsert commodities ──
     if (commodities.length > 0) {
-      const COMM_COLS = [
-        'uuid','class_name','name','type','sub_type','symbol','occupancy_scu','data_json',
-      ];
-      const COMM_UPDATE = COMM_COLS.filter(c => c !== 'uuid')
-        .map(c => `${c}=new.${c}`)
+      const COMM_COLS = ['uuid', 'class_name', 'name', 'type', 'sub_type', 'symbol', 'occupancy_scu', 'data_json'];
+      const COMM_UPDATE = COMM_COLS.filter((c) => c !== 'uuid')
+        .map((c) => `${c}=new.${c}`)
         .join(', ');
       const COMM_PH = COMM_COLS.map(() => '?').join(', ');
 
@@ -967,8 +1099,13 @@ export class ExtractionService {
 
         for (const cm of batch) {
           values.push(
-            cm.uuid, cm.className, cm.name, cm.type, cm.subType,
-            cm.symbol, cm.occupancyScu,
+            cm.uuid,
+            cm.className,
+            cm.name,
+            cm.type,
+            cm.subType,
+            cm.symbol,
+            cm.occupancyScu,
             cm.dataJson ? JSON.stringify(cm.dataJson) : null,
           );
         }
@@ -998,7 +1135,16 @@ export class ExtractionService {
     // Batch insert shops
     const shopRows: any[][] = [];
     for (const shop of shops) {
-      shopRows.push([shop.name, shop.location || null, shop.parentLocation || null, shop.system || null, shop.planetMoon || null, shop.city || null, shop.shopType || null, shop.className]);
+      shopRows.push([
+        shop.name,
+        shop.location || null,
+        shop.parentLocation || null,
+        shop.system || null,
+        shop.planetMoon || null,
+        shop.city || null,
+        shop.shopType || null,
+        shop.className,
+      ]);
     }
     if (shopRows.length > 0) {
       savedShops = await ExtractionService.batchUpsert(
@@ -1016,10 +1162,10 @@ export class ExtractionService {
     }
 
     // Pre-cache shop class_name → id and component class_name → uuid
-    const [shopIdRows]: any = await conn.execute("SELECT id, class_name FROM shops");
+    const [shopIdRows]: any = await conn.execute('SELECT id, class_name FROM shops');
     const shopIdCache = new Map<string, number>(shopIdRows.map((r: any) => [r.class_name, r.id]));
 
-    const [compUuidRows]: any = await conn.execute("SELECT uuid, class_name FROM components");
+    const [compUuidRows]: any = await conn.execute('SELECT uuid, class_name FROM components');
     const compUuidCache = new Map<string, string>(compUuidRows.map((r: any) => [r.class_name, r.uuid]));
 
     // Batch insert inventory
@@ -1028,9 +1174,16 @@ export class ExtractionService {
       const shopId = shopIdCache.get(inv.shopClassName);
       if (!shopId) continue;
       const compUuid = compUuidCache.get(inv.componentClassName) || null;
-      invRows.push([shopId, compUuid, inv.componentClassName, inv.basePrice ?? null,
-        inv.rentalPrice1d ?? null, inv.rentalPrice3d ?? null,
-        inv.rentalPrice7d ?? null, inv.rentalPrice30d ?? null]);
+      invRows.push([
+        shopId,
+        compUuid,
+        inv.componentClassName,
+        inv.basePrice ?? null,
+        inv.rentalPrice1d ?? null,
+        inv.rentalPrice3d ?? null,
+        inv.rentalPrice7d ?? null,
+        inv.rentalPrice30d ?? null,
+      ]);
     }
     if (invRows.length > 0) {
       savedInventory = await ExtractionService.batchUpsert(
@@ -1063,10 +1216,10 @@ export class ExtractionService {
     oldCommodities: Map<string, any>,
   ): Promise<void> {
     const [newShipsRaw] = await conn.execute<any[]>(
-      "SELECT uuid, class_name, name, manufacturer_code, role, career, mass, scm_speed, max_speed, total_hp, shield_hp, cargo_capacity, missile_damage_total, weapon_damage_total, crew_size FROM ships"
+      'SELECT uuid, class_name, name, manufacturer_code, role, career, mass, scm_speed, max_speed, total_hp, shield_hp, cargo_capacity, missile_damage_total, weapon_damage_total, crew_size FROM ships',
     );
     const [newCompsRaw] = await conn.execute<any[]>(
-      "SELECT uuid, class_name, name, type, sub_type, size, grade, manufacturer_code FROM components"
+      'SELECT uuid, class_name, name, type, sub_type, size, grade, manufacturer_code FROM components',
     );
     const newShips = new Map(newShipsRaw.map((s: any) => [s.class_name, s]));
     const newComps = new Map(newCompsRaw.map((c: any) => [c.class_name, c]));
@@ -1082,7 +1235,20 @@ export class ExtractionService {
       if (!newShips.has(cn)) inserts.push([extractionId, 'ship', ship.uuid, ship.name || cn, 'removed', null, null, null]);
     }
     // Modified ships
-    const shipFields = ['mass', 'scm_speed', 'max_speed', 'total_hp', 'shield_hp', 'cargo_capacity', 'missile_damage_total', 'weapon_damage_total', 'crew_size', 'role', 'career', 'name'];
+    const shipFields = [
+      'mass',
+      'scm_speed',
+      'max_speed',
+      'total_hp',
+      'shield_hp',
+      'cargo_capacity',
+      'missile_damage_total',
+      'weapon_damage_total',
+      'crew_size',
+      'role',
+      'career',
+      'name',
+    ];
     for (const [cn, newShip] of newShips) {
       const oldShip = oldShips.get(cn);
       if (!oldShip) continue;
@@ -1095,7 +1261,16 @@ export class ExtractionService {
         } else if (String(oldVal) === String(newVal)) {
           continue;
         }
-        inserts.push([extractionId, 'ship', newShip.uuid, newShip.name || cn, 'modified', field, oldVal != null ? String(oldVal) : null, newVal != null ? String(newVal) : null]);
+        inserts.push([
+          extractionId,
+          'ship',
+          newShip.uuid,
+          newShip.name || cn,
+          'modified',
+          field,
+          oldVal != null ? String(oldVal) : null,
+          newVal != null ? String(newVal) : null,
+        ]);
       }
     }
 
@@ -1109,9 +1284,7 @@ export class ExtractionService {
     }
 
     // ── Items changelog ──
-    const [newItemsRaw] = await conn.execute<any[]>(
-      "SELECT uuid, class_name, name, type, sub_type, manufacturer_code FROM items"
-    );
+    const [newItemsRaw] = await conn.execute<any[]>('SELECT uuid, class_name, name, type, sub_type, manufacturer_code FROM items');
     const newItems = new Map(newItemsRaw.map((i: any) => [i.class_name, i]));
     for (const [cn, item] of newItems) {
       if (!oldItems.has(cn)) inserts.push([extractionId, 'item', item.uuid, item.name || cn, 'added', null, null, null]);
@@ -1121,22 +1294,22 @@ export class ExtractionService {
     }
 
     // ── Commodities changelog ──
-    const [newCommoditiesRaw] = await conn.execute<any[]>(
-      "SELECT uuid, class_name, name, type FROM commodities"
-    );
+    const [newCommoditiesRaw] = await conn.execute<any[]>('SELECT uuid, class_name, name, type FROM commodities');
     const newCommodities = new Map(newCommoditiesRaw.map((c: any) => [c.class_name, c]));
     for (const [cn, commodity] of newCommodities) {
-      if (!oldCommodities.has(cn)) inserts.push([extractionId, 'commodity', commodity.uuid, commodity.name || cn, 'added', null, null, null]);
+      if (!oldCommodities.has(cn))
+        inserts.push([extractionId, 'commodity', commodity.uuid, commodity.name || cn, 'added', null, null, null]);
     }
     for (const [cn, commodity] of oldCommodities) {
-      if (!newCommodities.has(cn)) inserts.push([extractionId, 'commodity', commodity.uuid, commodity.name || cn, 'removed', null, null, null]);
+      if (!newCommodities.has(cn))
+        inserts.push([extractionId, 'commodity', commodity.uuid, commodity.name || cn, 'removed', null, null, null]);
     }
 
     if (inserts.length > 0) {
       const batchSize = 100;
       for (let i = 0; i < inserts.length; i += batchSize) {
         const batch = inserts.slice(i, i + batchSize);
-        const placeholders = batch.map(() => "(?, ?, ?, ?, ?, ?, ?, ?)").join(", ");
+        const placeholders = batch.map(() => '(?, ?, ?, ?, ?, ?, ?, ?)').join(', ');
         const values = batch.flat();
         await conn.execute(
           `INSERT INTO changelog (extraction_id, entity_type, entity_uuid, entity_name, change_type, field_name, old_value, new_value) VALUES ${placeholders}`,
@@ -1145,7 +1318,7 @@ export class ExtractionService {
       }
       logger.info(`Changelog: ${inserts.length} entries generated`);
     } else {
-      logger.info("Changelog: No changes detected");
+      logger.info('Changelog: No changes detected');
     }
   }
 }
