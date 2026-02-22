@@ -12,12 +12,6 @@
 import logger from './logger.js';
 import type { P4KProvider } from './p4k-provider.js';
 
-/** Parsed localization entry */
-interface LocEntry {
-  key: string;
-  value: string;
-}
-
 export class LocalizationService {
   /** LOC key → display name */
   private nameIndex = new Map<string, string>();
@@ -170,7 +164,7 @@ export class LocalizationService {
     }
 
     // Try variants with/without SCItem suffix
-    const withSCItem = this.classNameIndex.get(cn.endsWith('_scitem') ? cn : cn + '_scitem');
+    const withSCItem = this.classNameIndex.get(cn.endsWith('_scitem') ? cn : `${cn}_scitem`);
     if (withSCItem) return withSCItem;
 
     const withoutSCItem = cn.endsWith('_scitem') ? this.classNameIndex.get(cn.replace(/_scitem$/, '')) : null;

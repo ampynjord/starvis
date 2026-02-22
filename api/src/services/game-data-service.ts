@@ -282,8 +282,8 @@ export class GameDataService {
     const [countRows] = await this.pool.execute<Row[]>(`SELECT COUNT(*) as total FROM changelog c${w}`, p);
     const total = Number(countRows[0]?.total) || 0;
 
-    const limit = Math.min(100, parseInt(params.limit || '50'));
-    const offset = parseInt(params.offset || '0');
+    const limit = Math.min(100, parseInt(params.limit || '50', 10));
+    const offset = parseInt(params.offset || '0', 10);
     const [rows] = await this.pool.execute<Row[]>(
       `SELECT c.*, e.game_version, e.extracted_at as extraction_date FROM changelog c LEFT JOIN extraction_log e ON c.extraction_id = e.id${w} ORDER BY c.created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
       p,

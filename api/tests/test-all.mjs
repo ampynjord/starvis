@@ -63,7 +63,7 @@ async function test(name, fn) {
 async function rawGet(path, retries = 5) {
   const res = await fetch(`${API}${path}`);
   if (res.status === 429 && retries > 0) {
-    const wait = Math.max(parseInt(res.headers.get('retry-after') || '5') * 1000, 5000);
+    const wait = Math.max(parseInt(res.headers.get('retry-after') || '5', 10) * 1000, 5000);
     info(`⏳ 429 rate limited, waiting ${wait}ms (${retries} retries left)...`);
     await delay(wait);
     return rawGet(path, retries - 1);
@@ -76,7 +76,7 @@ async function rawGet(path, retries = 5) {
 async function adminGet(path, retries = 5) {
   const res = await fetch(`${BASE}${path}`, { headers: { 'X-API-Key': ADMIN_KEY } });
   if (res.status === 429 && retries > 0) {
-    const wait = Math.max(parseInt(res.headers.get('retry-after') || '5') * 1000, 5000);
+    const wait = Math.max(parseInt(res.headers.get('retry-after') || '5', 10) * 1000, 5000);
     info(`⏳ 429 rate limited, waiting ${wait}ms (${retries} retries left)...`);
     await delay(wait);
     return adminGet(path, retries - 1);
@@ -95,7 +95,7 @@ function skip(msg) {
 async function apiFetch(url, opts = {}, retries = 5) {
   const res = await fetch(url, opts);
   if (res.status === 429 && retries > 0) {
-    const wait = Math.max(parseInt(res.headers.get('retry-after') || '5') * 1000, 5000);
+    const wait = Math.max(parseInt(res.headers.get('retry-after') || '5', 10) * 1000, 5000);
     info(`⏳ 429 rate limited, waiting ${wait}ms (${retries} retries left)...`);
     await delay(wait);
     return apiFetch(url, opts, retries - 1);
@@ -115,14 +115,14 @@ try {
 // ─── Détection données de jeu ───────────────────────────────────────────────
 // Use /components (P4K-only) instead of /ships (which now includes concept ships via UNION ALL)
 let hasGameData = false;
-let shipCount = 0;
-let compCount = 0;
+let _shipCount = 0;
+let _compCount = 0;
 try {
   const r = await rawGet('/components?limit=1');
   hasGameData = r.ok && (r.data.total || r.data.count || 0) > 0;
   if (hasGameData) {
     const s = await rawGet('/ships?limit=1');
-    shipCount = s.data.total || s.data.count || 0;
+    _shipCount = s.data.total || s.data.count || 0;
   }
 } catch {
   /* pas de game data */
@@ -309,7 +309,7 @@ await test('GET /components → ≥500 items', async () => {
   const { data } = await rawGet('/components?limit=100');
   const total = data.total || data.count;
   assert(data.success && total >= 500, `Only ${total}`);
-  compCount = total;
+  _compCount = total;
   info(`${total} components total`);
 });
 
@@ -479,7 +479,7 @@ await test('GET /ship-matrix?format=csv → CSV output', async () => {
   if (!hasShipMatrix) skip('no ship matrix data');
   const res = await apiFetch(`${API}/ship-matrix?format=csv`);
   const ct = res.headers.get('content-type');
-  assert(ct && ct.includes('text/csv'), `Expected text/csv, got ${ct}`);
+  assert(ct?.includes('text/csv'), `Expected text/csv, got ${ct}`);
   const text = await res.text();
   assert(text.includes(','), 'No CSV data');
   const lines = text.trim().split('\n');
@@ -491,7 +491,7 @@ await test('GET /ships?format=csv → CSV output', async () => {
   if (!hasGameData) skip('no game data');
   const res = await apiFetch(`${API}/ships?format=csv&limit=10`);
   const ct = res.headers.get('content-type');
-  assert(ct && ct.includes('text/csv'), `Expected text/csv, got ${ct}`);
+  assert(ct?.includes('text/csv'), `Expected text/csv, got ${ct}`);
   const text = await res.text();
   const lines = text.trim().split('\n');
   assert(lines.length >= 2, 'CSV should have header + data');
@@ -523,7 +523,7 @@ await test('GET /ship-matrix → Cache-Control header', async () => {
   if (!hasShipMatrix) skip('no ship matrix data');
   const res = await apiFetch(`${API}/ship-matrix`);
   const cc = res.headers.get('cache-control');
-  assert(cc && cc.includes('max-age'), `Missing/wrong Cache-Control: ${cc}`);
+  assert(cc?.includes('max-age'), `Missing/wrong Cache-Control: ${cc}`);
   info(`Cache-Control: ${cc}`);
 });
 

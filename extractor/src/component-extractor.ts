@@ -241,7 +241,7 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
                     comp.weaponRange = Math.round(pp.lifetime * comp.weaponSpeed * 100) / 100;
                 }
               }
-            } catch (e) {
+            } catch (_e) {
               /* ammo resolution — non-critical */
             }
           }
@@ -340,7 +340,7 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
         if (cType === 'SProjectile' || cType === 'SCItemProjectileParams') {
           const bDmg = c.bulletImpactDamage || c.damage;
           if (bDmg && typeof bDmg === 'object') {
-            const dt = Object.entries(bDmg).find(([k, v]) => typeof v === 'number' && (v as number) > 0);
+            const dt = Object.entries(bDmg).find(([_k, v]) => typeof v === 'number' && (v as number) > 0);
             if (dt) {
               comp.weaponDamage = Math.round((dt[1] as number) * 10000) / 10000;
               comp.weaponDamageType = dt[0];

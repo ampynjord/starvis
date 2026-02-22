@@ -5,7 +5,7 @@
  * It parses binary game data, extracts ships/components/paints/shops,
  * and writes everything to the remote MySQL database.
  */
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
 import type { Pool, PoolConnection } from 'mysql2/promise';
 import { applyHullSeriesCargoFallback, crossReferenceShipMatrix, tagVariantTypes } from './crossref.js';
 import { classifyPort, type DataForgeService, MANUFACTURER_CODES } from './dataforge-service.js';
@@ -841,15 +841,6 @@ export class ExtractionService {
       } catch (e: unknown) {
         logger.error(`Module ${port.portName} on ${shipClassName}: ${e instanceof Error ? e.message : String(e)}`);
       }
-    }
-  }
-
-  private async resolveComponentUuid(conn: PoolConnection, className: string): Promise<string | null> {
-    try {
-      const [rows] = await conn.execute<any[]>('SELECT uuid FROM components WHERE class_name = ? LIMIT 1', [className]);
-      return rows[0]?.uuid || null;
-    } catch {
-      return null;
     }
   }
 

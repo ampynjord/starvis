@@ -85,8 +85,8 @@ describe('MANUFACTURER_CODES', () => {
   });
 
   it('maps codes to full names (not abbreviations)', () => {
-    expect(MANUFACTURER_CODES['AEGS']).toBe('Aegis Dynamics');
-    expect(MANUFACTURER_CODES['RSI']).toBe('Roberts Space Industries');
-    expect(MANUFACTURER_CODES['BEHR']).toBe('Behring Applied Technology');
+    expect(MANUFACTURER_CODES.AEGS).toBe('Aegis Dynamics');
+    expect(MANUFACTURER_CODES.RSI).toBe('Roberts Space Industries');
+    expect(MANUFACTURER_CODES.BEHR).toBe('Behring Applied Technology');
   });
 });

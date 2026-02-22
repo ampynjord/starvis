@@ -2,10 +2,10 @@
  * P4K Provider - Reads Star Citizen .p4k archive files (ZIP64 with AES encryption)
  * Handles: ZIP parsing, AES-128-CBC decryption, Zstd/Deflate decompression
  */
-import { createDecipheriv } from 'crypto';
-import { statSync } from 'fs';
-import { type FileHandle, open } from 'fs/promises';
-import { inflateRawSync } from 'zlib';
+import { createDecipheriv } from 'node:crypto';
+import { statSync } from 'node:fs';
+import { type FileHandle, open } from 'node:fs/promises';
+import { inflateRawSync } from 'node:zlib';
 import logger from './logger.js';
 
 export interface P4KEntry {

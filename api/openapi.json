@@ -15,6 +15,7 @@
     { "name": "Manufacturers", "description": "Ship & component manufacturers" },
     { "name": "Ship Matrix", "description": "RSI Ship Matrix mirror" },
     { "name": "Loadout", "description": "Loadout simulator" },
+    { "name": "Search", "description": "Unified multi-entity search" },
     { "name": "Changelog", "description": "Data change tracking" },
     { "name": "Stats", "description": "Database statistics" },
     { "name": "System", "description": "Health & version" }
@@ -543,6 +544,32 @@
           }
         },
         "responses": { "200": { "description": "Calculated loadout stats" }, "404": { "description": "Ship not found" } }
+      }
+    },
+    "/api/v1/search": {
+      "get": {
+        "tags": ["Search"],
+        "summary": "Unified search across ships, components and items",
+        "operationId": "unifiedSearch",
+        "parameters": [
+          {
+            "name": "search",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "minLength": 2 },
+            "description": "Search query (min 2 chars)"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": { "type": "integer", "default": 10, "maximum": 20 },
+            "description": "Max results per entity"
+          }
+        ],
+        "responses": {
+          "200": { "description": "Grouped results by entity type" },
+          "400": { "description": "Invalid search query" }
+        }
       }
     },
     "/api/v1/changelog": {

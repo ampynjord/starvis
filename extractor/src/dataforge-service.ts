@@ -251,7 +251,7 @@ export class DataForgeService implements DataForgeContext {
     if (!this.dfData) return [];
     const entityClassIdx = this.dfData.structDefs.findIndex((s) => s.name === 'EntityClassDefinition');
     if (entityClassIdx === -1) return [];
-    const prefix = className + '_';
+    const prefix = `${className}_`;
     // Regex to find _PU as a segment: _PU at end or _PU_ followed by more
     const puSegmentRegex = /_PU($|_)/;
 
@@ -305,7 +305,7 @@ export class DataForgeService implements DataForgeContext {
     }
 
     // Try className_PU (exact or fuzzy via findEntityRecord which handles AI suffixes)
-    const puName = className + '_PU';
+    const puName = `${className}_PU`;
     const puRecord = this.findEntityRecord(puName);
     if (puRecord) {
       // findEntityRecord may have found className_PU_AI_CIV via fuzzy match - that's OK
@@ -320,7 +320,7 @@ export class DataForgeService implements DataForgeContext {
       }
     } else {
       // Try className_PU_AI_CIV explicitly
-      const civName = className + '_PU_AI_CIV';
+      const civName = `${className}_PU_AI_CIV`;
       const civRecord = this.findEntityRecord(civName);
       if (civRecord) {
         const civData = this.readInstance(civRecord.structIndex, civRecord.instanceIndex, 0, 3);
@@ -916,7 +916,7 @@ export class DataForgeService implements DataForgeContext {
       if (variantRecord) {
         const variantData = this.readInstance(variantRecord.structIndex, variantRecord.instanceIndex, 0, 6);
         if (variantData?.Components) {
-          const variantLoadoutCount = 0;
+          const _variantLoadoutCount = 0;
           for (const comp of variantData.Components) {
             if (!comp || typeof comp !== 'object' || !comp.__type) continue;
             const cType = comp.__type as string;
@@ -1013,7 +1013,7 @@ export class DataForgeService implements DataForgeContext {
           xmlUsedWasVariantSpecific = xmlName === entities.vehicleXmlName && xmlName !== className;
           break; // Found XML, stop trying
         }
-      } catch (e) {
+      } catch (_e) {
         /* XML not found, try next */
       }
     }
@@ -1062,7 +1062,7 @@ export class DataForgeService implements DataForgeContext {
       const { totalHp, bodyHp, parts } = this.extractVehicleXmlParts(mainPart);
 
       return { mass, totalHp, bodyHp, hullParts: parts };
-    } catch (e) {
+    } catch (_e) {
       return null;
     }
   }
@@ -1296,7 +1296,7 @@ export class DataForgeService implements DataForgeContext {
     }
 
     // Get all ships' variant loadout for fallback
-    const variantMap = this.findVariantLoadoutMap(loadoutEntries[0]?.__parentClassName || '');
+    const _variantMap = this.findVariantLoadoutMap(loadoutEntries[0]?.__parentClassName || '');
 
     // Process each loadout entry
     for (const entry of loadoutEntries) {
@@ -1693,7 +1693,7 @@ export class DataForgeService implements DataForgeContext {
     }
   }
 
-  private categorizeItem(portName: string, compType: string, className: string): string | null {
+  private categorizeItem(portName: string, _compType: string, className: string): string | null {
     const lp = portName.toLowerCase();
     const lc = className.toLowerCase();
     if (lp.includes('thruster') || lc.includes('thruster')) return 'thrusters';
