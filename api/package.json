@@ -27,7 +27,7 @@
     "express-rate-limit": "^8.2.1",
     "express-slow-down": "^3.0.1",
     "helmet": "^8.1.0",
-    "mysql2": "^3.16.0",
+    "mysql2": "^3.17.4",
     "swagger-ui-express": "^5.0.1",
     "tsx": "^4.21.0",
     "winston": "^3.11.0",
