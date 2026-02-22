@@ -10,6 +10,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "biome check --write .",
     "lint:ci": "biome check .",
+    "openapi:lint": "swagger-cli validate openapi.json",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "node tests/test-all.mjs"

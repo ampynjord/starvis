@@ -2,10 +2,10 @@
  * STARVIS - Schema initialization & versioned migrations
  * Reads and executes db/schema.sql, then runs new migrations from db/migrations/
  */
-import { existsSync, readdirSync, readFileSync } from 'fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { PoolConnection } from 'mysql2/promise';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import logger from '../utils/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

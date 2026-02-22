@@ -15,7 +15,7 @@
  *   LOG_LEVEL (debug|info|warn|error, default: info)
  */
 import 'dotenv/config';
-import { existsSync } from 'fs';
+import { existsSync } from 'node:fs';
 import * as mysql from 'mysql2/promise';
 import { DataForgeService } from './src/dataforge-service.js';
 import { ExtractionService } from './src/extraction-service.js';
@@ -77,7 +77,7 @@ async function main() {
   // Database connection
   const dbConfig = {
     host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '3306'),
+    port: parseInt(process.env.DB_PORT || '3306', 10),
     user: process.env.DB_USER || '',
     password: process.env.DB_PASSWORD || '',
     database: process.env.DB_NAME || '',

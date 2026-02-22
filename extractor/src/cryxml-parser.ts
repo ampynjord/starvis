@@ -92,7 +92,7 @@ function readInt32(buf: Buffer, offset: number, order: ByteOrder): number {
   return order === 'BE' ? buf.readInt32BE(offset) : buf.readInt32LE(offset);
 }
 
-function readUInt32(buf: Buffer, offset: number, order: ByteOrder): number {
+function _readUInt32(buf: Buffer, offset: number, order: ByteOrder): number {
   return order === 'BE' ? buf.readUInt32BE(offset) : buf.readUInt32LE(offset);
 }
 
@@ -121,7 +121,7 @@ const MAGIC_CRY3SDK = 'CRY3SDK';
 
 const NODE_SIZE = 28;
 const ATTRIBUTE_SIZE = 8;
-const CHILD_ENTRY_SIZE = 4;
+const _CHILD_ENTRY_SIZE = 4;
 
 /**
  * Detect if a buffer contains CryXML binary data.
@@ -194,9 +194,9 @@ export function parseCryXml(buf: Buffer): CryXmlNode {
   off += 4;
   const attrTableCount = readInt32(buf, off, order);
   off += 4;
-  const childTableOffset = readInt32(buf, off, order);
+  const _childTableOffset = readInt32(buf, off, order);
   off += 4;
-  const childTableCount = readInt32(buf, off, order);
+  const _childTableCount = readInt32(buf, off, order);
   off += 4;
   const stringTableOffset = readInt32(buf, off, order);
   off += 4;

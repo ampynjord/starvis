@@ -19,7 +19,7 @@ export interface PaginatedResult {
 // ── Numeric helpers ───────────────────────────────────────
 
 export const num = (v: unknown): number => parseFloat(String(v)) || 0;
-export const int = (v: unknown): number => parseInt(String(v)) || 0;
+export const int = (v: unknown): number => parseInt(String(v), 10) || 0;
 export const r1 = (v: number): number => Math.round(v * 10) / 10;
 export const r2 = (v: number): number => Math.round(v * 100) / 100;
 export const r4 = (v: number): number => Math.round(v * 10000) / 10000;

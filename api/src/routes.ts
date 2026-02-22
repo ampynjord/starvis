@@ -9,7 +9,7 @@
  *
  * Features: Pagination, ETag caching, CSV export, Zod validation
  */
-import { createHash } from 'crypto';
+import { createHash } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import type { Pool } from 'mysql2/promise';
@@ -162,7 +162,7 @@ export function createRoutes(deps: RouteDependencies): Router {
   router.get(
     '/api/v1/ship-matrix/:id',
     asyncHandler(async (req, res) => {
-      const id = parseInt(req.params.id);
+      const id = parseInt(req.params.id, 10);
       const ship = Number.isNaN(id) ? await shipMatrixService.getByName(req.params.id) : await shipMatrixService.getById(id);
       if (!ship) return void res.status(404).json({ success: false, error: 'Not found' });
       sendWithETag(req, res, { success: true, data: ship });
@@ -209,7 +209,7 @@ export function createRoutes(deps: RouteDependencies): Router {
       const { search } = SearchQuery.parse(req.query);
       if (!search || search.length < 2)
         return void res.status(400).json({ success: false, error: "Query 'search' must be at least 2 characters" });
-      const limit = Math.min(20, Math.max(1, parseInt(String(req.query.limit)) || 10));
+      const limit = Math.min(20, Math.max(1, parseInt(String(req.query.limit), 10) || 10));
       const data = await gameDataService!.searchShipsAutocomplete(search, limit);
       sendWithETag(req, res, { success: true, count: data.length, data });
     }),
@@ -335,7 +335,7 @@ export function createRoutes(deps: RouteDependencies): Router {
     asyncHandler(async (req, res) => {
       const uuid = await resolveShipUuid(req.params.uuid);
       if (!uuid) return void res.status(404).json({ success: false, error: 'Ship not found' });
-      const limit = Math.min(10, Math.max(1, parseInt(String(req.query.limit)) || 5));
+      const limit = Math.min(10, Math.max(1, parseInt(String(req.query.limit), 10) || 5));
       const data = await gameDataService!.getSimilarShips(uuid, limit);
       sendWithETag(req, res, { success: true, count: data.length, data });
     }),
@@ -569,8 +569,8 @@ export function createRoutes(deps: RouteDependencies): Router {
     '/api/v1/shops/:id/inventory',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const shopId = parseInt(req.params.id);
-      if (isNaN(shopId)) return void res.status(400).json({ success: false, error: 'Invalid shop ID' });
+      const shopId = parseInt(req.params.id, 10);
+      if (Number.isNaN(shopId)) return void res.status(400).json({ success: false, error: 'Invalid shop ID' });
       const data = await gameDataService!.getShopInventory(shopId);
       if (req.query.format === 'csv')
         return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
@@ -682,7 +682,7 @@ export function createRoutes(deps: RouteDependencies): Router {
       const { search } = SearchQuery.parse(req.query);
       if (!search || search.length < 2)
         return void res.status(400).json({ success: false, error: "Query 'search' must be at least 2 characters" });
-      const limit = parseInt(String(req.query.limit) || '10');
+      const limit = parseInt(String(req.query.limit) || '10', 10);
       const data = await gameDataService!.unifiedSearch(search, limit);
       sendWithETag(req, res, {
         success: true,

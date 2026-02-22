@@ -403,7 +403,7 @@ export class LoadoutService {
         else mountType = portType === 'Turret' || portType === 'TurretBase' ? 'Turret' : portType === 'MissileRack' ? 'Rack' : 'Gimbal';
 
         const sizeMatch = compCls.match(/[Ss](\d+)/);
-        if (sizeMatch) mountSize = parseInt(sizeMatch[1]);
+        if (sizeMatch) mountSize = parseInt(sizeMatch[1], 10);
       }
 
       const componentType = String(root.type || '');
@@ -539,7 +539,7 @@ export class LoadoutService {
         display_name: c.name ? cleanName(c.name || '', cType) : cMountName,
         type: cType,
         sub_type: c.sub_type || null,
-        size: int(c.size) || (cMountSize ? parseInt(cMountSize) : null),
+        size: int(c.size) || (cMountSize ? parseInt(cMountSize, 10) : null),
         grade: c.grade || null,
         manufacturer_code: c.manufacturer_code || null,
         hp: r2(num(c.hp)) || null,
@@ -574,7 +574,7 @@ export class LoadoutService {
       name: row.name || (isMountItem ? row.component_class_name : null),
       display_name: row.name ? cleanName(row.name || '', type) : mountDisplayName,
       type: effectiveType,
-      size: int(row.size) || (mountSize ? parseInt(mountSize) : null),
+      size: int(row.size) || (mountSize ? parseInt(mountSize, 10) : null),
       port_max_size: int(row.port_max_size) || null,
       port_min_size: int(row.port_min_size) || null,
       grade: row.grade || null,

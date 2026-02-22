@@ -8,16 +8,16 @@
  * Features: Pagination, ETag caching, CSV export, Rate limiting, Swagger docs
  */
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import compression from 'compression';
 import cors from 'cors';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
-import { readFileSync } from 'fs';
 import helmet from 'helmet';
 import * as mysql from 'mysql2/promise';
-import path from 'path';
 import swaggerUi from 'swagger-ui-express';
 
 import { createRoutes } from './src/routes.js';
@@ -64,7 +64,7 @@ const speedLimiter = slowDown({
 // Layer 2: Hard rate limit — 200 req/15min per IP (then 429)
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: parseInt(process.env.RATE_LIMIT_MAX || '200'),
+  max: parseInt(process.env.RATE_LIMIT_MAX || '200', 10),
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: 'Too many requests, please try again later' },
@@ -85,7 +85,7 @@ const adminLimiter = rateLimit({
 // Layer 4: Burst protection — configurable req/min max (prevents hammering)
 const burstLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: parseInt(process.env.RATE_LIMIT_BURST || '30'),
+  max: parseInt(process.env.RATE_LIMIT_BURST || '30', 10),
   standardHeaders: false,
   legacyHeaders: false,
   message: { success: false, error: 'Too many requests per minute, slow down' },
@@ -111,7 +111,7 @@ app.use((req, res, next) => {
 // ===== SWAGGER / OPENAPI =====
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const swaggerSpec = JSON.parse(readFileSync(path.join(__dirname, 'openapi.json'), 'utf-8'));
-swaggerSpec.servers = [{ url: `http://localhost:${PORT}`, description: 'Local' }];
+swaggerSpec.servers = [{ url: '/', description: 'Current host' }];
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // ===== ROOT =====
@@ -144,7 +144,7 @@ async function start() {
       conn.release();
       logger.info('✅ Database ready', { module: 'DB' });
       break;
-    } catch (e) {
+    } catch (_e) {
       logger.warn(`DB retry ${i + 1}/30…`, { module: 'DB' });
       await new Promise((r) => setTimeout(r, 1000));
     }

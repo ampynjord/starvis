@@ -158,7 +158,7 @@ export function extractShops(ctx: DataForgeContext): { shops: any[]; inventory: 
         shopType,
         shopCode,
       });
-    } catch (e) {
+    } catch (_e) {
       // Skip problematic records
     }
   }
@@ -226,7 +226,7 @@ export function extractPaints(
       const eventPattern =
         /_(BIS\d{4}|IAE|ILW|Invictus|PirateWeek|Pirate|Holiday|Penumbra|Showdown|Citizencon|Star_Kitten|Stormbringer|Timberline|Ghoulish|Metallic|Black|White|Grey|Red|Blue|Green|Orange|Purple|Tan|Crimson|Gold|Silver|Carbon|Camo|Digital|Paint|Skin|Livery|Pack|FreeWeekend|FW\d+|NovemberAnniversary|FleetWeek|StarKitten|ValentinesDay|LunarNewYear|JumpTown)/i;
       const match = afterPaint.match(eventPattern);
-      if (match && match.index && match.index > 0) {
+      if (match?.index && match.index > 0) {
         shipShortName = afterPaint.substring(0, match.index);
       } else {
         shipShortName = afterPaint;

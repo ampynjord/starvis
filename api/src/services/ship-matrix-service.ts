@@ -66,7 +66,7 @@ export class ShipMatrixService {
             const media = ship.media?.[0] || {};
             const images = media.images || {};
 
-            placeholders.push('(' + Array(34).fill('?').join(',') + ')');
+            placeholders.push(`(${Array(34).fill('?').join(',')})`);
             values.push(
               ship.id,
               ship.name,

@@ -34,15 +34,15 @@ export class ComponentQueryService {
     }
     if (filters?.size) {
       where.push('c.size = ?');
-      params.push(parseInt(filters.size));
+      params.push(parseInt(filters.size, 10));
     }
     if (filters?.min_size) {
       where.push('c.size >= ?');
-      params.push(parseInt(filters.min_size));
+      params.push(parseInt(filters.min_size, 10));
     }
     if (filters?.max_size) {
       where.push('c.size <= ?');
-      params.push(parseInt(filters.max_size));
+      params.push(parseInt(filters.max_size, 10));
     }
     if (filters?.grade) {
       where.push('c.grade = ?');
