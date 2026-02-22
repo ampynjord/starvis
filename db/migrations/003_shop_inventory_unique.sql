@@ -7,4 +7,4 @@ INNER JOIN (
   FROM shop_inventory GROUP BY shop_id, component_class_name HAVING COUNT(*) > 1
 ) dups ON si.shop_id = dups.shop_id AND si.component_class_name = dups.component_class_name AND si.id != dups.keep_id;
 
-ALTER TABLE shop_inventory ADD UNIQUE KEY IF NOT EXISTS uk_shop_component (shop_id, component_class_name);
+ALTER TABLE shop_inventory ADD UNIQUE KEY uk_shop_component (shop_id, component_class_name);
