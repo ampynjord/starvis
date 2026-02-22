@@ -22,6 +22,16 @@ import { ShopService } from "./shop-service.js";
 
 export type { PaginatedResult, Row };
 
+// ── Simple TTL cache ──────────────────────────────────────
+class TtlCache<T> {
+  private data: T | undefined;
+  private expiresAt = 0;
+  constructor(private ttlMs: number) {}
+  get(): T | undefined { return Date.now() < this.expiresAt ? this.data : undefined; }
+  set(value: T): void { this.data = value; this.expiresAt = Date.now() + this.ttlMs; }
+  invalidate(): void { this.expiresAt = 0; }
+}
+
 export class GameDataService {
   private ships: ShipQueryService;
   private components: ComponentQueryService;
@@ -29,6 +39,8 @@ export class GameDataService {
   private shopsSvc: ShopService;
   private itemsSvc: ItemQueryService;
   private commoditiesSvc: CommodityQueryService;
+  private statsCache = new TtlCache<Record<string, unknown>>(60_000);       // 1 min
+  private publicStatsCache = new TtlCache<Record<string, unknown>>(60_000); // 1 min
 
   constructor(private pool: Pool) {
     this.ships       = new ShipQueryService(pool);
@@ -116,6 +128,39 @@ export class GameDataService {
   getCommodityByUuid(uuid: string) { return this.commoditiesSvc.getCommodityByUuid(uuid); }
   getCommodityTypes() { return this.commoditiesSvc.getCommodityTypes(); }
 
+  // ── Unified search ──────────────────────────────────────
+
+  async unifiedSearch(q: string, limit = 10): Promise<{ ships: Row[]; components: Row[]; items: Row[] }> {
+    const cap = Math.min(limit, 20);
+    const [ships, components, items] = await Promise.all([
+      this.ships.searchShipsAutocomplete(q, cap),
+      (async () => {
+        const t = `%${q}%`;
+        const [rows] = await this.pool.execute<Row[]>(
+          `SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade, c.manufacturer_code,
+                  m.name as manufacturer_name
+           FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code
+           WHERE c.name LIKE ? OR c.class_name LIKE ?
+           ORDER BY c.name LIMIT ${cap}`,
+          [t, t],
+        );
+        return rows;
+      })(),
+      (async () => {
+        const t = `%${q}%`;
+        const [rows] = await this.pool.execute<Row[]>(
+          `SELECT i.uuid, i.class_name, i.name, i.type, i.sub_type, i.manufacturer_code
+           FROM items i
+           WHERE i.name LIKE ? OR i.class_name LIKE ?
+           ORDER BY i.name LIMIT ${cap}`,
+          [t, t],
+        );
+        return rows;
+      })(),
+    ]);
+    return { ships, components, items };
+  }
+
   // ── Changelog & stats (kept locally — small) ────────────
 
   async getChangelog(params: { limit?: string; offset?: string; entityType?: string; changeType?: string }): Promise<{ data: Row[]; total: number }> {
@@ -138,6 +183,8 @@ export class GameDataService {
   }
 
   async getStats(): Promise<Record<string, unknown>> {
+    const cached = this.statsCache.get();
+    if (cached) return cached;
     const [rows] = await this.pool.execute<Row[]>(`
       SELECT
         (SELECT COUNT(*) FROM ships) as ships,
@@ -151,7 +198,9 @@ export class GameDataService {
         (SELECT COUNT(*) FROM ships WHERE ship_matrix_id IS NOT NULL) as shipsLinkedToMatrix
     `);
     const latest = await this.getLatestExtraction();
-    return { ...rows[0], latestExtraction: latest };
+    const result = { ...rows[0], latestExtraction: latest };
+    this.statsCache.set(result);
+    return result;
   }
 
   async getExtractionLog(): Promise<Row[]> {
@@ -165,6 +214,8 @@ export class GameDataService {
   }
 
   async getPublicStats(): Promise<Record<string, unknown>> {
+    const cached = this.publicStatsCache.get();
+    if (cached) return cached;
     const [rows] = await this.pool.execute<Row[]>(`
       SELECT
         (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL) as ships,
@@ -180,11 +231,13 @@ export class GameDataService {
         (SELECT COUNT(DISTINCT type) FROM items) as item_types
     `);
     const latest = await this.getLatestExtraction();
-    return {
+    const result = {
       ...rows[0],
       game_version: latest?.game_version || null,
       last_extraction: latest?.extracted_at || null,
     };
+    this.publicStatsCache.set(result);
+    return result;
   }
 
   async getChangelogSummary(): Promise<Record<string, unknown>> {

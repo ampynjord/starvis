@@ -7,6 +7,7 @@
  */
 import { createHash } from "crypto";
 import type { Pool, PoolConnection } from "mysql2/promise";
+import { crossReferenceShipMatrix, tagVariantTypes, applyHullSeriesCargoFallback } from "./crossref.js";
 import { DataForgeService, MANUFACTURER_CODES, classifyPort } from "./dataforge-service.js";
 import { LocalizationService } from "./localization-service.js";
 import logger from "./logger.js";
@@ -51,7 +52,7 @@ export class ExtractionService {
    * @param batchSize Rows per batch (default: BATCH_SIZE)
    * @returns Number of rows affected
    */
-  private async batchUpsert(
+  static async batchUpsert(
     conn: PoolConnection,
     insertHead: string,
     updateTail: string,
@@ -145,6 +146,15 @@ export class ExtractionService {
       const oldShips = new Map(oldShipsRaw.map((s: any) => [s.class_name, s]));
       const oldComps = new Map(oldCompsRaw.map((c: any) => [c.class_name, c]));
 
+      const [oldItemsRaw] = await conn.execute<any[]>(
+        "SELECT uuid, class_name, name, type, sub_type, manufacturer_code FROM items"
+      );
+      const [oldCommoditiesRaw] = await conn.execute<any[]>(
+        "SELECT uuid, class_name, name, type FROM commodities"
+      );
+      const oldItems = new Map(oldItemsRaw.map((i: any) => [i.class_name, i]));
+      const oldCommodities = new Map(oldCommoditiesRaw.map((c: any) => [c.class_name, c]));
+
       // Wrap the entire extraction in a transaction — if anything fails,
       // the old data remains intact (no downtime with empty tables)
       await conn.beginTransaction();
@@ -191,13 +201,13 @@ export class ExtractionService {
 
       // 6. Cross-reference with ship_matrix
       onProgress?.("Cross-referencing with Ship Matrix…");
-      stats.shipMatrixLinked = await this.crossReferenceShipMatrix(conn);
+      stats.shipMatrixLinked = await crossReferenceShipMatrix(conn);
 
       // 6a. Tag variant types for non-SM ships
-      await this.tagVariantTypes(conn);
+      await tagVariantTypes(conn);
 
       // 6b. Hull series SCU fallback from Ship Matrix
-      await this.applyHullSeriesCargoFallback(conn);
+      await applyHullSeriesCargoFallback(conn);
 
       // 6c. Log extraction to extraction_log
       stats.durationMs = Date.now() - startTime;
@@ -215,13 +225,30 @@ export class ExtractionService {
       if (extractionId) {
         try {
           onProgress?.("Generating changelog…");
-          await this.generateChangelog(conn, extractionId, oldShips, oldComps);
+          await this.generateChangelog(conn, extractionId, oldShips, oldComps, oldItems, oldCommodities);
         } catch (e) {
           logger.warn("Changelog generation failed", { error: String(e) });
         }
       }
 
       onProgress?.(`✅ Extraction complete: ${stats.ships} ships, ${stats.components} components, ${stats.items} items, ${stats.commodities} commodities, ${stats.manufacturers} manufacturers, ${stats.loadoutPorts} loadout ports, ${stats.shops} shops, ${stats.shipMatrixLinked} linked to Ship Matrix`);
+
+      // ── Sanity check — abort if data dropped by >50% ──
+      const oldCounts = { ships: oldShipsRaw.length, components: oldCompsRaw.length };
+      const threshold = 0.5;
+      const sanityErrors: string[] = [];
+      if (oldCounts.ships > 20 && stats.ships < oldCounts.ships * threshold) {
+        sanityErrors.push(`Ships dropped from ${oldCounts.ships} to ${stats.ships}`);
+      }
+      if (oldCounts.components > 50 && stats.components < oldCounts.components * threshold) {
+        sanityErrors.push(`Components dropped from ${oldCounts.components} to ${stats.components}`);
+      }
+      if (sanityErrors.length > 0) {
+        const msg = `Sanity check failed: ${sanityErrors.join('; ')}`;
+        logger.error(msg);
+        onProgress?.(`⚠️ ${msg} — rolling back`);
+        throw new Error(msg);
+      }
 
       // Commit the transaction — all data is now atomically visible
       await conn.commit();
@@ -374,7 +401,7 @@ export class ExtractionService {
     ];
 
     const rows = components.map(toRow);
-    const saved = await this.batchUpsert(
+    const saved = await ExtractionService.batchUpsert(
       conn,
       `INSERT INTO components (${COMP_COLS}) VALUES`,
       COMP_UPDATE,
@@ -583,6 +610,7 @@ export class ExtractionService {
     componentUuidCache: Map<string, string>,
   ): Promise<number> {
     let count = 0;
+    const childRows: any[][] = [];
 
     for (const port of loadout) {
       try {
@@ -604,20 +632,30 @@ export class ExtractionService {
             const childCompUuid = child.componentClassName
               ? (componentUuidCache.get(child.componentClassName) || null)
               : null;
-
-            await conn.execute(
-              `INSERT INTO ships_loadouts
-                (ship_uuid, port_name, port_type, component_class_name, component_uuid, parent_id)
-               VALUES (?, ?, ?, ?, ?, ?)`,
-              [shipUuid, child.portName, classifyPort(child.portName, child.componentClassName || ""), child.componentClassName || null, childCompUuid, parentId],
-            );
-            count++;
+            childRows.push([
+              shipUuid, child.portName,
+              classifyPort(child.portName, child.componentClassName || ""),
+              child.componentClassName || null, childCompUuid, parentId,
+            ]);
           }
         }
       } catch (e: unknown) {
         logger.error(`Loadout port ${port.portName}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
+
+    // Batch insert children
+    if (childRows.length > 0) {
+      await ExtractionService.batchUpsert(
+        conn,
+        `INSERT INTO ships_loadouts (ship_uuid, port_name, port_type, component_class_name, component_uuid, parent_id) VALUES`,
+        `ON DUPLICATE KEY UPDATE component_class_name=new.component_class_name, component_uuid=new.component_uuid`,
+        6,
+        childRows,
+      );
+      count += childRows.length;
+    }
+
     return count;
   }
 
@@ -814,7 +852,7 @@ export class ExtractionService {
 
     // Batch insert paints (ignore duplicates / FK errors)
     const PAINT_INSERT = `INSERT IGNORE INTO ship_paints (ship_uuid, paint_class_name, paint_name, paint_uuid) VALUES `;
-    await this.batchUpsert(conn, PAINT_INSERT, '', 4, paintRows, ExtractionService.BATCH_SIZE);
+    await ExtractionService.batchUpsert(conn, PAINT_INSERT, '', 4, paintRows, ExtractionService.BATCH_SIZE);
     saved = paintRows.length;
     onProgress?.(`Paints: ${saved}/${paints.length} saved (${paints.length - saved} unmatched)`);
   }
@@ -855,224 +893,6 @@ export class ExtractionService {
       }
     }
     return saved;
-  }
-
-  // ======================================================
-  //  CROSS-REFERENCE ships ↔ ship_matrix
-  // ======================================================
-
-  private static readonly SM_TO_P4K_ALIASES: Record<string, string> = {
-    "Mercury": "Star Runner",
-    "Ares Inferno": "Starfighter Inferno",
-    "Ares Ion": "Starfighter Ion",
-    "A2 Hercules": "Starlifter A2",
-    "C2 Hercules": "Starlifter C2",
-    "M2 Hercules": "Starlifter M2",
-    "Genesis": "Starliner Genesis",
-    "A1 Spirit": "Spirit A1",
-    "C1 Spirit": "Spirit C1",
-    "E1 Spirit": "Spirit E1",
-    "F7A Hornet Mk I": "Hornet F7A Mk1",
-    "F7A Hornet Mk II": "Hornet F7A Mk2",
-    "F7C Hornet Mk I": "Hornet F7C",
-    "F7C Hornet Mk II": "Hornet F7C Mk2",
-    "F7C Hornet Wildfire Mk I": "Hornet F7C Wildfire",
-    "F7C-R Hornet Tracker Mk I": "Hornet F7CR",
-    "F7C-R Hornet Tracker Mk II": "Hornet F7CR Mk2",
-    "F7C-S Hornet Ghost Mk I": "Hornet F7CS",
-    "F7C-S Hornet Ghost Mk II": "Hornet F7CS Mk2",
-    "F7C-M Super Hornet Mk I": "Hornet F7CM",
-    "F7C-M Super Hornet Heartseeker Mk I": "Hornet F7CM Heartseeker",
-    "F7C-M Super Hornet Mk II": "Hornet F7CM Mk2",
-    "F8C Lightning": "Lightning F8C",
-    "F8C Lightning Executive Edition": "Lightning F8C Exec",
-    "P-52 Merlin": "P52 Merlin",
-    "P-72 Archimedes": "P72 Archimedes",
-    "P-72 Archimedes Emerald": "P72 Archimedes Emerald",
-    "Reliant Kore": "Reliant",
-    "Expanse": "Starlancer Max",
-    "Fury MX": "Fury Miru",
-    "890 Jump": "890Jump",
-    "600i Explorer": "600i",
-    "600i Touring": "600i Touring",
-    "MPUV Cargo": "MPUV 1T",
-    "MPUV Personnel": "MPUV Transport",
-    "MPUV Tractor": "MPUV",
-    "Dragonfly Black": "Dragonfly",
-    "Dragonfly Yellowjacket": "Dragonfly Yellow",
-    "Mustang Alpha Vindicator": "Mustang Alpha",
-    "Gladius Pirate Edition": "Gladius PIR",
-    "Caterpillar Pirate Edition": "Caterpillar Pirate",
-    "Caterpillar Best In Show Edition 2949": "Caterpillar",
-    "Cutlass Black Best In Show Edition 2949": "Cutlass Black",
-    "Hammerhead Best In Show Edition 2949": "Hammerhead",
-    "Reclaimer Best In Show Edition 2949": "Reclaimer",
-    "Valkyrie Liberator Edition": "Valkyrie",
-    "Argo Mole Carbon Edition": "MOLE Carbon",
-    "Argo Mole Talus Edition": "MOLE Talus",
-    "Nautilus Solstice Edition": "Nautilus Solstice",
-    "Carrack w/C8X": "Carrack",
-    "Carrack Expedition w/C8X": "Carrack Expedition",
-    "Anvil Ballista Dunestalker": "Ballista Dunestalker",
-    "Anvil Ballista Snowblind": "Ballista Snowblind",
-    "Nox": "Nox",
-    "Nox Kue": "Nox Kue",
-    "Khartu-Al": "Scout",
-    "San'tok.yāi": "SanTokYai",
-    "San'tok.y?i": "SanTokYai",
-    "CSV-SM": "CSV Cargo",
-    "Zeus Mk II CL": "Zeus CL",
-    "Zeus Mk II ES": "Zeus ES",
-    "Zeus Mk II MR": "Zeus MR",
-    "Vanguard Warden": "Vanguard",
-    "Ursa": "Ursa Rover",
-    "Ursa Fortuna": "Ursa Rover Emerald",
-    "ROC-DS": "ROC DS",
-    "L-21 Wolf": "L21 Wolf",
-    "L-22 Alpha Wolf": "L22 AlphaWolf",
-  };
-
-  private normalizeForMatch(name: string): string {
-    return name.toLowerCase().trim()
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      .replace(/['\u2019\u2018]/g, "'")
-      .replace(/-/g, " ").replace(/\./g, "").replace(/\//g, "")
-      .replace(/\s+/g, " ");
-  }
-
-  private async crossReferenceShipMatrix(conn: PoolConnection): Promise<number> {
-    await conn.execute("UPDATE ships SET ship_matrix_id = NULL WHERE ship_matrix_id IS NOT NULL");
-
-    const [ships] = await conn.execute<any[]>("SELECT uuid, class_name, name FROM ships");
-    const [smEntries] = await conn.execute<any[]>("SELECT id, name FROM ship_matrix");
-
-    const aliasMap = new Map<string, string>();
-    for (const [smName, p4kName] of Object.entries(ExtractionService.SM_TO_P4K_ALIASES)) {
-      aliasMap.set(this.normalizeForMatch(smName), this.normalizeForMatch(p4kName));
-    }
-
-    const p4kByName = new Map<string, string>();
-    const p4kByClassName = new Map<string, string>();
-    for (const ship of ships) {
-      const norm = this.normalizeForMatch(ship.name || "");
-      if (norm && !p4kByName.has(norm)) p4kByName.set(norm, ship.uuid);
-      const short = this.normalizeForMatch(ship.class_name.replace(/^[A-Z]{3,5}_/, "").replace(/_/g, " "));
-      if (short && !p4kByClassName.has(short)) p4kByClassName.set(short, ship.uuid);
-    }
-
-    const matchedP4K = new Set<string>();
-    const matchedSM = new Set<number>();
-    const results: Array<{ smId: number; uuid: string }> = [];
-
-    const tryMatch = (smId: number, strategies: Array<() => string | undefined>) => {
-      if (matchedSM.has(smId)) return;
-      for (const strategy of strategies) {
-        const uuid = strategy();
-        if (uuid && !matchedP4K.has(uuid)) {
-          matchedP4K.add(uuid);
-          matchedSM.add(smId);
-          results.push({ smId, uuid });
-          return;
-        }
-      }
-    };
-
-    // Pass 1: Exact name matches
-    for (const sm of smEntries) {
-      const smNorm = this.normalizeForMatch(sm.name);
-      tryMatch(sm.id, [() => p4kByName.get(smNorm)]);
-    }
-
-    // Pass 2: Alias + class_name matches
-    for (const sm of smEntries) {
-      const smNorm = this.normalizeForMatch(sm.name);
-      tryMatch(sm.id, [
-        () => {
-          const alias = aliasMap.get(smNorm);
-          return alias ? (p4kByName.get(alias) || p4kByClassName.get(alias)) : undefined;
-        },
-        () => p4kByClassName.get(smNorm),
-        () => {
-          const stripped = smNorm.replace(/^(anvil|argo|crusader|drake)\s+/, "");
-          return stripped !== smNorm ? (p4kByName.get(stripped) || p4kByClassName.get(stripped)) : undefined;
-        },
-      ]);
-    }
-
-    // Pass 3: Token-based fuzzy matching
-    for (const sm of smEntries) {
-      if (matchedSM.has(sm.id)) continue;
-      const smNorm = this.normalizeForMatch(sm.name);
-      const smTokens = new Set(smNorm.split(" ").filter(t => t.length > 1));
-      if (smTokens.size < 2) continue;
-
-      let bestScore = 0;
-      let bestUuid: string | undefined;
-      for (const ship of ships) {
-        if (matchedP4K.has(ship.uuid)) continue;
-        const p4kNorm = this.normalizeForMatch(ship.name || "");
-        const p4kTokens = new Set(p4kNorm.split(" ").filter(t => t.length > 1));
-        let hits = 0;
-        for (const t of smTokens) if (p4kTokens.has(t)) hits++;
-        const score = hits / smTokens.size;
-        if (hits >= 2 && score > bestScore && score >= 0.6) {
-          bestScore = score;
-          bestUuid = ship.uuid;
-        }
-      }
-      if (bestUuid) {
-        matchedP4K.add(bestUuid);
-        matchedSM.add(sm.id);
-        results.push({ smId: sm.id, uuid: bestUuid });
-      }
-    }
-
-    for (const { smId, uuid } of results) {
-      await conn.execute("UPDATE ships SET ship_matrix_id = ? WHERE uuid = ?", [smId, uuid]);
-    }
-
-    return results.length;
-  }
-
-  private async applyHullSeriesCargoFallback(conn: PoolConnection): Promise<void> {
-    try {
-      const [updated]: any = await conn.execute(
-        `UPDATE ships s JOIN ship_matrix sm ON s.ship_matrix_id = sm.id
-         SET s.cargo_capacity = sm.cargocapacity
-         WHERE (s.cargo_capacity IS NULL OR s.cargo_capacity = 0)
-           AND sm.cargocapacity IS NOT NULL AND sm.cargocapacity > 0
-           AND s.class_name LIKE '%Hull_%'`
-      );
-      if (updated.affectedRows > 0) {
-        logger.info(`Hull series cargo fallback applied to ${updated.affectedRows} ships`);
-      }
-    } catch (e: unknown) {
-      logger.warn(`Hull cargo fallback failed: ${e instanceof Error ? e.message : String(e)}`);
-    }
-  }
-
-  private async tagVariantTypes(conn: PoolConnection): Promise<void> {
-    const rules: Array<{ type: string; patterns: string[] }> = [
-      { type: 'collector', patterns: ['%_Collector_%', '%_Collector'] },
-      { type: 'exec', patterns: ['%_Exec_%', '%_Exec'] },
-      { type: 'bis_edition', patterns: ['%_BIS%'] },
-      { type: 'tutorial', patterns: ['%_Teach%', '%Tutorial%'] },
-      { type: 'enemy_ai', patterns: ['%_EA_%', '%_EA'] },
-      { type: 'military', patterns: ['%_Military%', '%_UEE%', '%_Advocacy%'] },
-      { type: 'event', patterns: ['%Fleetweek%', '%_FW%', '%CitizenCon%', '%ShipShowdown%', '%Showdown%'] },
-      { type: 'pirate', patterns: ['%_PIR%', '%Pirate%'] },
-      { type: 'arena_ai', patterns: ['%_Swarm%'] },
-    ];
-
-    for (const rule of rules) {
-      const conditions = rule.patterns.map(() => 'class_name LIKE ?').join(' OR ');
-      await conn.execute(
-        `UPDATE ships SET variant_type = ? WHERE ship_matrix_id IS NULL AND variant_type IS NULL AND (${conditions})`,
-        [rule.type, ...rule.patterns]
-      );
-    }
-
-    await conn.execute("UPDATE ships SET variant_type = 'special' WHERE ship_matrix_id IS NULL AND variant_type IS NULL");
   }
 
   // ======================================================
@@ -1175,48 +995,55 @@ export class ExtractionService {
     let savedShops = 0;
     let savedInventory = 0;
 
+    // Batch insert shops
+    const shopRows: any[][] = [];
     for (const shop of shops) {
-      try {
-        await conn.execute(
-          `INSERT INTO shops (name, location, parent_location, \`system\`, planet_moon, city, shop_type, class_name)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?) AS new
-           ON DUPLICATE KEY UPDATE
-             name=new.name, location=new.location,
-             parent_location=new.parent_location,
-             \`system\`=new.\`system\`, planet_moon=new.planet_moon, city=new.city,
-             shop_type=new.shop_type,
-             updated_at=CURRENT_TIMESTAMP`,
-          [shop.name, shop.location || null, shop.parentLocation || null, shop.system || null, shop.planetMoon || null, shop.city || null, shop.shopType || null, shop.className]
-        );
-        savedShops++;
-      } catch (e: unknown) {
-        logger.error(`Shop ${shop.className}: ${e instanceof Error ? e.message : String(e)}`);
-      }
+      shopRows.push([shop.name, shop.location || null, shop.parentLocation || null, shop.system || null, shop.planetMoon || null, shop.city || null, shop.shopType || null, shop.className]);
+    }
+    if (shopRows.length > 0) {
+      savedShops = await ExtractionService.batchUpsert(
+        conn,
+        `INSERT INTO shops (name, location, parent_location, \`system\`, planet_moon, city, shop_type, class_name) VALUES`,
+        `ON DUPLICATE KEY UPDATE
+           name=new.name, location=new.location,
+           parent_location=new.parent_location,
+           \`system\`=new.\`system\`, planet_moon=new.planet_moon, city=new.city,
+           shop_type=new.shop_type,
+           updated_at=CURRENT_TIMESTAMP`,
+        8,
+        shopRows,
+      );
     }
 
+    // Pre-cache shop class_name → id and component class_name → uuid
+    const [shopIdRows]: any = await conn.execute("SELECT id, class_name FROM shops");
+    const shopIdCache = new Map<string, number>(shopIdRows.map((r: any) => [r.class_name, r.id]));
+
+    const [compUuidRows]: any = await conn.execute("SELECT uuid, class_name FROM components");
+    const compUuidCache = new Map<string, string>(compUuidRows.map((r: any) => [r.class_name, r.uuid]));
+
+    // Batch insert inventory
+    const invRows: any[][] = [];
     for (const inv of inventory) {
-      try {
-        const [shopRows]: any = await conn.execute("SELECT id FROM shops WHERE class_name = ? LIMIT 1", [inv.shopClassName]);
-        if (!shopRows.length) continue;
-        const shopId = shopRows[0].id;
-
-        const [compRows]: any = await conn.execute("SELECT uuid FROM components WHERE class_name = ? LIMIT 1", [inv.componentClassName]);
-        const compUuid = compRows.length ? compRows[0].uuid : null;
-
-        await conn.execute(
-          `INSERT INTO shop_inventory (shop_id, component_uuid, component_class_name, base_price, rental_price_1d, rental_price_3d, rental_price_7d, rental_price_30d)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?) AS new
-           ON DUPLICATE KEY UPDATE
-             component_uuid=new.component_uuid, base_price=new.base_price,
-             rental_price_1d=new.rental_price_1d, rental_price_3d=new.rental_price_3d,
-             rental_price_7d=new.rental_price_7d, rental_price_30d=new.rental_price_30d,
-             updated_at=CURRENT_TIMESTAMP`,
-          [shopId, compUuid, inv.componentClassName, inv.basePrice ?? null,
-           inv.rentalPrice1d ?? null, inv.rentalPrice3d ?? null,
-           inv.rentalPrice7d ?? null, inv.rentalPrice30d ?? null]
-        );
-        savedInventory++;
-      } catch { /* Skip duplicates or resolution failures */ }
+      const shopId = shopIdCache.get(inv.shopClassName);
+      if (!shopId) continue;
+      const compUuid = compUuidCache.get(inv.componentClassName) || null;
+      invRows.push([shopId, compUuid, inv.componentClassName, inv.basePrice ?? null,
+        inv.rentalPrice1d ?? null, inv.rentalPrice3d ?? null,
+        inv.rentalPrice7d ?? null, inv.rentalPrice30d ?? null]);
+    }
+    if (invRows.length > 0) {
+      savedInventory = await ExtractionService.batchUpsert(
+        conn,
+        `INSERT INTO shop_inventory (shop_id, component_uuid, component_class_name, base_price, rental_price_1d, rental_price_3d, rental_price_7d, rental_price_30d) VALUES`,
+        `ON DUPLICATE KEY UPDATE
+           component_uuid=new.component_uuid, base_price=new.base_price,
+           rental_price_1d=new.rental_price_1d, rental_price_3d=new.rental_price_3d,
+           rental_price_7d=new.rental_price_7d, rental_price_30d=new.rental_price_30d,
+           updated_at=CURRENT_TIMESTAMP`,
+        8,
+        invRows,
+      );
     }
 
     onProgress?.(`Shops: ${savedShops}/${shops.length}, Inventory: ${savedInventory}/${inventory.length}`);
@@ -1232,6 +1059,8 @@ export class ExtractionService {
     extractionId: number,
     oldShips: Map<string, any>,
     oldComps: Map<string, any>,
+    oldItems: Map<string, any>,
+    oldCommodities: Map<string, any>,
   ): Promise<void> {
     const [newShipsRaw] = await conn.execute<any[]>(
       "SELECT uuid, class_name, name, manufacturer_code, role, career, mass, scm_speed, max_speed, total_hp, shield_hp, cargo_capacity, missile_damage_total, weapon_damage_total, crew_size FROM ships"
@@ -1277,6 +1106,30 @@ export class ExtractionService {
     // Removed components
     for (const [cn, comp] of oldComps) {
       if (!newComps.has(cn)) inserts.push([extractionId, 'component', comp.uuid, comp.name || cn, 'removed', null, null, null]);
+    }
+
+    // ── Items changelog ──
+    const [newItemsRaw] = await conn.execute<any[]>(
+      "SELECT uuid, class_name, name, type, sub_type, manufacturer_code FROM items"
+    );
+    const newItems = new Map(newItemsRaw.map((i: any) => [i.class_name, i]));
+    for (const [cn, item] of newItems) {
+      if (!oldItems.has(cn)) inserts.push([extractionId, 'item', item.uuid, item.name || cn, 'added', null, null, null]);
+    }
+    for (const [cn, item] of oldItems) {
+      if (!newItems.has(cn)) inserts.push([extractionId, 'item', item.uuid, item.name || cn, 'removed', null, null, null]);
+    }
+
+    // ── Commodities changelog ──
+    const [newCommoditiesRaw] = await conn.execute<any[]>(
+      "SELECT uuid, class_name, name, type FROM commodities"
+    );
+    const newCommodities = new Map(newCommoditiesRaw.map((c: any) => [c.class_name, c]));
+    for (const [cn, commodity] of newCommodities) {
+      if (!oldCommodities.has(cn)) inserts.push([extractionId, 'commodity', commodity.uuid, commodity.name || cn, 'added', null, null, null]);
+    }
+    for (const [cn, commodity] of oldCommodities) {
+      if (!newCommodities.has(cn)) inserts.push([extractionId, 'commodity', commodity.uuid, commodity.name || cn, 'removed', null, null, null]);
     }
 
     if (inserts.length > 0) {

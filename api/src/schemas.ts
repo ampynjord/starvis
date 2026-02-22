@@ -9,7 +9,7 @@ import { z } from "zod";
 // ── Query param coercers ──────────────────────────────────
 
 /** Coerce Express query param (string | string[] | undefined) → string | undefined */
-export const qStr = z.preprocess(v => (Array.isArray(v) ? v[0] : v) || undefined, z.string().optional());
+export const qStr = z.preprocess(v => (Array.isArray(v) ? v[0] : v) || undefined, z.string().max(200).optional());
 
 export const qInt = (def: number, max?: number) =>
   z.preprocess(

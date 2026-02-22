@@ -1,8 +1,8 @@
 /**
- * STARVIS - Schema initialization
- * Reads and executes db/schema.sql
+ * STARVIS - Schema initialization & versioned migrations
+ * Reads and executes db/schema.sql, then runs new migrations from db/migrations/
  */
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, readdirSync } from "fs";
 import type { PoolConnection } from "mysql2/promise";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -124,5 +124,70 @@ export async function initializeSchema(conn: PoolConnection): Promise<void> {
     }
   } catch (e: any) {
     logger.debug(`Migration uk_shop_component skip: ${e.message}`, { module: 'schema' });
+  }
+
+  // ── Versioned migrations from db/migrations/*.sql ──
+  await runVersionedMigrations(conn);
+}
+
+/**
+ * Run versioned SQL migrations from db/migrations/ directory.
+ * Each file is named NNN_description.sql and tracked in a `schema_migrations` table.
+ */
+async function runVersionedMigrations(conn: PoolConnection): Promise<void> {
+  // Ensure migrations tracking table exists
+  await conn.execute(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version VARCHAR(255) PRIMARY KEY,
+      applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Find migrations directory
+  const candidate1 = path.join(__dirname, "..", "..", "db", "migrations");
+  const candidate2 = path.join(__dirname, "..", "..", "..", "db", "migrations");
+  const migrationsDir = existsSync(candidate1) ? candidate1 : existsSync(candidate2) ? candidate2 : null;
+
+  if (!migrationsDir) {
+    logger.debug('No migrations directory found, skipping versioned migrations', { module: 'schema' });
+    return;
+  }
+
+  // Get already-applied migrations
+  const [applied] = await conn.execute<any[]>("SELECT version FROM schema_migrations");
+  const appliedSet = new Set(applied.map((r: any) => r.version));
+
+  // Read and sort migration files
+  const files = readdirSync(migrationsDir)
+    .filter(f => f.endsWith('.sql'))
+    .sort();
+
+  for (const file of files) {
+    const version = file.replace('.sql', '');
+    if (appliedSet.has(version)) continue;
+
+    logger.info(`Running migration: ${file}`, { module: 'schema' });
+    const sql = readFileSync(path.join(migrationsDir, file), 'utf-8');
+    const statements = sql
+      .replace(/--.*$/gm, '')
+      .split(';')
+      .map(s => s.trim())
+      .filter(s => s.length > 5);
+
+    for (const stmt of statements) {
+      try {
+        await conn.execute(stmt);
+      } catch (e: any) {
+        // Skip benign errors (already exists, duplicate key, etc.)
+        if (['ER_TABLE_EXISTS_ERROR', 'ER_DUP_KEYNAME', 'ER_DUP_FIELDNAME', 'ER_CANT_DROP_FIELD_OR_KEY'].includes(e.code)) {
+          logger.debug(`Migration ${file}: ${e.message} (skipped)`, { module: 'schema' });
+        } else {
+          throw e;
+        }
+      }
+    }
+
+    await conn.execute("INSERT INTO schema_migrations (version) VALUES (?)", [version]);
+    logger.info(`Migration ${file} applied`, { module: 'schema' });
   }
 }
