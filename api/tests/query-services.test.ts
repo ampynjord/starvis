@@ -2,12 +2,12 @@
  * STARVIS - Query service unit tests
  * Tests ShipQueryService, ComponentQueryService, ItemQueryService with mocked pool
  */
-import { describe, expect, it, vi } from "vitest";
-import { ShipQueryService } from "../src/services/ship-query-service.js";
-import { ComponentQueryService } from "../src/services/component-query-service.js";
-import { ItemQueryService } from "../src/services/item-query-service.js";
-import { GameDataService } from "../src/services/game-data-service.js";
 import type { Pool } from "mysql2/promise";
+import { describe, expect, it, vi } from "vitest";
+import { ComponentQueryService } from "../src/services/component-query-service.js";
+import { GameDataService } from "../src/services/game-data-service.js";
+import { ItemQueryService } from "../src/services/item-query-service.js";
+import { ShipQueryService } from "../src/services/ship-query-service.js";
 
 // ── Mock Pool Factory ────────────────────────────────────
 
