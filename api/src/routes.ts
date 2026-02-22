@@ -58,14 +58,6 @@ function setETag(res: Response, jsonStr: string): string {
   return etag;
 }
 
-/** Returns true if client cache is still valid (304 sent). If not, sends the pre-serialized JSON. */
-function sendOrNotModified(req: Request, res: Response, data: unknown): boolean {
-  const jsonStr = JSON.stringify(data);
-  const etag = setETag(res, jsonStr);
-  if (req.headers["if-none-match"] === etag) { res.status(304).end(); return true; }
-  return false;
-}
-
 /** Serialize once, check ETag, and send — avoids double JSON.stringify.
  *  ETag is computed without volatile fields (meta.responseTime). */
 function sendWithETag(req: Request, res: Response, payload: Record<string, unknown>): void {
@@ -451,6 +443,20 @@ export function createRoutes(deps: RouteDependencies): Router {
     const commodity = await gameDataService!.getCommodityByUuid(req.params.uuid);
     if (!commodity) return void res.status(404).json({ success: false, error: "Commodity not found" });
     sendWithETag(req, res, { success: true, data: commodity });
+  }));
+
+  // ── UNIFIED SEARCH ──────────────────────────────────────
+
+  router.get("/api/v1/search", requireGameData, asyncHandler(async (req, res) => {
+    const { search } = SearchQuery.parse(req.query);
+    if (!search || search.length < 2) return void res.status(400).json({ success: false, error: "Query 'search' must be at least 2 characters" });
+    const limit = parseInt(String(req.query.limit) || "10");
+    const data = await gameDataService!.unifiedSearch(search, limit);
+    sendWithETag(req, res, {
+      success: true,
+      data,
+      total: data.ships.length + data.components.length + data.items.length,
+    });
   }));
 
   // ── LOADOUT SIMULATOR ──────────────────────────────────

@@ -60,9 +60,11 @@ export class ItemQueryService {
   }
 
   async getItemFilters(): Promise<{ types: string[]; sub_types: string[]; manufacturers: string[] }> {
-    const [typeRows] = await this.pool.execute<Row[]>("SELECT DISTINCT type FROM items WHERE type IS NOT NULL ORDER BY type");
-    const [subTypeRows] = await this.pool.execute<Row[]>("SELECT DISTINCT sub_type FROM items WHERE sub_type IS NOT NULL AND sub_type != '' ORDER BY sub_type");
-    const [mfrRows] = await this.pool.execute<Row[]>("SELECT DISTINCT manufacturer_code FROM items WHERE manufacturer_code IS NOT NULL ORDER BY manufacturer_code");
+    const [[typeRows], [subTypeRows], [mfrRows]] = await Promise.all([
+      this.pool.execute<Row[]>("SELECT DISTINCT type FROM items WHERE type IS NOT NULL ORDER BY type"),
+      this.pool.execute<Row[]>("SELECT DISTINCT sub_type FROM items WHERE sub_type IS NOT NULL AND sub_type != '' ORDER BY sub_type"),
+      this.pool.execute<Row[]>("SELECT DISTINCT manufacturer_code FROM items WHERE manufacturer_code IS NOT NULL ORDER BY manufacturer_code"),
+    ]);
     return {
       types: typeRows.map(r => String(r.type)),
       sub_types: subTypeRows.map(r => String(r.sub_type)),

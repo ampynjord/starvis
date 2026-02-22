@@ -7,6 +7,8 @@
   "scripts": {
     "extract": "tsx extract.ts",
     "dev": "tsx watch extract.ts",
+    "lint": "biome check --write .",
+    "lint:ci": "biome check .",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -18,7 +20,9 @@
     "mysql2": "^3.16.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.0.0",
     "@types/node": "^20.19.30",
+    "@vitest/coverage-v8": "^4.0.18",
     "tsx": "^4.21.0",
     "typescript": "^5.3.3",
     "vitest": "^4.0.18"

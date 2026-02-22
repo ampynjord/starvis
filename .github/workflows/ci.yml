@@ -41,8 +41,14 @@ jobs:
       - name: Install & type-check API
         run: cd api && npm ci && npx tsc --noEmit
 
+      - name: Lint API (Biome)
+        run: cd api && npx biome check .
+
       - name: Install & type-check Extractor
         run: cd extractor && npm ci && npx tsc --noEmit
+
+      - name: Lint Extractor (Biome)
+        run: cd extractor && npx biome check .
 
       - name: Audit API dependencies
         run: cd api && npm audit --audit-level=high
@@ -99,10 +105,10 @@ jobs:
         run: cd extractor && npm ci
 
       - name: Run API unit tests
-        run: cd api && npx vitest run
+        run: cd api && npx vitest run --coverage
 
       - name: Run Extractor unit tests
-        run: cd extractor && npx vitest run
+        run: cd extractor && npx vitest run --coverage
 
       - name: Wait for MySQL
         run: |

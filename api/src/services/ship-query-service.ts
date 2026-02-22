@@ -123,9 +123,11 @@ export class ShipQueryService {
   }
 
   async getShipFilters(): Promise<{ roles: string[]; careers: string[]; variant_types: string[] }> {
-    const [roleRows] = await this.pool.execute<Row[]>("SELECT DISTINCT role FROM ships WHERE role IS NOT NULL AND role != '' ORDER BY role");
-    const [careerRows] = await this.pool.execute<Row[]>("SELECT DISTINCT career FROM ships WHERE career IS NOT NULL AND career != '' ORDER BY career");
-    const [variantRows] = await this.pool.execute<Row[]>("SELECT DISTINCT variant_type FROM ships WHERE variant_type IS NOT NULL AND variant_type != '' ORDER BY variant_type");
+    const [[roleRows], [careerRows], [variantRows]] = await Promise.all([
+      this.pool.execute<Row[]>("SELECT DISTINCT role FROM ships WHERE role IS NOT NULL AND role != '' ORDER BY role"),
+      this.pool.execute<Row[]>("SELECT DISTINCT career FROM ships WHERE career IS NOT NULL AND career != '' ORDER BY career"),
+      this.pool.execute<Row[]>("SELECT DISTINCT variant_type FROM ships WHERE variant_type IS NOT NULL AND variant_type != '' ORDER BY variant_type"),
+    ]);
     return {
       roles: roleRows.map((r) => String(r.role)),
       careers: careerRows.map((r) => String(r.career)),
