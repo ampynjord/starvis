@@ -114,6 +114,19 @@ describe('ComponentQueryService', () => {
       expect(result).toBeTruthy();
     });
   });
+
+  describe('getComponentShips', () => {
+    it('joins manufacturers to provide manufacturer_name safely', async () => {
+      const pool = createMockPool([[[row({ uuid: 'ship-1', name: 'Gladius', class_name: 'AEGS_Gladius', manufacturer_code: 'AEGS' })], []]]);
+      const svc = new ComponentQueryService(pool);
+      const result = await svc.getComponentShips('component-uuid');
+
+      expect(result).toHaveLength(1);
+      const callArgs = (pool.execute as any).mock.calls[0];
+      expect(callArgs[0]).toContain('LEFT JOIN manufacturers m ON s.manufacturer_code = m.code');
+      expect(callArgs[1]).toEqual(['component-uuid']);
+    });
+  });
 });
 
 // ── ItemQueryService ─────────────────────────────────────
