@@ -114,8 +114,10 @@ export class ComponentQueryService {
 
   async getComponentShips(uuid: string): Promise<Row[]> {
     const [rows] = await this.pool.execute<Row[]>(
-      `SELECT DISTINCT s.uuid, s.name, s.class_name, s.manufacturer_code, s.manufacturer_name
-       FROM ships_loadouts sl JOIN ships s ON sl.ship_uuid = s.uuid
+      `SELECT DISTINCT s.uuid, s.name, s.class_name, s.manufacturer_code, m.name as manufacturer_name
+       FROM ships_loadouts sl
+       JOIN ships s ON sl.ship_uuid = s.uuid
+       LEFT JOIN manufacturers m ON s.manufacturer_code = m.code
        WHERE sl.component_uuid = ? ORDER BY s.name`,
       [uuid],
     );
