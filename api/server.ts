@@ -136,6 +136,7 @@ app.get('/', (_, res) =>
 // ===== STARTUP =====
 async function start() {
   // 1. Database connection with retry
+  let dbReady = false;
   for (let i = 0; i < 30; i++) {
     try {
       pool = mysql.createPool(DB_CONFIG);
@@ -143,13 +144,19 @@ async function start() {
       await initializeSchema(conn);
       conn.release();
       logger.info('✅ Database ready', { module: 'DB' });
+      dbReady = true;
       break;
-    } catch (_e) {
+    } catch (e) {
+      logger.warn(String(e), { module: 'DB' });
       logger.warn(`DB retry ${i + 1}/30…`, { module: 'DB' });
+      if (pool) {
+        await pool.end();
+        pool = null;
+      }
       await new Promise((r) => setTimeout(r, 1000));
     }
   }
-  if (!pool) {
+  if (!dbReady || !pool) {
     logger.error('Database connection failed after 30 retries', { module: 'DB' });
     process.exit(1);
   }
