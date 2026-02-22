@@ -11,14 +11,14 @@
  *
  * This facade keeps the same public API so routes.ts is untouched.
  */
-import type { Pool } from "mysql2/promise";
-import { CommodityQueryService } from "./commodity-query-service.js";
-import { ComponentQueryService } from "./component-query-service.js";
-import { ItemQueryService } from "./item-query-service.js";
-import { LoadoutService } from "./loadout-service.js";
-import type { PaginatedResult, Row } from "./shared.js";
-import { ShipQueryService } from "./ship-query-service.js";
-import { ShopService } from "./shop-service.js";
+import type { Pool } from 'mysql2/promise';
+import { CommodityQueryService } from './commodity-query-service.js';
+import { ComponentQueryService } from './component-query-service.js';
+import { ItemQueryService } from './item-query-service.js';
+import { LoadoutService } from './loadout-service.js';
+import type { PaginatedResult, Row } from './shared.js';
+import { ShipQueryService } from './ship-query-service.js';
+import { ShopService } from './shop-service.js';
 
 export type { PaginatedResult, Row };
 
@@ -27,9 +27,16 @@ class TtlCache<T> {
   private data: T | undefined;
   private expiresAt = 0;
   constructor(private ttlMs: number) {}
-  get(): T | undefined { return Date.now() < this.expiresAt ? this.data : undefined; }
-  set(value: T): void { this.data = value; this.expiresAt = Date.now() + this.ttlMs; }
-  invalidate(): void { this.expiresAt = 0; }
+  get(): T | undefined {
+    return Date.now() < this.expiresAt ? this.data : undefined;
+  }
+  set(value: T): void {
+    this.data = value;
+    this.expiresAt = Date.now() + this.ttlMs;
+  }
+  invalidate(): void {
+    this.expiresAt = 0;
+  }
 }
 
 export class GameDataService {
@@ -39,94 +46,185 @@ export class GameDataService {
   private shopsSvc: ShopService;
   private itemsSvc: ItemQueryService;
   private commoditiesSvc: CommodityQueryService;
-  private statsCache = new TtlCache<Record<string, unknown>>(60_000);       // 1 min
+  private statsCache = new TtlCache<Record<string, unknown>>(60_000); // 1 min
   private publicStatsCache = new TtlCache<Record<string, unknown>>(60_000); // 1 min
 
   constructor(private pool: Pool) {
-    this.ships       = new ShipQueryService(pool);
-    this.components  = new ComponentQueryService(pool);
-    this.loadouts    = new LoadoutService(pool);
-    this.shopsSvc    = new ShopService(pool);
-    this.itemsSvc    = new ItemQueryService(pool);
+    this.ships = new ShipQueryService(pool);
+    this.components = new ComponentQueryService(pool);
+    this.loadouts = new LoadoutService(pool);
+    this.shopsSvc = new ShopService(pool);
+    this.itemsSvc = new ItemQueryService(pool);
     this.commoditiesSvc = new CommodityQueryService(pool);
   }
 
   // ── Ships (delegated) ───────────────────────────────────
 
   getAllShips(filters?: {
-    manufacturer?: string; role?: string; career?: string; status?: string;
-    vehicle_category?: string; variant_type?: string; search?: string;
-    sort?: string; order?: string; page?: number; limit?: number;
+    manufacturer?: string;
+    role?: string;
+    career?: string;
+    status?: string;
+    vehicle_category?: string;
+    variant_type?: string;
+    search?: string;
+    sort?: string;
+    order?: string;
+    page?: number;
+    limit?: number;
   }): Promise<PaginatedResult> {
     return this.ships.getAllShips(filters);
   }
 
-  getShipByUuid(uuid: string) { return this.ships.getShipByUuid(uuid); }
-  getShipByClassName(className: string) { return this.ships.getShipByClassName(className); }
-  getShipFilters() { return this.ships.getShipFilters(); }
-  getAllManufacturers() { return this.ships.getAllManufacturers(); }
-  getShipManufacturers() { return this.ships.getShipManufacturers(); }
-  getManufacturerByCode(code: string) { return this.ships.getManufacturerByCode(code); }
-  getManufacturerShips(code: string) { return this.ships.getManufacturerShips(code); }
-  getManufacturerComponents(code: string) { return this.ships.getManufacturerComponents(code); }
-  searchShipsAutocomplete(q: string, limit?: number) { return this.ships.searchShipsAutocomplete(q, limit); }
-  getRandomShip() { return this.ships.getRandomShip(); }
-  getSimilarShips(uuid: string, limit?: number) { return this.ships.getSimilarShips(uuid, limit); }
+  getShipByUuid(uuid: string) {
+    return this.ships.getShipByUuid(uuid);
+  }
+  getShipByClassName(className: string) {
+    return this.ships.getShipByClassName(className);
+  }
+  getShipFilters() {
+    return this.ships.getShipFilters();
+  }
+  getAllManufacturers() {
+    return this.ships.getAllManufacturers();
+  }
+  getShipManufacturers() {
+    return this.ships.getShipManufacturers();
+  }
+  getManufacturerByCode(code: string) {
+    return this.ships.getManufacturerByCode(code);
+  }
+  getManufacturerShips(code: string) {
+    return this.ships.getManufacturerShips(code);
+  }
+  getManufacturerComponents(code: string) {
+    return this.ships.getManufacturerComponents(code);
+  }
+  searchShipsAutocomplete(q: string, limit?: number) {
+    return this.ships.searchShipsAutocomplete(q, limit);
+  }
+  getRandomShip() {
+    return this.ships.getRandomShip();
+  }
+  getSimilarShips(uuid: string, limit?: number) {
+    return this.ships.getSimilarShips(uuid, limit);
+  }
 
   // ── Components (delegated) ──────────────────────────────
 
   getAllComponents(filters?: {
-    type?: string; sub_type?: string; size?: string; grade?: string;
-    min_size?: string; max_size?: string;
-    manufacturer?: string; search?: string;
-    sort?: string; order?: string; page?: number; limit?: number;
+    type?: string;
+    sub_type?: string;
+    size?: string;
+    grade?: string;
+    min_size?: string;
+    max_size?: string;
+    manufacturer?: string;
+    search?: string;
+    sort?: string;
+    order?: string;
+    page?: number;
+    limit?: number;
   }): Promise<PaginatedResult> {
     return this.components.getAllComponents(filters);
   }
 
-  getComponentByUuid(uuid: string) { return this.components.getComponentByUuid(uuid); }
-  getComponentByClassName(className: string) { return this.components.getComponentByClassName(className); }
-  resolveComponent(id: string) { return this.components.resolveComponent(id); }
-  getComponentFilters() { return this.components.getComponentFilters(); }
-  getComponentBuyLocations(uuid: string) { return this.components.getComponentBuyLocations(uuid); }
-  getComponentShips(uuid: string) { return this.components.getComponentShips(uuid); }
-  getComponentTypes() { return this.components.getComponentTypes(); }
+  getComponentByUuid(uuid: string) {
+    return this.components.getComponentByUuid(uuid);
+  }
+  getComponentByClassName(className: string) {
+    return this.components.getComponentByClassName(className);
+  }
+  resolveComponent(id: string) {
+    return this.components.resolveComponent(id);
+  }
+  getComponentFilters() {
+    return this.components.getComponentFilters();
+  }
+  getComponentBuyLocations(uuid: string) {
+    return this.components.getComponentBuyLocations(uuid);
+  }
+  getComponentShips(uuid: string) {
+    return this.components.getComponentShips(uuid);
+  }
+  getComponentTypes() {
+    return this.components.getComponentTypes();
+  }
 
   // ── Loadout (delegated) ─────────────────────────────────
 
-  getShipLoadout(shipUuid: string) { return this.loadouts.getShipLoadout(shipUuid); }
-  getShipModules(shipUuid: string) { return this.loadouts.getShipModules(shipUuid); }
-  getShipPaints(shipUuid: string) { return this.loadouts.getShipPaints(shipUuid); }
-  getAllPaints(opts: { search?: string; ship_uuid?: string; page?: number; limit?: number }) { return this.loadouts.getAllPaints(opts); }
-  calculateLoadout(shipUuid: string, swaps: { portId?: number; portName?: string; componentUuid: string }[]) { return this.loadouts.calculateLoadout(shipUuid, swaps); }
-  getShipStats(shipUuid: string) { return this.loadouts.getShipStats(shipUuid); }
-  getShipHardpoints(shipUuid: string) { return this.loadouts.getShipHardpoints(shipUuid); }
+  getShipLoadout(shipUuid: string) {
+    return this.loadouts.getShipLoadout(shipUuid);
+  }
+  getShipModules(shipUuid: string) {
+    return this.loadouts.getShipModules(shipUuid);
+  }
+  getShipPaints(shipUuid: string) {
+    return this.loadouts.getShipPaints(shipUuid);
+  }
+  getAllPaints(opts: { search?: string; ship_uuid?: string; page?: number; limit?: number }) {
+    return this.loadouts.getAllPaints(opts);
+  }
+  calculateLoadout(shipUuid: string, swaps: { portId?: number; portName?: string; componentUuid: string }[]) {
+    return this.loadouts.calculateLoadout(shipUuid, swaps);
+  }
+  getShipStats(shipUuid: string) {
+    return this.loadouts.getShipStats(shipUuid);
+  }
+  getShipHardpoints(shipUuid: string) {
+    return this.loadouts.getShipHardpoints(shipUuid);
+  }
 
   // ── Shops (delegated) ───────────────────────────────────
 
-  getShops(opts: { page?: number; limit?: number; location?: string; type?: string; search?: string }) { return this.shopsSvc.getShops(opts); }
-  getShopInventory(shopId: number) { return this.shopsSvc.getShopInventory(shopId); }
+  getShops(opts: { page?: number; limit?: number; location?: string; type?: string; search?: string }) {
+    return this.shopsSvc.getShops(opts);
+  }
+  getShopInventory(shopId: number) {
+    return this.shopsSvc.getShopInventory(shopId);
+  }
 
   // ── Items (delegated) ──────────────────────────────────
 
   getAllItems(filters?: {
-    type?: string; sub_type?: string; manufacturer?: string; search?: string;
-    sort?: string; order?: string; page?: number; limit?: number;
-  }) { return this.itemsSvc.getAllItems(filters); }
-  getItemByUuid(uuid: string) { return this.itemsSvc.getItemByUuid(uuid); }
-  getItemByClassName(className: string) { return this.itemsSvc.getItemByClassName(className); }
-  resolveItem(id: string) { return this.itemsSvc.resolveItem(id); }
-  getItemFilters() { return this.itemsSvc.getItemFilters(); }
-  getItemTypes() { return this.itemsSvc.getItemTypes(); }
+    type?: string;
+    sub_type?: string;
+    manufacturer?: string;
+    search?: string;
+    sort?: string;
+    order?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.itemsSvc.getAllItems(filters);
+  }
+  getItemByUuid(uuid: string) {
+    return this.itemsSvc.getItemByUuid(uuid);
+  }
+  getItemByClassName(className: string) {
+    return this.itemsSvc.getItemByClassName(className);
+  }
+  resolveItem(id: string) {
+    return this.itemsSvc.resolveItem(id);
+  }
+  getItemFilters() {
+    return this.itemsSvc.getItemFilters();
+  }
+  getItemTypes() {
+    return this.itemsSvc.getItemTypes();
+  }
 
   // ── Commodities (delegated) ─────────────────────────────
 
-  getAllCommodities(filters?: {
-    type?: string; search?: string;
-    sort?: string; order?: string; page?: number; limit?: number;
-  }) { return this.commoditiesSvc.getAllCommodities(filters); }
-  getCommodityByUuid(uuid: string) { return this.commoditiesSvc.getCommodityByUuid(uuid); }
-  getCommodityTypes() { return this.commoditiesSvc.getCommodityTypes(); }
+  getAllCommodities(filters?: { type?: string; search?: string; sort?: string; order?: string; page?: number; limit?: number }) {
+    return this.commoditiesSvc.getAllCommodities(filters);
+  }
+  getCommodityByUuid(uuid: string) {
+    return this.commoditiesSvc.getCommodityByUuid(uuid);
+  }
+  getCommodityTypes() {
+    return this.commoditiesSvc.getCommodityTypes();
+  }
 
   // ── Unified search ──────────────────────────────────────
 
@@ -163,18 +261,29 @@ export class GameDataService {
 
   // ── Changelog & stats (kept locally — small) ────────────
 
-  async getChangelog(params: { limit?: string; offset?: string; entityType?: string; changeType?: string }): Promise<{ data: Row[]; total: number }> {
+  async getChangelog(params: {
+    limit?: string;
+    offset?: string;
+    entityType?: string;
+    changeType?: string;
+  }): Promise<{ data: Row[]; total: number }> {
     const where: string[] = [];
     const p: (string | number)[] = [];
-    if (params.entityType) { where.push("c.entity_type = ?"); p.push(params.entityType); }
-    if (params.changeType) { where.push("c.change_type = ?"); p.push(params.changeType); }
+    if (params.entityType) {
+      where.push('c.entity_type = ?');
+      p.push(params.entityType);
+    }
+    if (params.changeType) {
+      where.push('c.change_type = ?');
+      p.push(params.changeType);
+    }
 
-    const w = where.length ? ` WHERE ${where.join(" AND ")}` : "";
+    const w = where.length ? ` WHERE ${where.join(' AND ')}` : '';
     const [countRows] = await this.pool.execute<Row[]>(`SELECT COUNT(*) as total FROM changelog c${w}`, p);
     const total = Number(countRows[0]?.total) || 0;
 
-    const limit = Math.min(100, parseInt(params.limit || "50"));
-    const offset = parseInt(params.offset || "0");
+    const limit = Math.min(100, parseInt(params.limit || '50'));
+    const offset = parseInt(params.offset || '0');
     const [rows] = await this.pool.execute<Row[]>(
       `SELECT c.*, e.game_version, e.extracted_at as extraction_date FROM changelog c LEFT JOIN extraction_log e ON c.extraction_id = e.id${w} ORDER BY c.created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
       p,
@@ -204,12 +313,12 @@ export class GameDataService {
   }
 
   async getExtractionLog(): Promise<Row[]> {
-    const [rows] = await this.pool.execute<Row[]>("SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 20");
+    const [rows] = await this.pool.execute<Row[]>('SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 20');
     return rows;
   }
 
   async getLatestExtraction(): Promise<Row | null> {
-    const [rows] = await this.pool.execute<Row[]>("SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 1");
+    const [rows] = await this.pool.execute<Row[]>('SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 1');
     return rows[0] || null;
   }
 
@@ -250,7 +359,7 @@ export class GameDataService {
        LEFT JOIN extraction_log e ON c.extraction_id = e.id
        ORDER BY c.created_at DESC LIMIT 10`,
     );
-    const [total] = await this.pool.execute<Row[]>("SELECT COUNT(*) as total FROM changelog");
+    const [total] = await this.pool.execute<Row[]>('SELECT COUNT(*) as total FROM changelog');
     return {
       total: Number(total[0]?.total) || 0,
       by_type: byType,

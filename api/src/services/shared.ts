@@ -1,7 +1,7 @@
 /**
  * Shared types, helpers and constants for game-data sub-services
  */
-import type { RowDataPacket } from "mysql2/promise";
+import type { RowDataPacket } from 'mysql2/promise';
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -67,28 +67,74 @@ export const SHIP_JOINS = `FROM ships s
   LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id`;
 
 export const SHIP_SORT = new Set([
-  "name", "class_name", "manufacturer_code", "mass", "scm_speed", "max_speed",
-  "total_hp", "shield_hp", "crew_size", "cargo_capacity", "missile_damage_total",
-  "weapon_damage_total", "armor_physical", "armor_energy", "armor_distortion",
-  "cross_section_x", "cross_section_y", "cross_section_z",
-  "hydrogen_fuel_capacity", "quantum_fuel_capacity", "boost_speed_forward",
-  "pitch_max", "yaw_max", "roll_max",
+  'name',
+  'class_name',
+  'manufacturer_code',
+  'mass',
+  'scm_speed',
+  'max_speed',
+  'total_hp',
+  'shield_hp',
+  'crew_size',
+  'cargo_capacity',
+  'missile_damage_total',
+  'weapon_damage_total',
+  'armor_physical',
+  'armor_energy',
+  'armor_distortion',
+  'cross_section_x',
+  'cross_section_y',
+  'cross_section_z',
+  'hydrogen_fuel_capacity',
+  'quantum_fuel_capacity',
+  'boost_speed_forward',
+  'pitch_max',
+  'yaw_max',
+  'roll_max',
 ]);
 
 export const COMP_SORT = new Set([
-  "name", "class_name", "type", "size", "grade", "manufacturer_code",
-  "weapon_dps", "weapon_burst_dps", "weapon_sustained_dps", "weapon_damage",
-  "weapon_fire_rate", "weapon_range", "weapon_damage_physical",
-  "weapon_damage_energy", "weapon_damage_distortion", "shield_hp", "shield_regen",
-  "qd_speed", "qd_spool_time", "power_output", "cooling_rate", "hp", "mass",
-  "thruster_max_thrust", "radar_range", "fuel_capacity",
+  'name',
+  'class_name',
+  'type',
+  'size',
+  'grade',
+  'manufacturer_code',
+  'weapon_dps',
+  'weapon_burst_dps',
+  'weapon_sustained_dps',
+  'weapon_damage',
+  'weapon_fire_rate',
+  'weapon_range',
+  'weapon_damage_physical',
+  'weapon_damage_energy',
+  'weapon_damage_distortion',
+  'shield_hp',
+  'shield_regen',
+  'qd_speed',
+  'qd_spool_time',
+  'power_output',
+  'cooling_rate',
+  'hp',
+  'mass',
+  'thruster_max_thrust',
+  'radar_range',
+  'fuel_capacity',
 ]);
 
 export const UTILITY_WEAPON_RX = /tractor|mining|salvage|repair|grin_tractor|grin_salvage/i;
 
 export const RELEVANT_TYPES = new Set([
-  "WeaponGun", "Shield", "PowerPlant", "Cooler", "QuantumDrive",
-  "Countermeasure", "Missile", "Radar", "EMP", "QuantumInterdictionGenerator",
+  'WeaponGun',
+  'Shield',
+  'PowerPlant',
+  'Cooler',
+  'QuantumDrive',
+  'Countermeasure',
+  'Missile',
+  'Radar',
+  'EMP',
+  'QuantumInterdictionGenerator',
 ]);
 
 // ── String helpers ────────────────────────────────────────
@@ -96,29 +142,28 @@ export const RELEVANT_TYPES = new Set([
 /** Detect utility weapon sub-type from name/class_name */
 export function detectUtilityType(name: string, className: string): string {
   const s = `${name} ${className}`.toLowerCase();
-  if (/mining|orion_mining/i.test(s)) return "MiningLaser";
-  if (/salvage|reclaim/i.test(s)) return "SalvageHead";
-  if (/tractor|grin_tractor/i.test(s)) return "TractorBeam";
-  if (/repair/i.test(s)) return "RepairBeam";
-  return "UtilityWeapon";
+  if (/mining|orion_mining/i.test(s)) return 'MiningLaser';
+  if (/salvage|reclaim/i.test(s)) return 'SalvageHead';
+  if (/tractor|grin_tractor/i.test(s)) return 'TractorBeam';
+  if (/repair/i.test(s)) return 'RepairBeam';
+  return 'UtilityWeapon';
 }
 
 export function cleanName(name: string, type: string): string {
-  if (!name) return "—";
+  if (!name) return '—';
   let c = name;
-  if (["Shield", "QuantumDrive", "PowerPlant", "Cooler", "Radar", "Missile"].includes(type))
-    c = c.replace(/^S\d{2}\s+/, "");
-  if (type === "Countermeasure") {
+  if (['Shield', 'QuantumDrive', 'PowerPlant', 'Cooler', 'Radar', 'Missile'].includes(type)) c = c.replace(/^S\d{2}\s+/, '');
+  if (type === 'Countermeasure') {
     const m = c.match(/(CML\s+.+)/i);
     if (m) c = m[1];
   }
-  c = c.replace(/\s*SCItem.*$/i, "").replace(/\s*_Resist.*$/i, "");
-  return c.trim() || "—";
+  c = c.replace(/\s*SCItem.*$/i, '').replace(/\s*_Resist.*$/i, '');
+  return c.trim() || '—';
 }
 
 // ── Pagination helper ─────────────────────────────────────
 
-import type { Pool } from "mysql2/promise";
+import type { Pool } from 'mysql2/promise';
 
 export async function paginate(
   pool: Pool,
@@ -132,8 +177,8 @@ export async function paginate(
   const [countRows] = await pool.execute<Row[]>(countSql, params);
   const total = countRows[0]?.total ?? countRows[0]?.count ?? 0;
 
-  const sortCol = sortCols.has(opts.sort || "") ? opts.sort! : "name";
-  const order = opts.order === "desc" ? "DESC" : "ASC";
+  const sortCol = sortCols.has(opts.sort || '') ? opts.sort! : 'name';
+  const order = opts.order === 'desc' ? 'DESC' : 'ASC';
   const page = Math.max(1, opts.page || 1);
   const limit = Math.min(200, Math.max(1, opts.limit || 50));
   const offset = (page - 1) * limit;

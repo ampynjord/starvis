@@ -14,23 +14,23 @@
  *   P4K_PATH (alternative to --p4k flag)
  *   LOG_LEVEL (debug|info|warn|error, default: info)
  */
-import "dotenv/config";
-import { existsSync } from "fs";
-import * as mysql from "mysql2/promise";
-import { DataForgeService } from "./src/dataforge-service.js";
-import { ExtractionService } from "./src/extraction-service.js";
-import logger from "./src/logger.js";
+import 'dotenv/config';
+import { existsSync } from 'fs';
+import * as mysql from 'mysql2/promise';
+import { DataForgeService } from './src/dataforge-service.js';
+import { ExtractionService } from './src/extraction-service.js';
+import logger from './src/logger.js';
 
 // ── Parse CLI args ──────────────────────────────────────────
 function parseArgs(): { p4kPath: string } {
   const args = process.argv.slice(2);
-  let p4kPath = process.env.P4K_PATH || "";
+  let p4kPath = process.env.P4K_PATH || '';
 
   for (let i = 0; i < args.length; i++) {
-    if ((args[i] === "--p4k" || args[i] === "-p") && args[i + 1]) {
+    if ((args[i] === '--p4k' || args[i] === '-p') && args[i + 1]) {
       p4kPath = args[++i];
     }
-    if (args[i] === "--help" || args[i] === "-h") {
+    if (args[i] === '--help' || args[i] === '-h') {
       console.log(`
 STARVIS Extractor — Star Citizen P4K → MySQL
 
@@ -55,7 +55,7 @@ Environment:
   }
 
   if (!p4kPath) {
-    console.error("Error: P4K path required. Use --p4k <path> or set P4K_PATH env var.");
+    console.error('Error: P4K path required. Use --p4k <path> or set P4K_PATH env var.');
     process.exit(1);
   }
 
@@ -76,17 +76,17 @@ async function main() {
 
   // Database connection
   const dbConfig = {
-    host: process.env.DB_HOST || "localhost",
-    port: parseInt(process.env.DB_PORT || "3306"),
-    user: process.env.DB_USER || "",
-    password: process.env.DB_PASSWORD || "",
-    database: process.env.DB_NAME || "",
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT || '3306'),
+    user: process.env.DB_USER || '',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || '',
     waitForConnections: true,
     connectionLimit: 5,
   };
 
   if (!dbConfig.user || !dbConfig.password || !dbConfig.database) {
-    console.error("Error: DB_USER, DB_PASSWORD, and DB_NAME environment variables are required.");
+    console.error('Error: DB_USER, DB_PASSWORD, and DB_NAME environment variables are required.');
     process.exit(1);
   }
 
@@ -96,17 +96,17 @@ async function main() {
     pool = mysql.createPool(dbConfig);
     const conn = await pool.getConnection();
     conn.release();
-    logger.info("✅ Database connected");
+    logger.info('✅ Database connected');
   } catch (e) {
     console.error(`Error: Cannot connect to database: ${(e as Error).message}`);
     process.exit(1);
   }
 
   // Initialize DataForge
-  logger.info("Initializing DataForge…");
+  logger.info('Initializing DataForge…');
   const dfService = new DataForgeService(p4kPath);
   await dfService.init();
-  logger.info("✅ DataForge initialized");
+  logger.info('✅ DataForge initialized');
 
   // Run extraction
   const extractor = new ExtractionService(pool, dfService);
@@ -116,7 +116,7 @@ async function main() {
     const stats = await extractor.extractAll((msg) => logger.info(msg));
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    logger.info("═══════════════════════════════════════════");
+    logger.info('═══════════════════════════════════════════');
     logger.info(`✅ Extraction complete in ${duration}s`);
     logger.info(`   Ships:        ${stats.ships}`);
     logger.info(`   Components:   ${stats.components}`);
@@ -127,7 +127,7 @@ async function main() {
       logger.warn(`   Errors:       ${stats.errors.length}`);
       for (const e of stats.errors) logger.warn(`     - ${e}`);
     }
-    logger.info("═══════════════════════════════════════════");
+    logger.info('═══════════════════════════════════════════');
   } catch (e) {
     logger.error(`Extraction failed: ${(e as Error).message}`);
     process.exit(1);
@@ -138,6 +138,6 @@ async function main() {
 }
 
 main().catch((e) => {
-  console.error("Fatal error:", e);
+  console.error('Fatal error:', e);
   process.exit(1);
 });

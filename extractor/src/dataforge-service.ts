@@ -4,21 +4,24 @@
  *
  * Extraction logic (components, shops, paints) is delegated to dedicated modules.
  */
-import { extractAllComponents as _extractAllComponents } from "./component-extractor.js";
-import { CryXmlNode, isCryXmlB, parseCryXml } from "./cryxml-parser.js";
+import { extractAllComponents as _extractAllComponents } from './component-extractor.js';
+import { type CryXmlNode, isCryXmlB, parseCryXml } from './cryxml-parser.js';
 import {
-    type DataForgeData, type RecordDef, DT_NAMES,
-    getStructProperties, parseDataForge,
-    readInstance as readInstancePure
-} from "./dataforge-parser.js";
-import { type DataForgeContext, classifyPort, resolveLocKey } from "./dataforge-utils.js";
-import { extractItems as _extractItems } from "./item-extractor.js";
-import logger from "./logger.js";
-import { P4KProvider } from "./p4k-provider.js";
-import { extractPaints as _extractPaints, extractShops as _extractShops } from "./shop-paint-extractor.js";
+  type DataForgeData,
+  DT_NAMES,
+  getStructProperties,
+  parseDataForge,
+  type RecordDef,
+  readInstance as readInstancePure,
+} from './dataforge-parser.js';
+import { classifyPort, type DataForgeContext, resolveLocKey } from './dataforge-utils.js';
+import { extractItems as _extractItems } from './item-extractor.js';
+import logger from './logger.js';
+import { P4KProvider } from './p4k-provider.js';
+import { extractPaints as _extractPaints, extractShops as _extractShops } from './shop-paint-extractor.js';
 
 // Re-export for backward compatibility (extraction-service.ts imports these from here)
-export { classifyPort, MANUFACTURER_CODES } from "./dataforge-utils.js";
+export { classifyPort, MANUFACTURER_CODES } from './dataforge-utils.js';
 
 export class DataForgeService implements DataForgeContext {
   private provider: P4KProvider | null = null;
@@ -32,10 +35,14 @@ export class DataForgeService implements DataForgeContext {
   // ============ DataForgeContext implementation ============
 
   /** Expose parsed DataForge data for extraction modules */
-  getDfData(): DataForgeData | null { return this.dfData; }
+  getDfData(): DataForgeData | null {
+    return this.dfData;
+  }
 
   /** Expose P4K provider (replaces the old `(svc as any).provider` hack) */
-  getProvider(): P4KProvider | null { return this.provider; }
+  getProvider(): P4KProvider | null {
+    return this.provider;
+  }
 
   async init(): Promise<void> {
     logger.info('Init P4K service...', { module: 'dataforge' });
@@ -45,29 +52,36 @@ export class DataForgeService implements DataForgeContext {
   }
 
   async close(): Promise<void> {
-    if (this.provider) { await this.provider.close(); this.provider = null; }
+    if (this.provider) {
+      await this.provider.close();
+      this.provider = null;
+    }
   }
 
   async loadDataForge(onProgress?: (m: string) => void) {
-    if (!this.provider) throw new Error("Service not init");
-    onProgress?.("Loading Game2.dcb...");
-    await this.provider.loadAllEntries((c, t) => { if (c % 100000 === 0) onProgress?.(`Loading: ${c.toLocaleString()}/${t.toLocaleString()}`); });
-    const dcbEntry = await this.provider.getEntry("Data\\Game2.dcb");
-    if (!dcbEntry) throw new Error("Game2.dcb not found");
+    if (!this.provider) throw new Error('Service not init');
+    onProgress?.('Loading Game2.dcb...');
+    await this.provider.loadAllEntries((c, t) => {
+      if (c % 100000 === 0) onProgress?.(`Loading: ${c.toLocaleString()}/${t.toLocaleString()}`);
+    });
+    const dcbEntry = await this.provider.getEntry('Data\\Game2.dcb');
+    if (!dcbEntry) throw new Error('Game2.dcb not found');
     onProgress?.(`Game2.dcb found (${(dcbEntry.uncompressedSize / 1024 / 1024).toFixed(1)} MB)`);
     this.dcbBuffer = await this.provider.readFileFromEntry(dcbEntry);
-    onProgress?.("Parsing DataForge...");
+    onProgress?.('Parsing DataForge...');
     this.dfData = parseDataForge(this.dcbBuffer);
     this.buildVehicleIndex();
     return {
       version: this.dfData.header.version,
       structCount: this.dfData.header.structDefinitionCount,
       recordCount: this.dfData.header.recordDefinitionCount,
-      vehicleCount: this.vehicleIndex.size
+      vehicleCount: this.vehicleIndex.size,
     };
   }
 
-  isDataForgeLoaded() { return this.dfData !== null; }
+  isDataForgeLoaded() {
+    return this.dfData !== null;
+  }
 
   getVersion(): string {
     return this.dfData?.header?.version?.toString() || 'unknown';
@@ -76,18 +90,18 @@ export class DataForgeService implements DataForgeContext {
   // ============ P4K file access ============
 
   async findFiles(pattern: string, limit = 100) {
-    if (!this.provider) throw new Error("Not init");
-    return this.provider.findFiles(new RegExp(pattern, "i"), limit);
+    if (!this.provider) throw new Error('Not init');
+    return this.provider.findFiles(new RegExp(pattern, 'i'), limit);
   }
 
   async getP4KStats() {
-    if (!this.provider) throw new Error("Not init");
+    if (!this.provider) throw new Error('Not init');
     const s = await this.provider.getStats();
     return { ...s, compressionRatio: 1 - s.compressedSize / s.totalSize };
   }
 
   async readFile(path: string): Promise<Buffer | null> {
-    if (!this.provider) throw new Error("Not init");
+    if (!this.provider) throw new Error('Not init');
     const entry = await this.provider.getEntry(path);
     if (!entry) return null;
     return this.provider.readFileFromEntry(entry);
@@ -111,20 +125,24 @@ export class DataForgeService implements DataForgeContext {
 
   readRecordByGuid(guid: string, maxDepth = 4): Record<string, any> | null {
     if (!this.dfData || !this.dcbBuffer || !guid || guid === '00000000-0000-0000-0000-000000000000') return null;
-    const record = this.dfData.records.find(r => r.id === guid);
+    const record = this.dfData.records.find((r) => r.id === guid);
     if (!record) return null;
     return this.readInstance(record.structIndex, record.instanceIndex, 0, maxDepth);
   }
 
   searchRecords(pattern: string, limit = 100) {
-    if (!this.dfData) throw new Error("DataForge not loaded");
-    const rx = new RegExp(pattern, "i"), res: any[] = [];
+    if (!this.dfData) throw new Error('DataForge not loaded');
+    const rx = new RegExp(pattern, 'i'),
+      res: any[] = [];
     for (const r of this.dfData.records) {
       if (rx.test(r.fileName) || rx.test(r.name)) {
         res.push({
-          name: r.name, fileName: r.fileName, uuid: r.id,
-          structType: this.dfData.structDefs[r.structIndex]?.name || "Unknown",
-          structIndex: r.structIndex, instanceIndex: r.instanceIndex
+          name: r.name,
+          fileName: r.fileName,
+          uuid: r.id,
+          structType: this.dfData.structDefs[r.structIndex]?.name || 'Unknown',
+          structIndex: r.structIndex,
+          instanceIndex: r.instanceIndex,
         });
         if (res.length >= limit) break;
       }
@@ -133,8 +151,9 @@ export class DataForgeService implements DataForgeContext {
   }
 
   searchByStructType(type: string, limit = 100) {
-    if (!this.dfData) throw new Error("DataForge not loaded");
-    const rx = new RegExp(type, "i"), res: any[] = [];
+    if (!this.dfData) throw new Error('DataForge not loaded');
+    const rx = new RegExp(type, 'i'),
+      res: any[] = [];
     for (let i = 0; i < this.dfData.structDefs.length; i++) {
       if (rx.test(this.dfData.structDefs[i].name)) {
         for (const r of this.dfData.records) {
@@ -149,17 +168,17 @@ export class DataForgeService implements DataForgeContext {
   }
 
   getStructTypes(): string[] {
-    if (!this.dfData) throw new Error("DataForge not loaded");
-    return this.dfData.structDefs.map(s => s.name);
+    if (!this.dfData) throw new Error('DataForge not loaded');
+    return this.dfData.structDefs.map((s) => s.name);
   }
 
   /** Debug: inspect struct property definitions with data types */
   debugStructProperties(structName: string): any[] {
-    if (!this.dfData) throw new Error("DataForge not loaded");
-    const idx = this.dfData.structDefs.findIndex(s => s.name === structName);
+    if (!this.dfData) throw new Error('DataForge not loaded');
+    const idx = this.dfData.structDefs.findIndex((s) => s.name === structName);
     if (idx === -1) return [];
     const props = getStructProperties(this.dfData, idx);
-    return props.map(p => ({
+    return props.map((p) => ({
       name: p.name,
       dataType: DT_NAMES[p.dataType] || `0x${p.dataType.toString(16)}`,
       conversionType: p.conversionType,
@@ -190,7 +209,7 @@ export class DataForgeService implements DataForgeContext {
   /** Debug: inspect a component SCItem by class_name */
   debugComponent(className: string): any {
     if (!this.dfData || !this.dcbBuffer) return null;
-    const entityClassIdx = this.dfData.structDefs.findIndex(s => s.name === 'EntityClassDefinition');
+    const entityClassIdx = this.dfData.structDefs.findIndex((s) => s.name === 'EntityClassDefinition');
     for (const r of this.dfData.records) {
       if (r.structIndex !== entityClassIdx) continue;
       const name = r.name?.replace('EntityClassDefinition.', '') || '';
@@ -203,7 +222,7 @@ export class DataForgeService implements DataForgeContext {
 
   findEntityRecord(entityClassName: string): RecordDef | null {
     if (!this.dfData) return null;
-    const entityClassIdx = this.dfData.structDefs.findIndex(s => s.name === 'EntityClassDefinition');
+    const entityClassIdx = this.dfData.structDefs.findIndex((s) => s.name === 'EntityClassDefinition');
     if (entityClassIdx === -1) return null;
     for (const r of this.dfData.records) {
       if (r.structIndex === entityClassIdx) {
@@ -230,12 +249,12 @@ export class DataForgeService implements DataForgeContext {
    */
   findVariantPUEntities(className: string): string[] {
     if (!this.dfData) return [];
-    const entityClassIdx = this.dfData.structDefs.findIndex(s => s.name === 'EntityClassDefinition');
+    const entityClassIdx = this.dfData.structDefs.findIndex((s) => s.name === 'EntityClassDefinition');
     if (entityClassIdx === -1) return [];
     const prefix = className + '_';
     // Regex to find _PU as a segment: _PU at end or _PU_ followed by more
     const puSegmentRegex = /_PU($|_)/;
-    
+
     // Collect all matching entities, grouped by variant base (part before _PU)
     const variantMap = new Map<string, string[]>(); // variantBase → [fullNames]
     for (const r of this.dfData.records) {
@@ -250,13 +269,13 @@ export class DataForgeService implements DataForgeContext {
         }
       }
     }
-    
+
     // For each variant base, pick the best entity (prefer _PU exact, then _PU_AI_CIV, then first)
     const results: string[] = [];
     for (const [base, names] of variantMap) {
-      const exact = names.find(n => n === base);
-      const civ = names.find(n => n.endsWith('_AI_CIV'));
-      const uee = names.find(n => n.endsWith('_AI_UEE'));
+      const exact = names.find((n) => n === base);
+      const civ = names.find((n) => n.endsWith('_AI_CIV'));
+      const uee = names.find((n) => n.endsWith('_AI_UEE'));
       results.push(exact || civ || uee || names[0]);
     }
     return results;
@@ -321,7 +340,11 @@ export class DataForgeService implements DataForgeContext {
       const variants = this.findVariantPUEntities(className);
       if (variants.length > 0) {
         // Score each variant against the ship name
-        const shipWords = shipName.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 1);
+        const shipWords = shipName
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, '')
+          .split(/\s+/)
+          .filter((w) => w.length > 1);
         let bestVariant = '';
         let bestScore = 0;
 
@@ -331,16 +354,28 @@ export class DataForgeService implements DataForgeContext {
           const puIdx = variant.indexOf('_PU');
           const variantPart = variant.slice(className.length + 1, puIdx); // "MR" from "RSI_Aurora_MR_PU_AI_CIV"
           if (!variantPart) continue; // Skip if no variant part (it's just className_PU_...)
-          const variantWords = variantPart.toLowerCase().split('_').filter(w => w.length > 0);
+          const variantWords = variantPart
+            .toLowerCase()
+            .split('_')
+            .filter((w) => w.length > 0);
 
           let score = 0;
           for (const vw of variantWords) {
             for (const sw of shipWords) {
-              if (sw === vw) { score += 3; break; }
-              if (sw.includes(vw) || vw.includes(sw)) { score += 1; break; }
+              if (sw === vw) {
+                score += 3;
+                break;
+              }
+              if (sw.includes(vw) || vw.includes(sw)) {
+                score += 1;
+                break;
+              }
               // Handle variants like "F7CM" matching "f7c-m" → "f7cm"
               const swClean = sw.replace(/[^a-z0-9]/g, '');
-              if (swClean === vw || vw === swClean) { score += 2; break; }
+              if (swClean === vw || vw === swClean) {
+                score += 2;
+                break;
+              }
             }
           }
           if (score > bestScore) {
@@ -359,11 +394,15 @@ export class DataForgeService implements DataForgeContext {
 
         // If no scoring match (e.g. no variant-specific word in ship name),
         // check if there's only one unique variant base - use it
-        const uniqueBases = new Set(variants.map(v => {
-          const pi = v.indexOf('_PU');
-          return v.slice(className.length + 1, pi);
-        }).filter(v => v.length > 0));
-        
+        const uniqueBases = new Set(
+          variants
+            .map((v) => {
+              const pi = v.indexOf('_PU');
+              return v.slice(className.length + 1, pi);
+            })
+            .filter((v) => v.length > 0),
+        );
+
         if (uniqueBases.size === 1) {
           result.loadoutEntity = variants[0];
           const puIdx = variants[0].indexOf('_PU');
@@ -394,35 +433,70 @@ export class DataForgeService implements DataForgeContext {
 
   /** Known manufacturer prefixes for ships/vehicles (all legit vehicles start with one of these) */
   private static readonly KNOWN_VEHICLE_PREFIXES = new Set([
-    'AEGS', 'ANVL', 'ARGO', 'BANU', 'CNOU', 'CRUS', 'DRAK', 'ESPR',
-    'GAMA', 'GLSN', 'GREY', 'GRIN', 'KRIG', 'MISC', 'MRAI', 'ORIG', 'RSI', 'TMBL',
-    'VNCL', 'XIAN', 'XNAA',
+    'AEGS',
+    'ANVL',
+    'ARGO',
+    'BANU',
+    'CNOU',
+    'CRUS',
+    'DRAK',
+    'ESPR',
+    'GAMA',
+    'GLSN',
+    'GREY',
+    'GRIN',
+    'KRIG',
+    'MISC',
+    'MRAI',
+    'ORIG',
+    'RSI',
+    'TMBL',
+    'VNCL',
+    'XIAN',
+    'XNAA',
   ]);
 
   /** Explicit non-vehicle entity patterns to reject from the vehicle index */
   private static readonly NON_VEHICLE_PATTERNS = [
-    /^ammobox/i, /^rotationsimple/i, /^storall/i, /^probe_/i,
-    /^vehicleitemdebris/i, /^eaobjectivedestructable/i, /^orbital_sentry/i,
-    /^softlock/i, /^npc\s/i, /^npc_/i, /^ammocrate/i,
+    /^ammobox/i,
+    /^rotationsimple/i,
+    /^storall/i,
+    /^probe_/i,
+    /^vehicleitemdebris/i,
+    /^eaobjectivedestructable/i,
+    /^orbital_sentry/i,
+    /^softlock/i,
+    /^npc\s/i,
+    /^npc_/i,
+    /^ammocrate/i,
   ];
 
   private buildVehicleIndex() {
     if (!this.dfData) return;
-    const entityClassDefIndex = this.dfData.structDefs.findIndex(s => s.name === "EntityClassDefinition");
+    const entityClassDefIndex = this.dfData.structDefs.findIndex((s) => s.name === 'EntityClassDefinition');
 
     for (const r of this.dfData.records) {
       if (r.structIndex !== entityClassDefIndex) continue;
-      const isVehicle = r.fileName?.includes('/spaceships/') || r.fileName?.includes('/groundvehicles/') ||
+      const isVehicle =
+        r.fileName?.includes('/spaceships/') ||
+        r.fileName?.includes('/groundvehicles/') ||
         (r.fileName?.includes('/actor/actors/') && r.name?.includes('ARGO_ATLS'));
       if (!isVehicle) continue;
       const className = r.name?.replace('EntityClassDefinition.', '') || '';
       if (!className) continue;
       const lowerName = className.toLowerCase();
-      if (lowerName.includes('_ai_') || lowerName.includes('_test') || lowerName.includes('_template') ||
-          lowerName.includes('_unmanned') || lowerName.includes('_indestructible') || lowerName.includes('_prison')) continue;
+      if (
+        lowerName.includes('_ai_') ||
+        lowerName.includes('_test') ||
+        lowerName.includes('_template') ||
+        lowerName.includes('_unmanned') ||
+        lowerName.includes('_indestructible') ||
+        lowerName.includes('_prison')
+      )
+        continue;
 
       // Reject non-vehicle entities (debris, probes, ammo boxes, storage, etc.)
-      if (DataForgeService.NON_VEHICLE_PATTERNS.some(rx => rx.test(className))) continue;
+      if (DataForgeService.NON_VEHICLE_PATTERNS.some((rx) => rx.test(className))) continue;
 
       // Require a known manufacturer prefix (all real ships/vehicles have one)
       const prefixMatch = className.match(/^([A-Z]{2,5})_/);
@@ -437,7 +511,7 @@ export class DataForgeService implements DataForgeContext {
     for (let i = 0; i < this.dfData.records.length; i++) {
       const r = this.dfData.records[i];
       if (r.id && r.id !== ZERO_GUID) {
-        const className = r.structIndex === entityClassDefIndex ? (r.name?.replace('EntityClassDefinition.', '') || '') : '';
+        const className = r.structIndex === entityClassDefIndex ? r.name?.replace('EntityClassDefinition.', '') || '' : '';
         this.guidIndex.set(r.id, className || r.name || `RECORD_${i}`);
       }
     }
@@ -453,8 +527,11 @@ export class DataForgeService implements DataForgeContext {
   // ============ Vehicle loadout extraction ============
 
   extractVehicleLoadout(className: string): Array<{
-    portName: string; portType?: string; componentClassName?: string;
-    minSize?: number; maxSize?: number;
+    portName: string;
+    portType?: string;
+    componentClassName?: string;
+    minSize?: number;
+    maxSize?: number;
     children?: Array<{ portName: string; componentClassName?: string }>;
   }> | null {
     if (!this.dfData || !this.dcbBuffer) return null;
@@ -481,14 +558,18 @@ export class DataForgeService implements DataForgeContext {
     }
 
     const mainEntries = this.extractLoadoutEntries(data);
-    const emptyPorts = mainEntries.filter(e => !e.entityClassName && e.portName);
+    const emptyPorts = mainEntries.filter((e) => !e.entityClassName && e.portName);
     let variantMap: Map<string, string> | null = null;
     if (emptyPorts.length > 0) variantMap = this.findVariantLoadoutMap(className);
 
     const loadoutItems: any[] = [];
     const processedPorts = new Set<string>();
 
-    const processEntry = (portName: string, entClassName: string, inlineChildren?: Array<{ portName: string; entityClassName: string }>): any => {
+    const processEntry = (
+      portName: string,
+      entClassName: string,
+      inlineChildren?: Array<{ portName: string; entityClassName: string }>,
+    ): any => {
       const item: any = { portName, componentClassName: entClassName || null, portType: classifyPort(portName, entClassName) };
       // Attach port size constraints
       const meta = portMetaMap.get(portName.toLowerCase());
@@ -499,7 +580,8 @@ export class DataForgeService implements DataForgeContext {
       const children: any[] = [];
       if (inlineChildren && inlineChildren.length > 0) {
         for (const child of inlineChildren) {
-          if (child.portName && child.entityClassName) children.push({ portName: child.portName, componentClassName: child.entityClassName });
+          if (child.portName && child.entityClassName)
+            children.push({ portName: child.portName, componentClassName: child.entityClassName });
         }
       }
       if (children.length === 0 && entClassName) {
@@ -513,7 +595,8 @@ export class DataForgeService implements DataForgeContext {
               if (!Array.isArray(subEntries)) continue;
               for (const se of subEntries) {
                 let subEntClassName = se.entityClassName || '';
-                if (!subEntClassName && se.entityClassReference?.__ref) subEntClassName = this.resolveGuid(se.entityClassReference.__ref) || '';
+                if (!subEntClassName && se.entityClassReference?.__ref)
+                  subEntClassName = this.resolveGuid(se.entityClassReference.__ref) || '';
                 if (!subEntClassName && variantMap) subEntClassName = variantMap.get(`${portName}/${se.itemPortName}`) || '';
                 if (se.itemPortName && subEntClassName) children.push({ portName: se.itemPortName, componentClassName: subEntClassName });
               }
@@ -548,7 +631,9 @@ export class DataForgeService implements DataForgeContext {
     return loadoutItems.length > 0 ? loadoutItems : null;
   }
 
-  private extractLoadoutEntries(data: any): Array<{ portName: string; entityClassName: string; children?: Array<{ portName: string; entityClassName: string }> }> {
+  private extractLoadoutEntries(
+    data: any,
+  ): Array<{ portName: string; entityClassName: string; children?: Array<{ portName: string; entityClassName: string }> }> {
     const entries: any[] = [];
     if (!data || !Array.isArray(data.Components)) return entries;
     for (const comp of data.Components) {
@@ -577,7 +662,7 @@ export class DataForgeService implements DataForgeContext {
   private findVariantLoadoutMap(className: string): Map<string, string> | null {
     if (!this.dfData || !this.dcbBuffer) return null;
     const suffixes = ['_PU_AI_UEE', '_PU_AI_SEC', '_PU_AI_CIV', '_PU_AI', '_PU', '_Template'];
-    const entityClassIdx = this.dfData.structDefs.findIndex(s => s.name === 'EntityClassDefinition');
+    const entityClassIdx = this.dfData.structDefs.findIndex((s) => s.name === 'EntityClassDefinition');
     if (entityClassIdx === -1) return null;
     for (const suffix of suffixes) {
       const variantName = className + suffix;
@@ -585,7 +670,10 @@ export class DataForgeService implements DataForgeContext {
       for (const r of this.dfData.records) {
         if (r.structIndex === entityClassIdx) {
           const name = r.name?.replace('EntityClassDefinition.', '') || '';
-          if (name === variantName) { varRecord = r; break; }
+          if (name === variantName) {
+            varRecord = r;
+            break;
+          }
         }
       }
       if (!varRecord) continue;
@@ -616,7 +704,7 @@ export class DataForgeService implements DataForgeContext {
         if (map.size > 0) {
           return map;
         }
-      } catch { continue; /* variant loadout not readable — non-critical */ }
+      } catch {}
     }
     return null;
   }
@@ -626,12 +714,14 @@ export class DataForgeService implements DataForgeContext {
   async extractVehicleStats(className: string): Promise<Record<string, number> | null> {
     if (!this.dfData || !this.dcbBuffer) return null;
     try {
-      const entityClassIdx = this.dfData.structDefs.findIndex(s => s.name === 'EntityClassDefinition');
+      const entityClassIdx = this.dfData.structDefs.findIndex((s) => s.name === 'EntityClassDefinition');
       if (entityClassIdx === -1) return null;
-      let record = this.dfData.records.find(r => r.structIndex === entityClassIdx && (r.name?.replace('EntityClassDefinition.', '') === className || r.name === className));
+      let record = this.dfData.records.find(
+        (r) => r.structIndex === entityClassIdx && (r.name?.replace('EntityClassDefinition.', '') === className || r.name === className),
+      );
       if (!record) {
         const lc = className.toLowerCase();
-        record = this.dfData.records.find(r => r.structIndex === entityClassIdx && r.name?.toLowerCase().includes(lc));
+        record = this.dfData.records.find((r) => r.structIndex === entityClassIdx && r.name?.toLowerCase().includes(lc));
       }
       if (!record) return null;
       return this.extractStatsFromRecord(record);
@@ -654,7 +744,8 @@ export class DataForgeService implements DataForgeContext {
 
         if (type === 'VehicleComponentParams') {
           if (typeof comp.crewSize === 'number' && comp.crewSize > 0) stats.crew_size = comp.crewSize;
-          if (typeof comp.vehicleHullDamageNormalizationValue === 'number' && comp.vehicleHullDamageNormalizationValue > 0) stats.hull_hp = Math.round(comp.vehicleHullDamageNormalizationValue);
+          if (typeof comp.vehicleHullDamageNormalizationValue === 'number' && comp.vehicleHullDamageNormalizationValue > 0)
+            stats.hull_hp = Math.round(comp.vehicleHullDamageNormalizationValue);
           const bbox = comp.maxBoundingBoxSize;
           if (bbox && typeof bbox === 'object') {
             if (typeof bbox.x === 'number') stats.length = Math.round(bbox.x * 100) / 100;
@@ -678,7 +769,8 @@ export class DataForgeService implements DataForgeContext {
                       if (!fc?.__type) continue;
                       if (fc.__type === 'IFCSParams') {
                         if (typeof fc.scmSpeed === 'number' && fc.scmSpeed > 0) stats.scm_speed = Math.round(fc.scmSpeed);
-                        if (typeof fc.boostSpeedForward === 'number' && fc.boostSpeedForward > 0) stats.afterburner_speed = Math.round(fc.boostSpeedForward);
+                        if (typeof fc.boostSpeedForward === 'number' && fc.boostSpeedForward > 0)
+                          stats.afterburner_speed = Math.round(fc.boostSpeedForward);
                         if (typeof fc.maxSpeed === 'number' && fc.maxSpeed > 0) stats.max_speed = Math.round(fc.maxSpeed);
                         const maxAV = fc.maxAngularVelocity;
                         if (maxAV && typeof maxAV === 'object') {
@@ -699,7 +791,7 @@ export class DataForgeService implements DataForgeContext {
         }
 
         if (!stats.actual_mass) {
-          const mass = typeof comp.mass === 'number' ? comp.mass : (typeof comp.Mass === 'number' ? comp.Mass : undefined);
+          const mass = typeof comp.mass === 'number' ? comp.mass : typeof comp.Mass === 'number' ? comp.Mass : undefined;
           if (mass && mass > 10) stats.actual_mass = Math.round(mass * 100) / 100;
         }
       }
@@ -783,7 +875,7 @@ export class DataForgeService implements DataForgeContext {
                   description: mfgData.Description || mfgData.description || '',
                   ref: mfgRef,
                   calculatorName: mfgData.CalculatorName || mfgData.calculatorName || '',
-                }
+                },
               };
             }
           }
@@ -793,7 +885,7 @@ export class DataForgeService implements DataForgeContext {
         if (typeof comp.Health === 'number') {
           result.health = {
             hp: comp.Health,
-            damageResistanceMultiplier: this.extractDamageResistance(comp)
+            damageResistanceMultiplier: this.extractDamageResistance(comp),
           };
         }
       }
@@ -809,7 +901,8 @@ export class DataForgeService implements DataForgeContext {
           result._insurance = {
             baseExpeditingFee: typeof sip.baseExpeditingFee === 'number' ? Math.round(sip.baseExpeditingFee * 100) / 100 : 0,
             baseWaitTimeMinutes: typeof sip.baseWaitTimeMinutes === 'number' ? Math.round(sip.baseWaitTimeMinutes * 100) / 100 : 0,
-            mandatoryWaitTimeMinutes: typeof sip.mandatoryWaitTimeMinutes === 'number' ? Math.round(sip.mandatoryWaitTimeMinutes * 100) / 100 : 0,
+            mandatoryWaitTimeMinutes:
+              typeof sip.mandatoryWaitTimeMinutes === 'number' ? Math.round(sip.mandatoryWaitTimeMinutes * 100) / 100 : 0,
             shipEntityClassName: className,
           };
         }
@@ -823,7 +916,7 @@ export class DataForgeService implements DataForgeContext {
       if (variantRecord) {
         const variantData = this.readInstance(variantRecord.structIndex, variantRecord.instanceIndex, 0, 6);
         if (variantData?.Components) {
-          let variantLoadoutCount = 0;
+          const variantLoadoutCount = 0;
           for (const comp of variantData.Components) {
             if (!comp || typeof comp !== 'object' || !comp.__type) continue;
             const cType = comp.__type as string;
@@ -843,7 +936,7 @@ export class DataForgeService implements DataForgeContext {
               if (typeof comp.Health === 'number') {
                 result.health = {
                   hp: comp.Health,
-                  damageResistanceMultiplier: this.extractDamageResistance(comp)
+                  damageResistanceMultiplier: this.extractDamageResistance(comp),
                 };
               }
             }
@@ -859,7 +952,8 @@ export class DataForgeService implements DataForgeContext {
                   result._insurance = {
                     baseExpeditingFee: typeof sip.baseExpeditingFee === 'number' ? Math.round(sip.baseExpeditingFee * 100) / 100 : 0,
                     baseWaitTimeMinutes: typeof sip.baseWaitTimeMinutes === 'number' ? Math.round(sip.baseWaitTimeMinutes * 100) / 100 : 0,
-                    mandatoryWaitTimeMinutes: typeof sip.mandatoryWaitTimeMinutes === 'number' ? Math.round(sip.mandatoryWaitTimeMinutes * 100) / 100 : 0,
+                    mandatoryWaitTimeMinutes:
+                      typeof sip.mandatoryWaitTimeMinutes === 'number' ? Math.round(sip.mandatoryWaitTimeMinutes * 100) / 100 : 0,
                     shipEntityClassName: entities.loadoutEntity,
                   };
                 }
@@ -906,7 +1000,7 @@ export class DataForgeService implements DataForgeContext {
         xmlNamesToTry.push(vdMatch[1]);
       }
     }
-    
+
     let xmlUsedWasVariantSpecific = false;
     for (const xmlName of xmlNamesToTry) {
       try {
@@ -916,10 +1010,12 @@ export class DataForgeService implements DataForgeContext {
           if (vehicleXml.totalHp > 0) result.hull.totalHp = vehicleXml.totalHp;
           if (vehicleXml.hullParts?.length > 0) result.hull.hp.body.parts = vehicleXml.hullParts;
           if (vehicleXml.bodyHp > 0) result.hull.hp.body.hp = vehicleXml.bodyHp;
-          xmlUsedWasVariantSpecific = (xmlName === entities.vehicleXmlName && xmlName !== className);
+          xmlUsedWasVariantSpecific = xmlName === entities.vehicleXmlName && xmlName !== className;
           break; // Found XML, stop trying
         }
-      } catch (e) { /* XML not found, try next */ }
+      } catch (e) {
+        /* XML not found, try next */
+      }
     }
 
     // Mass from flight controller physics params:
@@ -938,7 +1034,9 @@ export class DataForgeService implements DataForgeContext {
    * Read vehicle implementation XML from P4K to extract mass, hull parts, and totalHp.
    * File path: Data\Scripts\Entities\Vehicles\Implementations\Xml\{className}.xml
    */
-  private async readVehicleImplementationXml(className: string): Promise<{ mass: number; totalHp: number; bodyHp: number; hullParts: any[] } | null> {
+  private async readVehicleImplementationXml(
+    className: string,
+  ): Promise<{ mass: number; totalHp: number; bodyHp: number; hullParts: any[] } | null> {
     if (!this.provider) return null;
     const xmlPath = `Data\\Scripts\\Entities\\Vehicles\\Implementations\\Xml\\${className}.xml`;
     try {
@@ -954,7 +1052,7 @@ export class DataForgeService implements DataForgeContext {
       }
 
       // Navigate: <Vehicle> -> <Parts> -> <Part name="..." mass="..." ...>
-      const partsNode = rootNode.children?.find(c => c.tag === 'Parts');
+      const partsNode = rootNode.children?.find((c) => c.tag === 'Parts');
       if (!partsNode || !partsNode.children?.length) return null;
 
       const mainPart = partsNode.children[0]; // Root Part element
@@ -980,8 +1078,8 @@ export class DataForgeService implements DataForgeContext {
     const parts: any[] = [];
 
     // The root part may have sub-Parts elements
-    const subPartsNode = partNode.children?.find(c => c.tag === 'Parts');
-    const childParts = subPartsNode?.children || partNode.children?.filter(c => c.tag === 'Part') || [];
+    const subPartsNode = partNode.children?.find((c) => c.tag === 'Parts');
+    const childParts = subPartsNode?.children || partNode.children?.filter((c) => c.tag === 'Part') || [];
 
     for (const child of childParts) {
       if (child.tag !== 'Part') continue;
@@ -1052,8 +1150,10 @@ export class DataForgeService implements DataForgeContext {
       };
     }
     if (typeof vp.inventoryContainerSize === 'number') vehicle.inventory = vp.inventoryContainerSize;
-    if (typeof vp.fusePenetrationDamageMultiplier === 'number') vehicle.fusePenetrationDamageMultiplier = vp.fusePenetrationDamageMultiplier;
-    if (typeof vp.componentPenetrationDamageMultiplier === 'number') vehicle.componentPenetrationDamageMultiplier = vp.componentPenetrationDamageMultiplier;
+    if (typeof vp.fusePenetrationDamageMultiplier === 'number')
+      vehicle.fusePenetrationDamageMultiplier = vp.fusePenetrationDamageMultiplier;
+    if (typeof vp.componentPenetrationDamageMultiplier === 'number')
+      vehicle.componentPenetrationDamageMultiplier = vp.componentPenetrationDamageMultiplier;
     return vehicle;
   }
 
@@ -1096,7 +1196,7 @@ export class DataForgeService implements DataForgeContext {
     for (const p of parts) {
       if (!p || typeof p !== 'object') continue;
       const part: any = {
-        hp: typeof p.hp === 'number' ? Math.round(p.hp) : (typeof p.Health === 'number' ? Math.round(p.Health) : 0),
+        hp: typeof p.hp === 'number' ? Math.round(p.hp) : typeof p.Health === 'number' ? Math.round(p.Health) : 0,
         name: p.name || p.Name || 'Part',
       };
       const subParts = p.parts || p.Parts || p.children;
@@ -1125,9 +1225,9 @@ export class DataForgeService implements DataForgeContext {
       const y = typeof bbox.y === 'number' ? bbox.y : 0;
       const z = typeof bbox.z === 'number' ? bbox.z : 0;
       return {
-        x: Math.round(y * z * 100) / 100,  // Front profile (y*z)
-        y: Math.round(x * z * 100) / 100,  // Side profile (x*z)
-        z: Math.round(x * y * 100) / 100,  // Top profile (x*y)
+        x: Math.round(y * z * 100) / 100, // Front profile (y*z)
+        y: Math.round(x * z * 100) / 100, // Side profile (x*z)
+        z: Math.round(x * y * 100) / 100, // Top profile (x*y)
       };
     }
     return { x: 0, y: 0, z: 0 };
@@ -1150,9 +1250,19 @@ export class DataForgeService implements DataForgeContext {
       qtFuelCapacity: 0,
       _mass: 0,
       items: {
-        cargos: [], controllers: [], countermeasures: [], dashboards: [],
-        fuelIntakes: [], fuelTanks: [], lifeSupports: [], personalStorage: [],
-        radars: [], seats: [], seatAccess: [], thrusters: [], utilities: []
+        cargos: [],
+        controllers: [],
+        countermeasures: [],
+        dashboards: [],
+        fuelIntakes: [],
+        fuelTanks: [],
+        lifeSupports: [],
+        personalStorage: [],
+        radars: [],
+        seats: [],
+        seatAccess: [],
+        thrusters: [],
+        utilities: [],
       },
       loadout: [],
     };
@@ -1338,9 +1448,11 @@ export class DataForgeService implements DataForgeContext {
       if (cType === 'SCItemShieldGeneratorParams') {
         const shield: Record<string, any> = result.shield || {};
         if (typeof comp.MaxShieldHealth === 'number') shield.maxShieldHealth = Math.round(comp.MaxShieldHealth * 100) / 100;
-        if (typeof comp.ShieldMaxHealth === 'number' && !shield.maxShieldHealth) shield.maxShieldHealth = Math.round(comp.ShieldMaxHealth * 100) / 100;
+        if (typeof comp.ShieldMaxHealth === 'number' && !shield.maxShieldHealth)
+          shield.maxShieldHealth = Math.round(comp.ShieldMaxHealth * 100) / 100;
         if (typeof comp.MaxShieldRegen === 'number') shield.maxShieldRegen = Math.round(comp.MaxShieldRegen * 1e4) / 1e4;
-        if (typeof comp.ShieldRegenRate === 'number' && !shield.maxShieldRegen) shield.maxShieldRegen = Math.round(comp.ShieldRegenRate * 1e4) / 1e4;
+        if (typeof comp.ShieldRegenRate === 'number' && !shield.maxShieldRegen)
+          shield.maxShieldRegen = Math.round(comp.ShieldRegenRate * 1e4) / 1e4;
         if (typeof comp.DamagedRegenDelay === 'number') shield.damagedRegenDelay = Math.round(comp.DamagedRegenDelay * 100) / 100;
         if (typeof comp.DownedRegenDelay === 'number') shield.downedRegenDelay = Math.round(comp.DownedRegenDelay * 100) / 100;
         if (typeof comp.Hardening === 'number') shield.hardening = Math.round(comp.Hardening * 1e4) / 1e4;
@@ -1348,8 +1460,10 @@ export class DataForgeService implements DataForgeContext {
           shield.maxReallocation = comp.MaxReallocation;
           shield.faceType = comp.MaxReallocation > 0 ? 'Quadrant' : 'Bubble';
         }
-        if (typeof comp.ReconfigurationCooldown === 'number') shield.reconfigurationCooldown = Math.round(comp.ReconfigurationCooldown * 100) / 100;
-        if (typeof comp.reconfigurationCooldown === 'number') shield.reconfigurationCooldown = Math.round(comp.reconfigurationCooldown * 100) / 100;
+        if (typeof comp.ReconfigurationCooldown === 'number')
+          shield.reconfigurationCooldown = Math.round(comp.ReconfigurationCooldown * 100) / 100;
+        if (typeof comp.reconfigurationCooldown === 'number')
+          shield.reconfigurationCooldown = Math.round(comp.reconfigurationCooldown * 100) / 100;
         // Capacitor assignments
         if (typeof comp.CapacitorAssignmentInputMax === 'number') shield.capacitorAssignmentInputMax = comp.CapacitorAssignmentInputMax;
         if (typeof comp.CapacitorAssignmentOutputMax === 'number') shield.capacitorAssignmentOutputMax = comp.CapacitorAssignmentOutputMax;
@@ -1360,14 +1474,30 @@ export class DataForgeService implements DataForgeContext {
       if (cType === 'SCItemVehicleArmorParams' || cType === 'ArmorParams') {
         // Get or create armor data container
         if (!result.armor || !result.armor.data) {
-          result.armor = { calculatorType: 'ArmorData', data: {
-            type: 'Armor', subType: '', size: 0, grade: '',
-            health: { hp: 0, damageResistanceMultiplier: {} },
-            armor: {
-              damageMultiplier: { damagePhysical: 1, damageEnergy: 1, damageDistortion: 1, damageThermal: 1, damageBiochemical: 1, damageStun: 1 },
-              signalIR: 1, signalEM: 1, signalCS: 1, armorPenetrationResistance: 0,
+          result.armor = {
+            calculatorType: 'ArmorData',
+            data: {
+              type: 'Armor',
+              subType: '',
+              size: 0,
+              grade: '',
+              health: { hp: 0, damageResistanceMultiplier: {} },
+              armor: {
+                damageMultiplier: {
+                  damagePhysical: 1,
+                  damageEnergy: 1,
+                  damageDistortion: 1,
+                  damageThermal: 1,
+                  damageBiochemical: 1,
+                  damageStun: 1,
+                },
+                signalIR: 1,
+                signalEM: 1,
+                signalCS: 1,
+                armorPenetrationResistance: 0,
+              },
             },
-          }};
+          };
         }
         const armorData = result.armor.data;
         // Extract damage multipliers (normalize PascalCase -> camelCase)
@@ -1386,10 +1516,16 @@ export class DataForgeService implements DataForgeContext {
         if (typeof comp.signalCrossSection === 'number') armorData.armor.signalCS = Math.round(comp.signalCrossSection * 1e6) / 1e6;
         if (typeof comp.SignalInfrared === 'number') armorData.armor.signalIR = Math.round(comp.SignalInfrared * 1e6) / 1e6;
         if (typeof comp.SignalElectroMagnetic === 'number') armorData.armor.signalEM = Math.round(comp.SignalElectroMagnetic * 1e6) / 1e6;
-        if (typeof comp.SignalCrossSectionReduction === 'number') armorData.armor.signalCS = Math.round(comp.SignalCrossSectionReduction * 1e6) / 1e6;
+        if (typeof comp.SignalCrossSectionReduction === 'number')
+          armorData.armor.signalCS = Math.round(comp.SignalCrossSectionReduction * 1e6) / 1e6;
         // ArmorPenetrationResistance (can be number or object)
-        if (typeof comp.armorPenetrationResistance === 'number') armorData.armor.armorPenetrationResistance = comp.armorPenetrationResistance;
-        if (comp.armorPenetrationResistance && typeof comp.armorPenetrationResistance === 'object' && typeof comp.armorPenetrationResistance.basePenetrationReduction === 'number') {
+        if (typeof comp.armorPenetrationResistance === 'number')
+          armorData.armor.armorPenetrationResistance = comp.armorPenetrationResistance;
+        if (
+          comp.armorPenetrationResistance &&
+          typeof comp.armorPenetrationResistance === 'object' &&
+          typeof comp.armorPenetrationResistance.basePenetrationReduction === 'number'
+        ) {
           armorData.armor.armorPenetrationResistance = comp.armorPenetrationResistance.basePenetrationReduction;
         }
       }
@@ -1398,14 +1534,30 @@ export class DataForgeService implements DataForgeContext {
       if (lp.includes('armor') && cType === 'SHealthComponentParams') {
         // Get or create armor data container
         if (!result.armor || !result.armor.data) {
-          result.armor = { calculatorType: 'ArmorData', data: {
-            type: 'Armor', subType: '', size: 0, grade: '',
-            health: { hp: 0, damageResistanceMultiplier: {} },
-            armor: {
-              damageMultiplier: { damagePhysical: 1, damageEnergy: 1, damageDistortion: 1, damageThermal: 1, damageBiochemical: 1, damageStun: 1 },
-              signalIR: 1, signalEM: 1, signalCS: 1, armorPenetrationResistance: 0,
+          result.armor = {
+            calculatorType: 'ArmorData',
+            data: {
+              type: 'Armor',
+              subType: '',
+              size: 0,
+              grade: '',
+              health: { hp: 0, damageResistanceMultiplier: {} },
+              armor: {
+                damageMultiplier: {
+                  damagePhysical: 1,
+                  damageEnergy: 1,
+                  damageDistortion: 1,
+                  damageThermal: 1,
+                  damageBiochemical: 1,
+                  damageStun: 1,
+                },
+                signalIR: 1,
+                signalEM: 1,
+                signalCS: 1,
+                armorPenetrationResistance: 0,
+              },
             },
-          }};
+          };
         }
         const armorData = result.armor.data;
         if (typeof comp.Health === 'number') armorData.health.hp = Math.round(comp.Health);
@@ -1427,7 +1579,7 @@ export class DataForgeService implements DataForgeContext {
       // === Power Plant ===
       if (cType === 'SCItemPowerPlantParams') {
         if (!result.rnPowerPools) result.rnPowerPools = {};
-        const output = typeof comp.MaxPower === 'number' ? comp.MaxPower : (typeof comp.PowerOutput === 'number' ? comp.PowerOutput : 0);
+        const output = typeof comp.MaxPower === 'number' ? comp.MaxPower : typeof comp.PowerOutput === 'number' ? comp.PowerOutput : 0;
         if (output > 0) {
           // Track total power output
           result._totalPowerOutput = (result._totalPowerOutput || 0) + output;
@@ -1516,7 +1668,8 @@ export class DataForgeService implements DataForgeContext {
         result.insurance = {
           baseExpeditingFee: typeof comp.baseExpeditingFee === 'number' ? Math.round(comp.baseExpeditingFee * 100) / 100 : 0,
           baseWaitTimeMinutes: typeof comp.baseWaitTimeMinutes === 'number' ? Math.round(comp.baseWaitTimeMinutes * 100) / 100 : 0,
-          mandatoryWaitTimeMinutes: typeof comp.mandatoryWaitTimeMinutes === 'number' ? Math.round(comp.mandatoryWaitTimeMinutes * 100) / 100 : 0,
+          mandatoryWaitTimeMinutes:
+            typeof comp.mandatoryWaitTimeMinutes === 'number' ? Math.round(comp.mandatoryWaitTimeMinutes * 100) / 100 : 0,
           shipEntityClassName: className,
         };
       }
@@ -1545,11 +1698,13 @@ export class DataForgeService implements DataForgeContext {
     const lc = className.toLowerCase();
     if (lp.includes('thruster') || lc.includes('thruster')) return 'thrusters';
     if (lp.includes('fuel_intake') || lc.includes('fuelintake')) return 'fuelIntakes';
-    if (lp.includes('fuel_tank') || lp.includes('hydrogen_fuel') || (lc.includes('fueltank') && !lp.includes('quantum'))) return 'fuelTanks';
+    if (lp.includes('fuel_tank') || lp.includes('hydrogen_fuel') || (lc.includes('fueltank') && !lp.includes('quantum')))
+      return 'fuelTanks';
     if (lp.includes('life_support') || lc.includes('lifesupport')) return 'lifeSupports';
     if (lp.includes('radar') || lc.includes('radar')) return 'radars';
     if (lp.includes('seat') || lc.includes('seat')) return 'seats';
-    if (lp.includes('countermeasure') || lc.includes('countermeasure') || lc.includes('flare') || lc.includes('noise')) return 'countermeasures';
+    if (lp.includes('countermeasure') || lc.includes('countermeasure') || lc.includes('flare') || lc.includes('noise'))
+      return 'countermeasures';
     if (lp.includes('cargo') || lc.includes('cargo')) return 'cargos';
     if (lp.includes('controller') || lc.includes('controller')) return 'controllers';
     if (lp.includes('dashboard') || lc.includes('dashboard')) return 'dashboards';

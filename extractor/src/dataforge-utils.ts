@@ -2,7 +2,7 @@
  * DataForge Utilities — Pure constants, helpers, and shared types
  * Used by DataForgeService and extraction modules (component, shop, paint).
  */
-import type { DataForgeData, RecordDef } from "./dataforge-parser.js";
+import type { DataForgeData, RecordDef } from './dataforge-parser.js';
 
 // ============ Shared context interface for extractors ============
 
@@ -23,43 +23,43 @@ export interface DataForgeContext {
 /** Manufacturer code → full name mapping (from SC game data prefixes) */
 export const MANUFACTURER_CODES: Record<string, string> = {
   // Vehicle manufacturers (ship_matrix + P4K)
-  AEGS: "Aegis Dynamics",
-  ANVL: "Anvil Aerospace",
-  ARGO: "ARGO Astronautics",
-  BANU: "Banu",
-  CNOU: "Consolidated Outland",
-  CRUS: "Crusader Industries",
-  DRAK: "Drake Interplanetary",
-  ESPR: "Esperia",
-  GAMA: "Gatac Manufacture",
+  AEGS: 'Aegis Dynamics',
+  ANVL: 'Anvil Aerospace',
+  ARGO: 'ARGO Astronautics',
+  BANU: 'Banu',
+  CNOU: 'Consolidated Outland',
+  CRUS: 'Crusader Industries',
+  DRAK: 'Drake Interplanetary',
+  ESPR: 'Esperia',
+  GAMA: 'Gatac Manufacture',
   GLSN: "Grey's Market",
   GREY: "Grey's Market",
-  GRIN: "Greycat Industrial",
-  KRIG: "Kruger Intergalactic",
-  MISC: "Musashi Industrial & Starflight Concern",
-  MRAI: "Mirai",
-  ORIG: "Origin Jumpworks",
-  RSI:  "Roberts Space Industries",
-  TMBL: "Tumbril Land Systems",
-  VNCL: "Vanduul",
-  XIAN: "Aopoa",
-  XNAA: "Aopoa",
+  GRIN: 'Greycat Industrial',
+  KRIG: 'Kruger Intergalactic',
+  MISC: 'Musashi Industrial & Starflight Concern',
+  MRAI: 'Mirai',
+  ORIG: 'Origin Jumpworks',
+  RSI: 'Roberts Space Industries',
+  TMBL: 'Tumbril Land Systems',
+  VNCL: 'Vanduul',
+  XIAN: 'Aopoa',
+  XNAA: 'Aopoa',
   // Component manufacturers (P4K only)
-  AMRS: "Amon & Reese Co.",
-  APAR: "Apocalypse Arms",
-  BEHR: "Behring Applied Technology",
-  BRRA: "Basilisk",
-  GATS: "Gallenson Tactical Systems",
-  HRST: "Hurston Dynamics",
-  JOKR: "Joker Engineering",
-  KBAR: "KnightBridge Arms",
-  KLWE: "Klaus & Werner",
-  KRON: "Kroneg",
-  MXOX: "MaxOx",
-  NOVP: "Nova Pyrotechnik",
-  PRAR: "Preacher Armaments",
-  TALN: "Talon",
-  TOAG: "Thermyte Concern",
+  AMRS: 'Amon & Reese Co.',
+  APAR: 'Apocalypse Arms',
+  BEHR: 'Behring Applied Technology',
+  BRRA: 'Basilisk',
+  GATS: 'Gallenson Tactical Systems',
+  HRST: 'Hurston Dynamics',
+  JOKR: 'Joker Engineering',
+  KBAR: 'KnightBridge Arms',
+  KLWE: 'Klaus & Werner',
+  KRON: 'Kroneg',
+  MXOX: 'MaxOx',
+  NOVP: 'Nova Pyrotechnik',
+  PRAR: 'Preacher Armaments',
+  TALN: 'Talon',
+  TOAG: 'Thermyte Concern',
 };
 
 // ============ Shop localization names ============
@@ -192,12 +192,16 @@ export function resolveLocKey(locKey: string, type: 'career' | 'role'): string {
   // Fallback: try to parse from key pattern
   let raw = locKey;
   for (const prefix of ['@vehicle_focus_', '@vehicle_class_', '@item_ShipFocus_', '@item_shipfocus_']) {
-    if (raw.toLowerCase().startsWith(prefix)) { raw = raw.substring(prefix.length); break; }
+    if (raw.toLowerCase().startsWith(prefix)) {
+      raw = raw.substring(prefix.length);
+      break;
+    }
   }
-  return raw.replace(/([a-z])([A-Z])/g, '$1 $2')
+  return raw
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
     .replace(/_/g, ' ')
     .split(' ')
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
     .join(' ');
 }
 
@@ -223,33 +227,74 @@ export function classifyPort(portName: string, compClassName: string): string {
 
   // Component-based classification
   if (cc) {
-    if (cc.includes('cannon_s') || cc.includes('repeater_s') || cc.includes('gatling_s') ||
-        cc.includes('scattergun_s') || cc.includes('machinegun_s') || cc.includes('neutrongun_s') ||
-        cc.includes('laser_beak_') || cc.includes('tarantula') ||
-        (cc.includes('weapon') && cc.match(/_s\d/) && !cc.includes('rack') && !cc.includes('turret') && !cc.includes('mount'))) return 'WeaponGun';
+    if (
+      cc.includes('cannon_s') ||
+      cc.includes('repeater_s') ||
+      cc.includes('gatling_s') ||
+      cc.includes('scattergun_s') ||
+      cc.includes('machinegun_s') ||
+      cc.includes('neutrongun_s') ||
+      cc.includes('laser_beak_') ||
+      cc.includes('tarantula') ||
+      (cc.includes('weapon') && cc.match(/_s\d/) && !cc.includes('rack') && !cc.includes('turret') && !cc.includes('mount'))
+    )
+      return 'WeaponGun';
     if (cc.includes('mount_gimbal_') || cc.includes('mount_fixed_')) return 'Gimbal';
     if (cc.includes('turret_') || cc.startsWith('vtol_')) return 'Turret';
     if (cc.includes('mrck_') || cc.includes('missilerack')) return 'MissileRack';
   }
 
-  if ((lp.includes('_gun_') || lp.includes('weapon_gun')) && !lp.includes('gunner') && !lp.includes('gunrack') && !lp.includes('seat') && !lp.includes('inventory')) return 'WeaponGun';
-  if (lp.match(/hardpoint_weapon(_|$)/) && !lp.includes('locker') && !lp.includes('cabinet') && !lp.includes('controller') && !lp.includes('missile') && !lp.includes('rack') && !lp.includes('mount') && !lp.includes('cockpit') && !lp.includes('salvage') && !lp.includes('tractor')) return 'WeaponGun';
+  if (
+    (lp.includes('_gun_') || lp.includes('weapon_gun')) &&
+    !lp.includes('gunner') &&
+    !lp.includes('gunrack') &&
+    !lp.includes('seat') &&
+    !lp.includes('inventory')
+  )
+    return 'WeaponGun';
+  if (
+    lp.match(/hardpoint_weapon(_|$)/) &&
+    !lp.includes('locker') &&
+    !lp.includes('cabinet') &&
+    !lp.includes('controller') &&
+    !lp.includes('missile') &&
+    !lp.includes('rack') &&
+    !lp.includes('mount') &&
+    !lp.includes('cockpit') &&
+    !lp.includes('salvage') &&
+    !lp.includes('tractor')
+  )
+    return 'WeaponGun';
   if (lp.match(/hardpoint_weapon_wing/)) return 'WeaponGun';
   if (lp.includes('turret')) return 'Turret';
   if (lp.includes('shield')) return 'Shield';
   if (lp.includes('power_plant') || lp.includes('powerplant')) return 'PowerPlant';
   if (lp.includes('cooler')) return 'Cooler';
-  if (lp.includes('quantum') && !lp.includes('interdiction') && !lp.includes('qed') || lp.includes('quantum_drive')) return 'QuantumDrive';
+  if ((lp.includes('quantum') && !lp.includes('interdiction') && !lp.includes('qed')) || lp.includes('quantum_drive'))
+    return 'QuantumDrive';
   if (lp.includes('missile') || lp.includes('pylon')) return 'MissileRack';
   if (lp.includes('radar')) return 'Radar';
   if (lp.includes('countermeasure')) return 'Countermeasure';
   if (lp.includes('controller_flight')) return 'FlightController';
   if (lp.includes('thruster')) return 'Thruster';
-  if (lp.includes('emp_device') || lp.includes('emp_generator') || (lp.includes('emp') && !lp.includes('temp') && !lp.match(/seat|access|dashboard|hud|inventory|weapon_?port/i))) return 'EMP';
+  if (
+    lp.includes('emp_device') ||
+    lp.includes('emp_generator') ||
+    (lp.includes('emp') && !lp.includes('temp') && !lp.match(/seat|access|dashboard|hud|inventory|weapon_?port/i))
+  )
+    return 'EMP';
   if (cc.includes('emp_device') || cc.includes('emp_generator') || cc.includes('emp_s')) return 'EMP';
   if (lp.includes('interdiction') || lp.includes('qig') || lp.includes('qed')) return 'QuantumInterdictionGenerator';
-  if (cc.includes('quantuminterdiction') || cc.includes('qig_') || cc.includes('qed_') || cc.includes('qdmp_')) return 'QuantumInterdictionGenerator';
-  if (lp.includes('weapon_rack') || lp.includes('weaponrack') || lp.includes('weapon_locker') || lp.includes('weaponlocker') || lp.includes('weapon_cabinet')) return 'WeaponRack';
+  if (cc.includes('quantuminterdiction') || cc.includes('qig_') || cc.includes('qed_') || cc.includes('qdmp_'))
+    return 'QuantumInterdictionGenerator';
+  if (
+    lp.includes('weapon_rack') ||
+    lp.includes('weaponrack') ||
+    lp.includes('weapon_locker') ||
+    lp.includes('weaponlocker') ||
+    lp.includes('weapon_cabinet')
+  )
+    return 'WeaponRack';
   if (lp.includes('weapon') && (lp.includes('controller') || lp.includes('cockpit') || lp.includes('locker'))) return 'Other';
   if (lp.includes('weapon') && !lp.includes('rack')) return 'Weapon';
   return 'Other';

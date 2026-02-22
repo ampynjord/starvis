@@ -9,8 +9,8 @@
  *
  * This service builds an index of these keys for fast lookup.
  */
-import logger from "./logger.js";
-import { P4KProvider } from "./p4k-provider.js";
+import logger from './logger.js';
+import type { P4KProvider } from './p4k-provider.js';
 
 /** Parsed localization entry */
 interface LocEntry {
@@ -30,8 +30,12 @@ export class LocalizationService {
 
   private loaded = false;
 
-  get isLoaded(): boolean { return this.loaded; }
-  get entryCount(): number { return this.nameIndex.size; }
+  get isLoaded(): boolean {
+    return this.loaded;
+  }
+  get entryCount(): number {
+    return this.nameIndex.size;
+  }
 
   /**
    * Load and parse global.ini from P4K provider.
@@ -39,10 +43,10 @@ export class LocalizationService {
    */
   async loadFromP4K(provider: P4KProvider, onProgress?: (msg: string) => void): Promise<number> {
     const paths = [
-      "Data/Localization/english/global.ini",
-      "Data/Localization/English/global.ini",
-      "Data\\Localization\\english\\global.ini",
-      "Data\\Localization\\English\\global.ini",
+      'Data/Localization/english/global.ini',
+      'Data/Localization/English/global.ini',
+      'Data\\Localization\\english\\global.ini',
+      'Data\\Localization\\English\\global.ini',
     ];
 
     let buffer: Buffer | null = null;
@@ -60,7 +64,7 @@ export class LocalizationService {
     }
 
     if (!buffer) {
-      logger.warn("global.ini not found in P4K — localization will use fallback names", { module: "localization" });
+      logger.warn('global.ini not found in P4K — localization will use fallback names', { module: 'localization' });
       this.loaded = true; // Mark as loaded but empty — fallback mode
       return 0;
     }
@@ -76,13 +80,13 @@ export class LocalizationService {
     let content: string;
 
     // Detect encoding: UTF-16LE BOM = 0xFF 0xFE
-    if (buffer.length >= 2 && buffer[0] === 0xFF && buffer[1] === 0xFE) {
-      content = buffer.toString("utf16le");
-    } else if (buffer.length >= 3 && buffer[0] === 0xEF && buffer[1] === 0xBB && buffer[2] === 0xBF) {
+    if (buffer.length >= 2 && buffer[0] === 0xff && buffer[1] === 0xfe) {
+      content = buffer.toString('utf16le');
+    } else if (buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf) {
       // UTF-8 BOM
-      content = buffer.toString("utf8").substring(1);
+      content = buffer.toString('utf8').substring(1);
     } else {
-      content = buffer.toString("utf8");
+      content = buffer.toString('utf8');
     }
 
     const lines = content.split(/\r?\n/);
@@ -90,9 +94,9 @@ export class LocalizationService {
 
     for (const line of lines) {
       const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith("//") || trimmed.startsWith("#") || trimmed.startsWith(";")) continue;
+      if (!trimmed || trimmed.startsWith('//') || trimmed.startsWith('#') || trimmed.startsWith(';')) continue;
 
-      const eqIdx = trimmed.indexOf("=");
+      const eqIdx = trimmed.indexOf('=');
       if (eqIdx < 1) continue;
 
       const rawKey = trimmed.substring(0, eqIdx).trim();
@@ -100,12 +104,12 @@ export class LocalizationService {
       if (!value) continue;
 
       // Normalize key: strip leading @
-      const key = rawKey.startsWith("@") ? rawKey.substring(1) : rawKey;
+      const key = rawKey.startsWith('@') ? rawKey.substring(1) : rawKey;
       const keyLower = key.toLowerCase();
 
       // Item names: item_Name{className}=Display Name
-      if (keyLower.startsWith("item_name")) {
-        const className = key.substring("item_Name".length);
+      if (keyLower.startsWith('item_name')) {
+        const className = key.substring('item_Name'.length);
         if (className) {
           this.nameIndex.set(key, value);
           this.classNameIndex.set(className.toLowerCase(), value);
@@ -113,16 +117,16 @@ export class LocalizationService {
         }
       }
       // Item descriptions: item_Desc{className}=Description
-      else if (keyLower.startsWith("item_desc")) {
-        const className = key.substring("item_Desc".length);
+      else if (keyLower.startsWith('item_desc')) {
+        const className = key.substring('item_Desc'.length);
         if (className) {
           this.descIndex.set(key, value);
           this.classNameDescIndex.set(className.toLowerCase(), value);
         }
       }
       // Vehicle names: vehicle_Name_{className}=Display Name
-      else if (keyLower.startsWith("vehicle_name_")) {
-        const className = key.substring("vehicle_Name_".length);
+      else if (keyLower.startsWith('vehicle_name_')) {
+        const className = key.substring('vehicle_Name_'.length);
         if (className) {
           this.nameIndex.set(key, value);
           this.classNameIndex.set(className.toLowerCase(), value);
@@ -136,7 +140,7 @@ export class LocalizationService {
     }
 
     this.loaded = true;
-    logger.info(`Localization loaded: ${parsed} name entries, ${this.descIndex.size} descriptions`, { module: "localization" });
+    logger.info(`Localization loaded: ${parsed} name entries, ${this.descIndex.size} descriptions`, { module: 'localization' });
     onProgress?.(`Localization: ${parsed} names, ${this.descIndex.size} descriptions`);
     return parsed;
   }
@@ -159,19 +163,17 @@ export class LocalizationService {
     if (direct) return direct;
 
     // Try without manufacturer prefix (e.g., BEHR_LaserRepeater_S2 → LaserRepeater_S2)
-    const withoutMfg = className.replace(/^[A-Z]{3,5}_/, "");
+    const withoutMfg = className.replace(/^[A-Z]{3,5}_/, '');
     if (withoutMfg !== className) {
       const mfgStripped = this.classNameIndex.get(withoutMfg.toLowerCase());
       if (mfgStripped) return mfgStripped;
     }
 
     // Try variants with/without SCItem suffix
-    const withSCItem = this.classNameIndex.get((cn.endsWith("_scitem") ? cn : cn + "_scitem"));
+    const withSCItem = this.classNameIndex.get(cn.endsWith('_scitem') ? cn : cn + '_scitem');
     if (withSCItem) return withSCItem;
 
-    const withoutSCItem = cn.endsWith("_scitem")
-      ? this.classNameIndex.get(cn.replace(/_scitem$/, ""))
-      : null;
+    const withoutSCItem = cn.endsWith('_scitem') ? this.classNameIndex.get(cn.replace(/_scitem$/, '')) : null;
     if (withoutSCItem) return withoutSCItem;
 
     return null;
@@ -225,30 +227,30 @@ export class LocalizationService {
    */
   private cleanFallbackName(className: string, currentName: string): string {
     // If currentName already looks clean (no underscores, not a class reference), use it
-    if (currentName && !currentName.includes("_") && !currentName.startsWith("@")) {
+    if (currentName && !currentName.includes('_') && !currentName.startsWith('@')) {
       return currentName;
     }
 
     let name = currentName || className;
 
     // Strip @LOC reference
-    if (name.startsWith("@")) name = className;
+    if (name.startsWith('@')) name = className;
 
     // Strip manufacturer prefix
-    name = name.replace(/^[A-Z]{3,5}_/, "");
+    name = name.replace(/^[A-Z]{3,5}_/, '');
 
     // Strip SCItem suffix
-    name = name.replace(/_?SCItem\b.*$/i, "");
-    name = name.replace(/_?scitem\b.*$/i, "");
+    name = name.replace(/_?SCItem\b.*$/i, '');
+    name = name.replace(/_?scitem\b.*$/i, '');
 
     // Strip size prefix (S01_, S02_)
-    name = name.replace(/^S\d{2}_?/i, "");
+    name = name.replace(/^S\d{2}_?/i, '');
 
     // Strip _Resist suffixes
-    name = name.replace(/_Resist.*$/i, "");
+    name = name.replace(/_Resist.*$/i, '');
 
     // Replace underscores with spaces
-    name = name.replace(/_/g, " ");
+    name = name.replace(/_/g, ' ');
 
     // Title case
     name = name.replace(/\b\w/g, (c) => c.toUpperCase());

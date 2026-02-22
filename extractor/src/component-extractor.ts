@@ -4,9 +4,9 @@
  * Extracted from DataForgeService.extractAllComponents() to reduce god-class size.
  * Depends on DataForgeContext interface (no circular dependency with DataForgeService).
  */
-import type { DataForgeContext } from "./dataforge-utils.js";
-import { MANUFACTURER_CODES, resolveComponentName } from "./dataforge-utils.js";
-import logger from "./logger.js";
+import type { DataForgeContext } from './dataforge-utils.js';
+import { MANUFACTURER_CODES, resolveComponentName } from './dataforge-utils.js';
+import logger from './logger.js';
 
 /**
  * Extract all ship components from DataForge SCItem records.
@@ -16,43 +16,55 @@ import logger from "./logger.js";
 export function extractAllComponents(ctx: DataForgeContext): any[] {
   const dfData = ctx.getDfData();
   if (!dfData) return [];
-  const entityClassIdx = dfData.structDefs.findIndex(s => s.name === 'EntityClassDefinition');
+  const entityClassIdx = dfData.structDefs.findIndex((s) => s.name === 'EntityClassDefinition');
   if (entityClassIdx === -1) return [];
 
   const components: any[] = [];
 
   const componentPaths: Record<string, RegExp> = {
-    'WeaponGun':     /scitem.*weapons\/[^\/\\]+$/i,
-    'Shield':        /shield_?generator[s]?[\/\\]|shield[s]?[\/\\]/i,
-    'PowerPlant':    /power_?plant[s]?[\/\\]|powerplant/i,
-    'Cooler':        /cooler[s]?[\/\\]/i,
-    'QuantumDrive':  /quantum_?drive[s]?[\/\\]|quantumdrive/i,
-    'Missile':       /missile[s]?[\/\\](?!rack|launcher|_rack)/i,
-    'Thruster':      /thruster[s]?[\/\\]/i,
-    'Radar':         /radar[s]?[\/\\]/i,
-    'Countermeasure': /countermeasure[s]?[\/\\]|flare[s]?[\/\\]|noise[\/\\]/i,
-    'FuelIntake':    /fuel_?intake[s]?[\/\\]/i,
-    'FuelTank':      /fuel_?tank[s]?[\/\\](?!quantum)/i,
-    'LifeSupport':   /life_?support[s]?[\/\\]/i,
-    'EMP':           /emp[\/\\]|distortion_?charge[\/\\]|emp_?generator/i,
-    'QuantumInterdictionGenerator': /quantum_?interdiction[\/\\]|qig[\/\\]|quantum_?enforcement/i,
-    'Gimbal':        /weapon_mounts\/gimbal[\/\\]|mount_?fixed[\/\\]/i,
-    'Turret':        /ships\/turret[\/\\](?!.*unmanned)/i,
-    'TurretUnmanned': /turret_?unmanned[\/\\]/i,
-    'MissileRack':   /missile_?racks?[\/\\]/i,
-    'MiningLaser':   /utility\/mining\/miningarm[\/\\]|mining_?laser[\/\\]|miningsubitems[\/\\]/i,
-    'SalvageHead':   /utility\/salvage\/salvagehead[\/\\]/i,
-    'SelfDestruct':  /ships\/selfdestruct[\/\\]/i,
-    'TractorBeam':   /utility\/tractorbeam[\/\\]/i,
+    WeaponGun: /scitem.*weapons\/[^/\\]+$/i,
+    Shield: /shield_?generator[s]?[/\\]|shield[s]?[/\\]/i,
+    PowerPlant: /power_?plant[s]?[/\\]|powerplant/i,
+    Cooler: /cooler[s]?[/\\]/i,
+    QuantumDrive: /quantum_?drive[s]?[/\\]|quantumdrive/i,
+    Missile: /missile[s]?[/\\](?!rack|launcher|_rack)/i,
+    Thruster: /thruster[s]?[/\\]/i,
+    Radar: /radar[s]?[/\\]/i,
+    Countermeasure: /countermeasure[s]?[/\\]|flare[s]?[/\\]|noise[/\\]/i,
+    FuelIntake: /fuel_?intake[s]?[/\\]/i,
+    FuelTank: /fuel_?tank[s]?[/\\](?!quantum)/i,
+    LifeSupport: /life_?support[s]?[/\\]/i,
+    EMP: /emp[/\\]|distortion_?charge[/\\]|emp_?generator/i,
+    QuantumInterdictionGenerator: /quantum_?interdiction[/\\]|qig[/\\]|quantum_?enforcement/i,
+    Gimbal: /weapon_mounts\/gimbal[/\\]|mount_?fixed[/\\]/i,
+    Turret: /ships\/turret[/\\](?!.*unmanned)/i,
+    TurretUnmanned: /turret_?unmanned[/\\]/i,
+    MissileRack: /missile_?racks?[/\\]/i,
+    MiningLaser: /utility\/mining\/miningarm[/\\]|mining_?laser[/\\]|miningsubitems[/\\]/i,
+    SalvageHead: /utility\/salvage\/salvagehead[/\\]/i,
+    SelfDestruct: /ships\/selfdestruct[/\\]/i,
+    TractorBeam: /utility\/tractorbeam[/\\]/i,
   };
 
   let scanned = 0;
   for (const r of dfData.records) {
     if (r.structIndex !== entityClassIdx) continue;
     const fn = (r.fileName || '').toLowerCase();
-    if (!fn.includes('scitem/ships/') && !fn.includes('scitem') && !fn.includes('/weapon/') && !fn.includes('/missile/') && !fn.includes('/systems/')) continue;
+    if (
+      !fn.includes('scitem/ships/') &&
+      !fn.includes('scitem') &&
+      !fn.includes('/weapon/') &&
+      !fn.includes('/missile/') &&
+      !fn.includes('/systems/')
+    )
+      continue;
     let type: string | null = null;
-    for (const [t, rx] of Object.entries(componentPaths)) { if (rx.test(fn)) { type = t; break; } }
+    for (const [t, rx] of Object.entries(componentPaths)) {
+      if (rx.test(fn)) {
+        type = t;
+        break;
+      }
+    }
     if (!type) continue;
     scanned++;
     try {
@@ -61,11 +73,18 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
       const className = r.name?.replace('EntityClassDefinition.', '') || '';
       if (!className) continue;
       const lcName = className.toLowerCase();
-      if (lcName.includes('_test') || lcName.startsWith('test_') ||
-          lcName.includes('_debug') || lcName.includes('_template') ||
-          lcName.includes('_indestructible') || lcName.includes('_npc_only') ||
-          lcName.includes('_placeholder') || lcName.includes('contestedzonereward') ||
-          lcName.startsWith('display_')) continue;
+      if (
+        lcName.includes('_test') ||
+        lcName.startsWith('test_') ||
+        lcName.includes('_debug') ||
+        lcName.includes('_template') ||
+        lcName.includes('_indestructible') ||
+        lcName.includes('_npc_only') ||
+        lcName.includes('_placeholder') ||
+        lcName.includes('contestedzonereward') ||
+        lcName.startsWith('display_')
+      )
+        continue;
 
       // Skip FPS weapons (personal weapons, not ship components)
       if (type === 'WeaponGun') {
@@ -129,7 +148,8 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
                 for (const se of pa.sequenceEntries) {
                   const wa = se?.weaponAction;
                   if (wa && typeof wa.fireRate === 'number') totalFR += wa.fireRate;
-                  if (!comp.weaponHeatPerShot && typeof wa?.heatPerShot === 'number') comp.weaponHeatPerShot = Math.round(wa.heatPerShot * 100000) / 100000;
+                  if (!comp.weaponHeatPerShot && typeof wa?.heatPerShot === 'number')
+                    comp.weaponHeatPerShot = Math.round(wa.heatPerShot * 100000) / 100000;
                   if (!comp.weaponPelletsPerShot && wa?.launchParams?.pelletCount) comp.weaponPelletsPerShot = wa.launchParams.pelletCount;
                 }
                 if (totalFR > 0) comp.weaponFireRate = Math.round(totalFR * 100) / 100;
@@ -159,12 +179,18 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
               const ammoData = ctx.readRecordByGuid(ammoGuid, 5);
               if (ammoData) {
                 if (typeof ammoData.speed === 'number' && !comp.weaponSpeed) comp.weaponSpeed = Math.round(ammoData.speed * 100) / 100;
-                if (typeof ammoData.lifetime === 'number' && comp.weaponSpeed) comp.weaponRange = Math.round(ammoData.lifetime * comp.weaponSpeed * 100) / 100;
+                if (typeof ammoData.lifetime === 'number' && comp.weaponSpeed)
+                  comp.weaponRange = Math.round(ammoData.lifetime * comp.weaponSpeed * 100) / 100;
 
                 const pp = ammoData.projectileParams;
                 if (pp && typeof pp === 'object') {
                   const dmg = pp.damage;
-                  let physical = 0, energy = 0, distortion = 0, thermal = 0, biochemical = 0, stun = 0;
+                  let physical = 0,
+                    energy = 0,
+                    distortion = 0,
+                    thermal = 0,
+                    biochemical = 0,
+                    stun = 0;
                   if (dmg && typeof dmg === 'object') {
                     physical = typeof dmg.DamagePhysical === 'number' ? dmg.DamagePhysical : 0;
                     energy = typeof dmg.DamageEnergy === 'number' ? dmg.DamageEnergy : 0;
@@ -199,15 +225,25 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
                     comp.weaponDamageThermal = Math.round(thermal * 10000) / 10000;
                     comp.weaponDamageBiochemical = Math.round(biochemical * 10000) / 10000;
                     comp.weaponDamageStun = Math.round(stun * 10000) / 10000;
-                    const dtypes: [string, number][] = [['physical', physical], ['energy', energy], ['distortion', distortion], ['thermal', thermal], ['biochemical', biochemical], ['stun', stun]];
+                    const dtypes: [string, number][] = [
+                      ['physical', physical],
+                      ['energy', energy],
+                      ['distortion', distortion],
+                      ['thermal', thermal],
+                      ['biochemical', biochemical],
+                      ['stun', stun],
+                    ];
                     comp.weaponDamageType = dtypes.sort((a, b) => b[1] - a[1])[0][0];
                   }
 
                   if (typeof pp.speed === 'number' && !comp.weaponSpeed) comp.weaponSpeed = Math.round(pp.speed * 100) / 100;
-                  if (typeof pp.lifetime === 'number' && comp.weaponSpeed && !comp.weaponRange) comp.weaponRange = Math.round(pp.lifetime * comp.weaponSpeed * 100) / 100;
+                  if (typeof pp.lifetime === 'number' && comp.weaponSpeed && !comp.weaponRange)
+                    comp.weaponRange = Math.round(pp.lifetime * comp.weaponSpeed * 100) / 100;
                 }
               }
-            } catch (e) { /* ammo resolution — non-critical */ }
+            } catch (e) {
+              /* ammo resolution — non-critical */
+            }
           }
         }
 
@@ -254,8 +290,10 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
 
           const jp = c.jumpParams || c.JumpParams;
           if (jp && typeof jp === 'object') {
-            if (typeof jp.Stage1AccelerationRate === 'number' && !comp.qdStage1Accel) comp.qdStage1Accel = Math.round(jp.Stage1AccelerationRate * 100) / 100;
-            if (typeof jp.Stage2AccelerationRate === 'number' && !comp.qdStage2Accel) comp.qdStage2Accel = Math.round(jp.Stage2AccelerationRate * 100) / 100;
+            if (typeof jp.Stage1AccelerationRate === 'number' && !comp.qdStage1Accel)
+              comp.qdStage1Accel = Math.round(jp.Stage1AccelerationRate * 100) / 100;
+            if (typeof jp.Stage2AccelerationRate === 'number' && !comp.qdStage2Accel)
+              comp.qdStage2Accel = Math.round(jp.Stage2AccelerationRate * 100) / 100;
           }
           const sjp = c.splineJumpParams || c.SplineJumpParams;
           if (sjp && typeof sjp === 'object') {
@@ -303,7 +341,10 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           const bDmg = c.bulletImpactDamage || c.damage;
           if (bDmg && typeof bDmg === 'object') {
             const dt = Object.entries(bDmg).find(([k, v]) => typeof v === 'number' && (v as number) > 0);
-            if (dt) { comp.weaponDamage = Math.round(dt[1] as number * 10000) / 10000; comp.weaponDamageType = dt[0]; }
+            if (dt) {
+              comp.weaponDamage = Math.round((dt[1] as number) * 10000) / 10000;
+              comp.weaponDamageType = dt[0];
+            }
           }
           if (typeof c.speed === 'number' && !comp.weaponSpeed) comp.weaponSpeed = Math.round(c.speed * 100) / 100;
           if (typeof c.lifetime === 'number' && comp.weaponSpeed) comp.weaponRange = Math.round(c.lifetime * comp.weaponSpeed * 100) / 100;
@@ -312,10 +353,20 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
         // Thruster
         if (cType === 'SCItemThrusterParams' || cType === 'SItemThrusterParams') {
           if (typeof c.thrustCapacity === 'number') comp.thrusterMaxThrust = Math.round(c.thrustCapacity * 100) / 100;
-          if (typeof c.ThrustCapacity === 'number' && !comp.thrusterMaxThrust) comp.thrusterMaxThrust = Math.round(c.ThrustCapacity * 100) / 100;
-          if (typeof c.maxThrustForce === 'number' && !comp.thrusterMaxThrust) comp.thrusterMaxThrust = Math.round(c.maxThrustForce * 100) / 100;
-          const thrusterType = fn.includes('main') || fn.includes('retro') ? (fn.includes('retro') ? 'Retro' : 'Main') :
-            fn.includes('vtol') ? 'VTOL' : fn.includes('mav') || fn.includes('maneuver') ? 'Maneuvering' : 'Main';
+          if (typeof c.ThrustCapacity === 'number' && !comp.thrusterMaxThrust)
+            comp.thrusterMaxThrust = Math.round(c.ThrustCapacity * 100) / 100;
+          if (typeof c.maxThrustForce === 'number' && !comp.thrusterMaxThrust)
+            comp.thrusterMaxThrust = Math.round(c.maxThrustForce * 100) / 100;
+          const thrusterType =
+            fn.includes('main') || fn.includes('retro')
+              ? fn.includes('retro')
+                ? 'Retro'
+                : 'Main'
+              : fn.includes('vtol')
+                ? 'VTOL'
+                : fn.includes('mav') || fn.includes('maneuver')
+                  ? 'Maneuvering'
+                  : 'Main';
           comp.thrusterType = thrusterType;
         }
 
@@ -325,7 +376,8 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           if (Array.isArray(sigDet) && sigDet.length > 0) {
             const activeSensitivities = sigDet.filter((s: any) => s?.permitPassiveDetection === true && typeof s?.sensitivity === 'number');
             if (activeSensitivities.length > 0) {
-              const avgSensitivity = activeSensitivities.reduce((sum: number, s: any) => sum + s.sensitivity, 0) / activeSensitivities.length;
+              const avgSensitivity =
+                activeSensitivities.reduce((sum: number, s: any) => sum + s.sensitivity, 0) / activeSensitivities.length;
               comp.radarTrackingSignal = Math.round(avgSensitivity * 10000) / 10000;
             }
             const piercingValues = sigDet.filter((s: any) => typeof s?.piercing === 'number').map((s: any) => s.piercing);
@@ -352,7 +404,8 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           if (typeof c.capacity === 'number') comp.fuelCapacity = Math.round(c.capacity * 100) / 100;
         }
         if (type === 'FuelTank' && cType === 'ResourceContainer') {
-          const cap = typeof c.capacity === 'object' ? (c.capacity?.standardCargoUnits || 0) : (typeof c.capacity === 'number' ? c.capacity : 0);
+          const cap =
+            typeof c.capacity === 'object' ? c.capacity?.standardCargoUnits || 0 : typeof c.capacity === 'number' ? c.capacity : 0;
           if (cap > 0) comp.fuelCapacity = Math.round(cap * 100) / 100;
         }
 
@@ -399,9 +452,11 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
         // Mining laser
         if (cType === 'SCItemMiningLaserParams' || cType === 'SMiningLaserParams') {
           if (typeof c.miningExtractionLaserPower === 'number') comp.miningSpeed = Math.round(c.miningExtractionLaserPower * 10000) / 10000;
-          if (typeof c.MiningExtractionLaserPower === 'number' && !comp.miningSpeed) comp.miningSpeed = Math.round(c.MiningExtractionLaserPower * 10000) / 10000;
+          if (typeof c.MiningExtractionLaserPower === 'number' && !comp.miningSpeed)
+            comp.miningSpeed = Math.round(c.MiningExtractionLaserPower * 10000) / 10000;
           if (typeof c.laserInstability === 'number') comp.miningInstability = Math.round(c.laserInstability * 10000) / 10000;
-          if (typeof c.LaserInstability === 'number' && !comp.miningInstability) comp.miningInstability = Math.round(c.LaserInstability * 10000) / 10000;
+          if (typeof c.LaserInstability === 'number' && !comp.miningInstability)
+            comp.miningInstability = Math.round(c.LaserInstability * 10000) / 10000;
           if (typeof c.resistanceModifier === 'number') comp.miningResistance = Math.round(c.resistanceModifier * 10000) / 10000;
           if (typeof c.optimalRange === 'number') comp.miningRange = Math.round(c.optimalRange * 100) / 100;
           if (typeof c.OptimalRange === 'number' && !comp.miningRange) comp.miningRange = Math.round(c.OptimalRange * 100) / 100;
@@ -431,7 +486,7 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
         }
 
         // Missile rack: count sub-ports
-        if ((type === 'MissileRack') && cType === 'SItemPortContainerComponentParams') {
+        if (type === 'MissileRack' && cType === 'SItemPortContainerComponentParams') {
           const ports = c.Ports;
           if (Array.isArray(ports)) {
             comp.rackCount = ports.length;
@@ -476,7 +531,10 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
       // Manufacturer from className prefix
       if (!comp.manufacturerCode) {
         const mfgMatch = className.match(/^([A-Z]{3,5})_/);
-        if (mfgMatch) { comp.manufacturerCode = mfgMatch[1]; comp.manufacturer = MANUFACTURER_CODES[mfgMatch[1]] || mfgMatch[1]; }
+        if (mfgMatch) {
+          comp.manufacturerCode = mfgMatch[1];
+          comp.manufacturer = MANUFACTURER_CODES[mfgMatch[1]] || mfgMatch[1];
+        }
       }
 
       components.push(comp);

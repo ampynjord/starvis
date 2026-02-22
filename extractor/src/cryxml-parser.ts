@@ -1,6 +1,6 @@
 /**
  * CryXML Binary Format Parser
- * 
+ *
  * Parses CryXmlB binary files used by CryEngine / Star Citizen.
  * Based on the reference C# implementation from dolkensp/unp4k:
  *   src/unforge/CryXmlB/CryXmlSerializer.cs
@@ -143,7 +143,7 @@ export function parseCryXml(buf: Buffer): CryXmlNode {
   }
 
   // Already plain XML?
-  if (buf[0] === 0x3C /* '<' */) {
+  if (buf[0] === 0x3c /* '<' */) {
     return null as any;
   }
 
@@ -186,14 +186,22 @@ export function parseCryXml(buf: Buffer): CryXmlNode {
   // -----------------------------------------------------------------------
   let off = headerLength;
   /*fileLength       */ off += 4;
-  const nodeTableOffset = readInt32(buf, off, order); off += 4;
-  const nodeTableCount = readInt32(buf, off, order); off += 4;
-  const attrTableOffset = readInt32(buf, off, order); off += 4;
-  const attrTableCount = readInt32(buf, off, order); off += 4;
-  const childTableOffset = readInt32(buf, off, order); off += 4;
-  const childTableCount = readInt32(buf, off, order); off += 4;
-  const stringTableOffset = readInt32(buf, off, order); off += 4;
-  const stringTableCount = readInt32(buf, off, order); off += 4;
+  const nodeTableOffset = readInt32(buf, off, order);
+  off += 4;
+  const nodeTableCount = readInt32(buf, off, order);
+  off += 4;
+  const attrTableOffset = readInt32(buf, off, order);
+  off += 4;
+  const attrTableCount = readInt32(buf, off, order);
+  off += 4;
+  const childTableOffset = readInt32(buf, off, order);
+  off += 4;
+  const childTableCount = readInt32(buf, off, order);
+  off += 4;
+  const stringTableOffset = readInt32(buf, off, order);
+  off += 4;
+  const stringTableCount = readInt32(buf, off, order);
+  off += 4;
 
   // -----------------------------------------------------------------------
   // 4. Build string dictionary (offset → string)
