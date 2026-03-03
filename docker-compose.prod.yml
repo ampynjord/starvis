@@ -1,15 +1,63 @@
-# Production override — used on VPS behind Traefik
-# Pulls pre-built images from GHCR, routes via Traefik reverse proxy
+# Production — VPS derrière Traefik
+# Images pré-buildées depuis GHCR, routage via Traefik
 #
-# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Usage: docker compose -f docker-compose.prod.yml up -d
+# Env:   cp .env.prod.example .env.prod && edit, puis passer --env-file .env.prod
 
 services:
+  mysql:
+    image: mysql:8.0
+    container_name: starvis-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    # Pas de port exposé en prod — accès interne uniquement
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   api:
     image: ghcr.io/ampynjord/starvis-api:latest
-    build: !reset null
-    ports: !reset []
+    container_name: starvis-api
     environment:
-      CORS_ORIGIN: "https://starvis.ampynjord.bzh"
+      NODE_ENV: production
+      PORT: ${API_INTERNAL_PORT:-3000}
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      ADMIN_API_KEY: ${ADMIN_API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://starvis.ampynjord.bzh}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-200}
+      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-30}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      mysql:
+        condition: service_healthy
     networks:
       - default
       - traefik-network
@@ -22,15 +70,21 @@ services:
 
   ihm:
     image: ghcr.io/ampynjord/starvis-ihm:latest
-    build: !reset null
-    ports: !reset []
-    # Override healthcheck to use 127.0.0.1 (Alpine resolves localhost to IPv6)
+    container_name: starvis-ihm
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    # 127.0.0.1 explicite : Alpine résout localhost en IPv6
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/"]
       interval: 30s
       timeout: 3s
       start_period: 5s
       retries: 3
+    depends_on:
+      - api
     networks:
       - default
       - traefik-network
@@ -41,9 +95,8 @@ services:
       traefik.http.routers.starvis-ihm.tls.certresolver: "letsencrypt"
       traefik.http.services.starvis-ihm.loadbalancer.server.port: "80"
 
-  mysql:
-    # No Traefik — internal only, no exposed ports in prod
-    ports: !reset []
+volumes:
+  mysql_data:
 
 networks:
   traefik-network:

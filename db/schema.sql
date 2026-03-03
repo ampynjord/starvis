@@ -1,6 +1,6 @@
 -- ============================================================
 -- STARVIS v2.0 - DATABASE SCHEMA
--- Last updated: June 2025
+-- Last updated: March 2026
 -- 
 -- Tables:
 --   ship_matrix       → Raw data from RSI Ship Matrix API (external)

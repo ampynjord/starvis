@@ -230,8 +230,8 @@ jobs:
             git pull --ff-only origin main
 
             # Pull pre-built images from GHCR (public repo, no auth needed)
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --remove-orphans
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
             # Wait for API health check
             echo "⏳ Waiting for API health..."
@@ -246,4 +246,4 @@ jobs:
             # Cleanup old images
             docker image prune -f
 
-            echo "✅ Deployed $(docker compose ps --format 'table {{.Name}}\t{{.Status}}')"
+            echo "✅ Deployed $(docker compose -f docker-compose.prod.yml ps --format 'table {{.Name}}\t{{.Status}}')"
