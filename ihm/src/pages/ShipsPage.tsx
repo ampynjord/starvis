@@ -58,7 +58,7 @@ export default function ShipsPage() {
           </h1>
           {data && (
             <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">
-              {data.pagination.total.toLocaleString('en-US')} ships
+              {data.total.toLocaleString('en-US')} ships
             </p>
           )}
         </div>
@@ -138,8 +138,8 @@ export default function ShipsPage() {
               {data && (
                 <Pagination
                   className="mt-6"
-                  page={data.pagination.page}
-                  totalPages={data.pagination.totalPages}
+                  page={data.page}
+                  totalPages={data.pages}
                   onPageChange={p => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 />
               )}

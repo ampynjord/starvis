@@ -15,8 +15,13 @@ async function get<T>(path: string, params?: Record<string, string | number | un
     }
   }
   const res = await fetch(url.toString());
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-  return res.json() as Promise<T>;
+  const json = await res.json() as Record<string, unknown>;
+  if (!res.ok) throw new Error(String(json['error'] ?? '') || `HTTP ${res.status}: ${res.statusText}`);
+  // Paginated list: numeric 'total' AND array 'data' at top level → return full response
+  if (typeof json['total'] === 'number' && Array.isArray(json['data'])) return json as unknown as T;
+  // Wrapped response: {success: true, data: T} → unwrap
+  if ('success' in json && 'data' in json) return json['data'] as T;
+  return json as unknown as T;
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {

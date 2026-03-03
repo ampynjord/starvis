@@ -51,7 +51,7 @@ export default function ItemsPage() {
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">FPS Items</h1>
-          {data && <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">{data.pagination.total.toLocaleString('en-US')} items</p>}
+          {data && <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">{data.total.toLocaleString('en-US')} items</p>}
         </div>
         <div className="relative w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={13} />
@@ -67,7 +67,7 @@ export default function ItemsPage() {
         </div>
 
         <div className="flex-1 min-w-0">
-          {isLoading ? <LoadingGrid message="CHARGEMENT…" />
+          {isLoading ? <LoadingGrid message="LOADING…" />
           : error ? <ErrorState error={error as Error} onRetry={() => void refetch()} />
           : data?.data.length === 0 ? <EmptyState icon="🛡" title="No items found" />
           : (
@@ -94,7 +94,7 @@ export default function ItemsPage() {
                   </motion.div>
                 ))}
               </div>
-              {data && <Pagination className="mt-6" page={data.pagination.page} totalPages={data.pagination.totalPages} onPageChange={p => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
+              {data && <Pagination className="mt-6" page={data.page} totalPages={data.pages} onPageChange={p => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
             </>
           )}
         </div>
