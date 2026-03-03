@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 
 interface Props { icon?: ReactNode; title?: string; message?: string; }
 
-export function EmptyState({ icon, title = 'Aucun résultat', message }: Props) {
+export function EmptyState({ icon, title = 'No results', message }: Props) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
       {icon && <div className="text-slate-700 text-4xl">{icon}</div>}

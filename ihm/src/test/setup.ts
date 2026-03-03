@@ -6,7 +6,7 @@ import React from 'react';
 vi.mock('framer-motion', () => ({
   motion: new Proxy({}, {
     get: (_target, prop) =>
-      // Retourne un composant "passthrough" pour chaque élément HTML
+      // Returns a "passthrough" component for each HTML element
       ({ children, initial: _i, animate: _a, exit: _e, transition: _t, whileHover: _wh, whileTap: _wt, layout: _l, ...rest }: Record<string, unknown>) =>
         React.createElement(prop as string, rest, children),
   }),

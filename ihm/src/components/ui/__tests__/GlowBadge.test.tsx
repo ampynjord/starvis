@@ -8,7 +8,7 @@ describe('GlowBadge', () => {
     expect(screen.getByText('Collector')).toBeInTheDocument();
   });
 
-  it('utilise la couleur slate par défaut', () => {
+  it('uses slate color by default', () => {
     const { container } = render(<GlowBadge>Test</GlowBadge>);
     expect(container.firstChild).toHaveClass('text-slate-400');
   });
@@ -38,7 +38,7 @@ describe('GlowBadge', () => {
     expect(container.firstChild).toHaveClass('text-purple-400');
   });
 
-  it('utilise text-xs par défaut (size=xs)', () => {
+  it('uses text-xs by default (size=xs)', () => {
     const { container } = render(<GlowBadge>Test</GlowBadge>);
     expect(container.firstChild).toHaveClass('text-xs');
   });
@@ -48,7 +48,7 @@ describe('GlowBadge', () => {
     expect(container.firstChild).toHaveClass('text-sm');
   });
 
-  it('accepte une className supplémentaire', () => {
+  it('accepts an extra className', () => {
     const { container } = render(<GlowBadge className="custom-class">Test</GlowBadge>);
     expect(container.firstChild).toHaveClass('custom-class');
   });

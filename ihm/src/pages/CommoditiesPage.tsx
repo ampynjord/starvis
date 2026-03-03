@@ -30,8 +30,8 @@ export default function CommoditiesPage() {
     <div className="max-w-screen-2xl mx-auto">
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
-          <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Marchandises</h1>
-          {data && <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">{data.pagination.total.toLocaleString('fr-FR')} commodités</p>}
+          <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Commodities</h1>
+          {data && <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">{data.pagination.total.toLocaleString('en-US')} commodities</p>}
         </div>
         <div className="relative w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={13} />
@@ -56,7 +56,7 @@ export default function CommoditiesPage() {
         <div className="flex-1 min-w-0">
           {isLoading ? <LoadingGrid message="CHARGEMENT…" />
           : error ? <ErrorState error={error as Error} onRetry={() => void refetch()} />
-          : data?.data.length === 0 ? <EmptyState icon="📦" title="Aucune marchandise" />
+          : data?.data.length === 0 ? <EmptyState icon="📦" title="No commodities found" />
           : (
             <>
               <div className="space-y-1.5">
@@ -67,7 +67,7 @@ export default function CommoditiesPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-orbitron text-sm text-slate-200">{c.name}</span>
-                            {c.is_illegal && <GlowBadge color="red">ILLÉGAL</GlowBadge>}
+                            {c.is_illegal && <GlowBadge color="red">ILLEGAL</GlowBadge>}
                             {c.is_raw && <GlowBadge color="amber">RAW</GlowBadge>}
                             {c.type && <GlowBadge color="slate">{c.type}</GlowBadge>}
                           </div>

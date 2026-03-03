@@ -41,21 +41,21 @@ export default function ItemsPage() {
   const resetFilters = () => { setType(''); setSize(''); setGrade(''); setSearch(''); setPage(1); };
 
   const filterGroups = filters ? [
-    { key: 'type', label: 'Type',  options: (filters['types'] ?? []).map((t: string) => ({ label: t, value: t })),  value: type,  onChange: (v: string) => { setType(v); setPage(1); } },
-    { key: 'size', label: 'Taille', options: (filters['sizes'] ?? []).map((s: string) => ({ label: `S${s}`, value: s })), value: size, onChange: (v: string) => { setSize(v); setPage(1); } },
-    { key: 'grade', label: 'Grade', options: (filters['grades'] ?? []).map((g: string) => ({ label: g, value: g })),  value: grade, onChange: (v: string) => { setGrade(v); setPage(1); } },
+    { key: 'type', label: 'Type',  options: (filters['types'] ?? []).map((t: string) => ({ label: t, value: t })),    value: type,  onChange: (v: string) => { setType(v); setPage(1); } },
+    { key: 'size', label: 'Size',  options: (filters['sizes'] ?? []).map((s: string) => ({ label: `S${s}`, value: s })), value: size, onChange: (v: string) => { setSize(v); setPage(1); } },
+    { key: 'grade', label: 'Grade', options: (filters['grades'] ?? []).map((g: string) => ({ label: g, value: g })),   value: grade, onChange: (v: string) => { setGrade(v); setPage(1); } },
   ] : [];
 
   return (
     <div className="max-w-screen-2xl mx-auto">
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
-          <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Équipements FPS</h1>
-          {data && <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">{data.pagination.total.toLocaleString('fr-FR')} équipements</p>}
+          <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">FPS Items</h1>
+          {data && <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">{data.pagination.total.toLocaleString('en-US')} items</p>}
         </div>
         <div className="relative w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={13} />
-          <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Rechercher un équipement…" className="sci-input w-full pl-8 text-xs" />
+          <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Search an item…" className="sci-input w-full pl-8 text-xs" />
         </div>
       </div>
 
@@ -63,13 +63,13 @@ export default function ItemsPage() {
         <div className="w-44 flex-shrink-0">
           {filterGroups.length > 0
             ? <FilterPanel hasFilters={hasFilters} onReset={resetFilters} groups={filterGroups} />
-            : <div className="sci-panel p-3 text-xs text-slate-600 animate-pulse">Chargement…</div>}
+            : <div className="sci-panel p-3 text-xs text-slate-600 animate-pulse">Loading…</div>}
         </div>
 
         <div className="flex-1 min-w-0">
           {isLoading ? <LoadingGrid message="CHARGEMENT…" />
           : error ? <ErrorState error={error as Error} onRetry={() => void refetch()} />
-          : data?.data.length === 0 ? <EmptyState icon="🛡" title="Aucun équipement" />
+          : data?.data.length === 0 ? <EmptyState icon="🛡" title="No items found" />
           : (
             <>
               <div className="space-y-1.5">

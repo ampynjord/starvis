@@ -1,6 +1,6 @@
 export const fNumber = (v: number | null | undefined, decimals = 0): string => {
   if (v == null) return '—';
-  return v.toLocaleString('fr-FR', { maximumFractionDigits: decimals });
+  return v.toLocaleString('en-US', { maximumFractionDigits: decimals });
 };
 
 export const fMass = (kg: number | null | undefined): string => {
@@ -31,14 +31,14 @@ export const fCredits = (aUEC: number | null | undefined): string => {
 
 export const fDate = (iso: string | null | undefined): string => {
   if (!iso) return '—';
-  return new Date(iso).toLocaleDateString('fr-FR', {
+  return new Date(iso).toLocaleDateString('en-US', {
     day: '2-digit', month: 'short', year: 'numeric',
   });
 };
 
 export const fDateTime = (iso: string | null | undefined): string => {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('fr-FR', {
+  return new Date(iso).toLocaleString('en-US', {
     day: '2-digit', month: 'short', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   });

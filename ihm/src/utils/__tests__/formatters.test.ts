@@ -12,109 +12,106 @@ import {
   fDimension,
 } from '@/utils/formatters';
 
-// Note : les tests de formatage utilisent la locale fr-FR du processus Node.
-// L'espace utilisé par fr-FR peut être une espace fine insécable (U+202F) ou une espace normale.
-// On utilise .replace(/\s/g, ' ') pour normaliser dans les comparaisons.
-const norm = (s: string) => s.replace(/\u202f/g, ' ').replace(/\u00a0/g, ' ');
+// en-US locale: thousands separator is ',' and decimal separator is '.'
+// No special whitespace normalisation needed.
 
 describe('fNumber', () => {
-  it('retourne — si null', () => {
+  it('returns — for null', () => {
     expect(fNumber(null)).toBe('—');
   });
-  it('retourne — si undefined', () => {
+  it('returns — for undefined', () => {
     expect(fNumber(undefined)).toBe('—');
   });
-  it('formate un entier', () => {
+  it('formats an integer', () => {
     expect(fNumber(0)).toBe('0');
     expect(fNumber(42)).toBe('42');
   });
-  it('formate avec séparateur de milliers fr-FR', () => {
-    // 1000 → "1 000" en fr-FR
-    expect(norm(fNumber(1000))).toBe('1 000');
-    expect(norm(fNumber(1_000_000))).toBe('1 000 000');
+  it('formats with en-US thousands separator', () => {
+    expect(fNumber(1000)).toBe('1,000');
+    expect(fNumber(1_000_000)).toBe('1,000,000');
   });
-  it('respecte le paramètre decimals', () => {
-    expect(norm(fNumber(3.14159, 2))).toBe('3,14');
-    expect(norm(fNumber(1234.5678, 0))).toBe('1 235');
+  it('respects decimals parameter', () => {
+    expect(fNumber(3.14159, 2)).toBe('3.14');
+    expect(fNumber(1234.5678, 0)).toBe('1,235');
   });
 });
 
 describe('fMass', () => {
-  it('retourne — si null/undefined', () => {
+  it('returns — for null/undefined', () => {
     expect(fMass(null)).toBe('—');
     expect(fMass(undefined)).toBe('—');
   });
-  it('formate en kg si < 1 000', () => {
-    expect(norm(fMass(500))).toContain('kg');
-    expect(norm(fMass(999))).toContain('kg');
+  it('formats in kg if < 1,000', () => {
+    expect(fMass(500)).toContain('kg');
+    expect(fMass(999)).toContain('kg');
   });
-  it('formate en t si >= 1 000', () => {
+  it('formats in t if >= 1,000', () => {
     expect(fMass(1000)).toContain('t');
     expect(fMass(5000)).toContain('t');
   });
-  it('formate en kt si >= 1 000 000', () => {
+  it('formats in kt if >= 1,000,000', () => {
     expect(fMass(1_000_000)).toContain('kt');
     expect(fMass(2_500_000)).toContain('kt');
   });
 });
 
 describe('fSpeed', () => {
-  it('retourne — si null/undefined', () => {
+  it('returns — for null/undefined', () => {
     expect(fSpeed(null)).toBe('—');
     expect(fSpeed(undefined)).toBe('—');
   });
-  it('formate en m/s', () => {
+  it('formats in m/s', () => {
     expect(fSpeed(0)).toBe('0 m/s');
-    expect(norm(fSpeed(150))).toBe('150 m/s');
-    expect(norm(fSpeed(1200))).toContain('m/s');
+    expect(fSpeed(150)).toBe('150 m/s');
+    expect(fSpeed(1200)).toContain('m/s');
   });
 });
 
 describe('fDistance', () => {
-  it('retourne — si null/undefined', () => {
+  it('returns — for null/undefined', () => {
     expect(fDistance(null)).toBe('—');
     expect(fDistance(undefined)).toBe('—');
   });
-  it('formate en m si < 1 000', () => {
-    expect(norm(fDistance(500))).toBe('500 m');
+  it('formats in m if < 1,000', () => {
+    expect(fDistance(500)).toBe('500 m');
   });
-  it('formate en km si >= 1 000', () => {
+  it('formats in km if >= 1,000', () => {
     expect(fDistance(1000)).toContain('km');
     expect(fDistance(50000)).toContain('km');
   });
-  it('formate en Gm si >= 1 000 000', () => {
+  it('formats in Gm if >= 1,000,000', () => {
     expect(fDistance(1_000_000)).toContain('Gm');
     expect(fDistance(2_500_000)).toContain('Gm');
   });
 });
 
 describe('fCredits', () => {
-  it('retourne — si null/undefined', () => {
+  it('returns — for null/undefined', () => {
     expect(fCredits(null)).toBe('—');
     expect(fCredits(undefined)).toBe('—');
   });
-  it('formate en aUEC si < 1 000', () => {
+  it('formats in aUEC if < 1,000', () => {
     expect(fCredits(500)).toContain('aUEC');
     expect(fCredits(500)).not.toContain('k');
     expect(fCredits(500)).not.toContain('M');
   });
-  it('formate en k aUEC si >= 1 000', () => {
+  it('formats in k aUEC if >= 1,000', () => {
     expect(fCredits(1000)).toContain('k aUEC');
     expect(fCredits(25000)).toContain('k aUEC');
   });
-  it('formate en M aUEC si >= 1 000 000', () => {
+  it('formats in M aUEC if >= 1,000,000', () => {
     expect(fCredits(1_000_000)).toContain('M aUEC');
     expect(fCredits(2_500_000)).toContain('M aUEC');
   });
 });
 
 describe('fDate', () => {
-  it('retourne — si null/undefined/vide', () => {
+  it('returns — for null/undefined/empty', () => {
     expect(fDate(null)).toBe('—');
     expect(fDate(undefined)).toBe('—');
     expect(fDate('')).toBe('—');
   });
-  it('formate une date ISO valide', () => {
+  it('formats a valid ISO date', () => {
     const result = fDate('2024-01-15T00:00:00Z');
     expect(result).not.toBe('—');
     expect(result).toContain('2024');
@@ -122,12 +119,12 @@ describe('fDate', () => {
 });
 
 describe('fDateTime', () => {
-  it('retourne — si null/undefined/vide', () => {
+  it('returns — for null/undefined/empty', () => {
     expect(fDateTime(null)).toBe('—');
     expect(fDateTime(undefined)).toBe('—');
     expect(fDateTime('')).toBe('—');
   });
-  it('formate un datetime ISO valide', () => {
+  it('formats a valid ISO datetime', () => {
     const result = fDateTime('2024-06-15T10:30:00Z');
     expect(result).not.toBe('—');
     expect(result).toContain('2024');
@@ -135,11 +132,11 @@ describe('fDateTime', () => {
 });
 
 describe('fSize', () => {
-  it('retourne — si null/undefined', () => {
+  it('returns — for null/undefined', () => {
     expect(fSize(null)).toBe('—');
     expect(fSize(undefined)).toBe('—');
   });
-  it('préfixe avec S', () => {
+  it('prefixes with S', () => {
     expect(fSize(1)).toBe('S1');
     expect(fSize(3)).toBe('S3');
     expect(fSize(10)).toBe('S10');
@@ -147,16 +144,16 @@ describe('fSize', () => {
 });
 
 describe('fTime', () => {
-  it('retourne — si null/undefined', () => {
+  it('returns — for null/undefined', () => {
     expect(fTime(null)).toBe('—');
     expect(fTime(undefined)).toBe('—');
   });
-  it('formate en secondes si < 60', () => {
+  it('formats in seconds if < 60', () => {
     expect(fTime(0)).toBe('0s');
     expect(fTime(45)).toBe('45s');
     expect(fTime(59)).toBe('59s');
   });
-  it('formate en minutes si >= 60', () => {
+  it('formats in minutes if >= 60', () => {
     expect(fTime(60)).toBe('1.0min');
     expect(fTime(90)).toBe('1.5min');
     expect(fTime(120)).toBe('2.0min');
@@ -164,15 +161,14 @@ describe('fTime', () => {
 });
 
 describe('fDimension', () => {
-  it('retourne — si null/undefined', () => {
+  it('returns — for null/undefined', () => {
     expect(fDimension(null)).toBe('—');
     expect(fDimension(undefined)).toBe('—');
   });
-  it('formate en mètres avec 1 décimale', () => {
-    // maximumFractionDigits=1 → pas de zéro final sur un entier
-    expect(norm(fDimension(10))).toBe('10 m');
-    // décimale conservée pour les flottants
-    expect(norm(fDimension(25.55))).toContain('m');
-    expect(norm(fDimension(1.5))).toBe('1,5 m');
+  it('formats in meters with 1 decimal (en-US)', () => {
+    // en-US: dot as decimal separator
+    expect(fDimension(10)).toBe('10 m');
+    expect(fDimension(25.55)).toContain('m');
+    expect(fDimension(1.5)).toBe('1.5 m');
   });
 });

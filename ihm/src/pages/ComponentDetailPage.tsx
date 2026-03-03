@@ -30,7 +30,7 @@ export default function ComponentDetailPage() {
     enabled: !!uuid,
   });
 
-  if (isLoading) return <LoadingGrid message="CHARGEMENT DU COMPOSANT…" />;
+  if (isLoading) return <LoadingGrid message="LOADING COMPONENT…" />;
   if (error)    return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
   if (!comp)    return null;
 
@@ -40,9 +40,9 @@ export default function ComponentDetailPage() {
     <div className="max-w-screen-lg mx-auto space-y-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs font-mono-sc text-slate-600">
-        <button onClick={() => navigate(-1)} className="hover:text-slate-400 transition-colors flex items-center gap-1"><ArrowLeft size={12} /> Retour</button>
+        <button onClick={() => navigate(-1)} className="hover:text-slate-400 transition-colors flex items-center gap-1"><ArrowLeft size={12} /> Back</button>
         <ChevronRight size={10} />
-        <Link to="/components" className="hover:text-slate-400">Composants</Link>
+        <Link to="/components" className="hover:text-slate-400">Components</Link>
         <ChevronRight size={10} />
         <span className="text-slate-400">{comp.name}</span>
       </div>
@@ -69,16 +69,16 @@ export default function ComponentDetailPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Stats */}
-        <ScifiPanel title="Caractéristiques">
+        <ScifiPanel title="Specifications">
           <div className="grid grid-cols-2 gap-2">
             {[
-              { label: 'Masse', value: comp.mass != null ? `${comp.mass.toFixed(1)} kg` : '—' },
-              { label: 'HP',    value: comp.hp != null ? comp.hp.toLocaleString('fr-FR') : '—' },
-              { label: 'Power base',  value: comp.power_base  != null ? `${comp.power_base.toFixed(0)} W`  : '—' },
-              { label: 'Power draw',  value: comp.power_draw  != null ? `${comp.power_draw.toFixed(0)} W`  : '—' },
-              { label: 'Chaleur',     value: comp.heat_generation     != null ? `${comp.heat_generation.toFixed(0)}` : '—' },
-              { label: 'EM sig.',     value: comp.em_signature        != null ? `${comp.em_signature.toFixed(0)}`    : '—' },
-              { label: 'IR sig.',     value: comp.ir_signature        != null ? `${comp.ir_signature.toFixed(0)}`    : '—' },
+              { label: 'Mass', value: comp.mass != null ? `${comp.mass.toFixed(1)} kg` : '—' },
+              { label: 'HP',   value: comp.hp != null ? comp.hp.toLocaleString('en-US') : '—' },
+              { label: 'Power base', value: comp.power_base  != null ? `${comp.power_base.toFixed(0)} W`  : '—' },
+              { label: 'Power draw', value: comp.power_draw  != null ? `${comp.power_draw.toFixed(0)} W`  : '—' },
+              { label: 'Heat',       value: comp.heat_generation     != null ? `${comp.heat_generation.toFixed(0)}` : '—' },
+              { label: 'EM sig.',    value: comp.em_signature        != null ? `${comp.em_signature.toFixed(0)}`    : '—' },
+              { label: 'IR sig.',    value: comp.ir_signature        != null ? `${comp.ir_signature.toFixed(0)}`    : '—' },
             ].map(({ label, value }) => (
               <div key={label} className="sci-panel p-2.5">
                 <p className="text-xs text-slate-600 font-mono-sc uppercase">{label}</p>
@@ -89,9 +89,9 @@ export default function ComponentDetailPage() {
         </ScifiPanel>
 
         {/* Buy locations */}
-        <ScifiPanel title="Points d'achat" subtitle={buyLocs ? `${buyLocs.length} emplacements` : undefined} actions={<MapPin size={14} className="text-slate-600" />}>
+        <ScifiPanel title="Buy locations" subtitle={buyLocs ? `${buyLocs.length} locations` : undefined} actions={<MapPin size={14} className="text-slate-600" />}>
           {!buyLocs?.length ? (
-            <p className="text-xs text-slate-600 italic py-4 text-center">Aucun point de vente connu</p>
+            <p className="text-xs text-slate-600 italic py-4 text-center">No known buy locations</p>
           ) : (
             <div className="space-y-1.5 max-h-72 overflow-y-auto">
               {buyLocs.map((loc, i) => (
@@ -114,7 +114,7 @@ export default function ComponentDetailPage() {
 
       {/* Ships using it */}
       {ships && ships.length > 0 && (
-        <ScifiPanel title="Vaisseaux équipés" subtitle={`${ships.length} vaisseaux`} actions={<Rocket size={14} className="text-slate-600" />}>
+        <ScifiPanel title="Equipped ships" subtitle={`${ships.length} ships`} actions={<Rocket size={14} className="text-slate-600" />}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {ships.map((s, i) => <ShipCard key={s.uuid} ship={s} index={i} />)}
           </div>

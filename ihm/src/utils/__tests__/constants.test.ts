@@ -10,13 +10,13 @@ import {
 } from '@/utils/constants';
 
 describe('API_BASE', () => {
-  it('vaut /api/v1', () => {
+  it('equals /api/v1', () => {
     expect(API_BASE).toBe('/api/v1');
   });
 });
 
 describe('VARIANT_TYPE_LABELS', () => {
-  it('contient les 4 types de variante', () => {
+  it('contains the 4 variant types', () => {
     expect(VARIANT_TYPE_LABELS.standard).toBe('Standard');
     expect(VARIANT_TYPE_LABELS.collector).toBe('Collector');
     expect(VARIANT_TYPE_LABELS.npc).toBe('NPC');
@@ -25,7 +25,7 @@ describe('VARIANT_TYPE_LABELS', () => {
 });
 
 describe('VARIANT_TYPE_COLORS', () => {
-  it('contient une entrée pour chaque type', () => {
+  it('contains an entry for each type', () => {
     expect(VARIANT_TYPE_COLORS.standard).toBeDefined();
     expect(VARIANT_TYPE_COLORS.collector).toContain('amber');
     expect(VARIANT_TYPE_COLORS.npc).toContain('red');
@@ -34,7 +34,7 @@ describe('VARIANT_TYPE_COLORS', () => {
 });
 
 describe('CAREER_ICONS', () => {
-  it('contient des icones pour les carrières', () => {
+  it('contains icons for careers', () => {
     expect(CAREER_ICONS.Combat).toBe('⚔');
     expect(CAREER_ICONS.Transport).toBe('📦');
     expect(CAREER_ICONS.Exploration).toBe('🔭');
@@ -43,26 +43,26 @@ describe('CAREER_ICONS', () => {
 });
 
 describe('SIZE_LABELS', () => {
-  it('contient les tailles S1 à S9', () => {
+  it('contains sizes S1 to S9', () => {
     for (let i = 1; i <= 9; i++) {
       expect(SIZE_LABELS[i]).toBe(`S${i}`);
     }
   });
-  it('label Capital pour taille 10', () => {
+  it('Capital label for size 10', () => {
     expect(SIZE_LABELS[10]).toBe('Capital');
   });
 });
 
 describe('COMPONENT_TYPE_COLORS', () => {
   const expectedTypes = ['WeaponGun', 'WeaponMissile', 'Shield', 'QuantumDrive', 'PowerPlant', 'Cooler'];
-  it.each(expectedTypes)('possède une couleur pour %s', (type) => {
+  it.each(expectedTypes)('has a color for %s', (type) => {
     expect(COMPONENT_TYPE_COLORS[type]).toBeDefined();
     expect(typeof COMPONENT_TYPE_COLORS[type]).toBe('string');
   });
 });
 
 describe('CHANGE_TYPE_COLORS', () => {
-  it('contient added, removed et modified', () => {
+  it('contains added, removed and modified', () => {
     expect(CHANGE_TYPE_COLORS.added).toBeDefined();
     expect(CHANGE_TYPE_COLORS.removed).toBeDefined();
     expect(CHANGE_TYPE_COLORS.modified).toBeDefined();

@@ -6,7 +6,7 @@ interface Props {
   message?: string;
 }
 
-export function LoadingGrid({ rows = 3, cols = 4, message = 'CHARGEMENT…' }: Props) {
+export function LoadingGrid({ rows = 3, cols = 4, message = 'LOADING…' }: Props) {
   return (
     <div className="flex flex-col items-center justify-center gap-6 py-20">
       <div

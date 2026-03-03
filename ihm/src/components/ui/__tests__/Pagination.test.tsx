@@ -4,21 +4,21 @@ import userEvent from '@testing-library/user-event';
 import { Pagination } from '@/components/ui/Pagination';
 
 describe('Pagination', () => {
-  it('ne rend rien si totalPages <= 1', () => {
+  it('renders nothing if totalPages <= 1', () => {
     const { container } = render(
       <Pagination page={1} totalPages={1} onPageChange={vi.fn()} />,
     );
     expect(container.firstChild).toBeNull();
   });
 
-  it('affiche toutes les pages si totalPages <= 7', () => {
+  it('shows all pages if totalPages <= 7', () => {
     render(<Pagination page={1} totalPages={5} onPageChange={vi.fn()} />);
     expect(screen.getByText('1')).toBeInTheDocument();
     expect(screen.getByText('2')).toBeInTheDocument();
     expect(screen.getByText('5')).toBeInTheDocument();
   });
 
-  it('appelle onPageChange avec la bonne page au clic', async () => {
+  it('calls onPageChange with the correct page on click', async () => {
     const user = userEvent.setup();
     const onPageChange = vi.fn();
     render(<Pagination page={1} totalPages={5} onPageChange={onPageChange} />);
@@ -27,21 +27,21 @@ describe('Pagination', () => {
     expect(onPageChange).toHaveBeenCalledWith(3);
   });
 
-  it('désactive le bouton précédent sur la première page', () => {
+  it('disables the previous button on the first page', () => {
     render(<Pagination page={1} totalPages={5} onPageChange={vi.fn()} />);
     const buttons = screen.getAllByRole('button');
-    // Premier bouton = chevron précédent
+    // First button = previous chevron
     expect(buttons[0]).toBeDisabled();
   });
 
-  it('désactive le bouton suivant sur la dernière page', () => {
+  it('disables the next button on the last page', () => {
     render(<Pagination page={5} totalPages={5} onPageChange={vi.fn()} />);
     const buttons = screen.getAllByRole('button');
-    // Dernier bouton = chevron suivant
+    // Last button = next chevron
     expect(buttons[buttons.length - 1]).toBeDisabled();
   });
 
-  it('navigue vers la page précédente via le chevron', async () => {
+  it('navigates to the previous page via chevron', async () => {
     const user = userEvent.setup();
     const onPageChange = vi.fn();
     render(<Pagination page={3} totalPages={5} onPageChange={onPageChange} />);
@@ -51,7 +51,7 @@ describe('Pagination', () => {
     expect(onPageChange).toHaveBeenCalledWith(2);
   });
 
-  it('navigue vers la page suivante via le chevron', async () => {
+  it('navigates to the next page via chevron', async () => {
     const user = userEvent.setup();
     const onPageChange = vi.fn();
     render(<Pagination page={3} totalPages={5} onPageChange={onPageChange} />);
@@ -61,13 +61,13 @@ describe('Pagination', () => {
     expect(onPageChange).toHaveBeenCalledWith(4);
   });
 
-  it('affiche des ellipses pour beaucoup de pages', () => {
+  it('shows ellipses for many pages', () => {
     render(<Pagination page={5} totalPages={20} onPageChange={vi.fn()} />);
     const ellipses = screen.getAllByText('…');
     expect(ellipses.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('met en évidence la page courante', () => {
+  it('highlights the current page', () => {
     render(<Pagination page={3} totalPages={5} onPageChange={vi.fn()} />);
     const page3Button = screen.getByText('3');
     expect(page3Button).toHaveClass('text-cyan-400');

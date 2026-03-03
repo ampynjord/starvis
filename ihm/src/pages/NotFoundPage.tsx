@@ -18,12 +18,12 @@ export default function NotFoundPage() {
       </motion.div>
 
       <div>
-        <p className="font-orbitron text-xl text-slate-400 tracking-widest uppercase">Secteur inconnu</p>
-        <p className="text-slate-600 text-sm mt-2">La page que vous recherchez n'existe pas dans cette quadrille.</p>
+        <p className="font-orbitron text-xl text-slate-400 tracking-widest uppercase">Unknown sector</p>
+        <p className="text-slate-600 text-sm mt-2">The page you are looking for does not exist in this quadrant.</p>
       </div>
 
       <Link to="/" className="sci-btn-primary">
-        ← Retour à la base
+        ← Back to base
       </Link>
     </div>
   );

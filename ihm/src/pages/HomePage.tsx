@@ -9,12 +9,12 @@ import { GlowBadge } from '@/components/ui/GlowBadge';
 import { fDateTime } from '@/utils/formatters';
 
 const STAT_CARDS = [
-  { key: 'ships',         label: 'Vaisseaux',    icon: Rocket,    color: 'text-cyan-400',   to: '/ships' },
-  { key: 'components',    label: 'Composants',   icon: Settings2, color: 'text-blue-400',   to: '/components' },
-  { key: 'items',         label: 'Équipements',  icon: Shield,    color: 'text-green-400',  to: '/items' },
-  { key: 'manufacturers', label: 'Fabricants',   icon: Zap,       color: 'text-amber-400',  to: '/manufacturers' },
-  { key: 'commodities',   label: 'Marchandises', icon: Package,   color: 'text-purple-400', to: '/commodities' },
-  { key: 'paints',        label: 'Livrées',      icon: BarChart3, color: 'text-pink-400',   to: '/ships' },
+  { key: 'ships',         label: 'Ships',         icon: Rocket,    color: 'text-cyan-400',   to: '/ships' },
+  { key: 'components',    label: 'Components',    icon: Settings2, color: 'text-blue-400',   to: '/components' },
+  { key: 'items',         label: 'Items',         icon: Shield,    color: 'text-green-400',  to: '/items' },
+  { key: 'manufacturers', label: 'Manufacturers', icon: Zap,       color: 'text-amber-400',  to: '/manufacturers' },
+  { key: 'commodities',   label: 'Commodities',   icon: Package,   color: 'text-purple-400', to: '/commodities' },
+  { key: 'paints',        label: 'Paints',        icon: BarChart3, color: 'text-pink-400',   to: '/ships' },
 ] as const;
 
 export default function HomePage() {
@@ -45,7 +45,7 @@ export default function HomePage() {
               STARVIS
             </h1>
             <p className="text-slate-500 text-sm mt-1 font-rajdhani">
-              Base de données Star Citizen — vaisseaux, composants, équipements
+              Star Citizen database — ships, components, items
             </p>
           </div>
           {version && (
@@ -60,7 +60,7 @@ export default function HomePage() {
 
       {/* Stats grid */}
       {statsLoading ? (
-        <LoadingGrid rows={1} cols={6} message="CHARGEMENT DES STATS…" />
+        <LoadingGrid rows={1} cols={6} message="LOADING STATS…" />
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {STAT_CARDS.map(({ key, label, icon: Icon, color, to }, i) => (
@@ -74,7 +74,7 @@ export default function HomePage() {
                 <div className="holo-card text-center py-4">
                   <Icon size={20} className={`${color} mx-auto mb-2`} />
                   <p className="font-orbitron text-xl font-bold text-slate-200">
-                    {stats ? (stats[key as keyof typeof stats] ?? 0).toLocaleString('fr-FR') : '—'}
+                    {stats ? (stats[key as keyof typeof stats] ?? 0).toLocaleString('en-US') : '—'}
                   </p>
                   <p className="text-xs font-rajdhani text-slate-500 uppercase tracking-wide mt-0.5">
                     {label}
@@ -89,7 +89,7 @@ export default function HomePage() {
       {/* Content grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Quick links */}
-        <ScifiPanel title="Navigation rapide" className="lg:col-span-1">
+        <ScifiPanel title="Quick nav" className="lg:col-span-1">
           <div className="space-y-1.5">
             {STAT_CARDS.map(({ to, icon: Icon, label, color }) => (
               <Link
@@ -109,7 +109,7 @@ export default function HomePage() {
             >
               <BarChart3 size={14} className="text-amber-400" />
               <span className="font-rajdhani font-semibold text-sm text-slate-400 group-hover:text-slate-200 uppercase tracking-wide transition-colors">
-                Comparateur
+                Compare
               </span>
             </Link>
           </div>
@@ -117,12 +117,12 @@ export default function HomePage() {
 
         {/* Changelog */}
         <ScifiPanel
-          title="Dernières modifications"
-          subtitle={changelogSummary ? `${changelogSummary.total} entrées au total` : undefined}
+          title="Latest changes"
+          subtitle={changelogSummary ? `${changelogSummary.total} entries total` : undefined}
           className="lg:col-span-2"
           actions={
             <Link to="/changelog" className="sci-btn-ghost py-1 px-2 text-xs">
-              <BookOpen size={11} /> Voir tout
+              <BookOpen size={11} /> View all
             </Link>
           }
         >

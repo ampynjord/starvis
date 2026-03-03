@@ -54,11 +54,11 @@ export default function ShipsPage() {
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">
-            Vaisseaux
+            Ships
           </h1>
           {data && (
             <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">
-              {data.pagination.total.toLocaleString('fr-FR')} vaisseaux
+              {data.pagination.total.toLocaleString('en-US')} ships
             </p>
           )}
         </div>
@@ -69,7 +69,7 @@ export default function ShipsPage() {
             type="text"
             value={search}
             onChange={e => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Rechercher un vaisseau…"
+            placeholder="Search a ship…"
             className="sci-input w-full pl-8 text-xs"
           />
         </div>
@@ -84,26 +84,26 @@ export default function ShipsPage() {
               onReset={resetFilters}
               groups={[
                 {
-                  key: 'manufacturer', label: 'Fabricant',
+                  key: 'manufacturer', label: 'Manufacturer',
                   options: filters.manufacturers.map(m => ({ label: m.name, value: m.code })),
                   value: manufacturer,
                   onChange: v => { setManufacturer(v); setPage(1); },
                 },
                 {
-                  key: 'career', label: 'Carrière',
+                  key: 'career', label: 'Career',
                   options: filters.careers.map(c => ({ label: c, value: c })),
                   value: career,
                   onChange: v => { setCareer(v); setPage(1); },
                 },
                 {
-                  key: 'role', label: 'Rôle',
+                  key: 'role', label: 'Role',
                   options: filters.roles.map(r => ({ label: r, value: r })),
                   value: role,
                   onChange: v => { setRole(v); setPage(1); },
                 },
                 {
-                  key: 'size', label: 'Taille',
-                  options: filters.sizes.map(s => ({ label: `Taille ${s}`, value: s })),
+                  key: 'size', label: 'Size',
+                  options: filters.sizes.map(s => ({ label: `Size ${s}`, value: s })),
                   value: size,
                   onChange: v => { setSize(v); setPage(1); },
                 },
@@ -116,18 +116,18 @@ export default function ShipsPage() {
               ]}
             />
           ) : (
-            <div className="sci-panel p-3 text-xs text-slate-600 animate-pulse">Chargement…</div>
+            <div className="sci-panel p-3 text-xs text-slate-600 animate-pulse">Loading…</div>
           )}
         </div>
 
         {/* Grid */}
         <div className="flex-1 min-w-0">
           {isLoading ? (
-            <LoadingGrid rows={3} cols={4} message="CHARGEMENT DES VAISSEAUX…" />
+            <LoadingGrid rows={3} cols={4} message="LOADING SHIPS…" />
           ) : error ? (
             <ErrorState error={error as Error} onRetry={() => void refetch()} />
           ) : data?.data.length === 0 ? (
-            <EmptyState icon="🚀" title="Aucun vaisseau trouvé" message="Essayez d'ajuster vos filtres." />
+            <EmptyState icon="🚀" title="No ships found" message="Try adjusting your filters." />
           ) : (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">

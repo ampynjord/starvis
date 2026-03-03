@@ -45,7 +45,7 @@ describe('ShipCard', () => {
     expect(screen.getByText('ANVL')).toBeInTheDocument();
   });
 
-  it('affiche la carrière', () => {
+  it('displays the career', () => {
     renderCard();
     expect(screen.getByText('Combat')).toBeInTheDocument();
   });
@@ -73,7 +73,7 @@ describe('ShipCard', () => {
 
   it('affiche — si scm_speed est null', () => {
     renderCard({ scm_speed: null });
-    // '—' apparaît au moins une fois
+    // '—' appears at least once
     const dashes = screen.getAllByText('—');
     expect(dashes.length).toBeGreaterThan(0);
   });
@@ -93,20 +93,20 @@ describe('ShipCard', () => {
     expect(screen.queryByText('Standard')).not.toBeInTheDocument();
   });
 
-  it('le lien mène vers la page du vaisseau', () => {
+  it('the link leads to the ship page', () => {
     renderCard();
     const link = screen.getByRole('link');
     expect(link).toHaveAttribute('href', '/ships/abc-123');
   });
 
-  it('n\'affiche pas le rôle s\'il est identique à la carrière', () => {
+  it('does not show role if it is the same as career', () => {
     renderCard({ career: 'Combat', role: 'Combat' });
-    // Le rôle ne doit pas être dupliqué
+    // Role must not be duplicated
     const badges = screen.getAllByText('Combat');
     expect(badges.length).toBe(1);
   });
 
-  it('affiche le rôle si différent de la carrière', () => {
+  it('shows role if different from career', () => {
     renderCard({ career: 'Combat', role: 'Interception' });
     expect(screen.getByText('Interception')).toBeInTheDocument();
   });
