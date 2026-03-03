@@ -219,11 +219,11 @@ jobs:
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
-          username: ubuntu
+          username: debian
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
             set -e
-            cd /home/ubuntu/docker/starvis
+            cd /home/debian/starvis
 
             # Reset tracked files to avoid merge conflicts (local edits like chmod)
             git reset --hard HEAD
