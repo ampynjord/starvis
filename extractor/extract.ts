@@ -15,8 +15,8 @@
  *   LOG_LEVEL (debug|info|warn|error, default: info)
  */
 import 'dotenv/config';
-import * as mysql from 'mysql2/promise';
 import { existsSync } from 'node:fs';
+import * as mysql from 'mysql2/promise';
 import { DataForgeService } from './src/dataforge-service.js';
 import { ExtractionService } from './src/extraction-service.js';
 import logger from './src/logger.js';
