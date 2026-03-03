@@ -103,7 +103,7 @@ export default function ChangelogPage() {
                         <span className="text-xs font-mono-sc text-slate-600 hidden md:block">{entry.game_version}</span>
                       )}
                       <span className="text-xs font-mono-sc text-slate-700 flex-shrink-0 hidden lg:block">
-                        {fDateTime(entry.changed_at)}
+                        {fDateTime(entry.created_at)}
                       </span>
                     </div>
                   </motion.div>

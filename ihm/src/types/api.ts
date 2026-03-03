@@ -29,36 +29,47 @@ export interface Version {
 export interface ShipListItem {
   uuid: string;
   name: string;
-  manufacturer: string;
-  manufacturer_code: string;
+  short_name: string | null;
+  class_name: string;
+  manufacturer_name: string | null;
+  manufacturer_code: string | null;
   role: string | null;
   career: string | null;
-  size: number | null;
-  crew_min: number | null;
-  crew_max: number | null;
+  vehicle_category: string | null;
+  crew_size: number | null;
   mass: number | null;
-  length: number | null;
-  width: number | null;
-  height: number | null;
+  cross_section_x: number | null;   // width
+  cross_section_y: number | null;   // height
+  cross_section_z: number | null;   // length
   scm_speed: number | null;
-  afterburner_speed: number | null;
-  quantum_speed: number | null;
-  has_sm_link: boolean;
+  max_speed: number | null;
+  boost_speed_forward: number | null;
+  cargo_capacity: number | null;
+  ship_matrix_id: number | null;    // non-null = has RSI SM link
+  thumbnail: string | null;
+  production_status: string | null;
   variant_type: string | null;
-  focus: string | null;
+  is_concept_only: boolean;
 }
 
 export interface Ship extends ShipListItem {
-  pledge_cost: number | null;
+  pitch_max: number | null;
+  yaw_max: number | null;
+  roll_max: number | null;
+  shield_hp: number | null;
+  total_hp: number | null;
+  hydrogen_fuel_capacity: number | null;
+  quantum_fuel_capacity: number | null;
+  boost_speed_backward: number | null;
+  armor_physical: number | null;
+  armor_energy: number | null;
+  armor_distortion: number | null;
   insurance_claim_time: number | null;
   insurance_expedite_cost: number | null;
-  insurance_expedite_time: number | null;
-  pitch: number | null;
-  yaw: number | null;
-  roll: number | null;
-  max_shield: number | null;
-  number_of_exits: number | null;
-  cargocapacity: number | null;
+  sm_description: string | null;
+  store_url: string | null;
+  sm_cargo: number | null;
+  thumbnail_large: string | null;
   game_data: Record<string, unknown> | null;
 }
 
@@ -79,10 +90,9 @@ export interface LoadoutNode {
 }
 
 export interface ShipPaint {
-  uuid: string;
-  name: string;
-  description: string | null;
-  ship_uuid: string;
+  paint_uuid: string;
+  paint_name: string;
+  paint_class_name: string;
 }
 
 export interface ShipStats {
@@ -100,7 +110,6 @@ export interface ShipFilters {
   manufacturers: { code: string; name: string }[];
   roles: string[];
   careers: string[];
-  sizes: number[];
   variant_types: string[];
 }
 
@@ -172,25 +181,25 @@ export interface Manufacturer {
 // ─── Commodities ──────────────────────────────────────────────────────────────
 export interface Commodity {
   uuid: string;
+  class_name: string;
   name: string;
   type: string | null;
   sub_type: string | null;
-  description: string | null;
-  buy_price: number | null;
-  sell_price: number | null;
-  is_illegal: boolean;
-  is_raw: boolean;
+  symbol: string | null;
+  occupancy_scu: number | null;
 }
 
 // ─── Shops ────────────────────────────────────────────────────────────────────
 export interface Shop {
   id: number;
   name: string;
-  location: string;
+  location: string | null;
+  parent_location: string | null;
   system: string | null;
+  planet_moon: string | null;
   city: string | null;
-  terminal: string | null;
-  type: string | null;
+  shop_type: string | null;
+  class_name: string;
 }
 
 // ─── Changelog ────────────────────────────────────────────────────────────────
@@ -200,9 +209,10 @@ export interface ChangelogEntry {
   entity_uuid: string;
   entity_name: string;
   change_type: string;
-  changed_at: string;
-  old_values: Record<string, unknown> | null;
-  new_values: Record<string, unknown> | null;
+  created_at: string;
+  field_name: string | null;
+  old_value: string | null;
+  new_value: string | null;
   game_version: string | null;
 }
 

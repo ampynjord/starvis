@@ -15,7 +15,7 @@ async function get<T>(path: string, params?: Record<string, string | number | un
     }
   }
   const res = await fetch(url.toString());
-  const json = await res.json() as Record<string, unknown>;
+  const json = (await res.json().catch(() => null)) as Record<string, unknown> | null ?? {};
   if (!res.ok) throw new Error(String(json['error'] ?? '') || `HTTP ${res.status}: ${res.statusText}`);
   // Paginated list: numeric 'total' AND array 'data' at top level → return full response
   if (typeof json['total'] === 'number' && Array.isArray(json['data'])) return json as unknown as T;

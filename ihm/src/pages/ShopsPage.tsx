@@ -48,9 +48,9 @@ export default function ShopsPage() {
                       {shop.city && (
                         <p className="text-xs text-slate-700 truncate">{shop.city}</p>
                       )}
-                      {shop.type && (
+                      {shop.shop_type && (
                         <div className="mt-1">
-                          <GlowBadge color="slate">{shop.type}</GlowBadge>
+                          <GlowBadge color="slate">{shop.shop_type}</GlowBadge>
                         </div>
                       )}
                     </div>
