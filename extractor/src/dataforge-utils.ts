@@ -277,6 +277,12 @@ export function classifyPort(portName: string, compClassName: string): string {
   if (lp.includes('countermeasure')) return 'Countermeasure';
   if (lp.includes('controller_flight')) return 'FlightController';
   if (lp.includes('thruster')) return 'Thruster';
+  // Jump drive → classified as QuantumDrive (quantum drive mount = same hardpoint category)
+  if (lp.includes('jump_drive') || lp.includes('jumpdrive')) return 'QuantumDrive';
+  // Scanner hardpoints
+  if (lp === 'hardpoint_scanner' || lp.startsWith('hardpoint_scanner_')) return 'Scanner';
+  // Fuel tanks (H2 + quantum fuel) — configurable but NOT fuel intakes/ports
+  if ((lp.includes('fuel_tank') || lp.includes('quantum_fuel')) && !lp.includes('intake') && !lp.includes('port')) return 'FuelTank';
   if (
     lp.includes('emp_device') ||
     lp.includes('emp_generator') ||
