@@ -192,14 +192,28 @@ export async function crossReferenceShipMatrix(conn: PoolConnection): Promise<nu
 /** Tag variant types for ships not linked to Ship Matrix */
 export async function tagVariantTypes(conn: PoolConnection): Promise<void> {
   const rules: Array<{ type: string; patterns: string[] }> = [
-    { type: 'collector', patterns: ['%_Collector_%', '%_Collector'] },
-    { type: 'exec', patterns: ['%_Exec_%', '%_Exec'] },
+    // collector: specific limited editions first, then generic _Collector_ pattern
+    // ATLS IKTI variants and Dragonfly Pink are limited DLC editions → collector
+    // 600i Executive Edition is a buyer package, not a PYAM exec reward → collector
+    {
+      type: 'collector',
+      patterns: [
+        '%_ATLS_IKTI%', // ARGO_ATLS_IKTI, ARGO_ATLS_IKTI_ARGOS, ARGO_ATLS_GEO_IKTI
+        '%_Executive_Edition', // ORIG_600i_Executive_Edition
+        '%_Dragonfly_Pink', // DRAK_Dragonfly_Pink (limited pink edition)
+        '%_Collector_%',
+        '%_Collector',
+      ],
+    },
+    // pyam_exec: ships rewarded via the PYAM Exec program (Hornet F7A Mk2, Corsair, Cutlass Black, Syulen)
+    // 600i Executive Edition is already caught above as collector and won't match here
+    { type: 'pyam_exec', patterns: ['%_Exec_%', '%_Exec'] },
     { type: 'bis_edition', patterns: ['%_BIS%'] },
     { type: 'tutorial', patterns: ['%_Teach%', '%Tutorial%'] },
-    { type: 'enemy_ai', patterns: ['%_EA_%', '%_EA'] },
+    // npc: both enemy AI and pirate ships are NPC-only in gameplay
+    { type: 'npc', patterns: ['%_EA_%', '%_EA', '%_PIR%', '%Pirate%'] },
     { type: 'military', patterns: ['%_Military%', '%_UEE%', '%_Advocacy%'] },
     { type: 'event', patterns: ['%Fleetweek%', '%_FW%', '%CitizenCon%', '%ShipShowdown%', '%Showdown%'] },
-    { type: 'pirate', patterns: ['%_PIR%', '%Pirate%'] },
     { type: 'arena_ai', patterns: ['%_Swarm%'] },
   ];
 
@@ -212,6 +226,31 @@ export async function tagVariantTypes(conn: PoolConnection): Promise<void> {
   }
 
   await conn.execute("UPDATE ships SET variant_type = 'special' WHERE ship_matrix_id IS NULL AND variant_type IS NULL");
+}
+
+/**
+ * Delete ships whose variant_type should not be visible in the application.
+ * Called after tagVariantTypes so that all ships have been classified first.
+ *
+ * Excluded:
+ *  - bis_edition  → promo skins, the base ship is already linked via SM
+ *  - event        → time-limited event variants (Fleetweek, CitizenCon, ShipShowdown…)
+ *  - military     → NPC-only military/advocacy variants
+ *  - tutorial     → solo tutorial ships not available in the PU
+ *  - special      → miscellaneous one-off ships (NoInterior, Piano, etc.)  already narrowed
+ *                   down because ATLS IKTI / Dragonfly Pink were re-tagged as collector
+ *  - arena_ai     → swarm AI ships used only in Arena Commander
+ *
+ * Ships tagged npc, pyam_exec, or collector are kept.
+ * Cascading FK deletes will clean ships_loadouts, ship_modules, ship_paints automatically.
+ */
+export async function pruneExcludedVariants(conn: PoolConnection): Promise<number> {
+  const EXCLUDED = ['bis_edition', 'event', 'military', 'tutorial', 'special', 'arena_ai'];
+  const placeholders = EXCLUDED.map(() => '?').join(', ');
+  const [result]: any = await conn.execute(`DELETE FROM ships WHERE variant_type IN (${placeholders})`, EXCLUDED);
+  const count = result.affectedRows as number;
+  if (count > 0) logger.info(`Pruned ${count} ships with excluded variant types (bis, event, military, tutorial, special, arena)`);
+  return count;
 }
 
 /** Apply Hull series cargo fallback from Ship Matrix data */

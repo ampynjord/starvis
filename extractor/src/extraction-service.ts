@@ -7,7 +7,7 @@
  */
 import { createHash } from 'node:crypto';
 import type { Pool, PoolConnection } from 'mysql2/promise';
-import { applyHullSeriesCargoFallback, crossReferenceShipMatrix, tagVariantTypes } from './crossref.js';
+import { applyHullSeriesCargoFallback, crossReferenceShipMatrix, pruneExcludedVariants, tagVariantTypes } from './crossref.js';
 import { classifyPort, type DataForgeService, MANUFACTURER_CODES } from './dataforge-service.js';
 import { LocalizationService } from './localization-service.js';
 import logger from './logger.js';
@@ -203,6 +203,10 @@ export class ExtractionService {
 
       // 6a. Tag variant types for non-SM ships
       await tagVariantTypes(conn);
+
+      // 6a-bis. Remove ships that should not be visible (bis_edition skins, events, tutorial…)
+      const pruned = await pruneExcludedVariants(conn);
+      if (pruned > 0) onProgress?.(`Pruned ${pruned} excluded variant ships`);
 
       // 6b. Hull series SCU fallback from Ship Matrix
       await applyHullSeriesCargoFallback(conn);
