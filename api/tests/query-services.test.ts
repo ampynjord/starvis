@@ -69,9 +69,9 @@ describe('ShipQueryService', () => {
       const svc = new ShipQueryService(pool);
       const results = await svc.searchShipsAutocomplete('aurora', 5);
       expect(results).toHaveLength(1);
-      expect(pool.execute).toHaveBeenCalledTimes(1);
+      expect((pool as any).execute).toHaveBeenCalledTimes(1);
       // Verify LIKE pattern is passed
-      const callArgs = (pool.execute as any).mock.calls[0];
+      const callArgs = ((pool as any).execute as any).mock.calls[0];
       expect(callArgs[1]).toContain('%aurora%');
     });
   });
@@ -104,7 +104,7 @@ describe('ComponentQueryService', () => {
       const svc = new ComponentQueryService(pool);
       const result = await svc.resolveComponent(uuid);
       expect(result).toBeTruthy();
-      expect(pool.execute).toHaveBeenCalledTimes(1);
+      expect((pool as any).execute).toHaveBeenCalledTimes(1);
     });
 
     it('uses className path for non-UUID id', async () => {
@@ -124,7 +124,7 @@ describe('ComponentQueryService', () => {
       const result = await svc.getComponentShips('component-uuid');
 
       expect(result).toHaveLength(1);
-      const callArgs = (pool.execute as any).mock.calls[0];
+      const callArgs = ((pool as any).execute as any).mock.calls[0];
       expect(callArgs[0]).toContain('LEFT JOIN manufacturers m ON s.manufacturer_code = m.code');
       expect(callArgs[1]).toEqual(['component-uuid']);
     });
@@ -190,6 +190,6 @@ describe('GameDataService cache', () => {
     const r2 = await svc.getPublicStats();
     expect(r1).toEqual(r2);
     // pool.execute should only be called twice (once for stats, once for latest)
-    expect(pool.execute).toHaveBeenCalledTimes(2);
+    expect((pool as any).execute).toHaveBeenCalledTimes(2);
   });
 });
