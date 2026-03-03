@@ -1,18 +1,18 @@
 #!/bin/bash
 # ==============================================================
 # MySQL Backup Script — Daily automated backup
-# Cron: 0 3 * * * /home/ubuntu/docker/starvis/db/backup.sh
+# Cron: 0 3 * * * /home/debian/starvis/db/backup.sh
 # Keeps last 7 days of backups
 # ==============================================================
 set -euo pipefail
 
-BACKUP_DIR="/home/ubuntu/docker/starvis/backups"
+BACKUP_DIR="/home/debian/starvis/backups"
 CONTAINER="starvis-mysql"
 RETENTION_DAYS=7
 DATE=$(date +%Y-%m-%d_%H%M)
 
 # Load env
-source /home/ubuntu/docker/starvis/.env
+source /home/debian/starvis/.env
 
 mkdir -p "$BACKUP_DIR"
 
