@@ -18,7 +18,6 @@ export default function ShipsPage() {
   const [manufacturer, setManufacturer] = useState('');
   const [role, setRole]     = useState('');
   const [career, setCareer] = useState('');
-  const [size, setSize]     = useState('');
   const [variantType, setVariantType] = useState('');
   const debouncedSearch = useDebounce(search, 350);
 
@@ -29,23 +28,22 @@ export default function ShipsPage() {
   });
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['ships.list', { page, search: debouncedSearch, manufacturer, role, career, size, variantType }],
+    queryKey: ['ships.list', { page, search: debouncedSearch, manufacturer, role, career, variantType }],
     queryFn: () => api.ships.list({
       page, limit: LIMIT,
       search: debouncedSearch || undefined,
       manufacturer: manufacturer || undefined,
       role: role || undefined,
       career: career || undefined,
-      size: size ? Number(size) : undefined,
       variant_type: variantType || undefined,
     }),
   });
 
-  const hasFilters = !!(manufacturer || role || career || size || variantType || debouncedSearch);
+  const hasFilters = !!(manufacturer || role || career || variantType || debouncedSearch);
 
   const resetFilters = () => {
     setManufacturer(''); setRole(''); setCareer('');
-    setSize(''); setVariantType(''); setSearch(''); setPage(1);
+    setVariantType(''); setSearch(''); setPage(1);
   };
 
   return (
@@ -85,7 +83,7 @@ export default function ShipsPage() {
               groups={[
                 {
                   key: 'manufacturer', label: 'Manufacturer',
-                  options: filters.manufacturers.map(m => ({ label: m.name, value: m.code })),
+                  options: (filters.manufacturers ?? []).map(m => ({ label: m.name, value: m.code })),
                   value: manufacturer,
                   onChange: v => { setManufacturer(v); setPage(1); },
                 },
@@ -100,12 +98,6 @@ export default function ShipsPage() {
                   options: filters.roles.map(r => ({ label: r, value: r })),
                   value: role,
                   onChange: v => { setRole(v); setPage(1); },
-                },
-                {
-                  key: 'size', label: 'Size',
-                  options: filters.sizes.map(s => ({ label: `Size ${s}`, value: s })),
-                  value: size,
-                  onChange: v => { setSize(v); setPage(1); },
                 },
                 {
                   key: 'variant_type', label: 'Type',

@@ -143,7 +143,7 @@ export default function HomePage() {
                   {entry.entity_type}
                 </span>
                 <span className="text-xs font-mono-sc text-slate-700 flex-shrink-0 hidden md:block">
-                  {fDateTime(entry.changed_at)}
+                  {fDateTime(entry.created_at)}
                 </span>
               </div>
             ))}

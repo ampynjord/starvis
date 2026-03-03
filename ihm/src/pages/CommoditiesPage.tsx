@@ -10,7 +10,6 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { useDebounce } from '@/hooks/useDebounce';
-import { fCredits } from '@/utils/formatters';
 
 const LIMIT = 30;
 
@@ -67,15 +66,13 @@ export default function CommoditiesPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-orbitron text-sm text-slate-200">{c.name}</span>
-                            {c.is_illegal && <GlowBadge color="red">ILLEGAL</GlowBadge>}
-                            {c.is_raw && <GlowBadge color="amber">RAW</GlowBadge>}
                             {c.type && <GlowBadge color="slate">{c.type}</GlowBadge>}
+                            {c.sub_type && <GlowBadge color="slate" size="xs">{c.sub_type}</GlowBadge>}
                           </div>
-                          {c.description && <p className="text-xs text-slate-600 mt-0.5 truncate-2">{c.description}</p>}
+                          {c.symbol && <p className="text-xs font-mono-sc text-slate-600 mt-0.5">{c.symbol}</p>}
                         </div>
                         <div className="text-right flex-shrink-0">
-                          {c.buy_price != null && <p className="text-xs font-mono-sc text-cyan-400">{fCredits(c.buy_price)}</p>}
-                          {c.sell_price != null && <p className="text-xs font-mono-sc text-amber-400">{fCredits(c.sell_price)}</p>}
+                          {c.occupancy_scu != null && <p className="text-xs font-mono-sc text-slate-600">{c.occupancy_scu} μSCU</p>}
                         </div>
                       </div>
                     </div>

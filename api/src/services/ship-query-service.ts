@@ -155,8 +155,14 @@ export class ShipQueryService {
     return rows[0] || null;
   }
 
-  async getShipFilters(): Promise<{ roles: string[]; careers: string[]; variant_types: string[] }> {
-    const [[roleRows], [careerRows], [variantRows]] = await Promise.all([
+  async getShipFilters(): Promise<{ manufacturers: { code: string; name: string }[]; roles: string[]; careers: string[]; variant_types: string[] }> {
+    const [[mfgRows], [roleRows], [careerRows], [variantRows]] = await Promise.all([
+      this.pool.execute<Row[]>(
+        `SELECT DISTINCT s.manufacturer_code as code, COALESCE(m.name, s.manufacturer_code) as name
+         FROM ships s LEFT JOIN manufacturers m ON s.manufacturer_code = m.code
+         WHERE s.manufacturer_code IS NOT NULL AND s.manufacturer_code != ''
+         ORDER BY name`,
+      ),
       this.pool.execute<Row[]>("SELECT DISTINCT role FROM ships WHERE role IS NOT NULL AND role != '' ORDER BY role"),
       this.pool.execute<Row[]>("SELECT DISTINCT career FROM ships WHERE career IS NOT NULL AND career != '' ORDER BY career"),
       this.pool.execute<Row[]>(
@@ -164,6 +170,7 @@ export class ShipQueryService {
       ),
     ]);
     return {
+      manufacturers: mfgRows.map((r) => ({ code: String(r.code), name: String(r.name) })),
       roles: roleRows.map((r) => String(r.role)),
       careers: careerRows.map((r) => String(r.career)),
       variant_types: variantRows.map((r) => String(r.variant_type)),

@@ -53,8 +53,8 @@ export function ShipCard({ ship, index = 0 }: Props) {
             {ship.role && ship.role !== ship.career && (
               <GlowBadge color="slate" size="xs">{ship.role}</GlowBadge>
             )}
-            {ship.size && (
-              <GlowBadge color="slate" size="xs">S{ship.size}</GlowBadge>
+            {ship.vehicle_category && (
+              <GlowBadge color="slate" size="xs">{ship.vehicle_category}</GlowBadge>
             )}
           </div>
 
@@ -63,13 +63,7 @@ export function ShipCard({ ship, index = 0 }: Props) {
             <StatCell
               icon={<Users size={10} />}
               label="Crew"
-              value={
-                ship.crew_min != null && ship.crew_max != null
-                  ? ship.crew_min === ship.crew_max
-                    ? String(ship.crew_min)
-                    : `${ship.crew_min}–${ship.crew_max}`
-                  : '—'
-              }
+              value={ship.crew_size != null ? String(ship.crew_size) : '—'}
             />
             <StatCell
               icon={<Zap size={10} />}
@@ -79,14 +73,14 @@ export function ShipCard({ ship, index = 0 }: Props) {
             <StatCell
               icon={<Maximize2 size={10} />}
               label="Long."
-              value={fDimension(ship.length)}
+              value={fDimension(ship.cross_section_z)}
             />
           </div>
 
           {/* Bottom border glow */}
           <div className="mt-3 pt-2 border-t border-border/50">
             <p className="text-xs text-slate-600 font-mono-sc truncate">
-              {ship.has_sm_link ? (
+              {ship.ship_matrix_id != null ? (
                 <span className="text-cyan-800">◆ RSI linked</span>
               ) : (
                 <span className="text-slate-700">◇ Source: game data</span>

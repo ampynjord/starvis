@@ -77,11 +77,11 @@ export default function ComparePage() {
               {ship && uuid ? (
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <p className="text-xs font-mono-sc text-cyan-700">{ship.manufacturer}</p>
+                    <p className="text-xs font-mono-sc text-cyan-700">{ship.manufacturer_name}</p>
                     <p className="font-orbitron text-sm text-slate-200">{ship.name}</p>
                     <div className="flex gap-1.5 mt-1">
                       {ship.career && <GlowBadge color="cyan">{ship.career}</GlowBadge>}
-                      {ship.size != null && <GlowBadge color="slate">S{ship.size}</GlowBadge>}
+                      {ship.vehicle_category && <GlowBadge color="slate">{ship.vehicle_category}</GlowBadge>}
                     </div>
                   </div>
                   <button onClick={() => setUuid('')} className="text-slate-600 hover:text-red-400 transition-colors">

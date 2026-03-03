@@ -7,23 +7,27 @@ import type { ShipListItem } from '@/types/api';
 const baseShip: ShipListItem = {
   uuid: 'abc-123',
   name: 'Hornet F7C',
-  manufacturer: 'Anvil Aerospace',
+  short_name: 'F7C',
+  class_name: 'ANVL_HornetF7C',
+  manufacturer_name: 'Anvil Aerospace',
   manufacturer_code: 'ANVL',
   role: 'Combat',
   career: 'Combat',
-  size: 2,
-  crew_min: 1,
-  crew_max: 1,
+  vehicle_category: null,
+  crew_size: 1,
   mass: 65000,
-  length: 22.5,
-  width: 19.1,
-  height: 5.5,
+  cross_section_x: 19.1,
+  cross_section_y: 5.5,
+  cross_section_z: 22.5,
   scm_speed: 210,
-  afterburner_speed: 1300,
-  quantum_speed: null,
-  has_sm_link: true,
+  max_speed: 1300,
+  boost_speed_forward: null,
+  cargo_capacity: null,
+  ship_matrix_id: 1,
+  thumbnail: null,
+  production_status: null,
   variant_type: null,
-  focus: null,
+  is_concept_only: false,
 };
 
 function renderCard(ship: Partial<ShipListItem> = {}) {
@@ -50,9 +54,9 @@ describe('ShipCard', () => {
     expect(screen.getByText('Combat')).toBeInTheDocument();
   });
 
-  it('affiche la taille comme badge', () => {
-    renderCard();
-    expect(screen.getByText('S2')).toBeInTheDocument();
+  it('affiche la taille (vehicle_category) si défini', () => {
+    renderCard({ vehicle_category: 'Ship' });
+    expect(screen.getByText('Ship')).toBeInTheDocument();
   });
 
   it('affiche la vitesse SCM', () => {
@@ -60,15 +64,9 @@ describe('ShipCard', () => {
     expect(screen.getByText('210 m/s')).toBeInTheDocument();
   });
 
-  it('affiche le crew (identique min/max)', () => {
-    renderCard({ crew_min: 1, crew_max: 1 });
+  it('affiche le crew', () => {
+    renderCard({ crew_size: 1 });
     expect(screen.getByText('1')).toBeInTheDocument();
-  });
-
-  it('affiche la plage crew (min ≠ max)', () => {
-    renderCard({ crew_min: 2, crew_max: 5 });
-    // Le texte exact est "2–5" (tiret cadratin)
-    expect(screen.getByText(/^2[–-]5$/)).toBeInTheDocument();
   });
 
   it('affiche — si scm_speed est null', () => {

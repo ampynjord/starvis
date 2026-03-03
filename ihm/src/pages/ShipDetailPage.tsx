@@ -74,7 +74,7 @@ export default function ShipDetailPage() {
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
           <div>
             <p className="text-xs font-mono-sc text-cyan-700 uppercase tracking-widest mb-1">
-              {ship.manufacturer}
+              {ship.manufacturer_name}
             </p>
             <h1 className="font-orbitron text-3xl font-black text-slate-100 leading-tight">
               {ship.name}
@@ -83,7 +83,7 @@ export default function ShipDetailPage() {
             <div className="flex flex-wrap gap-2 mt-3">
               {ship.career && <GlowBadge color="cyan">{ship.career}</GlowBadge>}
               {ship.role && ship.role !== ship.career && <GlowBadge color="slate">{ship.role}</GlowBadge>}
-              {ship.size != null && <GlowBadge color="slate">Size {ship.size}</GlowBadge>}
+              {ship.vehicle_category && <GlowBadge color="slate">{ship.vehicle_category}</GlowBadge>}
               {ship.variant_type && ship.variant_type !== 'standard' && (
                 <GlowBadge
                   color={ship.variant_type === 'collector' ? 'amber' : ship.variant_type === 'npc' ? 'red' : 'slate'}
@@ -91,7 +91,7 @@ export default function ShipDetailPage() {
                   {VARIANT_TYPE_LABELS[ship.variant_type] ?? ship.variant_type}
                 </GlowBadge>
               )}
-              {ship.has_sm_link && <GlowBadge color="green">RSI Ship Matrix</GlowBadge>}
+              {ship.ship_matrix_id != null && <GlowBadge color="green">RSI Ship Matrix</GlowBadge>}
             </div>
           </div>
           {/* Action buttons */}
@@ -110,36 +110,34 @@ export default function ShipDetailPage() {
           {/* Dimensions */}
           <ScifiPanel title="Dimensions" subtitle="Measurements in meters">
             <div className="grid grid-cols-2 gap-3">
-              <SpecCell label="Length" value={fDimension(ship.length)} />
-              <SpecCell label="Width"  value={fDimension(ship.width)} />
-              <SpecCell label="Height" value={fDimension(ship.height)} />
+              <SpecCell label="Length" value={fDimension(ship.cross_section_z)} />
+              <SpecCell label="Width"  value={fDimension(ship.cross_section_x)} />
+              <SpecCell label="Height" value={fDimension(ship.cross_section_y)} />
               <SpecCell label="Mass"   value={fMass(ship.mass)} />
             </div>
           </ScifiPanel>
 
           {/* Crew */}
           <ScifiPanel title="Crew">
-            <div className="grid grid-cols-3 gap-3">
-              <SpecCell label="Min"   value={ship.crew_min != null ? String(ship.crew_min) : '—'} />
-              <SpecCell label="Max"   value={ship.crew_max != null ? String(ship.crew_max) : '—'} />
-              <SpecCell label="Exits" value={ship.number_of_exits != null ? String(ship.number_of_exits) : '—'} />
+            <div className="grid grid-cols-2 gap-3">
+              <SpecCell label="Crew"     value={ship.crew_size != null ? String(ship.crew_size) : '—'} />
+              <SpecCell label="Category" value={ship.vehicle_category ?? '—'} />
             </div>
           </ScifiPanel>
 
           {/* Cargo */}
-          {ship.cargocapacity != null && (
+          {ship.cargo_capacity != null && (
             <ScifiPanel title="Cargo">
-              <SpecCell label="Capacity" value={`${ship.cargocapacity.toLocaleString('en-US')} SCU`} />
+              <SpecCell label="Capacity" value={`${ship.cargo_capacity.toLocaleString('en-US')} SCU`} />
             </ScifiPanel>
           )}
 
           {/* Insurance */}
-          {ship.pledge_cost != null && (
-            <ScifiPanel title="Insurance & Price">
+          {(ship.insurance_claim_time != null || ship.insurance_expedite_cost != null) && (
+            <ScifiPanel title="Insurance">
               <div className="space-y-2">
-                <SpecCell label="Pledge price"    value={fCredits(ship.pledge_cost)} />
-                <SpecCell label="Claim time"      value={fTime(ship.insurance_claim_time)} />
-                <SpecCell label="Expedite cost"   value={fCredits(ship.insurance_expedite_cost)} />
+                <SpecCell label="Claim time"    value={fTime(ship.insurance_claim_time)} />
+                <SpecCell label="Expedite cost" value={fCredits(ship.insurance_expedite_cost)} />
               </div>
             </ScifiPanel>
           )}
@@ -149,17 +147,17 @@ export default function ShipDetailPage() {
         <div className="space-y-4">
           <ScifiPanel title="Speed & Agility">
             <div className="space-y-3">
-              <StatBar label="SCM" displayValue={fSpeed(ship.scm_speed)} value={ship.scm_speed ?? 0} max={600} />
-              <StatBar label="Afterburner" displayValue={fSpeed(ship.afterburner_speed)} value={ship.afterburner_speed ?? 0} max={1400} color="amber" />
-              <StatBar label="Quantum" displayValue={ship.quantum_speed != null ? `${(ship.quantum_speed / 1e6).toFixed(0)} Mm/s` : '—'} value={ship.quantum_speed ?? 0} max={500e6} color="cyan" />
+              <StatBar label="SCM"       displayValue={fSpeed(ship.scm_speed)}           value={ship.scm_speed ?? 0}           max={600} />
+              <StatBar label="Max speed" displayValue={fSpeed(ship.max_speed)}           value={ship.max_speed ?? 0}           max={1400} color="amber" />
+              <StatBar label="Boost fwd" displayValue={fSpeed(ship.boost_speed_forward)} value={ship.boost_speed_forward ?? 0} max={2000} color="cyan" />
             </div>
           </ScifiPanel>
 
           <ScifiPanel title="Agility (deg/s)">
             <div className="space-y-3">
-              <StatBar label="Pitch" displayValue={ship.pitch != null ? `${ship.pitch.toFixed(0)}°/s` : '—'} value={ship.pitch ?? 0} max={90} />
-              <StatBar label="Yaw"   displayValue={ship.yaw   != null ? `${ship.yaw.toFixed(0)}°/s`   : '—'} value={ship.yaw   ?? 0} max={90} />
-              <StatBar label="Roll"  displayValue={ship.roll  != null ? `${ship.roll.toFixed(0)}°/s`   : '—'} value={ship.roll  ?? 0} max={90} color="amber" />
+              <StatBar label="Pitch" displayValue={ship.pitch_max != null ? `${ship.pitch_max.toFixed(0)}°/s` : '—'} value={ship.pitch_max ?? 0} max={90} />
+              <StatBar label="Yaw"   displayValue={ship.yaw_max   != null ? `${ship.yaw_max.toFixed(0)}°/s`   : '—'} value={ship.yaw_max   ?? 0} max={90} />
+              <StatBar label="Roll"  displayValue={ship.roll_max  != null ? `${ship.roll_max.toFixed(0)}°/s`   : '—'} value={ship.roll_max  ?? 0} max={90} color="amber" />
             </div>
           </ScifiPanel>
 
@@ -184,9 +182,9 @@ export default function ShipDetailPage() {
             <ScifiPanel title="Available paints" subtitle={`${paints.length} paints`} actions={<Palette size={14} className="text-slate-600" />}>
               <div className="space-y-1 max-h-64 overflow-y-auto">
                 {paints.map(p => (
-                  <div key={p.uuid} className="flex items-start gap-2 px-2 py-1.5 rounded hover:bg-white/5">
+                  <div key={p.paint_uuid} className="flex items-start gap-2 px-2 py-1.5 rounded hover:bg-white/5">
                     <div className="w-3 h-3 rounded-sm mt-0.5 flex-shrink-0 border border-cyan-800 bg-gradient-to-br from-cyan-900 to-blue-900" />
-                    <span className="text-xs text-slate-400">{p.name}</span>
+                    <span className="text-xs text-slate-400">{p.paint_name}</span>
                   </div>
                 ))}
               </div>
