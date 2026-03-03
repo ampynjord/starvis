@@ -8,6 +8,9 @@
  * Features: Pagination, ETag caching, CSV export, Rate limiting, Swagger docs
  */
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import compression from 'compression';
 import cors from 'cors';
 import express from 'express';
@@ -15,9 +18,6 @@ import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import helmet from 'helmet';
 import * as mysql from 'mysql2/promise';
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import swaggerUi from 'swagger-ui-express';
 
 import { createRoutes } from './src/routes.js';
