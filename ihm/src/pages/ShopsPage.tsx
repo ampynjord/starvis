@@ -15,9 +15,9 @@ export default function ShopsPage() {
     queryFn: () => api.shops.list(),
   });
 
-  if (isLoading) return <LoadingGrid message="CHARGEMENT DES BOUTIQUES…" />;
+  if (isLoading) return <LoadingGrid message="LOADING SHOPS…" />;
   if (error)     return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
-  if (!shops?.length) return <EmptyState icon="🛒" title="Aucune boutique" />;
+  if (!shops?.length) return <EmptyState icon="🛒" title="No shops" />;
 
   // Group by system
   const bySystem = shops.reduce<Record<string, Shop[]>>((acc, shop) => {
@@ -30,12 +30,12 @@ export default function ShopsPage() {
   return (
     <div className="max-w-screen-xl mx-auto space-y-6">
       <div>
-        <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Boutiques</h1>
-        <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">{shops.length} boutiques</p>
+        <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Shops</h1>
+        <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">{shops.length} shops</p>
       </div>
 
       {Object.entries(bySystem).sort((a, b) => a[0].localeCompare(b[0])).map(([system, shops]) => (
-        <ScifiPanel key={system} title={system} subtitle={`${shops.length} boutiques`} actions={<MapPin size={14} className="text-slate-600" />}>
+        <ScifiPanel key={system} title={system} subtitle={`${shops.length} shops`} actions={<MapPin size={14} className="text-slate-600" />}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
             {shops.map((shop, i) => (
               <motion.div key={shop.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { api } from '@/services/api';
 
-// Fixture basique
+// Basic fixtures
 const mockOverview = { ships: 309, components: 3023, items: 0, manufacturers: 42, paints: 0, commodities: 0 };
 const mockVersion = { game_version: '4.0.1', extracted_at: '2024-06-01T00:00:00Z', ships_count: 309, components_count: 3023 };
 const mockShipList = {
@@ -22,7 +22,7 @@ function mockFetch(data: unknown, ok = true, status = 200) {
 describe('api.stats', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('overview() appelle /api/v1/stats/overview', async () => {
+  it('overview() calls /api/v1/stats/overview', async () => {
     global.fetch = mockFetch(mockOverview);
     const result = await api.stats.overview();
     expect(result).toEqual(mockOverview);
@@ -31,7 +31,7 @@ describe('api.stats', () => {
     expect(String(url)).toContain('/api/v1/stats/overview');
   });
 
-  it('version() appelle /api/v1/version', async () => {
+  it('version() calls /api/v1/version', async () => {
     global.fetch = mockFetch(mockVersion);
     const result = await api.stats.version();
     expect(result).toEqual(mockVersion);
@@ -42,14 +42,14 @@ describe('api.stats', () => {
 describe('api.ships', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('list() appelle /api/v1/ships', async () => {
+  it('list() calls /api/v1/ships', async () => {
     global.fetch = mockFetch(mockShipList);
     const result = await api.ships.list({});
     expect(result).toEqual(mockShipList);
     expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('/api/v1/ships');
   });
 
-  it('list() transmet les paramètres de pagination', async () => {
+  it('list() forwards pagination parameters', async () => {
     global.fetch = mockFetch(mockShipList);
     await api.ships.list({ page: 2, limit: 50, search: 'hornet' });
     const url = String(vi.mocked(fetch).mock.calls[0][0]);
@@ -58,14 +58,14 @@ describe('api.ships', () => {
     expect(url).toContain('search=hornet');
   });
 
-  it('get() appelle /api/v1/ships/:uuid', async () => {
+  it('get() calls /api/v1/ships/:uuid', async () => {
     global.fetch = mockFetch(mockShip);
     const result = await api.ships.get('abc');
     expect(result).toEqual(mockShip);
     expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('/api/v1/ships/abc');
   });
 
-  it('lève une erreur si la réponse n\'est pas ok', async () => {
+  it('throws an error if the response is not ok', async () => {
     global.fetch = mockFetch(null, false, 404);
     await expect(api.ships.get('unknown')).rejects.toThrow('HTTP 404');
   });
@@ -74,7 +74,7 @@ describe('api.ships', () => {
 describe('api.search', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('appelle /api/v1/search avec le paramètre search', async () => {
+  it('calls /api/v1/search with the search parameter', async () => {
     global.fetch = mockFetch({ ships: [], components: [] });
     await api.search('aurora');
     const url = String(vi.mocked(fetch).mock.calls[0][0]);
@@ -86,13 +86,13 @@ describe('api.search', () => {
 describe('api.components', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('list() appelle /api/v1/components', async () => {
+  it('list() calls /api/v1/components', async () => {
     global.fetch = mockFetch({ data: [], pagination: {} });
     await api.components.list({});
     expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('/api/v1/components');
   });
 
-  it('get() appelle /api/v1/components/:uuid', async () => {
+  it('get() calls /api/v1/components/:uuid', async () => {
     global.fetch = mockFetch({ uuid: 'comp-123' });
     await api.components.get('comp-123');
     expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('/api/v1/components/comp-123');
@@ -102,7 +102,7 @@ describe('api.components', () => {
 describe('api.changelog', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('summary() appelle /api/v1/changelog/summary', async () => {
+  it('summary() calls /api/v1/changelog/summary', async () => {
     global.fetch = mockFetch({});
     await api.changelog.summary();
     expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('/api/v1/changelog/summary');
@@ -112,7 +112,7 @@ describe('api.changelog', () => {
 describe('api.loadout', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
-  it('calculate() envoie une requête POST', async () => {
+  it('calculate() sends a POST request', async () => {
     global.fetch = mockFetch([]);
     await api.loadout.calculate('ship-uuid', []);
     const [, options] = vi.mocked(fetch).mock.calls[0];

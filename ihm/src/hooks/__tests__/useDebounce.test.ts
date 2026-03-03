@@ -11,23 +11,23 @@ describe('useDebounce', () => {
     vi.useRealTimers();
   });
 
-  it('retourne la valeur initiale immédiatement', () => {
+  it('returns the initial value immediately', () => {
     const { result } = renderHook(() => useDebounce('initial', 300));
     expect(result.current).toBe('initial');
   });
 
-  it('ne met pas à jour la valeur avant le délai', () => {
+  it('does not update the value before the delay', () => {
     const { result, rerender } = renderHook(
       ({ value, delay }: { value: string; delay: number }) => useDebounce(value, delay),
       { initialProps: { value: 'first', delay: 300 } },
     );
 
     rerender({ value: 'second', delay: 300 });
-    // Avant 300ms la valeur reste 'first'
+    // before 300ms the value stays 'first'
     expect(result.current).toBe('first');
   });
 
-  it('met à jour la valeur après le délai', () => {
+  it('updates the value after the delay', () => {
     const { result, rerender } = renderHook(
       ({ value, delay }: { value: string; delay: number }) => useDebounce(value, delay),
       { initialProps: { value: 'first', delay: 300 } },
@@ -42,7 +42,7 @@ describe('useDebounce', () => {
     expect(result.current).toBe('second');
   });
 
-  it('reset le timer si la valeur change rapidement', () => {
+  it('resets the timer if the value changes rapidly', () => {
     const { result, rerender } = renderHook(
       ({ value, delay }: { value: string; delay: number }) => useDebounce(value, delay),
       { initialProps: { value: 'a', delay: 300 } },
@@ -50,20 +50,20 @@ describe('useDebounce', () => {
 
     rerender({ value: 'b', delay: 300 });
     act(() => { vi.advanceTimersByTime(200); });
-    // Pas encore mis à jour
+    // not yet updated
     expect(result.current).toBe('a');
 
     rerender({ value: 'c', delay: 300 });
     act(() => { vi.advanceTimersByTime(200); });
-    // Toujours pas (timer réinitialisé)
+    // still not (timer reset)
     expect(result.current).toBe('a');
 
     act(() => { vi.advanceTimersByTime(100); });
-    // Maintenant 300ms depuis le dernier changement → mis à jour
+    // now 300ms since last change → updated
     expect(result.current).toBe('c');
   });
 
-  it('fonctionne avec un type numérique', () => {
+  it('works with a numeric type', () => {
     const { result, rerender } = renderHook(
       ({ value, delay }: { value: number; delay: number }) => useDebounce(value, delay),
       { initialProps: { value: 0, delay: 100 } },

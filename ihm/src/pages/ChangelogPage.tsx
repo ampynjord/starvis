@@ -42,8 +42,8 @@ export default function ChangelogPage() {
         <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Changelog</h1>
         {summary && (
           <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">
-            {summary.total.toLocaleString('fr-FR')} entrées
-            {summary.last_extraction && ` · Dernière extraction : ${fDateTime(summary.last_extraction)}`}
+        {summary.total.toLocaleString('en-US')} entries
+            {summary.last_extraction && ` · Last extraction: ${fDateTime(summary.last_extraction)}`}
           </p>
         )}
       </div>
@@ -54,7 +54,7 @@ export default function ChangelogPage() {
           {Object.entries(summary.by_change).map(([type, count]) => (
             <div key={type} className="sci-panel px-3 py-1.5 flex items-center gap-2">
               <GlowBadge color={type === 'added' ? 'green' : type === 'removed' ? 'red' : 'amber'}>{type}</GlowBadge>
-              <span className="font-mono-sc text-sm text-slate-300">{(count as number).toLocaleString('fr-FR')}</span>
+              <span className="font-mono-sc text-sm text-slate-300">{(count as number).toLocaleString('en-US')}</span>
             </div>
           ))}
         </div>
@@ -67,13 +67,13 @@ export default function ChangelogPage() {
             onReset={resetFilters}
             groups={[
               {
-                key: 'entity_type', label: 'Entité',
+                key: 'entity_type', label: 'Entity',
                 options: ENTITY_TYPES.map(t => ({ label: t, value: t })),
                 value: entityType,
                 onChange: v => { setEntityType(v); setPage(1); },
               },
               {
-                key: 'change_type', label: 'Changement',
+                key: 'change_type', label: 'Change',
                 options: CHANGE_TYPES.map(t => ({ label: t, value: t })),
                 value: changeType,
                 onChange: v => { setChangeType(v); setPage(1); },

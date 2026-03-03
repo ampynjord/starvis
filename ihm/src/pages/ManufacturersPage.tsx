@@ -27,7 +27,7 @@ export default function ManufacturersPage() {
 
   return (
     <div className="max-w-screen-xl mx-auto space-y-6">
-      <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Fabricants</h1>
+      <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Manufacturers</h1>
 
       <div className="flex gap-6">
         {/* List */}
@@ -35,7 +35,7 @@ export default function ManufacturersPage() {
           <div className="sci-panel overflow-hidden">
             <div className="px-3 py-2 border-b border-border">
               <p className="text-xs font-mono-sc text-slate-600 uppercase">
-                {manufacturers?.length ?? 0} fabricants
+                {manufacturers?.length ?? 0} manufacturers
               </p>
             </div>
             <div className="space-y-0.5 p-1.5 max-h-[calc(100vh-200px)] overflow-y-auto">
@@ -83,19 +83,19 @@ export default function ManufacturersPage() {
                     <div className="sci-panel p-3 text-center">
                       <Rocket size={16} className="text-cyan-400 mx-auto mb-1" />
                       <p className="font-orbitron text-lg text-slate-200">{selectedMfr.ships_count}</p>
-                      <p className="text-xs text-slate-600">Vaisseaux</p>
+                      <p className="text-xs text-slate-600">Ships</p>
                     </div>
                     <div className="sci-panel p-3 text-center">
                       <Settings2 size={16} className="text-blue-400 mx-auto mb-1" />
                       <p className="font-orbitron text-lg text-slate-200">{selectedMfr.components_count}</p>
-                      <p className="text-xs text-slate-600">Composants</p>
+                      <p className="text-xs text-slate-600">Components</p>
                     </div>
                   </div>
                 </div>
               </ScifiPanel>
 
               {shipsByMfr && shipsByMfr.length > 0 && (
-                <ScifiPanel title="Vaisseaux" subtitle={`${shipsByMfr.length} vaisseaux`}>
+                <ScifiPanel title="Ships" subtitle={`${shipsByMfr.length} ships`}>
                   <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                     {shipsByMfr.map((s, i) => <ShipCard key={s.uuid} ship={s} index={i} />)}
                   </div>
@@ -105,7 +105,7 @@ export default function ManufacturersPage() {
           ) : (
             <div className="flex flex-col items-center justify-center gap-3 py-24 text-slate-700">
               <Zap size={32} />
-              <p className="font-orbitron text-sm tracking-widest">Sélectionnez un fabricant</p>
+              <p className="font-orbitron text-sm tracking-widest">Select a manufacturer</p>
             </div>
           )}
         </div>

@@ -42,29 +42,29 @@ export default function ComparePage() {
   });
 
   const STAT_ROWS: { key: string; label: string; format: (v: number | null) => string }[] = [
-    { key: 'mass', label: 'Masse', format: v => fMass(v) },
-    { key: 'length', label: 'Longueur', format: v => fDimension(v) },
-    { key: 'width', label: 'Largeur', format: v => fDimension(v) },
-    { key: 'height', label: 'Hauteur', format: v => fDimension(v) },
+    { key: 'mass', label: 'Mass', format: v => fMass(v) },
+    { key: 'length', label: 'Length', format: v => fDimension(v) },
+    { key: 'width', label: 'Width', format: v => fDimension(v) },
+    { key: 'height', label: 'Height', format: v => fDimension(v) },
     { key: 'scm_speed', label: 'SCM', format: v => fSpeed(v) },
     { key: 'afterburner_speed', label: 'Afterburner', format: v => fSpeed(v) },
     { key: 'pitch', label: 'Pitch', format: v => v != null ? `${v.toFixed(0)}°/s` : '—' },
     { key: 'yaw', label: 'Yaw', format: v => v != null ? `${v.toFixed(0)}°/s` : '—' },
     { key: 'roll', label: 'Roll', format: v => v != null ? `${v.toFixed(0)}°/s` : '—' },
-    { key: 'crew_max', label: 'Équipage max', format: v => v != null ? String(v) : '—' },
-    { key: 'cargocapacity', label: 'Cargo (SCU)', format: v => v != null ? v.toLocaleString('fr-FR') : '—' },
+    { key: 'crew_max', label: 'Max crew', format: v => v != null ? String(v) : '—' },
+    { key: 'cargocapacity', label: 'Cargo (SCU)', format: v => v != null ? v.toLocaleString('en-US') : '—' },
   ];
 
   return (
     <div className="max-w-screen-lg mx-auto space-y-6">
       <div>
-        <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest">COMPARATEUR</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Comparez deux vaisseaux côte à côte</p>
+        <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest">COMPARE</h1>
+        <p className="text-sm text-slate-500 mt-0.5">Compare two ships side by side</p>
       </div>
 
       {/* Ship selectors */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {([{ slot: 'a', label: 'Vaisseau A' }, { slot: 'b', label: 'Vaisseau B' }] as ShipSelector[]).map(({ slot, label }) => {
+        {([{ slot: 'a', label: 'Ship A' }, { slot: 'b', label: 'Ship B' }] as ShipSelector[]).map(({ slot, label }) => {
           const uuid = slot === 'a' ? uuidA : uuidB;
           const setUuid = slot === 'a' ? setUuidA : setUuidB;
           const query = slot === 'a' ? queryA : queryB;
@@ -94,7 +94,7 @@ export default function ComparePage() {
                     type="text"
                     value={query}
                     onChange={e => setQuery(e.target.value)}
-                    placeholder={`Rechercher…`}
+                    placeholder={`Search…`}
                     className="sci-input w-full text-sm"
                   />
                   {suggestions && suggestions.length > 0 && (
@@ -119,10 +119,10 @@ export default function ComparePage() {
       </div>
 
       {/* Results */}
-      {isLoading && <LoadingGrid message="COMPARAISON EN COURS…" />}
+      {isLoading && <LoadingGrid message="COMPARING…" />}
 
       {comparison && (
-        <ScifiPanel title="Comparaison" subtitle="Vert = meilleur, ligne bleue = équivalent">
+        <ScifiPanel title="Comparison" subtitle="Green = better, blue row = equivalent">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -166,7 +166,7 @@ export default function ComparePage() {
       {!uuidA && !uuidB && (
         <div className="flex flex-col items-center gap-3 py-16 text-center text-slate-600">
           <BarChart3 size={32} />
-          <p className="font-orbitron text-sm tracking-widest">Sélectionnez deux vaisseaux pour les comparer</p>
+          <p className="font-orbitron text-sm tracking-widest">Select two ships to compare</p>
         </div>
       )}
     </div>

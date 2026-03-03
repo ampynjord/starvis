@@ -3,7 +3,7 @@ import { render, type RenderOptions } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 
-/** Crée un QueryClient sans retry pour les tests */
+/** Creates a QueryClient without retry for tests */
 function makeQueryClient() {
   return new QueryClient({
     defaultOptions: {

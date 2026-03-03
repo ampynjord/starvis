@@ -6,13 +6,13 @@ import { NavLink } from 'react-router-dom';
 
 const NAV_ITEMS = [
   { to: '/',             icon: Home,        label: 'Dashboard' },
-  { to: '/ships',        icon: Rocket,      label: 'Vaisseaux' },
-  { to: '/compare',      icon: BarChart3,   label: 'Comparer' },
-  { to: '/components',   icon: Settings2,   label: 'Composants' },
-  { to: '/items',        icon: Shield,      label: 'Équipements' },
-  { to: '/commodities',  icon: Package,     label: 'Marchandises' },
-  { to: '/manufacturers',icon: Zap,         label: 'Fabricants' },
-  { to: '/shops',        icon: ShoppingBag, label: 'Boutiques' },
+  { to: '/ships',        icon: Rocket,      label: 'Ships' },
+  { to: '/compare',      icon: BarChart3,   label: 'Compare' },
+  { to: '/components',   icon: Settings2,   label: 'Components' },
+  { to: '/items',        icon: Shield,      label: 'Items' },
+  { to: '/commodities',  icon: Package,     label: 'Commodities' },
+  { to: '/manufacturers',icon: Zap,         label: 'Manufacturers' },
+  { to: '/shops',        icon: ShoppingBag, label: 'Shops' },
   { to: '/changelog',    icon: BookOpen,    label: 'Changelog' },
 ];
 

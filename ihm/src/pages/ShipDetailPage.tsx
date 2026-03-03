@@ -52,7 +52,7 @@ export default function ShipDetailPage() {
     enabled: !!uuid,
   });
 
-  if (isLoading) return <LoadingGrid message="CHARGEMENT DU VAISSEAU…" />;
+  if (isLoading) return <LoadingGrid message="LOADING SHIP…" />;
   if (error)    return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
   if (!ship)    return null;
 
@@ -61,10 +61,10 @@ export default function ShipDetailPage() {
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs font-mono-sc text-slate-600">
         <button onClick={() => navigate(-1)} className="hover:text-slate-400 transition-colors flex items-center gap-1">
-          <ArrowLeft size={12} /> Retour
+          <ArrowLeft size={12} /> Back
         </button>
         <ChevronRight size={10} />
-        <Link to="/ships" className="hover:text-slate-400 transition-colors">Vaisseaux</Link>
+        <Link to="/ships" className="hover:text-slate-400 transition-colors">Ships</Link>
         <ChevronRight size={10} />
         <span className="text-slate-400">{ship.name}</span>
       </div>
@@ -83,7 +83,7 @@ export default function ShipDetailPage() {
             <div className="flex flex-wrap gap-2 mt-3">
               {ship.career && <GlowBadge color="cyan">{ship.career}</GlowBadge>}
               {ship.role && ship.role !== ship.career && <GlowBadge color="slate">{ship.role}</GlowBadge>}
-              {ship.size != null && <GlowBadge color="slate">Taille {ship.size}</GlowBadge>}
+              {ship.size != null && <GlowBadge color="slate">Size {ship.size}</GlowBadge>}
               {ship.variant_type && ship.variant_type !== 'standard' && (
                 <GlowBadge
                   color={ship.variant_type === 'collector' ? 'amber' : ship.variant_type === 'npc' ? 'red' : 'slate'}
@@ -97,7 +97,7 @@ export default function ShipDetailPage() {
           {/* Action buttons */}
           <div className="flex gap-2 flex-shrink-0">
             <Link to={`/compare?a=${uuid}`} className="sci-btn-amber text-sm">
-              <BarChart3 size={13} /> Comparer
+              <BarChart3 size={13} /> Compare
             </Link>
           </div>
         </div>
@@ -108,38 +108,38 @@ export default function ShipDetailPage() {
         {/* Specs column */}
         <div className="space-y-4">
           {/* Dimensions */}
-          <ScifiPanel title="Dimensions" subtitle="Mesures en mètres">
+          <ScifiPanel title="Dimensions" subtitle="Measurements in meters">
             <div className="grid grid-cols-2 gap-3">
-              <SpecCell label="Longueur" value={fDimension(ship.length)} />
-              <SpecCell label="Largeur"  value={fDimension(ship.width)} />
-              <SpecCell label="Hauteur"  value={fDimension(ship.height)} />
-              <SpecCell label="Masse"    value={fMass(ship.mass)} />
+              <SpecCell label="Length" value={fDimension(ship.length)} />
+              <SpecCell label="Width"  value={fDimension(ship.width)} />
+              <SpecCell label="Height" value={fDimension(ship.height)} />
+              <SpecCell label="Mass"   value={fMass(ship.mass)} />
             </div>
           </ScifiPanel>
 
           {/* Crew */}
-          <ScifiPanel title="Équipage">
+          <ScifiPanel title="Crew">
             <div className="grid grid-cols-3 gap-3">
-              <SpecCell label="Min"     value={ship.crew_min != null ? String(ship.crew_min) : '—'} />
-              <SpecCell label="Max"     value={ship.crew_max != null ? String(ship.crew_max) : '—'} />
-              <SpecCell label="Sorties" value={ship.number_of_exits != null ? String(ship.number_of_exits) : '—'} />
+              <SpecCell label="Min"   value={ship.crew_min != null ? String(ship.crew_min) : '—'} />
+              <SpecCell label="Max"   value={ship.crew_max != null ? String(ship.crew_max) : '—'} />
+              <SpecCell label="Exits" value={ship.number_of_exits != null ? String(ship.number_of_exits) : '—'} />
             </div>
           </ScifiPanel>
 
           {/* Cargo */}
           {ship.cargocapacity != null && (
             <ScifiPanel title="Cargo">
-              <SpecCell label="Capacité" value={`${ship.cargocapacity.toLocaleString('fr-FR')} SCU`} />
+              <SpecCell label="Capacity" value={`${ship.cargocapacity.toLocaleString('en-US')} SCU`} />
             </ScifiPanel>
           )}
 
           {/* Insurance */}
           {ship.pledge_cost != null && (
-            <ScifiPanel title="Assurance & Prix">
+            <ScifiPanel title="Insurance & Price">
               <div className="space-y-2">
-                <SpecCell label="Prix pledge" value={fCredits(ship.pledge_cost)} />
-                <SpecCell label="Temps réclamation" value={fTime(ship.insurance_claim_time)} />
-                <SpecCell label="Expédition" value={fCredits(ship.insurance_expedite_cost)} />
+                <SpecCell label="Pledge price"    value={fCredits(ship.pledge_cost)} />
+                <SpecCell label="Claim time"      value={fTime(ship.insurance_claim_time)} />
+                <SpecCell label="Expedite cost"   value={fCredits(ship.insurance_expedite_cost)} />
               </div>
             </ScifiPanel>
           )}
@@ -147,7 +147,7 @@ export default function ShipDetailPage() {
 
         {/* Performance column */}
         <div className="space-y-4">
-          <ScifiPanel title="Vitesse & Maniabilité">
+          <ScifiPanel title="Speed & Agility">
             <div className="space-y-3">
               <StatBar label="SCM" displayValue={fSpeed(ship.scm_speed)} value={ship.scm_speed ?? 0} max={600} />
               <StatBar label="Afterburner" displayValue={fSpeed(ship.afterburner_speed)} value={ship.afterburner_speed ?? 0} max={1400} color="amber" />
@@ -155,7 +155,7 @@ export default function ShipDetailPage() {
             </div>
           </ScifiPanel>
 
-          <ScifiPanel title="Maniabilité (deg/s)">
+          <ScifiPanel title="Agility (deg/s)">
             <div className="space-y-3">
               <StatBar label="Pitch" displayValue={ship.pitch != null ? `${ship.pitch.toFixed(0)}°/s` : '—'} value={ship.pitch ?? 0} max={90} />
               <StatBar label="Yaw"   displayValue={ship.yaw   != null ? `${ship.yaw.toFixed(0)}°/s`   : '—'} value={ship.yaw   ?? 0} max={90} />
@@ -165,7 +165,7 @@ export default function ShipDetailPage() {
 
           {/* Hardpoints summary */}
           {stats && (
-            <ScifiPanel title="Armement & systèmes" subtitle={`${stats.total_hardpoints} points d'emport`}>
+            <ScifiPanel title="Weapons & systems" subtitle={`${stats.total_hardpoints} hardpoints`}>
               <div className="grid grid-cols-2 gap-2">
                 {Object.entries(stats.by_type).map(([type, count]) => (
                   <div key={type} className="flex items-center justify-between px-2 py-1.5 sci-panel">
@@ -181,7 +181,7 @@ export default function ShipDetailPage() {
         {/* Paints column */}
         <div className="space-y-4">
           {paints && paints.length > 0 && (
-            <ScifiPanel title="Livrées disponibles" subtitle={`${paints.length} peintures`} actions={<Palette size={14} className="text-slate-600" />}>
+            <ScifiPanel title="Available paints" subtitle={`${paints.length} paints`} actions={<Palette size={14} className="text-slate-600" />}>
               <div className="space-y-1 max-h-64 overflow-y-auto">
                 {paints.map(p => (
                   <div key={p.uuid} className="flex items-start gap-2 px-2 py-1.5 rounded hover:bg-white/5">
@@ -195,7 +195,7 @@ export default function ShipDetailPage() {
 
           {/* Hardpoints detail */}
           {hardpoints && hardpoints.length > 0 && (
-            <ScifiPanel title="Points d'emport" subtitle={`${hardpoints.length} slots`}>
+            <ScifiPanel title="Hardpoints" subtitle={`${hardpoints.length} slots`}>
               <div className="space-y-0.5 max-h-52 overflow-y-auto">
                 {hardpoints.map((hp: Hardpoint) => (
                   <div key={hp.uuid} className="flex items-center justify-between px-2 py-1 rounded hover:bg-white/5">
@@ -214,7 +214,7 @@ export default function ShipDetailPage() {
 
       {/* Loadout */}
       {loadout && loadout.length > 0 && (
-        <ScifiPanel title="Loadout par défaut" subtitle="Arborescence complète du vaisseau" actions={<Layers size={14} className="text-slate-600" />}>
+        <ScifiPanel title="Default loadout" subtitle="Full ship tree" actions={<Layers size={14} className="text-slate-600" />}>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 max-h-96 overflow-y-auto">
             {loadout.map((node, i) => (
               <LoadoutTree key={i} node={node} />
@@ -225,7 +225,7 @@ export default function ShipDetailPage() {
 
       {/* Similar ships */}
       {similar && similar.length > 0 && (
-        <ScifiPanel title="Vaisseaux similaires" subtitle="Même rôle ou gabarit">
+        <ScifiPanel title="Similar ships" subtitle="Same role or size class">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {similar.map((s, i) => (
               <ShipCard key={s.uuid} ship={s} index={i} />

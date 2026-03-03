@@ -48,7 +48,7 @@ export function TopBar() {
           onChange={e => { setQuery(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 200)}
-          placeholder="Rechercher vaisseaux, composants, équipements…"
+          placeholder="Search ships, components, items…"
           className="sci-input w-full pl-8 pr-8 text-xs"
         />
         {query && (
@@ -70,7 +70,7 @@ export function TopBar() {
               {results.ships.length > 0 && (
                 <>
                   <div className="px-3 py-1.5 text-xs font-mono-sc text-cyan-700 border-b border-border/50">
-                    VAISSEAUX
+                    SHIPS
                   </div>
                   {results.ships.map(s => (
                     <button
@@ -87,7 +87,7 @@ export function TopBar() {
               {results.components.length > 0 && (
                 <>
                   <div className="px-3 py-1.5 text-xs font-mono-sc text-cyan-700 border-t border-b border-border/50">
-                    COMPOSANTS
+                    COMPONENTS
                   </div>
                   {results.components.map(c => (
                     <button
@@ -104,7 +104,7 @@ export function TopBar() {
               {results.items.length > 0 && (
                 <>
                   <div className="px-3 py-1.5 text-xs font-mono-sc text-cyan-700 border-t border-b border-border/50">
-                    ÉQUIPEMENTS
+                    ITEMS
                   </div>
                   {results.items.map(i => (
                     <button
