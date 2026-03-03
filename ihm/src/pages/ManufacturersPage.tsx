@@ -22,7 +22,7 @@ export default function ManufacturersPage() {
   });
   const selectedMfr = manufacturers?.find((m: Manufacturer) => m.code === selected);
 
-  if (isLoading) return <LoadingGrid message="CHARGEMENT…" />;
+  if (isLoading) return <LoadingGrid message="LOADING…" />;
   if (error)     return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
 
   return (
@@ -54,7 +54,7 @@ export default function ManufacturersPage() {
                     <p className="text-xs text-slate-600 truncate">{m.name}</p>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                    <span className="text-xs font-mono-sc text-slate-600">{m.ships_count}</span>
+                    <span className="text-xs font-mono-sc text-slate-600">{m.ship_count}</span>
                     <ChevronRight size={10} className="text-slate-700" />
                   </div>
                 </button>
@@ -82,12 +82,12 @@ export default function ManufacturersPage() {
                   <div className="grid grid-cols-2 gap-2 flex-shrink-0">
                     <div className="sci-panel p-3 text-center">
                       <Rocket size={16} className="text-cyan-400 mx-auto mb-1" />
-                      <p className="font-orbitron text-lg text-slate-200">{selectedMfr.ships_count}</p>
+                      <p className="font-orbitron text-lg text-slate-200">{selectedMfr.ship_count}</p>
                       <p className="text-xs text-slate-600">Ships</p>
                     </div>
                     <div className="sci-panel p-3 text-center">
                       <Settings2 size={16} className="text-blue-400 mx-auto mb-1" />
-                      <p className="font-orbitron text-lg text-slate-200">{selectedMfr.components_count}</p>
+                      <p className="font-orbitron text-lg text-slate-200">{selectedMfr.component_count}</p>
                       <p className="text-xs text-slate-600">Components</p>
                     </div>
                   </div>

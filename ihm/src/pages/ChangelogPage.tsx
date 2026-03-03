@@ -83,7 +83,7 @@ export default function ChangelogPage() {
         </div>
 
         <div className="flex-1 min-w-0">
-          {isLoading ? <LoadingGrid message="CHARGEMENT…" />
+          {isLoading ? <LoadingGrid message="LOADING…" />
           : error ? <ErrorState error={error as Error} onRetry={() => void refetch()} />
           : (
             <>

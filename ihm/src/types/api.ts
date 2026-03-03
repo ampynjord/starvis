@@ -1,12 +1,11 @@
 // ─── Pagination ──────────────────────────────────────────────────────────────
 export interface PaginatedResponse<T> {
   data: T[];
-  pagination: {
-    page: number;
-    limit: number;
-    total: number;
-    totalPages: number;
-  };
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+  count: number;
 }
 
 // ─── Overview ─────────────────────────────────────────────────────────────────
@@ -166,8 +165,8 @@ export interface Manufacturer {
   name: string;
   description: string | null;
   known_for: string | null;
-  ships_count: number;
-  components_count: number;
+  ship_count: number;
+  component_count: number;
 }
 
 // ─── Commodities ──────────────────────────────────────────────────────────────
