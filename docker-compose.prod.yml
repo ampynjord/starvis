@@ -13,7 +13,9 @@ services:
       MYSQL_DATABASE: ${DB_NAME}
       MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${DB_PASSWORD}
-    # Pas de port exposé en prod — accès interne uniquement
+    # Port exposé en loopback uniquement — pour extractions locales via tunnel SSH
+    ports:
+      - "127.0.0.1:3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./db:/docker-entrypoint-initdb.d:ro
