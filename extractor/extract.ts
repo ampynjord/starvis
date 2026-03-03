@@ -83,6 +83,10 @@ async function main() {
     database: process.env.DB_NAME || '',
     waitForConnections: true,
     connectionLimit: 5,
+    // Keep TCP connection alive during long extractions (30+ minutes)
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 10000,
+    connectTimeout: 60000,
   };
 
   if (!dbConfig.user || !dbConfig.password || !dbConfig.database) {
