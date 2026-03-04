@@ -137,12 +137,13 @@ export class ShipQueryService {
     const [rows] = await this.pool.execute<Row[]>(`SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS} WHERE s.uuid = ?`, [uuid]);
     if (!rows[0]) return null;
     const ship = rows[0];
-    if (!ship.cross_section_x && !ship.cross_section_y && !ship.cross_section_z && ship.ship_matrix_id) {
+    // Fallback: use Ship Matrix dimensions if P4K bbox is missing
+    if (!num(ship.size_y) && ship.ship_matrix_id) {
       const [smRows] = await this.pool.execute<Row[]>('SELECT length, beam, height FROM ship_matrix WHERE id = ?', [ship.ship_matrix_id]);
       if (smRows.length) {
-        ship.cross_section_x = num(smRows[0].length);
-        ship.cross_section_y = num(smRows[0].beam);
-        ship.cross_section_z = num(smRows[0].height);
+        ship.size_x = num(smRows[0].beam);   // beam   → width  (size_x)
+        ship.size_y = num(smRows[0].length); // length → length (size_y)
+        ship.size_z = num(smRows[0].height); // height → height (size_z)
       }
     }
     return ship;

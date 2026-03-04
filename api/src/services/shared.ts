@@ -36,6 +36,7 @@ export const SHIP_SELECT = `s.uuid, s.class_name, COALESCE(sm.name, s.name) as n
   s.missile_damage_total, s.weapon_damage_total,
   s.armor_physical, s.armor_energy, s.armor_distortion,
   s.cross_section_x, s.cross_section_y, s.cross_section_z,
+  s.size_x, s.size_y, s.size_z,
   s.ship_matrix_id,
   sm.media_store_small as thumbnail, sm.media_store_large as thumbnail_large,
   sm.production_status, sm.description as sm_description,
@@ -43,7 +44,10 @@ export const SHIP_SELECT = `s.uuid, s.class_name, COALESCE(sm.name, s.name) as n
   sm.min_crew, sm.max_crew,
   s.vehicle_category, s.insurance_claim_time, s.insurance_expedite_cost,
   s.short_name, s.variant_type, s.game_data,
-  s.armor_signal_ir, s.armor_signal_em, s.armor_signal_cs`;
+  s.armor_signal_ir, s.armor_signal_em, s.armor_signal_cs,
+  s.armor_hp, s.armor_phys_resist, s.armor_energy_resist,
+  s.fuse_penetration, s.component_penetration,
+  s.boost_ramp_up, s.boost_ramp_down`;
 
 /** Concept-only columns: ship_matrix entries without P4K data */
 export const CONCEPT_SELECT = `CONCAT('concept-', sm2.id) as uuid, LOWER(REPLACE(REPLACE(sm2.name, ' ', '_'), '''', '')) as class_name,
@@ -57,6 +61,7 @@ export const CONCEPT_SELECT = `CONCAT('concept-', sm2.id) as uuid, LOWER(REPLACE
   NULL as missile_damage_total, NULL as weapon_damage_total,
   NULL as armor_physical, NULL as armor_energy, NULL as armor_distortion,
   NULL as cross_section_x, NULL as cross_section_y, NULL as cross_section_z,
+  NULL as size_x, NULL as size_y, NULL as size_z,
   sm2.id as ship_matrix_id,
   sm2.media_store_small as thumbnail, sm2.media_store_large as thumbnail_large,
   sm2.production_status, sm2.description as sm_description,
@@ -64,7 +69,10 @@ export const CONCEPT_SELECT = `CONCAT('concept-', sm2.id) as uuid, LOWER(REPLACE
   sm2.min_crew, sm2.max_crew,
   NULL as vehicle_category, NULL as insurance_claim_time, NULL as insurance_expedite_cost,
   NULL as short_name, NULL as variant_type, NULL as game_data,
-  NULL as armor_signal_ir, NULL as armor_signal_em, NULL as armor_signal_cs`;
+  NULL as armor_signal_ir, NULL as armor_signal_em, NULL as armor_signal_cs,
+  NULL as armor_hp, NULL as armor_phys_resist, NULL as armor_energy_resist,
+  NULL as fuse_penetration, NULL as component_penetration,
+  NULL as boost_ramp_up, NULL as boost_ramp_down`;
 
 export const SHIP_JOINS = `FROM ships s
   LEFT JOIN manufacturers m ON s.manufacturer_code = m.code

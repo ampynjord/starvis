@@ -126,9 +126,9 @@ export default function ShipDetailPage() {
           {/* ── Dimensions ── */}
           <ScifiPanel title="Dimensions" actions={<Ruler size={13} className="text-slate-600" />}>
             {(() => {
-              const L = Number(ship.cross_section_z) || 0;
-              const W = Number(ship.cross_section_x) || 0;
-              const H = Number(ship.cross_section_y) || 0;
+              const L = Number(ship.size_y) || 0;  // size_y = length (forward axis)
+              const W = Number(ship.size_x) || 0;  // size_x = width/beam
+              const H = Number(ship.size_z) || 0;  // size_z = height
               const maxDim = Math.max(L, W, H, 1);
               const scale = 48;
               const lp = Math.max((L / maxDim) * scale, 4); // length  → left axis

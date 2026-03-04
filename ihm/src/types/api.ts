@@ -55,6 +55,16 @@ export interface ShipListItem {
 }
 
 export interface Ship extends ShipListItem {
+  size_x: number | null;  // width  (m)
+  size_y: number | null;  // length (m)
+  size_z: number | null;  // height (m)
+  armor_hp: number | null;
+  armor_phys_resist: number | null;
+  armor_energy_resist: number | null;
+  fuse_penetration: number | null;
+  component_penetration: number | null;
+  boost_ramp_up: number | null;
+  boost_ramp_down: number | null;
   pitch_max: number | null;
   yaw_max: number | null;
   roll_max: number | null;
@@ -107,6 +117,7 @@ export interface LoadoutNode {
   // QD
   qd_speed: number | null;
   qd_spool_time: number | null;
+  qd_range: number | null;
   // Power / heat
   power_output: number | null;
   power_draw: number | null;

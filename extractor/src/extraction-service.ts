@@ -7,7 +7,7 @@
  */
 import { createHash } from 'node:crypto';
 import type { Pool, PoolConnection } from 'mysql2/promise';
-import { applyHullSeriesCargoFallback, crossReferenceShipMatrix, pruneExcludedVariants, tagVariantTypes } from './crossref.js';
+import { applyDimensionsFallback, applyHullSeriesCargoFallback, crossReferenceShipMatrix, pruneExcludedVariants, tagVariantTypes } from './crossref.js';
 import { classifyPort, type DataForgeService, MANUFACTURER_CODES } from './dataforge-service.js';
 import { LocalizationService } from './localization-service.js';
 import logger from './logger.js';
@@ -200,6 +200,7 @@ export class ExtractionService {
       // 6. Cross-reference with ship_matrix
       onProgress?.('Cross-referencing with Ship Matrix…');
       stats.shipMatrixLinked = await crossReferenceShipMatrix(conn);
+      await applyDimensionsFallback(conn);
 
       // 6a. Tag variant types for non-SM ships
       await tagVariantTypes(conn);
@@ -584,12 +585,15 @@ export class ExtractionService {
             armor_physical, armor_energy, armor_distortion,
             armor_thermal, armor_biochemical, armor_stun,
             armor_signal_ir, armor_signal_em, armor_signal_cs,
+            armor_hp, armor_phys_resist, armor_energy_resist,
+            fuse_penetration, component_penetration,
+            boost_ramp_up, boost_ramp_down,
             cross_section_x, cross_section_y, cross_section_z,
             short_name, description, ship_grade, cargo_capacity,
             insurance_claim_time, insurance_expedite_cost,
             vehicle_category,
             game_data
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) AS new
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) AS new
           ON DUPLICATE KEY UPDATE
             class_name=new.class_name, name=new.name,
             manufacturer_code=new.manufacturer_code,
@@ -610,6 +614,10 @@ export class ExtractionService {
             armor_biochemical=new.armor_biochemical, armor_stun=new.armor_stun,
             armor_signal_ir=new.armor_signal_ir, armor_signal_em=new.armor_signal_em,
             armor_signal_cs=new.armor_signal_cs,
+            armor_hp=new.armor_hp, armor_phys_resist=new.armor_phys_resist,
+            armor_energy_resist=new.armor_energy_resist,
+            fuse_penetration=new.fuse_penetration, component_penetration=new.component_penetration,
+            boost_ramp_up=new.boost_ramp_up, boost_ramp_down=new.boost_ramp_down,
             cross_section_x=new.cross_section_x, cross_section_y=new.cross_section_y,
             cross_section_z=new.cross_section_z,
             short_name=new.short_name, description=new.description,
@@ -653,6 +661,13 @@ export class ExtractionService {
             fullData.armor?.data?.armor?.signalIR ?? null,
             fullData.armor?.data?.armor?.signalEM ?? null,
             fullData.armor?.data?.armor?.signalCS ?? null,
+            fullData.armor?.data?.health?.hp ?? null,
+            fullData.armor?.data?.health?.damageResistanceMultiplier?.physical ?? null,
+            fullData.armor?.data?.health?.damageResistanceMultiplier?.energy ?? null,
+            fullData.vehicle?.fusePenetrationDamageMultiplier ?? null,
+            fullData.vehicle?.componentPenetrationDamageMultiplier ?? null,
+            fullData.ifcs?.afterburner?.afterburnerRampUpTime ?? null,
+            fullData.ifcs?.afterburner?.afterburnerRampDownTime ?? null,
             fullData.crossSection?.x || null,
             fullData.crossSection?.y || null,
             fullData.crossSection?.z || null,

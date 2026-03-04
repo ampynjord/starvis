@@ -143,6 +143,13 @@ CREATE TABLE IF NOT EXISTS ships (
   armor_signal_ir DECIMAL(10,6) COMMENT 'IR signature multiplier',
   armor_signal_em DECIMAL(10,6) COMMENT 'EM signature multiplier',
   armor_signal_cs DECIMAL(10,6) COMMENT 'Cross-section signature multiplier',
+  armor_hp DECIMAL(10,2) COMMENT 'Armor plate health points',
+  armor_phys_resist DECIMAL(10,6) COMMENT 'Armor physical damage resistance multiplier',
+  armor_energy_resist DECIMAL(10,6) COMMENT 'Armor energy damage resistance multiplier',
+  fuse_penetration DECIMAL(10,4) COMMENT 'Fuse penetration damage multiplier',
+  component_penetration DECIMAL(10,4) COMMENT 'Component penetration damage multiplier',
+  boost_ramp_up DECIMAL(8,2) COMMENT 'Afterburner ramp-up time (s)',
+  boost_ramp_down DECIMAL(8,2) COMMENT 'Afterburner ramp-down time (s)',
   
   -- Cross section (bounding box projections in m²)
   cross_section_x DECIMAL(10,2) COMMENT 'Front profile area',
