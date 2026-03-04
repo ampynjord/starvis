@@ -20,7 +20,7 @@ export function ShipCard({ ship, index = 0 }: Props) {
     >
       <Link to={`/ships/${ship.uuid}`} className="block">
         {/* Rectangle horizontal : hauteur fixe, plus large que haute */}
-        <div className="holo-card h-56 flex flex-col overflow-hidden">
+        <div className="holo-card h-60 flex flex-col overflow-hidden">
           {/* Thumbnail — haut, hauteur fixe */}
           <div className="relative h-28 flex-shrink-0 bg-slate-900/80">
             {ship.thumbnail ? (
@@ -62,21 +62,21 @@ export function ShipCard({ ship, index = 0 }: Props) {
               <p className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider truncate leading-none">
                 {ship.manufacturer_code}
               </p>
-              <h3 className="font-orbitron text-sm font-bold text-slate-200 truncate leading-tight mt-1">
+              <h3 className="font-orbitron text-sm font-bold text-slate-200 truncate leading-tight mt-2">
                 {ship.name}
               </h3>
             </div>
 
             {/* Stats */}
-            <div className="flex gap-2">
+            <div className="flex gap-3">
               <StatCell icon={<Users size={9} />} label="Crew" value={ship.crew_size != null ? String(ship.crew_size) : '—'} />
               <StatCell icon={<Zap size={9} />} label="SCM" value={fSpeed(ship.scm_speed)} />
               <StatCell icon={<Maximize2 size={9} />} label="Long." value={fDimension(ship.cross_section_z)} />
             </div>
 
             {/* Career + RSI badge */}
-            <div className="flex items-center justify-between gap-1">
-              <div className="flex gap-1 min-w-0 overflow-hidden">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex gap-2 min-w-0 overflow-hidden">
                 {ship.career && (
                   <GlowBadge color="cyan" size="xs">{ship.career}</GlowBadge>
                 )}
@@ -100,8 +100,8 @@ export function ShipCard({ ship, index = 0 }: Props) {
 
 function StatCell({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="sci-panel px-2 py-1.5 text-center flex-1">
-      <div className="flex items-center justify-center gap-1 text-slate-600 mb-1">
+    <div className="sci-panel px-3 py-2 text-center flex-1">
+      <div className="flex items-center justify-center gap-1 text-slate-600 mb-1.5">
         {icon}
         <span className="text-[9px] font-mono-sc uppercase tracking-wide">{label}</span>
       </div>
