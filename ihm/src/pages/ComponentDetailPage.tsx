@@ -72,13 +72,13 @@ export default function ComponentDetailPage() {
         <ScifiPanel title="Specifications">
           <div className="grid grid-cols-2 gap-2">
             {[
-              { label: 'Mass', value: comp.mass != null ? `${comp.mass.toFixed(1)} kg` : '—' },
-              { label: 'HP',   value: comp.hp != null ? comp.hp.toLocaleString('en-US') : '—' },
-              { label: 'Power base', value: comp.power_base  != null ? `${comp.power_base.toFixed(0)} W`  : '—' },
-              { label: 'Power draw', value: comp.power_draw  != null ? `${comp.power_draw.toFixed(0)} W`  : '—' },
-              { label: 'Heat',       value: comp.heat_generation     != null ? `${comp.heat_generation.toFixed(0)}` : '—' },
-              { label: 'EM sig.',    value: comp.em_signature        != null ? `${comp.em_signature.toFixed(0)}`    : '—' },
-              { label: 'IR sig.',    value: comp.ir_signature        != null ? `${comp.ir_signature.toFixed(0)}`    : '—' },
+              { label: 'Mass', value: comp.mass != null ? `${Number(comp.mass).toFixed(1)} kg` : '—' },
+              { label: 'HP',   value: comp.hp != null ? Number(comp.hp).toLocaleString('en-US') : '—' },
+              { label: 'Power base', value: comp.power_base  != null ? `${Number(comp.power_base).toFixed(0)} W`  : '—' },
+              { label: 'Power draw', value: comp.power_draw  != null ? `${Number(comp.power_draw).toFixed(0)} W`  : '—' },
+              { label: 'Heat',       value: comp.heat_generation     != null ? `${Number(comp.heat_generation).toFixed(0)}` : '—' },
+              { label: 'EM sig.',    value: comp.em_signature        != null ? `${Number(comp.em_signature).toFixed(0)}`    : '—' },
+              { label: 'IR sig.',    value: comp.ir_signature        != null ? `${Number(comp.ir_signature).toFixed(0)}`    : '—' },
             ].map(({ label, value }) => (
               <div key={label} className="sci-panel p-2.5">
                 <p className="text-xs text-slate-600 font-mono-sc uppercase">{label}</p>

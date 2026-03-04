@@ -501,25 +501,9 @@ export function ShipLoadout({ nodes }: Props) {
   const hasShields = data.shields.length > 0;
   const hasSystems = data.systems.length > 0;
   const hasThrusters = data.thrusters.length > 0;
-  const hasCM = data.cmDecoys.length > 0 || data.cmNoises.length > 0;
-
-  const totalDecoys = data.cmDecoys.reduce((s, c) => s + c.count, 0);
-  const totalNoises = data.cmNoises.reduce((s, c) => s + c.count, 0);
 
   return (
     <div className="space-y-6">
-      {/* ── Countermeasures — résumé haut ──────────── */}
-      {hasCM && (
-        <div className="flex items-center gap-4 text-xs font-mono-sc text-slate-500 pb-2 border-b border-border/20">
-          <span className="text-slate-700 uppercase tracking-widest">CM</span>
-          {totalDecoys > 0 && (
-            <span>{totalDecoys}× Decoy{totalDecoys > 1 ? 's' : ''}</span>
-          )}
-          {totalNoises > 0 && (
-            <span>{totalNoises}× Noise{totalNoises > 1 ? 's' : ''}</span>
-          )}
-        </div>
-      )}
       {/* ── Weapons ────────────────────────────────── */}
       {hasWeapons && (
         <Section title="Weapons & Utilities">

@@ -6,13 +6,13 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/services/api';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { GlowBadge } from '@/components/ui/GlowBadge';
-import { StatBar } from '@/components/ui/StatBar';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ShipCard } from '@/components/ship/ShipCard';
 import { ShipLoadout } from '@/components/ship/ShipLoadout';
+import { ShipStatsBanner } from '@/components/ship/ShipStatsBanner';
 import {
-  fCredits, fDimension, fMass, fSpeed,
+  fCredits, fDimension, fMass,
 } from '@/utils/formatters';
 import { VARIANT_TYPE_LABELS } from '@/utils/constants';
 import type { Hardpoint } from '@/types/api';
@@ -34,11 +34,6 @@ export default function ShipDetailPage() {
   const { data: paints } = useQuery({
     queryKey: ['ships.paints', uuid],
     queryFn: () => api.ships.paints(uuid!),
-    enabled: !!uuid,
-  });
-  const { data: stats } = useQuery({
-    queryKey: ['ships.stats', uuid],
-    queryFn: () => api.ships.stats(uuid!),
     enabled: !!uuid,
   });
   const { data: similar } = useQuery({
@@ -167,35 +162,9 @@ export default function ShipDetailPage() {
 
         {/* Performance column */}
         <div className="space-y-4">
-          <ScifiPanel title="Speed & Agility">
-            <div className="space-y-3">
-              <StatBar label="SCM"       displayValue={fSpeed(ship.scm_speed)}           value={ship.scm_speed ?? 0}           max={600} />
-              <StatBar label="Max speed" displayValue={fSpeed(ship.max_speed)}           value={ship.max_speed ?? 0}           max={1400} color="amber" />
-              <StatBar label="Boost fwd" displayValue={fSpeed(ship.boost_speed_forward)} value={ship.boost_speed_forward ?? 0} max={2000} color="cyan" />
-            </div>
+          <ScifiPanel title="Combat & Speed">
+            <ShipStatsBanner ship={ship} loadout={loadout ?? []} />
           </ScifiPanel>
-
-          <ScifiPanel title="Agility (deg/s)">
-            <div className="space-y-3">
-              <StatBar label="Pitch" displayValue={ship.pitch_max != null ? `${Number(ship.pitch_max).toFixed(0)}°/s` : '—'} value={ship.pitch_max ?? 0} max={90} />
-                  <StatBar label="Yaw"   displayValue={ship.yaw_max   != null ? `${Number(ship.yaw_max).toFixed(0)}°/s`   : '—'} value={ship.yaw_max   ?? 0} max={90} />
-                  <StatBar label="Roll"  displayValue={ship.roll_max  != null ? `${Number(ship.roll_max).toFixed(0)}°/s`   : '—'} value={ship.roll_max  ?? 0} max={90} color="amber" />
-            </div>
-          </ScifiPanel>
-
-          {/* Hardpoints summary */}
-          {stats && (
-            <ScifiPanel title="Weapons & systems" subtitle={`${stats.total_hardpoints} hardpoints`}>
-              <div className="grid grid-cols-2 gap-2">
-                {Object.entries(stats.by_type).map(([type, count]) => (
-                  <div key={type} className="flex items-center justify-between px-2 py-1.5 sci-panel">
-                    <span className="text-xs text-slate-500 truncate">{type}</span>
-                    <span className="text-xs font-mono-sc text-cyan-400 ml-1">{count}</span>
-                  </div>
-                ))}
-              </div>
-            </ScifiPanel>
-          )}
         </div>
 
         {/* Paints column */}

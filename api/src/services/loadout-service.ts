@@ -31,7 +31,7 @@ export class LoadoutService {
               c.weapon_dps, c.weapon_damage, c.weapon_fire_rate, c.weapon_range,
               c.shield_hp, c.shield_regen, c.shield_regen_delay,
               c.qd_speed, c.qd_spool_time,
-              c.power_output, c.cooling_rate,
+              c.power_output, c.power_draw, c.power_base, c.heat_generation, c.cooling_rate,
               c.missile_damage, c.missile_signal_type,
               c.thruster_max_thrust, c.thruster_type,
               c.rack_count, c.rack_missile_size,
