@@ -617,9 +617,11 @@ export class DataForgeService implements DataForgeContext {
     }
 
     const mainEntries = this.extractLoadoutEntries(data);
-    const emptyPorts = mainEntries.filter((e) => !e.entityClassName && e.portName);
-    let variantMap: Map<string, string> | null = null;
-    if (emptyPorts.length > 0) variantMap = this.findVariantLoadoutMap(className);
+    // Always build variantMap — it's also needed to resolve weapon class names inside
+    // sub-records (e.g. hardpoint_class_2 inside Mount_Gimbal_S4 inside a turret entity).
+    // The old guard `if (emptyPorts.length > 0)` was too narrow: even when every top-level
+    // port has an entityClassName, child ports inside sub-records may still need the map.
+    const variantMap: Map<string, string> | null = this.findVariantLoadoutMap(className);
 
     const loadoutItems: any[] = [];
     const processedPorts = new Set<string>();
