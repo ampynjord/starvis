@@ -21,7 +21,7 @@ export function ShipCard({ ship, index = 0 }: Props) {
       <Link to={`/ships/${ship.uuid}`} className="block">
         <div className="holo-card h-full">
           {/* Thumbnail */}
-          <div className="relative w-full aspect-video mb-3 rounded overflow-hidden bg-slate-900/80 border border-border/40">
+          <div className="relative w-full aspect-video rounded overflow-hidden bg-slate-900/80 border border-border/40">
             {ship.thumbnail ? (
               <img
                 src={ship.thumbnail}
@@ -50,10 +50,12 @@ export function ShipCard({ ship, index = 0 }: Props) {
                 </GlowBadge>
               </div>
             )}
+            {/* Gradient fade vers le bas */}
+            <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#0A1628] to-transparent pointer-events-none" />
           </div>
 
-          {/* Header */}
-          <div className="mb-2">
+          {/* Header — chevauche le fondu */}
+          <div className="mb-2 -mt-1 relative z-10">
             <p className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider truncate">
               {ship.manufacturer_code}
             </p>
@@ -98,7 +100,7 @@ export function ShipCard({ ship, index = 0 }: Props) {
           <div className="mt-3 pt-2 border-t border-border/50">
             <p className="text-xs text-slate-600 font-mono-sc truncate">
               {ship.ship_matrix_id != null ? (
-                <span className="text-cyan-800">◆ RSI linked</span>
+                <span className="text-green-500">◆ RSI linked</span>
               ) : (
                 <span className="text-slate-700">◇ Source: game data</span>
               )}
