@@ -89,20 +89,26 @@ function buildRackName(rack: LoadoutNode): string {
 // Atoms
 // ─────────────────────────────────────────────
 
-const GRADE_STYLE: Record<string, string> = {
-  A: 'text-emerald-300 bg-emerald-950/60 border-emerald-800/60',
-  B: 'text-cyan-300 bg-cyan-950/60 border-cyan-800/60',
-  C: 'text-slate-300 bg-slate-800/60 border-slate-600/60',
-  D: 'text-amber-300 bg-amber-950/60 border-amber-800/60',
-  E: 'text-red-300 bg-red-950/60 border-red-800/60',
+// Grade A/B = Military, C = Civilian, D/E = Industrial
+const GRADE_INFO: Record<string, { abbr: string; color: string }> = {
+  A: { abbr: 'MIL', color: 'text-emerald-300 bg-emerald-950/60 border-emerald-800/60' },
+  B: { abbr: 'MIL', color: 'text-cyan-300   bg-cyan-950/60   border-cyan-800/60'   },
+  C: { abbr: 'CIV', color: 'text-slate-300  bg-slate-800/60  border-slate-600/60'  },
+  D: { abbr: 'IND', color: 'text-amber-300  bg-amber-950/60  border-amber-800/60'  },
+  E: { abbr: 'IND', color: 'text-red-300    bg-red-950/60    border-red-800/60'    },
 };
 
 function GradePill({ grade }: { grade: string | null }) {
   if (!grade) return null;
-  const s = GRADE_STYLE[grade] ?? 'text-slate-500 bg-slate-900 border-slate-700';
-  return (
-    <span className={`text-[9px] font-mono-sc font-bold border rounded px-1 py-0.5 leading-none ${s}`}>
+  const info = GRADE_INFO[grade];
+  if (!info) return (
+    <span className="text-[9px] font-mono-sc font-bold border rounded px-1 py-0.5 leading-none text-slate-500 bg-slate-900 border-slate-700">
       {grade}
+    </span>
+  );
+  return (
+    <span className={`text-[9px] font-mono-sc font-bold border rounded px-1 py-0.5 leading-none ${info.color}`}>
+      {info.abbr} {grade}
     </span>
   );
 }
@@ -239,6 +245,80 @@ function WeaponCard({ portName, mount, weapon }: {
           <GradePill grade={weapon.grade ?? null} />
         </div>
       )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Turret card
+// ─────────────────────────────────────────────
+
+function TurretCard({ node }: { node: LoadoutNode }) {
+  const turretName = cleanCompName(node.component_name);
+  const gimbals = (node.children ?? []).filter(
+    c => c.port_type === 'Gimbal' || (c.component_class_name ?? '').toLowerCase().includes('gimbal'),
+  );
+
+  return (
+    <div className="flex flex-col rounded-md border border-amber-900/40 bg-amber-950/10 hover:border-amber-700/40 transition-all overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between gap-1 px-2 pt-1.5 pb-1 border-b border-amber-900/30">
+        <span className="text-[9px] font-mono-sc text-slate-600 truncate flex-1 min-w-0">
+          {cleanPortName(node.port_name)}
+        </span>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <span className="text-[8px] font-mono-sc text-amber-400 bg-amber-950/40 border border-amber-900/60 rounded px-1 py-0.5 leading-none">
+            Turret
+          </span>
+          <SizeBadge size={node.component_size ?? node.port_max_size} />
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 px-2 py-1.5 space-y-1.5">
+        {turretName && (
+          <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">
+            {node.component_uuid
+              ? <Link to={`/components/${node.component_uuid}`} className="hover:text-cyan-400 transition-colors">{turretName}</Link>
+              : turretName}
+          </p>
+        )}
+
+        {/* Gimbal weapon slots */}
+        {gimbals.length > 0 ? (
+          <div className="space-y-1">
+            {gimbals.map((g, i) => {
+              const weapon = (g.children ?? []).find(
+                c => c.component_type && WEAPON_TYPES.has(c.component_type),
+              ) ?? null;
+              const weaponName = cleanCompName(weapon?.component_name);
+              const slotSize   = g.component_size ?? g.port_max_size;
+              const dps        = weapon?.weapon_dps
+                ? Math.round(parseFloat(String(weapon.weapon_dps)))
+                : null;
+              return (
+                <div key={i} className="flex items-center gap-1.5 pl-2 border-l-2 border-amber-900/30">
+                  {slotSize != null && <SizeBadge size={slotSize} />}
+                  {weaponName ? (
+                    <span className="text-[10px] font-semibold text-slate-200 truncate flex-1 min-w-0">
+                      {weapon?.component_uuid
+                        ? <Link to={`/components/${weapon.component_uuid}`} className="hover:text-cyan-400 transition-colors">{weaponName}</Link>
+                        : weaponName}
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-mono-sc text-slate-700 italic flex-1">— empty —</span>
+                  )}
+                  {dps != null && (
+                    <span className="text-[9px] font-mono-sc text-red-400 tabular-nums flex-shrink-0">{dps}</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-[9px] font-mono-sc text-slate-700 italic">— no slots —</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -430,6 +510,7 @@ interface ThrusterGroup { type: string; size: number | null; count: number; tota
 
 interface ProcessedLoadout {
   weapons:   WeaponSlot[];
+  turrets:   LoadoutNode[];
   racks:     RackSlot[];
   shields:   LoadoutNode[];
   systems:   SystemSlot[];
@@ -443,6 +524,7 @@ const THRUSTER_ORDER = ['Main','Maneuvering','Retro'];
 
 function processLoadout(nodes: LoadoutNode[]): ProcessedLoadout {
   const weapons:       WeaponSlot[]    = [];
+  const turrets:       LoadoutNode[]   = [];
   const racks:         RackSlot[]      = [];
   const shields:       LoadoutNode[]   = [];
   const rawSystems:    SystemSlot[]    = [];
@@ -468,7 +550,10 @@ function processLoadout(nodes: LoadoutNode[]): ProcessedLoadout {
         cmDecoyMap.set(name, (cmDecoyMap.get(name) ?? 0) + 1);
       continue;
     }
-    if ((portType === 'Gimbal' || portType === 'Turret' || portType === 'WeaponRack') && node.component_uuid) {
+    if (portType === 'Turret' && node.component_uuid) {
+      turrets.push(node); continue;
+    }
+    if ((portType === 'Gimbal' || portType === 'WeaponRack') && node.component_uuid) {
       const weapon = node.children.find(c => c.component_type && WEAPON_TYPES.has(c.component_type)) ?? null;
       weapons.push({ portName: node.port_name, mount: node, weapon }); continue;
     }
@@ -519,7 +604,7 @@ function processLoadout(nodes: LoadoutNode[]): ProcessedLoadout {
   ];
 
   return {
-    weapons, racks, shields, systems, thrusters,
+    weapons, turrets, racks, shields, systems, thrusters,
     cmDecoys: Array.from(cmDecoyMap.entries()).map(([name, count]) => ({ name, count })),
     cmNoises: Array.from(cmNoiseMap.entries()).map(([name, count]) => ({ name, count })),
     defaultPaint,
@@ -542,6 +627,17 @@ export function ShipLoadout({ nodes }: { nodes: LoadoutNode[] }) {
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
             {data.weapons.map((slot, i) => (
               <WeaponCard key={i} portName={slot.portName} mount={slot.mount} weapon={slot.weapon} />
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* ── Turrets ── */}
+      {data.turrets.length > 0 && (
+        <Section title="Turrets" accent="text-amber-400" count={data.turrets.length}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+            {data.turrets.map((t, i) => (
+              <TurretCard key={i} node={t} />
             ))}
           </div>
         </Section>
