@@ -17,7 +17,7 @@ interface WrapperOptions extends Omit<RenderOptions, 'wrapper'> {
   initialEntries?: string[];
 }
 
-/** render() avec QueryClientProvider + MemoryRouter */
+/** render() avec QueryClientProvider + MemoryRouter (React Router v7 future flags activés) */
 export function renderWithProviders(
   ui: React.ReactElement,
   { initialEntries = ['/'], ...options }: WrapperOptions = {},
@@ -27,7 +27,12 @@ export function renderWithProviders(
   function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={initialEntries}>{children}</MemoryRouter>
+        <MemoryRouter
+          initialEntries={initialEntries}
+          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
+        >
+          {children}
+        </MemoryRouter>
       </QueryClientProvider>
     );
   }
