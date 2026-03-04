@@ -95,14 +95,20 @@ export interface LoadoutNode {
   manufacturer_code: string | null;
   // Weapons
   weapon_dps: number | null;
+  weapon_damage: number | null;
+  weapon_fire_rate: number | null;
   weapon_range: number | null;
   // Shield
   shield_hp: number | null;
+  shield_regen: number | null;
+  shield_regen_delay: number | null;
   // QD
   qd_speed: number | null;
+  qd_spool_time: number | null;
   // Power / heat
   power_output: number | null;
   power_draw: number | null;
+  power_base: number | null;
   heat_generation: number | null;
   cooling_rate: number | null;
   // Thruster
@@ -111,6 +117,9 @@ export interface LoadoutNode {
   // Rack
   rack_count: number | null;
   rack_missile_size: number | null;
+  // Missile
+  missile_damage: number | null;
+  missile_signal_type: string | null;
   // CM
   cm_ammo_count: number | null;
   children: LoadoutNode[];
