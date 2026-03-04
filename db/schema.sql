@@ -563,3 +563,17 @@ CREATE TABLE IF NOT EXISTS shop_inventory (
   CONSTRAINT fk_inventory_component FOREIGN KEY (component_uuid) REFERENCES components(uuid) ON DELETE SET NULL,
   CONSTRAINT fk_inventory_item FOREIGN KEY (item_uuid) REFERENCES items(uuid) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ─── Migrations tracking ──────────────────────────────────────────────────────
+-- Tracks which versioned migrations have been applied.
+-- Pre-populated with migrations whose columns are already in this schema file,
+-- so fresh installs skip those migration files automatically.
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  version    VARCHAR(255) PRIMARY KEY,
+  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Migration 001 columns (size_x/y/z, armor_hp, resistances, penetration,
+-- boost_ramp_up/down) are already present in the CREATE TABLE ships above.
+INSERT IGNORE INTO schema_migrations (version) VALUES ('001_add_ship_stats_columns');
