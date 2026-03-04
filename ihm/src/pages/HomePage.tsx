@@ -93,7 +93,7 @@ export default function HomePage() {
           <div className="space-y-1.5">
             {STAT_CARDS.map(({ to, icon: Icon, label, color }) => (
               <Link
-                key={to}
+                key={label}
                 to={to}
                 className="flex items-center gap-3 px-3 py-2.5 rounded border border-transparent hover:border-border hover:bg-white/5 transition-all group"
               >

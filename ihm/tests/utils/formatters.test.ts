@@ -13,7 +13,6 @@ import {
 } from '@/utils/formatters';
 
 // en-US locale: thousands separator is ',' and decimal separator is '.'
-// No special whitespace normalisation needed.
 
 describe('fNumber', () => {
   it('returns — for null', () => {
@@ -166,7 +165,6 @@ describe('fDimension', () => {
     expect(fDimension(undefined)).toBe('—');
   });
   it('formats in meters with 1 decimal (en-US)', () => {
-    // en-US: dot as decimal separator
     expect(fDimension(10)).toBe('10 m');
     expect(fDimension(25.55)).toContain('m');
     expect(fDimension(1.5)).toBe('1.5 m');

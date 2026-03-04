@@ -30,14 +30,12 @@ describe('Pagination', () => {
   it('disables the previous button on the first page', () => {
     render(<Pagination page={1} totalPages={5} onPageChange={vi.fn()} />);
     const buttons = screen.getAllByRole('button');
-    // First button = previous chevron
     expect(buttons[0]).toBeDisabled();
   });
 
   it('disables the next button on the last page', () => {
     render(<Pagination page={5} totalPages={5} onPageChange={vi.fn()} />);
     const buttons = screen.getAllByRole('button');
-    // Last button = next chevron
     expect(buttons[buttons.length - 1]).toBeDisabled();
   });
 
@@ -47,7 +45,7 @@ describe('Pagination', () => {
     render(<Pagination page={3} totalPages={5} onPageChange={onPageChange} />);
 
     const buttons = screen.getAllByRole('button');
-    await user.click(buttons[0]); // chevron gauche
+    await user.click(buttons[0]);
     expect(onPageChange).toHaveBeenCalledWith(2);
   });
 
@@ -57,7 +55,7 @@ describe('Pagination', () => {
     render(<Pagination page={3} totalPages={5} onPageChange={onPageChange} />);
 
     const buttons = screen.getAllByRole('button');
-    await user.click(buttons[buttons.length - 1]); // chevron droit
+    await user.click(buttons[buttons.length - 1]);
     expect(onPageChange).toHaveBeenCalledWith(4);
   });
 

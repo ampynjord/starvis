@@ -23,7 +23,6 @@ describe('useDebounce', () => {
     );
 
     rerender({ value: 'second', delay: 300 });
-    // before 300ms the value stays 'first'
     expect(result.current).toBe('first');
   });
 
@@ -50,16 +49,13 @@ describe('useDebounce', () => {
 
     rerender({ value: 'b', delay: 300 });
     act(() => { vi.advanceTimersByTime(200); });
-    // not yet updated
     expect(result.current).toBe('a');
 
     rerender({ value: 'c', delay: 300 });
     act(() => { vi.advanceTimersByTime(200); });
-    // still not (timer reset)
     expect(result.current).toBe('a');
 
     act(() => { vi.advanceTimersByTime(100); });
-    // now 300ms since last change → updated
     expect(result.current).toBe('c');
   });
 

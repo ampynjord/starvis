@@ -32,7 +32,7 @@ const baseShip: ShipListItem = {
 
 function renderCard(ship: Partial<ShipListItem> = {}) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <ShipCard ship={{ ...baseShip, ...ship }} />
     </MemoryRouter>,
   );
@@ -71,7 +71,6 @@ describe('ShipCard', () => {
 
   it('affiche — si scm_speed est null', () => {
     renderCard({ scm_speed: null });
-    // '—' appears at least once
     const dashes = screen.getAllByText('—');
     expect(dashes.length).toBeGreaterThan(0);
   });
@@ -86,7 +85,7 @@ describe('ShipCard', () => {
     expect(screen.getByText('NPC')).toBeInTheDocument();
   });
 
-  it('n\'affiche pas de badge variant_type si standard', () => {
+  it("n'affiche pas de badge variant_type si standard", () => {
     renderCard({ variant_type: 'standard' });
     expect(screen.queryByText('Standard')).not.toBeInTheDocument();
   });
@@ -99,7 +98,6 @@ describe('ShipCard', () => {
 
   it('does not show role if it is the same as career', () => {
     renderCard({ career: 'Combat', role: 'Combat' });
-    // Role must not be duplicated
     const badges = screen.getAllByText('Combat');
     expect(badges.length).toBe(1);
   });

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { screen } from '@testing-library/react';
-import { renderWithProviders } from '@/test/utils';
+import { renderWithProviders } from '../utils';
 import NotFoundPage from '@/pages/NotFoundPage';
 
 describe('NotFoundPage', () => {
