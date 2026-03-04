@@ -32,7 +32,10 @@ export class LoadoutService {
               c.shield_hp, c.shield_regen, c.shield_regen_delay,
               c.qd_speed, c.qd_spool_time,
               c.power_output, c.cooling_rate,
-              c.missile_damage, c.missile_signal_type
+              c.missile_damage, c.missile_signal_type,
+              c.thruster_max_thrust, c.thruster_type,
+              c.rack_count, c.rack_missile_size,
+              c.cm_ammo_count
        FROM ships_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
        WHERE sl.ship_uuid = ? ORDER BY sl.port_type, sl.port_name`,
       [shipUuid],
