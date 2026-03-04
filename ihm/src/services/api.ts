@@ -1,7 +1,7 @@
 import type {
   BuyLocation, ChangelogEntry, ChangelogSummary, Commodity,
   Component, ComponentListItem, Hardpoint, Item, ItemListItem,
-  LoadoutNode, Manufacturer, PaginatedResponse, SearchResult,
+  LoadoutNode, Manufacturer, PaginatedResponse, PaintListItem, SearchResult,
   Ship, ShipComparison, ShipFilters, ShipListItem, ShipPaint,
   ShipStats, Shop, StatsOverview, Version,
 } from '@/types/api';
@@ -95,8 +95,8 @@ export const api = {
 
   // ─── Paints ────────────────────────────────────────────────────────
   paints: {
-    list: (p?: { page?: number; limit?: number; ship_uuid?: string }) =>
-      get<PaginatedResponse<ShipPaint>>('/paints', p),
+    list: (p?: { page?: number; limit?: number; ship_uuid?: string; search?: string }) =>
+      get<PaginatedResponse<PaintListItem>>('/paints', p),
   },
 
   // ─── Shops ─────────────────────────────────────────────────────────

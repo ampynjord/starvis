@@ -20,6 +20,7 @@ const CommoditiesPage     = lazy(() => import('@/pages/CommoditiesPage'));
 const ManufacturersPage   = lazy(() => import('@/pages/ManufacturersPage'));
 const ShopsPage           = lazy(() => import('@/pages/ShopsPage'));
 const ChangelogPage       = lazy(() => import('@/pages/ChangelogPage'));
+const PaintsPage          = lazy(() => import('@/pages/PaintsPage'));
 const NotFoundPage        = lazy(() => import('@/pages/NotFoundPage'));
 
 export const router = createBrowserRouter([
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
       { path: 'manufacturers',    element: wrap(ManufacturersPage) },
       { path: 'shops',            element: wrap(ShopsPage) },
       { path: 'changelog',        element: wrap(ChangelogPage) },
+      { path: 'paints',            element: wrap(PaintsPage) },
       { path: '*',                element: wrap(NotFoundPage) },
     ],
   },
