@@ -707,7 +707,14 @@ export class ExtractionService {
 
     // Recursive helper: inserts a port and all its children at any depth
     const insertPort = async (
-      port: { portName: string; portType?: string; componentClassName?: string | null; minSize?: number; maxSize?: number; children?: any[] },
+      port: {
+        portName: string;
+        portType?: string;
+        componentClassName?: string | null;
+        minSize?: number;
+        maxSize?: number;
+        children?: any[];
+      },
       parentId: number | null,
     ): Promise<void> => {
       const compUuid = port.componentClassName ? componentUuidCache.get(port.componentClassName) || null : null;
