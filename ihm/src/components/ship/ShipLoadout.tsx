@@ -166,6 +166,12 @@ const WEAPON_TYPE_LABELS: Record<string, string> = {
   EMP: 'EMP', QuantumInterdictionGenerator: 'QED', UtilityWeapon: 'Utility',
 };
 
+const DMGTYPE_SHORT: Record<string, { label: string; color: string }> = {
+  energy:      { label: 'Laser',    color: 'text-red-400 border-red-900/60 bg-red-950/30' },
+  physical:    { label: 'Ballistic',color: 'text-amber-400 border-amber-900/60 bg-amber-950/30' },
+  distortion:  { label: 'Distortion',color: 'text-violet-400 border-violet-900/60 bg-violet-950/30' },
+};
+
 const MOUNT_TYPE_STYLE: Record<string, string> = {
   Gimbal:     'text-violet-400 bg-violet-950/40 border-violet-900/60',
   Turret:     'text-amber-400  bg-amber-950/40  border-amber-900/60',
@@ -183,6 +189,10 @@ function WeaponCard({ portName, mount, weapon }: {
   const dmg  = weapon?.weapon_damage ? Math.round(parseFloat(String(weapon.weapon_damage))).toString() : null;
   const fr   = weapon?.weapon_fire_rate ? Math.round(parseFloat(String(weapon.weapon_fire_rate))).toString() : null;
   const rng  = weapon?.weapon_range  ? Math.round(parseFloat(String(weapon.weapon_range))).toString() : null;
+  const ammo = (weapon?.weapon_ammo_count != null && weapon.weapon_ammo_count > 0) ? weapon.weapon_ammo_count : null;
+  const pwr  = (weapon?.power_draw || mount?.power_draw) ? Math.round(parseFloat(String(weapon?.power_draw ?? mount?.power_draw))).toString() : null;
+  const dmgTypeRaw = weapon?.weapon_damage_type ?? null;
+  const dmgTypeInfo = dmgTypeRaw ? (DMGTYPE_SHORT[dmgTypeRaw] ?? { label: dmgTypeRaw, color: 'text-slate-400 border-slate-700 bg-slate-900' }) : null;
   const wLabel = weapon?.component_type ? (WEAPON_TYPE_LABELS[weapon.component_type] ?? '') : '';
   const mountStyle = mountType ? (MOUNT_TYPE_STYLE[mountType] ?? '') : '';
 
@@ -202,6 +212,11 @@ function WeaponCard({ portName, mount, weapon }: {
           {wLabel && (
             <span className="text-[8px] font-mono-sc text-slate-500 border border-slate-700 rounded px-1 py-0.5 leading-none">
               {wLabel}
+            </span>
+          )}
+          {dmgTypeInfo && (
+            <span className={`text-[8px] font-mono-sc border rounded px-1 py-0.5 leading-none ${dmgTypeInfo.color}`}>
+              {dmgTypeInfo.label}
             </span>
           )}
           <SizeBadge size={displaySize} />
@@ -226,25 +241,29 @@ function WeaponCard({ portName, mount, weapon }: {
         ) : (
           <p className="text-[10px] font-mono-sc text-slate-700 italic">— empty —</p>
         )}
-        {(dps || dmg || fr || rng) && (
+        {(dps || dmg || fr || rng || ammo) && (
           <div className="flex flex-wrap gap-x-2 gap-y-0.5 pt-0.5">
-            {dps && <StatPill label="DPS" value={dps} color="text-red-400" />}
-            {dmg && <StatPill label="dmg" value={dmg} color="text-orange-400" />}
-            {fr  && <StatPill label="rpm" value={fr} />}
-            {rng && <StatPill label="rng" value={`${rng}m`} />}
+            {dps  && <StatPill label="DPS"  value={dps}        color="text-red-400" />}
+            {dmg  && <StatPill label="dmg"  value={dmg}        color="text-orange-400" />}
+            {fr   && <StatPill label="rpm"  value={fr} />}
+            {rng  && <StatPill label="rng"  value={`${rng}m`} />}
+            {ammo && <StatPill label="ammo" value={ammo}       color="text-amber-300" />}
           </div>
         )}
       </div>
 
-      {/* Footer: grade + mfr */}
-      {(weapon?.grade || weapon?.manufacturer_code) && (
-        <div className="flex items-center justify-between px-2 pb-1.5">
-          <span className="text-[9px] font-mono-sc text-slate-700">
-            {extractMfr(weapon.component_class_name, weapon.manufacturer_code)}
-          </span>
-          <GradePill grade={weapon.grade ?? null} />
+      {/* Footer: grade + mfr + pipes */}
+      <div className="flex items-center justify-between px-2 pb-1.5 gap-1">
+        <span className="text-[9px] font-mono-sc text-slate-700">
+          {extractMfr(weapon?.component_class_name, weapon?.manufacturer_code)}
+        </span>
+        <div className="flex items-center gap-1.5">
+          {pwr && (
+            <span className="text-[8px] font-mono-sc text-yellow-600 tabular-nums">{pwr}⚡</span>
+          )}
+          {weapon?.grade && <GradePill grade={weapon.grade ?? null} />}
         </div>
-      )}
+      </div>
     </div>
   );
 }
@@ -290,13 +309,18 @@ function TurretCard({ node }: { node: LoadoutNode }) {
             {gimbals.map((g, i) => {
               const gimbalName = cleanCompName(g.component_name);
               const weapon = (g.children ?? []).find(
-                c => c.component_type && WEAPON_TYPES.has(c.component_type),
+                c => c.component_type && ALL_WEAPON_TYPES.has(c.component_type),
               ) ?? null;
               const weaponName = cleanCompName(weapon?.component_name);
               const slotSize   = g.component_size ?? g.port_max_size;
-              const dps        = weapon?.weapon_dps
-                ? Math.round(parseFloat(String(weapon.weapon_dps)))
-                : null;
+              const dps   = weapon?.weapon_dps    ? Math.round(parseFloat(String(weapon.weapon_dps))) : null;
+              const dmg   = weapon?.weapon_damage ? Math.round(parseFloat(String(weapon.weapon_damage))) : null;
+              const fr    = weapon?.weapon_fire_rate ? Math.round(parseFloat(String(weapon.weapon_fire_rate))) : null;
+              const rng   = weapon?.weapon_range  ? Math.round(parseFloat(String(weapon.weapon_range))) : null;
+              const ammo  = (weapon?.weapon_ammo_count != null && weapon.weapon_ammo_count > 0) ? weapon.weapon_ammo_count : null;
+              const pwr   = weapon?.power_draw     ? Math.round(parseFloat(String(weapon.power_draw))) : null;
+              const dmgTypeRaw  = weapon?.weapon_damage_type ?? null;
+              const dmgTypeInfo = dmgTypeRaw ? (DMGTYPE_SHORT[dmgTypeRaw] ?? null) : null;
               return (
                 <div key={i} className="flex flex-col gap-0.5 pl-2 border-l-2 border-amber-900/30">
                   {/* Ligne gimbal */}
@@ -311,6 +335,9 @@ function TurretCard({ node }: { node: LoadoutNode }) {
                     ) : (
                       <span className="text-[9px] font-mono-sc text-slate-600 italic flex-1">— empty gimbal —</span>
                     )}
+                    {dmgTypeInfo && (
+                      <span className={`text-[7px] font-mono-sc border rounded px-1 leading-tight flex-shrink-0 ${dmgTypeInfo.color}`}>{dmgTypeInfo.label}</span>
+                    )}
                   </div>
                   {/* Ligne arme */}
                   <div className="flex items-center gap-1.5 pl-3">
@@ -323,10 +350,18 @@ function TurretCard({ node }: { node: LoadoutNode }) {
                     ) : (
                       <span className="text-[9px] font-mono-sc text-slate-700 italic flex-1">— empty —</span>
                     )}
-                    {dps != null && (
-                      <span className="text-[9px] font-mono-sc text-red-400 tabular-nums flex-shrink-0">{dps}</span>
-                    )}
+                    {pwr != null && <span className="text-[8px] font-mono-sc text-yellow-600 tabular-nums flex-shrink-0">{pwr}⚡</span>}
                   </div>
+                  {/* Stats arme */}
+                  {(dps != null || dmg != null || fr != null || rng != null || ammo != null) && (
+                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 pl-3">
+                      {dps  != null && <StatPill label="DPS"  value={dps.toLocaleString('en-US')} color="text-red-400" />}
+                      {dmg  != null && <StatPill label="dmg"  value={dmg}   color="text-orange-400" />}
+                      {fr   != null && <StatPill label="rpm"  value={fr} />}
+                      {rng  != null && <StatPill label="rng"  value={`${rng}m`} />}
+                      {ammo != null && <StatPill label="ammo" value={ammo}  color="text-amber-300" />}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -412,13 +447,21 @@ function SystemCard({ node, jumpModule }: { node: LoadoutNode; jumpModule: Loado
     const cr = parseFloat(String(node.cooling_rate));
     stats = <StatPill label="cooling" value={cr >= 1000 ? `${(cr/1000).toFixed(0)}k` : cr.toFixed(0)} color={accent.text} />;
   } else if (t === 'PowerPlant' && node.power_output) {
-    stats = <StatPill label="power" value={`${parseFloat(String(node.power_output)).toFixed(0)} eu`} color={accent.text} />;
+    stats = <StatPill label="output" value={`${parseFloat(String(node.power_output)).toFixed(0)} eu`} color={accent.text} />;
   } else if (t === 'QuantumDrive' && node.qd_speed) {
     const speed = parseFloat(String(node.qd_speed));
     stats = (
       <>
         <StatPill label="speed" value={`${(speed/1e6).toFixed(0)}Mm/s`} color={accent.text} />
         {node.qd_spool_time && <StatPill label="spool" value={`${parseFloat(String(node.qd_spool_time)).toFixed(1)}s`} />}
+      </>
+    );
+  } else if (t === 'Radar') {
+    stats = (
+      <>
+        {node.radar_range && <StatPill label="range"    value={`${Math.round(parseFloat(String(node.radar_range))/1000)}km`} color={accent.text} />}
+        {node.radar_tracking_signal && <StatPill label="track" value={parseFloat(String(node.radar_tracking_signal)).toFixed(2)} />}
+        {node.radar_detection_lifetime && <StatPill label="ttl" value={`${parseFloat(String(node.radar_detection_lifetime)).toFixed(1)}s`} />}
       </>
     );
   }
@@ -456,11 +499,16 @@ function SystemCard({ node, jumpModule }: { node: LoadoutNode; jumpModule: Loado
         )}
         {stats && <div className="flex flex-wrap gap-x-2 gap-y-0.5 pt-0.5">{stats}</div>}
       </div>
-      {node.manufacturer_code && (
-        <div className="px-2 pb-1.5">
+      {(node.manufacturer_code || node.power_draw) && (
+        <div className="flex items-center justify-between px-2 pb-1.5">
           <span className="text-[9px] font-mono-sc text-slate-700">
             {extractMfr(node.component_class_name, node.manufacturer_code)}
           </span>
+          {node.power_draw && (
+            <span className="text-[8px] font-mono-sc text-yellow-600 tabular-nums">
+              {Math.round(parseFloat(String(node.power_draw)))}⚡
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -499,11 +547,16 @@ function ShieldCard({ node }: { node: LoadoutNode }) {
           </div>
         )}
       </div>
-      {node.manufacturer_code && (
-        <div className="px-2 pb-1.5">
+      {(node.manufacturer_code || node.power_draw) && (
+        <div className="flex items-center justify-between px-2 pb-1.5">
           <span className="text-[9px] font-mono-sc text-slate-700">
             {extractMfr(node.component_class_name, node.manufacturer_code)}
           </span>
+          {node.power_draw && (
+            <span className="text-[8px] font-mono-sc text-yellow-600 tabular-nums">
+              {Math.round(parseFloat(String(node.power_draw)))}⚡
+            </span>
+          )}
         </div>
       )}
     </div>
@@ -514,39 +567,68 @@ function ShieldCard({ node }: { node: LoadoutNode }) {
 // Data processing — slots individuels
 // ─────────────────────────────────────────────
 
+// Armes de combat (WeaponGun, EMP, QIG...)
 const WEAPON_TYPES = new Set([
-  'WeaponGun','Weapon','MiningLaser','SalvageHead',
-  'TractorBeam','RepairBeam','EMP','QuantumInterdictionGenerator','UtilityWeapon',
+  'WeaponGun','Weapon','EMP','QuantumInterdictionGenerator','UtilityWeapon',
 ]);
+// Outils utilitaires (mining, salvage, tractor, repair)
+const UTILITY_TYPES = new Set([
+  'MiningLaser','SalvageHead','TractorBeam','RepairBeam',
+]);
+// Tous types d'armes/outils (pour chercher dans les enfants)
+const ALL_WEAPON_TYPES = new Set([...WEAPON_TYPES, ...UTILITY_TYPES]);
 
 interface WeaponSlot { portName: string; mount: LoadoutNode | null; weapon: LoadoutNode | null }
 interface RackSlot   { rack: LoadoutNode; missiles: LoadoutNode[] }
 interface SystemSlot { node: LoadoutNode; jumpModule: LoadoutNode | null }
 interface ThrusterGroup { type: string; size: number | null; count: number; totalThrust: number }
+interface CMEntry { name: string; count: number; ammoPerUnit: number | null; uuid: string | null }
 
 interface ProcessedLoadout {
-  weapons:   WeaponSlot[];
-  turrets:   LoadoutNode[];
-  racks:     RackSlot[];
-  shields:   LoadoutNode[];
-  systems:   SystemSlot[];
-  thrusters: ThrusterGroup[];
-  cmDecoys:  Array<{ name: string; count: number }>;
-  cmNoises:  Array<{ name: string; count: number }>;
+  weapons:     WeaponSlot[];
+  weapTurrets: LoadoutNode[];  // tourelles classées « armes »
+  utilities:   LoadoutNode[];  // tourelles/montages classés « utilitaires »
+  racks:       RackSlot[];
+  shields:     LoadoutNode[];
+  systems:     SystemSlot[];
+  thrusters:   ThrusterGroup[];
+  cmDecoys:    CMEntry[];
+  cmNoises:    CMEntry[];
   defaultPaint: string | null;
+}
+
+/** Détermine si un nœud (tourelle ou child) est une arme de combat */
+function classifyTurretNode(turret: LoadoutNode): 'weapon' | 'utility' {
+  // Parcourir les enfants (gimbals) et leurs enfants (armes)
+  for (const child of turret.children ?? []) {
+    const ct = child.component_type;
+    if (ct) {
+      if (WEAPON_TYPES.has(ct)) return 'weapon';
+      if (UTILITY_TYPES.has(ct)) return 'utility';
+    }
+    for (const sub of child.children ?? []) {
+      const st = sub.component_type;
+      if (st) {
+        if (WEAPON_TYPES.has(st)) return 'weapon';
+        if (UTILITY_TYPES.has(st)) return 'utility';
+      }
+    }
+  }
+  return 'weapon'; // par défaut: arme
 }
 
 const THRUSTER_ORDER = ['Main','Maneuvering','Retro'];
 
 function processLoadout(nodes: LoadoutNode[]): ProcessedLoadout {
   const weapons:       WeaponSlot[]    = [];
-  const turrets:       LoadoutNode[]   = [];
+  const weapTurrets:   LoadoutNode[]   = [];  // tourelles combat
+  const utilities:     LoadoutNode[]   = [];  // tourelles utilitaires
   const racks:         RackSlot[]      = [];
   const shields:       LoadoutNode[]   = [];
   const rawSystems:    SystemSlot[]    = [];
   const rawThrusters:  LoadoutNode[]   = [];
-  const cmDecoyMap = new Map<string, number>();
-  const cmNoiseMap = new Map<string, number>();
+  const cmDecoyMap = new Map<string, CMEntry>();
+  const cmNoiseMap = new Map<string, CMEntry>();
   let defaultPaint: string | null = null;
 
   for (const node of nodes) {
@@ -560,21 +642,36 @@ function processLoadout(nodes: LoadoutNode[]): ProcessedLoadout {
     if (compType === 'Countermeasure' && node.component_uuid) {
       const name = node.component_name ?? 'Unknown';
       const lc = name.toLowerCase();
-      if (lc.includes('noise') || lc.includes('flare') || lc.includes('chaff'))
-        cmNoiseMap.set(name, (cmNoiseMap.get(name) ?? 0) + 1);
-      else
-        cmDecoyMap.set(name, (cmDecoyMap.get(name) ?? 0) + 1);
+      const ammo = node.cm_ammo_count ?? null;
+      const map = (lc.includes('noise') || lc.includes('flare') || lc.includes('chaff')) ? cmNoiseMap : cmDecoyMap;
+      const ex = map.get(name);
+      if (ex) ex.count++;
+      else map.set(name, { name, count: 1, ammoPerUnit: ammo, uuid: node.component_uuid });
       continue;
     }
     if (portType === 'Turret' && node.component_uuid) {
-      turrets.push(node); continue;
+      const cat = classifyTurretNode(node);
+      if (cat === 'utility') utilities.push(node);
+      else weapTurrets.push(node);
+      continue;
     }
     if ((portType === 'Gimbal' || portType === 'WeaponRack') && node.component_uuid) {
-      const weapon = node.children.find(c => c.component_type && WEAPON_TYPES.has(c.component_type)) ?? null;
-      weapons.push({ portName: node.port_name, mount: node, weapon }); continue;
+      const weapon = node.children.find(c => c.component_type && ALL_WEAPON_TYPES.has(c.component_type)) ?? null;
+      const wt = weapon?.component_type;
+      if (wt && UTILITY_TYPES.has(wt)) {
+        // montage gimbal utilitaire → utilities
+        utilities.push(node);
+      } else {
+        weapons.push({ portName: node.port_name, mount: node, weapon });
+      }
+      continue;
     }
     if (compType && WEAPON_TYPES.has(compType) && node.component_uuid) {
       weapons.push({ portName: node.port_name, mount: null, weapon: node }); continue;
+    }
+    if (compType && UTILITY_TYPES.has(compType) && node.component_uuid) {
+      // arme utilitaire directe → utilities (on la wrappe dans un WeaponSlot fictif)
+      utilities.push(node); continue;
     }
     if ((portType === 'MissileRack' || compType === 'MissileRack') && node.component_uuid) {
       const missiles = node.children.filter(c =>
@@ -620,9 +717,9 @@ function processLoadout(nodes: LoadoutNode[]): ProcessedLoadout {
   ];
 
   return {
-    weapons, turrets, racks, shields, systems, thrusters,
-    cmDecoys: Array.from(cmDecoyMap.entries()).map(([name, count]) => ({ name, count })),
-    cmNoises: Array.from(cmNoiseMap.entries()).map(([name, count]) => ({ name, count })),
+    weapons, weapTurrets, utilities, racks, shields, systems, thrusters,
+    cmDecoys: Array.from(cmDecoyMap.values()),
+    cmNoises: Array.from(cmNoiseMap.values()),
     defaultPaint,
   };
 }
@@ -638,30 +735,39 @@ export function ShipLoadout({ nodes }: { nodes: LoadoutNode[] }) {
     <div className="space-y-6">
 
       {/* ── Weapons ── */}
-      {data.weapons.length > 0 && (
-        <Section title="Weapons & Utilities" accent="text-red-400" count={data.weapons.length}>
+      {(data.weapons.length > 0 || data.weapTurrets.length > 0) && (
+        <Section title="Weapons" accent="text-red-400" count={data.weapons.length + data.weapTurrets.length}>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
             {data.weapons.map((slot, i) => (
               <WeaponCard key={i} portName={slot.portName} mount={slot.mount} weapon={slot.weapon} />
             ))}
-          </div>
-        </Section>
-      )}
-
-      {/* ── Turrets ── */}
-      {data.turrets.length > 0 && (
-        <Section title="Turrets" accent="text-amber-400" count={data.turrets.length}>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-            {data.turrets.map((t, i) => (
-              <TurretCard key={i} node={t} />
+            {data.weapTurrets.map((t, i) => (
+              <TurretCard key={`t${i}`} node={t} />
             ))}
           </div>
         </Section>
       )}
 
-      {/* ── Missiles ── */}
+      {/* ── Utilities ── */}
+      {data.utilities.length > 0 && (
+        <Section title="Utilities" accent="text-teal-400" count={data.utilities.length}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+            {data.utilities.map((node, i) => {
+              // Un nœud turret utilitaire → TurretCard, sinon WeaponCard
+              if (node.port_type === 'Turret') {
+                return <TurretCard key={i} node={node} />;
+              }
+              // Gimbal/WeaponRack utilitaire → WeaponCard
+              const weapon = node.children?.find(c => c.component_type && ALL_WEAPON_TYPES.has(c.component_type)) ?? null;
+              return <WeaponCard key={i} portName={node.port_name} mount={node} weapon={weapon} />;
+            })}
+          </div>
+        </Section>
+      )}
+
+      {/* ── Missiles, Bombs and Torpedos ── */}
       {data.racks.length > 0 && (
-        <Section title="Missiles" accent="text-orange-400" count={data.racks.length}>
+        <Section title="Missiles, Bombs and Torpedos" accent="text-orange-400" count={data.racks.length}>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
             {data.racks.map((slot, i) => (
               <RackCard key={i} rack={slot.rack} missiles={slot.missiles} />
@@ -722,6 +828,9 @@ export function ShipLoadout({ nodes }: { nodes: LoadoutNode[] }) {
               >
                 <span className="text-xs text-slate-300">{cm.name}</span>
                 <span className="text-xs font-mono-sc text-teal-600">x{cm.count}</span>
+                {cm.ammoPerUnit != null && (
+                  <span className="text-[9px] font-mono-sc text-slate-500 tabular-nums">{cm.ammoPerUnit * cm.count} shots</span>
+                )}
               </div>
             ))}
           </div>
