@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import {
-  BarChart3, BookOpen, Home, Package, Palette, Rocket, Settings2, Shield, ShoppingBag, Zap,
+  BarChart3, BookOpen, FileText, Home, Package, Palette, Rocket, Settings2, Shield, ShoppingBag, Zap,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
