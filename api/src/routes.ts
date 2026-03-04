@@ -261,17 +261,18 @@ export function createRoutes(deps: RouteDependencies): Router {
       const loadout = await gameDataService!.getShipLoadout(uuid);
       if (!loadout.length) return void res.status(404).json({ success: false, error: 'No loadout found' });
       // Build recursive hierarchical tree (supports turret→gimbal→weapon 3+ levels)
+      // Use Number() to normalize id/parent_id: MySQL2 may return them as strings or numbers
       const rootPorts = loadout.filter((p: Record<string, unknown>) => !p.parent_id);
       const childMap = new Map<number, Record<string, unknown>[]>();
       for (const p of loadout) {
-        const parentId = p.parent_id as number | null;
+        const parentId = p.parent_id != null ? Number(p.parent_id) : null;
         if (parentId) {
           if (!childMap.has(parentId)) childMap.set(parentId, []);
           childMap.get(parentId)!.push(p);
         }
       }
       function buildTree(node: Record<string, unknown>): Record<string, unknown> {
-        const children = childMap.get(node.id as number) || [];
+        const children = childMap.get(Number(node.id)) || [];
         return { ...node, children: children.map(buildTree) };
       }
       const hierarchical = rootPorts.map(buildTree);
