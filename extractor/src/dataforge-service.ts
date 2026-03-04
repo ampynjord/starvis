@@ -77,11 +77,7 @@ export class DataForgeService implements DataForgeContext {
 
     // Try to read the SC game version from build_manifest.id in the P4K
     try {
-      const versionPaths = [
-        'build_manifest.id',
-        'Data\\build_manifest.id',
-        'Data/build_manifest.id',
-      ];
+      const versionPaths = ['build_manifest.id', 'Data\\build_manifest.id', 'Data/build_manifest.id'];
       for (const vPath of versionPaths) {
         const vEntry = await this.provider.getEntry(vPath);
         if (vEntry) {
@@ -102,7 +98,7 @@ export class DataForgeService implements DataForgeContext {
           break;
         }
       }
-    } catch (err) {
+    } catch (_err) {
       logger.warn('Could not read SC game version from P4K', { module: 'dataforge' });
     }
 
