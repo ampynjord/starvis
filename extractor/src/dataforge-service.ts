@@ -539,7 +539,7 @@ export class DataForgeService implements DataForgeContext {
     if (!this.dfData || !this.dcbBuffer) return null;
     const record = this.findEntityRecord(className);
     if (!record) return null;
-    const data = this.readInstance(record.structIndex, record.instanceIndex, 0, 6);
+    const data = this.readInstance(record.structIndex, record.instanceIndex, 0, 8);
     if (!data || !Array.isArray(data.Components)) return null;
 
     // Build port metadata map for min/max size from SItemPortContainerComponentParams
@@ -716,7 +716,7 @@ export class DataForgeService implements DataForgeContext {
       }
       if (!varRecord) continue;
       try {
-        const varData = this.readInstance(varRecord.structIndex, varRecord.instanceIndex, 0, 6);
+        const varData = this.readInstance(varRecord.structIndex, varRecord.instanceIndex, 0, 8);
         if (!varData || !Array.isArray(varData.Components)) continue;
         const map = new Map<string, string>();
         for (const comp of varData.Components) {
