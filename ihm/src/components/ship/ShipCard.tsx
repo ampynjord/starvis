@@ -20,18 +20,25 @@ export function ShipCard({ ship, index = 0 }: Props) {
     >
       <Link to={`/ships/${ship.uuid}`} className="block">
         <div className="holo-card h-full">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-2 mb-3">
-            <div className="min-w-0">
-              <p className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider truncate">
-                {ship.manufacturer_code}
-              </p>
-              <h3 className="font-orbitron text-sm font-bold text-slate-200 truncate mt-0.5 leading-tight">
-                {ship.name}
-              </h3>
-            </div>
-            <div className="flex flex-col items-end gap-1 flex-shrink-0">
-              {ship.variant_type && ship.variant_type !== 'standard' && (
+          {/* Thumbnail */}
+          <div className="relative w-full aspect-video mb-3 rounded overflow-hidden bg-slate-900/80 border border-border/40">
+            {ship.thumbnail ? (
+              <img
+                src={ship.thumbnail}
+                alt={ship.name}
+                className="w-full h-full object-cover opacity-90 hover:opacity-100 transition-opacity"
+                loading="lazy"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <span className="font-orbitron text-2xl font-black text-slate-700 select-none">
+                  {ship.manufacturer_code ?? ship.name.slice(0, 2).toUpperCase()}
+                </span>
+              </div>
+            )}
+            {/* Variant badge overlay */}
+            {ship.variant_type && ship.variant_type !== 'standard' && (
+              <div className="absolute top-1.5 right-1.5">
                 <GlowBadge
                   color={
                     ship.variant_type === 'collector' ? 'amber' :
@@ -41,8 +48,18 @@ export function ShipCard({ ship, index = 0 }: Props) {
                 >
                   {VARIANT_TYPE_LABELS[ship.variant_type] ?? ship.variant_type}
                 </GlowBadge>
-              )}
-            </div>
+              </div>
+            )}
+          </div>
+
+          {/* Header */}
+          <div className="mb-2">
+            <p className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider truncate">
+              {ship.manufacturer_code}
+            </p>
+            <h3 className="font-orbitron text-sm font-bold text-slate-200 truncate mt-0.5 leading-tight">
+              {ship.name}
+            </h3>
           </div>
 
           {/* Role/Career */}
