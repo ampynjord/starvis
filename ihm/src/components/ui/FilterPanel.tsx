@@ -19,7 +19,7 @@ interface Props {
 }
 
 function FilterGroup({ label, options, value, onChange }: FilterGroup) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   return (
     <div className="border-b border-border last:border-0">
       <button
