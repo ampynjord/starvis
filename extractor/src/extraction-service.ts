@@ -696,20 +696,24 @@ export class ExtractionService {
     loadout: Array<{
       portName: string;
       portType?: string;
-      componentClassName?: string;
+      componentClassName?: string | null;
       minSize?: number;
       maxSize?: number;
-      children?: Array<{ portName: string; componentClassName?: string }>;
+      children?: any[];
     }>,
     componentUuidCache: Map<string, string>,
   ): Promise<number> {
     let count = 0;
-    const childRows: any[][] = [];
 
-    for (const port of loadout) {
-      try {
-        const compUuid = port.componentClassName ? componentUuidCache.get(port.componentClassName) || null : null;
-
+    // Recursive helper: inserts a port and all its children at any depth
+    const insertPort = async (
+      port: { portName: string; portType?: string; componentClassName?: string | null; minSize?: number; maxSize?: number; children?: any[] },
+      parentId: number | null,
+    ): Promise<void> => {
+      const compUuid = port.componentClassName ? componentUuidCache.get(port.componentClassName) || null : null;
+      let insertId: number;
+      if (parentId === null) {
+        // Root port — include size columns
         const [result] = await conn.execute<any>(
           `INSERT INTO ships_loadouts
             (ship_uuid, port_name, port_type, component_class_name, component_uuid, port_min_size, port_max_size)
@@ -724,37 +728,37 @@ export class ExtractionService {
             port.maxSize ?? null,
           ],
         );
-        const parentId = result.insertId;
-        count++;
-
-        if (port.children && port.children.length > 0) {
-          for (const child of port.children) {
-            const childCompUuid = child.componentClassName ? componentUuidCache.get(child.componentClassName) || null : null;
-            childRows.push([
-              shipUuid,
-              child.portName,
-              classifyPort(child.portName, child.componentClassName || ''),
-              child.componentClassName || null,
-              childCompUuid,
-              parentId,
-            ]);
-          }
+        insertId = result.insertId;
+      } else {
+        const [result] = await conn.execute<any>(
+          `INSERT INTO ships_loadouts
+            (ship_uuid, port_name, port_type, component_class_name, component_uuid, parent_id)
+           VALUES (?, ?, ?, ?, ?, ?)`,
+          [
+            shipUuid,
+            port.portName,
+            port.portType || classifyPort(port.portName, port.componentClassName || ''),
+            port.componentClassName || null,
+            compUuid,
+            parentId,
+          ],
+        );
+        insertId = result.insertId;
+      }
+      count++;
+      if (port.children && port.children.length > 0) {
+        for (const child of port.children) {
+          await insertPort(child, insertId);
         }
+      }
+    };
+
+    for (const port of loadout) {
+      try {
+        await insertPort(port, null);
       } catch (e: unknown) {
         logger.error(`Loadout port ${port.portName}: ${e instanceof Error ? e.message : String(e)}`);
       }
-    }
-
-    // Batch insert children
-    if (childRows.length > 0) {
-      await ExtractionService.batchUpsert(
-        conn,
-        `INSERT INTO ships_loadouts (ship_uuid, port_name, port_type, component_class_name, component_uuid, parent_id) VALUES`,
-        `ON DUPLICATE KEY UPDATE component_class_name=new.component_class_name, component_uuid=new.component_uuid`,
-        6,
-        childRows,
-      );
-      count += childRows.length;
     }
 
     return count;
