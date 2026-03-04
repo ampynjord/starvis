@@ -13,7 +13,11 @@
     "openapi:lint": "swagger-cli validate openapi.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "node tests/test-all.mjs"
+    "test:e2e": "node tests/test-all.mjs",
+    "db:generate": "drizzle-kit generate --config drizzle.config.ts",
+    "db:migrate": "drizzle-kit migrate --config drizzle.config.ts",
+    "db:studio": "drizzle-kit studio --config drizzle.config.ts",
+    "db:push": "drizzle-kit push --config drizzle.config.ts"
   },
   "keywords": [
     "star-citizen",
@@ -24,6 +28,7 @@
   "dependencies": {
     "compression": "^1.8.1",
     "cors": "^2.8.5",
+    "drizzle-orm": "^0.45.1",
     "express": "^4.18.2",
     "express-rate-limit": "^8.2.1",
     "express-slow-down": "^3.0.1",
@@ -42,6 +47,7 @@
     "@types/node": "^20.19.30",
     "@types/swagger-ui-express": "^4.1.8",
     "@vitest/coverage-v8": "^4.0.18",
+    "drizzle-kit": "^0.31.9",
     "swagger-cli": "^4.0.4",
     "typescript": "^5.3.3",
     "vitest": "^4.0.18"
