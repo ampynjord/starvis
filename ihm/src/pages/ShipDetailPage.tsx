@@ -14,7 +14,7 @@ import { ShipLoadout } from '@/components/ship/ShipLoadout';
 import { ShipStatsBanner } from '@/components/ship/ShipStatsBanner';
 import { CargoGrid } from '@/components/ship/CargoGrid';
 import {
-  fCredits, fDimension, fMass,
+  fCredits, fMass,
 } from '@/utils/formatters';
 import { VARIANT_TYPE_LABELS } from '@/utils/constants';
 
@@ -237,13 +237,13 @@ export default function ShipDetailPage() {
                   {/* Legend */}
                   <div className="flex gap-4 items-center">
                     <span className="flex items-center gap-1 text-[9px] font-mono-sc text-emerald-600">
-                      <span className="w-3 h-px bg-emerald-600 inline-block" /> L {fDimension(ship.cross_section_z)}
+                      <span className="w-3 h-px bg-emerald-600 inline-block" /> L
                     </span>
                     <span className="flex items-center gap-1 text-[9px] font-mono-sc text-amber-500">
-                      <span className="w-3 h-px bg-amber-500 inline-block" /> W {fDimension(ship.cross_section_x)}
+                      <span className="w-3 h-px bg-amber-500 inline-block" /> W
                     </span>
                     <span className="flex items-center gap-1 text-[9px] font-mono-sc text-cyan-500">
-                      <span className="w-3 h-px bg-cyan-500 inline-block" /> H {fDimension(ship.cross_section_y)}
+                      <span className="w-3 h-px bg-cyan-500 inline-block" /> H
                     </span>
                     {ship.mass != null && (
                       <span className="text-[9px] font-mono-sc text-slate-700 ml-auto">{fMass(ship.mass)}</span>
