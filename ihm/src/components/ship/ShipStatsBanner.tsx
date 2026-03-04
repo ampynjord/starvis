@@ -276,6 +276,72 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
       </div>
 
       {/* ════════════════════════════════════════
+          SIGNATURES
+      ════════════════════════════════════════ */}
+      {(ship.armor_signal_ir != null || ship.armor_signal_em != null || ship.armor_signal_cs != null) && (() => {
+        const sigs = [
+          { key: 'IR',    label: 'Thermal',  val: ship.armor_signal_ir, color: '#f97316', dimColor: 'text-orange-400', trackColor: 'rgba(234,88,12,0.15)' },
+          { key: 'EM',    label: 'Electro',  val: ship.armor_signal_em, color: '#a855f7', dimColor: 'text-violet-400', trackColor: 'rgba(168,85,247,0.15)' },
+          { key: 'CS',    label: 'Cross-sec',val: ship.armor_signal_cs, color: '#06b6d4', dimColor: 'text-cyan-400',   trackColor: 'rgba(6,182,212,0.15)'  },
+        ].filter(s => s.val != null) as { key: string; label: string; val: number; color: string; dimColor: string; trackColor: string }[];
+
+        // Référence : 1.0 = baseline. Valeurs normalement entre 0 et 1+
+        // (on ignore maxVal car les valeurs sont déjà en fraction de la référence)
+
+        return (
+          <div>
+            <SectionLabel>Signatures</SectionLabel>
+            <div className="grid grid-cols-3 gap-1.5">
+              {sigs.map(({ key, label, val, color, dimColor, trackColor }) => {
+                const pct = Math.min(val * 100, 100);
+                // Couleur selon pct relatif : bas = emerald, moyen = amber, haut = red
+                const barColor = pct < 40 ? '#22c55e' : pct < 70 ? '#f59e0b' : '#ef4444';
+                const r = 18, cx = 24, cy = 24;
+                const startA = -210 * (Math.PI / 180);
+                const endA   =  30  * (Math.PI / 180);
+                const totalA = endA - startA;
+                const fillA  = startA + (pct / 100) * totalA;
+                const arcPath = (from: number, to: number) => {
+                  const x1 = cx + r * Math.cos(from), y1 = cy + r * Math.sin(from);
+                  const x2 = cx + r * Math.cos(to),   y2 = cy + r * Math.sin(to);
+                  const large = (to - from) > Math.PI ? 1 : 0;
+                  return `M ${x1.toFixed(1)} ${y1.toFixed(1)} A ${r} ${r} 0 ${large} 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`;
+                };
+
+                return (
+                  <div key={key} className="relative flex flex-col items-center rounded-md border border-slate-800 bg-slate-900/40 overflow-hidden pt-1 pb-2 px-1"
+                    style={{ background: `radial-gradient(ellipse at 50% 100%, ${trackColor} 0%, transparent 70%)` }}
+                  >
+                    <svg viewBox="0 0 48 32" className="w-full" style={{ maxHeight: 40 }}>
+                      {/* Track */}
+                      <path d={arcPath(startA, endA)}
+                        fill="none" stroke="rgba(51,65,85,0.8)" strokeWidth="3.5" strokeLinecap="round" />
+                      {/* Fill */}
+                      {pct > 0 && (
+                        <path d={arcPath(startA, fillA)}
+                          fill="none" stroke={barColor} strokeWidth="3.5" strokeLinecap="round" opacity="0.9" />
+                      )}
+                      {/* Dot central */}
+                      <circle cx={cx} cy={cy - 4} r="1.5" fill={color} opacity="0.6" />
+                      {/* Label clé */}
+                      <text x={cx} y={cy + 6} textAnchor="middle" fontSize="7"
+                        fontWeight="bold" fontFamily="monospace" fill={color} opacity="0.85">
+                        {key}
+                      </text>
+                    </svg>
+                    <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest -mt-0.5">{label}</span>
+                    <span className={`text-[11px] font-orbitron font-bold tabular-nums mt-0.5 ${dimColor}`}>
+                      {(val * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ════════════════════════════════════════
           SYSTEMS — Power + Heat
       ════════════════════════════════════════ */}
       {hasPower && (

@@ -71,6 +71,9 @@ export interface Ship extends ShipListItem {
   sm_cargo: number | null;
   thumbnail_large: string | null;
   game_data: Record<string, unknown> | null;
+  armor_signal_ir: number | null;
+  armor_signal_em: number | null;
+  armor_signal_cs: number | null;
 }
 
 export interface LoadoutNode {
