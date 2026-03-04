@@ -566,14 +566,11 @@ CREATE TABLE IF NOT EXISTS shop_inventory (
 
 -- ─── Migrations tracking ──────────────────────────────────────────────────────
 -- Tracks which versioned migrations have been applied.
--- Pre-populated with migrations whose columns are already in this schema file,
--- so fresh installs skip those migration files automatically.
+-- The table is seeded here so it exists before runVersionedMigrations() runs.
+-- Individual migration entries are NOT pre-seeded: each migration must run and
+-- be idempotent (the runner swallows ER_DUP_FIELDNAME / ER_TABLE_EXISTS etc.).
 
 CREATE TABLE IF NOT EXISTS schema_migrations (
   version    VARCHAR(255) PRIMARY KEY,
   applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- Migration 001 columns (size_x/y/z, armor_hp, resistances, penetration,
--- boost_ramp_up/down) are already present in the CREATE TABLE ships above.
-INSERT IGNORE INTO schema_migrations (version) VALUES ('001_add_ship_stats_columns');
