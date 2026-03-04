@@ -77,21 +77,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Ligne stat : label · barre · valeur */
-function StatRow({
-  label, value, pct, color, accent,
-}: { label: string; value: string; pct: number; color: string; accent?: string }) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className={`text-[10px] font-mono-sc w-16 shrink-0 ${accent ?? 'text-slate-500'}`}>{label}</span>
-      <div className="flex-1 h-1 bg-slate-800 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(100, pct)}%` }} />
-      </div>
-      <span className="text-[10px] font-mono-sc text-slate-300 w-14 text-right tabular-nums">{value}</span>
-    </div>
-  );
-}
-
 // ── Component ────────────────────────────────────────────
 interface Props { ship: Ship; loadout: LoadoutNode[] }
 
@@ -296,32 +281,97 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
       {hasPower && (
         <div>
           <SectionLabel>Systems</SectionLabel>
-          <div className="space-y-2.5">
-            {(() => {
-              const pwrPct = ls.powerOutput > 0 ? (ls.powerDraw / ls.powerOutput) * 100 : 0;
-              const htPct  = ls.cooling > 0 ? (ls.heat / ls.cooling) * 100 : 0;
-              const pwrColor = pwrPct > 100 ? 'bg-red-600' : pwrPct > 80 ? 'bg-amber-500' : 'bg-yellow-500';
-              const htColor  = htPct  > 100 ? 'bg-red-600' : htPct  > 80 ? 'bg-amber-500' : 'bg-blue-500';
-              const pwrTxt   = pwrPct > 100 ? 'text-red-400' : pwrPct > 80 ? 'text-amber-400' : 'text-slate-300';
-              const htTxt    = htPct  > 100 ? 'text-red-400' : htPct  > 80 ? 'text-amber-400' : 'text-slate-300';
+          {(() => {
+            const pwrPct = ls.powerOutput > 0 ? (ls.powerDraw / ls.powerOutput) * 100 : 0;
+            const htPct  = ls.cooling > 0 ? (ls.heat / ls.cooling) * 100 : 0;
+
+            // Couleurs selon utilisation
+            const pwrStroke = pwrPct > 100 ? '#ef4444' : pwrPct > 80 ? '#f59e0b' : '#eab308';
+            const htStroke  = htPct  > 100 ? '#ef4444' : htPct  > 80 ? '#f59e0b' : '#3b82f6';
+            const pwrTxt    = pwrPct > 100 ? 'text-red-400' : pwrPct > 80 ? 'text-amber-400' : 'text-yellow-400';
+            const htTxt     = htPct  > 100 ? 'text-red-400' : htPct  > 80 ? 'text-amber-400' : 'text-blue-400';
+
+            /** Arc SVG semi-circulaire (haut = 0%, bas gauche = 50%, bas droite = 100%) */
+            function ArcGauge({
+              pct, stroke, label, draw, capacity, textClass,
+            }: {
+              pct: number; stroke: string; label: string;
+              draw: string; capacity: string; textClass: string;
+            }) {
+              const r = 28;
+              const cx = 36, cy = 36;
+              // Arc de -210° à +30° (240° total, ouverture en bas)
+              const startAngle = -210 * (Math.PI / 180);
+              const endAngle   =   30 * (Math.PI / 180);
+              const totalAngle = endAngle - startAngle; // 240° en radians
+
+              const clampedPct = Math.min(pct, 100);
+              const fillAngle  = startAngle + (clampedPct / 100) * totalAngle;
+
+              // arc path helper
+              const arcPath = (from: number, to: number) => {
+                const x1 = cx + r * Math.cos(from), y1 = cy + r * Math.sin(from);
+                const x2 = cx + r * Math.cos(to),   y2 = cy + r * Math.sin(to);
+                const large = (to - from) > Math.PI ? 1 : 0;
+                return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
+              };
+
               return (
-                <>
-                  <StatRow
-                    label="Power"
-                    value={`${fK(ls.powerDraw)} / ${fK(ls.powerOutput)}`}
-                    pct={pwrPct} color={pwrColor} accent={pwrTxt}
-                  />
-                  {ls.cooling > 0 && (
-                    <StatRow
-                      label="Heat"
-                      value={`${fK(ls.heat)} / ${fK(ls.cooling)}`}
-                      pct={htPct} color={htColor} accent={htTxt}
-                    />
-                  )}
-                </>
+                <div className="flex flex-col items-center">
+                  <div className="relative w-[72px] h-[50px] overflow-visible">
+                    <svg viewBox="0 0 72 60" className="w-full" style={{ overflow: 'visible' }}>
+                      {/* Piste fond */}
+                      <path d={arcPath(startAngle, endAngle)}
+                        fill="none" stroke="rgba(51,65,85,0.8)" strokeWidth="5"
+                        strokeLinecap="round" />
+                      {/* Remplissage */}
+                      {clampedPct > 0 && (
+                        <path d={arcPath(startAngle, fillAngle)}
+                          fill="none" stroke={stroke} strokeWidth="5"
+                          strokeLinecap="round" opacity="0.85" />
+                      )}
+                      {/* Dépassement rouge si > 100% */}
+                      {pct > 100 && (
+                        <path d={arcPath(startAngle, endAngle)}
+                          fill="none" stroke="#ef4444" strokeWidth="5"
+                          strokeLinecap="round" opacity="0.4"
+                          strokeDasharray="3 2" />
+                      )}
+                      {/* Valeur % au centre */}
+                      <text x={cx} y={cy - 2}
+                        textAnchor="middle" dominantBaseline="middle"
+                        fontSize="11" fontWeight="bold" fontFamily="monospace"
+                        fill={stroke}>
+                        {Math.round(pct)}%
+                      </text>
+                    </svg>
+                  </div>
+                  {/* Label + draw/capacity sous la jauge */}
+                  <span className="text-[9px] font-mono-sc text-slate-500 uppercase tracking-widest -mt-1">{label}</span>
+                  <span className={`text-[9px] font-mono-sc tabular-nums mt-0.5 ${textClass}`}>
+                    {draw} <span className="text-slate-700">/</span> {capacity}
+                  </span>
+                </div>
               );
-            })()}
-          </div>
+            }
+
+            return (
+              <div className="grid grid-cols-2 gap-2">
+                <ArcGauge
+                  pct={pwrPct} stroke={pwrStroke} label="Power"
+                  draw={fK(ls.powerDraw)} capacity={fK(ls.powerOutput)}
+                  textClass={pwrTxt}
+                />
+                {ls.cooling > 0 && (
+                  <ArcGauge
+                    pct={htPct} stroke={htStroke} label="Heat"
+                    draw={fK(ls.heat)} capacity={fK(ls.cooling)}
+                    textClass={htTxt}
+                  />
+                )}
+              </div>
+            );
+          })()}
         </div>
       )}
 
