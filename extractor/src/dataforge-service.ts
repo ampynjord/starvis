@@ -38,6 +38,7 @@ export class DataForgeService implements DataForgeContext {
   private dfData: DataForgeData | null = null;
   private vehicleIndex = new Map<string, { uuid: string; name: string; className: string }>();
   private guidIndex = new Map<string, string>();
+  private scVersion: string | null = null;
 
   constructor(private p4kPath: string) {}
 
@@ -73,6 +74,38 @@ export class DataForgeService implements DataForgeContext {
     await this.provider.loadAllEntries((c, t) => {
       if (c % 100000 === 0) onProgress?.(`Loading: ${c.toLocaleString()}/${t.toLocaleString()}`);
     });
+
+    // Try to read the SC game version from build_manifest.id in the P4K
+    try {
+      const versionPaths = [
+        'build_manifest.id',
+        'Data\\build_manifest.id',
+        'Data/build_manifest.id',
+      ];
+      for (const vPath of versionPaths) {
+        const vEntry = await this.provider.getEntry(vPath);
+        if (vEntry) {
+          const vBuf = await this.provider.readFileFromEntry(vEntry);
+          const raw = vBuf.toString('utf8').trim();
+          // Format: "CIG-1234567-SC-LIVE-PATCHNAME-00000000.0.0.0-00000000"
+          // or version string like "4.0.1-LIVE.9484804"
+          // Extract the numeric version like "4.6.0" from various formats
+          const match = raw.match(/(?:^|\b)(\d+\.\d+(?:\.\d+)*(?:-[A-Z]+\.\d+)?)/);
+          if (match) {
+            this.scVersion = match[1];
+            logger.info(`SC game version: ${this.scVersion} (from ${vPath})`, { module: 'dataforge' });
+          } else {
+            // Use raw content as-is if not parseable
+            this.scVersion = raw.slice(0, 32);
+            logger.info(`SC game version (raw): ${this.scVersion}`, { module: 'dataforge' });
+          }
+          break;
+        }
+      }
+    } catch (err) {
+      logger.warn('Could not read SC game version from P4K', { module: 'dataforge' });
+    }
+
     const dcbEntry = await this.provider.getEntry('Data\\Game2.dcb');
     if (!dcbEntry) throw new Error('Game2.dcb not found');
     onProgress?.(`Game2.dcb found (${(dcbEntry.uncompressedSize / 1024 / 1024).toFixed(1)} MB)`);
@@ -93,7 +126,9 @@ export class DataForgeService implements DataForgeContext {
   }
 
   getVersion(): string {
-    return this.dfData?.header?.version?.toString() || 'unknown';
+    // Return the SC game version (from build_manifest.id) if available,
+    // otherwise fall back to the DataForge internal format version (e.g. "6").
+    return this.scVersion || this.dfData?.header?.version?.toString() || 'unknown';
   }
 
   // ============ P4K file access ============

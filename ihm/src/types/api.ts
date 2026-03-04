@@ -45,6 +45,8 @@ export interface ShipListItem {
   max_speed: number | null;
   boost_speed_forward: number | null;
   cargo_capacity: number | null;
+  min_crew: number | null;
+  max_crew: number | null;
   ship_matrix_id: number | null;    // non-null = has RSI SM link
   thumbnail: string | null;
   production_status: string | null;
@@ -74,8 +76,6 @@ export interface Ship extends ShipListItem {
   armor_signal_ir: number | null;
   armor_signal_em: number | null;
   armor_signal_cs: number | null;
-  min_crew: number | null;
-  max_crew: number | null;
 }
 
 export interface LoadoutNode {

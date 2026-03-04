@@ -529,11 +529,13 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
       }
 
       // Manufacturer from className prefix
+      // Only assign manufacturer if the prefix is a known manufacturer code.
+      // This avoids false positives where the prefix is a component type (COOL_, SHLD_, HTNK_…)
       if (!comp.manufacturerCode) {
         const mfgMatch = className.match(/^([A-Z]{3,5})_/);
-        if (mfgMatch) {
+        if (mfgMatch && MANUFACTURER_CODES[mfgMatch[1]]) {
           comp.manufacturerCode = mfgMatch[1];
-          comp.manufacturer = MANUFACTURER_CODES[mfgMatch[1]] || mfgMatch[1];
+          comp.manufacturer = MANUFACTURER_CODES[mfgMatch[1]];
         }
       }
 

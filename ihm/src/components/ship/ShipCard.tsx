@@ -69,7 +69,13 @@ export function ShipCard({ ship, index = 0 }: Props) {
 
             {/* Stats */}
             <div className="flex gap-3">
-              <StatCell icon={<Users size={9} />} label="Crew" value={ship.crew_size != null ? String(ship.crew_size) : '—'} />
+              <StatCell icon={<Users size={9} />} label="Crew" value={
+                ship.min_crew != null
+                  ? ship.max_crew != null && ship.max_crew !== ship.min_crew
+                    ? `${ship.min_crew}\u2013${ship.max_crew}`
+                    : String(ship.min_crew)
+                  : ship.crew_size != null ? String(ship.crew_size) : '—'
+              } />
               <StatCell icon={<Zap size={9} />} label="SCM" value={fSpeed(ship.scm_speed)} />
               <StatCell icon={<Package size={9} />} label="Cargo" value={ship.cargo_capacity ? `${ship.cargo_capacity} SCU` : '—'} />
             </div>

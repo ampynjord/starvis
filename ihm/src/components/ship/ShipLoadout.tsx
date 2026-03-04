@@ -288,6 +288,7 @@ function TurretCard({ node }: { node: LoadoutNode }) {
         {gimbals.length > 0 ? (
           <div className="space-y-1">
             {gimbals.map((g, i) => {
+              const gimbalName = cleanCompName(g.component_name);
               const weapon = (g.children ?? []).find(
                 c => c.component_type && WEAPON_TYPES.has(c.component_type),
               ) ?? null;
@@ -297,20 +298,35 @@ function TurretCard({ node }: { node: LoadoutNode }) {
                 ? Math.round(parseFloat(String(weapon.weapon_dps)))
                 : null;
               return (
-                <div key={i} className="flex items-center gap-1.5 pl-2 border-l-2 border-amber-900/30">
-                  {slotSize != null && <SizeBadge size={slotSize} />}
-                  {weaponName ? (
-                    <span className="text-[10px] font-semibold text-slate-200 truncate flex-1 min-w-0">
-                      {weapon?.component_uuid
-                        ? <Link to={`/components/${weapon.component_uuid}`} className="hover:text-cyan-400 transition-colors">{weaponName}</Link>
-                        : weaponName}
-                    </span>
-                  ) : (
-                    <span className="text-[9px] font-mono-sc text-slate-700 italic flex-1">— empty —</span>
-                  )}
-                  {dps != null && (
-                    <span className="text-[9px] font-mono-sc text-red-400 tabular-nums flex-shrink-0">{dps}</span>
-                  )}
+                <div key={i} className="flex flex-col gap-0.5 pl-2 border-l-2 border-amber-900/30">
+                  {/* Ligne gimbal */}
+                  <div className="flex items-center gap-1.5">
+                    {slotSize != null && <SizeBadge size={slotSize} />}
+                    {gimbalName ? (
+                      <span className="text-[9px] font-mono-sc text-violet-400 truncate flex-1 min-w-0">
+                        {g.component_uuid
+                          ? <Link to={`/components/${g.component_uuid}`} className="hover:text-violet-200 transition-colors">{gimbalName}</Link>
+                          : gimbalName}
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-mono-sc text-slate-600 italic flex-1">— empty gimbal —</span>
+                    )}
+                  </div>
+                  {/* Ligne arme */}
+                  <div className="flex items-center gap-1.5 pl-3">
+                    {weaponName ? (
+                      <span className="text-[10px] font-semibold text-slate-200 truncate flex-1 min-w-0">
+                        {weapon?.component_uuid
+                          ? <Link to={`/components/${weapon.component_uuid}`} className="hover:text-cyan-400 transition-colors">{weaponName}</Link>
+                          : weaponName}
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-mono-sc text-slate-700 italic flex-1">— empty —</span>
+                    )}
+                    {dps != null && (
+                      <span className="text-[9px] font-mono-sc text-red-400 tabular-nums flex-shrink-0">{dps}</span>
+                    )}
+                  </div>
                 </div>
               );
             })}
