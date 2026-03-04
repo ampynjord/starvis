@@ -65,21 +65,6 @@ function computeStats(nodes: LoadoutNode[]): LStats {
   return { powerOutput, powerDraw, heat, cooling, shieldHp, totalDps, hardpoints };
 }
 
-// ── HP type colors ───────────────────────────────────────
-const TYPE_STYLE: Record<string, { badge: string; row: string; label: string }> = {
-  WeaponGun:    { badge: 'bg-amber-500 text-amber-950',   row: 'text-amber-400',    label: 'Gun' },
-  Weapon:       { badge: 'bg-amber-500 text-amber-950',   row: 'text-amber-400',    label: 'Weapon' },
-  Gimbal:       { badge: 'bg-amber-400 text-amber-950',   row: 'text-amber-300',    label: 'Gimbal' },
-  Turret:       { badge: 'bg-amber-600 text-amber-100',   row: 'text-amber-300',    label: 'Turret' },
-  MissileRack:  { badge: 'bg-orange-500 text-orange-950', row: 'text-orange-400',   label: 'Missile' },
-  Shield:       { badge: 'bg-cyan-500 text-cyan-950',     row: 'text-cyan-400',     label: 'Shield' },
-  PowerPlant:   { badge: 'bg-yellow-400 text-yellow-950', row: 'text-yellow-400',   label: 'Power' },
-  Cooler:       { badge: 'bg-blue-500 text-white',        row: 'text-blue-400',     label: 'Cooler' },
-  QuantumDrive: { badge: 'bg-violet-500 text-white',      row: 'text-violet-400',   label: 'QD' },
-  Radar:        { badge: 'bg-indigo-500 text-white',      row: 'text-indigo-400',   label: 'Radar' },
-};
-const DEF_STYLE = { badge: 'bg-slate-700 text-slate-200', row: 'text-slate-500', label: 'Other' };
-
 // ── Primitives ───────────────────────────────────────────
 
 /** Séparateur section */
@@ -233,41 +218,6 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
       </div>
 
       {/* ════════════════════════════════════════
-          HARDPOINTS
-      ════════════════════════════════════════ */}
-      {hpGroups.size > 0 && (
-        <div>
-          <SectionLabel>Hardpoints — {ls.hardpoints.length} slots</SectionLabel>
-          <div className="space-y-1.5">
-            {Array.from(hpGroups.entries()).map(([type, sizes]) => {
-              const st = TYPE_STYLE[type] ?? DEF_STYLE;
-              return (
-                <div key={type} className="flex items-center gap-2">
-                  <span className={`text-[10px] font-mono-sc w-14 shrink-0 ${st.row}`}>
-                    {st.label}
-                  </span>
-                  <div className="flex flex-wrap gap-1">
-                    {sizes.map((sz, i) => (
-                      <span
-                        key={i}
-                        className={`
-                          inline-flex items-center justify-center w-5 h-5
-                          rounded text-[10px] font-orbitron font-bold leading-none
-                          ${st.badge}
-                        `}
-                      >
-                        {sz}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* ════════════════════════════════════════
           SURVIVAL — HP + ARMOR
       ════════════════════════════════════════ */}
       <div>
@@ -281,12 +231,14 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
                 {shieldHp > 0 && (
                   <span className="flex items-center gap-1">
                     <span className="w-2 h-2 rounded-sm bg-cyan-500" />
+                    <span className="text-[10px] font-mono-sc text-cyan-600">Shield</span>
                     <span className="text-[10px] font-mono-sc text-cyan-400 tabular-nums">{fK(shieldHp)} HP</span>
                   </span>
                 )}
                 {hullHp > 0 && (
                   <span className="flex items-center gap-1">
                     <span className="w-2 h-2 rounded-sm bg-slate-500" />
+                    <span className="text-[10px] font-mono-sc text-slate-500">Hull</span>
                     <span className="text-[10px] font-mono-sc text-slate-400 tabular-nums">{fK(hullHp)} HP</span>
                   </span>
                 )}
@@ -386,7 +338,7 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
                 <span className="text-sm font-orbitron font-bold text-sky-400 tabular-nums">
                   {Number(ship.hydrogen_fuel_capacity).toFixed(1)}
                 </span>
-                <span className="text-[9px] font-mono-sc text-slate-700">SCU</span>
+                <span className="text-[9px] font-mono-sc text-slate-700">L</span>
               </div>
             )}
             {ship.quantum_fuel_capacity != null && (
@@ -395,7 +347,7 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
                 <span className="text-sm font-orbitron font-bold text-violet-400 tabular-nums">
                   {Number(ship.quantum_fuel_capacity).toFixed(1)}
                 </span>
-                <span className="text-[9px] font-mono-sc text-slate-700">SCU</span>
+                <span className="text-[9px] font-mono-sc text-slate-700">L</span>
               </div>
             )}
           </div>
