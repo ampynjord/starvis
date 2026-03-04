@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, BarChart3, ChevronRight, Clock, ExternalLink,
-  Layers, Package, Palette, Ruler, Users,
+  Layers, Palette, Ruler, Users,
 } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/services/api';
@@ -12,6 +12,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { ShipCard } from '@/components/ship/ShipCard';
 import { ShipLoadout } from '@/components/ship/ShipLoadout';
 import { ShipStatsBanner } from '@/components/ship/ShipStatsBanner';
+import { CargoGrid } from '@/components/ship/CargoGrid';
 import {
   fCredits, fDimension, fMass,
 } from '@/utils/formatters';
@@ -281,35 +282,7 @@ export default function ShipDetailPage() {
               )}
               {/* Cargo */}
               {ship.cargo_capacity != null && ship.cargo_capacity > 0 && (
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="flex items-center gap-1.5 text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest">
-                      <Package size={10} /> Cargo
-                    </span>
-                    <span className="text-sm font-orbitron font-bold text-emerald-400 tabular-nums">
-                      {ship.cargo_capacity.toLocaleString('en-US')} <span className="text-[10px] text-emerald-700">SCU</span>
-                    </span>
-                  </div>
-                  {/* Cargo blocks grid — 1 block = 10 SCU, max 50 blocks */}
-                  {(() => {
-                    const blockSize = ship.cargo_capacity >= 500 ? 100 : ship.cargo_capacity >= 100 ? 20 : ship.cargo_capacity >= 20 ? 5 : 1;
-                    const blocks = Math.min(Math.round(ship.cargo_capacity / blockSize), 40);
-                    return (
-                      <div className="flex flex-wrap gap-0.5">
-                        {Array.from({ length: blocks }).map((_, i) => (
-                          <div
-                            key={i}
-                            className="w-3 h-3 rounded-sm bg-emerald-900/70 border border-emerald-700/30"
-                          />
-                        ))}
-                        {Math.round(ship.cargo_capacity / blockSize) > 40 && (
-                          <span className="text-[9px] font-mono-sc text-emerald-800 self-end">…</span>
-                        )}
-                      </div>
-                    );
-                  })()}
-                  <p className="text-[9px] font-mono-sc text-slate-800 mt-1">1 block = {ship.cargo_capacity >= 500 ? 100 : ship.cargo_capacity >= 100 ? 20 : ship.cargo_capacity >= 20 ? 5 : 1} SCU</p>
-                </div>
+                <CargoGrid scu={Number(ship.cargo_capacity)} />
               )}
             </div>
           </ScifiPanel>

@@ -92,15 +92,6 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Barre horizontale simple */
-function HBar({ pct, color, h = 'h-1.5' }: { pct: number; color: string; h?: string }) {
-  return (
-    <div className={`${h} bg-slate-800/80 rounded-full overflow-hidden`}>
-      <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(100, Math.max(0, pct))}%` }} />
-    </div>
-  );
-}
-
 /** Ligne stat : label · barre · valeur */
 function StatRow({
   label, value, pct, color, accent,
