@@ -125,64 +125,72 @@ export default function ShipDetailPage() {
           {/* ── Dimensions ── */}
           <ScifiPanel title="Dimensions" actions={<Ruler size={13} className="text-slate-600" />}>
             {(() => {
-              const L = Number(ship.cross_section_z) || 0;
-              const W = Number(ship.cross_section_x) || 0;
-              const H = Number(ship.cross_section_y) || 0;
+              const L = Number(ship.cross_section_z) || 0; // Length
+              const W = Number(ship.cross_section_x) || 0; // Width
+              const H = Number(ship.cross_section_y) || 0; // Height
               const maxDim = Math.max(L, W, H, 1);
-              const bars = [
-                { label: 'Length', val: L, color: 'bg-cyan-600',    text: 'text-cyan-400',    border: 'border-cyan-900' },
-                { label: 'Width',  val: W, color: 'bg-amber-600',   text: 'text-amber-400',   border: 'border-amber-900' },
-                { label: 'Height', val: H, color: 'bg-emerald-600', text: 'text-emerald-400', border: 'border-emerald-900' },
-              ];
+              const scale = 52;
+              const lp = Math.max((L / maxDim) * scale, 3);
+              const wp = Math.max((W / maxDim) * scale, 3);
+              const hp = Math.max((H / maxDim) * scale, 3);
+              const c = 0.866, s = 0.5; // cos30, sin30
+              const pad = 12;
+              // Anchor = front-bottom vertex
+              const ax = lp * c + pad;
+              const ay = (lp + wp) * s + hp + pad;
+              // 4 bottom
+              const Bf = [ax,             ay            ];
+              const Bl = [ax - lp*c,      ay - lp*s     ]; // Length direction (left)
+              const Br = [ax + wp*c,      ay - wp*s     ]; // Width direction (right)
+              const Bb = [ax - lp*c+wp*c, ay - lp*s-wp*s];
+              // 4 top
+              const Tf = [Bf[0], Bf[1] - hp];
+              const Tl = [Bl[0], Bl[1] - hp];
+              const Tr = [Br[0], Br[1] - hp];
+              const Tb = [Bb[0], Bb[1] - hp];
+              const svgW = (lp + wp) * c + pad * 2;
+              const svgH = (lp + wp) * s + hp + pad * 2;
+              const pts = (...vs: number[][]) =>
+                vs.map(v => `${v[0].toFixed(1)},${v[1].toFixed(1)}`).join(' ');
               return (
                 <div className="space-y-3">
-                  {/* Top-view silhouette CSS */}
-                  {L > 0 && W > 0 && (
-                    <div className="flex items-center justify-center py-2">
-                      <div
-                        className="relative border border-cyan-800/50 bg-cyan-950/20 rounded-sm"
-                        style={{
-                          width:  `${Math.round((L / maxDim) * 110)}px`,
-                          height: `${Math.round((W / maxDim) * 110)}px`,
-                          minWidth: '20px', minHeight: '8px',
-                        }}
-                      >
-                        {/* centre dot */}
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="w-1 h-1 rounded-full bg-cyan-600 opacity-60" />
-                        </div>
-                        {/* L label */}
-                        <span className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[9px] font-mono-sc text-cyan-600">
-                          {fDimension(ship.cross_section_z)}
-                        </span>
-                        {/* W label */}
-                        <span className="absolute top-1/2 -translate-y-1/2 -right-8 text-[9px] font-mono-sc text-amber-600">
-                          {fDimension(ship.cross_section_x)}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                  {/* Dimension bars */}
-                  <div className="space-y-2 pt-3">
-                    {bars.map(({ label, val, color, text, border }) => (
-                      <div key={label}>
-                        <div className="flex justify-between items-baseline mb-0.5">
-                          <span className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest">{label}</span>
-                          <span className={`text-[10px] font-mono-sc tabular-nums ${text}`}>{val > 0 ? fDimension(val) : '—'}</span>
-                        </div>
-                        <div className={`h-1 bg-slate-800 rounded-full overflow-hidden border-b ${border}`}>
-                          <div className={`h-full ${color} rounded-full`} style={{ width: `${(val / maxDim) * 100}%` }} />
-                        </div>
-                      </div>
-                    ))}
+                  <svg
+                    viewBox={`0 0 ${svgW.toFixed(0)} ${svgH.toFixed(0)}`}
+                    className="w-full"
+                    style={{ maxHeight: '130px' }}
+                  >
+                    {/* Left face — Length × Height — emerald */}
+                    <polygon points={pts(Bf, Bl, Tl, Tf)}
+                      fill="rgba(5,150,105,0.12)" stroke="rgb(5,150,105)" strokeWidth="1" />
+                    {/* Right face — Width × Height — amber */}
+                    <polygon points={pts(Bf, Br, Tr, Tf)}
+                      fill="rgba(245,158,11,0.12)" stroke="rgb(245,158,11)" strokeWidth="1" />
+                    {/* Top face — Length × Width — cyan */}
+                    <polygon points={pts(Tf, Tl, Tb, Tr)}
+                      fill="rgba(8,145,178,0.15)" stroke="rgb(8,145,178)" strokeWidth="1" />
+                    {/* Labels */}
+                    <text x={(Bf[0]+Bl[0])/2 - 4} y={(Bf[1]+Bl[1])/2 + 1}
+                      fontSize="6" fill="rgb(52,211,153)" textAnchor="end" fontFamily="monospace">
+                      {L > 0 ? `${L.toFixed(0)}m` : ''}
+                    </text>
+                    <text x={(Bf[0]+Br[0])/2 + 4} y={(Bf[1]+Br[1])/2 + 1}
+                      fontSize="6" fill="rgb(251,191,36)" textAnchor="start" fontFamily="monospace">
+                      {W > 0 ? `${W.toFixed(0)}m` : ''}
+                    </text>
+                    <text x={Bf[0] + 4} y={(Bf[1]+Tf[1])/2 + 2}
+                      fontSize="6" fill="rgb(34,211,238)" textAnchor="start" fontFamily="monospace">
+                      {H > 0 ? `${H.toFixed(0)}m` : ''}
+                    </text>
+                  </svg>
+                  {/* Légende axes */}
+                  <div className="flex gap-4">
+                    <span className="text-[9px] font-mono-sc text-emerald-600">L {fDimension(ship.cross_section_z)}</span>
+                    <span className="text-[9px] font-mono-sc text-amber-600">W {fDimension(ship.cross_section_x)}</span>
+                    <span className="text-[9px] font-mono-sc text-cyan-600">H {fDimension(ship.cross_section_y)}</span>
+                    {ship.mass != null && (
+                      <span className="text-[9px] font-mono-sc text-slate-700 ml-auto">{fMass(ship.mass)}</span>
+                    )}
                   </div>
-                  {/* mass */}
-                  {ship.mass != null && (
-                    <div className="flex items-center justify-between border-t border-slate-800 pt-2 mt-1">
-                      <span className="text-[10px] font-mono-sc text-slate-700 uppercase tracking-widest">Mass</span>
-                      <span className="text-[11px] font-mono-sc text-slate-400 tabular-nums">{fMass(ship.mass)}</span>
-                    </div>
-                  )}
                 </div>
               );
             })()}
@@ -307,31 +315,12 @@ export default function ShipDetailPage() {
         <div className="space-y-4">
           {paints && paints.length > 0 && (
             <ScifiPanel title="Available paints" subtitle={`${paints.length} paints`} actions={<Palette size={14} className="text-slate-600" />}>
-              <div className="grid grid-cols-2 gap-1.5 max-h-72 overflow-y-auto pr-0.5">
-                {paints.map(p => {
-                  // Couleur déterministe à partir du nom
-                  let hash = 0;
-                  for (let i = 0; i < p.paint_name.length; i++) {
-                    hash = p.paint_name.charCodeAt(i) + ((hash << 5) - hash);
-                  }
-                  const h1 = Math.abs(hash) % 360;
-                  const h2 = (h1 + 40) % 360;
-                  return (
-                    <div
-                      key={p.paint_uuid}
-                      className="relative overflow-hidden rounded-md border border-slate-800 hover:border-slate-600 transition-colors cursor-default group"
-                    >
-                      {/* Swatch gradient */}
-                      <div
-                        className="h-8 w-full opacity-70 group-hover:opacity-90 transition-opacity"
-                        style={{ background: `linear-gradient(135deg, hsl(${h1},35%,18%), hsl(${h2},45%,25%))` }}
-                      />
-                      <div className="px-1.5 py-1">
-                        <p className="text-[9px] font-mono-sc text-slate-500 leading-tight truncate">{p.paint_name}</p>
-                      </div>
-                    </div>
-                  );
-                })}
+              <div className="space-y-0.5 max-h-64 overflow-y-auto">
+                {paints.map(p => (
+                  <div key={p.paint_uuid} className="px-2 py-1.5 rounded hover:bg-white/5">
+                    <span className="text-xs font-mono-sc text-slate-400">{p.paint_name}</span>
+                  </div>
+                ))}
               </div>
             </ScifiPanel>
           )}
