@@ -125,68 +125,125 @@ export default function ShipDetailPage() {
           {/* ── Dimensions ── */}
           <ScifiPanel title="Dimensions" actions={<Ruler size={13} className="text-slate-600" />}>
             {(() => {
-              const L = Number(ship.cross_section_z) || 0; // Length
-              const W = Number(ship.cross_section_x) || 0; // Width
-              const H = Number(ship.cross_section_y) || 0; // Height
+              const L = Number(ship.cross_section_z) || 0;
+              const W = Number(ship.cross_section_x) || 0;
+              const H = Number(ship.cross_section_y) || 0;
               const maxDim = Math.max(L, W, H, 1);
-              const scale = 52;
-              const lp = Math.max((L / maxDim) * scale, 3);
-              const wp = Math.max((W / maxDim) * scale, 3);
-              const hp = Math.max((H / maxDim) * scale, 3);
-              const c = 0.866, s = 0.5; // cos30, sin30
-              const pad = 12;
-              // Anchor = front-bottom vertex
+              const scale = 48;
+              const lp = Math.max((L / maxDim) * scale, 4); // length  → left axis
+              const wp = Math.max((W / maxDim) * scale, 4); // width   → right axis
+              const hp = Math.max((H / maxDim) * scale, 4); // height  → up axis
+              const c = 0.866, s = 0.5; // cos30°, sin30°
+              const pad = 20;
+              // anchor: front-bottom vertex (Bf)
               const ax = lp * c + pad;
               const ay = (lp + wp) * s + hp + pad;
-              // 4 bottom
-              const Bf = [ax,             ay            ];
-              const Bl = [ax - lp*c,      ay - lp*s     ]; // Length direction (left)
-              const Br = [ax + wp*c,      ay - wp*s     ]; // Width direction (right)
-              const Bb = [ax - lp*c+wp*c, ay - lp*s-wp*s];
-              // 4 top
-              const Tf = [Bf[0], Bf[1] - hp];
-              const Tl = [Bl[0], Bl[1] - hp];
-              const Tr = [Br[0], Br[1] - hp];
-              const Tb = [Bb[0], Bb[1] - hp];
+              type V = [number, number];
+              // 8 vertices
+              const Bf: V = [ax,                    ay           ];
+              const Bl: V = [ax - lp*c,             ay - lp*s    ]; // back via length
+              const Br: V = [ax + wp*c,             ay - wp*s    ]; // right via width
+              const Bb: V = [ax - lp*c + wp*c,      ay - lp*s - wp*s];
+              const Tf: V = [Bf[0],                 Bf[1] - hp   ];
+              const Tl: V = [Bl[0],                 Bl[1] - hp   ];
+              const Tr: V = [Br[0],                 Br[1] - hp   ];
+              const Tb: V = [Bb[0],                 Bb[1] - hp   ];
               const svgW = (lp + wp) * c + pad * 2;
               const svgH = (lp + wp) * s + hp + pad * 2;
-              const pts = (...vs: number[][]) =>
-                vs.map(v => `${v[0].toFixed(1)},${v[1].toFixed(1)}`).join(' ');
+              const seg = (a: V, b: V, props: React.SVGProps<SVGLineElement>) => (
+                <line x1={a[0].toFixed(1)} y1={a[1].toFixed(1)}
+                      x2={b[0].toFixed(1)} y2={b[1].toFixed(1)} {...props} />
+              );
+              const tick = (a: V, b: V, d: V) => {
+                const mx = (a[0]+b[0])/2, my = (a[1]+b[1])/2;
+                return <line x1={(mx+d[0]).toFixed(1)} y1={(my+d[1]).toFixed(1)}
+                             x2={(mx-d[0]).toFixed(1)} y2={(my-d[1]).toFixed(1)}
+                             stroke="rgba(100,116,139,0.6)" strokeWidth="0.6" />;
+              };
               return (
-                <div className="space-y-3">
-                  <svg
-                    viewBox={`0 0 ${svgW.toFixed(0)} ${svgH.toFixed(0)}`}
-                    className="w-full"
-                    style={{ maxHeight: '130px' }}
-                  >
-                    {/* Left face — Length × Height — emerald */}
-                    <polygon points={pts(Bf, Bl, Tl, Tf)}
-                      fill="rgba(5,150,105,0.12)" stroke="rgb(5,150,105)" strokeWidth="1" />
-                    {/* Right face — Width × Height — amber */}
-                    <polygon points={pts(Bf, Br, Tr, Tf)}
-                      fill="rgba(245,158,11,0.12)" stroke="rgb(245,158,11)" strokeWidth="1" />
-                    {/* Top face — Length × Width — cyan */}
-                    <polygon points={pts(Tf, Tl, Tb, Tr)}
-                      fill="rgba(8,145,178,0.15)" stroke="rgb(8,145,178)" strokeWidth="1" />
-                    {/* Labels */}
-                    <text x={(Bf[0]+Bl[0])/2 - 4} y={(Bf[1]+Bl[1])/2 + 1}
-                      fontSize="6" fill="rgb(52,211,153)" textAnchor="end" fontFamily="monospace">
-                      {L > 0 ? `${L.toFixed(0)}m` : ''}
-                    </text>
-                    <text x={(Bf[0]+Br[0])/2 + 4} y={(Bf[1]+Br[1])/2 + 1}
-                      fontSize="6" fill="rgb(251,191,36)" textAnchor="start" fontFamily="monospace">
-                      {W > 0 ? `${W.toFixed(0)}m` : ''}
-                    </text>
-                    <text x={Bf[0] + 4} y={(Bf[1]+Tf[1])/2 + 2}
-                      fontSize="6" fill="rgb(34,211,238)" textAnchor="start" fontFamily="monospace">
-                      {H > 0 ? `${H.toFixed(0)}m` : ''}
-                    </text>
+                <div className="space-y-2">
+                  <svg viewBox={`0 0 ${svgW.toFixed(0)} ${svgH.toFixed(0)}`}
+                       className="w-full" style={{ maxHeight: '140px' }}>
+                    <defs>
+                      <marker id="aL" markerWidth="4" markerHeight="4" refX="2" refY="2" orient="auto">
+                        <polygon points="0,0 4,2 0,4" fill="rgb(52,211,153)" />
+                      </marker>
+                      <marker id="aW" markerWidth="4" markerHeight="4" refX="2" refY="2" orient="auto">
+                        <polygon points="0,0 4,2 0,4" fill="rgb(251,191,36)" />
+                      </marker>
+                      <marker id="aH" markerWidth="4" markerHeight="4" refX="2" refY="2" orient="auto">
+                        <polygon points="0,0 4,2 0,4" fill="rgb(34,211,238)" />
+                      </marker>
+                    </defs>
+
+                    {/* ── Hidden edges (dashed, muted) ── */}
+                    {seg(Bl, Bb, { stroke:'rgba(100,116,139,0.35)', strokeWidth:'0.7', strokeDasharray:'2,2' })}
+                    {seg(Br, Bb, { stroke:'rgba(100,116,139,0.35)', strokeWidth:'0.7', strokeDasharray:'2,2' })}
+                    {seg(Bf, Bb, { stroke:'rgba(100,116,139,0.35)', strokeWidth:'0.7', strokeDasharray:'2,2' })}
+
+                    {/* ── Visible edges (solid, slate) ── */}
+                    {seg(Bf, Bl, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
+                    {seg(Bf, Br, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
+                    {seg(Bf, Tf, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
+                    {seg(Bl, Tl, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
+                    {seg(Br, Tr, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
+                    {seg(Tf, Tl, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
+                    {seg(Tf, Tr, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
+                    {seg(Tl, Tb, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
+                    {seg(Tr, Tb, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
+
+                    {/* ── Axis dimension lines (outside the box) ── */}
+                    {/* Length axis — left, emerald */}
+                    {L > 0 && <>
+                      {seg(Bf, Bl, { stroke:'rgb(52,211,153)', strokeWidth:'1', markerEnd:'url(#aL)', opacity:0.7 })}
+                      {tick(Bf, Bl, [lp*s*0.15, -lp*c*0.15] as V)}
+                      {tick(Bl, Bf, [lp*s*0.15, -lp*c*0.15] as V)}
+                      <text x={((Bf[0]+Bl[0])/2 - lp*s*0.22).toFixed(1)}
+                            y={((Bf[1]+Bl[1])/2 - lp*c*0.10 + 3).toFixed(1)}
+                            fontSize="6.5" fill="rgb(52,211,153)" textAnchor="middle"
+                            fontFamily="monospace" fontWeight="bold">
+                        {L.toFixed(0)} m
+                      </text>
+                    </>}
+
+                    {/* Width axis — right, amber */}
+                    {W > 0 && <>
+                      {seg(Bf, Br, { stroke:'rgb(251,191,36)', strokeWidth:'1', markerEnd:'url(#aW)', opacity:0.7 })}
+                      {tick(Bf, Br, [wp*s*0.15, wp*c*0.15] as V)}
+                      {tick(Br, Bf, [wp*s*0.15, wp*c*0.15] as V)}
+                      <text x={((Bf[0]+Br[0])/2 + wp*s*0.22).toFixed(1)}
+                            y={((Bf[1]+Br[1])/2 - wp*c*0.10 + 3).toFixed(1)}
+                            fontSize="6.5" fill="rgb(251,191,36)" textAnchor="middle"
+                            fontFamily="monospace" fontWeight="bold">
+                        {W.toFixed(0)} m
+                      </text>
+                    </>}
+
+                    {/* Height axis — vertical, cyan */}
+                    {H > 0 && <>
+                      {seg(Br, Tr, { stroke:'rgb(34,211,238)', strokeWidth:'1', markerEnd:'url(#aH)', opacity:0.7 })}
+                      {tick(Br, Tr, [3, 0] as V)}
+                      {tick(Tr, Br, [3, 0] as V)}
+                      <text x={(Br[0] + 8).toFixed(1)}
+                            y={((Br[1]+Tr[1])/2 + 2).toFixed(1)}
+                            fontSize="6.5" fill="rgb(34,211,238)" textAnchor="start"
+                            fontFamily="monospace" fontWeight="bold">
+                        {H.toFixed(0)} m
+                      </text>
+                    </>}
                   </svg>
-                  {/* Légende axes */}
-                  <div className="flex gap-4">
-                    <span className="text-[9px] font-mono-sc text-emerald-600">L {fDimension(ship.cross_section_z)}</span>
-                    <span className="text-[9px] font-mono-sc text-amber-600">W {fDimension(ship.cross_section_x)}</span>
-                    <span className="text-[9px] font-mono-sc text-cyan-600">H {fDimension(ship.cross_section_y)}</span>
+
+                  {/* Legend */}
+                  <div className="flex gap-4 items-center">
+                    <span className="flex items-center gap-1 text-[9px] font-mono-sc text-emerald-600">
+                      <span className="w-3 h-px bg-emerald-600 inline-block" /> L {fDimension(ship.cross_section_z)}
+                    </span>
+                    <span className="flex items-center gap-1 text-[9px] font-mono-sc text-amber-500">
+                      <span className="w-3 h-px bg-amber-500 inline-block" /> W {fDimension(ship.cross_section_x)}
+                    </span>
+                    <span className="flex items-center gap-1 text-[9px] font-mono-sc text-cyan-500">
+                      <span className="w-3 h-px bg-cyan-500 inline-block" /> H {fDimension(ship.cross_section_y)}
+                    </span>
                     {ship.mass != null && (
                       <span className="text-[9px] font-mono-sc text-slate-700 ml-auto">{fMass(ship.mass)}</span>
                     )}
