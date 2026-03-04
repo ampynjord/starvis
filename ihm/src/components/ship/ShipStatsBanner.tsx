@@ -101,6 +101,22 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
   // ── Radar ──────────────────────────────────────────────
   const radarNode = allNodes.find(nd => nd.component_type === 'Radar' && nd.component_uuid) ?? null;
 
+  // ── Quantum Drive ─────────────────────────────────────
+  const qdNode = allNodes.find(nd => nd.component_type === 'QuantumDrive' && nd.component_uuid) ?? null;
+
+  // ── Boost angles + ramp (depuis game_data) ────────────
+  const gd = ship.game_data as any;
+  const ab = gd?.ifcs?.afterburner;
+  const abAngMult = ab?.afterburnAngVelocityMultiplier as { x: number; y: number; z: number } | undefined;
+  const abAccelMult = ab?.afterburnAccelMultiplierPositive as { x: number; y: number; z: number } | undefined;
+  const boostedPitch = (abAngMult && n(ship.pitch_max) > 0) ? n(ship.pitch_max) * abAngMult.x : null;
+  const boostedYaw   = (abAngMult && n(ship.yaw_max)   > 0) ? n(ship.yaw_max)   * abAngMult.z : null;
+  const boostedRoll  = (abAngMult && n(ship.roll_max)  > 0) ? n(ship.roll_max)  * abAngMult.y : null;
+  const rampUp   = ship.boost_ramp_up   ?? (typeof ab?.afterburnerRampUpTime   === 'number' ? ab.afterburnerRampUpTime   : null);
+  const rampDown = ship.boost_ramp_down ?? (typeof ab?.afterburnerRampDownTime === 'number' ? ab.afterburnerRampDownTime : null);
+  // Accélération boosté (G)
+  const gForceBoost = (abAccelMult && gForce != null) ? gForce * abAccelMult.x : null;
+
   // ── Velocity ruler ─────────────────────────────────────
   const maxSpeed = Math.max(n(ship.max_speed), n(ship.boost_speed_forward), 500);
   const pctOf = (v: number | null | undefined) =>
@@ -216,11 +232,40 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
           ))}
         </div>
 
-        {/* G-force */}
+        {/* G-force + boost */}
         {gForce != null && (
           <div className="flex items-center justify-between mt-2 rounded-md border border-slate-800 bg-slate-900/40 px-3 py-1.5">
             <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest">Accel (fwd)</span>
-            <span className="text-sm font-orbitron font-bold text-amber-400 tabular-nums">{gForce.toFixed(1)} G</span>
+            <div className="flex items-baseline gap-2">
+              <span className="text-sm font-orbitron font-bold text-amber-400 tabular-nums">{gForce.toFixed(1)} G</span>
+              {gForceBoost != null && (
+                <span className="text-xs font-orbitron text-amber-600 tabular-nums">↑{gForceBoost.toFixed(1)} G</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Angles boostés + ramp */}
+        {(boostedPitch != null || rampUp != null) && (
+          <div className="grid grid-cols-2 gap-1.5 mt-2">
+            {boostedPitch != null && (
+              <div className="flex flex-col items-center rounded-md border border-amber-900/30 bg-amber-950/10 py-1.5 px-1">
+                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Boost °/s</span>
+                <span className="text-[11px] font-orbitron font-bold text-amber-400 tabular-nums">
+                  {boostedPitch?.toFixed(1)}° / {boostedYaw?.toFixed(1)}° / {boostedRoll?.toFixed(1)}°
+                </span>
+                <span className="text-[9px] font-mono-sc text-slate-700">P / Y / R</span>
+              </div>
+            )}
+            {rampUp != null && (
+              <div className="flex flex-col items-center rounded-md border border-amber-900/30 bg-amber-950/10 py-1.5 px-1">
+                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Boost Ramp</span>
+                <span className="text-[11px] font-orbitron font-bold text-amber-400 tabular-nums">
+                  ↑{n(rampUp).toFixed(1)}s ↓{n(rampDown).toFixed(1)}s
+                </span>
+                <span className="text-[9px] font-mono-sc text-slate-700">Up / Down</span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -270,6 +315,39 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
           </div>
         )}
 
+        {/* Armor HP + durabilité */}
+        {(ship.armor_hp != null || ship.armor_phys_resist != null) && (
+          <div className="flex items-center gap-1.5 mb-2">
+            {ship.armor_hp != null && (
+              <div className="flex-1 flex flex-col items-center rounded-md border border-slate-800 bg-slate-900/40 py-1.5 px-1">
+                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Armor HP</span>
+                <span className="text-sm font-orbitron font-bold text-orange-400 tabular-nums">{fK(n(ship.armor_hp))}</span>
+              </div>
+            )}
+            {(ship.armor_phys_resist != null || ship.armor_energy_resist != null) && (
+              <div className="flex-1 flex flex-col items-center rounded-md border border-slate-800 bg-slate-900/40 py-1.5 px-1">
+                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Durability</span>
+                <div className="flex gap-1.5 items-baseline">
+                  {ship.armor_phys_resist != null && (
+                    <span className={`text-[11px] font-orbitron font-bold tabular-nums ${ n(ship.armor_phys_resist) < 1 ? 'text-green-400' : 'text-red-400'}`}>
+                      {n(ship.armor_phys_resist) < 1
+                        ? `-${((1 - n(ship.armor_phys_resist)) * 100).toFixed(0)}%`
+                        : `+${((n(ship.armor_phys_resist) - 1) * 100).toFixed(0)}%`} PHY
+                    </span>
+                  )}
+                  {ship.armor_energy_resist != null && (
+                    <span className={`text-[11px] font-orbitron font-bold tabular-nums ${ n(ship.armor_energy_resist) <= 1 ? 'text-green-400' : 'text-red-400'}`}>
+                      {n(ship.armor_energy_resist) < 1
+                        ? `-${((1 - n(ship.armor_energy_resist)) * 100).toFixed(0)}%`
+                        : `+${((n(ship.armor_energy_resist) - 1) * 100).toFixed(0)}%`} NRG
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Armor resistance — 3 blocs côte à côte */}
         {armBars.length > 0 && (
           <div className="grid grid-cols-3 gap-1.5">
@@ -293,6 +371,35 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Pénétration de dommages */}
+        {(ship.fuse_penetration != null || ship.component_penetration != null) && (
+          <div className="flex items-center justify-between mt-2 rounded-md border border-orange-900/30 bg-orange-950/10 px-3 py-1.5">
+            <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest">Penetration</span>
+            <div className="flex gap-3 items-baseline">
+              {ship.fuse_penetration != null && (
+                <span className="text-[11px] font-mono-sc">
+                  <span className="text-slate-500">Fuse </span>
+                  <span className="font-bold text-orange-400">
+                    {((1 - n(ship.fuse_penetration)) * 100) > 0
+                      ? `-${((1 - n(ship.fuse_penetration)) * 100).toFixed(0)}%`
+                      : `${((1 - n(ship.fuse_penetration)) * 100).toFixed(0)}%`}
+                  </span>
+                </span>
+              )}
+              {ship.component_penetration != null && (
+                <span className="text-[11px] font-mono-sc">
+                  <span className="text-slate-500">Comp </span>
+                  <span className="font-bold text-orange-400">
+                    {((1 - n(ship.component_penetration)) * 100) > 0
+                      ? `-${((1 - n(ship.component_penetration)) * 100).toFixed(0)}%`
+                      : `${((1 - n(ship.component_penetration)) * 100).toFixed(0)}%`}
+                  </span>
+                </span>
+              )}
+            </div>
           </div>
         )}
 
@@ -443,7 +550,7 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
       {/* ════════════════════════════════════════
           FUEL + CARGO
       ════════════════════════════════════════ */}
-      {(ship.hydrogen_fuel_capacity != null || ship.quantum_fuel_capacity != null) && (
+      {(ship.hydrogen_fuel_capacity != null || ship.quantum_fuel_capacity != null || qdNode?.qd_range != null) && (
         <div>
           <SectionLabel>Fuel</SectionLabel>
           <div className="grid grid-cols-2 gap-1.5">
@@ -451,21 +558,35 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
               <div className="flex flex-col items-center rounded-md border border-slate-800 bg-slate-900/40 py-2 px-1">
                 <span className="text-[9px] font-mono-sc text-slate-700 uppercase tracking-widest mb-0.5">Hydrogen</span>
                 <span className="text-sm font-orbitron font-bold text-sky-400 tabular-nums">
-                  {Number(ship.hydrogen_fuel_capacity).toFixed(1)}
+                  {Number(ship.hydrogen_fuel_capacity).toFixed(2)}
                 </span>
-                <span className="text-[9px] font-mono-sc text-slate-700">L</span>
+                <span className="text-[9px] font-mono-sc text-slate-700">SCU</span>
               </div>
             )}
             {ship.quantum_fuel_capacity != null && (
               <div className="flex flex-col items-center rounded-md border border-slate-800 bg-slate-900/40 py-2 px-1">
                 <span className="text-[9px] font-mono-sc text-slate-700 uppercase tracking-widest mb-0.5">Quantum</span>
                 <span className="text-sm font-orbitron font-bold text-violet-400 tabular-nums">
-                  {Number(ship.quantum_fuel_capacity).toFixed(1)}
+                  {Number(ship.quantum_fuel_capacity).toFixed(2)}
                 </span>
-                <span className="text-[9px] font-mono-sc text-slate-700">L</span>
+                <span className="text-[9px] font-mono-sc text-slate-700">SCU</span>
               </div>
             )}
           </div>
+          {/* QD range */}
+          {qdNode?.qd_range != null && n(qdNode.qd_range) > 0 && (
+            <div className="flex items-center justify-between mt-1.5 rounded-md border border-violet-900/30 bg-violet-950/10 px-3 py-1.5">
+              <div>
+                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest">QD Range</span>
+                {qdNode.component_name && (
+                  <span className="ml-2 text-[9px] font-mono-sc text-slate-700">{qdNode.component_name}</span>
+                )}
+              </div>
+              <span className="text-sm font-orbitron font-bold text-violet-400 tabular-nums">
+                {(n(qdNode.qd_range) / 1_000_000_000).toFixed(2)} GM
+              </span>
+            </div>
+          )}
         </div>
       )}
 
