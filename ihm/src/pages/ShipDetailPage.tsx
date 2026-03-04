@@ -307,10 +307,13 @@ export default function ShipDetailPage() {
             <ScifiPanel title="Insurance" actions={<Clock size={13} className="text-slate-600" />}>
               {ship.insurance_claim_time != null && (() => {
                 const claimMin = Number(ship.insurance_claim_time);
-                // 0–15 min = fast (green), 15–45 = normal (amber), >45 = slow (red)
-                const color    = claimMin < 15 ? 'bg-emerald-600' : claimMin < 45 ? 'bg-amber-500' : 'bg-red-600';
-                const textColor= claimMin < 15 ? 'text-emerald-400' : claimMin < 45 ? 'text-amber-400' : 'text-red-400';
-                const pct = Math.min(100, (claimMin / 60) * 100);
+                // Idris M = 253 min (le plus long à claim) → 100% de la barre
+                const MAX_CLAIM = 253;
+                const color     = claimMin < 60 ? 'bg-emerald-600' : claimMin < 120 ? 'bg-amber-500' : 'bg-red-600';
+                const textColor = claimMin < 60 ? 'text-emerald-400' : claimMin < 120 ? 'text-amber-400' : 'text-red-400';
+                const pct = Math.min(100, (claimMin / MAX_CLAIM) * 100);
+                // ticks à 60, 120, 180 minutes
+                const ticks = [60, 120, 180].map(t => ({ min: t, pct: (t / MAX_CLAIM) * 100 }));
                 return (
                   <div className="mb-3">
                     <div className="flex items-baseline justify-between mb-1">
@@ -319,20 +322,19 @@ export default function ShipDetailPage() {
                         {claimMin.toFixed(1)} <span className="text-[10px]">min</span>
                       </span>
                     </div>
-                    {/* Timeline bar */}
+                    {/* Timeline bar (0 → Idris M = 253 min) */}
                     <div className="relative h-2 bg-slate-800 rounded-full overflow-hidden">
                       <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
-                      {/* tick marks at 15, 30, 45 min */}
-                      {[25, 50, 75].map(t => (
-                        <div key={t} className="absolute top-0 bottom-0 w-px bg-slate-700/50" style={{ left: `${t}%` }} />
+                      {ticks.map(({ min, pct: tp }) => (
+                        <div key={min} className="absolute top-0 bottom-0 w-px bg-slate-700/50" style={{ left: `${tp}%` }} />
                       ))}
                     </div>
                     <div className="flex justify-between mt-0.5">
                       <span className="text-[8px] font-mono-sc text-slate-800">0</span>
-                      <span className="text-[8px] font-mono-sc text-slate-800">15</span>
-                      <span className="text-[8px] font-mono-sc text-slate-800">30</span>
-                      <span className="text-[8px] font-mono-sc text-slate-800">45</span>
-                      <span className="text-[8px] font-mono-sc text-slate-800">60min</span>
+                      {ticks.map(({ min }) => (
+                        <span key={min} className="text-[8px] font-mono-sc text-slate-800">{min}</span>
+                      ))}
+                      <span className="text-[8px] font-mono-sc text-slate-800">253min</span>
                     </div>
                   </div>
                 );

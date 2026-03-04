@@ -86,6 +86,21 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
   const hullHp   = n(ship.total_hp);
   const hasPower = ls.powerOutput > 0 || ls.powerDraw > 0;
 
+  // ── G-force ────────────────────────────────────────────
+  const allNodes = flattenNodes(loadout);
+  const mainThrusters = allNodes.filter(nd =>
+    nd.component_type === 'Thruster' &&
+    (nd.thruster_type === 'Main' || nd.thruster_type === 'VTOL') &&
+    nd.component_uuid,
+  );
+  const totalThrustN = mainThrusters.reduce((s, nd) => s + n(nd.thruster_max_thrust), 0);
+  const gForce = (ship.mass && n(ship.mass) > 0 && totalThrustN > 0)
+    ? (totalThrustN / n(ship.mass)) / 9.81
+    : null;
+
+  // ── Radar ──────────────────────────────────────────────
+  const radarNode = allNodes.find(nd => nd.component_type === 'Radar' && nd.component_uuid) ?? null;
+
   // ── Velocity ruler ─────────────────────────────────────
   const maxSpeed = Math.max(n(ship.max_speed), n(ship.boost_speed_forward), 500);
   const pctOf = (v: number | null | undefined) =>
@@ -200,6 +215,14 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
             </div>
           ))}
         </div>
+
+        {/* G-force */}
+        {gForce != null && (
+          <div className="flex items-center justify-between mt-2 rounded-md border border-slate-800 bg-slate-900/40 px-3 py-1.5">
+            <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest">Accel (fwd)</span>
+            <span className="text-sm font-orbitron font-bold text-amber-400 tabular-nums">{gForce.toFixed(1)} G</span>
+          </div>
+        )}
       </div>
 
       {/* ════════════════════════════════════════
@@ -352,94 +375,68 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
           {(() => {
             const pwrPct = ls.powerOutput > 0 ? (ls.powerDraw / ls.powerOutput) * 100 : 0;
             const htPct  = ls.cooling > 0 ? (ls.heat / ls.cooling) * 100 : 0;
-
-            // Couleurs selon utilisation
-            const pwrStroke = pwrPct > 100 ? '#ef4444' : pwrPct > 80 ? '#f59e0b' : '#eab308';
-            const htStroke  = htPct  > 100 ? '#ef4444' : htPct  > 80 ? '#f59e0b' : '#3b82f6';
-            const pwrTxt    = pwrPct > 100 ? 'text-red-400' : pwrPct > 80 ? 'text-amber-400' : 'text-yellow-400';
-            const htTxt     = htPct  > 100 ? 'text-red-400' : htPct  > 80 ? 'text-amber-400' : 'text-blue-400';
-
-            /** Arc SVG semi-circulaire (haut = 0%, bas gauche = 50%, bas droite = 100%) */
-            function ArcGauge({
-              pct, stroke, label, draw, capacity, textClass,
-            }: {
-              pct: number; stroke: string; label: string;
-              draw: string; capacity: string; textClass: string;
-            }) {
-              const r = 28;
-              const cx = 36, cy = 36;
-              // Arc de -210° à +30° (240° total, ouverture en bas)
-              const startAngle = -210 * (Math.PI / 180);
-              const endAngle   =   30 * (Math.PI / 180);
-              const totalAngle = endAngle - startAngle; // 240° en radians
-
-              const clampedPct = Math.min(pct, 100);
-              const fillAngle  = startAngle + (clampedPct / 100) * totalAngle;
-
-              // arc path helper
-              const arcPath = (from: number, to: number) => {
-                const x1 = cx + r * Math.cos(from), y1 = cy + r * Math.sin(from);
-                const x2 = cx + r * Math.cos(to),   y2 = cy + r * Math.sin(to);
-                const large = (to - from) > Math.PI ? 1 : 0;
-                return `M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${r} ${r} 0 ${large} 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`;
-              };
-
-              return (
-                <div className="flex flex-col items-center">
-                  <div className="relative w-[72px] h-[50px] overflow-visible">
-                    <svg viewBox="0 0 72 60" className="w-full" style={{ overflow: 'visible' }}>
-                      {/* Piste fond */}
-                      <path d={arcPath(startAngle, endAngle)}
-                        fill="none" stroke="rgba(51,65,85,0.8)" strokeWidth="5"
-                        strokeLinecap="round" />
-                      {/* Remplissage */}
-                      {clampedPct > 0 && (
-                        <path d={arcPath(startAngle, fillAngle)}
-                          fill="none" stroke={stroke} strokeWidth="5"
-                          strokeLinecap="round" opacity="0.85" />
-                      )}
-                      {/* Dépassement rouge si > 100% */}
-                      {pct > 100 && (
-                        <path d={arcPath(startAngle, endAngle)}
-                          fill="none" stroke="#ef4444" strokeWidth="5"
-                          strokeLinecap="round" opacity="0.4"
-                          strokeDasharray="3 2" />
-                      )}
-                      {/* Valeur % au centre */}
-                      <text x={cx} y={cy - 2}
-                        textAnchor="middle" dominantBaseline="middle"
-                        fontSize="11" fontWeight="bold" fontFamily="monospace"
-                        fill={stroke}>
-                        {Math.round(pct)}%
-                      </text>
-                    </svg>
-                  </div>
-                  {/* Label + draw/capacity sous la jauge */}
-                  <span className="text-[9px] font-mono-sc text-slate-500 uppercase tracking-widest -mt-1">{label}</span>
-                  <span className={`text-[9px] font-mono-sc tabular-nums mt-0.5 ${textClass}`}>
-                    {draw} <span className="text-slate-700">/</span> {capacity}
-                  </span>
-                </div>
-              );
-            }
-
+            const pwrColor = pwrPct > 100 ? 'text-red-400' : pwrPct > 80 ? 'text-amber-400' : 'text-yellow-400';
+            const htColor  = htPct  > 100 ? 'text-red-400' : htPct  > 80 ? 'text-amber-400' : 'text-blue-400';
+            const pwrDraw = Math.round(ls.powerDraw);
+            const pwrOut  = Math.round(ls.powerOutput);
+            const htDraw  = Math.round(ls.heat);
+            const htCool  = Math.round(ls.cooling);
             return (
               <div className="grid grid-cols-2 gap-2">
-                <ArcGauge
-                  pct={pwrPct} stroke={pwrStroke} label="Output"
-                  draw={fK(ls.powerDraw)} capacity={fK(ls.powerOutput)}
-                  textClass={pwrTxt}
-                />
+                {/* Output */}
+                <div className="flex flex-col items-center rounded-md border border-slate-800 bg-slate-900/40 py-2 px-2">
+                  <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-1">Output</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className={`text-base font-orbitron font-bold tabular-nums ${pwrColor}`}>{pwrDraw}</span>
+                    <span className="text-[9px] font-mono-sc text-slate-600">/</span>
+                    <span className="text-sm font-orbitron font-bold tabular-nums text-slate-400">{pwrOut}</span>
+                  </div>
+                  <span className="text-[9px] font-mono-sc text-slate-700 mt-0.5">EU</span>
+                </div>
+                {/* Cooling */}
                 {ls.cooling > 0 && (
-                  <ArcGauge
-                    pct={htPct} stroke={htStroke} label="Consumption"
-                    draw={fK(ls.heat)} capacity={fK(ls.cooling)}
-                    textClass={htTxt}
-                  />
+                  <div className="flex flex-col items-center rounded-md border border-slate-800 bg-slate-900/40 py-2 px-2">
+                    <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-1">Heat</span>
+                    <div className="flex items-baseline gap-1">
+                      <span className={`text-base font-orbitron font-bold tabular-nums ${htColor}`}>{htDraw}</span>
+                      <span className="text-[9px] font-mono-sc text-slate-600">/</span>
+                      <span className="text-sm font-orbitron font-bold tabular-nums text-slate-400">{htCool}</span>
+                    </div>
+                    <span className="text-[9px] font-mono-sc text-slate-700 mt-0.5">kW</span>
+                  </div>
                 )}
               </div>
             );
           })()}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════
+          RADAR
+      ════════════════════════════════════════ */}
+      {radarNode && (radarNode.radar_tracking_signal || radarNode.radar_detection_lifetime) && (
+        <div>
+          <SectionLabel>Radar</SectionLabel>
+          <div className="grid grid-cols-2 gap-1.5">
+            {radarNode.radar_tracking_signal != null && (
+              <div className="flex flex-col items-center rounded-md border border-green-900/40 bg-green-950/10 py-2 px-1">
+                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Tracking</span>
+                <span className="text-sm font-orbitron font-bold text-green-400 tabular-nums">
+                  {(n(radarNode.radar_tracking_signal) * 100).toFixed(1)}
+                </span>
+                <span className="text-[9px] font-mono-sc text-slate-700">%</span>
+              </div>
+            )}
+            {radarNode.radar_detection_lifetime != null && (
+              <div className="flex flex-col items-center rounded-md border border-green-900/40 bg-green-950/10 py-2 px-1">
+                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Ping</span>
+                <span className="text-sm font-orbitron font-bold text-green-400 tabular-nums">
+                  {n(radarNode.radar_detection_lifetime).toFixed(1)}
+                </span>
+                <span className="text-[9px] font-mono-sc text-slate-700">s</span>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

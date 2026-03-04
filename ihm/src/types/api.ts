@@ -98,6 +98,8 @@ export interface LoadoutNode {
   weapon_damage: number | null;
   weapon_fire_rate: number | null;
   weapon_range: number | null;
+  weapon_ammo_count: number | null;
+  weapon_damage_type: string | null;
   // Shield
   shield_hp: number | null;
   shield_regen: number | null;
@@ -122,6 +124,10 @@ export interface LoadoutNode {
   missile_signal_type: string | null;
   // CM
   cm_ammo_count: number | null;
+  // Radar
+  radar_range: number | null;
+  radar_detection_lifetime: number | null;
+  radar_tracking_signal: number | null;
   children: LoadoutNode[];
 }
 
