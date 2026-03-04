@@ -12,7 +12,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { ShipCard } from '@/components/ship/ShipCard';
 import { LoadoutTree } from '@/components/ship/LoadoutTree';
 import {
-  fCredits, fDimension, fMass, fSpeed, fTime,
+  fCredits, fDimension, fMass, fSpeed,
 } from '@/utils/formatters';
 import { VARIANT_TYPE_LABELS } from '@/utils/constants';
 import type { Hardpoint } from '@/types/api';
@@ -70,45 +70,50 @@ export default function ShipDetailPage() {
       </div>
 
       {/* Ship hero */}
-      <div className="sci-panel p-6">
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
-          <div>
-            <p className="text-xs font-mono-sc text-cyan-700 uppercase tracking-widest mb-1">
-              {ship.manufacturer_name}
-            </p>
-            <h1 className="font-orbitron text-3xl font-black text-slate-100 leading-tight">
-              {ship.name}
-            </h1>
-            {/* Badges */}
-            <div className="flex flex-wrap gap-2 mt-3">
-              {ship.career && <GlowBadge color="cyan">{ship.career}</GlowBadge>}
-              {ship.role && ship.role !== ship.career && <GlowBadge color="slate">{ship.role}</GlowBadge>}
-              {ship.vehicle_category && <GlowBadge color="slate">{ship.vehicle_category}</GlowBadge>}
-              {ship.variant_type && ship.variant_type !== 'standard' && (
-                <GlowBadge
-                  color={ship.variant_type === 'collector' ? 'amber' : ship.variant_type === 'npc' ? 'red' : 'slate'}
-                >
-                  {VARIANT_TYPE_LABELS[ship.variant_type] ?? ship.variant_type}
-                </GlowBadge>
-              )}
-              {ship.ship_matrix_id != null && <GlowBadge color="green">RSI Ship Matrix</GlowBadge>}
-            </div>
+      <div className="sci-panel overflow-hidden">
+        {/* Bannière pleine largeur */}
+        {(ship.thumbnail_large ?? ship.thumbnail) && (
+          <div className="relative w-full h-52 bg-slate-900/80">
+            <img
+              src={(ship.thumbnail_large ?? ship.thumbnail)!}
+              alt={ship.name}
+              className="w-full h-full object-cover opacity-80"
+              loading="lazy"
+            />
+            <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#0A1628] to-transparent" />
           </div>
-          {/* Thumbnail + actions */}
-          <div className="flex flex-col items-end gap-3 flex-shrink-0">
-            {(ship.thumbnail_large ?? ship.thumbnail) && (
-              <div className="w-64 xl:w-80 rounded overflow-hidden border border-border/50 bg-slate-900/60">
-                <img
-                  src={(ship.thumbnail_large ?? ship.thumbnail)!}
-                  alt={ship.name}
-                  className="w-full object-cover"
-                  loading="lazy"
-                />
+        )}
+        {/* Contenu */}
+        <div className="p-6">
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+            <div>
+              <p className="text-xs font-mono-sc text-cyan-700 uppercase tracking-widest mb-1">
+                {ship.manufacturer_name}
+              </p>
+              <h1 className="font-orbitron text-3xl font-black text-slate-100 leading-tight">
+                {ship.name}
+              </h1>
+              {/* Badges */}
+              <div className="flex flex-wrap gap-2 mt-3">
+                {ship.career && <GlowBadge color="cyan">{ship.career}</GlowBadge>}
+                {ship.role && ship.role !== ship.career && <GlowBadge color="slate">{ship.role}</GlowBadge>}
+                {ship.vehicle_category && <GlowBadge color="slate">{ship.vehicle_category}</GlowBadge>}
+                {ship.variant_type && ship.variant_type !== 'standard' && (
+                  <GlowBadge
+                    color={ship.variant_type === 'collector' ? 'amber' : ship.variant_type === 'npc' ? 'red' : 'slate'}
+                  >
+                    {VARIANT_TYPE_LABELS[ship.variant_type] ?? ship.variant_type}
+                  </GlowBadge>
+                )}
+                {ship.ship_matrix_id != null && <GlowBadge color="green">RSI Link</GlowBadge>}
               </div>
-            )}
-            <Link to={`/compare?a=${uuid}`} className="sci-btn-amber text-sm">
-              <BarChart3 size={13} /> Compare
-            </Link>
+            </div>
+            {/* Actions */}
+            <div className="flex-shrink-0">
+              <Link to={`/compare?a=${uuid}`} className="sci-btn-amber text-sm">
+                <BarChart3 size={13} /> Compare
+              </Link>
+            </div>
           </div>
         </div>
       </div>
@@ -129,10 +134,7 @@ export default function ShipDetailPage() {
 
           {/* Crew */}
           <ScifiPanel title="Crew">
-            <div className="grid grid-cols-2 gap-3">
-              <SpecCell label="Crew"     value={ship.crew_size != null ? String(ship.crew_size) : '—'} />
-              <SpecCell label="Category" value={ship.vehicle_category ?? '—'} />
-            </div>
+            <SpecCell label="Crew" value={ship.crew_size != null ? String(ship.crew_size) : '—'} />
           </ScifiPanel>
 
           {/* Cargo */}
@@ -146,7 +148,7 @@ export default function ShipDetailPage() {
           {(ship.insurance_claim_time != null || ship.insurance_expedite_cost != null) && (
             <ScifiPanel title="Insurance">
               <div className="space-y-2">
-                <SpecCell label="Claim time"    value={fTime(ship.insurance_claim_time)} />
+                <SpecCell label="Claim time"    value={ship.insurance_claim_time != null ? `${Number(ship.insurance_claim_time).toFixed(1)} min` : '—'} />
                 <SpecCell label="Expedite cost" value={fCredits(ship.insurance_expedite_cost)} />
               </div>
             </ScifiPanel>
@@ -202,34 +204,52 @@ export default function ShipDetailPage() {
           )}
 
           {/* Hardpoints detail */}
-          {hardpoints && hardpoints.length > 0 && (
-            <ScifiPanel title="Hardpoints" subtitle={`${hardpoints.length} slots`}>
-              <div className="space-y-0.5 max-h-52 overflow-y-auto">
-                {hardpoints.map((hp: Hardpoint) => (
-                  <div key={hp.uuid} className="flex items-center justify-between px-2 py-1 rounded hover:bg-white/5">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-mono-sc text-slate-600 flex-shrink-0">S{hp.port_size ?? '?'}</span>
-                      <span className="text-xs text-slate-400 truncate">{hp.parts_name}</span>
+          {(() => {
+            const HP_TYPES = new Set([
+              'WeaponGun', 'Weapon', 'WeaponRack', 'Gimbal', 'Turret',
+              'MissileRack', 'Shield', 'PowerPlant', 'Cooler', 'QuantumDrive',
+              'Radar', 'Countermeasure', 'EMP', 'QuantumInterdictionGenerator',
+            ]);
+            const visibleHp = (hardpoints ?? []).filter((hp: Hardpoint) => HP_TYPES.has(hp.port_type));
+            if (!visibleHp.length) return null;
+            return (
+              <ScifiPanel title="Hardpoints" subtitle={`${visibleHp.length} emplacements`}>
+                <div className="space-y-0.5 max-h-52 overflow-y-auto">
+                  {visibleHp.map((hp: Hardpoint) => (
+                    <div key={hp.uuid} className="flex items-center justify-between px-2 py-1 rounded hover:bg-white/5">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs font-mono-sc text-slate-600 flex-shrink-0">S{hp.port_size ?? '?'}</span>
+                        <span className="text-xs text-slate-400 truncate">{hp.parts_name}</span>
+                      </div>
+                      <span className="text-xs text-cyan-700 ml-2 flex-shrink-0">{hp.port_type}</span>
                     </div>
-                    <span className="text-xs text-cyan-700 ml-2 flex-shrink-0">{hp.port_type}</span>
-                  </div>
-                ))}
-              </div>
-            </ScifiPanel>
-          )}
+                  ))}
+                </div>
+              </ScifiPanel>
+            );
+          })()}
         </div>
       </div>
 
       {/* Loadout */}
-      {loadout && loadout.length > 0 && (
-        <ScifiPanel title="Default loadout" subtitle="Full ship tree" actions={<Layers size={14} className="text-slate-600" />}>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 max-h-96 overflow-y-auto">
-            {loadout.map((node, i) => (
-              <LoadoutTree key={i} node={node} />
-            ))}
-          </div>
-        </ScifiPanel>
-      )}
+      {(() => {
+        const LOADOUT_TYPES = new Set([
+          'WeaponGun', 'Weapon', 'WeaponRack', 'Gimbal', 'Turret',
+          'MissileRack', 'Shield', 'PowerPlant', 'Cooler', 'QuantumDrive',
+          'Radar', 'Countermeasure', 'EMP', 'QuantumInterdictionGenerator',
+        ]);
+        const visibleLoadout = (loadout ?? []).filter(n => LOADOUT_TYPES.has(n.port_type));
+        if (!visibleLoadout.length) return null;
+        return (
+          <ScifiPanel title="Default loadout" subtitle={`${visibleLoadout.length} composants`} actions={<Layers size={14} className="text-slate-600" />}>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 max-h-96 overflow-y-auto">
+              {visibleLoadout.map((node, i) => (
+                <LoadoutTree key={i} node={node} />
+              ))}
+            </div>
+          </ScifiPanel>
+        );
+      })()}
 
       {/* Similar ships */}
       {similar && similar.length > 0 && (
