@@ -570,9 +570,12 @@ export class DataForgeService implements DataForgeContext {
     const processEntry = (
       portName: string,
       entClassName: string,
-      inlineChildren?: Array<{ portName: string; entityClassName: string }>,
+      inlineChildren?: Array<{ portName: string; entityClassName: string; children?: any[] }>,
       depth = 0,
+      parentPath = '',
     ): any => {
+      const fullPath = parentPath ? `${parentPath}/${portName}` : portName;
+      if (!entClassName && variantMap) entClassName = variantMap.get(fullPath) || variantMap.get(portName) || '';
       const item: any = { portName, componentClassName: entClassName || null, portType: classifyPort(portName, entClassName) };
       // Attach port size constraints
       const meta = portMetaMap.get(portName.toLowerCase());
@@ -584,8 +587,9 @@ export class DataForgeService implements DataForgeContext {
       const children: any[] = [];
       if (inlineChildren && inlineChildren.length > 0) {
         for (const child of inlineChildren) {
-          if (child.portName && child.entityClassName)
-            children.push(processEntry(child.portName, child.entityClassName, undefined, depth + 1));
+          if (!child.portName) continue;
+          // Always recurse — processEntry will resolve empty entityClassName via variantMap
+          children.push(processEntry(child.portName, child.entityClassName || '', child.children, depth + 1, fullPath));
         }
       }
       if (children.length === 0 && entClassName) {
@@ -601,18 +605,37 @@ export class DataForgeService implements DataForgeContext {
                 let subEntClassName = se.entityClassName || '';
                 if (!subEntClassName && se.entityClassReference?.__ref)
                   subEntClassName = this.resolveGuid(se.entityClassReference.__ref) || '';
-                if (!subEntClassName && variantMap) subEntClassName = variantMap.get(`${portName}/${se.itemPortName}`) || '';
+                if (!subEntClassName && variantMap)
+                  subEntClassName =
+                    variantMap.get(`${fullPath}/${se.itemPortName}`) || variantMap.get(`${portName}/${se.itemPortName}`) || '';
                 if (se.itemPortName && subEntClassName) {
                   // Collect inline sub-sub-children from the entry's own loadout node if present
-                  const subInline: Array<{ portName: string; entityClassName: string }> = [];
+                  const subInline: Array<{ portName: string; entityClassName: string; children?: any[] }> = [];
                   if (se.loadout?.entries && Array.isArray(se.loadout.entries)) {
                     for (const ssl of se.loadout.entries) {
                       let sslCN = ssl.entityClassName || '';
                       if (!sslCN && ssl.entityClassReference?.__ref) sslCN = this.resolveGuid(ssl.entityClassReference.__ref) || '';
-                      if (ssl.itemPortName && sslCN) subInline.push({ portName: ssl.itemPortName, entityClassName: sslCN });
+                      if (ssl.itemPortName && sslCN) {
+                        const subSubInline: Array<{ portName: string; entityClassName: string }> = [];
+                        if (Array.isArray(ssl.loadout?.entries)) {
+                          for (const sssl of ssl.loadout.entries) {
+                            let ssslCN = sssl.entityClassName || '';
+                            if (!ssslCN && sssl.entityClassReference?.__ref)
+                              ssslCN = this.resolveGuid(sssl.entityClassReference.__ref) || '';
+                            if (sssl.itemPortName && ssslCN) subSubInline.push({ portName: sssl.itemPortName, entityClassName: ssslCN });
+                          }
+                        }
+                        subInline.push({
+                          portName: ssl.itemPortName,
+                          entityClassName: sslCN,
+                          children: subSubInline.length > 0 ? subSubInline : undefined,
+                        });
+                      }
                     }
                   }
-                  children.push(processEntry(se.itemPortName, subEntClassName, subInline.length > 0 ? subInline : undefined, depth + 1));
+                  children.push(
+                    processEntry(se.itemPortName, subEntClassName, subInline.length > 0 ? subInline : undefined, depth + 1, fullPath),
+                  );
                 }
               }
             }
@@ -628,7 +651,7 @@ export class DataForgeService implements DataForgeContext {
       let entClassName = entry.entityClassName || '';
       if (!portName) continue;
       if (!entClassName && variantMap) entClassName = variantMap.get(portName) || '';
-      loadoutItems.push(processEntry(portName, entClassName, entry.children));
+      loadoutItems.push(processEntry(portName, entClassName, entry.children, 0, ''));
       processedPorts.add(portName);
     }
 
@@ -637,7 +660,7 @@ export class DataForgeService implements DataForgeContext {
         if (portName.includes('/') || processedPorts.has(portName)) continue;
         const portType = classifyPort(portName, entClassName);
         if (['WeaponGun', 'Turret', 'MissileRack', 'Gimbal', 'Weapon'].includes(portType)) {
-          loadoutItems.push(processEntry(portName, entClassName));
+          loadoutItems.push(processEntry(portName, entClassName, undefined, 0, ''));
           processedPorts.add(portName);
         }
       }
@@ -646,30 +669,30 @@ export class DataForgeService implements DataForgeContext {
     return loadoutItems.length > 0 ? loadoutItems : null;
   }
 
-  private extractLoadoutEntries(
-    data: any,
-  ): Array<{ portName: string; entityClassName: string; children?: Array<{ portName: string; entityClassName: string }> }> {
+  private extractLoadoutEntries(data: any): Array<{ portName: string; entityClassName: string; children?: any[] }> {
+    if (!data || !Array.isArray(data.Components)) return [];
+
+    const parseEntries = (rawEntries: any[]): any[] => {
+      const result: any[] = [];
+      for (const e of rawEntries) {
+        let className = e.entityClassName || '';
+        if (!className && e.entityClassReference?.__ref) className = this.resolveGuid(e.entityClassReference.__ref) || '';
+        const entry: any = { portName: e.itemPortName || '', entityClassName: className };
+        if (Array.isArray(e.loadout?.entries) && e.loadout.entries.length > 0) {
+          const children = parseEntries(e.loadout.entries);
+          if (children.length > 0) entry.children = children;
+        }
+        result.push(entry);
+      }
+      return result;
+    };
+
     const entries: any[] = [];
-    if (!data || !Array.isArray(data.Components)) return entries;
     for (const comp of data.Components) {
       if (!comp || comp.__type !== 'SEntityComponentDefaultLoadoutParams') continue;
       const items = comp.loadout?.entries;
       if (!Array.isArray(items)) continue;
-      for (const e of items) {
-        let className = e.entityClassName || '';
-        if (!className && e.entityClassReference?.__ref) className = this.resolveGuid(e.entityClassReference.__ref) || '';
-        const entry: any = { portName: e.itemPortName || '', entityClassName: className };
-        if (e.loadout?.entries && Array.isArray(e.loadout.entries)) {
-          const children: any[] = [];
-          for (const sub of e.loadout.entries) {
-            let subCN = sub.entityClassName || '';
-            if (!subCN && sub.entityClassReference?.__ref) subCN = this.resolveGuid(sub.entityClassReference.__ref) || '';
-            if (sub.itemPortName) children.push({ portName: sub.itemPortName, entityClassName: subCN });
-          }
-          if (children.length > 0) entry.children = children;
-        }
-        entries.push(entry);
-      }
+      entries.push(...parseEntries(items));
     }
     return entries;
   }
@@ -710,7 +733,19 @@ export class DataForgeService implements DataForgeContext {
                 for (const sub of e.loadout.entries) {
                   let subName = sub.entityClassName || '';
                   if (!subName && sub.entityClassReference?.__ref) subName = this.resolveGuid(sub.entityClassReference.__ref) || '';
-                  if (sub.itemPortName && subName) map.set(`${portName}/${sub.itemPortName}`, subName);
+                  if (sub.itemPortName && subName) {
+                    map.set(`${portName}/${sub.itemPortName}`, subName);
+                    // Level 3: portName/childPort/grandchildPort
+                    if (Array.isArray(sub.loadout?.entries)) {
+                      for (const subsub of sub.loadout.entries) {
+                        let subsubName = subsub.entityClassName || '';
+                        if (!subsubName && subsub.entityClassReference?.__ref)
+                          subsubName = this.resolveGuid(subsub.entityClassReference.__ref) || '';
+                        if (subsub.itemPortName && subsubName)
+                          map.set(`${portName}/${sub.itemPortName}/${subsub.itemPortName}`, subsubName);
+                      }
+                    }
+                  }
                 }
               }
             }
