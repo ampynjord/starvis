@@ -1,44 +1,85 @@
 /**
- * CargoGrid — Visualisation de la capacité cargo en grille 2D
- * Approximation visuelle : 1 cellule = blockSize SCU
- * Les dimensions réelles de soute ne sont pas dans la DB,
- * on calcule une géométrie plausible basée sur le SCU total.
+ * CargoGrid — Visualisation isométrique 3D de la soute
+ * Chaque cube représente blockSize SCU.
+ * Layout calculé automatiquement : largeur × profondeur × étages.
  */
 
-interface Props {
-  scu: number;
+const COS30 = Math.sqrt(3) / 2; // ≈ 0.866
+
+/** Projection isométrique 3D → coordonnées SVG (y vers le bas) */
+function iso(c: number, r: number, z: number, s: number): [number, number] {
+  return [
+    (c - r) * s * COS30,
+    (c + r) * s * 0.5 - z * s,
+  ];
 }
 
-/** Trouve cols×rows avec ratio proche de 2:1 (soutes sont souvent plus larges que hautes) */
-function gridLayout(scu: number): { cols: number; rows: number; blockSize: number } {
-  // On vise ~40 cellules max affichées
-  const MAX_CELLS = 40;
-  const blockSize = Math.max(1, Math.ceil(scu / MAX_CELLS));
-  const cells = Math.ceil(scu / blockSize);
-
-  // Ratio cible : ~2.5 cols pour 1 row
-  const RATIO = 2.5;
-  const cols = Math.max(1, Math.round(Math.sqrt(cells * RATIO)));
-  const rows = Math.max(1, Math.ceil(cells / cols));
-
-  return { cols, rows, blockSize };
+/** Convertit un tableau de points en string SVG polygon */
+function polyStr(pts: [number, number][]): string {
+  return pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
 }
 
-export function CargoGrid({ scu }: Props) {
+/** Calcule un layout w×d×h plausible pour le nombre de blocs donné */
+function computeLayout(scu: number): { w: number; d: number; h: number; blockSize: number } {
+  const MAX_BLOCKS = 64;
+  const blockSize = Math.max(1, Math.ceil(scu / MAX_BLOCKS));
+  const blocks = Math.ceil(scu / blockSize);
+
+  // Préférer les layouts plats (h petit), w ≈ 2×d
+  const h = Math.min(4, Math.max(1, Math.round(Math.pow(blocks, 1 / 3))));
+  const base = Math.ceil(blocks / h);
+  const d = Math.max(1, Math.round(Math.sqrt(base / 2)));
+  const w = Math.max(d, Math.ceil(base / d));
+
+  return { w, d, h: Math.max(1, Math.ceil(blocks / (w * d))), blockSize };
+}
+
+interface CubeEntry { c: number; r: number; z: number; filled: boolean; idx: number }
+
+export function CargoGrid({ scu }: { scu: number }) {
   if (scu <= 0) return null;
 
-  const { cols, rows, blockSize } = gridLayout(scu);
-  const totalCells = cols * rows;
-  const filledCells = Math.ceil(scu / blockSize);
+  const { w, d, h, blockSize } = computeLayout(scu);
+  const filledBlocks = Math.ceil(scu / blockSize);
+  const totalBlocks = w * d * h;
+
+  // Construire la liste des cubes (ordre d'itération définit l'index)
+  const cubes: CubeEntry[] = [];
+  let idx = 0;
+  for (let z = 0; z < h; z++)
+    for (let r = 0; r < d; r++)
+      for (let c = 0; c < w; c++)
+        cubes.push({ c, r, z, filled: idx < filledBlocks, idx: idx++ });
+
+  // Algorithme du peintre : trier par profondeur décroissante (c+r-z)
+  // Les cubes "au fond" (grande valeur) sont dessinés en premier
+  cubes.sort((a, b) => (b.c + b.r - b.z) - (a.c + a.r - a.z));
+
+  // Taille d'un cube en pixels (s'adapte au layout)
+  const S = Math.max(10, Math.min(24, Math.floor(200 / Math.max(w + d, (h + 1) * 2))));
+  const PAD = 6;
+
+  const svgW = Math.ceil((w + d) * S * COS30 + PAD * 2);
+  const svgH = Math.ceil((w + d) * S * 0.5 + h * S + PAD * 2);
+  // Origine : décale pour que (0,0,0) soit visible
+  const ox = d * S * COS30 + PAD;
+  const oy = h * S + PAD;
+
+  /** Coordonnée SVG d'un sommet du cube */
+  const pt = (c: number, r: number, z: number): [number, number] => {
+    const [x, y] = iso(c, r, z, S);
+    return [x + ox, y + oy];
+  };
 
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-2">
+
       {/* En-tête */}
       <div className="flex items-baseline justify-between">
         <span className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest">Cargo hold</span>
         <div className="flex items-baseline gap-2">
           {blockSize > 1 && (
-            <span className="text-[9px] font-mono-sc text-slate-700">1 cell = {blockSize} SCU</span>
+            <span className="text-[9px] font-mono-sc text-slate-700">1 cube = {blockSize} SCU</span>
           )}
           <span className="text-sm font-orbitron font-bold text-emerald-400 tabular-nums">
             {scu.toLocaleString('en-US')}
@@ -47,54 +88,86 @@ export function CargoGrid({ scu }: Props) {
         </div>
       </div>
 
-      {/* Grille */}
-      <div
-        className="grid gap-px rounded-sm overflow-hidden border border-slate-800/80"
-        style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
-      >
-        {Array.from({ length: totalCells }).map((_, i) => {
-          const filled = i < filledCells;
-          const isLast = i === filledCells - 1;
-          const partialPct = isLast && scu % blockSize !== 0
-            ? Math.round(((scu % blockSize) / blockSize) * 100)
-            : 100;
+      {/* Rendu isométrique */}
+      <svg viewBox={`0 0 ${svgW} ${svgH}`} className="w-full" style={{ maxHeight: 200 }}>
+        {cubes.map(({ c, r, z, filled, idx: i }) => {
+          // 3 faces visibles d'un cube isométrique vu de dessus-droite
+          const topFace: [number, number][] = [
+            pt(c, r, z + 1), pt(c + 1, r, z + 1), pt(c + 1, r + 1, z + 1), pt(c, r + 1, z + 1),
+          ];
+          const rightFace: [number, number][] = [   // face côté +col (droite écran)
+            pt(c + 1, r, z), pt(c + 1, r, z + 1), pt(c + 1, r + 1, z + 1), pt(c + 1, r + 1, z),
+          ];
+          const leftFace: [number, number][] = [    // face côté +row (gauche écran)
+            pt(c, r + 1, z), pt(c, r + 1, z + 1), pt(c + 1, r + 1, z + 1), pt(c + 1, r + 1, z),
+          ];
+
+          if (!filled) {
+            // Cube vide — contour fantôme très discret
+            return (
+              <g key={i} opacity={0.12}>
+                <polygon points={polyStr(topFace)}   fill="none" stroke="#334155" strokeWidth={0.6} />
+                <polygon points={polyStr(rightFace)} fill="none" stroke="#334155" strokeWidth={0.6} />
+                <polygon points={polyStr(leftFace)}  fill="none" stroke="#334155" strokeWidth={0.6} />
+              </g>
+            );
+          }
+
+          // Centroïde de la face du dessus pour le label
+          const cx = topFace.reduce((s, [x]) => s + x, 0) / 4;
+          const cy = topFace.reduce((s, [, y]) => s + y, 0) / 4;
+          const showLabel = S >= 16;
 
           return (
-            <div
-              key={i}
-              title={filled ? `${Math.min(blockSize, scu - i * blockSize)} SCU` : 'Empty'}
-              className={`
-                relative h-4 transition-colors
-                ${filled
-                  ? 'bg-emerald-900/70 hover:bg-emerald-800/80'
-                  : 'bg-slate-900/40'
-                }
-              `}
-            >
-              {/* Barre de remplissage partielle pour la dernière cellule */}
-              {isLast && partialPct < 100 && (
-                <div
-                  className="absolute inset-y-0 left-0 bg-emerald-900/70"
-                  style={{ width: `${partialPct}%` }}
-                />
+            <g key={i}>
+              {/* Face du dessus : la plus claire */}
+              <polygon
+                points={polyStr(topFace)}
+                fill="#065f46"
+                stroke="#10b981"
+                strokeWidth={0.5}
+                strokeOpacity={0.4}
+              />
+              {/* Face droite */}
+              <polygon
+                points={polyStr(rightFace)}
+                fill="#064e3b"
+                stroke="#10b981"
+                strokeWidth={0.5}
+                strokeOpacity={0.4}
+              />
+              {/* Face gauche : la plus sombre */}
+              <polygon
+                points={polyStr(leftFace)}
+                fill="#022c22"
+                stroke="#10b981"
+                strokeWidth={0.5}
+                strokeOpacity={0.4}
+              />
+              {/* Numéro de cube */}
+              {showLabel && (
+                <text
+                  x={cx}
+                  y={cy + 0.5}
+                  textAnchor="middle"
+                  dominantBaseline="middle"
+                  fontSize={S * 0.32}
+                  fill="#6ee7b7"
+                  opacity={0.65}
+                  fontFamily="monospace"
+                >
+                  {i + 1}
+                </text>
               )}
-              {/* Bordure intérieure pour donner l'effet "boîte" */}
-              {filled && (
-                <div className="absolute inset-0 border border-emerald-700/20 pointer-events-none rounded-[1px]" />
-              )}
-            </div>
+            </g>
           );
         })}
-      </div>
+      </svg>
 
-      {/* Infos layout */}
+      {/* Pied de page */}
       <div className="flex items-center justify-between">
-        <span className="text-[9px] font-mono-sc text-slate-800">
-          {cols} × {rows} grid
-        </span>
-        <span className="text-[9px] font-mono-sc text-slate-800">
-          {filledCells} / {totalCells} cells
-        </span>
+        <span className="text-[9px] font-mono-sc text-slate-800">{w}×{d}×{h} layout</span>
+        <span className="text-[9px] font-mono-sc text-slate-800">{filledBlocks}/{totalBlocks} cubes</span>
       </div>
     </div>
   );
