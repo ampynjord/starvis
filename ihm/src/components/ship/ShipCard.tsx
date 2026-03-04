@@ -1,9 +1,9 @@
 import { motion } from 'framer-motion';
-import { Users, Maximize2, Zap } from 'lucide-react';
+import { Users, Package, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { ShipListItem } from '@/types/api';
 import { GlowBadge } from '@/components/ui/GlowBadge';
-import { fSpeed, fDimension } from '@/utils/formatters';
+import { fSpeed } from '@/utils/formatters';
 import { VARIANT_TYPE_LABELS } from '@/utils/constants';
 
 interface Props {
@@ -71,7 +71,7 @@ export function ShipCard({ ship, index = 0 }: Props) {
             <div className="flex gap-3">
               <StatCell icon={<Users size={9} />} label="Crew" value={ship.crew_size != null ? String(ship.crew_size) : '—'} />
               <StatCell icon={<Zap size={9} />} label="SCM" value={fSpeed(ship.scm_speed)} />
-              <StatCell icon={<Maximize2 size={9} />} label="Long." value={fDimension(ship.cross_section_z)} />
+              <StatCell icon={<Package size={9} />} label="Cargo" value={ship.cargo_capacity ? `${ship.cargo_capacity} SCU` : '—'} />
             </div>
 
             {/* Career + RSI badge */}
