@@ -155,7 +155,12 @@ export class ShipQueryService {
     return rows[0] || null;
   }
 
-  async getShipFilters(): Promise<{ manufacturers: { code: string; name: string }[]; roles: string[]; careers: string[]; variant_types: string[] }> {
+  async getShipFilters(): Promise<{
+    manufacturers: { code: string; name: string }[];
+    roles: string[];
+    careers: string[];
+    variant_types: string[];
+  }> {
     const [[mfgRows], [roleRows], [careerRows], [variantRows]] = await Promise.all([
       this.pool.execute<Row[]>(
         `SELECT DISTINCT s.manufacturer_code as code, COALESCE(m.name, s.manufacturer_code) as name

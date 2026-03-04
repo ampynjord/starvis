@@ -57,7 +57,7 @@ export default function ComponentDetailPage() {
               {comp.grade && <GlowBadge color="amber">{comp.grade}</GlowBadge>}
               {comp.size != null && <GlowBadge color="slate">S{comp.size}</GlowBadge>}
               {comp.sub_type && <GlowBadge color="slate">{comp.sub_type}</GlowBadge>}
-              {comp.class && <GlowBadge color="slate">{comp.class}</GlowBadge>}
+              {comp.class_name && <GlowBadge color="slate">{comp.class_name}</GlowBadge>}
               {comp.manufacturer_name && <GlowBadge color="cyan">{comp.manufacturer_name}</GlowBadge>}
             </div>
           </div>

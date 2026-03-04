@@ -86,18 +86,28 @@ export class ComponentQueryService {
     return id.length === 36 ? await this.getComponentByUuid(id) : await this.getComponentByClassName(id);
   }
 
-  async getComponentFilters(): Promise<{ types: string[]; sub_types: string[]; sizes: number[]; grades: string[] }> {
-    const [[typeRows], [subTypeRows], [sizeRows], [gradeRows]] = await Promise.all([
+  async getComponentFilters(): Promise<{
+    types: string[];
+    sub_types: string[];
+    sizes: number[];
+    grades: string[];
+    manufacturers: string[];
+  }> {
+    const [[typeRows], [subTypeRows], [sizeRows], [gradeRows], [mfrRows]] = await Promise.all([
       this.pool.execute<Row[]>("SELECT DISTINCT type FROM components WHERE type IS NOT NULL AND type != '' ORDER BY type"),
       this.pool.execute<Row[]>("SELECT DISTINCT sub_type FROM components WHERE sub_type IS NOT NULL AND sub_type != '' ORDER BY sub_type"),
       this.pool.execute<Row[]>('SELECT DISTINCT size FROM components ORDER BY size'),
       this.pool.execute<Row[]>("SELECT DISTINCT grade FROM components WHERE grade IS NOT NULL AND grade != '' ORDER BY grade"),
+      this.pool.execute<Row[]>(
+        "SELECT DISTINCT manufacturer_code FROM components WHERE manufacturer_code IS NOT NULL AND manufacturer_code != '' ORDER BY manufacturer_code",
+      ),
     ]);
     return {
       types: typeRows.map((r) => String(r.type)),
       sub_types: subTypeRows.map((r) => String(r.sub_type)),
       sizes: sizeRows.map((r) => Number(r.size)),
       grades: gradeRows.map((r) => String(r.grade)),
+      manufacturers: mfrRows.map((r) => String(r.manufacturer_code)),
     };
   }
 
