@@ -23,6 +23,15 @@ import { extractPaints as _extractPaints, extractShops as _extractShops } from '
 // Re-export for backward compatibility (extraction-service.ts imports these from here)
 export { classifyPort, MANUFACTURER_CODES } from './dataforge-utils.js';
 
+export interface LoadoutPortEntry {
+  portName: string;
+  portType?: string;
+  componentClassName?: string | null;
+  minSize?: number;
+  maxSize?: number;
+  children?: LoadoutPortEntry[];
+}
+
 export class DataForgeService implements DataForgeContext {
   private provider: P4KProvider | null = null;
   private dcbBuffer: Buffer | null = null;
@@ -526,14 +535,7 @@ export class DataForgeService implements DataForgeContext {
 
   // ============ Vehicle loadout extraction ============
 
-  extractVehicleLoadout(className: string): Array<{
-    portName: string;
-    portType?: string;
-    componentClassName?: string;
-    minSize?: number;
-    maxSize?: number;
-    children?: Array<{ portName: string; componentClassName?: string }>;
-  }> | null {
+  extractVehicleLoadout(className: string): Array<LoadoutPortEntry> | null {
     if (!this.dfData || !this.dcbBuffer) return null;
     const record = this.findEntityRecord(className);
     if (!record) return null;
@@ -569,6 +571,7 @@ export class DataForgeService implements DataForgeContext {
       portName: string,
       entClassName: string,
       inlineChildren?: Array<{ portName: string; entityClassName: string }>,
+      depth = 0,
     ): any => {
       const item: any = { portName, componentClassName: entClassName || null, portType: classifyPort(portName, entClassName) };
       // Attach port size constraints
@@ -577,11 +580,12 @@ export class DataForgeService implements DataForgeContext {
         item.minSize = meta.minSize;
         item.maxSize = meta.maxSize;
       }
+      if (depth >= 5) return item; // guard against infinite recursion
       const children: any[] = [];
       if (inlineChildren && inlineChildren.length > 0) {
         for (const child of inlineChildren) {
           if (child.portName && child.entityClassName)
-            children.push({ portName: child.portName, componentClassName: child.entityClassName });
+            children.push(processEntry(child.portName, child.entityClassName, undefined, depth + 1));
         }
       }
       if (children.length === 0 && entClassName) {
@@ -598,7 +602,18 @@ export class DataForgeService implements DataForgeContext {
                 if (!subEntClassName && se.entityClassReference?.__ref)
                   subEntClassName = this.resolveGuid(se.entityClassReference.__ref) || '';
                 if (!subEntClassName && variantMap) subEntClassName = variantMap.get(`${portName}/${se.itemPortName}`) || '';
-                if (se.itemPortName && subEntClassName) children.push({ portName: se.itemPortName, componentClassName: subEntClassName });
+                if (se.itemPortName && subEntClassName) {
+                  // Collect inline sub-sub-children from the entry's own loadout node if present
+                  const subInline: Array<{ portName: string; entityClassName: string }> = [];
+                  if (se.loadout?.entries && Array.isArray(se.loadout.entries)) {
+                    for (const ssl of se.loadout.entries) {
+                      let sslCN = ssl.entityClassName || '';
+                      if (!sslCN && ssl.entityClassReference?.__ref) sslCN = this.resolveGuid(ssl.entityClassReference.__ref) || '';
+                      if (ssl.itemPortName && sslCN) subInline.push({ portName: ssl.itemPortName, entityClassName: sslCN });
+                    }
+                  }
+                  children.push(processEntry(se.itemPortName, subEntClassName, subInline.length > 0 ? subInline : undefined, depth + 1));
+                }
               }
             }
           }
