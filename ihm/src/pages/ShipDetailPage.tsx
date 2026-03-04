@@ -15,7 +15,6 @@ import {
   fCredits, fDimension, fMass,
 } from '@/utils/formatters';
 import { VARIANT_TYPE_LABELS } from '@/utils/constants';
-import type { Hardpoint } from '@/types/api';
 
 export default function ShipDetailPage() {
   const { uuid } = useParams<{ uuid: string }>();
@@ -41,12 +40,6 @@ export default function ShipDetailPage() {
     queryFn: () => api.ships.similar(uuid!, 4),
     enabled: !!uuid,
   });
-  const { data: hardpoints } = useQuery({
-    queryKey: ['ships.hardpoints', uuid],
-    queryFn: () => api.ships.hardpoints(uuid!),
-    enabled: !!uuid,
-  });
-
   if (isLoading) return <LoadingGrid message="LOADING SHIP…" />;
   if (error)    return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
   if (!ship)    return null;
@@ -182,31 +175,7 @@ export default function ShipDetailPage() {
             </ScifiPanel>
           )}
 
-          {/* Hardpoints detail */}
-          {(() => {
-            const HP_TYPES = new Set([
-              'WeaponGun', 'Weapon', 'WeaponRack', 'Gimbal', 'Turret',
-              'MissileRack', 'Shield', 'PowerPlant', 'Cooler', 'QuantumDrive',
-              'Radar', 'Countermeasure', 'EMP', 'QuantumInterdictionGenerator',
-            ]);
-            const visibleHp = (hardpoints ?? []).filter((hp: Hardpoint) => HP_TYPES.has(hp.port_type));
-            if (!visibleHp.length) return null;
-            return (
-              <ScifiPanel title="Hardpoints" subtitle={`${visibleHp.length} emplacements`}>
-                <div className="space-y-0.5 max-h-52 overflow-y-auto">
-                  {visibleHp.map((hp: Hardpoint) => (
-                    <div key={hp.uuid} className="flex items-center justify-between px-2 py-1 rounded hover:bg-white/5">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-xs font-mono-sc text-slate-600 flex-shrink-0">S{hp.port_size ?? '?'}</span>
-                        <span className="text-xs text-slate-400 truncate">{hp.parts_name}</span>
-                      </div>
-                      <span className="text-xs text-cyan-700 ml-2 flex-shrink-0">{hp.port_type}</span>
-                    </div>
-                  ))}
-                </div>
-              </ScifiPanel>
-            );
-          })()}
+
         </div>
       </div>
 
