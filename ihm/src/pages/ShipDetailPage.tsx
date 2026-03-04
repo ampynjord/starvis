@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowLeft, BarChart3, ChevronRight, Layers, Palette,
+  ArrowLeft, BarChart3, ChevronRight, ExternalLink, Layers, Palette,
 } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/services/api';
@@ -10,7 +10,7 @@ import { StatBar } from '@/components/ui/StatBar';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ShipCard } from '@/components/ship/ShipCard';
-import { LoadoutTree } from '@/components/ship/LoadoutTree';
+import { ShipLoadout } from '@/components/ship/ShipLoadout';
 import {
   fCredits, fDimension, fMass, fSpeed,
 } from '@/utils/formatters';
@@ -109,10 +109,20 @@ export default function ShipDetailPage() {
               </div>
             </div>
             {/* Actions */}
-            <div className="flex-shrink-0">
+            <div className="flex flex-col items-start gap-2 flex-shrink-0">
               <Link to={`/compare?a=${uuid}`} className="sci-btn-amber text-sm">
                 <BarChart3 size={13} /> Compare
               </Link>
+              {ship.store_url && (
+                <a
+                  href={ship.store_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-mono-sc text-slate-500 hover:text-cyan-400 transition-colors"
+                >
+                  <ExternalLink size={11} /> RSI Store
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -232,24 +242,11 @@ export default function ShipDetailPage() {
       </div>
 
       {/* Loadout */}
-      {(() => {
-        const LOADOUT_TYPES = new Set([
-          'WeaponGun', 'Weapon', 'WeaponRack', 'Gimbal', 'Turret',
-          'MissileRack', 'Shield', 'PowerPlant', 'Cooler', 'QuantumDrive',
-          'Radar', 'Countermeasure', 'EMP', 'QuantumInterdictionGenerator',
-        ]);
-        const visibleLoadout = (loadout ?? []).filter(n => LOADOUT_TYPES.has(n.port_type));
-        if (!visibleLoadout.length) return null;
-        return (
-          <ScifiPanel title="Default loadout" subtitle={`${visibleLoadout.length} composants`} actions={<Layers size={14} className="text-slate-600" />}>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2 max-h-96 overflow-y-auto">
-              {visibleLoadout.map((node, i) => (
-                <LoadoutTree key={i} node={node} />
-              ))}
-            </div>
-          </ScifiPanel>
-        );
-      })()}
+      {loadout && loadout.length > 0 && (
+        <ScifiPanel title="Default loadout" subtitle="Composants par défaut" actions={<Layers size={14} className="text-slate-600" />}>
+          <ShipLoadout nodes={loadout} />
+        </ScifiPanel>
+      )}
 
       {/* Similar ships */}
       {similar && similar.length > 0 && (

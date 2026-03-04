@@ -84,8 +84,25 @@ export interface LoadoutNode {
   component_name: string | null;
   component_type: string | null;
   component_size: number | null;
+  component_class_name: string | null;
   sub_type: string | null;
+  grade: string | null;
   manufacturer_code: string | null;
+  // Weapons
+  weapon_dps: number | null;
+  weapon_range: number | null;
+  // Shield
+  shield_hp: number | null;
+  // QD
+  qd_speed: number | null;
+  // Thruster
+  thruster_max_thrust: number | null;
+  thruster_type: string | null;
+  // Rack
+  rack_count: number | null;
+  rack_missile_size: number | null;
+  // CM
+  cm_ammo_count: number | null;
   children: LoadoutNode[];
 }
 
