@@ -344,7 +344,7 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
       })()}
 
       {/* ════════════════════════════════════════
-          SYSTEMS — Power + Heat
+          SYSTEMS — Output + Consumption
       ════════════════════════════════════════ */}
       {hasPower && (
         <div>
@@ -426,13 +426,13 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
             return (
               <div className="grid grid-cols-2 gap-2">
                 <ArcGauge
-                  pct={pwrPct} stroke={pwrStroke} label="Power"
+                  pct={pwrPct} stroke={pwrStroke} label="Output"
                   draw={fK(ls.powerDraw)} capacity={fK(ls.powerOutput)}
                   textClass={pwrTxt}
                 />
                 {ls.cooling > 0 && (
                   <ArcGauge
-                    pct={htPct} stroke={htStroke} label="Heat"
+                    pct={htPct} stroke={htStroke} label="Consumption"
                     draw={fK(ls.heat)} capacity={fK(ls.cooling)}
                     textClass={htTxt}
                   />
