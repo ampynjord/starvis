@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { BarChart3, BookOpen, Package, Rocket, Settings2, Shield, Zap } from 'lucide-react';
+import { BarChart3, BookOpen, Package, Rocket, Settings2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '@/services/api';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
@@ -9,13 +9,13 @@ import { GlowBadge } from '@/components/ui/GlowBadge';
 import { fDateTime } from '@/utils/formatters';
 
 const STAT_CARDS = [
-  { key: 'ships',         label: 'Ships',         icon: Rocket,    color: 'text-cyan-400',   to: '/ships' },
-  { key: 'components',    label: 'Components',    icon: Settings2, color: 'text-blue-400',   to: '/components' },
-  { key: 'items',         label: 'Items',         icon: Shield,    color: 'text-green-400',  to: '/items' },
-  { key: 'manufacturers', label: 'Manufacturers', icon: Zap,       color: 'text-amber-400',  to: '/manufacturers' },
-  { key: 'commodities',   label: 'Commodities',   icon: Package,   color: 'text-purple-400', to: '/commodities' },
-  { key: 'paints',        label: 'Paints',        icon: BarChart3, color: 'text-pink-400',   to: '/paints' },
-] as const;
+  { key: 'ships',         label: 'Ships',         icon: Rocket,    emoji: null,  color: 'text-cyan-400',   to: '/ships' },
+  { key: 'components',    label: 'Components',    icon: Settings2, emoji: null,  color: 'text-blue-400',   to: '/components' },
+  { key: 'items',         label: 'Items',         icon: null,      emoji: '🎲',  color: 'text-green-400',  to: '/items' },
+  { key: 'manufacturers', label: 'Manufacturers', icon: null,      emoji: '🔧',  color: 'text-amber-400',  to: '/manufacturers' },
+  { key: 'commodities',   label: 'Commodities',   icon: Package,   emoji: null,  color: 'text-purple-400', to: '/commodities' },
+  { key: 'paints',        label: 'Paints',        icon: null,      emoji: '🎨',  color: 'text-pink-400',   to: '/paints' },
+];
 
 export default function HomePage() {
   const { data: stats, isLoading: statsLoading } = useQuery({
@@ -63,7 +63,7 @@ export default function HomePage() {
         <LoadingGrid rows={1} cols={6} message="LOADING STATS…" />
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {STAT_CARDS.map(({ key, label, icon: Icon, color, to }, i) => (
+          {STAT_CARDS.map(({ key, label, icon: Icon, emoji, color, to }, i) => (
             <motion.div
               key={key}
               initial={{ opacity: 0, y: 20 }}
@@ -72,7 +72,10 @@ export default function HomePage() {
             >
               <Link to={to} className="block">
                 <div className="holo-card text-center py-4">
-                  <Icon size={20} className={`${color} mx-auto mb-2`} />
+                  {emoji
+                    ? <span className={`text-xl block mb-2 ${color}`}>{emoji}</span>
+                    : Icon ? <Icon size={20} className={`${color} mx-auto mb-2`} /> : null
+                  }
                   <p className="font-orbitron text-xl font-bold text-slate-200">
                     {stats ? (stats[key as keyof typeof stats] ?? 0).toLocaleString('en-US') : '—'}
                   </p>
@@ -91,13 +94,16 @@ export default function HomePage() {
         {/* Quick links */}
         <ScifiPanel title="Quick nav" className="lg:col-span-1">
           <div className="space-y-1.5">
-            {STAT_CARDS.map(({ to, icon: Icon, label, color }) => (
+            {STAT_CARDS.map(({ to, icon: Icon, emoji, label, color }) => (
               <Link
                 key={label}
                 to={to}
                 className="flex items-center gap-3 px-3 py-2.5 rounded border border-transparent hover:border-border hover:bg-white/5 transition-all group"
               >
-                <Icon size={14} className={color} />
+                {emoji
+                  ? <span className={`text-sm leading-none ${color}`}>{emoji}</span>
+                  : Icon ? <Icon size={14} className={color} /> : null
+                }
                 <span className="font-rajdhani font-semibold text-sm text-slate-400 group-hover:text-slate-200 uppercase tracking-wide transition-colors">
                   {label}
                 </span>
