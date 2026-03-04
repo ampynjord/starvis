@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import {
-  BarChart3, BookOpen, FileText, Home, Package, Palette, Rocket, Settings2, Shield, ShoppingBag, Zap,
+  BarChart3, BookOpen, Dices, FileText, Home, Package, Palette, Rocket, Settings2, ShoppingBag, Wrench,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
@@ -9,10 +9,10 @@ const NAV_ITEMS = [
   { to: '/ships',        icon: Rocket,      label: 'Ships' },
   { to: '/compare',      icon: BarChart3,   label: 'Compare' },
   { to: '/components',   icon: Settings2,   label: 'Components' },
-  { to: '/items',        icon: Shield,      label: 'Items' },
+  { to: '/items',        icon: Dices,       label: 'Items' },
   { to: '/commodities',  icon: Package,     label: 'Commodities' },
   { to: '/paints',       icon: Palette,     label: 'Paints' },
-  { to: '/manufacturers',icon: Zap,         label: 'Manufacturers' },
+  { to: '/manufacturers',icon: Wrench,      label: 'Manufacturers' },
   { to: '/shops',        icon: ShoppingBag, label: 'Shops' },
   { to: '/changelog',    icon: BookOpen,    label: 'Changelog' },
 ];
