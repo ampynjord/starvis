@@ -79,7 +79,7 @@ export function Sidebar() {
           className="hidden md:flex items-center gap-2 text-xs text-slate-600 hover:text-slate-400 transition-colors"
         >
           <FileText size={12} />
-          <span className="font-mono-sc">RSI UNIVERSE</span>
+          <span className="font-mono-sc">RSI Website</span>
         </a>
       </div>
     </aside>
