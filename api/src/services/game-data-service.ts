@@ -354,9 +354,7 @@ export class GameDataService {
       `SELECT entity_type, change_type, COUNT(*) as count
        FROM changelog GROUP BY entity_type, change_type ORDER BY entity_type, change_type`,
     );
-    const [latest] = await this.pool.execute<Row[]>(
-      'SELECT extracted_at FROM extraction_log ORDER BY id DESC LIMIT 1',
-    );
+    const [latest] = await this.pool.execute<Row[]>('SELECT extracted_at FROM extraction_log ORDER BY id DESC LIMIT 1');
     const [total] = await this.pool.execute<Row[]>('SELECT COUNT(*) as total FROM changelog');
 
     const by_entity: Record<string, number> = {};
