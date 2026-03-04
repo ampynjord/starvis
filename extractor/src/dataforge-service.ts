@@ -79,10 +79,16 @@ export class DataForgeService implements DataForgeContext {
     try {
       // 1. Known fixed paths
       const versionPaths = [
-        'build_manifest.id', 'Data\\build_manifest.id', 'Data/build_manifest.id',
-        'version.cfg', 'Data\\version.cfg', 'Data/version.cfg',
-        'Data\\Libs\\Config\\game.ini', 'Data/Libs/Config/game.ini',
-        'Data\\Scripts\\AutoExec.cfg', 'Data/Scripts/AutoExec.cfg',
+        'build_manifest.id',
+        'Data\\build_manifest.id',
+        'Data/build_manifest.id',
+        'version.cfg',
+        'Data\\version.cfg',
+        'Data/version.cfg',
+        'Data\\Libs\\Config\\game.ini',
+        'Data/Libs/Config/game.ini',
+        'Data\\Scripts\\AutoExec.cfg',
+        'Data/Scripts/AutoExec.cfg',
       ];
       const parseVersionBuf = (raw: string, vPath: string): boolean => {
         const match = raw.match(/(?:^|\b)(\d+\.\d+(?:\.\d+)*(?:-[A-Z]+\.\d+)?)/);
@@ -113,7 +119,9 @@ export class DataForgeService implements DataForgeContext {
           try {
             const raw = (await this.provider.readFileFromEntry(entry)).toString('utf8').trim();
             if (parseVersionBuf(raw, entry.fileName)) break;
-          } catch (_e) { /* skip non-text files */ }
+          } catch (_e) {
+            /* skip non-text files */
+          }
         }
       }
     } catch (_err) {

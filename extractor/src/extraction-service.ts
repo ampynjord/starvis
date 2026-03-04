@@ -7,7 +7,13 @@
  */
 import { createHash } from 'node:crypto';
 import type { Pool, PoolConnection } from 'mysql2/promise';
-import { applyDimensionsFallback, applyHullSeriesCargoFallback, crossReferenceShipMatrix, pruneExcludedVariants, tagVariantTypes } from './crossref.js';
+import {
+  applyDimensionsFallback,
+  applyHullSeriesCargoFallback,
+  crossReferenceShipMatrix,
+  pruneExcludedVariants,
+  tagVariantTypes,
+} from './crossref.js';
 import { classifyPort, type DataForgeService, MANUFACTURER_CODES } from './dataforge-service.js';
 import { LocalizationService } from './localization-service.js';
 import logger from './logger.js';
