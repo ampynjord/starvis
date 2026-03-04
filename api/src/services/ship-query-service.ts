@@ -141,7 +141,7 @@ export class ShipQueryService {
     if (!num(ship.size_y) && ship.ship_matrix_id) {
       const [smRows] = await this.pool.execute<Row[]>('SELECT length, beam, height FROM ship_matrix WHERE id = ?', [ship.ship_matrix_id]);
       if (smRows.length) {
-        ship.size_x = num(smRows[0].beam);   // beam   → width  (size_x)
+        ship.size_x = num(smRows[0].beam); // beam   → width  (size_x)
         ship.size_y = num(smRows[0].length); // length → length (size_y)
         ship.size_z = num(smRows[0].height); // height → height (size_z)
       }
