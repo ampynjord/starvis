@@ -19,92 +19,77 @@ export function ShipCard({ ship, index = 0 }: Props) {
       transition={{ duration: 0.25, delay: Math.min(index * 0.04, 0.4) }}
     >
       <Link to={`/ships/${ship.uuid}`} className="block">
-        <div className="holo-card h-full">
-          {/* Thumbnail */}
-          <div className="relative w-full aspect-video rounded overflow-hidden bg-slate-900/80 border border-border/40">
+        {/* Carte horizontale à hauteur fixe */}
+        <div className="holo-card flex h-28 overflow-hidden">
+          {/* Thumbnail — largeur fixe, hauteur 100% */}
+          <div className="relative w-36 flex-shrink-0 bg-slate-900/80">
             {ship.thumbnail ? (
               <img
                 src={ship.thumbnail}
                 alt={ship.name}
-                className="w-full h-full object-cover opacity-90 hover:opacity-100 transition-opacity"
+                className="w-full h-full object-cover opacity-90"
                 loading="lazy"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <span className="font-orbitron text-2xl font-black text-slate-700 select-none">
+                <span className="font-orbitron text-lg font-black text-slate-700 select-none">
                   {ship.manufacturer_code ?? ship.name.slice(0, 2).toUpperCase()}
                 </span>
               </div>
             )}
-            {/* Variant badge overlay */}
-            {ship.variant_type && ship.variant_type !== 'standard' && (
-              <div className="absolute top-1.5 right-1.5">
-                <GlowBadge
-                  color={
-                    ship.variant_type === 'collector' ? 'amber' :
-                    ship.variant_type === 'npc' ? 'red' :
-                    ship.variant_type === 'pyam_exec' ? 'purple' : 'slate'
-                  }
-                >
-                  {VARIANT_TYPE_LABELS[ship.variant_type] ?? ship.variant_type}
-                </GlowBadge>
+            {/* Gradient fondu vers la droite */}
+            <div className="absolute inset-y-0 right-0 w-8 bg-gradient-to-r from-transparent to-[#0A1628] pointer-events-none" />
+          </div>
+
+          {/* Contenu */}
+          <div className="flex-1 min-w-0 flex flex-col justify-between p-3 pl-2">
+            {/* Haut : fabricant + nom + badge variante */}
+            <div className="min-w-0">
+              <div className="flex items-start justify-between gap-1">
+                <p className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider truncate">
+                  {ship.manufacturer_code}
+                </p>
+                {ship.variant_type && ship.variant_type !== 'standard' && (
+                  <GlowBadge
+                    color={
+                      ship.variant_type === 'collector' ? 'amber' :
+                      ship.variant_type === 'npc' ? 'red' :
+                      ship.variant_type === 'pyam_exec' ? 'purple' : 'slate'
+                    }
+                  >
+                    {VARIANT_TYPE_LABELS[ship.variant_type] ?? ship.variant_type}
+                  </GlowBadge>
+                )}
               </div>
-            )}
-            {/* Gradient fade vers le bas */}
-            <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#0A1628] to-transparent pointer-events-none" />
-          </div>
+              <h3 className="font-orbitron text-xs font-bold text-slate-200 truncate leading-tight mt-0.5">
+                {ship.name}
+              </h3>
+            </div>
 
-          {/* Header — chevauche le fondu */}
-          <div className="mb-2 -mt-1 relative z-10">
-            <p className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider truncate">
-              {ship.manufacturer_code}
-            </p>
-            <h3 className="font-orbitron text-sm font-bold text-slate-200 truncate mt-0.5 leading-tight">
-              {ship.name}
-            </h3>
-          </div>
+            {/* Milieu : stats */}
+            <div className="flex gap-2">
+              <StatCell icon={<Users size={9} />} label="Crew" value={ship.crew_size != null ? String(ship.crew_size) : '—'} />
+              <StatCell icon={<Zap size={9} />} label="SCM" value={fSpeed(ship.scm_speed)} />
+              <StatCell icon={<Maximize2 size={9} />} label="Long." value={fDimension(ship.cross_section_z)} />
+            </div>
 
-          {/* Role/Career */}
-          <div className="flex flex-wrap gap-1 mb-3">
-            {ship.career && (
-              <GlowBadge color="cyan" size="xs">{ship.career}</GlowBadge>
-            )}
-            {ship.role && ship.role !== ship.career && (
-              <GlowBadge color="slate" size="xs">{ship.role}</GlowBadge>
-            )}
-            {ship.vehicle_category && (
-              <GlowBadge color="slate" size="xs">{ship.vehicle_category}</GlowBadge>
-            )}
-          </div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <StatCell
-              icon={<Users size={10} />}
-              label="Crew"
-              value={ship.crew_size != null ? String(ship.crew_size) : '—'}
-            />
-            <StatCell
-              icon={<Zap size={10} />}
-              label="SCM"
-              value={fSpeed(ship.scm_speed)}
-            />
-            <StatCell
-              icon={<Maximize2 size={10} />}
-              label="Long."
-              value={fDimension(ship.cross_section_z)}
-            />
-          </div>
-
-          {/* Bottom border glow */}
-          <div className="mt-3 pt-2 border-t border-border/50">
-            <p className="text-xs text-slate-600 font-mono-sc truncate">
-              {ship.ship_matrix_id != null ? (
-                <span className="text-green-500">◆ RSI linked</span>
-              ) : (
-                <span className="text-slate-700">◇ Source: game data</span>
-              )}
-            </p>
+            {/* Bas : badge career/role + RSI status */}
+            <div className="flex items-center justify-between gap-1">
+              <div className="flex gap-1 min-w-0 flex-wrap">
+                {ship.career && (
+                  <GlowBadge color="cyan" size="xs">{ship.career}</GlowBadge>
+                )}
+                {ship.role && ship.role !== ship.career && (
+                  <GlowBadge color="slate" size="xs">{ship.role}</GlowBadge>
+                )}
+              </div>
+              <p className="text-xs font-mono-sc flex-shrink-0">
+                {ship.ship_matrix_id != null
+                  ? <span className="text-green-500">◆ RSI</span>
+                  : <span className="text-slate-700">◇</span>
+                }
+              </p>
+            </div>
           </div>
         </div>
       </Link>
@@ -114,12 +99,12 @@ export function ShipCard({ ship, index = 0 }: Props) {
 
 function StatCell({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="sci-panel p-1.5 text-center">
-      <div className="flex items-center justify-center gap-1 text-slate-600 mb-0.5">
+    <div className="sci-panel px-1.5 py-1 text-center flex-1">
+      <div className="flex items-center justify-center gap-0.5 text-slate-600 mb-0.5">
         {icon}
-        <span className="text-xs font-mono-sc uppercase">{label}</span>
+        <span className="text-[9px] font-mono-sc uppercase">{label}</span>
       </div>
-      <p className="text-xs font-mono-sc text-slate-300">{value}</p>
+      <p className="text-[10px] font-mono-sc text-slate-300 leading-tight">{value}</p>
     </div>
   );
 }

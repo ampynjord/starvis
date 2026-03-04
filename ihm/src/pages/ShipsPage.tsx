@@ -122,7 +122,7 @@ export default function ShipsPage() {
             <EmptyState icon="🚀" title="No ships found" message="Try adjusting your filters." />
           ) : (
             <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                 {data?.data.map((ship, i) => (
                   <ShipCard key={ship.uuid} ship={ship} index={i} />
                 ))}
