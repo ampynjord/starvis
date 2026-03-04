@@ -142,6 +142,14 @@ export class ExtractionService {
     stats.extractionHash = extractionHash;
 
     const conn = await this.pool.getConnection();
+    // Keepalive: send a harmless SELECT every 30 s to prevent the MySQL server
+    // (or the SSH tunnel in front of it) from closing the connection during the
+    // CPU-intensive ship-extraction phase (which can run for 15+ minutes without
+    // sending any SQL).
+    const keepaliveTimer = setInterval(async () => {
+      try { await conn.query('SELECT 1'); } catch { /* ignore — if the connection is
+      broken we'll find out on the next real query */ }
+    }, 30_000);
     try {
       // 1b. Snapshot current data BEFORE cleaning — for changelog comparison
       onProgress?.('Snapshotting current data for changelog…');
@@ -288,6 +296,7 @@ export class ExtractionService {
       onProgress?.('❌ Extraction failed — transaction rolled back, old data preserved');
       throw e;
     } finally {
+      clearInterval(keepaliveTimer);
       conn.release();
     }
 
