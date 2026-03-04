@@ -95,6 +95,11 @@ export interface LoadoutNode {
   shield_hp: number | null;
   // QD
   qd_speed: number | null;
+  // Power / heat
+  power_output: number | null;
+  power_draw: number | null;
+  heat_generation: number | null;
+  cooling_rate: number | null;
   // Thruster
   thruster_max_thrust: number | null;
   thruster_type: string | null;
