@@ -55,11 +55,11 @@ export default function CommoditiesPage() {
         <div className="flex-1 min-w-0">
           {isLoading ? <LoadingGrid message="LOADING…" />
           : error ? <ErrorState error={error as Error} onRetry={() => void refetch()} />
-          : data?.data.length === 0 ? <EmptyState icon="📦" title="No commodities found" />
+          : !data?.data?.length ? <EmptyState icon="📦" title="No commodities found" />
           : (
             <>
               <div className="space-y-1.5">
-                {data?.data.map((c, i) => (
+                {(data.data ?? []).map((c, i) => (
                   <motion.div key={c.uuid} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }}>
                     <div className="sci-panel px-4 py-3 hover:border-cyan-800 transition-colors">
                       <div className="flex items-center gap-3">
