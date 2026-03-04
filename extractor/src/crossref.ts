@@ -270,3 +270,23 @@ export async function applyHullSeriesCargoFallback(conn: PoolConnection): Promis
     logger.warn(`Hull cargo fallback failed: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
+
+/**
+ * Apply dimensions fallback from Ship Matrix when P4K bbox is missing (size_y = NULL or 0).
+ * Maps SM columns: beam → size_x (width), length → size_y (length), height → size_z (height).
+ */
+export async function applyDimensionsFallback(conn: PoolConnection): Promise<void> {
+  try {
+    const [updated]: any = await conn.execute(
+      `UPDATE ships s JOIN ship_matrix sm ON s.ship_matrix_id = sm.id
+       SET s.size_x = sm.beam, s.size_y = sm.length, s.size_z = sm.height
+       WHERE (s.size_y IS NULL OR s.size_y = 0)
+         AND sm.length IS NOT NULL AND sm.length > 0`,
+    );
+    if (updated.affectedRows > 0) {
+      logger.info(`Dimensions fallback (Ship Matrix) applied to ${updated.affectedRows} ships`);
+    }
+  } catch (e: unknown) {
+    logger.warn(`Dimensions fallback failed: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
