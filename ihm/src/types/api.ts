@@ -74,6 +74,8 @@ export interface Ship extends ShipListItem {
   armor_signal_ir: number | null;
   armor_signal_em: number | null;
   armor_signal_cs: number | null;
+  min_crew: number | null;
+  max_crew: number | null;
 }
 
 export interface LoadoutNode {
