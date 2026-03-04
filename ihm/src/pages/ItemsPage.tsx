@@ -17,8 +17,7 @@ export default function ItemsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [type, setType] = useState('');
-  const [size, setSize] = useState('');
-  const [grade, setGrade] = useState('');
+  const [manufacturer, setManufacturer] = useState('');
   const debouncedSearch = useDebounce(search, 350);
 
   const { data: filters } = useQuery({
@@ -27,23 +26,21 @@ export default function ItemsPage() {
     staleTime: Infinity,
   });
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['items.list', { page, search: debouncedSearch, type, size, grade }],
+    queryKey: ['items.list', { page, search: debouncedSearch, type, manufacturer }],
     queryFn: () => api.items.list({
       page, limit: LIMIT,
       search: debouncedSearch || undefined,
       type: type || undefined,
-      size: size ? Number(size) : undefined,
-      grade: grade || undefined,
+      manufacturer: manufacturer || undefined,
     }),
   });
 
-  const hasFilters = !!(type || size || grade || debouncedSearch);
-  const resetFilters = () => { setType(''); setSize(''); setGrade(''); setSearch(''); setPage(1); };
+  const hasFilters = !!(type || manufacturer || debouncedSearch);
+  const resetFilters = () => { setType(''); setManufacturer(''); setSearch(''); setPage(1); };
 
   const filterGroups = filters ? [
-    { key: 'type', label: 'Type',  options: (filters['types'] ?? []).map((t: string) => ({ label: t, value: t })),    value: type,  onChange: (v: string) => { setType(v); setPage(1); } },
-    { key: 'size', label: 'Size',  options: (filters['sizes'] ?? []).map((s: string) => ({ label: `S${s}`, value: s })), value: size, onChange: (v: string) => { setSize(v); setPage(1); } },
-    { key: 'grade', label: 'Grade', options: (filters['grades'] ?? []).map((g: string) => ({ label: g, value: g })),   value: grade, onChange: (v: string) => { setGrade(v); setPage(1); } },
+    { key: 'type', label: 'Type',         options: (filters['types'] ?? []).map((t: string) => ({ label: t, value: t })),   value: type,         onChange: (v: string) => { setType(v); setPage(1); } },
+    { key: 'mfr',  label: 'Manufacturer', options: (filters['manufacturers'] ?? []).map((m: string) => ({ label: m, value: m })), value: manufacturer, onChange: (v: string) => { setManufacturer(v); setPage(1); } },
   ] : [];
 
   return (

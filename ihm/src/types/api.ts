@@ -116,18 +116,18 @@ export interface ShipFilters {
 // ─── Components ───────────────────────────────────────────────────────────────
 export interface ComponentListItem {
   uuid: string;
+  class_name: string;
   name: string;
   type: string;
   sub_type: string | null;
   size: number | null;
   grade: string | null;
-  class: string | null;
   manufacturer_code: string | null;
   manufacturer_name: string | null;
-  description: string | null;
 }
 
 export interface Component extends ComponentListItem {
+  description: string | null;
   mass: number | null;
   hp: number | null;
   power_base: number | null;
@@ -153,6 +153,7 @@ export interface BuyLocation {
 // ─── Items ─────────────────────────────────────────────────────────────────────
 export interface ItemListItem {
   uuid: string;
+  class_name: string;
   name: string;
   type: string;
   sub_type: string | null;
@@ -160,11 +161,12 @@ export interface ItemListItem {
   grade: string | null;
   manufacturer_code: string | null;
   manufacturer_name: string | null;
-  description: string | null;
 }
 
 export interface Item extends ItemListItem {
   mass: number | null;
+  hp: number | null;
+  description: string | null;
   game_data: Record<string, unknown> | null;
 }
 
