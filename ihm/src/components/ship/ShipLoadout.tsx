@@ -212,9 +212,46 @@ function parseJumpDriveName(className: string): string {
     .replace(/_/g, ' ');
 }
 
+// Extract size from JDRV class_name: JDRV_TARS_S01_Explorer_SCItem → 1
+function parseJumpDriveSize(className: string | null | undefined): number | null {
+  if (!className) return null;
+  const m = className.match(/^JDRV_[A-Z0-9]+_S(\d+)/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+
 // Convert N → MN string
 function toMN(n: number) {
   return (n / 1_000_000).toFixed(2);
+}
+
+// Strip "S## " size prefix embedded in component names from DB (e.g. "S01 Ecouter" → "Ecouter")
+function cleanCompName(name: string | null | undefined): string | null {
+  if (!name) return null;
+  return name.replace(/^S\d{2}\s+/, '');
+}
+
+// Extract real manufacturer code from class_name.
+// For type-prefixed class_names, the DB stores the type code in manufacturer_code instead.
+// Pattern: {TYPECODE}_{MFR}_{SIZE}_..._SCItem → real mfr is segment[1]
+// Exception for racks: MRCK_{SIZE}_{MFR}_... → real mfr is segment[2]
+const COMPONENT_TYPE_PREFIXES = new Set(['COOL','RADR','SHLD','QDRV','PWRP','PPLNT','THRM','POWR']);
+function extractMfr(
+  className: string | null | undefined,
+  fallback: string | null | undefined,
+): string | null {
+  if (!className) return fallback ?? null;
+  const parts = className.split('_');
+  const prefix = (parts[0] ?? '').toUpperCase();
+  if (prefix === 'MRCK' || prefix === 'GMRCK') {
+    // MRCK_S02_ORIG_100i_... → segment[2] is manufacturer
+    return parts[2] ?? fallback ?? null;
+  }
+  if (COMPONENT_TYPE_PREFIXES.has(prefix)) {
+    // COOL_AEGS_S03_..., RADR_GRNP_S01_..., SHLD_BEHR_S02_... → segment[1]
+    return parts[1] ?? fallback ?? null;
+  }
+  // WeaponGun, Thruster, Gimbal... → manufacturer_code already correct
+  return fallback ?? null;
 }
 
 // ── Interfaces internes ──────────────────────────────────
@@ -236,6 +273,7 @@ interface SystemItem {
 }
 interface ThrusterGroup {
   type: string;
+  size: number | null;
   count: number;
   totalThrust: number; // N
 }
@@ -400,21 +438,24 @@ function processLoadout(nodes: LoadoutNode[]): ProcessedLoadout {
   for (const node of rawThrusters) {
     const thrType = node.thruster_type ?? 'Main';
     const thrust = node.thruster_max_thrust ?? 0;
-    const ex = thrusterMap.get(thrType);
+    const size = node.component_size ?? null;
+    const key = `${thrType}|${size}`;
+    const ex = thrusterMap.get(key);
     if (ex) {
       ex.count++;
       ex.totalThrust += thrust;
     } else {
-      thrusterMap.set(thrType, { type: thrType, count: 1, totalThrust: thrust });
+      thrusterMap.set(key, { type: thrType, size, count: 1, totalThrust: thrust });
     }
   }
-  const thrusters = THRUSTER_ORDER
-    .map(t => thrusterMap.get(t))
-    .filter((t): t is ThrusterGroup => t != null);
-  // Add any unrecognized types at end
-  for (const [t, v] of thrusterMap) {
-    if (!THRUSTER_ORDER.includes(t)) thrusters.push(v);
-  }
+  // Sort by THRUSTER_ORDER, then by type key alphabetically for unknowns
+  const allGroups = Array.from(thrusterMap.values());
+  const thrusters = [
+    ...THRUSTER_ORDER.flatMap(t =>
+      allGroups.filter(g => g.type === t).sort((a, b) => (b.size ?? 0) - (a.size ?? 0))
+    ),
+    ...allGroups.filter(g => !THRUSTER_ORDER.includes(g.type)),
+  ];
 
   return {
     weapons,
@@ -494,9 +535,8 @@ export function ShipLoadout({ nodes }: Props) {
                 <LoadoutRow
                   key={i}
                   size={mount.component_size ?? mount.port_max_size}
-                  name={mount.component_name ?? `${mount.port_type} Mount`}
-                  grade={mount.grade}
-                  mfr={mount.manufacturer_code}
+                  name={cleanCompName(mount.component_name) ?? `${mount.port_type} Mount`}
+                  mfr={extractMfr(mount.component_class_name, mount.manufacturer_code)}
                   count={slot.count}
                   uuid={mount.component_uuid}
                   meta={wLabel}
@@ -504,9 +544,8 @@ export function ShipLoadout({ nodes }: Props) {
                   {weapon ? (
                     <SubRow
                       size={weapon.component_size ?? weapon.port_max_size}
-                      name={weapon.component_name ?? '—'}
-                      grade={weapon.grade}
-                      mfr={weapon.manufacturer_code}
+                      name={cleanCompName(weapon.component_name) ?? '—'}
+                      mfr={extractMfr(weapon.component_class_name, weapon.manufacturer_code)}
                       count={slot.count}
                       uuid={weapon.component_uuid}
                     />
@@ -522,9 +561,8 @@ export function ShipLoadout({ nodes }: Props) {
                 <LoadoutRow
                   key={i}
                   size={w.component_size ?? w.port_max_size}
-                  name={w.component_name ?? '—'}
-                  grade={w.grade}
-                  mfr={w.manufacturer_code}
+                  name={cleanCompName(w.component_name) ?? '—'}
+                  mfr={extractMfr(w.component_class_name, w.manufacturer_code)}
                   count={slot.count}
                   uuid={w.component_uuid}
                   meta={wLabel}
@@ -546,17 +584,15 @@ export function ShipLoadout({ nodes }: Props) {
                 key={i}
                 size={slot.rack.component_size ?? slot.rack.port_max_size}
                 name={buildRackName(slot.rack)}
-                grade={slot.rack.grade}
-                mfr={slot.rack.manufacturer_code}
+                mfr={extractMfr(slot.rack.component_class_name, slot.rack.manufacturer_code)}
                 count={slot.count}
                 uuid={slot.rack.component_uuid}
               >
                 {missileNode && (
                   <SubRow
                     size={missileNode.component_size ?? missileNode.port_max_size}
-                    name={missileNode.component_name ?? 'Missile'}
-                    grade={missileNode.grade}
-                    mfr={missileNode.manufacturer_code}
+                    name={cleanCompName(missileNode.component_name) ?? 'Missile'}
+                    mfr={extractMfr(missileNode.component_class_name, missileNode.manufacturer_code)}
                     count={totalMissiles}
                     uuid={missileNode.component_uuid}
                   />
@@ -574,9 +610,9 @@ export function ShipLoadout({ nodes }: Props) {
             <LoadoutRow
               key={i}
               size={item.node.component_size}
-              name={item.node.component_name ?? '—'}
+              name={cleanCompName(item.node.component_name) ?? '—'}
               grade={item.node.grade}
-              mfr={item.node.manufacturer_code}
+              mfr={extractMfr(item.node.component_class_name, item.node.manufacturer_code)}
               count={item.count}
               uuid={item.node.component_uuid}
               meta={item.node.shield_hp != null ? `${item.node.shield_hp.toLocaleString('en-US')} HP` : undefined}
@@ -595,9 +631,9 @@ export function ShipLoadout({ nodes }: Props) {
               <LoadoutRow
                 key={i}
                 size={item.node.component_size}
-                name={item.node.component_name ?? '—'}
+                name={cleanCompName(item.node.component_name) ?? '—'}
                 grade={item.node.grade}
-                mfr={item.node.manufacturer_code}
+                mfr={extractMfr(item.node.component_class_name, item.node.manufacturer_code)}
                 count={item.count}
                 uuid={item.node.component_uuid}
                 meta={typeLabel}
@@ -606,15 +642,15 @@ export function ShipLoadout({ nodes }: Props) {
                   <SubRow
                     name={
                       jm.component_name
-                        ? jm.component_name
+                        ? cleanCompName(jm.component_name) ?? 'Jump Module'
                         : jm.component_class_name
                           ? parseJumpDriveName(jm.component_class_name)
                           : 'Jump Module'
                     }
                     grade={jm.grade}
-                    mfr={jm.manufacturer_code}
+                    mfr={extractMfr(jm.component_class_name, jm.manufacturer_code)}
                     uuid={jm.component_uuid}
-                    size={jm.component_size}
+                    size={jm.component_size ?? parseJumpDriveSize(jm.component_class_name)}
                   />
                 )}
               </LoadoutRow>
@@ -632,9 +668,11 @@ export function ShipLoadout({ nodes }: Props) {
               className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-white/5 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <span className="text-xs font-mono-sc bg-slate-800 text-slate-500 border border-slate-700 rounded px-1 py-0.5 leading-none flex-shrink-0">
-                  S1
-                </span>
+                {g.size != null && (
+                  <span className="text-xs font-mono-sc bg-slate-800 text-slate-500 border border-slate-700 rounded px-1 py-0.5 leading-none flex-shrink-0">
+                    S{g.size}
+                  </span>
+                )}
                 <span className="text-sm text-slate-300">{g.type}</span>
                 <span className="text-xs font-mono-sc text-slate-500">
                   ×{g.count}
