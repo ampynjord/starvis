@@ -32,12 +32,14 @@ describe('ShipQueryService', () => {
   describe('getShipFilters', () => {
     it('returns filter values from parallel queries', async () => {
       const pool = createMockPool([
+        [[row({ code: 'RSI', name: 'Roberts Space Industries' })], []],
         [[row({ role: 'Combat' }), row({ role: 'Exploration' })], []],
         [[row({ career: 'Military' })], []],
         [[row({ variant_type: 'collector' })], []],
       ]);
       const svc = new ShipQueryService(pool);
       const filters = await svc.getShipFilters();
+      expect(filters.manufacturers).toEqual([{ code: 'RSI', name: 'Roberts Space Industries' }]);
       expect(filters.roles).toEqual(['Combat', 'Exploration']);
       expect(filters.careers).toEqual(['Military']);
       expect(filters.variant_types).toEqual(['collector']);
