@@ -19,7 +19,7 @@ import slowDown from 'express-slow-down';
 import helmet from 'helmet';
 import * as mysql from 'mysql2/promise';
 import swaggerUi from 'swagger-ui-express';
-
+import { initDrizzle } from './src/db/index.js';
 import { createRoutes } from './src/routes.js';
 import { GameDataService, initializeSchema, ShipMatrixService } from './src/services/index.js';
 import { DB_CONFIG, logger } from './src/utils/index.js';
@@ -143,6 +143,7 @@ async function start() {
       const conn = await pool.getConnection();
       await initializeSchema(conn);
       conn.release();
+      initDrizzle(pool);
       logger.info('✅ Database ready', { module: 'DB' });
       dbReady = true;
       break;
