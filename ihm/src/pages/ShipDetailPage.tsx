@@ -155,9 +155,9 @@ export default function ShipDetailPage() {
 
           <ScifiPanel title="Agility (deg/s)">
             <div className="space-y-3">
-              <StatBar label="Pitch" displayValue={ship.pitch_max != null ? `${ship.pitch_max.toFixed(0)}°/s` : '—'} value={ship.pitch_max ?? 0} max={90} />
-              <StatBar label="Yaw"   displayValue={ship.yaw_max   != null ? `${ship.yaw_max.toFixed(0)}°/s`   : '—'} value={ship.yaw_max   ?? 0} max={90} />
-              <StatBar label="Roll"  displayValue={ship.roll_max  != null ? `${ship.roll_max.toFixed(0)}°/s`   : '—'} value={ship.roll_max  ?? 0} max={90} color="amber" />
+              <StatBar label="Pitch" displayValue={ship.pitch_max != null ? `${Number(ship.pitch_max).toFixed(0)}°/s` : '—'} value={ship.pitch_max ?? 0} max={90} />
+                  <StatBar label="Yaw"   displayValue={ship.yaw_max   != null ? `${Number(ship.yaw_max).toFixed(0)}°/s`   : '—'} value={ship.yaw_max   ?? 0} max={90} />
+                  <StatBar label="Roll"  displayValue={ship.roll_max  != null ? `${Number(ship.roll_max).toFixed(0)}°/s`   : '—'} value={ship.roll_max  ?? 0} max={90} color="amber" />
             </div>
           </ScifiPanel>
 

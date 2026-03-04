@@ -354,16 +354,25 @@ export class GameDataService {
       `SELECT entity_type, change_type, COUNT(*) as count
        FROM changelog GROUP BY entity_type, change_type ORDER BY entity_type, change_type`,
     );
-    const [recent] = await this.pool.execute<Row[]>(
-      `SELECT c.*, e.game_version FROM changelog c
-       LEFT JOIN extraction_log e ON c.extraction_id = e.id
-       ORDER BY c.created_at DESC LIMIT 10`,
+    const [latest] = await this.pool.execute<Row[]>(
+      'SELECT extracted_at FROM extraction_log ORDER BY id DESC LIMIT 1',
     );
     const [total] = await this.pool.execute<Row[]>('SELECT COUNT(*) as total FROM changelog');
+
+    const by_entity: Record<string, number> = {};
+    const by_change: Record<string, number> = {};
+    for (const row of byType) {
+      const et = String(row.entity_type);
+      const ct = String(row.change_type);
+      by_entity[et] = (by_entity[et] ?? 0) + Number(row.count);
+      by_change[ct] = (by_change[ct] ?? 0) + Number(row.count);
+    }
+
     return {
       total: Number(total[0]?.total) || 0,
-      by_type: byType,
-      recent,
+      by_entity,
+      by_change,
+      last_extraction: (latest[0]?.extracted_at as string) ?? null,
     };
   }
 }

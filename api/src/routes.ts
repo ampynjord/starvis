@@ -637,7 +637,7 @@ export function createRoutes(deps: RouteDependencies): Router {
     requireGameData,
     asyncHandler(async (req, res) => {
       const data = await gameDataService!.getCommodityTypes();
-      sendWithETag(req, res, { success: true, ...data });
+      sendWithETag(req, res, { success: true, data: data.types.map(t => t.type) });
     }),
   );
 
