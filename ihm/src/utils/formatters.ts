@@ -1,6 +1,8 @@
 export const fNumber = (v: number | null | undefined, decimals = 0): string => {
   if (v == null) return '—';
-  return v.toLocaleString('en-US', { maximumFractionDigits: decimals });
+  const n = typeof v === 'number' ? v : Number(v);
+  if (isNaN(n)) return '—';
+  return n.toLocaleString('en-US', { maximumFractionDigits: decimals });
 };
 
 export const fMass = (kg: number | null | undefined): string => {
@@ -51,8 +53,10 @@ export const fSize = (s: number | null | undefined): string => {
 
 export const fTime = (seconds: number | null | undefined): string => {
   if (seconds == null) return '—';
-  if (seconds < 60) return `${seconds.toFixed(0)}s`;
-  return `${(seconds / 60).toFixed(1)}min`;
+  const s = typeof seconds === 'number' ? seconds : Number(seconds);
+  if (isNaN(s)) return '—';
+  if (s < 60) return `${s.toFixed(0)}s`;
+  return `${(s / 60).toFixed(1)}min`;
 };
 
 export const fDimension = (v: number | null | undefined): string => {
