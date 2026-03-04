@@ -345,20 +345,6 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
           </div>
         )}
 
-        {/* Claim time */}
-        {ship.insurance_claim_time != null && (
-          <div className="flex items-center justify-between mt-2 px-0">
-            <span className="text-[10px] font-mono-sc text-slate-700 uppercase tracking-widest">Claim</span>
-            <span className="text-[10px] font-mono-sc text-slate-400">
-              {Number(ship.insurance_claim_time).toFixed(1)} min
-              {ship.insurance_expedite_cost != null && (
-                <span className="text-amber-600 ml-2">
-                  · {Number(ship.insurance_expedite_cost).toLocaleString('en-US')} aUEC
-                </span>
-              )}
-            </span>
-          </div>
-        )}
       </div>
 
       {/* ════════════════════════════════════════
@@ -399,13 +385,13 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
       {/* ════════════════════════════════════════
           FUEL + CARGO
       ════════════════════════════════════════ */}
-      {(ship.hydrogen_fuel_capacity != null || ship.quantum_fuel_capacity != null || (ship.cargo_capacity ?? 0) > 0) && (
+      {(ship.hydrogen_fuel_capacity != null || ship.quantum_fuel_capacity != null) && (
         <div>
-          <SectionLabel>Logistics</SectionLabel>
-          <div className="grid grid-cols-3 gap-1.5">
+          <SectionLabel>Fuel</SectionLabel>
+          <div className="grid grid-cols-2 gap-1.5">
             {ship.hydrogen_fuel_capacity != null && (
               <div className="flex flex-col items-center rounded-md border border-slate-800 bg-slate-900/40 py-2 px-1">
-                <span className="text-[9px] font-mono-sc text-slate-700 uppercase tracking-widest mb-0.5">H₂</span>
+                <span className="text-[9px] font-mono-sc text-slate-700 uppercase tracking-widest mb-0.5">Hydrogen</span>
                 <span className="text-sm font-orbitron font-bold text-sky-400 tabular-nums">
                   {Number(ship.hydrogen_fuel_capacity).toFixed(1)}
                 </span>
@@ -414,18 +400,9 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
             )}
             {ship.quantum_fuel_capacity != null && (
               <div className="flex flex-col items-center rounded-md border border-slate-800 bg-slate-900/40 py-2 px-1">
-                <span className="text-[9px] font-mono-sc text-slate-700 uppercase tracking-widest mb-0.5">QT</span>
+                <span className="text-[9px] font-mono-sc text-slate-700 uppercase tracking-widest mb-0.5">Quantum</span>
                 <span className="text-sm font-orbitron font-bold text-violet-400 tabular-nums">
                   {Number(ship.quantum_fuel_capacity).toFixed(1)}
-                </span>
-                <span className="text-[9px] font-mono-sc text-slate-700">SCU</span>
-              </div>
-            )}
-            {(ship.cargo_capacity ?? 0) > 0 && (
-              <div className="flex flex-col items-center rounded-md border border-slate-800 bg-slate-900/40 py-2 px-1">
-                <span className="text-[9px] font-mono-sc text-slate-700 uppercase tracking-widest mb-0.5">Cargo</span>
-                <span className="text-sm font-orbitron font-bold text-emerald-400 tabular-nums">
-                  {ship.cargo_capacity}
                 </span>
                 <span className="text-[9px] font-mono-sc text-slate-700">SCU</span>
               </div>
