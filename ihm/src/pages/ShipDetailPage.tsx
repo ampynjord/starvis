@@ -97,7 +97,7 @@ export default function ShipDetailPage() {
               <div className="flex flex-wrap gap-2 mt-3">
                 {ship.career && <GlowBadge color="cyan">{ship.career}</GlowBadge>}
                 {ship.role && ship.role !== ship.career && <GlowBadge color="slate">{ship.role}</GlowBadge>}
-                {ship.vehicle_category && <GlowBadge color="slate">{ship.vehicle_category}</GlowBadge>}
+                {ship.vehicle_category && ship.vehicle_category !== 'ship' && <GlowBadge color="slate">{ship.vehicle_category}</GlowBadge>}
                 {ship.variant_type && ship.variant_type !== 'standard' && (
                   <GlowBadge
                     color={ship.variant_type === 'collector' ? 'amber' : ship.variant_type === 'npc' ? 'red' : 'slate'}
