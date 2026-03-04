@@ -12,8 +12,8 @@ interface Props {
 export function LoadoutTree({ node, depth = 0 }: Props) {
   const [expanded, setExpanded] = useState(depth < 1);
   const hasChildren = node.children.length > 0;
-  const compColor = node.component?.type
-    ? (COMPONENT_TYPE_COLORS[node.component.type] ?? 'text-slate-400')
+  const compColor = node.component_type
+    ? (COMPONENT_TYPE_COLORS[node.component_type] ?? 'text-slate-400')
     : 'text-slate-600';
 
   return (
@@ -33,20 +33,20 @@ export function LoadoutTree({ node, depth = 0 }: Props) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5 flex-wrap">
             {/* Port size */}
-            {node.portSize > 0 && (
-              <span className="text-xs font-mono-sc text-slate-700">S{node.portSize}</span>
+            {node.port_max_size != null && node.port_max_size > 0 && (
+              <span className="text-xs font-mono-sc text-slate-700">S{node.port_max_size}</span>
             )}
             {/* Port type */}
-            <span className="text-xs text-slate-600 font-mono-sc">{node.portType}</span>
+            <span className="text-xs text-slate-600 font-mono-sc">{node.port_type}</span>
           </div>
           {/* Component */}
-          {node.component ? (
+          {node.component_uuid ? (
             <Link
-              to={`/components/${node.component.uuid}`}
+              to={`/components/${node.component_uuid}`}
               onClick={e => e.stopPropagation()}
               className={`text-xs ${compColor} hover:underline truncate block transition-colors`}
             >
-              {node.component.name}
+              {node.component_name}
             </Link>
           ) : (
             <span className="text-xs text-slate-700 italic">— vide —</span>

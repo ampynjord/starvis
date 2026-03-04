@@ -43,16 +43,19 @@ export default function ComparePage() {
 
   const STAT_ROWS: { key: string; label: string; format: (v: number | null) => string }[] = [
     { key: 'mass', label: 'Mass', format: v => fMass(v) },
-    { key: 'length', label: 'Length', format: v => fDimension(v) },
-    { key: 'width', label: 'Width', format: v => fDimension(v) },
-    { key: 'height', label: 'Height', format: v => fDimension(v) },
+    { key: 'cross_section_z', label: 'Length', format: v => fDimension(v) },
+    { key: 'cross_section_x', label: 'Width', format: v => fDimension(v) },
+    { key: 'cross_section_y', label: 'Height', format: v => fDimension(v) },
     { key: 'scm_speed', label: 'SCM', format: v => fSpeed(v) },
-    { key: 'afterburner_speed', label: 'Afterburner', format: v => fSpeed(v) },
-    { key: 'pitch', label: 'Pitch', format: v => v != null ? `${v.toFixed(0)}°/s` : '—' },
-    { key: 'yaw', label: 'Yaw', format: v => v != null ? `${v.toFixed(0)}°/s` : '—' },
-    { key: 'roll', label: 'Roll', format: v => v != null ? `${v.toFixed(0)}°/s` : '—' },
-    { key: 'crew_max', label: 'Max crew', format: v => v != null ? String(v) : '—' },
-    { key: 'cargocapacity', label: 'Cargo (SCU)', format: v => v != null ? v.toLocaleString('en-US') : '—' },
+    { key: 'max_speed', label: 'Max speed', format: v => fSpeed(v) },
+    { key: 'boost_speed_forward', label: 'Boost fwd', format: v => fSpeed(v) },
+    { key: 'pitch_max', label: 'Pitch', format: v => v != null ? `${v.toFixed(0)}°/s` : '—' },
+    { key: 'yaw_max', label: 'Yaw', format: v => v != null ? `${v.toFixed(0)}°/s` : '—' },
+    { key: 'roll_max', label: 'Roll', format: v => v != null ? `${v.toFixed(0)}°/s` : '—' },
+    { key: 'crew_size', label: 'Crew', format: v => v != null ? String(v) : '—' },
+    { key: 'cargo_capacity', label: 'Cargo (SCU)', format: v => v != null ? v.toLocaleString('en-US') : '—' },
+    { key: 'total_hp', label: 'Total HP', format: v => v != null ? v.toLocaleString('en-US') : '—' },
+    { key: 'shield_hp', label: 'Shield HP', format: v => v != null ? v.toLocaleString('en-US') : '—' },
   ];
 
   return (
@@ -70,7 +73,7 @@ export default function ComparePage() {
           const query = slot === 'a' ? queryA : queryB;
           const setQuery = slot === 'a' ? setQueryA : setQueryB;
           const suggestions = slot === 'a' ? suggestA : suggestB;
-          const ship = comparison?.[slot === 'a' ? 'ship1' : 'ship2'];
+          const ship = comparison?.full[slot === 'a' ? 'ship1' : 'ship2'];
 
           return (
             <ScifiPanel key={slot} title={label}>
@@ -135,8 +138,10 @@ export default function ComparePage() {
               </thead>
               <tbody className="divide-y divide-border/50">
                 {STAT_ROWS.map(({ key, label, format }) => {
-                  const delta = comparison.deltas[key];
+                  const delta = comparison.comparison[key];
                   if (!delta) return null;
+                  // higher = better for most stats; diff = ship2 - ship1
+                  const better = delta.diff > 0 ? 'ship2' : delta.diff < 0 ? 'ship1' : null;
                   return (
                     <motion.tr
                       key={key}
@@ -145,14 +150,14 @@ export default function ComparePage() {
                       className="hover:bg-white/5 transition-colors"
                     >
                       <td className="py-2 px-3 text-slate-500 font-mono-sc text-xs">{label}</td>
-                      <td className={`py-2 px-3 text-right font-mono-sc ${delta.better === 'ship1' ? 'text-green-400' : 'text-slate-300'}`}>
+                      <td className={`py-2 px-3 text-right font-mono-sc ${better === 'ship1' ? 'text-green-400' : 'text-slate-300'}`}>
                         {format(delta.ship1)}
                       </td>
-                      <td className={`py-2 px-3 text-right font-mono-sc ${delta.better === 'ship2' ? 'text-green-400' : 'text-slate-300'}`}>
+                      <td className={`py-2 px-3 text-right font-mono-sc ${better === 'ship2' ? 'text-green-400' : 'text-slate-300'}`}>
                         {format(delta.ship2)}
                       </td>
-                      <td className={`py-2 px-3 text-right text-xs font-mono-sc ${delta.delta == null ? 'text-slate-700' : delta.delta > 0 ? 'text-cyan-500' : delta.delta < 0 ? 'text-amber-500' : 'text-slate-600'}`}>
-                        {delta.delta != null ? (delta.delta > 0 ? '+' : '') + delta.delta.toFixed(0) : '—'}
+                      <td className={`py-2 px-3 text-right text-xs font-mono-sc ${delta.diff === 0 ? 'text-slate-700' : delta.diff > 0 ? 'text-cyan-500' : 'text-amber-500'}`}>
+                        {delta.diff !== 0 ? (delta.diff > 0 ? '+' : '') + delta.diff.toFixed(0) : '—'}
                       </td>
                     </motion.tr>
                   );

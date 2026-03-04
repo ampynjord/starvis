@@ -74,18 +74,18 @@ export interface Ship extends ShipListItem {
 }
 
 export interface LoadoutNode {
-  partsName: string;
-  portType: string;
-  portSize: number;
-  portFlags: string[];
-  component: {
-    uuid: string;
-    name: string;
-    type: string;
-    sub_type: string;
-    size: number;
-    manufacturer_code: string;
-  } | null;
+  id: number;
+  port_name: string;
+  port_type: string;
+  port_min_size: number | null;
+  port_max_size: number | null;
+  parent_id: number | null;
+  component_uuid: string | null;
+  component_name: string | null;
+  component_type: string | null;
+  component_size: number | null;
+  sub_type: string | null;
+  manufacturer_code: string | null;
   children: LoadoutNode[];
 }
 
@@ -243,8 +243,16 @@ export interface Hardpoint {
 }
 
 // ─── Compare ──────────────────────────────────────────────────────────────────
+export interface ShipDelta {
+  ship1: number;
+  ship2: number;
+  diff: number;
+  pct: string;
+}
+
 export interface ShipComparison {
-  ship1: Ship;
-  ship2: Ship;
-  deltas: Record<string, { ship1: number | null; ship2: number | null; delta: number | null; better: 'ship1' | 'ship2' | 'equal' | null }>;
+  ship1: { uuid: string; name: string; class_name: string; manufacturer_code: string | null };
+  ship2: { uuid: string; name: string; class_name: string; manufacturer_code: string | null };
+  comparison: Record<string, ShipDelta>;
+  full: { ship1: Ship; ship2: Ship };
 }
