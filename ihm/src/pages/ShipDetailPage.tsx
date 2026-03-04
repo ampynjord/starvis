@@ -282,7 +282,7 @@ export default function ShipDetailPage() {
               )}
               {/* Cargo */}
               {ship.cargo_capacity != null && ship.cargo_capacity > 0 && (
-                <CargoGrid scu={Number(ship.cargo_capacity)} />
+                <CargoGrid scu={Number(ship.cargo_capacity)} shipName={ship.name} />
               )}
             </div>
           </ScifiPanel>
