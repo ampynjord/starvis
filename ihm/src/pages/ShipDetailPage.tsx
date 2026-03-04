@@ -94,8 +94,18 @@ export default function ShipDetailPage() {
               {ship.ship_matrix_id != null && <GlowBadge color="green">RSI Ship Matrix</GlowBadge>}
             </div>
           </div>
-          {/* Action buttons */}
-          <div className="flex gap-2 flex-shrink-0">
+          {/* Thumbnail + actions */}
+          <div className="flex flex-col items-end gap-3 flex-shrink-0">
+            {(ship.thumbnail_large ?? ship.thumbnail) && (
+              <div className="w-64 xl:w-80 rounded overflow-hidden border border-border/50 bg-slate-900/60">
+                <img
+                  src={(ship.thumbnail_large ?? ship.thumbnail)!}
+                  alt={ship.name}
+                  className="w-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+            )}
             <Link to={`/compare?a=${uuid}`} className="sci-btn-amber text-sm">
               <BarChart3 size={13} /> Compare
             </Link>
