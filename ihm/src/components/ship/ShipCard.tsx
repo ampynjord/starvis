@@ -20,9 +20,9 @@ export function ShipCard({ ship, index = 0 }: Props) {
     >
       <Link to={`/ships/${ship.uuid}`} className="block">
         {/* Rectangle horizontal : hauteur fixe, plus large que haute */}
-        <div className="holo-card h-48 flex flex-col overflow-hidden">
+        <div className="holo-card h-56 flex flex-col overflow-hidden">
           {/* Thumbnail — haut, hauteur fixe */}
-          <div className="relative h-24 flex-shrink-0 bg-slate-900/80">
+          <div className="relative h-28 flex-shrink-0 bg-slate-900/80">
             {ship.thumbnail ? (
               <img
                 src={ship.thumbnail}
@@ -56,19 +56,19 @@ export function ShipCard({ ship, index = 0 }: Props) {
           </div>
 
           {/* Infos — bas */}
-          <div className="flex-1 flex flex-col justify-between px-3 py-2 min-h-0">
+          <div className="flex-1 flex flex-col justify-between px-4 py-3 min-h-0">
             {/* Fabricant + nom */}
             <div className="min-w-0">
               <p className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider truncate leading-none">
                 {ship.manufacturer_code}
               </p>
-              <h3 className="font-orbitron text-xs font-bold text-slate-200 truncate leading-tight mt-0.5">
+              <h3 className="font-orbitron text-sm font-bold text-slate-200 truncate leading-tight mt-1">
                 {ship.name}
               </h3>
             </div>
 
             {/* Stats */}
-            <div className="flex gap-1.5">
+            <div className="flex gap-2">
               <StatCell icon={<Users size={9} />} label="Crew" value={ship.crew_size != null ? String(ship.crew_size) : '—'} />
               <StatCell icon={<Zap size={9} />} label="SCM" value={fSpeed(ship.scm_speed)} />
               <StatCell icon={<Maximize2 size={9} />} label="Long." value={fDimension(ship.cross_section_z)} />
@@ -100,12 +100,12 @@ export function ShipCard({ ship, index = 0 }: Props) {
 
 function StatCell({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
-    <div className="sci-panel px-1.5 py-1 text-center flex-1">
-      <div className="flex items-center justify-center gap-0.5 text-slate-600 mb-0.5">
+    <div className="sci-panel px-2 py-1.5 text-center flex-1">
+      <div className="flex items-center justify-center gap-1 text-slate-600 mb-1">
         {icon}
-        <span className="text-[9px] font-mono-sc uppercase">{label}</span>
+        <span className="text-[9px] font-mono-sc uppercase tracking-wide">{label}</span>
       </div>
-      <p className="text-[10px] font-mono-sc text-slate-300 leading-tight">{value}</p>
+      <p className="text-xs font-mono-sc text-slate-300">{value}</p>
     </div>
   );
 }
