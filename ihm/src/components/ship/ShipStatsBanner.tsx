@@ -1,82 +1,53 @@
 /**
- * ShipStatsBanner — Bloc de stats style DPS Calculator (erkul.games inspired)
- * Affiche : énergie (heat/power/shield), grille de hardpoints, mode SCM/NAV,
- * et tableau de vitesses selon le mode sélectionné.
+ * ShipStatsBanner — Bloc stats vaisseau 3 onglets (Combat / Speed / Survive)
  */
 
 import { useState } from 'react';
 import type { LoadoutNode, Ship } from '@/types/api';
 
-// ── Helpers numériques ───────────────────────────────────
-function n(v: unknown): number {
-  return Number(v ?? 0) || 0;
+// ── Helpers ──────────────────────────────────────────────
+function n(v: unknown): number { return Number(v ?? 0) || 0; }
+function fN(v: number | null | undefined, dec = 0): string {
+  if (v == null) return '—';
+  return Number(v).toFixed(dec);
 }
 function fK(val: number): string {
   if (val === 0) return '0';
   if (val >= 1_000_000) return `${(val / 1_000_000).toFixed(1)}M`;
-  if (val >= 1000) return `${(val / 1000).toFixed(1)}K`;
+  if (val >= 1000) return `${(val / 1000).toFixed(1)}k`;
   return val.toFixed(0);
 }
-function fSpeed(v: number | null | undefined, decimals = 0): string {
-  if (v == null) return '—';
-  return `${Number(v).toFixed(decimals)} m/s`;
-}
-function fDeg(v: number | null | undefined): string {
-  if (v == null) return '—';
-  return `${Number(v).toFixed(0)} °/s`;
-}
-function fSCU(v: number | null | undefined): string {
-  if (v == null) return '—';
-  return `${Number(v).toFixed(1)} SCU`;
-}
 
-// ── Couleurs par type de hardpoint ───────────────────────
-interface HpStyle { bg: string; border: string; text: string }
-const HP_STYLES: Record<string, HpStyle> = {
-  WeaponGun:    { bg: 'bg-amber-950/60',  border: 'border-amber-700/60',  text: 'text-amber-400' },
-  Weapon:       { bg: 'bg-amber-950/60',  border: 'border-amber-700/60',  text: 'text-amber-400' },
-  Gimbal:       { bg: 'bg-amber-900/40',  border: 'border-amber-700/40',  text: 'text-amber-300' },
-  Turret:       { bg: 'bg-amber-900/40',  border: 'border-amber-700/40',  text: 'text-amber-300' },
-  MissileRack:  { bg: 'bg-orange-950/60', border: 'border-orange-700/60', text: 'text-orange-400' },
-  Shield:       { bg: 'bg-cyan-950/60',   border: 'border-cyan-700/60',   text: 'text-cyan-400'  },
-  PowerPlant:   { bg: 'bg-yellow-950/60', border: 'border-yellow-700/60', text: 'text-yellow-400' },
-  Cooler:       { bg: 'bg-blue-950/60',   border: 'border-blue-800/60',   text: 'text-blue-400'  },
-  QuantumDrive: { bg: 'bg-violet-950/60', border: 'border-violet-700/60', text: 'text-violet-400' },
-  Radar:        { bg: 'bg-indigo-950/60', border: 'border-indigo-700/60', text: 'text-indigo-400' },
-};
-const HP_ORDER = ['WeaponGun','Weapon','Gimbal','Turret','MissileRack','Shield','PowerPlant','Cooler','QuantumDrive','Radar'];
-const DEFAULT_HP_STYLE: HpStyle = { bg: 'bg-slate-800', border: 'border-slate-700', text: 'text-slate-500' };
-
-const VISUAL_TYPES = new Set(HP_ORDER);
-const NOISY_PATTERNS = ['controller','_door','radar_helper','fuel_tank','fuel_intake'];
-
-// ── Types internes ───────────────────────────────────────
-interface EnergyStats {
-  powerOutput: number;
-  powerDraw:   number;
-  heat:        number;
-  cooling:     number;
-  shieldHp:    number;
-}
-
-interface HpSlot {
-  type: string;
-  size: number;
-}
-
-// ── Récursion sur l'arbre de loadout ─────────────────────
+// ── Flatten loadout tree ─────────────────────────────────
 function flattenNodes(nodes: LoadoutNode[]): LoadoutNode[] {
-  const result: LoadoutNode[] = [];
-  for (const n of nodes) {
-    result.push(n);
-    if (n.children.length) result.push(...flattenNodes(n.children));
+  const r: LoadoutNode[] = [];
+  for (const node of nodes) {
+    r.push(node);
+    if (node.children.length) r.push(...flattenNodes(node.children));
   }
-  return result;
+  return r;
 }
 
-function computeEnergy(nodes: LoadoutNode[]): EnergyStats {
+// ── Aggregated stats from loadout ────────────────────────
+interface LoadoutStats {
+  powerOutput: number;
+  powerDraw: number;
+  heat: number;
+  cooling: number;
+  shieldHp: number;
+  totalDps: number;
+  hardpoints: { type: string; size: number }[];
+}
+
+const HP_ORDER = ['WeaponGun', 'Weapon', 'Gimbal', 'Turret', 'MissileRack', 'Shield', 'PowerPlant', 'Cooler', 'QuantumDrive', 'Radar'];
+const VISUAL_HP = new Set(HP_ORDER);
+const NOISY = ['controller', '_door', 'radar_helper', 'fuel_tank', 'fuel_intake'];
+
+function computeStats(nodes: LoadoutNode[]): LoadoutStats {
   const all = flattenNodes(nodes);
-  let powerOutput = 0, powerDraw = 0, heat = 0, cooling = 0, shieldHp = 0;
+  let powerOutput = 0, powerDraw = 0, heat = 0, cooling = 0, shieldHp = 0, totalDps = 0;
+  const hardpoints: { type: string; size: number }[] = [];
+
   for (const node of all) {
     if (!node.component_uuid) continue;
     powerOutput += n(node.power_output);
@@ -84,52 +55,119 @@ function computeEnergy(nodes: LoadoutNode[]): EnergyStats {
     heat        += n(node.heat_generation);
     cooling     += n(node.cooling_rate);
     shieldHp    += n(node.shield_hp);
-  }
-  return { powerOutput, powerDraw, heat, cooling, shieldHp };
-}
+    totalDps    += n(node.weapon_dps);
 
-function extractHpSlots(nodes: LoadoutNode[]): HpSlot[] {
-  const slots: HpSlot[] = [];
-  for (const node of nodes) {
-    if (!node.component_uuid) continue;
     const pn = node.port_name.toLowerCase();
-    if (NOISY_PATTERNS.some(p => pn.includes(p))) continue;
+    if (NOISY.some(p => pn.includes(p))) continue;
     const type = node.port_type || node.component_type || '';
-    if (!VISUAL_TYPES.has(type)) continue;
-    slots.push({ type, size: n(node.component_size ?? node.port_max_size) || 1 });
+    if (VISUAL_HP.has(type)) {
+      hardpoints.push({ type, size: n(node.component_size ?? node.port_max_size) || 1 });
+    }
   }
-  slots.sort((a, b) => {
-    const ai = HP_ORDER.indexOf(a.type), bi = HP_ORDER.indexOf(b.type);
-    if (ai !== bi) return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
-    return b.size - a.size;
+
+  hardpoints.sort((a, b) => {
+    const di = HP_ORDER.indexOf(a.type) - HP_ORDER.indexOf(b.type);
+    return di !== 0 ? di : b.size - a.size;
   });
-  return slots;
+
+  return { powerOutput, powerDraw, heat, cooling, shieldHp, totalDps, hardpoints };
 }
 
-// ── Sub-composants UI ────────────────────────────────────
-function StatPip({ value, label, color }: { value: string; label: string; color: string }) {
+// ── Hardpoint colors ─────────────────────────────────────
+const HP_COLOR: Record<string, { bg: string; border: string; text: string; dot: string }> = {
+  WeaponGun:    { bg: 'bg-amber-950/70',  border: 'border-amber-600/50',  text: 'text-amber-400',  dot: 'bg-amber-500' },
+  Weapon:       { bg: 'bg-amber-950/70',  border: 'border-amber-600/50',  text: 'text-amber-400',  dot: 'bg-amber-500' },
+  Gimbal:       { bg: 'bg-amber-900/50',  border: 'border-amber-700/40',  text: 'text-amber-300',  dot: 'bg-amber-400' },
+  Turret:       { bg: 'bg-amber-900/50',  border: 'border-amber-700/40',  text: 'text-amber-300',  dot: 'bg-amber-400' },
+  MissileRack:  { bg: 'bg-orange-950/70', border: 'border-orange-600/50', text: 'text-orange-400', dot: 'bg-orange-500' },
+  Shield:       { bg: 'bg-cyan-950/70',   border: 'border-cyan-600/50',   text: 'text-cyan-400',   dot: 'bg-cyan-500' },
+  PowerPlant:   { bg: 'bg-yellow-950/70', border: 'border-yellow-600/50', text: 'text-yellow-400', dot: 'bg-yellow-500' },
+  Cooler:       { bg: 'bg-blue-950/70',   border: 'border-blue-700/50',   text: 'text-blue-400',   dot: 'bg-blue-500' },
+  QuantumDrive: { bg: 'bg-violet-950/70', border: 'border-violet-600/50', text: 'text-violet-400', dot: 'bg-violet-500' },
+  Radar:        { bg: 'bg-indigo-950/70', border: 'border-indigo-600/50', text: 'text-indigo-400', dot: 'bg-indigo-500' },
+};
+const DEF_HP_COLOR = { bg: 'bg-slate-800', border: 'border-slate-700', text: 'text-slate-500', dot: 'bg-slate-600' };
+
+// ── Primitives UI ────────────────────────────────────────
+
+/** Barre de stat avec label + valeur + fill */
+function StatBar({
+  label, value, max, unit = '',
+  color = 'bg-cyan-600', subValue,
+}: {
+  label: string; value: number; max: number; unit?: string;
+  color?: string; subValue?: string;
+}) {
+  const pct = max > 0 ? Math.min(100, (value / max) * 100) : 0;
   return (
-    <div className="flex flex-col items-center justify-center sci-panel py-2 px-1">
-      <span className={`font-orbitron font-bold text-base leading-tight ${color}`}>{value}</span>
-      <span className="text-[10px] font-mono-sc text-slate-600 mt-0.5 uppercase tracking-wide leading-tight text-center">{label}</span>
+    <div className="group">
+      <div className="flex items-baseline justify-between mb-1">
+        <span className="text-[10px] font-mono-sc text-slate-500 uppercase tracking-widest">{label}</span>
+        <div className="flex items-baseline gap-1.5">
+          {subValue && <span className="text-[10px] font-mono-sc text-slate-600">{subValue}</span>}
+          <span className="text-xs font-mono-sc text-slate-200 tabular-nums">
+            {value > 0 ? `${fN(value)}${unit}` : '—'}
+          </span>
+        </div>
+      </div>
+      <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-300 ${color}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
     </div>
   );
 }
 
-function EnergyBar({
-  label, pct, right,
-}: { label: string; pct: number; right: string }) {
-  const over = pct > 100;
-  const barColor = over ? 'bg-red-500' : pct > 80 ? 'bg-amber-500' : 'bg-cyan-600';
+/** Barre de résistance — value 0-1, affiché en % de réduction */
+function ArmorBar({
+  label, value, color,
+}: { label: string; value: number | null | undefined; color: string }) {
+  if (value == null) return null;
+  const pct = Math.round((1 - n(value)) * 100);
   return (
-    <div className="space-y-0.5">
-      <div className="flex items-center justify-between text-[10px] font-mono-sc">
-        <span className="text-slate-600 uppercase tracking-widest">{label}</span>
-        <span className={over ? 'text-red-400' : 'text-slate-400'}>{right}</span>
+    <div>
+      <div className="flex items-baseline justify-between mb-1">
+        <span className="text-[10px] font-mono-sc text-slate-500 uppercase tracking-widest">{label}</span>
+        <span className={`text-xs font-mono-sc font-semibold ${pct > 0 ? color : 'text-slate-600'}`}>
+          {pct > 0 ? `${pct}%` : '0%'}
+        </span>
       </div>
-      <div className="h-1 bg-slate-800/80 rounded overflow-hidden">
+      <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
         <div
-          className={`h-full rounded transition-all ${barColor}`}
+          className={`h-full rounded-full ${color.replace('text-', 'bg-')}`}
+          style={{ width: `${Math.max(pct > 0 ? 3 : 0, pct)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** Barre énergie — used/total avec couleur selon saturation */
+function EnergyBar({
+  label, used, total, colorOk, colorWarn, colorOver,
+}: {
+  label: string; used: number; total: number;
+  colorOk: string; colorWarn: string; colorOver: string;
+}) {
+  if (total === 0 && used === 0) return null;
+  const pct = total > 0 ? (used / total) * 100 : 0;
+  const barColor = pct > 100 ? colorOver : pct > 80 ? colorWarn : colorOk;
+  const textColor = pct > 100 ? 'text-red-400' : pct > 80 ? 'text-amber-400' : 'text-slate-300';
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-1">
+        <span className="text-[10px] font-mono-sc text-slate-500 uppercase tracking-widest">{label}</span>
+        <span className={`text-xs font-mono-sc tabular-nums ${textColor}`}>
+          {total > 0
+            ? `${fK(used)} / ${fK(total)}  (${Math.round(pct)}%)`
+            : fK(used)}
+        </span>
+      </div>
+      <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${barColor}`}
           style={{ width: `${Math.min(100, pct)}%` }}
         />
       </div>
@@ -137,135 +175,278 @@ function EnergyBar({
   );
 }
 
-function StatRow({ label, value }: { label: string; value: string }) {
+/** Grande valeur + unité + label sous */
+function BigStat({
+  value, unit, label, color = 'text-slate-100',
+}: { value: string; unit?: string; label: string; color?: string }) {
   return (
-    <div className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-white/[0.03] sci-panel">
-      <span className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-wide">{label}</span>
-      <span className="text-xs font-mono-sc text-slate-300">{value}</span>
+    <div className="flex flex-col items-center justify-center rounded-lg border border-slate-800 bg-slate-900/60 py-3 px-2 min-w-0">
+      <div className="flex items-baseline gap-0.5">
+        <span className={`font-orbitron font-bold text-lg leading-none tabular-nums ${color}`}>{value}</span>
+        {unit && <span className="text-[9px] font-mono-sc text-slate-600 self-end mb-0.5">{unit}</span>}
+      </div>
+      <span className="text-[9px] font-mono-sc text-slate-600 mt-1 uppercase tracking-widest text-center leading-tight">
+        {label}
+      </span>
     </div>
   );
 }
 
+// ── Tab definitions ──────────────────────────────────────
+type Tab = 'combat' | 'speed' | 'survive';
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'combat',  label: 'Combat'  },
+  { id: 'speed',   label: 'Speed'   },
+  { id: 'survive', label: 'Survive' },
+];
+
 // ── Composant principal ──────────────────────────────────
-interface Props {
-  ship: Ship;
-  loadout: LoadoutNode[];
-}
+interface Props { ship: Ship; loadout: LoadoutNode[] }
 
 export function ShipStatsBanner({ ship, loadout }: Props) {
-  const [mode, setMode] = useState<'scm' | 'nav'>('scm');
+  const [tab, setTab] = useState<Tab>('combat');
+  const ls = computeStats(loadout);
 
-  const energy   = computeEnergy(loadout);
-  const hpSlots  = extractHpSlots(loadout);
-  const hasEnergy = energy.powerOutput > 0 || energy.powerDraw > 0;
-
-  const consumptionPct = energy.powerOutput > 0
-    ? Math.round((energy.powerDraw / energy.powerOutput) * 100)
-    : 0;
-  const heatPct = energy.cooling > 0
-    ? Math.round((energy.heat / energy.cooling) * 100)
-    : 0;
-
-  // Shield HP : préfère le total calculé depuis le loadout, sinon ship.shield_hp
-  const shieldHp = energy.shieldHp > 0 ? energy.shieldHp : n(ship.shield_hp);
+  const shieldHp   = ls.shieldHp > 0 ? ls.shieldHp : n(ship.shield_hp);
+  const hasPower   = ls.powerOutput > 0 || ls.powerDraw > 0;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
+      {/* ── Navigation tabs ─────────────────────── */}
+      <div className="flex gap-1 border-b border-slate-800 pb-1">
+        {TABS.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`
+              text-[10px] font-mono-sc uppercase tracking-widest px-3 py-1.5 rounded-t border-b-2 transition-all
+              ${tab === t.id
+                ? 'border-cyan-500 text-cyan-400 bg-cyan-950/20'
+                : 'border-transparent text-slate-600 hover:text-slate-400'
+              }
+            `}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      {/* ── 3 stats énergie ──────────────────────── */}
-      {hasEnergy && (
-        <div className="grid grid-cols-3 gap-2">
-          <StatPip value={fK(energy.heat)}      label="Heat gen." color="text-orange-400" />
-          <StatPip value={fK(energy.powerDraw)} label="Power draw" color="text-yellow-400" />
-          <StatPip value={fK(shieldHp)}         label="Shield HP" color="text-cyan-400" />
-        </div>
-      )}
+      {/* ═══════════════════════════════════════════
+          ONGLET : COMBAT
+      ═══════════════════════════════════════════ */}
+      {tab === 'combat' && (
+        <div className="space-y-4">
+          {/* Trio big stats */}
+          <div className="grid grid-cols-3 gap-2">
+            <BigStat
+              value={ls.totalDps > 0 ? fK(ls.totalDps) : '—'}
+              unit="DPS"
+              label="Weapons"
+              color="text-amber-400"
+            />
+            <BigStat
+              value={shieldHp > 0 ? fK(shieldHp) : '—'}
+              unit="HP"
+              label="Shields"
+              color="text-cyan-400"
+            />
+            <BigStat
+              value={ship.total_hp != null ? fK(n(ship.total_hp)) : '—'}
+              unit="HP"
+              label="Hull"
+              color="text-slate-300"
+            />
+          </div>
 
-      {/* ── Barres énergie ───────────────────────── */}
-      {hasEnergy && (
-        <div className="space-y-2 px-0.5">
-          <EnergyBar
-            label="Power consumption"
-            pct={consumptionPct}
-            right={`${energy.powerDraw.toFixed(0)} / ${energy.powerOutput.toFixed(0)} W  (${consumptionPct}%)`}
-          />
-          {energy.cooling > 0 && (
+          {/* Grille de hardpoints */}
+          {ls.hardpoints.length > 0 && (
+            <div>
+              <p className="text-[10px] font-mono-sc text-slate-700 uppercase tracking-widest mb-2">
+                Hardpoints — {ls.hardpoints.length}
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {ls.hardpoints.map((hp, i) => {
+                  const c = HP_COLOR[hp.type] ?? DEF_HP_COLOR;
+                  return (
+                    <div
+                      key={i}
+                      title={hp.type}
+                      className={`
+                        inline-flex items-center justify-center
+                        w-8 h-8 rounded border font-orbitron font-bold text-[11px]
+                        ${c.bg} ${c.border} ${c.text}
+                      `}
+                    >
+                      {hp.size}
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Légende */}
+              {(() => {
+                const seen = new Map<string, { dot: string; label: string }>();
+                for (const hp of ls.hardpoints) {
+                  if (!seen.has(hp.type)) {
+                    const c = HP_COLOR[hp.type] ?? DEF_HP_COLOR;
+                    const label = hp.type.replace(/([A-Z])/g, ' $1').trim();
+                    seen.set(hp.type, { dot: c.dot, label });
+                  }
+                }
+                return (
+                  <div className="flex flex-wrap gap-x-3 gap-y-1 mt-2">
+                    {Array.from(seen.entries()).map(([type, { dot, label }]) => (
+                      <span key={type} className="flex items-center gap-1">
+                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${dot}`} />
+                        <span className="text-[9px] font-mono-sc text-slate-600">{label}</span>
+                      </span>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Conso énergie */}
+          {hasPower && (
             <EnergyBar
-              label="Heat / Cooling"
-              pct={heatPct}
-              right={`${energy.heat.toFixed(0)} / ${energy.cooling.toFixed(0)}  (${heatPct}%)`}
+              label="Power draw"
+              used={ls.powerDraw} total={ls.powerOutput}
+              colorOk="bg-yellow-600" colorWarn="bg-amber-500" colorOver="bg-red-600"
             />
           )}
         </div>
       )}
 
-      {/* ── Grille hardpoints ────────────────────── */}
-      {hpSlots.length > 0 && (
-        <div>
-          <p className="text-[10px] font-mono-sc text-slate-700 uppercase tracking-widest mb-1.5">
-            Hardpoints ({hpSlots.length})
-          </p>
-          <div className="flex flex-wrap gap-1">
-            {hpSlots.map((slot, i) => {
-              const s = HP_STYLES[slot.type] ?? DEFAULT_HP_STYLE;
-              return (
-                <span
-                  key={i}
-                  title={slot.type}
-                  className={`
-                    inline-flex items-center justify-center
-                    w-7 h-7 rounded text-xs font-mono-sc font-bold
-                    border ${s.bg} ${s.border} ${s.text}
-                  `}
-                >
-                  {slot.size}
-                </span>
-              );
-            })}
+      {/* ═══════════════════════════════════════════
+          ONGLET : SPEED
+      ═══════════════════════════════════════════ */}
+      {tab === 'speed' && (
+        <div className="space-y-4">
+          {/* Vitesses */}
+          <div className="space-y-2.5">
+            <p className="text-[10px] font-mono-sc text-slate-700 uppercase tracking-widest">Velocities</p>
+            <StatBar
+              label="SCM Speed"
+              value={n(ship.scm_speed)} max={800} unit=" m/s"
+              color="bg-cyan-600"
+            />
+            <StatBar
+              label="Boost Fwd"
+              value={n(ship.boost_speed_forward)} max={2500} unit=" m/s"
+              color="bg-amber-500"
+              subValue={
+                ship.boost_speed_forward != null && ship.scm_speed != null
+                  ? `×${(n(ship.boost_speed_forward) / n(ship.scm_speed)).toFixed(1)}`
+                  : undefined
+              }
+            />
+            <StatBar
+              label="Boost Back"
+              value={n(ship.boost_speed_backward ?? 0)} max={2500} unit=" m/s"
+              color="bg-amber-700"
+            />
+            <StatBar
+              label="Nav Max"
+              value={n(ship.max_speed)} max={2000} unit=" m/s"
+              color="bg-violet-500"
+            />
           </div>
+
+          {/* Agilité */}
+          <div className="space-y-2.5">
+            <p className="text-[10px] font-mono-sc text-slate-700 uppercase tracking-widest">Agility</p>
+            <StatBar label="Pitch" value={n(ship.pitch_max)} max={130} unit="°/s" color="bg-emerald-600" />
+            <StatBar label="Yaw"   value={n(ship.yaw_max)}   max={130} unit="°/s" color="bg-emerald-600" />
+            <StatBar label="Roll"  value={n(ship.roll_max)}  max={260} unit="°/s" color="bg-teal-600" />
+          </div>
+
+          {/* Carburant */}
+          <div className="grid grid-cols-2 gap-2">
+            <BigStat value={fN(ship.hydrogen_fuel_capacity, 1)} unit="SCU" label="H₂ Tank" color="text-sky-400" />
+            <BigStat value={fN(ship.quantum_fuel_capacity, 1)}  unit="SCU" label="QT Tank"  color="text-violet-400" />
+          </div>
+          {(ship.cargo_capacity ?? 0) > 0 && (
+            <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2">
+              <span className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest">Cargo</span>
+              <span className="text-sm font-mono-sc text-slate-200">
+                {ship.cargo_capacity} SCU
+              </span>
+            </div>
+          )}
         </div>
       )}
 
-      {/* ── Mode SCM / NAV ───────────────────────── */}
-      <div>
-        <div className="flex gap-1 mb-3">
-          {(['scm', 'nav'] as const).map(m => (
-            <button
-              key={m}
-              onClick={() => setMode(m)}
-              className={`
-                text-[10px] font-mono-sc uppercase tracking-widest px-3 py-1.5 rounded border transition-colors
-                ${mode === m
-                  ? 'bg-amber-900/30 border-amber-700/60 text-amber-400'
-                  : 'bg-slate-800/50 border-slate-700 text-slate-500 hover:text-slate-400 hover:border-slate-600'
-                }
-              `}
-            >
-              {m} mode
-            </button>
-          ))}
-        </div>
+      {/* ═══════════════════════════════════════════
+          ONGLET : SURVIVE
+      ═══════════════════════════════════════════ */}
+      {tab === 'survive' && (
+        <div className="space-y-4">
+          {/* HP */}
+          <div className="grid grid-cols-2 gap-2">
+            <BigStat
+              value={shieldHp > 0 ? fK(shieldHp) : '—'}
+              unit="HP"
+              label="Shields"
+              color="text-cyan-400"
+            />
+            <BigStat
+              value={ship.total_hp != null ? fK(n(ship.total_hp)) : '—'}
+              unit="HP"
+              label="Hull"
+              color="text-slate-300"
+            />
+          </div>
 
-        {mode === 'scm' ? (
-          <div className="space-y-1">
-            <StatRow label="SCM Speed"  value={fSpeed(ship.scm_speed)} />
-            <StatRow label="Boost Fwd"  value={fSpeed(ship.boost_speed_forward)} />
-            <StatRow label="Boost Back" value={fSpeed(ship.boost_speed_backward)} />
-            <StatRow label="Pitch"      value={fDeg(ship.pitch_max)} />
-            <StatRow label="Yaw"        value={fDeg(ship.yaw_max)} />
-            <StatRow label="Roll"       value={fDeg(ship.roll_max)} />
-          </div>
-        ) : (
-          <div className="space-y-1">
-            <StatRow label="Nav Max Speed"   value={fSpeed(ship.max_speed)} />
-            <StatRow label="H₂ Fuel Cap."    value={fSCU(ship.hydrogen_fuel_capacity)} />
-            <StatRow label="QT Fuel Cap."    value={fSCU(ship.quantum_fuel_capacity)} />
-            <StatRow label="Crew"            value={ship.crew_size != null ? String(ship.crew_size) : '—'} />
-            <StatRow label="Cargo"           value={ship.cargo_capacity != null ? `${Number(ship.cargo_capacity)} SCU` : '—'} />
-            <StatRow label="Mass"            value={ship.mass != null ? `${Number(ship.mass).toLocaleString('en-US')} kg` : '—'} />
-          </div>
-        )}
-      </div>
+          {/* Résistances armure */}
+          {(ship.armor_physical != null || ship.armor_energy != null || ship.armor_distortion != null) && (
+            <div className="space-y-2.5">
+              <p className="text-[10px] font-mono-sc text-slate-700 uppercase tracking-widest">
+                Armor Reduction
+              </p>
+              <ArmorBar label="Physical"   value={ship.armor_physical}   color="text-slate-300" />
+              <ArmorBar label="Energy"     value={ship.armor_energy}     color="text-cyan-400" />
+              <ArmorBar label="Distortion" value={ship.armor_distortion} color="text-violet-400" />
+            </div>
+          )}
+
+          {/* Systèmes énergie */}
+          {hasPower && (
+            <div className="space-y-2.5">
+              <p className="text-[10px] font-mono-sc text-slate-700 uppercase tracking-widest">Systems</p>
+              <EnergyBar
+                label="Power consumption"
+                used={ls.powerDraw} total={ls.powerOutput}
+                colorOk="bg-yellow-600" colorWarn="bg-amber-500" colorOver="bg-red-600"
+              />
+              {ls.cooling > 0 && (
+                <EnergyBar
+                  label="Heat / Cooling"
+                  used={ls.heat} total={ls.cooling}
+                  colorOk="bg-blue-600" colorWarn="bg-amber-500" colorOver="bg-red-600"
+                />
+              )}
+            </div>
+          )}
+
+          {/* Assurance */}
+          {ship.insurance_claim_time != null && (
+            <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2">
+              <span className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest">Claim time</span>
+              <span className="text-xs font-mono-sc text-slate-300">
+                {Number(ship.insurance_claim_time).toFixed(1)} min
+              </span>
+            </div>
+          )}
+          {ship.insurance_expedite_cost != null && (
+            <div className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2">
+              <span className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest">Expedite</span>
+              <span className="text-xs font-mono-sc text-amber-400">
+                {Number(ship.insurance_expedite_cost).toLocaleString('en-US')} aUEC
+              </span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
