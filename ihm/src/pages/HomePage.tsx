@@ -14,7 +14,7 @@ const STAT_CARDS = [
   { key: 'items',         label: 'Items',         icon: Shield,    color: 'text-green-400',  to: '/items' },
   { key: 'manufacturers', label: 'Manufacturers', icon: Zap,       color: 'text-amber-400',  to: '/manufacturers' },
   { key: 'commodities',   label: 'Commodities',   icon: Package,   color: 'text-purple-400', to: '/commodities' },
-  { key: 'paints',        label: 'Paints',        icon: BarChart3, color: 'text-pink-400',   to: '/ships' },
+  { key: 'paints',        label: 'Paints',        icon: BarChart3, color: 'text-pink-400',   to: '/paints' },
 ] as const;
 
 export default function HomePage() {

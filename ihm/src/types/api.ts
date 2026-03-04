@@ -95,6 +95,15 @@ export interface ShipPaint {
   paint_class_name: string;
 }
 
+export interface PaintListItem extends ShipPaint {
+  id: number;
+  ship_uuid: string | null;
+  ship_name: string | null;
+  ship_class_name: string | null;
+  manufacturer_name: string | null;
+  manufacturer_code: string | null;
+}
+
 export interface ShipStats {
   total_hardpoints: number;
   weapons: number;
