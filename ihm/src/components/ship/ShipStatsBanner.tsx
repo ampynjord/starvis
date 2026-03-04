@@ -293,14 +293,16 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
             <SectionLabel>Signatures</SectionLabel>
             <div className="grid grid-cols-3 gap-1.5">
               {sigs.map(({ key, label, val, color, dimColor, trackColor }) => {
-                const pct = Math.min(val * 100, 100);
-                // Couleur selon pct relatif : bas = emerald, moyen = amber, haut = red
-                const barColor = pct < 40 ? '#22c55e' : pct < 70 ? '#f59e0b' : '#ef4444';
+                const v = parseFloat(String(val));
+                const pct = Math.min(v * 100, 150); // peut dépasser 1.0
+                const pctCapped = Math.min(pct, 100);
+                // Couleur : bas = vert (discret), haut = rouge (visible)
+                const barColor = pct < 30 ? '#22c55e' : pct < 70 ? '#f59e0b' : '#ef4444';
                 const r = 18, cx = 24, cy = 24;
                 const startA = -210 * (Math.PI / 180);
                 const endA   =  30  * (Math.PI / 180);
                 const totalA = endA - startA;
-                const fillA  = startA + (pct / 100) * totalA;
+                const fillA  = startA + (pctCapped / 100) * totalA;
                 const arcPath = (from: number, to: number) => {
                   const x1 = cx + r * Math.cos(from), y1 = cy + r * Math.sin(from);
                   const x2 = cx + r * Math.cos(to),   y2 = cy + r * Math.sin(to);
@@ -331,7 +333,7 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
                     </svg>
                     <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest -mt-0.5">{label}</span>
                     <span className={`text-[11px] font-orbitron font-bold tabular-nums mt-0.5 ${dimColor}`}>
-                      {(val * 100).toFixed(0)}%
+                      ×{v.toFixed(2)}
                     </span>
                   </div>
                 );

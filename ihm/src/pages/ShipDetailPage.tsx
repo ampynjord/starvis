@@ -258,28 +258,43 @@ export default function ShipDetailPage() {
           <ScifiPanel title="Crew & Cargo">
             <div className="space-y-4">
               {/* Crew pips */}
-              {ship.crew_size != null && (
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="flex items-center gap-1.5 text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest">
-                      <Users size={10} /> Crew
-                    </span>
-                    <span className="text-sm font-orbitron font-bold text-teal-400 tabular-nums">{ship.crew_size}</span>
-                  </div>
-                  <div className="flex gap-1 flex-wrap">
-                    {Array.from({ length: Math.min(ship.crew_size, 16) }).map((_, i) => (
-                      <div key={i} className="w-4 h-4 rounded-sm bg-teal-900/60 border border-teal-700/50 flex items-center justify-center">
-                        <div className="w-1.5 h-1.5 rounded-full bg-teal-500" />
-                      </div>
-                    ))}
-                    {ship.crew_size > 16 && (
-                      <div className="w-4 h-4 rounded-sm bg-teal-900/40 border border-teal-800/40 flex items-center justify-center">
-                        <span className="text-[7px] font-mono-sc text-teal-600">+{ship.crew_size - 16}</span>
-                      </div>
+              {(() => {
+                // Priorité : ship_matrix min/max_crew, sinon P4K crew_size
+                const minC = ship.min_crew != null ? Number(ship.min_crew) : (ship.crew_size ?? null);
+                const maxC = ship.max_crew != null ? Number(ship.max_crew) : (ship.crew_size ?? null);
+                if (maxC == null) return null;
+                const crewLabel = minC != null && maxC !== minC ? `${minC} – ${maxC}` : String(maxC);
+                const pipCount = Math.min(maxC, 16);
+                return (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="flex items-center gap-1.5 text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest">
+                        <Users size={10} /> Crew
+                      </span>
+                      <span className="text-sm font-orbitron font-bold text-teal-400 tabular-nums">{crewLabel}</span>
+                    </div>
+                    <div className="flex gap-1 flex-wrap">
+                      {Array.from({ length: pipCount }).map((_, i) => (
+                        <div key={i} className={`w-4 h-4 rounded-sm border flex items-center justify-center ${
+                          minC != null && i < minC ? 'bg-teal-900/60 border-teal-700/50' : 'bg-teal-900/30 border-teal-800/40'
+                        }`}>
+                          <div className={`w-1.5 h-1.5 rounded-full ${minC != null && i < minC ? 'bg-teal-500' : 'bg-teal-700'}`} />
+                        </div>
+                      ))}
+                      {maxC > 16 && (
+                        <div className="w-4 h-4 rounded-sm bg-teal-900/40 border border-teal-800/40 flex items-center justify-center">
+                          <span className="text-[7px] font-mono-sc text-teal-600">+{maxC - 16}</span>
+                        </div>
+                      )}
+                    </div>
+                    {minC != null && maxC !== minC && (
+                      <p className="text-[9px] font-mono-sc text-slate-600 mt-1.5">
+                        <span className="text-teal-700">{minC} min</span> · <span className="text-teal-500">{maxC} max</span>
+                      </p>
                     )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
               {/* Cargo */}
               {ship.cargo_capacity != null && ship.cargo_capacity > 0 && (
                 <CargoGrid scu={Number(ship.cargo_capacity)} shipName={ship.name} />

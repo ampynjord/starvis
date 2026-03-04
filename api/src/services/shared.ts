@@ -40,6 +40,7 @@ export const SHIP_SELECT = `s.uuid, s.class_name, COALESCE(sm.name, s.name) as n
   sm.media_store_small as thumbnail, sm.media_store_large as thumbnail_large,
   sm.production_status, sm.description as sm_description,
   sm.url as store_url, sm.cargocapacity as sm_cargo,
+  sm.min_crew, sm.max_crew,
   s.vehicle_category, s.insurance_claim_time, s.insurance_expedite_cost,
   s.short_name, s.variant_type, s.game_data,
   s.armor_signal_ir, s.armor_signal_em, s.armor_signal_cs`;
@@ -60,6 +61,7 @@ export const CONCEPT_SELECT = `CONCAT('concept-', sm2.id) as uuid, LOWER(REPLACE
   sm2.media_store_small as thumbnail, sm2.media_store_large as thumbnail_large,
   sm2.production_status, sm2.description as sm_description,
   sm2.url as store_url, sm2.cargocapacity as sm_cargo,
+  sm2.min_crew, sm2.max_crew,
   NULL as vehicle_category, NULL as insurance_claim_time, NULL as insurance_expedite_cost,
   NULL as short_name, NULL as variant_type, NULL as game_data,
   NULL as armor_signal_ir, NULL as armor_signal_em, NULL as armor_signal_cs`;
