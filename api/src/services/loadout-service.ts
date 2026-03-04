@@ -345,9 +345,10 @@ export class LoadoutService {
     const rootPorts: Row[] = [];
 
     for (const port of loadout) {
-      if (port.parent_id) {
-        if (!childMap.has(port.parent_id as number)) childMap.set(port.parent_id as number, []);
-        childMap.get(port.parent_id as number)!.push(port);
+      if (port.parent_id != null && port.parent_id !== 0) {
+        const pid = Number(port.parent_id);
+        if (!childMap.has(pid)) childMap.set(pid, []);
+        childMap.get(pid)!.push(port);
       } else {
         rootPorts.push(port);
       }
@@ -378,7 +379,7 @@ export class LoadoutService {
     for (const root of rootPorts) {
       const portType = String(root.port_type || '');
       const portName = String(root.port_name || '');
-      const allChildren = childMap.get(root.id as number) || [];
+      const allChildren = childMap.get(Number(root.id)) || [];
 
       if (portName.includes('controller') || portName.endsWith('_helper')) continue;
       if (portName.includes('seat') || portName.includes('dashboard')) continue;
@@ -522,7 +523,7 @@ export class LoadoutService {
     const mountDisplayName = isMountItem ? this.cleanMountName(String(row.component_class_name)) : '';
     const mountSize = isMountItem ? (String(row.component_class_name).match(/[Ss](\d+)/) || [])[1] : null;
 
-    const subChildren = childMap.get(row.id as number) || [];
+    const subChildren = childMap.get(Number(row.id)) || [];
     const relevantSubChildren = subChildren.filter((c) => {
       const cn = String(c.port_name || '');
       if (cn.startsWith('Screen_') || cn.startsWith('Display_') || cn.startsWith('Annunciator')) return false;
