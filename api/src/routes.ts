@@ -311,9 +311,41 @@ export function createRoutes(deps: RouteDependencies): Router {
     asyncHandler(async (req, res) => {
       const uuid = await resolveShipUuid(req.params.uuid);
       if (!uuid) return void res.status(404).json({ success: false, error: 'Ship not found' });
-      const stats = await gameDataService!.getShipStats(uuid);
-      if (!stats) return void res.status(404).json({ success: false, error: 'Ship not found' });
-      sendWithETag(req, res, { success: true, data: stats });
+      const raw = await gameDataService!.getShipStats(uuid);
+      if (!raw) return void res.status(404).json({ success: false, error: 'Ship not found' });
+      // Project rich stats → simple ShipStats shape expected by the IHM
+      const s = (raw.stats ?? {}) as Record<string, Record<string, unknown>>;
+      const weaponCount   = Number((s['weapons']   as Record<string,unknown>)?.count   ?? 0);
+      const shieldCount   = Number((s['shields']   as Record<string,unknown>)?.count   ?? 0);
+      const missileCount  = Number((s['missiles']  as Record<string,unknown>)?.count   ?? 0);
+      const powerDetails  = ((s['power']   as Record<string,unknown>)?.details  as unknown[]) ?? [];
+      const coolerDetails = ((s['thermal'] as Record<string,unknown>)?.details  as unknown[]) ?? [];
+      const cmDetails     = ((s['countermeasures'] as Record<string,unknown>)?.details as unknown[]) ?? [];
+      const utilCount     = Number((s['utility'] as Record<string,unknown>)?.count ?? 0);
+      const hasQD         = !!((s['quantum'] as Record<string,unknown>)?.drive_name);
+      const by_type: Record<string, number> = {};
+      if (weaponCount  > 0) by_type['Weapon']       = weaponCount;
+      if (shieldCount  > 0) by_type['Shield']        = shieldCount;
+      if (missileCount > 0) by_type['Missile']       = missileCount;
+      if (powerDetails.length  > 0) by_type['Power Plant'] = powerDetails.length;
+      if (coolerDetails.length > 0) by_type['Cooler']       = coolerDetails.length;
+      if (hasQD)              by_type['Quantum Drive'] = 1;
+      if (cmDetails.length > 0) by_type['Countermeasure'] = cmDetails.length;
+      if (utilCount > 0)      by_type['Utility']      = utilCount;
+      const total_hardpoints = Object.values(by_type).reduce((a, b) => a + b, 0);
+      sendWithETag(req, res, {
+        success: true,
+        data: {
+          total_hardpoints,
+          weapons:       weaponCount,
+          shields:       shieldCount,
+          quantum_drives: hasQD ? 1 : 0,
+          fuel_tanks:    0,
+          coolers:       coolerDetails.length,
+          power_plants:  powerDetails.length,
+          by_type,
+        },
+      });
     }),
   );
 
