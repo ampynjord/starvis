@@ -20,7 +20,7 @@ export function ShipCard({ ship, index = 0 }: Props) {
     >
       <Link to={`/ships/${ship.uuid}`} className="block">
         {/* Rectangle horizontal : hauteur fixe, plus large que haute */}
-        <div className="holo-card h-60 flex flex-col overflow-hidden">
+        <div className="holo-card flex flex-col overflow-hidden">
           {/* Thumbnail — haut, hauteur fixe */}
           <div className="relative h-28 flex-shrink-0 bg-slate-900/80">
             {ship.thumbnail ? (
@@ -56,7 +56,7 @@ export function ShipCard({ ship, index = 0 }: Props) {
           </div>
 
           {/* Infos — bas */}
-          <div className="flex-1 flex flex-col justify-between px-4 py-3 min-h-0">
+          <div className="flex flex-col gap-3 px-4 py-4">
             {/* Fabricant + nom */}
             <div className="min-w-0">
               <p className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider truncate leading-none">
