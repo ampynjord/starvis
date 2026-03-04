@@ -1,240 +1,19 @@
 /**
- * ShipLoadout — Composant d'affichage complet du loadout par défaut d'un vaisseau.
- *
- * Sections générées automatiquement selon les composants présents :
- * - Weapons (armes, gimbals, mining, tractor, EMP/QIG)
- * - Missiles (racks + missiles enfants)
- * - Shields
- * - Systems (Cooler, Power Plant, Quantum Drive + Jump Module, Radar)
- * - Thrusters (Main / Maneuvering / Retro)
- * - Countermeasures (stats uniquement, pas de section dédiée)
+ * ShipLoadout — Layout carte inspiré erkul.games
+ * Chaque port est une carte individuelle, stats inline par type.
  */
 
 import { Link } from 'react-router-dom';
 import type { LoadoutNode } from '@/types/api';
 
-// ── Grade ────────────────────────────────────────────────
-const GRADE_COLOR: Record<string, string> = {
-  A: 'text-emerald-400 border-emerald-800',
-  B: 'text-cyan-400 border-cyan-900',
-  C: 'text-slate-400 border-slate-700',
-  D: 'text-amber-500 border-amber-900',
-  E: 'text-red-400 border-red-900',
-};
+// ─────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────
 
-function GradePill({ grade }: { grade: string | null }) {
-  if (!grade) return null;
-  const color = GRADE_COLOR[grade] ?? 'text-slate-500 border-slate-700';
-  return (
-    <span className={`text-xs font-mono-sc border rounded px-1 leading-none py-0.5 ${color}`}>
-      {grade}
-    </span>
-  );
-}
+const COMPONENT_TYPE_PREFIXES = new Set([
+  'COOL','RADR','SHLD','QDRV','PWRP','PPLNT','THRM','POWR',
+]);
 
-// ── Size badge ───────────────────────────────────────────
-function SizeBadge({ size }: { size: number | null | undefined }) {
-  if (size == null) return null;
-  return (
-    <span className="text-xs font-mono-sc bg-slate-800 text-slate-500 border border-slate-700 rounded px-1 py-0.5 leading-none flex-shrink-0">
-      S{size}
-    </span>
-  );
-}
-
-// ── Count badge ──────────────────────────────────────────
-function CountBadge({ count }: { count: number }) {
-  if (count <= 1) return null;
-  return (
-    <span className="text-xs font-mono-sc text-slate-400 bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 leading-none flex-shrink-0">
-      ×{count}
-    </span>
-  );
-}
-
-// ── Manufacturer badge ───────────────────────────────────
-function MfrBadge({ code }: { code: string | null | undefined }) {
-  if (!code) return null;
-  return (
-    <span className="text-xs font-mono-sc text-slate-600">[{code}]</span>
-  );
-}
-
-// ── Row container ────────────────────────────────────────
-function LoadoutRow({
-  size,
-  name,
-  grade,
-  mfr,
-  count,
-  meta,
-  uuid,
-  children,
-}: {
-  size?: number | null;
-  name: string;
-  grade?: string | null;
-  mfr?: string | null;
-  count?: number;
-  meta?: React.ReactNode;
-  uuid?: string | null;
-  children?: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-0.5">
-      <div className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/5 transition-colors">
-        <SizeBadge size={size} />
-        <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
-          {uuid ? (
-            <Link
-              to={`/components/${uuid}`}
-              className="text-sm text-slate-200 hover:text-cyan-400 transition-colors truncate"
-            >
-              {name}
-            </Link>
-          ) : (
-            <span className="text-sm text-slate-200 truncate">{name}</span>
-          )}
-          <CountBadge count={count ?? 1} />
-          <MfrBadge code={mfr} />
-          <GradePill grade={grade ?? null} />
-          {meta && <span className="text-xs text-slate-600">{meta}</span>}
-        </div>
-      </div>
-      {children && (
-        <div className="ml-6 border-l border-border/30 pl-3 space-y-0.5">
-          {children}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Sub-row (indented) ───────────────────────────────────
-function SubRow({
-  size,
-  name,
-  grade,
-  mfr,
-  count,
-  uuid,
-}: {
-  size?: number | null;
-  name: string;
-  grade?: string | null;
-  mfr?: string | null;
-  count?: number;
-  uuid?: string | null;
-}) {
-  return (
-    <div className="flex items-center gap-2 px-2 py-1 rounded hover:bg-white/5 transition-colors">
-      <span className="text-xs text-slate-700">└</span>
-      <SizeBadge size={size} />
-      <div className="flex-1 flex items-center gap-2 flex-wrap">
-        {uuid ? (
-          <Link
-            to={`/components/${uuid}`}
-            className="text-xs text-slate-400 hover:text-cyan-400 transition-colors"
-          >
-            {name}
-          </Link>
-        ) : (
-          <span className="text-xs text-slate-400">{name}</span>
-        )}
-        <CountBadge count={count ?? 1} />
-        <MfrBadge code={mfr} />
-        <GradePill grade={grade ?? null} />
-      </div>
-    </div>
-  );
-}
-
-// ── Section container ────────────────────────────────────
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <h4 className="text-xs font-mono-sc text-slate-600 uppercase tracking-widest mb-2 border-b border-border/30 pb-1">
-        {title}
-      </h4>
-      <div className="space-y-0.5">{children}</div>
-    </div>
-  );
-}
-
-// ── Helpers ──────────────────────────────────────────────
-function isNoisyPort(n: LoadoutNode): boolean {
-  const p = n.port_name.toLowerCase();
-  if (p.includes('controller')) return true;
-  if (p.endsWith('_door') || p.includes('_door_') || p === 'radar_helper') return true;
-  // Quantum fuel tank (port_type = QuantumDrive but component_type = FuelTank)
-  if (n.component_type === 'FuelTank' || n.component_type === 'FuelIntake') return true;
-  return false;
-}
-
-// ── Rack name builder ───────────────────────────────────
-// MRCK_S02_ORIG_100i_Dual_S02 + size=2, rack_count=2, missile_size=2 → "100i-222"
-function buildRackName(rack: LoadoutNode): string {
-  const cls = rack.component_class_name ?? '';
-  const count = rack.rack_count;
-  const missileSize = rack.rack_missile_size;
-  const rackSize = rack.component_size;
-
-  // Strip MRCK or GMRCK prefix, then split: [S02, MFR, SHIP?, ...]
-  const parts = cls.replace(/^G?MRCK_/i, '').split('_');
-  // parts[0] = S##, parts[1] = manufacturer code, parts[2] = potential ship name
-  let shipTag: string | null = null;
-  if (parts.length >= 3) {
-    const candidate = parts[2];
-    // Ship tag has digits or mixed alphanumeric (e.g. "100i", "Perseus", "Fury")
-    if (candidate && /\d/.test(candidate)) {
-      shipTag = candidate;
-    } else if (candidate && candidate.length > 2 && candidate !== 'Quad' && candidate !== 'Dual' && candidate !== 'Single') {
-      shipTag = candidate;
-    }
-  }
-
-  if (shipTag && count != null && missileSize != null && rackSize != null) {
-    return `${shipTag}-${rackSize}${count}${missileSize}`;
-  }
-  if (count != null && missileSize != null && rackSize != null) {
-    return `Rack S${rackSize} (${count}×S${missileSize})`;
-  }
-  return rack.component_name ?? 'Missile Rack';
-}
-
-function parseJumpDriveName(className: string): string {
-  // JDRV_TARS_S01_Explorer_SCItem → "Explorer (TARS)"
-  const m = className.match(/^JDRV_([A-Z0-9]+)_S\d{2}_([^_]+)/i);
-  if (m) return `${m[2]} (${m[1]})`;
-  return className
-    .replace(/^JDRV_/i, '')
-    .replace(/_SCItem$/i, '')
-    .replace(/_/g, ' ');
-}
-
-// Extract size from JDRV class_name: JDRV_TARS_S01_Explorer_SCItem → 1
-function parseJumpDriveSize(className: string | null | undefined): number | null {
-  if (!className) return null;
-  const m = className.match(/^JDRV_[A-Z0-9]+_S(\d+)/i);
-  return m ? parseInt(m[1], 10) : null;
-}
-
-// Convert N → MN string
-function toMN(n: number) {
-  return (n / 1_000_000).toFixed(2);
-}
-
-// Strip "S## " size prefix embedded in component names from DB (e.g. "S01 Ecouter" → "Ecouter")
-function cleanCompName(name: string | null | undefined): string | null {
-  if (!name) return null;
-  return name.replace(/^S\d{2}\s+/, '');
-}
-
-// Extract real manufacturer code from class_name.
-// For type-prefixed class_names, the DB stores the type code in manufacturer_code instead.
-// Pattern: {TYPECODE}_{MFR}_{SIZE}_..._SCItem → real mfr is segment[1]
-// Exception for racks: MRCK_{SIZE}_{MFR}_... → real mfr is segment[2]
-const COMPONENT_TYPE_PREFIXES = new Set(['COOL','RADR','SHLD','QDRV','PWRP','PPLNT','THRM','POWR']);
 function extractMfr(
   className: string | null | undefined,
   fallback: string | null | undefined,
@@ -242,443 +21,608 @@ function extractMfr(
   if (!className) return fallback ?? null;
   const parts = className.split('_');
   const prefix = (parts[0] ?? '').toUpperCase();
-  if (prefix === 'MRCK' || prefix === 'GMRCK') {
-    // MRCK_S02_ORIG_100i_... → segment[2] is manufacturer
-    return parts[2] ?? fallback ?? null;
-  }
-  if (COMPONENT_TYPE_PREFIXES.has(prefix)) {
-    // COOL_AEGS_S03_..., RADR_GRNP_S01_..., SHLD_BEHR_S02_... → segment[1]
-    return parts[1] ?? fallback ?? null;
-  }
-  // WeaponGun, Thruster, Gimbal... → manufacturer_code already correct
+  if (prefix === 'MRCK' || prefix === 'GMRCK') return parts[2] ?? fallback ?? null;
+  if (COMPONENT_TYPE_PREFIXES.has(prefix)) return parts[1] ?? fallback ?? null;
   return fallback ?? null;
 }
 
-// ── Interfaces internes ──────────────────────────────────
-interface WeaponSlot {
-  mount: LoadoutNode | null;
-  weapon: LoadoutNode | null;
-  count: number;
-}
-interface RackSlot {
-  rack: LoadoutNode;
-  missiles: LoadoutNode[];
-  missileCount: number;
-  count: number;
-}
-interface SystemItem {
-  node: LoadoutNode;
-  count: number;
-  jumpModule: LoadoutNode | null;
-}
-interface ThrusterGroup {
-  type: string;
-  size: number | null;
-  count: number;
-  totalThrust: number; // N
+function cleanCompName(name: string | null | undefined): string | null {
+  if (!name) return null;
+  return name.replace(/^S\d{2}\s+/, '');
 }
 
+/** "hardpoint_gun_laser_bottom_left" → "Bottom Left" */
+function cleanPortName(portName: string): string {
+  return portName
+    .replace(/^hardpoint_/, '')
+    .replace(/_/g, ' ')
+    .replace(/\b(hardpoint|base|scitem|controller)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\w+/g, w => w.charAt(0).toUpperCase() + w.slice(1));
+}
+
+function isNoisyPort(n: LoadoutNode): boolean {
+  const p = n.port_name.toLowerCase();
+  if (p.includes('controller')) return true;
+  if (p.endsWith('_door') || p.includes('_door_') || p === 'radar_helper') return true;
+  if (n.component_type === 'FuelTank' || n.component_type === 'FuelIntake') return true;
+  return false;
+}
+
+function toMN(n: number) {
+  return (n / 1_000_000).toFixed(2);
+}
+
+function parseJumpDriveName(className: string): string {
+  const m = className.match(/^JDRV_([A-Z0-9]+)_S\d{2}_([^_]+)/i);
+  if (m) return `${m[2]} (${m[1]})`;
+  return className.replace(/^JDRV_/i, '').replace(/_SCItem$/i, '').replace(/_/g, ' ');
+}
+
+function parseJumpDriveSize(className: string | null | undefined): number | null {
+  if (!className) return null;
+  const m = className.match(/^JDRV_[A-Z0-9]+_S(\d+)/i);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function buildRackName(rack: LoadoutNode): string {
+  const cls = rack.component_class_name ?? '';
+  const count = rack.rack_count;
+  const missileSize = rack.rack_missile_size;
+  const rackSize = rack.component_size;
+  const parts = cls.replace(/^G?MRCK_/i, '').split('_');
+  let shipTag: string | null = null;
+  if (parts.length >= 3) {
+    const candidate = parts[2];
+    if (candidate && /\d/.test(candidate)) shipTag = candidate;
+    else if (candidate && candidate.length > 2 && !['Quad','Dual','Single'].includes(candidate)) shipTag = candidate;
+  }
+  if (shipTag && count != null && missileSize != null && rackSize != null)
+    return `${shipTag}-${rackSize}${count}${missileSize}`;
+  if (count != null && missileSize != null && rackSize != null)
+    return `Rack S${rackSize} (${count}xS${missileSize})`;
+  return rack.component_name ?? 'Missile Rack';
+}
+
+// ─────────────────────────────────────────────
+// Atoms
+// ─────────────────────────────────────────────
+
+const GRADE_STYLE: Record<string, string> = {
+  A: 'text-emerald-300 bg-emerald-950/60 border-emerald-800/60',
+  B: 'text-cyan-300 bg-cyan-950/60 border-cyan-800/60',
+  C: 'text-slate-300 bg-slate-800/60 border-slate-600/60',
+  D: 'text-amber-300 bg-amber-950/60 border-amber-800/60',
+  E: 'text-red-300 bg-red-950/60 border-red-800/60',
+};
+
+function GradePill({ grade }: { grade: string | null }) {
+  if (!grade) return null;
+  const s = GRADE_STYLE[grade] ?? 'text-slate-500 bg-slate-900 border-slate-700';
+  return (
+    <span className={`text-[9px] font-mono-sc font-bold border rounded px-1 py-0.5 leading-none ${s}`}>
+      {grade}
+    </span>
+  );
+}
+
+function SizeBadge({ size }: { size: number | null | undefined }) {
+  if (size == null) return null;
+  return (
+    <span className="text-[9px] font-mono-sc font-bold bg-slate-800 text-slate-400 border border-slate-700 rounded px-1.5 py-0.5 leading-none flex-shrink-0">
+      S{size}
+    </span>
+  );
+}
+
+function StatPill({ label, value, color = 'text-slate-400' }: {
+  label: string; value: string | number; color?: string;
+}) {
+  return (
+    <span className="flex items-center gap-0.5">
+      <span className="text-[9px] font-mono-sc text-slate-600 uppercase">{label}</span>
+      <span className={`text-[10px] font-orbitron font-bold tabular-nums ${color}`}>{value}</span>
+    </span>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Section header
+// ─────────────────────────────────────────────
+
+function Section({ title, accent, count, children }: {
+  title: string; accent: string; count?: number; children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <span className={`text-[10px] font-mono-sc uppercase tracking-widest font-bold ${accent}`}>{title}</span>
+        {count != null && (
+          <span className="text-[9px] font-mono-sc text-slate-600 border border-slate-800 rounded px-1">
+            {count}
+          </span>
+        )}
+        <span className="flex-1 h-px bg-slate-800" />
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Weapon card
+// ─────────────────────────────────────────────
+
+const WEAPON_TYPE_LABELS: Record<string, string> = {
+  WeaponGun: '', MiningLaser: 'Mining', SalvageHead: 'Salvage',
+  TractorBeam: 'Tractor', RepairBeam: 'Repair',
+  EMP: 'EMP', QuantumInterdictionGenerator: 'QED', UtilityWeapon: 'Utility',
+};
+
+const MOUNT_TYPE_STYLE: Record<string, string> = {
+  Gimbal:     'text-violet-400 bg-violet-950/40 border-violet-900/60',
+  Turret:     'text-amber-400  bg-amber-950/40  border-amber-900/60',
+  WeaponRack: 'text-cyan-400   bg-cyan-950/40   border-cyan-900/60',
+};
+
+function WeaponCard({ portName, mount, weapon }: {
+  portName: string; mount: LoadoutNode | null; weapon: LoadoutNode | null;
+}) {
+  const mountType = mount?.port_type ?? null;
+  const displaySize = mount?.component_size ?? weapon?.component_size ?? null;
+  const weaponName  = cleanCompName(weapon?.component_name);
+  const mountName   = cleanCompName(mount?.component_name);
+  const dps  = weapon?.weapon_dps    ? Math.round(parseFloat(String(weapon.weapon_dps))).toLocaleString('en-US') : null;
+  const dmg  = weapon?.weapon_damage ? Math.round(parseFloat(String(weapon.weapon_damage))).toString() : null;
+  const fr   = weapon?.weapon_fire_rate ? Math.round(parseFloat(String(weapon.weapon_fire_rate))).toString() : null;
+  const rng  = weapon?.weapon_range  ? Math.round(parseFloat(String(weapon.weapon_range))).toString() : null;
+  const wLabel = weapon?.component_type ? (WEAPON_TYPE_LABELS[weapon.component_type] ?? '') : '';
+  const mountStyle = mountType ? (MOUNT_TYPE_STYLE[mountType] ?? '') : '';
+
+  return (
+    <div className="flex flex-col rounded-md border border-slate-800 bg-slate-900/60 hover:border-slate-700 hover:bg-slate-900 transition-all overflow-hidden">
+      {/* Header: port name + type badges */}
+      <div className="flex items-center justify-between gap-1 px-2 pt-1.5 pb-1 border-b border-slate-800/60">
+        <span className="text-[9px] font-mono-sc text-slate-600 truncate flex-1 min-w-0">
+          {cleanPortName(portName)}
+        </span>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {mountType && (
+            <span className={`text-[8px] font-mono-sc border rounded px-1 py-0.5 leading-none ${mountStyle}`}>
+              {mountType}
+            </span>
+          )}
+          {wLabel && (
+            <span className="text-[8px] font-mono-sc text-slate-500 border border-slate-700 rounded px-1 py-0.5 leading-none">
+              {wLabel}
+            </span>
+          )}
+          <SizeBadge size={displaySize} />
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 px-2 py-1.5 space-y-1">
+        {mount && mountName && (
+          <p className="text-[9px] font-mono-sc text-slate-600 truncate">
+            {mount.component_uuid
+              ? <Link to={`/components/${mount.component_uuid}`} className="hover:text-slate-400 transition-colors">{mountName}</Link>
+              : mountName}
+          </p>
+        )}
+        {weaponName ? (
+          <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">
+            {weapon?.component_uuid
+              ? <Link to={`/components/${weapon.component_uuid}`} className="hover:text-cyan-400 transition-colors">{weaponName}</Link>
+              : weaponName}
+          </p>
+        ) : (
+          <p className="text-[10px] font-mono-sc text-slate-700 italic">— empty —</p>
+        )}
+        {(dps || dmg || fr || rng) && (
+          <div className="flex flex-wrap gap-x-2 gap-y-0.5 pt-0.5">
+            {dps && <StatPill label="DPS" value={dps} color="text-red-400" />}
+            {dmg && <StatPill label="dmg" value={dmg} color="text-orange-400" />}
+            {fr  && <StatPill label="rpm" value={fr} />}
+            {rng && <StatPill label="rng" value={`${rng}m`} />}
+          </div>
+        )}
+      </div>
+
+      {/* Footer: grade + mfr */}
+      {(weapon?.grade || weapon?.manufacturer_code) && (
+        <div className="flex items-center justify-between px-2 pb-1.5">
+          <span className="text-[9px] font-mono-sc text-slate-700">
+            {extractMfr(weapon.component_class_name, weapon.manufacturer_code)}
+          </span>
+          <GradePill grade={weapon.grade ?? null} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Rack card
+// ─────────────────────────────────────────────
+
+function RackCard({ rack, missiles }: { rack: LoadoutNode; missiles: LoadoutNode[] }) {
+  const missileNode = missiles[0] ?? null;
+  const missileName = cleanCompName(missileNode?.component_name);
+  const rackName    = buildRackName(rack);
+  const dmg = missileNode?.missile_damage
+    ? Math.round(parseFloat(String(missileNode.missile_damage))).toLocaleString('en-US')
+    : null;
+  const sig = missileNode?.missile_signal_type;
+
+  return (
+    <div className="flex flex-col rounded-md border border-orange-900/40 bg-orange-950/10 hover:brightness-110 transition-all overflow-hidden">
+      <div className="flex items-center justify-between px-2 pt-1.5 pb-1 border-b border-orange-900/30">
+        <span className="text-[9px] font-mono-sc text-slate-600 truncate flex-1">
+          {cleanPortName(rack.port_name)}
+        </span>
+        <SizeBadge size={rack.component_size ?? rack.port_max_size} />
+      </div>
+      <div className="flex-1 px-2 py-1.5 space-y-1">
+        <p className="text-[9px] font-mono-sc text-orange-400/70 truncate">
+          {rack.component_uuid
+            ? <Link to={`/components/${rack.component_uuid}`} className="hover:text-orange-300 transition-colors">{rackName}</Link>
+            : rackName}
+        </p>
+        {missileName ? (
+          <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">
+            {missileNode?.component_uuid
+              ? <Link to={`/components/${missileNode.component_uuid}`} className="hover:text-cyan-400 transition-colors">{missileName}</Link>
+              : missileName}
+          </p>
+        ) : (
+          <p className="text-[10px] font-mono-sc text-slate-700 italic">— no missile —</p>
+        )}
+        {(dmg || sig || missiles.length > 0) && (
+          <div className="flex flex-wrap gap-x-2 gap-y-0.5 pt-0.5">
+            {dmg && <StatPill label="dmg" value={dmg} color="text-orange-400" />}
+            {sig && <StatPill label="sig" value={sig} color="text-violet-400" />}
+            {missiles.length > 0 && <StatPill label="x" value={missiles.length} />}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// System card
+// ─────────────────────────────────────────────
+
+const SYS_ACCENT: Record<string, { border: string; text: string; bg: string }> = {
+  Cooler:       { border: 'border-cyan-900/50',   text: 'text-cyan-400',   bg: 'bg-cyan-950/15'    },
+  PowerPlant:   { border: 'border-yellow-900/50', text: 'text-yellow-400', bg: 'bg-yellow-950/15'  },
+  QuantumDrive: { border: 'border-violet-900/50', text: 'text-violet-400', bg: 'bg-violet-950/15'  },
+  Radar:        { border: 'border-green-900/50',  text: 'text-green-400',  bg: 'bg-green-950/15'   },
+};
+const SYS_ICONS: Record<string, string>  = { Cooler: '❄', PowerPlant: '⚡', QuantumDrive: '⊛', Radar: '◈' };
+const SYS_LABELS: Record<string, string> = { Cooler: 'Cooler', PowerPlant: 'Power Plant', QuantumDrive: 'Quantum Drive', Radar: 'Radar' };
+
+function SystemCard({ node, jumpModule }: { node: LoadoutNode; jumpModule: LoadoutNode | null }) {
+  const t = node.component_type ?? '';
+  const accent = SYS_ACCENT[t] ?? { border: 'border-slate-800', text: 'text-slate-400', bg: '' };
+  const icon   = SYS_ICONS[t] ?? '●';
+  const label  = SYS_LABELS[t] ?? t;
+  const name   = cleanCompName(node.component_name) ?? '—';
+
+  let stats: React.ReactNode = null;
+  if (t === 'Cooler' && node.cooling_rate) {
+    const cr = parseFloat(String(node.cooling_rate));
+    stats = <StatPill label="cooling" value={cr >= 1000 ? `${(cr/1000).toFixed(0)}k` : cr.toFixed(0)} color={accent.text} />;
+  } else if (t === 'PowerPlant' && node.power_output) {
+    stats = <StatPill label="power" value={`${parseFloat(String(node.power_output)).toFixed(0)} eu`} color={accent.text} />;
+  } else if (t === 'QuantumDrive' && node.qd_speed) {
+    const speed = parseFloat(String(node.qd_speed));
+    stats = (
+      <>
+        <StatPill label="speed" value={`${(speed/1e6).toFixed(0)}Mm/s`} color={accent.text} />
+        {node.qd_spool_time && <StatPill label="spool" value={`${parseFloat(String(node.qd_spool_time)).toFixed(1)}s`} />}
+      </>
+    );
+  }
+
+  const jmName = jumpModule
+    ? (jumpModule.component_name
+        ? cleanCompName(jumpModule.component_name)
+        : jumpModule.component_class_name
+          ? parseJumpDriveName(jumpModule.component_class_name)
+          : 'Jump Module')
+    : null;
+  const jmSize = jumpModule?.component_size ?? parseJumpDriveSize(jumpModule?.component_class_name);
+
+  return (
+    <div className={`flex flex-col rounded-md border ${accent.border} ${accent.bg} hover:brightness-110 transition-all overflow-hidden`}>
+      <div className={`flex items-center gap-1.5 px-2 py-1 border-b ${accent.border}`}>
+        <span className={`text-[10px] ${accent.text}`}>{icon}</span>
+        <span className={`text-[9px] font-mono-sc uppercase tracking-wider ${accent.text} opacity-70 flex-1`}>{label}</span>
+        <SizeBadge size={node.component_size} />
+        <GradePill grade={node.grade ?? null} />
+      </div>
+      <div className="flex-1 px-2 py-1.5 space-y-1">
+        <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">
+          {node.component_uuid
+            ? <Link to={`/components/${node.component_uuid}`} className="hover:text-cyan-400 transition-colors">{name}</Link>
+            : name}
+        </p>
+        {jmName && (
+          <p className="text-[9px] font-mono-sc text-slate-500 flex items-center gap-1">
+            <SizeBadge size={jmSize} />
+            {jumpModule?.component_uuid
+              ? <Link to={`/components/${jumpModule.component_uuid}`} className="hover:text-violet-400 transition-colors">{jmName}</Link>
+              : jmName}
+          </p>
+        )}
+        {stats && <div className="flex flex-wrap gap-x-2 gap-y-0.5 pt-0.5">{stats}</div>}
+      </div>
+      {node.manufacturer_code && (
+        <div className="px-2 pb-1.5">
+          <span className="text-[9px] font-mono-sc text-slate-700">
+            {extractMfr(node.component_class_name, node.manufacturer_code)}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Shield card
+// ─────────────────────────────────────────────
+
+function ShieldCard({ node }: { node: LoadoutNode }) {
+  const name   = cleanCompName(node.component_name) ?? '—';
+  const hp     = node.shield_hp ? Math.round(parseFloat(String(node.shield_hp))).toLocaleString('en-US') : null;
+  const regen  = node.shield_regen ? parseFloat(String(node.shield_regen)).toFixed(1) : null;
+  const delay  = node.shield_regen_delay ? parseFloat(String(node.shield_regen_delay)).toFixed(1) : null;
+
+  return (
+    <div className="flex flex-col rounded-md border border-blue-900/40 bg-blue-950/10 hover:brightness-110 transition-all overflow-hidden">
+      <div className="flex items-center gap-1.5 px-2 py-1 border-b border-blue-900/30">
+        <span className="text-[10px] text-blue-400">◈</span>
+        <span className="text-[9px] font-mono-sc uppercase tracking-wider text-blue-400 opacity-70 flex-1">Shield</span>
+        <SizeBadge size={node.component_size} />
+        <GradePill grade={node.grade ?? null} />
+      </div>
+      <div className="flex-1 px-2 py-1.5 space-y-1">
+        <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">
+          {node.component_uuid
+            ? <Link to={`/components/${node.component_uuid}`} className="hover:text-cyan-400 transition-colors">{name}</Link>
+            : name}
+        </p>
+        {(hp || regen) && (
+          <div className="flex flex-wrap gap-x-2 gap-y-0.5 pt-0.5">
+            {hp    && <StatPill label="HP"    value={hp}          color="text-blue-400" />}
+            {regen && <StatPill label="regen" value={`${regen}/s`} color="text-sky-400" />}
+            {delay && <StatPill label="delay" value={`${delay}s`} />}
+          </div>
+        )}
+      </div>
+      {node.manufacturer_code && (
+        <div className="px-2 pb-1.5">
+          <span className="text-[9px] font-mono-sc text-slate-700">
+            {extractMfr(node.component_class_name, node.manufacturer_code)}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+// Data processing — slots individuels
+// ─────────────────────────────────────────────
+
+const WEAPON_TYPES = new Set([
+  'WeaponGun','Weapon','MiningLaser','SalvageHead',
+  'TractorBeam','RepairBeam','EMP','QuantumInterdictionGenerator','UtilityWeapon',
+]);
+
+interface WeaponSlot { portName: string; mount: LoadoutNode | null; weapon: LoadoutNode | null }
+interface RackSlot   { rack: LoadoutNode; missiles: LoadoutNode[] }
+interface SystemSlot { node: LoadoutNode; jumpModule: LoadoutNode | null }
+interface ThrusterGroup { type: string; size: number | null; count: number; totalThrust: number }
+
 interface ProcessedLoadout {
-  weapons: WeaponSlot[];
-  racks: RackSlot[];
-  shields: SystemItem[];
-  systems: SystemItem[];
+  weapons:   WeaponSlot[];
+  racks:     RackSlot[];
+  shields:   LoadoutNode[];
+  systems:   SystemSlot[];
   thrusters: ThrusterGroup[];
-  cmDecoys: Array<{ name: string; count: number }>;
-  cmNoises: Array<{ name: string; count: number }>;
+  cmDecoys:  Array<{ name: string; count: number }>;
+  cmNoises:  Array<{ name: string; count: number }>;
   defaultPaint: string | null;
 }
 
-const THRUSTER_ORDER = ['Main', 'Maneuvering', 'Retro'];
-const WEAPON_TYPES = new Set([
-  'WeaponGun', 'Weapon', 'MiningLaser', 'SalvageHead',
-  'TractorBeam', 'RepairBeam', 'EMP', 'QuantumInterdictionGenerator', 'UtilityWeapon',
-]);
+const THRUSTER_ORDER = ['Main','Maneuvering','Retro'];
 
 function processLoadout(nodes: LoadoutNode[]): ProcessedLoadout {
-  const rawWeapons: Array<{ mount: LoadoutNode | null; weapon: LoadoutNode | null }> = [];
-  const rawRacks: Array<{ rack: LoadoutNode; missiles: LoadoutNode[] }> = [];
-  const rawShields: LoadoutNode[] = [];
-  const rawSystems: Array<{ node: LoadoutNode; jumpModule: LoadoutNode | null }> = [];
-  const rawThrusters: LoadoutNode[] = [];
+  const weapons:       WeaponSlot[]    = [];
+  const racks:         RackSlot[]      = [];
+  const shields:       LoadoutNode[]   = [];
+  const rawSystems:    SystemSlot[]    = [];
+  const rawThrusters:  LoadoutNode[]   = [];
   const cmDecoyMap = new Map<string, number>();
   const cmNoiseMap = new Map<string, number>();
   let defaultPaint: string | null = null;
 
   for (const node of nodes) {
     if (isNoisyPort(node)) continue;
-
     const portType = node.port_type;
     const compType = node.component_type;
 
-    // Peinture par défaut
     if (node.port_name === 'hardpoint_paint' && node.component_name) {
-      defaultPaint = node.component_name;
-      continue;
+      defaultPaint = node.component_name; continue;
     }
-
-    // Countermeasures → stats only
     if (compType === 'Countermeasure' && node.component_uuid) {
       const name = node.component_name ?? 'Unknown';
-      const nameLc = name.toLowerCase();
-      if (nameLc.includes('noise') || nameLc.includes('flare') || nameLc.includes('chaff')) {
+      const lc = name.toLowerCase();
+      if (lc.includes('noise') || lc.includes('flare') || lc.includes('chaff'))
         cmNoiseMap.set(name, (cmNoiseMap.get(name) ?? 0) + 1);
-      } else {
+      else
         cmDecoyMap.set(name, (cmDecoyMap.get(name) ?? 0) + 1);
-      }
       continue;
     }
-
-    // Weapon mounts (Gimbal / Turret / WeaponRack avec port)
     if ((portType === 'Gimbal' || portType === 'Turret' || portType === 'WeaponRack') && node.component_uuid) {
-      const weapon = node.children.find(c =>
-        c.component_type && WEAPON_TYPES.has(c.component_type)
-      ) ?? null;
-      rawWeapons.push({ mount: node, weapon });
-      continue;
+      const weapon = node.children.find(c => c.component_type && WEAPON_TYPES.has(c.component_type)) ?? null;
+      weapons.push({ portName: node.port_name, mount: node, weapon }); continue;
     }
-
-    // Direct weapons (no parent mount)
     if (compType && WEAPON_TYPES.has(compType) && node.component_uuid) {
-      rawWeapons.push({ mount: null, weapon: node });
-      continue;
+      weapons.push({ portName: node.port_name, mount: null, weapon: node }); continue;
     }
-
-    // Missile Racks
     if ((portType === 'MissileRack' || compType === 'MissileRack') && node.component_uuid) {
       const missiles = node.children.filter(c =>
-        c.component_type === 'Missile' || c.port_type === 'Missile' ||
-        (c.port_name ?? '').includes('missile')
+        c.component_type === 'Missile' || c.port_type === 'Missile' || (c.port_name ?? '').includes('missile')
       );
-      rawRacks.push({ rack: node, missiles });
-      continue;
+      racks.push({ rack: node, missiles }); continue;
     }
-
-    // Shields
-    if (compType === 'Shield' && node.component_uuid) {
-      rawShields.push(node);
-      continue;
-    }
-
-    // Thrusters
-    if (portType === 'Thruster' && compType === 'Thruster' && node.component_uuid) {
-      rawThrusters.push(node);
-      continue;
-    }
-
-    // QD (only the actual QD component, not fuel tank)
+    if (compType === 'Shield' && node.component_uuid) { shields.push(node); continue; }
+    if (portType === 'Thruster' && compType === 'Thruster' && node.component_uuid) { rawThrusters.push(node); continue; }
     if (portType === 'QuantumDrive' && compType === 'QuantumDrive' && node.component_uuid) {
       const jumpChild = node.children.find(c => {
         const cls = (c.component_class_name ?? '').toUpperCase();
         return cls.startsWith('JDRV') || c.component_type === 'JumpDrive';
       }) ?? null;
-      rawSystems.push({ node, jumpModule: jumpChild });
-      continue;
+      rawSystems.push({ node, jumpModule: jumpChild }); continue;
     }
-
-    // Other systems (Cooler, PowerPlant, Radar)
-    if (['Cooler', 'PowerPlant', 'Radar'].includes(compType ?? '') && node.component_uuid) {
-      rawSystems.push({ node, jumpModule: null });
-      continue;
+    if (['Cooler','PowerPlant','Radar'].includes(compType ?? '') && node.component_uuid) {
+      rawSystems.push({ node, jumpModule: null }); continue;
     }
   }
 
-  // ── Dedup weapons ──────────────────────────────────────
-  const weaponMap = new Map<string, WeaponSlot>();
-  for (const { mount, weapon } of rawWeapons) {
-    const key = `${mount?.component_name ?? 'fixed'}|${weapon?.component_name ?? 'empty'}`;
-    const ex = weaponMap.get(key);
-    if (ex) ex.count++;
-    else weaponMap.set(key, { mount, weapon, count: 1 });
-  }
-  const weapons = Array.from(weaponMap.values());
-
-  // ── Dedup racks ────────────────────────────────────────
-  const rackMap = new Map<string, RackSlot>();
-  for (const { rack, missiles } of rawRacks) {
-    const key = rack.component_name ?? rack.component_class_name ?? rack.port_name;
-    const ex = rackMap.get(key);
-    if (ex) {
-      ex.count++;
-      ex.missileCount += missiles.length;
-    } else {
-      rackMap.set(key, { rack, missiles, missileCount: missiles.length, count: 1 });
-    }
-  }
-  const racks = Array.from(rackMap.values());
-
-  // ── Dedup shields ──────────────────────────────────────
-  const shieldMap = new Map<string, SystemItem>();
-  for (const node of rawShields) {
-    const key = node.component_name ?? node.port_name;
-    const ex = shieldMap.get(key);
-    if (ex) ex.count++;
-    else shieldMap.set(key, { node, count: 1, jumpModule: null });
-  }
-  const shields = Array.from(shieldMap.values());
-
-  // ── Dedup systems ──────────────────────────────────────
-  const sysMap = new Map<string, SystemItem>();
-  for (const { node, jumpModule } of rawSystems) {
-    const key = `${node.component_type}|${node.component_name ?? node.port_name}`;
-    const ex = sysMap.get(key);
-    if (ex) ex.count++;
-    else sysMap.set(key, { node, count: 1, jumpModule });
-  }
-  // Sort: Cooler, PowerPlant, QuantumDrive, Radar
-  const SYS_ORDER = ['Cooler', 'PowerPlant', 'QuantumDrive', 'Radar'];
-  const systems = Array.from(sysMap.values()).sort((a, b) => {
+  const SYS_ORDER = ['Cooler','PowerPlant','QuantumDrive','Radar'];
+  const systems = rawSystems.sort((a,b) => {
     const ai = SYS_ORDER.indexOf(a.node.component_type ?? '');
     const bi = SYS_ORDER.indexOf(b.node.component_type ?? '');
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
   });
 
-  // ── Group thrusters ────────────────────────────────────
   const thrusterMap = new Map<string, ThrusterGroup>();
   for (const node of rawThrusters) {
-    const thrType = node.thruster_type ?? 'Main';
-    const thrust = node.thruster_max_thrust ?? 0;
-    const size = node.component_size ?? null;
-    const key = `${thrType}|${size}`;
+    const type   = node.thruster_type ?? 'Main';
+    const size   = node.component_size ?? null;
+    const thrust = parseFloat(String(node.thruster_max_thrust ?? 0));
+    const key    = `${type}|${size}`;
     const ex = thrusterMap.get(key);
-    if (ex) {
-      ex.count++;
-      ex.totalThrust += thrust;
-    } else {
-      thrusterMap.set(key, { type: thrType, size, count: 1, totalThrust: thrust });
-    }
+    if (ex) { ex.count++; ex.totalThrust += thrust; }
+    else thrusterMap.set(key, { type, size, count: 1, totalThrust: thrust });
   }
-  // Sort by THRUSTER_ORDER, then by type key alphabetically for unknowns
-  const allGroups = Array.from(thrusterMap.values());
+  const allGrps = Array.from(thrusterMap.values());
   const thrusters = [
-    ...THRUSTER_ORDER.flatMap(t =>
-      allGroups.filter(g => g.type === t).sort((a, b) => (b.size ?? 0) - (a.size ?? 0))
-    ),
-    ...allGroups.filter(g => !THRUSTER_ORDER.includes(g.type)),
+    ...THRUSTER_ORDER.flatMap(t => allGrps.filter(g => g.type === t).sort((a,b)=>(b.size??0)-(a.size??0))),
+    ...allGrps.filter(g => !THRUSTER_ORDER.includes(g.type)),
   ];
 
   return {
-    weapons,
-    racks,
-    shields,
-    systems,
-    thrusters,
+    weapons, racks, shields, systems, thrusters,
     cmDecoys: Array.from(cmDecoyMap.entries()).map(([name, count]) => ({ name, count })),
     cmNoises: Array.from(cmNoiseMap.entries()).map(([name, count]) => ({ name, count })),
     defaultPaint,
   };
 }
 
-// ── Weapon type label ────────────────────────────────────
-const WEAPON_TYPE_LABELS: Record<string, string> = {
-  WeaponGun: 'Gun',
-  MiningLaser: 'Mining',
-  SalvageHead: 'Salvage',
-  TractorBeam: 'Tractor',
-  RepairBeam: 'Repair',
-  EMP: 'EMP',
-  QuantumInterdictionGenerator: 'QED',
-  UtilityWeapon: 'Utility',
-};
+// ─────────────────────────────────────────────
+// Main component
+// ─────────────────────────────────────────────
 
-const SYS_LABELS: Record<string, string> = {
-  Cooler: 'Cooler',
-  PowerPlant: 'Power',
-  QuantumDrive: 'Quantum Drive',
-  Radar: 'Radar',
-};
-
-// ── Main component ───────────────────────────────────────
-interface Props {
-  nodes: LoadoutNode[];
-}
-
-export function ShipLoadout({ nodes }: Props) {
+export function ShipLoadout({ nodes }: { nodes: LoadoutNode[] }) {
   const data = processLoadout(nodes);
-
-  const hasWeapons = data.weapons.length > 0;
-  const hasRacks = data.racks.length > 0;
-  const hasShields = data.shields.length > 0;
-  const hasSystems = data.systems.length > 0;
-  const hasThrusters = data.thrusters.length > 0;
 
   return (
     <div className="space-y-6">
-      {/* ── Weapons ────────────────────────────────── */}
-      {hasWeapons && (
-        <Section title="Weapons & Utilities">
-          {data.weapons.map((slot, i) => {
-            const weapon = slot.weapon;
-            const mount = slot.mount;
-            const wType = weapon?.component_type ?? null;
-            const wLabel = wType ? (WEAPON_TYPE_LABELS[wType] ?? null) : null;
 
-            if (mount) {
-              // Weapon in a gimbal/turret
-              return (
-                <LoadoutRow
-                  key={i}
-                  size={mount.component_size ?? mount.port_max_size}
-                  name={cleanCompName(mount.component_name) ?? `${mount.port_type} Mount`}
-                  mfr={extractMfr(mount.component_class_name, mount.manufacturer_code)}
-                  count={slot.count}
-                  uuid={mount.component_uuid}
-                  meta={wLabel}
-                >
-                  {weapon ? (
-                    <SubRow
-                      size={weapon.component_size ?? weapon.port_max_size}
-                      name={cleanCompName(weapon.component_name) ?? '—'}
-                      mfr={extractMfr(weapon.component_class_name, weapon.manufacturer_code)}
-                      count={slot.count}
-                      uuid={weapon.component_uuid}
-                    />
-                  ) : (
-                    <SubRow name="— empty —" />
-                  )}
-                </LoadoutRow>
-              );
-            } else {
-              // Direct weapon
-              const w = weapon!;
-              return (
-                <LoadoutRow
-                  key={i}
-                  size={w.component_size ?? w.port_max_size}
-                  name={cleanCompName(w.component_name) ?? '—'}
-                  mfr={extractMfr(w.component_class_name, w.manufacturer_code)}
-                  count={slot.count}
-                  uuid={w.component_uuid}
-                  meta={wLabel}
-                />
-              );
-            }
-          })}
+      {/* ── Weapons ── */}
+      {data.weapons.length > 0 && (
+        <Section title="Weapons & Utilities" accent="text-red-400" count={data.weapons.length}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+            {data.weapons.map((slot, i) => (
+              <WeaponCard key={i} portName={slot.portName} mount={slot.mount} weapon={slot.weapon} />
+            ))}
+          </div>
         </Section>
       )}
 
-      {/* ── Racks & Missiles ───────────────────────── */}
-      {hasRacks && (
-        <Section title="Racks">
-          {data.racks.map((slot, i) => {
-            const missileNode = slot.missiles[0] ?? null;
-            const totalMissiles = slot.missileCount;
-            return (
-              <LoadoutRow
-                key={i}
-                size={slot.rack.component_size ?? slot.rack.port_max_size}
-                name={buildRackName(slot.rack)}
-                mfr={extractMfr(slot.rack.component_class_name, slot.rack.manufacturer_code)}
-                count={slot.count}
-                uuid={slot.rack.component_uuid}
+      {/* ── Missiles ── */}
+      {data.racks.length > 0 && (
+        <Section title="Missiles" accent="text-orange-400" count={data.racks.length}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+            {data.racks.map((slot, i) => (
+              <RackCard key={i} rack={slot.rack} missiles={slot.missiles} />
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* ── Shields ── */}
+      {data.shields.length > 0 && (
+        <Section title="Shields" accent="text-blue-400" count={data.shields.length}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+            {data.shields.map((node, i) => (
+              <ShieldCard key={i} node={node} />
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* ── Systems ── */}
+      {data.systems.length > 0 && (
+        <Section title="Systems" accent="text-violet-400" count={data.systems.length}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+            {data.systems.map((item, i) => (
+              <SystemCard key={i} node={item.node} jumpModule={item.jumpModule} />
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* ── Thrusters ── */}
+      {data.thrusters.length > 0 && (
+        <Section title="Thrusters" accent="text-amber-400">
+          <div className="flex flex-wrap gap-2">
+            {data.thrusters.map((g, i) => (
+              <div key={i}
+                className="flex items-center gap-2 rounded-md border border-amber-900/30 bg-amber-950/10 px-3 py-1.5"
               >
-                {missileNode && (
-                  <SubRow
-                    size={missileNode.component_size ?? missileNode.port_max_size}
-                    name={cleanCompName(missileNode.component_name) ?? 'Missile'}
-                    mfr={extractMfr(missileNode.component_class_name, missileNode.manufacturer_code)}
-                    count={totalMissiles}
-                    uuid={missileNode.component_uuid}
-                  />
-                )}
-              </LoadoutRow>
-            );
-          })}
-        </Section>
-      )}
-
-      {/* ── Shields ────────────────────────────────── */}
-      {hasShields && (
-        <Section title="Shield">
-          {data.shields.map((item, i) => (
-            <LoadoutRow
-              key={i}
-              size={item.node.component_size}
-              name={cleanCompName(item.node.component_name) ?? '—'}
-              grade={item.node.grade}
-              mfr={extractMfr(item.node.component_class_name, item.node.manufacturer_code)}
-              count={item.count}
-              uuid={item.node.component_uuid}
-              meta={item.node.shield_hp != null ? `${item.node.shield_hp.toLocaleString('en-US')} HP` : undefined}
-            />
-          ))}
-        </Section>
-      )}
-
-      {/* ── Systems ────────────────────────────────── */}
-      {hasSystems && (
-        <Section title="Systems">
-          {data.systems.map((item, i) => {
-            const typeLabel = SYS_LABELS[item.node.component_type ?? ''] ?? item.node.component_type;
-            const jm = item.jumpModule;
-            return (
-              <LoadoutRow
-                key={i}
-                size={item.node.component_size}
-                name={cleanCompName(item.node.component_name) ?? '—'}
-                grade={item.node.grade}
-                mfr={extractMfr(item.node.component_class_name, item.node.manufacturer_code)}
-                count={item.count}
-                uuid={item.node.component_uuid}
-                meta={typeLabel}
-              >
-                {jm && (
-                  <SubRow
-                    name={
-                      jm.component_name
-                        ? cleanCompName(jm.component_name) ?? 'Jump Module'
-                        : jm.component_class_name
-                          ? parseJumpDriveName(jm.component_class_name)
-                          : 'Jump Module'
-                    }
-                    grade={jm.grade}
-                    mfr={extractMfr(jm.component_class_name, jm.manufacturer_code)}
-                    uuid={jm.component_uuid}
-                    size={jm.component_size ?? parseJumpDriveSize(jm.component_class_name)}
-                  />
-                )}
-              </LoadoutRow>
-            );
-          })}
-        </Section>
-      )}
-
-      {/* ── Thrusters ──────────────────────────────── */}
-      {hasThrusters && (
-        <Section title="Thrusters">
-          {data.thrusters.map((g, i) => (
-            <div
-              key={i}
-              className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-white/5 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                {g.size != null && (
-                  <span className="text-xs font-mono-sc bg-slate-800 text-slate-500 border border-slate-700 rounded px-1 py-0.5 leading-none flex-shrink-0">
-                    S{g.size}
-                  </span>
-                )}
-                <span className="text-sm text-slate-300">{g.type}</span>
-                <span className="text-xs font-mono-sc text-slate-500">
-                  ×{g.count}
+                {g.size != null && <SizeBadge size={g.size} />}
+                <span className="text-xs font-mono-sc text-amber-300">{g.type}</span>
+                <span className="text-xs font-mono-sc text-slate-600">x{g.count}</span>
+                <span className="text-[10px] font-orbitron text-slate-500 tabular-nums">
+                  {toMN(g.totalThrust)} MN
                 </span>
               </div>
-              <span className="text-xs font-mono-sc text-slate-500">
-                thrust capacity&nbsp;{toMN(g.totalThrust)}&nbsp;MN
-              </span>
-            </div>
-          ))}
+            ))}
+          </div>
         </Section>
       )}
 
-      {/* ── Peinture par défaut ─────────────────────── */}
-      {data.defaultPaint && (
-        <div>
-          <h4 className="text-xs font-mono-sc text-slate-600 uppercase tracking-widest mb-2 border-b border-border/30 pb-1">
-            Default Paint
-          </h4>
-          <span className="text-sm text-slate-400">{data.defaultPaint}</span>
-        </div>
+      {/* ── Countermeasures ── */}
+      {(data.cmDecoys.length > 0 || data.cmNoises.length > 0) && (
+        <Section title="Countermeasures" accent="text-teal-400">
+          <div className="flex flex-wrap gap-2">
+            {[...data.cmDecoys, ...data.cmNoises].map((cm, i) => (
+              <div key={i}
+                className="flex items-center gap-2 rounded-md border border-teal-900/30 bg-teal-950/10 px-3 py-1.5"
+              >
+                <span className="text-xs text-slate-300">{cm.name}</span>
+                <span className="text-xs font-mono-sc text-teal-600">x{cm.count}</span>
+              </div>
+            ))}
+          </div>
+        </Section>
       )}
+
+      {/* ── Default Paint ── */}
+      {data.defaultPaint && (
+        <Section title="Default Paint" accent="text-slate-500">
+          <span className="text-sm text-slate-400">{data.defaultPaint}</span>
+        </Section>
+      )}
+
     </div>
   );
 }
