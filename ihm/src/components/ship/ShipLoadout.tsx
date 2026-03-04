@@ -21,21 +21,13 @@ const GRADE_COLOR: Record<string, string> = {
   D: 'text-amber-500 border-amber-900',
   E: 'text-red-400 border-red-900',
 };
-const GRADE_LABEL: Record<string, string> = {
-  A: 'Military',
-  B: 'Industrial',
-  C: 'Civilian',
-  D: 'Starter',
-  E: 'Economy',
-};
 
 function GradePill({ grade }: { grade: string | null }) {
   if (!grade) return null;
   const color = GRADE_COLOR[grade] ?? 'text-slate-500 border-slate-700';
-  const label = GRADE_LABEL[grade];
   return (
     <span className={`text-xs font-mono-sc border rounded px-1 leading-none py-0.5 ${color}`}>
-      {grade}{label ? ` · ${label}` : ''}
+      {grade}
     </span>
   );
 }
@@ -177,6 +169,37 @@ function isNoisyPort(n: LoadoutNode): boolean {
   // Quantum fuel tank (port_type = QuantumDrive but component_type = FuelTank)
   if (n.component_type === 'FuelTank' || n.component_type === 'FuelIntake') return true;
   return false;
+}
+
+// ── Rack name builder ───────────────────────────────────
+// MRCK_S02_ORIG_100i_Dual_S02 + size=2, rack_count=2, missile_size=2 → "100i-222"
+function buildRackName(rack: LoadoutNode): string {
+  const cls = rack.component_class_name ?? '';
+  const count = rack.rack_count;
+  const missileSize = rack.rack_missile_size;
+  const rackSize = rack.component_size;
+
+  // Strip MRCK or GMRCK prefix, then split: [S02, MFR, SHIP?, ...]
+  const parts = cls.replace(/^G?MRCK_/i, '').split('_');
+  // parts[0] = S##, parts[1] = manufacturer code, parts[2] = potential ship name
+  let shipTag: string | null = null;
+  if (parts.length >= 3) {
+    const candidate = parts[2];
+    // Ship tag has digits or mixed alphanumeric (e.g. "100i", "Perseus", "Fury")
+    if (candidate && /\d/.test(candidate)) {
+      shipTag = candidate;
+    } else if (candidate && candidate.length > 2 && candidate !== 'Quad' && candidate !== 'Dual' && candidate !== 'Single') {
+      shipTag = candidate;
+    }
+  }
+
+  if (shipTag && count != null && missileSize != null && rackSize != null) {
+    return `${shipTag}-${rackSize}${count}${missileSize}`;
+  }
+  if (count != null && missileSize != null && rackSize != null) {
+    return `Rack S${rackSize} (${count}×S${missileSize})`;
+  }
+  return rack.component_name ?? 'Missile Rack';
 }
 
 function parseJumpDriveName(className: string): string {
@@ -439,8 +462,23 @@ export function ShipLoadout({ nodes }: Props) {
   const hasThrusters = data.thrusters.length > 0;
   const hasCM = data.cmDecoys.length > 0 || data.cmNoises.length > 0;
 
+  const totalDecoys = data.cmDecoys.reduce((s, c) => s + c.count, 0);
+  const totalNoises = data.cmNoises.reduce((s, c) => s + c.count, 0);
+
   return (
     <div className="space-y-6">
+      {/* ── Countermeasures — résumé haut ──────────── */}
+      {hasCM && (
+        <div className="flex items-center gap-4 text-xs font-mono-sc text-slate-500 pb-2 border-b border-border/20">
+          <span className="text-slate-700 uppercase tracking-widest">CM</span>
+          {totalDecoys > 0 && (
+            <span>{totalDecoys}× Decoy{totalDecoys > 1 ? 's' : ''}</span>
+          )}
+          {totalNoises > 0 && (
+            <span>{totalNoises}× Noise{totalNoises > 1 ? 's' : ''}</span>
+          )}
+        </div>
+      )}
       {/* ── Weapons ────────────────────────────────── */}
       {hasWeapons && (
         <Section title="Weapons & Utilities">
@@ -507,7 +545,7 @@ export function ShipLoadout({ nodes }: Props) {
               <LoadoutRow
                 key={i}
                 size={slot.rack.component_size ?? slot.rack.port_max_size}
-                name={slot.rack.component_name ?? `Rack`}
+                name={buildRackName(slot.rack)}
                 grade={slot.rack.grade}
                 mfr={slot.rack.manufacturer_code}
                 count={slot.count}
@@ -594,36 +632,20 @@ export function ShipLoadout({ nodes }: Props) {
               className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-white/5 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <span className="text-sm text-slate-200 w-28">{g.type}</span>
-                <CountBadge count={g.count} />
+                <span className="text-xs font-mono-sc bg-slate-800 text-slate-500 border border-slate-700 rounded px-1 py-0.5 leading-none flex-shrink-0">
+                  S1
+                </span>
+                <span className="text-sm text-slate-300">{g.type}</span>
+                <span className="text-xs font-mono-sc text-slate-500">
+                  ×{g.count}
+                </span>
               </div>
               <span className="text-xs font-mono-sc text-slate-500">
-                thrust&nbsp;{toMN(g.totalThrust)}&nbsp;MN
+                thrust capacity&nbsp;{toMN(g.totalThrust)}&nbsp;MN
               </span>
             </div>
           ))}
         </Section>
-      )}
-
-      {/* ── Countermeasures (stats) ─────────────────── */}
-      {hasCM && (
-        <div>
-          <h4 className="text-xs font-mono-sc text-slate-600 uppercase tracking-widest mb-2 border-b border-border/30 pb-1">
-            Countermeasures
-          </h4>
-          <div className="flex flex-wrap gap-2">
-            {data.cmDecoys.map(({ name, count }, i) => (
-              <span key={i} className="text-xs font-mono-sc border border-slate-700 rounded px-2 py-1 text-slate-400">
-                {count}× Decoy{count > 1 ? 's' : ''} ({name})
-              </span>
-            ))}
-            {data.cmNoises.map(({ name, count }, i) => (
-              <span key={i} className="text-xs font-mono-sc border border-slate-700 rounded px-2 py-1 text-slate-400">
-                {count}× Noise{count > 1 ? 's' : ''} ({name})
-              </span>
-            ))}
-          </div>
-        </div>
       )}
 
       {/* ── Peinture par défaut ─────────────────────── */}
