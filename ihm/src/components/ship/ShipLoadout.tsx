@@ -138,25 +138,6 @@ function StatPill({ label, value, color = 'text-slate-400' }: {
 // Section header
 // ─────────────────────────────────────────────
 
-function Section({ title, accent, count, children }: {
-  title: string; accent: string; count?: number; children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className="flex items-center gap-2 mb-3">
-        <span className={`text-[10px] font-mono-sc uppercase tracking-widest font-bold ${accent}`}>{title}</span>
-        {count != null && (
-          <span className="text-[9px] font-mono-sc text-slate-600 border border-slate-800 rounded px-1">
-            {count}
-          </span>
-        )}
-        <span className="flex-1 h-px bg-slate-800" />
-      </div>
-      {children}
-    </div>
-  );
-}
-
 // ─────────────────────────────────────────────
 // Weapon card
 // ─────────────────────────────────────────────
