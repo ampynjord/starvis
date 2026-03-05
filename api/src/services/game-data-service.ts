@@ -150,7 +150,15 @@ export class GameDataService {
   getComponentTypes() {
     return this.components.getComponentTypes();
   }
-  getCompatibleComponents(opts: { type?: string; min_size?: number; max_size?: number; search?: string; sort?: string; order?: string; limit?: number }) {
+  getCompatibleComponents(opts: {
+    type?: string;
+    min_size?: number;
+    max_size?: number;
+    search?: string;
+    sort?: string;
+    order?: string;
+    limit?: number;
+  }) {
     return this.components.getCompatibleComponents(opts);
   }
 

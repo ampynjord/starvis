@@ -11,13 +11,13 @@ export function mountComponentRoutes(router: Router, deps: RouteDependencies): v
     '/api/v1/components/compatible',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const type     = String(req.query.type ?? '');
+      const type = String(req.query.type ?? '');
       const min_size = req.query.min_size != null ? parseInt(String(req.query.min_size), 10) : undefined;
       const max_size = req.query.max_size != null ? parseInt(String(req.query.max_size), 10) : undefined;
-      const search   = String(req.query.search ?? '');
-      const sort     = String(req.query.sort ?? 'size');
-      const order    = String(req.query.order ?? 'asc');
-      const limit    = Math.min(200, parseInt(String(req.query.limit ?? '100'), 10) || 100);
+      const search = String(req.query.search ?? '');
+      const sort = String(req.query.sort ?? 'size');
+      const order = String(req.query.order ?? 'asc');
+      const limit = Math.min(200, parseInt(String(req.query.limit ?? '100'), 10) || 100);
       const data = await gameDataService!.getCompatibleComponents({
         type: type || undefined,
         min_size,

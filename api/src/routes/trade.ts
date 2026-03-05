@@ -3,18 +3,23 @@
  * Inspired by UEX Corp / SC Trade Tools
  */
 import type { Router } from 'express';
+import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { asyncHandler, makeGameDataGuard, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
-import type { Pool } from 'mysql2/promise';
-import type { RowDataPacket } from 'mysql2/promise';
 
 type Row = RowDataPacket & Record<string, unknown>;
 
 async function getCommodityPrices(pool: Pool, commodityUuid?: string, system?: string): Promise<Row[]> {
   const where: string[] = [];
   const params: (string | number)[] = [];
-  if (commodityUuid) { where.push('cp.commodity_uuid = ?'); params.push(commodityUuid); }
-  if (system)        { where.push('cp.system_name = ?');    params.push(system); }
+  if (commodityUuid) {
+    where.push('cp.commodity_uuid = ?');
+    params.push(commodityUuid);
+  }
+  if (system) {
+    where.push('cp.system_name = ?');
+    params.push(system);
+  }
   const wSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const [rows] = await pool.execute<Row[]>(
     `SELECT cp.*, c.name as commodity_name, c.type as commodity_type, c.symbol
@@ -27,11 +32,14 @@ async function getCommodityPrices(pool: Pool, commodityUuid?: string, system?: s
   return rows;
 }
 
-async function getBestRoutes(pool: Pool, opts: {
-  cargo_scu?: number;
-  budget?: number;
-  system?: string;
-}): Promise<Row[]> {
+async function getBestRoutes(
+  pool: Pool,
+  opts: {
+    cargo_scu?: number;
+    budget?: number;
+    system?: string;
+  },
+): Promise<Row[]> {
   // Join commodity_prices with itself (buy + sell) to find arbitrage routes
   const cargo = Math.max(1, opts.cargo_scu ?? 1);
   const systemFilter = opts.system ? 'AND b.system_name = ? AND s.system_name = ?' : '';
@@ -73,7 +81,7 @@ export function mountTradeRoutes(router: Router, deps: RouteDependencies): void 
     requireGameData,
     asyncHandler(async (req, res) => {
       const commodityUuid = String(req.query.commodity_uuid ?? '');
-      const system        = String(req.query.system ?? '');
+      const system = String(req.query.system ?? '');
       const data = await getCommodityPrices(pool, commodityUuid || undefined, system || undefined);
       sendWithETag(req, res, { success: true, count: data.length, data });
     }),
@@ -84,7 +92,7 @@ export function mountTradeRoutes(router: Router, deps: RouteDependencies): void 
     '/api/v1/trade/routes',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const cargo  = parseInt(String(req.query.cargo_scu ?? '1'), 10) || 1;
+      const cargo = parseInt(String(req.query.cargo_scu ?? '1'), 10) || 1;
       const system = String(req.query.system ?? '');
       const data = await getBestRoutes(pool, { cargo_scu: cargo, system: system || undefined });
       sendWithETag(req, res, { success: true, count: data.length, data });
@@ -97,7 +105,7 @@ export function mountTradeRoutes(router: Router, deps: RouteDependencies): void 
     requireGameData,
     asyncHandler(async (req, res) => {
       const system = String(req.query.system ?? '');
-      const where  = system ? 'WHERE system_name = ?' : '';
+      const where = system ? 'WHERE system_name = ?' : '';
       const params = system ? [system] : [];
       const [rows] = await (pool as Pool).execute<Row[]>(
         `SELECT DISTINCT location_name, system_name FROM commodity_prices ${where} ORDER BY system_name, location_name`,
