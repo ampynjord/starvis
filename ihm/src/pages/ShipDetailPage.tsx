@@ -75,6 +75,16 @@ export default function ShipDetailPage() {
     () => ({ ...defaultSelected, ...selectedModules }),
     [defaultSelected, selectedModules],
   );
+
+  // Résoudre le module actif pour chaque slot (utilisé dans ShipLoadout)
+  const activeModules = useMemo(
+    () =>
+      moduleSlots.map((slot) => {
+        const sel = effectiveSelection[slot[0].slot_name];
+        return slot.find((m) => m.module_class_name === sel) ?? slot.find((m) => m.is_default) ?? slot[0];
+      }),
+    [moduleSlots, effectiveSelection],
+  );
   if (isLoading) return <LoadingGrid message="LOADING SHIP…" />;
   if (error)    return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
   if (!ship)    return null;
@@ -410,7 +420,7 @@ export default function ShipDetailPage() {
       {/* Loadout */}
       {loadout && loadout.length > 0 && (
         <ScifiPanel title="Default loadout" subtitle="Composants par défaut" actions={<Layers size={14} className="text-slate-600" />}>
-          <ShipLoadout nodes={loadout} />
+          <ShipLoadout nodes={loadout} activeModules={activeModules} />
         </ScifiPanel>
       )}
 

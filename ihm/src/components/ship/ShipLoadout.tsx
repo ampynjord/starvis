@@ -4,7 +4,7 @@
  */
 
 import { Link } from 'react-router-dom';
-import type { LoadoutNode } from '@/types/api';
+import type { LoadoutNode, ShipModule } from '@/types/api';
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -584,17 +584,24 @@ interface SystemSlot { node: LoadoutNode; jumpModule: LoadoutNode | null }
 interface ThrusterGroup { type: string; size: number | null; count: number; totalThrust: number }
 interface CMEntry { name: string; count: number; ammoPerUnit: number | null; uuid: string | null }
 
+interface ModuleEntry {
+  moduleInfo: ShipModule | null;
+  node: LoadoutNode;
+  subLoadout: ProcessedLoadout;
+}
+
 interface ProcessedLoadout {
-  weapons:     WeaponSlot[];
-  weapTurrets: LoadoutNode[];  // tourelles classées « armes »
-  utilities:   LoadoutNode[];  // tourelles/montages classés « utilitaires »
-  racks:       RackSlot[];
-  shields:     LoadoutNode[];
-  systems:     SystemSlot[];
-  thrusters:   ThrusterGroup[];
-  cmDecoys:    CMEntry[];
-  cmNoises:    CMEntry[];
+  weapons:      WeaponSlot[];
+  weapTurrets:  LoadoutNode[];  // tourelles classées « armes »
+  utilities:    LoadoutNode[];  // tourelles/montages classés « utilitaires »
+  racks:        RackSlot[];
+  shields:      LoadoutNode[];
+  systems:      SystemSlot[];
+  thrusters:    ThrusterGroup[];
+  cmDecoys:     CMEntry[];
+  cmNoises:     CMEntry[];
   defaultPaint: string | null;
+  moduleEntries: ModuleEntry[];
 }
 
 /** Détermine si un nœud (tourelle ou child) est une arme de combat */
@@ -619,7 +626,7 @@ function classifyTurretNode(turret: LoadoutNode): 'weapon' | 'utility' {
 
 const THRUSTER_ORDER = ['Main','Maneuvering','Retro'];
 
-function processLoadout(nodes: LoadoutNode[]): ProcessedLoadout {
+function processLoadout(nodes: LoadoutNode[], activeModules: ShipModule[] = []): ProcessedLoadout {
   const weapons:       WeaponSlot[]    = [];
   const weapTurrets:   LoadoutNode[]   = [];  // tourelles combat
   const utilities:     LoadoutNode[]   = [];  // tourelles utilitaires
@@ -627,14 +634,25 @@ function processLoadout(nodes: LoadoutNode[]): ProcessedLoadout {
   const shields:       LoadoutNode[]   = [];
   const rawSystems:    SystemSlot[]    = [];
   const rawThrusters:  LoadoutNode[]   = [];
+  const moduleEntries: ModuleEntry[]   = [];
   const cmDecoyMap = new Map<string, CMEntry>();
   const cmNoiseMap = new Map<string, CMEntry>();
   let defaultPaint: string | null = null;
+
+  const moduleSlotNames = new Set(activeModules.map(m => m.slot_name));
 
   for (const node of nodes) {
     if (isNoisyPort(node)) continue;
     const portType = node.port_type;
     const compType = node.component_type;
+
+    // Module slots (baies modulaires — Retaliator front/rear, Apollo left/right)
+    if (moduleSlotNames.has(node.port_name)) {
+      const info = activeModules.find(m => m.slot_name === node.port_name) ?? null;
+      const subLoadout = processLoadout(node.children ?? []);  // process children, no nested modules
+      moduleEntries.push({ moduleInfo: info, node, subLoadout });
+      continue;
+    }
 
     if (node.port_name === 'hardpoint_paint' && node.component_name) {
       defaultPaint = node.component_name; continue;
@@ -721,18 +739,148 @@ function processLoadout(nodes: LoadoutNode[]): ProcessedLoadout {
     cmDecoys: Array.from(cmDecoyMap.values()),
     cmNoises: Array.from(cmNoiseMap.values()),
     defaultPaint,
+    moduleEntries,
   };
+}
+
+// ─────────────────────────────────────────────
+// Module card (baies modulaires — Retaliator, Apollo)
+// ─────────────────────────────────────────────
+
+function cleanSlotDisplayName(name: string | null | undefined, portName: string): string {
+  if (name) return name;
+  return portName
+    .replace(/^hardpoint_/i, '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
+}
+
+const SLOT_TYPE_STYLE: Record<string, string> = {
+  front:  'text-cyan-300  border-cyan-800/60  bg-cyan-950/40',
+  rear:   'text-indigo-300 border-indigo-800/60 bg-indigo-950/40',
+  left:   'text-teal-300  border-teal-800/60  bg-teal-950/40',
+  right:  'text-sky-300   border-sky-800/60   bg-sky-950/40',
+};
+
+function ModuleCard({ entry }: { entry: ModuleEntry }) {
+  const info     = entry.moduleInfo;
+  const children = entry.node.children ?? [];
+  const sub      = entry.subLoadout;
+  const slotLabel  = cleanSlotDisplayName(info?.slot_display_name, entry.node.port_name);
+  const moduleName = info?.module_name ?? entry.node.component_class_name ?? 'Unknown Module';
+  const tier       = info?.module_tier;
+  const slotType   = info?.slot_type?.toLowerCase();
+  const slotStyle  = slotType ? (SLOT_TYPE_STYLE[slotType] ?? 'text-cyan-300 border-cyan-800/60 bg-cyan-950/40') : null;
+
+  const hasWeapons = sub.weapons.length > 0 || sub.weapTurrets.length > 0;
+  const hasRacks   = sub.racks.length > 0;
+  const hasSystems = sub.systems.length > 0;
+  const hasContent = hasWeapons || hasRacks || hasSystems;
+
+  // Fallback: children whose type wasn't categorised (e.g. Apollo medical beds)
+  const uncategorized = !hasContent
+    ? children.filter(c => c.component_uuid && c.component_name)
+    : [];
+
+  return (
+    <div className="flex flex-col rounded-md border border-cyan-900/40 bg-cyan-950/5 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-2 px-2.5 pt-2 pb-1.5 bg-cyan-950/20 border-b border-cyan-900/30">
+        {slotStyle && (
+          <span className={`text-[8px] font-mono-sc uppercase border rounded px-1.5 py-0.5 leading-none ${slotStyle}`}>
+            {slotType}
+          </span>
+        )}
+        <span className="text-[10px] font-mono-sc text-cyan-400/80 flex-1 truncate">{slotLabel}</span>
+        {tier != null && (
+          <span className="text-[8px] font-mono-sc text-cyan-200 bg-cyan-800/40 border border-cyan-700/50 rounded px-1.5 py-0.5 leading-none">
+            T{tier}
+          </span>
+        )}
+      </div>
+
+      {/* Module name */}
+      <div className="px-2.5 py-2">
+        <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">{moduleName}</p>
+      </div>
+
+      {/* Sub-components from loadout tree */}
+      {hasContent && (
+        <div className="px-2.5 pb-2.5 pt-1 space-y-2 border-t border-cyan-900/20">
+          {hasWeapons && (
+            <div>
+              <p className="text-[8px] font-mono-sc text-red-400/60 uppercase tracking-wider mb-1.5">Weapons</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {sub.weapons.map((slot, i) => (
+                  <WeaponCard key={i} portName={slot.portName} mount={slot.mount} weapon={slot.weapon} />
+                ))}
+                {sub.weapTurrets.map((t, i) => <TurretCard key={`t${i}`} node={t} />)}
+              </div>
+            </div>
+          )}
+          {hasRacks && (
+            <div>
+              <p className="text-[8px] font-mono-sc text-orange-400/60 uppercase tracking-wider mb-1.5">Ordnance</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {sub.racks.map((r, i) => <RackCard key={i} rack={r.rack} missiles={r.missiles} />)}
+              </div>
+            </div>
+          )}
+          {hasSystems && (
+            <div>
+              <p className="text-[8px] font-mono-sc text-violet-400/60 uppercase tracking-wider mb-1.5">Systems</p>
+              <div className="grid grid-cols-2 gap-1.5">
+                {sub.systems.map((item, i) => (
+                  <SystemCard key={i} node={item.node} jumpModule={item.jumpModule} />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Raw fallback for uncategorised sub-components */}
+      {uncategorized.length > 0 && (
+        <div className="px-2.5 pb-2.5 pt-1 border-t border-cyan-900/20 space-y-1">
+          {uncategorized.map((c, i) => (
+            <p key={i} className="text-[10px] font-mono-sc text-slate-400">
+              {c.component_uuid
+                ? <Link to={`/components/${c.component_uuid}`} className="hover:text-cyan-400 transition-colors">{cleanCompName(c.component_name)}</Link>
+                : cleanCompName(c.component_name)}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {!hasContent && uncategorized.length === 0 && children.length === 0 && (
+        <div className="px-2.5 pb-2.5">
+          <p className="text-[9px] font-mono-sc text-slate-700 italic">— no sub-components —</p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ─────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────
 
-export function ShipLoadout({ nodes }: { nodes: LoadoutNode[] }) {
-  const data = processLoadout(nodes);
+export function ShipLoadout({ nodes, activeModules = [] }: { nodes: LoadoutNode[]; activeModules?: ShipModule[] }) {
+  const data = processLoadout(nodes, activeModules);
 
   return (
     <div className="space-y-6">
+
+      {/* ── Modules (baies modulaires — Retaliator, Apollo) ── */}
+      {data.moduleEntries.length > 0 && (
+        <Section title="Modules" accent="text-cyan-400" count={data.moduleEntries.length}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {data.moduleEntries.map((entry, i) => (
+              <ModuleCard key={i} entry={entry} />
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* ── Weapons ── */}
       {(data.weapons.length > 0 || data.weapTurrets.length > 0) && (
