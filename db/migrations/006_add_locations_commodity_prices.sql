@@ -40,8 +40,8 @@ CREATE TABLE IF NOT EXISTS commodity_prices (
 -- ── Commodity availability view ───────────────────────────────────────────────
 -- Link shops to locations (nullable, enriched progressively)
 ALTER TABLE shops
-  ADD COLUMN IF NOT EXISTS location_id INT NULL COMMENT 'FK to locations.id',
-  ADD INDEX IF NOT EXISTS idx_location_id (location_id);
+  ADD COLUMN location_id INT NULL COMMENT 'FK to locations.id',
+  ADD INDEX idx_location_id (location_id);
 
 -- ── Ship ASOP prices per location ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS ship_prices (
