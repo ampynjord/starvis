@@ -150,6 +150,9 @@ export class GameDataService {
   getComponentTypes() {
     return this.components.getComponentTypes();
   }
+  getCompatibleComponents(opts: { type?: string; min_size?: number; max_size?: number; search?: string; sort?: string; order?: string; limit?: number }) {
+    return this.components.getCompatibleComponents(opts);
+  }
 
   // ── Loadout (delegated) ─────────────────────────────────
 
@@ -212,6 +215,9 @@ export class GameDataService {
   }
   getItemTypes() {
     return this.itemsSvc.getItemTypes();
+  }
+  getItemBuyLocations(uuid: string) {
+    return this.itemsSvc.getItemBuyLocations(uuid);
   }
 
   // ── Commodities (delegated) ─────────────────────────────

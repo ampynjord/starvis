@@ -287,6 +287,114 @@ export interface ChangelogSummary {
   last_extraction: string | null;
 }
 
+// ─── Outfitter / Loadout calculator ──────────────────────────────────────────
+
+export interface LoadoutPortEntry {
+  port_id: number;
+  port_name: string;
+  port_type: string;
+  port_min_size: number | null;
+  port_max_size: number | null;
+  component_uuid: string | null;
+  component_name: string | null;
+  display_name: string | null;
+  component_type: string | null;
+  component_size: number | null;
+  grade: string | null;
+  manufacturer_code: string | null;
+  weapon_dps?: number | null;
+  shield_hp?: number | null;
+  power_output?: number | null;
+  cooling_rate?: number | null;
+  qd_speed?: number | null;
+  swapped?: boolean;
+}
+
+export interface LoadoutResult {
+  ship: { uuid: string; name: string; class_name: string };
+  swaps: number;
+  stats: {
+    weapons: { count: number; total_dps: number; total_burst_dps: number; total_sustained_dps: number };
+    shields: { count: number; total_hp: number; total_regen: number; time_to_charge: number };
+    missiles: { count: number; total_damage: number };
+    power: { total_draw: number; total_output: number; balance: number };
+    thermal: { total_heat_generation: number; total_cooling_rate: number; balance: number };
+    quantum: { drive_name: string; speed: number; spool_time: number; range: number };
+    mobility: { scm_speed: number; max_speed: number; boost_forward: number; pitch: number; yaw: number; roll: number; mass: number };
+    hull: { total_hp: number; ehp: number };
+    fuel: { hydrogen: number; quantum: number };
+    signatures: { ir: number; em: number; cs: number };
+    armor: { physical: number; energy: number; distortion: number };
+    countermeasures: { flare_count: number; chaff_count: number };
+    [key: string]: unknown;
+  };
+  hardpoints: unknown[];
+  loadout: LoadoutPortEntry[];
+  modules: unknown[];
+  paints: unknown[];
+}
+
+// ─── Compatible components (Outfitter picker) ─────────────────────────────────
+export interface CompatibleComponent {
+  uuid: string;
+  class_name: string;
+  name: string;
+  type: string;
+  sub_type: string | null;
+  size: number | null;
+  grade: string | null;
+  manufacturer_code: string | null;
+  manufacturer_name: string | null;
+  weapon_dps: number | null;
+  weapon_burst_dps: number | null;
+  shield_hp: number | null;
+  qd_speed: number | null;
+  power_output: number | null;
+  cooling_rate: number | null;
+}
+
+// ─── Trade routes ─────────────────────────────────────────────────────────────
+export interface TradeRoute {
+  commodity_uuid: string;
+  commodity_name: string;
+  commodity_symbol: string | null;
+  buy_location: string;
+  buy_system: string | null;
+  buy_price: number;
+  sell_location: string;
+  sell_system: string | null;
+  sell_price: number;
+  profit_per_scu: number;
+  total_profit: number;
+}
+
+export interface CommodityPrice {
+  commodity_uuid: string;
+  commodity_name: string;
+  commodity_symbol: string | null;
+  location_name: string;
+  system_name: string | null;
+  buy_price: number | null;
+  sell_price: number | null;
+}
+
+export interface TradeLocation {
+  location_name: string;
+  system_name: string | null;
+}
+
+// ─── Item / Component buy locations (FPS) ─────────────────────────────────────
+export interface ItemBuyLocation {
+  shop_id: number;
+  shop_name: string;
+  location: string | null;
+  system_name: string | null;
+  city: string | null;
+  shop_type: string | null;
+  base_price: number | null;
+  rental_price_1d: number | null;
+}
+
 // ─── Search ───────────────────────────────────────────────────────────────────
 export interface SearchResult {
   ships: ShipListItem[];

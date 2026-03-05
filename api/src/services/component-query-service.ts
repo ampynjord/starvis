@@ -138,4 +138,64 @@ export class ComponentQueryService {
     const [rows] = await this.pool.execute<Row[]>('SELECT type, COUNT(*) as count FROM components GROUP BY type ORDER BY count DESC');
     return { types: rows.map((r) => ({ type: String(r.type), count: Number(r.count) })) };
   }
+
+  /**
+   * Returns components compatible with a given loadout port.
+   * Used by the Ship Outfitter to populate the component picker.
+   */
+  async getCompatibleComponents(opts: {
+    type?: string;
+    min_size?: number;
+    max_size?: number;
+    search?: string;
+    sort?: string;
+    order?: string;
+    limit?: number;
+  }): Promise<Row[]> {
+    const where: string[] = [];
+    const params: (string | number)[] = [];
+
+    if (opts.type) {
+      where.push('c.type = ?');
+      params.push(opts.type);
+    }
+    if (opts.min_size != null) {
+      where.push('c.size >= ?');
+      params.push(opts.min_size);
+    }
+    if (opts.max_size != null) {
+      where.push('c.size <= ?');
+      params.push(opts.max_size);
+    }
+    if (opts.search) {
+      where.push('(c.name LIKE ? OR c.class_name LIKE ?)');
+      params.push(`%${opts.search}%`, `%${opts.search}%`);
+    }
+
+    const sortCol = COMP_SORT.has(opts.sort ?? '') ? opts.sort! : 'size';
+    const order  = opts.order === 'desc' ? 'DESC' : 'ASC';
+    const limit  = Math.min(200, Math.max(1, opts.limit ?? 100));
+    const wSql   = where.length ? `WHERE ${where.join(' AND ')}` : '';
+
+    const sql = `
+      SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade,
+             c.manufacturer_code, m.name as manufacturer_name,
+             c.weapon_dps, c.weapon_burst_dps, c.weapon_sustained_dps,
+             c.weapon_damage, c.weapon_fire_rate, c.weapon_range,
+             c.weapon_damage_energy, c.weapon_damage_physical, c.weapon_damage_distortion,
+             c.shield_hp, c.shield_regen, c.shield_regen_delay, c.shield_hardening,
+             c.qd_speed, c.qd_spool_time, c.qd_fuel_rate, c.qd_range,
+             c.power_output, c.power_draw, c.cooling_rate,
+             c.heat_generation, c.em_signature, c.ir_signature,
+             c.thruster_max_thrust, c.radar_range, c.fuel_capacity,
+             c.cm_ammo_count, c.missile_damage, c.mass, c.hp
+      FROM components c
+      LEFT JOIN manufacturers m ON c.manufacturer_code = m.code
+      ${wSql}
+      ORDER BY c.${sortCol} ${order}
+      LIMIT ${limit}`;
+
+    const [rows] = await this.pool.execute<Row[]>(sql, params);
+    return rows;
+  }
 }

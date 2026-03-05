@@ -56,4 +56,15 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
       sendWithETag(req, res, { success: true, data: item });
     }),
   );
+
+  router.get(
+    '/api/v1/items/:uuid/buy-locations',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const item = await gameDataService!.resolveItem(req.params.uuid);
+      if (!item) return void res.status(404).json({ success: false, error: 'Item not found' });
+      const data = await gameDataService!.getItemBuyLocations(String(item.uuid));
+      sendWithETag(req, res, { success: true, count: data.length, data });
+    }),
+  );
 }

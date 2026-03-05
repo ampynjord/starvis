@@ -3,12 +3,16 @@ import type {
   ChangelogEntry,
   ChangelogSummary,
   Commodity,
+  CompatibleComponent,
   Component,
   ComponentListItem,
+  CommodityPrice,
   Hardpoint,
   Item,
+  ItemBuyLocation,
   ItemListItem,
   LoadoutNode,
+  LoadoutResult,
   Manufacturer,
   PaginatedResponse,
   PaintListItem,
@@ -22,6 +26,8 @@ import type {
   ShipStats,
   Shop,
   StatsOverview,
+  TradeLocation,
+  TradeRoute,
   Version,
 } from '@/types/api';
 import { API_BASE } from '@/utils/constants';
@@ -84,6 +90,8 @@ export const api = {
     similar: (uuid: string, limit = 6) => get<ShipListItem[]>(`/ships/${uuid}/similar`, { limit }),
     compare: (uuid1: string, uuid2: string) => get<ShipComparison>(`/ships/${uuid1}/compare/${uuid2}`),
     modules: (uuid: string) => get<ShipModule[]>(`/ships/${uuid}/modules`),
+    ranking: (sort_by: string, order: 'asc' | 'desc', category?: string) =>
+      get<ShipListItem[]>('/ships/ranking', { sort_by, order, category }),
   },
 
   // ─── Components ────────────────────────────────────────────────────
@@ -103,6 +111,8 @@ export const api = {
     get: (uuid: string) => get<Component>(`/components/${uuid}`),
     buyLocations: (uuid: string) => get<BuyLocation[]>(`/components/${uuid}/buy-locations`),
     ships: (uuid: string) => get<ShipListItem[]>(`/components/${uuid}/ships`),
+    compatible: (opts: { type?: string; min_size?: number; max_size?: number; search?: string; sort?: string; order?: string; limit?: number }) =>
+      get<CompatibleComponent[]>('/components/compatible', opts as Record<string, string | number | undefined>),
   },
 
   // ─── Items ─────────────────────────────────────────────────────────
@@ -120,6 +130,7 @@ export const api = {
     types: () => get<string[]>('/items/types'),
     filters: () => get<Record<string, string[]>>('/items/filters'),
     get: (uuid: string) => get<Item>(`/items/${uuid}`),
+    buyLocations: (uuid: string) => get<ItemBuyLocation[]>(`/items/${uuid}/buy-locations`),
   },
 
   // ─── Manufacturers ─────────────────────────────────────────────────
@@ -159,9 +170,19 @@ export const api = {
     summary: () => get<ChangelogSummary>('/changelog/summary'),
   },
 
+  // ─── Trade ─────────────────────────────────────────────────────────
+  trade: {
+    prices: (opts?: { commodity_uuid?: string; system?: string }) =>
+      get<CommodityPrice[]>('/trade/prices', opts as Record<string, string | undefined>),
+    routes: (opts?: { cargo_scu?: number; system?: string }) =>
+      get<TradeRoute[]>('/trade/routes', opts as Record<string, string | number | undefined>),
+    locations: (system?: string) =>
+      get<TradeLocation[]>('/trade/locations', system ? { system } : undefined),
+  },
+
   // ─── Loadout simulator ─────────────────────────────────────────────
   loadout: {
     calculate: (shipUuid: string, swaps: { portName: string; componentUuid: string }[]) =>
-      post<LoadoutNode[]>('/loadout/calculate', { shipUuid, swaps }),
+      post<LoadoutResult>('/loadout/calculate', { shipUuid, swaps }),
   },
 };

@@ -10,6 +10,7 @@ import { mountShipMatrixRoutes } from './ship-matrix.js';
 import { mountShipRoutes } from './ships.js';
 import { mountShopRoutes } from './shops.js';
 import { mountSystemRoutes } from './system.js';
+import { mountTradeRoutes } from './trade.js';
 import type { RouteDependencies } from './types.js';
 
 export type { RouteDependencies } from './types.js';
@@ -26,6 +27,7 @@ export function createRoutes(deps: RouteDependencies): Router {
   mountCommodityRoutes(router, deps);
   mountSearchRoutes(router, deps);
   mountSystemRoutes(router, deps);
+  mountTradeRoutes(router, deps);
   mountAdminRoutes(router, deps);
   return router;
 }

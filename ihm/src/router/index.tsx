@@ -21,6 +21,10 @@ const ManufacturersPage   = lazy(() => import('@/pages/ManufacturersPage'));
 const ShopsPage           = lazy(() => import('@/pages/ShopsPage'));
 const ChangelogPage       = lazy(() => import('@/pages/ChangelogPage'));
 const PaintsPage          = lazy(() => import('@/pages/PaintsPage'));
+const RankingPage         = lazy(() => import('@/pages/RankingPage'));
+const OutfitterPage       = lazy(() => import('@/pages/OutfitterPage'));
+const TradePage           = lazy(() => import('@/pages/TradePage'));
+const HistoryPage         = lazy(() => import('@/pages/HistoryPage'));
 const NotFoundPage        = lazy(() => import('@/pages/NotFoundPage'));
 
 export const router = createBrowserRouter([
@@ -32,6 +36,10 @@ export const router = createBrowserRouter([
       { path: 'ships',            element: wrap(ShipsPage) },
       { path: 'ships/:uuid',      element: wrap(ShipDetailPage) },
       { path: 'compare',          element: wrap(ComparePage) },
+      { path: 'ranking',          element: wrap(RankingPage) },
+      { path: 'outfitter',        element: wrap(OutfitterPage) },
+      { path: 'trade',            element: wrap(TradePage) },
+      { path: 'history',          element: wrap(HistoryPage) },
       { path: 'components',       element: wrap(ComponentsPage) },
       { path: 'components/:uuid', element: wrap(ComponentDetailPage) },
       { path: 'items',            element: wrap(ItemsPage) },
