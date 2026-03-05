@@ -33,12 +33,26 @@ export async function initializeSchema(conn: PoolConnection): Promise<void> {
     logger.debug(`Migration skip: ${e.message}`, { module: 'schema' });
   }
 
-  // Remove comments and split on semicolons
-  const cleaned = schema.replace(/--.*$/gm, '').replace(/\n\s*\n/g, '\n');
-  const statements = cleaned
-    .split(';')
-    .map((s) => s.trim())
-    .filter((s) => s.length > 10);
+  // Split on semicolons, respecting single-quoted strings
+  // (naive split(';') breaks on COMMENTs like 'text; more text')
+  const noLineComments = schema.replace(/--[^\n]*$/gm, '');
+  const statements: string[] = [];
+  let cur = '';
+  let inStr = false;
+  for (const ch of noLineComments) {
+    if (ch === "'") {
+      inStr = !inStr;
+      cur += ch;
+    } else if (ch === ';' && !inStr) {
+      const s = cur.trim();
+      if (s.length > 10) statements.push(s);
+      cur = '';
+    } else {
+      cur += ch;
+    }
+  }
+  const lastStmt = cur.trim();
+  if (lastStmt.length > 10) statements.push(lastStmt);
 
   logger.info(`Found ${statements.length} SQL statements to execute`, { module: 'schema' });
 
