@@ -3,16 +3,55 @@ import { motion } from 'framer-motion';
 import { BarChart3, X } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import {
+  Legend,
+  PolarAngleAxis,
+  PolarGrid,
+  Radar,
+  RadarChart,
+  ResponsiveContainer,
+  Tooltip,
+} from 'recharts';
 import { api } from '@/services/api';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { useDebounce } from '@/hooks/useDebounce';
 import { fDimension, fMass, fSpeed } from '@/utils/formatters';
+import type { Ship } from '@/types/api';
 
 interface ShipSelector {
   slot: 'a' | 'b';
   label: string;
+}
+
+// Radar chart stats: normalize each stat to 0–100 relative to both ships
+const RADAR_STATS: { key: keyof Ship; label: string }[] = [
+  { key: 'scm_speed', label: 'SCM Speed' },
+  { key: 'max_speed', label: 'Max Speed' },
+  { key: 'pitch_max', label: 'Agility' },
+  { key: 'total_hp', label: 'Hull HP' },
+  { key: 'shield_hp', label: 'Shield HP' },
+  { key: 'cargo_capacity', label: 'Cargo' },
+];
+
+function normalize(a: number, b: number, val: number): number {
+  const max = Math.max(a, b);
+  if (!max) return 0;
+  return Math.round((val / max) * 100);
+}
+
+function buildRadarData(s1: Ship, s2: Ship) {
+  return RADAR_STATS.map(({ key, label }) => {
+    const v1 = (s1[key] as number | null) ?? 0;
+    const v2 = (s2[key] as number | null) ?? 0;
+    const m = Math.max(v1, v2);
+    return {
+      stat: label,
+      [s1.name ?? 'Ship A']: m > 0 ? Math.round((v1 / m) * 100) : 0,
+      [s2.name ?? 'Ship B']: m > 0 ? Math.round((v2 / m) * 100) : 0,
+    };
+  });
 }
 
 export default function ComparePage() {
@@ -167,6 +206,32 @@ export default function ComparePage() {
           </div>
         </ScifiPanel>
       )}
+
+      {/* Radar chart */}
+      {comparison?.full?.ship1 && comparison?.full?.ship2 && (() => {
+        const radarData = buildRadarData(comparison.full.ship1, comparison.full.ship2);
+        const n1 = comparison.ship1.name ?? 'Ship A';
+        const n2 = comparison.ship2.name ?? 'Ship B';
+        return (
+          <ScifiPanel title="Radar Overview" subtitle="Normalized 0–100 relative to the two ships">
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart data={radarData} margin={{ top: 8, right: 32, bottom: 8, left: 32 }}>
+                  <PolarGrid stroke="#1e293b" />
+                  <PolarAngleAxis dataKey="stat" tick={{ fill: '#64748b', fontSize: 11, fontFamily: 'Rajdhani, sans-serif' }} />
+                  <Radar name={n1} dataKey={n1} stroke="#22d3ee" fill="#22d3ee" fillOpacity={0.15} strokeWidth={2} />
+                  <Radar name={n2} dataKey={n2} stroke="#fbbf24" fill="#fbbf24" fillOpacity={0.15} strokeWidth={2} />
+                  <Legend iconSize={10} wrapperStyle={{ fontSize: '11px', fontFamily: 'Rajdhani, sans-serif' }} />
+                  <Tooltip
+                    contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '6px', fontSize: '11px' }}
+                    formatter={(val: number) => [`${val}%`]}
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
+          </ScifiPanel>
+        );
+      })()}
 
       {!uuidA && !uuidB && (
         <div className="flex flex-col items-center gap-3 py-16 text-center text-slate-600">
