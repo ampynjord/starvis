@@ -588,6 +588,7 @@ interface ModuleEntry {
   moduleInfo: ShipModule | null;
   node: LoadoutNode;
   subLoadout: ProcessedLoadout;
+  slotOptions: ShipModule[];
 }
 
 interface ProcessedLoadout {
@@ -626,7 +627,7 @@ function classifyTurretNode(turret: LoadoutNode): 'weapon' | 'utility' {
 
 const THRUSTER_ORDER = ['Main','Maneuvering','Retro'];
 
-function processLoadout(nodes: LoadoutNode[], activeModules: ShipModule[] = []): ProcessedLoadout {
+function processLoadout(nodes: LoadoutNode[], activeModules: ShipModule[] = [], moduleSlots: ShipModule[][] = []): ProcessedLoadout {
   const weapons:       WeaponSlot[]    = [];
   const weapTurrets:   LoadoutNode[]   = [];  // tourelles combat
   const utilities:     LoadoutNode[]   = [];  // tourelles utilitaires
@@ -652,7 +653,8 @@ function processLoadout(nodes: LoadoutNode[], activeModules: ShipModule[] = []):
       // Prefer the per-variant loadout_json (tier-correct) over the default ship loadout tree
       const subNodes = info?.loadout_json ?? node.children ?? [];
       const subLoadout = processLoadout(subNodes);
-      moduleEntries.push({ moduleInfo: info, node, subLoadout });
+      const slotOptions = moduleSlots.find(slot => slot[0]?.slot_name === node.port_name) ?? [];
+      moduleEntries.push({ moduleInfo: info, node, subLoadout, slotOptions });
       continue;
     }
 
@@ -764,7 +766,10 @@ const SLOT_TYPE_STYLE: Record<string, string> = {
   right:  'text-sky-300   border-sky-800/60   bg-sky-950/40',
 };
 
-function ModuleCard({ entry }: { entry: ModuleEntry }) {
+function ModuleCard({ entry, onModuleChange }: {
+  entry: ModuleEntry;
+  onModuleChange?: (slotName: string, className: string) => void;
+}) {
   const info     = entry.moduleInfo;
   const sub      = entry.subLoadout;
   const slotLabel  = cleanSlotDisplayName(info?.slot_display_name, entry.node.port_name);
@@ -772,6 +777,11 @@ function ModuleCard({ entry }: { entry: ModuleEntry }) {
   const tier       = info?.module_tier;
   const slotType   = info?.slot_type?.toLowerCase();
   const slotStyle  = slotType ? (SLOT_TYPE_STYLE[slotType] ?? 'text-cyan-300 border-cyan-800/60 bg-cyan-950/40') : null;
+
+  const hasTiers = entry.slotOptions.some(m => m.module_tier !== null);
+  const sortedOptions = hasTiers
+    ? [...entry.slotOptions].sort((a, b) => (a.module_tier ?? 0) - (b.module_tier ?? 0))
+    : entry.slotOptions;
 
   const hasWeapons = sub.weapons.length > 0 || sub.weapTurrets.length > 0;
   const hasRacks   = sub.racks.length > 0;
@@ -801,10 +811,43 @@ function ModuleCard({ entry }: { entry: ModuleEntry }) {
         )}
       </div>
 
-      {/* Module name */}
-      <div className="px-2.5 py-2">
-        <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">{moduleName}</p>
-      </div>
+      {/* Module selector */}
+      {sortedOptions.length > 1 ? (
+        <div className="px-2.5 py-2 flex flex-wrap gap-1.5">
+          {sortedOptions.map((m) => {
+            const isActive = m.module_class_name === info?.module_class_name;
+            const btnLabel = hasTiers
+              ? `T${m.module_tier}`
+              : (m.module_name ?? m.module_class_name);
+            return (
+              <button
+                key={m.module_class_name}
+                type="button"
+                onClick={() => onModuleChange?.(m.slot_name, m.module_class_name)}
+                className={[
+                  'px-2 py-0.5 text-[9px] font-mono-sc rounded border transition-colors',
+                  isActive
+                    ? 'bg-purple-900/50 border-purple-500 text-purple-200'
+                    : 'bg-slate-900/40 border-slate-700 text-slate-400 hover:border-purple-700 hover:text-purple-300',
+                ].join(' ')}
+              >
+                {btnLabel}
+              </button>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="px-2.5 py-2">
+          <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">{moduleName}</p>
+        </div>
+      )}
+
+      {/* Active module name (when selector shown) */}
+      {sortedOptions.length > 1 && (
+        <div className="px-2.5 pb-1.5 -mt-1">
+          <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">{moduleName}</p>
+        </div>
+      )}
 
       {/* Sub-components from loadout tree */}
       {hasContent && (
@@ -867,8 +910,18 @@ function ModuleCard({ entry }: { entry: ModuleEntry }) {
 // Main component
 // ─────────────────────────────────────────────
 
-export function ShipLoadout({ nodes, activeModules = [] }: { nodes: LoadoutNode[]; activeModules?: ShipModule[] }) {
-  const data = processLoadout(nodes, activeModules);
+export function ShipLoadout({
+  nodes,
+  activeModules = [],
+  moduleSlots = [],
+  onModuleChange,
+}: {
+  nodes: LoadoutNode[];
+  activeModules?: ShipModule[];
+  moduleSlots?: ShipModule[][];
+  onModuleChange?: (slotName: string, className: string) => void;
+}) {
+  const data = processLoadout(nodes, activeModules, moduleSlots);
 
   return (
     <div className="space-y-6">
@@ -981,7 +1034,7 @@ export function ShipLoadout({ nodes, activeModules = [] }: { nodes: LoadoutNode[
         <Section title="Modules" accent="text-purple-400" count={data.moduleEntries.length}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {data.moduleEntries.map((entry, i) => (
-              <ModuleCard key={i} entry={entry} />
+              <ModuleCard key={i} entry={entry} onModuleChange={onModuleChange} />
             ))}
           </div>
         </Section>

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, BarChart3, ChevronRight, Clock, ExternalLink,
-  Layers, Package, Palette, Ruler, Users,
+  Layers, Palette, Ruler, Users,
 } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/services/api';
@@ -420,65 +420,14 @@ export default function ShipDetailPage() {
       {/* Loadout */}
       {loadout && loadout.length > 0 && (
         <ScifiPanel title="Default loadout" subtitle="Composants par défaut" actions={<Layers size={14} className="text-slate-600" />}>
-          <ShipLoadout nodes={loadout} activeModules={activeModules} />
-        </ScifiPanel>
-      )}
-
-      {/* Module Selector */}
-      {moduleSlots.length > 0 && (
-        <ScifiPanel title="Module Configuration" subtitle={`${moduleSlots.length} interchangeable slot${moduleSlots.length > 1 ? 's' : ''}`} actions={<Package size={14} className="text-slate-600" />}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {moduleSlots.map((slot) => {
-              const first = slot[0];
-              const hasTiers = slot.some((m) => m.module_tier !== null);
-              const displayName = first.slot_display_name ?? first.slot_name
-                .replace(/hardpoint_/i, '')
-                .replace(/_/g, ' ')
-                .replace(/\b\w/g, (c) => c.toUpperCase());
-              const selected = effectiveSelection[first.slot_name];
-              return (
-                <div key={first.slot_name} className="space-y-2">
-                  <p className="text-[10px] font-mono-sc text-cyan-700 uppercase tracking-widest">{displayName}</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {(hasTiers
-                      ? [...slot].sort((a, b) => (a.module_tier ?? 0) - (b.module_tier ?? 0))
-                      : slot
-                    ).map((m) => {
-                      const isSelected = selected === m.module_class_name;
-                      const label = hasTiers
-                        ? `Tier ${m.module_tier}`
-                        : (m.module_name ?? m.module_class_name);
-                      return (
-                        <button
-                          key={m.module_class_name}
-                          onClick={() => setSelectedModules((prev) => ({ ...prev, [m.slot_name]: m.module_class_name }))}
-                          className={[
-                            'px-3 py-1 text-[10px] font-mono-sc rounded border transition-colors',
-                            isSelected
-                              ? 'bg-cyan-900/40 border-cyan-600 text-cyan-300'
-                              : 'bg-slate-900/40 border-slate-700 text-slate-400 hover:border-slate-500 hover:text-slate-300',
-                          ].join(' ')}
-                        >
-                          {label}
-                          {m.is_default && !isSelected && (
-                            <span className="ml-1 text-slate-600">(default)</span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {(() => {
-                    const active = slot.find((m) => m.module_class_name === selected);
-                    if (!active) return null;
-                    const fullLabel = active.module_name ?? active.module_class_name;
-                    return (
-                      <p className="text-[10px] text-slate-600 font-mono-sc">{fullLabel}</p>
-                    );
-                  })()}
-                </div>
-              );
-            })}
-          </div>
+          <ShipLoadout
+            nodes={loadout}
+            activeModules={activeModules}
+            moduleSlots={moduleSlots}
+            onModuleChange={(slotName, className) =>
+              setSelectedModules((prev) => ({ ...prev, [slotName]: className }))
+            }
+          />
         </ScifiPanel>
       )}
 
