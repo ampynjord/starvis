@@ -5,14 +5,14 @@
 Monorepo en 4 modules :
 - **api/** — Backend Express.js + TypeScript + MySQL (déployé sur VPS)
 - **extractor/** — CLI d'extraction P4K/DataForge (exécuté localement)
-- **db/** — Schéma SQL, initialisation, backup
-- **ihm/** — Page placeholder statique (IHM en cours de développement)
+- **db/** — Schéma SQL, migrations, initialisation, backup
+- **ihm/** — Interface web React 19 + TanStack Query + Tailwind CSS
 
 Deux sources de données complémentaires :
 - **RSI Ship Matrix** — données marketing officielles (246 vaisseaux), synchronisées par l'API
-- **P4K DataForge** — données réelles du jeu (~309 vaisseaux, ~3 023 composants, ~5 237 items FPS, ~237 commodités, ~33 957 ports de loadout, ~1 791 paints), extraites localement par le CLI
+- **P4K DataForge** — données réelles du jeu (~309 vaisseaux, ~3 023 composants, ~5 237 items FPS, ~237 commodités, ~36 596 ports de loadout, ~1 791 paints), extraites localement par le CLI
 
-Production : **[starvis-api.ampynjord.bzh](https://starvis-api.ampynjord.bzh)** (API) — IHM en cours de développement
+Production : **[starvis.ampynjord.bzh](https://starvis.ampynjord.bzh)**
 
 ---
 
@@ -62,66 +62,99 @@ Production : **[starvis-api.ampynjord.bzh](https://starvis-api.ampynjord.bzh)** 
 
 ```
 starvis/
+├── biome.json                  # Linter/formatter (Biome)
 ├── docker-compose.yml          # Orchestration 3 services (mysql, api, ihm)
 ├── docker-compose.prod.yml     # Override prod (Traefik, images GHCR)
 ├── .env.example                # Template de configuration
+├── .env.prod.example           # Template prod
 ├── api/                        # Backend Express.js + TypeScript (VPS)
 │   ├── Dockerfile              # Multi-stage (4 étapes)
 │   ├── server.ts               # Entry point (helmet, rate limiting, OpenAPI inline)
+│   ├── drizzle.config.ts       # Config Drizzle ORM
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── src/
 │       ├── routes.ts           # 45 endpoints (pagination, ETag, CSV)
+│       ├── schemas.ts          # Schémas Zod de validation
+│       ├── db/
+│       │   ├── index.ts        # Pool mysql2 + helpers
+│       │   └── schema.ts       # Schéma Drizzle ORM
 │       ├── middleware/
 │       │   ├── auth.ts         # X-API-Key auth (timing-safe)
 │       │   └── index.ts
 │       ├── services/
-│       │   ├── schema.ts       # Init DB schema + auto-migrations
-│       │   ├── ship-matrix-service.ts  # RSI API → ship_matrix
-│       │   ├── game-data-service.ts    # Read-only queries → REST API
-│       │   ├── ship-query-service.ts   # Ships queries
-│       │   ├── component-query-service.ts  # Components queries
-│       │   ├── item-query-service.ts       # Items queries
-│       │   ├── commodity-query-service.ts  # Commodities queries
-│       │   ├── shop-service.ts         # Shops queries
-│       │   ├── loadout-service.ts      # Loadout calculator
-│       │   ├── shared.ts              # Shared query utilities
+│       │   ├── schema.ts       # Init DB schema + auto-migrations en démarrage
+│       │   ├── ship-matrix-service.ts      # RSI API → ship_matrix
+│       │   ├── game-data-service.ts        # Façade read-only → REST API
+│       │   ├── ship-query-service.ts       # Requêtes ships
+│       │   ├── component-query-service.ts  # Requêtes composants
+│       │   ├── item-query-service.ts       # Requêtes items FPS
+│       │   ├── commodity-query-service.ts  # Requêtes commodités
+│       │   ├── shop-service.ts             # Requêtes magasins
+│       │   ├── loadout-service.ts          # Loadout + simulateur
+│       │   ├── shared.ts                   # Utilitaires requêtes partagées
 │       │   └── index.ts
 │       └── utils/
 │           ├── config.ts       # Configuration centralisée
 │           ├── logger.ts       # Winston (module tags, durées)
 │           └── index.ts
 │   └── tests/
-│       ├── schemas.test.ts     # 35 tests unitaires (Vitest)
-│       ├── loadout.test.ts     # 17 tests loadout (Vitest)
-│       └── test-all.mjs        # Tests e2e API
+│       ├── schemas.test.ts          # Tests schémas Zod (Vitest)
+│       ├── loadout.test.ts          # Tests loadout (Vitest)
+│       ├── query-services.test.ts   # Tests services de requête (Vitest)
+│       └── test-all.mjs             # Tests e2e API
 ├── extractor/                  # CLI d'extraction P4K (PC local)
 │   ├── extract.ts              # Point d'entrée CLI
 │   ├── package.json
 │   ├── tsconfig.json
 │   └── src/
 │       ├── extraction-service.ts   # Ships/components/loadouts/paints/modules → MySQL
-│       ├── item-extractor.ts       # Items FPS + commodities → MySQL
-│       ├── component-extractor.ts  # Components extraction logic
-│       ├── shop-paint-extractor.ts # Shops + paints extraction
-│       ├── dataforge-service.ts    # DataForge DCB orchestrator
-│       ├── dataforge-parser.ts     # Binary DataForge parser
-│       ├── dataforge-utils.ts      # DataForge helper utilities
-│       ├── p4k-provider.ts         # P4K file reader (ZIP + AES)
-│       ├── cryxml-parser.ts        # Binary CryXML parser
+│       ├── item-extractor.ts       # Items FPS + commodités → MySQL
+│       ├── component-extractor.ts  # Extraction composants
+│       ├── shop-paint-extractor.ts # Extraction shops + peintures
+│       ├── crossref.ts             # Cross-référence ships ↔ ship_matrix
+│       ├── dataforge-service.ts    # Orchestrateur DataForge DCB
+│       ├── dataforge-parser.ts     # Parser binaire DataForge
+│       ├── dataforge-utils.ts      # Utilitaires DataForge (classifyPort, etc.)
+│       ├── p4k-provider.ts         # Lecteur fichier P4K (ZIP + AES)
+│       ├── cryxml-parser.ts        # Parser CryXML binaire
 │       ├── localization-service.ts # Localisation du jeu
 │       └── logger.ts
 │   └── tests/
-│       ├── classifyPort.test.ts       # 30 tests
-│       └── dataforge-helpers.test.ts  # 14 tests
-├── ihm/                        # Page placeholder (IHM en développement)
-│   ├── Dockerfile              # Nginx Alpine simple
+│       ├── classifyPort.test.ts       # Tests classifyPort (30 tests)
+│       └── dataforge-helpers.test.ts  # Tests helpers DataForge (14 tests)
+├── ihm/                        # Interface web React 19
+│   ├── Dockerfile              # Multi-stage : Vite build + Nginx Alpine
 │   ├── nginx.conf
-│   └── index.html              # Page "coming soon"
+│   ├── vite.config.ts
+│   ├── vitest.config.ts
+│   ├── tailwind.config.js
+│   ├── package.json
+│   └── src/
+│       ├── App.tsx
+│       ├── main.tsx
+│       ├── index.css           # Styles globaux Tailwind + thème sci-fi
+│       ├── components/
+│       │   ├── ui/             # Composants génériques (ScifiPanel, GlowBadge, Pagination…)
+│       │   └── ship/           # Composants spécifiques vaisseaux (ShipCard, ShipLoadout…)
+│       ├── hooks/
+│       │   └── useDebounce.ts
+│       ├── pages/              # 13 pages (Ships, ShipDetail, Components, Shops, Paints…)
+│       ├── router/
+│       │   └── index.tsx
+│       ├── services/
+│       │   └── api.ts          # Toutes les fonctions fetch vers l'API REST
+│       ├── types/
+│       │   └── api.ts          # Types TypeScript des réponses API
+│       └── utils/
+│           ├── constants.ts
+│           └── formatters.ts
+│   └── tests/                  # Tests Vitest (composants, hooks, pages, services)
 ├── db/
 │   ├── schema.sql              # 13 tables MySQL + FK + index
 │   ├── init.sh                 # Initialisation DB (permissions % host)
-│   └── backup.sh               # Backup automatisé (mysqldump, gzip, 7j rétention)
+│   ├── backup.sh               # Backup automatisé (mysqldump, gzip, 7j rétention)
+│   └── migrations/             # Migrations SQL numérotées (001…)
 └── .github/workflows/
     └── ci.yml                  # CI/CD complet (4 jobs)
 ```
@@ -450,7 +483,37 @@ GET /health
 
 ## Frontend (IHM)
 
-IHM en cours de développement. Page placeholder statique servie par Nginx.
+Interface web React 19 déployée sur **[starvis.ampynjord.bzh](https://starvis.ampynjord.bzh)**.
+
+### Pages disponibles
+
+| Page | Route | Description |
+|------|-------|-------------|
+| Home | `/` | Vue d'ensemble + stats |
+| Ships | `/ships` | Liste filtrée + recherche |
+| Ship Detail | `/ships/:uuid` | Détails + loadout + modules + peintures |
+| Compare | `/compare` | Comparaison côte à côte |
+| Components | `/components` | Liste composants filtrée |
+| Component Detail | `/components/:uuid` | Détails + où acheter |
+| Manufacturers | `/manufacturers` | Liste fabricants |
+| Shops | `/shops` | Magasins in-game |
+| Paints | `/paints` | Peintures disponibles |
+| Items | `/items` | Items FPS |
+| Commodities | `/commodities` | Commodités échangeables |
+| Changelog | `/changelog` | Historique des extractions |
+
+### Stack IHM
+
+| Lib | Usage |
+|-----|-------|
+| React 19 | Framework UI |
+| React Router v7 | Navigation |
+| TanStack Query v5 | Fetch + cache serveur |
+| Tailwind CSS v3 | Styles utilitaires |
+| Lucide React | Icônes |
+| Recharts | Graphiques (DPS, stats) |
+| Framer Motion | Animations |
+| Vitest + Testing Library | Tests unitaires |
 
 ---
 
@@ -504,14 +567,19 @@ IHM en cours de développement. Page placeholder statique servie par Nginx.
    │ ship_uuid (FK)
    ├──────────────────────┐
    │                      │
-┌──▼─────────────────┐ ┌──▼─────────────────┐
-│   ship_modules     │ │   ship_paints      │
-├────────────────────┤ ├────────────────────┤
-│ id (PK)            │ │ id (PK)            │
-│ ship_uuid (FK)     │ │ ship_uuid (FK)     │
-│ module_name        │ │ paint_name         │
-│ module_class_name  │ │ paint_class_name   │
-└────────────────────┘ └────────────────────┘
+┌──▼─────────────────────────┐ ┌──▼─────────────────┐
+│       ship_modules         │ │   ship_paints      │
+├────────────────────────────┤ ├────────────────────┤
+│ id (PK)                    │ │ id (PK)            │
+│ ship_uuid (FK)             │ │ ship_uuid (FK)     │
+│ slot_name                  │ │ paint_name         │
+│ slot_display_name          │ │ paint_class_name   │
+│ slot_type (front/rear…)    │ └────────────────────┘
+│ module_class_name          │
+│ module_name                │
+│ module_tier (1/2/3)        │
+│ is_default BOOLEAN         │
+└────────────────────────────┘
 
 ┌─────────────────────┐     ┌─────────────────────────┐
 │       shops         │     │   shop_inventory        │
@@ -562,8 +630,8 @@ IHM en cours de développement. Page placeholder statique servie par Nginx.
 | `items` | 5 237 |
 | `commodities` | 237 |
 | `manufacturers` | 55 |
-| `ships_loadouts` | 33 957 |
-| `ship_modules` | Variable |
+| `ships_loadouts` | 36 596 |
+| `ship_modules` | ~18 (3 options × 2 slots × 3 vaisseaux) |
 | `ship_paints` | 1 791 |
 | `shops` | 18 |
 | `shop_inventory` | Variable |
@@ -633,7 +701,7 @@ PC local (Extractor — exécution manuelle) :
   ├── saveManufacturers()            → ~55 fabricants
   ├── saveComponents()               → ~3 023 composants (batch INSERT, 22 types)
   ├── saveShips() + loadouts         → ~309 vaisseaux + ~33 957 ports
-  ├── detectAndSaveModules()         → modules des vaisseaux modulaires (Retaliator, Apollo…)
+  ├── detectAndSaveModules()         → modules config-driven (Retaliator×6, Apollo×6) + fallback générique
   ├── savePaints()                   → ~1 791 peintures/livrées
   ├── saveItems()                    → ~5 237 items FPS (15 types)
   ├── saveCommodities()              → ~237 commodités échangeables
@@ -654,8 +722,10 @@ Les écritures en DB ne se font qu'au démarrage ou via les endpoints admin POST
 | **Validation** | Zod 4 |
 | **Documentation** | OpenAPI 3.0 (spec pré-générée + swagger-ui-express) |
 | **Base de données** | MySQL 8.0 (utf8mb4_unicode_ci) |
-| **Frontend** | Vue 3, Vue Router, Tailwind CSS |
+| **Frontend** | React 19, React Router v7, TanStack Query v5 |
+| **UI Frontend** | Tailwind CSS v3, Lucide React, Recharts, Framer Motion |
 | **Build frontend** | Vite 6 |
+| **Linting** | Biome (lint + format, unified pour tout le monorepo) |
 | **Containerisation** | Docker multi-stage + Docker Compose |
 | **Reverse proxy** | Traefik (Let's Encrypt, HTTPS automatique) |
 | **CI/CD** | GitHub Actions (4 jobs) |
@@ -721,13 +791,14 @@ Le fichier `docker-compose.prod.yml` surcharge la config de base :
 ### Tests unitaires (Vitest)
 
 ```bash
-# API — 52 tests (schémas Zod, validation, loadout)
+# API — tests unitaires (Vitest)
 cd api && npx vitest run
 
 # Extractor — 44 tests (classifyPort, dataforge helpers)
 cd extractor && npx vitest run
 
-# Total : 96 tests
+# IHM — tests composants/hooks/pages (Vitest + Testing Library)
+cd ihm && npm run test:run
 ```
 
 ### Tests e2e (API)
@@ -812,7 +883,7 @@ cd extractor && npx tsx extract.ts --p4k "/path/to/Data.p4k"
 # Dev mode avec hot-reload (API)
 cd api && npm run dev
 
-# Dev mode (IHM)
+# Dev mode (IHM — http://localhost:5173)
 cd ihm && npm run dev
 
 # Logs Docker en temps réel
@@ -820,6 +891,10 @@ docker compose logs -f api
 
 # Rebuild complet (reset DB)
 docker compose down -v && docker compose up --build -d
+
+# Appliquer une migration SQL (via tunnel SSH)
+cd extractor && export $(grep -E "^DB_" .env | xargs)
+node -e "require('mysql2/promise').createConnection({host: process.env.DB_HOST, port: parseInt(process.env.DB_PORT), user: process.env.DB_USER, password: process.env.DB_PASSWORD, database: process.env.DB_NAME}).then(c => c.query(require('fs').readFileSync('db/migrations/004_add_module_slot_type.sql','utf8')).then(() => c.end()))"
 ```
 
 ---

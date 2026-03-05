@@ -134,18 +134,24 @@ export class ShipQueryService {
       );
       return rows[0] || null;
     }
-    const [rows] = await this.pool.execute<Row[]>(`SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS} WHERE s.uuid = ?`, [uuid]);
+    const [rows] = await this.pool.execute<Row[]>(
+      `SELECT ${SHIP_SELECT}, FALSE as is_concept_only,
+              sm.length as sm_length, sm.beam as sm_beam, sm.height as sm_height
+       ${SHIP_JOINS} WHERE s.uuid = ?`,
+      [uuid],
+    );
     if (!rows[0]) return null;
     const ship = rows[0];
-    // Fallback: use Ship Matrix dimensions if P4K bbox is missing
-    if (!num(ship.size_y) && ship.ship_matrix_id) {
-      const [smRows] = await this.pool.execute<Row[]>('SELECT length, beam, height FROM ship_matrix WHERE id = ?', [ship.ship_matrix_id]);
-      if (smRows.length) {
-        ship.size_x = num(smRows[0].beam); // beam   → width  (size_x)
-        ship.size_y = num(smRows[0].length); // length → length (size_y)
-        ship.size_z = num(smRows[0].height); // height → height (size_z)
-      }
+    // Fallback: use Ship Matrix dimensions if P4K bbox is missing (no extra query needed)
+    if (!num(ship.size_y)) {
+      if (ship.sm_beam) ship.size_x = num(ship.sm_beam); // beam   → width  (size_x)
+      if (ship.sm_length) ship.size_y = num(ship.sm_length); // length → depth  (size_y)
+      if (ship.sm_height) ship.size_z = num(ship.sm_height); // height → height (size_z)
     }
+    // Remove internal-only fields before returning
+    delete (ship as any).sm_length;
+    delete (ship as any).sm_beam;
+    delete (ship as any).sm_height;
     return ship;
   }
 
@@ -251,10 +257,18 @@ export class ShipQueryService {
   }
 
   async getRandomShip(): Promise<Row | null> {
+    // ORDER BY RAND() is O(n) — use count + random offset instead
+    const [countRows] = await this.pool.execute<Row[]>(
+      "SELECT COUNT(*) as total FROM ships WHERE variant_type IS NULL AND vehicle_category = 'ship'",
+    );
+    const total = Number(countRows[0]?.total) || 0;
+    if (total === 0) return null;
+    const offset = Math.floor(Math.random() * total);
+
     const [rows] = await this.pool.execute<Row[]>(
       `SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS}
        WHERE s.variant_type IS NULL AND s.vehicle_category = 'ship'
-       ORDER BY RAND() LIMIT 1`,
+       LIMIT 1 OFFSET ${offset}`,
     );
     if (!rows[0]) return null;
     const { game_data, ...rest } = rows[0];

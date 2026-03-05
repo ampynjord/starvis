@@ -147,8 +147,12 @@ export class ExtractionService {
     // CPU-intensive ship-extraction phase (which can run for 15+ minutes without
     // sending any SQL).
     const keepaliveTimer = setInterval(async () => {
-      try { await conn.query('SELECT 1'); } catch { /* ignore — if the connection is
-      broken we'll find out on the next real query */ }
+      try {
+        await conn.query('SELECT 1');
+      } catch {
+        /* ignore — if the connection is
+      broken we'll find out on the next real query */
+      }
     }, 30_000);
     try {
       // 1b. Snapshot current data BEFORE cleaning — for changelog comparison
@@ -850,12 +854,36 @@ export class ExtractionService {
       { slotName: 'hardpoint_rear_module', slotType: 'rear', modulePrefix: 'AEGS_Retaliator_Module_Rear_', defaultContains: 'Base' },
     ],
     RSI_Apollo_Medivac: [
-      { slotName: 'hardpoint_modular_room_left', slotType: 'left', modulePrefix: 'RSI_Apollo_Module_Left_Tier_', defaultContains: 'Tier_3', tierExtract: true },
-      { slotName: 'hardpoint_modular_room_right', slotType: 'right', modulePrefix: 'RSI_Apollo_Module_Right_Tier_', defaultContains: 'Tier_3', tierExtract: true },
+      {
+        slotName: 'hardpoint_modular_room_left',
+        slotType: 'left',
+        modulePrefix: 'RSI_Apollo_Module_Left_Tier_',
+        defaultContains: 'Tier_3',
+        tierExtract: true,
+      },
+      {
+        slotName: 'hardpoint_modular_room_right',
+        slotType: 'right',
+        modulePrefix: 'RSI_Apollo_Module_Right_Tier_',
+        defaultContains: 'Tier_3',
+        tierExtract: true,
+      },
     ],
     RSI_Apollo_Triage: [
-      { slotName: 'hardpoint_modular_room_left', slotType: 'left', modulePrefix: 'RSI_Apollo_Module_Left_Tier_', defaultContains: 'Tier_1', tierExtract: true },
-      { slotName: 'hardpoint_modular_room_right', slotType: 'right', modulePrefix: 'RSI_Apollo_Module_Right_Tier_', defaultContains: 'Tier_1', tierExtract: true },
+      {
+        slotName: 'hardpoint_modular_room_left',
+        slotType: 'left',
+        modulePrefix: 'RSI_Apollo_Module_Left_Tier_',
+        defaultContains: 'Tier_1',
+        tierExtract: true,
+      },
+      {
+        slotName: 'hardpoint_modular_room_right',
+        slotType: 'right',
+        modulePrefix: 'RSI_Apollo_Module_Right_Tier_',
+        defaultContains: 'Tier_1',
+        tierExtract: true,
+      },
     ],
   };
 
@@ -863,7 +891,7 @@ export class ExtractionService {
     // e.g. "AEGS_Retaliator_Module_Front_Base" → "Front Base"
     //      "RSI_Apollo_Module_Left_Tier_3" → "Left Tier 3"
     return className
-      .replace(/^[A-Z]{2,5}_/, '')  // Strip manufacturer prefix
+      .replace(/^[A-Z]{2,5}_/, '') // Strip manufacturer prefix
       .replace(/_/g, ' ')
       .replace(/\b\w/g, (c) => c.toUpperCase())
       .trim();
@@ -915,7 +943,9 @@ export class ExtractionService {
               [fullData.ref, slotDef.slotName, slotDisplay, slotDef.slotType, moduleName, moduleDisplayName, tier, isDefault ? 1 : 0],
             );
           } catch (e: unknown) {
-            logger.error(`Module ${moduleName} (slot ${slotDef.slotName}) on ${shipClassName}: ${e instanceof Error ? e.message : String(e)}`);
+            logger.error(
+              `Module ${moduleName} (slot ${slotDef.slotName}) on ${shipClassName}: ${e instanceof Error ? e.message : String(e)}`,
+            );
           }
         }
       }

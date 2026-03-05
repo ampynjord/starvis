@@ -68,13 +68,21 @@ export async function initializeSchema(conn: PoolConnection): Promise<void> {
  * Each file is named NNN_description.sql and tracked in a `schema_migrations` table.
  */
 async function runVersionedMigrations(conn: PoolConnection): Promise<void> {
-  // Ensure migrations tracking table exists
+  // Ensure migrations tracking table exists (column: filename WITH .sql extension)
   await conn.execute(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
-      version VARCHAR(255) PRIMARY KEY,
+      filename VARCHAR(255) PRIMARY KEY,
       applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
+
+  // Handle older installations where the column was named 'version' instead of 'filename'
+  try {
+    await conn.execute(`ALTER TABLE schema_migrations CHANGE COLUMN version filename VARCHAR(255) NOT NULL`);
+    logger.info('Migrated schema_migrations: renamed column version -> filename', { module: 'schema' });
+  } catch (_) {
+    // Column already named 'filename' — nothing to do
+  }
 
   // Find migrations directory
   const candidate1 = path.join(__dirname, '..', '..', 'db', 'migrations');
@@ -86,9 +94,9 @@ async function runVersionedMigrations(conn: PoolConnection): Promise<void> {
     return;
   }
 
-  // Get already-applied migrations
-  const [applied] = await conn.execute<any[]>('SELECT version FROM schema_migrations');
-  const appliedSet = new Set(applied.map((r: any) => r.version));
+  // Get already-applied migrations (stored as filename WITH .sql extension)
+  const [applied] = await conn.execute<any[]>('SELECT filename FROM schema_migrations');
+  const appliedSet = new Set(applied.map((r: any) => r.filename));
 
   // Read and sort migration files
   const files = readdirSync(migrationsDir)
@@ -96,7 +104,7 @@ async function runVersionedMigrations(conn: PoolConnection): Promise<void> {
     .sort();
 
   for (const file of files) {
-    const version = file.replace('.sql', '');
+    const version = file; // keep .sql extension — consistent with extractor/scripts/apply-migrations.ts
     if (appliedSet.has(version)) continue;
 
     logger.info(`Running migration: ${file}`, { module: 'schema' });
@@ -120,7 +128,7 @@ async function runVersionedMigrations(conn: PoolConnection): Promise<void> {
       }
     }
 
-    await conn.execute('INSERT INTO schema_migrations (version) VALUES (?)', [version]);
+    await conn.execute('INSERT INTO schema_migrations (filename) VALUES (?)', [version]);
     logger.info(`Migration ${file} applied`, { module: 'schema' });
   }
 }

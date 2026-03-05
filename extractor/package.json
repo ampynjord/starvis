@@ -7,6 +7,7 @@
   "scripts": {
     "extract": "tsx extract.ts",
     "dev": "tsx watch extract.ts",
+    "migrate": "tsx scripts/apply-migrations.ts",
     "lint": "biome check --write .",
     "lint:ci": "biome check .",
     "test": "vitest run",
@@ -21,7 +22,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.4",
-    "@types/node": "^20.19.30",
+    "@types/node": "^20.19.35",
     "@vitest/coverage-v8": "^4.0.18",
     "tsx": "^4.21.0",
     "typescript": "^5.3.3",
