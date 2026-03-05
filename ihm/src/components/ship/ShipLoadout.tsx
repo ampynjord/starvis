@@ -627,6 +627,45 @@ function classifyTurretNode(turret: LoadoutNode): 'weapon' | 'utility' {
 
 const THRUSTER_ORDER = ['Main','Maneuvering','Retro'];
 
+/**
+ * The loadout_json stored in ship_modules uses camelCase keys (portName, componentClassName…)
+ * whereas LoadoutNode / processLoadout expects snake_case (port_name, component_class_name…).
+ * This function normalises both formats so processLoadout can handle module sub-trees.
+ */
+function normalizeModuleNode(raw: Record<string, unknown>): LoadoutNode {
+  const className = ((raw.componentClassName ?? raw.component_class_name) ?? null) as string | null;
+  const children = Array.isArray(raw.children)
+    ? (raw.children as Record<string, unknown>[]).map(normalizeModuleNode)
+    : [];
+  return {
+    id: 0,
+    port_name:    ((raw.portName  ?? raw.port_name)  ?? '') as string,
+    port_type:    ((raw.portType  ?? raw.port_type)  ?? '') as string,
+    port_min_size: ((raw.minSize  ?? raw.port_min_size) ?? null) as number | null,
+    port_max_size: ((raw.maxSize  ?? raw.port_max_size) ?? null) as number | null,
+    parent_id: null,
+    // Use class name as a stand-in uuid so processLoadout's "is port filled?" guards pass
+    component_uuid:       className,
+    component_name:       null,
+    // Derive component_type from portType so rack/missile/shield categorisation works
+    component_type:       ((raw.portType ?? raw.port_type) ?? null) as string | null,
+    component_size:       ((raw.maxSize  ?? raw.port_max_size) ?? null) as number | null,
+    component_class_name: className,
+    sub_type: null, grade: null, manufacturer_code: null,
+    weapon_dps: null, weapon_damage: null, weapon_fire_rate: null, weapon_range: null,
+    weapon_ammo_count: null, weapon_damage_type: null,
+    shield_hp: null, shield_regen: null, shield_regen_delay: null,
+    qd_speed: null, qd_spool_time: null, qd_range: null,
+    power_output: null, power_draw: null, power_base: null, heat_generation: null, cooling_rate: null,
+    thruster_max_thrust: null, thruster_type: null,
+    rack_count: null, rack_missile_size: null,
+    missile_damage: null, missile_signal_type: null,
+    cm_ammo_count: null,
+    radar_range: null, radar_detection_lifetime: null, radar_tracking_signal: null,
+    children,
+  };
+}
+
 function processLoadout(nodes: LoadoutNode[], activeModules: ShipModule[] = [], moduleSlots: ShipModule[][] = []): ProcessedLoadout {
   const weapons:       WeaponSlot[]    = [];
   const weapTurrets:   LoadoutNode[]   = [];  // tourelles combat
@@ -650,8 +689,11 @@ function processLoadout(nodes: LoadoutNode[], activeModules: ShipModule[] = [], 
     // Module slots (baies modulaires — Retaliator front/rear, Apollo left/right)
     if (moduleSlotNames.has(node.port_name)) {
       const info = activeModules.find(m => m.slot_name === node.port_name) ?? null;
-      // Prefer the per-variant loadout_json (tier-correct) over the default ship loadout tree
-      const subNodes = info?.loadout_json ?? node.children ?? [];
+      // Normalise loadout_json (camelCase from DB) to snake_case LoadoutNode before processing
+      const rawSub = info?.loadout_json ?? null;
+      const subNodes: LoadoutNode[] = rawSub
+        ? (rawSub as unknown as Record<string, unknown>[]).map(normalizeModuleNode)
+        : (node.children ?? []);
       const subLoadout = processLoadout(subNodes);
       const slotOptions = moduleSlots.find(slot => slot[0]?.slot_name === node.port_name) ?? [];
       moduleEntries.push({ moduleInfo: info, node, subLoadout, slotOptions });
@@ -783,6 +825,22 @@ function ModuleCard({ entry, onModuleChange }: {
     ? [...entry.slotOptions].sort((a, b) => (a.module_tier ?? 0) - (b.module_tier ?? 0))
     : entry.slotOptions;
 
+  // Strip common word-prefix among all options for compact labels (e.g. "Retaliator Module Front Bomber" → "Bomber")
+  const allModuleNames = entry.slotOptions.map(m => m.module_name ?? m.module_class_name ?? '');
+  function shortLabel(m: ShipModule): string {
+    if (hasTiers) return `T${m.module_tier}`;
+    const name = m.module_name ?? m.module_class_name ?? '';
+    if (allModuleNames.length <= 1) return name;
+    const words = name.split(' ');
+    const allWords = allModuleNames.map(n => n.split(' '));
+    let shared = 0;
+    for (let i = 0; i < words.length - 1; i++) {
+      if (allWords.every(ws => ws[i] === words[i])) shared = i + 1;
+      else break;
+    }
+    return words.slice(shared).join(' ') || name;
+  }
+
   const hasWeapons = sub.weapons.length > 0 || sub.weapTurrets.length > 0;
   const hasRacks   = sub.racks.length > 0;
   const hasSystems = sub.systems.length > 0;
@@ -816,9 +874,6 @@ function ModuleCard({ entry, onModuleChange }: {
         <div className="px-2.5 py-2 flex flex-wrap gap-1.5">
           {sortedOptions.map((m) => {
             const isActive = m.module_class_name === info?.module_class_name;
-            const btnLabel = hasTiers
-              ? `T${m.module_tier}`
-              : (m.module_name ?? m.module_class_name);
             return (
               <button
                 key={m.module_class_name}
@@ -831,7 +886,7 @@ function ModuleCard({ entry, onModuleChange }: {
                     : 'bg-slate-900/40 border-slate-700 text-slate-400 hover:border-purple-700 hover:text-purple-300',
                 ].join(' ')}
               >
-                {btnLabel}
+                {shortLabel(m)}
               </button>
             );
           })}
