@@ -952,7 +952,17 @@ export class ExtractionService {
                  module_tier       = VALUES(module_tier),
                  is_default        = VALUES(is_default),
                  loadout_json      = VALUES(loadout_json)`,
-              [fullData.ref, slotDef.slotName, slotDisplay, slotDef.slotType, moduleName, moduleDisplayName, tier, isDefault ? 1 : 0, loadoutJson],
+              [
+                fullData.ref,
+                slotDef.slotName,
+                slotDisplay,
+                slotDef.slotType,
+                moduleName,
+                moduleDisplayName,
+                tier,
+                isDefault ? 1 : 0,
+                loadoutJson,
+              ],
             );
           } catch (e: unknown) {
             logger.error(
