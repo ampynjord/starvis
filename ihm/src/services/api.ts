@@ -1,9 +1,28 @@
 import type {
-  BuyLocation, ChangelogEntry, ChangelogSummary, Commodity,
-  Component, ComponentListItem, Hardpoint, Item, ItemListItem,
-  LoadoutNode, Manufacturer, PaginatedResponse, PaintListItem, SearchResult,
-  Ship, ShipComparison, ShipFilters, ShipListItem, ShipModule, ShipPaint,
-  ShipStats, Shop, StatsOverview, Version,
+  BuyLocation,
+  ChangelogEntry,
+  ChangelogSummary,
+  Commodity,
+  Component,
+  ComponentListItem,
+  Hardpoint,
+  Item,
+  ItemListItem,
+  LoadoutNode,
+  Manufacturer,
+  PaginatedResponse,
+  PaintListItem,
+  SearchResult,
+  Ship,
+  ShipComparison,
+  ShipFilters,
+  ShipListItem,
+  ShipModule,
+  ShipPaint,
+  ShipStats,
+  Shop,
+  StatsOverview,
+  Version,
 } from '@/types/api';
 import { API_BASE } from '@/utils/constants';
 
@@ -15,12 +34,12 @@ async function get<T>(path: string, params?: Record<string, string | number | un
     }
   }
   const res = await fetch(url.toString());
-  const json = (await res.json().catch(() => null)) as Record<string, unknown> | null ?? {};
-  if (!res.ok) throw new Error(String(json['error'] ?? '') || `HTTP ${res.status}: ${res.statusText}`);
+  const json = ((await res.json().catch(() => null)) as Record<string, unknown> | null) ?? {};
+  if (!res.ok) throw new Error(String(json.error ?? '') || `HTTP ${res.status}: ${res.statusText}`);
   // Paginated list: numeric 'total' AND array 'data' at top level → return full response
-  if (typeof json['total'] === 'number' && Array.isArray(json['data'])) return json as unknown as T;
+  if (typeof json.total === 'number' && Array.isArray(json.data)) return json as unknown as T;
   // Wrapped response: {success: true, data: T} → unwrap
-  if ('success' in json && 'data' in json) return json['data'] as T;
+  if ('success' in json && 'data' in json) return json.data as T;
   return json as unknown as T;
 }
 
@@ -44,9 +63,14 @@ export const api = {
   // ─── Ships ─────────────────────────────────────────────────────────
   ships: {
     list: (p: {
-      page?: number; limit?: number; search?: string;
-      manufacturer?: string; role?: string; career?: string;
-      size?: number; variant_type?: string;
+      page?: number;
+      limit?: number;
+      search?: string;
+      manufacturer?: string;
+      role?: string;
+      career?: string;
+      size?: number;
+      variant_type?: string;
     }) => get<PaginatedResponse<ShipListItem>>('/ships', p),
     filters: () => get<ShipFilters>('/ships/filters'),
     search: (search: string, limit = 8) => get<ShipListItem[]>('/ships/search', { search, limit }),
@@ -65,8 +89,14 @@ export const api = {
   // ─── Components ────────────────────────────────────────────────────
   components: {
     list: (p: {
-      page?: number; limit?: number; search?: string;
-      type?: string; sub_type?: string; size?: number; grade?: string; manufacturer?: string;
+      page?: number;
+      limit?: number;
+      search?: string;
+      type?: string;
+      sub_type?: string;
+      size?: number;
+      grade?: string;
+      manufacturer?: string;
     }) => get<PaginatedResponse<ComponentListItem>>('/components', p),
     types: () => get<string[]>('/components/types'),
     filters: () => get<Record<string, string[]>>('/components/filters'),
@@ -78,8 +108,14 @@ export const api = {
   // ─── Items ─────────────────────────────────────────────────────────
   items: {
     list: (p: {
-      page?: number; limit?: number; search?: string;
-      type?: string; sub_type?: string; size?: number; grade?: string; manufacturer?: string;
+      page?: number;
+      limit?: number;
+      search?: string;
+      type?: string;
+      sub_type?: string;
+      size?: number;
+      grade?: string;
+      manufacturer?: string;
     }) => get<PaginatedResponse<ItemListItem>>('/items', p),
     types: () => get<string[]>('/items/types'),
     filters: () => get<Record<string, string[]>>('/items/filters'),
@@ -108,15 +144,13 @@ export const api = {
 
   // ─── Commodities ───────────────────────────────────────────────────
   commodities: {
-    list: (p: { page?: number; limit?: number; search?: string; type?: string }) =>
-      get<PaginatedResponse<Commodity>>('/commodities', p),
+    list: (p: { page?: number; limit?: number; search?: string; type?: string }) => get<PaginatedResponse<Commodity>>('/commodities', p),
     types: () => get<string[]>('/commodities/types'),
     get: (uuid: string) => get<Commodity>(`/commodities/${uuid}`),
   },
 
   // ─── Search ────────────────────────────────────────────────────────
-  search: (query: string, limit = 5) =>
-    get<SearchResult>('/search', { search: query, limit }),
+  search: (query: string, limit = 5) => get<SearchResult>('/search', { search: query, limit }),
 
   // ─── Changelog ─────────────────────────────────────────────────────
   changelog: {

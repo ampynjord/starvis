@@ -1,7 +1,7 @@
 export const fNumber = (v: number | null | undefined, decimals = 0): string => {
   if (v == null) return '—';
   const n = typeof v === 'number' ? v : Number(v);
-  if (isNaN(n)) return '—';
+  if (Number.isNaN(n)) return '—';
   return n.toLocaleString('en-US', { maximumFractionDigits: decimals });
 };
 
@@ -34,15 +34,20 @@ export const fCredits = (aUEC: number | null | undefined): string => {
 export const fDate = (iso: string | null | undefined): string => {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('en-US', {
-    day: '2-digit', month: 'short', year: 'numeric',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
   });
 };
 
 export const fDateTime = (iso: string | null | undefined): string => {
   if (!iso) return '—';
   return new Date(iso).toLocaleString('en-US', {
-    day: '2-digit', month: 'short', year: 'numeric',
-    hour: '2-digit', minute: '2-digit',
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 };
 
@@ -54,7 +59,7 @@ export const fSize = (s: number | null | undefined): string => {
 export const fTime = (seconds: number | null | undefined): string => {
   if (seconds == null) return '—';
   const s = typeof seconds === 'number' ? seconds : Number(seconds);
-  if (isNaN(s)) return '—';
+  if (Number.isNaN(s)) return '—';
   if (s < 60) return `${s.toFixed(0)}s`;
   return `${(s / 60).toFixed(1)}min`;
 };

@@ -38,16 +38,16 @@ export interface ShipListItem {
   vehicle_category: string | null;
   crew_size: number | null;
   mass: number | null;
-  cross_section_x: number | null;   // width
-  cross_section_y: number | null;   // height
-  cross_section_z: number | null;   // length
+  cross_section_x: number | null; // width
+  cross_section_y: number | null; // height
+  cross_section_z: number | null; // length
   scm_speed: number | null;
   max_speed: number | null;
   boost_speed_forward: number | null;
   cargo_capacity: number | null;
   min_crew: number | null;
   max_crew: number | null;
-  ship_matrix_id: number | null;    // non-null = has RSI SM link
+  ship_matrix_id: number | null; // non-null = has RSI SM link
   thumbnail: string | null;
   production_status: string | null;
   variant_type: string | null;
@@ -55,9 +55,9 @@ export interface ShipListItem {
 }
 
 export interface Ship extends ShipListItem {
-  size_x: number | null;  // width  (m)
-  size_y: number | null;  // length (m)
-  size_z: number | null;  // height (m)
+  size_x: number | null; // width  (m)
+  size_y: number | null; // length (m)
+  size_z: number | null; // height (m)
   armor_hp: number | null;
   armor_phys_resist: number | null;
   armor_energy_resist: number | null;
