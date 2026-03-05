@@ -2,7 +2,7 @@ import type {
   BuyLocation, ChangelogEntry, ChangelogSummary, Commodity,
   Component, ComponentListItem, Hardpoint, Item, ItemListItem,
   LoadoutNode, Manufacturer, PaginatedResponse, PaintListItem, SearchResult,
-  Ship, ShipComparison, ShipFilters, ShipListItem, ShipPaint,
+  Ship, ShipComparison, ShipFilters, ShipListItem, ShipModule, ShipPaint,
   ShipStats, Shop, StatsOverview, Version,
 } from '@/types/api';
 import { API_BASE } from '@/utils/constants';
@@ -59,6 +59,7 @@ export const api = {
     hardpoints: (uuid: string) => get<Hardpoint[]>(`/ships/${uuid}/hardpoints`),
     similar: (uuid: string, limit = 6) => get<ShipListItem[]>(`/ships/${uuid}/similar`, { limit }),
     compare: (uuid1: string, uuid2: string) => get<ShipComparison>(`/ships/${uuid1}/compare/${uuid2}`),
+    modules: (uuid: string) => get<ShipModule[]>(`/ships/${uuid}/modules`),
   },
 
   // ─── Components ────────────────────────────────────────────────────
