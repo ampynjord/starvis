@@ -102,9 +102,8 @@ export default function ShipDetailPage() {
         <span className="text-slate-400">{ship.name}</span>
       </div>
 
-      {/* Ship hero */}
+      {/* ── Hero ── */}
       <div className="sci-panel overflow-hidden">
-        {/* Bannière pleine largeur */}
         {(ship.thumbnail_large ?? ship.thumbnail) && (
           <div className="relative w-full h-52 bg-slate-900/80">
             <img
@@ -116,7 +115,6 @@ export default function ShipDetailPage() {
             <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#0A1628] to-transparent" />
           </div>
         )}
-        {/* Contenu */}
         <div className="p-6">
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
             <div>
@@ -126,7 +124,6 @@ export default function ShipDetailPage() {
               <h1 className="font-orbitron text-3xl font-black text-slate-100 leading-tight">
                 {ship.name}
               </h1>
-              {/* Badges */}
               <div className="flex flex-wrap gap-2 mt-3">
                 {ship.career && <GlowBadge color="cyan">{ship.career}</GlowBadge>}
                 {ship.role && ship.role !== ship.career && <GlowBadge color="slate">{ship.role}</GlowBadge>}
@@ -141,7 +138,6 @@ export default function ShipDetailPage() {
                 {ship.ship_matrix_id != null && <GlowBadge color="green">RSI Link</GlowBadge>}
               </div>
             </div>
-            {/* Actions */}
             <div className="flex flex-col items-start gap-2 flex-shrink-0">
               <Link to={`/compare?a=${uuid}`} className="sci-btn-amber text-sm">
                 <BarChart3 size={13} /> Compare
@@ -161,32 +157,38 @@ export default function ShipDetailPage() {
         </div>
       </div>
 
-      {/* Main grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Specs column */}
-        <div className="space-y-4">
+      {/* ── Description (ship matrix) ── */}
+      {ship.sm_description && (
+        <p className="text-sm text-slate-400 leading-relaxed px-1 border-l-2 border-cyan-900/40 pl-4">
+          {ship.sm_description}
+        </p>
+      )}
 
-          {/* ── Dimensions ── */}
+      {/* ── Main layout: left content (2/3) + right sidebar (1/3) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+
+        {/* ════ LEFT — Dimensions · Cargo · Loadout ════ */}
+        <div className="lg:col-span-2 space-y-6">
+
+          {/* Dimensions */}
           <ScifiPanel title="Dimensions" actions={<Ruler size={13} className="text-slate-600" />}>
             {(() => {
-              const L = Number(ship.size_y) || 0;  // size_y = length (forward axis)
-              const W = Number(ship.size_x) || 0;  // size_x = width/beam
-              const H = Number(ship.size_z) || 0;  // size_z = height
+              const L = Number(ship.size_y) || 0;
+              const W = Number(ship.size_x) || 0;
+              const H = Number(ship.size_z) || 0;
               const maxDim = Math.max(L, W, H, 1);
               const scale = 48;
-              const lp = Math.max((L / maxDim) * scale, 4); // length  → left axis
-              const wp = Math.max((W / maxDim) * scale, 4); // width   → right axis
-              const hp = Math.max((H / maxDim) * scale, 4); // height  → up axis
-              const c = 0.866, s = 0.5; // cos30°, sin30°
+              const lp = Math.max((L / maxDim) * scale, 4);
+              const wp = Math.max((W / maxDim) * scale, 4);
+              const hp = Math.max((H / maxDim) * scale, 4);
+              const c = 0.866, s = 0.5;
               const pad = 20;
-              // anchor: front-bottom vertex (Bf)
               const ax = lp * c + pad;
               const ay = (lp + wp) * s + hp + pad;
               type V = [number, number];
-              // 8 vertices
               const Bf: V = [ax,                    ay           ];
-              const Bl: V = [ax - lp*c,             ay - lp*s    ]; // back via length
-              const Br: V = [ax + wp*c,             ay - wp*s    ]; // right via width
+              const Bl: V = [ax - lp*c,             ay - lp*s    ];
+              const Br: V = [ax + wp*c,             ay - wp*s    ];
               const Bb: V = [ax - lp*c + wp*c,      ay - lp*s - wp*s];
               const Tf: V = [Bf[0],                 Bf[1] - hp   ];
               const Tl: V = [Bl[0],                 Bl[1] - hp   ];
@@ -219,13 +221,9 @@ export default function ShipDetailPage() {
                         <polygon points="0,0 4,2 0,4" fill="rgb(34,211,238)" />
                       </marker>
                     </defs>
-
-                    {/* ── Hidden edges (dashed, muted) ── */}
                     {seg(Bl, Bb, { stroke:'rgba(100,116,139,0.35)', strokeWidth:'0.7', strokeDasharray:'2,2' })}
                     {seg(Br, Bb, { stroke:'rgba(100,116,139,0.35)', strokeWidth:'0.7', strokeDasharray:'2,2' })}
                     {seg(Bf, Bb, { stroke:'rgba(100,116,139,0.35)', strokeWidth:'0.7', strokeDasharray:'2,2' })}
-
-                    {/* ── Visible edges (solid, slate) ── */}
                     {seg(Bf, Bl, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
                     {seg(Bf, Br, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
                     {seg(Bf, Tf, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
@@ -235,9 +233,6 @@ export default function ShipDetailPage() {
                     {seg(Tf, Tr, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
                     {seg(Tl, Tb, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
                     {seg(Tr, Tb, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
-
-                    {/* ── Axis dimension lines (outside the box) ── */}
-                    {/* Length axis — left, emerald */}
                     {L > 0 && <>
                       {seg(Bf, Bl, { stroke:'rgb(52,211,153)', strokeWidth:'1', markerEnd:'url(#aL)', opacity:0.7 })}
                       {tick(Bf, Bl, [lp*s*0.15, -lp*c*0.15] as V)}
@@ -249,8 +244,6 @@ export default function ShipDetailPage() {
                         {L.toFixed(0)} m
                       </text>
                     </>}
-
-                    {/* Width axis — right, amber */}
                     {W > 0 && <>
                       {seg(Bf, Br, { stroke:'rgb(251,191,36)', strokeWidth:'1', markerEnd:'url(#aW)', opacity:0.7 })}
                       {tick(Bf, Br, [wp*s*0.15, wp*c*0.15] as V)}
@@ -262,8 +255,6 @@ export default function ShipDetailPage() {
                         {W.toFixed(0)} m
                       </text>
                     </>}
-
-                    {/* Height axis — vertical, cyan */}
                     {H > 0 && <>
                       {seg(Br, Tr, { stroke:'rgb(34,211,238)', strokeWidth:'1', markerEnd:'url(#aH)', opacity:0.7 })}
                       {tick(Br, Tr, [3, 0] as V)}
@@ -276,8 +267,6 @@ export default function ShipDetailPage() {
                       </text>
                     </>}
                   </svg>
-
-                  {/* Legend */}
                   <div className="flex gap-4 items-center">
                     <span className="flex items-center gap-1 text-[9px] font-mono-sc text-emerald-600">
                       <span className="w-3 h-px bg-emerald-600 inline-block" /> L
@@ -297,65 +286,83 @@ export default function ShipDetailPage() {
             })()}
           </ScifiPanel>
 
-          {/* ── Crew & Cargo ── */}
-          <ScifiPanel title="Crew & Cargo">
-            <div className="space-y-4">
-              {/* Crew pips */}
-              {(() => {
-                // Priorité : ship_matrix min/max_crew, sinon P4K crew_size
-                const minC = ship.min_crew != null ? Number(ship.min_crew) : (ship.crew_size ?? null);
-                const maxC = ship.max_crew != null ? Number(ship.max_crew) : (ship.crew_size ?? null);
-                if (maxC == null) return null;
-                const crewLabel = minC != null && maxC !== minC ? `${minC} – ${maxC}` : String(maxC);
-                const pipCount = Math.min(maxC, 16);
-                return (
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="flex items-center gap-1.5 text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest">
-                        <Users size={10} /> Crew
-                      </span>
-                      <span className="text-sm font-orbitron font-bold text-teal-400 tabular-nums">{crewLabel}</span>
-                    </div>
-                    <div className="flex gap-1 flex-wrap">
-                      {Array.from({ length: pipCount }).map((_, i) => (
-                        <div key={i} className={`w-4 h-4 rounded-sm border flex items-center justify-center ${
-                          minC != null && i < minC ? 'bg-teal-900/60 border-teal-700/50' : 'bg-teal-900/30 border-teal-800/40'
-                        }`}>
-                          <div className={`w-1.5 h-1.5 rounded-full ${minC != null && i < minC ? 'bg-teal-500' : 'bg-teal-700'}`} />
-                        </div>
-                      ))}
-                      {maxC > 16 && (
-                        <div className="w-4 h-4 rounded-sm bg-teal-900/40 border border-teal-800/40 flex items-center justify-center">
-                          <span className="text-[7px] font-mono-sc text-teal-600">+{maxC - 16}</span>
-                        </div>
-                      )}
-                    </div>
-                    {minC != null && maxC !== minC && (
-                      <p className="text-[9px] font-mono-sc text-slate-600 mt-1.5">
-                        <span className="text-teal-700">{minC} min</span> · <span className="text-teal-500">{maxC} max</span>
-                      </p>
-                    )}
-                  </div>
-                );
-              })()}
-              {/* Cargo */}
-              {ship.cargo_capacity != null && ship.cargo_capacity > 0 && (
-                <CargoGrid scu={Number(ship.cargo_capacity)} shipName={ship.name} />
-              )}
-            </div>
+          {/* Cargo */}
+          {ship.cargo_capacity != null && ship.cargo_capacity > 0 && (
+            <ScifiPanel title="Cargo">
+              <CargoGrid scu={Number(ship.cargo_capacity)} shipName={ship.name} />
+            </ScifiPanel>
+          )}
+
+          {/* Loadout (tabbed) */}
+          {loadout && loadout.length > 0 && (
+            <ScifiPanel title="Loadout" subtitle="Stock equipment" actions={<Layers size={14} className="text-slate-600" />}>
+              <ShipLoadout
+                nodes={loadout}
+                activeModules={activeModules}
+                moduleSlots={moduleSlots}
+                onModuleChange={(slotName, className) =>
+                  setSelectedModules((prev) => ({ ...prev, [slotName]: className }))
+                }
+              />
+            </ScifiPanel>
+          )}
+        </div>
+
+        {/* ════ RIGHT sidebar — Stats · Crew · Insurance · Paints ════ */}
+        <div className="lg:col-span-1 space-y-4">
+
+          {/* Combat & Speed */}
+          <ScifiPanel title="Combat & Speed">
+            <ShipStatsBanner ship={ship} loadout={loadout ?? []} />
           </ScifiPanel>
 
-          {/* ── Insurance ── */}
+          {/* Crew */}
+          {(() => {
+            const minC = ship.min_crew != null ? Number(ship.min_crew) : (ship.crew_size ?? null);
+            const maxC = ship.max_crew != null ? Number(ship.max_crew) : (ship.crew_size ?? null);
+            if (maxC == null) return null;
+            const crewLabel = minC != null && maxC !== minC ? `${minC} – ${maxC}` : String(maxC);
+            const pipCount = Math.min(maxC, 16);
+            return (
+              <ScifiPanel>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="flex items-center gap-1.5 text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest">
+                    <Users size={10} /> Crew
+                  </span>
+                  <span className="text-sm font-orbitron font-bold text-teal-400 tabular-nums">{crewLabel}</span>
+                </div>
+                <div className="flex gap-1 flex-wrap">
+                  {Array.from({ length: pipCount }).map((_, i) => (
+                    <div key={i} className={`w-4 h-4 rounded-sm border flex items-center justify-center ${
+                      minC != null && i < minC ? 'bg-teal-900/60 border-teal-700/50' : 'bg-teal-900/30 border-teal-800/40'
+                    }`}>
+                      <div className={`w-1.5 h-1.5 rounded-full ${minC != null && i < minC ? 'bg-teal-500' : 'bg-teal-700'}`} />
+                    </div>
+                  ))}
+                  {maxC > 16 && (
+                    <div className="w-4 h-4 rounded-sm bg-teal-900/40 border border-teal-800/40 flex items-center justify-center">
+                      <span className="text-[7px] font-mono-sc text-teal-600">+{maxC - 16}</span>
+                    </div>
+                  )}
+                </div>
+                {minC != null && maxC !== minC && (
+                  <p className="text-[9px] font-mono-sc text-slate-600 mt-1.5">
+                    <span className="text-teal-700">{minC} min</span> · <span className="text-teal-500">{maxC} max</span>
+                  </p>
+                )}
+              </ScifiPanel>
+            );
+          })()}
+
+          {/* Insurance */}
           {(ship.insurance_claim_time != null || ship.insurance_expedite_cost != null) && (
             <ScifiPanel title="Insurance" actions={<Clock size={13} className="text-slate-600" />}>
               {ship.insurance_claim_time != null && (() => {
                 const claimMin = Number(ship.insurance_claim_time);
-                // Idris M = 253 min (le plus long à claim) → 100% de la barre
                 const MAX_CLAIM = 253;
                 const color     = claimMin < 60 ? 'bg-emerald-600' : claimMin < 120 ? 'bg-amber-500' : 'bg-red-600';
                 const textColor = claimMin < 60 ? 'text-emerald-400' : claimMin < 120 ? 'text-amber-400' : 'text-red-400';
                 const pct = Math.min(100, (claimMin / MAX_CLAIM) * 100);
-                // ticks à 60, 120, 180 minutes
                 const ticks = [60, 120, 180].map(t => ({ min: t, pct: (t / MAX_CLAIM) * 100 }));
                 return (
                   <div className="mb-3">
@@ -365,7 +372,6 @@ export default function ShipDetailPage() {
                         {claimMin.toFixed(1)} <span className="text-[10px]">min</span>
                       </span>
                     </div>
-                    {/* Timeline bar (0 → Idris M = 253 min) */}
                     <div className="relative h-2 bg-slate-800 rounded-full overflow-hidden">
                       <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
                       {ticks.map(({ min, pct: tp }) => (
@@ -392,17 +398,8 @@ export default function ShipDetailPage() {
               )}
             </ScifiPanel>
           )}
-        </div>
 
-        {/* Performance column */}
-        <div className="space-y-4">
-          <ScifiPanel title="Combat & Speed">
-            <ShipStatsBanner ship={ship} loadout={loadout ?? []} />
-          </ScifiPanel>
-        </div>
-
-        {/* Paints column */}
-        <div className="space-y-4">
+          {/* Paints */}
           {paints && paints.length > 0 && (
             <ScifiPanel title="Available paints" subtitle={`${paints.length} paints`} actions={<Palette size={14} className="text-slate-600" />}>
               <div className="space-y-0.5 max-h-64 overflow-y-auto">
@@ -417,21 +414,7 @@ export default function ShipDetailPage() {
         </div>
       </div>
 
-      {/* Loadout */}
-      {loadout && loadout.length > 0 && (
-        <ScifiPanel title="Default loadout" subtitle="Composants par défaut" actions={<Layers size={14} className="text-slate-600" />}>
-          <ShipLoadout
-            nodes={loadout}
-            activeModules={activeModules}
-            moduleSlots={moduleSlots}
-            onModuleChange={(slotName, className) =>
-              setSelectedModules((prev) => ({ ...prev, [slotName]: className }))
-            }
-          />
-        </ScifiPanel>
-      )}
-
-      {/* Similar ships */}
+      {/* ── Similar ships (full width) ── */}
       {similar && similar.length > 0 && (
         <ScifiPanel title="Similar ships" subtitle="Same role or size class">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -444,5 +427,4 @@ export default function ShipDetailPage() {
     </div>
   );
 }
-
 
