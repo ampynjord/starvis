@@ -331,4 +331,5 @@ export interface ShipModule {
   module_tier: number | null;
   module_uuid: string | null;
   is_default: boolean;
+  loadout_json: LoadoutNode[] | null;
 }

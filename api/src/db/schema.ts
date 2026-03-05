@@ -359,6 +359,7 @@ export const shipModules = mysqlTable(
     moduleUuid: char('module_uuid', { length: 36 }),
     moduleTier: tinyint('module_tier', { unsigned: true }),
     isDefault: boolean('is_default').default(false),
+    loadoutJson: json('loadout_json'),
   },
   (t) => [index('idx_ship').on(t.shipUuid), index('idx_module_class').on(t.moduleClassName)],
 );

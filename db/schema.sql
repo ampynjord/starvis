@@ -384,6 +384,7 @@ CREATE TABLE IF NOT EXISTS ship_modules (
   module_uuid CHAR(36) COMMENT 'DataForge UUID of the module',
   module_tier TINYINT UNSIGNED DEFAULT NULL COMMENT 'Tier number (1/2/3) for Apollo-style modules — NULL for others',
   is_default BOOLEAN DEFAULT FALSE COMMENT 'Whether this is the default module for this slot',
+  loadout_json JSON DEFAULT NULL COMMENT 'Serialised LoadoutPortEntry[] for this module variant (racks and loaded weapons)',
 
   UNIQUE KEY uq_ship_slot_module (ship_uuid, slot_name, module_class_name),
   INDEX idx_ship (ship_uuid),
