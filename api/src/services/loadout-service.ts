@@ -60,7 +60,11 @@ export class LoadoutService {
     const [rows] = await this.pool.execute<Row[]>(`SELECT * FROM ship_modules WHERE ship_uuid = ? AND ${noiseClauses} ORDER BY slot_name`, [
       shipUuid,
     ]);
-    return rows;
+    // MySQL returns JSON columns as strings — parse them so the API sends proper objects
+    return (rows as Record<string, unknown>[]).map((row) => ({
+      ...row,
+      loadout_json: typeof row.loadout_json === 'string' ? JSON.parse(row.loadout_json) : (row.loadout_json ?? null),
+    })) as unknown as Row[];
   }
 
   async getShipPaints(shipUuid: string): Promise<Row[]> {

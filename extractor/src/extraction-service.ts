@@ -929,18 +929,30 @@ export class ExtractionService {
           const moduleDisplayName = ExtractionService.formatModuleName(moduleName);
           const tier = slotDef.tierExtract ? ExtractionService.extractTier(moduleName) : null;
 
+          // Extract the module's own internal ports (racks, weapons, missiles) for tier-correct display
+          let loadoutJson: string | null = null;
+          try {
+            const modulePorts = this.dfService.extractVehicleLoadout(moduleName);
+            if (modulePorts && modulePorts.length > 0) {
+              loadoutJson = JSON.stringify(modulePorts);
+            }
+          } catch (_) {
+            // Module may have no internal ports (e.g. medical, habitation) — that's fine
+          }
+
           try {
             await conn.execute(
               `INSERT INTO ship_modules
-                 (ship_uuid, slot_name, slot_display_name, slot_type, module_class_name, module_name, module_tier, is_default)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                 (ship_uuid, slot_name, slot_display_name, slot_type, module_class_name, module_name, module_tier, is_default, loadout_json)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON DUPLICATE KEY UPDATE
                  slot_display_name = VALUES(slot_display_name),
-                 slot_type        = VALUES(slot_type),
-                 module_name      = VALUES(module_name),
-                 module_tier      = VALUES(module_tier),
-                 is_default       = VALUES(is_default)`,
-              [fullData.ref, slotDef.slotName, slotDisplay, slotDef.slotType, moduleName, moduleDisplayName, tier, isDefault ? 1 : 0],
+                 slot_type         = VALUES(slot_type),
+                 module_name       = VALUES(module_name),
+                 module_tier       = VALUES(module_tier),
+                 is_default        = VALUES(is_default),
+                 loadout_json      = VALUES(loadout_json)`,
+              [fullData.ref, slotDef.slotName, slotDisplay, slotDef.slotType, moduleName, moduleDisplayName, tier, isDefault ? 1 : 0, loadoutJson],
             );
           } catch (e: unknown) {
             logger.error(

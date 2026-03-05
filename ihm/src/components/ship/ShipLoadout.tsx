@@ -649,7 +649,9 @@ function processLoadout(nodes: LoadoutNode[], activeModules: ShipModule[] = []):
     // Module slots (baies modulaires — Retaliator front/rear, Apollo left/right)
     if (moduleSlotNames.has(node.port_name)) {
       const info = activeModules.find(m => m.slot_name === node.port_name) ?? null;
-      const subLoadout = processLoadout(node.children ?? []);  // process children, no nested modules
+      // Prefer the per-variant loadout_json (tier-correct) over the default ship loadout tree
+      const subNodes = info?.loadout_json ?? node.children ?? [];
+      const subLoadout = processLoadout(subNodes);
       moduleEntries.push({ moduleInfo: info, node, subLoadout });
       continue;
     }
@@ -764,7 +766,6 @@ const SLOT_TYPE_STYLE: Record<string, string> = {
 
 function ModuleCard({ entry }: { entry: ModuleEntry }) {
   const info     = entry.moduleInfo;
-  const children = entry.node.children ?? [];
   const sub      = entry.subLoadout;
   const slotLabel  = cleanSlotDisplayName(info?.slot_display_name, entry.node.port_name);
   const moduleName = info?.module_name ?? entry.node.component_class_name ?? 'Unknown Module';
@@ -777,23 +778,24 @@ function ModuleCard({ entry }: { entry: ModuleEntry }) {
   const hasSystems = sub.systems.length > 0;
   const hasContent = hasWeapons || hasRacks || hasSystems;
 
-  // Fallback: children whose type wasn't categorised (e.g. Apollo medical beds)
+  // Fallback: items from the active loadout source that weren't categorised (e.g. Apollo medical beds)
+  const subNodes = entry.moduleInfo?.loadout_json ?? entry.node.children ?? [];
   const uncategorized = !hasContent
-    ? children.filter(c => c.component_uuid && c.component_name)
+    ? subNodes.filter(c => c.component_uuid && c.component_name)
     : [];
 
   return (
-    <div className="flex flex-col rounded-md border border-cyan-900/40 bg-cyan-950/5 overflow-hidden">
+    <div className="flex flex-col rounded-md border border-purple-900/40 bg-purple-950/10 hover:border-purple-800/50 transition-all overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-2 px-2.5 pt-2 pb-1.5 bg-cyan-950/20 border-b border-cyan-900/30">
+      <div className="flex items-center gap-2 px-2.5 pt-2 pb-1.5 bg-purple-950/20 border-b border-purple-900/30">
         {slotStyle && (
           <span className={`text-[8px] font-mono-sc uppercase border rounded px-1.5 py-0.5 leading-none ${slotStyle}`}>
             {slotType}
           </span>
         )}
-        <span className="text-[10px] font-mono-sc text-cyan-400/80 flex-1 truncate">{slotLabel}</span>
+        <span className="text-[10px] font-mono-sc text-purple-300/80 flex-1 truncate">{slotLabel}</span>
         {tier != null && (
-          <span className="text-[8px] font-mono-sc text-cyan-200 bg-cyan-800/40 border border-cyan-700/50 rounded px-1.5 py-0.5 leading-none">
+          <span className="text-[8px] font-mono-sc text-purple-200 bg-purple-800/40 border border-purple-700/50 rounded px-1.5 py-0.5 leading-none">
             T{tier}
           </span>
         )}
@@ -806,7 +808,7 @@ function ModuleCard({ entry }: { entry: ModuleEntry }) {
 
       {/* Sub-components from loadout tree */}
       {hasContent && (
-        <div className="px-2.5 pb-2.5 pt-1 space-y-2 border-t border-cyan-900/20">
+        <div className="px-2.5 pb-2.5 pt-1 space-y-2 border-t border-purple-900/20">
           {hasWeapons && (
             <div>
               <p className="text-[8px] font-mono-sc text-red-400/60 uppercase tracking-wider mb-1.5">Weapons</p>
@@ -841,7 +843,7 @@ function ModuleCard({ entry }: { entry: ModuleEntry }) {
 
       {/* Raw fallback for uncategorised sub-components */}
       {uncategorized.length > 0 && (
-        <div className="px-2.5 pb-2.5 pt-1 border-t border-cyan-900/20 space-y-1">
+        <div className="px-2.5 pb-2.5 pt-1 border-t border-purple-900/20 space-y-1">
           {uncategorized.map((c, i) => (
             <p key={i} className="text-[10px] font-mono-sc text-slate-400">
               {c.component_uuid
@@ -852,7 +854,7 @@ function ModuleCard({ entry }: { entry: ModuleEntry }) {
         </div>
       )}
 
-      {!hasContent && uncategorized.length === 0 && children.length === 0 && (
+      {!hasContent && uncategorized.length === 0 && subNodes.length === 0 && (
         <div className="px-2.5 pb-2.5">
           <p className="text-[9px] font-mono-sc text-slate-700 italic">— no sub-components —</p>
         </div>
@@ -870,17 +872,6 @@ export function ShipLoadout({ nodes, activeModules = [] }: { nodes: LoadoutNode[
 
   return (
     <div className="space-y-6">
-
-      {/* ── Modules (baies modulaires — Retaliator, Apollo) ── */}
-      {data.moduleEntries.length > 0 && (
-        <Section title="Modules" accent="text-cyan-400" count={data.moduleEntries.length}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {data.moduleEntries.map((entry, i) => (
-              <ModuleCard key={i} entry={entry} />
-            ))}
-          </div>
-        </Section>
-      )}
 
       {/* ── Weapons ── */}
       {(data.weapons.length > 0 || data.weapTurrets.length > 0) && (
@@ -980,6 +971,17 @@ export function ShipLoadout({ nodes, activeModules = [] }: { nodes: LoadoutNode[
                   <span className="text-[9px] font-mono-sc text-slate-500 tabular-nums">{cm.ammoPerUnit * cm.count} shots</span>
                 )}
               </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* ── Modules (baies modulaires — Retaliator, Apollo) ── */}
+      {data.moduleEntries.length > 0 && (
+        <Section title="Modules" accent="text-purple-400" count={data.moduleEntries.length}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {data.moduleEntries.map((entry, i) => (
+              <ModuleCard key={i} entry={entry} />
             ))}
           </div>
         </Section>
