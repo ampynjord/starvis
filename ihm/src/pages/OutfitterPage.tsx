@@ -38,12 +38,6 @@ interface PortEntry {
   swapped?: boolean;
 }
 
-interface LoadoutResult {
-  ship: { uuid: string; name: string; class_name: string };
-  stats: Record<string, unknown>;
-  loadout: PortEntry[];
-}
-
 // ── Type icon mapping ─────────────────────────────────────────────────────────
 
 const TYPE_ICON: Record<string, string> = {
@@ -211,11 +205,6 @@ export default function OutfitterPage() {
     queryFn: () => api.ships.search(dShipSearch, 8),
     enabled: dShipSearch.length >= 2 && !selectedShip,
   });
-
-  const swapArray = useMemo(
-    () => Object.entries(swaps).map(([portName, componentUuid]) => ({ portName, componentUuid })),
-    [swaps],
-  );
 
   const { mutate: calculate, data: loadout, isPending } = useMutation<
     LoadoutResult,

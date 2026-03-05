@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import {
-  BarChart3, BookOpen, Clock, Dices, Home, Package, Palette, Rocket, Settings2, ShoppingBag, SlidersHorizontal, TrendingUp, Trophy, Wrench,
+  BarChart3, BookOpen, Clock, Dices, ExternalLink, Home, Package, Palette, Rocket, Settings2, ShoppingBag, SlidersHorizontal, TrendingUp, Trophy, Wrench,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
@@ -82,7 +82,7 @@ export function Sidebar() {
           rel="noreferrer"
           className="hidden md:flex items-center gap-2 text-xs text-slate-600 hover:text-slate-400 transition-colors"
         >
-          <FileText size={12} />
+          <ExternalLink size={12} />
           <span className="font-mono-sc">RSI Website</span>
         </a>
       </div>

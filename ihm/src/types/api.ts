@@ -52,6 +52,16 @@ export interface ShipListItem {
   production_status: string | null;
   variant_type: string | null;
   is_concept_only: boolean;
+  // Combat / flight stats returned by getAllShips query
+  pitch_max: number | null;
+  yaw_max: number | null;
+  roll_max: number | null;
+  total_hp: number | null;
+  shield_hp: number | null;
+  weapon_damage_total: number | null;
+  missile_damage_total: number | null;
+  hydrogen_fuel_capacity: number | null;
+  quantum_fuel_capacity: number | null;
 }
 
 export interface Ship extends ShipListItem {
@@ -65,13 +75,6 @@ export interface Ship extends ShipListItem {
   component_penetration: number | null;
   boost_ramp_up: number | null;
   boost_ramp_down: number | null;
-  pitch_max: number | null;
-  yaw_max: number | null;
-  roll_max: number | null;
-  shield_hp: number | null;
-  total_hp: number | null;
-  hydrogen_fuel_capacity: number | null;
-  quantum_fuel_capacity: number | null;
   boost_speed_backward: number | null;
   armor_physical: number | null;
   armor_energy: number | null;
@@ -326,7 +329,6 @@ export interface LoadoutResult {
     signatures: { ir: number; em: number; cs: number };
     armor: { physical: number; energy: number; distortion: number };
     countermeasures: { flare_count: number; chaff_count: number };
-    [key: string]: unknown;
   };
   hardpoints: unknown[];
   loadout: LoadoutPortEntry[];

@@ -35,12 +35,6 @@ const RADAR_STATS: { key: keyof Ship; label: string }[] = [
   { key: 'cargo_capacity', label: 'Cargo' },
 ];
 
-function normalize(a: number, b: number, val: number): number {
-  const max = Math.max(a, b);
-  if (!max) return 0;
-  return Math.round((val / max) * 100);
-}
-
 function buildRadarData(s1: Ship, s2: Ship) {
   return RADAR_STATS.map(({ key, label }) => {
     const v1 = (s1[key] as number | null) ?? 0;
