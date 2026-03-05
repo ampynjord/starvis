@@ -353,9 +353,11 @@ export const shipModules = mysqlTable(
     shipUuid: char('ship_uuid', { length: 36 }).notNull(),
     slotName: varchar('slot_name', { length: 100 }).notNull(),
     slotDisplayName: varchar('slot_display_name', { length: 100 }),
+    slotType: varchar('slot_type', { length: 20 }),
     moduleClassName: varchar('module_class_name', { length: 255 }).notNull(),
     moduleName: varchar('module_name', { length: 255 }),
     moduleUuid: char('module_uuid', { length: 36 }),
+    moduleTier: tinyint('module_tier', { unsigned: true }),
     isDefault: boolean('is_default').default(false),
   },
   (t) => [index('idx_ship').on(t.shipUuid), index('idx_module_class').on(t.moduleClassName)],
@@ -424,7 +426,7 @@ export const changelog = mysqlTable(
 
 // ─── shops ───────────────────────────────────────────────────────────────────
 
-export const shopsByName = mysqlTable(
+export const shops = mysqlTable(
   'shops',
   {
     id: int('id').autoincrement().primaryKey(),
@@ -502,3 +504,6 @@ export type InsertExtractionLog = typeof extractionLog.$inferInsert;
 
 export type Changelog = typeof changelog.$inferSelect;
 export type InsertChangelog = typeof changelog.$inferInsert;
+
+export type Shop = typeof shops.$inferSelect;
+export type InsertShop = typeof shops.$inferInsert;
