@@ -173,9 +173,9 @@ export class ComponentQueryService {
     }
 
     const sortCol = COMP_SORT.has(opts.sort ?? '') ? opts.sort! : 'size';
-    const order  = opts.order === 'desc' ? 'DESC' : 'ASC';
-    const limit  = Math.min(200, Math.max(1, opts.limit ?? 100));
-    const wSql   = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const order = opts.order === 'desc' ? 'DESC' : 'ASC';
+    const limit = Math.min(200, Math.max(1, opts.limit ?? 100));
+    const wSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
     const sql = `
       SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade,

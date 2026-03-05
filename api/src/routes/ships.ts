@@ -34,14 +34,14 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
     '/api/v1/ships/ranking',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const sort   = String(req.query.sort_by ?? req.query.sort ?? 'scm_speed');
-      const order  = String(req.query.order ?? 'desc').toUpperCase() === 'ASC' ? 'asc' : 'desc';
+      const sort = String(req.query.sort_by ?? req.query.sort ?? 'scm_speed');
+      const order = String(req.query.order ?? 'desc').toUpperCase() === 'ASC' ? 'asc' : 'desc';
       const category = String(req.query.category ?? '');
       const result = await gameDataService!.getAllShips({
         sort,
         order,
         vehicle_category: category || undefined,
-        variant_type: 'none',   // exclude non-playable variants
+        variant_type: 'none', // exclude non-playable variants
         limit: 500,
         page: 1,
       });
