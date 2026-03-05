@@ -9,7 +9,6 @@ import { useState } from 'react';
 import { api } from '@/services/api';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
-import { GlowBadge } from '@/components/ui/GlowBadge';
 import { fNumber } from '@/utils/formatters';
 import type { TradeRoute, CommodityPrice } from '@/types/api';
 
