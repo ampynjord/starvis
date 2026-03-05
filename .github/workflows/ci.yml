@@ -229,9 +229,18 @@ jobs:
             git reset --hard HEAD
             git pull --ff-only origin main
 
+            # Resolve env file — prefer .env.prod if present, fall back to .env
+            if [ -f .env.prod ]; then
+              ENV_OPT="--env-file .env.prod"
+            elif [ -f .env ]; then
+              ENV_OPT="--env-file .env"
+            else
+              ENV_OPT=""
+            fi
+
             # Pull pre-built images from GHCR (public repo, no auth needed)
-            docker compose -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans
+            docker compose -f docker-compose.prod.yml $ENV_OPT pull
+            docker compose -f docker-compose.prod.yml $ENV_OPT up -d --remove-orphans
 
             # Wait for API health check
             echo "⏳ Waiting for API health..."
@@ -246,4 +255,4 @@ jobs:
             # Cleanup old images
             docker image prune -f
 
-            echo "✅ Deployed $(docker compose -f docker-compose.prod.yml ps --format 'table {{.Name}}\t{{.Status}}')"
+            echo "✅ Deployed $(docker compose -f docker-compose.prod.yml $ENV_OPT ps --format 'table {{.Name}}\t{{.Status}}')"
