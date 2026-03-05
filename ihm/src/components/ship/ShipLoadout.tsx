@@ -3,6 +3,7 @@
  * Chaque port est une carte individuelle, stats inline par type.
  */
 
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { LoadoutNode, ShipModule } from '@/types/api';
 
@@ -978,130 +979,160 @@ export function ShipLoadout({
 }) {
   const data = processLoadout(nodes, activeModules, moduleSlots);
 
+  // ── Tabs ─────────────────────────────────────────────────
+  type TabKey = 'weapons' | 'ordnance' | 'shields' | 'systems' | 'countermeasures' | 'modules' | 'paint';
+  interface TabDef { key: TabKey; label: string; count: number }
+  const allTabs: TabDef[] = ([
+    { key: 'weapons' as TabKey,         label: 'Weapons & Utility', count: data.weapons.length + data.weapTurrets.length + data.utilities.length },
+    { key: 'ordnance' as TabKey,        label: 'Ordnance',          count: data.racks.length },
+    { key: 'shields' as TabKey,         label: 'Shields',           count: data.shields.length },
+    { key: 'systems' as TabKey,         label: 'Systems',           count: data.systems.length + data.thrusters.length },
+    { key: 'countermeasures' as TabKey, label: 'Countermeasures',   count: data.cmDecoys.length + data.cmNoises.length },
+    { key: 'modules' as TabKey,         label: 'Modules',           count: data.moduleEntries.length },
+    { key: 'paint' as TabKey,           label: 'Paint',             count: data.defaultPaint ? 1 : 0 },
+  ] as TabDef[]).filter(t => t.count > 0);
+
+  const [activeTab, setActiveTab] = useState<TabKey>(() => (allTabs[0]?.key ?? 'weapons') as TabKey);
+  const validTab: TabKey = allTabs.some(t => t.key === activeTab) ? activeTab : ((allTabs[0]?.key ?? 'weapons') as TabKey);
+
+  if (allTabs.length === 0) return null;
+
   return (
-    <div className="space-y-6">
+    <div>
+      {/* ── Tab bar ── */}
+      <div className="flex flex-wrap gap-1 border-b border-slate-800/60 pb-3 mb-5 overflow-x-auto">
+        {allTabs.map(tab => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key)}
+            className={[
+              'flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono-sc rounded border transition-colors whitespace-nowrap',
+              validTab === tab.key
+                ? 'bg-cyan-950/40 border-cyan-700/50 text-cyan-300'
+                : 'bg-slate-900/40 border-slate-800 text-slate-500 hover:border-slate-600 hover:text-slate-300',
+            ].join(' ')}
+          >
+            {tab.label}
+            <span className={`text-[8px] rounded px-1 py-0.5 leading-none font-bold ${
+              validTab === tab.key ? 'bg-cyan-800/50 text-cyan-400' : 'bg-slate-800 text-slate-600'
+            }`}>
+              {tab.count}
+            </span>
+          </button>
+        ))}
+      </div>
 
-      {/* ── Weapons ── */}
-      {(data.weapons.length > 0 || data.weapTurrets.length > 0) && (
-        <Section title="Weapons" accent="text-red-400" count={data.weapons.length + data.weapTurrets.length}>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-            {data.weapons.map((slot, i) => (
-              <WeaponCard key={i} portName={slot.portName} mount={slot.mount} weapon={slot.weapon} />
-            ))}
-            {data.weapTurrets.map((t, i) => (
-              <TurretCard key={`t${i}`} node={t} />
-            ))}
-          </div>
-        </Section>
-      )}
+      {/* ── Tab content ── */}
 
-      {/* ── Utilities ── */}
-      {data.utilities.length > 0 && (
-        <Section title="Utilities" accent="text-teal-400" count={data.utilities.length}>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-            {data.utilities.map((node, i) => {
-              // Un nœud turret utilitaire → TurretCard, sinon WeaponCard
-              if (node.port_type === 'Turret') {
-                return <TurretCard key={i} node={node} />;
-              }
-              // Gimbal/WeaponRack utilitaire → WeaponCard
-              const weapon = node.children?.find(c => c.component_type && ALL_WEAPON_TYPES.has(c.component_type)) ?? null;
-              return <WeaponCard key={i} portName={node.port_name} mount={node} weapon={weapon} />;
-            })}
-          </div>
-        </Section>
-      )}
-
-      {/* ── Missiles, Bombs and Torpedos ── */}
-      {data.racks.length > 0 && (
-        <Section title="Missiles, Bombs and Torpedos" accent="text-orange-400" count={data.racks.length}>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-            {data.racks.map((slot, i) => (
-              <RackCard key={i} rack={slot.rack} missiles={slot.missiles} />
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* ── Shields ── */}
-      {data.shields.length > 0 && (
-        <Section title="Shields" accent="text-blue-400" count={data.shields.length}>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-            {data.shields.map((node, i) => (
-              <ShieldCard key={i} node={node} />
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* ── Systems ── */}
-      {data.systems.length > 0 && (
-        <Section title="Systems" accent="text-violet-400" count={data.systems.length}>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-            {data.systems.map((item, i) => (
-              <SystemCard key={i} node={item.node} jumpModule={item.jumpModule} />
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* ── Thrusters ── */}
-      {data.thrusters.length > 0 && (
-        <Section title="Thrusters" accent="text-amber-400">
-          <div className="flex flex-wrap gap-2">
-            {data.thrusters.map((g, i) => (
-              <div key={i}
-                className="flex items-center gap-2 rounded-md border border-amber-900/30 bg-amber-950/10 px-3 py-1.5"
-              >
-                {g.size != null && <SizeBadge size={g.size} />}
-                <span className="text-xs font-mono-sc text-amber-300">{g.type}</span>
-                <span className="text-xs font-mono-sc text-slate-600">x{g.count}</span>
-                <span className="text-[10px] font-orbitron text-slate-500 tabular-nums">
-                  {toMN(g.totalThrust)} MN
-                </span>
+      {/* Weapons & Utility */}
+      {validTab === 'weapons' && (
+        <div className="space-y-5">
+          {(data.weapons.length > 0 || data.weapTurrets.length > 0) && (
+            <div>
+              <p className="text-[9px] font-mono-sc text-red-400/70 uppercase tracking-wider mb-3">Weapons</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                {data.weapons.map((slot, i) => (
+                  <WeaponCard key={i} portName={slot.portName} mount={slot.mount} weapon={slot.weapon} />
+                ))}
+                {data.weapTurrets.map((t, i) => (
+                  <TurretCard key={`t${i}`} node={t} />
+                ))}
               </div>
-            ))}
-          </div>
-        </Section>
-      )}
-
-      {/* ── Countermeasures ── */}
-      {(data.cmDecoys.length > 0 || data.cmNoises.length > 0) && (
-        <Section title="Countermeasures" accent="text-teal-400">
-          <div className="flex flex-wrap gap-2">
-            {[...data.cmDecoys, ...data.cmNoises].map((cm, i) => (
-              <div key={i}
-                className="flex items-center gap-2 rounded-md border border-teal-900/30 bg-teal-950/10 px-3 py-1.5"
-              >
-                <span className="text-xs text-slate-300">{cm.name}</span>
-                <span className="text-xs font-mono-sc text-teal-600">x{cm.count}</span>
-                {cm.ammoPerUnit != null && (
-                  <span className="text-[9px] font-mono-sc text-slate-500 tabular-nums">{cm.ammoPerUnit * cm.count} shots</span>
-                )}
+            </div>
+          )}
+          {data.utilities.length > 0 && (
+            <div>
+              <p className="text-[9px] font-mono-sc text-teal-400/70 uppercase tracking-wider mb-3">Utility</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                {data.utilities.map((node, i) => {
+                  if (node.port_type === 'Turret') return <TurretCard key={i} node={node} />;
+                  const weapon = node.children?.find(c => c.component_type && ALL_WEAPON_TYPES.has(c.component_type)) ?? null;
+                  return <WeaponCard key={i} portName={node.port_name} mount={node} weapon={weapon} />;
+                })}
               </div>
-            ))}
-          </div>
-        </Section>
+            </div>
+          )}
+        </div>
       )}
 
-      {/* ── Modules (baies modulaires — Retaliator, Apollo) ── */}
-      {data.moduleEntries.length > 0 && (
-        <Section title="Modules" accent="text-purple-400" count={data.moduleEntries.length}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {data.moduleEntries.map((entry, i) => (
-              <ModuleCard key={i} entry={entry} onModuleChange={onModuleChange} />
-            ))}
-          </div>
-        </Section>
+      {/* Ordnance */}
+      {validTab === 'ordnance' && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+          {data.racks.map((slot, i) => (
+            <RackCard key={i} rack={slot.rack} missiles={slot.missiles} />
+          ))}
+        </div>
       )}
 
-      {/* ── Default Paint ── */}
-      {data.defaultPaint && (
-        <Section title="Default Paint" accent="text-slate-500">
-          <span className="text-sm text-slate-400">{data.defaultPaint}</span>
-        </Section>
+      {/* Shields */}
+      {validTab === 'shields' && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+          {data.shields.map((node, i) => (
+            <ShieldCard key={i} node={node} />
+          ))}
+        </div>
       )}
 
+      {/* Systems + Thrusters */}
+      {validTab === 'systems' && (
+        <div className="space-y-5">
+          {data.systems.length > 0 && (
+            <div>
+              <p className="text-[9px] font-mono-sc text-violet-400/70 uppercase tracking-wider mb-3">Systems</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                {data.systems.map((item, i) => (
+                  <SystemCard key={i} node={item.node} jumpModule={item.jumpModule} />
+                ))}
+              </div>
+            </div>
+          )}
+          {data.thrusters.length > 0 && (
+            <div>
+              <p className="text-[9px] font-mono-sc text-amber-400/70 uppercase tracking-wider mb-3">Thrusters</p>
+              <div className="flex flex-wrap gap-2">
+                {data.thrusters.map((g, i) => (
+                  <div key={i} className="flex items-center gap-2 rounded-md border border-amber-900/30 bg-amber-950/10 px-3 py-1.5">
+                    {g.size != null && <SizeBadge size={g.size} />}
+                    <span className="text-xs font-mono-sc text-amber-300">{g.type}</span>
+                    <span className="text-xs font-mono-sc text-slate-600">x{g.count}</span>
+                    <span className="text-[10px] font-orbitron text-slate-500 tabular-nums">{toMN(g.totalThrust)} MN</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Countermeasures */}
+      {validTab === 'countermeasures' && (
+        <div className="flex flex-wrap gap-2">
+          {[...data.cmDecoys, ...data.cmNoises].map((cm, i) => (
+            <div key={i} className="flex items-center gap-2 rounded-md border border-teal-900/30 bg-teal-950/10 px-3 py-1.5">
+              <span className="text-xs text-slate-300">{cm.name}</span>
+              <span className="text-xs font-mono-sc text-teal-600">x{cm.count}</span>
+              {cm.ammoPerUnit != null && (
+                <span className="text-[9px] font-mono-sc text-slate-500 tabular-nums">{cm.ammoPerUnit * cm.count} shots</span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Modules */}
+      {validTab === 'modules' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {data.moduleEntries.map((entry, i) => (
+            <ModuleCard key={i} entry={entry} onModuleChange={onModuleChange} />
+          ))}
+        </div>
+      )}
+
+      {/* Paint */}
+      {validTab === 'paint' && (
+        <p className="text-sm text-slate-400">{data.defaultPaint}</p>
+      )}
     </div>
   );
 }
