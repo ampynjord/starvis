@@ -4,5 +4,5 @@
 
 ALTER TABLE ship_modules
   ADD COLUMN module_tier TINYINT UNSIGNED DEFAULT NULL
-    COMMENT 'Tier number (1/2/3) for Apollo-style modules; NULL for others'
+    COMMENT 'Tier number (1/2/3) for Apollo-style modules — NULL for others'
   AFTER module_uuid;

@@ -109,11 +109,26 @@ async function runVersionedMigrations(conn: PoolConnection): Promise<void> {
 
     logger.info(`Running migration: ${file}`, { module: 'schema' });
     const sql = readFileSync(path.join(migrationsDir, file), 'utf-8');
-    const statements = sql
-      .replace(/--.*$/gm, '')
-      .split(';')
-      .map((s) => s.trim())
-      .filter((s) => s.length > 5);
+    // Strip -- line comments first, then split on ; respecting single-quoted strings
+    // (naive split(';') breaks on COMMENTs like 'text; more text')
+    const noComments = sql.replace(/--[^\n]*$/gm, '');
+    const statements: string[] = [];
+    let current = '';
+    let inString = false;
+    for (const ch of noComments) {
+      if (ch === "'") {
+        inString = !inString;
+        current += ch;
+      } else if (ch === ';' && !inString) {
+        const s = current.trim();
+        if (s.length > 5) statements.push(s);
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    const last = current.trim();
+    if (last.length > 5) statements.push(last);
 
     for (const stmt of statements) {
       try {
