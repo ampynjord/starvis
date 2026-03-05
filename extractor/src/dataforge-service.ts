@@ -1835,4 +1835,22 @@ export class DataForgeService implements DataForgeContext {
   extractItems(): { items: any[]; commodities: any[] } {
     return _extractItems(this);
   }
+
+  /**
+   * Return all EntityClassDefinition record names that start with `prefix` (case-insensitive).
+   * Used to enumerate module variants for modular ships (Retaliator, Apollo).
+   */
+  findEntityClassNamesByPrefix(prefix: string): string[] {
+    if (!this.dfData) return [];
+    const entityClassIdx = this.dfData.structDefs.findIndex((s) => s.name === 'EntityClassDefinition');
+    if (entityClassIdx === -1) return [];
+    const lprefix = prefix.toLowerCase();
+    const result: string[] = [];
+    for (const r of this.dfData.records) {
+      if (r.structIndex !== entityClassIdx) continue;
+      const name = (r.name ?? '').replace('EntityClassDefinition.', '');
+      if (name.toLowerCase().startsWith(lprefix)) result.push(name);
+    }
+    return result;
+  }
 }

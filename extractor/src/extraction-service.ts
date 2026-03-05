@@ -831,11 +831,99 @@ export class ExtractionService {
     }
   }
 
+  // Config-driven modular ship slot definitions.
+  // Each key is the ship's DataForge class_name.
+  // Each slot entry defines the port, display, prefix to search for all module options,
+  // the substring identifying the default module, and optional tier extraction.
+  private static readonly MODULAR_SHIP_CONFIGS: Record<
+    string,
+    Array<{
+      slotName: string;
+      slotType: string;
+      modulePrefix: string;
+      defaultContains: string;
+      tierExtract?: boolean;
+    }>
+  > = {
+    AEGS_Retaliator: [
+      { slotName: 'hardpoint_front_module', slotType: 'front', modulePrefix: 'AEGS_Retaliator_Module_Front_', defaultContains: 'Base' },
+      { slotName: 'hardpoint_rear_module', slotType: 'rear', modulePrefix: 'AEGS_Retaliator_Module_Rear_', defaultContains: 'Base' },
+    ],
+    RSI_Apollo_Medivac: [
+      { slotName: 'hardpoint_modular_room_left', slotType: 'left', modulePrefix: 'RSI_Apollo_Module_Left_Tier_', defaultContains: 'Tier_3', tierExtract: true },
+      { slotName: 'hardpoint_modular_room_right', slotType: 'right', modulePrefix: 'RSI_Apollo_Module_Right_Tier_', defaultContains: 'Tier_3', tierExtract: true },
+    ],
+    RSI_Apollo_Triage: [
+      { slotName: 'hardpoint_modular_room_left', slotType: 'left', modulePrefix: 'RSI_Apollo_Module_Left_Tier_', defaultContains: 'Tier_1', tierExtract: true },
+      { slotName: 'hardpoint_modular_room_right', slotType: 'right', modulePrefix: 'RSI_Apollo_Module_Right_Tier_', defaultContains: 'Tier_1', tierExtract: true },
+    ],
+  };
+
+  private static formatModuleName(className: string): string {
+    // e.g. "AEGS_Retaliator_Module_Front_Base" → "Front Base"
+    //      "RSI_Apollo_Module_Left_Tier_3" → "Left Tier 3"
+    return className
+      .replace(/^[A-Z]{2,5}_/, '')  // Strip manufacturer prefix
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (c) => c.toUpperCase())
+      .trim();
+  }
+
+  private static extractTier(className: string): number | null {
+    const m = className.match(/Tier_?(\d+)$/i);
+    return m ? parseInt(m[1], 10) : null;
+  }
+
   private async detectAndSaveModules(conn: PoolConnection, fullData: any, shipClassName: string): Promise<void> {
     if (!fullData?.ref) return;
 
+    const config = ExtractionService.MODULAR_SHIP_CONFIGS[shipClassName];
+
+    if (config) {
+      // Config-driven path: enumerate all module alternatives via DataForge prefix search
+      await conn.execute('DELETE FROM ship_modules WHERE ship_uuid = ?', [fullData.ref]);
+
+      for (const slotDef of config) {
+        const allModuleNames = this.dfService.findEntityClassNamesByPrefix(slotDef.modulePrefix);
+        if (allModuleNames.length === 0) {
+          logger.warn(`No modules found for prefix "${slotDef.modulePrefix}" on ${shipClassName}`);
+          continue;
+        }
+
+        const slotDisplay = slotDef.slotName
+          .replace(/hardpoint_/i, '')
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, (c) => c.toUpperCase())
+          .trim();
+
+        for (const moduleName of allModuleNames) {
+          const isDefault = moduleName.includes(slotDef.defaultContains);
+          const moduleDisplayName = ExtractionService.formatModuleName(moduleName);
+          const tier = slotDef.tierExtract ? ExtractionService.extractTier(moduleName) : null;
+
+          try {
+            await conn.execute(
+              `INSERT INTO ship_modules
+                 (ship_uuid, slot_name, slot_display_name, slot_type, module_class_name, module_name, module_tier, is_default)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+               ON DUPLICATE KEY UPDATE
+                 slot_display_name = VALUES(slot_display_name),
+                 slot_type        = VALUES(slot_type),
+                 module_name      = VALUES(module_name),
+                 module_tier      = VALUES(module_tier),
+                 is_default       = VALUES(is_default)`,
+              [fullData.ref, slotDef.slotName, slotDisplay, slotDef.slotType, moduleName, moduleDisplayName, tier, isDefault ? 1 : 0],
+            );
+          } catch (e: unknown) {
+            logger.error(`Module ${moduleName} (slot ${slotDef.slotName}) on ${shipClassName}: ${e instanceof Error ? e.message : String(e)}`);
+          }
+        }
+      }
+      return;
+    }
+
+    // Generic fallback path: save only the default module from the current loadout
     const MODULE_PATTERNS = [/module/i, /modular/i, /compartment/i, /bay_section/i];
-    // Noise slot patterns — these contain "module" but are not real swappable modules
     const NOISE_SLOT_PATTERNS = [
       /cargogrid_module/i,
       /pdc_aimodule/i,
@@ -849,13 +937,11 @@ export class ExtractionService {
     const loadout = this.dfService.extractVehicleLoadout(shipClassName);
     if (!loadout) return;
 
-    // Extract ship short name to clean module names (e.g., "Retaliator" from "AEGS_Retaliator")
     const shipShort = shipClassName.replace(/^[A-Z]{2,5}_/, '').replace(/_/g, ' ');
 
     for (const port of loadout) {
       const isModulePort = MODULE_PATTERNS.some((rx) => rx.test(port.portName));
       if (!isModulePort || !port.componentClassName) continue;
-      // Skip noise modules (cargo grids, AI modules, dashboards, seats, nacelles, etc.)
       const isNoise = NOISE_SLOT_PATTERNS.some((rx) => rx.test(port.portName));
       if (isNoise) continue;
 
@@ -870,7 +956,6 @@ export class ExtractionService {
         .replace(/_/g, ' ')
         .replace(/\b\w/g, (c) => c.toUpperCase())
         .trim();
-      // Remove ship name prefix from module name for cleaner display
       const shipShortTitle = shipShort.replace(/\b\w/g, (c) => c.toUpperCase());
       if (moduleName.startsWith(shipShortTitle)) {
         moduleName = moduleName.slice(shipShortTitle.length).trim();
@@ -880,7 +965,10 @@ export class ExtractionService {
       try {
         await conn.execute(
           `INSERT INTO ship_modules (ship_uuid, slot_name, slot_display_name, module_class_name, module_name, is_default)
-           VALUES (?, ?, ?, ?, ?, TRUE)`,
+           VALUES (?, ?, ?, ?, ?, TRUE)
+           ON DUPLICATE KEY UPDATE
+             slot_display_name = VALUES(slot_display_name),
+             module_name       = VALUES(module_name)`,
           [fullData.ref, port.portName, slotDisplay, port.componentClassName, moduleName],
         );
       } catch (e: unknown) {

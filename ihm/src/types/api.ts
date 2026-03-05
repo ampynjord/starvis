@@ -318,3 +318,17 @@ export interface ShipComparison {
   comparison: Record<string, ShipDelta>;
   full: { ship1: Ship; ship2: Ship };
 }
+
+// ─── Ship Modules ─────────────────────────────────────────────────────────────
+export interface ShipModule {
+  id: number;
+  ship_uuid: string;
+  slot_name: string;
+  slot_display_name: string | null;
+  slot_type: string | null;
+  module_class_name: string;
+  module_name: string | null;
+  module_tier: number | null;
+  module_uuid: string | null;
+  is_default: boolean;
+}

@@ -376,13 +376,16 @@ CREATE TABLE IF NOT EXISTS ships_loadouts (
 CREATE TABLE IF NOT EXISTS ship_modules (
   id INT AUTO_INCREMENT PRIMARY KEY,
   ship_uuid CHAR(36) NOT NULL COMMENT 'FK to ships.uuid — parent ship',
-  slot_name VARCHAR(100) NOT NULL COMMENT 'e.g. module_front, module_rear',
+  slot_name VARCHAR(100) NOT NULL COMMENT 'e.g. hardpoint_front_module, hardpoint_modular_room_left',
   slot_display_name VARCHAR(100) COMMENT 'Human-readable slot name',
+  slot_type VARCHAR(20) DEFAULT NULL COMMENT 'front/rear (Retaliator) or left/right (Apollo)',
   module_class_name VARCHAR(255) NOT NULL COMMENT 'DataForge className of the module entity',
   module_name VARCHAR(255) COMMENT 'Display name of the module',
   module_uuid CHAR(36) COMMENT 'DataForge UUID of the module',
+  module_tier TINYINT UNSIGNED DEFAULT NULL COMMENT 'Tier number (1/2/3) for Apollo-style modules; NULL for others',
   is_default BOOLEAN DEFAULT FALSE COMMENT 'Whether this is the default module for this slot',
-  
+
+  UNIQUE KEY uq_ship_slot_module (ship_uuid, slot_name, module_class_name),
   INDEX idx_ship (ship_uuid),
   INDEX idx_module_class (module_class_name),
   CONSTRAINT fk_module_ship FOREIGN KEY (ship_uuid) REFERENCES ships(uuid) ON DELETE CASCADE
