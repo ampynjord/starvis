@@ -74,3 +74,6 @@ coverage/
 *.temp
 .cache/
 backups/
+
+# Docs
+docs/
