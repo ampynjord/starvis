@@ -4,6 +4,9 @@
  *
  * Extraction logic (components, shops, paints) is delegated to dedicated modules.
  */
+
+import { readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { extractAllComponents as _extractAllComponents } from './component-extractor.js';
 import { type CryXmlNode, isCryXmlB, parseCryXml } from './cryxml-parser.js';
 import {
@@ -17,8 +20,6 @@ import {
 import { type DataForgeContext, resolveLocKey } from './dataforge-utils.js';
 import { extractItems as _extractItems } from './item-extractor.js';
 import { LoadoutParser, type LoadoutPortEntry } from './loadout-parser.js';
-import { readFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
 import logger from './logger.js';
 import { P4KProvider } from './p4k-provider.js';
 import { extractPaints as _extractPaints, extractShops as _extractShops } from './shop-paint-extractor.js';
@@ -86,60 +87,61 @@ export class DataForgeService implements DataForgeContext {
     }
 
     // Try to read the SC game version from the P4K
-    if (!this.scVersion) try {
-      // 1. Known fixed paths
-      const versionPaths = [
-        'build_manifest.id',
-        'Data\\build_manifest.id',
-        'Data/build_manifest.id',
-        'c_version.cfg',
-        'Data\\c_version.cfg',
-        'Data/c_version.cfg',
-        'version.cfg',
-        'Data\\version.cfg',
-        'Data/version.cfg',
-        'Data\\Libs\\Config\\game.ini',
-        'Data/Libs/Config/game.ini',
-        'Data\\Scripts\\AutoExec.cfg',
-        'Data/Scripts/AutoExec.cfg',
-      ];
-      const parseVersionBuf = (raw: string, vPath: string): boolean => {
-        const match = raw.match(/(?:^|\b)(\d+\.\d+(?:\.\d+)*(?:-[A-Z]+\.\d+)?)/);
-        if (match) {
-          this.scVersion = match[1];
-          logger.info(`SC game version: ${this.scVersion} (from ${vPath})`, { module: 'dataforge' });
-          return true;
-        }
-        if (raw.length > 0 && raw.length <= 48) {
-          this.scVersion = raw.slice(0, 32);
-          logger.info(`SC game version (raw): ${this.scVersion} (from ${vPath})`, { module: 'dataforge' });
-          return true;
-        }
-        return false;
-      };
-      for (const vPath of versionPaths) {
-        const vEntry = await this.provider.getEntry(vPath);
-        if (vEntry) {
-          const raw = (await this.provider.readFileFromEntry(vEntry)).toString('utf8').trim();
-          if (parseVersionBuf(raw, vPath)) break;
-        }
-      }
-      // 2. If still no version, search P4K for any manifest/version file
-      if (!this.scVersion) {
-        const candidates = await this.provider.findFiles(/(?:build_manifest|version_info|version\.cfg|game_version)/i, 20);
-        for (const entry of candidates) {
-          if (entry.uncompressedSize > 1024) continue; // skip large files
-          try {
-            const raw = (await this.provider.readFileFromEntry(entry)).toString('utf8').trim();
-            if (parseVersionBuf(raw, entry.fileName)) break;
-          } catch (_e) {
-            /* skip non-text files */
+    if (!this.scVersion)
+      try {
+        // 1. Known fixed paths
+        const versionPaths = [
+          'build_manifest.id',
+          'Data\\build_manifest.id',
+          'Data/build_manifest.id',
+          'c_version.cfg',
+          'Data\\c_version.cfg',
+          'Data/c_version.cfg',
+          'version.cfg',
+          'Data\\version.cfg',
+          'Data/version.cfg',
+          'Data\\Libs\\Config\\game.ini',
+          'Data/Libs/Config/game.ini',
+          'Data\\Scripts\\AutoExec.cfg',
+          'Data/Scripts/AutoExec.cfg',
+        ];
+        const parseVersionBuf = (raw: string, vPath: string): boolean => {
+          const match = raw.match(/(?:^|\b)(\d+\.\d+(?:\.\d+)*(?:-[A-Z]+\.\d+)?)/);
+          if (match) {
+            this.scVersion = match[1];
+            logger.info(`SC game version: ${this.scVersion} (from ${vPath})`, { module: 'dataforge' });
+            return true;
+          }
+          if (raw.length > 0 && raw.length <= 48) {
+            this.scVersion = raw.slice(0, 32);
+            logger.info(`SC game version (raw): ${this.scVersion} (from ${vPath})`, { module: 'dataforge' });
+            return true;
+          }
+          return false;
+        };
+        for (const vPath of versionPaths) {
+          const vEntry = await this.provider.getEntry(vPath);
+          if (vEntry) {
+            const raw = (await this.provider.readFileFromEntry(vEntry)).toString('utf8').trim();
+            if (parseVersionBuf(raw, vPath)) break;
           }
         }
+        // 2. If still no version, search P4K for any manifest/version file
+        if (!this.scVersion) {
+          const candidates = await this.provider.findFiles(/(?:build_manifest|version_info|version\.cfg|game_version)/i, 20);
+          for (const entry of candidates) {
+            if (entry.uncompressedSize > 1024) continue; // skip large files
+            try {
+              const raw = (await this.provider.readFileFromEntry(entry)).toString('utf8').trim();
+              if (parseVersionBuf(raw, entry.fileName)) break;
+            } catch (_e) {
+              /* skip non-text files */
+            }
+          }
+        }
+      } catch (_err) {
+        logger.warn('Could not read SC game version from P4K', { module: 'dataforge' });
       }
-    } catch (_err) {
-      logger.warn('Could not read SC game version from P4K', { module: 'dataforge' });
-    }
 
     const dcbEntry = await this.provider.getEntry('Data\\Game2.dcb');
     if (!dcbEntry) throw new Error('Game2.dcb not found');
