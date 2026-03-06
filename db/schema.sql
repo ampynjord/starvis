@@ -1,13 +1,15 @@
 -- ============================================================
 -- STARVIS v2.0 - DATABASE SCHEMA
 -- Last updated: March 2026
--- 
+--
 -- Tables:
 --   ship_matrix       → Raw data from RSI Ship Matrix API (external)
 --   manufacturers     → All manufacturers from DataForge (ships + components)
 --   ships             → Ships extracted from P4K/DataForge (game data only)
 --   components        → All SCItem components from DataForge (ship + vehicle)
---   ships_loadouts    → Default loadout per ship (ports + equipped components)
+--   ship_loadouts     → Default loadout per ship (ports + equipped components)
+--   ship_modules      → Modular compartments (Retaliator, Apollo, Caterpillar…)
+--   ship_paints       → Available paints/liveries per ship
 --   items             → FPS weapons, armor, clothing, attachments, consumables
 --   commodities       → Tradeable/mineable goods (metals, gas, food, etc.)
 --   shops             → In-game shops / vendor locations
@@ -338,10 +340,10 @@ CREATE TABLE IF NOT EXISTS components (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ====================
--- SHIPS_LOADOUTS - Default loadout per ship (from DataForge entity loadout)
+-- SHIP_LOADOUTS - Default loadout per ship (from DataForge entity loadout)
 -- Each row = one port on a ship with its default equipped component
 -- ====================
-CREATE TABLE IF NOT EXISTS ships_loadouts (
+CREATE TABLE IF NOT EXISTS ship_loadouts (
   id INT AUTO_INCREMENT PRIMARY KEY,
   ship_uuid CHAR(36) NOT NULL COMMENT 'FK to ships.uuid',
   
@@ -474,6 +476,54 @@ CREATE TABLE IF NOT EXISTS ship_paints (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ====================
+-- SHOPS - In-game shops / vendor locations
+-- ====================
+CREATE TABLE IF NOT EXISTS shops (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  location VARCHAR(255) COMMENT 'Display location name (e.g. Port Olisar, Lorville)',
+  `system` VARCHAR(50) COMMENT 'Star system (Stanton, Pyro, Nyx)',
+  planet_moon VARCHAR(100) COMMENT 'Planet or moon (e.g. Crusader, Hurston)',
+  city VARCHAR(100) COMMENT 'City or station name',
+  shop_type VARCHAR(50) COMMENT 'Weapon, Ship, Component, etc.',
+  class_name VARCHAR(255) UNIQUE NOT NULL,
+  location_id INT NULL COMMENT 'FK to locations.id',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  INDEX idx_location (location),
+  INDEX idx_planet_moon (planet_moon),
+  INDEX idx_type (shop_type),
+  INDEX idx_system (`system`),
+  INDEX idx_city (city),
+  INDEX idx_location_id (location_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ====================
+-- SHOP_INVENTORY - Items available for purchase / rental in shops
+-- ====================
+CREATE TABLE IF NOT EXISTS shop_inventory (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  shop_id INT NOT NULL,
+  component_uuid CHAR(36) COMMENT 'FK to components.uuid if resolved',
+  component_class_name VARCHAR(255) NOT NULL,
+  base_price DECIMAL(12,2),
+  rental_price_1d DECIMAL(12,2),
+  rental_price_3d DECIMAL(12,2),
+  rental_price_7d DECIMAL(12,2),
+  rental_price_30d DECIMAL(12,2),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  INDEX idx_shop (shop_id),
+  INDEX idx_component (component_uuid),
+  INDEX idx_class_name (component_class_name),
+  UNIQUE KEY uk_shop_component (shop_id, component_class_name),
+  CONSTRAINT fk_inventory_shop FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
+  CONSTRAINT fk_inventory_component FOREIGN KEY (component_uuid) REFERENCES components(uuid) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ====================
 -- EXTRACTION_LOG - Version history for game data extractions
 -- (must come before changelog which references it via FK)
 -- ====================
@@ -517,55 +567,6 @@ CREATE TABLE IF NOT EXISTS changelog (
   INDEX idx_change_type (change_type),
   INDEX idx_created (created_at),
   CONSTRAINT fk_changelog_extraction FOREIGN KEY (extraction_id) REFERENCES extraction_log(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ====================
--- SHOPS - In-game shops / vendor locations
--- ====================
-CREATE TABLE IF NOT EXISTS shops (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  location VARCHAR(255) COMMENT 'e.g. Port Olisar, Lorville',
-  parent_location VARCHAR(255) COMMENT 'e.g. Crusader, Hurston',
-  `system` VARCHAR(50) COMMENT 'Star system (Stanton, Pyro, Nyx)',
-  planet_moon VARCHAR(100) COMMENT 'Planet or moon name',
-  city VARCHAR(100) COMMENT 'City or station name',
-  shop_type VARCHAR(50) COMMENT 'Weapon, Ship, Component, etc.',
-  class_name VARCHAR(255) UNIQUE NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  
-  INDEX idx_location (location),
-  INDEX idx_type (shop_type),
-  INDEX idx_system (`system`),
-  INDEX idx_city (city)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ====================
--- SHOP_INVENTORY - Items available for purchase / rental in shops
--- ====================
-CREATE TABLE IF NOT EXISTS shop_inventory (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  shop_id INT NOT NULL,
-  component_uuid CHAR(36) COMMENT 'FK to components.uuid if resolved',
-  item_uuid CHAR(36) COMMENT 'FK to items.uuid if FPS item',
-  component_class_name VARCHAR(255) NOT NULL,
-  base_price DECIMAL(12,2),
-  rental_price_1d DECIMAL(12,2),
-  rental_price_3d DECIMAL(12,2),
-  rental_price_7d DECIMAL(12,2),
-  rental_price_30d DECIMAL(12,2),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  
-  INDEX idx_shop (shop_id),
-  INDEX idx_component (component_uuid),
-  INDEX idx_item (item_uuid),
-  INDEX idx_class_name (component_class_name),
-  UNIQUE KEY uk_shop_component (shop_id, component_class_name),
-  CONSTRAINT fk_inventory_shop FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
-  CONSTRAINT fk_inventory_component FOREIGN KEY (component_uuid) REFERENCES components(uuid) ON DELETE SET NULL,
-  CONSTRAINT fk_inventory_item FOREIGN KEY (item_uuid) REFERENCES items(uuid) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ====================

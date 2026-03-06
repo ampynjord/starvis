@@ -12,14 +12,14 @@ export class ShopService {
     const params: (string | number)[] = [];
 
     if (opts.search) {
-      where.push('(name LIKE ? OR location LIKE ? OR parent_location LIKE ?)');
+      where.push('(name LIKE ? OR location LIKE ? OR planet_moon LIKE ? OR city LIKE ?)');
       const t = `%${opts.search}%`;
-      params.push(t, t, t);
+      params.push(t, t, t, t);
     }
     if (opts.location) {
-      where.push('(location LIKE ? OR parent_location LIKE ?)');
+      where.push('(location LIKE ? OR planet_moon LIKE ? OR city LIKE ?)');
       const t = `%${opts.location}%`;
-      params.push(t, t);
+      params.push(t, t, t);
     }
     if (opts.type) {
       where.push('shop_type = ?');
