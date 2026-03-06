@@ -55,8 +55,10 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-  return res.json() as Promise<T>;
+  const json = ((await res.json().catch(() => null)) as Record<string, unknown> | null) ?? {};
+  if (!res.ok) throw new Error(String(json.error ?? '') || `HTTP ${res.status}: ${res.statusText}`);
+  if ('success' in json && 'data' in json) return json.data as T;
+  return json as unknown as T;
 }
 
 // ─── Stats / Version ─────────────────────────────────────────────────────────
