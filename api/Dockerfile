@@ -1,7 +1,7 @@
 # ==============================================================
 # STARVIS API — Multi-stage Dockerfile
 # Build context: project root (for access to db/)
-# Stages: deps → build → production
+# Stages: deps → build → development (hot reload) → production
 # ==============================================================
 
 # ---- Stage 1: base ----
@@ -24,7 +24,14 @@ COPY db/ ./db/
 # Type-check only — tsx runs TS directly, no emit needed
 RUN npx tsc --noEmit
 
-# ---- Stage 4: production ----
+# ---- Stage 4: development (hot reload) ----
+# Source code est monté en volume depuis l'hôte (docker-compose.dev.yml)
+# tsx watch redémarre l'API à chaque modification de fichier source
+FROM deps AS development
+EXPOSE 3000
+CMD ["npm", "run", "dev"]
+
+# ---- Stage 5: production ----
 FROM base AS production
 
 # Install production deps (tsx is now in dependencies)
