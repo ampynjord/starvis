@@ -66,12 +66,11 @@ export class ShipMatrixService {
             const media = ship.media?.[0] || {};
             const images = media.images || {};
 
-            placeholders.push(`(${Array(34).fill('?').join(',')})`);
+            placeholders.push(`(${Array(31).fill('?').join(',')})`);
             values.push(
               ship.id,
               ship.name,
               ship.chassis_id || null,
-              mfg.id || null,
               mfg.code || null,
               mfg.name || null,
               ship.focus || null,
@@ -108,8 +107,6 @@ export class ShipMatrixService {
                   : `https://robertsspaceindustries.com${images.store_large}`
                 : null,
               ship.compiled ? JSON.stringify(ship.compiled) : null,
-              ship.time_modified || null,
-              ship['time_modified.unfiltered'] ? new Date(ship['time_modified.unfiltered']) : null,
             );
             stats.synced++;
           } catch (e: unknown) {
@@ -122,17 +119,17 @@ export class ShipMatrixService {
           await conn.execute(
             `INSERT INTO ship_matrix (
               id, name, chassis_id,
-              manufacturer_id, manufacturer_code, manufacturer_name,
+              manufacturer_code, manufacturer_name,
               focus, type, description, production_status, production_note, size, url,
               length, beam, height, mass, cargocapacity, min_crew, max_crew,
               scm_speed, afterburner_speed, pitch_max, yaw_max, roll_max,
               xaxis_acceleration, yaxis_acceleration, zaxis_acceleration,
               media_source_url, media_store_small, media_store_large,
-              compiled, time_modified, time_modified_unfiltered
+              compiled
             ) VALUES ${placeholders.join(',')} AS new
             ON DUPLICATE KEY UPDATE
               name=new.name, chassis_id=new.chassis_id,
-              manufacturer_id=new.manufacturer_id, manufacturer_code=new.manufacturer_code,
+              manufacturer_code=new.manufacturer_code,
               manufacturer_name=new.manufacturer_name,
               focus=new.focus, type=new.type, description=new.description,
               production_status=new.production_status, production_note=new.production_note,
@@ -146,8 +143,7 @@ export class ShipMatrixService {
               zaxis_acceleration=new.zaxis_acceleration,
               media_source_url=new.media_source_url, media_store_small=new.media_store_small,
               media_store_large=new.media_store_large,
-              compiled=new.compiled, time_modified=new.time_modified,
-              time_modified_unfiltered=new.time_modified_unfiltered,
+              compiled=new.compiled,
               synced_at=CURRENT_TIMESTAMP`,
             values,
           );

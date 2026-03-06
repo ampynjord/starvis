@@ -36,7 +36,6 @@ export const shipMatrix = mysqlTable(
     id: int('id').primaryKey(),
     name: varchar('name', { length: 255 }).notNull(),
     chassisId: int('chassis_id'),
-    manufacturerId: int('manufacturer_id'),
     manufacturerCode: varchar('manufacturer_code', { length: 10 }),
     manufacturerName: varchar('manufacturer_name', { length: 100 }),
     focus: varchar('focus', { length: 255 }),
@@ -65,8 +64,6 @@ export const shipMatrix = mysqlTable(
     mediaStoreSmall: text('media_store_small'),
     mediaStoreLarge: text('media_store_large'),
     compiled: json('compiled'),
-    timeModified: varchar('time_modified', { length: 100 }),
-    timeModifiedUnfiltered: timestamp('time_modified_unfiltered'),
     syncedAt: timestamp('synced_at').defaultNow(),
   },
   (t) => [
@@ -108,9 +105,7 @@ export const ships = mysqlTable(
     // Vehicle params
     role: varchar('role', { length: 100 }),
     career: varchar('career', { length: 100 }),
-    dogFightEnabled: boolean('dog_fight_enabled').default(true),
     crewSize: int('crew_size').default(1),
-    vehicleDefinition: varchar('vehicle_definition', { length: 255 }),
 
     // Dimensions
     sizeX: decimal('size_x', { precision: 10, scale: 2 }),
@@ -160,8 +155,6 @@ export const ships = mysqlTable(
 
     // Metadata
     shortName: varchar('short_name', { length: 255 }),
-    description: text('description'),
-    shipGrade: varchar('ship_grade', { length: 10 }),
     cargoCapacity: decimal('cargo_capacity', { precision: 10, scale: 2 }),
     missileDamageTotal: decimal('missile_damage_total', { precision: 10, scale: 2 }),
     weaponDamageTotal: decimal('weapon_damage_total', { precision: 10, scale: 2 }),
@@ -319,15 +312,14 @@ export const components = mysqlTable(
   ],
 );
 
-// ─── ships_loadouts ──────────────────────────────────────────────────────────
+// ─── ship_loadouts ───────────────────────────────────────────────────────────
 
 export const shipsLoadouts = mysqlTable(
-  'ships_loadouts',
+  'ship_loadouts',
   {
     id: int('id').autoincrement().primaryKey(),
     shipUuid: char('ship_uuid', { length: 36 }).notNull(),
     portName: varchar('port_name', { length: 100 }).notNull(),
-    portDisplayName: varchar('port_display_name', { length: 100 }),
     portMinSize: tinyint('port_min_size', { unsigned: true }),
     portMaxSize: tinyint('port_max_size', { unsigned: true }),
     portEditable: boolean('port_editable').default(true),
@@ -356,7 +348,6 @@ export const shipModules = mysqlTable(
     slotType: varchar('slot_type', { length: 20 }),
     moduleClassName: varchar('module_class_name', { length: 255 }).notNull(),
     moduleName: varchar('module_name', { length: 255 }),
-    moduleUuid: char('module_uuid', { length: 36 }),
     moduleTier: tinyint('module_tier', { unsigned: true }),
     isDefault: boolean('is_default').default(false),
     loadoutJson: json('loadout_json'),
@@ -433,7 +424,6 @@ export const shops = mysqlTable(
     id: int('id').autoincrement().primaryKey(),
     name: varchar('name', { length: 255 }).notNull(),
     location: varchar('location', { length: 255 }),
-    parentLocation: varchar('parent_location', { length: 255 }),
     system: varchar('system', { length: 50 }),
     planetMoon: varchar('planet_moon', { length: 100 }),
     city: varchar('city', { length: 100 }),
@@ -459,7 +449,6 @@ export const shopInventory = mysqlTable(
     id: int('id').autoincrement().primaryKey(),
     shopId: int('shop_id').notNull(),
     componentUuid: char('component_uuid', { length: 36 }),
-    itemUuid: char('item_uuid', { length: 36 }),
     componentClassName: varchar('component_class_name', { length: 255 }).notNull(),
     basePrice: decimal('base_price', { precision: 12, scale: 2 }),
     rentalPrice1d: decimal('rental_price_1d', { precision: 12, scale: 2 }),
@@ -472,7 +461,6 @@ export const shopInventory = mysqlTable(
   (t) => [
     index('idx_shop').on(t.shopId),
     index('idx_component').on(t.componentUuid),
-    index('idx_item').on(t.itemUuid),
     index('idx_class_name').on(t.componentClassName),
   ],
 );
