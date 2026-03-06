@@ -384,8 +384,8 @@ function HardpointRow({
     ? `${hp.mount_type}${hp.mount_size ? ` S${hp.mount_size}` : ''}`
     : null;
 
-  // Cas 1: composant direct
-  if (!isMounted && hp.component) {
+  // Cas 1: composant direct (ex: Shield, PowerPlant — sans enfants)
+  if (!isMounted && hp.component && hp.items.length === 0) {
     return (
       <ComponentRow
         comp={hp.component}
@@ -394,6 +394,35 @@ function HardpointRow({
         onOpenPicker={onOpenPicker}
         depth={0}
       />
+    );
+  }
+
+  // Cas 1b: composant direct + sous-slots (ex: QuantumDrive → JumpModule)
+  if (!isMounted && hp.items.length > 0) {
+    return (
+      <div>
+        {hp.component && (
+          <ComponentRow
+            comp={hp.component}
+            swappedIds={swappedIds}
+            activePortId={activePortId}
+            onOpenPicker={onOpenPicker}
+            depth={0}
+          />
+        )}
+        <div className={`space-y-0.5 ${hp.component ? 'mt-0.5 ml-4 border-l border-slate-800 pl-3' : ''}`}>
+          {hp.items.map(item => (
+            <ComponentRow
+              key={item.port_id}
+              comp={item}
+              swappedIds={swappedIds}
+              activePortId={activePortId}
+              onOpenPicker={onOpenPicker}
+              depth={0}
+            />
+          ))}
+        </div>
+      </div>
     );
   }
 

@@ -454,6 +454,14 @@ export class LoadoutService {
       const items = children.map((c) => this.buildComponentInfo(c, childMap));
 
       if (hasRelevantChildren || (mountType && children.length > 0)) {
+        // For non-mount ports (e.g. QuantumDrive with JumpModule children), preserve
+        // the installed component in `component` so the UI can display + swap it.
+        // For actual mounts (Gimbal, Turret…) component stays null — the mount itself
+        // is not a swappable component in the outfitter.
+        const rootComponent =
+          mountType === null && root.component_uuid
+            ? this.buildComponentInfo(root, new Map())
+            : null;
         hardpoints.push({
           port_id: root.id,
           port_name: portName,
@@ -464,7 +472,7 @@ export class LoadoutService {
           mount_type: mountType,
           mount_class_name: compCls || null,
           mount_size: mountSize,
-          component: null,
+          component: rootComponent,
           items,
           swapped: !!root._swapped,
         });
