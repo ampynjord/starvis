@@ -124,7 +124,7 @@ export class GameDataService {
         (SELECT COUNT(*) FROM items) as items,
         (SELECT COUNT(*) FROM commodities) as commodities,
         (SELECT COUNT(*) FROM manufacturers) as manufacturers,
-        (SELECT COUNT(*) FROM ships_loadouts) as loadoutPorts,
+        (SELECT COUNT(*) FROM ship_loadouts) as loadoutPorts,
         (SELECT COUNT(*) FROM ship_paints) as paints,
         (SELECT COUNT(*) FROM shops) as shops,
         (SELECT COUNT(*) FROM ships WHERE ship_matrix_id IS NOT NULL) as shipsLinkedToMatrix
