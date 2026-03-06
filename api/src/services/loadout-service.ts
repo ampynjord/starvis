@@ -458,10 +458,7 @@ export class LoadoutService {
         // the installed component in `component` so the UI can display + swap it.
         // For actual mounts (Gimbal, Turret…) component stays null — the mount itself
         // is not a swappable component in the outfitter.
-        const rootComponent =
-          mountType === null && root.component_uuid
-            ? this.buildComponentInfo(root, new Map())
-            : null;
+        const rootComponent = mountType === null && root.component_uuid ? this.buildComponentInfo(root, new Map()) : null;
         hardpoints.push({
           port_id: root.id,
           port_name: portName,
