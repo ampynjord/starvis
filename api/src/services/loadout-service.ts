@@ -501,27 +501,6 @@ export class LoadoutService {
     return hardpoints;
   }
 
-  /** Parse mount display name from component_class_name */
-  private cleanMountName(className: string): string {
-    if (!className) return '';
-    let name = className
-      .replace(/^(Mount_|MRCK_|SCItem_|Vehicle_)/i, '')
-      .replace(/_SCItem_.*/i, '')
-      .replace(/^[A-Z]{3,4}_\w+_/, '');
-    const sizeMatch = name.match(/[Ss](\d+)/);
-    const size = sizeMatch ? ` S${sizeMatch[1]}` : '';
-    name = name
-      .replace(/[Ss]\d+/g, '')
-      .replace(/_+/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (!name) {
-      const parts = className.split('_');
-      name = parts.length > 1 ? parts[1] : parts[0];
-    }
-    return `${name}${size}`.trim();
-  }
-
   /** Build component info for a single loadout row */
   private buildComponentInfo(row: Row, childMap: Map<number, Row[]>): Record<string, unknown> {
     const type = String(row.type || row.port_type || '');
@@ -529,7 +508,7 @@ export class LoadoutService {
     const effectiveType = isUtility ? detectUtilityType(row.name || '', row.class_name || '') : type;
 
     const isMountItem = !row.component_uuid && row.component_class_name;
-    const mountDisplayName = isMountItem ? this.cleanMountName(String(row.component_class_name)) : '';
+    const portDisplayName = this.cleanPortName(String(row.port_name || ''));
     const mountSize = isMountItem ? (String(row.component_class_name).match(/[Ss](\d+)/) || [])[1] : null;
 
     const subChildren = childMap.get(Number(row.id)) || [];
@@ -541,7 +520,6 @@ export class LoadoutService {
     });
     const subItems = relevantSubChildren.map((c) => {
       const cIsMountItem = !c.component_uuid && c.component_class_name;
-      const cMountName = cIsMountItem ? this.cleanMountName(String(c.component_class_name)) : '';
       const cMountSize = cIsMountItem ? (String(c.component_class_name).match(/[Ss](\d+)/) || [])[1] : null;
       const cType = String(c.type || c.port_type || '');
       return {
@@ -550,8 +528,8 @@ export class LoadoutService {
         port_max_size: int(c.port_max_size) || null,
         port_min_size: int(c.port_min_size) || null,
         uuid: c.component_uuid || null,
-        name: c.name || (cIsMountItem ? c.component_class_name : null),
-        display_name: c.name ? cleanName(c.name || '', cType) : cMountName,
+        name: c.name || null,
+        display_name: c.name ? cleanName(c.name || '', cType) : this.cleanPortName(String(c.port_name || '')),
         type: cType,
         sub_type: c.sub_type || null,
         size: int(c.size) || (cMountSize ? parseInt(cMountSize, 10) : null),
@@ -586,8 +564,8 @@ export class LoadoutService {
       port_id: row.id,
       port_name: row.port_name,
       uuid: row.component_uuid || null,
-      name: row.name || (isMountItem ? row.component_class_name : null),
-      display_name: row.name ? cleanName(row.name || '', type) : mountDisplayName,
+      name: row.name || null,
+      display_name: row.name ? cleanName(row.name || '', type) : portDisplayName,
       type: effectiveType,
       size: int(row.size) || (mountSize ? parseInt(mountSize, 10) : null),
       port_max_size: int(row.port_max_size) || null,
