@@ -7,25 +7,31 @@
 --
 --   • shops.parent_location  → dropped (redundant with planet_moon)
 --   • shop_inventory.item_uuid → dropped (column was never populated by the extractor)
+--
+-- NOTE: MySQL 8.0 does not support DROP COLUMN IF EXISTS / ADD COLUMN IF NOT EXISTS.
+-- The migration runner in schema.ts already silently ignores:
+--   ER_CANT_DROP_FIELD_OR_KEY → column/key doesn't exist (DROP on fresh install)
+--   ER_DUP_FIELDNAME          → column already exists (ADD on already-migrated install)
+--   ER_DUP_KEYNAME            → index already exists  (ADD INDEX on already-migrated install)
 
--- Drop redundant parent_location from shops (replaced by planet_moon column)
+-- Drop redundant parent_location from shops (replaced by planet_moon)
 ALTER TABLE shops
-  DROP COLUMN IF EXISTS parent_location;
+  DROP COLUMN parent_location;
 
--- Drop vestigial item_uuid from shop_inventory
+-- Drop vestigial item_uuid from shop_inventory (never populated by extractor)
 ALTER TABLE shop_inventory
-  DROP FOREIGN KEY IF EXISTS fk_inventory_item;
+  DROP FOREIGN KEY fk_inventory_item;
 ALTER TABLE shop_inventory
-  DROP INDEX IF EXISTS idx_item;
+  DROP INDEX idx_item;
 ALTER TABLE shop_inventory
-  DROP COLUMN IF EXISTS item_uuid;
+  DROP COLUMN item_uuid;
 
--- Add planet_moon index if not already present (improves filtered shop queries)
+-- Add planet_moon index (improves filtered shop queries)
 ALTER TABLE shops
-  ADD INDEX IF NOT EXISTS idx_planet_moon (planet_moon);
+  ADD INDEX idx_planet_moon (planet_moon);
 
--- Add location_id column if not yet added by migration 006
+-- Add location_id column (from migration 006 if not already present)
 ALTER TABLE shops
-  ADD COLUMN IF NOT EXISTS location_id INT NULL COMMENT 'FK to locations.id';
+  ADD COLUMN location_id INT NULL COMMENT 'FK to locations.id';
 ALTER TABLE shops
-  ADD INDEX IF NOT EXISTS idx_location_id (location_id);
+  ADD INDEX idx_location_id (location_id);
