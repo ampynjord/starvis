@@ -25,11 +25,15 @@ COPY db/ ./db/
 RUN npx tsc --noEmit
 
 # ---- Stage 4: development (hot reload) ----
-# Source code est monté en volume depuis l'hôte (docker-compose.dev.yml)
-# tsx watch redémarre l'API à chaque modification de fichier source
+# Le répertoire source est monté en volume depuis l'hôte (docker-compose.dev.yml).
+# tsx watch redémarre l'API automatiquement à chaque modification de fichier.
+# node_modules vit dans un named volume séparé pour ne pas être écrasé par le bind.
 FROM deps AS development
+# Les deps sont déjà installées dans /app/node_modules par le stage deps.
+# Au démarrage, npm install --prefer-offline sync si package.json a changé,
+# puis tsx watch lance le serveur en mode watch.
 EXPOSE 3000
-CMD ["npm", "run", "dev"]
+CMD ["sh", "-c", "npm install --prefer-offline --silent && npm run dev"]
 
 # ---- Stage 5: production ----
 FROM base AS production
