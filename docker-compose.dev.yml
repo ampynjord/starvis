@@ -31,10 +31,12 @@ services:
       dockerfile: api/Dockerfile
       target: development
     container_name: starvis-api
-    # Source montée en volume → tsx watch recharge à chaque modification
+    # Sources montées → tsx watch recharge à chaque modification
+    # node_modules dans un named volume pour ne pas être écrasé par le montage ./api
     volumes:
       - ./api:/app
       - api_node_modules:/app/node_modules
+      - ./db:/db:ro
     ports:
       - "${API_PORT:-3003}:3000"
     environment:
