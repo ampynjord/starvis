@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import {
-  BarChart3, BookOpen, Clock, Dices, ExternalLink, Home, Package, Palette, Rocket, Settings2, ShoppingBag, SlidersHorizontal, TrendingUp, Trophy, Wrench,
+  BarChart3, BookOpen, Dices, ExternalLink, Home, Package, Palette, Rocket, Settings2, ShoppingBag, SlidersHorizontal, TrendingUp, Trophy, Wrench,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
@@ -11,7 +11,6 @@ const NAV_ITEMS = [
   { to: '/compare',      icon: BarChart3,           label: 'Compare' },
   { to: '/outfitter',    icon: SlidersHorizontal,  label: 'Outfitter' },
   { to: '/trade',        icon: TrendingUp,         label: 'Trade' },
-  { to: '/history',      icon: Clock,              label: 'History' },
   { to: '/components',   icon: Settings2,          label: 'Components' },
   { to: '/items',        icon: Dices,              label: 'Items' },
   { to: '/commodities',  icon: Package,            label: 'Commodities' },
