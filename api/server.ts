@@ -20,9 +20,9 @@ import helmet from 'helmet';
 import * as mysql from 'mysql2/promise';
 import swaggerUi from 'swagger-ui-express';
 import { initDrizzle } from './src/db/index.js';
-import { createRoutes } from './src/routes.js';
+import { createRoutes } from './src/routes/index.js';
 import { GameDataService, initializeSchema, ShipMatrixService } from './src/services/index.js';
-import { DB_CONFIG, logger } from './src/utils/index.js';
+import { DB_CONFIG, logger, RATE_LIMITS } from './src/utils/index.js';
 
 const PORT = process.env.PORT || 3000;
 
@@ -52,19 +52,19 @@ app.use(express.json({ limit: '1mb' }));
 
 const isTest = process.env.NODE_ENV === 'test';
 
-// Layer 1: Speed limiter — after 100 req/15min, add 500ms delay per request
+// Layer 1: Speed limiter — after slowAfter req/window, add 500ms delay per request
 const speedLimiter = slowDown({
-  windowMs: 15 * 60 * 1000,
-  delayAfter: 100,
-  delayMs: (hits) => (hits - 100) * 500,
+  windowMs: RATE_LIMITS.windowMs,
+  delayAfter: RATE_LIMITS.slowAfter,
+  delayMs: (hits) => (hits - RATE_LIMITS.slowAfter) * 500,
   maxDelayMs: 20_000,
   skip: () => isTest,
 });
 
-// Layer 2: Hard rate limit — 200 req/15min per IP (then 429)
+// Layer 2: Hard rate limit — max req/15min per IP (then 429)
 const apiLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: parseInt(process.env.RATE_LIMIT_MAX || '200', 10),
+  windowMs: RATE_LIMITS.windowMs,
+  max: RATE_LIMITS.max,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: 'Too many requests, please try again later' },
@@ -72,20 +72,20 @@ const apiLimiter = rateLimit({
   skip: () => isTest,
 });
 
-// Layer 3: Strict limit on admin endpoints — 20 req/15min
+// Layer 3: Strict limit on admin endpoints
 const adminLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
+  windowMs: RATE_LIMITS.windowMs,
+  max: RATE_LIMITS.adminMax,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: 'Admin rate limit exceeded' },
   skip: () => isTest,
 });
 
-// Layer 4: Burst protection — configurable req/min max (prevents hammering)
+// Layer 4: Burst protection — max requests per minute per IP
 const burstLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: parseInt(process.env.RATE_LIMIT_BURST || '30', 10),
+  windowMs: RATE_LIMITS.burstWindowMs,
+  max: RATE_LIMITS.burst,
   standardHeaders: false,
   legacyHeaders: false,
   message: { success: false, error: 'Too many requests per minute, slow down' },

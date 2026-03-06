@@ -10,7 +10,7 @@ export function mountManufacturerRoutes(router: Router, deps: RouteDependencies)
     '/api/v1/manufacturers',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const data = await gameDataService!.getAllManufacturers();
+      const data = await gameDataService!.ships.getAllManufacturers();
       if (req.query.format === 'csv')
         return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
       sendWithETag(req, res, { success: true, count: data.length, data });
@@ -21,7 +21,7 @@ export function mountManufacturerRoutes(router: Router, deps: RouteDependencies)
     '/api/v1/manufacturers/:code',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const mfr = await gameDataService!.getManufacturerByCode(req.params.code);
+      const mfr = await gameDataService!.ships.getManufacturerByCode(req.params.code);
       if (!mfr) return void res.status(404).json({ success: false, error: 'Manufacturer not found' });
       sendWithETag(req, res, { success: true, data: mfr });
     }),
@@ -31,9 +31,9 @@ export function mountManufacturerRoutes(router: Router, deps: RouteDependencies)
     '/api/v1/manufacturers/:code/ships',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const mfr = await gameDataService!.getManufacturerByCode(req.params.code);
+      const mfr = await gameDataService!.ships.getManufacturerByCode(req.params.code);
       if (!mfr) return void res.status(404).json({ success: false, error: 'Manufacturer not found' });
-      const data = await gameDataService!.getManufacturerShips(req.params.code);
+      const data = await gameDataService!.ships.getManufacturerShips(req.params.code);
       if (req.query.format === 'csv')
         return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
       sendWithETag(req, res, { success: true, count: data.length, data });
@@ -44,9 +44,9 @@ export function mountManufacturerRoutes(router: Router, deps: RouteDependencies)
     '/api/v1/manufacturers/:code/components',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const mfr = await gameDataService!.getManufacturerByCode(req.params.code);
+      const mfr = await gameDataService!.ships.getManufacturerByCode(req.params.code);
       if (!mfr) return void res.status(404).json({ success: false, error: 'Manufacturer not found' });
-      const data = await gameDataService!.getManufacturerComponents(req.params.code);
+      const data = await gameDataService!.ships.getManufacturerComponents(req.params.code);
       if (req.query.format === 'csv')
         return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
       sendWithETag(req, res, { success: true, count: data.length, data });

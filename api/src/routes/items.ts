@@ -11,7 +11,7 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
     '/api/v1/items/types',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const data = await gameDataService!.getItemTypes();
+      const data = await gameDataService!.items.getItemTypes();
       sendWithETag(req, res, { success: true, ...data });
     }),
   );
@@ -20,7 +20,7 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
     '/api/v1/items/filters',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const data = await gameDataService!.getItemFilters();
+      const data = await gameDataService!.items.getItemFilters();
       sendWithETag(req, res, { success: true, data });
     }),
   );
@@ -31,7 +31,7 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
     asyncHandler(async (req, res) => {
       const t = Date.now();
       const filters = ItemQuery.parse(req.query);
-      const result = await gameDataService!.getAllItems(filters);
+      const result = await gameDataService!.items.getAllItems(filters);
       const payload = {
         success: true,
         count: result.data.length,
@@ -51,7 +51,7 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
     '/api/v1/items/:uuid',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const item = await gameDataService!.resolveItem(req.params.uuid);
+      const item = await gameDataService!.items.resolveItem(req.params.uuid);
       if (!item) return void res.status(404).json({ success: false, error: 'Item not found' });
       sendWithETag(req, res, { success: true, data: item });
     }),
@@ -61,9 +61,9 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
     '/api/v1/items/:uuid/buy-locations',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const item = await gameDataService!.resolveItem(req.params.uuid);
+      const item = await gameDataService!.items.resolveItem(req.params.uuid);
       if (!item) return void res.status(404).json({ success: false, error: 'Item not found' });
-      const data = await gameDataService!.getItemBuyLocations(String(item.uuid));
+      const data = await gameDataService!.items.getItemBuyLocations(String(item.uuid));
       sendWithETag(req, res, { success: true, count: data.length, data });
     }),
   );

@@ -6,7 +6,7 @@ import type { RouteDependencies } from './types.js';
 export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
   const { gameDataService } = deps;
   const requireGameData = makeGameDataGuard(gameDataService);
-  const { resolveShipUuid, resolveShip } = makeShipResolver(gameDataService!);
+  const { resolveShipUuid, resolveShip } = makeShipResolver(gameDataService!.ships);
 
   router.get(
     '/api/v1/ships',
@@ -14,7 +14,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
     asyncHandler(async (req, res) => {
       const t = Date.now();
       const filters = ShipQuery.parse(req.query);
-      const result = await gameDataService!.getAllShips(filters);
+      const result = await gameDataService!.ships.getAllShips(filters);
       const payload = {
         success: true,
         count: result.data.length,
@@ -37,7 +37,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
       const sort = String(req.query.sort_by ?? req.query.sort ?? 'scm_speed');
       const order = String(req.query.order ?? 'desc').toUpperCase() === 'ASC' ? 'asc' : 'desc';
       const category = String(req.query.category ?? '');
-      const result = await gameDataService!.getAllShips({
+      const result = await gameDataService!.ships.getAllShips({
         sort,
         order,
         vehicle_category: category || undefined,
@@ -53,7 +53,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
     '/api/v1/ships/filters',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const data = await gameDataService!.getShipFilters();
+      const data = await gameDataService!.ships.getShipFilters();
       sendWithETag(req, res, { success: true, data });
     }),
   );
@@ -66,7 +66,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
       if (!search || search.length < 2)
         return void res.status(400).json({ success: false, error: "Query 'search' must be at least 2 characters" });
       const limit = Math.min(20, Math.max(1, parseInt(String(req.query.limit), 10) || 10));
-      const data = await gameDataService!.searchShipsAutocomplete(search, limit);
+      const data = await gameDataService!.ships.searchShipsAutocomplete(search, limit);
       sendWithETag(req, res, { success: true, count: data.length, data });
     }),
   );
@@ -75,7 +75,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
     '/api/v1/ships/random',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const ship = await gameDataService!.getRandomShip();
+      const ship = await gameDataService!.ships.getRandomShip();
       if (!ship) return void res.status(404).json({ success: false, error: 'No ships available' });
       sendWithETag(req, res, { success: true, data: ship });
     }),
@@ -85,7 +85,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
     '/api/v1/ships/manufacturers',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const data = await gameDataService!.getShipManufacturers();
+      const data = await gameDataService!.ships.getShipManufacturers();
       if (req.query.format === 'csv')
         return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
       sendWithETag(req, res, { success: true, count: data.length, data });
@@ -114,7 +114,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
     asyncHandler(async (req, res) => {
       const uuid = await resolveShipUuid(req.params.uuid);
       if (!uuid) return void res.status(404).json({ success: false, error: 'Ship not found' });
-      const loadout = await gameDataService!.getShipLoadout(uuid);
+      const loadout = await gameDataService!.loadouts.getShipLoadout(uuid);
       if (!loadout.length) return void res.status(404).json({ success: false, error: 'No loadout found' });
       // Build recursive hierarchical tree (supports turret→gimbal→weapon 3+ levels)
       const rootPorts = loadout.filter((p: Record<string, unknown>) => !p.parent_id);
@@ -141,7 +141,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
     asyncHandler(async (req, res) => {
       const uuid = await resolveShipUuid(req.params.uuid);
       if (!uuid) return void res.status(404).json({ success: false, error: 'Ship not found' });
-      const modules = await gameDataService!.getShipModules(uuid);
+      const modules = await gameDataService!.loadouts.getShipModules(uuid);
       if (req.query.format === 'csv')
         return void sendCsvOrJson(req, res, modules as Record<string, unknown>[], { success: true, data: modules });
       sendWithETag(req, res, { success: true, data: modules });
@@ -154,7 +154,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
     asyncHandler(async (req, res) => {
       const uuid = await resolveShipUuid(req.params.uuid);
       if (!uuid) return void res.status(404).json({ success: false, error: 'Ship not found' });
-      const paints = await gameDataService!.getShipPaints(uuid);
+      const paints = await gameDataService!.loadouts.getShipPaints(uuid);
       if (req.query.format === 'csv')
         return void sendCsvOrJson(req, res, paints as Record<string, unknown>[], { success: true, data: paints });
       sendWithETag(req, res, { success: true, data: paints });
@@ -167,7 +167,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
     asyncHandler(async (req, res) => {
       const uuid = await resolveShipUuid(req.params.uuid);
       if (!uuid) return void res.status(404).json({ success: false, error: 'Ship not found' });
-      const raw = await gameDataService!.getShipStats(uuid);
+      const raw = await gameDataService!.loadouts.getShipStats(uuid);
       if (!raw) return void res.status(404).json({ success: false, error: 'Ship not found' });
       const s = (raw.stats ?? {}) as Record<string, Record<string, unknown>>;
       const weaponCount = Number((s.weapons as Record<string, unknown>)?.count ?? 0);
@@ -210,7 +210,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
     asyncHandler(async (req, res) => {
       const uuid = await resolveShipUuid(req.params.uuid);
       if (!uuid) return void res.status(404).json({ success: false, error: 'Ship not found' });
-      const hardpoints = await gameDataService!.getShipHardpoints(uuid);
+      const hardpoints = await gameDataService!.loadouts.getShipHardpoints(uuid);
       if (!hardpoints) return void res.status(404).json({ success: false, error: 'Ship not found' });
       sendWithETag(req, res, { success: true, count: hardpoints.length, data: hardpoints });
     }),
@@ -223,7 +223,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
       const uuid = await resolveShipUuid(req.params.uuid);
       if (!uuid) return void res.status(404).json({ success: false, error: 'Ship not found' });
       const limit = Math.min(10, Math.max(1, parseInt(String(req.query.limit), 10) || 5));
-      const data = await gameDataService!.getSimilarShips(uuid, limit);
+      const data = await gameDataService!.ships.getSimilarShips(uuid, limit);
       sendWithETag(req, res, { success: true, count: data.length, data });
     }),
   );

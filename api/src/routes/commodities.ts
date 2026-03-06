@@ -11,7 +11,7 @@ export function mountCommodityRoutes(router: Router, deps: RouteDependencies): v
     '/api/v1/commodities/types',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const data = await gameDataService!.getCommodityTypes();
+      const data = await gameDataService!.commodities.getCommodityTypes();
       sendWithETag(req, res, { success: true, data: data.types.map((t) => t.type) });
     }),
   );
@@ -22,7 +22,7 @@ export function mountCommodityRoutes(router: Router, deps: RouteDependencies): v
     asyncHandler(async (req, res) => {
       const t = Date.now();
       const filters = CommodityQuery.parse(req.query);
-      const result = await gameDataService!.getAllCommodities(filters);
+      const result = await gameDataService!.commodities.getAllCommodities(filters);
       const payload = {
         success: true,
         count: result.data.length,
@@ -42,7 +42,7 @@ export function mountCommodityRoutes(router: Router, deps: RouteDependencies): v
     '/api/v1/commodities/:uuid',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const commodity = await gameDataService!.getCommodityByUuid(req.params.uuid);
+      const commodity = await gameDataService!.commodities.getCommodityByUuid(req.params.uuid);
       if (!commodity) return void res.status(404).json({ success: false, error: 'Commodity not found' });
       sendWithETag(req, res, { success: true, data: commodity });
     }),

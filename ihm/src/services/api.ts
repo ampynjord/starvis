@@ -32,7 +32,7 @@ import type {
 } from '@/types/api';
 import { API_BASE } from '@/utils/constants';
 
-async function get<T>(path: string, params?: Record<string, string | number | undefined>): Promise<T> {
+async function get<T>(path: string, params?: Record<string, string | number | boolean | undefined>): Promise<T> {
   const url = new URL(API_BASE + path, window.location.origin);
   if (params) {
     for (const [k, v] of Object.entries(params)) {
@@ -114,7 +114,7 @@ export const api = {
     buyLocations: (uuid: string) => get<BuyLocation[]>(`/components/${uuid}/buy-locations`),
     ships: (uuid: string) => get<ShipListItem[]>(`/components/${uuid}/ships`),
     compatible: (opts: { type?: string; min_size?: number; max_size?: number; search?: string; sort?: string; order?: string; limit?: number }) =>
-      get<CompatibleComponent[]>('/components/compatible', opts as Record<string, string | number | undefined>),
+      get<CompatibleComponent[]>('/components/compatible', opts as Record<string, string | number | boolean | undefined>),
   },
 
   // ─── Items ─────────────────────────────────────────────────────────

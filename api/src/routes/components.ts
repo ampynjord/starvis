@@ -18,7 +18,7 @@ export function mountComponentRoutes(router: Router, deps: RouteDependencies): v
       const sort = String(req.query.sort ?? 'size');
       const order = String(req.query.order ?? 'asc');
       const limit = Math.min(200, parseInt(String(req.query.limit ?? '100'), 10) || 100);
-      const data = await gameDataService!.getCompatibleComponents({
+      const data = await gameDataService!.components.getCompatibleComponents({
         type: type || undefined,
         min_size,
         max_size,
@@ -35,7 +35,7 @@ export function mountComponentRoutes(router: Router, deps: RouteDependencies): v
     '/api/v1/components/types',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const data = await gameDataService!.getComponentTypes();
+      const data = await gameDataService!.components.getComponentTypes();
       sendWithETag(req, res, { success: true, data });
     }),
   );
@@ -46,7 +46,7 @@ export function mountComponentRoutes(router: Router, deps: RouteDependencies): v
     asyncHandler(async (req, res) => {
       const t = Date.now();
       const filters = ComponentQuery.parse(req.query);
-      const result = await gameDataService!.getAllComponents(filters);
+      const result = await gameDataService!.components.getAllComponents(filters);
       const payload = {
         success: true,
         count: result.data.length,
@@ -66,7 +66,7 @@ export function mountComponentRoutes(router: Router, deps: RouteDependencies): v
     '/api/v1/components/filters',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const data = await gameDataService!.getComponentFilters();
+      const data = await gameDataService!.components.getComponentFilters();
       sendWithETag(req, res, { success: true, data });
     }),
   );
@@ -75,7 +75,7 @@ export function mountComponentRoutes(router: Router, deps: RouteDependencies): v
     '/api/v1/components/:uuid',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const comp = await gameDataService!.resolveComponent(req.params.uuid);
+      const comp = await gameDataService!.components.resolveComponent(req.params.uuid);
       if (!comp) return void res.status(404).json({ success: false, error: 'Component not found' });
       sendWithETag(req, res, { success: true, data: comp });
     }),
@@ -85,9 +85,9 @@ export function mountComponentRoutes(router: Router, deps: RouteDependencies): v
     '/api/v1/components/:uuid/buy-locations',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const comp = await gameDataService!.resolveComponent(req.params.uuid);
+      const comp = await gameDataService!.components.resolveComponent(req.params.uuid);
       if (!comp) return void res.status(404).json({ success: false, error: 'Component not found' });
-      const data = await gameDataService!.getComponentBuyLocations(comp.uuid);
+      const data = await gameDataService!.components.getComponentBuyLocations(comp.uuid);
       if (req.query.format === 'csv')
         return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
       sendWithETag(req, res, { success: true, count: data.length, data });
@@ -98,9 +98,9 @@ export function mountComponentRoutes(router: Router, deps: RouteDependencies): v
     '/api/v1/components/:uuid/ships',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const comp = await gameDataService!.resolveComponent(req.params.uuid);
+      const comp = await gameDataService!.components.resolveComponent(req.params.uuid);
       if (!comp) return void res.status(404).json({ success: false, error: 'Component not found' });
-      const data = await gameDataService!.getComponentShips(comp.uuid);
+      const data = await gameDataService!.components.getComponentShips(comp.uuid);
       sendWithETag(req, res, { success: true, count: data.length, data });
     }),
   );
