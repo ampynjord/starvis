@@ -76,6 +76,9 @@ export class DataForgeService implements DataForgeContext {
         'build_manifest.id',
         'Data\\build_manifest.id',
         'Data/build_manifest.id',
+        'c_version.cfg',
+        'Data\\c_version.cfg',
+        'Data/c_version.cfg',
         'version.cfg',
         'Data\\version.cfg',
         'Data/version.cfg',
@@ -142,9 +145,10 @@ export class DataForgeService implements DataForgeContext {
   }
 
   getVersion(): string {
-    // Return the SC game version (from build_manifest.id) if available,
-    // otherwise fall back to the DataForge internal format version (e.g. "6").
-    return this.scVersion || this.dfData?.header?.version?.toString() || 'unknown';
+    // Return the SC game version (from build_manifest.id / c_version.cfg) if available.
+    // Do NOT fall back to dfData.header.version — that's the DataForge internal format
+    // version (e.g. "6"), not the SC game version.
+    return this.scVersion || 'unknown';
   }
 
   // ============ P4K file access ============
