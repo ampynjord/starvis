@@ -1,0 +1,85 @@
+# ============================================================
+# STARVIS — Développement local (hot reload)
+# Usage : docker compose -f docker-compose.dev.yml --env-file .env.dev up
+# L'API et l'IHM se rechargent automatiquement à chaque modification source.
+# ============================================================
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: starvis-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_EXTERNAL_PORT:-3307}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./db:/docker-entrypoint-initdb.d:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+      target: development
+    container_name: starvis-api
+    # Source montée en volume → tsx watch recharge à chaque modification
+    volumes:
+      - ./api:/app
+      - api_node_modules:/app/node_modules
+    ports:
+      - "${API_PORT:-3003}:3000"
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      ADMIN_API_KEY: ${ADMIN_API_KEY}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-500}
+      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-200}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  ihm:
+    image: node:22-alpine
+    container_name: starvis-ihm
+    working_dir: /app
+    # Source montée en volume → Vite HMR recharge le navigateur à chaque modification
+    volumes:
+      - ./ihm:/app
+      - ihm_node_modules:/app/node_modules
+    command: sh -c "npm install --prefer-offline && npm run dev"
+    ports:
+      - "${IHM_DEV_PORT:-5173}:5173"
+    environment:
+      # Le proxy Vite forward /api vers le service 'api' interne Docker
+      VITE_API_URL: http://api:3000
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  mysql_data:
+  api_node_modules:
+  ihm_node_modules:

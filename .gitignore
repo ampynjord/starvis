@@ -20,6 +20,7 @@ pnpm-debug.log*
 
 # Environment variables
 .env
+.env.dev
 .env.local
 .env.*.local
 .env.prod

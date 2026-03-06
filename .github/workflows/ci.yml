@@ -55,6 +55,17 @@ jobs:
       - name: Audit API dependencies
         run: cd api && npm audit --audit-level=high
 
+      - name: Validate docker-compose files
+        run: |
+          docker compose -f docker-compose.dev.yml config --quiet
+          docker compose -f docker-compose.prod.yml config --quiet
+        env:
+          DB_USER: ci
+          DB_PASSWORD: ci
+          DB_NAME: ci
+          MYSQL_ROOT_PASSWORD: ci
+          ADMIN_API_KEY: ci
+
   # ==========================================
   #  2. UNIT / INTEGRATION TESTS
   # ==========================================
