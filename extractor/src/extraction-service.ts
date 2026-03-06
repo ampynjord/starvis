@@ -173,6 +173,7 @@ export class ExtractionService {
 
       // Wrap the entire extraction in a transaction — if anything fails,
       // the old data remains intact (no downtime with empty tables)
+      await conn.execute('SET SESSION innodb_lock_wait_timeout = 600');
       await conn.beginTransaction();
 
       // 1c. Clean stale data before fresh extraction (order matters for FK constraints)
