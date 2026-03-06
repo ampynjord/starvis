@@ -313,6 +313,58 @@ export interface LoadoutPortEntry {
   swapped?: boolean;
 }
 
+// ─── Outfitter hardpoints (hierarchical) ─────────────────────────────────────
+export interface HardpointComponent {
+  port_id: number;
+  port_name: string;
+  uuid: string | null;
+  name: string | null;
+  display_name: string | null;
+  type: string | null;
+  sub_type: string | null;
+  size: number | null;
+  port_max_size: number | null;
+  port_min_size: number | null;
+  grade: string | null;
+  manufacturer_code: string | null;
+  hp: number | null;
+  power_draw: number | null;
+  heat_generation: number | null;
+  weapon_dps?: number | null;
+  weapon_burst_dps?: number | null;
+  weapon_sustained_dps?: number | null;
+  weapon_fire_rate?: number | null;
+  weapon_range?: number | null;
+  shield_hp?: number | null;
+  shield_regen?: number | null;
+  power_output?: number | null;
+  cooling_rate?: number | null;
+  qd_speed?: number | null;
+  qd_range?: number | null;
+  qd_spool_time?: number | null;
+  missile_damage?: number | null;
+  missile_signal_type?: string | null;
+  cm_ammo?: number | null;
+  radar_range?: number | null;
+  sub_items?: HardpointComponent[];
+  swapped?: boolean;
+}
+
+export interface HardpointEntry {
+  port_id: number;
+  port_name: string;
+  display_name: string;
+  category: string;
+  port_min_size: number | null;
+  port_max_size: number | null;
+  mount_type: string | null;
+  mount_class_name: string | null;
+  mount_size: number | null;
+  component: HardpointComponent | null;
+  items: HardpointComponent[];
+  swapped?: boolean;
+}
+
 export interface LoadoutResult {
   ship: { uuid: string; name: string; class_name: string };
   swaps: number;
@@ -330,7 +382,7 @@ export interface LoadoutResult {
     armor: { physical: number; energy: number; distortion: number };
     countermeasures: { flare_count: number; chaff_count: number };
   };
-  hardpoints: unknown[];
+  hardpoints: HardpointEntry[];
   loadout: LoadoutPortEntry[];
   modules: unknown[];
   paints: unknown[];
