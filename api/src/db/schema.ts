@@ -458,11 +458,7 @@ export const shopInventory = mysqlTable(
     createdAt: timestamp('created_at').defaultNow(),
     updatedAt: timestamp('updated_at').defaultNow(),
   },
-  (t) => [
-    index('idx_shop').on(t.shopId),
-    index('idx_component').on(t.componentUuid),
-    index('idx_class_name').on(t.componentClassName),
-  ],
+  (t) => [index('idx_shop').on(t.shopId), index('idx_component').on(t.componentUuid), index('idx_class_name').on(t.componentClassName)],
 );
 
 // ─── Inferred TypeScript types ───────────────────────────────────────────────
