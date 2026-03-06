@@ -104,7 +104,10 @@ export class ShipQueryService {
     const limit = Math.min(200, Math.max(1, filters?.limit || 50));
     const offset = (page - 1) * limit;
 
+    // nullSafeOrder: used for UNION queries (no table alias possible)
     const nullSafeOrder = `${sortCol} IS NULL, ${sortCol} ${order}`;
+    // qualifiedOrder: used for single-table queries to avoid ambiguity with joined ship_matrix
+    const qualifiedOrder = `s.${sortCol} IS NULL, s.${sortCol} ${order}`;
 
     let sql: string;
     let allParams: (string | number)[];
@@ -116,7 +119,7 @@ export class ShipQueryService {
       sql = `(SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS}${w}) UNION ALL (SELECT ${CONCEPT_SELECT}, TRUE as is_concept_only FROM ship_matrix sm2${cw}) ORDER BY ${nullSafeOrder} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
       allParams = [...params, ...conceptParams];
     } else {
-      sql = `SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS}${w} ORDER BY ${sortCol} IS NULL, s.${sortCol} ${order} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
+      sql = `SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS}${w} ORDER BY ${qualifiedOrder} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
       allParams = [...params];
     }
 

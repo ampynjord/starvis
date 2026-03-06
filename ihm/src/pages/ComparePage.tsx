@@ -54,6 +54,8 @@ export default function ComparePage() {
   const [uuidB, setUuidB] = useState(searchParams.get('b') ?? '');
   const [queryA, setQueryA] = useState('');
   const [queryB, setQueryB] = useState('');
+  const [shipA, setShipA] = useState<{ uuid: string; name: string; manufacturer_code: string | null; career: string | null; vehicle_category: string | null; manufacturer_name?: string | null } | null>(null);
+  const [shipB, setShipB] = useState<{ uuid: string; name: string; manufacturer_code: string | null; career: string | null; vehicle_category: string | null; manufacturer_name?: string | null } | null>(null);
   const dA = useDebounce(queryA, 300);
   const dB = useDebounce(queryB, 300);
 
@@ -103,10 +105,11 @@ export default function ComparePage() {
         {([{ slot: 'a', label: 'Ship A' }, { slot: 'b', label: 'Ship B' }] as ShipSelector[]).map(({ slot, label }) => {
           const uuid = slot === 'a' ? uuidA : uuidB;
           const setUuid = slot === 'a' ? setUuidA : setUuidB;
+          const setShip = slot === 'a' ? setShipA : setShipB;
           const query = slot === 'a' ? queryA : queryB;
           const setQuery = slot === 'a' ? setQueryA : setQueryB;
           const suggestions = slot === 'a' ? suggestA : suggestB;
-          const ship = comparison?.full[slot === 'a' ? 'ship1' : 'ship2'];
+          const ship = comparison?.full?.[slot === 'a' ? 'ship1' : 'ship2'] ?? (slot === 'a' ? shipA : shipB);
 
           return (
             <ScifiPanel key={slot} title={label}>
@@ -120,7 +123,7 @@ export default function ComparePage() {
                       {ship.vehicle_category && <GlowBadge color="slate">{ship.vehicle_category}</GlowBadge>}
                     </div>
                   </div>
-                  <button onClick={() => setUuid('')} className="text-slate-600 hover:text-red-400 transition-colors">
+                  <button onClick={() => { setUuid(''); setShip(null); }} className="text-slate-600 hover:text-red-400 transition-colors">
                     <X size={14} />
                   </button>
                 </div>
@@ -138,7 +141,7 @@ export default function ComparePage() {
                       {suggestions.map(s => (
                         <button
                           key={s.uuid}
-                          onClick={() => { setUuid(s.uuid); setQuery(''); }}
+                          onClick={() => { setUuid(s.uuid); setShip(s); setQuery(''); }}
                           className="w-full text-left px-3 py-2 text-sm text-slate-300 hover:bg-cyan-950/40 transition-colors truncate"
                         >
                           <span className="text-cyan-700 mr-2 text-xs">{s.manufacturer_code}</span>
