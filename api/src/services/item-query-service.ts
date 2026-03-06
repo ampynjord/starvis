@@ -106,12 +106,12 @@ export class ItemQueryService {
 
   async getItemBuyLocations(uuid: string): Promise<Row[]> {
     const [rows] = await this.pool.execute<Row[]>(
-      `SELECT s.id as shop_id, s.name as shop_name, s.location, s.parent_location,
+      `SELECT s.id as shop_id, s.name as shop_name, s.location, s.planet_moon,
               s.\`system\` as system_name, s.city, s.shop_type,
               si.base_price, si.rental_price_1d
        FROM shop_inventory si
        JOIN shops s ON si.shop_id = s.id
-       WHERE si.item_uuid = ?
+       WHERE si.component_uuid = ?
        ORDER BY si.base_price`,
       [uuid],
     );

@@ -593,7 +593,7 @@ export class ExtractionService {
         await conn.execute(
           `INSERT INTO ships (
             uuid, class_name, name, manufacturer_code,
-            role, career, dog_fight_enabled, crew_size, vehicle_definition,
+            role, career, crew_size,
             size_x, size_y, size_z,
             mass, scm_speed, max_speed,
             boost_speed_forward, boost_speed_backward,
@@ -608,17 +608,16 @@ export class ExtractionService {
             fuse_penetration, component_penetration,
             boost_ramp_up, boost_ramp_down,
             cross_section_x, cross_section_y, cross_section_z,
-            short_name, description, ship_grade, cargo_capacity,
+            short_name, cargo_capacity,
             insurance_claim_time, insurance_expedite_cost,
             vehicle_category,
             game_data
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) AS new
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) AS new
           ON DUPLICATE KEY UPDATE
             class_name=new.class_name, name=new.name,
             manufacturer_code=new.manufacturer_code,
             role=new.role, career=new.career,
-            dog_fight_enabled=new.dog_fight_enabled, crew_size=new.crew_size,
-            vehicle_definition=new.vehicle_definition,
+            crew_size=new.crew_size,
             size_x=new.size_x, size_y=new.size_y, size_z=new.size_z,
             mass=new.mass, scm_speed=new.scm_speed, max_speed=new.max_speed,
             boost_speed_forward=new.boost_speed_forward,
@@ -639,8 +638,7 @@ export class ExtractionService {
             boost_ramp_up=new.boost_ramp_up, boost_ramp_down=new.boost_ramp_down,
             cross_section_x=new.cross_section_x, cross_section_y=new.cross_section_y,
             cross_section_z=new.cross_section_z,
-            short_name=new.short_name, description=new.description,
-            ship_grade=new.ship_grade, cargo_capacity=new.cargo_capacity,
+            short_name=new.short_name, cargo_capacity=new.cargo_capacity,
             insurance_claim_time=new.insurance_claim_time,
             insurance_expedite_cost=new.insurance_expedite_cost,
             vehicle_category=new.vehicle_category,
@@ -653,9 +651,7 @@ export class ExtractionService {
             mfgCode,
             fullData.vehicle?.role || null,
             fullData.vehicle?.career || null,
-            fullData.vehicle?.dogfightEnabled ?? true,
             fullData.vehicle?.crewSize || 1,
-            fullData.vehicle?.vehicleDefinition || veh.className,
             fullData.vehicle?.size?.x || null,
             fullData.vehicle?.size?.y || null,
             fullData.vehicle?.size?.z || null,
@@ -691,8 +687,6 @@ export class ExtractionService {
             fullData.crossSection?.y || null,
             fullData.crossSection?.z || null,
             fullData.shortName || null,
-            fullData.description || null,
-            fullData.grade || null,
             fullData.cargo ?? null,
             fullData.insurance?.baseWaitTimeMinutes || null,
             fullData.insurance?.baseExpeditingFee || null,

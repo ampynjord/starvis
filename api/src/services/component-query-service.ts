@@ -113,7 +113,7 @@ export class ComponentQueryService {
 
   async getComponentBuyLocations(uuid: string): Promise<Row[]> {
     const [rows] = await this.pool.execute<Row[]>(
-      `SELECT s.name as shop_name, s.location, s.parent_location, s.shop_type,
+      `SELECT s.name as shop_name, s.location, s.planet_moon, s.shop_type,
               si.base_price, si.rental_price_1d, si.rental_price_3d, si.rental_price_7d, si.rental_price_30d
        FROM shop_inventory si JOIN shops s ON si.shop_id = s.id
        WHERE si.component_uuid = ? ORDER BY si.base_price`,

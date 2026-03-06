@@ -1,578 +1,458 @@
 -- ============================================================
--- STARVIS v2.0 - DATABASE SCHEMA
--- Last updated: March 2026
---
--- Tables:
---   ship_matrix       → Raw data from RSI Ship Matrix API (external)
---   manufacturers     → All manufacturers from DataForge (ships + components)
---   ships             → Ships extracted from P4K/DataForge (game data only)
---   components        → All SCItem components from DataForge (ship + vehicle)
---   ship_loadouts     → Default loadout per ship (ports + equipped components)
---   ship_modules      → Modular compartments (Retaliator, Apollo, Caterpillar…)
---   ship_paints       → Available paints/liveries per ship
---   items             → FPS weapons, armor, clothing, attachments, consumables
---   commodities       → Tradeable/mineable goods (metals, gas, food, etc.)
---   shops             → In-game shops / vendor locations
---   shop_inventory    → Items available in shops
---   extraction_log    → Extraction version history
---   changelog         → Track changes between extractions
+-- STARVIS — DATABASE SCHEMA (v3.0, March 2026)
+-- Migrations 001-007 intégrées, colonnes orphelines supprimées
 -- ============================================================
 
--- ====================
--- SHIP_MATRIX - Raw RSI Ship Matrix data (246 ships, no game data)
--- ====================
+-- ── ship_matrix ──────────────────────────────────────────────
+-- Source : RSI Ship Matrix API (sync automatique au démarrage)
+-- Note   : sert aussi de base pour les vaisseaux "concept-only"
 CREATE TABLE IF NOT EXISTS ship_matrix (
-  id INT PRIMARY KEY COMMENT 'RSI ship ID',
-  name VARCHAR(255) NOT NULL,
-  chassis_id INT,
-  
-  -- Manufacturer info (from RSI)
-  manufacturer_id INT,
-  manufacturer_code VARCHAR(10),
-  manufacturer_name VARCHAR(100),
-  
-  -- Ship characteristics
-  focus VARCHAR(255) COMMENT 'e.g. Starter / Pathfinder',
-  type VARCHAR(50) COMMENT 'multi, combat, transport, etc.',
-  description TEXT,
-  production_status VARCHAR(50) COMMENT 'flight-ready, in-concept, in-production',
-  production_note TEXT,
-  size VARCHAR(20) COMMENT 'small, medium, large, capital',
-  url VARCHAR(500) COMMENT 'RSI pledge page URL',
-  
-  -- Dimensions & specs (from RSI, not game data)
-  length DECIMAL(10,2),
-  beam DECIMAL(10,2),
-  height DECIMAL(10,2),
-  mass INT,
-  cargocapacity INT,
-  min_crew INT DEFAULT 1,
-  max_crew INT DEFAULT 1,
-  scm_speed INT,
-  afterburner_speed INT,
-  pitch_max DECIMAL(10,2),
-  yaw_max DECIMAL(10,2),
-  roll_max DECIMAL(10,2),
-  xaxis_acceleration DECIMAL(10,4),
-  yaxis_acceleration DECIMAL(10,4),
-  zaxis_acceleration DECIMAL(10,4),
-  
-  -- Media
-  media_source_url TEXT COMMENT 'Main image source URL',
-  media_store_small TEXT COMMENT 'Store thumbnail URL',
-  media_store_large TEXT COMMENT 'Store large image URL',
-  
-  -- Compiled hardpoints summary (JSON from RSI)
-  compiled JSON COMMENT 'Full RSI compiled hardpoints (RSIAvionic, RSIModular, RSIPropulsion, RSIThruster, RSIWeapon)',
-  
-  -- Timestamps
-  time_modified VARCHAR(100) COMMENT 'RSI relative time string',
-  time_modified_unfiltered DATETIME COMMENT 'Exact last modified time',
-  synced_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  
-  INDEX idx_name (name),
+  id                    INT            PRIMARY KEY COMMENT 'RSI ship ID',
+  name                  VARCHAR(255)   NOT NULL,
+  chassis_id            INT            NULL,
+  manufacturer_code     VARCHAR(10)    NULL,
+  manufacturer_name     VARCHAR(100)   NULL,
+  focus                 VARCHAR(255)   NULL COMMENT 'e.g. Starter / Pathfinder — utilisé pour la recherche textuelle',
+  type                  VARCHAR(50)    NULL COMMENT 'multi / combat / transport …',
+  description           TEXT           NULL,
+  production_status     VARCHAR(50)    NULL COMMENT 'flight-ready | in-concept | in-production',
+  production_note       TEXT           NULL,
+  size                  VARCHAR(20)    NULL COMMENT 'small | medium | large | capital',
+  url                   VARCHAR(500)   NULL,
+  length                DECIMAL(10,2)  NULL,
+  beam                  DECIMAL(10,2)  NULL,
+  height                DECIMAL(10,2)  NULL,
+  mass                  INT            NULL,
+  cargocapacity         INT            NULL,
+  min_crew              INT            NOT NULL DEFAULT 1,
+  max_crew              INT            NOT NULL DEFAULT 1,
+  scm_speed             INT            NULL,
+  afterburner_speed     INT            NULL,
+  pitch_max             DECIMAL(10,2)  NULL,
+  yaw_max               DECIMAL(10,2)  NULL,
+  roll_max              DECIMAL(10,2)  NULL,
+  xaxis_acceleration    DECIMAL(10,4)  NULL,
+  yaxis_acceleration    DECIMAL(10,4)  NULL,
+  zaxis_acceleration    DECIMAL(10,4)  NULL,
+  media_source_url      TEXT           NULL,
+  media_store_small     TEXT           NULL,
+  media_store_large     TEXT           NULL,
+  compiled              JSON           NULL COMMENT 'Hardpoints summary JSON (RSI)',
+  synced_at             TIMESTAMP      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  INDEX idx_name              (name),
   INDEX idx_manufacturer_code (manufacturer_code),
   INDEX idx_production_status (production_status),
-  INDEX idx_chassis_id (chassis_id),
-  INDEX idx_size (size),
-  INDEX idx_type (type)
+  INDEX idx_chassis_id        (chassis_id),
+  INDEX idx_size              (size),
+  INDEX idx_type              (type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ====================
--- MANUFACTURERS - From DataForge game data (component + ship manufacturers)
--- ====================
+-- ── manufacturers ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS manufacturers (
-  code VARCHAR(10) PRIMARY KEY COMMENT 'e.g. AEGS, ANVL, RSI',
-  name VARCHAR(100) NOT NULL,
-  description TEXT,
-  known_for VARCHAR(255),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  code        VARCHAR(10)  PRIMARY KEY COMMENT 'e.g. AEGS, ANVL, RSI',
+  name        VARCHAR(100) NOT NULL,
+  description TEXT         NULL,
+  known_for   VARCHAR(255) NULL,
+  created_at  TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
   INDEX idx_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ====================
--- SHIPS - From P4K/DataForge (game data only)
--- ====================
+-- ── ships ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS ships (
-  uuid CHAR(36) PRIMARY KEY COMMENT 'DataForge entity UUID',
-  class_name VARCHAR(255) NOT NULL COMMENT 'e.g. AEGS_Gladius, RSI_Aurora',
-  
-  -- Ship identity
-  name VARCHAR(255) COMMENT 'Display name from DataForge',
-  manufacturer_code VARCHAR(10),
-  
-  -- Vehicle params (from VehicleComponentParams)
-  role VARCHAR(100),
-  career VARCHAR(100),
-  dog_fight_enabled BOOLEAN DEFAULT TRUE,
-  crew_size INT DEFAULT 1,
-  vehicle_definition VARCHAR(255),
-  
-  -- Dimensions (from vehicle XML bounding box)
-  size_x DECIMAL(10,2) COMMENT 'Width in meters',
-  size_y DECIMAL(10,2) COMMENT 'Length in meters',
-  size_z DECIMAL(10,2) COMMENT 'Height in meters',
-  
-  -- Mass (from vehicle XML)
-  mass DECIMAL(15,2) COMMENT 'Total mass in kg',
-  
-  -- Flight (from IFCS / flight controller)
-  scm_speed INT COMMENT 'Standard Combat Maneuvering speed',
-  max_speed INT,
-  boost_speed_forward INT COMMENT 'Afterburner forward speed',
-  boost_speed_backward INT COMMENT 'Afterburner backward speed',
-  pitch_max DECIMAL(8,2) COMMENT 'Max pitch rate (deg/s)',
-  yaw_max DECIMAL(8,2) COMMENT 'Max yaw rate (deg/s)',
-  roll_max DECIMAL(8,2) COMMENT 'Max roll rate (deg/s)',
-  
-  -- Hull
-  total_hp INT COMMENT 'Total hull hit points',
-  
-  -- Fuel (computed from fuel tank components)
-  hydrogen_fuel_capacity DECIMAL(10,2),
-  quantum_fuel_capacity DECIMAL(10,2),
-  
-  -- Shield summary
-  shield_hp INT,
-  
-  -- Armor damage multipliers (from SCItemVehicleArmorParams)
-  armor_physical DECIMAL(10,6) COMMENT 'Physical damage multiplier',
-  armor_energy DECIMAL(10,6) COMMENT 'Energy damage multiplier',
-  armor_distortion DECIMAL(10,6) COMMENT 'Distortion damage multiplier',
-  armor_thermal DECIMAL(10,6) COMMENT 'Thermal damage multiplier',
-  armor_biochemical DECIMAL(10,6) COMMENT 'Biochemical damage multiplier',
-  armor_stun DECIMAL(10,6) COMMENT 'Stun damage multiplier',
-  armor_signal_ir DECIMAL(10,6) COMMENT 'IR signature multiplier',
-  armor_signal_em DECIMAL(10,6) COMMENT 'EM signature multiplier',
-  armor_signal_cs DECIMAL(10,6) COMMENT 'Cross-section signature multiplier',
-  armor_hp DECIMAL(10,2) COMMENT 'Armor plate health points',
-  armor_phys_resist DECIMAL(10,6) COMMENT 'Armor physical damage resistance multiplier',
-  armor_energy_resist DECIMAL(10,6) COMMENT 'Armor energy damage resistance multiplier',
-  fuse_penetration DECIMAL(10,4) COMMENT 'Fuse penetration damage multiplier',
-  component_penetration DECIMAL(10,4) COMMENT 'Component penetration damage multiplier',
-  boost_ramp_up DECIMAL(8,2) COMMENT 'Afterburner ramp-up time (s)',
-  boost_ramp_down DECIMAL(8,2) COMMENT 'Afterburner ramp-down time (s)',
-  
-  -- Cross section (bounding box projections in m²)
-  cross_section_x DECIMAL(10,2) COMMENT 'Front profile area',
-  cross_section_y DECIMAL(10,2) COMMENT 'Side profile area',
-  cross_section_z DECIMAL(10,2) COMMENT 'Top profile area',
-  
-  -- Extra metadata (Erkul parity)
-  short_name VARCHAR(255) COMMENT 'Short display name',
-  description TEXT COMMENT 'In-game description',
-  ship_grade VARCHAR(10) COMMENT 'Grade (A, B, C...)',
-  cargo_capacity DECIMAL(10,2) COMMENT 'Total cargo SCU',
-  missile_damage_total DECIMAL(10,2) COMMENT 'Sum of all default missile damage',
-  weapon_damage_total DECIMAL(10,2) COMMENT 'Sum of all default weapon DPS (WeaponGun)',
-  variant_type VARCHAR(20) COMMENT 'Non-playable variant tag: exec, collector, bis_edition, tutorial, enemy_ai, military, event, pirate, arena_ai, special',
-  vehicle_category VARCHAR(20) DEFAULT 'ship' COMMENT 'ship, ground, gravlev — vehicle classification',
-  
-  -- Insurance
-  insurance_claim_time DECIMAL(10,2) COMMENT 'Base wait time in minutes',
-  insurance_expedite_cost DECIMAL(10,2),
-  
-  -- Full game data (erkul-compatible nested JSON)
-  game_data JSON COMMENT 'Complete extracted game data',
-  
-  -- Ship Matrix link
-  ship_matrix_id INT COMMENT 'FK to ship_matrix.id for cross-reference',
-  
-  extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  
-  INDEX idx_class_name (class_name),
-  INDEX idx_name (name),
-  INDEX idx_manufacturer (manufacturer_code),
-  INDEX idx_ship_matrix (ship_matrix_id),
-  INDEX idx_role (role),
-  INDEX idx_career (career),
+  uuid           CHAR(36)      PRIMARY KEY COMMENT 'DataForge entity UUID',
+  class_name     VARCHAR(255)  NOT NULL,
+  name           VARCHAR(255)  NULL,
+  manufacturer_code VARCHAR(10) NULL,
+
+  -- Rôle & catégorie
+  role              VARCHAR(100)  NULL,
+  career            VARCHAR(100)  NULL,
+  crew_size         INT           NOT NULL DEFAULT 1,
+  vehicle_category  VARCHAR(20)   NOT NULL DEFAULT 'ship' COMMENT 'ship | ground | gravlev',
+  variant_type      VARCHAR(20)   NULL COMMENT 'exec | collector | bis_edition | tutorial | enemy_ai | …',
+  short_name        VARCHAR(255)  NULL,
+
+  -- Dimensions (bounding box)
+  size_x   DECIMAL(10,2)  NULL COMMENT 'Width m',
+  size_y   DECIMAL(10,2)  NULL COMMENT 'Length m',
+  size_z   DECIMAL(10,2)  NULL COMMENT 'Height m',
+  mass     DECIMAL(15,2)  NULL COMMENT 'Total mass kg',
+
+  -- Vol (IFCS)
+  scm_speed            INT           NULL,
+  max_speed            INT           NULL,
+  boost_speed_forward  INT           NULL,
+  boost_speed_backward INT           NULL,
+  pitch_max            DECIMAL(8,2)  NULL,
+  yaw_max              DECIMAL(8,2)  NULL,
+  roll_max             DECIMAL(8,2)  NULL,
+  boost_ramp_up        DECIMAL(8,2)  NULL,
+  boost_ramp_down      DECIMAL(8,2)  NULL,
+
+  -- Structure
+  total_hp             INT            NULL,
+  hydrogen_fuel_capacity DECIMAL(10,2) NULL,
+  quantum_fuel_capacity  DECIMAL(10,2) NULL,
+  cargo_capacity         DECIMAL(10,2) NULL,
+  shield_hp              INT            NULL,
+
+  -- Armure & signatures
+  armor_physical      DECIMAL(10,6)  NULL,
+  armor_energy        DECIMAL(10,6)  NULL,
+  armor_distortion    DECIMAL(10,6)  NULL,
+  armor_thermal       DECIMAL(10,6)  NULL,
+  armor_biochemical   DECIMAL(10,6)  NULL,
+  armor_stun          DECIMAL(10,6)  NULL,
+  armor_hp            DECIMAL(10,2)  NULL,
+  armor_phys_resist   DECIMAL(10,6)  NULL,
+  armor_energy_resist DECIMAL(10,6)  NULL,
+  armor_signal_ir     DECIMAL(10,6)  NULL,
+  armor_signal_em     DECIMAL(10,6)  NULL,
+  armor_signal_cs     DECIMAL(10,6)  NULL,
+  fuse_penetration    DECIMAL(10,4)  NULL,
+  component_penetration DECIMAL(10,4) NULL,
+
+  -- Section transversale (m²)
+  cross_section_x DECIMAL(10,2)  NULL,
+  cross_section_y DECIMAL(10,2)  NULL,
+  cross_section_z DECIMAL(10,2)  NULL,
+
+  -- Combat (calculé à l'extraction)
+  missile_damage_total DECIMAL(10,2) NULL,
+  weapon_damage_total  DECIMAL(10,2) NULL,
+
+  -- Assurance
+  insurance_claim_time    DECIMAL(10,2) NULL COMMENT 'minutes',
+  insurance_expedite_cost DECIMAL(10,2) NULL,
+
+  -- Données complètes (JSON erkul-compatible)
+  game_data      JSON          NULL,
+  ship_matrix_id INT           NULL,
+
+  extracted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  INDEX idx_class_name      (class_name),
+  INDEX idx_name            (name),
+  INDEX idx_manufacturer    (manufacturer_code),
+  INDEX idx_ship_matrix     (ship_matrix_id),
+  INDEX idx_role            (role),
+  INDEX idx_career          (career),
   INDEX idx_vehicle_category (vehicle_category),
-  CONSTRAINT fk_ship_manufacturer FOREIGN KEY (manufacturer_code) 
-    REFERENCES manufacturers(code) ON DELETE SET NULL,
-  CONSTRAINT fk_ship_matrix FOREIGN KEY (ship_matrix_id) 
-    REFERENCES ship_matrix(id) ON DELETE SET NULL
+  CONSTRAINT fk_ship_manufacturer FOREIGN KEY (manufacturer_code) REFERENCES manufacturers(code) ON DELETE SET NULL,
+  CONSTRAINT fk_ship_matrix       FOREIGN KEY (ship_matrix_id)    REFERENCES ship_matrix(id)    ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ====================
--- COMPONENTS - All SCItem components from DataForge
--- ====================
+-- ── components ───────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS components (
-  uuid CHAR(36) PRIMARY KEY,
-  class_name VARCHAR(255) NOT NULL,
-  name VARCHAR(255) NOT NULL,
-  type VARCHAR(50) NOT NULL COMMENT 'WeaponGun, Shield, PowerPlant, Cooler, etc.',
-  sub_type VARCHAR(100),
-  size TINYINT UNSIGNED,
-  grade VARCHAR(10),
-  manufacturer_code VARCHAR(10),
-  
-  -- Base stats
-  mass DECIMAL(10,2),
-  hp INT,
-  
-  -- Power
-  power_draw DECIMAL(10,2),
-  power_base DECIMAL(10,2),
-  power_output DECIMAL(10,2),
-  
-  -- Thermal
-  heat_generation DECIMAL(10,2),
-  cooling_rate DECIMAL(15,2),
-  
-  -- Signatures
-  em_signature DECIMAL(10,2),
-  ir_signature DECIMAL(10,2),
-  
-  -- Weapon stats
-  weapon_damage DECIMAL(10,4),
-  weapon_damage_type VARCHAR(50),
-  weapon_fire_rate DECIMAL(10,4),
-  weapon_range DECIMAL(10,2),
-  weapon_speed DECIMAL(10,2),
-  weapon_ammo_count INT,
-  weapon_pellets_per_shot TINYINT UNSIGNED DEFAULT 1,
-  weapon_burst_size TINYINT UNSIGNED,
-  weapon_alpha_damage DECIMAL(10,4),
-  weapon_dps DECIMAL(10,4),
-  weapon_damage_physical DECIMAL(10,4),
-  weapon_damage_energy DECIMAL(10,4),
-  weapon_damage_distortion DECIMAL(10,4),
-  weapon_damage_thermal DECIMAL(10,4),
-  weapon_damage_biochemical DECIMAL(10,4),
-  weapon_damage_stun DECIMAL(10,4),
-  weapon_heat_per_shot DECIMAL(10,5),
-  weapon_burst_dps DECIMAL(10,4),
-  weapon_sustained_dps DECIMAL(10,4),
-  
-  -- Shield stats
-  shield_hp DECIMAL(15,2),
-  shield_regen DECIMAL(10,4),
-  shield_regen_delay DECIMAL(10,2),
-  shield_hardening DECIMAL(10,4),
-  shield_faces TINYINT UNSIGNED,
-  
-  -- Quantum drive stats
-  qd_speed DECIMAL(15,2),
-  qd_spool_time DECIMAL(10,2),
-  qd_cooldown DECIMAL(10,2),
-  qd_fuel_rate DECIMAL(10,6),
-  qd_range DECIMAL(15,2),
-  qd_stage1_accel DECIMAL(15,2),
-  qd_stage2_accel DECIMAL(15,2),
-  
-  -- Missile stats
-  missile_damage DECIMAL(10,2),
-  missile_signal_type VARCHAR(20),
-  missile_lock_time DECIMAL(10,2),
-  missile_speed DECIMAL(10,2),
-  missile_range DECIMAL(10,2),
-  missile_lock_range DECIMAL(10,2),
-  missile_damage_physical DECIMAL(10,2),
-  missile_damage_energy DECIMAL(10,2),
-  missile_damage_distortion DECIMAL(10,2),
-  
-  -- Thruster stats
-  thruster_max_thrust DECIMAL(15,2) COMMENT 'Maximum thrust force (N)',
-  thruster_type VARCHAR(50) COMMENT 'Main, Retro, Maneuvering, VTOL',
-  
-  -- Radar stats
-  radar_range DECIMAL(15,2) COMMENT 'Detection range (m)',
-  radar_detection_lifetime DECIMAL(10,2) COMMENT 'How long a detected signal persists (s)',
-  radar_tracking_signal DECIMAL(10,4) COMMENT 'Tracking signal amplifier multiplier',
-  
-  -- Countermeasure stats
-  cm_ammo_count INT COMMENT 'Countermeasure ammo count',
-  
-  -- Fuel tank stats
-  fuel_capacity DECIMAL(10,2) COMMENT 'Fuel capacity (L or SCU)',
-  
-  -- Fuel intake stats
-  fuel_intake_rate DECIMAL(10,4) COMMENT 'Fuel intake rate',
-  
-  -- EMP stats
-  emp_damage DECIMAL(10,2) COMMENT 'EMP distortion damage',
-  emp_radius DECIMAL(10,2) COMMENT 'EMP max effect radius (m)',
-  emp_charge_time DECIMAL(10,2) COMMENT 'EMP charge duration (s)',
-  emp_cooldown DECIMAL(10,2) COMMENT 'EMP cooldown time (s)',
-  
-  -- Quantum Interdiction Generator (QIG/QED) stats
-  qig_jammer_range DECIMAL(15,2) COMMENT 'QIG jammer range (m)',
-  qig_snare_radius DECIMAL(15,2) COMMENT 'QIG quantum snare radius (m)',
-  qig_charge_time DECIMAL(10,2) COMMENT 'QIG charge time (s)',
-  qig_cooldown DECIMAL(10,2) COMMENT 'QIG cooldown time (s)',
-  
-  -- Quantum Drive extended stats (spline jump)
-  qd_tuning_rate DECIMAL(10,4) COMMENT 'QD spline jump tuning rate',
-  qd_alignment_rate DECIMAL(10,4) COMMENT 'QD spline jump alignment rate',
-  qd_disconnect_range DECIMAL(15,2) COMMENT 'QD disconnect range (m)',
-  
-  -- Mining laser stats
-  mining_speed DECIMAL(10,4) COMMENT 'Mining extraction rate',
-  mining_range DECIMAL(10,2) COMMENT 'Mining optimal range (m)',
-  mining_resistance DECIMAL(10,4) COMMENT 'Mining resistance modifier',
-  mining_instability DECIMAL(10,4) COMMENT 'Mining instability modifier',
-  
-  -- Tractor beam stats
-  tractor_max_force DECIMAL(15,2) COMMENT 'Max tractor beam force (N)',
-  tractor_max_range DECIMAL(10,2) COMMENT 'Max tractor beam range (m)',
-  
-  -- Salvage stats
-  salvage_speed DECIMAL(10,4) COMMENT 'Salvage extraction rate',
-  salvage_radius DECIMAL(10,2) COMMENT 'Salvage extraction radius',
-  
-  -- Gimbal / Mount stats
-  gimbal_type VARCHAR(20) COMMENT 'Fixed, Gimbal',
-  
-  -- Missile rack stats
-  rack_count TINYINT UNSIGNED COMMENT 'Number of missile slots on rack',
-  rack_missile_size TINYINT UNSIGNED COMMENT 'Size of missiles the rack holds',
-  
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  
-  INDEX idx_type (type),
-  INDEX idx_sub_type (sub_type),
-  INDEX idx_size (size),
-  INDEX idx_grade (grade),
+  uuid              CHAR(36)      PRIMARY KEY,
+  class_name        VARCHAR(255)  NOT NULL,
+  name              VARCHAR(255)  NOT NULL,
+  type              VARCHAR(50)   NOT NULL,
+  sub_type          VARCHAR(100)  NULL,
+  size              TINYINT       UNSIGNED NULL,
+  grade             VARCHAR(10)   NULL,
+  manufacturer_code VARCHAR(10)   NULL,
+
+  mass DECIMAL(10,2)  NULL,
+  hp   INT            NULL,
+
+  -- Power / Thermal / Signatures
+  power_draw        DECIMAL(10,2) NULL,
+  power_base        DECIMAL(10,2) NULL,
+  power_output      DECIMAL(10,2) NULL,
+  heat_generation   DECIMAL(10,2) NULL,
+  cooling_rate      DECIMAL(15,2) NULL,
+  em_signature      DECIMAL(10,2) NULL,
+  ir_signature      DECIMAL(10,2) NULL,
+
+  -- Weapons
+  weapon_damage           DECIMAL(10,4) NULL,
+  weapon_damage_type      VARCHAR(50)   NULL,
+  weapon_fire_rate        DECIMAL(10,4) NULL,
+  weapon_range            DECIMAL(10,2) NULL,
+  weapon_speed            DECIMAL(10,2) NULL,
+  weapon_ammo_count       INT           NULL,
+  weapon_pellets_per_shot TINYINT       UNSIGNED NULL DEFAULT 1,
+  weapon_burst_size       TINYINT       UNSIGNED NULL,
+  weapon_alpha_damage     DECIMAL(10,4) NULL,
+  weapon_dps              DECIMAL(10,4) NULL,
+  weapon_damage_physical  DECIMAL(10,4) NULL,
+  weapon_damage_energy    DECIMAL(10,4) NULL,
+  weapon_damage_distortion DECIMAL(10,4) NULL,
+  weapon_damage_thermal   DECIMAL(10,4) NULL,
+  weapon_damage_biochemical DECIMAL(10,4) NULL,
+  weapon_damage_stun      DECIMAL(10,4) NULL,
+  weapon_heat_per_shot    DECIMAL(10,5) NULL,
+  weapon_burst_dps        DECIMAL(10,4) NULL,
+  weapon_sustained_dps    DECIMAL(10,4) NULL,
+
+  -- Shield
+  shield_hp           DECIMAL(15,2) NULL,
+  shield_regen        DECIMAL(10,4) NULL,
+  shield_regen_delay  DECIMAL(10,2) NULL,
+  shield_hardening    DECIMAL(10,4) NULL,
+  shield_faces        TINYINT       UNSIGNED NULL,
+
+  -- Quantum Drive
+  qd_speed            DECIMAL(15,2) NULL,
+  qd_spool_time       DECIMAL(10,2) NULL,
+  qd_cooldown         DECIMAL(10,2) NULL,
+  qd_fuel_rate        DECIMAL(10,6) NULL,
+  qd_range            DECIMAL(15,2) NULL,
+  qd_stage1_accel     DECIMAL(15,2) NULL,
+  qd_stage2_accel     DECIMAL(15,2) NULL,
+  qd_tuning_rate      DECIMAL(10,4) NULL,
+  qd_alignment_rate   DECIMAL(10,4) NULL,
+  qd_disconnect_range DECIMAL(15,2) NULL,
+
+  -- Missiles
+  missile_damage            DECIMAL(10,2) NULL,
+  missile_signal_type       VARCHAR(20)   NULL,
+  missile_lock_time         DECIMAL(10,2) NULL,
+  missile_speed             DECIMAL(10,2) NULL,
+  missile_range             DECIMAL(10,2) NULL,
+  missile_lock_range        DECIMAL(10,2) NULL,
+  missile_damage_physical   DECIMAL(10,2) NULL,
+  missile_damage_energy     DECIMAL(10,2) NULL,
+  missile_damage_distortion DECIMAL(10,2) NULL,
+
+  -- Thruster
+  thruster_max_thrust DECIMAL(15,2) NULL,
+  thruster_type       VARCHAR(50)   NULL,
+
+  -- Radar
+  radar_range               DECIMAL(15,2) NULL,
+  radar_detection_lifetime  DECIMAL(10,2) NULL,
+  radar_tracking_signal     DECIMAL(10,4) NULL,
+
+  -- Misc
+  cm_ammo_count   INT           NULL,
+  fuel_capacity   DECIMAL(10,2) NULL,
+  fuel_intake_rate DECIMAL(10,4) NULL,
+  emp_damage      DECIMAL(10,2) NULL,
+  emp_radius      DECIMAL(10,2) NULL,
+  emp_charge_time DECIMAL(10,2) NULL,
+  emp_cooldown    DECIMAL(10,2) NULL,
+  qig_jammer_range DECIMAL(15,2) NULL,
+  qig_snare_radius DECIMAL(15,2) NULL,
+  qig_charge_time  DECIMAL(10,2) NULL,
+  qig_cooldown     DECIMAL(10,2) NULL,
+  mining_speed        DECIMAL(10,4) NULL,
+  mining_range        DECIMAL(10,2) NULL,
+  mining_resistance   DECIMAL(10,4) NULL,
+  mining_instability  DECIMAL(10,4) NULL,
+  tractor_max_force   DECIMAL(15,2) NULL,
+  tractor_max_range   DECIMAL(10,2) NULL,
+  salvage_speed       DECIMAL(10,4) NULL,
+  salvage_radius      DECIMAL(10,2) NULL,
+  gimbal_type         VARCHAR(20)   NULL,
+  rack_count          TINYINT       UNSIGNED NULL,
+  rack_missile_size   TINYINT       UNSIGNED NULL,
+
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  INDEX idx_class_name  (class_name),
+  INDEX idx_type        (type),
+  INDEX idx_sub_type    (sub_type),
+  INDEX idx_size        (size),
+  INDEX idx_grade       (grade),
   INDEX idx_manufacturer (manufacturer_code),
-  INDEX idx_class_name (class_name),
-  INDEX idx_type_size (type, size)
+  INDEX idx_type_size   (type, size)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ====================
--- SHIP_LOADOUTS - Default loadout per ship (from DataForge entity loadout)
--- Each row = one port on a ship with its default equipped component
--- ====================
+-- ── ship_loadouts ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS ship_loadouts (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ship_uuid CHAR(36) NOT NULL COMMENT 'FK to ships.uuid',
-  
-  -- Port info
-  port_name VARCHAR(100) NOT NULL COMMENT 'e.g. hardpoint_weapon_gun_left',
-  port_display_name VARCHAR(100),
-  port_min_size TINYINT UNSIGNED,
-  port_max_size TINYINT UNSIGNED,
-  port_editable BOOLEAN DEFAULT TRUE,
-  
-  -- Equipped component
-  component_class_name VARCHAR(255) COMMENT 'DataForge className of equipped item',
-  component_uuid CHAR(36) COMMENT 'FK to components.uuid if resolved',
-  
-  -- Classification
-  port_type VARCHAR(50) COMMENT 'WeaponGun, Shield, PowerPlant, Cooler, Thruster, etc.',
-  
-  -- Hierarchy (sub-ports on turrets, missile racks, etc.)
-  parent_id INT COMMENT 'FK to ship_loadouts.id for nested ports',
-  
-  INDEX idx_ship (ship_uuid),
+  id                   INT           AUTO_INCREMENT PRIMARY KEY,
+  ship_uuid            CHAR(36)      NOT NULL,
+  port_name            VARCHAR(100)  NOT NULL,
+  port_min_size        TINYINT       UNSIGNED NULL,
+  port_max_size        TINYINT       UNSIGNED NULL,
+  port_editable        BOOLEAN       NOT NULL DEFAULT TRUE,
+  component_class_name VARCHAR(255)  NULL,
+  component_uuid       CHAR(36)      NULL,
+  port_type            VARCHAR(50)   NULL,
+  parent_id            INT           NULL,
+
+  INDEX idx_ship      (ship_uuid),
   INDEX idx_port_type (port_type),
   INDEX idx_component (component_uuid),
-  INDEX idx_parent (parent_id),
-  CONSTRAINT fk_loadout_ship FOREIGN KEY (ship_uuid) REFERENCES ships(uuid) ON DELETE CASCADE,
+  INDEX idx_parent    (parent_id),
+  CONSTRAINT fk_loadout_ship      FOREIGN KEY (ship_uuid)      REFERENCES ships(uuid)      ON DELETE CASCADE,
   CONSTRAINT fk_loadout_component FOREIGN KEY (component_uuid) REFERENCES components(uuid) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ====================
--- SHIP_MODULES - Modular compartments for ships like Retaliator, Apollo, Caterpillar
--- ====================
+-- ── ship_modules ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS ship_modules (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ship_uuid CHAR(36) NOT NULL COMMENT 'FK to ships.uuid — parent ship',
-  slot_name VARCHAR(100) NOT NULL COMMENT 'e.g. hardpoint_front_module, hardpoint_modular_room_left',
-  slot_display_name VARCHAR(100) COMMENT 'Human-readable slot name',
-  slot_type VARCHAR(20) DEFAULT NULL COMMENT 'front/rear (Retaliator) or left/right (Apollo)',
-  module_class_name VARCHAR(255) NOT NULL COMMENT 'DataForge className of the module entity',
-  module_name VARCHAR(255) COMMENT 'Display name of the module',
-  module_uuid CHAR(36) COMMENT 'DataForge UUID of the module',
-  module_tier TINYINT UNSIGNED DEFAULT NULL COMMENT 'Tier number (1/2/3) for Apollo-style modules — NULL for others',
-  is_default BOOLEAN DEFAULT FALSE COMMENT 'Whether this is the default module for this slot',
-  loadout_json JSON DEFAULT NULL COMMENT 'Serialised LoadoutPortEntry[] for this module variant (racks and loaded weapons)',
+  id                 INT           AUTO_INCREMENT PRIMARY KEY,
+  ship_uuid          CHAR(36)      NOT NULL,
+  slot_name          VARCHAR(100)  NOT NULL,
+  slot_display_name  VARCHAR(100)  NULL,
+  slot_type          VARCHAR(20)   NULL COMMENT 'front | rear | left | right',
+  module_class_name  VARCHAR(255)  NOT NULL,
+  module_name        VARCHAR(255)  NULL,
+  module_tier        TINYINT       UNSIGNED NULL,
+  is_default         BOOLEAN       NOT NULL DEFAULT FALSE,
+  loadout_json       JSON          NULL,
 
   UNIQUE KEY uq_ship_slot_module (ship_uuid, slot_name, module_class_name),
-  INDEX idx_ship (ship_uuid),
+  INDEX idx_ship         (ship_uuid),
   INDEX idx_module_class (module_class_name),
   CONSTRAINT fk_module_ship FOREIGN KEY (ship_uuid) REFERENCES ships(uuid) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ====================
--- ITEMS - FPS weapons, personal armor, clothing, attachments, gadgets, consumables
--- ====================
-CREATE TABLE IF NOT EXISTS items (
-  uuid CHAR(36) PRIMARY KEY COMMENT 'DataForge entity UUID',
-  class_name VARCHAR(255) NOT NULL,
-  name VARCHAR(255) NOT NULL,
-  type VARCHAR(50) NOT NULL COMMENT 'FPS_Weapon, Armor_Helmet, Armor_Torso, Armor_Arms, Armor_Legs, Armor_Backpack, Undersuit, Clothing, Attachment, Magazine, Consumable, Gadget, Tool, Grenade, Knife',
-  sub_type VARCHAR(100) COMMENT 'e.g. Assault Rifle, Pistol, SMG, Sniper, LMG, Shotgun, Light, Medium, Heavy',
-  size TINYINT UNSIGNED,
-  grade VARCHAR(10),
-  manufacturer_code VARCHAR(10),
-  
-  -- Physical
-  mass DECIMAL(10,2),
-  hp INT,
-  
-  -- FPS Weapon stats
-  weapon_damage DECIMAL(10,4) COMMENT 'Per-shot damage',
-  weapon_damage_type VARCHAR(50) COMMENT 'physical, energy, distortion',
-  weapon_fire_rate DECIMAL(10,4) COMMENT 'Rounds per minute',
-  weapon_range DECIMAL(10,2) COMMENT 'Effective range (m)',
-  weapon_speed DECIMAL(10,2) COMMENT 'Projectile speed (m/s)',
-  weapon_ammo_count INT COMMENT 'Magazine capacity',
-  weapon_dps DECIMAL(10,4) COMMENT 'Damage per second',
-  
-  -- Armor stats
-  armor_damage_reduction DECIMAL(10,4) COMMENT 'Damage reduction %',
-  armor_temp_min DECIMAL(10,2) COMMENT 'Min temp resistance (°C)',
-  armor_temp_max DECIMAL(10,2) COMMENT 'Max temp resistance (°C)',
-  
-  -- Extended data (type-specific JSON blob)
-  data_json JSON COMMENT 'Extended type-specific data',
-  
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  
-  INDEX idx_type (type),
-  INDEX idx_sub_type (sub_type),
-  INDEX idx_manufacturer (manufacturer_code),
-  INDEX idx_class_name (class_name),
-  INDEX idx_type_sub (type, sub_type)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ====================
--- COMMODITIES - Tradeable and mineable goods (metals, gas, minerals, food, etc.)
--- ====================
-CREATE TABLE IF NOT EXISTS commodities (
-  uuid CHAR(36) PRIMARY KEY COMMENT 'DataForge entity UUID',
-  class_name VARCHAR(255) NOT NULL,
-  name VARCHAR(255) NOT NULL,
-  type VARCHAR(50) NOT NULL COMMENT 'Metal, Gas, Mineral, Food, Vice, Consumer Goods, etc.',
-  sub_type VARCHAR(100) COMMENT 'Specific commodity (Aluminum, Titanium, etc.)',
-  symbol VARCHAR(20) COMMENT 'Chemical/trade symbol (Al, Ti, etc.)',
-  occupancy_scu DECIMAL(10,4) COMMENT 'Size in micro-SCU',
-  
-  data_json JSON COMMENT 'Extended commodity data',
-  
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  
-  INDEX idx_type (type),
-  INDEX idx_sub_type (sub_type),
-  INDEX idx_class_name (class_name)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ====================
--- SHIP_PAINTS - Available paints/liveries per ship
--- ====================
+-- ── ship_paints ──────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS ship_paints (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  ship_uuid CHAR(36) NOT NULL COMMENT 'FK to ships.uuid — parent ship',
-  paint_class_name VARCHAR(255) NOT NULL COMMENT 'DataForge className of paint entity',
-  paint_name VARCHAR(255) COMMENT 'Display name of the paint/livery',
-  paint_uuid CHAR(36) COMMENT 'DataForge entity UUID of the paint',
-  
-  INDEX idx_ship (ship_uuid),
+  id               INT           AUTO_INCREMENT PRIMARY KEY,
+  ship_uuid        CHAR(36)      NOT NULL,
+  paint_class_name VARCHAR(255)  NOT NULL,
+  paint_name       VARCHAR(255)  NULL,
+  paint_uuid       CHAR(36)      NULL,
+
+  INDEX idx_ship       (ship_uuid),
   INDEX idx_paint_class (paint_class_name),
   CONSTRAINT fk_paint_ship FOREIGN KEY (ship_uuid) REFERENCES ships(uuid) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ====================
--- SHOPS - In-game shops / vendor locations
--- ====================
-CREATE TABLE IF NOT EXISTS shops (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  location VARCHAR(255) COMMENT 'Display location name (e.g. Port Olisar, Lorville)',
-  `system` VARCHAR(50) COMMENT 'Star system (Stanton, Pyro, Nyx)',
-  planet_moon VARCHAR(100) COMMENT 'Planet or moon (e.g. Crusader, Hurston)',
-  city VARCHAR(100) COMMENT 'City or station name',
-  shop_type VARCHAR(50) COMMENT 'Weapon, Ship, Component, etc.',
-  class_name VARCHAR(255) UNIQUE NOT NULL,
-  location_id INT NULL COMMENT 'FK to locations.id',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+-- ── items ────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS items (
+  uuid              CHAR(36)      PRIMARY KEY,
+  class_name        VARCHAR(255)  NOT NULL,
+  name              VARCHAR(255)  NOT NULL,
+  type              VARCHAR(50)   NOT NULL COMMENT 'FPS_Weapon | Armor_Helmet | Armor_Torso | Clothing | Consumable | …',
+  sub_type          VARCHAR(100)  NULL,
+  size              TINYINT       UNSIGNED NULL,
+  grade             VARCHAR(10)   NULL,
+  manufacturer_code VARCHAR(10)   NULL,
+  mass              DECIMAL(10,2) NULL,
+  hp                INT           NULL,
 
-  INDEX idx_location (location),
-  INDEX idx_planet_moon (planet_moon),
-  INDEX idx_type (shop_type),
-  INDEX idx_system (`system`),
-  INDEX idx_city (city),
-  INDEX idx_location_id (location_id)
+  -- Armes FPS
+  weapon_damage      DECIMAL(10,4) NULL,
+  weapon_damage_type VARCHAR(50)   NULL,
+  weapon_fire_rate   DECIMAL(10,4) NULL,
+  weapon_range       DECIMAL(10,2) NULL,
+  weapon_speed       DECIMAL(10,2) NULL,
+  weapon_ammo_count  INT           NULL,
+  weapon_dps         DECIMAL(10,4) NULL,
+
+  -- Armure FPS
+  armor_damage_reduction DECIMAL(10,4) NULL,
+  armor_temp_min         DECIMAL(10,2) NULL,
+  armor_temp_max         DECIMAL(10,2) NULL,
+
+  data_json JSON NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  INDEX idx_type       (type),
+  INDEX idx_sub_type   (sub_type),
+  INDEX idx_manufacturer (manufacturer_code),
+  INDEX idx_class_name (class_name),
+  INDEX idx_type_sub   (type, sub_type)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ====================
--- SHOP_INVENTORY - Items available for purchase / rental in shops
--- ====================
-CREATE TABLE IF NOT EXISTS shop_inventory (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  shop_id INT NOT NULL,
-  component_uuid CHAR(36) COMMENT 'FK to components.uuid if resolved',
-  component_class_name VARCHAR(255) NOT NULL,
-  base_price DECIMAL(12,2),
-  rental_price_1d DECIMAL(12,2),
-  rental_price_3d DECIMAL(12,2),
-  rental_price_7d DECIMAL(12,2),
-  rental_price_30d DECIMAL(12,2),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+-- ── commodities ──────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS commodities (
+  uuid         CHAR(36)      PRIMARY KEY,
+  class_name   VARCHAR(255)  NOT NULL,
+  name         VARCHAR(255)  NOT NULL,
+  type         VARCHAR(50)   NOT NULL,
+  sub_type     VARCHAR(100)  NULL,
+  symbol       VARCHAR(20)   NULL,
+  occupancy_scu DECIMAL(10,4) NULL,
+  data_json    JSON          NULL,
+  created_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
-  INDEX idx_shop (shop_id),
-  INDEX idx_component (component_uuid),
-  INDEX idx_class_name (component_class_name),
+  INDEX idx_type       (type),
+  INDEX idx_sub_type   (sub_type),
+  INDEX idx_class_name (class_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── shops ────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS shops (
+  id          INT           AUTO_INCREMENT PRIMARY KEY,
+  name        VARCHAR(255)  NOT NULL,
+  class_name  VARCHAR(255)  NOT NULL UNIQUE,
+  location    VARCHAR(255)  NULL COMMENT 'Nom affichage du lieu',
+  `system`    VARCHAR(50)   NULL,
+  planet_moon VARCHAR(100)  NULL,
+  city        VARCHAR(100)  NULL,
+  shop_type   VARCHAR(50)   NULL,
+  created_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  INDEX idx_location   (location),
+  INDEX idx_planet_moon (planet_moon),
+  INDEX idx_system     (`system`),
+  INDEX idx_city       (city),
+  INDEX idx_type       (shop_type)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── shop_inventory ───────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS shop_inventory (
+  id                   INT           AUTO_INCREMENT PRIMARY KEY,
+  shop_id              INT           NOT NULL,
+  component_uuid       CHAR(36)      NULL,
+  component_class_name VARCHAR(255)  NOT NULL,
+  base_price           DECIMAL(12,2) NULL,
+  rental_price_1d      DECIMAL(12,2) NULL,
+  rental_price_3d      DECIMAL(12,2) NULL,
+  rental_price_7d      DECIMAL(12,2) NULL,
+  rental_price_30d     DECIMAL(12,2) NULL,
+  created_at           TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at           TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
   UNIQUE KEY uk_shop_component (shop_id, component_class_name),
-  CONSTRAINT fk_inventory_shop FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE,
+  INDEX idx_shop       (shop_id),
+  INDEX idx_component  (component_uuid),
+  INDEX idx_class_name (component_class_name),
+  CONSTRAINT fk_inventory_shop      FOREIGN KEY (shop_id)       REFERENCES shops(id)       ON DELETE CASCADE,
   CONSTRAINT fk_inventory_component FOREIGN KEY (component_uuid) REFERENCES components(uuid) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ====================
--- EXTRACTION_LOG - Version history for game data extractions
--- (must come before changelog which references it via FK)
--- ====================
+-- ── extraction_log ───────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS extraction_log (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  extraction_hash CHAR(64) NOT NULL COMMENT 'SHA-256 of p4k metadata',
-  game_version VARCHAR(50) COMMENT 'Detected game version string',
-  ships_count INT DEFAULT 0,
-  components_count INT DEFAULT 0,
-  items_count INT DEFAULT 0,
-  commodities_count INT DEFAULT 0,
-  manufacturers_count INT DEFAULT 0,
-  loadout_ports_count INT DEFAULT 0,
-  shops_count INT DEFAULT 0,
-  duration_ms INT COMMENT 'Extraction duration in ms',
-  status ENUM('success', 'partial', 'failed') DEFAULT 'success',
-  error_message TEXT,
-  extracted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  
-  INDEX idx_hash (extraction_hash),
+  id                   INT           AUTO_INCREMENT PRIMARY KEY,
+  extraction_hash      CHAR(64)      NOT NULL,
+  game_version         VARCHAR(50)   NULL,
+  ships_count          INT           NOT NULL DEFAULT 0,
+  components_count     INT           NOT NULL DEFAULT 0,
+  items_count          INT           NOT NULL DEFAULT 0,
+  commodities_count    INT           NOT NULL DEFAULT 0,
+  manufacturers_count  INT           NOT NULL DEFAULT 0,
+  loadout_ports_count  INT           NOT NULL DEFAULT 0,
+  shops_count          INT           NOT NULL DEFAULT 0,
+  duration_ms          INT           NULL,
+  status               ENUM('success','partial','failed') NOT NULL DEFAULT 'success',
+  error_message        TEXT          NULL,
+  extracted_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  INDEX idx_hash         (extraction_hash),
   INDEX idx_extracted_at (extracted_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ====================
--- CHANGELOG - Track changes between game data extractions
--- ====================
+-- ── changelog ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS changelog (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  extraction_id INT NOT NULL COMMENT 'FK to extraction_log.id',
-  entity_type ENUM('ship', 'component', 'item', 'commodity', 'shop', 'module') NOT NULL,
-  entity_uuid VARCHAR(255) NOT NULL COMMENT 'UUID or identifier of changed entity',
-  entity_name VARCHAR(255) COMMENT 'Name for display',
-  change_type ENUM('added', 'removed', 'modified') NOT NULL,
-  field_name VARCHAR(100) COMMENT 'Which field changed (for modifications)',
-  old_value TEXT COMMENT 'Previous value (JSON for complex)',
-  new_value TEXT COMMENT 'New value (JSON for complex)',
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  
-  INDEX idx_extraction (extraction_id),
+  id            INT           AUTO_INCREMENT PRIMARY KEY,
+  extraction_id INT           NOT NULL,
+  entity_type   ENUM('ship','component','item','commodity','shop','module') NOT NULL,
+  entity_uuid   VARCHAR(255)  NOT NULL,
+  entity_name   VARCHAR(255)  NULL,
+  change_type   ENUM('added','removed','modified') NOT NULL,
+  field_name    VARCHAR(100)  NULL,
+  old_value     TEXT          NULL,
+  new_value     TEXT          NULL,
+  game_version  VARCHAR(50)   NULL COMMENT 'Dénormalisé depuis extraction_log pour perf',
+  created_at    TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  INDEX idx_extraction  (extraction_id),
   INDEX idx_entity_type (entity_type),
   INDEX idx_change_type (change_type),
-  INDEX idx_created (created_at),
+  INDEX idx_game_version (game_version),
+  INDEX idx_created     (created_at),
   CONSTRAINT fk_changelog_extraction FOREIGN KEY (extraction_id) REFERENCES extraction_log(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ====================
--- SCHEMA_MIGRATIONS - Versioned migration tracking
--- ====================
-CREATE TABLE IF NOT EXISTS schema_migrations (
-  filename   VARCHAR(255) PRIMARY KEY,
-  applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
