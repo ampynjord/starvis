@@ -38,7 +38,7 @@ export class LoadoutService {
               c.rack_count, c.rack_missile_size,
               c.cm_ammo_count,
               c.radar_range, c.radar_detection_lifetime, c.radar_tracking_signal
-       FROM ships_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
+       FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
        WHERE sl.ship_uuid = ? ORDER BY sl.port_type, sl.port_name`,
       [shipUuid],
     );
@@ -139,7 +139,7 @@ export class LoadoutService {
       `SELECT sl.id, sl.port_name, sl.port_type, sl.port_min_size, sl.port_max_size,
               sl.parent_id, sl.component_uuid, sl.component_class_name, sl.port_editable,
               c.*
-       FROM ships_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
+       FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
        WHERE sl.ship_uuid = ?`,
       [shipUuid],
     );
@@ -266,7 +266,7 @@ export class LoadoutService {
       `SELECT sl.id, sl.port_name, sl.port_type, sl.port_min_size, sl.port_max_size,
               sl.parent_id, sl.component_uuid, sl.component_class_name, sl.port_editable,
               c.*
-       FROM ships_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
+       FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
        WHERE sl.ship_uuid = ?`,
       [shipUuid],
     );
@@ -287,7 +287,7 @@ export class LoadoutService {
       `SELECT sl.id, sl.port_name, sl.port_type, sl.port_min_size, sl.port_max_size,
               sl.parent_id, sl.component_uuid, sl.component_class_name, sl.port_editable,
               c.*
-       FROM ships_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
+       FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
        WHERE sl.ship_uuid = ?`,
       [shipUuid],
     );

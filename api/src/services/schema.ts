@@ -33,6 +33,19 @@ export async function initializeSchema(conn: PoolConnection): Promise<void> {
     logger.debug(`Migration skip: ${e.message}`, { module: 'schema' });
   }
 
+  // Migration: rename ships_loadouts → ship_loadouts if needed (naming consistency)
+  try {
+    const [tables] = await conn.execute<any[]>(
+      "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ships_loadouts'",
+    );
+    if (tables.length > 0) {
+      logger.info('Renaming ships_loadouts → ship_loadouts', { module: 'schema' });
+      await conn.execute('RENAME TABLE ships_loadouts TO ship_loadouts');
+    }
+  } catch (e: any) {
+    logger.debug(`Migration skip: ${e.message}`, { module: 'schema' });
+  }
+
   // Split on semicolons, respecting single-quoted strings
   // (naive split(';') breaks on COMMENTs like 'text; more text')
   const noLineComments = schema.replace(/--[^\n]*$/gm, '');

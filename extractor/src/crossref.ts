@@ -242,7 +242,7 @@ export async function tagVariantTypes(conn: PoolConnection): Promise<void> {
  *  - arena_ai     → swarm AI ships used only in Arena Commander
  *
  * Ships tagged npc, pyam_exec, or collector are kept.
- * Cascading FK deletes will clean ships_loadouts, ship_modules, ship_paints automatically.
+ * Cascading FK deletes will clean ship_loadouts, ship_modules, ship_paints automatically.
  */
 export async function pruneExcludedVariants(conn: PoolConnection): Promise<number> {
   const EXCLUDED = ['bis_edition', 'event', 'military', 'tutorial', 'special', 'arena_ai'];

@@ -180,7 +180,7 @@ export class ExtractionService {
       await conn.execute('DELETE FROM shop_inventory');
       await conn.execute('DELETE FROM shops');
       await conn.execute('DELETE FROM ship_modules');
-      await conn.execute('DELETE FROM ships_loadouts');
+      await conn.execute('DELETE FROM ship_loadouts');
       await conn.execute('DELETE FROM ship_paints WHERE 1=1');
       await conn.execute('DELETE FROM ships');
       await conn.execute('DELETE FROM components');
@@ -503,7 +503,7 @@ export class ExtractionService {
   }
 
   // ======================================================
-  //  SHIPS → ships + ships_loadouts tables
+  //  SHIPS → ships + ship_loadouts tables
   // ======================================================
 
   private async saveShips(conn: PoolConnection, onProgress?: (msg: string) => void): Promise<{ ships: number; loadoutPorts: number }> {
@@ -705,7 +705,7 @@ export class ExtractionService {
         // Extract & save loadout
         const loadout = this.dfService.extractVehicleLoadout(veh.className);
         if (loadout && loadout.length > 0) {
-          await conn.execute('DELETE FROM ships_loadouts WHERE ship_uuid = ?', [fullData.ref]);
+          await conn.execute('DELETE FROM ship_loadouts WHERE ship_uuid = ?', [fullData.ref]);
           totalPorts += await this.saveLoadout(conn, fullData.ref, loadout, componentUuidCache);
           await this.computeAndStoreMissileDamage(conn, fullData.ref);
           await this.computeAndStoreWeaponDamage(conn, fullData.ref);
@@ -756,7 +756,7 @@ export class ExtractionService {
       if (parentId === null) {
         // Root port — include size columns
         const [result] = await conn.execute<any>(
-          `INSERT INTO ships_loadouts
+          `INSERT INTO ship_loadouts
             (ship_uuid, port_name, port_type, component_class_name, component_uuid, port_min_size, port_max_size)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
           [
@@ -772,7 +772,7 @@ export class ExtractionService {
         insertId = result.insertId;
       } else {
         const [result] = await conn.execute<any>(
-          `INSERT INTO ships_loadouts
+          `INSERT INTO ship_loadouts
             (ship_uuid, port_name, port_type, component_class_name, component_uuid, parent_id)
            VALUES (?, ?, ?, ?, ?, ?)`,
           [
@@ -809,7 +809,7 @@ export class ExtractionService {
     try {
       const [rows] = await conn.execute<any[]>(
         `SELECT COALESCE(SUM(c.missile_damage), 0) as total
-         FROM ships_loadouts sl JOIN components c ON sl.component_uuid = c.uuid
+         FROM ship_loadouts sl JOIN components c ON sl.component_uuid = c.uuid
          WHERE sl.ship_uuid = ? AND c.type IN ('Missile','WeaponMissile')`,
         [shipUuid],
       );
@@ -824,7 +824,7 @@ export class ExtractionService {
     try {
       const [rows] = await conn.execute<any[]>(
         `SELECT COALESCE(SUM(c.weapon_dps), 0) as total_dps
-         FROM ships_loadouts sl JOIN components c ON sl.component_uuid = c.uuid
+         FROM ship_loadouts sl JOIN components c ON sl.component_uuid = c.uuid
          WHERE sl.ship_uuid = ? AND c.type = 'WeaponGun'`,
         [shipUuid],
       );
@@ -1314,7 +1314,6 @@ export class ExtractionService {
       shopRows.push([
         shop.name,
         shop.location || null,
-        shop.parentLocation || null,
         shop.system || null,
         shop.planetMoon || null,
         shop.city || null,
@@ -1325,14 +1324,13 @@ export class ExtractionService {
     if (shopRows.length > 0) {
       savedShops = await ExtractionService.batchUpsert(
         conn,
-        `INSERT INTO shops (name, location, parent_location, \`system\`, planet_moon, city, shop_type, class_name) VALUES`,
+        `INSERT INTO shops (name, location, \`system\`, planet_moon, city, shop_type, class_name) VALUES`,
         `ON DUPLICATE KEY UPDATE
            name=new.name, location=new.location,
-           parent_location=new.parent_location,
            \`system\`=new.\`system\`, planet_moon=new.planet_moon, city=new.city,
            shop_type=new.shop_type,
            updated_at=CURRENT_TIMESTAMP`,
-        8,
+        7,
         shopRows,
       );
     }
