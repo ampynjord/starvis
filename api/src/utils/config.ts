@@ -17,3 +17,17 @@ export const DB_CONFIG = {
   waitForConnections: true,
   connectionLimit: 10,
 };
+
+export const RATE_LIMITS = {
+  // Shared window for all limiters
+  windowMs: 15 * 60 * 1000,
+  // Hard limit: requests per window per IP (then 429)
+  max: parseInt(process.env.RATE_LIMIT_MAX || '200', 10),
+  // Strict limit for admin endpoints
+  adminMax: 20,
+  // Burst: max requests per minute per IP
+  burstWindowMs: 60 * 1000,
+  burst: parseInt(process.env.RATE_LIMIT_BURST || '30', 10),
+  // Slow-down: start adding delay after this many requests
+  slowAfter: 100,
+};

@@ -82,15 +82,8 @@ export async function initializeSchema(conn: PoolConnection): Promise<void> {
  * Each file is named NNN_description.sql and tracked in a `schema_migrations` table.
  */
 async function runVersionedMigrations(conn: PoolConnection): Promise<void> {
-  // Ensure migrations tracking table exists (column: filename WITH .sql extension)
-  await conn.execute(`
-    CREATE TABLE IF NOT EXISTS schema_migrations (
-      filename VARCHAR(255) PRIMARY KEY,
-      applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
   // Handle older installations where the column was named 'version' instead of 'filename'
+  // (schema.sql now creates the table with 'filename'; this ALTER is a no-op on current installs)
   try {
     await conn.execute(`ALTER TABLE schema_migrations CHANGE COLUMN version filename VARCHAR(255) NOT NULL`);
     logger.info('Migrated schema_migrations: renamed column version -> filename', { module: 'schema' });

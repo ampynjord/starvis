@@ -13,7 +13,7 @@ export function mountPaintRoutes(router: Router, deps: RouteDependencies): void 
     asyncHandler(async (req, res) => {
       const t = Date.now();
       const filters = PaintQuery.parse(req.query);
-      const result = await gameDataService!.getAllPaints(filters);
+      const result = await gameDataService!.loadouts.getAllPaints(filters);
       const payload = {
         success: true,
         count: result.data.length,

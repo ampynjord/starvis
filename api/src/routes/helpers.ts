@@ -3,6 +3,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { ZodError } from 'zod';
 import { arrayToCsv } from '../schemas.js';
 import type { GameDataService } from '../services/game-data-service.js';
+import type { ShipQueryService } from '../services/ship-query-service.js';
 import { logger } from '../utils/index.js';
 
 /** Wrap async route handler — catches errors (including ZodErrors → 400) */
@@ -65,15 +66,15 @@ export function makeGameDataGuard(gameDataService: GameDataService | undefined) 
 }
 
 /** Factory: returns helpers for resolving ship identifiers (UUID or class_name) */
-export function makeShipResolver(gameDataService: GameDataService) {
+export function makeShipResolver(ships: ShipQueryService) {
   return {
     async resolveShipUuid(id: string): Promise<string | null> {
       if (id.length === 36) return id;
-      const ship = await gameDataService.getShipByClassName(id);
-      return ship?.uuid || null;
+      const ship = await ships.getShipByClassName(id);
+      return (ship?.uuid as string) || null;
     },
     async resolveShip(id: string): Promise<Record<string, unknown> | null> {
-      return (await gameDataService.getShipByUuid(id)) || (await gameDataService.getShipByClassName(id));
+      return (await ships.getShipByUuid(id)) || (await ships.getShipByClassName(id));
     },
   };
 }

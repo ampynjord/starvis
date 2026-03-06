@@ -6,7 +6,7 @@ import type { RouteDependencies } from './types.js';
 export function mountSearchRoutes(router: Router, deps: RouteDependencies): void {
   const { gameDataService } = deps;
   const requireGameData = makeGameDataGuard(gameDataService);
-  const { resolveShipUuid } = makeShipResolver(gameDataService!);
+  const { resolveShipUuid } = makeShipResolver(gameDataService!.ships);
 
   router.get(
     '/api/v1/search',
@@ -32,7 +32,7 @@ export function mountSearchRoutes(router: Router, deps: RouteDependencies): void
       const { shipUuid, swaps } = LoadoutBody.parse(req.body);
       const uuid = await resolveShipUuid(shipUuid);
       if (!uuid) return void res.status(404).json({ success: false, error: 'Ship not found' });
-      const result = await gameDataService!.calculateLoadout(uuid, swaps);
+      const result = await gameDataService!.loadouts.calculateLoadout(uuid, swaps);
       res.json({ success: true, data: result });
     }),
   );

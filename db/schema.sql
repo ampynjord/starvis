@@ -568,13 +568,10 @@ CREATE TABLE IF NOT EXISTS shop_inventory (
   CONSTRAINT fk_inventory_item FOREIGN KEY (item_uuid) REFERENCES items(uuid) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ─── Migrations tracking ──────────────────────────────────────────────────────
--- Tracks which versioned migrations have been applied.
--- The table is seeded here so it exists before runVersionedMigrations() runs.
--- Individual migration entries are NOT pre-seeded: each migration must run and
--- be idempotent (the runner swallows ER_DUP_FIELDNAME / ER_TABLE_EXISTS etc.).
-
+-- ====================
+-- SCHEMA_MIGRATIONS - Versioned migration tracking
+-- ====================
 CREATE TABLE IF NOT EXISTS schema_migrations (
-  version    VARCHAR(255) PRIMARY KEY,
+  filename   VARCHAR(255) PRIMARY KEY,
   applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
