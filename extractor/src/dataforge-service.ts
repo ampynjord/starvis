@@ -17,6 +17,8 @@ import {
 import { type DataForgeContext, resolveLocKey } from './dataforge-utils.js';
 import { extractItems as _extractItems } from './item-extractor.js';
 import { LoadoutParser, type LoadoutPortEntry } from './loadout-parser.js';
+import { readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import logger from './logger.js';
 import { P4KProvider } from './p4k-provider.js';
 import { extractPaints as _extractPaints, extractShops as _extractShops } from './shop-paint-extractor.js';
@@ -69,8 +71,22 @@ export class DataForgeService implements DataForgeContext {
       if (c % 100000 === 0) onProgress?.(`Loading: ${c.toLocaleString()}/${t.toLocaleString()}`);
     });
 
-    // Try to read the SC game version from the P4K
+    // 0. Try to read build_manifest.id from the SC install dir (next to Data.p4k)
     try {
+      const manifestPath = join(dirname(this.p4kPath), 'build_manifest.id');
+      const raw = await readFile(manifestPath, 'utf8');
+      const parsed = JSON.parse(raw);
+      const ver = parsed?.Data?.Version || parsed?.Version;
+      if (ver) {
+        this.scVersion = String(ver);
+        logger.info(`SC game version: ${this.scVersion} (from build_manifest.id)`, { module: 'dataforge' });
+      }
+    } catch (_e) {
+      // file not found or parse error — fall through to P4K search
+    }
+
+    // Try to read the SC game version from the P4K
+    if (!this.scVersion) try {
       // 1. Known fixed paths
       const versionPaths = [
         'build_manifest.id',
