@@ -11,7 +11,9 @@ WORKDIR /app
 # ---- Stage 2: dependencies ----
 FROM base AS deps
 COPY api/package*.json ./
+COPY api/prisma/ ./prisma/
 # Install ALL deps (including devDependencies for type-check)
+# postinstall hook will run "prisma generate"
 RUN npm ci && npm cache clean --force
 
 # ---- Stage 3: build (TypeScript type-check) ----
@@ -40,7 +42,13 @@ FROM base AS production
 
 # Install production deps (tsx is now in dependencies)
 COPY api/package*.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+COPY api/prisma/ ./prisma/
+# Skip postinstall hook since prisma CLI is not in production deps
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+
+# Copy generated Prisma client from deps stage (where prisma CLI was available)
+COPY --from=deps /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=deps /app/node_modules/@prisma ./node_modules/@prisma
 
 # Copy source
 COPY api/server.ts ./
