@@ -190,6 +190,9 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
+      - name: Install Playwright browsers
+        run: cd api && npx playwright install --with-deps chromium
+
       - name: Start API server
         run: |
           cd api && npx tsx server.ts &

@@ -11,7 +11,8 @@
     "lint": "biome check --write .",
     "lint:ci": "biome check .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "author": "ampynjord - Dawnstar",
   "license": "MIT",
