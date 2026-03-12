@@ -129,6 +129,9 @@ jobs:
       - name: Install extractor deps
         run: cd extractor && npm ci
 
+      - name: Install Redis CLI
+        run: sudo apt-get update && sudo apt-get install -y redis-tools
+
       - name: Generate Prisma Client
         run: cd api && npx prisma generate
         env:
@@ -151,7 +154,7 @@ jobs:
           echo "✅ Redis ready"
 
       - name: Setup database schema
-        run: cd api && npx prisma db push --skip-generate
+        run: cd api && npx prisma db push --skip-generate --accept-data-loss --force-reset
         env:
           DATABASE_URL: mysql://starvis_user:testpass@127.0.0.1:3306/starvis_test
 
@@ -175,7 +178,7 @@ jobs:
       - name: Upload API coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: ./api/coverage/coverage-final.json
+          files: ./api/coverage/lcov.info
           flags: api
           name: api-coverage
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -184,7 +187,7 @@ jobs:
       - name: Upload Extractor coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: ./extractor/coverage/coverage-final.json
+          files: ./extractor/coverage/lcov.info
           flags: extractor
           name: extractor-coverage
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -195,15 +198,27 @@ jobs:
 
       - name: Start API server
         run: |
-          cd api && npx tsx server.ts &
+          cd api && npx tsx server.ts > server.log 2>&1 &
           echo $! > server.pid
+          echo "🚀 API server started (PID: $(cat server.pid))"
+          
           # Wait for server to be ready (up to 60 seconds)
           for i in $(seq 1 60); do
-            curl -sf http://localhost:3000/health/live > /dev/null 2>&1 && break
+            if curl -sf http://localhost:3000/health/live > /dev/null 2>&1; then
+              echo "✅ Liveness check passed"
+              break
+            fi
             sleep 1
           done
-          curl -sf http://localhost:3000/health/ready || (echo "❌ Server failed health check" && exit 1)
-          echo "✅ Server ready"
+          
+          # Check readiness (DB + Redis)
+          if curl -sf http://localhost:3000/health/ready > /dev/null 2>&1; then
+            echo "✅ Readiness check passed - Server ready for E2E tests"
+          else
+            echo "❌ Server failed health check"
+            cat server.log
+            exit 1
+          fi
         env:
           DATABASE_URL: mysql://starvis_user:testpass@127.0.0.1:3306/starvis_test
           DB_HOST: 127.0.0.1
@@ -237,7 +252,18 @@ jobs:
         if: always()
         run: |
           if [ -f api/server.pid ]; then
-            kill $(cat api/server.pid) || true
+            PID=$(cat api/server.pid)
+            echo "🛑 Stopping API server (PID: $PID)"
+            kill $PID 2>/dev/null || echo "Server already stopped"
+            rm -f api/server.pid
+          fi
+          
+      - name: Show server logs on failure
+        if: failure()
+        run: |
+          if [ -f api/server.log ]; then
+            echo "📋 Server logs:"
+            cat api/server.log
           fi
 
   # ==========================================
