@@ -2,7 +2,7 @@
  * ShipQueryService — Ship listing, search, filters, manufacturers
  */
 import type { PrismaClient } from '@prisma/client';
-import { CONCEPT_SELECT, num, type PaginatedResult, type Row, SHIP_JOINS, SHIP_SELECT, SHIP_SORT } from './shared.js';
+import { CONCEPT_SELECT, convertBigIntToNumber, num, type PaginatedResult, type Row, SHIP_JOINS, SHIP_SELECT, SHIP_SORT } from './shared.js';
 
 export class ShipQueryService {
   constructor(private prisma: PrismaClient) {}
@@ -124,7 +124,7 @@ export class ShipQueryService {
     }
 
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(sql, ...allParams);
-    const data = rows.map(({ game_data, ...rest }) => rest as Row);
+    const data = rows.map(({ game_data, ...rest }) => convertBigIntToNumber(rest as Row));
     return { data, total: totalCount, page, limit, pages: Math.ceil(totalCount / limit) };
   }
 

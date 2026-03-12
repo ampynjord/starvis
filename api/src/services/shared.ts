@@ -19,6 +19,25 @@ export interface PaginatedResult {
 
 // ── Numeric helpers ───────────────────────────────────────
 
+/**
+ * Convert BigInt to Number recursively in object/array
+ * Prisma raw queries return COUNT/SUM as BigInt which cannot be JSON serialized
+ */
+export function convertBigIntToNumber<T>(obj: T): T {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === 'bigint') return Number(obj) as T;
+  if (Array.isArray(obj)) return obj.map(convertBigIntToNumber) as T;
+  if (typeof obj === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = convertBigIntToNumber(value);
+    }
+    return result as T;
+  }
+  return obj;
+}
+
+
 export const num = (v: unknown): number => parseFloat(String(v)) || 0;
 export const int = (v: unknown): number => parseInt(String(v), 10) || 0;
 export const r1 = (v: number): number => Math.round(v * 10) / 10;
