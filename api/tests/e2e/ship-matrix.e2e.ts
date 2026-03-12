@@ -55,7 +55,11 @@ test.describe('Ship Matrix API', () => {
     // First request
     const response1 = await request.get('/api/v1/ship-matrix');
     expect(response1.status()).toBe(200);
-		const etag = response1.headers().etag;
+    const etag = response1.headers().etag;
+    expect(etag).toBeDefined();
+
+    // Second request with If-None-Match header
+    const response2 = await request.get('/api/v1/ship-matrix', {
       headers: { 'If-None-Match': etag! },
     });
     expect(response2.status()).toBe(304);
