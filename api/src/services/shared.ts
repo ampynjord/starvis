@@ -28,7 +28,7 @@ export interface PaginatedResult {
 export function convertBigIntToNumber<T>(obj: T): T {
   if (obj === null || obj === undefined) return obj;
   if (typeof obj === 'bigint') return Number(obj) as T;
-  
+
   // Detect Prisma Decimal: object with shape { s: number, e: number, d: number[] }
   if (
     typeof obj === 'object' &&
@@ -46,7 +46,7 @@ export function convertBigIntToNumber<T>(obj: T): T {
     const exponent = decimal.e;
     return (sign * parseFloat(`${mantissa}e${exponent - mantissa.length + 1}`)) as T;
   }
-  
+
   if (Array.isArray(obj)) return obj.map(convertBigIntToNumber) as T;
   if (typeof obj === 'object') {
     const result: Record<string, unknown> = {};
