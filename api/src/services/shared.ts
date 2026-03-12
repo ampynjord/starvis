@@ -37,7 +37,6 @@ export function convertBigIntToNumber<T>(obj: T): T {
   return obj;
 }
 
-
 export const num = (v: unknown): number => parseFloat(String(v)) || 0;
 export const int = (v: unknown): number => parseInt(String(v), 10) || 0;
 export const r1 = (v: number): number => Math.round(v * 10) / 10;
