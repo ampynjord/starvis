@@ -8,7 +8,7 @@
  *
  * Cross-cutting logic (stats, changelog, unified search) lives here.
  */
-import type { Pool } from 'mysql2/promise';
+import type { PrismaClient } from '@prisma/client';
 import { CommodityQueryService } from './commodity-query-service.js';
 import { ComponentQueryService } from './component-query-service.js';
 import { ItemQueryService } from './item-query-service.js';
@@ -44,13 +44,13 @@ export class GameDataService {
   private statsCache = new TtlCache<Record<string, unknown>>(60_000);
   private publicStatsCache = new TtlCache<Record<string, unknown>>(60_000);
 
-  constructor(private pool: Pool) {
-    this.ships = new ShipQueryService(pool);
-    this.components = new ComponentQueryService(pool);
-    this.loadouts = new LoadoutService(pool);
-    this.shops = new ShopService(pool);
-    this.items = new ItemQueryService(pool);
-    this.commodities = new CommodityQueryService(pool);
+  constructor(private prisma: PrismaClient) {
+    this.ships = new ShipQueryService(prisma);
+    this.components = new ComponentQueryService(prisma);
+    this.loadouts = new LoadoutService(prisma);
+    this.shops = new ShopService(prisma);
+    this.items = new ItemQueryService(prisma);
+    this.commodities = new CommodityQueryService(prisma);
   }
 
   // ── Unified search (cross-cutting — queries ships + components + items) ──
@@ -60,24 +60,22 @@ export class GameDataService {
     const t = `%${q}%`;
     const [ships, components, items] = await Promise.all([
       this.ships.searchShipsAutocomplete(q, cap),
-      this.pool
-        .execute<Row[]>(
-          `SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade, c.manufacturer_code,
-                  m.name as manufacturer_name
-           FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code
-           WHERE c.name LIKE ? OR c.class_name LIKE ?
-           ORDER BY c.name LIMIT ${cap}`,
-          [t, t],
-        )
-        .then(([rows]) => rows),
-      this.pool
-        .execute<Row[]>(
-          `SELECT i.uuid, i.class_name, i.name, i.type, i.sub_type, i.manufacturer_code
-           FROM items i WHERE i.name LIKE ? OR i.class_name LIKE ?
-           ORDER BY i.name LIMIT ${cap}`,
-          [t, t],
-        )
-        .then(([rows]) => rows),
+      this.prisma.$queryRawUnsafe<Row[]>(
+        `SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade, c.manufacturer_code,
+                m.name as manufacturer_name
+         FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code
+         WHERE c.name LIKE ? OR c.class_name LIKE ?
+         ORDER BY c.name LIMIT ${cap}`,
+        t,
+        t,
+      ),
+      this.prisma.$queryRawUnsafe<Row[]>(
+        `SELECT i.uuid, i.class_name, i.name, i.type, i.sub_type, i.manufacturer_code
+         FROM items i WHERE i.name LIKE ? OR i.class_name LIKE ?
+         ORDER BY i.name LIMIT ${cap}`,
+        t,
+        t,
+      ),
     ]);
     return { ships, components, items };
   }
@@ -102,14 +100,14 @@ export class GameDataService {
     }
 
     const w = where.length ? ` WHERE ${where.join(' AND ')}` : '';
-    const [countRows] = await this.pool.execute<Row[]>(`SELECT COUNT(*) as total FROM changelog c${w}`, p);
+    const countRows = await this.prisma.$queryRawUnsafe<Row[]>(`SELECT COUNT(*) as total FROM changelog c${w}`, ...p);
     const total = Number(countRows[0]?.total) || 0;
 
     const limit = Math.min(100, parseInt(params.limit || '50', 10));
     const offset = parseInt(params.offset || '0', 10);
-    const [rows] = await this.pool.execute<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT c.*, e.game_version, e.extracted_at as extraction_date FROM changelog c LEFT JOIN extraction_log e ON c.extraction_id = e.id${w} ORDER BY c.created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
-      p,
+      ...p,
     );
     return { data: rows, total };
   }
@@ -117,7 +115,7 @@ export class GameDataService {
   async getStats(): Promise<Record<string, unknown>> {
     const cached = this.statsCache.get();
     if (cached) return cached;
-    const [rows] = await this.pool.execute<Row[]>(`
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(`
       SELECT
         (SELECT COUNT(*) FROM ships) as ships,
         (SELECT COUNT(*) FROM components) as components,
@@ -136,19 +134,19 @@ export class GameDataService {
   }
 
   async getExtractionLog(): Promise<Row[]> {
-    const [rows] = await this.pool.execute<Row[]>('SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 20');
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>('SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 20');
     return rows;
   }
 
   async getLatestExtraction(): Promise<Row | null> {
-    const [rows] = await this.pool.execute<Row[]>('SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 1');
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>('SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 1');
     return rows[0] || null;
   }
 
   async getPublicStats(): Promise<Record<string, unknown>> {
     const cached = this.publicStatsCache.get();
     if (cached) return cached;
-    const [rows] = await this.pool.execute<Row[]>(`
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(`
       SELECT
         (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL) as ships,
         (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL AND vehicle_category = 'ship') as flyable_ships,
@@ -173,12 +171,12 @@ export class GameDataService {
   }
 
   async getChangelogSummary(): Promise<Record<string, unknown>> {
-    const [byType] = await this.pool.execute<Row[]>(
+    const byType = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT entity_type, change_type, COUNT(*) as count
        FROM changelog GROUP BY entity_type, change_type ORDER BY entity_type, change_type`,
     );
-    const [latest] = await this.pool.execute<Row[]>('SELECT extracted_at FROM extraction_log ORDER BY id DESC LIMIT 1');
-    const [total] = await this.pool.execute<Row[]>('SELECT COUNT(*) as total FROM changelog');
+    const latest = await this.prisma.$queryRawUnsafe<Row[]>('SELECT extracted_at FROM extraction_log ORDER BY id DESC LIMIT 1');
+    const total = await this.prisma.$queryRawUnsafe<Row[]>('SELECT COUNT(*) as total FROM changelog');
 
     const by_entity: Record<string, number> = {};
     const by_change: Record<string, number> = {};

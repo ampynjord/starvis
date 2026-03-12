@@ -1,11 +1,11 @@
 /**
  * ShipQueryService — Ship listing, search, filters, manufacturers
  */
-import type { Pool } from 'mysql2/promise';
+import type { PrismaClient } from '@prisma/client';
 import { CONCEPT_SELECT, num, type PaginatedResult, type Row, SHIP_JOINS, SHIP_SELECT, SHIP_SORT } from './shared.js';
 
 export class ShipQueryService {
-  constructor(private pool: Pool) {}
+  constructor(private prisma: PrismaClient) {}
 
   async getAllShips(filters?: {
     manufacturer?: string;
@@ -87,14 +87,14 @@ export class ShipQueryService {
 
     let totalCount = 0;
     if (!wantConceptOnly) {
-      const [countRows] = await this.pool.execute<Row[]>(
+      const countRows = await this.prisma.$queryRawUnsafe<Row[]>(
         `SELECT COUNT(*) as total FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id${w}`,
-        params,
+        ...params,
       );
       totalCount += Number(countRows[0]?.total) || 0;
     }
     if (includeConceptShips || wantConceptOnly) {
-      const [conceptCount] = await this.pool.execute<Row[]>(`SELECT COUNT(*) as total FROM ship_matrix sm2${cw}`, conceptParams);
+      const conceptCount = await this.prisma.$queryRawUnsafe<Row[]>(`SELECT COUNT(*) as total FROM ship_matrix sm2${cw}`, ...conceptParams);
       totalCount += Number(conceptCount[0]?.total) || 0;
     }
 
@@ -123,7 +123,7 @@ export class ShipQueryService {
       allParams = [...params];
     }
 
-    const [rows] = await this.pool.execute<Row[]>(sql, allParams);
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(sql, ...allParams);
     const data = rows.map(({ game_data, ...rest }) => rest as Row);
     return { data, total: totalCount, page, limit, pages: Math.ceil(totalCount / limit) };
   }
@@ -131,17 +131,17 @@ export class ShipQueryService {
   async getShipByUuid(uuid: string): Promise<Row | null> {
     if (uuid.startsWith('concept-')) {
       const smId = uuid.replace('concept-', '');
-      const [rows] = await this.pool.execute<Row[]>(
+      const rows = await this.prisma.$queryRawUnsafe<Row[]>(
         `SELECT ${CONCEPT_SELECT}, TRUE as is_concept_only FROM ship_matrix sm2 WHERE sm2.id = ? AND sm2.id NOT IN (SELECT ship_matrix_id FROM ships WHERE ship_matrix_id IS NOT NULL)`,
-        [smId],
+        smId,
       );
       return rows[0] || null;
     }
-    const [rows] = await this.pool.execute<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT ${SHIP_SELECT}, FALSE as is_concept_only,
               sm.length as sm_length, sm.beam as sm_beam, sm.height as sm_height
        ${SHIP_JOINS} WHERE s.uuid = ?`,
-      [uuid],
+      uuid,
     );
     if (!rows[0]) return null;
     const ship = rows[0];
@@ -159,9 +159,10 @@ export class ShipQueryService {
   }
 
   async getShipByClassName(className: string): Promise<Row | null> {
-    const [rows] = await this.pool.execute<Row[]>(`SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS} WHERE s.class_name = ?`, [
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+      `SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS} WHERE s.class_name = ?`,
       className,
-    ]);
+    );
     return rows[0] || null;
   }
 
@@ -171,16 +172,16 @@ export class ShipQueryService {
     careers: string[];
     variant_types: string[];
   }> {
-    const [[mfgRows], [roleRows], [careerRows], [variantRows]] = await Promise.all([
-      this.pool.execute<Row[]>(
+    const [mfgRows, roleRows, careerRows, variantRows] = await Promise.all([
+      this.prisma.$queryRawUnsafe<Row[]>(
         `SELECT DISTINCT s.manufacturer_code as code, COALESCE(m.name, s.manufacturer_code) as name
          FROM ships s LEFT JOIN manufacturers m ON s.manufacturer_code = m.code
          WHERE s.manufacturer_code IS NOT NULL AND s.manufacturer_code != ''
          ORDER BY name`,
       ),
-      this.pool.execute<Row[]>("SELECT DISTINCT role FROM ships WHERE role IS NOT NULL AND role != '' ORDER BY role"),
-      this.pool.execute<Row[]>("SELECT DISTINCT career FROM ships WHERE career IS NOT NULL AND career != '' ORDER BY career"),
-      this.pool.execute<Row[]>(
+      this.prisma.$queryRawUnsafe<Row[]>("SELECT DISTINCT role FROM ships WHERE role IS NOT NULL AND role != '' ORDER BY role"),
+      this.prisma.$queryRawUnsafe<Row[]>("SELECT DISTINCT career FROM ships WHERE career IS NOT NULL AND career != '' ORDER BY career"),
+      this.prisma.$queryRawUnsafe<Row[]>(
         "SELECT DISTINCT variant_type FROM ships WHERE variant_type IS NOT NULL AND variant_type != '' ORDER BY variant_type",
       ),
     ]);
@@ -193,7 +194,7 @@ export class ShipQueryService {
   }
 
   async getAllManufacturers(): Promise<Row[]> {
-    const [rows] = await this.pool.execute<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT m.*, COUNT(DISTINCT c.uuid) as component_count, COUNT(DISTINCT s.uuid) as ship_count
        FROM manufacturers m LEFT JOIN components c ON m.code = c.manufacturer_code LEFT JOIN ships s ON m.code = s.manufacturer_code
        GROUP BY m.code ORDER BY m.name`,
@@ -202,7 +203,7 @@ export class ShipQueryService {
   }
 
   async getShipManufacturers(): Promise<Row[]> {
-    const [rows] = await this.pool.execute<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT m.code, m.name, COUNT(s.uuid) as ship_count
        FROM manufacturers m INNER JOIN ships s ON m.code = s.manufacturer_code
        GROUP BY m.code, m.name ORDER BY m.name`,
@@ -211,42 +212,42 @@ export class ShipQueryService {
   }
 
   async getManufacturerByCode(code: string): Promise<Row | null> {
-    const [rows] = await this.pool.execute<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT m.*, COUNT(DISTINCT s.uuid) as ship_count, COUNT(DISTINCT c.uuid) as component_count
        FROM manufacturers m
        LEFT JOIN ships s ON m.code = s.manufacturer_code
        LEFT JOIN components c ON m.code = c.manufacturer_code
        WHERE m.code = ?
        GROUP BY m.code`,
-      [code.toUpperCase()],
+      code.toUpperCase(),
     );
     return rows[0] || null;
   }
 
   async getManufacturerShips(code: string): Promise<Row[]> {
-    const [rows] = await this.pool.execute<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS}
        WHERE s.manufacturer_code = ? AND (s.variant_type IS NULL OR s.variant_type NOT IN ('tutorial','enemy_ai','arena_ai','competition'))
        ORDER BY s.name`,
-      [code.toUpperCase()],
+      code.toUpperCase(),
     );
     return rows.map(({ game_data, ...rest }) => rest as Row);
   }
 
   async getManufacturerComponents(code: string): Promise<Row[]> {
-    const [rows] = await this.pool.execute<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade, c.manufacturer_code,
               m.name as manufacturer_name
        FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code
        WHERE c.manufacturer_code = ? ORDER BY c.type, c.size, c.name`,
-      [code.toUpperCase()],
+      code.toUpperCase(),
     );
     return rows;
   }
 
   async searchShipsAutocomplete(q: string, limit = 10): Promise<Row[]> {
     const t = `%${q}%`;
-    const [rows] = await this.pool.execute<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT s.uuid, COALESCE(sm.name, s.name) as name, s.class_name, s.manufacturer_code,
               m.name as manufacturer_name, sm.media_store_small as thumbnail,
               s.vehicle_category
@@ -254,21 +255,24 @@ export class ShipQueryService {
        WHERE (s.name LIKE ? OR s.class_name LIKE ? OR s.short_name LIKE ? OR sm.name LIKE ?)
          AND (s.variant_type IS NULL OR s.variant_type NOT IN ('tutorial','enemy_ai','arena_ai','competition'))
        ORDER BY s.name LIMIT ${Number(Math.min(limit, 20))}`,
-      [t, t, t, t],
+      t,
+      t,
+      t,
+      t,
     );
     return rows;
   }
 
   async getRandomShip(): Promise<Row | null> {
     // ORDER BY RAND() is O(n) — use count + random offset instead
-    const [countRows] = await this.pool.execute<Row[]>(
+    const countRows = await this.prisma.$queryRawUnsafe<Row[]>(
       "SELECT COUNT(*) as total FROM ships WHERE variant_type IS NULL AND vehicle_category = 'ship'",
     );
     const total = Number(countRows[0]?.total) || 0;
     if (total === 0) return null;
     const offset = Math.floor(Math.random() * total);
 
-    const [rows] = await this.pool.execute<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS}
        WHERE s.variant_type IS NULL AND s.vehicle_category = 'ship'
        LIMIT 1 OFFSET ${offset}`,
@@ -279,18 +283,25 @@ export class ShipQueryService {
   }
 
   async getSimilarShips(uuid: string, limit = 5): Promise<Row[]> {
-    const [shipRows] = await this.pool.execute<Row[]>('SELECT role, vehicle_category, manufacturer_code FROM ships WHERE uuid = ?', [uuid]);
+    const shipRows = await this.prisma.$queryRawUnsafe<Row[]>(
+      'SELECT role, vehicle_category, manufacturer_code FROM ships WHERE uuid = ?',
+      uuid,
+    );
     if (!shipRows[0]) return [];
     const ship = shipRows[0];
 
-    const [rows] = await this.pool.execute<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS}
        WHERE s.uuid != ? AND s.variant_type IS NULL
          AND s.vehicle_category = ?
          AND (s.role = ? OR s.manufacturer_code = ?)
        ORDER BY (s.role = ?) DESC, s.name
        LIMIT ${Number(Math.min(limit, 10))}`,
-      [uuid, ship.vehicle_category, ship.role, ship.manufacturer_code, ship.role],
+      uuid,
+      ship.vehicle_category,
+      ship.role,
+      ship.manufacturer_code,
+      ship.role,
     );
     return rows.map(({ game_data, ...rest }) => rest as Row);
   }

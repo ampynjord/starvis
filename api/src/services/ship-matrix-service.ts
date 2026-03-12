@@ -4,20 +4,20 @@
  * This service ONLY handles external RSI data. No game data here.
  * All 246 ships are stored as-is from the Ship Matrix API.
  */
-import type { Pool } from 'mysql2/promise';
+import type { PrismaClient } from '@prisma/client';
 import { logger } from '../utils/index.js';
 
 const RSI_SHIP_MATRIX_URL = 'https://robertsspaceindustries.com/ship-matrix/index';
 
 export class ShipMatrixService {
-  constructor(private pool: Pool) {}
+  constructor(private prisma: PrismaClient) {}
 
   /**
    * Check if a sync is needed (no data or last sync > 24h ago).
    */
   async isSyncNeeded(): Promise<boolean> {
     try {
-      const [rows] = await this.pool.execute<any[]>('SELECT MAX(synced_at) as last_sync FROM ship_matrix');
+      const rows = await this.prisma.$queryRawUnsafe<any[]>('SELECT MAX(synced_at) as last_sync FROM ship_matrix');
       if (!rows[0]?.last_sync) return true;
       const lastSync = new Date(rows[0].last_sync).getTime();
       const hoursSince = (Date.now() - lastSync) / (1000 * 60 * 60);
@@ -49,10 +49,7 @@ export class ShipMatrixService {
     stats.total = body.data.length;
     logger.info(`[ShipMatrix] Retrieved ${stats.total} ships from RSI`);
 
-    const conn = await this.pool.getConnection();
-    try {
-      await conn.beginTransaction();
-
+    await this.prisma.$transaction(async (tx) => {
       // Batch insert — build multi-row VALUES for better performance
       const BATCH_SIZE = 50;
       for (let i = 0; i < body.data.length; i += BATCH_SIZE) {
@@ -116,7 +113,7 @@ export class ShipMatrixService {
         }
 
         if (placeholders.length > 0) {
-          await conn.execute(
+          await tx.$executeRawUnsafe(
             `INSERT INTO ship_matrix (
               id, name, chassis_id,
               manufacturer_code, manufacturer_name,
@@ -145,18 +142,11 @@ export class ShipMatrixService {
               media_store_large=new.media_store_large,
               compiled=new.compiled,
               synced_at=CURRENT_TIMESTAMP`,
-            values,
+            ...values,
           );
         }
       }
-
-      await conn.commit();
-    } catch (e) {
-      await conn.rollback();
-      throw e;
-    } finally {
-      conn.release();
-    }
+    });
 
     logger.info(`[ShipMatrix] ✅ Sync: ${stats.synced}/${stats.total} (${stats.errors} errors)`);
     return stats;
@@ -164,37 +154,39 @@ export class ShipMatrixService {
 
   /** Get all ship_matrix entries */
   async getAll(): Promise<any[]> {
-    const [rows] = await this.pool.execute('SELECT * FROM ship_matrix ORDER BY name');
-    return rows as any[];
+    const rows = await this.prisma.$queryRawUnsafe<any[]>('SELECT * FROM ship_matrix ORDER BY name');
+    return rows;
   }
 
   /** Get a single ship_matrix entry by RSI id */
   async getById(id: number): Promise<any | null> {
-    const [rows] = await this.pool.execute<any[]>('SELECT * FROM ship_matrix WHERE id = ?', [id]);
+    const rows = await this.prisma.$queryRawUnsafe<any[]>('SELECT * FROM ship_matrix WHERE id = ?', id);
     return rows[0] || null;
   }
 
   /** Get a single ship_matrix entry by name (collation is case-insensitive) */
   async getByName(name: string): Promise<any | null> {
-    const [rows] = await this.pool.execute<any[]>('SELECT * FROM ship_matrix WHERE name = ?', [name]);
+    const rows = await this.prisma.$queryRawUnsafe<any[]>('SELECT * FROM ship_matrix WHERE name = ?', name);
     return rows[0] || null;
   }
 
   /** Search ship_matrix by name or manufacturer */
   async search(q: string): Promise<any[]> {
     const pattern = `%${q}%`;
-    const [rows] = await this.pool.execute(
+    const rows = await this.prisma.$queryRawUnsafe<any[]>(
       `SELECT * FROM ship_matrix 
        WHERE name LIKE ? OR manufacturer_name LIKE ? OR focus LIKE ?
        ORDER BY name`,
-      [pattern, pattern, pattern],
+      pattern,
+      pattern,
+      pattern,
     );
-    return rows as any[];
+    return rows;
   }
 
   /** Get stats about the ship_matrix table */
   async getStats(): Promise<any> {
-    const [rows] = await this.pool.execute<any[]>(`
+    const rows = await this.prisma.$queryRawUnsafe<any[]>(`
       SELECT 
         COUNT(*) as total,
         SUM(production_status = 'flight-ready') as flight_ready,

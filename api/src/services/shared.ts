@@ -1,12 +1,13 @@
 /**
  * Shared types, helpers and constants for game-data sub-services
  */
-import type { RowDataPacket } from 'mysql2/promise';
+import type { PrismaClient } from '@prisma/client';
 
 // ── Types ─────────────────────────────────────────────────
 
-/** A single row returned by mysql2 queries */
-export type Row = RowDataPacket & Record<string, unknown>;
+/** A single row returned by Prisma raw queries */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Row = Record<string, any>;
 
 export interface PaginatedResult {
   data: Row[];
@@ -270,10 +271,8 @@ export function cleanName(name: string, type: string): string {
 
 // ── Pagination helper ─────────────────────────────────────
 
-import type { Pool } from 'mysql2/promise';
-
 export async function paginate(
-  pool: Pool,
+  prisma: PrismaClient,
   baseSql: string,
   countSql: string,
   params: (string | number)[],
@@ -281,7 +280,7 @@ export async function paginate(
   sortCols: Set<string>,
   alias: string,
 ): Promise<PaginatedResult> {
-  const [countRows] = await pool.execute<Row[]>(countSql, params);
+  const countRows = await prisma.$queryRawUnsafe<Row[]>(countSql, ...params);
   const total = countRows[0]?.total ?? countRows[0]?.count ?? 0;
 
   const sortCol = sortCols.has(opts.sort || '') ? opts.sort! : 'name';
@@ -291,6 +290,6 @@ export async function paginate(
   const offset = (page - 1) * limit;
 
   const sql = `${baseSql} ORDER BY ${alias}.${sortCol} ${order} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
-  const [rows] = await pool.execute<Row[]>(sql, params);
+  const rows = await prisma.$queryRawUnsafe<Row[]>(sql, ...params);
   return { data: rows, total: Number(total), page, limit, pages: Math.ceil(Number(total) / limit) };
 }

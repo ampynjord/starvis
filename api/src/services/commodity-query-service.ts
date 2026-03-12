@@ -1,13 +1,13 @@
 /**
  * CommodityQueryService — Tradeable/mineable goods (metals, minerals, gas, food, etc.)
  */
-import type { Pool } from 'mysql2/promise';
+import type { PrismaClient } from '@prisma/client';
 import { type PaginatedResult, paginate, type Row } from './shared.js';
 
 const COMMODITY_SORT = new Set(['name', 'class_name', 'type', 'sub_type', 'symbol', 'occupancy_scu']);
 
 export class CommodityQueryService {
-  constructor(private pool: Pool) {}
+  constructor(private prisma: PrismaClient) {}
 
   async getAllCommodities(filters?: {
     type?: string;
@@ -34,16 +34,18 @@ export class CommodityQueryService {
     const baseSql = `SELECT c.* FROM commodities c${w}`;
     const countSql = `SELECT COUNT(*) as total FROM commodities c${w}`;
 
-    return paginate(this.pool, baseSql, countSql, params, filters || {}, COMMODITY_SORT, 'c');
+    return paginate(this.prisma, baseSql, countSql, params, filters || {}, COMMODITY_SORT, 'c');
   }
 
   async getCommodityByUuid(uuid: string): Promise<Row | null> {
-    const [rows] = await this.pool.execute<Row[]>('SELECT * FROM commodities WHERE uuid = ?', [uuid]);
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>('SELECT * FROM commodities WHERE uuid = ?', uuid);
     return rows[0] || null;
   }
 
   async getCommodityTypes(): Promise<{ types: { type: string; count: number }[] }> {
-    const [rows] = await this.pool.execute<Row[]>('SELECT type, COUNT(*) as count FROM commodities GROUP BY type ORDER BY count DESC');
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+      'SELECT type, COUNT(*) as count FROM commodities GROUP BY type ORDER BY count DESC',
+    );
     return { types: rows.map((r) => ({ type: String(r.type), count: Number(r.count) })) };
   }
 }

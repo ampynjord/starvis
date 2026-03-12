@@ -1,0 +1,380 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum ExtractionStatus {
+  success
+  partial
+  failed
+}
+
+enum ChangelogEntityType {
+  ship
+  component
+  item
+  commodity
+  shop
+  module
+}
+
+enum ChangelogChangeType {
+  added
+  removed
+  modified
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model ShipMatrix {
+  id               Int       @id
+  name             String    @db.VarChar(255)
+  chassisId        Int?      @map("chassis_id")
+  manufacturerCode String?   @map("manufacturer_code") @db.VarChar(10)
+  manufacturerName String?   @map("manufacturer_name") @db.VarChar(100)
+  focus            String?   @db.VarChar(255)
+  type             String?   @db.VarChar(50)
+  description      String?   @db.Text
+  productionStatus String?   @map("production_status") @db.VarChar(50)
+  productionNote   String?   @map("production_note") @db.Text
+  size             String?   @db.VarChar(20)
+  url              String?   @db.VarChar(500)
+  length           Decimal?  @db.Decimal(10, 2)
+  beam             Decimal?  @db.Decimal(10, 2)
+  height           Decimal?  @db.Decimal(10, 2)
+  mass             Int?
+  cargocapacity    Int?
+  minCrew          Int?      @map("min_crew") @default(1)
+  maxCrew          Int?      @map("max_crew") @default(1)
+  scmSpeed         Int?      @map("scm_speed")
+  afterburnerSpeed Int?      @map("afterburner_speed")
+  pitchMax         Decimal?  @map("pitch_max") @db.Decimal(10, 2)
+  yawMax           Decimal?  @map("yaw_max") @db.Decimal(10, 2)
+  rollMax          Decimal?  @map("roll_max") @db.Decimal(10, 2)
+  xaxisAcceleration Decimal? @map("xaxis_acceleration") @db.Decimal(10, 4)
+  yaxisAcceleration Decimal? @map("yaxis_acceleration") @db.Decimal(10, 4)
+  zaxisAcceleration Decimal? @map("zaxis_acceleration") @db.Decimal(10, 4)
+  mediaSourceUrl   String?   @map("media_source_url") @db.Text
+  mediaStoreSmall  String?   @map("media_store_small") @db.Text
+  mediaStoreLarge  String?   @map("media_store_large") @db.Text
+  compiled         Json?
+  syncedAt         DateTime  @default(now()) @map("synced_at") @db.DateTime(0)
+
+  @@map("ship_matrix")
+}
+
+model Manufacturer {
+  code        String   @id @db.VarChar(10)
+  name        String   @db.VarChar(100)
+  description String?  @db.Text
+  knownFor    String?  @map("known_for") @db.VarChar(255)
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(0)
+
+  @@map("manufacturers")
+}
+
+model Ship {
+  uuid                  String   @id @db.Char(36)
+  className             String   @map("class_name") @db.VarChar(255)
+  name                  String?  @db.VarChar(255)
+  manufacturerCode      String?  @map("manufacturer_code") @db.VarChar(10)
+  role                  String?  @db.VarChar(100)
+  career                String?  @db.VarChar(100)
+  crewSize              Int?     @map("crew_size") @default(1)
+  sizeX                 Decimal? @map("size_x") @db.Decimal(10, 2)
+  sizeY                 Decimal? @map("size_y") @db.Decimal(10, 2)
+  sizeZ                 Decimal? @map("size_z") @db.Decimal(10, 2)
+  mass                  Decimal? @db.Decimal(15, 2)
+  scmSpeed              Int?     @map("scm_speed")
+  maxSpeed              Int?     @map("max_speed")
+  boostSpeedForward     Int?     @map("boost_speed_forward")
+  boostSpeedBackward    Int?     @map("boost_speed_backward")
+  pitchMax              Decimal? @map("pitch_max") @db.Decimal(8, 2)
+  yawMax                Decimal? @map("yaw_max") @db.Decimal(8, 2)
+  rollMax               Decimal? @map("roll_max") @db.Decimal(8, 2)
+  totalHp               Int?     @map("total_hp")
+  hydrogenFuelCapacity  Decimal? @map("hydrogen_fuel_capacity") @db.Decimal(10, 2)
+  quantumFuelCapacity   Decimal? @map("quantum_fuel_capacity") @db.Decimal(10, 2)
+  shieldHp              Int?     @map("shield_hp")
+  armorPhysical         Decimal? @map("armor_physical") @db.Decimal(10, 6)
+  armorEnergy           Decimal? @map("armor_energy") @db.Decimal(10, 6)
+  armorDistortion       Decimal? @map("armor_distortion") @db.Decimal(10, 6)
+  armorThermal          Decimal? @map("armor_thermal") @db.Decimal(10, 6)
+  armorBiochemical      Decimal? @map("armor_biochemical") @db.Decimal(10, 6)
+  armorStun             Decimal? @map("armor_stun") @db.Decimal(10, 6)
+  armorSignalIr         Decimal? @map("armor_signal_ir") @db.Decimal(10, 6)
+  armorSignalEm         Decimal? @map("armor_signal_em") @db.Decimal(10, 6)
+  armorSignalCs         Decimal? @map("armor_signal_cs") @db.Decimal(10, 6)
+  armorHp               Decimal? @map("armor_hp") @db.Decimal(10, 2)
+  armorPhysResist       Decimal? @map("armor_phys_resist") @db.Decimal(10, 6)
+  armorEnergyResist     Decimal? @map("armor_energy_resist") @db.Decimal(10, 6)
+  fusePenetration       Decimal? @map("fuse_penetration") @db.Decimal(10, 4)
+  componentPenetration  Decimal? @map("component_penetration") @db.Decimal(10, 4)
+  boostRampUp           Decimal? @map("boost_ramp_up") @db.Decimal(8, 2)
+  boostRampDown         Decimal? @map("boost_ramp_down") @db.Decimal(8, 2)
+  crossSectionX         Decimal? @map("cross_section_x") @db.Decimal(10, 2)
+  crossSectionY         Decimal? @map("cross_section_y") @db.Decimal(10, 2)
+  crossSectionZ         Decimal? @map("cross_section_z") @db.Decimal(10, 2)
+  shortName             String?  @map("short_name") @db.VarChar(255)
+  cargoCapacity         Decimal? @map("cargo_capacity") @db.Decimal(10, 2)
+  missileDamageTotal    Decimal? @map("missile_damage_total") @db.Decimal(10, 2)
+  weaponDamageTotal     Decimal? @map("weapon_damage_total") @db.Decimal(10, 2)
+  variantType           String?  @map("variant_type") @db.VarChar(20)
+  vehicleCategory       String?  @map("vehicle_category") @db.VarChar(20) @default("ship")
+  insuranceClaimTime    Decimal? @map("insurance_claim_time") @db.Decimal(10, 2)
+  insuranceExpediteCost Decimal? @map("insurance_expedite_cost") @db.Decimal(10, 2)
+  gameData              Json?    @map("game_data")
+  shipMatrixId          Int?     @map("ship_matrix_id")
+  extractedAt           DateTime @default(now()) @map("extracted_at") @db.DateTime(0)
+
+  @@map("ships")
+}
+
+model Component {
+  uuid                    String   @id @db.Char(36)
+  className               String   @map("class_name") @db.VarChar(255)
+  name                    String   @db.VarChar(255)
+  type                    String   @db.VarChar(50)
+  subType                 String?  @map("sub_type") @db.VarChar(100)
+  size                    Int?     @db.UnsignedTinyInt
+  grade                   String?  @db.VarChar(10)
+  manufacturerCode        String?  @map("manufacturer_code") @db.VarChar(10)
+  mass                    Decimal? @db.Decimal(10, 2)
+  hp                      Int?
+  powerDraw               Decimal? @map("power_draw") @db.Decimal(10, 2)
+  powerBase               Decimal? @map("power_base") @db.Decimal(10, 2)
+  powerOutput             Decimal? @map("power_output") @db.Decimal(10, 2)
+  heatGeneration          Decimal? @map("heat_generation") @db.Decimal(10, 2)
+  coolingRate             Decimal? @map("cooling_rate") @db.Decimal(15, 2)
+  emSignature             Decimal? @map("em_signature") @db.Decimal(10, 2)
+  irSignature             Decimal? @map("ir_signature") @db.Decimal(10, 2)
+  weaponDamage            Decimal? @map("weapon_damage") @db.Decimal(10, 4)
+  weaponDamageType        String?  @map("weapon_damage_type") @db.VarChar(50)
+  weaponFireRate          Decimal? @map("weapon_fire_rate") @db.Decimal(10, 4)
+  weaponRange             Decimal? @map("weapon_range") @db.Decimal(10, 2)
+  weaponSpeed             Decimal? @map("weapon_speed") @db.Decimal(10, 2)
+  weaponAmmoCount         Int?     @map("weapon_ammo_count")
+  weaponPelletsPerShot    Int?     @map("weapon_pellets_per_shot") @default(1) @db.UnsignedTinyInt
+  weaponBurstSize         Int?     @map("weapon_burst_size") @db.UnsignedTinyInt
+  weaponAlphaDamage       Decimal? @map("weapon_alpha_damage") @db.Decimal(10, 4)
+  weaponDps               Decimal? @map("weapon_dps") @db.Decimal(10, 4)
+  weaponDamagePhysical    Decimal? @map("weapon_damage_physical") @db.Decimal(10, 4)
+  weaponDamageEnergy      Decimal? @map("weapon_damage_energy") @db.Decimal(10, 4)
+  weaponDamageDistortion  Decimal? @map("weapon_damage_distortion") @db.Decimal(10, 4)
+  weaponDamageThermal     Decimal? @map("weapon_damage_thermal") @db.Decimal(10, 4)
+  weaponDamageBiochemical Decimal? @map("weapon_damage_biochemical") @db.Decimal(10, 4)
+  weaponDamageStun        Decimal? @map("weapon_damage_stun") @db.Decimal(10, 4)
+  weaponHeatPerShot       Decimal? @map("weapon_heat_per_shot") @db.Decimal(10, 5)
+  weaponBurstDps          Decimal? @map("weapon_burst_dps") @db.Decimal(10, 4)
+  weaponSustainedDps      Decimal? @map("weapon_sustained_dps") @db.Decimal(10, 4)
+  shieldHp                Decimal? @map("shield_hp") @db.Decimal(15, 2)
+  shieldRegen             Decimal? @map("shield_regen") @db.Decimal(10, 4)
+  shieldRegenDelay        Decimal? @map("shield_regen_delay") @db.Decimal(10, 2)
+  shieldHardening         Decimal? @map("shield_hardening") @db.Decimal(10, 4)
+  shieldFaces             Int?     @map("shield_faces") @db.UnsignedTinyInt
+  qdSpeed                 Decimal? @map("qd_speed") @db.Decimal(15, 2)
+  qdSpoolTime             Decimal? @map("qd_spool_time") @db.Decimal(10, 2)
+  qdCooldown              Decimal? @map("qd_cooldown") @db.Decimal(10, 2)
+  qdFuelRate              Decimal? @map("qd_fuel_rate") @db.Decimal(10, 6)
+  qdRange                 Decimal? @map("qd_range") @db.Decimal(15, 2)
+  qdStage1Accel           Decimal? @map("qd_stage1_accel") @db.Decimal(15, 2)
+  qdStage2Accel           Decimal? @map("qd_stage2_accel") @db.Decimal(15, 2)
+  qdTuningRate            Decimal? @map("qd_tuning_rate") @db.Decimal(10, 4)
+  qdAlignmentRate         Decimal? @map("qd_alignment_rate") @db.Decimal(10, 4)
+  qdDisconnectRange       Decimal? @map("qd_disconnect_range") @db.Decimal(15, 2)
+  missileDamage           Decimal? @map("missile_damage") @db.Decimal(10, 2)
+  missileSignalType       String?  @map("missile_signal_type") @db.VarChar(20)
+  missileLockTime         Decimal? @map("missile_lock_time") @db.Decimal(10, 2)
+  missileSpeed            Decimal? @map("missile_speed") @db.Decimal(10, 2)
+  missileRange            Decimal? @map("missile_range") @db.Decimal(10, 2)
+  missileLockRange        Decimal? @map("missile_lock_range") @db.Decimal(10, 2)
+  missileDamagePhysical   Decimal? @map("missile_damage_physical") @db.Decimal(10, 2)
+  missileDamageEnergy     Decimal? @map("missile_damage_energy") @db.Decimal(10, 2)
+  missileDamageDistortion Decimal? @map("missile_damage_distortion") @db.Decimal(10, 2)
+  thrusterMaxThrust       Decimal? @map("thruster_max_thrust") @db.Decimal(15, 2)
+  thrusterType            String?  @map("thruster_type") @db.VarChar(50)
+  radarRange              Decimal? @map("radar_range") @db.Decimal(15, 2)
+  radarDetectionLifetime  Decimal? @map("radar_detection_lifetime") @db.Decimal(10, 2)
+  radarTrackingSignal     Decimal? @map("radar_tracking_signal") @db.Decimal(10, 4)
+  cmAmmoCount             Int?     @map("cm_ammo_count")
+  fuelCapacity            Decimal? @map("fuel_capacity") @db.Decimal(10, 2)
+  fuelIntakeRate          Decimal? @map("fuel_intake_rate") @db.Decimal(10, 4)
+  empDamage               Decimal? @map("emp_damage") @db.Decimal(10, 2)
+  empRadius               Decimal? @map("emp_radius") @db.Decimal(10, 2)
+  empChargeTime           Decimal? @map("emp_charge_time") @db.Decimal(10, 2)
+  empCooldown             Decimal? @map("emp_cooldown") @db.Decimal(10, 2)
+  qigJammerRange          Decimal? @map("qig_jammer_range") @db.Decimal(15, 2)
+  qigSnareRadius          Decimal? @map("qig_snare_radius") @db.Decimal(15, 2)
+  qigChargeTime           Decimal? @map("qig_charge_time") @db.Decimal(10, 2)
+  qigCooldown             Decimal? @map("qig_cooldown") @db.Decimal(10, 2)
+  miningSpeed             Decimal? @map("mining_speed") @db.Decimal(10, 4)
+  miningRange             Decimal? @map("mining_range") @db.Decimal(10, 2)
+  miningResistance        Decimal? @map("mining_resistance") @db.Decimal(10, 4)
+  miningInstability       Decimal? @map("mining_instability") @db.Decimal(10, 4)
+  tractorMaxForce         Decimal? @map("tractor_max_force") @db.Decimal(15, 2)
+  tractorMaxRange         Decimal? @map("tractor_max_range") @db.Decimal(10, 2)
+  salvageSpeed            Decimal? @map("salvage_speed") @db.Decimal(10, 4)
+  salvageRadius           Decimal? @map("salvage_radius") @db.Decimal(10, 2)
+  gimbalType              String?  @map("gimbal_type") @db.VarChar(20)
+  rackCount               Int?     @map("rack_count") @db.UnsignedTinyInt
+  rackMissileSize         Int?     @map("rack_missile_size") @db.UnsignedTinyInt
+  createdAt               DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt               DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+
+  @@map("components")
+}
+
+model ShipLoadout {
+  id                 Int     @id @default(autoincrement())
+  shipUuid           String  @map("ship_uuid") @db.Char(36)
+  portName           String  @map("port_name") @db.VarChar(100)
+  portMinSize        Int?    @map("port_min_size") @db.UnsignedTinyInt
+  portMaxSize        Int?    @map("port_max_size") @db.UnsignedTinyInt
+  portEditable       Boolean @map("port_editable") @default(true)
+  componentClassName String? @map("component_class_name") @db.VarChar(255)
+  componentUuid      String? @map("component_uuid") @db.Char(36)
+  portType           String? @map("port_type") @db.VarChar(50)
+  parentId           Int?    @map("parent_id")
+
+  @@map("ship_loadouts")
+}
+
+model ShipModule {
+  id              Int     @id @default(autoincrement())
+  shipUuid        String  @map("ship_uuid") @db.Char(36)
+  slotName        String  @map("slot_name") @db.VarChar(100)
+  slotDisplayName String? @map("slot_display_name") @db.VarChar(100)
+  slotType        String? @map("slot_type") @db.VarChar(20)
+  moduleClassName String  @map("module_class_name") @db.VarChar(255)
+  moduleName      String? @map("module_name") @db.VarChar(255)
+  moduleTier      Int?    @map("module_tier") @db.UnsignedTinyInt
+  isDefault       Boolean @map("is_default") @default(false)
+  loadoutJson     Json?   @map("loadout_json")
+
+  @@map("ship_modules")
+}
+
+model ShipPaint {
+  id             Int     @id @default(autoincrement())
+  shipUuid       String  @map("ship_uuid") @db.Char(36)
+  paintClassName String  @map("paint_class_name") @db.VarChar(255)
+  paintName      String? @map("paint_name") @db.VarChar(255)
+  paintUuid      String? @map("paint_uuid") @db.Char(36)
+
+  @@map("ship_paints")
+}
+
+model Item {
+  uuid                  String   @id @db.Char(36)
+  className             String   @map("class_name") @db.VarChar(255)
+  name                  String   @db.VarChar(255)
+  type                  String   @db.VarChar(50)
+  subType               String?  @map("sub_type") @db.VarChar(100)
+  size                  Int?     @db.UnsignedTinyInt
+  grade                 String?  @db.VarChar(10)
+  manufacturerCode      String?  @map("manufacturer_code") @db.VarChar(10)
+  mass                  Decimal? @db.Decimal(10, 2)
+  hp                    Int?
+  weaponDamage          Decimal? @map("weapon_damage") @db.Decimal(10, 4)
+  weaponDamageType      String?  @map("weapon_damage_type") @db.VarChar(50)
+  weaponFireRate        Decimal? @map("weapon_fire_rate") @db.Decimal(10, 4)
+  weaponRange           Decimal? @map("weapon_range") @db.Decimal(10, 2)
+  weaponSpeed           Decimal? @map("weapon_speed") @db.Decimal(10, 2)
+  weaponAmmoCount       Int?     @map("weapon_ammo_count")
+  weaponDps             Decimal? @map("weapon_dps") @db.Decimal(10, 4)
+  armorDamageReduction  Decimal? @map("armor_damage_reduction") @db.Decimal(10, 4)
+  armorTempMin          Decimal? @map("armor_temp_min") @db.Decimal(10, 2)
+  armorTempMax          Decimal? @map("armor_temp_max") @db.Decimal(10, 2)
+  dataJson              Json?    @map("data_json")
+  createdAt             DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+
+  @@map("items")
+}
+
+model Commodity {
+  uuid        String   @id @db.Char(36)
+  className   String   @map("class_name") @db.VarChar(255)
+  name        String   @db.VarChar(255)
+  type        String   @db.VarChar(50)
+  subType     String?  @map("sub_type") @db.VarChar(100)
+  symbol      String?  @db.VarChar(20)
+  occupancyScu Decimal? @map("occupancy_scu") @db.Decimal(10, 4)
+  dataJson    Json?    @map("data_json")
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+
+  @@map("commodities")
+}
+
+model Shop {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(255)
+  className String   @unique @map("class_name") @db.VarChar(255)
+  location  String?  @db.VarChar(255)
+  system    String?  @db.VarChar(50)
+  planetMoon String? @map("planet_moon") @db.VarChar(100)
+  city      String?  @db.VarChar(100)
+  shopType  String?  @map("shop_type") @db.VarChar(50)
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+
+  @@map("shops")
+}
+
+model ShopInventory {
+  id                   Int      @id @default(autoincrement())
+  shopId               Int      @map("shop_id")
+  componentUuid        String?  @map("component_uuid") @db.Char(36)
+  componentClassName   String   @map("component_class_name") @db.VarChar(255)
+  basePrice            Decimal? @map("base_price") @db.Decimal(12, 2)
+  rentalPrice1d        Decimal? @map("rental_price_1d") @db.Decimal(12, 2)
+  rentalPrice3d        Decimal? @map("rental_price_3d") @db.Decimal(12, 2)
+  rentalPrice7d        Decimal? @map("rental_price_7d") @db.Decimal(12, 2)
+  rentalPrice30d       Decimal? @map("rental_price_30d") @db.Decimal(12, 2)
+  createdAt            DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+
+  @@unique([shopId, componentClassName], map: "uk_shop_component")
+  @@map("shop_inventory")
+}
+
+model ExtractionLog {
+  id                 Int              @id @default(autoincrement())
+  extractionHash     String           @map("extraction_hash") @db.Char(64)
+  gameVersion        String?          @map("game_version") @db.VarChar(50)
+  shipsCount         Int              @map("ships_count") @default(0)
+  componentsCount    Int              @map("components_count") @default(0)
+  itemsCount         Int              @map("items_count") @default(0)
+  commoditiesCount   Int              @map("commodities_count") @default(0)
+  manufacturersCount Int              @map("manufacturers_count") @default(0)
+  loadoutPortsCount  Int              @map("loadout_ports_count") @default(0)
+  shopsCount         Int              @map("shops_count") @default(0)
+  durationMs         Int?             @map("duration_ms")
+  status             ExtractionStatus @default(success)
+  errorMessage       String?          @map("error_message") @db.Text
+  extractedAt        DateTime         @default(now()) @map("extracted_at") @db.DateTime(0)
+
+  @@map("extraction_log")
+}
+
+model Changelog {
+  id           Int                 @id @default(autoincrement())
+  extractionId Int                 @map("extraction_id")
+  entityType   ChangelogEntityType @map("entity_type")
+  entityUuid   String              @map("entity_uuid") @db.VarChar(255)
+  entityName   String?             @map("entity_name") @db.VarChar(255)
+  changeType   ChangelogChangeType @map("change_type")
+  fieldName    String?             @map("field_name") @db.VarChar(100)
+  oldValue     String?             @map("old_value") @db.Text
+  newValue     String?             @map("new_value") @db.Text
+  createdAt    DateTime            @default(now()) @map("created_at") @db.DateTime(0)
+
+  @@map("changelog")
+}
