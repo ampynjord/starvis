@@ -37,7 +37,7 @@ export const RATE_LIMITS = {
   adminMax: 20,
   // Burst: max requests per minute per IP
   burstWindowMs: 60 * 1000,
-  burst: parseInt(process.env.RATE_LIMIT_BURST || '30', 10),
+  burst: parseInt(process.env.RATE_LIMIT_BURST || '60', 10),
   // Slow-down: start adding delay after this many requests
   slowAfter: 100,
 };

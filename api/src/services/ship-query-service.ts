@@ -144,7 +144,7 @@ export class ShipQueryService {
         `SELECT ${CONCEPT_SELECT}, TRUE as is_concept_only FROM ship_matrix sm2 WHERE sm2.id = ? AND sm2.id NOT IN (SELECT ship_matrix_id FROM ships WHERE ship_matrix_id IS NOT NULL)`,
         smId,
       );
-      return rows[0] || null;
+      return rows[0] ? convertBigIntToNumber(rows[0]) : null;
     }
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT ${SHIP_SELECT}, FALSE as is_concept_only,
@@ -164,7 +164,7 @@ export class ShipQueryService {
     delete (ship as any).sm_length;
     delete (ship as any).sm_beam;
     delete (ship as any).sm_height;
-    return ship;
+    return convertBigIntToNumber(ship);
   }
 
   async getShipByClassName(className: string): Promise<Row | null> {
@@ -172,7 +172,7 @@ export class ShipQueryService {
       `SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS} WHERE s.class_name = ?`,
       className,
     );
-    return rows[0] || null;
+    return rows[0] ? convertBigIntToNumber(rows[0]) : null;
   }
 
   async getShipFilters(): Promise<{
@@ -245,7 +245,7 @@ export class ShipQueryService {
        ORDER BY s.name`,
       code.toUpperCase(),
     );
-    return rows.map(({ game_data, ...rest }) => rest as Row);
+    return rows.map(({ game_data, ...rest }) => convertBigIntToNumber(rest));
   }
 
   async getManufacturerComponents(code: string): Promise<Row[]> {
@@ -274,7 +274,7 @@ export class ShipQueryService {
       t,
       t,
     );
-    return rows;
+    return rows.map(convertBigIntToNumber);
   }
 
   async getRandomShip(): Promise<Row | null> {
@@ -293,7 +293,7 @@ export class ShipQueryService {
     );
     if (!rows[0]) return null;
     const { game_data, ...rest } = rows[0];
-    return rest as Row;
+    return convertBigIntToNumber(rest);
   }
 
   async getSimilarShips(uuid: string, limit = 5): Promise<Row[]> {
@@ -317,6 +317,6 @@ export class ShipQueryService {
       ship.manufacturer_code,
       ship.role,
     );
-    return rows.map(({ game_data, ...rest }) => rest as Row);
+    return rows.map(({ game_data, ...rest }) => convertBigIntToNumber(rest));
   }
 }
