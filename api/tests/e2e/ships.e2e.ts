@@ -50,6 +50,14 @@ test.describe('Ships API', () => {
   });
 
   test('GET /api/v1/ships/random should return a random ship', async ({ request }) => {
+    // Skip if no game data imported in this environment
+    const listResponse = await request.get('/api/v1/ships?limit=1');
+    const listData = await listResponse.json();
+    if (listData.total === 0) {
+      test.skip(true, 'No game data available in test environment');
+      return;
+    }
+
     const response = await request.get('/api/v1/ships/random');
     expect(response.status()).toBe(200);
 
@@ -64,8 +72,8 @@ test.describe('Ships API', () => {
     // First get a list to find a valid UUID
     const listResponse = await request.get('/api/v1/ships?limit=1');
     const listData = await listResponse.json();
-    if (listData.data.length === 0) {
-      test.skip();
+    if (listData.total === 0) {
+      test.skip(true, 'No game data available in test environment');
       return;
     }
     const uuid = listData.data[0].uuid;
@@ -85,8 +93,8 @@ test.describe('Ships API', () => {
     // First get a list to find a valid UUID
     const listResponse = await request.get('/api/v1/ships?limit=1');
     const listData = await listResponse.json();
-    if (listData.data.length === 0) {
-      test.skip();
+    if (listData.total === 0) {
+      test.skip(true, 'No game data available in test environment');
       return;
     }
     const uuid = listData.data[0].uuid;
