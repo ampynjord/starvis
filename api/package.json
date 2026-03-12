@@ -13,11 +13,26 @@
     "openapi:lint": "swagger-cli validate openapi.json",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "node tests/test-all.mjs",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e-old": "node tests/test-all.mjs",
+    "test:all": "npm run test && npm run test:e2e",
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,js}": [
+      "biome check --write --no-errors-on-unmatched",
+      "vitest related --run --reporter=verbose"
+    ],
+    "*.prisma": [
+      "prisma format",
+      "prisma validate"
+    ]
   },
   "keywords": [
     "star-citizen",
@@ -33,6 +48,8 @@
     "express-rate-limit": "^8.2.1",
     "express-slow-down": "^3.0.1",
     "helmet": "^8.1.0",
+    "ioredis": "^5.10.0",
+    "prom-client": "^15.1.3",
     "swagger-ui-express": "^5.0.1",
     "tsx": "^4.21.0",
     "winston": "^3.11.0",
@@ -40,12 +57,15 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.4",
+    "@playwright/test": "^1.58.2",
     "@types/compression": "^1.8.1",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/node": "^20.19.30",
     "@types/swagger-ui-express": "^4.1.8",
     "@vitest/coverage-v8": "^4.0.18",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.3.3",
     "prisma": "^6.19.2",
     "swagger-cli": "^4.0.4",
     "typescript": "^5.3.3",

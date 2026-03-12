@@ -48,6 +48,13 @@ analyze-*.ts
 check-*.ts
 find-*.ts
 
+# Test reports & coverage
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+*.lcov
+
 # Extractor local data
 extractor/.env
 

@@ -1,5 +1,10 @@
 # STARVIS v1.0
 
+[![CI/CD](https://github.com/ampynjord/starvis/actions/workflows/ci.yml/badge.svg)](https://github.com/ampynjord/starvis/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/ampynjord/starvis/branch/main/graph/badge.svg)](https://codecov.io/gh/ampynjord/starvis)
+[![Node v22](https://img.shields.io/badge/node-v22-green)](https://nodejs.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 **REST API + Web Interface for Star Citizen ship data**
 
 Monorepo en 4 modules :
@@ -473,10 +478,40 @@ curl -H "X-API-Key: $ADMIN_API_KEY" https://starvis-api.ampynjord.bzh/admin/stat
 curl -H "X-API-Key: $ADMIN_API_KEY" https://starvis-api.ampynjord.bzh/admin/extraction-log
 ```
 
-### Health
+### Health & Monitoring
+
+**Liveness & Readiness Probes**
+```bash
+GET /health/live   # Liveness probe (toujours 200 si l'API répond)
+GET /health/ready  # Readiness probe (vérifie DB + Redis)
+```
+
+**Prometheus Metrics**
+```bash
+GET /health/metrics  # Métriques Prometheus (format text/plain)
+```
+
+Métriques exposées :
+- `http_request_duration_seconds` (histogram) : latence des requêtes HTTP par route/méthode/status
+- `http_request_total` (counter) : nombre total de requêtes HTTP
+- `db_query_duration_seconds` (histogram) : latence des requêtes DB par type/table
+- `db_query_total` (counter) : nombre total de requêtes DB
+- `db_connections_active` (gauge) : connexions actives au pool
+- `cache_operations_total` (counter) : opérations de cache (hit/miss/set)
+- `cache_hit_rate` (gauge) : taux de succès du cache (0-1)
+- `api_response_size_bytes` (histogram) : taille des réponses API
+
+**Cache Statistics**
+```bash
+GET /health/cache/stats  # Stats Redis (hits, misses, hit rate)
+```
+
+---
+
+### Backward Compatibility
 
 ```bash
-GET /health
+GET /health  # Alias vers /health/live (legacy endpoint)
 ```
 
 ---
@@ -722,13 +757,18 @@ Les écritures en DB ne se font qu'au démarrage ou via les endpoints admin POST
 | **Validation** | Zod 4 |
 | **Documentation** | OpenAPI 3.0 (spec pré-générée + swagger-ui-express) |
 | **Base de données** | MySQL 8.0 (utf8mb4_unicode_ci) |
+| **ORM** | Prisma 6 (migration progressive depuis mysql2) |
+| **Cache** | Redis 7 (ioredis, graceful fallback) |
+| **Monitoring** | Prometheus (prom-client 15, métriques HTTP/DB/cache) |
 | **Frontend** | React 19, React Router v7, TanStack Query v5 |
 | **UI Frontend** | Tailwind CSS v3, Lucide React, Recharts, Framer Motion |
 | **Build frontend** | Vite 6 |
 | **Linting** | Biome (lint + format, unified pour tout le monorepo) |
+| **Tests API** | Vitest (unit) + Playwright (E2E, 16+ tests) |
+| **Quality** | Husky + lint-staged (pre-commit hooks) |
 | **Containerisation** | Docker multi-stage + Docker Compose |
 | **Reverse proxy** | Traefik (Let's Encrypt, HTTPS automatique) |
-| **CI/CD** | GitHub Actions (4 jobs) |
+| **CI/CD** | GitHub Actions (4 jobs, coverage Codecov) |
 | **Registry** | ghcr.io (GitHub Container Registry) |
 | **Logging** | Winston (module tags, durées, filtrage) |
 | **Backup** | mysqldump + gzip, cron quotidien, 7 jours de rétention |
@@ -742,14 +782,24 @@ Pipeline GitHub Actions (`.github/workflows/ci.yml`) en 4 jobs :
 | Job | Description | Déclencheur |
 |-----|-------------|-------------|
 | **🔍 Lint** | Type-check TypeScript (`tsc --noEmit`) API + Extractor + build IHM + `npm audit` | push/PR sur `main` |
-| **🧪 Test** | Tests unitaires Vitest (96 tests : 52 API + 44 Extractor) + tests e2e API avec MySQL | après Lint |
+| **🧪 Test** | Tests unitaires Vitest (52 API + 44 Extractor) + E2E Playwright (16+ tests) + coverage Codecov | après Lint |
 | **🐳 Build** | Build Docker + push sur ghcr.io (API + IHM) | push sur `main` uniquement |
 | **🚀 Deploy** | SSH sur VPS : `git pull`, `docker compose pull/up`, health check | après Test + Build |
+
+**Tests E2E** (Playwright) :
+- Health checks (live/ready/metrics/cache)
+- Ship Matrix API (list/search/stats/ETag)
+- Ships API (pagination/filters/autocomplete/loadout)
+
+**Coverage** :
+- Seuils configurés : 70% lines, 65% functions, 60% branches
+- Upload automatique vers Codecov sur chaque commit
+- Rapports HTML générés localement avec `npm run test:coverage`
 
 Le déploiement se fait via SSH (`appleboy/ssh-action@v1`) avec :
 - `git reset --hard HEAD` avant pull (évite les conflits de fichiers modifiés localement)
 - Pull des images GHCR pré-buildées
-- Health check de l'API post-déploiement
+- Health check de l'API post-déploiement (vérifie DB + Redis)
 - Nettoyage des images Docker obsolètes
 
 Les tests game-data sont automatiquement skippés en CI quand aucune extraction n'est disponible.
