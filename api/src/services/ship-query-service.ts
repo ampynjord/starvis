@@ -199,7 +199,8 @@ export class ShipQueryService {
        FROM manufacturers m LEFT JOIN components c ON m.code = c.manufacturer_code LEFT JOIN ships s ON m.code = s.manufacturer_code
        GROUP BY m.code ORDER BY m.name`,
     );
-    return rows;
+    // Convert BigInt to Number for JSON serialization
+    return rows.map((r) => ({ ...r, component_count: Number(r.component_count), ship_count: Number(r.ship_count) }));
   }
 
   async getShipManufacturers(): Promise<Row[]> {
@@ -208,7 +209,8 @@ export class ShipQueryService {
        FROM manufacturers m INNER JOIN ships s ON m.code = s.manufacturer_code
        GROUP BY m.code, m.name ORDER BY m.name`,
     );
-    return rows;
+    // Convert BigInt to Number for JSON serialization
+    return rows.map((r) => ({ ...r, ship_count: Number(r.ship_count) }));
   }
 
   async getManufacturerByCode(code: string): Promise<Row | null> {
@@ -221,7 +223,10 @@ export class ShipQueryService {
        GROUP BY m.code`,
       code.toUpperCase(),
     );
-    return rows[0] || null;
+    const raw = rows[0];
+    if (!raw) return null;
+    // Convert BigInt to Number for JSON serialization
+    return { ...raw, ship_count: Number(raw.ship_count), component_count: Number(raw.component_count) };
   }
 
   async getManufacturerShips(code: string): Promise<Row[]> {
