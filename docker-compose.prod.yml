@@ -66,9 +66,11 @@ services:
     labels:
       traefik.enable: "true"
       traefik.docker.network: "traefik-network"
-      traefik.http.routers.starvis-api.rule: "Host(`starvis-api.ampynjord.bzh`)"
+      # API accessible depuis le domaine principal ET sous-domaine
+      traefik.http.routers.starvis-api.rule: "Host(`starvis.ampynjord.bzh`) && PathPrefix(`/api`)"
       traefik.http.routers.starvis-api.entrypoints: "websecure"
       traefik.http.routers.starvis-api.tls.certresolver: "letsencrypt"
+      traefik.http.routers.starvis-api.priority: "100"
       traefik.http.services.starvis-api.loadbalancer.server.port: "3000"
 
   ihm:
