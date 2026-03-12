@@ -131,9 +131,43 @@ jobs:
 
       - name: Generate Prisma Client
         run: cd api && npx prisma generate
+        env:
+          DATABASE_URL: mysql://starvis_user:testpass@127.0.0.1:3306/starvis_test
+
+      - name: Wait for services
+        run: |
+          echo "⏳ Waiting for MySQL..."
+          for i in $(seq 1 30); do
+            mysqladmin ping -h 127.0.0.1 -u root -ptestroot --silent && break
+            sleep 2
+          done
+          echo "✅ MySQL ready"
+          
+          echo "⏳ Waiting for Redis..."
+          for i in $(seq 1 10); do
+            redis-cli -h 127.0.0.1 ping > /dev/null 2>&1 && break
+            sleep 1
+          done
+          echo "✅ Redis ready"
+
+      - name: Setup database schema
+        run: cd api && npx prisma db push --skip-generate
+        env:
+          DATABASE_URL: mysql://starvis_user:testpass@127.0.0.1:3306/starvis_test
 
       - name: Run API unit tests with coverage
         run: cd api && npm run test:coverage
+        env:
+          DATABASE_URL: mysql://starvis_user:testpass@127.0.0.1:3306/starvis_test
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: starvis_user
+          DB_PASSWORD: testpass
+          DB_NAME: starvis_test
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+          ADMIN_API_KEY: ci_test_key
+          LOG_LEVEL: error
 
       - name: Run Extractor unit tests with coverage
         run: cd extractor && npm run test:coverage
@@ -156,27 +190,6 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
-      - name: Wait for services
-        run: |
-          echo "⏳ Waiting for MySQL..."
-          for i in $(seq 1 30); do
-            mysqladmin ping -h 127.0.0.1 -u root -ptestroot --silent && break
-            sleep 2
-          done
-          echo "✅ MySQL ready"
-          
-          echo "⏳ Waiting for Redis..."
-          for i in $(seq 1 10); do
-            redis-cli -h 127.0.0.1 ping > /dev/null 2>&1 && break
-            sleep 1
-          done
-          echo "✅ Redis ready"
-
-      - name: Run Prisma migrations
-        run: cd api && npx prisma migrate deploy
-        env:
-          DATABASE_URL: mysql://starvis_user:testpass@127.0.0.1:3306/starvis_test
-
       - name: Start API server
         run: |
           cd api && npx tsx server.ts &
@@ -189,8 +202,19 @@ jobs:
           curl -sf http://localhost:3000/health/ready || (echo "❌ Server failed health check" && exit 1)
           echo "✅ Server ready"
         env:
-          P4K_PATH: ""
           DATABASE_URL: mysql://starvis_user:testpass@127.0.0.1:3306/starvis_test
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: starvis_user
+          DB_PASSWORD: testpass
+          DB_NAME: starvis_test
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+          ADMIN_API_KEY: ci_test_key
+          PORT: 3000
+          NODE_ENV: test
+          LOG_LEVEL: warn
+          P4K_PATH: ""
 
       - name: Run E2E tests
         run: cd api && npm run test:e2e
