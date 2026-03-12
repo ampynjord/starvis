@@ -33,38 +33,41 @@ enum ChangelogChangeType {
 // ─── Models ───────────────────────────────────────────────────────────────────
 
 model ShipMatrix {
-  id               Int       @id
-  name             String    @db.VarChar(255)
-  chassisId        Int?      @map("chassis_id")
-  manufacturerCode String?   @map("manufacturer_code") @db.VarChar(10)
-  manufacturerName String?   @map("manufacturer_name") @db.VarChar(100)
-  focus            String?   @db.VarChar(255)
-  type             String?   @db.VarChar(50)
-  description      String?   @db.Text
-  productionStatus String?   @map("production_status") @db.VarChar(50)
-  productionNote   String?   @map("production_note") @db.Text
-  size             String?   @db.VarChar(20)
-  url              String?   @db.VarChar(500)
-  length           Decimal?  @db.Decimal(10, 2)
-  beam             Decimal?  @db.Decimal(10, 2)
-  height           Decimal?  @db.Decimal(10, 2)
-  mass             Int?
-  cargocapacity    Int?
-  minCrew          Int?      @map("min_crew") @default(1)
-  maxCrew          Int?      @map("max_crew") @default(1)
-  scmSpeed         Int?      @map("scm_speed")
-  afterburnerSpeed Int?      @map("afterburner_speed")
-  pitchMax         Decimal?  @map("pitch_max") @db.Decimal(10, 2)
-  yawMax           Decimal?  @map("yaw_max") @db.Decimal(10, 2)
-  rollMax          Decimal?  @map("roll_max") @db.Decimal(10, 2)
+  id                Int      @id
+  name              String   @db.VarChar(255)
+  chassisId         Int?     @map("chassis_id")
+  manufacturerCode  String?  @map("manufacturer_code") @db.VarChar(10)
+  manufacturerName  String?  @map("manufacturer_name") @db.VarChar(100)
+  focus             String?  @db.VarChar(255)
+  type              String?  @db.VarChar(50)
+  description       String?  @db.Text
+  productionStatus  String?  @map("production_status") @db.VarChar(50)
+  productionNote    String?  @map("production_note") @db.Text
+  size              String?  @db.VarChar(20)
+  url               String?  @db.VarChar(500)
+  length            Decimal? @db.Decimal(10, 2)
+  beam              Decimal? @db.Decimal(10, 2)
+  height            Decimal? @db.Decimal(10, 2)
+  mass              Int?
+  cargocapacity     Int?
+  minCrew           Int?     @default(1) @map("min_crew")
+  maxCrew           Int?     @default(1) @map("max_crew")
+  scmSpeed          Int?     @map("scm_speed")
+  afterburnerSpeed  Int?     @map("afterburner_speed")
+  pitchMax          Decimal? @map("pitch_max") @db.Decimal(10, 2)
+  yawMax            Decimal? @map("yaw_max") @db.Decimal(10, 2)
+  rollMax           Decimal? @map("roll_max") @db.Decimal(10, 2)
   xaxisAcceleration Decimal? @map("xaxis_acceleration") @db.Decimal(10, 4)
   yaxisAcceleration Decimal? @map("yaxis_acceleration") @db.Decimal(10, 4)
   zaxisAcceleration Decimal? @map("zaxis_acceleration") @db.Decimal(10, 4)
-  mediaSourceUrl   String?   @map("media_source_url") @db.Text
-  mediaStoreSmall  String?   @map("media_store_small") @db.Text
-  mediaStoreLarge  String?   @map("media_store_large") @db.Text
-  compiled         Json?
-  syncedAt         DateTime  @default(now()) @map("synced_at") @db.DateTime(0)
+  mediaSourceUrl    String?  @map("media_source_url") @db.Text
+  mediaStoreSmall   String?  @map("media_store_small") @db.Text
+  mediaStoreLarge   String?  @map("media_store_large") @db.Text
+  compiled          Json?
+  syncedAt          DateTime @default(now()) @map("synced_at") @db.DateTime(0)
+
+  // Relations
+  ships Ship[]
 
   @@map("ship_matrix")
 }
@@ -76,6 +79,10 @@ model Manufacturer {
   knownFor    String?  @map("known_for") @db.VarChar(255)
   createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(0)
 
+  // Relations
+  ships      Ship[]      @relation("ShipManufacturer")
+  components Component[] @relation("ComponentManufacturer")
+
   @@map("manufacturers")
 }
 
@@ -86,7 +93,7 @@ model Ship {
   manufacturerCode      String?  @map("manufacturer_code") @db.VarChar(10)
   role                  String?  @db.VarChar(100)
   career                String?  @db.VarChar(100)
-  crewSize              Int?     @map("crew_size") @default(1)
+  crewSize              Int?     @default(1) @map("crew_size")
   sizeX                 Decimal? @map("size_x") @db.Decimal(10, 2)
   sizeY                 Decimal? @map("size_y") @db.Decimal(10, 2)
   sizeZ                 Decimal? @map("size_z") @db.Decimal(10, 2)
@@ -126,13 +133,22 @@ model Ship {
   missileDamageTotal    Decimal? @map("missile_damage_total") @db.Decimal(10, 2)
   weaponDamageTotal     Decimal? @map("weapon_damage_total") @db.Decimal(10, 2)
   variantType           String?  @map("variant_type") @db.VarChar(20)
-  vehicleCategory       String?  @map("vehicle_category") @db.VarChar(20) @default("ship")
+  vehicleCategory       String?  @default("ship") @map("vehicle_category") @db.VarChar(20)
   insuranceClaimTime    Decimal? @map("insurance_claim_time") @db.Decimal(10, 2)
   insuranceExpediteCost Decimal? @map("insurance_expedite_cost") @db.Decimal(10, 2)
   gameData              Json?    @map("game_data")
   shipMatrixId          Int?     @map("ship_matrix_id")
   extractedAt           DateTime @default(now()) @map("extracted_at") @db.DateTime(0)
 
+  // Relations
+  manufacturer Manufacturer? @relation("ShipManufacturer", fields: [manufacturerCode], references: [code], onDelete: SetNull, map: "fk_ship_manufacturer")
+  shipMatrix   ShipMatrix?   @relation(fields: [shipMatrixId], references: [id], onDelete: SetNull, map: "fk_ship_matrix")
+  loadouts     ShipLoadout[]
+  modules      ShipModule[]
+  paints       ShipPaint[]
+
+  @@index([manufacturerCode], map: "idx_ship_manufacturer_code")
+  @@index([shipMatrixId], map: "idx_ship_matrix_id")
   @@map("ships")
 }
 
@@ -160,7 +176,7 @@ model Component {
   weaponRange             Decimal? @map("weapon_range") @db.Decimal(10, 2)
   weaponSpeed             Decimal? @map("weapon_speed") @db.Decimal(10, 2)
   weaponAmmoCount         Int?     @map("weapon_ammo_count")
-  weaponPelletsPerShot    Int?     @map("weapon_pellets_per_shot") @default(1) @db.UnsignedTinyInt
+  weaponPelletsPerShot    Int?     @default(1) @map("weapon_pellets_per_shot") @db.UnsignedTinyInt
   weaponBurstSize         Int?     @map("weapon_burst_size") @db.UnsignedTinyInt
   weaponAlphaDamage       Decimal? @map("weapon_alpha_damage") @db.Decimal(10, 4)
   weaponDps               Decimal? @map("weapon_dps") @db.Decimal(10, 4)
@@ -227,6 +243,14 @@ model Component {
   createdAt               DateTime @default(now()) @map("created_at") @db.DateTime(0)
   updatedAt               DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
 
+  // Relations
+  manufacturer  Manufacturer?   @relation("ComponentManufacturer", fields: [manufacturerCode], references: [code], onDelete: SetNull, map: "fk_component_manufacturer")
+  loadouts      ShipLoadout[]
+  shopInventory ShopInventory[]
+
+  @@index([manufacturerCode], map: "idx_component_manufacturer_code")
+  @@index([type], map: "idx_component_type")
+  @@index([subType], map: "idx_component_sub_type")
   @@map("components")
 }
 
@@ -236,12 +260,18 @@ model ShipLoadout {
   portName           String  @map("port_name") @db.VarChar(100)
   portMinSize        Int?    @map("port_min_size") @db.UnsignedTinyInt
   portMaxSize        Int?    @map("port_max_size") @db.UnsignedTinyInt
-  portEditable       Boolean @map("port_editable") @default(true)
+  portEditable       Boolean @default(true) @map("port_editable")
   componentClassName String? @map("component_class_name") @db.VarChar(255)
   componentUuid      String? @map("component_uuid") @db.Char(36)
   portType           String? @map("port_type") @db.VarChar(50)
   parentId           Int?    @map("parent_id")
 
+  // Relations
+  ship      Ship?      @relation(fields: [shipUuid], references: [uuid], onDelete: Cascade, map: "fk_loadout_ship")
+  component Component? @relation(fields: [componentUuid], references: [uuid], onDelete: SetNull, map: "fk_loadout_component")
+
+  @@index([shipUuid], map: "idx_loadout_ship")
+  @@index([componentUuid], map: "idx_loadout_component")
   @@map("ship_loadouts")
 }
 
@@ -254,9 +284,13 @@ model ShipModule {
   moduleClassName String  @map("module_class_name") @db.VarChar(255)
   moduleName      String? @map("module_name") @db.VarChar(255)
   moduleTier      Int?    @map("module_tier") @db.UnsignedTinyInt
-  isDefault       Boolean @map("is_default") @default(false)
+  isDefault       Boolean @default(false) @map("is_default")
   loadoutJson     Json?   @map("loadout_json")
 
+  // Relations
+  ship Ship @relation(fields: [shipUuid], references: [uuid], onDelete: Cascade, map: "fk_module_ship")
+
+  @@index([shipUuid], map: "idx_module_ship")
   @@map("ship_modules")
 }
 
@@ -267,81 +301,94 @@ model ShipPaint {
   paintName      String? @map("paint_name") @db.VarChar(255)
   paintUuid      String? @map("paint_uuid") @db.Char(36)
 
+  // Relations
+  ship Ship @relation(fields: [shipUuid], references: [uuid], onDelete: Cascade, map: "fk_paint_ship")
+
+  @@index([shipUuid], map: "idx_paint_ship")
   @@map("ship_paints")
 }
 
 model Item {
-  uuid                  String   @id @db.Char(36)
-  className             String   @map("class_name") @db.VarChar(255)
-  name                  String   @db.VarChar(255)
-  type                  String   @db.VarChar(50)
-  subType               String?  @map("sub_type") @db.VarChar(100)
-  size                  Int?     @db.UnsignedTinyInt
-  grade                 String?  @db.VarChar(10)
-  manufacturerCode      String?  @map("manufacturer_code") @db.VarChar(10)
-  mass                  Decimal? @db.Decimal(10, 2)
-  hp                    Int?
-  weaponDamage          Decimal? @map("weapon_damage") @db.Decimal(10, 4)
-  weaponDamageType      String?  @map("weapon_damage_type") @db.VarChar(50)
-  weaponFireRate        Decimal? @map("weapon_fire_rate") @db.Decimal(10, 4)
-  weaponRange           Decimal? @map("weapon_range") @db.Decimal(10, 2)
-  weaponSpeed           Decimal? @map("weapon_speed") @db.Decimal(10, 2)
-  weaponAmmoCount       Int?     @map("weapon_ammo_count")
-  weaponDps             Decimal? @map("weapon_dps") @db.Decimal(10, 4)
-  armorDamageReduction  Decimal? @map("armor_damage_reduction") @db.Decimal(10, 4)
-  armorTempMin          Decimal? @map("armor_temp_min") @db.Decimal(10, 2)
-  armorTempMax          Decimal? @map("armor_temp_max") @db.Decimal(10, 2)
-  dataJson              Json?    @map("data_json")
-  createdAt             DateTime @default(now()) @map("created_at") @db.DateTime(0)
-  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+  uuid                 String   @id @db.Char(36)
+  className            String   @map("class_name") @db.VarChar(255)
+  name                 String   @db.VarChar(255)
+  type                 String   @db.VarChar(50)
+  subType              String?  @map("sub_type") @db.VarChar(100)
+  size                 Int?     @db.UnsignedTinyInt
+  grade                String?  @db.VarChar(10)
+  manufacturerCode     String?  @map("manufacturer_code") @db.VarChar(10)
+  mass                 Decimal? @db.Decimal(10, 2)
+  hp                   Int?
+  weaponDamage         Decimal? @map("weapon_damage") @db.Decimal(10, 4)
+  weaponDamageType     String?  @map("weapon_damage_type") @db.VarChar(50)
+  weaponFireRate       Decimal? @map("weapon_fire_rate") @db.Decimal(10, 4)
+  weaponRange          Decimal? @map("weapon_range") @db.Decimal(10, 2)
+  weaponSpeed          Decimal? @map("weapon_speed") @db.Decimal(10, 2)
+  weaponAmmoCount      Int?     @map("weapon_ammo_count")
+  weaponDps            Decimal? @map("weapon_dps") @db.Decimal(10, 4)
+  armorDamageReduction Decimal? @map("armor_damage_reduction") @db.Decimal(10, 4)
+  armorTempMin         Decimal? @map("armor_temp_min") @db.Decimal(10, 2)
+  armorTempMax         Decimal? @map("armor_temp_max") @db.Decimal(10, 2)
+  dataJson             Json?    @map("data_json")
+  createdAt            DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
 
   @@map("items")
 }
 
 model Commodity {
-  uuid        String   @id @db.Char(36)
-  className   String   @map("class_name") @db.VarChar(255)
-  name        String   @db.VarChar(255)
-  type        String   @db.VarChar(50)
-  subType     String?  @map("sub_type") @db.VarChar(100)
-  symbol      String?  @db.VarChar(20)
+  uuid         String   @id @db.Char(36)
+  className    String   @map("class_name") @db.VarChar(255)
+  name         String   @db.VarChar(255)
+  type         String   @db.VarChar(50)
+  subType      String?  @map("sub_type") @db.VarChar(100)
+  symbol       String?  @db.VarChar(20)
   occupancyScu Decimal? @map("occupancy_scu") @db.Decimal(10, 4)
-  dataJson    Json?    @map("data_json")
-  createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(0)
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+  dataJson     Json?    @map("data_json")
+  createdAt    DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
 
   @@map("commodities")
 }
 
 model Shop {
-  id        Int      @id @default(autoincrement())
-  name      String   @db.VarChar(255)
-  className String   @unique @map("class_name") @db.VarChar(255)
-  location  String?  @db.VarChar(255)
-  system    String?  @db.VarChar(50)
-  planetMoon String? @map("planet_moon") @db.VarChar(100)
-  city      String?  @db.VarChar(100)
-  shopType  String?  @map("shop_type") @db.VarChar(50)
-  createdAt DateTime @default(now()) @map("created_at") @db.DateTime(0)
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+  id         Int      @id @default(autoincrement())
+  name       String   @db.VarChar(255)
+  className  String   @unique @map("class_name") @db.VarChar(255)
+  location   String?  @db.VarChar(255)
+  system     String?  @db.VarChar(50)
+  planetMoon String?  @map("planet_moon") @db.VarChar(100)
+  city       String?  @db.VarChar(100)
+  shopType   String?  @map("shop_type") @db.VarChar(50)
+  createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+
+  // Relations
+  inventory ShopInventory[]
 
   @@map("shops")
 }
 
 model ShopInventory {
-  id                   Int      @id @default(autoincrement())
-  shopId               Int      @map("shop_id")
-  componentUuid        String?  @map("component_uuid") @db.Char(36)
-  componentClassName   String   @map("component_class_name") @db.VarChar(255)
-  basePrice            Decimal? @map("base_price") @db.Decimal(12, 2)
-  rentalPrice1d        Decimal? @map("rental_price_1d") @db.Decimal(12, 2)
-  rentalPrice3d        Decimal? @map("rental_price_3d") @db.Decimal(12, 2)
-  rentalPrice7d        Decimal? @map("rental_price_7d") @db.Decimal(12, 2)
-  rentalPrice30d       Decimal? @map("rental_price_30d") @db.Decimal(12, 2)
-  createdAt            DateTime @default(now()) @map("created_at") @db.DateTime(0)
-  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+  id                 Int      @id @default(autoincrement())
+  shopId             Int      @map("shop_id")
+  componentUuid      String?  @map("component_uuid") @db.Char(36)
+  componentClassName String   @map("component_class_name") @db.VarChar(255)
+  basePrice          Decimal? @map("base_price") @db.Decimal(12, 2)
+  rentalPrice1d      Decimal? @map("rental_price_1d") @db.Decimal(12, 2)
+  rentalPrice3d      Decimal? @map("rental_price_3d") @db.Decimal(12, 2)
+  rentalPrice7d      Decimal? @map("rental_price_7d") @db.Decimal(12, 2)
+  rentalPrice30d     Decimal? @map("rental_price_30d") @db.Decimal(12, 2)
+  createdAt          DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+
+  // Relations
+  shop      Shop       @relation(fields: [shopId], references: [id], onDelete: Cascade, map: "fk_inventory_shop")
+  component Component? @relation(fields: [componentUuid], references: [uuid], onDelete: SetNull, map: "fk_inventory_component")
 
   @@unique([shopId, componentClassName], map: "uk_shop_component")
+  @@index([shopId], map: "idx_shop_id")
+  @@index([componentUuid], map: "idx_inventory_component")
   @@map("shop_inventory")
 }
 
@@ -349,18 +396,22 @@ model ExtractionLog {
   id                 Int              @id @default(autoincrement())
   extractionHash     String           @map("extraction_hash") @db.Char(64)
   gameVersion        String?          @map("game_version") @db.VarChar(50)
-  shipsCount         Int              @map("ships_count") @default(0)
-  componentsCount    Int              @map("components_count") @default(0)
-  itemsCount         Int              @map("items_count") @default(0)
-  commoditiesCount   Int              @map("commodities_count") @default(0)
-  manufacturersCount Int              @map("manufacturers_count") @default(0)
-  loadoutPortsCount  Int              @map("loadout_ports_count") @default(0)
-  shopsCount         Int              @map("shops_count") @default(0)
+  shipsCount         Int              @default(0) @map("ships_count")
+  componentsCount    Int              @default(0) @map("components_count")
+  itemsCount         Int              @default(0) @map("items_count")
+  commoditiesCount   Int              @default(0) @map("commodities_count")
+  manufacturersCount Int              @default(0) @map("manufacturers_count")
+  loadoutPortsCount  Int              @default(0) @map("loadout_ports_count")
+  shopsCount         Int              @default(0) @map("shops_count")
   durationMs         Int?             @map("duration_ms")
   status             ExtractionStatus @default(success)
   errorMessage       String?          @map("error_message") @db.Text
   extractedAt        DateTime         @default(now()) @map("extracted_at") @db.DateTime(0)
 
+  // Relations
+  changelogs Changelog[]
+
+  @@index([extractionHash], map: "idx_extraction_hash")
   @@map("extraction_log")
 }
 
@@ -376,5 +427,10 @@ model Changelog {
   newValue     String?             @map("new_value") @db.Text
   createdAt    DateTime            @default(now()) @map("created_at") @db.DateTime(0)
 
+  // Relations
+  extraction ExtractionLog @relation(fields: [extractionId], references: [id], onDelete: Cascade, map: "fk_changelog_extraction")
+
+  @@index([extractionId], map: "idx_changelog_extraction")
+  @@index([entityType, entityUuid], map: "idx_changelog_entity")
   @@map("changelog")
 }
