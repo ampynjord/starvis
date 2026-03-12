@@ -6,6 +6,7 @@
  */
 import type { PrismaClient } from '@prisma/client';
 import { logger } from '../utils/index.js';
+import { buildCacheKey, CACHE_TTL, cacheGet, cacheInvalidatePattern, cacheSet } from './redis.js';
 
 const RSI_SHIP_MATRIX_URL = 'https://robertsspaceindustries.com/ship-matrix/index';
 
@@ -17,10 +18,14 @@ export class ShipMatrixService {
    */
   async isSyncNeeded(): Promise<boolean> {
     try {
-      const rows = await this.prisma.$queryRawUnsafe<any[]>('SELECT MAX(synced_at) as last_sync FROM ship_matrix');
-      if (!rows[0]?.last_sync) return true;
-      const lastSync = new Date(rows[0].last_sync).getTime();
-      const hoursSince = (Date.now() - lastSync) / (1000 * 60 * 60);
+      const lastShip = await this.prisma.shipMatrix.findFirst({
+        orderBy: { syncedAt: 'desc' },
+        select: { syncedAt: true },
+      });
+
+      if (!lastShip?.syncedAt) return true;
+
+      const hoursSince = (Date.now() - lastShip.syncedAt.getTime()) / (1000 * 60 * 60);
       return hoursSince > 24;
     } catch {
       return true;
@@ -149,43 +154,85 @@ export class ShipMatrixService {
     });
 
     logger.info(`[ShipMatrix] ✅ Sync: ${stats.synced}/${stats.total} (${stats.errors} errors)`);
+
+    // Invalider le cache après la synchronisation
+    await cacheInvalidatePattern('starvis:ship-matrix:*');
+
     return stats;
   }
 
   /** Get all ship_matrix entries */
   async getAll(): Promise<any[]> {
-    const rows = await this.prisma.$queryRawUnsafe<any[]>('SELECT * FROM ship_matrix ORDER BY name');
-    return rows;
+    const cacheKey = buildCacheKey('ship-matrix', 'all');
+    const cached = await cacheGet<any[]>(cacheKey);
+    if (cached) return cached;
+
+    const ships = await this.prisma.shipMatrix.findMany({
+      orderBy: { name: 'asc' },
+    });
+
+    await cacheSet(cacheKey, ships, CACHE_TTL.SHIP_MATRIX);
+    return ships;
   }
 
   /** Get a single ship_matrix entry by RSI id */
   async getById(id: number): Promise<any | null> {
-    const rows = await this.prisma.$queryRawUnsafe<any[]>('SELECT * FROM ship_matrix WHERE id = ?', id);
-    return rows[0] || null;
+    const cacheKey = buildCacheKey('ship-matrix', 'id', id);
+    const cached = await cacheGet<any>(cacheKey);
+    if (cached) return cached;
+
+    const ship = await this.prisma.shipMatrix.findUnique({
+      where: { id },
+    });
+
+    if (ship) {
+      await cacheSet(cacheKey, ship, CACHE_TTL.SHIP_MATRIX);
+    }
+
+    return ship;
   }
 
   /** Get a single ship_matrix entry by name (collation is case-insensitive) */
   async getByName(name: string): Promise<any | null> {
-    const rows = await this.prisma.$queryRawUnsafe<any[]>('SELECT * FROM ship_matrix WHERE name = ?', name);
-    return rows[0] || null;
+    const cacheKey = buildCacheKey('ship-matrix', 'name', name);
+    const cached = await cacheGet<any>(cacheKey);
+    if (cached) return cached;
+
+    const ship = await this.prisma.shipMatrix.findFirst({
+      where: { name },
+    });
+
+    if (ship) {
+      await cacheSet(cacheKey, ship, CACHE_TTL.SHIP_MATRIX);
+    }
+
+    return ship;
   }
 
   /** Search ship_matrix by name or manufacturer */
   async search(q: string): Promise<any[]> {
-    const pattern = `%${q}%`;
-    const rows = await this.prisma.$queryRawUnsafe<any[]>(
-      `SELECT * FROM ship_matrix 
-       WHERE name LIKE ? OR manufacturer_name LIKE ? OR focus LIKE ?
-       ORDER BY name`,
-      pattern,
-      pattern,
-      pattern,
-    );
-    return rows;
+    const cacheKey = buildCacheKey('ship-matrix', 'search', q);
+    const cached = await cacheGet<any[]>(cacheKey);
+    if (cached) return cached;
+
+    const ships = await this.prisma.shipMatrix.findMany({
+      where: {
+        OR: [{ name: { contains: q } }, { manufacturerName: { contains: q } }, { focus: { contains: q } }],
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    await cacheSet(cacheKey, ships, CACHE_TTL.SHIP_MATRIX);
+    return ships;
   }
 
   /** Get stats about the ship_matrix table */
   async getStats(): Promise<any> {
+    const cacheKey = buildCacheKey('ship-matrix', 'stats');
+    const cached = await cacheGet<any>(cacheKey);
+    if (cached) return cached;
+
+    // Keep raw SQL for complex aggregations with conditional SUM
     const rows = await this.prisma.$queryRawUnsafe<any[]>(`
       SELECT 
         COUNT(*) as total,
@@ -195,15 +242,20 @@ export class ShipMatrixService {
         COUNT(DISTINCT manufacturer_code) as manufacturers
       FROM ship_matrix
     `);
+
     const raw = rows[0];
     if (!raw) return null;
+
     // Convert BigInt to Number for JSON serialization
-    return {
+    const stats = {
       total: Number(raw.total),
       flight_ready: Number(raw.flight_ready),
       in_concept: Number(raw.in_concept),
       in_production: Number(raw.in_production),
       manufacturers: Number(raw.manufacturers),
     };
+
+    await cacheSet(cacheKey, stats, CACHE_TTL.SHIP_MATRIX);
+    return stats;
   }
 }
