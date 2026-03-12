@@ -19,8 +19,11 @@ import slowDown from 'express-slow-down';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
 import { getPrisma, initPrisma } from './src/db/index.js';
+import { prometheusMiddleware } from './src/middleware/prometheus.js';
+import { healthRouter } from './src/routes/health.js';
 import { createRoutes } from './src/routes/index.js';
 import { GameDataService, initializeSchema, ShipMatrixService } from './src/services/index.js';
+import { redis } from './src/services/redis.js';
 import { buildDatabaseUrl, logger, RATE_LIMITS } from './src/utils/index.js';
 
 const PORT = process.env.PORT || 3000;
@@ -45,6 +48,12 @@ app.use(
 app.use(cors({ origin: process.env.CORS_ORIGIN || '*', credentials: true }));
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
+
+// ──Prometheus metrics middleware ────────────────────────
+app.use(prometheusMiddleware);
+
+// ── Health checks (liveness, readiness, metrics) ─────────
+app.use('/health', healthRouter);
 
 // ── Rate limiting (multi-layer, disabled in test) ────────
 
@@ -154,19 +163,30 @@ async function start() {
     process.exit(1);
   }
 
-  // 2. Ship Matrix service (always available)
+  // 2. Initialize Redis (non-blocking, cache disabled if unavailable)
+  const redisReady = await redis
+    .connect()
+    .then(() => true)
+    .catch(() => false);
+  if (redisReady) {
+    logger.info('✅ Redis ready', { module: 'Redis' });
+  } else {
+    logger.warn('⚠️  Redis unavailable, cache disabled', { module: 'Redis' });
+  }
+
+  // 3. Ship Matrix service (always available)
   const shipMatrixService = new ShipMatrixService(prisma);
 
-  // 3. GameDataService (reads from MySQL — fed by standalone extractor)
+  // 4. GameDataService (reads from MySQL — fed by standalone extractor)
   gameDataService = new GameDataService(prisma);
 
-  // 4. Mount routes
+  // 5. Mount routes
   app.use('/', createRoutes({ prisma, shipMatrixService, gameDataService }));
 
-  // 5. Start listening BEFORE non-critical sync (so /health is immediately available)
+  // 6. Start listening BEFORE non-critical sync (so /health is immediately available)
   httpServer = app.listen(PORT, () => logger.info(`✅ Starvis v1.0 listening on :${PORT}`, { module: 'Server' }));
 
-  // 6. Non-critical sync: Ship Matrix (don't block server startup, skip if <24h old)
+  // 7. Non-critical sync: Ship Matrix (don't block server startup, skip if <24h old)
   try {
     const needsSync = await shipMatrixService.isSyncNeeded();
     if (needsSync) {
@@ -182,15 +202,27 @@ async function start() {
   }
 }
 
-// Graceful shutdown: close HTTP server + disconnect Prisma
+// Graceful shutdown: close HTTP server + disconnect Prisma + Redis
 async function shutdown(signal: string) {
   logger.info(`${signal} received — shutting down…`, { module: 'Server' });
   if (httpServer) httpServer.close();
+
+  // Disconnect Prisma
   try {
     await getPrisma().$disconnect();
+    logger.info('Prisma disconnected', { module: 'DB' });
   } catch {
     /* not initialised */
   }
+
+  // Disconnect Redis
+  try {
+    await redis.quit();
+    logger.info('Redis disconnected', { module: 'Redis' });
+  } catch {
+    /* not initialised */
+  }
+
   process.exit(0);
 }
 
