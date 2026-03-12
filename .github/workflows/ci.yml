@@ -228,10 +228,13 @@ jobs:
     steps:
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@v1
+        env:
+          GHCR_TOKEN: ${{ secrets.GHCR_PAT }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: debian
           key: ${{ secrets.VPS_SSH_KEY }}
+          envs: GHCR_TOKEN
           script: |
             set -e
             cd /home/debian/starvis
@@ -249,9 +252,15 @@ jobs:
               ENV_OPT=""
             fi
 
-            # Pull pre-built images from GHCR (public repo, no auth needed)
+            # Login to GHCR to pull private images
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u ampynjord --password-stdin
+
+            # Pull pre-built images from GHCR
             docker compose -f docker-compose.prod.yml $ENV_OPT pull
             docker compose -f docker-compose.prod.yml $ENV_OPT up -d --remove-orphans
+
+            # Logout from GHCR
+            docker logout ghcr.io
 
             # Wait for API health check
             echo "⏳ Waiting for API health..."
