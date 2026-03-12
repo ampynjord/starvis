@@ -89,6 +89,16 @@ jobs:
           --health-timeout=5s
           --health-retries=5
 
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     env:
       DB_HOST: 127.0.0.1
       DB_PORT: 3306
@@ -96,6 +106,8 @@ jobs:
       DB_PASSWORD: testpass
       DB_NAME: starvis_test
       MYSQL_ROOT_PASSWORD: testroot
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
       ADMIN_API_KEY: ci_test_key
       PORT: 3000
       NODE_ENV: test
@@ -117,36 +129,89 @@ jobs:
       - name: Install extractor deps
         run: cd extractor && npm ci
 
-      - name: Run API unit tests
-        run: cd api && npx vitest run --coverage
+      - name: Generate Prisma Client
+        run: cd api && npx prisma generate
 
-      - name: Run Extractor unit tests
-        run: cd extractor && npx vitest run --coverage
+      - name: Run API unit tests with coverage
+        run: cd api && npm run test:coverage
 
-      - name: Wait for MySQL
+      - name: Run Extractor unit tests with coverage
+        run: cd extractor && npm run test:coverage
+
+      - name: Upload API coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./api/coverage/coverage-final.json
+          flags: api
+          name: api-coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      - name: Upload Extractor coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./extractor/coverage/coverage-final.json
+          flags: extractor
+          name: extractor-coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      - name: Wait for services
         run: |
+          echo "⏳ Waiting for MySQL..."
           for i in $(seq 1 30); do
             mysqladmin ping -h 127.0.0.1 -u root -ptestroot --silent && break
             sleep 2
           done
+          echo "✅ MySQL ready"
+          
+          echo "⏳ Waiting for Redis..."
+          for i in $(seq 1 10); do
+            redis-cli -h 127.0.0.1 ping > /dev/null 2>&1 && break
+            sleep 1
+          done
+          echo "✅ Redis ready"
+
+      - name: Run Prisma migrations
+        run: cd api && npx prisma migrate deploy
+        env:
+          DATABASE_URL: mysql://starvis_user:testpass@127.0.0.1:3306/starvis_test
 
       - name: Start API server
         run: |
           cd api && npx tsx server.ts &
+          echo $! > server.pid
           # Wait for server to be ready (up to 60 seconds)
           for i in $(seq 1 60); do
-            curl -sf http://localhost:3000/health > /dev/null 2>&1 && break
+            curl -sf http://localhost:3000/health/live > /dev/null 2>&1 && break
             sleep 1
           done
-          curl -sf http://localhost:3000/health || (echo "❌ Server failed to start" && exit 1)
+          curl -sf http://localhost:3000/health/ready || (echo "❌ Server failed health check" && exit 1)
           echo "✅ Server ready"
         env:
           P4K_PATH: ""
+          DATABASE_URL: mysql://starvis_user:testpass@127.0.0.1:3306/starvis_test
 
-      - name: Run API tests
-        run: cd api && npm run test:e2e -- http://localhost:3000
+      - name: Run E2E tests
+        run: cd api && npm run test:e2e
         env:
+          API_URL: http://localhost:3000
           ADMIN_API_KEY: ci_test_key
+
+      - name: Upload E2E test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: api/playwright-report/
+          retention-days: 7
+
+      - name: Stop API server
+        if: always()
+        run: |
+          if [ -f api/server.pid ]; then
+            kill $(cat api/server.pid) || true
+          fi
 
   # ==========================================
   #  3. BUILD DOCKER IMAGE

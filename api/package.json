@@ -21,7 +21,18 @@
     "db:generate": "prisma generate",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,js}": [
+      "biome check --write --no-errors-on-unmatched",
+      "vitest related --run --reporter=verbose"
+    ],
+    "*.prisma": [
+      "prisma format",
+      "prisma validate"
+    ]
   },
   "keywords": [
     "star-citizen",
