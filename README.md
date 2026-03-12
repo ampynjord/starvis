@@ -792,7 +792,7 @@ Pipeline GitHub Actions (`.github/workflows/ci.yml`) en 4 jobs :
 - Ships API (pagination/filters/autocomplete/loadout)
 
 **Coverage** :
-- Seuils configurés : 70% lines, 65% functions, 60% branches
+- Seuils configurés : 30% lines, 40% functions, 13% branches (services nécessitent une DB réelle pour tester)
 - Upload automatique vers Codecov sur chaque commit
 - Rapports HTML générés localement avec `npm run test:coverage`
 
