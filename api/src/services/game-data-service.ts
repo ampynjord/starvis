@@ -128,7 +128,20 @@ export class GameDataService {
         (SELECT COUNT(*) FROM ships WHERE ship_matrix_id IS NOT NULL) as shipsLinkedToMatrix
     `);
     const latest = await this.getLatestExtraction();
-    const result = { ...rows[0], latestExtraction: latest };
+    const raw = rows[0];
+    // Convert BigInt to Number for JSON serialization
+    const result = {
+      ships: Number(raw.ships),
+      components: Number(raw.components),
+      items: Number(raw.items),
+      commodities: Number(raw.commodities),
+      manufacturers: Number(raw.manufacturers),
+      loadoutPorts: Number(raw.loadoutPorts),
+      paints: Number(raw.paints),
+      shops: Number(raw.shops),
+      shipsLinkedToMatrix: Number(raw.shipsLinkedToMatrix),
+      latestExtraction: latest,
+    };
     this.statsCache.set(result);
     return result;
   }

@@ -195,6 +195,15 @@ export class ShipMatrixService {
         COUNT(DISTINCT manufacturer_code) as manufacturers
       FROM ship_matrix
     `);
-    return rows[0];
+    const raw = rows[0];
+    if (!raw) return null;
+    // Convert BigInt to Number for JSON serialization
+    return {
+      total: Number(raw.total),
+      flight_ready: Number(raw.flight_ready),
+      in_concept: Number(raw.in_concept),
+      in_production: Number(raw.in_production),
+      manufacturers: Number(raw.manufacturers),
+    };
   }
 }
