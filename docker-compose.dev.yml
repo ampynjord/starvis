@@ -25,6 +25,21 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: starvis-redis
+    ports:
+      - "${REDIS_EXTERNAL_PORT:-6380}:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes
+
   api:
     build:
       context: .
@@ -47,6 +62,8 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       ADMIN_API_KEY: ${ADMIN_API_KEY}
       LOG_LEVEL: ${LOG_LEVEL:-debug}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
@@ -54,13 +71,15 @@ services:
       RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-200}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health/live"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 15s
     depends_on:
       mysql:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   ihm:
@@ -83,5 +102,6 @@ services:
 
 volumes:
   mysql_data:
+  redis_data:
   api_node_modules:
   ihm_node_modules:
