@@ -20,12 +20,33 @@ export interface PaginatedResult {
 // ── Numeric helpers ───────────────────────────────────────
 
 /**
- * Convert BigInt to Number recursively in object/array
- * Prisma raw queries return COUNT/SUM as BigInt which cannot be JSON serialized
+ * Convert BigInt and Decimal to Number recursively in object/array
+ * Prisma raw queries return:
+ * - COUNT/SUM as BigInt (cannot be JSON serialized)
+ * - DECIMAL/NUMERIC columns as Decimal objects with shape {s, e, d} (also cannot be JSON serialized)
  */
 export function convertBigIntToNumber<T>(obj: T): T {
   if (obj === null || obj === undefined) return obj;
   if (typeof obj === 'bigint') return Number(obj) as T;
+  
+  // Detect Prisma Decimal: object with shape { s: number, e: number, d: number[] }
+  if (
+    typeof obj === 'object' &&
+    !Array.isArray(obj) &&
+    's' in obj &&
+    'e' in obj &&
+    'd' in obj &&
+    typeof (obj as any).s === 'number' &&
+    Array.isArray((obj as any).d)
+  ) {
+    // Convert Decimal to number using scientific notation
+    const decimal = obj as any;
+    const sign = decimal.s === 1 ? 1 : -1;
+    const mantissa = decimal.d.join('');
+    const exponent = decimal.e;
+    return (sign * parseFloat(`${mantissa}e${exponent - mantissa.length + 1}`)) as T;
+  }
+  
   if (Array.isArray(obj)) return obj.map(convertBigIntToNumber) as T;
   if (typeof obj === 'object') {
     const result: Record<string, unknown> = {};
