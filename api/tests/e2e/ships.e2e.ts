@@ -50,13 +50,7 @@ test.describe('Ships API', () => {
   });
 
   test('GET /api/v1/ships/random should return a random ship', async ({ request }) => {
-    // Skip if no game data imported in this environment
-    const listResponse = await request.get('/api/v1/ships?limit=1');
-    const listData = await listResponse.json();
-    if (listData.total === 0) {
-      test.skip(true, 'No game data available in test environment');
-      return;
-    }
+    test.skip(!!process.env.CI, 'Requires P4K game data, not available in CI environment');
 
     const response = await request.get('/api/v1/ships/random');
     expect(response.status()).toBe(200);
@@ -69,13 +63,10 @@ test.describe('Ships API', () => {
   });
 
   test('GET /api/v1/ships/:uuid should return ship details', async ({ request }) => {
-    // First get a list to find a valid UUID
+    test.skip(!!process.env.CI, 'Requires P4K game data, not available in CI environment');
+
     const listResponse = await request.get('/api/v1/ships?limit=1');
     const listData = await listResponse.json();
-    if (listData.total === 0) {
-      test.skip(true, 'No game data available in test environment');
-      return;
-    }
     const uuid = listData.data[0].uuid;
 
     // Then get ship details
@@ -90,13 +81,10 @@ test.describe('Ships API', () => {
   });
 
   test('GET /api/v1/ships/:uuid/loadout should return ship loadout', async ({ request }) => {
-    // First get a list to find a valid UUID
+    test.skip(!!process.env.CI, 'Requires P4K game data, not available in CI environment');
+
     const listResponse = await request.get('/api/v1/ships?limit=1');
     const listData = await listResponse.json();
-    if (listData.total === 0) {
-      test.skip(true, 'No game data available in test environment');
-      return;
-    }
     const uuid = listData.data[0].uuid;
 
     // Then get loadout
