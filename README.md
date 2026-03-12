@@ -18,6 +18,7 @@ Deux sources de données complémentaires :
 - **P4K DataForge** — données réelles du jeu (~309 vaisseaux, ~3 023 composants, ~5 237 items FPS, ~237 commodités, ~36 596 ports de loadout, ~1 791 paints), extraites localement par le CLI
 
 Production : **[starvis.ampynjord.bzh](https://starvis.ampynjord.bzh)**
+API publique : **[starvis-api.ampynjord.bzh](https://starvis-api.ampynjord.bzh)**
 
 ---
 
