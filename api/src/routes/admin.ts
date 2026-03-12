@@ -4,7 +4,7 @@ import { asyncHandler, makeGameDataGuard } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
 export function mountAdminRoutes(router: Router, deps: RouteDependencies): void {
-  const { pool, shipMatrixService, gameDataService } = deps;
+  const { prisma, shipMatrixService, gameDataService } = deps;
   const requireGameData = makeGameDataGuard(gameDataService);
 
   router.use('/admin', authMiddleware);
@@ -38,7 +38,7 @@ export function mountAdminRoutes(router: Router, deps: RouteDependencies): void 
   router.get(
     '/health',
     asyncHandler(async (_req, res) => {
-      await pool.execute('SELECT 1');
+      await prisma.$queryRawUnsafe('SELECT 1');
       res.json({ status: 'ok', database: 'connected', gameData: gameDataService ? 'available' : 'unavailable' });
     }),
   );

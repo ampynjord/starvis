@@ -17,17 +17,15 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import helmet from 'helmet';
-import * as mysql from 'mysql2/promise';
 import swaggerUi from 'swagger-ui-express';
-import { initDrizzle } from './src/db/index.js';
+import { getPrisma, initPrisma } from './src/db/index.js';
 import { createRoutes } from './src/routes/index.js';
 import { GameDataService, initializeSchema, ShipMatrixService } from './src/services/index.js';
-import { DB_CONFIG, logger, RATE_LIMITS } from './src/utils/index.js';
+import { buildDatabaseUrl, logger, RATE_LIMITS } from './src/utils/index.js';
 
 const PORT = process.env.PORT || 3000;
 
 const app = express();
-let pool: mysql.Pool | null = null;
 let gameDataService: GameDataService | null = null;
 let httpServer: ReturnType<typeof app.listen> | null = null;
 
@@ -135,41 +133,35 @@ app.get('/', (_, res) =>
 
 // ===== STARTUP =====
 async function start() {
-  // 1. Database connection with retry
+  // 1. Initialise Prisma + connect with retry
+  const prisma = initPrisma(buildDatabaseUrl());
   let dbReady = false;
   for (let i = 0; i < 30; i++) {
     try {
-      pool = mysql.createPool(DB_CONFIG);
-      const conn = await pool.getConnection();
-      await initializeSchema(conn);
-      conn.release();
-      initDrizzle(pool);
+      await prisma.$queryRawUnsafe('SELECT 1');
+      await initializeSchema(prisma);
       logger.info('✅ Database ready', { module: 'DB' });
       dbReady = true;
       break;
     } catch (e) {
       logger.warn(String(e), { module: 'DB' });
       logger.warn(`DB retry ${i + 1}/30…`, { module: 'DB' });
-      if (pool) {
-        await pool.end();
-        pool = null;
-      }
       await new Promise((r) => setTimeout(r, 1000));
     }
   }
-  if (!dbReady || !pool) {
+  if (!dbReady) {
     logger.error('Database connection failed after 30 retries', { module: 'DB' });
     process.exit(1);
   }
 
   // 2. Ship Matrix service (always available)
-  const shipMatrixService = new ShipMatrixService(pool);
+  const shipMatrixService = new ShipMatrixService(prisma);
 
   // 3. GameDataService (reads from MySQL — fed by standalone extractor)
-  gameDataService = new GameDataService(pool);
+  gameDataService = new GameDataService(prisma);
 
   // 4. Mount routes
-  app.use('/', createRoutes({ pool, shipMatrixService, gameDataService }));
+  app.use('/', createRoutes({ prisma, shipMatrixService, gameDataService }));
 
   // 5. Start listening BEFORE non-critical sync (so /health is immediately available)
   httpServer = app.listen(PORT, () => logger.info(`✅ Starvis v1.0 listening on :${PORT}`, { module: 'Server' }));
@@ -190,11 +182,15 @@ async function start() {
   }
 }
 
-// Graceful shutdown: close HTTP server + DB pool
+// Graceful shutdown: close HTTP server + disconnect Prisma
 async function shutdown(signal: string) {
   logger.info(`${signal} received — shutting down…`, { module: 'Server' });
   if (httpServer) httpServer.close();
-  if (pool) await pool.end();
+  try {
+    await getPrisma().$disconnect();
+  } catch {
+    /* not initialised */
+  }
   process.exit(0);
 }
 

@@ -1,38 +1,38 @@
 /**
- * Drizzle ORM client — wraps the existing mysql2 pool.
+ * Prisma client singleton.
  *
  * Usage:
- *   import { db } from '@/db';
- *   import { ships, eq } from '@/db/schema';
+ *   import { getPrisma, initPrisma } from '@/db/index.js';
  *
- *   const row = await db.select().from(ships).where(eq(ships.uuid, id));
+ *   // At startup:
+ *   initPrisma();
+ *
+ *   // In services:
+ *   const rows = await getPrisma().$queryRawUnsafe<Row[]>('SELECT ...', ...params);
  */
 
-import type { MySql2Client, MySql2Database } from 'drizzle-orm/mysql2';
-import { drizzle } from 'drizzle-orm/mysql2';
-import * as schema from './schema.js';
+import { PrismaClient } from '@prisma/client';
 
-let _db: MySql2Database<typeof schema> | null = null;
+let _prisma: PrismaClient | null = null;
 
 /**
- * Initialise the Drizzle client from an existing mysql2 pool.
- * Call this once at startup after the pool is created.
+ * Initialise the PrismaClient.
+ * Call this once at startup.
  */
-export function initDrizzle(pool: MySql2Client) {
-  _db = drizzle(pool, { schema, mode: 'default' });
-  return _db;
+export function initPrisma(databaseUrl: string): PrismaClient {
+  _prisma = new PrismaClient({
+    datasources: { db: { url: databaseUrl } },
+  });
+  return _prisma;
 }
 
 /**
- * Returns the Drizzle DB instance.
- * Throws if initDrizzle() has not been called.
+ * Returns the PrismaClient instance.
+ * Throws if initPrisma() has not been called.
  */
-export function getDb() {
-  if (!_db) throw new Error('Drizzle not initialised — call initDrizzle(pool) first');
-  return _db;
+export function getPrisma(): PrismaClient {
+  if (!_prisma) throw new Error('Prisma not initialised — call initPrisma(url) first');
+  return _prisma;
 }
 
-// Re-export drizzle operators so callers don't need a second import
-export { and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, like, lte, ne, or, sql } from 'drizzle-orm';
-// Re-export schema symbols for convenience
-export * from './schema.js';
+export { PrismaClient } from '@prisma/client';

@@ -6,12 +6,12 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { PoolConnection } from 'mysql2/promise';
+import type { PrismaClient } from '@prisma/client';
 import logger from '../utils/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export async function initializeSchema(conn: PoolConnection): Promise<void> {
+export async function initializeSchema(prisma: PrismaClient): Promise<void> {
   // Docker: db/ is at ../../db (same level as src/)
   // Monorepo CI/local: db/ is at ../../../db (one level above api/)
   const candidate1 = path.join(__dirname, '..', '..', 'db', 'schema.sql');
@@ -22,12 +22,12 @@ export async function initializeSchema(conn: PoolConnection): Promise<void> {
 
   // Migration: rename ships_default_loadouts → ships_loadouts if needed
   try {
-    const [tables] = await conn.execute<any[]>(
+    const tables = await prisma.$queryRawUnsafe<any[]>(
       "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ships_default_loadouts'",
     );
     if (tables.length > 0) {
       logger.info('Renaming ships_default_loadouts → ships_loadouts', { module: 'schema' });
-      await conn.execute('RENAME TABLE ships_default_loadouts TO ships_loadouts');
+      await prisma.$executeRawUnsafe('RENAME TABLE ships_default_loadouts TO ships_loadouts');
     }
   } catch (e: any) {
     logger.debug(`Migration skip: ${e.message}`, { module: 'schema' });
@@ -35,12 +35,12 @@ export async function initializeSchema(conn: PoolConnection): Promise<void> {
 
   // Migration: rename ships_loadouts → ship_loadouts if needed (naming consistency)
   try {
-    const [tables] = await conn.execute<any[]>(
+    const tables = await prisma.$queryRawUnsafe<any[]>(
       "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ships_loadouts'",
     );
     if (tables.length > 0) {
       logger.info('Renaming ships_loadouts → ship_loadouts', { module: 'schema' });
-      await conn.execute('RENAME TABLE ships_loadouts TO ship_loadouts');
+      await prisma.$executeRawUnsafe('RENAME TABLE ships_loadouts TO ship_loadouts');
     }
   } catch (e: any) {
     logger.debug(`Migration skip: ${e.message}`, { module: 'schema' });
@@ -73,7 +73,7 @@ export async function initializeSchema(conn: PoolConnection): Promise<void> {
     try {
       const preview = sql.substring(0, 60).replace(/\s+/g, ' ');
       logger.debug(`Executing: ${preview}...`, { module: 'schema' });
-      await conn.execute(sql);
+      await prisma.$executeRawUnsafe(sql);
     } catch (e: any) {
       // Ignore "already exists" type errors
       if (e.code === 'ER_TABLE_EXISTS_ERROR' || e.code === 'ER_DUP_KEYNAME') {
@@ -87,18 +87,18 @@ export async function initializeSchema(conn: PoolConnection): Promise<void> {
   logger.info('Schema initialized', { module: 'schema' });
 
   // ── Versioned migrations from db/migrations/*.sql ──
-  await runVersionedMigrations(conn);
+  await runVersionedMigrations(prisma);
 }
 
 /**
  * Run versioned SQL migrations from db/migrations/ directory.
  * Each file is named NNN_description.sql and tracked in a `schema_migrations` table.
  */
-async function runVersionedMigrations(conn: PoolConnection): Promise<void> {
+async function runVersionedMigrations(prisma: PrismaClient): Promise<void> {
   // Handle older installations where the column was named 'version' instead of 'filename'
   // (schema.sql now creates the table with 'filename'; this ALTER is a no-op on current installs)
   try {
-    await conn.execute(`ALTER TABLE schema_migrations CHANGE COLUMN version filename VARCHAR(255) NOT NULL`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE schema_migrations CHANGE COLUMN version filename VARCHAR(255) NOT NULL`);
     logger.info('Migrated schema_migrations: renamed column version -> filename', { module: 'schema' });
   } catch (_) {
     // Column already named 'filename' — nothing to do
@@ -115,7 +115,7 @@ async function runVersionedMigrations(conn: PoolConnection): Promise<void> {
   }
 
   // Get already-applied migrations (stored as filename WITH .sql extension)
-  const [applied] = await conn.execute<any[]>('SELECT filename FROM schema_migrations');
+  const applied = await prisma.$queryRawUnsafe<any[]>('SELECT filename FROM schema_migrations');
   const appliedSet = new Set(applied.map((r: any) => r.filename));
 
   // Read and sort migration files
@@ -152,7 +152,7 @@ async function runVersionedMigrations(conn: PoolConnection): Promise<void> {
 
     for (const stmt of statements) {
       try {
-        await conn.execute(stmt);
+        await prisma.$executeRawUnsafe(stmt);
       } catch (e: any) {
         // Skip benign errors (already exists, duplicate key, etc.)
         if (['ER_TABLE_EXISTS_ERROR', 'ER_DUP_KEYNAME', 'ER_DUP_FIELDNAME', 'ER_CANT_DROP_FIELD_OR_KEY'].includes(e.code)) {
@@ -163,7 +163,7 @@ async function runVersionedMigrations(conn: PoolConnection): Promise<void> {
       }
     }
 
-    await conn.execute('INSERT INTO schema_migrations (filename) VALUES (?)', [version]);
+    await prisma.$executeRawUnsafe('INSERT INTO schema_migrations (filename) VALUES (?)', version);
     logger.info(`Migration ${file} applied`, { module: 'schema' });
   }
 }

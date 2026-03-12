@@ -18,6 +18,16 @@ export const DB_CONFIG = {
   connectionLimit: 10,
 };
 
+/** Build a mysql:// URL suited for Prisma from individual DB env vars. */
+export function buildDatabaseUrl(): string {
+  const user = encodeURIComponent(requireEnv('DB_USER'));
+  const pass = encodeURIComponent(requireEnv('DB_PASSWORD'));
+  const host = requireEnv('DB_HOST');
+  const port = process.env.DB_PORT || '3306';
+  const name = requireEnv('DB_NAME');
+  return `mysql://${user}:${pass}@${host}:${port}/${name}`;
+}
+
 export const RATE_LIMITS = {
   // Shared window for all limiters
   windowMs: 15 * 60 * 1000,

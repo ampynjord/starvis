@@ -1,11 +1,11 @@
 /**
  * ComponentQueryService — Component listing, filters, buy locations, ships
  */
-import type { Pool } from 'mysql2/promise';
+import type { PrismaClient } from '@prisma/client';
 import { COMP_SORT, type PaginatedResult, paginate, type Row } from './shared.js';
 
 export class ComponentQueryService {
-  constructor(private pool: Pool) {}
+  constructor(private prisma: PrismaClient) {}
 
   async getAllComponents(filters?: {
     type?: string;
@@ -62,21 +62,21 @@ export class ComponentQueryService {
     const baseSql = `SELECT c.*, m.name as manufacturer_name FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code${w}`;
     const countSql = `SELECT COUNT(*) as total FROM components c${w}`;
 
-    return paginate(this.pool, baseSql, countSql, params, filters || {}, COMP_SORT, 'c');
+    return paginate(this.prisma, baseSql, countSql, params, filters || {}, COMP_SORT, 'c');
   }
 
   async getComponentByUuid(uuid: string): Promise<Row | null> {
-    const [rows] = await this.pool.execute<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       'SELECT c.*, m.name as manufacturer_name FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code WHERE c.uuid = ?',
-      [uuid],
+      uuid,
     );
     return rows[0] || null;
   }
 
   async getComponentByClassName(className: string): Promise<Row | null> {
-    const [rows] = await this.pool.execute<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       'SELECT c.*, m.name as manufacturer_name FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code WHERE c.class_name = ?',
-      [className],
+      className,
     );
     return rows[0] || null;
   }
@@ -93,12 +93,14 @@ export class ComponentQueryService {
     grades: string[];
     manufacturers: string[];
   }> {
-    const [[typeRows], [subTypeRows], [sizeRows], [gradeRows], [mfrRows]] = await Promise.all([
-      this.pool.execute<Row[]>("SELECT DISTINCT type FROM components WHERE type IS NOT NULL AND type != '' ORDER BY type"),
-      this.pool.execute<Row[]>("SELECT DISTINCT sub_type FROM components WHERE sub_type IS NOT NULL AND sub_type != '' ORDER BY sub_type"),
-      this.pool.execute<Row[]>('SELECT DISTINCT size FROM components ORDER BY size'),
-      this.pool.execute<Row[]>("SELECT DISTINCT grade FROM components WHERE grade IS NOT NULL AND grade != '' ORDER BY grade"),
-      this.pool.execute<Row[]>(
+    const [typeRows, subTypeRows, sizeRows, gradeRows, mfrRows] = await Promise.all([
+      this.prisma.$queryRawUnsafe<Row[]>("SELECT DISTINCT type FROM components WHERE type IS NOT NULL AND type != '' ORDER BY type"),
+      this.prisma.$queryRawUnsafe<Row[]>(
+        "SELECT DISTINCT sub_type FROM components WHERE sub_type IS NOT NULL AND sub_type != '' ORDER BY sub_type",
+      ),
+      this.prisma.$queryRawUnsafe<Row[]>('SELECT DISTINCT size FROM components ORDER BY size'),
+      this.prisma.$queryRawUnsafe<Row[]>("SELECT DISTINCT grade FROM components WHERE grade IS NOT NULL AND grade != '' ORDER BY grade"),
+      this.prisma.$queryRawUnsafe<Row[]>(
         "SELECT DISTINCT manufacturer_code FROM components WHERE manufacturer_code IS NOT NULL AND manufacturer_code != '' ORDER BY manufacturer_code",
       ),
     ]);
@@ -112,30 +114,32 @@ export class ComponentQueryService {
   }
 
   async getComponentBuyLocations(uuid: string): Promise<Row[]> {
-    const [rows] = await this.pool.execute<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT s.name as shop_name, s.location, s.planet_moon, s.shop_type,
               si.base_price, si.rental_price_1d, si.rental_price_3d, si.rental_price_7d, si.rental_price_30d
        FROM shop_inventory si JOIN shops s ON si.shop_id = s.id
        WHERE si.component_uuid = ? ORDER BY si.base_price`,
-      [uuid],
+      uuid,
     );
     return rows;
   }
 
   async getComponentShips(uuid: string): Promise<Row[]> {
-    const [rows] = await this.pool.execute<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT DISTINCT s.uuid, s.name, s.class_name, s.manufacturer_code, m.name as manufacturer_name
        FROM ships_loadouts sl
        JOIN ships s ON sl.ship_uuid = s.uuid
        LEFT JOIN manufacturers m ON s.manufacturer_code = m.code
        WHERE sl.component_uuid = ? ORDER BY s.name`,
-      [uuid],
+      uuid,
     );
     return rows;
   }
 
   async getComponentTypes(): Promise<{ types: { type: string; count: number }[] }> {
-    const [rows] = await this.pool.execute<Row[]>('SELECT type, COUNT(*) as count FROM components GROUP BY type ORDER BY count DESC');
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+      'SELECT type, COUNT(*) as count FROM components GROUP BY type ORDER BY count DESC',
+    );
     return { types: rows.map((r) => ({ type: String(r.type), count: Number(r.count) })) };
   }
 
@@ -195,7 +199,7 @@ export class ComponentQueryService {
       ORDER BY c.${sortCol} ${order}
       LIMIT ${limit}`;
 
-    const [rows] = await this.pool.execute<Row[]>(sql, params);
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(sql, ...params);
     return rows;
   }
 }

@@ -1,7 +1,7 @@
 /**
  * LoadoutService — Loadout calculator, hardpoint builder, stat aggregation
  */
-import type { Pool } from 'mysql2/promise';
+import type { PrismaClient } from '@prisma/client';
 import {
   cleanName,
   detectUtilityType,
@@ -18,12 +18,12 @@ import {
 } from './shared.js';
 
 export class LoadoutService {
-  constructor(private pool: Pool) {}
+  constructor(private prisma: PrismaClient) {}
 
   // ── Read loadout / modules / paints ─────────────────────
 
   async getShipLoadout(shipUuid: string): Promise<Row[]> {
-    const [rows] = await this.pool.execute(
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT sl.id, sl.port_name, sl.port_type, sl.component_class_name, sl.component_uuid,
               sl.port_min_size, sl.port_max_size, sl.parent_id,
               c.name as component_name, c.type as component_type, c.sub_type,
@@ -40,7 +40,7 @@ export class LoadoutService {
               c.radar_range, c.radar_detection_lifetime, c.radar_tracking_signal
        FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
        WHERE sl.ship_uuid = ? ORDER BY sl.port_type, sl.port_name`,
-      [shipUuid],
+      shipUuid,
     );
     return rows as Row[];
   }
@@ -57,9 +57,10 @@ export class LoadoutService {
       'modular_bed',
     ];
     const noiseClauses = NOISE_PATTERNS.map((p) => `slot_name NOT LIKE '%${p}%'`).join(' AND ');
-    const [rows] = await this.pool.execute<Row[]>(`SELECT * FROM ship_modules WHERE ship_uuid = ? AND ${noiseClauses} ORDER BY slot_name`, [
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+      `SELECT * FROM ship_modules WHERE ship_uuid = ? AND ${noiseClauses} ORDER BY slot_name`,
       shipUuid,
-    ]);
+    );
     // MySQL returns JSON columns as strings — parse them so the API sends proper objects
     return (rows as Record<string, unknown>[]).map((row) => ({
       ...row,
@@ -68,9 +69,9 @@ export class LoadoutService {
   }
 
   async getShipPaints(shipUuid: string): Promise<Row[]> {
-    const [rows] = await this.pool.execute<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       'SELECT paint_class_name, paint_name, paint_uuid FROM ship_paints WHERE ship_uuid = ? ORDER BY paint_name',
-      [shipUuid],
+      shipUuid,
     );
     return rows;
   }
@@ -95,7 +96,7 @@ export class LoadoutService {
     const baseSql = `SELECT sp.id, sp.ship_uuid, sp.paint_class_name, sp.paint_name, sp.paint_uuid, s.name as ship_name, s.class_name as ship_class_name, m.name as manufacturer_name, m.code as manufacturer_code FROM ship_paints sp LEFT JOIN ships s ON sp.ship_uuid = s.uuid LEFT JOIN manufacturers m ON s.manufacturer_code = m.code${w}`;
     const countSql = `SELECT COUNT(*) as total FROM ship_paints sp LEFT JOIN ships s ON sp.ship_uuid = s.uuid${w}`;
 
-    const [countRows] = await this.pool.execute<Row[]>(countSql, params);
+    const countRows = await this.prisma.$queryRawUnsafe<Row[]>(countSql, ...params);
     const total = Number(countRows[0]?.total) || 0;
 
     const page = Math.max(1, opts.page || 1);
@@ -103,7 +104,7 @@ export class LoadoutService {
     const offset = (page - 1) * limit;
 
     const sql = `${baseSql} ORDER BY s.name, sp.paint_name LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
-    const [rows] = await this.pool.execute<Row[]>(sql, params);
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(sql, ...params);
     return { data: rows, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
@@ -114,9 +115,9 @@ export class LoadoutService {
     swaps: { portId?: number; portName?: string; componentUuid: string }[],
   ): Promise<Record<string, unknown>> {
     // 1. Load ship
-    const [shipRows] = await this.pool.execute<Row[]>(
+    const shipRows = await this.prisma.$queryRawUnsafe<Row[]>(
       'SELECT s.*, COALESCE(sm.name, s.name) as display_name FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE s.uuid = ?',
-      [shipUuid],
+      shipUuid,
     );
     if (!shipRows.length) throw new Error('Ship not found');
     const ship = shipRows[0];
@@ -126,7 +127,10 @@ export class LoadoutService {
       crossY = num(ship.cross_section_y),
       crossZ = num(ship.cross_section_z);
     if (crossX === 0 && crossY === 0 && crossZ === 0 && ship.ship_matrix_id) {
-      const [smRows] = await this.pool.execute<Row[]>('SELECT length, beam, height FROM ship_matrix WHERE id = ?', [ship.ship_matrix_id]);
+      const smRows = await this.prisma.$queryRawUnsafe<Row[]>(
+        'SELECT length, beam, height FROM ship_matrix WHERE id = ?',
+        ship.ship_matrix_id,
+      );
       if (smRows.length) {
         crossX = num(smRows[0].length);
         crossY = num(smRows[0].beam);
@@ -135,13 +139,13 @@ export class LoadoutService {
     }
 
     // 3. Load ALL loadout ports
-    const [loadoutRows] = await this.pool.execute<Row[]>(
+    const loadoutRows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT sl.id, sl.port_name, sl.port_type, sl.port_min_size, sl.port_max_size,
               sl.parent_id, sl.component_uuid, sl.component_class_name, sl.port_editable,
               c.*
        FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
        WHERE sl.ship_uuid = ?`,
-      [shipUuid],
+      shipUuid,
     );
     const loadout: Row[] = loadoutRows.map((row) => ({ ...row }) as Row);
 
@@ -154,7 +158,7 @@ export class LoadoutService {
 
       if (swapUuids.length) {
         const ph = swapUuids.map(() => '?').join(',');
-        const [compRows] = await this.pool.execute<Row[]>(`SELECT * FROM components WHERE uuid IN (${ph})`, swapUuids);
+        const compRows = await this.prisma.$queryRawUnsafe<Row[]>(`SELECT * FROM components WHERE uuid IN (${ph})`, ...swapUuids);
         for (const c of compRows) swapComponents.set(c.uuid, c);
       }
 
@@ -243,9 +247,9 @@ export class LoadoutService {
   // ── Ship Stats (standalone, without loadout calculator overhead) ──
 
   async getShipStats(shipUuid: string): Promise<Record<string, unknown> | null> {
-    const [shipRows] = await this.pool.execute<Row[]>(
+    const shipRows = await this.prisma.$queryRawUnsafe<Row[]>(
       'SELECT s.*, COALESCE(sm.name, s.name) as display_name FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE s.uuid = ?',
-      [shipUuid],
+      shipUuid,
     );
     if (!shipRows.length) return null;
     const ship = shipRows[0];
@@ -254,7 +258,10 @@ export class LoadoutService {
       crossY = num(ship.cross_section_y),
       crossZ = num(ship.cross_section_z);
     if (crossX === 0 && crossY === 0 && crossZ === 0 && ship.ship_matrix_id) {
-      const [smRows] = await this.pool.execute<Row[]>('SELECT length, beam, height FROM ship_matrix WHERE id = ?', [ship.ship_matrix_id]);
+      const smRows = await this.prisma.$queryRawUnsafe<Row[]>(
+        'SELECT length, beam, height FROM ship_matrix WHERE id = ?',
+        ship.ship_matrix_id,
+      );
       if (smRows.length) {
         crossX = num(smRows[0].length);
         crossY = num(smRows[0].beam);
@@ -262,13 +269,13 @@ export class LoadoutService {
       }
     }
 
-    const [loadoutRows] = await this.pool.execute<Row[]>(
+    const loadoutRows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT sl.id, sl.port_name, sl.port_type, sl.port_min_size, sl.port_max_size,
               sl.parent_id, sl.component_uuid, sl.component_class_name, sl.port_editable,
               c.*
        FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
        WHERE sl.ship_uuid = ?`,
-      [shipUuid],
+      shipUuid,
     );
 
     return {
@@ -280,16 +287,16 @@ export class LoadoutService {
   // ── Ship Hardpoints (standalone, no stat aggregation) ───
 
   async getShipHardpoints(shipUuid: string): Promise<Record<string, unknown>[] | null> {
-    const [shipRows] = await this.pool.execute<Row[]>('SELECT uuid FROM ships WHERE uuid = ?', [shipUuid]);
+    const shipRows = await this.prisma.$queryRawUnsafe<Row[]>('SELECT uuid FROM ships WHERE uuid = ?', shipUuid);
     if (!shipRows.length) return null;
 
-    const [loadoutRows] = await this.pool.execute<Row[]>(
+    const loadoutRows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT sl.id, sl.port_name, sl.port_type, sl.port_min_size, sl.port_max_size,
               sl.parent_id, sl.component_uuid, sl.component_class_name, sl.port_editable,
               c.*
        FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
        WHERE sl.ship_uuid = ?`,
-      [shipUuid],
+      shipUuid,
     );
 
     return this.buildHardpoints(loadoutRows as Row[]);

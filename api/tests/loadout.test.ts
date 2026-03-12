@@ -40,7 +40,6 @@ function mockShip(overrides: Record<string, unknown> = {}): Row {
     ship_matrix_id: 1,
     display_name: 'Aurora MR',
     ...overrides,
-    constructor: { name: 'RowDataPacket' },
   } as unknown as Row;
 }
 
@@ -69,7 +68,6 @@ function mockWeapon(overrides: Record<string, unknown> = {}): Row {
     power_draw: 3.5,
     heat_generation: 2.8,
     ...overrides,
-    constructor: { name: 'RowDataPacket' },
   } as unknown as Row;
 }
 
@@ -93,7 +91,6 @@ function mockShield(overrides: Record<string, unknown> = {}): Row {
     power_draw: 4.2,
     heat_generation: 3.0,
     ...overrides,
-    constructor: { name: 'RowDataPacket' },
   } as unknown as Row;
 }
 
@@ -114,7 +111,6 @@ function mockPowerPlant(overrides: Record<string, unknown> = {}): Row {
     power_draw: 0,
     heat_generation: 5.0,
     ...overrides,
-    constructor: { name: 'RowDataPacket' },
   } as unknown as Row;
 }
 
@@ -135,7 +131,6 @@ function mockCooler(overrides: Record<string, unknown> = {}): Row {
     power_draw: 1.5,
     heat_generation: 0,
     ...overrides,
-    constructor: { name: 'RowDataPacket' },
   } as unknown as Row;
 }
 
@@ -163,7 +158,6 @@ function mockQD(overrides: Record<string, unknown> = {}): Row {
     power_draw: 2.0,
     heat_generation: 1.5,
     ...overrides,
-    constructor: { name: 'RowDataPacket' },
   } as unknown as Row;
 }
 
@@ -189,7 +183,6 @@ function mockMissile(overrides: Record<string, unknown> = {}): Row {
     power_draw: 0,
     heat_generation: 0,
     ...overrides,
-    constructor: { name: 'RowDataPacket' },
   } as unknown as Row;
 }
 
@@ -206,7 +199,6 @@ function mockCM(overrides: Record<string, unknown> = {}): Row {
     power_draw: 0.5,
     heat_generation: 0.3,
     ...overrides,
-    constructor: { name: 'RowDataPacket' },
   } as unknown as Row;
 }
 

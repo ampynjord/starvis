@@ -2,14 +2,15 @@
  * Trade routes — commodity prices by location and best-routes calculator
  * Inspired by UEX Corp / SC Trade Tools
  */
+
+import type { PrismaClient } from '@prisma/client';
 import type { Router } from 'express';
-import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { asyncHandler, makeGameDataGuard, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
-type Row = RowDataPacket & Record<string, unknown>;
+type Row = Record<string, unknown>;
 
-async function getCommodityPrices(pool: Pool, commodityUuid?: string, system?: string): Promise<Row[]> {
+async function getCommodityPrices(prisma: PrismaClient, commodityUuid?: string, system?: string): Promise<Row[]> {
   const where: string[] = [];
   const params: (string | number)[] = [];
   if (commodityUuid) {
@@ -21,19 +22,19 @@ async function getCommodityPrices(pool: Pool, commodityUuid?: string, system?: s
     params.push(system);
   }
   const wSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-  const [rows] = await pool.execute<Row[]>(
+  const rows = await prisma.$queryRawUnsafe<Row[]>(
     `SELECT cp.*, c.name as commodity_name, c.type as commodity_type, c.symbol
      FROM commodity_prices cp
      JOIN commodities c ON cp.commodity_uuid = c.uuid
      ${wSql}
      ORDER BY cp.system_name, cp.location_name`,
-    params,
+    ...params,
   );
   return rows;
 }
 
 async function getBestRoutes(
-  pool: Pool,
+  prisma: PrismaClient,
   opts: {
     cargo_scu?: number;
     budget?: number;
@@ -44,7 +45,7 @@ async function getBestRoutes(
   const cargo = Math.max(1, opts.cargo_scu ?? 1);
   const systemFilter = opts.system ? 'AND b.system_name = ? AND s.system_name = ?' : '';
   const params: (string | number)[] = opts.system ? [opts.system, opts.system] : [];
-  const [rows] = await pool.execute<Row[]>(
+  const rows = await prisma.$queryRawUnsafe<Row[]>(
     `SELECT
        c.name   AS commodity_name,
        c.symbol AS commodity_symbol,
@@ -66,13 +67,13 @@ async function getBestRoutes(
        ${systemFilter}
      ORDER BY profit_per_scu DESC
      LIMIT 50`,
-    params,
+    ...params,
   );
   return rows;
 }
 
 export function mountTradeRoutes(router: Router, deps: RouteDependencies): void {
-  const { gameDataService: _gs, pool } = deps as RouteDependencies & { pool: Pool };
+  const { gameDataService: _gs, prisma } = deps;
   const requireGameData = makeGameDataGuard(_gs);
 
   // GET /api/v1/trade/prices?commodity_uuid=...&system=...
@@ -82,7 +83,7 @@ export function mountTradeRoutes(router: Router, deps: RouteDependencies): void 
     asyncHandler(async (req, res) => {
       const commodityUuid = String(req.query.commodity_uuid ?? '');
       const system = String(req.query.system ?? '');
-      const data = await getCommodityPrices(pool, commodityUuid || undefined, system || undefined);
+      const data = await getCommodityPrices(prisma, commodityUuid || undefined, system || undefined);
       sendWithETag(req, res, { success: true, count: data.length, data });
     }),
   );
@@ -94,7 +95,7 @@ export function mountTradeRoutes(router: Router, deps: RouteDependencies): void 
     asyncHandler(async (req, res) => {
       const cargo = parseInt(String(req.query.cargo_scu ?? '1'), 10) || 1;
       const system = String(req.query.system ?? '');
-      const data = await getBestRoutes(pool, { cargo_scu: cargo, system: system || undefined });
+      const data = await getBestRoutes(prisma, { cargo_scu: cargo, system: system || undefined });
       sendWithETag(req, res, { success: true, count: data.length, data });
     }),
   );
@@ -107,9 +108,9 @@ export function mountTradeRoutes(router: Router, deps: RouteDependencies): void 
       const system = String(req.query.system ?? '');
       const where = system ? 'WHERE system_name = ?' : '';
       const params = system ? [system] : [];
-      const [rows] = await (pool as Pool).execute<Row[]>(
+      const rows = await prisma.$queryRawUnsafe<Row[]>(
         `SELECT DISTINCT location_name, system_name FROM commodity_prices ${where} ORDER BY system_name, location_name`,
-        params,
+        ...params,
       );
       sendWithETag(req, res, { success: true, count: rows.length, data: rows });
     }),
