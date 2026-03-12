@@ -174,8 +174,20 @@ export class GameDataService {
         (SELECT COUNT(DISTINCT type) FROM items) as item_types
     `);
     const latest = await this.getLatestExtraction();
+    const raw = rows[0];
+    // Convert BigInt to Number for JSON serialization
     const result = {
-      ...rows[0],
+      ships: Number(raw.ships),
+      flyable_ships: Number(raw.flyable_ships),
+      ground_vehicles: Number(raw.ground_vehicles),
+      components: Number(raw.components),
+      items: Number(raw.items),
+      commodities: Number(raw.commodities),
+      manufacturers: Number(raw.manufacturers),
+      paints: Number(raw.paints),
+      shops: Number(raw.shops),
+      component_types: Number(raw.component_types),
+      item_types: Number(raw.item_types),
       game_version: latest?.game_version || null,
       last_extraction: latest?.extracted_at || null,
     };
