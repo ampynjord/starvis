@@ -176,7 +176,7 @@ jobs:
         run: cd extractor && npm run test:coverage
 
       - name: Upload API coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: ./api/coverage/lcov.info
           flags: api
@@ -185,7 +185,7 @@ jobs:
           fail_ci_if_error: false
 
       - name: Upload Extractor coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: ./extractor/coverage/lcov.info
           flags: extractor
