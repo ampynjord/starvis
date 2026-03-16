@@ -89,6 +89,9 @@ export function ShipCard({ ship, index = 0 }: Props) {
                 {ship.role && ship.role !== ship.career && (
                   <GlowBadge color="slate" size="xs">{ship.role}</GlowBadge>
                 )}
+                {ship.vehicle_category && (
+                  <GlowBadge color="slate" size="xs">{ship.vehicle_category}</GlowBadge>
+                )}
               </div>
               <span className="text-xs font-mono-sc flex-shrink-0">
                 {ship.ship_matrix_id != null

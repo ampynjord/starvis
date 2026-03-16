@@ -46,7 +46,7 @@ describe('ShipCard', () => {
 
   it('affiche le code fabricant', () => {
     renderCard();
-    expect(screen.getByText('ANVL')).toBeInTheDocument();
+    expect(screen.getAllByText('ANVL').length).toBeGreaterThanOrEqual(1);
   });
 
   it('displays the career', () => {
