@@ -338,6 +338,20 @@ export interface MiningStats {
   parts: number;
 }
 
+// ─── Missions ─────────────────────────────────────────────────────────────────
+export interface Mission {
+  uuid: string;
+  class_name: string;
+  title: string | null;
+  description: string | null;
+  mission_type: string | null;
+  can_be_shared: boolean;
+  only_owner_complete: boolean;
+  is_legal: boolean;
+  completion_time_s: number | null;
+  game_env: string;
+}
+
 export interface ChangelogEntry {
   id: number;
   entity_type: string;

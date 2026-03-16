@@ -484,6 +484,25 @@ CREATE TABLE IF NOT EXISTS mining_composition_parts (
   CONSTRAINT fk_mcp_element     FOREIGN KEY (element_uuid)     REFERENCES mining_elements(uuid)     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ─── Missions ──────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS missions (
+  uuid                CHAR(36)     NOT NULL,
+  class_name          VARCHAR(300) NOT NULL,
+  title               VARCHAR(500) DEFAULT NULL,
+  description         TEXT         DEFAULT NULL,
+  mission_type        VARCHAR(100) DEFAULT NULL,
+  can_be_shared       TINYINT(1)   NOT NULL DEFAULT 0,
+  only_owner_complete TINYINT(1)   NOT NULL DEFAULT 0,
+  is_legal            TINYINT(1)   NOT NULL DEFAULT 1,
+  completion_time_s   INT          DEFAULT NULL,
+  not_for_release     TINYINT(1)   NOT NULL DEFAULT 0,
+  work_in_progress    TINYINT(1)   NOT NULL DEFAULT 0,
+  game_env            VARCHAR(10)  NOT NULL DEFAULT 'live',
+  PRIMARY KEY (uuid),
+  KEY idx_mission_type (mission_type),
+  KEY idx_game_env     (game_env)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+
 CREATE TABLE IF NOT EXISTS changelog (
   id            INT           AUTO_INCREMENT PRIMARY KEY,
   extraction_id INT           NOT NULL,

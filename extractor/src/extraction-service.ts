@@ -18,6 +18,20 @@ import { classifyPort, type DataForgeService, MANUFACTURER_CODES } from './dataf
 import { LocalizationService } from './localization-service.js';
 import logger from './logger.js';
 import { extractMiningCompositions, extractMiningElements } from './mining-extractor.js';
+import { extractMissions } from './mission-extractor.js';
+
+export type ExtractionModule = 'ships' | 'components' | 'items' | 'commodities' | 'mining' | 'missions' | 'paints' | 'shops';
+
+export type GameEnv = 'live' | 'ptu' | 'eptu' | 'custom';
+
+export interface ExtractionOptions {
+  /** Which modules to run. Use `new Set(['all'])` for everything. */
+  modules: Set<ExtractionModule | 'all'>;
+  /** Game environment label — stored in game_env column of missions. */
+  env: GameEnv;
+}
+
+const DEFAULT_OPTIONS: ExtractionOptions = { modules: new Set(['all']), env: 'live' };
 
 export interface ExtractionStats {
   manufacturers: number;
@@ -30,6 +44,7 @@ export interface ExtractionStats {
   shipMatrixLinked: number;
   miningElements: number;
   miningCompositions: number;
+  missions: number;
   errors: string[];
   extractionHash?: string;
   durationMs?: number;
@@ -92,19 +107,23 @@ export class ExtractionService {
   //  FULL EXTRACTION PIPELINE
   // ======================================================
 
-  async extractAll(onProgress?: (msg: string) => void): Promise<ExtractionStats> {
+  async extractAll(onProgress?: (msg: string) => void, options: ExtractionOptions = DEFAULT_OPTIONS): Promise<ExtractionStats> {
     if (this._extracting) {
       throw new Error('An extraction is already in progress');
     }
     this._extracting = true;
     try {
-      return await this._doExtractAll(onProgress);
+      return await this._doExtractAll(onProgress, options);
     } finally {
       this._extracting = false;
     }
   }
 
-  private async _doExtractAll(onProgress?: (msg: string) => void): Promise<ExtractionStats> {
+  private async _doExtractAll(onProgress?: (msg: string) => void, options: ExtractionOptions = DEFAULT_OPTIONS): Promise<ExtractionStats> {
+    const { env } = options;
+    const runAll = options.modules.has('all');
+    const run = (m: ExtractionModule) => runAll || options.modules.has(m);
+
     const startTime = Date.now();
     const stats: ExtractionStats = {
       manufacturers: 0,
@@ -117,6 +136,7 @@ export class ExtractionService {
       shipMatrixLinked: 0,
       miningElements: 0,
       miningCompositions: 0,
+      missions: 0,
       errors: [],
     };
 
@@ -183,67 +203,90 @@ export class ExtractionService {
 
       // 1c. Clean stale data before fresh extraction (order matters for FK constraints)
       onProgress?.('Cleaning stale data…');
-      await conn.execute('DELETE FROM shop_inventory');
-      await conn.execute('DELETE FROM shops');
-      await conn.execute('DELETE FROM ship_modules');
-      await conn.execute('DELETE FROM ship_loadouts');
-      await conn.execute('DELETE FROM ship_paints WHERE 1=1');
-      await conn.execute('DELETE FROM ships');
-      await conn.execute('DELETE FROM components');
-      await conn.execute('DELETE FROM items');
-      await conn.execute('DELETE FROM commodities');
-      await conn.execute('DELETE FROM mining_composition_parts');
-      await conn.execute('DELETE FROM mining_compositions');
-      await conn.execute('DELETE FROM mining_elements');
+      if (run('shops')) {
+        await conn.execute('DELETE FROM shop_inventory');
+        await conn.execute('DELETE FROM shops');
+      }
+      if (run('ships')) {
+        await conn.execute('DELETE FROM ship_modules');
+        await conn.execute('DELETE FROM ship_loadouts');
+        await conn.execute('DELETE FROM ship_paints WHERE 1=1');
+        await conn.execute('DELETE FROM ships');
+      }
+      if (run('components')) await conn.execute('DELETE FROM components');
+      if (run('items') || run('commodities')) {
+        await conn.execute('DELETE FROM items');
+        await conn.execute('DELETE FROM commodities');
+      }
+      if (run('mining')) {
+        await conn.execute('DELETE FROM mining_composition_parts');
+        await conn.execute('DELETE FROM mining_compositions');
+        await conn.execute('DELETE FROM mining_elements');
+      }
+      if (run('missions')) await conn.execute('DELETE FROM missions WHERE game_env = ?', [env]);
 
       // 2. Collect & save manufacturers FIRST (before ships, due to FK constraint)
       onProgress?.('Saving manufacturers…');
       stats.manufacturers = await this.saveManufacturersFromData(conn);
 
       // 3. Extract & save components
-      onProgress?.('Extracting components…');
-      stats.components = await this.saveComponents(conn, onProgress);
+      if (run('components')) {
+        onProgress?.('Extracting components…');
+        stats.components = await this.saveComponents(conn, onProgress);
+      }
 
       // 3b. Extract & save items (FPS weapons, armor, clothing, gadgets)
-      onProgress?.('Extracting items (FPS, armor, clothing)…');
-      const itemResult = await this.saveItems(conn, onProgress);
-      stats.items = itemResult.items;
-      stats.commodities = itemResult.commodities;
+      if (run('items') || run('commodities')) {
+        onProgress?.('Extracting items (FPS, armor, clothing)…');
+        const itemResult = await this.saveItems(conn, onProgress);
+        stats.items = itemResult.items;
+        stats.commodities = itemResult.commodities;
+      }
 
       // 4. Extract & save ships + loadouts
-      onProgress?.('Extracting ships…');
-      const shipResult = await this.saveShips(conn, onProgress);
-      stats.ships = shipResult.ships;
-      stats.loadoutPorts = shipResult.loadoutPorts;
+      if (run('ships')) {
+        onProgress?.('Extracting ships…');
+        const shipResult = await this.saveShips(conn, onProgress);
+        stats.ships = shipResult.ships;
+        stats.loadoutPorts = shipResult.loadoutPorts;
+      }
 
       // 5. Extract & save shops/vendors
-      onProgress?.('Extracting shops & prices…');
-      await this.saveShopsData(conn, onProgress);
+      if (run('shops')) {
+        onProgress?.('Extracting shops & prices…');
+        await this.saveShopsData(conn, onProgress);
+      }
 
       // 5b. Extract & save paints/liveries
-      onProgress?.('Extracting paints…');
-      await this.savePaints(conn, onProgress);
+      if (run('paints')) {
+        onProgress?.('Extracting paints…');
+        await this.savePaints(conn, onProgress);
+      }
 
       // 5c. Extract & save mining data (elements + compositions)
-      onProgress?.('Extracting mining data…');
-      const miningResult = await this.saveMiningData(conn, onProgress);
-      stats.miningElements = miningResult.elements;
-      stats.miningCompositions = miningResult.compositions;
+      if (run('mining')) {
+        onProgress?.('Extracting mining data…');
+        const miningResult = await this.saveMiningData(conn, onProgress);
+        stats.miningElements = miningResult.elements;
+        stats.miningCompositions = miningResult.compositions;
+      }
 
-      // 6. Cross-reference with ship_matrix
-      onProgress?.('Cross-referencing with Ship Matrix…');
-      stats.shipMatrixLinked = await crossReferenceShipMatrix(conn);
-      await applyDimensionsFallback(conn);
+      // 5d. Extract & save missions (ContractTemplate)
+      if (run('missions')) {
+        onProgress?.('Extracting missions (ContractTemplate)…');
+        stats.missions = await this.saveMissions(conn, env, onProgress);
+      }
 
-      // 6a. Tag variant types for non-SM ships
-      await tagVariantTypes(conn);
-
-      // 6a-bis. Remove ships that should not be visible (bis_edition skins, events, tutorial…)
-      const pruned = await pruneExcludedVariants(conn);
-      if (pruned > 0) onProgress?.(`Pruned ${pruned} excluded variant ships`);
-
-      // 6b. Hull series SCU fallback from Ship Matrix
-      await applyHullSeriesCargoFallback(conn);
+      // 6. Cross-reference with ship_matrix (only when ships were extracted)
+      if (run('ships')) {
+        onProgress?.('Cross-referencing with Ship Matrix…');
+        stats.shipMatrixLinked = await crossReferenceShipMatrix(conn);
+        await applyDimensionsFallback(conn);
+        await tagVariantTypes(conn);
+        const pruned = await pruneExcludedVariants(conn);
+        if (pruned > 0) onProgress?.(`Pruned ${pruned} excluded variant ships`);
+        await applyHullSeriesCargoFallback(conn);
+      }
 
       // 6c. Log extraction to extraction_log
       stats.durationMs = Date.now() - startTime;
@@ -1589,5 +1632,58 @@ export class ExtractionService {
 
     onProgress?.(`Mining: ${savedElements} elements, ${compositions.length} compositions, ${partRows.length} parts`);
     return { elements: savedElements, compositions: compositions.length };
+  }
+
+  // ======================================================
+  //  MISSIONS → missions table
+  // ======================================================
+
+  private async saveMissions(conn: PoolConnection, env: GameEnv, onProgress?: (msg: string) => void): Promise<number> {
+    const locAdapter = this.locService.isLoaded ? { resolveKey: (k: string) => this.locService.resolveKey(k) ?? null } : undefined;
+
+    const missions = extractMissions(this.dfService, locAdapter);
+    if (!missions.length) {
+      onProgress?.('Missions: no ContractTemplate records found');
+      return 0;
+    }
+
+    // Only store missions not flagged as dev-only
+    const filtered = missions.filter((m) => !m.notForRelease && !m.workInProgress);
+    onProgress?.(`Missions: ${filtered.length} usable out of ${missions.length} total`);
+
+    const rows = filtered.map((m) => [
+      m.uuid,
+      m.className,
+      m.title,
+      m.description,
+      m.missionType,
+      m.canBeShared ? 1 : 0,
+      m.onlyOwnerComplete ? 1 : 0,
+      m.isLegal ? 1 : 0,
+      m.completionTimeSecs,
+      m.notForRelease ? 1 : 0,
+      m.workInProgress ? 1 : 0,
+      env,
+    ]);
+
+    const saved = await ExtractionService.batchUpsert(
+      conn,
+      `INSERT INTO missions
+         (uuid, class_name, title, description, mission_type,
+          can_be_shared, only_owner_complete, is_legal,
+          completion_time_s, not_for_release, work_in_progress, game_env)
+       VALUES`,
+      `ON DUPLICATE KEY UPDATE
+         class_name=new.class_name, title=new.title, description=new.description,
+         mission_type=new.mission_type, can_be_shared=new.can_be_shared,
+         only_owner_complete=new.only_owner_complete, is_legal=new.is_legal,
+         completion_time_s=new.completion_time_s, not_for_release=new.not_for_release,
+         work_in_progress=new.work_in_progress, game_env=new.game_env`,
+      12,
+      rows,
+    );
+
+    onProgress?.(`Missions: ${saved} records saved [${env}]`);
+    return saved;
   }
 }

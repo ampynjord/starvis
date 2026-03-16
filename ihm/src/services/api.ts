@@ -3,10 +3,10 @@ import type {
   ChangelogEntry,
   ChangelogSummary,
   Commodity,
+  CommodityPrice,
   CompatibleComponent,
   Component,
   ComponentListItem,
-  CommodityPrice,
   Hardpoint,
   Item,
   ItemBuyLocation,
@@ -18,6 +18,7 @@ import type {
   MiningElement,
   MiningSolverResult,
   MiningStats,
+  Mission,
   PaginatedResponse,
   PaintListItem,
   SearchResult,
@@ -117,8 +118,15 @@ export const api = {
     get: (uuid: string) => get<Component>(`/components/${uuid}`),
     buyLocations: (uuid: string) => get<BuyLocation[]>(`/components/${uuid}/buy-locations`),
     ships: (uuid: string) => get<ShipListItem[]>(`/components/${uuid}/ships`),
-    compatible: (opts: { type?: string; min_size?: number; max_size?: number; search?: string; sort?: string; order?: string; limit?: number }) =>
-      get<CompatibleComponent[]>('/components/compatible', opts as Record<string, string | number | boolean | undefined>),
+    compatible: (opts: {
+      type?: string;
+      min_size?: number;
+      max_size?: number;
+      search?: string;
+      sort?: string;
+      order?: string;
+      limit?: number;
+    }) => get<CompatibleComponent[]>('/components/compatible', opts as Record<string, string | number | boolean | undefined>),
   },
 
   // ─── Items ─────────────────────────────────────────────────────────
@@ -182,8 +190,7 @@ export const api = {
       get<CommodityPrice[]>('/trade/prices', opts as Record<string, string | undefined>),
     routes: (opts?: { cargo_scu?: number; system?: string }) =>
       get<TradeRoute[]>('/trade/routes', opts as Record<string, string | number | undefined>),
-    locations: (system?: string) =>
-      get<TradeLocation[]>('/trade/locations', system ? { system } : undefined),
+    locations: (system?: string) => get<TradeLocation[]>('/trade/locations', system ? { system } : undefined),
   },
 
   // ─── Loadout simulator ─────────────────────────────────────────────
@@ -196,13 +203,19 @@ export const api = {
   mining: {
     elements: () => get<MiningElement[]>('/mining/elements'),
     element: (uuid: string) => get<MiningElement>(`/mining/elements/${uuid}`),
-    compositions: (includeEmpty = false) =>
-      get<MiningComposition[]>('/mining/compositions', { include_empty: includeEmpty || undefined }),
+    compositions: (includeEmpty = false) => get<MiningComposition[]>('/mining/compositions', { include_empty: includeEmpty || undefined }),
     composition: (uuid: string) => get<MiningComposition>(`/mining/compositions/${uuid}`),
     solveForElement: (elementUuid: string, minProbability?: number) =>
       get<MiningSolverResult[]>('/mining/solver', { element: elementUuid, min_probability: minProbability }),
-    solveForComposition: (compositionUuid: string) =>
-      get<MiningSolverResult[]>('/mining/solver', { composition: compositionUuid }),
+    solveForComposition: (compositionUuid: string) => get<MiningSolverResult[]>('/mining/solver', { composition: compositionUuid }),
     stats: () => get<MiningStats>('/mining/stats'),
+  },
+
+  // ─── Missions ──────────────────────────────────────────────────────
+  missions: {
+    types: (env?: string) => get<string[]>('/missions/types', { env }),
+    list: (filters?: { env?: string; type?: string; legal?: string; shared?: string; search?: string; page?: number; limit?: number }) =>
+      get<PaginatedResponse<Mission>>('/missions', filters as Record<string, string | number | undefined>),
+    get: (uuid: string) => get<Mission>(`/missions/${uuid}`),
   },
 };
