@@ -7,7 +7,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { ComponentQueryService } from '../src/services/component-query-service.js';
 import { GameDataService } from '../src/services/game-data-service.js';
 import { ItemQueryService } from '../src/services/item-query-service.js';
+import { MissionService } from '../src/services/mission-service.js';
 import { ShipQueryService } from '../src/services/ship-query-service.js';
+import { ShopService } from '../src/services/shop-service.js';
 
 // ── Mock PrismaClient Factory ────────────────────────────
 
@@ -191,5 +193,135 @@ describe('GameDataService cache', () => {
     expect(r1).toEqual(r2);
     // prisma.$queryRawUnsafe should only be called twice (once for stats, once for latest)
     expect((prisma as any).$queryRawUnsafe).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ── MissionService ───────────────────────────────────────
+
+describe('MissionService', () => {
+  describe('getMissionTypes', () => {
+    it('returns distinct mission types for given env', async () => {
+      const prisma = createMockPrisma([[row({ mission_type: 'Bounty' }), row({ mission_type: 'Delivery' })]]);
+      const svc = new MissionService(prisma);
+      const types = await svc.getMissionTypes('live');
+      expect(types).toEqual(['Bounty', 'Delivery']);
+      const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
+      expect(callArgs[1]).toBe('live');
+    });
+
+    it('defaults to live env', async () => {
+      const prisma = createMockPrisma([[row({ mission_type: 'Combat' })]]);
+      const svc = new MissionService(prisma);
+      const types = await svc.getMissionTypes();
+      expect(types).toEqual(['Combat']);
+    });
+  });
+
+  describe('getMissions', () => {
+    it('returns paginated missions', async () => {
+      const countRow = row({ total: 2 });
+      const m1 = row({ uuid: 'u1', class_name: 'mission_bounty_01', title: 'Bounty Hunt', mission_type: 'Bounty', is_legal: 1, can_be_shared: 0, game_env: 'live' });
+      const m2 = row({ uuid: 'u2', class_name: 'mission_delivery_01', title: 'Deliver Cargo', mission_type: 'Delivery', is_legal: 1, can_be_shared: 1, game_env: 'live' });
+      const prisma = createMockPrisma([[countRow], [m1, m2]]);
+      const svc = new MissionService(prisma);
+      const result = await svc.getMissions({ env: 'live', page: 1, limit: 50 });
+      expect(result.total).toBe(2);
+      expect(result.data).toHaveLength(2);
+      expect(result.page).toBe(1);
+    });
+
+    it('applies type filter', async () => {
+      const prisma = createMockPrisma([[row({ total: 0 })], []]);
+      const svc = new MissionService(prisma);
+      await svc.getMissions({ type: 'Bounty' });
+      const sql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
+      expect(sql).toContain('COUNT(*)');
+    });
+
+    it('applies is_legal = true filter', async () => {
+      const prisma = createMockPrisma([[row({ total: 0 })], []]);
+      const svc = new MissionService(prisma);
+      await svc.getMissions({ legal: 'true' });
+      const sql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
+      expect(sql).toContain('is_legal = 1');
+    });
+
+    it('applies is_legal = false filter', async () => {
+      const prisma = createMockPrisma([[row({ total: 0 })], []]);
+      const svc = new MissionService(prisma);
+      await svc.getMissions({ legal: 'false' });
+      const sql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
+      expect(sql).toContain('is_legal = 0');
+    });
+
+    it('clamps limit to 200', async () => {
+      const prisma = createMockPrisma([[row({ total: 0 })], []]);
+      const svc = new MissionService(prisma);
+      const result = await svc.getMissions({ limit: 9999 });
+      expect(result.limit).toBe(200);
+    });
+  });
+
+  describe('getMissionByUuid', () => {
+    it('returns mission when found', async () => {
+      const mission = row({ uuid: 'abc-123', class_name: 'test', title: 'Test Mission', mission_type: 'Bounty' });
+      const prisma = createMockPrisma([[mission]]);
+      const svc = new MissionService(prisma);
+      const result = await svc.getMissionByUuid('abc-123');
+      expect(result).toBeTruthy();
+      expect(result?.uuid).toBe('abc-123');
+    });
+
+    it('returns null when not found', async () => {
+      const prisma = createMockPrisma([[]]);
+      const svc = new MissionService(prisma);
+      const result = await svc.getMissionByUuid('nonexistent');
+      expect(result).toBeNull();
+    });
+  });
+});
+
+// ── ShopService ──────────────────────────────────────────
+
+describe('ShopService', () => {
+  describe('getShops', () => {
+    it('returns paginated shops', async () => {
+      const prisma = createMockPrisma([
+        [row({ count: 3 })],
+        [row({ id: 1, name: 'Dumper\'s Depot', location: 'Area 18' }), row({ id: 2, name: 'Astro Armada', location: 'Area 18' })],
+      ]);
+      const svc = new ShopService(prisma);
+      const result = await svc.getShops({});
+      expect(result.total).toBe(3);
+      expect(result.data).toHaveLength(2);
+    });
+
+    it('applies search filter', async () => {
+      const prisma = createMockPrisma([[row({ count: 0 })], []]);
+      const svc = new ShopService(prisma);
+      await svc.getShops({ search: 'Dumper' });
+      const sql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
+      expect(sql).toContain('WHERE');
+    });
+
+    it('applies type filter', async () => {
+      const prisma = createMockPrisma([[row({ count: 0 })], []]);
+      const svc = new ShopService(prisma);
+      await svc.getShops({ type: 'Weapons' });
+      const sql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
+      expect(sql).toContain('shop_type');
+    });
+  });
+
+  describe('getShopInventory', () => {
+    it('returns inventory for given shop id', async () => {
+      const inv = [row({ id: 1, shop_id: 42, component_name: 'Laser Cannon' })];
+      const prisma = createMockPrisma([inv]);
+      const svc = new ShopService(prisma);
+      const result = await svc.getShopInventory(42);
+      expect(result).toHaveLength(1);
+      const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
+      expect(callArgs[1]).toBe(42);
+    });
   });
 });
