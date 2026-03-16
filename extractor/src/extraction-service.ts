@@ -1565,9 +1565,7 @@ export class ExtractionService {
     }
 
     // ── Commodities changelog ──
-    const [newCommoditiesRaw] = await conn.execute<any[]>('SELECT uuid, class_name, name, type FROM commodities WHERE game_env = ?', [
-      env,
-    ]);
+    const [newCommoditiesRaw] = await conn.execute<any[]>('SELECT uuid, class_name, name, type FROM commodities WHERE game_env = ?', [env]);
     const newCommodities = new Map(newCommoditiesRaw.map((c: any) => [c.class_name, c]));
     for (const [cn, commodity] of newCommodities) {
       if (!oldCommodities.has(cn))
