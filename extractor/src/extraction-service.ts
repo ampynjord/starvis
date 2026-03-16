@@ -1514,7 +1514,7 @@ export class ExtractionService {
     onProgress?: (msg: string) => void,
   ): Promise<{ elements: number; compositions: number }> {
     const locAdapter = this.locService.isLoaded
-      ? { resolve: (k: string) => this.locService.resolve?.(k) ?? null }
+      ? { resolve: (k: string) => this.locService.resolveKey(k) ?? null }
       : undefined;
 
     const elements = extractMiningElements(this.dfService, locAdapter);
