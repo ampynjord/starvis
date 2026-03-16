@@ -4,6 +4,7 @@ import { mountCommodityRoutes } from './commodities.js';
 import { mountComponentRoutes } from './components.js';
 import { mountItemRoutes } from './items.js';
 import { mountManufacturerRoutes } from './manufacturers.js';
+import { mountMiningRoutes } from './mining.js';
 import { mountPaintRoutes } from './paints.js';
 import { mountSearchRoutes } from './search.js';
 import { mountShipMatrixRoutes } from './ship-matrix.js';
@@ -25,6 +26,7 @@ export function createRoutes(deps: RouteDependencies): Router {
   mountShopRoutes(router, deps);
   mountItemRoutes(router, deps);
   mountCommodityRoutes(router, deps);
+  mountMiningRoutes(router, deps);
   mountSearchRoutes(router, deps);
   mountSystemRoutes(router, deps);
   mountTradeRoutes(router, deps);

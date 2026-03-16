@@ -270,6 +270,74 @@ export interface Shop {
 }
 
 // ─── Changelog ────────────────────────────────────────────────────────────────
+// ─── Mining ───────────────────────────────────────────────────────────────────
+export interface MiningElement {
+  uuid: string;
+  class_name: string;
+  name: string;
+  commodity_uuid: string | null;
+  instability: number | null;
+  resistance: number | null;
+  optimal_window_midpoint: number | null;
+  optimal_window_thinness: number | null;
+  explosion_multiplier: number | null;
+  cluster_factor: number | null;
+  /** Only present when fetched via /elements/:uuid */
+  found_in?: MiningCompositionRef[];
+}
+
+export interface MiningCompositionRef {
+  composition_uuid: string;
+  deposit_name: string;
+  class_name: string;
+  min_percentage: number;
+  max_percentage: number;
+  probability: number;
+}
+
+export interface MiningCompositionPart {
+  element_uuid: string;
+  element_name: string;
+  instability: number | null;
+  resistance: number | null;
+  min_percentage: number;
+  max_percentage: number;
+  probability: number;
+}
+
+export interface MiningComposition {
+  uuid: string;
+  class_name: string;
+  deposit_name: string;
+  min_distinct_elements: number | null;
+  element_count?: number;
+  /** Only present when fetched via /compositions/:uuid */
+  elements?: MiningCompositionPart[];
+}
+
+export interface MiningSolverResult {
+  uuid: string;
+  class_name: string;
+  deposit_name: string;
+  min_distinct_elements: number | null;
+  element_name: string;
+  instability: number | null;
+  resistance: number | null;
+  optimal_window_midpoint: number | null;
+  optimal_window_thinness: number | null;
+  explosion_multiplier: number | null;
+  min_percentage: number;
+  max_percentage: number;
+  probability: number;
+  curve_exponent: number | null;
+}
+
+export interface MiningStats {
+  elements: number;
+  compositions: number;
+  parts: number;
+}
+
 export interface ChangelogEntry {
   id: number;
   entity_type: string;
