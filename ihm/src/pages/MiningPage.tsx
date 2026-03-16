@@ -18,27 +18,33 @@ import type { MiningElement, MiningSolverResult } from '@/types/api';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function pct(v: number | null): string {
+function pct(v: number | string | null): string {
   if (v == null) return '—';
-  return `${(v * 100).toFixed(1)}%`;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '—';
+  return `${(n * 100).toFixed(1)}%`;
 }
 
-function fNum(v: number | null, decimals = 2): string {
+function fNum(v: number | string | null, decimals = 2): string {
   if (v == null) return '—';
-  return v.toFixed(decimals);
+  const n = Number(v);
+  if (!Number.isFinite(n)) return '—';
+  return n.toFixed(decimals);
 }
 
 /** Color from 0 (green/safe) to 1 (red/dangerous) */
-function dangerColor(v: number | null): string {
+function dangerColor(v: number | string | null): string {
   if (v == null) return 'text-slate-500';
-  if (v < 0.3) return 'text-green-400';
-  if (v < 0.6) return 'text-amber-400';
+  const n = Number(v);
+  if (n < 0.3) return 'text-green-400';
+  if (n < 0.6) return 'text-amber-400';
   return 'text-red-400';
 }
 
-function probColor(v: number): string {
-  if (v >= 0.7) return 'bg-green-500';
-  if (v >= 0.4) return 'bg-amber-500';
+function probColor(v: number | string): string {
+  const n = Number(v);
+  if (n >= 0.7) return 'bg-green-500';
+  if (n >= 0.4) return 'bg-amber-500';
   return 'bg-slate-600';
 }
 
@@ -103,7 +109,7 @@ function ElementStats({ element }: { element: MiningElement }) {
     { label: 'Resistance',        value: fNum(element.resistance),                   color: dangerColor(element.resistance) },
     { label: 'Opt. Window (mid)', value: fNum(element.optimal_window_midpoint),       color: 'text-cyan-400' },
     { label: 'Opt. Window (thin)',value: fNum(element.optimal_window_thinness),       color: 'text-cyan-400' },
-    { label: 'Explosion ×',       value: fNum(element.explosion_multiplier),         color: dangerColor(element.explosion_multiplier != null ? Math.min(element.explosion_multiplier / 3, 1) : null) },
+    { label: 'Explosion ×',       value: fNum(element.explosion_multiplier),         color: dangerColor(element.explosion_multiplier != null ? Math.min(Number(element.explosion_multiplier) / 3, 1) : null) },
     { label: 'Cluster factor',    value: fNum(element.cluster_factor),               color: 'text-slate-300' },
   ];
 
@@ -145,7 +151,7 @@ function SolverResultRow({ result, rank }: { result: MiningSolverResult; rank: n
             <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all ${probColor(result.probability)}`}
-                style={{ width: `${Math.round(result.probability * 100)}%` }}
+                style={{ width: `${Math.round(Number(result.probability) * 100)}%` }}
               />
             </div>
             <span className="text-xs font-mono-sc text-slate-400 w-10 text-right flex-shrink-0">
