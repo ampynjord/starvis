@@ -436,6 +436,54 @@ CREATE TABLE IF NOT EXISTS extraction_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ── changelog ────────────────────────────────────────────────
+-- ── mining_elements ──────────────────────────────────────────
+-- Source : DataForge MineableElement records (~43 entries)
+-- Chaque minéral (Quantanium, Agricium, etc.) avec ses propriétés de minage
+CREATE TABLE IF NOT EXISTS mining_elements (
+  uuid                          VARCHAR(36)    PRIMARY KEY,
+  class_name                    VARCHAR(255)   NOT NULL UNIQUE,
+  name                          VARCHAR(255)   NULL COMMENT 'Nom localisé',
+  commodity_uuid                VARCHAR(36)    NULL COMMENT 'FK vers commodities.uuid (si lié)',
+  instability                   DECIMAL(8,2)   NULL COMMENT 'Instabilité (0=stable, haut=explosif)',
+  resistance                    DECIMAL(6,4)   NULL COMMENT 'Résistance au laser (-1..1)',
+  optimal_window_midpoint       DECIMAL(6,4)   NULL COMMENT 'Milieu de la fenêtre optimale (0..1)',
+  optimal_window_midpoint_rand  DECIMAL(6,4)   NULL COMMENT 'Randomisation du midpoint',
+  optimal_window_thinness       DECIMAL(6,4)   NULL COMMENT 'Finesse de la fenêtre (négatif = plus large)',
+  explosion_multiplier          DECIMAL(8,2)   NULL COMMENT 'Multiplicateur explosion',
+  cluster_factor                DECIMAL(6,4)   NULL COMMENT 'Facteur de regroupement (0..1)',
+
+  INDEX idx_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── mining_compositions ──────────────────────────────────────
+-- Source : DataForge MineableComposition records (~185 entries)
+-- Types de roches (asteroid, surface rock, etc.) avec leur composition
+CREATE TABLE IF NOT EXISTS mining_compositions (
+  uuid                     VARCHAR(36)    PRIMARY KEY,
+  class_name               VARCHAR(255)   NOT NULL UNIQUE,
+  deposit_name             VARCHAR(255)   NULL COMMENT 'Nom localisé (ex: "Asteroid Type P")',
+  min_distinct_elements    INT            NULL COMMENT 'Nombre minimum de minéraux distincts',
+
+  INDEX idx_deposit_name (deposit_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── mining_composition_parts ─────────────────────────────────
+-- Composition détaillée : quel minéral dans quelle roche
+CREATE TABLE IF NOT EXISTS mining_composition_parts (
+  id                   INT           AUTO_INCREMENT PRIMARY KEY,
+  composition_uuid     VARCHAR(36)   NOT NULL,
+  element_uuid         VARCHAR(36)   NOT NULL,
+  min_percentage       DECIMAL(6,2)  NULL COMMENT 'Pourcentage minimum dans la roche',
+  max_percentage       DECIMAL(6,2)  NULL COMMENT 'Pourcentage maximum dans la roche',
+  probability          DECIMAL(6,4)  NULL COMMENT 'Probabilité de présence (0..1)',
+  curve_exponent       DECIMAL(6,4)  NULL,
+
+  INDEX idx_composition (composition_uuid),
+  INDEX idx_element     (element_uuid),
+  CONSTRAINT fk_mcp_composition FOREIGN KEY (composition_uuid) REFERENCES mining_compositions(uuid) ON DELETE CASCADE,
+  CONSTRAINT fk_mcp_element     FOREIGN KEY (element_uuid)     REFERENCES mining_elements(uuid)     ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS changelog (
   id            INT           AUTO_INCREMENT PRIMARY KEY,
   extraction_id INT           NOT NULL,

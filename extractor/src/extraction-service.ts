@@ -17,6 +17,7 @@ import {
 import { classifyPort, type DataForgeService, MANUFACTURER_CODES } from './dataforge-service.js';
 import { LocalizationService } from './localization-service.js';
 import logger from './logger.js';
+import { extractMiningElements, extractMiningCompositions } from './mining-extractor.js';
 
 export interface ExtractionStats {
   manufacturers: number;
@@ -27,6 +28,8 @@ export interface ExtractionStats {
   loadoutPorts: number;
   shops: number;
   shipMatrixLinked: number;
+  miningElements: number;
+  miningCompositions: number;
   errors: string[];
   extractionHash?: string;
   durationMs?: number;
@@ -112,6 +115,8 @@ export class ExtractionService {
       loadoutPorts: 0,
       shops: 0,
       shipMatrixLinked: 0,
+      miningElements: 0,
+      miningCompositions: 0,
       errors: [],
     };
 
@@ -187,6 +192,9 @@ export class ExtractionService {
       await conn.execute('DELETE FROM components');
       await conn.execute('DELETE FROM items');
       await conn.execute('DELETE FROM commodities');
+      await conn.execute('DELETE FROM mining_composition_parts');
+      await conn.execute('DELETE FROM mining_compositions');
+      await conn.execute('DELETE FROM mining_elements');
 
       // 2. Collect & save manufacturers FIRST (before ships, due to FK constraint)
       onProgress?.('Saving manufacturers…');
@@ -215,6 +223,12 @@ export class ExtractionService {
       // 5b. Extract & save paints/liveries
       onProgress?.('Extracting paints…');
       await this.savePaints(conn, onProgress);
+
+      // 5c. Extract & save mining data (elements + compositions)
+      onProgress?.('Extracting mining data…');
+      const miningResult = await this.saveMiningData(conn, onProgress);
+      stats.miningElements = miningResult.elements;
+      stats.miningCompositions = miningResult.compositions;
 
       // 6. Cross-reference with ship_matrix
       onProgress?.('Cross-referencing with Ship Matrix…');
@@ -268,7 +282,7 @@ export class ExtractionService {
       }
 
       onProgress?.(
-        `✅ Extraction complete: ${stats.ships} ships, ${stats.components} components, ${stats.items} items, ${stats.commodities} commodities, ${stats.manufacturers} manufacturers, ${stats.loadoutPorts} loadout ports, ${stats.shops} shops, ${stats.shipMatrixLinked} linked to Ship Matrix`,
+        `✅ Extraction complete: ${stats.ships} ships, ${stats.components} components, ${stats.items} items, ${stats.commodities} commodities, ${stats.manufacturers} manufacturers, ${stats.loadoutPorts} loadout ports, ${stats.shops} shops, ${stats.shipMatrixLinked} linked to Ship Matrix, ${stats.miningElements} mining elements, ${stats.miningCompositions} compositions`,
       );
 
       // ── Sanity check — abort if data dropped by >50% ──
@@ -1489,5 +1503,94 @@ export class ExtractionService {
     } else {
       logger.info('Changelog: No changes detected');
     }
+  }
+
+  // ======================================================
+  //  MINING DATA
+  // ======================================================
+
+  private async saveMiningData(
+    conn: PoolConnection,
+    onProgress?: (msg: string) => void,
+  ): Promise<{ elements: number; compositions: number }> {
+    const locAdapter = this.locService.isLoaded
+      ? { resolve: (k: string) => this.locService.resolve?.(k) ?? null }
+      : undefined;
+
+    const elements = extractMiningElements(this.dfService, locAdapter);
+    const compositions = extractMiningCompositions(this.dfService, elements, locAdapter);
+
+    if (!elements.length && !compositions.length) {
+      onProgress?.('Mining: no data found in DataForge');
+      return { elements: 0, compositions: 0 };
+    }
+
+    // ── Save elements ──
+    const elemRows = elements.map((e) => [
+      e.uuid, e.className, e.name, e.commodityUuid,
+      e.instability, e.resistance,
+      e.optimalWindowMidpoint, e.optimalWindowMidpointRand,
+      e.optimalWindowThinness, e.explosionMultiplier, e.clusterFactor,
+    ]);
+    const savedElements = await ExtractionService.batchUpsert(
+      conn,
+      `INSERT INTO mining_elements
+         (uuid, class_name, name, commodity_uuid,
+          instability, resistance,
+          optimal_window_midpoint, optimal_window_midpoint_rand,
+          optimal_window_thinness, explosion_multiplier, cluster_factor)
+       VALUES`,
+      `ON DUPLICATE KEY UPDATE
+         class_name=new.class_name, name=new.name, commodity_uuid=new.commodity_uuid,
+         instability=new.instability, resistance=new.resistance,
+         optimal_window_midpoint=new.optimal_window_midpoint,
+         optimal_window_midpoint_rand=new.optimal_window_midpoint_rand,
+         optimal_window_thinness=new.optimal_window_thinness,
+         explosion_multiplier=new.explosion_multiplier, cluster_factor=new.cluster_factor`,
+      11,
+      elemRows,
+    );
+
+    // ── Save compositions (parent rows first) ──
+    const compRows = compositions.map((c) => [
+      c.uuid, c.className, c.depositName, c.minDistinctElements,
+    ]);
+    await ExtractionService.batchUpsert(
+      conn,
+      `INSERT INTO mining_compositions (uuid, class_name, deposit_name, min_distinct_elements) VALUES`,
+      `ON DUPLICATE KEY UPDATE class_name=new.class_name, deposit_name=new.deposit_name, min_distinct_elements=new.min_distinct_elements`,
+      4,
+      compRows,
+    );
+
+    // ── Save composition parts ──
+    const partRows: (string | number | null)[][] = [];
+    for (const comp of compositions) {
+      for (const part of comp.parts) {
+        partRows.push([
+          comp.uuid, part.elementUuid,
+          part.minPercentage, part.maxPercentage,
+          part.probability, part.curveExponent,
+        ]);
+      }
+    }
+    if (partRows.length > 0) {
+      await ExtractionService.batchUpsert(
+        conn,
+        `INSERT INTO mining_composition_parts
+           (composition_uuid, element_uuid, min_percentage, max_percentage, probability, curve_exponent)
+         VALUES`,
+        `ON DUPLICATE KEY UPDATE
+           min_percentage=new.min_percentage, max_percentage=new.max_percentage,
+           probability=new.probability, curve_exponent=new.curve_exponent`,
+        6,
+        partRows,
+      );
+    }
+
+    onProgress?.(
+      `Mining: ${savedElements} elements, ${compositions.length} compositions, ${partRows.length} parts`,
+    );
+    return { elements: savedElements, compositions: compositions.length };
   }
 }

@@ -14,6 +14,10 @@ import type {
   LoadoutNode,
   LoadoutResult,
   Manufacturer,
+  MiningComposition,
+  MiningElement,
+  MiningSolverResult,
+  MiningStats,
   PaginatedResponse,
   PaintListItem,
   SearchResult,
@@ -186,5 +190,19 @@ export const api = {
   loadout: {
     calculate: (shipUuid: string, swaps: { portId?: number; portName?: string; componentUuid: string }[]) =>
       post<LoadoutResult>('/loadout/calculate', { shipUuid, swaps }),
+  },
+
+  // ─── Mining ────────────────────────────────────────────────────────
+  mining: {
+    elements: () => get<MiningElement[]>('/mining/elements'),
+    element: (uuid: string) => get<MiningElement>(`/mining/elements/${uuid}`),
+    compositions: (includeEmpty = false) =>
+      get<MiningComposition[]>('/mining/compositions', { include_empty: includeEmpty || undefined }),
+    composition: (uuid: string) => get<MiningComposition>(`/mining/compositions/${uuid}`),
+    solveForElement: (elementUuid: string, minProbability?: number) =>
+      get<MiningSolverResult[]>('/mining/solver', { element: elementUuid, min_probability: minProbability }),
+    solveForComposition: (compositionUuid: string) =>
+      get<MiningSolverResult[]>('/mining/solver', { composition: compositionUuid }),
+    stats: () => get<MiningStats>('/mining/stats'),
   },
 };

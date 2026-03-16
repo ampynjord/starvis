@@ -24,6 +24,7 @@ const PaintsPage          = lazy(() => import('@/pages/PaintsPage'));
 const RankingPage         = lazy(() => import('@/pages/RankingPage'));
 const OutfitterPage       = lazy(() => import('@/pages/OutfitterPage'));
 const TradePage           = lazy(() => import('@/pages/TradePage'));
+const MiningPage          = lazy(() => import('@/pages/MiningPage'));
 const NotFoundPage        = lazy(() => import('@/pages/NotFoundPage'));
 
 export const router = createBrowserRouter([
@@ -38,6 +39,7 @@ export const router = createBrowserRouter([
       { path: 'ranking',          element: wrap(RankingPage) },
       { path: 'outfitter',        element: wrap(OutfitterPage) },
       { path: 'trade',            element: wrap(TradePage) },
+      { path: 'mining',           element: wrap(MiningPage) },
       { path: 'components',       element: wrap(ComponentsPage) },
       { path: 'components/:uuid', element: wrap(ComponentDetailPage) },
       { path: 'items',            element: wrap(ItemsPage) },

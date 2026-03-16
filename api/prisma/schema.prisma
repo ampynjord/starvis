@@ -434,3 +434,49 @@ model Changelog {
   @@index([entityType, entityUuid], map: "idx_changelog_entity")
   @@map("changelog")
 }
+
+model MiningElement {
+  uuid                       String  @id @db.Char(36)
+  className                  String  @unique @map("class_name") @db.VarChar(255)
+  name                       String? @db.VarChar(255)
+  commodityUuid              String? @map("commodity_uuid") @db.Char(36)
+  instability                Decimal? @db.Decimal(8, 2)
+  resistance                 Decimal? @db.Decimal(6, 4)
+  optimalWindowMidpoint      Decimal? @map("optimal_window_midpoint") @db.Decimal(6, 4)
+  optimalWindowMidpointRand  Decimal? @map("optimal_window_midpoint_rand") @db.Decimal(6, 4)
+  optimalWindowThinness      Decimal? @map("optimal_window_thinness") @db.Decimal(6, 4)
+  explosionMultiplier        Decimal? @map("explosion_multiplier") @db.Decimal(8, 2)
+  clusterFactor              Decimal? @map("cluster_factor") @db.Decimal(6, 4)
+
+  compositionParts MiningCompositionPart[]
+
+  @@map("mining_elements")
+}
+
+model MiningComposition {
+  uuid                  String  @id @db.Char(36)
+  className             String  @unique @map("class_name") @db.VarChar(255)
+  depositName           String? @map("deposit_name") @db.VarChar(255)
+  minDistinctElements   Int?    @map("min_distinct_elements")
+
+  parts MiningCompositionPart[]
+
+  @@map("mining_compositions")
+}
+
+model MiningCompositionPart {
+  id               Int     @id @default(autoincrement())
+  compositionUuid  String  @map("composition_uuid") @db.Char(36)
+  elementUuid      String  @map("element_uuid") @db.Char(36)
+  minPercentage    Decimal? @map("min_percentage") @db.Decimal(6, 2)
+  maxPercentage    Decimal? @map("max_percentage") @db.Decimal(6, 2)
+  probability      Decimal? @db.Decimal(6, 4)
+  curveExponent    Decimal? @map("curve_exponent") @db.Decimal(6, 4)
+
+  composition MiningComposition @relation(fields: [compositionUuid], references: [uuid], onDelete: Cascade, map: "fk_mcp_composition")
+  element     MiningElement     @relation(fields: [elementUuid], references: [uuid], onDelete: Cascade, map: "fk_mcp_element")
+
+  @@index([compositionUuid], map: "idx_mcp_composition")
+  @@index([elementUuid], map: "idx_mcp_element")
+  @@map("mining_composition_parts")
+}
