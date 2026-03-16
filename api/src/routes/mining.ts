@@ -58,9 +58,7 @@ export function mountMiningRoutes(router: Router, deps: RouteDependencies): void
       const { element, composition, min_probability } = req.query as Record<string, string | undefined>;
 
       if (!element && !composition) {
-        return void res
-          .status(400)
-          .json({ success: false, error: 'Provide either element or composition query param' });
+        return void res.status(400).json({ success: false, error: 'Provide either element or composition query param' });
       }
 
       const minProb = min_probability !== undefined ? Number(min_probability) : 0;
