@@ -201,6 +201,16 @@ export class LocalizationService {
   }
 
   /**
+   * Resolve a raw LOC key (with or without leading @) directly from the nameIndex.
+   * Used for keys that don't follow className patterns, e.g. @hud_mining_rock_name_1
+   */
+  resolveKey(rawKey: string): string | null {
+    if (!rawKey) return null;
+    const key = rawKey.startsWith('@') ? rawKey.substring(1) : rawKey;
+    return this.nameIndex.get(key) ?? this.nameIndex.get(key.toLowerCase()) ?? null;
+  }
+
+  /**
    * Bulk resolve: try to resolve name for className, return fallback if not found.
    */
   resolveOrFallback(className: string, currentName: string): string {
