@@ -25,7 +25,7 @@ function probe(structType: string, samples = 4) {
     try {
       const data = ctx.readRecordByGuid(r.uuid, 4);
       console.log(`\n  [${r.name}]`);
-      console.log('  ' + JSON.stringify(data, null, 2).replace(/\n/g, '\n  ').slice(0, 1200));
+      console.log(`  ${JSON.stringify(data, null, 2).replace(/\n/g, '\n  ').slice(0, 1200)}`);
     } catch (e: any) {
       console.log(`  ERROR: ${e.message}`);
     }

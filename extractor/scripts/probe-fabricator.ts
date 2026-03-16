@@ -25,7 +25,7 @@ for (const s of structs) {
     try {
       const data = ctx.readRecordByGuid(r.uuid, 4);
       console.log(`  [${r.name}]`);
-      console.log('  ' + JSON.stringify(data, null, 2).replace(/\n/g, '\n  ').slice(0, 800));
+      console.log(`  ${JSON.stringify(data, null, 2).replace(/\n/g, '\n  ').slice(0, 800)}`);
     } catch (e: any) {
       console.log(`  [${r.name}] ERROR: ${e.message}`);
     }
