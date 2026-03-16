@@ -23,7 +23,7 @@ function probeFirst(structType: string, samples = 3) {
     try {
       const data = ctx.readRecordByGuid(r.uuid, 4);
       console.log(`  [${r.name}]  ${r.fileName}`);
-      console.log('  ' + JSON.stringify(data, null, 2).replace(/\n/g, '\n  ').slice(0, 3000));
+      console.log(`  ${JSON.stringify(data, null, 2).replace(/\n/g, '\n  ').slice(0, 3000)}`);
     } catch (e: any) {
       console.log(`  [${r.name}] ERROR: ${e.message}`);
     }
