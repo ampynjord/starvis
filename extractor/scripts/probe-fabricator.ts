@@ -11,12 +11,7 @@ const ctx = new DataForgeService(p4k);
 await ctx.init();
 await ctx.loadDataForge();
 
-const structs = [
-  'LegacyCraftingRecipeDefRecord',
-  'HarvestablePreset',
-  'HarvestableEntityRecord',
-  'CraftingBlueprintRecord',
-];
+const structs = ['LegacyCraftingRecipeDefRecord', 'HarvestablePreset', 'HarvestableEntityRecord', 'CraftingBlueprintRecord'];
 
 for (const s of structs) {
   const records = ctx.searchByStructType(`^${s}$`, 3);
