@@ -20,7 +20,10 @@ const structs = [
 
 for (const s of structs) {
   const records = ctx.searchByStructType(`^${s}$`, 3);
-  if (!records.length) { console.log(`\n${s}: NOT FOUND`); continue; }
+  if (!records.length) {
+    console.log(`\n${s}: NOT FOUND`);
+    continue;
+  }
   const total = ctx.searchByStructType(`^${s}$`, 99999).length;
   console.log(`\n=== ${s}: ${total} records total ===`);
   for (const r of records) {

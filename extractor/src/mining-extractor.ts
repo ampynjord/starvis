@@ -89,7 +89,7 @@ export function extractMiningElements(ctx: DataForgeContext, _locService?: { res
       //   "MinableElement_GroundVehicle_Carinite"  → "Carinite"
       //   "MineableElement_Copper_Ore"             → "Copper Ore"
       const rawName = r.name
-        .replace(/^(?:Mine?ableElement[._\s]+)+/gi, '')  // strip repeated struct prefix   
+        .replace(/^(?:Mine?ableElement[._\s]+)+/gi, '') // strip repeated struct prefix
         .replace(/^(?:FPS|GroundVehicle|SpaceShip|Vehicle|Hangar|Ship)[._\s]+/gi, '')
         .replace(/_/g, ' ')
         .trim();
