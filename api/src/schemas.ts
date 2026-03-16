@@ -11,6 +11,12 @@ import { z } from 'zod';
 /** Coerce Express query param (string | string[] | undefined) → string | undefined */
 export const qStr = z.preprocess((v) => (Array.isArray(v) ? v[0] : v) || undefined, z.string().max(200).optional());
 
+/** Coerce env query param → validated GameEnv string, defaults to 'live' */
+export const qEnv = z.preprocess(
+  (v) => (Array.isArray(v) ? v[0] : v) || 'live',
+  z.enum(['live', 'ptu', 'eptu', 'custom']).catch('live'),
+);
+
 export const qInt = (def: number, max?: number) =>
   z.preprocess(
     (v) => {
@@ -29,6 +35,7 @@ export const qInt = (def: number, max?: number) =>
 
 export const ShipQuery = z
   .object({
+    env: qEnv,
     manufacturer: qStr,
     role: qStr,
     career: qStr,
@@ -46,6 +53,7 @@ export const ShipQuery = z
 
 export const ComponentQuery = z
   .object({
+    env: qEnv,
     type: qStr,
     sub_type: qStr,
     size: qStr,
@@ -64,6 +72,7 @@ export const ComponentQuery = z
 
 export const ShopQuery = z
   .object({
+    env: qEnv,
     search: qStr,
     location: qStr,
     type: qStr,
@@ -111,6 +120,7 @@ export const PaintQuery = z
 
 export const ItemQuery = z
   .object({
+    env: qEnv,
     type: qStr,
     sub_type: qStr,
     manufacturer: qStr,
@@ -125,6 +135,7 @@ export const ItemQuery = z
 
 export const CommodityQuery = z
   .object({
+    env: qEnv,
     type: qStr,
     search: qStr,
     sort: qStr,

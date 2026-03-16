@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ChevronRight, MapPin, Rocket } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/services/api';
+import { useEnv } from '@/contexts/EnvContext';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
@@ -13,10 +14,11 @@ import { fCredits } from '@/utils/formatters';
 export default function ComponentDetailPage() {
   const { uuid } = useParams<{ uuid: string }>();
   const navigate = useNavigate();
+  const { env } = useEnv();
 
   const { data: comp, isLoading, error, refetch } = useQuery({
-    queryKey: ['components.get', uuid],
-    queryFn: () => api.components.get(uuid!),
+    queryKey: ['components.get', uuid, env],
+    queryFn: () => api.components.get(uuid!, env),
     enabled: !!uuid,
   });
   const { data: ships } = useQuery({
@@ -25,8 +27,8 @@ export default function ComponentDetailPage() {
     enabled: !!uuid,
   });
   const { data: buyLocs } = useQuery({
-    queryKey: ['components.buyLocs', uuid],
-    queryFn: () => api.components.buyLocations(uuid!),
+    queryKey: ['components.buyLocs', uuid, env],
+    queryFn: () => api.components.buyLocations(uuid!, env),
     enabled: !!uuid,
   });
 

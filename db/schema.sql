@@ -61,7 +61,8 @@ CREATE TABLE IF NOT EXISTS manufacturers (
 
 -- ── ships ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS ships (
-  uuid           CHAR(36)      PRIMARY KEY COMMENT 'DataForge entity UUID',
+  uuid           CHAR(36)      NOT NULL COMMENT 'DataForge entity UUID',
+  game_env       VARCHAR(10)   NOT NULL DEFAULT 'live' COMMENT 'live | ptu | eptu | custom',
   class_name     VARCHAR(255)  NOT NULL,
   name           VARCHAR(255)  NULL,
   manufacturer_code VARCHAR(10) NULL,
@@ -133,6 +134,7 @@ CREATE TABLE IF NOT EXISTS ships (
 
   extracted_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
+  PRIMARY KEY (uuid, game_env),
   INDEX idx_class_name      (class_name),
   INDEX idx_name            (name),
   INDEX idx_manufacturer    (manufacturer_code),
@@ -140,13 +142,15 @@ CREATE TABLE IF NOT EXISTS ships (
   INDEX idx_role            (role),
   INDEX idx_career          (career),
   INDEX idx_vehicle_category (vehicle_category),
+  INDEX idx_game_env        (game_env),
   CONSTRAINT fk_ship_manufacturer FOREIGN KEY (manufacturer_code) REFERENCES manufacturers(code) ON DELETE SET NULL,
   CONSTRAINT fk_ship_matrix       FOREIGN KEY (ship_matrix_id)    REFERENCES ship_matrix(id)    ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ── components ───────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS components (
-  uuid              CHAR(36)      PRIMARY KEY,
+  uuid              CHAR(36)      NOT NULL,
+  game_env          VARCHAR(10)   NOT NULL DEFAULT 'live' COMMENT 'live | ptu | eptu | custom',
   class_name        VARCHAR(255)  NOT NULL,
   name              VARCHAR(255)  NOT NULL,
   type              VARCHAR(50)   NOT NULL,
@@ -254,19 +258,22 @@ CREATE TABLE IF NOT EXISTS components (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
+  PRIMARY KEY (uuid, game_env),
   INDEX idx_class_name  (class_name),
   INDEX idx_type        (type),
   INDEX idx_sub_type    (sub_type),
   INDEX idx_size        (size),
   INDEX idx_grade       (grade),
   INDEX idx_manufacturer (manufacturer_code),
-  INDEX idx_type_size   (type, size)
+  INDEX idx_type_size   (type, size),
+  INDEX idx_game_env    (game_env)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ── ship_loadouts ────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS ship_loadouts (
   id                   INT           AUTO_INCREMENT PRIMARY KEY,
   ship_uuid            CHAR(36)      NOT NULL,
+  game_env             VARCHAR(10)   NOT NULL DEFAULT 'live',
   port_name            VARCHAR(100)  NOT NULL,
   port_min_size        TINYINT       UNSIGNED NULL,
   port_max_size        TINYINT       UNSIGNED NULL,
@@ -277,17 +284,18 @@ CREATE TABLE IF NOT EXISTS ship_loadouts (
   parent_id            INT           NULL,
 
   INDEX idx_ship      (ship_uuid),
+  INDEX idx_game_env  (game_env),
   INDEX idx_port_type (port_type),
   INDEX idx_component (component_uuid),
   INDEX idx_parent    (parent_id),
-  CONSTRAINT fk_loadout_ship      FOREIGN KEY (ship_uuid)      REFERENCES ships(uuid)      ON DELETE CASCADE,
-  CONSTRAINT fk_loadout_component FOREIGN KEY (component_uuid) REFERENCES components(uuid) ON DELETE SET NULL
+  CONSTRAINT fk_loadout_ship FOREIGN KEY (ship_uuid, game_env) REFERENCES ships(uuid, game_env) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ── ship_modules ─────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS ship_modules (
   id                 INT           AUTO_INCREMENT PRIMARY KEY,
   ship_uuid          CHAR(36)      NOT NULL,
+  game_env           VARCHAR(10)   NOT NULL DEFAULT 'live',
   slot_name          VARCHAR(100)  NOT NULL,
   slot_display_name  VARCHAR(100)  NULL,
   slot_type          VARCHAR(20)   NULL COMMENT 'front | rear | left | right',
@@ -297,28 +305,32 @@ CREATE TABLE IF NOT EXISTS ship_modules (
   is_default         BOOLEAN       NOT NULL DEFAULT FALSE,
   loadout_json       JSON          NULL,
 
-  UNIQUE KEY uq_ship_slot_module (ship_uuid, slot_name, module_class_name),
+  UNIQUE KEY uq_ship_slot_module (ship_uuid, game_env, slot_name, module_class_name),
   INDEX idx_ship         (ship_uuid),
+  INDEX idx_game_env     (game_env),
   INDEX idx_module_class (module_class_name),
-  CONSTRAINT fk_module_ship FOREIGN KEY (ship_uuid) REFERENCES ships(uuid) ON DELETE CASCADE
+  CONSTRAINT fk_module_ship FOREIGN KEY (ship_uuid, game_env) REFERENCES ships(uuid, game_env) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ── ship_paints ──────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS ship_paints (
   id               INT           AUTO_INCREMENT PRIMARY KEY,
   ship_uuid        CHAR(36)      NOT NULL,
+  game_env         VARCHAR(10)   NOT NULL DEFAULT 'live',
   paint_class_name VARCHAR(255)  NOT NULL,
   paint_name       VARCHAR(255)  NULL,
   paint_uuid       CHAR(36)      NULL,
 
   INDEX idx_ship       (ship_uuid),
+  INDEX idx_game_env   (game_env),
   INDEX idx_paint_class (paint_class_name),
-  CONSTRAINT fk_paint_ship FOREIGN KEY (ship_uuid) REFERENCES ships(uuid) ON DELETE CASCADE
+  CONSTRAINT fk_paint_ship FOREIGN KEY (ship_uuid, game_env) REFERENCES ships(uuid, game_env) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ── items ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS items (
-  uuid              CHAR(36)      PRIMARY KEY,
+  uuid              CHAR(36)      NOT NULL,
+  game_env          VARCHAR(10)   NOT NULL DEFAULT 'live' COMMENT 'live | ptu | eptu | custom',
   class_name        VARCHAR(255)  NOT NULL,
   name              VARCHAR(255)  NOT NULL,
   type              VARCHAR(50)   NOT NULL COMMENT 'FPS_Weapon | Armor_Helmet | Armor_Torso | Clothing | Consumable | …',
@@ -347,16 +359,19 @@ CREATE TABLE IF NOT EXISTS items (
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
+  PRIMARY KEY (uuid, game_env),
   INDEX idx_type       (type),
   INDEX idx_sub_type   (sub_type),
   INDEX idx_manufacturer (manufacturer_code),
   INDEX idx_class_name (class_name),
-  INDEX idx_type_sub   (type, sub_type)
+  INDEX idx_type_sub   (type, sub_type),
+  INDEX idx_game_env   (game_env)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ── commodities ──────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS commodities (
-  uuid         CHAR(36)      PRIMARY KEY,
+  uuid         CHAR(36)      NOT NULL,
+  game_env     VARCHAR(10)   NOT NULL DEFAULT 'live' COMMENT 'live | ptu | eptu | custom',
   class_name   VARCHAR(255)  NOT NULL,
   name         VARCHAR(255)  NOT NULL,
   type         VARCHAR(50)   NOT NULL,
@@ -367,16 +382,19 @@ CREATE TABLE IF NOT EXISTS commodities (
   created_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
+  PRIMARY KEY (uuid, game_env),
   INDEX idx_type       (type),
   INDEX idx_sub_type   (sub_type),
-  INDEX idx_class_name (class_name)
+  INDEX idx_class_name (class_name),
+  INDEX idx_game_env   (game_env)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ── shops ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS shops (
   id          INT           AUTO_INCREMENT PRIMARY KEY,
+  game_env    VARCHAR(10)   NOT NULL DEFAULT 'live' COMMENT 'live | ptu | eptu | custom',
   name        VARCHAR(255)  NOT NULL,
-  class_name  VARCHAR(255)  NOT NULL UNIQUE,
+  class_name  VARCHAR(255)  NOT NULL,
   location    VARCHAR(255)  NULL COMMENT 'Nom affichage du lieu',
   `system`    VARCHAR(50)   NULL,
   planet_moon VARCHAR(100)  NULL,
@@ -385,6 +403,8 @@ CREATE TABLE IF NOT EXISTS shops (
   created_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at  TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
+  UNIQUE KEY uk_class_env  (class_name, game_env),
+  INDEX idx_game_env   (game_env),
   INDEX idx_location   (location),
   INDEX idx_planet_moon (planet_moon),
   INDEX idx_system     (`system`),
@@ -396,6 +416,7 @@ CREATE TABLE IF NOT EXISTS shops (
 CREATE TABLE IF NOT EXISTS shop_inventory (
   id                   INT           AUTO_INCREMENT PRIMARY KEY,
   shop_id              INT           NOT NULL,
+  game_env             VARCHAR(10)   NOT NULL DEFAULT 'live',
   component_uuid       CHAR(36)      NULL,
   component_class_name VARCHAR(255)  NOT NULL,
   base_price           DECIMAL(12,2) NULL,
@@ -407,11 +428,11 @@ CREATE TABLE IF NOT EXISTS shop_inventory (
   updated_at           TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
   UNIQUE KEY uk_shop_component (shop_id, component_class_name),
+  INDEX idx_game_env   (game_env),
   INDEX idx_shop       (shop_id),
   INDEX idx_component  (component_uuid),
   INDEX idx_class_name (component_class_name),
-  CONSTRAINT fk_inventory_shop      FOREIGN KEY (shop_id)       REFERENCES shops(id)       ON DELETE CASCADE,
-  CONSTRAINT fk_inventory_component FOREIGN KEY (component_uuid) REFERENCES components(uuid) ON DELETE SET NULL
+  CONSTRAINT fk_inventory_shop FOREIGN KEY (shop_id) REFERENCES shops(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ── extraction_log ───────────────────────────────────────────
@@ -419,6 +440,7 @@ CREATE TABLE IF NOT EXISTS extraction_log (
   id                   INT           AUTO_INCREMENT PRIMARY KEY,
   extraction_hash      CHAR(64)      NOT NULL,
   game_version         VARCHAR(50)   NULL,
+  game_env             VARCHAR(10)   NOT NULL DEFAULT 'live' COMMENT 'live | ptu | eptu | custom',
   ships_count          INT           NOT NULL DEFAULT 0,
   components_count     INT           NOT NULL DEFAULT 0,
   items_count          INT           NOT NULL DEFAULT 0,
@@ -432,7 +454,28 @@ CREATE TABLE IF NOT EXISTS extraction_log (
   extracted_at         TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
   INDEX idx_hash         (extraction_hash),
+  INDEX idx_game_env     (game_env),
   INDEX idx_extracted_at (extracted_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ── commodity_prices ──────────────────────────────────────────────────
+-- Prix spotmarkets (UEX / Erkul feed, mis à jour par un job externe)
+CREATE TABLE IF NOT EXISTS commodity_prices (
+  id              INT           AUTO_INCREMENT PRIMARY KEY,
+  commodity_uuid  CHAR(36)      NOT NULL,
+  game_env        VARCHAR(10)   NOT NULL DEFAULT 'live',
+  shop_id         INT           NULL COMMENT 'NULL = prix moyen marché',
+  price_buy       DECIMAL(12,2) NULL COMMENT 'Prix achat aUEC',
+  price_sell      DECIMAL(12,2) NULL COMMENT 'Prix vente aUEC',
+  scu_available   INT           NULL COMMENT 'SCU disponibles',
+  scu_demand      INT           NULL COMMENT 'SCU demandés',
+  updated_at      TIMESTAMP     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+  UNIQUE KEY uk_commodity_shop_env (commodity_uuid, shop_id, game_env),
+  INDEX idx_commodity (commodity_uuid),
+  INDEX idx_shop      (shop_id),
+  INDEX idx_game_env  (game_env),
+  CONSTRAINT fk_cp_shop      FOREIGN KEY (shop_id)        REFERENCES shops(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ── changelog ────────────────────────────────────────────────
@@ -440,8 +483,9 @@ CREATE TABLE IF NOT EXISTS extraction_log (
 -- Source : DataForge MineableElement records (~43 entries)
 -- Chaque minéral (Quantanium, Agricium, etc.) avec ses propriétés de minage
 CREATE TABLE IF NOT EXISTS mining_elements (
-  uuid                          VARCHAR(36)    PRIMARY KEY,
-  class_name                    VARCHAR(255)   NOT NULL UNIQUE,
+  uuid                          VARCHAR(36)    NOT NULL,
+  game_env                      VARCHAR(10)    NOT NULL DEFAULT 'live',
+  class_name                    VARCHAR(255)   NOT NULL,
   name                          VARCHAR(255)   NULL COMMENT 'Nom localisé',
   commodity_uuid                VARCHAR(36)    NULL COMMENT 'FK vers commodities.uuid (si lié)',
   instability                   DECIMAL(8,2)   NULL COMMENT 'Instabilité (0=stable, haut=explosif)',
@@ -452,19 +496,24 @@ CREATE TABLE IF NOT EXISTS mining_elements (
   explosion_multiplier          DECIMAL(8,2)   NULL COMMENT 'Multiplicateur explosion',
   cluster_factor                DECIMAL(6,4)   NULL COMMENT 'Facteur de regroupement (0..1)',
 
-  INDEX idx_name (name)
+  PRIMARY KEY (uuid, game_env),
+  INDEX idx_name     (name),
+  INDEX idx_game_env (game_env)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ── mining_compositions ──────────────────────────────────────
 -- Source : DataForge MineableComposition records (~185 entries)
 -- Types de roches (asteroid, surface rock, etc.) avec leur composition
 CREATE TABLE IF NOT EXISTS mining_compositions (
-  uuid                     VARCHAR(36)    PRIMARY KEY,
-  class_name               VARCHAR(255)   NOT NULL UNIQUE,
+  uuid                     VARCHAR(36)    NOT NULL,
+  game_env                 VARCHAR(10)    NOT NULL DEFAULT 'live',
+  class_name               VARCHAR(255)   NOT NULL,
   deposit_name             VARCHAR(255)   NULL COMMENT 'Nom localisé (ex: "Asteroid Type P")',
   min_distinct_elements    INT            NULL COMMENT 'Nombre minimum de minéraux distincts',
 
-  INDEX idx_deposit_name (deposit_name)
+  PRIMARY KEY (uuid, game_env),
+  INDEX idx_deposit_name (deposit_name),
+  INDEX idx_game_env     (game_env)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ── mining_composition_parts ─────────────────────────────────
@@ -473,6 +522,7 @@ CREATE TABLE IF NOT EXISTS mining_composition_parts (
   id                   INT           AUTO_INCREMENT PRIMARY KEY,
   composition_uuid     VARCHAR(36)   NOT NULL,
   element_uuid         VARCHAR(36)   NOT NULL,
+  game_env             VARCHAR(10)   NOT NULL DEFAULT 'live',
   min_percentage       DECIMAL(6,2)  NULL COMMENT 'Pourcentage minimum dans la roche',
   max_percentage       DECIMAL(6,2)  NULL COMMENT 'Pourcentage maximum dans la roche',
   probability          DECIMAL(6,4)  NULL COMMENT 'Probabilité de présence (0..1)',
@@ -480,8 +530,9 @@ CREATE TABLE IF NOT EXISTS mining_composition_parts (
 
   INDEX idx_composition (composition_uuid),
   INDEX idx_element     (element_uuid),
-  CONSTRAINT fk_mcp_composition FOREIGN KEY (composition_uuid) REFERENCES mining_compositions(uuid) ON DELETE CASCADE,
-  CONSTRAINT fk_mcp_element     FOREIGN KEY (element_uuid)     REFERENCES mining_elements(uuid)     ON DELETE CASCADE
+  INDEX idx_game_env    (game_env),
+  CONSTRAINT fk_mcp_composition FOREIGN KEY (composition_uuid, game_env) REFERENCES mining_compositions(uuid, game_env) ON DELETE CASCADE,
+  CONSTRAINT fk_mcp_element     FOREIGN KEY (element_uuid, game_env)     REFERENCES mining_elements(uuid, game_env)     ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ─── Missions ──────────────────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Search } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '@/services/api';
+import { useEnv } from '@/contexts/EnvContext';
 import { FilterPanel } from '@/components/ui/FilterPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { Pagination } from '@/components/ui/Pagination';
@@ -14,6 +15,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 const LIMIT = 30;
 
 export default function CommoditiesPage() {
+  const { env } = useEnv();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [type, setType] = useState('');
@@ -21,8 +23,8 @@ export default function CommoditiesPage() {
 
   const { data: types } = useQuery({ queryKey: ['commodities.types'], queryFn: api.commodities.types, staleTime: Infinity });
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['commodities.list', { page, search: debouncedSearch, type }],
-    queryFn: () => api.commodities.list({ page, limit: LIMIT, search: debouncedSearch || undefined, type: type || undefined }),
+    queryKey: ['commodities.list', env, { page, search: debouncedSearch, type }],
+    queryFn: () => api.commodities.list({ env, page, limit: LIMIT, search: debouncedSearch || undefined, type: type || undefined }),
   });
 
   return (
