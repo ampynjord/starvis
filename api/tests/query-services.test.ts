@@ -220,24 +220,24 @@ describe('MissionService', () => {
   describe('getMissions', () => {
     it('returns paginated missions', async () => {
       const countRow = row({ total: 2 });
-        const m1 = row({
-          uuid: 'u1',
-          class_name: 'mission_bounty_01',
-          title: 'Bounty Hunt',
-          mission_type: 'Bounty',
-          is_legal: 1,
-          can_be_shared: 0,
-          game_env: 'live',
-        });
-        const m2 = row({
-          uuid: 'u2',
-          class_name: 'mission_delivery_01',
-          title: 'Deliver Cargo',
-          mission_type: 'Delivery',
-          is_legal: 1,
-          can_be_shared: 1,
-          game_env: 'live',
-        });
+      const m1 = row({
+        uuid: 'u1',
+        class_name: 'mission_bounty_01',
+        title: 'Bounty Hunt',
+        mission_type: 'Bounty',
+        is_legal: 1,
+        can_be_shared: 0,
+        game_env: 'live',
+      });
+      const m2 = row({
+        uuid: 'u2',
+        class_name: 'mission_delivery_01',
+        title: 'Deliver Cargo',
+        mission_type: 'Delivery',
+        is_legal: 1,
+        can_be_shared: 1,
+        game_env: 'live',
+      });
       const prisma = createMockPrisma([[countRow], [m1, m2]]);
       const svc = new MissionService(prisma);
       const result = await svc.getMissions({ env: 'live', page: 1, limit: 50 });
@@ -304,7 +304,7 @@ describe('ShopService', () => {
     it('returns paginated shops', async () => {
       const prisma = createMockPrisma([
         [row({ count: 3 })],
-          [row({ id: 1, name: "Dumper's Depot", location: 'Area 18' }), row({ id: 2, name: 'Astro Armada', location: 'Area 18' })],
+        [row({ id: 1, name: "Dumper's Depot", location: 'Area 18' }), row({ id: 2, name: 'Astro Armada', location: 'Area 18' })],
       ]);
       const svc = new ShopService(prisma);
       const result = await svc.getShops({});
