@@ -10,14 +10,12 @@ import {
   Pickaxe,
   Rocket,
   Settings2,
-  Shield,
   ShoppingBag,
   SlidersHorizontal,
   TrendingUp,
   Trophy,
   Wrench,
   ClipboardList,
-  Layers,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
@@ -25,8 +23,6 @@ const DB_ITEMS = [
   { to: '/',              icon: Home,              label: 'Dashboard' },
   { to: '/ships',         icon: Rocket,            label: 'Ships' },
   { to: '/missions',      icon: ClipboardList,     label: 'Missions' },
-  { to: '/resources',     icon: Layers,            label: 'Resources' },
-  { to: '/armor',         icon: Shield,            label: 'Armor / FPS' },
   { to: '/components',    icon: Settings2,         label: 'Components' },
   { to: '/items',         icon: Dices,             label: 'Items' },
   { to: '/commodities',   icon: Package,           label: 'Commodities' },
