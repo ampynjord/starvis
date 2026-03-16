@@ -87,3 +87,19 @@ backups/
 
 # Docs
 docs/
+# Fichiers temporaires de développement local
+.env
+.env.dev
+.env.local
+docker-compose.simple.yml
+LOCAL_EXECUTION_GUIDE.md
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependencies
+node_modules/
+
