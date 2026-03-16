@@ -31,7 +31,7 @@ Agréger et exposer deux sources de données complémentaires :
 ```
 starvis/
 ├── api/              # Backend Express.js + TypeScript + Prisma
-├── ihm/              # Frontend React 19 + TanStack Query + Tailwind
+├── ihm/              # Frontend React 18 + TanStack Query + Tailwind
 ├── extractor/        # CLI d'extraction P4K/DataForge (local)
 └── db/               # Schémas SQL, migrations, scripts backup
 ```
@@ -615,7 +615,7 @@ gunzip < backups/starvis_YYYY-MM-DD.sql.gz | \
 6. ✅ **Performance** - Cache Redis, ETag, pagination
 7. ✅ **Monitoring** - Prometheus, health checks, logs structurés
 8. ✅ **DevOps** - Docker, CI/CD, backup automatisé
-9. ✅ **UI moderne** - React 19, Tailwind, animations fluides
+9. ✅ **UI moderne** - React 18, Tailwind, animations fluides
 10. ✅ **API publique** - Swagger, CSV export, filtres dynamiques
 
 ---
@@ -707,7 +707,7 @@ gunzip < backups/starvis_YYYY-MM-DD.sql.gz | \
 
 ### Frontend
 
-- ✅ React 19 moderne
+- ✅ React 18 moderne
 - ✅ TypeScript
 - ✅ TanStack Query (server state)
 - ✅ Tailwind CSS
@@ -740,7 +740,7 @@ gunzip < backups/starvis_YYYY-MM-DD.sql.gz | \
 ### Forces Principales
 
 1. **Architecture propre** - Monorepo bien organisé, séparation claire des responsabilités
-2. **Stack moderne** - Technologies récentes (React 19, Node 22, Prisma, TypeScript)
+2. **Stack moderne** - Technologies récentes (React 18, Node 22, Prisma, TypeScript)
 3. **Qualité du code** - Tests, linting, CI/CD, couverture élevée
 4. **Documentation** - README exhaustif, Swagger complet
 5. **Sécurité** - Rate limiting, headers, auth, validation
