@@ -49,7 +49,11 @@ export class MiningQueryService {
     if (!rows[0]) return null;
     const row = rows[0];
     if (typeof row.found_in === 'string') {
-      try { row.found_in = JSON.parse(row.found_in); } catch { row.found_in = []; }
+      try {
+        row.found_in = JSON.parse(row.found_in);
+      } catch {
+        row.found_in = [];
+      }
     }
     return row;
   }
@@ -93,7 +97,11 @@ export class MiningQueryService {
     if (!rows[0]) return null;
     const row = rows[0];
     if (typeof row.elements === 'string') {
-      try { row.elements = JSON.parse(row.elements); } catch { row.elements = []; }
+      try {
+        row.elements = JSON.parse(row.elements);
+      } catch {
+        row.elements = [];
+      }
     }
     return row;
   }
@@ -105,10 +113,7 @@ export class MiningQueryService {
    * that contain it, sorted by probability descending.
    * Optionally filter by min probability threshold.
    */
-  async solveForElement(
-    elementUuid: string,
-    opts?: { minProbability?: number },
-  ): Promise<Row[]> {
+  async solveForElement(elementUuid: string, opts?: { minProbability?: number }): Promise<Row[]> {
     const minProb = opts?.minProbability ?? 0;
 
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
