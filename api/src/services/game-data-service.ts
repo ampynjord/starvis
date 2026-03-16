@@ -14,6 +14,7 @@ import { ComponentQueryService } from './component-query-service.js';
 import { ItemQueryService } from './item-query-service.js';
 import { LoadoutService } from './loadout-service.js';
 import { MiningQueryService } from './mining-query-service.js';
+import { MissionService } from './mission-service.js';
 import type { PaginatedResult, Row } from './shared.js';
 import { ShipQueryService } from './ship-query-service.js';
 import { ShopService } from './shop-service.js';
@@ -42,6 +43,7 @@ export class GameDataService {
   readonly items: ItemQueryService;
   readonly commodities: CommodityQueryService;
   readonly mining: MiningQueryService;
+  readonly missions: MissionService;
 
   private statsCache = new TtlCache<Record<string, unknown>>(60_000);
   private publicStatsCache = new TtlCache<Record<string, unknown>>(60_000);
@@ -54,6 +56,7 @@ export class GameDataService {
     this.items = new ItemQueryService(prisma);
     this.commodities = new CommodityQueryService(prisma);
     this.mining = new MiningQueryService(prisma);
+    this.missions = new MissionService(prisma);
   }
 
   // ── Unified search (cross-cutting — queries ships + components + items) ──

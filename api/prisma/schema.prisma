@@ -480,3 +480,22 @@ model MiningCompositionPart {
   @@index([elementUuid], map: "idx_mcp_element")
   @@map("mining_composition_parts")
 }
+
+model Mission {
+  uuid               String   @id @db.Char(36)
+  className          String   @map("class_name") @db.VarChar(300)
+  title              String?  @db.VarChar(500)
+  description        String?  @db.Text
+  missionType        String?  @map("mission_type") @db.VarChar(100)
+  canBeShared        Boolean  @default(false) @map("can_be_shared")
+  onlyOwnerComplete  Boolean  @default(false) @map("only_owner_complete")
+  isLegal            Boolean  @default(true) @map("is_legal")
+  completionTimeSecs Int?     @map("completion_time_s")
+  notForRelease      Boolean  @default(false) @map("not_for_release")
+  workInProgress     Boolean  @default(false) @map("work_in_progress")
+  gameEnv            String   @default("live") @map("game_env") @db.VarChar(10)
+
+  @@index([missionType], map: "idx_mission_type")
+  @@index([gameEnv], map: "idx_game_env")
+  @@map("missions")
+}

@@ -25,6 +25,9 @@ const RankingPage         = lazy(() => import('@/pages/RankingPage'));
 const OutfitterPage       = lazy(() => import('@/pages/OutfitterPage'));
 const TradePage           = lazy(() => import('@/pages/TradePage'));
 const MiningPage          = lazy(() => import('@/pages/MiningPage'));
+const MissionsPage        = lazy(() => import('@/pages/MissionsPage'));
+const ResourcesPage       = lazy(() => import('@/pages/ResourcesPage'));
+const ArmorPage           = lazy(() => import('@/pages/ArmorPage'));
 const NotFoundPage        = lazy(() => import('@/pages/NotFoundPage'));
 
 export const router = createBrowserRouter([
@@ -40,6 +43,9 @@ export const router = createBrowserRouter([
       { path: 'outfitter',        element: wrap(OutfitterPage) },
       { path: 'trade',            element: wrap(TradePage) },
       { path: 'mining',           element: wrap(MiningPage) },
+      { path: 'missions',         element: wrap(MissionsPage) },
+      { path: 'resources',        element: wrap(ResourcesPage) },
+      { path: 'armor',            element: wrap(ArmorPage) },
       { path: 'components',       element: wrap(ComponentsPage) },
       { path: 'components/:uuid', element: wrap(ComponentDetailPage) },
       { path: 'items',            element: wrap(ItemsPage) },

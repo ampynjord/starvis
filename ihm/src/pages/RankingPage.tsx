@@ -1,12 +1,23 @@
 /**
- * RankingPage — SPViewer-style ship ranking table
- * Sort all ships by any stat with percentage bars
+ * RankingPage — SPViewer-style ship ranking table + bar chart
+ * Sort all ships by any stat with percentage bars and chart view
  */
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { ChevronDown, ChevronUp, ChevronsUpDown, Trophy } from 'lucide-react';
+import { BarChart2, ChevronDown, ChevronUp, ChevronsUpDown, Table2, Trophy } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  LabelList,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { api } from '@/services/api';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
@@ -87,6 +98,7 @@ export default function RankingPage() {
   const [order, setOrder]           = useState<'asc' | 'desc'>('desc');
   const [vehicleCat, setVehicleCat] = useState('ship');
   const [statCat, setStatCat]       = useState('Flight');
+  const [viewMode, setViewMode]     = useState<'table' | 'chart'>('table');
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['ships.ranking', sortKey, order, vehicleCat],
@@ -124,21 +136,43 @@ export default function RankingPage() {
           </p>
         </div>
 
-        {/* Vehicle category toggle */}
-        <div className="flex gap-1">
-          {VEHICLE_CATS.map(({ label, value }) => (
+        <div className="flex items-center gap-2">
+          {/* View mode toggle */}
+          <div className="flex gap-1 border border-slate-800 rounded p-0.5">
             <button
-              key={value}
-              onClick={() => setVehicleCat(value)}
-              className={`px-3 py-1.5 text-xs font-rajdhani font-semibold uppercase tracking-wider rounded border transition-all ${
-                vehicleCat === value
-                  ? 'bg-cyan-950/60 border-cyan-800 text-cyan-400'
-                  : 'border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-600'
-              }`}
+              type="button"
+              onClick={() => setViewMode('table')}
+              title="Table view"
+              className={`p-1.5 rounded transition-colors ${viewMode === 'table' ? 'bg-cyan-950/60 text-cyan-400' : 'text-slate-600 hover:text-slate-300'}`}
             >
-              {label}
+              <Table2 size={14} />
             </button>
-          ))}
+            <button
+              type="button"
+              onClick={() => setViewMode('chart')}
+              title="Chart view"
+              className={`p-1.5 rounded transition-colors ${viewMode === 'chart' ? 'bg-cyan-950/60 text-cyan-400' : 'text-slate-600 hover:text-slate-300'}`}
+            >
+              <BarChart2 size={14} />
+            </button>
+          </div>
+
+          {/* Vehicle category toggle */}
+          <div className="flex gap-1">
+            {VEHICLE_CATS.map(({ label, value }) => (
+              <button
+                key={value}
+                onClick={() => setVehicleCat(value)}
+                className={`px-3 py-1.5 text-xs font-rajdhani font-semibold uppercase tracking-wider rounded border transition-all ${
+                  vehicleCat === value
+                    ? 'bg-cyan-950/60 border-cyan-800 text-cyan-400'
+                    : 'border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-600'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -158,13 +192,87 @@ export default function RankingPage() {
           />
         </div>
 
-        {/* Table */}
+        {/* Table / Chart */}
         <div className="flex-1 min-w-0 overflow-x-auto">
           {isLoading ? (
             <LoadingGrid message="COMPUTING RANKINGS…" />
           ) : error ? (
             <ErrorState error={error as Error} onRetry={() => void refetch()} />
+          ) : viewMode === 'chart' ? (
+            /* ─── Bar Chart view ─── */
+            <div className="space-y-6">
+              {visibleStats.map((stat) => {
+                const chartData = ships
+                  .filter((s) => (s[stat.key] as number | null) != null && (s[stat.key] as number) > 0)
+                  .slice(0, 20)
+                  .map((s) => ({
+                    name: (s.name ?? s.class_name ?? '').slice(0, 18),
+                    value: parseFloat(String(s[stat.key])),
+                    uuid: s.uuid,
+                  }));
+                if (!chartData.length) return null;
+                const isActive = stat.key === sortKey;
+                return (
+                  <div
+                    key={stat.key as string}
+                    className={`sci-panel p-4 ${isActive ? 'border-cyan-800/60' : ''}`}
+                  >
+                    <p
+                      className={`font-orbitron text-xs font-bold uppercase tracking-widest mb-3 cursor-pointer ${isActive ? 'text-cyan-400' : 'text-slate-500 hover:text-slate-300'}`}
+                      onClick={() => handleSort(stat.key)}
+                    >
+                      {stat.label}
+                      {stat.unit ? ` (${stat.unit})` : ''}
+                    </p>
+                    <ResponsiveContainer width="100%" height={Math.max(200, chartData.length * 22)}>
+                      <BarChart
+                        data={chartData}
+                        layout="vertical"
+                        margin={{ top: 0, right: 80, bottom: 0, left: 8 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#1e293b" />
+                        <XAxis
+                          type="number"
+                          tick={{ fill: '#475569', fontSize: 10, fontFamily: 'monospace' }}
+                          tickFormatter={(v: number) => stat.format(v)}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <YAxis
+                          type="category"
+                          dataKey="name"
+                          width={120}
+                          tick={{ fill: '#94a3b8', fontSize: 10, fontFamily: 'Rajdhani, sans-serif' }}
+                          axisLine={false}
+                          tickLine={false}
+                        />
+                        <Tooltip
+                          contentStyle={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '6px', fontSize: '11px' }}
+                          formatter={(v: number) => [stat.format(v), stat.label]}
+                          cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                        />
+                        <Bar dataKey="value" radius={[0, 3, 3, 0]} maxBarSize={16}>
+                          {chartData.map((_, i) => (
+                            <Cell
+                              key={i}
+                              fill={i === 0 ? '#fbbf24' : i < 3 ? '#22d3ee' : '#334155'}
+                            />
+                          ))}
+                          <LabelList
+                            dataKey="value"
+                            position="right"
+                            formatter={(v: number) => stat.format(v)}
+                            style={{ fill: '#64748b', fontSize: 10, fontFamily: 'monospace' }}
+                          />
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
+            /* ─── Table view ─── */
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="border-b border-slate-800">

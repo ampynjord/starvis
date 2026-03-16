@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import {
-  BarChart3, BookOpen, Dices, ExternalLink, Home, Package, Palette, Pickaxe, Rocket, Settings2, ShoppingBag, SlidersHorizontal, TrendingUp, Trophy, Wrench,
+  BarChart3, BookOpen, Dices, ExternalLink, Home, Package, Palette, Pickaxe, Rocket, Settings2, Shield, ShoppingBag, SlidersHorizontal, TrendingUp, Trophy, Wrench, ClipboardList, Layers,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
@@ -12,6 +12,9 @@ const NAV_ITEMS = [
   { to: '/outfitter',    icon: SlidersHorizontal,  label: 'Outfitter' },
   { to: '/trade',        icon: TrendingUp,         label: 'Trade' },
   { to: '/mining',       icon: Pickaxe,            label: 'Mining' },
+  { to: '/missions',     icon: ClipboardList,      label: 'Missions' },
+  { to: '/resources',    icon: Layers,             label: 'Resources' },
+  { to: '/armor',        icon: Shield,             label: 'Armor / FPS' },
   { to: '/components',   icon: Settings2,          label: 'Components' },
   { to: '/items',        icon: Dices,              label: 'Items' },
   { to: '/commodities',  icon: Package,            label: 'Commodities' },
