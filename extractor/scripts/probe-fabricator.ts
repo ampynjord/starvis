@@ -2,7 +2,10 @@ import 'dotenv/config';
 import { DataForgeService } from '../src/dataforge-service.js';
 
 const p4k = process.argv[process.argv.indexOf('--p4k') + 1] || process.env.P4K_PATH;
-if (!p4k) { console.error('--p4k required'); process.exit(1); }
+if (!p4k) {
+  console.error('--p4k required');
+  process.exit(1);
+}
 
 const ctx = new DataForgeService(p4k);
 await ctx.init();
