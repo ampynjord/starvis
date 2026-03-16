@@ -46,10 +46,10 @@ export interface MiningComposition {
 function n(v: unknown): number | null {
   if (v === null || v === undefined) return null;
   const f = typeof v === 'string' ? parseFloat(v) : Number(v);
-  return isFinite(f) ? f : null;
+  return Number.isFinite(f) ? f : null;
 }
 
-function locKey(raw: string | null | undefined): string | null {
+function _locKey(raw: string | null | undefined): string | null {
   if (!raw) return null;
   // Remove @-prefix locale keys → keep raw localization key
   return raw.startsWith('@') ? raw : null;
@@ -57,7 +57,7 @@ function locKey(raw: string | null | undefined): string | null {
 
 // ── MineableElement extraction ────────────────────────────────
 
-export function extractMiningElements(ctx: DataForgeContext, locService?: { resolve(key: string): string | null }): MiningElement[] {
+export function extractMiningElements(ctx: DataForgeContext, _locService?: { resolve(key: string): string | null }): MiningElement[] {
   const dfData = ctx.getDfData();
   if (!dfData) return [];
 
@@ -134,7 +134,7 @@ export function extractMiningCompositions(
 
   // Build element UUID index for fast lookup
   const elementByUuid = new Map(elements.map((e) => [e.uuid, e]));
-  const elementByClassName = new Map(elements.map((e) => [e.className.toLowerCase(), e]));
+  const _elementByClassName = new Map(elements.map((e) => [e.className.toLowerCase(), e]));
 
   const records = dfData.records.filter((r) => r.structIndex === structIdx);
   const results: MiningComposition[] = [];
