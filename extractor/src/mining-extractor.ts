@@ -84,11 +84,15 @@ export function extractMiningElements(ctx: DataForgeContext, locService?: { reso
         void refData;
       }
 
-      // Derive element name from class_name: "MineableElement.Copper_Ore" → "Copper Ore"
+      // Derive element name from class_name:
+      //   "MinableElement_FPS_Jaclium"             → "Jaclium"
+      //   "MinableElement_GroundVehicle_Carinite"  → "Carinite"
+      //   "MineableElement_Copper_Ore"             → "Copper Ore"
       const rawName = r.name
-        .replace(/^MineableElement\./i, '')
+        .replace(/^(?:Mine?ableElement[._\s]+)+/gi, '')  // strip repeated struct prefix   
+        .replace(/^(?:FPS|GroundVehicle|SpaceShip|Vehicle|Hangar|Ship)[._\s]+/gi, '')
         .replace(/_/g, ' ')
-        .replace(/\s+Ore$/i, ' Ore');
+        .trim();
 
       results.push({
         uuid: r.id,

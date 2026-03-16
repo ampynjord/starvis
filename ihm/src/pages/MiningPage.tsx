@@ -6,7 +6,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Pickaxe, ChevronDown, Info } from 'lucide-react';
+import { Pickaxe, ChevronDown, Info, Search } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '@/services/api';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
@@ -60,12 +60,17 @@ function ElementSelector({
   onChange: (uuid: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
   const current = elements.find((e) => e.uuid === selected);
+
+  const filtered = search.trim()
+    ? elements.filter((e) => e.name.toLowerCase().includes(search.toLowerCase()))
+    : elements;
 
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => { setOpen((v) => !v); setSearch(''); }}
         className="sci-input w-full flex items-center justify-between gap-2 pr-3 text-left"
       >
         <span className={`font-rajdhani font-semibold text-sm ${current ? 'text-slate-100' : 'text-slate-500'}`}>
@@ -80,22 +85,43 @@ function ElementSelector({
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            className="absolute z-50 top-full mt-1 left-0 right-0 bg-panel border border-border rounded shadow-xl max-h-72 overflow-y-auto"
+            className="absolute z-50 top-full mt-1 left-0 right-0 bg-panel border border-border rounded shadow-xl"
           >
-            {elements.map((el) => (
-              <button
-                key={el.uuid}
-                onClick={() => { onChange(el.uuid); setOpen(false); }}
-                className={`w-full px-3 py-2 text-left hover:bg-white/5 transition-colors flex items-center gap-2 ${el.uuid === selected ? 'text-cyan-400' : 'text-slate-300'}`}
-              >
-                <span className="font-rajdhani font-semibold text-sm flex-1">{el.name}</span>
-                {el.instability != null && (
-                  <span className={`text-xs font-mono-sc ${dangerColor(el.instability)}`}>
-                    inst {fNum(el.instability)}
-                  </span>
-                )}
-              </button>
-            ))}
+            {/* Search input */}
+            <div className="sticky top-0 bg-panel border-b border-border p-2">
+              <div className="relative">
+                <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  autoFocus
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search mineral…"
+                  className="sci-input w-full pl-7 text-xs py-1.5"
+                />
+              </div>
+            </div>
+            {/* List */}
+            <div className="max-h-60 overflow-y-auto">
+              {filtered.length === 0 ? (
+                <p className="px-3 py-4 text-xs text-slate-600 text-center">No results</p>
+              ) : (
+                filtered.map((el) => (
+                  <button
+                    key={el.uuid}
+                    onClick={() => { onChange(el.uuid); setOpen(false); setSearch(''); }}
+                    className={`w-full px-3 py-2 text-left hover:bg-white/5 transition-colors flex items-center gap-2 ${el.uuid === selected ? 'text-cyan-400' : 'text-slate-300'}`}
+                  >
+                    <span className="font-rajdhani font-semibold text-sm flex-1">{el.name}</span>
+                    {el.instability != null && (
+                      <span className={`text-xs font-mono-sc ${dangerColor(el.instability)}`}>
+                        inst {fNum(el.instability)}
+                      </span>
+                    )}
+                  </button>
+                ))
+              )}
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
