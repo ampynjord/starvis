@@ -18,6 +18,7 @@ import {
   ClipboardList,
 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
+import { useEnv } from '@/contexts/EnvContext';
 
 const DB_ITEMS = [
   { to: '/',              icon: Home,              label: 'Dashboard' },
@@ -92,6 +93,8 @@ function NavGroup({ label, items }: { label: string; items: typeof DB_ITEMS }) {
 }
 
 export function Sidebar() {
+  const { env, setEnv } = useEnv();
+
   return (
     <aside className="w-16 md:w-56 flex-shrink-0 flex flex-col border-r border-border bg-panel/80 backdrop-blur">
       {/* Logo */}
@@ -108,6 +111,38 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto py-2 space-y-0.5 px-2">
+        {/* Env Switcher */}
+        <div className="mb-3 px-0">
+          <p className="hidden md:block px-2 pb-1 text-[10px] font-orbitron tracking-widest text-slate-600 uppercase select-none">
+            Environment
+          </p>
+          <div className="flex gap-1 px-0">
+            <button
+              onClick={() => setEnv('live')}
+              className={[
+                'flex-1 py-1.5 rounded text-[10px] font-orbitron font-bold tracking-widest uppercase transition-all duration-150 border',
+                env === 'live'
+                  ? 'bg-cyan-950/60 border-cyan-700 text-cyan-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/5',
+              ].join(' ')}
+            >
+              <span className="hidden md:inline">LIVE</span>
+              <span className="md:hidden text-[8px]">L</span>
+            </button>
+            <button
+              onClick={() => setEnv('ptu')}
+              className={[
+                'flex-1 py-1.5 rounded text-[10px] font-orbitron font-bold tracking-widest uppercase transition-all duration-150 border',
+                env === 'ptu'
+                  ? 'bg-orange-950/60 border-orange-700 text-orange-400'
+                  : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/5',
+              ].join(' ')}
+            >
+              <span className="hidden md:inline">PTU</span>
+              <span className="md:hidden text-[8px]">P</span>
+            </button>
+          </div>
+        </div>
         <NavGroup label="Database" items={DB_ITEMS} />
         <NavGroup label="Tools" items={TOOL_ITEMS} />
       </nav>

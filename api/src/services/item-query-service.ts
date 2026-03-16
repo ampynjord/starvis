@@ -27,6 +27,7 @@ export class ItemQueryService {
   constructor(private prisma: PrismaClient) {}
 
   async getAllItems(filters?: {
+    env?: string;
     type?: string;
     sub_type?: string;
     manufacturer?: string;
@@ -36,8 +37,9 @@ export class ItemQueryService {
     page?: number;
     limit?: number;
   }): Promise<PaginatedResult> {
-    const where: string[] = [];
-    const params: (string | number)[] = [];
+    const env = filters?.env ?? 'live';
+    const where: string[] = ['i.game_env = ?'];
+    const params: (string | number)[] = [env];
 
     if (filters?.type) {
       where.push('i.type = ?');
@@ -64,24 +66,26 @@ export class ItemQueryService {
     return paginate(this.prisma, baseSql, countSql, params, filters || {}, ITEM_SORT, 'i');
   }
 
-  async getItemByUuid(uuid: string): Promise<Row | null> {
+  async getItemByUuid(uuid: string, env = 'live'): Promise<Row | null> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-      'SELECT i.*, m.name as manufacturer_name FROM items i LEFT JOIN manufacturers m ON i.manufacturer_code = m.code WHERE i.uuid = ?',
+      'SELECT i.*, m.name as manufacturer_name FROM items i LEFT JOIN manufacturers m ON i.manufacturer_code = m.code WHERE i.uuid = ? AND i.game_env = ?',
       uuid,
+      env,
     );
     return rows[0] || null;
   }
 
-  async getItemByClassName(className: string): Promise<Row | null> {
+  async getItemByClassName(className: string, env = 'live'): Promise<Row | null> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-      'SELECT i.*, m.name as manufacturer_name FROM items i LEFT JOIN manufacturers m ON i.manufacturer_code = m.code WHERE i.class_name = ?',
+      'SELECT i.*, m.name as manufacturer_name FROM items i LEFT JOIN manufacturers m ON i.manufacturer_code = m.code WHERE i.class_name = ? AND i.game_env = ?',
       className,
+      env,
     );
     return rows[0] || null;
   }
 
-  async resolveItem(id: string): Promise<Row | null> {
-    return id.length === 36 ? this.getItemByUuid(id) : this.getItemByClassName(id);
+  async resolveItem(id: string, env = 'live'): Promise<Row | null> {
+    return id.length === 36 ? this.getItemByUuid(id, env) : this.getItemByClassName(id, env);
   }
 
   async getItemFilters(): Promise<{ types: string[]; sub_types: string[]; manufacturers: string[] }> {

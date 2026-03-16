@@ -10,6 +10,7 @@ export class CommodityQueryService {
   constructor(private prisma: PrismaClient) {}
 
   async getAllCommodities(filters?: {
+    env?: string;
     type?: string;
     search?: string;
     sort?: string;
@@ -17,8 +18,9 @@ export class CommodityQueryService {
     page?: number;
     limit?: number;
   }): Promise<PaginatedResult> {
-    const where: string[] = [];
-    const params: (string | number)[] = [];
+    const env = filters?.env ?? 'live';
+    const where: string[] = ['c.game_env = ?'];
+    const params: (string | number)[] = [env];
 
     if (filters?.type) {
       where.push('c.type = ?');
@@ -37,8 +39,8 @@ export class CommodityQueryService {
     return paginate(this.prisma, baseSql, countSql, params, filters || {}, COMMODITY_SORT, 'c');
   }
 
-  async getCommodityByUuid(uuid: string): Promise<Row | null> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>('SELECT * FROM commodities WHERE uuid = ?', uuid);
+  async getCommodityByUuid(uuid: string, env = 'live'): Promise<Row | null> {
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>('SELECT * FROM commodities WHERE uuid = ? AND game_env = ?', uuid, env);
     return rows[0] || null;
   }
 

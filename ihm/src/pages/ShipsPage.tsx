@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Search } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '@/services/api';
+import { useEnv } from '@/contexts/EnvContext';
 import { ShipCard } from '@/components/ship/ShipCard';
 import { FilterPanel } from '@/components/ui/FilterPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
@@ -13,6 +14,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 const LIMIT = 24;
 
 export default function ShipsPage() {
+  const { env } = useEnv();
   const [page, setPage]     = useState(1);
   const [search, setSearch] = useState('');
   const [manufacturer, setManufacturer] = useState('');
@@ -22,14 +24,15 @@ export default function ShipsPage() {
   const debouncedSearch = useDebounce(search, 350);
 
   const { data: filters } = useQuery({
-    queryKey: ['ships.filters'],
-    queryFn: api.ships.filters,
+    queryKey: ['ships.filters', env],
+    queryFn: () => api.ships.filters(env),
     staleTime: Infinity,
   });
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['ships.list', { page, search: debouncedSearch, manufacturer, role, career, variantType }],
+    queryKey: ['ships.list', env, { page, search: debouncedSearch, manufacturer, role, career, variantType }],
     queryFn: () => api.ships.list({
+      env,
       page, limit: LIMIT,
       search: debouncedSearch || undefined,
       manufacturer: manufacturer || undefined,

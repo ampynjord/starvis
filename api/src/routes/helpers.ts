@@ -68,13 +68,13 @@ export function makeGameDataGuard(gameDataService: GameDataService | undefined) 
 /** Factory: returns helpers for resolving ship identifiers (UUID or class_name) */
 export function makeShipResolver(ships: ShipQueryService) {
   return {
-    async resolveShipUuid(id: string): Promise<string | null> {
+    async resolveShipUuid(id: string, env = 'live'): Promise<string | null> {
       if (id.length === 36) return id;
-      const ship = await ships.getShipByClassName(id);
+      const ship = await ships.getShipByClassName(id, env);
       return (ship?.uuid as string) || null;
     },
-    async resolveShip(id: string): Promise<Record<string, unknown> | null> {
-      return (await ships.getShipByUuid(id)) || (await ships.getShipByClassName(id));
+    async resolveShip(id: string, env = 'live'): Promise<Record<string, unknown> | null> {
+      return (await ships.getShipByUuid(id, env)) || (await ships.getShipByClassName(id, env));
     },
   };
 }

@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api } from '@/services/api';
+import { useEnv } from '@/contexts/EnvContext';
 import type { ShipModule } from '@/types/api';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { GlowBadge } from '@/components/ui/GlowBadge';
@@ -23,30 +24,31 @@ import { VARIANT_TYPE_LABELS } from '@/utils/constants';
 export default function ShipDetailPage() {
   const { uuid } = useParams<{ uuid: string }>();
   const navigate = useNavigate();
+  const { env } = useEnv();
 
   const { data: ship, isLoading, error, refetch } = useQuery({
-    queryKey: ['ships.get', uuid],
-    queryFn: () => api.ships.get(uuid!),
+    queryKey: ['ships.get', uuid, env],
+    queryFn: () => api.ships.get(uuid!, env),
     enabled: !!uuid,
   });
   const { data: loadout } = useQuery({
-    queryKey: ['ships.loadout', uuid],
-    queryFn: () => api.ships.loadout(uuid!),
+    queryKey: ['ships.loadout', uuid, env],
+    queryFn: () => api.ships.loadout(uuid!, env),
     enabled: !!uuid,
   });
   const { data: paints } = useQuery({
-    queryKey: ['ships.paints', uuid],
-    queryFn: () => api.ships.paints(uuid!),
+    queryKey: ['ships.paints', uuid, env],
+    queryFn: () => api.ships.paints(uuid!, env),
     enabled: !!uuid,
   });
   const { data: similar } = useQuery({
-    queryKey: ['ships.similar', uuid],
-    queryFn: () => api.ships.similar(uuid!, 4),
+    queryKey: ['ships.similar', uuid, env],
+    queryFn: () => api.ships.similar(uuid!, 4, env),
     enabled: !!uuid,
   });
   const { data: modules } = useQuery({
-    queryKey: ['ships.modules', uuid],
-    queryFn: () => api.ships.modules(uuid!),
+    queryKey: ['ships.modules', uuid, env],
+    queryFn: () => api.ships.modules(uuid!, env),
     enabled: !!uuid,
   });
 

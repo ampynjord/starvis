@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Search } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '@/services/api';
+import { useEnv } from '@/contexts/EnvContext';
 import { FilterPanel } from '@/components/ui/FilterPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { Pagination } from '@/components/ui/Pagination';
@@ -24,6 +25,7 @@ const CATEGORY_CHIPS: { label: string; types: string[] }[] = [
 ];
 
 export default function ItemsPage() {
+  const { env } = useEnv();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [type, setType] = useState('');
@@ -53,8 +55,9 @@ export default function ItemsPage() {
     staleTime: Infinity,
   });
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['items.list', { page, search: debouncedSearch, type: effectiveType, manufacturer }],
+    queryKey: ['items.list', env, { page, search: debouncedSearch, type: effectiveType, manufacturer }],
     queryFn: () => api.items.list({
+      env,
       page, limit: LIMIT,
       search: debouncedSearch || undefined,
       type: effectiveType || undefined,

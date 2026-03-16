@@ -25,7 +25,8 @@ export function mountShopRoutes(router: Router, deps: RouteDependencies): void {
     asyncHandler(async (req, res) => {
       const shopId = parseInt(req.params.id, 10);
       if (Number.isNaN(shopId)) return void res.status(400).json({ success: false, error: 'Invalid shop ID' });
-      const data = await gameDataService!.shops.getShopInventory(shopId);
+      const env = String(req.query.env ?? 'live');
+      const data = await gameDataService!.shops.getShopInventory(shopId, env);
       if (req.query.format === 'csv')
         return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
       sendWithETag(req, res, { success: true, count: data.length, data });

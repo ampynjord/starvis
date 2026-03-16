@@ -76,6 +76,7 @@ export const api = {
   // ─── Ships ─────────────────────────────────────────────────────────
   ships: {
     list: (p: {
+      env?: string;
       page?: number;
       limit?: number;
       search?: string;
@@ -85,25 +86,26 @@ export const api = {
       size?: number;
       variant_type?: string;
     }) => get<PaginatedResponse<ShipListItem>>('/ships', p),
-    filters: () => get<ShipFilters>('/ships/filters'),
-    search: (search: string, limit = 8) => get<ShipListItem[]>('/ships/search', { search, limit }),
-    random: () => get<ShipListItem>('/ships/random'),
+    filters: (env?: string) => get<ShipFilters>('/ships/filters', { env }),
+    search: (search: string, limit = 8, env?: string) => get<ShipListItem[]>('/ships/search', { search, limit, env }),
+    random: (env?: string) => get<ShipListItem>('/ships/random', { env }),
     manufacturers: () => get<{ code: string; name: string }[]>('/ships/manufacturers'),
-    get: (uuid: string) => get<Ship>(`/ships/${uuid}`),
-    loadout: (uuid: string) => get<LoadoutNode[]>(`/ships/${uuid}/loadout`),
-    paints: (uuid: string) => get<ShipPaint[]>(`/ships/${uuid}/paints`),
-    stats: (uuid: string) => get<ShipStats>(`/ships/${uuid}/stats`),
-    hardpoints: (uuid: string) => get<Hardpoint[]>(`/ships/${uuid}/hardpoints`),
-    similar: (uuid: string, limit = 6) => get<ShipListItem[]>(`/ships/${uuid}/similar`, { limit }),
-    compare: (uuid1: string, uuid2: string) => get<ShipComparison>(`/ships/${uuid1}/compare/${uuid2}`),
-    modules: (uuid: string) => get<ShipModule[]>(`/ships/${uuid}/modules`),
-    ranking: (sort_by: string, order: 'asc' | 'desc', category?: string) =>
-      get<ShipListItem[]>('/ships/ranking', { sort_by, order, category }),
+    get: (uuid: string, env?: string) => get<Ship>(`/ships/${uuid}`, { env }),
+    loadout: (uuid: string, env?: string) => get<LoadoutNode[]>(`/ships/${uuid}/loadout`, { env }),
+    paints: (uuid: string, env?: string) => get<ShipPaint[]>(`/ships/${uuid}/paints`, { env }),
+    stats: (uuid: string, env?: string) => get<ShipStats>(`/ships/${uuid}/stats`, { env }),
+    hardpoints: (uuid: string, env?: string) => get<Hardpoint[]>(`/ships/${uuid}/hardpoints`, { env }),
+    similar: (uuid: string, limit = 6, env?: string) => get<ShipListItem[]>(`/ships/${uuid}/similar`, { limit, env }),
+    compare: (uuid1: string, uuid2: string, env?: string) => get<ShipComparison>(`/ships/${uuid1}/compare/${uuid2}`, { env }),
+    modules: (uuid: string, env?: string) => get<ShipModule[]>(`/ships/${uuid}/modules`, { env }),
+    ranking: (sort_by: string, order: 'asc' | 'desc', category?: string, env?: string) =>
+      get<ShipListItem[]>('/ships/ranking', { sort_by, order, category, env }),
   },
 
   // ─── Components ────────────────────────────────────────────────────
   components: {
     list: (p: {
+      env?: string;
       page?: number;
       limit?: number;
       search?: string;
@@ -114,11 +116,12 @@ export const api = {
       manufacturer?: string;
     }) => get<PaginatedResponse<ComponentListItem>>('/components', p),
     types: () => get<string[]>('/components/types'),
-    filters: () => get<Record<string, string[]>>('/components/filters'),
-    get: (uuid: string) => get<Component>(`/components/${uuid}`),
-    buyLocations: (uuid: string) => get<BuyLocation[]>(`/components/${uuid}/buy-locations`),
+    filters: (env?: string) => get<Record<string, string[]>>('/components/filters', { env }),
+    get: (uuid: string, env?: string) => get<Component>(`/components/${uuid}`, { env }),
+    buyLocations: (uuid: string, env?: string) => get<BuyLocation[]>(`/components/${uuid}/buy-locations`, { env }),
     ships: (uuid: string) => get<ShipListItem[]>(`/components/${uuid}/ships`),
     compatible: (opts: {
+      env?: string;
       type?: string;
       min_size?: number;
       max_size?: number;
@@ -132,6 +135,7 @@ export const api = {
   // ─── Items ─────────────────────────────────────────────────────────
   items: {
     list: (p: {
+      env?: string;
       page?: number;
       limit?: number;
       search?: string;
@@ -143,8 +147,8 @@ export const api = {
     }) => get<PaginatedResponse<ItemListItem>>('/items', p),
     types: () => get<string[]>('/items/types'),
     filters: () => get<Record<string, string[]>>('/items/filters'),
-    get: (uuid: string) => get<Item>(`/items/${uuid}`),
-    buyLocations: (uuid: string) => get<ItemBuyLocation[]>(`/items/${uuid}/buy-locations`),
+    get: (uuid: string, env?: string) => get<Item>(`/items/${uuid}`, { env }),
+    buyLocations: (uuid: string, env?: string) => get<ItemBuyLocation[]>(`/items/${uuid}/buy-locations`, { env }),
   },
 
   // ─── Manufacturers ─────────────────────────────────────────────────
@@ -163,15 +167,15 @@ export const api = {
 
   // ─── Shops ─────────────────────────────────────────────────────────
   shops: {
-    list: (p?: { system?: string; city?: string }) => get<Shop[]>('/shops', p),
-    inventory: (id: number) => get<unknown[]>(`/shops/${id}/inventory`),
+    list: (p?: { env?: string; system?: string; city?: string }) => get<Shop[]>('/shops', p),
+    inventory: (id: number, env?: string) => get<unknown[]>(`/shops/${id}/inventory`, { env }),
   },
 
   // ─── Commodities ───────────────────────────────────────────────────
   commodities: {
-    list: (p: { page?: number; limit?: number; search?: string; type?: string }) => get<PaginatedResponse<Commodity>>('/commodities', p),
+    list: (p: { env?: string; page?: number; limit?: number; search?: string; type?: string }) => get<PaginatedResponse<Commodity>>('/commodities', p),
     types: () => get<string[]>('/commodities/types'),
-    get: (uuid: string) => get<Commodity>(`/commodities/${uuid}`),
+    get: (uuid: string, env?: string) => get<Commodity>(`/commodities/${uuid}`, { env }),
   },
 
   // ─── Search ────────────────────────────────────────────────────────

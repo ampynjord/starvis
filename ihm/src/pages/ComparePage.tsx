@@ -13,6 +13,7 @@ import {
   Tooltip,
 } from 'recharts';
 import { api } from '@/services/api';
+import { useEnv } from '@/contexts/EnvContext';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { GlowBadge } from '@/components/ui/GlowBadge';
@@ -91,6 +92,7 @@ const initSlot = (): SlotState => ({ uuid: '', query: '', ship: null });
 
 export default function ComparePage() {
   const [searchParams] = useSearchParams();
+  const { env } = useEnv();
   const [slots, setSlots] = useState<Record<Slot, SlotState>>({
     a: { ...initSlot(), uuid: searchParams.get('a') ?? '' },
     b: { ...initSlot(), uuid: searchParams.get('b') ?? '' },
@@ -107,18 +109,18 @@ export default function ComparePage() {
   const dD = useDebounce(slots.d.query, 300);
   const debounced: Record<Slot, string> = { a: dA, b: dB, c: dC, d: dD };
 
-  const suggestA = useQuery({ queryKey: ['ships.search', dA], queryFn: () => api.ships.search(dA, 6), enabled: dA.length >= 2 });
-  const suggestB = useQuery({ queryKey: ['ships.search', dB], queryFn: () => api.ships.search(dB, 6), enabled: dB.length >= 2 });
-  const suggestC = useQuery({ queryKey: ['ships.search', dC], queryFn: () => api.ships.search(dC, 6), enabled: dC.length >= 2 });
-  const suggestD = useQuery({ queryKey: ['ships.search', dD], queryFn: () => api.ships.search(dD, 6), enabled: dD.length >= 2 });
+  const suggestA = useQuery({ queryKey: ['ships.search', dA, env], queryFn: () => api.ships.search(dA, 6, env), enabled: dA.length >= 2 });
+  const suggestB = useQuery({ queryKey: ['ships.search', dB, env], queryFn: () => api.ships.search(dB, 6, env), enabled: dB.length >= 2 });
+  const suggestC = useQuery({ queryKey: ['ships.search', dC, env], queryFn: () => api.ships.search(dC, 6, env), enabled: dC.length >= 2 });
+  const suggestD = useQuery({ queryKey: ['ships.search', dD, env], queryFn: () => api.ships.search(dD, 6, env), enabled: dD.length >= 2 });
   const suggestions: Record<Slot, ShipListItem[] | undefined> = {
     a: suggestA.data, b: suggestB.data, c: suggestC.data, d: suggestD.data,
   };
 
-  const qA = useQuery({ queryKey: ['ships.get', slots.a.uuid], queryFn: () => api.ships.get(slots.a.uuid), enabled: !!slots.a.uuid });
-  const qB = useQuery({ queryKey: ['ships.get', slots.b.uuid], queryFn: () => api.ships.get(slots.b.uuid), enabled: !!slots.b.uuid });
-  const qC = useQuery({ queryKey: ['ships.get', slots.c.uuid], queryFn: () => api.ships.get(slots.c.uuid), enabled: !!slots.c.uuid });
-  const qD = useQuery({ queryKey: ['ships.get', slots.d.uuid], queryFn: () => api.ships.get(slots.d.uuid), enabled: !!slots.d.uuid });
+  const qA = useQuery({ queryKey: ['ships.get', slots.a.uuid, env], queryFn: () => api.ships.get(slots.a.uuid, env), enabled: !!slots.a.uuid });
+  const qB = useQuery({ queryKey: ['ships.get', slots.b.uuid, env], queryFn: () => api.ships.get(slots.b.uuid, env), enabled: !!slots.b.uuid });
+  const qC = useQuery({ queryKey: ['ships.get', slots.c.uuid, env], queryFn: () => api.ships.get(slots.c.uuid, env), enabled: !!slots.c.uuid });
+  const qD = useQuery({ queryKey: ['ships.get', slots.d.uuid, env], queryFn: () => api.ships.get(slots.d.uuid, env), enabled: !!slots.d.uuid });
   const shipData: Record<Slot, Ship | undefined> = { a: qA.data, b: qB.data, c: qC.data, d: qD.data };
   const isLoading = [qA, qB, qC, qD].some((q) => q.isFetching);
 

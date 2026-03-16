@@ -19,6 +19,7 @@ import {
   YAxis,
 } from 'recharts';
 import { api } from '@/services/api';
+import { useEnv } from '@/contexts/EnvContext';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -94,6 +95,7 @@ function SortIcon({ col, active, order }: { col: string; active: string; order: 
 }
 
 export default function RankingPage() {
+  const { env } = useEnv();
   const [sortKey, setSortKey]       = useState<keyof ShipListItem>('scm_speed');
   const [order, setOrder]           = useState<'asc' | 'desc'>('desc');
   const [vehicleCat, setVehicleCat] = useState('ship');
@@ -101,8 +103,8 @@ export default function RankingPage() {
   const [viewMode, setViewMode]     = useState<'table' | 'chart'>('table');
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['ships.ranking', sortKey, order, vehicleCat],
-    queryFn: () => api.ships.ranking(String(sortKey), order, vehicleCat),
+    queryKey: ['ships.ranking', sortKey, order, vehicleCat, env],
+    queryFn: () => api.ships.ranking(String(sortKey), order, vehicleCat, env),
     staleTime: 5 * 60_000,
   });
 

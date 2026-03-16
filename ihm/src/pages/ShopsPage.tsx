@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { MapPin, ShoppingBag } from 'lucide-react';
 import { api } from '@/services/api';
+import { useEnv } from '@/contexts/EnvContext';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -10,9 +11,10 @@ import type { Shop } from '@/types/api';
 import { motion } from 'framer-motion';
 
 export default function ShopsPage() {
+  const { env } = useEnv();
   const { data: shops, isLoading, error, refetch } = useQuery({
-    queryKey: ['shops.list'],
-    queryFn: () => api.shops.list(),
+    queryKey: ['shops.list', env],
+    queryFn: () => api.shops.list({ env }),
   });
 
   if (isLoading) return <LoadingGrid message="LOADING SHOPS…" />;

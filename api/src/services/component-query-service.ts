@@ -8,6 +8,7 @@ export class ComponentQueryService {
   constructor(private prisma: PrismaClient) {}
 
   async getAllComponents(filters?: {
+    env?: string;
     type?: string;
     sub_type?: string;
     size?: string;
@@ -21,8 +22,9 @@ export class ComponentQueryService {
     page?: number;
     limit?: number;
   }): Promise<PaginatedResult> {
-    const where: string[] = [];
-    const params: (string | number)[] = [];
+    const env = filters?.env ?? 'live';
+    const where: string[] = ['c.game_env = ?'];
+    const params: (string | number)[] = [env];
 
     if (filters?.type) {
       where.push('c.type = ?');
@@ -65,28 +67,30 @@ export class ComponentQueryService {
     return paginate(this.prisma, baseSql, countSql, params, filters || {}, COMP_SORT, 'c');
   }
 
-  async getComponentByUuid(uuid: string): Promise<Row | null> {
+  async getComponentByUuid(uuid: string, env = 'live'): Promise<Row | null> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-      'SELECT c.*, m.name as manufacturer_name FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code WHERE c.uuid = ?',
+      'SELECT c.*, m.name as manufacturer_name FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code WHERE c.uuid = ? AND c.game_env = ?',
       uuid,
+      env,
     );
     return rows[0] || null;
   }
 
-  async getComponentByClassName(className: string): Promise<Row | null> {
+  async getComponentByClassName(className: string, env = 'live'): Promise<Row | null> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-      'SELECT c.*, m.name as manufacturer_name FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code WHERE c.class_name = ?',
+      'SELECT c.*, m.name as manufacturer_name FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code WHERE c.class_name = ? AND c.game_env = ?',
       className,
+      env,
     );
     return rows[0] || null;
   }
 
   /** Resolve UUID or class_name → component */
-  async resolveComponent(id: string): Promise<Row | null> {
-    return id.length === 36 ? await this.getComponentByUuid(id) : await this.getComponentByClassName(id);
+  async resolveComponent(id: string, env = 'live'): Promise<Row | null> {
+    return id.length === 36 ? await this.getComponentByUuid(id, env) : await this.getComponentByClassName(id, env);
   }
 
-  async getComponentFilters(): Promise<{
+  async getComponentFilters(env = 'live'): Promise<{
     types: string[];
     sub_types: string[];
     sizes: number[];
@@ -94,14 +98,16 @@ export class ComponentQueryService {
     manufacturers: string[];
   }> {
     const [typeRows, subTypeRows, sizeRows, gradeRows, mfrRows] = await Promise.all([
-      this.prisma.$queryRawUnsafe<Row[]>("SELECT DISTINCT type FROM components WHERE type IS NOT NULL AND type != '' ORDER BY type"),
+      this.prisma.$queryRawUnsafe<Row[]>("SELECT DISTINCT type FROM components WHERE type IS NOT NULL AND type != '' AND game_env = ? ORDER BY type", env),
       this.prisma.$queryRawUnsafe<Row[]>(
-        "SELECT DISTINCT sub_type FROM components WHERE sub_type IS NOT NULL AND sub_type != '' ORDER BY sub_type",
+        "SELECT DISTINCT sub_type FROM components WHERE sub_type IS NOT NULL AND sub_type != '' AND game_env = ? ORDER BY sub_type",
+        env,
       ),
-      this.prisma.$queryRawUnsafe<Row[]>('SELECT DISTINCT size FROM components ORDER BY size'),
-      this.prisma.$queryRawUnsafe<Row[]>("SELECT DISTINCT grade FROM components WHERE grade IS NOT NULL AND grade != '' ORDER BY grade"),
+      this.prisma.$queryRawUnsafe<Row[]>('SELECT DISTINCT size FROM components WHERE game_env = ? ORDER BY size', env),
+      this.prisma.$queryRawUnsafe<Row[]>("SELECT DISTINCT grade FROM components WHERE grade IS NOT NULL AND grade != '' AND game_env = ? ORDER BY grade", env),
       this.prisma.$queryRawUnsafe<Row[]>(
-        "SELECT DISTINCT manufacturer_code FROM components WHERE manufacturer_code IS NOT NULL AND manufacturer_code != '' ORDER BY manufacturer_code",
+        "SELECT DISTINCT manufacturer_code FROM components WHERE manufacturer_code IS NOT NULL AND manufacturer_code != '' AND game_env = ? ORDER BY manufacturer_code",
+        env,
       ),
     ]);
     return {
@@ -113,13 +119,14 @@ export class ComponentQueryService {
     };
   }
 
-  async getComponentBuyLocations(uuid: string): Promise<Row[]> {
+  async getComponentBuyLocations(uuid: string, env = 'live'): Promise<Row[]> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT s.name as shop_name, s.location, s.planet_moon, s.shop_type,
               si.base_price, si.rental_price_1d, si.rental_price_3d, si.rental_price_7d, si.rental_price_30d
        FROM shop_inventory si JOIN shops s ON si.shop_id = s.id
-       WHERE si.component_uuid = ? ORDER BY si.base_price`,
+       WHERE si.component_uuid = ? AND si.game_env = ? ORDER BY si.base_price`,
       uuid,
+      env,
     );
     return rows;
   }
@@ -148,6 +155,7 @@ export class ComponentQueryService {
    * Used by the Ship Outfitter to populate the component picker.
    */
   async getCompatibleComponents(opts: {
+    env?: string;
     type?: string;
     min_size?: number;
     max_size?: number;
@@ -156,8 +164,9 @@ export class ComponentQueryService {
     order?: string;
     limit?: number;
   }): Promise<Row[]> {
-    const where: string[] = [];
-    const params: (string | number)[] = [];
+    const env = opts.env ?? 'live';
+    const where: string[] = ['c.game_env = ?'];
+    const params: (string | number)[] = [env];
 
     if (opts.type) {
       where.push('c.type = ?');

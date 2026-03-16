@@ -22,7 +22,7 @@ export class LoadoutService {
 
   // ── Read loadout / modules / paints ─────────────────────
 
-  async getShipLoadout(shipUuid: string): Promise<Row[]> {
+  async getShipLoadout(shipUuid: string, env = 'live'): Promise<Row[]> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT sl.id, sl.port_name, sl.port_type, sl.component_class_name, sl.component_uuid,
               sl.port_min_size, sl.port_max_size, sl.parent_id,
@@ -38,14 +38,15 @@ export class LoadoutService {
               c.rack_count, c.rack_missile_size,
               c.cm_ammo_count,
               c.radar_range, c.radar_detection_lifetime, c.radar_tracking_signal
-       FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
-       WHERE sl.ship_uuid = ? ORDER BY sl.port_type, sl.port_name`,
+       FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid AND c.game_env = sl.game_env
+       WHERE sl.ship_uuid = ? AND sl.game_env = ? ORDER BY sl.port_type, sl.port_name`,
       shipUuid,
+      env,
     );
     return rows as Row[];
   }
 
-  async getShipModules(shipUuid: string): Promise<Row[]> {
+  async getShipModules(shipUuid: string, env = 'live'): Promise<Row[]> {
     const NOISE_PATTERNS = [
       'cargogrid_module',
       'pdc_aimodule',
@@ -58,8 +59,9 @@ export class LoadoutService {
     ];
     const noiseClauses = NOISE_PATTERNS.map((p) => `slot_name NOT LIKE '%${p}%'`).join(' AND ');
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-      `SELECT * FROM ship_modules WHERE ship_uuid = ? AND ${noiseClauses} ORDER BY slot_name`,
+      `SELECT * FROM ship_modules WHERE ship_uuid = ? AND game_env = ? AND ${noiseClauses} ORDER BY slot_name`,
       shipUuid,
+      env,
     );
     // MySQL returns JSON columns as strings — parse them so the API sends proper objects
     return (rows as Record<string, unknown>[]).map((row) => ({
@@ -68,10 +70,11 @@ export class LoadoutService {
     })) as unknown as Row[];
   }
 
-  async getShipPaints(shipUuid: string): Promise<Row[]> {
+  async getShipPaints(shipUuid: string, env = 'live'): Promise<Row[]> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-      'SELECT paint_class_name, paint_name, paint_uuid FROM ship_paints WHERE ship_uuid = ? ORDER BY paint_name',
+      'SELECT paint_class_name, paint_name, paint_uuid FROM ship_paints WHERE ship_uuid = ? AND game_env = ? ORDER BY paint_name',
       shipUuid,
+      env,
     );
     return rows;
   }
@@ -246,10 +249,11 @@ export class LoadoutService {
 
   // ── Ship Stats (standalone, without loadout calculator overhead) ──
 
-  async getShipStats(shipUuid: string): Promise<Record<string, unknown> | null> {
+  async getShipStats(shipUuid: string, env = 'live'): Promise<Record<string, unknown> | null> {
     const shipRows = await this.prisma.$queryRawUnsafe<Row[]>(
-      'SELECT s.*, COALESCE(sm.name, s.name) as display_name FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE s.uuid = ?',
+      'SELECT s.*, COALESCE(sm.name, s.name) as display_name FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE s.uuid = ? AND s.game_env = ?',
       shipUuid,
+      env,
     );
     if (!shipRows.length) return null;
     const ship = shipRows[0];
@@ -273,9 +277,10 @@ export class LoadoutService {
       `SELECT sl.id, sl.port_name, sl.port_type, sl.port_min_size, sl.port_max_size,
               sl.parent_id, sl.component_uuid, sl.component_class_name, sl.port_editable,
               c.*
-       FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
-       WHERE sl.ship_uuid = ?`,
+       FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid AND c.game_env = sl.game_env
+       WHERE sl.ship_uuid = ? AND sl.game_env = ?`,
       shipUuid,
+      env,
     );
 
     return {
@@ -286,17 +291,18 @@ export class LoadoutService {
 
   // ── Ship Hardpoints (standalone, no stat aggregation) ───
 
-  async getShipHardpoints(shipUuid: string): Promise<Record<string, unknown>[] | null> {
-    const shipRows = await this.prisma.$queryRawUnsafe<Row[]>('SELECT uuid FROM ships WHERE uuid = ?', shipUuid);
+  async getShipHardpoints(shipUuid: string, env = 'live'): Promise<Record<string, unknown>[] | null> {
+    const shipRows = await this.prisma.$queryRawUnsafe<Row[]>('SELECT uuid FROM ships WHERE uuid = ? AND game_env = ?', shipUuid, env);
     if (!shipRows.length) return null;
 
     const loadoutRows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT sl.id, sl.port_name, sl.port_type, sl.port_min_size, sl.port_max_size,
               sl.parent_id, sl.component_uuid, sl.component_class_name, sl.port_editable,
               c.*
-       FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
-       WHERE sl.ship_uuid = ?`,
+       FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid AND c.game_env = sl.game_env
+       WHERE sl.ship_uuid = ? AND sl.game_env = ?`,
       shipUuid,
+      env,
     );
 
     return this.buildHardpoints(loadoutRows as Row[]);

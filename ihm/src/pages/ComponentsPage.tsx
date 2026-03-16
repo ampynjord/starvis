@@ -3,6 +3,7 @@ import { Search } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/services/api';
+import { useEnv } from '@/contexts/EnvContext';
 import { FilterPanel } from '@/components/ui/FilterPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { Pagination } from '@/components/ui/Pagination';
@@ -16,6 +17,7 @@ import { motion } from 'framer-motion';
 const LIMIT = 30;
 
 export default function ComponentsPage() {
+  const { env } = useEnv();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [type, setType] = useState('');
@@ -25,13 +27,14 @@ export default function ComponentsPage() {
   const debouncedSearch = useDebounce(search, 350);
 
   const { data: filters } = useQuery({
-    queryKey: ['components.filters'],
-    queryFn: api.components.filters,
+    queryKey: ['components.filters', env],
+    queryFn: () => api.components.filters(env),
     staleTime: Infinity,
   });
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['components.list', { page, search: debouncedSearch, type, size, grade, manufacturer }],
+    queryKey: ['components.list', env, { page, search: debouncedSearch, type, size, grade, manufacturer }],
     queryFn: () => api.components.list({
+      env,
       page, limit: LIMIT,
       search: debouncedSearch || undefined,
       type: type || undefined,

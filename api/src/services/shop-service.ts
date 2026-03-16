@@ -7,9 +7,10 @@ import type { PaginatedResult, Row } from './shared.js';
 export class ShopService {
   constructor(private prisma: PrismaClient) {}
 
-  async getShops(opts: { page?: number; limit?: number; location?: string; type?: string; search?: string }): Promise<PaginatedResult> {
-    const where: string[] = [];
-    const params: (string | number)[] = [];
+  async getShops(opts: { env?: string; page?: number; limit?: number; location?: string; type?: string; search?: string }): Promise<PaginatedResult> {
+    const env = opts.env ?? 'live';
+    const where: string[] = ['game_env = ?'];
+    const params: (string | number)[] = [env];
 
     if (opts.search) {
       where.push('(name LIKE ? OR location LIKE ? OR planet_moon LIKE ? OR city LIKE ?)');
@@ -41,12 +42,13 @@ export class ShopService {
     return { data: rows, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
-  async getShopInventory(shopId: number): Promise<Row[]> {
+  async getShopInventory(shopId: number, env = 'live'): Promise<Row[]> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT si.*, c.name as component_name, c.type as component_type, c.size as component_size
-       FROM shop_inventory si LEFT JOIN components c ON si.component_uuid = c.uuid
-       WHERE si.shop_id = ? ORDER BY c.type, c.name`,
+       FROM shop_inventory si LEFT JOIN components c ON si.component_uuid = c.uuid AND c.game_env = si.game_env
+       WHERE si.shop_id = ? AND si.game_env = ? ORDER BY c.type, c.name`,
       shopId,
+      env,
     );
     return rows;
   }

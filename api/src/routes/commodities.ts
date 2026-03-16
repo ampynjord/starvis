@@ -42,7 +42,8 @@ export function mountCommodityRoutes(router: Router, deps: RouteDependencies): v
     '/api/v1/commodities/:uuid',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const commodity = await gameDataService!.commodities.getCommodityByUuid(req.params.uuid);
+      const env = String(req.query.env ?? 'live');
+      const commodity = await gameDataService!.commodities.getCommodityByUuid(req.params.uuid, env);
       if (!commodity) return void res.status(404).json({ success: false, error: 'Commodity not found' });
       sendWithETag(req, res, { success: true, data: commodity });
     }),

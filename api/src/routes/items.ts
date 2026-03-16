@@ -51,7 +51,8 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
     '/api/v1/items/:uuid',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const item = await gameDataService!.items.resolveItem(req.params.uuid);
+      const env = String(req.query.env ?? 'live');
+      const item = await gameDataService!.items.resolveItem(req.params.uuid, env);
       if (!item) return void res.status(404).json({ success: false, error: 'Item not found' });
       sendWithETag(req, res, { success: true, data: item });
     }),
@@ -61,7 +62,8 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
     '/api/v1/items/:uuid/buy-locations',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const item = await gameDataService!.items.resolveItem(req.params.uuid);
+      const env = String(req.query.env ?? 'live');
+      const item = await gameDataService!.items.resolveItem(req.params.uuid, env);
       if (!item) return void res.status(404).json({ success: false, error: 'Item not found' });
       const data = await gameDataService!.items.getItemBuyLocations(String(item.uuid));
       sendWithETag(req, res, { success: true, count: data.length, data });
