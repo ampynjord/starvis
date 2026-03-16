@@ -12,10 +12,7 @@ import { z } from 'zod';
 export const qStr = z.preprocess((v) => (Array.isArray(v) ? v[0] : v) || undefined, z.string().max(200).optional());
 
 /** Coerce env query param → validated GameEnv string, defaults to 'live' */
-export const qEnv = z.preprocess(
-  (v) => (Array.isArray(v) ? v[0] : v) || 'live',
-  z.enum(['live', 'ptu', 'eptu', 'custom']).catch('live'),
-);
+export const qEnv = z.preprocess((v) => (Array.isArray(v) ? v[0] : v) || 'live', z.enum(['live', 'ptu', 'eptu', 'custom']).catch('live'));
 
 export const qInt = (def: number, max?: number) =>
   z.preprocess(
