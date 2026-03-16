@@ -17,7 +17,7 @@ import {
 import { classifyPort, type DataForgeService, MANUFACTURER_CODES } from './dataforge-service.js';
 import { LocalizationService } from './localization-service.js';
 import logger from './logger.js';
-import { extractMiningElements, extractMiningCompositions } from './mining-extractor.js';
+import { extractMiningCompositions, extractMiningElements } from './mining-extractor.js';
 
 export interface ExtractionStats {
   manufacturers: number;
@@ -1513,9 +1513,7 @@ export class ExtractionService {
     conn: PoolConnection,
     onProgress?: (msg: string) => void,
   ): Promise<{ elements: number; compositions: number }> {
-    const locAdapter = this.locService.isLoaded
-      ? { resolve: (k: string) => this.locService.resolveKey(k) ?? null }
-      : undefined;
+    const locAdapter = this.locService.isLoaded ? { resolve: (k: string) => this.locService.resolveKey(k) ?? null } : undefined;
 
     const elements = extractMiningElements(this.dfService, locAdapter);
     const compositions = extractMiningCompositions(this.dfService, elements, locAdapter);
@@ -1527,10 +1525,17 @@ export class ExtractionService {
 
     // ── Save elements ──
     const elemRows = elements.map((e) => [
-      e.uuid, e.className, e.name, e.commodityUuid,
-      e.instability, e.resistance,
-      e.optimalWindowMidpoint, e.optimalWindowMidpointRand,
-      e.optimalWindowThinness, e.explosionMultiplier, e.clusterFactor,
+      e.uuid,
+      e.className,
+      e.name,
+      e.commodityUuid,
+      e.instability,
+      e.resistance,
+      e.optimalWindowMidpoint,
+      e.optimalWindowMidpointRand,
+      e.optimalWindowThinness,
+      e.explosionMultiplier,
+      e.clusterFactor,
     ]);
     const savedElements = await ExtractionService.batchUpsert(
       conn,
@@ -1552,9 +1557,7 @@ export class ExtractionService {
     );
 
     // ── Save compositions (parent rows first) ──
-    const compRows = compositions.map((c) => [
-      c.uuid, c.className, c.depositName, c.minDistinctElements,
-    ]);
+    const compRows = compositions.map((c) => [c.uuid, c.className, c.depositName, c.minDistinctElements]);
     await ExtractionService.batchUpsert(
       conn,
       `INSERT INTO mining_compositions (uuid, class_name, deposit_name, min_distinct_elements) VALUES`,
@@ -1567,11 +1570,7 @@ export class ExtractionService {
     const partRows: (string | number | null)[][] = [];
     for (const comp of compositions) {
       for (const part of comp.parts) {
-        partRows.push([
-          comp.uuid, part.elementUuid,
-          part.minPercentage, part.maxPercentage,
-          part.probability, part.curveExponent,
-        ]);
+        partRows.push([comp.uuid, part.elementUuid, part.minPercentage, part.maxPercentage, part.probability, part.curveExponent]);
       }
     }
     if (partRows.length > 0) {
@@ -1588,9 +1587,7 @@ export class ExtractionService {
       );
     }
 
-    onProgress?.(
-      `Mining: ${savedElements} elements, ${compositions.length} compositions, ${partRows.length} parts`,
-    );
+    onProgress?.(`Mining: ${savedElements} elements, ${compositions.length} compositions, ${partRows.length} parts`);
     return { elements: savedElements, compositions: compositions.length };
   }
 }
