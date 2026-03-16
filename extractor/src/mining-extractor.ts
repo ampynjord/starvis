@@ -57,10 +57,7 @@ function locKey(raw: string | null | undefined): string | null {
 
 // ── MineableElement extraction ────────────────────────────────
 
-export function extractMiningElements(
-  ctx: DataForgeContext,
-  locService?: { resolve(key: string): string | null },
-): MiningElement[] {
+export function extractMiningElements(ctx: DataForgeContext, locService?: { resolve(key: string): string | null }): MiningElement[] {
   const dfData = ctx.getDfData();
   if (!dfData) return [];
 
@@ -88,7 +85,10 @@ export function extractMiningElements(
       }
 
       // Derive element name from class_name: "MineableElement.Copper_Ore" → "Copper Ore"
-      const rawName = r.name.replace(/^MineableElement\./i, '').replace(/_/g, ' ').replace(/\s+Ore$/i, ' Ore');
+      const rawName = r.name
+        .replace(/^MineableElement\./i, '')
+        .replace(/_/g, ' ')
+        .replace(/\s+Ore$/i, ' Ore');
 
       results.push({
         uuid: r.id,
