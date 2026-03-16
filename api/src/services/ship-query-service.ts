@@ -194,8 +194,14 @@ export class ShipQueryService {
          ORDER BY name`,
         env,
       ),
-      this.prisma.$queryRawUnsafe<Row[]>("SELECT DISTINCT role FROM ships WHERE role IS NOT NULL AND role != '' AND game_env = ? ORDER BY role", env),
-      this.prisma.$queryRawUnsafe<Row[]>("SELECT DISTINCT career FROM ships WHERE career IS NOT NULL AND career != '' AND game_env = ? ORDER BY career", env),
+      this.prisma.$queryRawUnsafe<Row[]>(
+        "SELECT DISTINCT role FROM ships WHERE role IS NOT NULL AND role != '' AND game_env = ? ORDER BY role",
+        env,
+      ),
+      this.prisma.$queryRawUnsafe<Row[]>(
+        "SELECT DISTINCT career FROM ships WHERE career IS NOT NULL AND career != '' AND game_env = ? ORDER BY career",
+        env,
+      ),
       this.prisma.$queryRawUnsafe<Row[]>(
         "SELECT DISTINCT variant_type FROM ships WHERE variant_type IS NOT NULL AND variant_type != '' AND game_env = ? ORDER BY variant_type",
         env,

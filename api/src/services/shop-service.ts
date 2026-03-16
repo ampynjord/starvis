@@ -7,7 +7,14 @@ import type { PaginatedResult, Row } from './shared.js';
 export class ShopService {
   constructor(private prisma: PrismaClient) {}
 
-  async getShops(opts: { env?: string; page?: number; limit?: number; location?: string; type?: string; search?: string }): Promise<PaginatedResult> {
+  async getShops(opts: {
+    env?: string;
+    page?: number;
+    limit?: number;
+    location?: string;
+    type?: string;
+    search?: string;
+  }): Promise<PaginatedResult> {
     const env = opts.env ?? 'live';
     const where: string[] = ['game_env = ?'];
     const params: (string | number)[] = [env];

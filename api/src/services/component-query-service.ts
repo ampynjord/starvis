@@ -98,13 +98,19 @@ export class ComponentQueryService {
     manufacturers: string[];
   }> {
     const [typeRows, subTypeRows, sizeRows, gradeRows, mfrRows] = await Promise.all([
-      this.prisma.$queryRawUnsafe<Row[]>("SELECT DISTINCT type FROM components WHERE type IS NOT NULL AND type != '' AND game_env = ? ORDER BY type", env),
+      this.prisma.$queryRawUnsafe<Row[]>(
+        "SELECT DISTINCT type FROM components WHERE type IS NOT NULL AND type != '' AND game_env = ? ORDER BY type",
+        env,
+      ),
       this.prisma.$queryRawUnsafe<Row[]>(
         "SELECT DISTINCT sub_type FROM components WHERE sub_type IS NOT NULL AND sub_type != '' AND game_env = ? ORDER BY sub_type",
         env,
       ),
       this.prisma.$queryRawUnsafe<Row[]>('SELECT DISTINCT size FROM components WHERE game_env = ? ORDER BY size', env),
-      this.prisma.$queryRawUnsafe<Row[]>("SELECT DISTINCT grade FROM components WHERE grade IS NOT NULL AND grade != '' AND game_env = ? ORDER BY grade", env),
+      this.prisma.$queryRawUnsafe<Row[]>(
+        "SELECT DISTINCT grade FROM components WHERE grade IS NOT NULL AND grade != '' AND game_env = ? ORDER BY grade",
+        env,
+      ),
       this.prisma.$queryRawUnsafe<Row[]>(
         "SELECT DISTINCT manufacturer_code FROM components WHERE manufacturer_code IS NOT NULL AND manufacturer_code != '' AND game_env = ? ORDER BY manufacturer_code",
         env,
