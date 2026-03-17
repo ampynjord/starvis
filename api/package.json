@@ -66,6 +66,7 @@
     "@vitest/coverage-v8": "^4.0.18",
     "husky": "^9.1.7",
     "lint-staged": "^16.3.3",
+    "magicast": "^0.3.5",
     "prisma": "^6.19.2",
     "swagger-cli": "^4.0.4",
     "typescript": "^5.3.3",
