@@ -137,6 +137,7 @@ export const api = {
       limit?: number;
       search?: string;
       type?: string;
+      types?: string;
       sub_type?: string;
       size?: number;
       grade?: string;
