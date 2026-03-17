@@ -52,7 +52,10 @@ function deriveMissionType(className: string): string {
 
 function isLocEmpty(s: string | null | undefined): boolean {
   if (!s) return true;
-  return s.startsWith('@LOC_UNINIT') || s === '@LOC_EMPTY' || s === '@LOC_' || s.startsWith('@LOC_UNINITIALIZED');
+  if (s.startsWith('@LOC_UNINIT') || s === '@LOC_EMPTY' || s === '@LOC_') return true;
+  // Also catch the resolved placeholder string from global.ini
+  const t = s.trim();
+  return t.includes('UNINITIALIZED') || t === '<= UNINITIALIZED =>' || t.startsWith('<= UNINITIALIZED');
 }
 
 export function extractMissions(ctx: DataForgeService, locService?: { resolveKey(key: string): string | null }): MissionRecord[] {

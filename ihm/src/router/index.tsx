@@ -23,7 +23,6 @@ const ChangelogPage       = lazy(() => import('@/pages/ChangelogPage'));
 const PaintsPage          = lazy(() => import('@/pages/PaintsPage'));
 const RankingPage         = lazy(() => import('@/pages/RankingPage'));
 const OutfitterPage       = lazy(() => import('@/pages/OutfitterPage'));
-const TradePage           = lazy(() => import('@/pages/TradePage'));
 const MiningPage          = lazy(() => import('@/pages/MiningPage'));
 const MissionsPage        = lazy(() => import('@/pages/MissionsPage'));
 const ResourcesPage       = lazy(() => import('@/pages/ResourcesPage'));
@@ -41,7 +40,6 @@ export const router = createBrowserRouter([
       { path: 'compare',          element: wrap(ComparePage) },
       { path: 'ranking',          element: wrap(RankingPage) },
       { path: 'outfitter',        element: wrap(OutfitterPage) },
-      { path: 'trade',            element: wrap(TradePage) },
       { path: 'mining',           element: wrap(MiningPage) },
       { path: 'missions',         element: wrap(MissionsPage) },
       { path: 'resources',        element: wrap(ResourcesPage) },
