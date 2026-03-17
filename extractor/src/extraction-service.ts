@@ -1652,13 +1652,13 @@ export class ExtractionService {
     const allElements = extractMiningElements(this.dfService, locAdapter);
     // Filter out test/template entries
     const elements = allElements.filter(
-      (e) => !e.className.toLowerCase().includes('test') && !e.name.toLowerCase().includes('template'),
+      (e) => !e.className.toLowerCase().includes('test') && !e.name?.toLowerCase().includes('template'),
     );
 
     const allCompositions = extractMiningCompositions(this.dfService, allElements, locAdapter);
     // Filter out test/template compositions
     const compositions = allCompositions.filter(
-      (c) => !c.className.toLowerCase().includes('test') && !c.depositName.toLowerCase().includes('test'),
+      (c) => !c.className.toLowerCase().includes('test') && !c.depositName?.toLowerCase().includes('test'),
     );
 
     if (!elements.length && !compositions.length) {
