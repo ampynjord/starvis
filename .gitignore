@@ -85,4 +85,6 @@ backups/
 
 # Docs
 docs/
+
+# Virtual environments
 .venv/
