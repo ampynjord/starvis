@@ -291,7 +291,7 @@ jobs:
 
       - name: Docker meta (API)
         id: meta-api
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api
           tags: |
@@ -302,7 +302,7 @@ jobs:
 
       - name: Docker meta (IHM)
         id: meta-ihm
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-ihm
           tags: |
