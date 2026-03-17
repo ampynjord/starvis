@@ -87,8 +87,8 @@ export class ExtractionService {
     if (!rawName) return className;
     // Strip trailing variant numbers like "01 01 01", "03 02 01", "a", etc.
     const stripped = rawName
-      .replace(/(\s+\d{2})+\s*[a-z]?\s*$/i, '')  // " 01 01 01" or " 01 01 01 a"
-      .replace(/\s+[a-z]\s*$/i, '')               // trailing single letter " a"
+      .replace(/(\s+\d{2})+\s*[a-z]?\s*$/i, '') // " 01 01 01" or " 01 01 01 a"
+      .replace(/\s+[a-z]\s*$/i, '') // trailing single letter " a"
       .trim();
     if (!stripped) return rawName;
     // Title-case each word
@@ -1651,9 +1651,7 @@ export class ExtractionService {
 
     const allElements = extractMiningElements(this.dfService, locAdapter);
     // Filter out test/template entries
-    const elements = allElements.filter(
-      (e) => !e.className.toLowerCase().includes('test') && !e.name?.toLowerCase().includes('template'),
-    );
+    const elements = allElements.filter((e) => !e.className.toLowerCase().includes('test') && !e.name?.toLowerCase().includes('template'));
 
     const allCompositions = extractMiningCompositions(this.dfService, allElements, locAdapter);
     // Filter out test/template compositions
