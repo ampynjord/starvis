@@ -160,6 +160,44 @@ describe('ItemQueryService', () => {
       expect(result.types[0]).toEqual({ type: 'WeaponPersonal', count: 42 });
     });
   });
+
+  describe('getAllItems with types filter', () => {
+    it('uses IN clause for multiple types', async () => {
+      const prisma = createMockPrisma([[row({ total: 5 })], []]);
+      const svc = new ItemQueryService(prisma);
+      await svc.getAllItems({ types: 'Armor,Helmet,Undersuit,Clothing' });
+      const countSql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
+      expect(countSql).toContain('IN');
+      const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
+      // params should include all 4 types
+      const paramValues = callArgs.slice(1);
+      expect(paramValues).toContain('Armor');
+      expect(paramValues).toContain('Helmet');
+      expect(paramValues).toContain('Undersuit');
+      expect(paramValues).toContain('Clothing');
+    });
+
+    it('uses = for a single type via types param', async () => {
+      const prisma = createMockPrisma([[row({ total: 3 })], []]);
+      const svc = new ItemQueryService(prisma);
+      await svc.getAllItems({ types: 'WeaponPersonal' });
+      const countSql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
+      expect(countSql).toContain('i.type = ?');
+    });
+
+    it('types param takes priority over type param', async () => {
+      const prisma = createMockPrisma([[row({ total: 2 })], []]);
+      const svc = new ItemQueryService(prisma);
+      await svc.getAllItems({ type: 'Gadget', types: 'Armor,Helmet' });
+      const countSql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
+      expect(countSql).toContain('IN');
+      const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
+      const paramValues = callArgs.slice(1);
+      expect(paramValues).toContain('Armor');
+      expect(paramValues).toContain('Helmet');
+      expect(paramValues).not.toContain('Gadget');
+    });
+  });
 });
 
 // ── GameDataService (cache) ──────────────────────────────
