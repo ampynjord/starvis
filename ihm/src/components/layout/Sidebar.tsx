@@ -37,7 +37,6 @@ const TOOL_ITEMS = [
   { to: '/ranking',   icon: Trophy,            label: 'Ranking' },
   { to: '/compare',   icon: BarChart3,         label: 'Compare' },
   { to: '/outfitter', icon: SlidersHorizontal, label: 'Outfitter' },
-  { to: '/trade',     icon: TrendingUp,        label: 'Trade' },
   { to: '/mining',    icon: Pickaxe,           label: 'Mining' },
 ];
 

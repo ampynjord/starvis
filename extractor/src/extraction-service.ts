@@ -76,6 +76,28 @@ export class ExtractionService {
    * @param batchSize Rows per batch (default: BATCH_SIZE)
    * @returns Number of rows affected
    */
+  /**
+   * Convert a raw lowercase item name from DataForge to a human-readable title.
+   * Examples:
+   *   "fio shoes 01 01 01"  → "FIO Shoes"
+   *   "sc nvy commodore bridgeofficer hat 01 01 01" → "SC NVY Commodore Bridgeofficer Hat"
+   *   "cds combat heavy core 03 02 01" → "CDS Combat Heavy Core"
+   */
+  static titleCaseItemName(rawName: string, className: string): string {
+    if (!rawName) return className;
+    // Strip trailing variant numbers like "01 01 01", "03 02 01", "a", etc.
+    const stripped = rawName
+      .replace(/(\s+\d{2})+\s*[a-z]?\s*$/i, '')  // " 01 01 01" or " 01 01 01 a"
+      .replace(/\s+[a-z]\s*$/i, '')               // trailing single letter " a"
+      .trim();
+    if (!stripped) return rawName;
+    // Title-case each word
+    return stripped
+      .split(' ')
+      .map((w) => (w.length <= 3 ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()))
+      .join(' ');
+  }
+
   static async batchUpsert(
     conn: PoolConnection,
     insertHead: string,
@@ -336,14 +358,14 @@ export class ExtractionService {
         `✅ Extraction complete: ${stats.ships} ships, ${stats.components} components, ${stats.items} items, ${stats.commodities} commodities, ${stats.manufacturers} manufacturers, ${stats.loadoutPorts} loadout ports, ${stats.shops} shops, ${stats.shipMatrixLinked} linked to Ship Matrix, ${stats.miningElements} mining elements, ${stats.miningCompositions} compositions`,
       );
 
-      // ── Sanity check — abort if data dropped by >50% ──
+      // ── Sanity check — abort if data dropped by >50% (only for extracted modules) ──
       const oldCounts = { ships: oldShipsRaw.length, components: oldCompsRaw.length };
       const threshold = 0.5;
       const sanityErrors: string[] = [];
-      if (oldCounts.ships > 20 && stats.ships < oldCounts.ships * threshold) {
+      if (run('ships') && oldCounts.ships > 20 && stats.ships < oldCounts.ships * threshold) {
         sanityErrors.push(`Ships dropped from ${oldCounts.ships} to ${stats.ships}`);
       }
-      if (oldCounts.components > 50 && stats.components < oldCounts.components * threshold) {
+      if (run('components') && oldCounts.components > 50 && stats.components < oldCounts.components * threshold) {
         sanityErrors.push(`Components dropped from ${oldCounts.components} to ${stats.components}`);
       }
       if (sanityErrors.length > 0) {
@@ -1270,6 +1292,29 @@ export class ExtractionService {
     let savedItems = 0;
     let savedCommodities = 0;
 
+    // Apply localization service to resolve human-readable names for items
+    if (this.locService.isLoaded) {
+      for (const it of items) {
+        // Force LOC lookup first (don't rely on resolveOrFallback's "looks clean" bail-out)
+        const locName = this.locService.resolveComponentName(it.className);
+        if (locName) {
+          it.name = locName;
+        } else {
+          // Fallback: title-case the existing lowercase name and expand manufacturer codes
+          it.name = ExtractionService.titleCaseItemName(it.name, it.className);
+        }
+      }
+      for (const cm of commodities) {
+        const locName = this.locService.resolveComponentName(cm.className);
+        if (locName) cm.name = locName;
+        else cm.name = ExtractionService.titleCaseItemName(cm.name, cm.className);
+      }
+    } else {
+      // No localization — still apply title case
+      for (const it of items) it.name = ExtractionService.titleCaseItemName(it.name, it.className);
+      for (const cm of commodities) cm.name = ExtractionService.titleCaseItemName(cm.name, cm.className);
+    }
+
     // ── Batch upsert items ──
     if (items.length > 0) {
       const ITEM_COLS = [
@@ -1604,8 +1649,17 @@ export class ExtractionService {
   ): Promise<{ elements: number; compositions: number }> {
     const locAdapter = this.locService.isLoaded ? { resolve: (k: string) => this.locService.resolveKey(k) ?? null } : undefined;
 
-    const elements = extractMiningElements(this.dfService, locAdapter);
-    const compositions = extractMiningCompositions(this.dfService, elements, locAdapter);
+    const allElements = extractMiningElements(this.dfService, locAdapter);
+    // Filter out test/template entries
+    const elements = allElements.filter(
+      (e) => !e.className.toLowerCase().includes('test') && !e.name.toLowerCase().includes('template'),
+    );
+
+    const allCompositions = extractMiningCompositions(this.dfService, allElements, locAdapter);
+    // Filter out test/template compositions
+    const compositions = allCompositions.filter(
+      (c) => !c.className.toLowerCase().includes('test') && !c.depositName.toLowerCase().includes('test'),
+    );
 
     if (!elements.length && !compositions.length) {
       onProgress?.('Mining: no data found in DataForge');

@@ -88,6 +88,7 @@ model Manufacturer {
 
 model Ship {
   uuid                  String   @id @db.Char(36)
+  gameEnv               String   @default("live") @map("game_env") @db.VarChar(10)
   className             String   @map("class_name") @db.VarChar(255)
   name                  String?  @db.VarChar(255)
   manufacturerCode      String?  @map("manufacturer_code") @db.VarChar(10)
@@ -149,11 +150,13 @@ model Ship {
 
   @@index([manufacturerCode], map: "idx_ship_manufacturer_code")
   @@index([shipMatrixId], map: "idx_ship_matrix_id")
+  @@index([gameEnv], map: "idx_game_env")
   @@map("ships")
 }
 
 model Component {
   uuid                    String   @id @db.Char(36)
+  gameEnv                 String   @default("live") @map("game_env") @db.VarChar(10)
   className               String   @map("class_name") @db.VarChar(255)
   name                    String   @db.VarChar(255)
   type                    String   @db.VarChar(50)
@@ -251,12 +254,14 @@ model Component {
   @@index([manufacturerCode], map: "idx_component_manufacturer_code")
   @@index([type], map: "idx_component_type")
   @@index([subType], map: "idx_component_sub_type")
+  @@index([gameEnv], map: "idx_game_env")
   @@map("components")
 }
 
 model ShipLoadout {
   id                 Int     @id @default(autoincrement())
   shipUuid           String  @map("ship_uuid") @db.Char(36)
+  gameEnv            String  @default("live") @map("game_env") @db.VarChar(10)
   portName           String  @map("port_name") @db.VarChar(100)
   portMinSize        Int?    @map("port_min_size") @db.UnsignedTinyInt
   portMaxSize        Int?    @map("port_max_size") @db.UnsignedTinyInt
@@ -278,6 +283,7 @@ model ShipLoadout {
 model ShipModule {
   id              Int     @id @default(autoincrement())
   shipUuid        String  @map("ship_uuid") @db.Char(36)
+  gameEnv         String  @default("live") @map("game_env") @db.VarChar(10)
   slotName        String  @map("slot_name") @db.VarChar(100)
   slotDisplayName String? @map("slot_display_name") @db.VarChar(100)
   slotType        String? @map("slot_type") @db.VarChar(20)
@@ -297,6 +303,7 @@ model ShipModule {
 model ShipPaint {
   id             Int     @id @default(autoincrement())
   shipUuid       String  @map("ship_uuid") @db.Char(36)
+  gameEnv        String  @default("live") @map("game_env") @db.VarChar(10)
   paintClassName String  @map("paint_class_name") @db.VarChar(255)
   paintName      String? @map("paint_name") @db.VarChar(255)
   paintUuid      String? @map("paint_uuid") @db.Char(36)
@@ -310,6 +317,7 @@ model ShipPaint {
 
 model Item {
   uuid                 String   @id @db.Char(36)
+  gameEnv              String   @default("live") @map("game_env") @db.VarChar(10)
   className            String   @map("class_name") @db.VarChar(255)
   name                 String   @db.VarChar(255)
   type                 String   @db.VarChar(50)
@@ -333,11 +341,13 @@ model Item {
   createdAt            DateTime @default(now()) @map("created_at") @db.DateTime(0)
   updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
 
+  @@index([gameEnv], map: "idx_game_env")
   @@map("items")
 }
 
 model Commodity {
   uuid         String   @id @db.Char(36)
+  gameEnv      String   @default("live") @map("game_env") @db.VarChar(10)
   className    String   @map("class_name") @db.VarChar(255)
   name         String   @db.VarChar(255)
   type         String   @db.VarChar(50)
@@ -348,13 +358,15 @@ model Commodity {
   createdAt    DateTime @default(now()) @map("created_at") @db.DateTime(0)
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
 
+  @@index([gameEnv], map: "idx_game_env")
   @@map("commodities")
 }
 
 model Shop {
   id         Int      @id @default(autoincrement())
   name       String   @db.VarChar(255)
-  className  String   @unique @map("class_name") @db.VarChar(255)
+  className  String   @map("class_name") @db.VarChar(255)
+  gameEnv    String   @default("live") @map("game_env") @db.VarChar(10)
   location   String?  @db.VarChar(255)
   system     String?  @db.VarChar(50)
   planetMoon String?  @map("planet_moon") @db.VarChar(100)
@@ -366,12 +378,14 @@ model Shop {
   // Relations
   inventory ShopInventory[]
 
+  @@unique([className, gameEnv], map: "uk_shop_class_env")
   @@map("shops")
 }
 
 model ShopInventory {
   id                 Int      @id @default(autoincrement())
   shopId             Int      @map("shop_id")
+  gameEnv            String   @default("live") @map("game_env") @db.VarChar(10)
   componentUuid      String?  @map("component_uuid") @db.Char(36)
   componentClassName String   @map("component_class_name") @db.VarChar(255)
   basePrice          Decimal? @map("base_price") @db.Decimal(12, 2)
@@ -407,11 +421,13 @@ model ExtractionLog {
   status             ExtractionStatus @default(success)
   errorMessage       String?          @map("error_message") @db.Text
   extractedAt        DateTime         @default(now()) @map("extracted_at") @db.DateTime(0)
+  gameEnv            String           @default("live") @map("game_env") @db.VarChar(10)
 
   // Relations
   changelogs Changelog[]
 
   @@index([extractionHash], map: "idx_extraction_hash")
+  @@index([gameEnv], map: "idx_game_env")
   @@map("extraction_log")
 }
 
@@ -436,8 +452,9 @@ model Changelog {
 }
 
 model MiningElement {
-  uuid                       String  @id @db.Char(36)
-  className                  String  @unique @map("class_name") @db.VarChar(255)
+  uuid                       String   @id @db.Char(36)
+  gameEnv                    String   @default("live") @map("game_env") @db.VarChar(10)
+  className                  String   @map("class_name") @db.VarChar(255)
   name                       String? @db.VarChar(255)
   commodityUuid              String? @map("commodity_uuid") @db.Char(36)
   instability                Decimal? @db.Decimal(8, 2)
@@ -450,17 +467,20 @@ model MiningElement {
 
   compositionParts MiningCompositionPart[]
 
+  @@index([gameEnv], map: "idx_game_env")
   @@map("mining_elements")
 }
 
 model MiningComposition {
   uuid                  String  @id @db.Char(36)
-  className             String  @unique @map("class_name") @db.VarChar(255)
+  gameEnv               String  @default("live") @map("game_env") @db.VarChar(10)
+  className             String  @map("class_name") @db.VarChar(255)
   depositName           String? @map("deposit_name") @db.VarChar(255)
   minDistinctElements   Int?    @map("min_distinct_elements")
 
   parts MiningCompositionPart[]
 
+  @@index([gameEnv], map: "idx_game_env")
   @@map("mining_compositions")
 }
 
@@ -468,6 +488,7 @@ model MiningCompositionPart {
   id               Int     @id @default(autoincrement())
   compositionUuid  String  @map("composition_uuid") @db.Char(36)
   elementUuid      String  @map("element_uuid") @db.Char(36)
+  gameEnv          String  @default("live") @map("game_env") @db.VarChar(10)
   minPercentage    Decimal? @map("min_percentage") @db.Decimal(6, 2)
   maxPercentage    Decimal? @map("max_percentage") @db.Decimal(6, 2)
   probability      Decimal? @db.Decimal(6, 4)
