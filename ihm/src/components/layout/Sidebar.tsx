@@ -12,7 +12,6 @@ import {
   Settings2,
   ShoppingBag,
   SlidersHorizontal,
-  TrendingUp,
   Trophy,
   Wrench,
   ClipboardList,

@@ -3,7 +3,6 @@ import type {
   ChangelogEntry,
   ChangelogSummary,
   Commodity,
-  CommodityPrice,
   CompatibleComponent,
   Component,
   ComponentListItem,
@@ -31,8 +30,6 @@ import type {
   ShipStats,
   Shop,
   StatsOverview,
-  TradeLocation,
-  TradeRoute,
   Version,
 } from '@/types/api';
 import { API_BASE } from '@/utils/constants';
@@ -186,15 +183,6 @@ export const api = {
     list: (p: { limit?: number; offset?: number; entity_type?: string; change_type?: string }) =>
       get<{ data: ChangelogEntry[]; total: number }>('/changelog', p),
     summary: () => get<ChangelogSummary>('/changelog/summary'),
-  },
-
-  // ─── Trade ─────────────────────────────────────────────────────────
-  trade: {
-    prices: (opts?: { commodity_uuid?: string; system?: string }) =>
-      get<CommodityPrice[]>('/trade/prices', opts as Record<string, string | undefined>),
-    routes: (opts?: { cargo_scu?: number; system?: string }) =>
-      get<TradeRoute[]>('/trade/routes', opts as Record<string, string | number | undefined>),
-    locations: (system?: string) => get<TradeLocation[]>('/trade/locations', system ? { system } : undefined),
   },
 
   // ─── Loadout simulator ─────────────────────────────────────────────

@@ -489,36 +489,6 @@ export interface CompatibleComponent {
   cooling_rate: number | null;
 }
 
-// ─── Trade routes ─────────────────────────────────────────────────────────────
-export interface TradeRoute {
-  commodity_uuid: string;
-  commodity_name: string;
-  commodity_symbol: string | null;
-  buy_location: string;
-  buy_system: string | null;
-  buy_price: number;
-  sell_location: string;
-  sell_system: string | null;
-  sell_price: number;
-  profit_per_scu: number;
-  total_profit: number;
-}
-
-export interface CommodityPrice {
-  commodity_uuid: string;
-  commodity_name: string;
-  commodity_symbol: string | null;
-  location_name: string;
-  system_name: string | null;
-  buy_price: number | null;
-  sell_price: number | null;
-}
-
-export interface TradeLocation {
-  location_name: string;
-  system_name: string | null;
-}
-
 // ─── Item / Component buy locations (FPS) ─────────────────────────────────────
 export interface ItemBuyLocation {
   shop_id: number;
