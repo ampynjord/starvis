@@ -312,7 +312,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
 
       - name: Build & Push API image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: api/Dockerfile
@@ -324,7 +324,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build & Push IHM image
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ihm
           push: ${{ github.event_name == 'push' }}
