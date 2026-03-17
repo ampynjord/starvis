@@ -85,3 +85,4 @@ backups/
 
 # Docs
 docs/
+.venv/
