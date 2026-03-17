@@ -1,0 +1,15 @@
+# Normalize line endings to LF in Git repository
+* text=auto eol=lf
+
+# Keep binary files as-is
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.pdf binary
+*.p4k binary
