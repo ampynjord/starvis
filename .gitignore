@@ -90,3 +90,7 @@ docs/
 
 # Virtual environments
 .venv/
+
+# Local development files
+docker-compose.simple.yml
+LOCAL_EXECUTION_GUIDE.md
