@@ -80,6 +80,28 @@ test.describe('Ships API', () => {
     expect(data.data).toHaveProperty('class_name');
   });
 
+  test('GET /api/v1/ships default view should exclude non-playable variant types', async ({ request }) => {
+    // The default ships list should exclude tutorial, enemy_ai, arena_ai, competition variants
+    // so that only player-accessible ships are shown
+    const response = await request.get('/api/v1/ships?limit=200&page=1');
+    expect(response.status()).toBe(200);
+
+    const data = await response.json();
+    expect(data.success).toBe(true);
+    const nonPlayable = ['tutorial', 'enemy_ai', 'arena_ai', 'competition'];
+    const hasNonPlayable = data.data.some((s: any) => nonPlayable.includes(s.variant_type));
+    expect(hasNonPlayable).toBe(false);
+  });
+
+  test('GET /api/v1/ships total and pages are consistent', async ({ request }) => {
+    const response = await request.get('/api/v1/ships?limit=24&page=1');
+    expect(response.status()).toBe(200);
+
+    const data = await response.json();
+    expect(data.success).toBe(true);
+    expect(data.pages).toBe(Math.ceil(data.total / data.limit));
+  });
+
   test('GET /api/v1/ships/:uuid/loadout should return ship loadout', async ({ request }) => {
     test.skip(!!process.env.CI, 'Requires P4K game data, not available in CI environment');
 

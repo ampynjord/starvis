@@ -119,6 +119,7 @@ export const ItemQuery = z
   .object({
     env: qEnv,
     type: qStr,
+    types: qStr,
     sub_type: qStr,
     manufacturer: qStr,
     search: qStr,
