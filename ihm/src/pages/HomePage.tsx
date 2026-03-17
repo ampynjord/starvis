@@ -194,7 +194,7 @@ export default function HomePage() {
         {/* Database navigation */}
         <ScifiPanel title="Database" className="lg:col-span-1">
           <div className="space-y-1">
-            {STAT_CARDS.map(({ to, icon: Icon, label, color }) => (
+            {STAT_CARDS.map(({ key, to, icon: Icon, label, color }) => (
               <Link
                 key={label}
                 to={to}
@@ -253,9 +253,6 @@ export default function HomePage() {
     </div>
   );
 }
-
-
-const STAT_CARDS = [
   { key: 'ships',         label: 'Ships',         icon: Rocket,   color: 'text-cyan-400',   to: '/ships' },
   { key: 'components',    label: 'Components',    icon: Settings2, color: 'text-blue-400',   to: '/components' },
   { key: 'items',         label: 'Items',         icon: Dices,    color: 'text-green-400',  to: '/items' },
