@@ -40,6 +40,9 @@ jobs:
             api/package-lock.json
             extractor/package-lock.json
 
+      - name: Update npm
+        run: npm install -g npm@latest
+
       - name: Install & type-check API
         run: cd api && npm ci && npx tsc --noEmit
 
@@ -123,6 +126,9 @@ jobs:
           cache-dependency-path: |
             api/package-lock.json
             extractor/package-lock.json
+
+      - name: Update npm
+        run: npm install -g npm@latest
 
       - run: cd api && npm ci
 
