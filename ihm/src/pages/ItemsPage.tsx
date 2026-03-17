@@ -48,6 +48,7 @@ export default function ItemsPage() {
   // Effective type filter: chip overrides manual filter
   const chipTypes = CATEGORY_CHIPS[activeCategory]?.types ?? [];
   const effectiveType = chipTypes.length === 1 ? chipTypes[0] : (activeCategory === 0 ? type : '');
+  const effectiveTypes = chipTypes.length > 1 ? chipTypes.join(',') : undefined;
 
   const { data: filters } = useQuery({
     queryKey: ['items.filters'],
@@ -55,20 +56,18 @@ export default function ItemsPage() {
     staleTime: Infinity,
   });
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['items.list', env, { page, search: debouncedSearch, type: effectiveType, manufacturer }],
+    queryKey: ['items.list', env, { page, search: debouncedSearch, type: effectiveType, types: effectiveTypes, manufacturer }],
     queryFn: () => api.items.list({
       env,
       page, limit: LIMIT,
       search: debouncedSearch || undefined,
       type: effectiveType || undefined,
+      types: effectiveTypes,
       manufacturer: manufacturer || undefined,
     }),
   });
 
-  // For multi-type chips (Armor = 4 types), filter client-side from the full "no type" result
-  const displayedData = chipTypes.length > 1
-    ? { ...data, data: (data?.data ?? []).filter((item) => chipTypes.includes(item.type ?? '')) }
-    : data;
+  const displayedData = data;
 
   const hasFilters = !!(effectiveType || manufacturer || debouncedSearch || activeCategory > 0);
   const resetFilters = () => { setType(''); setManufacturer(''); setSearch(''); setPage(1); setActiveCategory(0); };

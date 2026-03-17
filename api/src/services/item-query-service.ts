@@ -29,6 +29,7 @@ export class ItemQueryService {
   async getAllItems(filters?: {
     env?: string;
     type?: string;
+    types?: string;
     sub_type?: string;
     manufacturer?: string;
     search?: string;
@@ -41,7 +42,19 @@ export class ItemQueryService {
     const where: string[] = ['i.game_env = ?'];
     const params: (string | number)[] = [env];
 
-    if (filters?.type) {
+    if (filters?.types) {
+      const typeList = filters.types
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+      if (typeList.length === 1) {
+        where.push('i.type = ?');
+        params.push(typeList[0]);
+      } else if (typeList.length > 1) {
+        where.push(`i.type IN (${typeList.map(() => '?').join(', ')})`);
+        params.push(...typeList);
+      }
+    } else if (filters?.type) {
       where.push('i.type = ?');
       params.push(filters.type);
     }
