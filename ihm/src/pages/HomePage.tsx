@@ -253,7 +253,6 @@ export default function HomePage() {
     </div>
   );
 }
-  { key: 'ships',         label: 'Ships',         icon: Rocket,   color: 'text-cyan-400',   to: '/ships' },
   { key: 'components',    label: 'Components',    icon: Settings2, color: 'text-blue-400',   to: '/components' },
   { key: 'items',         label: 'Items',         icon: Dices,    color: 'text-green-400',  to: '/items' },
   { key: 'manufacturers', label: 'Manufacturers', icon: Wrench,   color: 'text-amber-400',  to: '/manufacturers' },
