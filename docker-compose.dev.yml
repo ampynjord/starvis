@@ -14,7 +14,7 @@ services:
       MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "${DB_EXTERNAL_PORT:-3307}:3306"
+      - "${DB_EXTERNAL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./db:/docker-entrypoint-initdb.d:ro
@@ -29,7 +29,7 @@ services:
     image: redis:7-alpine
     container_name: starvis-redis
     ports:
-      - "${REDIS_EXTERNAL_PORT:-6380}:6379"
+      - "${REDIS_EXTERNAL_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     restart: unless-stopped
@@ -53,7 +53,7 @@ services:
       - api_node_modules:/app/node_modules
       - ./db:/db:ro
     ports:
-      - "${API_PORT:-3003}:3000"
+      - "${API_PORT:-3000}:3000"
     environment:
       NODE_ENV: development
       PORT: 3000

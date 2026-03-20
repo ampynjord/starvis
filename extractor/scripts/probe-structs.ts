@@ -3,7 +3,8 @@
  * les structs liés aux missions, blueprints et ressources minables.
  * Usage: npx tsx scripts/probe-structs.ts --p4k "C:\...\Data.p4k"
  */
-import 'dotenv/config';
+import { config } from 'dotenv';
+config({ path: '.env.extractor' });
 import { DataForgeService } from '../src/dataforge-service.js';
 
 const p4kPath = process.argv[process.argv.indexOf('--p4k') + 1] || process.env.P4K_PATH;
