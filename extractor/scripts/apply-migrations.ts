@@ -9,7 +9,9 @@
  *   DB_HOST=127.0.0.1 DB_PORT=13306 npm run migrate
  */
 import { config } from 'dotenv';
+
 config({ path: '.env.extractor' });
+
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';

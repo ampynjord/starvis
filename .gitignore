@@ -79,9 +79,6 @@ model-cache/
 *.sql.backup
 db-backup/
 
-# Copilot temporary files
-.claude/
-
 # Coverage reports
 coverage/
 .nyc_output/
