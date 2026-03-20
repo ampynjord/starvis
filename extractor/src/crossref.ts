@@ -204,28 +204,35 @@ export async function populateChassisId(conn: PoolConnection): Promise<number> {
 /** Tag variant types for ships not linked to Ship Matrix */
 export async function tagVariantTypes(conn: PoolConnection): Promise<void> {
   const rules: Array<{ type: string; patterns: string[] }> = [
-    // collector: specific limited editions first, then generic _Collector_ pattern
-    // ATLS IKTI variants and Dragonfly Pink are limited DLC editions → collector
-    // 600i Executive Edition is a buyer package, not a PYAM exec reward → collector
+    // collector: true limited/exclusive editions (only 2 today)
     {
       type: 'collector',
       patterns: [
-        '%_ATLS_IKTI%', // ARGO_ATLS_IKTI, ARGO_ATLS_IKTI_ARGOS, ARGO_ATLS_GEO_IKTI
         '%_Executive_Edition', // ORIG_600i_Executive_Edition
-        '%_Dragonfly_Pink', // DRAK_Dragonfly_Pink (limited pink edition)
-        '%_Collector_%',
-        '%_Collector',
+        '%_Dragonfly_Pink', // DRAK_Dragonfly_Pink (Star Kitten)
       ],
     },
-    // pyam_exec: ships rewarded via the PYAM Exec program (Hornet F7A Mk2, Corsair, Cutlass Black, Syulen)
-    // 600i Executive Edition is already caught above as collector and won't match here
-    { type: 'pyam_exec', patterns: ['%_Exec_%', '%_Exec'] },
+    // wikelo: same chassis with alternate loadout/colors (Collector suffix, ATLS IKTI variants)
+    {
+      type: 'wikelo',
+      patterns: [
+        '%_Collector_%',
+        '%_Collector',
+        '%_ATLS_IKTI%', // ARGO_ATLS_IKTI, ARGO_ATLS_IKTI_ARGOS
+        '%_ATLS_GEO_Collector%', // ARGO_ATLS_GEO_Collector_Grad01/02/03
+      ],
+    },
+    // pyam_exec: PYAM Exec program variants + Scorpius Stealth / Ursa Medivac Stealth
+    {
+      type: 'pyam_exec',
+      patterns: ['%_Exec_%', '%_Exec', 'RSI_Scorpius_Stealth', 'RSI_Ursa_Medivac_Stealth'],
+    },
     { type: 'bis_edition', patterns: ['%_BIS%'] },
     { type: 'tutorial', patterns: ['%_Teach%', '%Tutorial%'] },
-    // npc: both enemy AI and pirate ships are NPC-only in gameplay
-    { type: 'npc', patterns: ['%_EA_%', '%_EA', '%_PIR%', '%Pirate%'] },
+    // npc: enemy AI, pirate, and showdown ships — NPC-only, pruned at extraction
+    { type: 'npc', patterns: ['%_EA_%', '%_EA', '%_PIR%', '%Pirate%', '%_Showdown'] },
     { type: 'military', patterns: ['%_Military%', '%_UEE%', '%_Advocacy%'] },
-    { type: 'event', patterns: ['%Fleetweek%', '%_FW%', '%CitizenCon%', '%ShipShowdown%', '%Showdown%'] },
+    { type: 'event', patterns: ['%Fleetweek%', '%_FW%', '%CitizenCon%', '%ShipShowdown%'] },
     { type: 'arena_ai', patterns: ['%_Swarm%'] },
   ];
 
@@ -252,16 +259,17 @@ export async function tagVariantTypes(conn: PoolConnection): Promise<void> {
  *  - special      → miscellaneous one-off ships (NoInterior, Piano, etc.)  already narrowed
  *                   down because ATLS IKTI / Dragonfly Pink were re-tagged as collector
  *  - arena_ai     → swarm AI ships used only in Arena Commander
+ *  - npc          → NPC-only ships (EA, pirate packages, Hammerhead Showdown…)
  *
- * Ships tagged npc, pyam_exec, or collector are kept.
+ * Ships tagged pyam_exec, collector, or wikelo are kept.
  * Cascading FK deletes will clean ship_loadouts, ship_modules, ship_paints automatically.
  */
 export async function pruneExcludedVariants(conn: PoolConnection): Promise<number> {
-  const EXCLUDED = ['bis_edition', 'event', 'military', 'tutorial', 'special', 'arena_ai'];
+  const EXCLUDED = ['bis_edition', 'event', 'military', 'tutorial', 'special', 'arena_ai', 'npc'];
   const placeholders = EXCLUDED.map(() => '?').join(', ');
   const [result]: any = await conn.execute(`DELETE FROM ships WHERE variant_type IN (${placeholders})`, EXCLUDED);
   const count = result.affectedRows as number;
-  if (count > 0) logger.info(`Pruned ${count} ships with excluded variant types (bis, event, military, tutorial, special, arena)`);
+  if (count > 0) logger.info(`Pruned ${count} ships with excluded variant types (bis, event, military, tutorial, special, arena, npc)`);
   return count;
 }
 

@@ -58,7 +58,7 @@ export class ShipQueryService {
         params.push(filters.variant_type);
       }
     } else {
-      where.push("(s.variant_type IS NULL OR s.variant_type NOT IN ('tutorial', 'enemy_ai', 'arena_ai', 'competition'))");
+      where.push("(s.variant_type IS NULL OR s.variant_type NOT IN ('npc', 'tutorial', 'enemy_ai', 'arena_ai', 'competition'))");
     }
 
     const wantConceptOnly = filters?.status === 'in-concept';
@@ -203,7 +203,7 @@ export class ShipQueryService {
         env,
       ),
       this.prisma.$queryRawUnsafe<Row[]>(
-        "SELECT DISTINCT variant_type FROM ships WHERE variant_type IS NOT NULL AND variant_type != '' AND game_env = ? ORDER BY variant_type",
+        "SELECT DISTINCT variant_type FROM ships WHERE variant_type IS NOT NULL AND variant_type != '' AND variant_type != 'npc' AND game_env = ? ORDER BY variant_type",
         env,
       ),
     ]);
