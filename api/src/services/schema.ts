@@ -124,7 +124,7 @@ async function runVersionedMigrations(prisma: PrismaClient): Promise<void> {
     .sort();
 
   for (const file of files) {
-    const version = file; // keep .sql extension — consistent with extractor/scripts/apply-migrations.ts
+    const version = file;
     if (appliedSet.has(version)) continue;
 
     logger.info(`Running migration: ${file}`, { module: 'schema' });
