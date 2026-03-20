@@ -339,4 +339,37 @@ export class ShipQueryService {
     );
     return rows.map(({ game_data, ...rest }) => convertBigIntToNumber(rest));
   }
+
+  /** Get all ships sharing the same chassis_id (variants of the same hull) */
+  async getShipVariants(uuid: string, env = 'live'): Promise<Row[]> {
+    const shipRows = await this.prisma.$queryRawUnsafe<Row[]>('SELECT chassis_id FROM ships WHERE uuid = ? AND game_env = ?', uuid, env);
+    const chassisId = shipRows[0]?.chassis_id;
+    if (!chassisId) return [];
+
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+      `SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS}
+       WHERE s.chassis_id = ? AND s.uuid != ? AND s.game_env = ?
+       ORDER BY COALESCE(sm.name, s.name)`,
+      chassisId,
+      uuid,
+      env,
+    );
+    return rows.map(({ game_data, ...rest }) => convertBigIntToNumber(rest));
+  }
+
+  /** Get a lightweight variant summary for a ship (uuid, name, thumbnail) */
+  async getVariantSummary(chassisId: number, currentUuid: string, env = 'live'): Promise<Row[]> {
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+      `SELECT s.uuid, COALESCE(sm.name, s.name) as name, s.class_name,
+              sm.media_store_small as thumbnail, s.variant_type
+       FROM ships s
+       LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id
+       WHERE s.chassis_id = ? AND s.uuid != ? AND s.game_env = ?
+       ORDER BY COALESCE(sm.name, s.name)`,
+      chassisId,
+      currentUuid,
+      env,
+    );
+    return rows.map(convertBigIntToNumber);
+  }
 }

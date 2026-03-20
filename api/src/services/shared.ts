@@ -135,6 +135,7 @@ export const SHIP_SELECT = [
   's.insurance_expedite_cost',
   's.short_name',
   's.variant_type',
+  's.chassis_id',
   's.game_data',
 ].join(', ');
 
@@ -206,6 +207,7 @@ export const CONCEPT_SELECT = [
   'NULL as insurance_expedite_cost',
   'NULL as short_name',
   'NULL as variant_type',
+  'sm2.chassis_id',
   'NULL as game_data',
 ].join(', ');
 

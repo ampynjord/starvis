@@ -11,6 +11,7 @@ import {
   applyDimensionsFallback,
   applyHullSeriesCargoFallback,
   crossReferenceShipMatrix,
+  populateChassisId,
   pruneExcludedVariants,
   tagVariantTypes,
 } from './crossref.js';
@@ -310,6 +311,7 @@ export class ExtractionService {
       if (run('ships')) {
         onProgress?.('Cross-referencing with Ship Matrix…');
         stats.shipMatrixLinked = await crossReferenceShipMatrix(conn);
+        await populateChassisId(conn);
         await applyDimensionsFallback(conn);
         await tagVariantTypes(conn);
         const pruned = await pruneExcludedVariants(conn);
