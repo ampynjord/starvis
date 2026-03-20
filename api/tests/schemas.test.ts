@@ -4,7 +4,18 @@
  */
 import { describe, expect, it } from 'vitest';
 import { ZodError } from 'zod';
-import { arrayToCsv, CommodityQuery, ComponentQuery, ItemQuery, LoadoutBody, qInt, qStr, ShipQuery } from '../src/schemas.js';
+import {
+  arrayToCsv,
+  CommodityQuery,
+  ComponentQuery,
+  ItemQuery,
+  LoadoutBody,
+  qEnv,
+  qInt,
+  qStr,
+  SearchQuery,
+  ShipQuery,
+} from '../src/schemas.js';
 
 // ── Tests ──
 
@@ -23,6 +34,36 @@ describe('qStr', () => {
 
   it('coerces empty string to undefined', () => {
     expect(qStr.parse('')).toBeUndefined();
+  });
+});
+
+describe('qEnv', () => {
+  it('defaults to live for undefined', () => {
+    expect(qEnv.parse(undefined)).toBe('live');
+  });
+
+  it('defaults to live for empty string', () => {
+    expect(qEnv.parse('')).toBe('live');
+  });
+
+  it('accepts ptu', () => {
+    expect(qEnv.parse('ptu')).toBe('ptu');
+  });
+
+  it('accepts eptu', () => {
+    expect(qEnv.parse('eptu')).toBe('eptu');
+  });
+
+  it('accepts live', () => {
+    expect(qEnv.parse('live')).toBe('live');
+  });
+
+  it('falls back to live for invalid value', () => {
+    expect(qEnv.parse('invalid')).toBe('live');
+  });
+
+  it('picks first from array', () => {
+    expect(qEnv.parse(['ptu', 'live'])).toBe('ptu');
   });
 });
 
@@ -89,6 +130,29 @@ describe('ShipQuery', () => {
   it('passes through unknown keys (passthrough)', () => {
     const result = ShipQuery.parse({ custom: 'value' });
     expect((result as Record<string, unknown>).custom).toBe('value');
+  });
+
+  it('defaults env to live', () => {
+    const result = ShipQuery.parse({});
+    expect(result.env).toBe('live');
+  });
+
+  it('accepts env=ptu', () => {
+    const result = ShipQuery.parse({ env: 'ptu' });
+    expect(result.env).toBe('ptu');
+  });
+});
+
+describe('SearchQuery', () => {
+  it('defaults env to live', () => {
+    const result = SearchQuery.parse({});
+    expect(result.env).toBe('live');
+  });
+
+  it('accepts env=ptu', () => {
+    const result = SearchQuery.parse({ search: 'aurora', env: 'ptu' });
+    expect(result.env).toBe('ptu');
+    expect(result.search).toBe('aurora');
   });
 });
 

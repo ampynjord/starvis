@@ -79,6 +79,26 @@ describe('ShipQueryService', () => {
       expect(callArgs[1]).toContain('%aurora%');
     });
   });
+
+  describe('getAllShips env filtering', () => {
+    it('passes env=ptu to SQL query', async () => {
+      const prisma = createMockPrisma([[row({ total: 0 })], []]);
+      const svc = new ShipQueryService(prisma);
+      await svc.getAllShips({ env: 'ptu' });
+      const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
+      expect(callArgs[0]).toContain('game_env');
+      expect(callArgs.slice(1)).toContain('ptu');
+    });
+
+    it('defaults env to live', async () => {
+      const prisma = createMockPrisma([[row({ total: 0 })], []]);
+      const svc = new ShipQueryService(prisma);
+      await svc.getAllShips({});
+      const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
+      expect(callArgs[0]).toContain('game_env');
+      expect(callArgs.slice(1)).toContain('live');
+    });
+  });
 });
 
 // ── ComponentQueryService ────────────────────────────────
@@ -131,6 +151,17 @@ describe('ComponentQueryService', () => {
       expect(callArgs[1]).toEqual('component-uuid');
     });
   });
+
+  describe('getAllComponents env filtering', () => {
+    it('passes env=ptu to SQL queries', async () => {
+      const prisma = createMockPrisma([[row({ total: 0 })], []]);
+      const svc = new ComponentQueryService(prisma);
+      await svc.getAllComponents({ env: 'ptu' });
+      const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
+      expect(callArgs[0]).toContain('game_env');
+      expect(callArgs.slice(1)).toContain('ptu');
+    });
+  });
 });
 
 // ── ItemQueryService ─────────────────────────────────────
@@ -158,6 +189,17 @@ describe('ItemQueryService', () => {
       const result = await svc.getItemTypes();
       expect(result.types).toHaveLength(2);
       expect(result.types[0]).toEqual({ type: 'WeaponPersonal', count: 42 });
+    });
+  });
+
+  describe('getAllItems env filtering', () => {
+    it('passes env=ptu to SQL queries', async () => {
+      const prisma = createMockPrisma([[row({ total: 0 })], []]);
+      const svc = new ItemQueryService(prisma);
+      await svc.getAllItems({ env: 'ptu' });
+      const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
+      expect(callArgs[0]).toContain('game_env');
+      expect(callArgs.slice(1)).toContain('ptu');
     });
   });
 
@@ -231,6 +273,30 @@ describe('GameDataService cache', () => {
     expect(r1).toEqual(r2);
     // prisma.$queryRawUnsafe should only be called twice (once for stats, once for latest)
     expect((prisma as any).$queryRawUnsafe).toHaveBeenCalledTimes(2);
+  });
+
+  it('getPublicStats passes env to extraction_log query', async () => {
+    const statsRow = row({
+      ships: 100,
+      flyable_ships: 80,
+      ground_vehicles: 20,
+      components: 5000,
+      items: 300,
+      commodities: 50,
+      manufacturers: 40,
+      paints: 200,
+      shops: 30,
+      component_types: 15,
+      item_types: 8,
+    });
+    const latestRow = row({ game_version: '4.7', extracted_at: '2026-01-01' });
+    const prisma = createMockPrisma([[statsRow], [latestRow]]);
+    const svc = new GameDataService(prisma);
+    await svc.getPublicStats('ptu');
+    // Second call should be extraction_log query with env=ptu
+    const extractionCallArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[1];
+    expect(extractionCallArgs[0]).toContain('game_env');
+    expect(extractionCallArgs.slice(1)).toContain('ptu');
   });
 });
 
