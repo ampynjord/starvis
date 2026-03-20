@@ -22,7 +22,6 @@ COPY api/tsconfig.json ./
 COPY api/server.ts ./
 COPY api/openapi.json ./
 COPY api/src/ ./src/
-COPY db/ ./db/
 # Type-check only — tsx runs TS directly, no emit needed
 RUN npx tsc --noEmit
 
@@ -40,21 +39,16 @@ CMD ["sh", "-c", "npm install --prefer-offline --silent && npm run dev"]
 # ---- Stage 5: production ----
 FROM base AS production
 
-# Install production deps (tsx is now in dependencies)
+# Install production deps (includes prisma CLI for db push at startup)
 COPY api/package*.json ./
 COPY api/prisma/ ./prisma/
-# Skip postinstall hook since prisma CLI is not in production deps
-RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
-
-# Copy generated Prisma client from deps stage (where prisma CLI was available)
-COPY --from=deps /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=deps /app/node_modules/@prisma ./node_modules/@prisma
+# postinstall runs "prisma generate" to create the client
+RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy source
 COPY api/server.ts ./
 COPY api/openapi.json ./
 COPY api/src/ ./src/
-COPY db/ ./db/
 
 # Non-root user
 RUN addgroup -g 1001 -S nodejs && \
