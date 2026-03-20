@@ -5,6 +5,15 @@
     "version": "1.0.0",
     "description": "Star Citizen Ships, Components, Items & Commodities API — Extracted from P4K game data and RSI Ship Matrix."
   },
+  "components": {
+    "securitySchemes": {
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    }
+  },
   "tags": [
     { "name": "Ships", "description": "Ship database (game data + RSI)" },
     { "name": "Components", "description": "Ship component database (weapons, shields, drives, etc.)" },
@@ -18,7 +27,12 @@
     { "name": "Search", "description": "Unified multi-entity search" },
     { "name": "Changelog", "description": "Data change tracking" },
     { "name": "Stats", "description": "Database statistics" },
-    { "name": "System", "description": "Health & version" }
+    { "name": "System", "description": "Health & version" },
+    { "name": "Mining", "description": "Mining elements, rock compositions and solver" },
+    { "name": "Missions", "description": "In-game missions" },
+    { "name": "Trade", "description": "Commodity prices, trade routes and locations" },
+    { "name": "Admin", "description": "Administrative endpoints (requires X-API-Key)" },
+    { "name": "Health", "description": "Liveness, readiness probes and metrics" }
   ],
   "paths": {
     "/api/v1/ships": {
@@ -624,10 +638,305 @@
     },
     "/health": {
       "get": {
-        "tags": ["System"],
+        "tags": ["Health"],
         "summary": "Health check",
         "operationId": "healthCheck",
         "responses": { "200": { "description": "OK — database connected, game data status" } }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Liveness probe",
+        "operationId": "liveness",
+        "description": "Returns 200 if the service is alive (for Docker/Kubernetes probes)",
+        "responses": { "200": { "description": "Service alive" } }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Readiness probe",
+        "operationId": "readiness",
+        "description": "Returns 200 if database and Redis are connected, 503 otherwise",
+        "responses": {
+          "200": { "description": "Service ready (DB + Redis connected)" },
+          "503": { "description": "Service not ready" }
+        }
+      }
+    },
+    "/health/metrics": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Prometheus metrics",
+        "operationId": "getMetrics",
+        "description": "Returns Prometheus-formatted metrics (request counts, durations, etc.)",
+        "responses": { "200": { "description": "Prometheus text metrics" } }
+      }
+    },
+    "/health/cache/stats": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Redis cache statistics",
+        "operationId": "getCacheStats",
+        "description": "Returns Redis cache hit/miss stats and connection status",
+        "responses": { "200": { "description": "Cache statistics" } }
+      }
+    },
+    "/api/v1/ships/ranking": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Ship ranking by numeric field",
+        "operationId": "getShipRanking",
+        "description": "Returns ships sorted by a numeric stat (speed, cargo, mass, etc.), excluding variants",
+        "parameters": [
+          {
+            "name": "sort_by",
+            "in": "query",
+            "schema": { "type": "string", "default": "scm_speed" },
+            "description": "Numeric field to rank by"
+          },
+          { "name": "order", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"], "default": "desc" } },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Filter by vehicle category (ship, ground, gravlev)"
+          }
+        ],
+        "responses": { "200": { "description": "Ranked ship list" }, "503": { "description": "Game data not available" } }
+      }
+    },
+    "/api/v1/components/compatible": {
+      "get": {
+        "tags": ["Components"],
+        "summary": "Find compatible components",
+        "operationId": "getCompatibleComponents",
+        "description": "Search components filtered by type, size range and keyword",
+        "parameters": [
+          { "name": "type", "in": "query", "schema": { "type": "string" }, "description": "Component type filter" },
+          { "name": "min_size", "in": "query", "schema": { "type": "integer" }, "description": "Minimum component size" },
+          { "name": "max_size", "in": "query", "schema": { "type": "integer" }, "description": "Maximum component size" },
+          { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Text search on name" },
+          { "name": "sort", "in": "query", "schema": { "type": "string", "default": "size" } },
+          { "name": "order", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"], "default": "asc" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 100, "maximum": 200 } }
+        ],
+        "responses": { "200": { "description": "Compatible component list" }, "503": { "description": "Game data not available" } }
+      }
+    },
+    "/api/v1/items/{uuid}/buy-locations": {
+      "get": {
+        "tags": ["Items"],
+        "summary": "Get buy locations for an item",
+        "operationId": "getItemBuyLocations",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Item UUID or name" }
+        ],
+        "responses": {
+          "200": { "description": "Buy location list" },
+          "404": { "description": "Item not found" }
+        }
+      }
+    },
+    "/api/v1/mining/elements": {
+      "get": {
+        "tags": ["Mining"],
+        "summary": "List all mining elements",
+        "operationId": "getMiningElements",
+        "responses": { "200": { "description": "All mineral elements" }, "503": { "description": "Game data not available" } }
+      }
+    },
+    "/api/v1/mining/elements/{uuid}": {
+      "get": {
+        "tags": ["Mining"],
+        "summary": "Get mining element details",
+        "operationId": "getMiningElement",
+        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Element details with containing rocks" },
+          "404": { "description": "Element not found" }
+        }
+      }
+    },
+    "/api/v1/mining/compositions": {
+      "get": {
+        "tags": ["Mining"],
+        "summary": "List rock compositions",
+        "operationId": "getMiningCompositions",
+        "parameters": [
+          {
+            "name": "include_empty",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["true", "false"] },
+            "description": "Include compositions with no minerals"
+          }
+        ],
+        "responses": { "200": { "description": "Rock composition list" }, "503": { "description": "Game data not available" } }
+      }
+    },
+    "/api/v1/mining/compositions/{uuid}": {
+      "get": {
+        "tags": ["Mining"],
+        "summary": "Get rock composition details",
+        "operationId": "getMiningComposition",
+        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Composition with mineral breakdown" },
+          "404": { "description": "Composition not found" }
+        }
+      }
+    },
+    "/api/v1/mining/solver": {
+      "get": {
+        "tags": ["Mining"],
+        "summary": "Mining solver",
+        "operationId": "getMiningSolver",
+        "description": "Ranks rocks by probability for a given mineral or composition",
+        "parameters": [
+          { "name": "element", "in": "query", "schema": { "type": "string" }, "description": "Element UUID to search for" },
+          { "name": "composition", "in": "query", "schema": { "type": "string" }, "description": "Composition UUID to search for" },
+          {
+            "name": "min_probability",
+            "in": "query",
+            "schema": { "type": "number", "minimum": 0, "maximum": 1, "default": 0 },
+            "description": "Minimum probability threshold"
+          }
+        ],
+        "responses": {
+          "200": { "description": "Solver results sorted by probability" },
+          "400": { "description": "Provide either element or composition param" }
+        }
+      }
+    },
+    "/api/v1/mining/stats": {
+      "get": {
+        "tags": ["Mining"],
+        "summary": "Mining statistics",
+        "operationId": "getMiningStats",
+        "responses": { "200": { "description": "Global mining statistics" }, "503": { "description": "Game data not available" } }
+      }
+    },
+    "/api/v1/missions/types": {
+      "get": {
+        "tags": ["Missions"],
+        "summary": "List mission types",
+        "operationId": "getMissionTypes",
+        "responses": { "200": { "description": "Distinct mission types" }, "503": { "description": "Game data not available" } }
+      }
+    },
+    "/api/v1/missions": {
+      "get": {
+        "tags": ["Missions"],
+        "summary": "List missions (paginated)",
+        "operationId": "getMissions",
+        "parameters": [
+          { "name": "type", "in": "query", "schema": { "type": "string" }, "description": "Filter by mission type" },
+          {
+            "name": "legal",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["true", "false"] },
+            "description": "Filter by legality"
+          },
+          { "name": "shared", "in": "query", "schema": { "type": "string", "enum": ["true"] }, "description": "Only shared missions" },
+          { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Text search" },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50, "maximum": 200 } }
+        ],
+        "responses": { "200": { "description": "Paginated mission list" }, "503": { "description": "Game data not available" } }
+      }
+    },
+    "/api/v1/missions/{uuid}": {
+      "get": {
+        "tags": ["Missions"],
+        "summary": "Get mission by UUID",
+        "operationId": "getMission",
+        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Mission details" },
+          "404": { "description": "Mission not found" }
+        }
+      }
+    },
+    "/api/v1/trade/prices": {
+      "get": {
+        "tags": ["Trade"],
+        "summary": "Get commodity prices by location",
+        "operationId": "getTradePrices",
+        "parameters": [
+          { "name": "commodity_uuid", "in": "query", "schema": { "type": "string" }, "description": "Filter by commodity UUID" },
+          { "name": "system", "in": "query", "schema": { "type": "string" }, "description": "Filter by star system" }
+        ],
+        "responses": {
+          "200": { "description": "Commodity price list with location data" },
+          "503": { "description": "Game data not available" }
+        }
+      }
+    },
+    "/api/v1/trade/routes": {
+      "get": {
+        "tags": ["Trade"],
+        "summary": "Get best trade routes",
+        "operationId": "getTradeRoutes",
+        "description": "Returns the most profitable buy/sell routes sorted by profit per SCU",
+        "parameters": [
+          { "name": "cargo_scu", "in": "query", "schema": { "type": "number", "default": 1 }, "description": "Cargo capacity in SCU" },
+          { "name": "system", "in": "query", "schema": { "type": "string" }, "description": "Filter both endpoints by star system" }
+        ],
+        "responses": {
+          "200": { "description": "Trade routes with profit calculations" },
+          "503": { "description": "Game data not available" }
+        }
+      }
+    },
+    "/api/v1/trade/locations": {
+      "get": {
+        "tags": ["Trade"],
+        "summary": "Get trade locations",
+        "operationId": "getTradeLocations",
+        "description": "Returns distinct locations that have commodity price data",
+        "parameters": [{ "name": "system", "in": "query", "schema": { "type": "string" }, "description": "Filter by star system" }],
+        "responses": { "200": { "description": "Location list with system names" }, "503": { "description": "Game data not available" } }
+      }
+    },
+    "/admin/sync-ship-matrix": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Sync Ship Matrix data",
+        "operationId": "syncShipMatrix",
+        "description": "Triggers a full sync from RSI Ship Matrix source",
+        "security": [{ "apiKey": [] }],
+        "responses": {
+          "200": { "description": "Sync result with counts" },
+          "401": { "description": "Missing or invalid API key" }
+        }
+      }
+    },
+    "/admin/stats": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Get admin statistics",
+        "operationId": "getAdminStats",
+        "description": "Returns Ship Matrix and Game Data internal statistics",
+        "security": [{ "apiKey": [] }],
+        "responses": {
+          "200": { "description": "Internal statistics" },
+          "401": { "description": "Missing or invalid API key" }
+        }
+      }
+    },
+    "/admin/extraction-log": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Get extraction log",
+        "operationId": "getExtractionLog",
+        "description": "Returns the game data extraction journal",
+        "security": [{ "apiKey": [] }],
+        "responses": {
+          "200": { "description": "Extraction log entries" },
+          "401": { "description": "Missing or invalid API key" },
+          "503": { "description": "Game data not available" }
+        }
       }
     }
   }
