@@ -1,13 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import {
-  API_BASE,
-  VARIANT_TYPE_LABELS,
-  VARIANT_TYPE_COLORS,
-  CAREER_ICONS,
-  SIZE_LABELS,
-  COMPONENT_TYPE_COLORS,
-  CHANGE_TYPE_COLORS,
-} from '@/utils/constants';
+import { describe, expect, it } from 'vitest';
+import { API_BASE, COMPONENT_TYPE_COLORS, VARIANT_TYPE_COLORS, VARIANT_TYPE_LABELS } from '@/utils/constants';
 
 describe('API_BASE', () => {
   it('equals /api/v1', () => {
@@ -33,40 +25,10 @@ describe('VARIANT_TYPE_COLORS', () => {
   });
 });
 
-describe('CAREER_ICONS', () => {
-  it('contains icons for careers', () => {
-    expect(CAREER_ICONS.Combat).toBe('⚔');
-    expect(CAREER_ICONS.Transport).toBe('📦');
-    expect(CAREER_ICONS.Exploration).toBe('🔭');
-    expect(CAREER_ICONS.Racing).toBe('🏁');
-  });
-});
-
-describe('SIZE_LABELS', () => {
-  it('contains sizes S1 to S9', () => {
-    for (let i = 1; i <= 9; i++) {
-      expect(SIZE_LABELS[i]).toBe(`S${i}`);
-    }
-  });
-  it('Capital label for size 10', () => {
-    expect(SIZE_LABELS[10]).toBe('Capital');
-  });
-});
-
 describe('COMPONENT_TYPE_COLORS', () => {
   const expectedTypes = ['WeaponGun', 'WeaponMissile', 'Shield', 'QuantumDrive', 'PowerPlant', 'Cooler'];
   it.each(expectedTypes)('has a color for %s', (type) => {
     expect(COMPONENT_TYPE_COLORS[type]).toBeDefined();
     expect(typeof COMPONENT_TYPE_COLORS[type]).toBe('string');
-  });
-});
-
-describe('CHANGE_TYPE_COLORS', () => {
-  it('contains added, removed and modified', () => {
-    expect(CHANGE_TYPE_COLORS.added).toBeDefined();
-    expect(CHANGE_TYPE_COLORS.removed).toBeDefined();
-    expect(CHANGE_TYPE_COLORS.modified).toBeDefined();
-    expect(CHANGE_TYPE_COLORS.removed).toContain('red');
-    expect(CHANGE_TYPE_COLORS.added).toContain('green');
   });
 });

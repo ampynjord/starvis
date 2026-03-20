@@ -1,6 +1,6 @@
-import { defineConfig } from 'vite';
+import path from 'node:path';
 import react from '@vitejs/plugin-react';
-import path from 'path';
+import { defineConfig } from 'vite';
 
 export default defineConfig({
   plugins: [react()],
@@ -10,11 +10,11 @@ export default defineConfig({
     },
   },
   server: {
-    host: '0.0.0.0',  // requis pour être accessible depuis Docker
+    host: '0.0.0.0', // requis pour être accessible depuis Docker
     port: 5173,
     proxy: {
       '/api': {
-        target: process.env.VITE_API_URL || 'http://localhost:3003',
+        target: process.env.VITE_API_URL || 'http://localhost:3000',
         changeOrigin: true,
       },
     },
