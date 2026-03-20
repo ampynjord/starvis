@@ -219,6 +219,27 @@
         "responses": { "200": { "description": "Comparison result with deltas" }, "404": { "description": "One or both ships not found" } }
       }
     },
+    "/api/v1/ships/{uuid}/variants": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get ship variants (same chassis)",
+        "operationId": "getShipVariants",
+        "description": "Returns all ships sharing the same chassis (e.g. Hornet F7C, F7C-M, F7C-R, F7C-S share chassis_id). Each variant differs mainly in loadout.",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Ship UUID or class_name"
+          }
+        ],
+        "responses": {
+          "200": { "description": "Variant list (full ship data, excluding current ship)" },
+          "404": { "description": "Ship not found" }
+        }
+      }
+    },
     "/api/v1/components": {
       "get": {
         "tags": ["Components"],

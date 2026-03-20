@@ -110,6 +110,10 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
         } catch {
           /* keep raw */
         }
+      // Attach lightweight variant list if ship belongs to a chassis family
+      if (ship.chassis_id) {
+        ship.variants = await gameDataService!.ships.getVariantSummary(Number(ship.chassis_id), String(ship.uuid), env);
+      }
       sendWithETag(req, res, { success: true, data: ship });
     }),
   );
@@ -236,6 +240,18 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
       if (!uuid) return void res.status(404).json({ success: false, error: 'Ship not found' });
       const limit = Math.min(10, Math.max(1, parseInt(String(req.query.limit), 10) || 5));
       const data = await gameDataService!.ships.getSimilarShips(uuid, limit, env);
+      sendWithETag(req, res, { success: true, count: data.length, data });
+    }),
+  );
+
+  router.get(
+    '/api/v1/ships/:uuid/variants',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = String(req.query.env ?? 'live');
+      const uuid = await resolveShipUuid(req.params.uuid, env);
+      if (!uuid) return void res.status(404).json({ success: false, error: 'Ship not found' });
+      const data = await gameDataService!.ships.getShipVariants(uuid, env);
       sendWithETag(req, res, { success: true, count: data.length, data });
     }),
   );
