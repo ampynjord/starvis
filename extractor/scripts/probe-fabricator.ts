@@ -1,4 +1,5 @@
-import 'dotenv/config';
+import { config } from 'dotenv';
+config({ path: '.env.extractor' });
 import { DataForgeService } from '../src/dataforge-service.js';
 
 const p4k = process.argv[process.argv.indexOf('--p4k') + 1] || process.env.P4K_PATH;
