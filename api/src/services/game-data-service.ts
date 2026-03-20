@@ -147,7 +147,7 @@ export class GameDataService {
       env,
       env,
     );
-    const latest = await this.getLatestExtraction();
+    const latest = await this.getLatestExtraction(env);
     const raw = rows[0];
     // Convert BigInt to Number for JSON serialization
     const result = {
@@ -171,8 +171,11 @@ export class GameDataService {
     return rows;
   }
 
-  async getLatestExtraction(): Promise<Row | null> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>('SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 1');
+  async getLatestExtraction(env = 'live'): Promise<Row | null> {
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+      'SELECT * FROM extraction_log WHERE game_env = ? ORDER BY extracted_at DESC LIMIT 1',
+      env,
+    );
     return rows[0] || null;
   }
 
@@ -207,7 +210,7 @@ export class GameDataService {
       env,
       env,
     );
-    const latest = await this.getLatestExtraction();
+    const latest = await this.getLatestExtraction(env);
     const raw = rows[0];
     // Convert BigInt to Number for JSON serialization
     const result = {

@@ -67,7 +67,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 export const api = {
   stats: {
     overview: (env?: string) => get<StatsOverview>('/stats/overview', { env }),
-    version: () => get<Version>('/version'),
+    version: (env?: string) => get<Version>('/version', { env }),
   },
 
   // ─── Ships ─────────────────────────────────────────────────────────
