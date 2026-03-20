@@ -79,7 +79,6 @@ model-cache/
 *.sql.backup
 db-backup/
 
-
 # Coverage reports
 coverage/
 .nyc_output/
