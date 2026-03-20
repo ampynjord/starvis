@@ -91,8 +91,8 @@ export default function HomePage() {
     queryFn: () => api.stats.overview(env),
   });
   const { data: version } = useQuery({
-    queryKey: ['version'],
-    queryFn: api.stats.version,
+    queryKey: ['version', env],
+    queryFn: () => api.stats.version(env),
   });
   const { data: changelog } = useQuery({
     queryKey: ['changelog.list', { limit: 10 }],

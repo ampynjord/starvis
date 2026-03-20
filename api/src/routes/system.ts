@@ -44,8 +44,9 @@ export function mountSystemRoutes(router: Router, deps: RouteDependencies): void
   router.get(
     '/api/v1/version',
     requireGameData,
-    asyncHandler(async (_req, res) => {
-      const latest = await gameDataService!.getLatestExtraction();
+    asyncHandler(async (req, res) => {
+      const env = String(req.query.env ?? 'live');
+      const latest = await gameDataService!.getLatestExtraction(env);
       res.json({ success: true, data: latest || { message: 'No extraction yet' } });
     }),
   );

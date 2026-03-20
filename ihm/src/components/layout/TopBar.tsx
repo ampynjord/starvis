@@ -23,8 +23,8 @@ export function TopBar() {
   });
 
   const { data: version } = useQuery({
-    queryKey: ['version'],
-    queryFn: api.stats.version,
+    queryKey: ['version', env],
+    queryFn: () => api.stats.version(env),
     staleTime: 10 * 60_000,
   });
 
