@@ -22,7 +22,7 @@ import { getPrisma, initPrisma } from './src/db/index.js';
 import { prometheusMiddleware } from './src/middleware/prometheus.js';
 import { healthRouter } from './src/routes/health.js';
 import { createRoutes } from './src/routes/index.js';
-import { GameDataService, initializeSchema, ShipMatrixService } from './src/services/index.js';
+import { GameDataService, ShipMatrixService } from './src/services/index.js';
 import { redis } from './src/services/redis.js';
 import { buildDatabaseUrl, logger, RATE_LIMITS } from './src/utils/index.js';
 
@@ -148,7 +148,6 @@ async function start() {
   for (let i = 0; i < 30; i++) {
     try {
       await prisma.$queryRawUnsafe('SELECT 1');
-      await initializeSchema(prisma);
       logger.info('✅ Database ready', { module: 'DB' });
       dbReady = true;
       break;
@@ -163,7 +162,20 @@ async function start() {
     process.exit(1);
   }
 
-  // 2. Initialize Redis (non-blocking, cache disabled if unavailable)
+  // 2. Sync schema via Prisma (CREATE / ALTER tables as needed)
+  try {
+    const { execSync } = await import('node:child_process');
+    execSync('npx prisma db push --skip-generate --accept-data-loss', {
+      stdio: 'pipe',
+      env: { ...process.env, DATABASE_URL: buildDatabaseUrl() },
+    });
+    logger.info('✅ Schema synced (prisma db push)', { module: 'DB' });
+  } catch (e: any) {
+    logger.error(`Schema sync failed: ${e.stderr?.toString() || e.message}`, { module: 'DB' });
+    process.exit(1);
+  }
+
+  // 3. Initialize Redis (non-blocking, cache disabled if unavailable)
   const redisReady = await redis
     .connect()
     .then(() => true)
@@ -174,16 +186,16 @@ async function start() {
     logger.warn('⚠️  Redis unavailable, cache disabled', { module: 'Redis' });
   }
 
-  // 3. Ship Matrix service (always available)
+  // 4. Ship Matrix service (always available)
   const shipMatrixService = new ShipMatrixService(prisma);
 
-  // 4. GameDataService (reads from MySQL — fed by standalone extractor)
+  // 5. GameDataService (reads from MySQL — fed by standalone extractor)
   gameDataService = new GameDataService(prisma);
 
-  // 5. Mount routes
+  // 6. Mount routes
   app.use('/', createRoutes({ prisma, shipMatrixService, gameDataService }));
 
-  // 6. Start listening BEFORE non-critical sync (so /health is immediately available)
+  // 7. Start listening BEFORE non-critical sync (so /health is immediately available)
   httpServer = app.listen(PORT, () => logger.info(`✅ Starvis v1.0 listening on :${PORT}`, { module: 'Server' }));
 
   // 7. Non-critical sync: Ship Matrix (don't block server startup, skip if <24h old)
