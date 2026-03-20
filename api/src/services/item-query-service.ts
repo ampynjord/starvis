@@ -121,7 +121,10 @@ export class ItemQueryService {
   }
 
   async getItemTypes(env = 'live'): Promise<{ types: { type: string; count: number }[] }> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>('SELECT type, COUNT(*) as count FROM items WHERE game_env = ? GROUP BY type ORDER BY count DESC', env);
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+      'SELECT type, COUNT(*) as count FROM items WHERE game_env = ? GROUP BY type ORDER BY count DESC',
+      env,
+    );
     return { types: rows.map((r) => ({ type: String(r.type), count: Number(r.count) })) };
   }
 

@@ -125,7 +125,8 @@ export class GameDataService {
       const cached = this.statsCache.get();
       if (cached) return cached;
     }
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(`
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+      `
       SELECT
         (SELECT COUNT(*) FROM ships WHERE game_env = ?) as ships,
         (SELECT COUNT(*) FROM components WHERE game_env = ?) as components,
@@ -136,7 +137,16 @@ export class GameDataService {
         (SELECT COUNT(*) FROM ship_paints WHERE game_env = ?) as paints,
         (SELECT COUNT(*) FROM shops WHERE game_env = ?) as shops,
         (SELECT COUNT(*) FROM ships WHERE ship_matrix_id IS NOT NULL AND game_env = ?) as shipsLinkedToMatrix
-    `, env, env, env, env, env, env, env, env);
+    `,
+      env,
+      env,
+      env,
+      env,
+      env,
+      env,
+      env,
+      env,
+    );
     const latest = await this.getLatestExtraction();
     const raw = rows[0];
     // Convert BigInt to Number for JSON serialization
@@ -171,7 +181,8 @@ export class GameDataService {
       const cached = this.publicStatsCache.get();
       if (cached) return cached;
     }
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(`
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+      `
       SELECT
         (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL AND game_env = ?) as ships,
         (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL AND vehicle_category = 'ship' AND game_env = ?) as flyable_ships,
@@ -184,7 +195,18 @@ export class GameDataService {
         (SELECT COUNT(*) FROM shops WHERE game_env = ?) as shops,
         (SELECT COUNT(DISTINCT type) FROM components WHERE game_env = ?) as component_types,
         (SELECT COUNT(DISTINCT type) FROM items WHERE game_env = ?) as item_types
-    `, env, env, env, env, env, env, env, env, env, env);
+    `,
+      env,
+      env,
+      env,
+      env,
+      env,
+      env,
+      env,
+      env,
+      env,
+      env,
+    );
     const latest = await this.getLatestExtraction();
     const raw = rows[0];
     // Convert BigInt to Number for JSON serialization
