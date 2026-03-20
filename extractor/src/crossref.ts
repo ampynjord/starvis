@@ -189,6 +189,18 @@ export async function crossReferenceShipMatrix(conn: PoolConnection): Promise<nu
   return results.length;
 }
 
+/** Copy chassis_id from ship_matrix to ships for fast variant grouping */
+export async function populateChassisId(conn: PoolConnection): Promise<number> {
+  const [result]: any = await conn.execute(
+    `UPDATE ships s JOIN ship_matrix sm ON s.ship_matrix_id = sm.id
+     SET s.chassis_id = sm.chassis_id
+     WHERE s.ship_matrix_id IS NOT NULL`,
+  );
+  const count = result.affectedRows as number;
+  if (count > 0) logger.info(`Populated chassis_id for ${count} ships`);
+  return count;
+}
+
 /** Tag variant types for ships not linked to Ship Matrix */
 export async function tagVariantTypes(conn: PoolConnection): Promise<void> {
   const rules: Array<{ type: string; patterns: string[] }> = [

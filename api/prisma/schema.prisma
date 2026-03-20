@@ -135,6 +135,7 @@ model Ship {
   weaponDamageTotal     Decimal? @map("weapon_damage_total") @db.Decimal(10, 2)
   variantType           String?  @map("variant_type") @db.VarChar(20)
   vehicleCategory       String?  @default("ship") @map("vehicle_category") @db.VarChar(20)
+  chassisId             Int?     @map("chassis_id")
   insuranceClaimTime    Decimal? @map("insurance_claim_time") @db.Decimal(10, 2)
   insuranceExpediteCost Decimal? @map("insurance_expedite_cost") @db.Decimal(10, 2)
   gameData              Json?    @map("game_data")
@@ -151,6 +152,7 @@ model Ship {
   @@index([manufacturerCode], map: "idx_ship_manufacturer_code")
   @@index([shipMatrixId], map: "idx_ship_matrix_id")
   @@index([gameEnv], map: "idx_game_env")
+  @@index([chassisId], map: "idx_ship_chassis_id")
   @@map("ships")
 }
 
