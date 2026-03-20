@@ -51,8 +51,8 @@ export default function ItemsPage() {
   const effectiveTypes = chipTypes.length > 1 ? chipTypes.join(',') : undefined;
 
   const { data: filters } = useQuery({
-    queryKey: ['items.filters'],
-    queryFn: api.items.filters,
+    queryKey: ['items.filters', env],
+    queryFn: () => api.items.filters(env),
     staleTime: Infinity,
   });
   const { data, isLoading, error, refetch } = useQuery({
