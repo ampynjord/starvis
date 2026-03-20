@@ -37,6 +37,9 @@
     "star-citizen",
     "api"
   ],
+  "overrides": {
+    "effect": ">=3.20.0"
+  },
   "author": "ampynjord - Dawnstar",
   "license": "MIT",
   "dependencies": {
