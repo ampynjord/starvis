@@ -37,7 +37,8 @@ export function mountComponentRoutes(router: Router, deps: RouteDependencies): v
     '/api/v1/components/types',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const data = await gameDataService!.components.getComponentTypes();
+      const env = String(req.query.env ?? 'live');
+      const data = await gameDataService!.components.getComponentTypes(env);
       sendWithETag(req, res, { success: true, data });
     }),
   );
@@ -106,7 +107,7 @@ export function mountComponentRoutes(router: Router, deps: RouteDependencies): v
       const env = String(req.query.env ?? 'live');
       const comp = await gameDataService!.components.resolveComponent(req.params.uuid, env);
       if (!comp) return void res.status(404).json({ success: false, error: 'Component not found' });
-      const data = await gameDataService!.components.getComponentShips(comp.uuid);
+      const data = await gameDataService!.components.getComponentShips(comp.uuid, env);
       sendWithETag(req, res, { success: true, count: data.length, data });
     }),
   );

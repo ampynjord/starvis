@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, Rocket, Settings2, Zap } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '@/services/api';
+import { useEnv } from '@/contexts/EnvContext';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -9,15 +10,16 @@ import { ShipCard } from '@/components/ship/ShipCard';
 import type { Manufacturer } from '@/types/api';
 
 export default function ManufacturersPage() {
+  const { env } = useEnv();
   const [selected, setSelected] = useState<string | null>(null);
 
   const { data: manufacturers, isLoading, error, refetch } = useQuery({
-    queryKey: ['manufacturers.list'],
-    queryFn: api.manufacturers.list,
+    queryKey: ['manufacturers.list', env],
+    queryFn: () => api.manufacturers.list(env),
   });
   const { data: shipsByMfr } = useQuery({
-    queryKey: ['manufacturers.ships', selected],
-    queryFn: () => api.manufacturers.ships(selected!),
+    queryKey: ['manufacturers.ships', selected, env],
+    queryFn: () => api.manufacturers.ships(selected!, env),
     enabled: !!selected,
   });
   const selectedMfr = manufacturers?.find((m: Manufacturer) => m.code === selected);

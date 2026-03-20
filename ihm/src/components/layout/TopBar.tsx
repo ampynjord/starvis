@@ -5,8 +5,10 @@ import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@/services/api';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useEnv } from '@/contexts/EnvContext';
 
 export function TopBar() {
+  const { env } = useEnv();
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const debouncedQuery = useDebounce(query, 300);
@@ -14,8 +16,8 @@ export function TopBar() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: results } = useQuery({
-    queryKey: ['search', debouncedQuery],
-    queryFn: () => api.search(debouncedQuery, 5),
+    queryKey: ['search', debouncedQuery, env],
+    queryFn: () => api.search(debouncedQuery, 5, env),
     enabled: debouncedQuery.length >= 2,
     staleTime: 30_000,
   });

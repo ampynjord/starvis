@@ -11,7 +11,8 @@ export function mountCommodityRoutes(router: Router, deps: RouteDependencies): v
     '/api/v1/commodities/types',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const data = await gameDataService!.commodities.getCommodityTypes();
+      const env = String(req.query.env ?? 'live');
+      const data = await gameDataService!.commodities.getCommodityTypes(env);
       sendWithETag(req, res, { success: true, data: data.types.map((t) => t.type) });
     }),
   );

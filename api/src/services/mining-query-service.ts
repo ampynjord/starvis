@@ -15,18 +15,20 @@ export class MiningQueryService {
 
   // ── Elements ──────────────────────────────────────────────
 
-  async getAllElements(): Promise<Row[]> {
+  async getAllElements(env = 'live'): Promise<Row[]> {
     return this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT uuid, class_name, name, commodity_uuid,
               instability, resistance,
               optimal_window_midpoint, optimal_window_thinness,
               explosion_multiplier, cluster_factor
        FROM mining_elements
+       WHERE game_env = ?
        ORDER BY name ASC`,
+      env,
     );
   }
 
-  async getElementById(uuid: string): Promise<Row | null> {
+  async getElementById(uuid: string, env = 'live'): Promise<Row | null> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT e.*,
               JSON_ARRAYAGG(
@@ -40,11 +42,12 @@ export class MiningQueryService {
                 )
               ) AS found_in
        FROM mining_elements e
-       LEFT JOIN mining_composition_parts p ON p.element_uuid = e.uuid
-       LEFT JOIN mining_compositions c      ON c.uuid = p.composition_uuid
-       WHERE e.uuid = ?
+       LEFT JOIN mining_composition_parts p ON p.element_uuid = e.uuid AND p.game_env = e.game_env
+       LEFT JOIN mining_compositions c      ON c.uuid = p.composition_uuid AND c.game_env = p.game_env
+       WHERE e.uuid = ? AND e.game_env = ?
        GROUP BY e.uuid`,
       uuid,
+      env,
     );
     if (!rows[0]) return null;
     const row = rows[0];
@@ -60,20 +63,22 @@ export class MiningQueryService {
 
   // ── Compositions ──────────────────────────────────────────
 
-  async getAllCompositions(includeEmpty = false): Promise<Row[]> {
+  async getAllCompositions(includeEmpty = false, env = 'live'): Promise<Row[]> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT mc.uuid, mc.class_name, mc.deposit_name, mc.min_distinct_elements,
               COUNT(mcp.id) AS element_count
        FROM mining_compositions mc
-       LEFT JOIN mining_composition_parts mcp ON mcp.composition_uuid = mc.uuid
+       LEFT JOIN mining_composition_parts mcp ON mcp.composition_uuid = mc.uuid AND mcp.game_env = mc.game_env
+       WHERE mc.game_env = ?
        ${includeEmpty ? '' : 'HAVING element_count > 0'}
        GROUP BY mc.uuid
        ORDER BY mc.deposit_name ASC`,
+      env,
     );
     return rows;
   }
 
-  async getCompositionByUuid(uuid: string): Promise<Row | null> {
+  async getCompositionByUuid(uuid: string, env = 'live'): Promise<Row | null> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT mc.*,
               JSON_ARRAYAGG(
@@ -88,11 +93,12 @@ export class MiningQueryService {
                 )
               ) AS elements
        FROM mining_compositions mc
-       LEFT JOIN mining_composition_parts mcp ON mcp.composition_uuid = mc.uuid
-       LEFT JOIN mining_elements e            ON e.uuid = mcp.element_uuid
-       WHERE mc.uuid = ?
+       LEFT JOIN mining_composition_parts mcp ON mcp.composition_uuid = mc.uuid AND mcp.game_env = mc.game_env
+       LEFT JOIN mining_elements e            ON e.uuid = mcp.element_uuid AND e.game_env = mcp.game_env
+       WHERE mc.uuid = ? AND mc.game_env = ?
        GROUP BY mc.uuid`,
       uuid,
+      env,
     );
     if (!rows[0]) return null;
     const row = rows[0];
@@ -113,8 +119,9 @@ export class MiningQueryService {
    * that contain it, sorted by probability descending.
    * Optionally filter by min probability threshold.
    */
-  async solveForElement(elementUuid: string, opts?: { minProbability?: number }): Promise<Row[]> {
+  async solveForElement(elementUuid: string, opts?: { minProbability?: number; env?: string }): Promise<Row[]> {
     const minProb = opts?.minProbability ?? 0;
+    const env = opts?.env ?? 'live';
 
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT mc.uuid, mc.class_name, mc.deposit_name, mc.min_distinct_elements,
@@ -124,13 +131,15 @@ export class MiningQueryService {
               e.optimal_window_midpoint, e.optimal_window_thinness,
               e.explosion_multiplier
        FROM mining_composition_parts mcp
-       JOIN mining_compositions mc ON mc.uuid = mcp.composition_uuid
-       JOIN mining_elements e      ON e.uuid  = mcp.element_uuid
+       JOIN mining_compositions mc ON mc.uuid = mcp.composition_uuid AND mc.game_env = mcp.game_env
+       JOIN mining_elements e      ON e.uuid  = mcp.element_uuid AND e.game_env = mcp.game_env
        WHERE mcp.element_uuid = ?
          AND mcp.probability >= ?
+         AND mcp.game_env = ?
        ORDER BY mcp.probability DESC, mcp.max_percentage DESC`,
       elementUuid,
       minProb,
+      env,
     );
     return rows;
   }
@@ -139,7 +148,7 @@ export class MiningQueryService {
    * Returns all minerals present in a given rock composition,
    * sorted by probability.
    */
-  async solveForComposition(compositionUuid: string): Promise<Row[]> {
+  async solveForComposition(compositionUuid: string, env = 'live'): Promise<Row[]> {
     return this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT e.uuid, e.name, e.class_name,
               e.instability, e.resistance,
@@ -147,19 +156,23 @@ export class MiningQueryService {
               e.explosion_multiplier, e.cluster_factor,
               mcp.min_percentage, mcp.max_percentage, mcp.probability
        FROM mining_composition_parts mcp
-       JOIN mining_elements e ON e.uuid = mcp.element_uuid
-       WHERE mcp.composition_uuid = ?
+       JOIN mining_elements e ON e.uuid = mcp.element_uuid AND e.game_env = mcp.game_env
+       WHERE mcp.composition_uuid = ? AND mcp.game_env = ?
        ORDER BY mcp.probability DESC, mcp.max_percentage DESC`,
       compositionUuid,
+      env,
     );
   }
 
-  async getStats(): Promise<{ elements: number; compositions: number; parts: number }> {
+  async getStats(env = 'live'): Promise<{ elements: number; compositions: number; parts: number }> {
     const [r] = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT
-         (SELECT COUNT(*) FROM mining_elements)         AS elements,
-         (SELECT COUNT(*) FROM mining_compositions)     AS compositions,
-         (SELECT COUNT(*) FROM mining_composition_parts) AS parts`,
+         (SELECT COUNT(*) FROM mining_elements WHERE game_env = ?)         AS elements,
+         (SELECT COUNT(*) FROM mining_compositions WHERE game_env = ?)     AS compositions,
+         (SELECT COUNT(*) FROM mining_composition_parts WHERE game_env = ?) AS parts`,
+      env,
+      env,
+      env,
     );
     return {
       elements: Number(r.elements),

@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import { Clock, Scale, Search, Share2, Shield, User } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '@/services/api';
+import { useEnv } from '@/contexts/EnvContext';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { FilterPanel } from '@/components/ui/FilterPanel';
@@ -41,6 +42,7 @@ const TYPE_COLORS: Record<string, 'cyan' | 'amber' | 'green' | 'red' | 'purple' 
 };
 
 export default function MissionsPage() {
+  const { env } = useEnv();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [type, setType] = useState('');
@@ -49,15 +51,16 @@ export default function MissionsPage() {
   const debouncedSearch = useDebounce(search, 350);
 
   const { data: types } = useQuery({
-    queryKey: ['missions.types'],
-    queryFn: () => api.missions.types(),
+    queryKey: ['missions.types', env],
+    queryFn: () => api.missions.types(env),
     staleTime: Infinity,
   });
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['missions.list', { page, search: debouncedSearch, type, legal, shared }],
+    queryKey: ['missions.list', env, { page, search: debouncedSearch, type, legal, shared }],
     queryFn: () =>
       api.missions.list({
+        env,
         page,
         limit: LIMIT,
         search: debouncedSearch || undefined,

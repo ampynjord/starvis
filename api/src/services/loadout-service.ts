@@ -81,9 +81,10 @@ export class LoadoutService {
 
   // ── Paints (global listing) ─────────────────────────────
 
-  async getAllPaints(opts: { search?: string; ship_uuid?: string; page?: number; limit?: number }): Promise<PaginatedResult> {
-    const where: string[] = [];
-    const params: (string | number)[] = [];
+  async getAllPaints(opts: { env?: string; search?: string; ship_uuid?: string; page?: number; limit?: number }): Promise<PaginatedResult> {
+    const env = opts.env ?? 'live';
+    const where: string[] = ['sp.game_env = ?'];
+    const params: (string | number)[] = [env];
 
     if (opts.search) {
       where.push('(sp.paint_name LIKE ? OR sp.paint_class_name LIKE ? OR s.name LIKE ?)');
