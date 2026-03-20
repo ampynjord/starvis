@@ -9,6 +9,7 @@ dist/
 
 # Data files
 ships-list.json
+ptu_*.sql
 
 # Logs
 logs/
