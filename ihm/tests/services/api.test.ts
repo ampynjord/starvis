@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { api } from '@/services/api';
 
 // Basic fixtures
@@ -20,7 +20,9 @@ function mockFetch(data: unknown, ok = true, status = 200) {
 }
 
 describe('api.stats', () => {
-  afterEach(() => { vi.restoreAllMocks(); });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it('overview() calls /api/v1/stats/overview', async () => {
     global.fetch = mockFetch(mockOverview);
@@ -40,7 +42,9 @@ describe('api.stats', () => {
 });
 
 describe('api.ships', () => {
-  afterEach(() => { vi.restoreAllMocks(); });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it('list() calls /api/v1/ships', async () => {
     global.fetch = mockFetch(mockShipList);
@@ -72,7 +76,9 @@ describe('api.ships', () => {
 });
 
 describe('api.search', () => {
-  afterEach(() => { vi.restoreAllMocks(); });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it('calls /api/v1/search with the search parameter', async () => {
     global.fetch = mockFetch({ ships: [], components: [] });
@@ -84,7 +90,9 @@ describe('api.search', () => {
 });
 
 describe('api.components', () => {
-  afterEach(() => { vi.restoreAllMocks(); });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it('list() calls /api/v1/components', async () => {
     global.fetch = mockFetch({ data: [], pagination: {} });
@@ -100,7 +108,9 @@ describe('api.components', () => {
 });
 
 describe('api.changelog', () => {
-  afterEach(() => { vi.restoreAllMocks(); });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it('summary() calls /api/v1/changelog/summary', async () => {
     global.fetch = mockFetch({});
@@ -110,7 +120,9 @@ describe('api.changelog', () => {
 });
 
 describe('api.loadout', () => {
-  afterEach(() => { vi.restoreAllMocks(); });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
   it('calculate() sends a POST request', async () => {
     global.fetch = mockFetch([]);

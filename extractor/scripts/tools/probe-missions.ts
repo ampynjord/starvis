@@ -2,7 +2,7 @@
  * Probe ContractTemplate (missions) + HarvestablePreset (resources)
  */
 import 'dotenv/config';
-import { DataForgeService } from '../src/dataforge-service.js';
+import { DataForgeService } from '../../src/dataforge-service.js';
 
 const p4kPath = process.argv[process.argv.indexOf('--p4k') + 1] || process.env.P4K_PATH;
 if (!p4kPath) {

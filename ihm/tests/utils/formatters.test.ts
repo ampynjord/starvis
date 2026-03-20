@@ -1,16 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import {
-  fNumber,
-  fMass,
-  fSpeed,
-  fDistance,
-  fCredits,
-  fDate,
-  fDateTime,
-  fSize,
-  fTime,
-  fDimension,
-} from '@/utils/formatters';
+import { describe, expect, it } from 'vitest';
+import { fCredits, fDate, fDateTime, fDimension, fDistance, fMass, fNumber, fSize, fSpeed, fTime } from '@/utils/formatters';
 
 // en-US locale: thousands separator is ',' and decimal separator is '.'
 
@@ -30,7 +19,7 @@ describe('fNumber', () => {
     expect(fNumber(1_000_000)).toBe('1,000,000');
   });
   it('respects decimals parameter', () => {
-    expect(fNumber(3.14159, 2)).toBe('3.14');
+    expect(fNumber(Math.PI, 2)).toBe('3.14');
     expect(fNumber(1234.5678, 0)).toBe('1,235');
   });
 });

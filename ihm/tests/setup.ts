@@ -1,15 +1,29 @@
 import '@testing-library/jest-dom';
-import { vi } from 'vitest';
 import React from 'react';
+import { vi } from 'vitest';
 
 // Mock framer-motion pour jsdom (pas de support animations)
 vi.mock('framer-motion', () => ({
-  motion: new Proxy({}, {
-    get: (_target, prop) =>
-      // Returns a "passthrough" component for each HTML element
-      ({ children, initial: _i, animate: _a, exit: _e, transition: _t, whileHover: _wh, whileTap: _wt, layout: _l, ...rest }: Record<string, unknown>) =>
-        React.createElement(prop as string, rest, children),
-  }),
+  motion: new Proxy(
+    {},
+    {
+      get:
+        (_target, prop) =>
+        // Returns a "passthrough" component for each HTML element
+        ({
+          children,
+          initial: _i,
+          animate: _a,
+          exit: _e,
+          transition: _t,
+          whileHover: _wh,
+          whileTap: _wt,
+          layout: _l,
+          ...rest
+        }: Record<string, unknown>) =>
+          React.createElement(prop as string, rest, children),
+    },
+  ),
   AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
   useAnimation: () => ({ start: vi.fn(), stop: vi.fn() }),
   useInView: () => false,
