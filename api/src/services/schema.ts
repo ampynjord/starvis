@@ -1,9 +1,10 @@
 /**
- * STARVIS - Schema initialization & versioned migrations
- * Reads and executes db/schema.sql, then runs new migrations from db/migrations/
+ * STARVIS - Schema initialization
+ * Executes db/schema.sql on startup (CREATE IF NOT EXISTS — idempotent).
+ * Prisma db push handles subsequent schema changes.
  */
 
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { PrismaClient } from '@prisma/client';
@@ -12,39 +13,11 @@ import logger from '../utils/logger.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export async function initializeSchema(prisma: PrismaClient): Promise<void> {
-  // Docker: db/ is at ../../db (same level as src/)
-  // Monorepo CI/local: db/ is at ../../../db (one level above api/)
   const candidate1 = path.join(__dirname, '..', '..', 'db', 'schema.sql');
   const candidate2 = path.join(__dirname, '..', '..', '..', 'db', 'schema.sql');
   const schemaPath = existsSync(candidate1) ? candidate1 : candidate2;
   logger.info(`Loading schema from: ${schemaPath}`, { module: 'schema' });
   const schema = readFileSync(schemaPath, 'utf-8');
-
-  // Migration: rename ships_default_loadouts → ships_loadouts if needed
-  try {
-    const tables = await prisma.$queryRawUnsafe<any[]>(
-      "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ships_default_loadouts'",
-    );
-    if (tables.length > 0) {
-      logger.info('Renaming ships_default_loadouts → ships_loadouts', { module: 'schema' });
-      await prisma.$executeRawUnsafe('RENAME TABLE ships_default_loadouts TO ships_loadouts');
-    }
-  } catch (e: any) {
-    logger.debug(`Migration skip: ${e.message}`, { module: 'schema' });
-  }
-
-  // Migration: rename ships_loadouts → ship_loadouts if needed (naming consistency)
-  try {
-    const tables = await prisma.$queryRawUnsafe<any[]>(
-      "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ships_loadouts'",
-    );
-    if (tables.length > 0) {
-      logger.info('Renaming ships_loadouts → ship_loadouts', { module: 'schema' });
-      await prisma.$executeRawUnsafe('RENAME TABLE ships_loadouts TO ship_loadouts');
-    }
-  } catch (e: any) {
-    logger.debug(`Migration skip: ${e.message}`, { module: 'schema' });
-  }
 
   // Split on semicolons, respecting single-quoted strings
   // (naive split(';') breaks on COMMENTs like 'text; more text')
@@ -85,85 +58,4 @@ export async function initializeSchema(prisma: PrismaClient): Promise<void> {
   }
 
   logger.info('Schema initialized', { module: 'schema' });
-
-  // ── Versioned migrations from db/migrations/*.sql ──
-  await runVersionedMigrations(prisma);
-}
-
-/**
- * Run versioned SQL migrations from db/migrations/ directory.
- * Each file is named NNN_description.sql and tracked in a `schema_migrations` table.
- */
-async function runVersionedMigrations(prisma: PrismaClient): Promise<void> {
-  // Handle older installations where the column was named 'version' instead of 'filename'
-  // (schema.sql now creates the table with 'filename'; this ALTER is a no-op on current installs)
-  try {
-    await prisma.$executeRawUnsafe(`ALTER TABLE schema_migrations CHANGE COLUMN version filename VARCHAR(255) NOT NULL`);
-    logger.info('Migrated schema_migrations: renamed column version -> filename', { module: 'schema' });
-  } catch (_) {
-    // Column already named 'filename' — nothing to do
-  }
-
-  // Find migrations directory
-  const candidate1 = path.join(__dirname, '..', '..', 'db', 'migrations');
-  const candidate2 = path.join(__dirname, '..', '..', '..', 'db', 'migrations');
-  const migrationsDir = existsSync(candidate1) ? candidate1 : existsSync(candidate2) ? candidate2 : null;
-
-  if (!migrationsDir) {
-    logger.debug('No migrations directory found, skipping versioned migrations', { module: 'schema' });
-    return;
-  }
-
-  // Get already-applied migrations (stored as filename WITH .sql extension)
-  const applied = await prisma.$queryRawUnsafe<any[]>('SELECT filename FROM schema_migrations');
-  const appliedSet = new Set(applied.map((r: any) => r.filename));
-
-  // Read and sort migration files
-  const files = readdirSync(migrationsDir)
-    .filter((f) => f.endsWith('.sql'))
-    .sort();
-
-  for (const file of files) {
-    const version = file;
-    if (appliedSet.has(version)) continue;
-
-    logger.info(`Running migration: ${file}`, { module: 'schema' });
-    const sql = readFileSync(path.join(migrationsDir, file), 'utf-8');
-    // Strip -- line comments first, then split on ; respecting single-quoted strings
-    // (naive split(';') breaks on COMMENTs like 'text; more text')
-    const noComments = sql.replace(/--[^\n]*$/gm, '');
-    const statements: string[] = [];
-    let current = '';
-    let inString = false;
-    for (const ch of noComments) {
-      if (ch === "'") {
-        inString = !inString;
-        current += ch;
-      } else if (ch === ';' && !inString) {
-        const s = current.trim();
-        if (s.length > 5) statements.push(s);
-        current = '';
-      } else {
-        current += ch;
-      }
-    }
-    const last = current.trim();
-    if (last.length > 5) statements.push(last);
-
-    for (const stmt of statements) {
-      try {
-        await prisma.$executeRawUnsafe(stmt);
-      } catch (e: any) {
-        // Skip benign errors (already exists, duplicate key, etc.)
-        if (['ER_TABLE_EXISTS_ERROR', 'ER_DUP_KEYNAME', 'ER_DUP_FIELDNAME', 'ER_CANT_DROP_FIELD_OR_KEY'].includes(e.code)) {
-          logger.debug(`Migration ${file}: ${e.message} (skipped)`, { module: 'schema' });
-        } else {
-          throw e;
-        }
-      }
-    }
-
-    await prisma.$executeRawUnsafe('INSERT INTO schema_migrations (filename) VALUES (?)', version);
-    logger.info(`Migration ${file} applied`, { module: 'schema' });
-  }
 }
