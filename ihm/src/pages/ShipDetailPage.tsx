@@ -132,7 +132,7 @@ export default function ShipDetailPage() {
                 {ship.vehicle_category && ship.vehicle_category !== 'ship' && <GlowBadge color="slate">{ship.vehicle_category}</GlowBadge>}
                 {ship.variant_type && ship.variant_type !== 'standard' && (
                   <GlowBadge
-                    color={ship.variant_type === 'collector' ? 'amber' : ship.variant_type === 'npc' ? 'red' : 'slate'}
+                    color={ship.variant_type === 'collector' ? 'amber' : ship.variant_type === 'wikelo' ? 'green' : ship.variant_type === 'pyam_exec' ? 'purple' : 'slate'}
                   >
                     {VARIANT_TYPE_LABELS[ship.variant_type] ?? ship.variant_type}
                   </GlowBadge>

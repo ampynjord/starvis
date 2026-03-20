@@ -3,14 +3,14 @@ export const API_BASE = '/api/v1';
 export const VARIANT_TYPE_LABELS: Record<string, string> = {
   standard: 'Standard',
   collector: 'Collector',
-  npc: 'NPC',
+  wikelo: 'Wikelo',
   pyam_exec: 'PyAM / Exec',
 };
 
 export const VARIANT_TYPE_COLORS: Record<string, string> = {
   standard: 'text-cyan-400 border-cyan-800 bg-cyan-950/40',
   collector: 'text-amber-400 border-amber-800 bg-amber-950/40',
-  npc: 'text-red-400 border-red-800 bg-red-950/40',
+  wikelo: 'text-emerald-400 border-emerald-800 bg-emerald-950/40',
   pyam_exec: 'text-purple-400 border-purple-800 bg-purple-950/40',
 };
 

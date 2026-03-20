@@ -43,7 +43,7 @@ export function ShipCard({ ship, index = 0 }: Props) {
                 <GlowBadge
                   color={
                     ship.variant_type === 'collector' ? 'amber' :
-                    ship.variant_type === 'npc' ? 'red' :
+                    ship.variant_type === 'wikelo' ? 'green' :
                     ship.variant_type === 'pyam_exec' ? 'purple' : 'slate'
                   }
                 >
