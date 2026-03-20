@@ -8,6 +8,7 @@ import { ChevronRight, ChevronDown, Settings2, X, Zap, Shield, Wind, Cpu, Search
 import { useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/services/api';
+import { useEnv } from '@/contexts/EnvContext';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
@@ -485,6 +486,7 @@ function HardpointRow({
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function OutfitterPage() {
+  const { env } = useEnv();
   const [shipSearch, setShipSearch]     = useState('');
   const [selectedShip, setSelectedShip] = useState<ShipListItem | null>(null);
   // swaps: portId (number) → componentUuid
@@ -493,8 +495,8 @@ export default function OutfitterPage() {
   const dShipSearch = useDebounce(shipSearch, 300);
 
   const { data: shipSuggestions } = useQuery({
-    queryKey: ['ships.search', dShipSearch],
-    queryFn: () => api.ships.search(dShipSearch, 8),
+    queryKey: ['ships.search', dShipSearch, env],
+    queryFn: () => api.ships.search(dShipSearch, 8, env),
     enabled: dShipSearch.length >= 2 && !selectedShip,
   });
 

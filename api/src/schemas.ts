@@ -107,6 +107,7 @@ export const SearchQuery = z.object({ search: qStr, format: qStr }).passthrough(
 
 export const PaintQuery = z
   .object({
+    env: qEnv,
     search: qStr,
     ship_uuid: qStr,
     page: qInt(1),

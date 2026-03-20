@@ -11,7 +11,8 @@ export function mountMiningRoutes(router: Router, deps: RouteDependencies): void
     '/api/v1/mining/elements',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const data = await gameDataService!.mining.getAllElements();
+      const env = String(req.query.env ?? 'live');
+      const data = await gameDataService!.mining.getAllElements(env);
       sendWithETag(req, res, { success: true, count: data.length, data });
     }),
   );
@@ -21,7 +22,8 @@ export function mountMiningRoutes(router: Router, deps: RouteDependencies): void
     '/api/v1/mining/elements/:uuid',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const data = await gameDataService!.mining.getElementById(req.params.uuid);
+      const env = String(req.query.env ?? 'live');
+      const data = await gameDataService!.mining.getElementById(req.params.uuid, env);
       if (!data) return void res.status(404).json({ success: false, error: 'Element not found' });
       sendWithETag(req, res, { success: true, data });
     }),
@@ -33,7 +35,8 @@ export function mountMiningRoutes(router: Router, deps: RouteDependencies): void
     requireGameData,
     asyncHandler(async (req, res) => {
       const includeEmpty = req.query.include_empty === 'true';
-      const data = await gameDataService!.mining.getAllCompositions(includeEmpty);
+      const env = String(req.query.env ?? 'live');
+      const data = await gameDataService!.mining.getAllCompositions(includeEmpty, env);
       sendWithETag(req, res, { success: true, count: data.length, data });
     }),
   );
@@ -43,7 +46,8 @@ export function mountMiningRoutes(router: Router, deps: RouteDependencies): void
     '/api/v1/mining/compositions/:uuid',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const data = await gameDataService!.mining.getCompositionByUuid(req.params.uuid);
+      const env = String(req.query.env ?? 'live');
+      const data = await gameDataService!.mining.getCompositionByUuid(req.params.uuid, env);
       if (!data) return void res.status(404).json({ success: false, error: 'Composition not found' });
       sendWithETag(req, res, { success: true, data });
     }),
@@ -56,6 +60,7 @@ export function mountMiningRoutes(router: Router, deps: RouteDependencies): void
     requireGameData,
     asyncHandler(async (req, res) => {
       const { element, composition, min_probability } = req.query as Record<string, string | undefined>;
+      const env = String(req.query.env ?? 'live');
 
       if (!element && !composition) {
         return void res.status(400).json({ success: false, error: 'Provide either element or composition query param' });
@@ -64,11 +69,11 @@ export function mountMiningRoutes(router: Router, deps: RouteDependencies): void
       const minProb = min_probability !== undefined ? Number(min_probability) : 0;
 
       if (element) {
-        const data = await gameDataService!.mining.solveForElement(element, { minProbability: minProb });
+        const data = await gameDataService!.mining.solveForElement(element, { minProbability: minProb, env });
         return void sendWithETag(req, res, { success: true, count: data.length, data });
       }
 
-      const data = await gameDataService!.mining.solveForComposition(composition!);
+      const data = await gameDataService!.mining.solveForComposition(composition!, env);
       sendWithETag(req, res, { success: true, count: data.length, data });
     }),
   );
@@ -78,7 +83,8 @@ export function mountMiningRoutes(router: Router, deps: RouteDependencies): void
     '/api/v1/mining/stats',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const data = await gameDataService!.mining.getStats();
+      const env = String(req.query.env ?? 'live');
+      const data = await gameDataService!.mining.getStats(env);
       sendWithETag(req, res, { success: true, data });
     }),
   );

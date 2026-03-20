@@ -215,34 +215,39 @@ export class ShipQueryService {
     };
   }
 
-  async getAllManufacturers(): Promise<Row[]> {
+  async getAllManufacturers(env = 'live'): Promise<Row[]> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT m.*, COUNT(DISTINCT c.uuid) as component_count, COUNT(DISTINCT s.uuid) as ship_count
-       FROM manufacturers m LEFT JOIN components c ON m.code = c.manufacturer_code LEFT JOIN ships s ON m.code = s.manufacturer_code
+       FROM manufacturers m LEFT JOIN components c ON m.code = c.manufacturer_code AND c.game_env = ? LEFT JOIN ships s ON m.code = s.manufacturer_code AND s.game_env = ?
        GROUP BY m.code ORDER BY m.name`,
+      env,
+      env,
     );
     // Convert BigInt to Number for JSON serialization
     return rows.map((r) => ({ ...r, component_count: Number(r.component_count), ship_count: Number(r.ship_count) }));
   }
 
-  async getShipManufacturers(): Promise<Row[]> {
+  async getShipManufacturers(env = 'live'): Promise<Row[]> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT m.code, m.name, COUNT(s.uuid) as ship_count
-       FROM manufacturers m INNER JOIN ships s ON m.code = s.manufacturer_code
+       FROM manufacturers m INNER JOIN ships s ON m.code = s.manufacturer_code AND s.game_env = ?
        GROUP BY m.code, m.name ORDER BY m.name`,
+      env,
     );
     // Convert BigInt to Number for JSON serialization
     return rows.map((r) => ({ ...r, ship_count: Number(r.ship_count) }));
   }
 
-  async getManufacturerByCode(code: string): Promise<Row | null> {
+  async getManufacturerByCode(code: string, env = 'live'): Promise<Row | null> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT m.*, COUNT(DISTINCT s.uuid) as ship_count, COUNT(DISTINCT c.uuid) as component_count
        FROM manufacturers m
-       LEFT JOIN ships s ON m.code = s.manufacturer_code
-       LEFT JOIN components c ON m.code = c.manufacturer_code
+       LEFT JOIN ships s ON m.code = s.manufacturer_code AND s.game_env = ?
+       LEFT JOIN components c ON m.code = c.manufacturer_code AND c.game_env = ?
        WHERE m.code = ?
        GROUP BY m.code`,
+      env,
+      env,
       code.toUpperCase(),
     );
     const raw = rows[0];
@@ -251,23 +256,25 @@ export class ShipQueryService {
     return { ...raw, ship_count: Number(raw.ship_count), component_count: Number(raw.component_count) };
   }
 
-  async getManufacturerShips(code: string): Promise<Row[]> {
+  async getManufacturerShips(code: string, env = 'live'): Promise<Row[]> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS}
-       WHERE s.manufacturer_code = ? AND (s.variant_type IS NULL OR s.variant_type NOT IN ('tutorial','enemy_ai','arena_ai','competition'))
+       WHERE s.manufacturer_code = ? AND s.game_env = ? AND (s.variant_type IS NULL OR s.variant_type NOT IN ('tutorial','enemy_ai','arena_ai','competition'))
        ORDER BY s.name`,
       code.toUpperCase(),
+      env,
     );
     return rows.map(({ game_data, ...rest }) => convertBigIntToNumber(rest));
   }
 
-  async getManufacturerComponents(code: string): Promise<Row[]> {
+  async getManufacturerComponents(code: string, env = 'live'): Promise<Row[]> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade, c.manufacturer_code,
               m.name as manufacturer_name
        FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code
-       WHERE c.manufacturer_code = ? ORDER BY c.type, c.size, c.name`,
+       WHERE c.manufacturer_code = ? AND c.game_env = ? ORDER BY c.type, c.size, c.name`,
       code.toUpperCase(),
+      env,
     );
     return rows;
   }

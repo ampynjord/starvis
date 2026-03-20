@@ -60,7 +60,8 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
     '/api/v1/missions/:uuid',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const mission = await gameDataService!.missions.getMissionByUuid(req.params.uuid);
+      const env = String(req.query.env ?? 'live');
+      const mission = await gameDataService!.missions.getMissionByUuid(req.params.uuid, env);
       if (!mission) return void res.status(404).json({ success: false, error: 'Mission not found' });
       sendWithETag(req, res, { success: true, data: mission });
     }),

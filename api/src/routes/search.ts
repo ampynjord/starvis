@@ -16,7 +16,8 @@ export function mountSearchRoutes(router: Router, deps: RouteDependencies): void
       if (!search || search.length < 2)
         return void res.status(400).json({ success: false, error: "Query 'search' must be at least 2 characters" });
       const limit = parseInt(String(req.query.limit ?? '10'), 10) || 10;
-      const data = await gameDataService!.unifiedSearch(search, limit);
+      const env = String(req.query.env ?? 'live');
+      const data = await gameDataService!.unifiedSearch(search, limit, env);
       sendWithETag(req, res, {
         success: true,
         data,
