@@ -203,6 +203,10 @@ export async function populateChassisId(conn: PoolConnection): Promise<number> {
 
 /** Tag variant types for ships not linked to Ship Matrix */
 export async function tagVariantTypes(conn: PoolConnection): Promise<void> {
+  // Tag SM-linked ships that are ultra-rare collectors
+  await conn.execute(
+    "UPDATE ships SET variant_type = 'collector' WHERE class_name IN ('VNCL_Scythe', 'ANVL_Lightning_F8C_Exec') AND variant_type IS NULL",
+  );
   const rules: Array<{ type: string; patterns: string[] }> = [
     // collector: true limited/exclusive editions (only 2 today)
     {
