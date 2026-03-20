@@ -103,7 +103,7 @@ export const LoadoutBody = z.object({
     .default([]),
 });
 
-export const SearchQuery = z.object({ search: qStr, format: qStr }).passthrough();
+export const SearchQuery = z.object({ env: qEnv, search: qStr, format: qStr }).passthrough();
 
 export const PaintQuery = z
   .object({
