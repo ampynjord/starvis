@@ -30,6 +30,23 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: starvis-redis
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes --maxmemory 32mb --maxmemory-policy allkeys-lru
+
   api:
     image: ghcr.io/ampynjord/starvis-api:latest
     container_name: starvis-api
@@ -41,6 +58,8 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
       ADMIN_API_KEY: ${ADMIN_API_KEY}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       CORS_ORIGIN: ${CORS_ORIGIN:-https://starvis.ampynjord.bzh}
@@ -59,6 +78,8 @@ services:
       start_period: 15s
     depends_on:
       mysql:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     networks:
       - default
@@ -101,6 +122,7 @@ services:
 
 volumes:
   mysql_data:
+  redis_data:
 
 networks:
   traefik-network:
