@@ -42,8 +42,10 @@ FROM base AS production
 # Install production deps (includes prisma CLI for db push at startup)
 COPY api/package*.json ./
 COPY api/prisma/ ./prisma/
-# postinstall runs "prisma generate" to create the client
-RUN npm ci --omit=dev && npm cache clean --force
+# --ignore-scripts skips "prepare" (husky, not available in prod)
+# then we run prisma generate manually to create the client
+RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
+RUN npx prisma generate
 
 # Copy source
 COPY api/server.ts ./
