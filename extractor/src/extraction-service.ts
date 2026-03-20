@@ -1655,7 +1655,7 @@ export class ExtractionService {
     // Filter out test/template entries
     const elements = allElements.filter((e) => !e.className.toLowerCase().includes('test') && !e.name?.toLowerCase().includes('template'));
 
-    const allCompositions = extractMiningCompositions(this.dfService, allElements, locAdapter);
+    const allCompositions = extractMiningCompositions(this.dfService, elements, locAdapter);
     // Filter out test/template compositions
     const compositions = allCompositions.filter(
       (c) => !c.className.toLowerCase().includes('test') && !c.depositName?.toLowerCase().includes('test'),
@@ -1711,10 +1711,13 @@ export class ExtractionService {
     );
 
     // ── Save composition parts ──
+    const elementUuidSet = new Set(elements.map((e) => e.uuid));
     const partRows: (string | number | null)[][] = [];
     for (const comp of compositions) {
       for (const part of comp.parts) {
-        partRows.push([comp.uuid, part.elementUuid, env, part.minPercentage, part.maxPercentage, part.probability, part.curveExponent]);
+        if (elementUuidSet.has(part.elementUuid)) {
+          partRows.push([comp.uuid, part.elementUuid, env, part.minPercentage, part.maxPercentage, part.probability, part.curveExponent]);
+        }
       }
     }
     if (partRows.length > 0) {
