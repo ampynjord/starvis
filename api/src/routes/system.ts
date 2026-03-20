@@ -35,7 +35,8 @@ export function mountSystemRoutes(router: Router, deps: RouteDependencies): void
     '/api/v1/stats/overview',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const data = await gameDataService!.getPublicStats();
+      const env = String(req.query.env ?? 'live');
+      const data = await gameDataService!.getPublicStats(env);
       sendWithETag(req, res, { success: true, data });
     }),
   );

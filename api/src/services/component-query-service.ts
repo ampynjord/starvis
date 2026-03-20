@@ -137,21 +137,23 @@ export class ComponentQueryService {
     return rows;
   }
 
-  async getComponentShips(uuid: string): Promise<Row[]> {
+  async getComponentShips(uuid: string, env = 'live'): Promise<Row[]> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT DISTINCT s.uuid, s.name, s.class_name, s.manufacturer_code, m.name as manufacturer_name
        FROM ships_loadouts sl
-       JOIN ships s ON sl.ship_uuid = s.uuid
+       JOIN ships s ON sl.ship_uuid = s.uuid AND sl.game_env = s.game_env
        LEFT JOIN manufacturers m ON s.manufacturer_code = m.code
-       WHERE sl.component_uuid = ? ORDER BY s.name`,
+       WHERE sl.component_uuid = ? AND sl.game_env = ? ORDER BY s.name`,
       uuid,
+      env,
     );
     return rows;
   }
 
-  async getComponentTypes(): Promise<{ types: { type: string; count: number }[] }> {
+  async getComponentTypes(env = 'live'): Promise<{ types: { type: string; count: number }[] }> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-      'SELECT type, COUNT(*) as count FROM components GROUP BY type ORDER BY count DESC',
+      'SELECT type, COUNT(*) as count FROM components WHERE game_env = ? GROUP BY type ORDER BY count DESC',
+      env,
     );
     return { types: rows.map((r) => ({ type: String(r.type), count: Number(r.count) })) };
   }

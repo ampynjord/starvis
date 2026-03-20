@@ -57,12 +57,15 @@ const VALID_MODULES: ExtractionModule[] = ['ships', 'components', 'items', 'comm
 function parseArgs(): { p4kPath: string; env: GameEnv; modules: Set<ExtractionModule | 'all'> } {
   const args = process.argv.slice(2);
   let p4kPath = process.env.P4K_PATH || '';
+  let p4kExplicit = false;
   let env: GameEnv = 'live';
+  let envExplicit = false;
   let modules: Set<ExtractionModule | 'all'> = new Set(['all']);
 
   for (let i = 0; i < args.length; i++) {
     if ((args[i] === '--p4k' || args[i] === '-p') && args[i + 1]) {
       p4kPath = args[++i];
+      p4kExplicit = true;
     } else if (args[i] === '--env' && args[i + 1]) {
       const v = args[++i] as GameEnv;
       if (!['live', 'ptu', 'eptu', 'custom'].includes(v)) {
@@ -70,6 +73,7 @@ function parseArgs(): { p4kPath: string; env: GameEnv; modules: Set<ExtractionMo
         process.exit(1);
       }
       env = v;
+      envExplicit = true;
     } else if (args[i] === '--only' && args[i + 1]) {
       const parts = args[++i].split(',').map((s) => s.trim().toLowerCase());
       const invalid = parts.filter((m) => m !== 'all' && !VALID_MODULES.includes(m as ExtractionModule));
@@ -112,8 +116,14 @@ Examples:
     }
   }
 
-  // Auto-detect P4K path from environment if not specified
-  if (!p4kPath) {
+  // Auto-detect P4K path: when --env is explicit and --p4k is not, override P4K_PATH env var
+  if (!p4kExplicit && envExplicit) {
+    const detected = autoDetectP4K(env);
+    if (detected) {
+      p4kPath = detected;
+      logger.info(`Auto-detected P4K for ${env.toUpperCase()}: ${p4kPath}`);
+    }
+  } else if (!p4kPath) {
     const detected = autoDetectP4K(env);
     if (detected) {
       p4kPath = detected;

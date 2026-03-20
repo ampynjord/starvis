@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '@/services/api';
+import { useEnv } from '@/contexts/EnvContext';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { GlowBadge } from '@/components/ui/GlowBadge';
@@ -84,9 +85,10 @@ const TOOL_CARDS: {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
+  const { env } = useEnv();
   const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ['stats.overview'],
-    queryFn: api.stats.overview,
+    queryKey: ['stats.overview', env],
+    queryFn: () => api.stats.overview(env),
   });
   const { data: version } = useQuery({
     queryKey: ['version'],

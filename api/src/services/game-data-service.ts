@@ -61,24 +61,26 @@ export class GameDataService {
 
   // ── Unified search (cross-cutting — queries ships + components + items) ──
 
-  async unifiedSearch(q: string, limit = 10): Promise<{ ships: Row[]; components: Row[]; items: Row[] }> {
+  async unifiedSearch(q: string, limit = 10, env = 'live'): Promise<{ ships: Row[]; components: Row[]; items: Row[] }> {
     const cap = Math.min(limit, 20);
     const t = `%${q}%`;
     const [ships, components, items] = await Promise.all([
-      this.ships.searchShipsAutocomplete(q, cap),
+      this.ships.searchShipsAutocomplete(q, cap, env),
       this.prisma.$queryRawUnsafe<Row[]>(
         `SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade, c.manufacturer_code,
                 m.name as manufacturer_name
          FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code
-         WHERE c.name LIKE ? OR c.class_name LIKE ?
+         WHERE c.game_env = ? AND (c.name LIKE ? OR c.class_name LIKE ?)
          ORDER BY c.name LIMIT ${cap}`,
+        env,
         t,
         t,
       ),
       this.prisma.$queryRawUnsafe<Row[]>(
         `SELECT i.uuid, i.class_name, i.name, i.type, i.sub_type, i.manufacturer_code
-         FROM items i WHERE i.name LIKE ? OR i.class_name LIKE ?
+         FROM items i WHERE i.game_env = ? AND (i.name LIKE ? OR i.class_name LIKE ?)
          ORDER BY i.name LIMIT ${cap}`,
+        env,
         t,
         t,
       ),
@@ -118,21 +120,23 @@ export class GameDataService {
     return { data: rows, total };
   }
 
-  async getStats(): Promise<Record<string, unknown>> {
-    const cached = this.statsCache.get();
-    if (cached) return cached;
+  async getStats(env = 'live'): Promise<Record<string, unknown>> {
+    if (env === 'live') {
+      const cached = this.statsCache.get();
+      if (cached) return cached;
+    }
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(`
       SELECT
-        (SELECT COUNT(*) FROM ships) as ships,
-        (SELECT COUNT(*) FROM components) as components,
-        (SELECT COUNT(*) FROM items) as items,
-        (SELECT COUNT(*) FROM commodities) as commodities,
+        (SELECT COUNT(*) FROM ships WHERE game_env = ?) as ships,
+        (SELECT COUNT(*) FROM components WHERE game_env = ?) as components,
+        (SELECT COUNT(*) FROM items WHERE game_env = ?) as items,
+        (SELECT COUNT(*) FROM commodities WHERE game_env = ?) as commodities,
         (SELECT COUNT(*) FROM manufacturers) as manufacturers,
-        (SELECT COUNT(*) FROM ship_loadouts) as loadoutPorts,
-        (SELECT COUNT(*) FROM ship_paints) as paints,
-        (SELECT COUNT(*) FROM shops) as shops,
-        (SELECT COUNT(*) FROM ships WHERE ship_matrix_id IS NOT NULL) as shipsLinkedToMatrix
-    `);
+        (SELECT COUNT(*) FROM ship_loadouts WHERE game_env = ?) as loadoutPorts,
+        (SELECT COUNT(*) FROM ship_paints WHERE game_env = ?) as paints,
+        (SELECT COUNT(*) FROM shops WHERE game_env = ?) as shops,
+        (SELECT COUNT(*) FROM ships WHERE ship_matrix_id IS NOT NULL AND game_env = ?) as shipsLinkedToMatrix
+    `, env, env, env, env, env, env, env, env);
     const latest = await this.getLatestExtraction();
     const raw = rows[0];
     // Convert BigInt to Number for JSON serialization
@@ -148,7 +152,7 @@ export class GameDataService {
       shipsLinkedToMatrix: Number(raw.shipsLinkedToMatrix),
       latestExtraction: latest,
     };
-    this.statsCache.set(result);
+    if (env === 'live') this.statsCache.set(result);
     return result;
   }
 
@@ -162,23 +166,25 @@ export class GameDataService {
     return rows[0] || null;
   }
 
-  async getPublicStats(): Promise<Record<string, unknown>> {
-    const cached = this.publicStatsCache.get();
-    if (cached) return cached;
+  async getPublicStats(env = 'live'): Promise<Record<string, unknown>> {
+    if (env === 'live') {
+      const cached = this.publicStatsCache.get();
+      if (cached) return cached;
+    }
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(`
       SELECT
-        (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL) as ships,
-        (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL AND vehicle_category = 'ship') as flyable_ships,
-        (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL AND vehicle_category = 'ground') as ground_vehicles,
-        (SELECT COUNT(*) FROM components) as components,
-        (SELECT COUNT(*) FROM items) as items,
-        (SELECT COUNT(*) FROM commodities) as commodities,
+        (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL AND game_env = ?) as ships,
+        (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL AND vehicle_category = 'ship' AND game_env = ?) as flyable_ships,
+        (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL AND vehicle_category = 'ground' AND game_env = ?) as ground_vehicles,
+        (SELECT COUNT(*) FROM components WHERE game_env = ?) as components,
+        (SELECT COUNT(*) FROM items WHERE game_env = ?) as items,
+        (SELECT COUNT(*) FROM commodities WHERE game_env = ?) as commodities,
         (SELECT COUNT(*) FROM manufacturers) as manufacturers,
-        (SELECT COUNT(*) FROM ship_paints) as paints,
-        (SELECT COUNT(*) FROM shops) as shops,
-        (SELECT COUNT(DISTINCT type) FROM components) as component_types,
-        (SELECT COUNT(DISTINCT type) FROM items) as item_types
-    `);
+        (SELECT COUNT(*) FROM ship_paints WHERE game_env = ?) as paints,
+        (SELECT COUNT(*) FROM shops WHERE game_env = ?) as shops,
+        (SELECT COUNT(DISTINCT type) FROM components WHERE game_env = ?) as component_types,
+        (SELECT COUNT(DISTINCT type) FROM items WHERE game_env = ?) as item_types
+    `, env, env, env, env, env, env, env, env, env, env);
     const latest = await this.getLatestExtraction();
     const raw = rows[0];
     // Convert BigInt to Number for JSON serialization
@@ -197,7 +203,7 @@ export class GameDataService {
       game_version: latest?.game_version || null,
       last_extraction: latest?.extracted_at || null,
     };
-    this.publicStatsCache.set(result);
+    if (env === 'live') this.publicStatsCache.set(result);
     return result;
   }
 

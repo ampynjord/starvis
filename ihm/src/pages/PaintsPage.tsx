@@ -4,6 +4,7 @@ import { Palette, Search } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/services/api';
+import { useEnv } from '@/contexts/EnvContext';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { Pagination } from '@/components/ui/Pagination';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -14,13 +15,14 @@ import type { PaintListItem } from '@/types/api';
 const LIMIT = 40;
 
 export default function PaintsPage() {
+  const { env } = useEnv();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 350);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['paints.list', { page, search: debouncedSearch }],
-    queryFn: () => api.paints.list({ page, limit: LIMIT, search: debouncedSearch || undefined }),
+    queryKey: ['paints.list', env, { page, search: debouncedSearch }],
+    queryFn: () => api.paints.list({ env, page, limit: LIMIT, search: debouncedSearch || undefined }),
   });
 
   return (

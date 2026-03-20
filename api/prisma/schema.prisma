@@ -87,7 +87,7 @@ model Manufacturer {
 }
 
 model Ship {
-  uuid                  String   @id @db.Char(36)
+  uuid                  String   @db.Char(36)
   gameEnv               String   @default("live") @map("game_env") @db.VarChar(10)
   className             String   @map("class_name") @db.VarChar(255)
   name                  String?  @db.VarChar(255)
@@ -149,6 +149,7 @@ model Ship {
   modules      ShipModule[]
   paints       ShipPaint[]
 
+  @@id([uuid, gameEnv])
   @@index([manufacturerCode], map: "idx_ship_manufacturer_code")
   @@index([shipMatrixId], map: "idx_ship_matrix_id")
   @@index([gameEnv], map: "idx_game_env")
@@ -157,7 +158,7 @@ model Ship {
 }
 
 model Component {
-  uuid                    String   @id @db.Char(36)
+  uuid                    String   @db.Char(36)
   gameEnv                 String   @default("live") @map("game_env") @db.VarChar(10)
   className               String   @map("class_name") @db.VarChar(255)
   name                    String   @db.VarChar(255)
@@ -253,6 +254,7 @@ model Component {
   loadouts      ShipLoadout[]
   shopInventory ShopInventory[]
 
+  @@id([uuid, gameEnv])
   @@index([manufacturerCode], map: "idx_component_manufacturer_code")
   @@index([type], map: "idx_component_type")
   @@index([subType], map: "idx_component_sub_type")
@@ -274,8 +276,8 @@ model ShipLoadout {
   parentId           Int?    @map("parent_id")
 
   // Relations
-  ship      Ship?      @relation(fields: [shipUuid], references: [uuid], onDelete: Cascade, map: "fk_loadout_ship")
-  component Component? @relation(fields: [componentUuid], references: [uuid], onDelete: SetNull, map: "fk_loadout_component")
+  ship      Ship?      @relation(fields: [shipUuid, gameEnv], references: [uuid, gameEnv], onDelete: Cascade, map: "fk_loadout_ship")
+  component Component? @relation(fields: [componentUuid, gameEnv], references: [uuid, gameEnv], onDelete: Cascade, map: "fk_loadout_component")
 
   @@index([shipUuid], map: "idx_loadout_ship")
   @@index([componentUuid], map: "idx_loadout_component")
@@ -296,7 +298,7 @@ model ShipModule {
   loadoutJson     Json?   @map("loadout_json")
 
   // Relations
-  ship Ship @relation(fields: [shipUuid], references: [uuid], onDelete: Cascade, map: "fk_module_ship")
+  ship Ship @relation(fields: [shipUuid, gameEnv], references: [uuid, gameEnv], onDelete: Cascade, map: "fk_module_ship")
 
   @@index([shipUuid], map: "idx_module_ship")
   @@map("ship_modules")
@@ -311,14 +313,14 @@ model ShipPaint {
   paintUuid      String? @map("paint_uuid") @db.Char(36)
 
   // Relations
-  ship Ship @relation(fields: [shipUuid], references: [uuid], onDelete: Cascade, map: "fk_paint_ship")
+  ship Ship @relation(fields: [shipUuid, gameEnv], references: [uuid, gameEnv], onDelete: Cascade, map: "fk_paint_ship")
 
   @@index([shipUuid], map: "idx_paint_ship")
   @@map("ship_paints")
 }
 
 model Item {
-  uuid                 String   @id @db.Char(36)
+  uuid                 String   @db.Char(36)
   gameEnv              String   @default("live") @map("game_env") @db.VarChar(10)
   className            String   @map("class_name") @db.VarChar(255)
   name                 String   @db.VarChar(255)
@@ -343,12 +345,13 @@ model Item {
   createdAt            DateTime @default(now()) @map("created_at") @db.DateTime(0)
   updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
 
+  @@id([uuid, gameEnv])
   @@index([gameEnv], map: "idx_game_env")
   @@map("items")
 }
 
 model Commodity {
-  uuid         String   @id @db.Char(36)
+  uuid         String   @db.Char(36)
   gameEnv      String   @default("live") @map("game_env") @db.VarChar(10)
   className    String   @map("class_name") @db.VarChar(255)
   name         String   @db.VarChar(255)
@@ -360,6 +363,7 @@ model Commodity {
   createdAt    DateTime @default(now()) @map("created_at") @db.DateTime(0)
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
 
+  @@id([uuid, gameEnv])
   @@index([gameEnv], map: "idx_game_env")
   @@map("commodities")
 }
@@ -400,7 +404,7 @@ model ShopInventory {
 
   // Relations
   shop      Shop       @relation(fields: [shopId], references: [id], onDelete: Cascade, map: "fk_inventory_shop")
-  component Component? @relation(fields: [componentUuid], references: [uuid], onDelete: SetNull, map: "fk_inventory_component")
+  component Component? @relation(fields: [componentUuid, gameEnv], references: [uuid, gameEnv], onDelete: Cascade, map: "fk_inventory_component")
 
   @@unique([shopId, componentClassName], map: "uk_shop_component")
   @@index([shopId], map: "idx_shop_id")
@@ -454,7 +458,7 @@ model Changelog {
 }
 
 model MiningElement {
-  uuid                       String   @id @db.Char(36)
+  uuid                       String   @db.Char(36)
   gameEnv                    String   @default("live") @map("game_env") @db.VarChar(10)
   className                  String   @map("class_name") @db.VarChar(255)
   name                       String? @db.VarChar(255)
@@ -469,12 +473,13 @@ model MiningElement {
 
   compositionParts MiningCompositionPart[]
 
+  @@id([uuid, gameEnv])
   @@index([gameEnv], map: "idx_game_env")
   @@map("mining_elements")
 }
 
 model MiningComposition {
-  uuid                  String  @id @db.Char(36)
+  uuid                  String  @db.Char(36)
   gameEnv               String  @default("live") @map("game_env") @db.VarChar(10)
   className             String  @map("class_name") @db.VarChar(255)
   depositName           String? @map("deposit_name") @db.VarChar(255)
@@ -482,6 +487,7 @@ model MiningComposition {
 
   parts MiningCompositionPart[]
 
+  @@id([uuid, gameEnv])
   @@index([gameEnv], map: "idx_game_env")
   @@map("mining_compositions")
 }
@@ -496,8 +502,8 @@ model MiningCompositionPart {
   probability      Decimal? @db.Decimal(6, 4)
   curveExponent    Decimal? @map("curve_exponent") @db.Decimal(6, 4)
 
-  composition MiningComposition @relation(fields: [compositionUuid], references: [uuid], onDelete: Cascade, map: "fk_mcp_composition")
-  element     MiningElement     @relation(fields: [elementUuid], references: [uuid], onDelete: Cascade, map: "fk_mcp_element")
+  composition MiningComposition @relation(fields: [compositionUuid, gameEnv], references: [uuid, gameEnv], onDelete: Cascade, map: "fk_mcp_composition")
+  element     MiningElement     @relation(fields: [elementUuid, gameEnv], references: [uuid, gameEnv], onDelete: Cascade, map: "fk_mcp_element")
 
   @@index([compositionUuid], map: "idx_mcp_composition")
   @@index([elementUuid], map: "idx_mcp_element")
@@ -505,7 +511,7 @@ model MiningCompositionPart {
 }
 
 model Mission {
-  uuid               String   @id @db.Char(36)
+  uuid               String   @db.Char(36)
   className          String   @map("class_name") @db.VarChar(300)
   title              String?  @db.VarChar(500)
   description        String?  @db.Text
@@ -518,6 +524,7 @@ model Mission {
   workInProgress     Boolean  @default(false) @map("work_in_progress")
   gameEnv            String   @default("live") @map("game_env") @db.VarChar(10)
 
+  @@id([uuid, gameEnv])
   @@index([missionType], map: "idx_mission_type")
   @@index([gameEnv], map: "idx_game_env")
   @@map("missions")

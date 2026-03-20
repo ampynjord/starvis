@@ -44,9 +44,10 @@ export class CommodityQueryService {
     return rows[0] || null;
   }
 
-  async getCommodityTypes(): Promise<{ types: { type: string; count: number }[] }> {
+  async getCommodityTypes(env = 'live'): Promise<{ types: { type: string; count: number }[] }> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-      'SELECT type, COUNT(*) as count FROM commodities GROUP BY type ORDER BY count DESC',
+      'SELECT type, COUNT(*) as count FROM commodities WHERE game_env = ? GROUP BY type ORDER BY count DESC',
+      env,
     );
     return { types: rows.map((r) => ({ type: String(r.type), count: Number(r.count) })) };
   }

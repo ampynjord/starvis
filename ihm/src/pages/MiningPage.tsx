@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { api } from '@/services/api';
+import { useEnv } from '@/contexts/EnvContext';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -233,12 +234,13 @@ function SolverResultRow({ result, rank }: { result: MiningSolverResult; rank: n
 // ── Tab: Mineral Finder ───────────────────────────────────────────────────────
 
 function MineralFinder({ elements }: { elements: MiningElement[] }) {
+  const { env } = useEnv();
   const [selectedElement, setSelectedElement] = useState<string>('');
   const [minProbability, setMinProbability] = useState<number>(0);
 
   const { data: results, isLoading, error } = useQuery({
-    queryKey: ['mining.solver', selectedElement, minProbability],
-    queryFn: () => api.mining.solveForElement(selectedElement, minProbability || undefined),
+    queryKey: ['mining.solver', selectedElement, minProbability, env],
+    queryFn: () => api.mining.solveForElement(selectedElement, minProbability || undefined, env),
     enabled: !!selectedElement,
     staleTime: 30 * 60_000,
   });
@@ -472,11 +474,12 @@ function OreLibrary({ elements }: { elements: MiningElement[] }) {
 // ── Tab: Rock Deposits ────────────────────────────────────────────────────────
 
 function DepositRow({ comp }: { comp: MiningComposition }) {
+  const { env } = useEnv();
   const [expanded, setExpanded] = useState(false);
 
   const { data: detail, isLoading } = useQuery({
-    queryKey: ['mining.composition', comp.uuid],
-    queryFn: () => api.mining.composition(comp.uuid),
+    queryKey: ['mining.composition', comp.uuid, env],
+    queryFn: () => api.mining.composition(comp.uuid, env),
     enabled: expanded,
     staleTime: 60 * 60_000,
   });
@@ -560,11 +563,12 @@ function DepositRow({ comp }: { comp: MiningComposition }) {
 }
 
 function RockDeposits() {
+  const { env } = useEnv();
   const [search, setSearch] = useState('');
 
   const { data: compositions, isLoading, error, refetch } = useQuery({
-    queryKey: ['mining.compositions'],
-    queryFn: () => api.mining.compositions(false),
+    queryKey: ['mining.compositions', env],
+    queryFn: () => api.mining.compositions(false, env),
     staleTime: 30 * 60_000,
   });
 
@@ -617,6 +621,7 @@ const TABS: { key: Tab; Icon: LucideIcon; label: string }[] = [
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function MiningPage() {
+  const { env } = useEnv();
   const [tab, setTab] = useState<Tab>('finder');
 
   const {
@@ -625,8 +630,8 @@ export default function MiningPage() {
     error: elementsError,
     refetch: refetchElements,
   } = useQuery({
-    queryKey: ['mining.elements'],
-    queryFn: api.mining.elements,
+    queryKey: ['mining.elements', env],
+    queryFn: () => api.mining.elements(env),
     staleTime: 30 * 60_000,
   });
 

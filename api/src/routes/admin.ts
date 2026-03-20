@@ -21,7 +21,7 @@ export function mountAdminRoutes(router: Router, deps: RouteDependencies): void 
     '/admin/stats',
     asyncHandler(async (_req, res) => {
       const smStats = await shipMatrixService.getStats();
-      const gdStats = gameDataService ? await gameDataService.getStats() : null;
+      const gdStats = gameDataService ? await gameDataService.getStats(String(_req.query.env ?? 'live')) : null;
       res.json({ success: true, data: { shipMatrix: smStats, gameData: gdStats } });
     }),
   );

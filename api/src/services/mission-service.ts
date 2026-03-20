@@ -77,14 +77,15 @@ export class MissionService {
   }
 
   /** Single mission by UUID */
-  async getMissionByUuid(uuid: string): Promise<Row | null> {
+  async getMissionByUuid(uuid: string, env = 'live'): Promise<Row | null> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT uuid, class_name, title, description, mission_type,
               can_be_shared, only_owner_complete, is_legal,
               completion_time_s, game_env
        FROM missions
-       WHERE uuid = ?`,
+       WHERE uuid = ? AND game_env = ?`,
       uuid,
+      env,
     );
     return rows.length ? convertBigIntToNumber(rows[0]) : null;
   }

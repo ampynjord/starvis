@@ -66,7 +66,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
 // ─── Stats / Version ─────────────────────────────────────────────────────────
 export const api = {
   stats: {
-    overview: () => get<StatsOverview>('/stats/overview'),
+    overview: (env?: string) => get<StatsOverview>('/stats/overview', { env }),
     version: () => get<Version>('/version'),
   },
 
@@ -86,7 +86,7 @@ export const api = {
     filters: (env?: string) => get<ShipFilters>('/ships/filters', { env }),
     search: (search: string, limit = 8, env?: string) => get<ShipListItem[]>('/ships/search', { search, limit, env }),
     random: (env?: string) => get<ShipListItem>('/ships/random', { env }),
-    manufacturers: () => get<{ code: string; name: string }[]>('/ships/manufacturers'),
+    manufacturers: (env?: string) => get<{ code: string; name: string }[]>('/ships/manufacturers', { env }),
     get: (uuid: string, env?: string) => get<Ship>(`/ships/${uuid}`, { env }),
     loadout: (uuid: string, env?: string) => get<LoadoutNode[]>(`/ships/${uuid}/loadout`, { env }),
     paints: (uuid: string, env?: string) => get<ShipPaint[]>(`/ships/${uuid}/paints`, { env }),
@@ -112,11 +112,11 @@ export const api = {
       grade?: string;
       manufacturer?: string;
     }) => get<PaginatedResponse<ComponentListItem>>('/components', p),
-    types: () => get<string[]>('/components/types'),
+    types: (env?: string) => get<string[]>('/components/types', { env }),
     filters: (env?: string) => get<Record<string, string[]>>('/components/filters', { env }),
     get: (uuid: string, env?: string) => get<Component>(`/components/${uuid}`, { env }),
     buyLocations: (uuid: string, env?: string) => get<BuyLocation[]>(`/components/${uuid}/buy-locations`, { env }),
-    ships: (uuid: string) => get<ShipListItem[]>(`/components/${uuid}/ships`),
+    ships: (uuid: string, env?: string) => get<ShipListItem[]>(`/components/${uuid}/ships`, { env }),
     compatible: (opts: {
       env?: string;
       type?: string;
@@ -143,23 +143,23 @@ export const api = {
       grade?: string;
       manufacturer?: string;
     }) => get<PaginatedResponse<ItemListItem>>('/items', p),
-    types: () => get<string[]>('/items/types'),
-    filters: () => get<Record<string, string[]>>('/items/filters'),
+    types: (env?: string) => get<string[]>('/items/types', { env }),
+    filters: (env?: string) => get<Record<string, string[]>>('/items/filters', { env }),
     get: (uuid: string, env?: string) => get<Item>(`/items/${uuid}`, { env }),
     buyLocations: (uuid: string, env?: string) => get<ItemBuyLocation[]>(`/items/${uuid}/buy-locations`, { env }),
   },
 
   // ─── Manufacturers ─────────────────────────────────────────────────
   manufacturers: {
-    list: () => get<Manufacturer[]>('/manufacturers'),
-    get: (code: string) => get<Manufacturer>(`/manufacturers/${code}`),
-    ships: (code: string) => get<ShipListItem[]>(`/manufacturers/${code}/ships`),
-    components: (code: string) => get<ComponentListItem[]>(`/manufacturers/${code}/components`),
+    list: (env?: string) => get<Manufacturer[]>('/manufacturers', { env }),
+    get: (code: string, env?: string) => get<Manufacturer>(`/manufacturers/${code}`, { env }),
+    ships: (code: string, env?: string) => get<ShipListItem[]>(`/manufacturers/${code}/ships`, { env }),
+    components: (code: string, env?: string) => get<ComponentListItem[]>(`/manufacturers/${code}/components`, { env }),
   },
 
   // ─── Paints ────────────────────────────────────────────────────────
   paints: {
-    list: (p?: { page?: number; limit?: number; ship_uuid?: string; search?: string }) =>
+    list: (p?: { env?: string; page?: number; limit?: number; ship_uuid?: string; search?: string }) =>
       get<PaginatedResponse<PaintListItem>>('/paints', p),
   },
 
@@ -173,12 +173,12 @@ export const api = {
   commodities: {
     list: (p: { env?: string; page?: number; limit?: number; search?: string; type?: string }) =>
       get<PaginatedResponse<Commodity>>('/commodities', p),
-    types: () => get<string[]>('/commodities/types'),
+    types: (env?: string) => get<string[]>('/commodities/types', { env }),
     get: (uuid: string, env?: string) => get<Commodity>(`/commodities/${uuid}`, { env }),
   },
 
   // ─── Search ────────────────────────────────────────────────────────
-  search: (query: string, limit = 5) => get<SearchResult>('/search', { search: query, limit }),
+  search: (query: string, limit = 5, env?: string) => get<SearchResult>('/search', { search: query, limit, env }),
 
   // ─── Changelog ─────────────────────────────────────────────────────
   changelog: {
@@ -195,14 +195,14 @@ export const api = {
 
   // ─── Mining ────────────────────────────────────────────────────────
   mining: {
-    elements: () => get<MiningElement[]>('/mining/elements'),
-    element: (uuid: string) => get<MiningElement>(`/mining/elements/${uuid}`),
-    compositions: (includeEmpty = false) => get<MiningComposition[]>('/mining/compositions', { include_empty: includeEmpty || undefined }),
-    composition: (uuid: string) => get<MiningComposition>(`/mining/compositions/${uuid}`),
-    solveForElement: (elementUuid: string, minProbability?: number) =>
-      get<MiningSolverResult[]>('/mining/solver', { element: elementUuid, min_probability: minProbability }),
-    solveForComposition: (compositionUuid: string) => get<MiningSolverResult[]>('/mining/solver', { composition: compositionUuid }),
-    stats: () => get<MiningStats>('/mining/stats'),
+    elements: (env?: string) => get<MiningElement[]>('/mining/elements', { env }),
+    element: (uuid: string, env?: string) => get<MiningElement>(`/mining/elements/${uuid}`, { env }),
+    compositions: (includeEmpty = false, env?: string) => get<MiningComposition[]>('/mining/compositions', { include_empty: includeEmpty || undefined, env }),
+    composition: (uuid: string, env?: string) => get<MiningComposition>(`/mining/compositions/${uuid}`, { env }),
+    solveForElement: (elementUuid: string, minProbability?: number, env?: string) =>
+      get<MiningSolverResult[]>('/mining/solver', { element: elementUuid, min_probability: minProbability, env }),
+    solveForComposition: (compositionUuid: string, env?: string) => get<MiningSolverResult[]>('/mining/solver', { composition: compositionUuid, env }),
+    stats: (env?: string) => get<MiningStats>('/mining/stats', { env }),
   },
 
   // ─── Missions ──────────────────────────────────────────────────────
