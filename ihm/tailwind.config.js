@@ -80,7 +80,7 @@ export default {
       boxShadow: {
         'cyan-glow': '0 0 10px rgba(0,212,255,0.3), 0 0 30px rgba(0,212,255,0.1)',
         'amber-glow': '0 0 10px rgba(255,184,0,0.3), 0 0 30px rgba(255,184,0,0.1)',
-        'panel': '0 4px 24px rgba(0,0,0,0.6), inset 0 1px 0 rgba(0,212,255,0.1)',
+        panel: '0 4px 24px rgba(0,0,0,0.6), inset 0 1px 0 rgba(0,212,255,0.1)',
         'panel-hover': '0 8px 32px rgba(0,0,0,0.8), 0 0 20px rgba(0,212,255,0.15)',
       },
     },

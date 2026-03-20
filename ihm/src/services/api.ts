@@ -171,7 +171,8 @@ export const api = {
 
   // ─── Commodities ───────────────────────────────────────────────────
   commodities: {
-    list: (p: { env?: string; page?: number; limit?: number; search?: string; type?: string }) => get<PaginatedResponse<Commodity>>('/commodities', p),
+    list: (p: { env?: string; page?: number; limit?: number; search?: string; type?: string }) =>
+      get<PaginatedResponse<Commodity>>('/commodities', p),
     types: () => get<string[]>('/commodities/types'),
     get: (uuid: string, env?: string) => get<Commodity>(`/commodities/${uuid}`, { env }),
   },

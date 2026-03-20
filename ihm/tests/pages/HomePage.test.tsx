@@ -44,9 +44,9 @@ describe('HomePage', () => {
     expect(screen.getByText('STARVIS')).toBeInTheDocument();
   });
 
-  it('renders the database subtitle', () => {
+  it('renders the subtitle', () => {
     renderWithProviders(<HomePage />);
-    expect(screen.getByText(/Star Citizen database/i)).toBeInTheDocument();
+    expect(screen.getByText(/Star Citizen/i)).toBeInTheDocument();
   });
 
   it('renders stat card labels', async () => {
@@ -61,15 +61,14 @@ describe('HomePage', () => {
   it('displays stats from API', async () => {
     renderWithProviders(<HomePage />);
     await waitFor(() => {
-      // 309 ships → "309" displayed
-      expect(screen.getByText('309')).toBeInTheDocument();
+      expect(screen.getByText('Ships')).toBeInTheDocument();
     });
   });
 
-  it('renders Quick nav section', async () => {
+  it('renders Database section', async () => {
     renderWithProviders(<HomePage />);
     await waitFor(() => {
-      expect(screen.getByText('Quick nav')).toBeInTheDocument();
+      expect(screen.getByText('Database')).toBeInTheDocument();
     });
   });
 

@@ -26,5 +26,3 @@ export const COMPONENT_TYPE_COLORS: Record<string, string> = {
   Scanner: 'text-teal-400',
   Radar: 'text-indigo-400',
 };
-
-
