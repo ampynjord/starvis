@@ -21,7 +21,7 @@ export default function CommoditiesPage() {
   const [type, setType] = useState('');
   const debouncedSearch = useDebounce(search, 350);
 
-  const { data: types } = useQuery({ queryKey: ['commodities.types'], queryFn: api.commodities.types, staleTime: Infinity });
+  const { data: types } = useQuery({ queryKey: ['commodities.types', env], queryFn: () => api.commodities.types(env), staleTime: Infinity });
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['commodities.list', env, { page, search: debouncedSearch, type }],
     queryFn: () => api.commodities.list({ env, page, limit: LIMIT, search: debouncedSearch || undefined, type: type || undefined }),
