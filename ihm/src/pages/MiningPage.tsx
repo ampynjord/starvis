@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   TrendingUp,
   Beaker,
+  Loader2,
   Search,
   Target,
   type LucideIcon,
@@ -84,9 +85,10 @@ interface CompositionSelectorProps {
   compositions: MiningComposition[] | undefined;
   selected: string;
   onChange: (compositionId: string, data: MiningCompositionView) => void;
+  onLoadingChange?: (loading: boolean) => void;
 }
 
-function CompositionSelector({ compositions, selected, onChange }: CompositionSelectorProps) {
+function CompositionSelector({ compositions, selected, onChange, onLoadingChange }: CompositionSelectorProps) {
   const { env } = useEnv();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -118,6 +120,7 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
     setOpen(false);
     setSearch('');
     setLoadingDetail(comp.uuid);
+    onLoadingChange?.(true);
 
     try {
       const detail = await api.mining.composition(comp.uuid, env);
@@ -128,8 +131,9 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
       onChange(comp.uuid, optimisticData);
     } finally {
       setLoadingDetail(null);
+      onLoadingChange?.(false);
     }
-  }, [env, onChange]);
+  }, [env, onChange, onLoadingChange]);
 
   return (
     <div className="relative">
@@ -201,16 +205,36 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
 
 interface CompositionBreakdownProps {
   data: MiningCompositionView | null;
+  loading?: boolean;
   selectedElementUuid: string | null;
   onSelectElement: (elementUuid: string) => void;
 }
 
-function CompositionBreakdown({ data, selectedElementUuid, onSelectElement }: CompositionBreakdownProps) {
+function CompositionBreakdown({ data, loading, selectedElementUuid, onSelectElement }: CompositionBreakdownProps) {
   if (!data) {
     return (
       <div className="text-center py-8 text-slate-600">
         <Beaker size={32} className="mx-auto mb-3 opacity-20" />
         <p className="text-xs font-mono-sc uppercase tracking-widest">Select a composition to view its breakdown</p>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="text-center py-8 text-slate-600">
+        <Loader2 size={28} className="mx-auto mb-3 opacity-40 animate-spin" />
+        <p className="text-xs font-mono-sc uppercase tracking-widest">Loading mineral data…</p>
+      </div>
+    );
+  }
+
+  if (data.elements.length === 0) {
+    return (
+      <div className="text-center py-8 text-slate-600">
+        <Beaker size={32} className="mx-auto mb-3 opacity-20" />
+        <p className="text-xs font-mono-sc uppercase tracking-widest">No minerals recorded for this deposit</p>
+        <p className="text-[10px] text-slate-700 mt-1">Run the extractor to populate composition data</p>
       </div>
     );
   }
@@ -621,6 +645,7 @@ export default function MiningPage() {
   const [selectedCompositionId, setSelectedCompositionId] = useState('');
   const [compositionData, setCompositionData] = useState<MiningCompositionView | null>(null);
   const [selectedElementUuid, setSelectedElementUuid] = useState<string | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   // Load all compositions for the scan phase
   const { data: compositions, isLoading: loadingCompositions, error: compositionsError } = useQuery({
@@ -685,6 +710,7 @@ export default function MiningPage() {
                 compositions={compositions}
                 selected={selectedCompositionId}
                 onChange={handleCompositionSelect}
+                onLoadingChange={setLoadingDetail}
               />
             )}
           </ScifiPanel>
@@ -730,6 +756,7 @@ export default function MiningPage() {
             >
               <CompositionBreakdown
                 data={compositionData}
+                loading={loadingDetail}
                 selectedElementUuid={selectedElementUuid}
                 onSelectElement={handleElementSelect}
               />
