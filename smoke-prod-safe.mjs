@@ -1,14 +1,22 @@
-const DEFAULT_BASE = 'https://starvis-api.ampynjord.bzh';
+const DEFAULT_API_BASE = 'https://starvis-api.ampynjord.bzh';
+const DEFAULT_FRONTEND_BASE = 'https://starvis.ampynjord.bzh';
+
+function parseBoolean(value, defaultValue = false) {
+  if (value == null) return defaultValue;
+  return ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase());
+}
 
 const config = {
-  baseUrl: process.env.SMOKE_BASE_URL || DEFAULT_BASE,
+  apiBaseUrl: process.env.SMOKE_BASE_URL || DEFAULT_API_BASE,
+  frontendBaseUrl: process.env.SMOKE_FRONTEND_BASE_URL || DEFAULT_FRONTEND_BASE,
+  includeFrontend: parseBoolean(process.env.SMOKE_INCLUDE_FRONTEND, false),
   paceMs: Number(process.env.SMOKE_PACE_MS || 1200),
   maxRetries: Number(process.env.SMOKE_MAX_RETRIES || 4),
   backoffBaseMs: Number(process.env.SMOKE_BACKOFF_BASE_MS || 1500),
   timeoutMs: Number(process.env.SMOKE_TIMEOUT_MS || 12000),
 };
 
-const endpoints = [
+const apiEndpoints = [
   '/health/ready',
   '/api/v1/search?search=gladius&limit=3',
   '/api/v1/ships?limit=3',
@@ -26,6 +34,28 @@ const endpoints = [
   '/api/v1/mining/stats',
   '/api/v1/missions?limit=5',
   '/api/v1/missions/types',
+];
+
+const frontendRoutes = [
+  '/',
+  '/ships',
+  '/components',
+  '/items',
+  '/commodities',
+  '/shops',
+  '/paints',
+  '/compare',
+  '/ranking',
+  '/outfitter',
+  '/mining',
+  '/fps-gear',
+  '/other-items',
+  '/industrial',
+  '/minerals',
+  '/equipment',
+  '/missions',
+  '/manufacturers',
+  '/changelog',
 ];
 
 function sleep(ms) {
@@ -115,39 +145,65 @@ async function fetchWithRetry(url) {
   };
 }
 
-async function run() {
-  console.log('Safe smoke test starting');
-  console.log(`Base URL: ${config.baseUrl}`);
-  console.log(`Endpoints: ${endpoints.length}`);
-  console.log(`Pace: ${config.paceMs}ms, retries: ${config.maxRetries}`);
+async function runSuite(name, baseUrl, paths) {
+  console.log(`${name} suite starting`);
+  console.log(`Base URL: ${baseUrl}`);
+  console.log(`Checks: ${paths.length}`);
 
   const results = [];
 
-  for (const endpoint of endpoints) {
-    const url = `${config.baseUrl}${endpoint}`;
+  for (const path of paths) {
+    const url = `${baseUrl}${path}`;
     const result = await fetchWithRetry(url);
-    results.push({ endpoint, ...result });
+    results.push({ path, ...result });
 
     const label = result.ok ? 'OK ' : 'KO ';
     const attemptInfo = result.attempt > 0 ? ` retries=${result.attempt}` : '';
     const errInfo = result.error ? ` err=${result.error}` : '';
-    console.log(`${label} status=${result.status} bytes=${result.bodyLength}${attemptInfo} ${endpoint}${errInfo}`);
+    console.log(`${label} status=${result.status} bytes=${result.bodyLength}${attemptInfo} ${path}${errInfo}`);
 
     await sleep(config.paceMs);
   }
 
   const ok = results.filter((r) => r.ok).length;
   const ko = results.length - ok;
-  const failed = results.filter((r) => !r.ok);
 
+  console.log(`${name} summary: total=${results.length} ok=${ok} ko=${ko}`);
   console.log('');
-  console.log(`Summary: total=${results.length} ok=${ok} ko=${ko}`);
+
+  return results;
+}
+
+async function run() {
+  console.log('Safe smoke test starting');
+  console.log(`API base URL: ${config.apiBaseUrl}`);
+  console.log(`Frontend base URL: ${config.frontendBaseUrl}`);
+  console.log(`Include frontend routes: ${config.includeFrontend}`);
+  console.log(`API endpoints: ${apiEndpoints.length}`);
+  console.log(`Frontend routes: ${frontendRoutes.length}`);
+  console.log(`Pace: ${config.paceMs}ms, retries: ${config.maxRetries}`);
+  console.log('');
+
+  const apiResults = await runSuite('API', config.apiBaseUrl, apiEndpoints);
+  const frontendResults = config.includeFrontend
+    ? await runSuite('Frontend', config.frontendBaseUrl, frontendRoutes)
+    : [];
+
+  const results = [...apiResults, ...frontendResults];
+
+  const ok = results.filter((r) => r.ok).length;
+  const ko = results.length - ok;
+  const failedApi = apiResults.filter((r) => !r.ok).map((r) => ({ scope: 'api', ...r }));
+  const failedFrontend = frontendResults.filter((r) => !r.ok).map((r) => ({ scope: 'frontend', ...r }));
+  const failed = [...failedApi, ...failedFrontend];
+
+  console.log(`Global summary: total=${results.length} ok=${ok} ko=${ko}`);
 
   if (failed.length > 0) {
-    console.log('Failed endpoints:');
+    console.log('Failed checks:');
     for (const f of failed) {
       const suffix = f.error ? ` error=${f.error}` : '';
-      console.log(`- ${f.endpoint} status=${f.status}${suffix}`);
+      console.log(`- [${f.scope}] ${f.path} status=${f.status}${suffix}`);
     }
     process.exitCode = 1;
     return;
