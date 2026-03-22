@@ -784,7 +784,7 @@ Pipeline GitHub Actions (`.github/workflows/ci.yml`) en 5 jobs standards + 2 job
 |-----|-------------|-------------|
 | **🔍 Lint** | Type-check TypeScript (`tsc --noEmit`) API + Extractor + build IHM + `npm audit` | push/PR sur `main` |
 | **🌐 Cornerstone adapter probe** | Dry-run manuel des sources externes CANONICAL (URL/API key) pour valider le mapping avant extraction réelle | `workflow_dispatch` (opt-in) |
-| **🩺 Safe smoke prod** | Vérification API production avec pacing + retries anti-429/5xx (`smoke-prod-safe.mjs`) | `workflow_dispatch` (opt-in) |
+| **🩺 Safe smoke prod** | Vérification API production (et routes IHM en option) avec pacing + retries anti-429/5xx (`smoke-prod-safe.mjs`) | `workflow_dispatch` (opt-in) |
 | **🧪 Test** | Tests unitaires Vitest (52 API + 44 Extractor) + E2E Playwright (16+ tests) + coverage Codecov | après Lint |
 | **🐳 Build** | Build Docker + push sur ghcr.io (API + IHM) | push sur `main` uniquement |
 | **🚀 Deploy** | SSH sur VPS : `git pull`, `docker compose pull/up`, health check | après Test + Build |
@@ -799,6 +799,8 @@ Le workflow expose ces inputs lors d'un lancement manuel :
 - `safe_smoke_base_url` : URL de base de l'API ciblée par le smoke test
 - `safe_smoke_pace_ms` : délai entre requêtes pour éviter le throttling
 - `safe_smoke_max_retries` : nombre de retries en cas de 429/5xx
+- `safe_smoke_include_frontend` : active aussi le test des routes IHM
+- `safe_smoke_frontend_base_url` : URL de base utilisée pour les routes IHM
 
 Par défaut, un lancement manuel exécute uniquement les jobs explicitement demandés (par ex. le probe) et ne déclenche pas le déploiement.
 
