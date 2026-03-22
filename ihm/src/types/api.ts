@@ -319,9 +319,15 @@ export interface MiningElement {
   instability: number | null;
   resistance: number | null;
   optimal_window_midpoint: number | null;
+  optimal_window_midpoint_rand: number | null;
   optimal_window_thinness: number | null;
   explosion_multiplier: number | null;
   cluster_factor: number | null;
+  /** Aggregated — present in getAllElements */
+  rocks_containing?: number;
+  avg_probability_pct?: number;
+  avg_min_pct?: number;
+  avg_max_pct?: number;
   /** Only present when fetched via /elements/:uuid */
   found_in?: MiningCompositionRef[];
 }

@@ -38,6 +38,17 @@ export default function ItemDetailPage() {
   if (error) return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
   if (!item) return null;
 
+  const isWeapon = !!item.weapon_damage || !!item.weapon_fire_rate || item.type?.toLowerCase().includes('weapon') || item.sub_type?.toLowerCase().includes('fps');
+  const isArmor =
+    !!item.armor_damage_reduction ||
+    !!item.armor_temp_min ||
+    !!item.armor_temp_max ||
+    item.type?.toLowerCase().includes('armor') ||
+    item.type?.toLowerCase().includes('suit') ||
+    item.type?.toLowerCase().includes('helmet') ||
+    item.type?.toLowerCase().includes('undersuit') ||
+    item.type?.toLowerCase().includes('backpack');
+
   const weaponStats = [
     { label: 'Damage', value: fmtNum(item.weapon_damage, '', 2) },
     { label: 'Damage type', value: item.weapon_damage_type ?? '—' },
@@ -123,29 +134,35 @@ export default function ItemDetailPage() {
         </ScifiPanel>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ScifiPanel title="FPS Weapon Stats">
-          <div className="grid grid-cols-2 gap-2">
-            {weaponStats.map(({ label, value }) => (
-              <div key={label} className="sci-panel p-2.5">
-                <p className="text-xs text-slate-600 font-mono-sc uppercase">{label}</p>
-                <p className="text-sm font-mono-sc text-slate-300 mt-0.5">{value}</p>
+      {(isWeapon || isArmor) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {isWeapon && (
+            <ScifiPanel title="FPS Weapon Stats">
+              <div className="grid grid-cols-2 gap-2">
+                {weaponStats.map(({ label, value }) => (
+                  <div key={label} className="sci-panel p-2.5">
+                    <p className="text-xs text-slate-600 font-mono-sc uppercase">{label}</p>
+                    <p className="text-sm font-mono-sc text-slate-300 mt-0.5">{value}</p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </ScifiPanel>
+            </ScifiPanel>
+          )}
 
-        <ScifiPanel title="Armor / Suit Stats">
-          <div className="grid grid-cols-2 gap-2">
-            {armorStats.map(({ label, value }) => (
-              <div key={label} className="sci-panel p-2.5">
-                <p className="text-xs text-slate-600 font-mono-sc uppercase">{label}</p>
-                <p className="text-sm font-mono-sc text-slate-300 mt-0.5">{value}</p>
+          {isArmor && (
+            <ScifiPanel title="Armor / Suit Stats">
+              <div className="grid grid-cols-2 gap-2">
+                {armorStats.map(({ label, value }) => (
+                  <div key={label} className="sci-panel p-2.5">
+                    <p className="text-xs text-slate-600 font-mono-sc uppercase">{label}</p>
+                    <p className="text-sm font-mono-sc text-slate-300 mt-0.5">{value}</p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </ScifiPanel>
-      </div>
+            </ScifiPanel>
+          )}
+        </div>
+      )}
 
       {rawPayload && (
         <ScifiPanel title="Raw Game Data" subtitle="Parsed payload from extractor">
