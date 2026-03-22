@@ -29,28 +29,15 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import type { MiningComposition } from '@/types/api';
+import {
+  getCompositionDisplayName,
+  mapCompositionToView,
+  type MiningCompositionView,
+} from '@/types/mining';
 
 // ── WORKFLOW TYPES ─────────────────────────────────────────────────────────────
 
 type WorkflowPhase = 'scan' | 'composition' | 'risk' | 'yield';
-
-interface CompositionData {
-  id: string;
-  name: string;
-  className: string;
-  minDistinctElements?: number;
-  elements: Array<{
-    elementUuid: string;
-    elementName: string;
-    probability: number;
-    minPercentage: number;
-    maxPercentage: number;
-    instability?: number;
-    resistance?: number;
-    explosionMultiplier?: number;
-    optimalWindow?: number;
-  }>;
-}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -96,7 +83,7 @@ function probColor(v: number | string): string {
 interface CompositionSelectorProps {
   compositions: MiningComposition[] | undefined;
   selected: string;
-  onChange: (compositionId: string, data: CompositionData) => void;
+  onChange: (compositionId: string, data: MiningCompositionView) => void;
 }
 
 function CompositionSelector({ compositions, selected, onChange }: CompositionSelectorProps) {
@@ -111,9 +98,10 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
     if (!compositions) return [];
     const q = search.trim().toLowerCase();
     if (!q) return compositions;
-    return compositions.filter(
-      (c) => (c.deposit_name || '').toLowerCase().includes(q) || (c.class_name || '').toLowerCase().includes(q),
-    );
+    return compositions.filter((c) => {
+      const displayName = getCompositionDisplayName(c).toLowerCase();
+      return displayName.includes(q) || (c.class_name || '').toLowerCase().includes(q);
+    });
   }, [compositions, search]);
 
   const handleSelect = useCallback(async (comp: MiningComposition) => {
@@ -121,23 +109,7 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
     try {
       const detail = await api.mining.composition(comp.uuid, env);
       if (detail?.elements && Array.isArray(detail.elements)) {
-        const data: CompositionData = {
-          id: comp.uuid,
-          name: comp.deposit_name || comp.class_name || 'Unknown',
-          className: comp.class_name || '',
-          minDistinctElements: comp.min_distinct_elements ?? undefined,
-          elements: detail.elements.map((el: any) => ({
-            elementUuid: el.element_uuid || el.elementUuid,
-            elementName: el.element_name || el.elementName,
-            probability: Number(el.probability),
-            minPercentage: Number(el.min_percentage || el.minPercentage),
-            maxPercentage: Number(el.max_percentage || el.maxPercentage),
-            instability: Number(el.instability),
-            resistance: Number(el.resistance),
-            explosionMultiplier: Number(el.explosion_multiplier || el.explosionMultiplier),
-            optimalWindow: Number(el.optimal_window_midpoint || el.optimalWindow),
-          })),
-        };
+        const data = mapCompositionToView(detail);
         onChange(comp.uuid, data);
         setOpen(false);
         setSearch('');
@@ -154,7 +126,7 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
         className="sci-input w-full flex items-center justify-between gap-2 pr-3 text-left"
       >
         <span className={`font-rajdhani font-semibold text-sm ${current ? 'text-slate-100' : 'text-slate-500'}`}>
-          {current?.deposit_name || current?.class_name || 'Select a rock composition…'}
+          {current ? getCompositionDisplayName(current) : 'Select a rock composition…'}
         </span>
         <ChevronDown size={14} className={`text-slate-500 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -193,7 +165,7 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
                   } ${loadingDetail === comp.uuid ? 'opacity-50' : ''}`}
                 >
                   <span className="font-rajdhani font-semibold text-sm flex-1">
-                    {comp.deposit_name || comp.class_name}
+                    {getCompositionDisplayName(comp)}
                   </span>
                   {comp.element_count != null && (
                     <GlowBadge color="slate" size="xs">{comp.element_count} minerals</GlowBadge>
@@ -211,7 +183,7 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
 // ── PHASE 2: CompositionBreakdown ───────────────────────────────────────────────
 
 interface CompositionBreakdownProps {
-  data: CompositionData | null;
+  data: MiningCompositionView | null;
 }
 
 function CompositionBreakdown({ data }: CompositionBreakdownProps) {
@@ -280,7 +252,7 @@ function CompositionBreakdown({ data }: CompositionBreakdownProps) {
 // ── PHASE 3: RiskAssessment ─────────────────────────────────────────────────────
 
 interface RiskAssessmentProps {
-  data: CompositionData | null;
+  data: MiningCompositionView | null;
 }
 
 function RiskAssessment({ data }: RiskAssessmentProps) {
@@ -397,7 +369,7 @@ function RiskAssessment({ data }: RiskAssessmentProps) {
 // ── PHASE 4: YieldCalculator ────────────────────────────────────────────────────
 
 interface YieldCalculatorProps {
-  data: CompositionData | null;
+  data: MiningCompositionView | null;
 }
 
 function YieldCalculator({ data }: YieldCalculatorProps) {
@@ -583,7 +555,7 @@ export default function MiningPage() {
   const { env } = useEnv();
   const [currentPhase, setCurrentPhase] = useState<WorkflowPhase>('scan');
   const [selectedCompositionId, setSelectedCompositionId] = useState('');
-  const [compositionData, setCompositionData] = useState<CompositionData | null>(null);
+  const [compositionData, setCompositionData] = useState<MiningCompositionView | null>(null);
 
   // Load all compositions for the scan phase
   const { data: compositions, isLoading: loadingCompositions, error: compositionsError } = useQuery({
@@ -593,7 +565,7 @@ export default function MiningPage() {
   });
 
   const handleCompositionSelect = useCallback(
-    (compositionId: string, data: CompositionData) => {
+    (compositionId: string, data: MiningCompositionView) => {
       setSelectedCompositionId(compositionId);
       setCompositionData(data);
       setCurrentPhase('composition');
