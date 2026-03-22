@@ -197,11 +197,13 @@ export const api = {
   mining: {
     elements: (env?: string) => get<MiningElement[]>('/mining/elements', { env }),
     element: (uuid: string, env?: string) => get<MiningElement>(`/mining/elements/${uuid}`, { env }),
-    compositions: (includeEmpty = false, env?: string) => get<MiningComposition[]>('/mining/compositions', { include_empty: includeEmpty || undefined, env }),
+    compositions: (includeEmpty = false, env?: string) =>
+      get<MiningComposition[]>('/mining/compositions', { include_empty: includeEmpty || undefined, env }),
     composition: (uuid: string, env?: string) => get<MiningComposition>(`/mining/compositions/${uuid}`, { env }),
     solveForElement: (elementUuid: string, minProbability?: number, env?: string) =>
       get<MiningSolverResult[]>('/mining/solver', { element: elementUuid, min_probability: minProbability, env }),
-    solveForComposition: (compositionUuid: string, env?: string) => get<MiningSolverResult[]>('/mining/solver', { composition: compositionUuid, env }),
+    solveForComposition: (compositionUuid: string, env?: string) =>
+      get<MiningSolverResult[]>('/mining/solver', { composition: compositionUuid, env }),
     stats: (env?: string) => get<MiningStats>('/mining/stats', { env }),
   },
 
