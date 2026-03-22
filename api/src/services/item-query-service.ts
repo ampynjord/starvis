@@ -132,6 +132,10 @@ export class ItemQueryService {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT s.id as shop_id, s.name as shop_name, s.location, s.planet_moon,
               s.\`system\` as system_name, s.city, s.shop_type,
+              s.source_type as shop_source_type, s.source_name as shop_source_name,
+              s.canonical_shop_key, s.canonical_location_key,
+              si.source_type as inventory_source_type, si.source_name as inventory_source_name,
+              si.confidence_score,
               si.base_price, si.rental_price_1d
        FROM shop_inventory si
        JOIN shops s ON si.shop_id = s.id
