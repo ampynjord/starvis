@@ -39,6 +39,7 @@ jobs:
           cache-dependency-path: |
             api/package-lock.json
             extractor/package-lock.json
+            ihm/package-lock.json
 
       - name: Update npm
         run: npm install -g npm@latest
@@ -54,6 +55,12 @@ jobs:
 
       - name: Lint Extractor (Biome)
         run: cd extractor && npx biome check .
+
+      - name: Install & build IHM
+        run: cd ihm && npm ci && npm run build
+
+      - name: Lint IHM (Biome)
+        run: cd ihm && npx biome check .
 
       - name: Audit API dependencies
         run: cd api && npm audit --audit-level=high
@@ -126,6 +133,7 @@ jobs:
           cache-dependency-path: |
             api/package-lock.json
             extractor/package-lock.json
+            ihm/package-lock.json
 
       - name: Update npm
         run: npm install -g npm@latest
@@ -134,6 +142,9 @@ jobs:
 
       - name: Install extractor deps
         run: cd extractor && npm ci
+
+      - name: Install IHM deps
+        run: cd ihm && npm ci
 
       - name: Install Redis CLI
         run: sudo apt-get update && sudo apt-get install -y redis-tools
@@ -181,6 +192,9 @@ jobs:
       - name: Run Extractor unit tests with coverage
         run: cd extractor && npm run test:coverage
 
+      - name: Run IHM unit tests with coverage
+        run: cd ihm && npm run coverage
+
       - name: Upload API coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
@@ -196,6 +210,15 @@ jobs:
           files: ./extractor/coverage/lcov.info
           flags: extractor
           name: extractor-coverage
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
+
+      - name: Upload IHM coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./ihm/coverage/lcov.info
+          flags: ihm
+          name: ihm-coverage
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
