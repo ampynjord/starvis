@@ -162,7 +162,7 @@ starvis/
 │   ├── backup.sh               # Backup automatisé (mysqldump, gzip, 7j rétention)
 │   └── migrations/             # Migrations SQL numérotées (001…)
 └── .github/workflows/
-    └── ci.yml                  # CI/CD complet (4 jobs)
+    └── ci.yml                  # CI/CD complet (5 jobs + 1 probe manuel)
 ```
 
 ---
@@ -769,7 +769,7 @@ Les écritures en DB ne se font qu'au démarrage ou via les endpoints admin POST
 | **Quality** | Husky + lint-staged (pre-commit hooks) |
 | **Containerisation** | Docker multi-stage + Docker Compose |
 | **Reverse proxy** | Traefik (Let's Encrypt, HTTPS automatique) |
-| **CI/CD** | GitHub Actions (4 jobs, coverage Codecov) |
+| **CI/CD** | GitHub Actions (5 jobs + probe manuel, coverage Codecov) |
 | **Registry** | ghcr.io (GitHub Container Registry) |
 | **Logging** | Winston (module tags, durées, filtrage) |
 | **Backup** | mysqldump + gzip, cron quotidien, 7 jours de rétention |
@@ -778,14 +778,31 @@ Les écritures en DB ne se font qu'au démarrage ou via les endpoints admin POST
 
 ## CI/CD
 
-Pipeline GitHub Actions (`.github/workflows/ci.yml`) en 4 jobs :
+Pipeline GitHub Actions (`.github/workflows/ci.yml`) en 5 jobs :
 
 | Job | Description | Déclencheur |
 |-----|-------------|-------------|
 | **🔍 Lint** | Type-check TypeScript (`tsc --noEmit`) API + Extractor + build IHM + `npm audit` | push/PR sur `main` |
+| **🌐 Cornerstone adapter probe** | Dry-run manuel des sources externes CANONICAL (URL/API key) pour valider le mapping avant extraction réelle | `workflow_dispatch` (opt-in) |
 | **🧪 Test** | Tests unitaires Vitest (52 API + 44 Extractor) + E2E Playwright (16+ tests) + coverage Codecov | après Lint |
 | **🐳 Build** | Build Docker + push sur ghcr.io (API + IHM) | push sur `main` uniquement |
 | **🚀 Deploy** | SSH sur VPS : `git pull`, `docker compose pull/up`, health check | après Test + Build |
+
+### Probe manuel des adapters Cornerstone
+
+Le workflow expose 2 inputs lors d'un lancement manuel :
+- `run_cornerstone_adapter_probe` : active le job de probe externe
+- `cornerstone_probe_sample` : nombre de lignes d'exemple affichées par `dry-run:adapters`
+
+Secrets GitHub recommandés (Repository ou Environment) :
+- `CANONICAL_SOURCE_COMPONENTS_URL`
+- `CANONICAL_SOURCE_ITEMS_URL`
+- `CANONICAL_SOURCE_COMMODITIES_URL`
+- `CANONICAL_SOURCE_SHOPS_URL`
+- `CANONICAL_SOURCE_API_KEY_HEADER` (optionnel)
+- `CANONICAL_SOURCE_API_KEY` (optionnel)
+
+Le job échoue explicitement si aucune URL `CANONICAL_SOURCE_*_URL` n'est définie.
 
 **Tests E2E** (Playwright) :
 - Health checks (live/ready/metrics/cache)
