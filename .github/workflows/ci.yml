@@ -8,6 +8,17 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      run_cornerstone_adapter_probe:
+        description: "Run external Cornerstone adapter probe"
+        required: false
+        default: false
+        type: boolean
+      cornerstone_probe_sample:
+        description: "Sample rows printed by extractor dry-run"
+        required: false
+        default: "3"
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -78,6 +89,58 @@ jobs:
           DB_NAME: ci
           MYSQL_ROOT_PASSWORD: ci
           ADMIN_API_KEY: ci
+
+  # ==========================================
+  #  1.b EXTERNAL ADAPTER PROBE (manual)
+  # ==========================================
+  cornerstone-adapter-probe:
+    name: "🌐 Cornerstone adapter probe"
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_cornerstone_adapter_probe }}
+    timeout-minutes: 10
+    env:
+      CANONICAL_SOURCE_COMPONENTS_URL: ${{ secrets.CANONICAL_SOURCE_COMPONENTS_URL }}
+      CANONICAL_SOURCE_ITEMS_URL: ${{ secrets.CANONICAL_SOURCE_ITEMS_URL }}
+      CANONICAL_SOURCE_COMMODITIES_URL: ${{ secrets.CANONICAL_SOURCE_COMMODITIES_URL }}
+      CANONICAL_SOURCE_SHOPS_URL: ${{ secrets.CANONICAL_SOURCE_SHOPS_URL }}
+      CANONICAL_SOURCE_API_KEY_HEADER: ${{ secrets.CANONICAL_SOURCE_API_KEY_HEADER }}
+      CANONICAL_SOURCE_API_KEY: ${{ secrets.CANONICAL_SOURCE_API_KEY }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: extractor/package-lock.json
+
+      - name: Update npm
+        run: npm install -g npm@latest
+
+      - name: Validate probe configuration
+        run: |
+          configured=0
+          for v in \
+            CANONICAL_SOURCE_COMPONENTS_URL \
+            CANONICAL_SOURCE_ITEMS_URL \
+            CANONICAL_SOURCE_COMMODITIES_URL \
+            CANONICAL_SOURCE_SHOPS_URL; do
+            if [ -n "${!v}" ]; then
+              configured=1
+            fi
+          done
+
+          if [ "$configured" -eq 0 ]; then
+            echo "::error::No CANONICAL_SOURCE_*_URL secret is configured for probe run."
+            exit 1
+          fi
+
+      - name: Install extractor dependencies
+        run: cd extractor && npm ci
+
+      - name: Run external adapter dry-run diagnostics
+        run: cd extractor && npm run dry-run:adapters -- --sample ${{ inputs.cornerstone_probe_sample }}
 
   # ==========================================
   #  2. UNIT / INTEGRATION TESTS
