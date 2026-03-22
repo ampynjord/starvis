@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { Navigate, createBrowserRouter } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { lazy, Suspense, type ReactElement } from 'react';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
@@ -22,12 +22,9 @@ const CommodityDetailPage = lazy(() => import('@/pages/CommodityDetailPage'));
 const ManufacturersPage   = lazy(() => import('@/pages/ManufacturersPage'));
 const ShopsPage           = lazy(() => import('@/pages/ShopsPage'));
 const ChangelogPage       = lazy(() => import('@/pages/ChangelogPage'));
-const PaintsPage          = lazy(() => import('@/pages/PaintsPage'));
 const RankingPage         = lazy(() => import('@/pages/RankingPage'));
 const OutfitterPage       = lazy(() => import('@/pages/OutfitterPage'));
 const MiningPage          = lazy(() => import('@/pages/MiningPage'));
-const MineralsLibraryPage = lazy(() => import('@/pages/MineralsLibraryPage'));
-const EquipmentPage       = lazy(() => import('@/pages/EquipmentPage'));
 const MissionsPage        = lazy(() => import('@/pages/MissionsPage'));
 const NotFoundPage        = lazy(() => import('@/pages/NotFoundPage'));
 
@@ -43,19 +40,22 @@ export const router = createBrowserRouter([
       { path: 'ranking',          element: wrap(RankingPage) },
       { path: 'outfitter',        element: wrap(OutfitterPage) },
       { path: 'mining',           element: wrap(MiningPage) },
-      { path: 'minerals',         element: wrap(MineralsLibraryPage) },
-      { path: 'equipment',        element: wrap(EquipmentPage) },
+      { path: 'fps-gear',         element: wrap(ItemsPage) },
+      { path: 'other-items',      element: wrap(ItemsPage) },
+      { path: 'industrial',       element: wrap(CommoditiesPage) },
+      { path: 'minerals',         element: <Navigate to="/mining" replace /> },
+      { path: 'equipment',        element: <Navigate to="/components" replace /> },
       { path: 'missions',         element: wrap(MissionsPage) },
       { path: 'components',        element: wrap(ComponentsPage) },
       { path: 'components/:uuid',  element: wrap(ComponentDetailPage) },
-      { path: 'items',             element: wrap(ItemsPage) },
+      { path: 'items',             element: <Navigate to="/fps-gear" replace /> },
       { path: 'items/:uuid',       element: wrap(ItemDetailPage) },
-      { path: 'commodities',       element: wrap(CommoditiesPage) },
+      { path: 'commodities',       element: <Navigate to="/industrial" replace /> },
       { path: 'commodities/:uuid', element: wrap(CommodityDetailPage) },
       { path: 'manufacturers',     element: wrap(ManufacturersPage) },
       { path: 'shops',            element: wrap(ShopsPage) },
       { path: 'changelog',        element: wrap(ChangelogPage) },
-      { path: 'paints',            element: wrap(PaintsPage) },
+      { path: 'paints',            element: <Navigate to="/ships" replace /> },
       { path: '*',                element: wrap(NotFoundPage) },
     ],
   },

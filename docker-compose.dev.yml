@@ -95,6 +95,9 @@ services:
     environment:
       # Le proxy Vite forward /api vers le service 'api' interne Docker
       VITE_API_URL: http://api:3000
+      # Nécessaire sur Windows : Docker Desktop ne propage pas inotify vers le conteneur
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "300"
     depends_on:
       api:
         condition: service_healthy

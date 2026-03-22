@@ -1,28 +1,26 @@
 /**
- * MiningPage — Mining Reference & Solver
+ * MiningPage — Regolith-Style Mining Solver
  *
- * Three tabs:
- *  1. Mineral Finder — select a mineral, view its properties, find rocks containing it
- *  2. Ore Library    — browse all minerals with sortable mining properties
- *  3. Rock Deposits  — browse all deposit types with their ore compositions
+ * Workflow: Scan → Composition → Risk → Yield
+ *
+ * SCAN PHASE:     Select a rock composition (deposit or element-based search)
+ * COMPOSITION:    View mineral breakdown with probabilities
+ * RISK:           Analyze instability, resistance, explosion factors
+ * YIELD:          Optimize laser power for maximum yield per element
  */
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Pickaxe,
   ChevronDown,
-  ChevronRight,
-  Info,
+  AlertTriangle,
+  TrendingUp,
+  Beaker,
   Search,
-  FlaskConical,
-  Layers3,
   Target,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
   type LucideIcon,
 } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
@@ -30,7 +28,29 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
-import type { MiningComposition, MiningElement, MiningSolverResult } from '@/types/api';
+import type { MiningComposition } from '@/types/api';
+
+// ── WORKFLOW TYPES ─────────────────────────────────────────────────────────────
+
+type WorkflowPhase = 'scan' | 'composition' | 'risk' | 'yield';
+
+interface CompositionData {
+  id: string;
+  name: string;
+  className: string;
+  minDistinctElements?: number;
+  elements: Array<{
+    elementUuid: string;
+    elementName: string;
+    probability: number;
+    minPercentage: number;
+    maxPercentage: number;
+    instability?: number;
+    resistance?: number;
+    explosionMultiplier?: number;
+    optimalWindow?: number;
+  }>;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -71,24 +91,61 @@ function probColor(v: number | string): string {
   return 'bg-slate-600';
 }
 
-// ── ElementSelector ───────────────────────────────────────────────────────────
+// ── PHASE 1: CompositionSelector ────────────────────────────────────────────────
 
-function ElementSelector({
-  elements,
-  selected,
-  onChange,
-}: {
-  elements: MiningElement[];
+interface CompositionSelectorProps {
+  compositions: MiningComposition[] | undefined;
   selected: string;
-  onChange: (uuid: string) => void;
-}) {
+  onChange: (compositionId: string, data: CompositionData) => void;
+}
+
+function CompositionSelector({ compositions, selected, onChange }: CompositionSelectorProps) {
+  const { env } = useEnv();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
-  const current = elements.find((e) => e.uuid === selected);
+  const [loadingDetail, setLoadingDetail] = useState<string | null>(null);
 
-  const filtered = search.trim()
-    ? elements.filter((e) => e.name.toLowerCase().includes(search.toLowerCase()))
-    : elements;
+  const current = compositions?.find((c) => c.uuid === selected);
+
+  const filtered = useMemo(() => {
+    if (!compositions) return [];
+    const q = search.trim().toLowerCase();
+    if (!q) return compositions;
+    return compositions.filter(
+      (c) => (c.deposit_name || '').toLowerCase().includes(q) || (c.class_name || '').toLowerCase().includes(q),
+    );
+  }, [compositions, search]);
+
+  const handleSelect = useCallback(async (comp: MiningComposition) => {
+    setLoadingDetail(comp.uuid);
+    try {
+      const detail = await api.mining.composition(comp.uuid, env);
+      if (detail?.elements && Array.isArray(detail.elements)) {
+        const data: CompositionData = {
+          id: comp.uuid,
+          name: comp.deposit_name || comp.class_name || 'Unknown',
+          className: comp.class_name || '',
+          minDistinctElements: comp.min_distinct_elements ?? undefined,
+          elements: detail.elements.map((el: any) => ({
+            elementUuid: el.element_uuid || el.elementUuid,
+            elementName: el.element_name || el.elementName,
+            probability: Number(el.probability),
+            minPercentage: Number(el.min_percentage || el.minPercentage),
+            maxPercentage: Number(el.max_percentage || el.maxPercentage),
+            instability: Number(el.instability),
+            resistance: Number(el.resistance),
+            explosionMultiplier: Number(el.explosion_multiplier || el.explosionMultiplier),
+            optimalWindow: Number(el.optimal_window_midpoint || el.optimalWindow),
+          })),
+        };
+        onChange(comp.uuid, data);
+        setOpen(false);
+        setSearch('');
+      }
+    } finally {
+      setLoadingDetail(null);
+    }
+  }, [env, onChange]);
 
   return (
     <div className="relative">
@@ -97,9 +154,9 @@ function ElementSelector({
         className="sci-input w-full flex items-center justify-between gap-2 pr-3 text-left"
       >
         <span className={`font-rajdhani font-semibold text-sm ${current ? 'text-slate-100' : 'text-slate-500'}`}>
-          {current?.name ?? 'Select a mineral…'}
+          {current?.deposit_name || current?.class_name || 'Select a rock composition…'}
         </span>
-        <ChevronDown size={14} className="text-slate-500 flex-shrink-0" />
+        <ChevronDown size={14} className={`text-slate-500 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       <AnimatePresence>
@@ -118,7 +175,7 @@ function ElementSelector({
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search mineral…"
+                  placeholder="Search deposit…"
                   className="sci-input w-full pl-7 text-xs py-1.5"
                 />
               </div>
@@ -126,17 +183,20 @@ function ElementSelector({
             <div className="max-h-60 overflow-y-auto">
               {filtered.length === 0 ? (
                 <p className="px-3 py-4 text-xs text-slate-600 text-center">No results</p>
-              ) : filtered.map((el) => (
+              ) : filtered.map((comp) => (
                 <button
-                  key={el.uuid}
-                  onClick={() => { onChange(el.uuid); setOpen(false); setSearch(''); }}
-                  className={`w-full px-3 py-2 text-left hover:bg-white/5 transition-colors flex items-center gap-2 ${el.uuid === selected ? 'text-cyan-400' : 'text-slate-300'}`}
+                  key={comp.uuid}
+                  onClick={() => handleSelect(comp)}
+                  disabled={loadingDetail === comp.uuid}
+                  className={`w-full px-3 py-2 text-left hover:bg-white/5 transition-colors flex items-center gap-2 ${
+                    comp.uuid === selected ? 'text-cyan-400' : 'text-slate-300'
+                  } ${loadingDetail === comp.uuid ? 'opacity-50' : ''}`}
                 >
-                  <span className="font-rajdhani font-semibold text-sm flex-1">{el.name}</span>
-                  {el.instability != null && (
-                    <span className={`text-xs font-mono-sc ${dangerColor(el.instability)}`}>
-                      inst {fNum(el.instability)}
-                    </span>
+                  <span className="font-rajdhani font-semibold text-sm flex-1">
+                    {comp.deposit_name || comp.class_name}
+                  </span>
+                  {comp.element_count != null && (
+                    <GlowBadge color="slate" size="xs">{comp.element_count} minerals</GlowBadge>
                   )}
                 </button>
               ))}
@@ -148,540 +208,519 @@ function ElementSelector({
   );
 }
 
-// ── ElementStats ──────────────────────────────────────────────────────────────
+// ── PHASE 2: CompositionBreakdown ───────────────────────────────────────────────
 
-function ElementStats({ element }: { element: MiningElement }) {
-  const optMid = element.optimal_window_midpoint != null
-    ? `${(Number(element.optimal_window_midpoint) * 100).toFixed(0)}%`
-    : '—';
+interface CompositionBreakdownProps {
+  data: CompositionData | null;
+}
 
-  const stats = [
-    { label: 'Instability',       value: fNum(element.instability),      color: dangerColor(element.instability) },
-    { label: 'Resistance',        value: fNum(element.resistance),        color: dangerColor(element.resistance) },
-    { label: 'Opt. Window (mid)', value: optMid,                          color: 'text-cyan-400' },
-    { label: 'Opt. Window (thin)',value: fNum(element.optimal_window_thinness), color: 'text-cyan-400' },
-    { label: 'Explosion ×',       value: fNum(element.explosion_multiplier),
-      color: dangerColor(element.explosion_multiplier != null ? Math.min(Number(element.explosion_multiplier) / 3, 1) : null) },
-    { label: 'Cluster factor',    value: fNum(element.cluster_factor),   color: 'text-slate-300' },
-  ];
+function CompositionBreakdown({ data }: CompositionBreakdownProps) {
+  if (!data) {
+    return (
+      <div className="text-center py-8 text-slate-600">
+        <Beaker size={32} className="mx-auto mb-3 opacity-20" />
+        <p className="text-xs font-mono-sc uppercase tracking-widest">Select a composition to view its breakdown</p>
+      </div>
+    );
+  }
+
+  const sorted = [...data.elements].sort((a, b) => b.probability - a.probability);
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-      {stats.map(({ label, value, color }) => (
-        <div key={label} className="sci-panel px-3 py-2">
-          <div className="text-[10px] text-slate-600 font-mono-sc uppercase tracking-wider mb-0.5">{label}</div>
-          <div className={`font-orbitron text-sm font-bold ${color}`}>{value}</div>
-        </div>
+    <div className="space-y-3">
+      {sorted.map((el) => (
+        <motion.div
+          key={el.elementUuid}
+          initial={{ opacity: 0, x: -8 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="sci-panel px-4 py-3"
+        >
+          <div className="flex items-start justify-between gap-3 mb-2">
+            <div>
+              <div className="font-rajdhani font-semibold text-sm text-slate-100">{el.elementName}</div>
+              <div className="text-[10px] text-slate-600 font-mono-sc">Probability of finding</div>
+            </div>
+            <div className="text-right flex-shrink-0">
+              <div className="font-orbitron text-sm font-bold text-green-400">{pct(el.probability)}</div>
+              <div className="text-[10px] text-slate-600 font-mono-sc">
+                {pct(el.minPercentage)} – {pct(el.maxPercentage)}
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex-1 h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full ${probColor(el.probability)}`}
+                style={{ width: `${Math.round(el.probability * 100)}%` }}
+              />
+            </div>
+          </div>
+          {el.instability != null || el.resistance != null ? (
+            <div className="flex gap-4 mt-2 text-xs font-mono-sc">
+              {el.instability != null && (
+                <span>
+                  <span className="text-slate-600">Inst: </span>
+                  <span className={dangerColor(el.instability)}>{fNum(el.instability)}</span>
+                </span>
+              )}
+              {el.resistance != null && (
+                <span>
+                  <span className="text-slate-600">Res: </span>
+                  <span className={dangerColor(el.resistance)}>{fNum(el.resistance)}</span>
+                </span>
+              )}
+            </div>
+          ) : null}
+        </motion.div>
       ))}
     </div>
   );
 }
 
-// ── SolverResultRow ───────────────────────────────────────────────────────────
+// ── PHASE 3: RiskAssessment ─────────────────────────────────────────────────────
 
-function SolverResultRow({ result, rank }: { result: MiningSolverResult; rank: number }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: Math.min(rank * 0.04, 0.5) }}
-      className="sci-panel px-4 py-3 hover:border-cyan-800 transition-colors"
-    >
-      <div className="flex items-start gap-3">
-        <div className="w-6 text-xs font-mono-sc text-slate-600 pt-0.5 flex-shrink-0">#{rank + 1}</div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap mb-1.5">
-            <span className="font-orbitron text-sm text-slate-100">{result.deposit_name || result.class_name}</span>
-            {result.min_distinct_elements != null && (
-              <GlowBadge color="slate" size="xs">min {result.min_distinct_elements} minerals</GlowBadge>
-            )}
-          </div>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${probColor(result.probability)}`}
-                style={{ width: `${Math.round(Number(result.probability) * 100)}%` }}
-              />
-            </div>
-            <span className="text-xs font-mono-sc text-slate-400 w-10 text-right flex-shrink-0">
-              {pct(result.probability)}
-            </span>
-          </div>
-          <div className="flex items-center gap-4 text-xs font-mono-sc text-slate-500">
-            <span>
-              <span className="text-slate-600">Content: </span>
-              {pct(result.min_percentage)} – {pct(result.max_percentage)}
-            </span>
-            {result.instability != null && (
-              <span>
-                <span className="text-slate-600">Inst: </span>
-                <span className={dangerColor(result.instability)}>{fNum(result.instability)}</span>
-              </span>
-            )}
-            {result.resistance != null && (
-              <span>
-                <span className="text-slate-600">Res: </span>
-                <span className={dangerColor(result.resistance)}>{fNum(result.resistance)}</span>
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    </motion.div>
-  );
+interface RiskAssessmentProps {
+  data: CompositionData | null;
 }
 
-// ── Tab: Mineral Finder ───────────────────────────────────────────────────────
-
-function MineralFinder({ elements }: { elements: MiningElement[] }) {
-  const { env } = useEnv();
-  const [selectedElement, setSelectedElement] = useState<string>('');
-  const [minProbability, setMinProbability] = useState<number>(0);
-
-  const { data: results, isLoading, error } = useQuery({
-    queryKey: ['mining.solver', selectedElement, minProbability, env],
-    queryFn: () => api.mining.solveForElement(selectedElement, minProbability || undefined, env),
-    enabled: !!selectedElement,
-    staleTime: 30 * 60_000,
-  });
-
-  const currentElement = elements.find((e) => e.uuid === selectedElement);
-
-  return (
-    <div className="space-y-4">
-      <ScifiPanel title="Select Mineral">
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="flex-1">
-            <ElementSelector elements={elements} selected={selectedElement} onChange={setSelectedElement} />
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <label className="text-xs text-slate-500 font-mono-sc whitespace-nowrap">Min probability</label>
-            <select
-              value={minProbability}
-              onChange={(e) => setMinProbability(Number(e.target.value))}
-              className="sci-input text-xs w-28"
-            >
-              <option value={0}>Any</option>
-              <option value={0.25}>≥ 25%</option>
-              <option value={0.5}>≥ 50%</option>
-              <option value={0.75}>≥ 75%</option>
-            </select>
-          </div>
-        </div>
-      </ScifiPanel>
-
-      <AnimatePresence>
-        {currentElement && (
-          <motion.div key={currentElement.uuid} initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-            <ScifiPanel title={currentElement.name} subtitle={currentElement.class_name}>
-              <ElementStats element={currentElement} />
-              <p className="mt-3 flex items-start gap-1.5 text-xs text-slate-600 font-mono-sc">
-                <Info size={12} className="mt-0.5 flex-shrink-0" />
-                Lower instability and resistance are easier to mine. Optimal window shows the laser power sweet spot.
-              </p>
-            </ScifiPanel>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {selectedElement && (
-        <ScifiPanel
-          title="Rock Compositions"
-          subtitle={results ? `${results.length} deposit type${results.length !== 1 ? 's' : ''} found` : undefined}
-        >
-          {isLoading ? (
-            <LoadingGrid message="SOLVING…" />
-          ) : error ? (
-            <ErrorState error={error as Error} />
-          ) : !results?.length ? (
-            <EmptyState icon="🪨" title="No compositions found"
-              message="This mineral was not found in any known rock composition, or lower the minimum probability." />
-          ) : (
-            <div className="space-y-2">
-              {results.map((r, i) => (
-                <SolverResultRow key={`${r.uuid}-${i}`} result={r} rank={i} />
-              ))}
-            </div>
-          )}
-        </ScifiPanel>
-      )}
-
-      {!selectedElement && (
-        <div className="text-center py-16 text-slate-600">
-          <Pickaxe size={40} className="mx-auto mb-3 opacity-20" />
-          <p className="font-rajdhani text-sm uppercase tracking-widest">Select a mineral above to find rock compositions</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Tab: Ore Library ──────────────────────────────────────────────────────────
-
-type OreSort = 'name' | 'instability' | 'resistance' | 'explosion_multiplier' | 'optimal_window_midpoint';
-
-function OreLibrary({ elements }: { elements: MiningElement[] }) {
-  const [search, setSearch] = useState('');
-  const [sortKey, setSortKey] = useState<OreSort>('name');
-  const [sortDesc, setSortDesc] = useState(false);
-
-  const sorted = useMemo(() => {
-    const base = search.trim()
-      ? elements.filter((e) => e.name.toLowerCase().includes(search.toLowerCase()))
-      : [...elements];
-
-    return base.sort((a, b) => {
-      const va = sortKey === 'name' ? a.name : a[sortKey];
-      const vb = sortKey === 'name' ? b.name : b[sortKey];
-
-      if (va == null && vb == null) return 0;
-      if (va == null) return 1;
-      if (vb == null) return -1;
-
-      const cmp = typeof va === 'string'
-        ? (va as string).localeCompare(vb as string)
-        : Number(va) - Number(vb);
-      return sortDesc ? -cmp : cmp;
-    });
-  }, [elements, search, sortKey, sortDesc]);
-
-  function toggleSort(key: OreSort) {
-    if (sortKey === key) setSortDesc((d) => !d);
-    else { setSortKey(key); setSortDesc(false); }
-  }
-
-  function SortIcon({ k }: { k: OreSort }) {
-    if (sortKey !== k) return <ArrowUpDown size={10} className="text-slate-600" />;
-    return sortDesc ? <ArrowDown size={10} className="text-cyan-400" /> : <ArrowUp size={10} className="text-cyan-400" />;
-  }
-
-  function ColHeader({ k, label, cls = '' }: { k: OreSort; label: string; cls?: string }) {
+function RiskAssessment({ data }: RiskAssessmentProps) {
+  if (!data || !data.elements.length) {
     return (
-      <th
-        className={`px-3 py-2 text-left cursor-pointer hover:text-cyan-300 select-none whitespace-nowrap ${sortKey === k ? 'text-cyan-400' : 'text-slate-500'} ${cls}`}
-        onClick={() => toggleSort(k)}
-      >
-        <span className="flex items-center gap-1 font-mono-sc text-[10px] uppercase tracking-wider">
-          {label} <SortIcon k={k} />
-        </span>
-      </th>
+      <div className="text-center py-8 text-slate-600">
+        <AlertTriangle size={32} className="mx-auto mb-3 opacity-20" />
+        <p className="text-xs font-mono-sc uppercase tracking-widest">No risk data available</p>
+      </div>
+    );
+  }
+
+  // Calculate aggregate risk metrics
+  const aggregates = useMemo(() => {
+    const allElements = data.elements.filter((el) => el.instability != null || el.resistance != null);
+    if (!allElements.length) return null;
+
+    const instabilities = allElements.map((el) => Number(el.instability ?? 0)).filter(Number.isFinite);
+    const resistances = allElements.map((el) => Number(el.resistance ?? 0)).filter(Number.isFinite);
+
+    return {
+      maxInstability: Math.max(...instabilities, 0),
+      avgInstability: instabilities.length ? instabilities.reduce((a, b) => a + b, 0) / instabilities.length : 0,
+      maxResistance: Math.max(...resistances, 0),
+      avgResistance: resistances.length ? resistances.reduce((a, b) => a + b, 0) / resistances.length : 0,
+      hasHighRisk: Math.max(...instabilities, 0) > 0.6 || Math.max(...resistances, 0) > 0.6,
+    };
+  }, [data]);
+
+  if (!aggregates) {
+    return (
+      <div className="text-center py-8 text-slate-600">
+        <p className="text-xs font-mono-sc">No mineral risk properties available</p>
+      </div>
     );
   }
 
   return (
-    <div className="space-y-4">
-      <div className="relative max-w-xs">
-        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Filter minerals…"
-          className="sci-input pl-8 w-full text-sm"
-        />
-      </div>
+    <div className="space-y-3">
+      {/* Overall Risk Gauge */}
+      <ScifiPanel title="Overall Risk Profile">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="border border-border/50 rounded p-3">
+            <div className="text-[10px] text-slate-600 font-mono-sc uppercase tracking-wider mb-1">Max Instability</div>
+            <div className={`font-orbitron text-lg font-bold ${dangerColor(aggregates.maxInstability)}`}>
+              {fNum(aggregates.maxInstability)}
+            </div>
+            <div className="mt-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full ${dangerBg(aggregates.maxInstability)}`}
+                style={{ width: `${Math.min(aggregates.maxInstability * 100, 100)}%` }}
+              />
+            </div>
+          </div>
+          <div className="border border-border/50 rounded p-3">
+            <div className="text-[10px] text-slate-600 font-mono-sc uppercase tracking-wider mb-1">Max Resistance</div>
+            <div className={`font-orbitron text-lg font-bold ${dangerColor(aggregates.maxResistance)}`}>
+              {fNum(aggregates.maxResistance)}
+            </div>
+            <div className="mt-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div
+                className={`h-full rounded-full ${dangerBg(aggregates.maxResistance)}`}
+                style={{ width: `${Math.min(aggregates.maxResistance * 100, 100)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </ScifiPanel>
 
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b border-border">
-              <ColHeader k="name" label="Mineral" />
-              <ColHeader k="instability" label="Instability" cls="w-44" />
-              <ColHeader k="resistance" label="Resistance" cls="w-44" />
-              <ColHeader k="optimal_window_midpoint" label="Opt. Window" cls="w-32" />
-              <ColHeader k="explosion_multiplier" label="Explosion ×" cls="w-28" />
-              <th className="px-3 py-2 text-left font-mono-sc text-[10px] uppercase tracking-wider text-slate-500 whitespace-nowrap w-24">
-                Cluster
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-3 py-8 text-center text-slate-600 font-mono-sc text-xs">
-                  No minerals found
-                </td>
-              </tr>
-            ) : sorted.map((el, i) => (
-              <motion.tr
-                key={el.uuid}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: Math.min(i * 0.015, 0.4) }}
-                className="border-b border-border/40 hover:bg-white/[0.03] transition-colors"
-              >
-                <td className="px-3 py-2.5">
-                  <span className="font-rajdhani font-semibold text-sm text-slate-100">{el.name}</span>
-                  <span className="block text-[10px] text-slate-600 font-mono-sc">{el.class_name}</span>
-                </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden flex-shrink-0">
-                      <div
-                        className={`h-full rounded-full ${dangerBg(el.instability)}`}
-                        style={{ width: `${Math.min((el.instability ?? 0) * 100, 100)}%` }}
-                      />
-                    </div>
-                    <span className={`text-xs font-mono-sc ${dangerColor(el.instability)}`}>{fNum(el.instability)}</span>
-                  </div>
-                </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden flex-shrink-0">
-                      <div
-                        className={`h-full rounded-full ${dangerBg(el.resistance)}`}
-                        style={{ width: `${Math.min((el.resistance ?? 0) * 100, 100)}%` }}
-                      />
-                    </div>
-                    <span className={`text-xs font-mono-sc ${dangerColor(el.resistance)}`}>{fNum(el.resistance)}</span>
-                  </div>
-                </td>
-                <td className="px-3 py-2.5">
-                  {el.optimal_window_midpoint != null ? (
-                    <div>
-                      <span className="text-xs font-mono-sc text-cyan-400">
-                        {(Number(el.optimal_window_midpoint) * 100).toFixed(0)}%
-                      </span>
-                      {el.optimal_window_thinness != null && (
-                        <span className="text-[10px] text-slate-600 ml-1">
-                          ({fNum(el.optimal_window_thinness, 1)} thin)
-                        </span>
-                      )}
-                    </div>
-                  ) : (
-                    <span className="text-slate-600 text-xs">—</span>
-                  )}
-                </td>
-                <td className="px-3 py-2.5">
-                  <span className={`text-xs font-mono-sc ${dangerColor(
-                    el.explosion_multiplier != null ? Math.min(Number(el.explosion_multiplier) / 3, 1) : null,
-                  )}`}>
-                    {fNum(el.explosion_multiplier)}
+      {/* Risk Warning */}
+      {aggregates.hasHighRisk && (
+        <div className="sci-panel border-red-600/50 p-3 flex gap-3">
+          <AlertTriangle size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="text-xs text-red-300">
+            <div className="font-semibold mb-1">⚠ High Risk Zone</div>
+            <div className="text-[11px] text-red-200/80">
+              This composition contains unstable or resistant minerals. Proceed with caution and use optimal laser power windows.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* High-Risk Elements */}
+      <div className="space-y-1.5">
+        {data.elements
+          .filter((el) => (el.instability ?? 0) > 0.5 || (el.resistance ?? 0) > 0.5)
+          .map((el) => (
+            <div key={el.elementUuid} className="sci-panel px-3 py-2 border-amber-600/30">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <span className="text-xs font-rajdhani font-semibold text-amber-300">{el.elementName}</span>
+                <span className="text-[10px] text-slate-600">{pct(el.probability)} likelihood</span>
+              </div>
+              <div className="flex gap-3 text-xs font-mono-sc">
+                {el.instability != null && (
+                  <span>
+                    <span className="text-slate-600">Inst </span>
+                    <span className={dangerColor(el.instability)}>{fNum(el.instability)}</span>
                   </span>
-                </td>
-                <td className="px-3 py-2.5">
-                  <span className="text-xs font-mono-sc text-slate-400">{fNum(el.cluster_factor)}</span>
-                </td>
-              </motion.tr>
-            ))}
-          </tbody>
-        </table>
+                )}
+                {el.resistance != null && (
+                  <span>
+                    <span className="text-slate-600">Res </span>
+                    <span className={dangerColor(el.resistance)}>{fNum(el.resistance)}</span>
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
       </div>
     </div>
   );
 }
 
-// ── Tab: Rock Deposits ────────────────────────────────────────────────────────
+// ── PHASE 4: YieldCalculator ────────────────────────────────────────────────────
 
-function DepositRow({ comp }: { comp: MiningComposition }) {
-  const { env } = useEnv();
-  const [expanded, setExpanded] = useState(false);
+interface YieldCalculatorProps {
+  data: CompositionData | null;
+}
 
-  const { data: detail, isLoading } = useQuery({
-    queryKey: ['mining.composition', comp.uuid, env],
-    queryFn: () => api.mining.composition(comp.uuid, env),
-    enabled: expanded,
-    staleTime: 60 * 60_000,
-  });
+function YieldCalculator({ data }: YieldCalculatorProps) {
+  if (!data || !data.elements.length) {
+    return (
+      <div className="text-center py-8 text-slate-600">
+        <TrendingUp size={32} className="mx-auto mb-3 opacity-20" />
+        <p className="text-xs font-mono-sc uppercase tracking-widest">No yield data available</p>
+      </div>
+    );
+  }
+
+  // Calculate optimal yield per element
+  const yieldResults = useMemo(() => {
+    return data.elements.map((el) => {
+      const optimalWindow = el.optimalWindow ?? 0.5;
+      const windowWidth = 0.15; // Typical narrow window
+      const baseYield = el.probability * (el.maxPercentage + el.minPercentage) / 2;
+      const riskPenalty = Math.max(0, 1 - ((el.instability ?? 0) + (el.resistance ?? 0)) / 2);
+      const optimizedYield = baseYield * riskPenalty * 1.2; // 20% bonus for optimal window
+
+      return {
+        elementName: el.elementName,
+        probability: el.probability,
+        baseYield: baseYield * 100,
+        optimizedYield: optimizedYield * 100,
+        optimalWindow,
+        windowWidth,
+        windowStart: Math.max(0, optimalWindow - windowWidth / 2),
+        windowEnd: Math.min(1, optimalWindow + windowWidth / 2),
+      };
+    });
+  }, [data]);
+
+  const totalYield = yieldResults.reduce((sum, r) => sum + r.optimizedYield, 0);
 
   return (
-    <div className="sci-panel overflow-hidden">
-      <button
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
-        onClick={() => setExpanded((v) => !v)}
-      >
-        <ChevronRight
-          size={14}
-          className={`text-slate-500 flex-shrink-0 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
-        />
-        <div className="flex-1 min-w-0">
-          <span className="font-orbitron text-sm text-slate-100">{comp.deposit_name || comp.class_name}</span>
-          {comp.deposit_name && (
-            <span className="text-[10px] text-slate-600 font-mono-sc ml-2">{comp.class_name}</span>
-          )}
+    <div className="space-y-3">
+      {/* Total Yield Summary */}
+      <ScifiPanel title="Expected Total Yield">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="text-center px-3 py-2 border border-cyan-600/50 rounded">
+            <div className="text-[10px] text-slate-600 font-mono-sc uppercase tracking-wider mb-1">Per Extraction</div>
+            <div className="font-orbitron text-xl font-bold text-cyan-400">{fNum(totalYield, 1)}%</div>
+            <div className="text-[10px] text-slate-600 mt-1">Average optimized</div>
+          </div>
+          <div className="text-center px-3 py-2 border border-slate-600/50 rounded">
+            <div className="text-[10px] text-slate-600 font-mono-sc uppercase tracking-wider mb-1">Elements</div>
+            <div className="font-orbitron text-xl font-bold text-slate-300">{data.elements.length}</div>
+            <div className="text-[10px] text-slate-600 mt-1">In composition</div>
+          </div>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {comp.element_count != null && (
-            <GlowBadge color="slate" size="xs">{comp.element_count} minerals</GlowBadge>
-          )}
-          {comp.min_distinct_elements != null && (
-            <GlowBadge color="cyan" size="xs">min {comp.min_distinct_elements}</GlowBadge>
-          )}
-        </div>
-      </button>
+      </ScifiPanel>
 
-      <AnimatePresence>
-        {expanded && (
+      {/* Per-Element Optimization */}
+      <div className="space-y-2">
+        {yieldResults.map((result) => (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden border-t border-border"
+            key={result.elementName}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="sci-panel px-4 py-3"
           >
-            <div className="px-4 py-3">
-              {isLoading ? (
-                <div className="py-4 text-center text-xs text-slate-600 font-mono-sc">Loading composition…</div>
-              ) : !detail?.elements?.length ? (
-                <div className="py-4 text-center text-xs text-slate-600 font-mono-sc">No mineral data available.</div>
-              ) : (
-                <div className="space-y-2">
-                  {detail.elements
-                    .slice()
-                    .sort((a, b) => Number(b.probability) - Number(a.probability))
-                    .map((part) => (
-                      <div key={part.element_uuid} className="flex items-center gap-3">
-                        <div className="w-32 flex-shrink-0">
-                          <span className="font-rajdhani font-semibold text-sm text-slate-200">{part.element_name}</span>
-                        </div>
-                        <div className="flex-1 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${probColor(part.probability)}`}
-                            style={{ width: `${Math.round(Number(part.probability) * 100)}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-mono-sc text-slate-400 w-10 text-right flex-shrink-0">
-                          {pct(part.probability)}
-                        </span>
-                        <span className="text-xs font-mono-sc text-slate-500 w-24 text-right flex-shrink-0">
-                          {pct(part.min_percentage)}–{pct(part.max_percentage)}
-                        </span>
-                        {part.instability != null && (
-                          <span className={`text-xs font-mono-sc w-14 text-right flex-shrink-0 ${dangerColor(part.instability)}`}>
-                            I:{fNum(part.instability)}
-                          </span>
-                        )}
-                      </div>
-                    ))}
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <div>
+                <div className="font-rajdhani font-semibold text-sm text-slate-100">{result.elementName}</div>
+                <div className="text-[10px] text-slate-600 font-mono-sc">
+                  Optimal laser power: {(result.windowStart * 100).toFixed(0)}% – {(result.windowEnd * 100).toFixed(0)}%
                 </div>
-              )}
+              </div>
+              <div className="text-right flex-shrink-0">
+                <div className="font-orbitron text-sm font-bold text-green-400">{fNum(result.optimizedYield, 1)}%</div>
+                <div className="text-[10px] text-slate-600">
+                  <span className="line-through">{fNum(result.baseYield, 1)}%</span> → optimized
+                </div>
+              </div>
+            </div>
+
+            {/* Optimal Window Visualization */}
+            <div className="space-y-1.5">
+              <div className="text-[10px] text-slate-600 font-mono-sc">Laser power window (0–100%)</div>
+              <div className="h-6 bg-slate-800 rounded border border-slate-700/50 overflow-hidden relative">
+                {/* Safe zone background */}
+                <div
+                  className="absolute h-full bg-green-900/30 border-r border-green-600/50"
+                  style={{
+                    left: `${result.windowStart * 100}%`,
+                    right: `${(1 - result.windowEnd) * 100}%`,
+                  }}
+                />
+                {/* Optimal point marker */}
+                <div
+                  className="absolute h-full w-0.5 bg-cyan-400 top-0"
+                  style={{ left: `${result.optimalWindow * 100}%` }}
+                />
+                {/* Tick marks */}
+                <div className="absolute inset-0 flex justify-between px-1 items-center pointer-events-none text-[8px] text-slate-600 font-mono-sc">
+                  <span>0%</span>
+                  <span>50%</span>
+                  <span>100%</span>
+                </div>
+              </div>
             </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        ))}
+      </div>
     </div>
   );
 }
 
-function RockDeposits() {
-  const { env } = useEnv();
-  const [search, setSearch] = useState('');
+// ── WORKFLOW PROGRESS INDICATOR ────────────────────────────────────────────────
 
-  const { data: compositions, isLoading, error, refetch } = useQuery({
+type PhaseConfig = {
+  phase: WorkflowPhase;
+  icon: LucideIcon;
+  label: string;
+  description: string;
+};
+
+const WORKFLOW_PHASES: PhaseConfig[] = [
+  { phase: 'scan', icon: Target, label: 'Scan', description: 'Select a rock' },
+  { phase: 'composition', icon: Beaker, label: 'Composition', description: 'View minerals' },
+  { phase: 'risk', icon: AlertTriangle, label: 'Risk', description: 'Assess danger' },
+  { phase: 'yield', icon: TrendingUp, label: 'Yield', description: 'Optimize output' },
+];
+
+interface WorkflowProgressProps {
+  currentPhase: WorkflowPhase;
+}
+
+function WorkflowProgress({ currentPhase }: WorkflowProgressProps) {
+  const currentIndex = WORKFLOW_PHASES.findIndex((p) => p.phase === currentPhase);
+
+  return (
+    <div className="mb-6">
+      <div className="flex items-center gap-1">
+        {WORKFLOW_PHASES.map((config, i) => {
+          const Icon = config.icon;
+          const isActive = i <= currentIndex;
+          const isCurrent = config.phase === currentPhase;
+
+          return (
+            <motion.div key={config.phase} className="flex items-center flex-1">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                className={`flex flex-col items-center gap-1 p-2 rounded border transition-all flex-1 ${
+                  isCurrent
+                    ? 'border-cyan-400 bg-cyan-400/10'
+                    : isActive
+                      ? 'border-slate-600 bg-slate-700/30'
+                      : 'border-slate-700 bg-transparent'
+                }`}
+              >
+                <Icon
+                  size={16}
+                  className={`${
+                    isCurrent ? 'text-cyan-400' : isActive ? 'text-slate-400' : 'text-slate-600'
+                  }`}
+                />
+                <div className="text-[10px] font-mono-sc uppercase tracking-wider text-center leading-tight">
+                  <div className={isCurrent ? 'text-cyan-400' : isActive ? 'text-slate-300' : 'text-slate-600'}>
+                    {config.label}
+                  </div>
+                  <div className={isCurrent ? 'text-cyan-300' : isActive ? 'text-slate-500' : 'text-slate-700'}>
+                    {config.description}
+                  </div>
+                </div>
+              </motion.button>
+              {i < WORKFLOW_PHASES.length - 1 && (
+                <div className={`h-0.5 flex-1 mx-1 ${isActive ? 'bg-slate-600' : 'bg-slate-800'}`} />
+              )}
+            </motion.div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN WORKFLOW PAGE ─────────────────────────────────────────────────────────
+
+export default function MiningPage() {
+  const { env } = useEnv();
+  const [currentPhase, setCurrentPhase] = useState<WorkflowPhase>('scan');
+  const [selectedCompositionId, setSelectedCompositionId] = useState('');
+  const [compositionData, setCompositionData] = useState<CompositionData | null>(null);
+
+  // Load all compositions for the scan phase
+  const { data: compositions, isLoading: loadingCompositions, error: compositionsError } = useQuery({
     queryKey: ['mining.compositions', env],
     queryFn: () => api.mining.compositions(false, env),
     staleTime: 30 * 60_000,
   });
 
-  const filtered = useMemo(() => {
-    if (!compositions) return [];
-    const q = search.trim().toLowerCase();
-    if (!q) return compositions;
-    return compositions.filter(
-      (c) => c.deposit_name.toLowerCase().includes(q) || c.class_name.toLowerCase().includes(q),
-    );
-  }, [compositions, search]);
-
-  if (isLoading) return <LoadingGrid message="LOADING DEPOSITS…" />;
-  if (error) return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
-  if (!compositions?.length) return (
-    <EmptyState icon="🪨" title="No deposit data" message="Run an extraction to populate mining data." />
+  const handleCompositionSelect = useCallback(
+    (compositionId: string, data: CompositionData) => {
+      setSelectedCompositionId(compositionId);
+      setCompositionData(data);
+      setCurrentPhase('composition');
+    },
+    [],
   );
 
-  return (
-    <div className="space-y-4">
-      <div className="relative max-w-xs">
-        <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Filter deposits…"
-          className="sci-input pl-8 w-full text-sm"
-        />
-      </div>
-      <div className="space-y-2">
-        {filtered.map((comp) => (
-          <DepositRow key={comp.uuid} comp={comp} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ── Tab definitions ───────────────────────────────────────────────────────────
-
-type Tab = 'finder' | 'library' | 'deposits';
-
-const TABS: { key: Tab; Icon: LucideIcon; label: string }[] = [
-  { key: 'finder',   Icon: Target,        label: 'Mineral Finder' },
-  { key: 'library',  Icon: FlaskConical,  label: 'Ore Library'    },
-  { key: 'deposits', Icon: Layers3,       label: 'Rock Deposits'  },
-];
-
-// ── Main page ─────────────────────────────────────────────────────────────────
-
-export default function MiningPage() {
-  const { env } = useEnv();
-  const [tab, setTab] = useState<Tab>('finder');
-
-  const {
-    data: elements,
-    isLoading: loadingElements,
-    error: elementsError,
-    refetch: refetchElements,
-  } = useQuery({
-    queryKey: ['mining.elements', env],
-    queryFn: () => api.mining.elements(env),
-    staleTime: 30 * 60_000,
-  });
+  const handlePhaseChange = useCallback((phase: WorkflowPhase) => {
+    if (selectedCompositionId && currentPhase !== phase) {
+      setCurrentPhase(phase);
+    }
+  }, [selectedCompositionId, currentPhase]);
 
   return (
-    <div className="max-w-screen-xl mx-auto">
+    <div className="max-w-screen-2xl mx-auto">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3">
           <Pickaxe size={20} className="text-cyan-400" />
           <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">
-            Mining
+            Mining Solver
           </h1>
         </div>
         <p className="text-sm text-slate-500 mt-1 font-mono-sc">
-          Ore properties, rock deposits, and mineral solver.
+          Regolith-style workflow: scan deposits, analyze composition, assess risk, optimize yield.
         </p>
       </div>
 
-      {/* Tab nav */}
-      <div className="flex gap-1 mb-6 border-b border-border">
-        {TABS.map(({ key, Icon, label }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`flex items-center gap-2 px-4 py-2.5 text-sm font-rajdhani font-semibold transition-colors border-b-2 -mb-px ${
-              tab === key
-                ? 'text-cyan-400 border-cyan-400'
-                : 'text-slate-500 border-transparent hover:text-slate-300 hover:border-slate-600'
-            }`}
-          >
-            <Icon size={14} />
-            {label}
-          </button>
-        ))}
-      </div>
+      {/* Workflow Progress */}
+      <WorkflowProgress currentPhase={currentPhase} />
 
-      {/* Tab content */}
-      {loadingElements ? (
-        <LoadingGrid message="LOADING MINING DATA…" />
-      ) : elementsError ? (
-        <ErrorState error={elementsError as Error} onRetry={() => void refetchElements()} />
-      ) : !elements?.length ? (
-        <EmptyState icon="⛏️" title="No mineral data available" message="Run an extraction to populate mining data." />
-      ) : (
-        <>
-          {tab === 'finder'   && <MineralFinder elements={elements} />}
-          {tab === 'library'  && <OreLibrary elements={elements} />}
-          {tab === 'deposits' && <RockDeposits />}
-        </>
-      )}
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+        {/* Left: Scan Phase (always visible) */}
+        <div className="xl:col-span-1">
+          <ScifiPanel title="1. Scan Deposit" subtitle="Select a rock type to analyze">
+            {loadingCompositions ? (
+              <LoadingGrid message="Loading deposits…" />
+            ) : compositionsError ? (
+              <ErrorState error={compositionsError as Error} />
+            ) : !compositions?.length ? (
+              <EmptyState icon="🪨" title="No data" message="Run extraction to populate mining deposits." />
+            ) : (
+              <CompositionSelector
+                compositions={compositions}
+                selected={selectedCompositionId}
+                onChange={handleCompositionSelect}
+              />
+            )}
+          </ScifiPanel>
+
+          {/* Quick Composition Info */}
+          {compositionData && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-4">
+              <ScifiPanel title="Composition Summary">
+                <div className="space-y-2 text-xs font-mono-sc">
+                  <div>
+                    <span className="text-slate-600">Deposit:</span>{' '}
+                    <span className="text-slate-300">{compositionData.name}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-600">Minerals:</span>{' '}
+                    <span className="text-cyan-400 font-semibold">{compositionData.elements.length}</span>
+                  </div>
+                  {compositionData.minDistinctElements && (
+                    <div>
+                      <span className="text-slate-600">Min Distinct:</span>{' '}
+                      <span className="text-amber-400">{compositionData.minDistinctElements}</span>
+                    </div>
+                  )}
+                </div>
+              </ScifiPanel>
+            </motion.div>
+          )}
+        </div>
+
+        {/* Right: Phase Content (Composition, Risk, Yield) */}
+        <div className="xl:col-span-2 space-y-6">
+          {/* PHASE 2: Composition Breakdown */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: currentPhase === 'composition' || currentPhase === 'risk' || currentPhase === 'yield' ? 1 : 0.5, y: 0 }}
+            transition={{ duration: 0.3 }}
+            onClick={() => handlePhaseChange('composition')}
+            className="cursor-pointer"
+          >
+            <ScifiPanel
+              title="2. Composition Breakdown"
+              subtitle="Mineral distribution and properties"
+            >
+              <CompositionBreakdown data={compositionData} />
+            </ScifiPanel>
+          </motion.div>
+
+          {/* PHASE 3: Risk Assessment */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: currentPhase === 'risk' || currentPhase === 'yield' ? 1 : 0.5, y: 0 }}
+            transition={{ duration: 0.3 }}
+            onClick={() => handlePhaseChange('risk')}
+            className="cursor-pointer"
+          >
+            <ScifiPanel
+              title="3. Risk Assessment"
+              subtitle="Instability, resistance, and hazard zones"
+            >
+              <RiskAssessment data={compositionData} />
+            </ScifiPanel>
+          </motion.div>
+
+          {/* PHASE 4: Yield Calculator */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: currentPhase === 'yield' ? 1 : 0.5, y: 0 }}
+            transition={{ duration: 0.3 }}
+            onClick={() => handlePhaseChange('yield')}
+            className="cursor-pointer"
+          >
+            <ScifiPanel
+              title="4. Yield Optimization"
+              subtitle="Optimal laser power windows and expected output"
+            >
+              <YieldCalculator data={compositionData} />
+            </ScifiPanel>
+          </motion.div>
+        </div>
+      </div>
     </div>
   );
 }

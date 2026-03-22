@@ -45,8 +45,9 @@ export class MissionService {
     if (legal === 'false') where.push('m.is_legal = 0');
     if (shared === 'true') where.push('m.can_be_shared = 1');
     if (search) {
-      where.push('m.title LIKE ?');
-      params.push(`%${search.replace(/[%_\\]/g, '\\$&')}%`);
+      where.push('(m.title LIKE ? OR m.class_name LIKE ? OR m.description LIKE ?)');
+      const q = `%${search.replace(/[%_\\]/g, '\\$&')}%`;
+      params.push(q, q, q);
     }
 
     const whereClause = where.join(' AND ');
