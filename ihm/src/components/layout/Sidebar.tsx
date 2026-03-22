@@ -2,8 +2,10 @@ import { motion } from 'framer-motion';
 import {
   BarChart3,
   BookOpen,
-  Dices,
+  Boxes,
+  Crosshair,
   ExternalLink,
+  Gem,
   Home,
   Package,
   Palette,
@@ -16,20 +18,20 @@ import {
   Wrench,
   ClipboardList,
 } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useEnv } from '@/contexts/EnvContext';
 
 const DB_ITEMS = [
-  { to: '/',              icon: Home,              label: 'Dashboard' },
-  { to: '/ships',         icon: Rocket,            label: 'Ships' },
-  { to: '/missions',      icon: ClipboardList,     label: 'Missions' },
-  { to: '/components',    icon: Settings2,         label: 'Components' },
-  { to: '/items',         icon: Dices,             label: 'Items' },
-  { to: '/commodities',   icon: Package,           label: 'Commodities' },
-  { to: '/paints',        icon: Palette,           label: 'Paints' },
-  { to: '/manufacturers', icon: Wrench,            label: 'Manufacturers' },
-  { to: '/shops',         icon: ShoppingBag,       label: 'Shops' },
-  { to: '/changelog',     icon: BookOpen,          label: 'Changelog' },
+  { to: '/',              icon: Home,          label: 'Dashboard' },
+  { to: '/ships',         icon: Rocket,        label: 'Ships' },
+  { to: '/missions',      icon: ClipboardList, label: 'Missions' },
+  { to: '/components',    icon: Settings2,     label: 'Components' },
+  { to: '/items',         icon: Crosshair,     label: 'FPS Gear' },
+  { to: '/equipment',     icon: Boxes,         label: 'Equipment' },
+  { to: '/commodities',   icon: Package,       label: 'Commodities' },
+  { to: '/manufacturers', icon: Wrench,        label: 'Manufacturers' },
+  { to: '/shops',         icon: ShoppingBag,   label: 'Shops' },
+  { to: '/paints',        icon: Palette,       label: 'Paints' },
 ];
 
 const TOOL_ITEMS = [
@@ -37,6 +39,7 @@ const TOOL_ITEMS = [
   { to: '/compare',   icon: BarChart3,         label: 'Compare' },
   { to: '/outfitter', icon: SlidersHorizontal, label: 'Outfitter' },
   { to: '/mining',    icon: Pickaxe,           label: 'Mining' },
+  { to: '/minerals',  icon: Gem,               label: 'Minerals' },
 ];
 
 function NavItem({ to, icon: Icon, label }: { to: string; icon: React.ElementType; label: string }) {
@@ -146,7 +149,14 @@ export function Sidebar() {
       </nav>
 
       {/* Footer */}
-      <div className="px-4 py-3 border-t border-border">
+      <div className="px-4 py-3 border-t border-border space-y-2">
+        <Link
+          to="/changelog"
+          className="hidden md:flex items-center gap-2 text-xs text-slate-600 hover:text-slate-400 transition-colors"
+        >
+          <BookOpen size={12} />
+          <span className="font-mono-sc">Changelog</span>
+        </Link>
         <a
           href="https://robertsspaceindustries.com"
           target="_blank"
