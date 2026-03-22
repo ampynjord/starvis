@@ -128,6 +128,10 @@ export class ComponentQueryService {
   async getComponentBuyLocations(uuid: string, env = 'live'): Promise<Row[]> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT s.name as shop_name, s.location, s.planet_moon, s.shop_type,
+              s.source_type as shop_source_type, s.source_name as shop_source_name,
+              s.canonical_shop_key, s.canonical_location_key,
+              si.source_type as inventory_source_type, si.source_name as inventory_source_name,
+              si.confidence_score,
               si.base_price, si.rental_price_1d, si.rental_price_3d, si.rental_price_7d, si.rental_price_30d
        FROM shop_inventory si JOIN shops s ON si.shop_id = s.id
        WHERE si.component_uuid = ? AND si.game_env = ? ORDER BY si.base_price`,

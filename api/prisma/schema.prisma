@@ -373,6 +373,13 @@ model Shop {
   name       String   @db.VarChar(255)
   className  String   @map("class_name") @db.VarChar(255)
   gameEnv    String   @default("live") @map("game_env") @db.VarChar(10)
+  normalizedName String?  @map("normalized_name") @db.VarChar(255)
+  canonicalShopKey String? @map("canonical_shop_key") @db.VarChar(255)
+  canonicalLocationKey String? @map("canonical_location_key") @db.VarChar(255)
+  sourceType String   @default("p4k_datamine") @map("source_type") @db.VarChar(50)
+  sourceName String   @default("starvis") @map("source_name") @db.VarChar(100)
+  sourceReference String? @map("source_reference") @db.VarChar(255)
+  confidenceScore Int  @default(70) @map("confidence_score")
   location   String?  @db.VarChar(255)
   system     String?  @db.VarChar(50)
   planetMoon String?  @map("planet_moon") @db.VarChar(100)
@@ -385,6 +392,8 @@ model Shop {
   inventory ShopInventory[]
 
   @@unique([className, gameEnv], map: "uk_shop_class_env")
+  @@index([canonicalShopKey, gameEnv], map: "idx_shop_canonical_key_env")
+  @@index([canonicalLocationKey], map: "idx_shop_canonical_location_key")
   @@map("shops")
 }
 
@@ -394,6 +403,10 @@ model ShopInventory {
   gameEnv            String   @default("live") @map("game_env") @db.VarChar(10)
   componentUuid      String?  @map("component_uuid") @db.Char(36)
   componentClassName String   @map("component_class_name") @db.VarChar(255)
+  sourceType         String   @default("p4k_datamine") @map("source_type") @db.VarChar(50)
+  sourceName         String   @default("starvis") @map("source_name") @db.VarChar(100)
+  sourceReference    String?  @map("source_reference") @db.VarChar(255)
+  confidenceScore    Int      @default(70) @map("confidence_score")
   basePrice          Decimal? @map("base_price") @db.Decimal(12, 2)
   rentalPrice1d      Decimal? @map("rental_price_1d") @db.Decimal(12, 2)
   rentalPrice3d      Decimal? @map("rental_price_3d") @db.Decimal(12, 2)
