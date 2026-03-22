@@ -162,6 +162,12 @@ model Component {
   gameEnv                 String   @default("live") @map("game_env") @db.VarChar(10)
   className               String   @map("class_name") @db.VarChar(255)
   name                    String   @db.VarChar(255)
+  normalizedName          String?  @map("normalized_name") @db.VarChar(255)
+  canonicalComponentKey   String?  @map("canonical_component_key") @db.VarChar(255)
+  sourceType              String   @default("p4k_datamine") @map("source_type") @db.VarChar(50)
+  sourceName              String   @default("starvis") @map("source_name") @db.VarChar(100)
+  sourceReference         String?  @map("source_reference") @db.VarChar(255)
+  confidenceScore         Int      @default(70) @map("confidence_score")
   type                    String   @db.VarChar(50)
   subType                 String?  @map("sub_type") @db.VarChar(100)
   size                    Int?     @db.UnsignedTinyInt
@@ -259,6 +265,7 @@ model Component {
   @@index([type], map: "idx_component_type")
   @@index([subType], map: "idx_component_sub_type")
   @@index([gameEnv], map: "idx_game_env")
+  @@index([canonicalComponentKey, gameEnv], map: "idx_component_canonical_key_env")
   @@map("components")
 }
 
