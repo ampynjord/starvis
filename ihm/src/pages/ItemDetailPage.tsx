@@ -7,6 +7,7 @@ import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { CanonicalMeta } from '@/components/ui/CanonicalMeta';
 import { fCredits } from '@/utils/formatters';
 
 function fmtNum(v: number | null | undefined, unit = '', digits = 0): string {
@@ -95,6 +96,14 @@ export default function ItemDetailPage() {
           {item.mass != null && <span className="text-xs font-mono-sc text-slate-500">MASS <span className="text-slate-300">{fmtNum(item.mass, 'kg', 2)}</span></span>}
           {item.hp != null && <span className="text-xs font-mono-sc text-slate-500">HP <span className="text-slate-300">{fmtNum(item.hp)}</span></span>}
         </div>
+        <CanonicalMeta
+          className="mt-4"
+          sourceType={item.source_type}
+          sourceName={item.source_name}
+          confidenceScore={item.confidence_score}
+          canonicalKey={item.canonical_item_key}
+          normalizedName={item.normalized_name}
+        />
         {item.description && <p className="mt-4 text-sm text-slate-500 leading-relaxed">{item.description}</p>}
       </div>
 
@@ -109,6 +118,13 @@ export default function ItemDetailPage() {
                   <div className="min-w-0">
                     <p className="text-sm text-slate-300 truncate">{loc.shop_name}</p>
                     <p className="text-xs text-slate-600 truncate">{loc.location ?? `${loc.city ?? '—'} · ${loc.system_name ?? '—'}`}</p>
+                    <CanonicalMeta
+                      compact
+                      className="mt-1"
+                      sourceType={loc.inventory_source_type ?? loc.shop_source_type}
+                      sourceName={loc.inventory_source_name ?? loc.shop_source_name}
+                      confidenceScore={loc.confidence_score}
+                    />
                   </div>
                   {loc.base_price != null && <span className="text-xs font-mono-sc text-amber-400 flex-shrink-0">{fCredits(loc.base_price)}</span>}
                 </div>

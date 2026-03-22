@@ -7,6 +7,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { GlowBadge } from '@/components/ui/GlowBadge';
+import { CanonicalMeta } from '@/components/ui/CanonicalMeta';
 import type { Shop } from '@/types/api';
 import { motion } from 'framer-motion';
 
@@ -55,6 +56,13 @@ export default function ShopsPage() {
                           <GlowBadge color="slate">{shop.shop_type}</GlowBadge>
                         </div>
                       )}
+                      <CanonicalMeta
+                        compact
+                        className="mt-1"
+                        sourceType={shop.source_type}
+                        sourceName={shop.source_name}
+                        confidenceScore={shop.confidence_score}
+                      />
                     </div>
                   </div>
                 </div>

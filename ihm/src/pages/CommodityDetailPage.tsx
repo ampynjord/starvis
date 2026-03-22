@@ -5,6 +5,7 @@ import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { GlowBadge } from '@/components/ui/GlowBadge';
+import { CanonicalMeta } from '@/components/ui/CanonicalMeta';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
 
@@ -49,6 +50,14 @@ export default function CommodityDetailPage() {
           {commodity.symbol && <GlowBadge color="cyan">{commodity.symbol}</GlowBadge>}
           <GlowBadge color="slate">{commodity.class_name}</GlowBadge>
         </div>
+        <CanonicalMeta
+          className="mt-4"
+          sourceType={commodity.source_type}
+          sourceName={commodity.source_name}
+          confidenceScore={commodity.confidence_score}
+          canonicalKey={commodity.canonical_commodity_key}
+          normalizedName={commodity.normalized_name}
+        />
       </div>
 
       <ScifiPanel title="Commodity Details">
