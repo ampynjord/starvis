@@ -44,6 +44,16 @@ on:
         required: false
         default: "4"
         type: string
+      safe_smoke_include_frontend:
+        description: "Also smoke test frontend routes"
+        required: false
+        default: false
+        type: boolean
+      safe_smoke_frontend_base_url:
+        description: "Base URL used for frontend smoke routes"
+        required: false
+        default: "https://starvis.ampynjord.bzh"
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -180,6 +190,8 @@ jobs:
       SMOKE_BASE_URL: ${{ inputs.safe_smoke_base_url }}
       SMOKE_PACE_MS: ${{ inputs.safe_smoke_pace_ms }}
       SMOKE_MAX_RETRIES: ${{ inputs.safe_smoke_max_retries }}
+      SMOKE_INCLUDE_FRONTEND: ${{ inputs.safe_smoke_include_frontend }}
+      SMOKE_FRONTEND_BASE_URL: ${{ inputs.safe_smoke_frontend_base_url }}
 
     steps:
       - uses: actions/checkout@v4
