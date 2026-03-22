@@ -54,6 +54,47 @@ function _locKey(raw: string | null | undefined): string | null {
   return raw.startsWith('@') ? raw : null;
 }
 
+function titleCaseWords(input: string): string {
+  return input
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ')
+    .trim();
+}
+
+function fallbackDepositNameFromToken(token: string): string | null {
+  const t = token.trim();
+  if (!t.startsWith('@')) return null;
+  if (/^@LOC_(EMPTY|UNINIT|)$/i.test(t)) return null;
+
+  if (t.startsWith('@items_commodities_raw_')) {
+    const ore = t.replace('@items_commodities_raw_', '');
+    return ore ? `Raw ${titleCaseWords(ore)}` : null;
+  }
+
+  if (t.startsWith('@items_commodities_') && t.endsWith('_ore')) {
+    const ore = t.replace('@items_commodities_', '').replace(/_ore$/, '');
+    return ore ? `${titleCaseWords(ore)} Ore` : null;
+  }
+
+  if (t.startsWith('@hud_mining_rock_name_')) {
+    const rock = t.replace('@hud_mining_rock_name_', '');
+    return rock ? titleCaseWords(rock) : null;
+  }
+
+  return titleCaseWords(t.replace(/^@/, '')) || null;
+}
+
+function fallbackDepositNameFromClassName(className: string): string | null {
+  const short = className.includes('.') ? className.split('.').pop() ?? className : className;
+  const cleaned = short
+    .replace(/^MineableComposition[_\s.]*/i, '')
+    .replace(/_?TEMPLATE$/i, '')
+    .trim();
+  return cleaned ? titleCaseWords(cleaned) : null;
+}
+
 // ── MineableElement extraction ────────────────────────────────
 
 export function extractMiningElements(ctx: DataForgeContext, _locService?: { resolve(key: string): string | null }): MiningElement[] {
@@ -143,15 +184,27 @@ export function extractMiningCompositions(
       const data = ctx.readInstance(r.structIndex, r.instanceIndex, 0, 5);
       if (!data) continue;
 
+      const className = r.name;
+
+      // Ignore template compositions used as dataforge blueprints.
+      if (/template/i.test(className)) continue;
+
       // Resolve deposit name from locale key
       let depositName: string | null = null;
       if (data.depositName) {
-        if (locService && data.depositName.startsWith('@')) {
-          depositName = locService.resolve(data.depositName) ?? data.depositName;
+        if (typeof data.depositName === 'string' && data.depositName.startsWith('@')) {
+          const resolved = locService?.resolve(data.depositName);
+          depositName = resolved && !resolved.startsWith('@') ? resolved : fallbackDepositNameFromToken(data.depositName);
         } else {
-          depositName = data.depositName;
+          depositName = typeof data.depositName === 'string' ? data.depositName.trim() : null;
         }
       }
+
+      if (!depositName) {
+        depositName = fallbackDepositNameFromClassName(className);
+      }
+
+      if (!depositName) continue;
 
       // Parse composition parts
       const parts: MiningCompositionPart[] = [];
@@ -174,9 +227,6 @@ export function extractMiningCompositions(
           curveExponent: n(part.curveExponent),
         });
       }
-
-      // Derive a human-readable class name: "MineableComposition.Asteroid_PType" → "Asteroid PType"
-      const className = r.name;
 
       results.push({
         uuid: r.id,
