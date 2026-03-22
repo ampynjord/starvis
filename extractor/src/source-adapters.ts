@@ -27,6 +27,8 @@ interface SourcePayload {
   shops?: ExternalSourceOverride[];
 }
 
+type LooseRow = Record<string, unknown>;
+
 export interface ExternalCanonicalData {
   items: Map<string, ExternalSourceOverride>;
   commodities: Map<string, ExternalSourceOverride>;
@@ -53,6 +55,62 @@ function toMap(rows: ExternalSourceOverride[] | undefined): Map<string, External
   return map;
 }
 
+function asString(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const v = value.trim();
+  return v.length ? v : null;
+}
+
+function asNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim().length) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+function pick(row: LooseRow, keys: string[]): unknown {
+  for (const key of keys) {
+    if (key in row) return row[key];
+  }
+  return undefined;
+}
+
+function normalizeRow(row: LooseRow): ExternalSourceOverride | null {
+  const className = asString(pick(row, ['className', 'class_name', 'componentClassName', 'component_class_name']));
+  if (!className) return null;
+
+  return {
+    className,
+    name: asString(pick(row, ['name', 'displayName', 'display_name'])),
+    type: asString(pick(row, ['type'])),
+    subType: asString(pick(row, ['subType', 'sub_type'])),
+    grade: asString(pick(row, ['grade'])),
+    size: asNumber(pick(row, ['size'])),
+    symbol: asString(pick(row, ['symbol'])),
+    location: asString(pick(row, ['location'])),
+    system: asString(pick(row, ['system'])),
+    planetMoon: asString(pick(row, ['planetMoon', 'planet_moon'])),
+    city: asString(pick(row, ['city'])),
+    sourceType: asString(pick(row, ['sourceType', 'source_type'])) as CanonicalSourceType | undefined,
+    sourceName: asString(pick(row, ['sourceName', 'source_name'])) ?? undefined,
+    sourceReference: asString(pick(row, ['sourceReference', 'source_reference', 'id', 'uuid'])),
+    confidenceScore: asNumber(pick(row, ['confidenceScore', 'confidence_score'])),
+  };
+}
+
+function normalizeRows(rows: unknown): ExternalSourceOverride[] {
+  if (!Array.isArray(rows)) return [];
+  const out: ExternalSourceOverride[] = [];
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue;
+    const normalized = normalizeRow(row as LooseRow);
+    if (normalized) out.push(normalized);
+  }
+  return out;
+}
+
 function readPayload(filePath: string): SourcePayload | null {
   if (!existsSync(filePath)) {
     logger.warn(`External source file not found: ${filePath}`);
@@ -65,6 +123,27 @@ function readPayload(filePath: string): SourcePayload | null {
     return parsed;
   } catch (error) {
     logger.warn(`Failed to parse external source file ${filePath}: ${(error as Error).message}`);
+    return null;
+  }
+}
+
+async function fetchPayload(url: string, headers: Record<string, string>): Promise<SourcePayload | null> {
+  try {
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      logger.warn(`Failed to fetch external source ${url}: HTTP ${res.status}`);
+      return null;
+    }
+
+    const parsed = (await res.json()) as unknown;
+    if (!parsed || typeof parsed !== 'object') {
+      logger.warn(`Invalid JSON payload from ${url}: expected object`);
+      return null;
+    }
+
+    return parsed as SourcePayload;
+  } catch (error) {
+    logger.warn(`Failed to fetch external source ${url}: ${(error as Error).message}`);
     return null;
   }
 }
@@ -89,10 +168,10 @@ function mergeMaps(
 
 function mapPayload(payload: SourcePayload): ExternalCanonicalData {
   return {
-    items: toMap(payload.items),
-    commodities: toMap(payload.commodities),
-    components: toMap(payload.components),
-    shops: toMap(payload.shops),
+    items: toMap(normalizeRows(payload.items)),
+    commodities: toMap(normalizeRows(payload.commodities)),
+    components: toMap(normalizeRows(payload.components)),
+    shops: toMap(normalizeRows(payload.shops)),
   };
 }
 
@@ -100,11 +179,15 @@ function count(data: ExternalCanonicalData): number {
   return data.items.size + data.commodities.size + data.components.size + data.shops.size;
 }
 
-export function loadExternalCanonicalData(): ExternalCanonicalData {
+export async function loadExternalCanonicalData(): Promise<ExternalCanonicalData> {
   const cornerstonePath = process.env.STARVIS_CORNERSTONE_CANONICAL_JSON?.trim();
   const communityPath = process.env.STARVIS_COMMUNITY_CANONICAL_JSON?.trim();
+  const cornerstoneUrl = process.env.STARVIS_CORNERSTONE_CANONICAL_URL?.trim();
+  const communityUrl = process.env.STARVIS_COMMUNITY_CANONICAL_URL?.trim();
+  const apiKey = process.env.STARVIS_CORNERSTONE_API_KEY?.trim();
+  const authHeader = process.env.STARVIS_CORNERSTONE_AUTH_HEADER?.trim() || 'X-API-Key';
 
-  if (!cornerstonePath && !communityPath) return EMPTY_DATA;
+  if (!cornerstonePath && !communityPath && !cornerstoneUrl && !communityUrl) return EMPTY_DATA;
 
   const result: ExternalCanonicalData = {
     items: new Map(),
@@ -117,18 +200,28 @@ export function loadExternalCanonicalData(): ExternalCanonicalData {
     {
       name: 'cornerstone',
       path: cornerstonePath,
+      url: cornerstoneUrl,
       defaults: { sourceType: 'cornerstone' as CanonicalSourceType, sourceName: 'cornerstone' },
     },
     {
       name: 'community',
       path: communityPath,
+      url: communityUrl,
       defaults: { sourceType: 'community_log' as CanonicalSourceType, sourceName: 'community' },
     },
   ];
 
   for (const source of sources) {
-    if (!source.path) continue;
-    const payload = readPayload(source.path);
+    let payload: SourcePayload | null = null;
+
+    if (source.path) payload = readPayload(source.path);
+
+    if (!payload && source.url) {
+      const headers: Record<string, string> = {};
+      if (source.name === 'cornerstone' && apiKey) headers[authHeader] = apiKey;
+      payload = await fetchPayload(source.url, headers);
+    }
+
     if (!payload) continue;
 
     const mapped = mapPayload(payload);
