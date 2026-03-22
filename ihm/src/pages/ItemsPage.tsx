@@ -29,26 +29,18 @@ export default function ItemsPage() {
   const { env } = useEnv();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [type, setType] = useState('');
   const [manufacturer, setManufacturer] = useState('');
   const [activeCategory, setActiveCategory] = useState(0);
   const debouncedSearch = useDebounce(search, 350);
 
   const selectCategory = (idx: number) => {
     setActiveCategory(idx);
-    setType('');
     setPage(1);
   };
 
-  const selectType = (v: string) => {
-    setType(v);
-    setActiveCategory(0);
-    setPage(1);
-  };
-
-  // Effective type filter: chip overrides manual filter
+  // Effective type filter from active chip
   const chipTypes = CATEGORY_CHIPS[activeCategory]?.types ?? [];
-  const effectiveType = chipTypes.length === 1 ? chipTypes[0] : (activeCategory === 0 ? type : '');
+  const effectiveType = chipTypes.length === 1 ? chipTypes[0] : undefined;
   const effectiveTypes = chipTypes.length > 1 ? chipTypes.join(',') : undefined;
 
   const { data: filters } = useQuery({
@@ -62,7 +54,7 @@ export default function ItemsPage() {
       env,
       page, limit: LIMIT,
       search: debouncedSearch || undefined,
-      type: effectiveType || undefined,
+      type: effectiveType,
       types: effectiveTypes,
       manufacturer: manufacturer || undefined,
     }),
@@ -70,19 +62,18 @@ export default function ItemsPage() {
 
   const displayedData = data;
 
-  const hasFilters = !!(effectiveType || manufacturer || debouncedSearch || activeCategory > 0);
-  const resetFilters = () => { setType(''); setManufacturer(''); setSearch(''); setPage(1); setActiveCategory(0); };
+  const hasFilters = !!(manufacturer || debouncedSearch || activeCategory > 0);
+  const resetFilters = () => { setManufacturer(''); setSearch(''); setPage(1); setActiveCategory(0); };
 
   const filterGroups = filters ? [
-    { key: 'type', label: 'Type',         options: (filters['types'] ?? []).map((t: string) => ({ label: t, value: t })),   value: type,         onChange: selectType },
-    { key: 'mfr',  label: 'Manufacturer', options: (filters['manufacturers'] ?? []).map((m: string) => ({ label: m, value: m })), value: manufacturer, onChange: (v: string) => { setManufacturer(v); setPage(1); } },
+    { key: 'mfr', label: 'Manufacturer', options: (filters['manufacturers'] ?? []).map((m: string) => ({ label: m, value: m })), value: manufacturer, onChange: (v: string) => { setManufacturer(v); setPage(1); } },
   ] : [];
 
   return (
     <div className="max-w-screen-2xl mx-auto">
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
-          <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Items</h1>
+          <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">FPS Gear</h1>
           {data && <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">{data.total.toLocaleString('en-US')} items</p>}
         </div>
         <div className="relative w-72">

@@ -65,17 +65,6 @@ export default function ItemDetailPage() {
     { label: 'Max temperature', value: fmtNum(item.armor_temp_max, '°C', 1) },
   ];
 
-  const baseStats = [
-    { label: 'Type', value: item.type },
-    { label: 'Sub-type', value: item.sub_type ?? '—' },
-    { label: 'Grade', value: item.grade ?? '—' },
-    { label: 'Size', value: item.size != null ? `S${item.size}` : '—' },
-    { label: 'Mass', value: fmtNum(item.mass, 'kg', 2) },
-    { label: 'HP', value: fmtNum(item.hp) },
-    { label: 'Manufacturer', value: item.manufacturer_name ?? item.manufacturer_code ?? '—' },
-    { label: 'Class', value: item.class_name },
-  ];
-
   const rawPayload = item.game_data ?? item.data_json ?? null;
 
   return (
@@ -83,7 +72,7 @@ export default function ItemDetailPage() {
       <div className="flex items-center gap-2 text-xs font-mono-sc text-slate-600">
         <button onClick={() => navigate(-1)} className="hover:text-slate-400 transition-colors flex items-center gap-1"><ArrowLeft size={12} /> Back</button>
         <ChevronRight size={10} />
-        <Link to="/items" className="hover:text-slate-400">Items</Link>
+        <Link to="/items" className="hover:text-slate-400">FPS Gear</Link>
         <ChevronRight size={10} />
         <span className="text-slate-400">{item.name}</span>
       </div>
@@ -98,41 +87,32 @@ export default function ItemDetailPage() {
           {item.class_name && <GlowBadge color="slate">{item.class_name}</GlowBadge>}
           {item.manufacturer_name && <GlowBadge color="cyan">{item.manufacturer_name}</GlowBadge>}
         </div>
+        <div className="flex gap-6 mt-4">
+          {item.mass != null && <span className="text-xs font-mono-sc text-slate-500">MASS <span className="text-slate-300">{fmtNum(item.mass, 'kg', 2)}</span></span>}
+          {item.hp != null && <span className="text-xs font-mono-sc text-slate-500">HP <span className="text-slate-300">{fmtNum(item.hp)}</span></span>}
+        </div>
         {item.description && <p className="mt-4 text-sm text-slate-500 leading-relaxed">{item.description}</p>}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ScifiPanel title="Base Specifications">
-          <div className="grid grid-cols-2 gap-2">
-            {baseStats.map(({ label, value }) => (
-              <div key={label} className="sci-panel p-2.5">
-                <p className="text-xs text-slate-600 font-mono-sc uppercase">{label}</p>
-                <p className="text-sm font-mono-sc text-slate-300 mt-0.5 break-words">{value}</p>
+      <ScifiPanel title="Buy Locations" subtitle={buyLocs ? `${buyLocs.length} locations` : undefined} actions={<MapPin size={14} className="text-slate-600" />}>
+        {!buyLocs?.length ? (
+          <p className="text-xs text-slate-600 italic py-4 text-center">No known buy locations</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 max-h-72 overflow-y-auto">
+            {buyLocs.map((loc, i) => (
+              <div key={i} className="sci-panel px-3 py-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm text-slate-300 truncate">{loc.shop_name}</p>
+                    <p className="text-xs text-slate-600 truncate">{loc.location ?? `${loc.city ?? '—'} · ${loc.system_name ?? '—'}`}</p>
+                  </div>
+                  {loc.base_price != null && <span className="text-xs font-mono-sc text-amber-400 flex-shrink-0">{fCredits(loc.base_price)}</span>}
+                </div>
               </div>
             ))}
           </div>
-        </ScifiPanel>
-
-        <ScifiPanel title="Buy Locations" subtitle={buyLocs ? `${buyLocs.length} locations` : undefined} actions={<MapPin size={14} className="text-slate-600" />}>
-          {!buyLocs?.length ? (
-            <p className="text-xs text-slate-600 italic py-4 text-center">No known buy locations</p>
-          ) : (
-            <div className="space-y-1.5 max-h-72 overflow-y-auto">
-              {buyLocs.map((loc, i) => (
-                <div key={i} className="sci-panel px-3 py-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm text-slate-300 truncate">{loc.shop_name}</p>
-                      <p className="text-xs text-slate-600 truncate">{loc.location ?? `${loc.city ?? '—'} · ${loc.system_name ?? '—'}`}</p>
-                    </div>
-                    {loc.base_price != null && <span className="text-xs font-mono-sc text-amber-400 flex-shrink-0">{fCredits(loc.base_price)}</span>}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </ScifiPanel>
-      </div>
+        )}
+      </ScifiPanel>
 
       {(isWeapon || isArmor) && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
