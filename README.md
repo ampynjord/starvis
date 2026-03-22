@@ -791,8 +791,11 @@ Pipeline GitHub Actions (`.github/workflows/ci.yml`) en 5 jobs :
 ### Probe manuel des adapters Cornerstone
 
 Le workflow expose 2 inputs lors d'un lancement manuel :
+- `run_full_pipeline` : exécute lint/test/build lors d'un `workflow_dispatch` (désactivé par défaut)
 - `run_cornerstone_adapter_probe` : active le job de probe externe
 - `cornerstone_probe_sample` : nombre de lignes d'exemple affichées par `dry-run:adapters`
+
+Par défaut, un lancement manuel exécute uniquement les jobs explicitement demandés (par ex. le probe) et ne déclenche pas le déploiement.
 
 Secrets GitHub recommandés (Repository ou Environment) :
 - `CANONICAL_SOURCE_COMPONENTS_URL`
