@@ -67,12 +67,10 @@ export class MiningQueryService {
         row.found_in = [];
       }
     }
-      // Filter out null-element entries produced by LEFT JOIN miss on mining_elements
-      if (Array.isArray(row.elements)) {
-        row.elements = (row.elements as Record<string, unknown>[]).filter(
-          (e) => e != null && e.element_uuid != null,
-        );
-      }
+    // Filter out null-element entries produced by LEFT JOIN miss on mining_elements
+    if (Array.isArray(row.elements)) {
+      row.elements = (row.elements as Record<string, unknown>[]).filter((e) => e != null && e.element_uuid != null);
+    }
     return row;
   }
 
