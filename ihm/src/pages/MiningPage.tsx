@@ -556,9 +556,11 @@ const WORKFLOW_PHASES: PhaseConfig[] = [
 
 interface WorkflowProgressProps {
   currentPhase: WorkflowPhase;
+  hasData: boolean;
+  onPhaseChange: (phase: WorkflowPhase) => void;
 }
 
-function WorkflowProgress({ currentPhase }: WorkflowProgressProps) {
+function WorkflowProgress({ currentPhase, hasData, onPhaseChange }: WorkflowProgressProps) {
   const currentIndex = WORKFLOW_PHASES.findIndex((p) => p.phase === currentPhase);
 
   return (
@@ -568,23 +570,27 @@ function WorkflowProgress({ currentPhase }: WorkflowProgressProps) {
           const Icon = config.icon;
           const isActive = i <= currentIndex;
           const isCurrent = config.phase === currentPhase;
+          const isClickable = config.phase === 'scan' || hasData;
 
           return (
             <motion.div key={config.phase} className="flex items-center flex-1">
               <motion.button
-                whileHover={{ scale: 1.05 }}
+                whileHover={isClickable ? { scale: 1.03 } : {}}
+                onClick={() => isClickable && onPhaseChange(config.phase)}
                 className={`flex flex-col items-center gap-1 p-2 rounded border transition-all flex-1 ${
                   isCurrent
                     ? 'border-cyan-400 bg-cyan-400/10'
                     : isActive
-                      ? 'border-slate-600 bg-slate-700/30'
-                      : 'border-slate-700 bg-transparent'
+                      ? 'border-slate-600 bg-slate-700/30 hover:border-slate-500'
+                      : isClickable
+                        ? 'border-slate-700 bg-transparent hover:border-slate-600'
+                        : 'border-slate-800 bg-transparent opacity-40 cursor-not-allowed'
                 }`}
               >
                 <Icon
                   size={16}
                   className={`${
-                    isCurrent ? 'text-cyan-400' : isActive ? 'text-slate-400' : 'text-slate-600'
+                    isCurrent ? 'text-cyan-400' : isActive ? 'text-slate-400' : isClickable ? 'text-slate-600' : 'text-slate-700'
                   }`}
                 />
                 <div className="text-[10px] font-mono-sc uppercase tracking-wider text-center leading-tight">
@@ -635,14 +641,11 @@ export default function MiningPage() {
 
   const handleElementSelect = useCallback((elementUuid: string) => {
     setSelectedElementUuid(elementUuid);
-    setCurrentPhase('risk');
   }, []);
 
   const handlePhaseChange = useCallback((phase: WorkflowPhase) => {
-    if (selectedCompositionId && currentPhase !== phase) {
-      setCurrentPhase(phase);
-    }
-  }, [selectedCompositionId, currentPhase]);
+    setCurrentPhase(phase);
+  }, []);
 
   return (
     <div className="max-w-screen-2xl mx-auto">
@@ -660,7 +663,11 @@ export default function MiningPage() {
       </div>
 
       {/* Workflow Progress */}
-      <WorkflowProgress currentPhase={currentPhase} />
+      <WorkflowProgress
+        currentPhase={currentPhase}
+        hasData={compositionData != null}
+        onPhaseChange={handlePhaseChange}
+      />
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
@@ -711,15 +718,15 @@ export default function MiningPage() {
         <div className="xl:col-span-2 space-y-6">
           {/* PHASE 2: Composition Breakdown */}
           <motion.div
+            id="phase-composition"
             initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: currentPhase === 'composition' || currentPhase === 'risk' || currentPhase === 'yield' ? 1 : 0.5, y: 0 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            onClick={() => handlePhaseChange('composition')}
-            className="cursor-pointer"
           >
             <ScifiPanel
               title="2. Composition Breakdown"
               subtitle="Mineral distribution and properties"
+              className={currentPhase === 'composition' ? 'ring-1 ring-cyan-600/30' : ''}
             >
               <CompositionBreakdown
                 data={compositionData}
@@ -731,15 +738,15 @@ export default function MiningPage() {
 
           {/* PHASE 3: Risk Assessment */}
           <motion.div
+            id="phase-risk"
             initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: currentPhase === 'risk' || currentPhase === 'yield' ? 1 : 0.5, y: 0 }}
-            transition={{ duration: 0.3 }}
-            onClick={() => handlePhaseChange('risk')}
-            className="cursor-pointer"
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.05 }}
           >
             <ScifiPanel
               title="3. Risk Assessment"
               subtitle="Instability, resistance, and hazard zones"
+              className={currentPhase === 'risk' ? 'ring-1 ring-cyan-600/30' : ''}
             >
               <RiskAssessment data={compositionData} selectedElementUuid={selectedElementUuid} />
             </ScifiPanel>
@@ -747,11 +754,10 @@ export default function MiningPage() {
 
           {/* PHASE 4: Yield Calculator */}
           <motion.div
+            id="phase-yield"
             initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: currentPhase === 'yield' ? 1 : 0.5, y: 0 }}
-            transition={{ duration: 0.3 }}
-            onClick={() => handlePhaseChange('yield')}
-            className="cursor-pointer"
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.1 }}
           >
             <ScifiPanel
               title="4. Yield Optimization"
