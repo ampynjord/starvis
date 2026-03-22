@@ -53,6 +53,9 @@ jobs:
       - name: Install & type-check Extractor
         run: cd extractor && npm ci && npx tsc --noEmit
 
+      - name: Run Extractor adapter dry-run diagnostics
+        run: cd extractor && npm run dry-run:adapters -- --sample 2
+
       - name: Lint Extractor (Biome)
         run: cd extractor && npx biome check .
 
