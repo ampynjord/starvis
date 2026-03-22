@@ -11,7 +11,7 @@ describe('VARIANT_TYPE_LABELS', () => {
   it('contains the 4 variant types', () => {
     expect(VARIANT_TYPE_LABELS.standard).toBe('Standard');
     expect(VARIANT_TYPE_LABELS.collector).toBe('Collector');
-    expect(VARIANT_TYPE_LABELS.npc).toBe('NPC');
+    expect(VARIANT_TYPE_LABELS.wikelo).toBe('Wikelo');
     expect(VARIANT_TYPE_LABELS.pyam_exec).toBe('PyAM / Exec');
   });
 });
@@ -20,7 +20,7 @@ describe('VARIANT_TYPE_COLORS', () => {
   it('contains an entry for each type', () => {
     expect(VARIANT_TYPE_COLORS.standard).toBeDefined();
     expect(VARIANT_TYPE_COLORS.collector).toContain('amber');
-    expect(VARIANT_TYPE_COLORS.npc).toContain('red');
+    expect(VARIANT_TYPE_COLORS.wikelo).toContain('emerald');
     expect(VARIANT_TYPE_COLORS.pyam_exec).toContain('purple');
   });
 });

@@ -52,8 +52,8 @@ describe('HomePage', () => {
   it('renders stat card labels', async () => {
     renderWithProviders(<HomePage />);
     await waitFor(() => {
-      expect(screen.getByText('Ships')).toBeInTheDocument();
-      expect(screen.getByText('Components')).toBeInTheDocument();
+      expect(screen.getByText('Ships / Vehicles')).toBeInTheDocument();
+      expect(screen.getByText('Ship Components')).toBeInTheDocument();
       expect(screen.getByText('Manufacturers')).toBeInTheDocument();
     });
   });
@@ -61,7 +61,7 @@ describe('HomePage', () => {
   it('displays stats from API', async () => {
     renderWithProviders(<HomePage />);
     await waitFor(() => {
-      expect(screen.getByText('Ships')).toBeInTheDocument();
+      expect(screen.getAllByText('309').length).toBeGreaterThan(0);
     });
   });
 
