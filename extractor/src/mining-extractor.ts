@@ -87,7 +87,7 @@ function fallbackDepositNameFromToken(token: string): string | null {
 }
 
 function fallbackDepositNameFromClassName(className: string): string | null {
-  const short = className.includes('.') ? className.split('.').pop() ?? className : className;
+  const short = className.includes('.') ? (className.split('.').pop() ?? className) : className;
   const cleaned = short
     .replace(/^MineableComposition[_\s.]*/i, '')
     .replace(/_?TEMPLATE$/i, '')
