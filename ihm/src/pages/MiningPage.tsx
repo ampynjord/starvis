@@ -105,15 +105,27 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
   }, [compositions, search]);
 
   const handleSelect = useCallback(async (comp: MiningComposition) => {
+    const optimisticData: MiningCompositionView = {
+      id: comp.uuid,
+      name: getCompositionDisplayName(comp),
+      className: comp.class_name || '',
+      minDistinctElements: comp.min_distinct_elements ?? undefined,
+      elements: [],
+    };
+
+    // Immediate feedback so click always feels responsive.
+    onChange(comp.uuid, optimisticData);
+    setOpen(false);
+    setSearch('');
     setLoadingDetail(comp.uuid);
+
     try {
       const detail = await api.mining.composition(comp.uuid, env);
-      if (detail?.elements && Array.isArray(detail.elements)) {
-        const data = mapCompositionToView(detail);
-        onChange(comp.uuid, data);
-        setOpen(false);
-        setSearch('');
-      }
+      const data = mapCompositionToView(detail);
+      onChange(comp.uuid, data);
+    } catch {
+      // Keep optimistic selection if detail loading fails.
+      onChange(comp.uuid, optimisticData);
     } finally {
       setLoadingDetail(null);
     }
@@ -123,10 +135,15 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
     <div className="relative">
       <button
         onClick={() => { setOpen((v) => !v); setSearch(''); }}
+        disabled={loadingDetail != null}
         className="sci-input w-full flex items-center justify-between gap-2 pr-3 text-left"
       >
         <span className={`font-rajdhani font-semibold text-sm ${current ? 'text-slate-100' : 'text-slate-500'}`}>
-          {current ? getCompositionDisplayName(current) : 'Select a rock composition…'}
+          {loadingDetail != null
+            ? 'Loading composition…'
+            : current
+              ? getCompositionDisplayName(current)
+              : 'Select a rock composition…'}
         </span>
         <ChevronDown size={14} className={`text-slate-500 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -184,9 +201,11 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
 
 interface CompositionBreakdownProps {
   data: MiningCompositionView | null;
+  selectedElementUuid: string | null;
+  onSelectElement: (elementUuid: string) => void;
 }
 
-function CompositionBreakdown({ data }: CompositionBreakdownProps) {
+function CompositionBreakdown({ data, selectedElementUuid, onSelectElement }: CompositionBreakdownProps) {
   if (!data) {
     return (
       <div className="text-center py-8 text-slate-600">
@@ -201,11 +220,16 @@ function CompositionBreakdown({ data }: CompositionBreakdownProps) {
   return (
     <div className="space-y-3">
       {sorted.map((el) => (
-        <motion.div
+        <motion.button
           key={el.elementUuid}
           initial={{ opacity: 0, x: -8 }}
           animate={{ opacity: 1, x: 0 }}
-          className="sci-panel px-4 py-3"
+          onClick={() => onSelectElement(el.elementUuid)}
+          className={`sci-panel px-4 py-3 w-full text-left transition-colors ${
+            selectedElementUuid === el.elementUuid
+              ? 'border-cyan-500/70 bg-cyan-500/5'
+              : 'hover:border-slate-500/60 hover:bg-white/5'
+          }`}
         >
           <div className="flex items-start justify-between gap-3 mb-2">
             <div>
@@ -243,7 +267,7 @@ function CompositionBreakdown({ data }: CompositionBreakdownProps) {
               )}
             </div>
           ) : null}
-        </motion.div>
+        </motion.button>
       ))}
     </div>
   );
@@ -253,9 +277,10 @@ function CompositionBreakdown({ data }: CompositionBreakdownProps) {
 
 interface RiskAssessmentProps {
   data: MiningCompositionView | null;
+  selectedElementUuid: string | null;
 }
 
-function RiskAssessment({ data }: RiskAssessmentProps) {
+function RiskAssessment({ data, selectedElementUuid }: RiskAssessmentProps) {
   if (!data || !data.elements.length) {
     return (
       <div className="text-center py-8 text-slate-600">
@@ -290,8 +315,21 @@ function RiskAssessment({ data }: RiskAssessmentProps) {
     );
   }
 
+  const selectedElement = selectedElementUuid
+    ? data.elements.find((el) => el.elementUuid === selectedElementUuid) ?? null
+    : null;
+
   return (
     <div className="space-y-3">
+      {selectedElement && (
+        <ScifiPanel title="Focused Material">
+          <div className="flex items-center justify-between gap-2 text-sm">
+            <span className="font-rajdhani font-semibold text-cyan-300">{selectedElement.elementName}</span>
+            <span className="text-xs text-slate-500">{pct(selectedElement.probability)} likelihood</span>
+          </div>
+        </ScifiPanel>
+      )}
+
       {/* Overall Risk Gauge */}
       <ScifiPanel title="Overall Risk Profile">
         <div className="grid grid-cols-2 gap-3">
@@ -340,7 +378,12 @@ function RiskAssessment({ data }: RiskAssessmentProps) {
         {data.elements
           .filter((el) => (el.instability ?? 0) > 0.5 || (el.resistance ?? 0) > 0.5)
           .map((el) => (
-            <div key={el.elementUuid} className="sci-panel px-3 py-2 border-amber-600/30">
+            <div
+              key={el.elementUuid}
+              className={`sci-panel px-3 py-2 border-amber-600/30 ${
+                selectedElementUuid === el.elementUuid ? 'border-cyan-500/70 bg-cyan-500/5' : ''
+              }`}
+            >
               <div className="flex items-center justify-between gap-2 mb-1">
                 <span className="text-xs font-rajdhani font-semibold text-amber-300">{el.elementName}</span>
                 <span className="text-[10px] text-slate-600">{pct(el.probability)} likelihood</span>
@@ -370,9 +413,10 @@ function RiskAssessment({ data }: RiskAssessmentProps) {
 
 interface YieldCalculatorProps {
   data: MiningCompositionView | null;
+  selectedElementUuid: string | null;
 }
 
-function YieldCalculator({ data }: YieldCalculatorProps) {
+function YieldCalculator({ data, selectedElementUuid }: YieldCalculatorProps) {
   if (!data || !data.elements.length) {
     return (
       <div className="text-center py-8 text-slate-600">
@@ -426,12 +470,25 @@ function YieldCalculator({ data }: YieldCalculatorProps) {
 
       {/* Per-Element Optimization */}
       <div className="space-y-2">
-        {yieldResults.map((result) => (
+        {yieldResults
+          .sort((a, b) => {
+            if (!selectedElementUuid) return 0;
+            const aSelected = data.elements.find((el) => el.elementName === a.elementName)?.elementUuid === selectedElementUuid;
+            const bSelected = data.elements.find((el) => el.elementName === b.elementName)?.elementUuid === selectedElementUuid;
+            if (aSelected === bSelected) return 0;
+            return aSelected ? -1 : 1;
+          })
+          .map((result) => {
+            const isSelected =
+              selectedElementUuid != null &&
+              data.elements.find((el) => el.elementName === result.elementName)?.elementUuid === selectedElementUuid;
+
+            return (
           <motion.div
             key={result.elementName}
             initial={{ opacity: 0, x: -8 }}
             animate={{ opacity: 1, x: 0 }}
-            className="sci-panel px-4 py-3"
+            className={`sci-panel px-4 py-3 ${isSelected ? 'border-cyan-500/70 bg-cyan-500/5' : ''}`}
           >
             <div className="flex items-start justify-between gap-3 mb-2">
               <div>
@@ -474,7 +531,8 @@ function YieldCalculator({ data }: YieldCalculatorProps) {
               </div>
             </div>
           </motion.div>
-        ))}
+            );
+          })}
       </div>
     </div>
   );
@@ -556,6 +614,7 @@ export default function MiningPage() {
   const [currentPhase, setCurrentPhase] = useState<WorkflowPhase>('scan');
   const [selectedCompositionId, setSelectedCompositionId] = useState('');
   const [compositionData, setCompositionData] = useState<MiningCompositionView | null>(null);
+  const [selectedElementUuid, setSelectedElementUuid] = useState<string | null>(null);
 
   // Load all compositions for the scan phase
   const { data: compositions, isLoading: loadingCompositions, error: compositionsError } = useQuery({
@@ -568,10 +627,16 @@ export default function MiningPage() {
     (compositionId: string, data: MiningCompositionView) => {
       setSelectedCompositionId(compositionId);
       setCompositionData(data);
+      setSelectedElementUuid(null);
       setCurrentPhase('composition');
     },
     [],
   );
+
+  const handleElementSelect = useCallback((elementUuid: string) => {
+    setSelectedElementUuid(elementUuid);
+    setCurrentPhase('risk');
+  }, []);
 
   const handlePhaseChange = useCallback((phase: WorkflowPhase) => {
     if (selectedCompositionId && currentPhase !== phase) {
@@ -656,7 +721,11 @@ export default function MiningPage() {
               title="2. Composition Breakdown"
               subtitle="Mineral distribution and properties"
             >
-              <CompositionBreakdown data={compositionData} />
+              <CompositionBreakdown
+                data={compositionData}
+                selectedElementUuid={selectedElementUuid}
+                onSelectElement={handleElementSelect}
+              />
             </ScifiPanel>
           </motion.div>
 
@@ -672,7 +741,7 @@ export default function MiningPage() {
               title="3. Risk Assessment"
               subtitle="Instability, resistance, and hazard zones"
             >
-              <RiskAssessment data={compositionData} />
+              <RiskAssessment data={compositionData} selectedElementUuid={selectedElementUuid} />
             </ScifiPanel>
           </motion.div>
 
@@ -688,7 +757,7 @@ export default function MiningPage() {
               title="4. Yield Optimization"
               subtitle="Optimal laser power windows and expected output"
             >
-              <YieldCalculator data={compositionData} />
+              <YieldCalculator data={compositionData} selectedElementUuid={selectedElementUuid} />
             </ScifiPanel>
           </motion.div>
         </div>
