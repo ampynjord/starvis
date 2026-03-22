@@ -2,13 +2,11 @@ import { motion } from 'framer-motion';
 import {
   BarChart3,
   BookOpen,
-  Boxes,
   Crosshair,
   ExternalLink,
-  Gem,
+  Factory,
   Home,
-  Package,
-  Palette,
+  Layers3,
   Pickaxe,
   Rocket,
   Settings2,
@@ -21,26 +19,31 @@ import {
 import { Link, NavLink } from 'react-router-dom';
 import { useEnv } from '@/contexts/EnvContext';
 
-const DB_ITEMS = [
+const CORE_ITEMS = [
   { to: '/',              icon: Home,          label: 'Dashboard' },
-  { to: '/ships',         icon: Rocket,        label: 'Ships' },
   { to: '/missions',      icon: ClipboardList, label: 'Missions' },
-  { to: '/components',    icon: Settings2,     label: 'Components' },
-  { to: '/items',         icon: Crosshair,     label: 'FPS Gear' },
-  { to: '/equipment',     icon: Boxes,         label: 'Equipment' },
-  { to: '/commodities',   icon: Package,       label: 'Commodities' },
   { to: '/manufacturers', icon: Wrench,        label: 'Manufacturers' },
   { to: '/shops',         icon: ShoppingBag,   label: 'Shops' },
-  { to: '/paints',        icon: Palette,       label: 'Paints' },
 ];
 
-const TOOL_ITEMS = [
-  { to: '/ranking',   icon: Trophy,            label: 'Ranking' },
-  { to: '/compare',   icon: BarChart3,         label: 'Compare' },
-  { to: '/outfitter', icon: SlidersHorizontal, label: 'Outfitter' },
-  { to: '/mining',    icon: Pickaxe,           label: 'Mining' },
-  { to: '/minerals',  icon: Gem,               label: 'Minerals' },
+const SHIP_ITEMS = [
+  { to: '/ships',         icon: Rocket,        label: 'Ships & Vehicles' },
+  { to: '/components',    icon: Settings2,     label: 'Ship Components' },
+  { to: '/outfitter',     icon: SlidersHorizontal, label: 'Outfitter' },
+  { to: '/compare',       icon: BarChart3,     label: 'Compare' },
+  { to: '/ranking',       icon: Trophy,        label: 'Ranking' },
 ];
+
+const FPS_ITEMS = [
+  { to: '/fps-gear',      icon: Crosshair,     label: 'FPS Gear' },
+  { to: '/other-items',   icon: Layers3,       label: 'Other Items' },
+];
+
+const INDUSTRIAL_ITEMS = [
+  { to: '/industrial',    icon: Factory,       label: 'Industrial' },
+  { to: '/mining',        icon: Pickaxe,       label: 'Mining' },
+];
+
 
 function NavItem({ to, icon: Icon, label }: { to: string; icon: React.ElementType; label: string }) {
   return (
@@ -79,7 +82,7 @@ function NavItem({ to, icon: Icon, label }: { to: string; icon: React.ElementTyp
   );
 }
 
-function NavGroup({ label, items }: { label: string; items: typeof DB_ITEMS }) {
+function NavGroup({ label, items }: { label: string; items: typeof CORE_ITEMS }) {
   return (
     <div>
       <p className="hidden md:block px-2 pt-3 pb-1 text-[10px] font-orbitron tracking-widest text-slate-600 uppercase select-none">
@@ -144,8 +147,10 @@ export function Sidebar() {
             </button>
           </div>
         </div>
-        <NavGroup label="Database" items={DB_ITEMS} />
-        <NavGroup label="Tools" items={TOOL_ITEMS} />
+        <NavGroup label="Core" items={CORE_ITEMS} />
+        <NavGroup label="Ships" items={SHIP_ITEMS} />
+        <NavGroup label="FPS" items={FPS_ITEMS} />
+        <NavGroup label="Industrial" items={INDUSTRIAL_ITEMS} />
       </nav>
 
       {/* Footer */}

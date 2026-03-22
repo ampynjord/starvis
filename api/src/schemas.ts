@@ -136,6 +136,7 @@ export const CommodityQuery = z
   .object({
     env: qEnv,
     type: qStr,
+    types: qStr,
     search: qStr,
     sort: qStr,
     order: qStr,

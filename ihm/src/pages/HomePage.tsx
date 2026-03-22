@@ -25,12 +25,12 @@ import { fDateTime } from '@/utils/formatters';
 // ── Stats cards ───────────────────────────────────────────────────────────────
 
 const STAT_CARDS = [
-  { key: 'ships',         label: 'Ships',         icon: Rocket,   color: 'text-cyan-400',   to: '/ships' },
-  { key: 'components',    label: 'Components',    icon: Settings2, color: 'text-blue-400',  to: '/components' },
-  { key: 'items',         label: 'Items',         icon: Dices,    color: 'text-green-400',  to: '/items' },
-  { key: 'commodities',   label: 'Commodities',   icon: Package,  color: 'text-purple-400', to: '/commodities' },
+  { key: 'ships',         label: 'Ships / Vehicles', icon: Rocket,   color: 'text-cyan-400',   to: '/ships' },
+  { key: 'components',    label: 'Ship Components',  icon: Settings2, color: 'text-blue-400',  to: '/components' },
+  { key: 'items',         label: 'FPS Gear',         icon: Dices,    color: 'text-green-400',  to: '/fps-gear' },
+  { key: 'commodities',   label: 'Industrial',       icon: Package,  color: 'text-purple-400', to: '/industrial' },
   { key: 'manufacturers', label: 'Manufacturers', icon: Wrench,   color: 'text-amber-400',  to: '/manufacturers' },
-  { key: 'paints',        label: 'Paints',        icon: Palette,  color: 'text-pink-400',   to: '/paints' },
+  { key: 'paints',        label: 'Ship Paints',      icon: Palette,  color: 'text-pink-400',   to: '/ships' },
 ];
 
 // ── Tool cards ────────────────────────────────────────────────────────────────

@@ -12,6 +12,13 @@ export default defineConfig({
   server: {
     host: '0.0.0.0', // requis pour être accessible depuis Docker
     port: 5173,
+    hmr: {
+      host: 'localhost',
+    },
+    watch: {
+      usePolling: true,
+      interval: 300,
+    },
     proxy: {
       '/api': {
         target: process.env.VITE_API_URL || 'http://localhost:3000',

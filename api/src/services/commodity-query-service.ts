@@ -12,6 +12,7 @@ export class CommodityQueryService {
   async getAllCommodities(filters?: {
     env?: string;
     type?: string;
+    types?: string;
     search?: string;
     sort?: string;
     order?: string;
@@ -22,7 +23,19 @@ export class CommodityQueryService {
     const where: string[] = ['c.game_env = ?'];
     const params: (string | number)[] = [env];
 
-    if (filters?.type) {
+    if (filters?.types) {
+      const typeList = filters.types
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
+      if (typeList.length === 1) {
+        where.push('c.type = ?');
+        params.push(typeList[0]);
+      } else if (typeList.length > 1) {
+        where.push(`c.type IN (${typeList.map(() => '?').join(', ')})`);
+        params.push(...typeList);
+      }
+    } else if (filters?.type) {
       where.push('c.type = ?');
       params.push(filters.type);
     }
