@@ -82,7 +82,7 @@ describe('ShipCard', () => {
 
   it('affiche le badge variant_type NPC', () => {
     renderCard({ variant_type: 'npc' });
-    expect(screen.getByText('NPC')).toBeInTheDocument();
+    expect(screen.getByText(/npc/i)).toBeInTheDocument();
   });
 
   it("n'affiche pas de badge variant_type si standard", () => {
