@@ -183,6 +183,12 @@ export interface ComponentListItem {
   uuid: string;
   class_name: string;
   name: string;
+  normalized_name?: string | null;
+  canonical_component_key?: string | null;
+  source_type?: string | null;
+  source_name?: string | null;
+  source_reference?: string | null;
+  confidence_score?: number | null;
   type: string;
   sub_type: string | null;
   size: number | null;
