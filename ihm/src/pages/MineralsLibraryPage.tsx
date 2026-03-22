@@ -104,7 +104,7 @@ function SortButton({ label, sortKey, current, onSort }: SortButtonProps) {
 // ── MineralRow ────────────────────────────────────────────────────────────────
 
 interface MineralRowProps {
-  mineral: MiningElement & { rocks_containing: number; avg_prob: number };
+  mineral: MiningElement;
 }
 
 function MineralRow({ mineral }: MineralRowProps) {
@@ -142,11 +142,11 @@ function MineralRow({ mineral }: MineralRowProps) {
         <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="p-2 bg-black/20 rounded">
             <p className="text-slate-500">Found In</p>
-            <p className="text-cyan-400 font-mono-sc">{mineral.rocks_containing} rocks</p>
+            <p className="text-cyan-400 font-mono-sc">{mineral.rocks_containing ?? 0} rocks</p>
           </div>
           <div className="p-2 bg-black/20 rounded">
             <p className="text-slate-500">Avg Prob</p>
-            <p className="text-cyan-400 font-mono-sc">{formatNumber(mineral.avg_prob * 100, 1)}%</p>
+            <p className="text-cyan-400 font-mono-sc">{mineral.avg_probability_pct != null ? `${mineral.avg_probability_pct}%` : '—'}</p>
           </div>
         </div>
 
@@ -174,14 +174,7 @@ export default function MineralsLibraryPage() {
 
   const { data: minerals = [], isLoading, error } = useQuery({
     queryKey: ['minerals-library', env.env],
-    queryFn: async () => {
-      const res = await api.mining.elements(env.env);
-      return res.map((el) => ({
-        ...el,
-        rocks_containing: 0, // TODO: fetch from backend with proper aggregation
-        avg_prob: 0,
-      }));
-    },
+    queryFn: () => api.mining.elements(env.env),
   });
 
   const filtered = useMemo(() => {
