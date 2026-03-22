@@ -15,6 +15,7 @@ import {
   pruneExcludedVariants,
   tagVariantTypes,
 } from './crossref.js';
+import { canonicalizeInventoryRecord, canonicalizeShopRecord } from './canonical-source.js';
 import { classifyPort, type DataForgeService, MANUFACTURER_CODES } from './dataforge-service.js';
 import { LocalizationService } from './localization-service.js';
 import logger from './logger.js';
@@ -1447,9 +1448,29 @@ export class ExtractionService {
     // Batch insert shops
     const shopRows: any[][] = [];
     for (const shop of shops) {
+      const canonical = canonicalizeShopRecord({
+        name: shop.name,
+        className: shop.className,
+        location: shop.location,
+        system: shop.system,
+        planetMoon: shop.planetMoon,
+        city: shop.city,
+        sourceType: 'p4k_datamine',
+        sourceName: 'starvis-dataforge',
+        sourceReference: shop.className,
+        confidenceScore: 70,
+      });
+
       shopRows.push([
         env,
         shop.name,
+        canonical.normalizedName,
+        canonical.canonicalShopKey,
+        canonical.canonicalLocationKey,
+        canonical.sourceType,
+        canonical.sourceName,
+        canonical.sourceReference,
+        canonical.confidenceScore,
         shop.location || null,
         shop.system || null,
         shop.planetMoon || null,
@@ -1461,13 +1482,23 @@ export class ExtractionService {
     if (shopRows.length > 0) {
       savedShops = await ExtractionService.batchUpsert(
         conn,
-        `INSERT INTO shops (game_env, name, location, \`system\`, planet_moon, city, shop_type, class_name) VALUES`,
+        `INSERT INTO shops (game_env, name, normalized_name, canonical_shop_key, canonical_location_key, source_type, source_name, source_reference, confidence_score, location, \`system\`, planet_moon, city, shop_type, class_name) VALUES`,
         `ON DUPLICATE KEY UPDATE
-           name=new.name, location=new.location,
-           \`system\`=new.\`system\`, planet_moon=new.planet_moon, city=new.city,
+           name=new.name,
+           normalized_name=new.normalized_name,
+           canonical_shop_key=new.canonical_shop_key,
+           canonical_location_key=new.canonical_location_key,
+           source_type=new.source_type,
+           source_name=new.source_name,
+           source_reference=new.source_reference,
+           confidence_score=new.confidence_score,
+           location=new.location,
+           \`system\`=new.\`system\`,
+           planet_moon=new.planet_moon,
+           city=new.city,
            shop_type=new.shop_type,
            updated_at=CURRENT_TIMESTAMP`,
-        8,
+        15,
         shopRows,
       );
     }
@@ -1485,11 +1516,23 @@ export class ExtractionService {
       const shopId = shopIdCache.get(inv.shopClassName);
       if (!shopId) continue;
       const compUuid = compUuidCache.get(inv.componentClassName) || null;
+      const canonical = canonicalizeInventoryRecord({
+        componentClassName: inv.componentClassName,
+        sourceType: 'p4k_datamine',
+        sourceName: 'starvis-dataforge',
+        sourceReference: inv.shopClassName,
+        confidenceScore: 70,
+      });
+
       invRows.push([
         shopId,
         env,
         compUuid,
         inv.componentClassName,
+        canonical.sourceType,
+        canonical.sourceName,
+        canonical.sourceReference,
+        canonical.confidenceScore,
         inv.basePrice ?? null,
         inv.rentalPrice1d ?? null,
         inv.rentalPrice3d ?? null,
@@ -1500,13 +1543,20 @@ export class ExtractionService {
     if (invRows.length > 0) {
       savedInventory = await ExtractionService.batchUpsert(
         conn,
-        `INSERT INTO shop_inventory (shop_id, game_env, component_uuid, component_class_name, base_price, rental_price_1d, rental_price_3d, rental_price_7d, rental_price_30d) VALUES`,
+        `INSERT INTO shop_inventory (shop_id, game_env, component_uuid, component_class_name, source_type, source_name, source_reference, confidence_score, base_price, rental_price_1d, rental_price_3d, rental_price_7d, rental_price_30d) VALUES`,
         `ON DUPLICATE KEY UPDATE
-           component_uuid=new.component_uuid, base_price=new.base_price,
-           rental_price_1d=new.rental_price_1d, rental_price_3d=new.rental_price_3d,
-           rental_price_7d=new.rental_price_7d, rental_price_30d=new.rental_price_30d,
+           component_uuid=new.component_uuid,
+           source_type=new.source_type,
+           source_name=new.source_name,
+           source_reference=new.source_reference,
+           confidence_score=new.confidence_score,
+           base_price=new.base_price,
+           rental_price_1d=new.rental_price_1d,
+           rental_price_3d=new.rental_price_3d,
+           rental_price_7d=new.rental_price_7d,
+           rental_price_30d=new.rental_price_30d,
            updated_at=CURRENT_TIMESTAMP`,
-        9,
+        13,
         invRows,
       );
     }

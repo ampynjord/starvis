@@ -239,6 +239,13 @@ export interface BuyLocation {
   system: string | null;
   city: string | null;
   terminal: string | null;
+  shop_source_type?: string | null;
+  shop_source_name?: string | null;
+  inventory_source_type?: string | null;
+  inventory_source_name?: string | null;
+  canonical_shop_key?: string | null;
+  canonical_location_key?: string | null;
+  confidence_score?: number | null;
   base_price: number | null;
   inventory: number | null;
 }
@@ -300,6 +307,13 @@ export interface Commodity {
 export interface Shop {
   id: number;
   name: string;
+  normalized_name?: string | null;
+  canonical_shop_key?: string | null;
+  canonical_location_key?: string | null;
+  source_type?: string | null;
+  source_name?: string | null;
+  source_reference?: string | null;
+  confidence_score?: number | null;
   location: string | null;
   parent_location: string | null;
   system: string | null;
@@ -543,6 +557,13 @@ export interface ItemBuyLocation {
   system_name: string | null;
   city: string | null;
   shop_type: string | null;
+  shop_source_type?: string | null;
+  shop_source_name?: string | null;
+  inventory_source_type?: string | null;
+  inventory_source_name?: string | null;
+  canonical_shop_key?: string | null;
+  canonical_location_key?: string | null;
+  confidence_score?: number | null;
   base_price: number | null;
   rental_price_1d: number | null;
 }

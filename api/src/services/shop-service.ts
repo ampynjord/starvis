@@ -51,8 +51,11 @@ export class ShopService {
 
   async getShopInventory(shopId: number, env = 'live'): Promise<Row[]> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-      `SELECT si.*, c.name as component_name, c.type as component_type, c.size as component_size
+      `SELECT si.*, c.name as component_name, c.type as component_type, c.size as component_size,
+              s.source_type as shop_source_type, s.source_name as shop_source_name,
+              s.canonical_shop_key, s.canonical_location_key
        FROM shop_inventory si LEFT JOIN components c ON si.component_uuid = c.uuid AND c.game_env = si.game_env
+       JOIN shops s ON si.shop_id = s.id
        WHERE si.shop_id = ? AND si.game_env = ? ORDER BY c.type, c.name`,
       shopId,
       env,
