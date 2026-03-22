@@ -79,6 +79,28 @@ export interface CanonicalizedCommodityRecord {
   confidenceScore: number;
 }
 
+export interface CanonicalComponentInput {
+  name: string;
+  className: string;
+  type?: string | null;
+  subType?: string | null;
+  grade?: string | null;
+  size?: number | null;
+  sourceType: CanonicalSourceType;
+  sourceName: string;
+  sourceReference?: string | null;
+  confidenceScore?: number | null;
+}
+
+export interface CanonicalizedComponentRecord {
+  normalizedName: string;
+  canonicalComponentKey: string;
+  sourceType: CanonicalSourceType;
+  sourceName: string;
+  sourceReference: string | null;
+  confidenceScore: number;
+}
+
 function normalizeText(value: string | null | undefined): string {
   const raw = value == null ? '' : String(value);
   const lower = raw.trim().toLowerCase();
@@ -153,6 +175,24 @@ export function canonicalizeCommodityRecord(input: CanonicalCommodityInput): Can
   return {
     normalizedName,
     canonicalCommodityKey,
+    sourceType: input.sourceType,
+    sourceName: input.sourceName,
+    sourceReference: input.sourceReference ?? null,
+    confidenceScore: clampConfidence(input.confidenceScore, input.sourceType === 'p4k_datamine' ? 70 : 85),
+  };
+}
+
+export function canonicalizeComponentRecord(input: CanonicalComponentInput): CanonicalizedComponentRecord {
+  const normalizedName = normalizeText(input.name) || normalizeText(input.className) || 'unknown-component';
+  const typeKey = normalizeText(input.type);
+  const subTypeKey = normalizeText(input.subType);
+  const gradeKey = normalizeText(input.grade);
+  const sizeKey = input.size == null ? '' : String(input.size);
+  const canonicalComponentKey = [typeKey, subTypeKey, gradeKey, sizeKey, normalizedName].filter(Boolean).join('::') || normalizedName;
+
+  return {
+    normalizedName,
+    canonicalComponentKey,
     sourceType: input.sourceType,
     sourceName: input.sourceName,
     sourceReference: input.sourceReference ?? null,
