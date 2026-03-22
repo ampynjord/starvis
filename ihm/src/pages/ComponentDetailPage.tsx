@@ -7,6 +7,7 @@ import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { CanonicalMeta } from '@/components/ui/CanonicalMeta';
 import { ShipCard } from '@/components/ship/ShipCard';
 import { COMPONENT_TYPE_COLORS } from '@/utils/constants';
 import { fCredits } from '@/utils/formatters';
@@ -113,6 +114,14 @@ export default function ComponentDetailPage() {
               {comp.class_name && <GlowBadge color="slate">{comp.class_name}</GlowBadge>}
               {comp.manufacturer_name && <GlowBadge color="cyan">{comp.manufacturer_name}</GlowBadge>}
             </div>
+            <CanonicalMeta
+              className="mt-4"
+              sourceType={comp.source_type}
+              sourceName={comp.source_name}
+              confidenceScore={comp.confidence_score}
+              canonicalKey={comp.canonical_component_key}
+              normalizedName={comp.normalized_name}
+            />
           </div>
         </div>
         {comp.description && <p className="mt-4 text-sm text-slate-500 leading-relaxed">{comp.description}</p>}
@@ -141,6 +150,13 @@ export default function ComponentDetailPage() {
                     <div className="min-w-0">
                       <p className="text-sm text-slate-300 truncate">{loc.shop_name}</p>
                       <p className="text-xs text-slate-600 truncate">{loc.location}</p>
+                      <CanonicalMeta
+                        compact
+                        className="mt-1"
+                        sourceType={loc.inventory_source_type ?? loc.shop_source_type}
+                        sourceName={loc.inventory_source_name ?? loc.shop_source_name}
+                        confidenceScore={loc.confidence_score}
+                      />
                     </div>
                     {loc.base_price != null && <span className="text-xs font-mono-sc text-amber-400 flex-shrink-0">{fCredits(loc.base_price)}</span>}
                   </div>
