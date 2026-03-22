@@ -121,7 +121,7 @@ export default function ComponentDetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ScifiPanel title="Core Specifications">
           <div className="grid grid-cols-2 gap-2">
-            {baseSpecs.map(({ label, value }) => (
+            {baseSpecs.filter(s => s.value !== '—').map(({ label, value }) => (
               <div key={label} className="sci-panel p-2.5">
                 <p className="text-xs text-slate-600 font-mono-sc uppercase">{label}</p>
                 <p className="text-sm font-mono-sc text-slate-300 mt-0.5">{value}</p>
@@ -151,29 +151,35 @@ export default function ComponentDetailPage() {
         </ScifiPanel>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ScifiPanel title="Combat Stats">
-          <div className="grid grid-cols-2 gap-2">
-            {combatSpecs.map(({ label, value }) => (
-              <div key={label} className="sci-panel p-2.5">
-                <p className="text-xs text-slate-600 font-mono-sc uppercase">{label}</p>
-                <p className="text-sm font-mono-sc text-slate-300 mt-0.5">{value}</p>
+      {(combatSpecs.some(s => s.value !== '—') || utilitySpecs.some(s => s.value !== '—')) && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {combatSpecs.some(s => s.value !== '—') && (
+            <ScifiPanel title="Combat Stats">
+              <div className="grid grid-cols-2 gap-2">
+                {combatSpecs.filter(s => s.value !== '—').map(({ label, value }) => (
+                  <div key={label} className="sci-panel p-2.5">
+                    <p className="text-xs text-slate-600 font-mono-sc uppercase">{label}</p>
+                    <p className="text-sm font-mono-sc text-slate-300 mt-0.5">{value}</p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </ScifiPanel>
+            </ScifiPanel>
+          )}
 
-        <ScifiPanel title="Flight / Utility Stats">
-          <div className="grid grid-cols-2 gap-2">
-            {utilitySpecs.map(({ label, value }) => (
-              <div key={label} className="sci-panel p-2.5">
-                <p className="text-xs text-slate-600 font-mono-sc uppercase">{label}</p>
-                <p className="text-sm font-mono-sc text-slate-300 mt-0.5">{value}</p>
+          {utilitySpecs.some(s => s.value !== '—') && (
+            <ScifiPanel title="Flight / Utility Stats">
+              <div className="grid grid-cols-2 gap-2">
+                {utilitySpecs.filter(s => s.value !== '—').map(({ label, value }) => (
+                  <div key={label} className="sci-panel p-2.5">
+                    <p className="text-xs text-slate-600 font-mono-sc uppercase">{label}</p>
+                    <p className="text-sm font-mono-sc text-slate-300 mt-0.5">{value}</p>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </ScifiPanel>
-      </div>
+            </ScifiPanel>
+          )}
+        </div>
+      )}
 
       {ships && ships.length > 0 && (
         <ScifiPanel title="Equipped Ships" subtitle={`${ships.length} ships`} actions={<Rocket size={14} className="text-slate-600" />}>
