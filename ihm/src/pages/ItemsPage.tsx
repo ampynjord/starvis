@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Search } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { FilterPanel } from '@/components/ui/FilterPanel';
@@ -125,7 +126,7 @@ export default function ItemsPage() {
               <div className="space-y-1.5">
                 {displayedData?.data.map((item, i) => (
                   <motion.div key={item.uuid} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }}>
-                    <div className="sci-panel hover:border-cyan-800 transition-colors px-4 py-3">
+                    <Link to={`/items/${item.uuid}`} className="block sci-panel hover:border-cyan-800 transition-colors px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -140,7 +141,7 @@ export default function ItemsPage() {
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   </motion.div>
                 ))}
               </div>

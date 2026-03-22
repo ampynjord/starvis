@@ -197,10 +197,38 @@ export interface Component extends ComponentListItem {
   hp: number | null;
   power_base: number | null;
   power_draw: number | null;
+  power_output: number | null;
   heat_generation: number | null;
+  cooling_rate: number | null;
   em_signature: number | null;
   ir_signature: number | null;
   cross_section_signature: number | null;
+  weapon_damage: number | null;
+  weapon_damage_type: string | null;
+  weapon_fire_rate: number | null;
+  weapon_range: number | null;
+  weapon_speed: number | null;
+  weapon_ammo_count: number | null;
+  weapon_alpha_damage: number | null;
+  weapon_dps: number | null;
+  weapon_burst_dps: number | null;
+  weapon_sustained_dps: number | null;
+  shield_hp: number | null;
+  shield_regen: number | null;
+  shield_regen_delay: number | null;
+  qd_speed: number | null;
+  qd_spool_time: number | null;
+  qd_range: number | null;
+  qd_fuel_rate: number | null;
+  missile_damage: number | null;
+  missile_speed: number | null;
+  missile_range: number | null;
+  radar_range: number | null;
+  thruster_max_thrust: number | null;
+  tractor_max_force: number | null;
+  mining_speed: number | null;
+  salvage_speed: number | null;
+  data_json?: Record<string, unknown> | null;
   game_data: Record<string, unknown> | null;
 }
 
@@ -232,6 +260,17 @@ export interface Item extends ItemListItem {
   mass: number | null;
   hp: number | null;
   description: string | null;
+  weapon_damage?: number | null;
+  weapon_damage_type?: string | null;
+  weapon_fire_rate?: number | null;
+  weapon_range?: number | null;
+  weapon_speed?: number | null;
+  weapon_ammo_count?: number | null;
+  weapon_dps?: number | null;
+  armor_damage_reduction?: number | null;
+  armor_temp_min?: number | null;
+  armor_temp_max?: number | null;
+  data_json?: Record<string, unknown> | null;
   game_data: Record<string, unknown> | null;
 }
 
@@ -254,6 +293,7 @@ export interface Commodity {
   sub_type: string | null;
   symbol: string | null;
   occupancy_scu: number | null;
+  data_json?: Record<string, unknown> | null;
 }
 
 // ─── Shops ────────────────────────────────────────────────────────────────────

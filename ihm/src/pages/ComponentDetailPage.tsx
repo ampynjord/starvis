@@ -11,6 +11,14 @@ import { ShipCard } from '@/components/ship/ShipCard';
 import { COMPONENT_TYPE_COLORS } from '@/utils/constants';
 import { fCredits } from '@/utils/formatters';
 
+function fmtNum(v: number | null | undefined, unit = '', digits = 0): string {
+  if (v == null) return '—';
+  const n = Number(v);
+  if (Number.isNaN(n)) return '—';
+  if (digits > 0) return `${n.toFixed(digits)}${unit ? ` ${unit}` : ''}`;
+  return `${n.toLocaleString('en-US')}${unit ? ` ${unit}` : ''}`;
+}
+
 export default function ComponentDetailPage() {
   const { uuid } = useParams<{ uuid: string }>();
   const navigate = useNavigate();
@@ -22,8 +30,8 @@ export default function ComponentDetailPage() {
     enabled: !!uuid,
   });
   const { data: ships } = useQuery({
-    queryKey: ['components.ships', uuid],
-    queryFn: () => api.components.ships(uuid!),
+    queryKey: ['components.ships', uuid, env],
+    queryFn: () => api.components.ships(uuid!, env),
     enabled: !!uuid,
   });
   const { data: buyLocs } = useQuery({
@@ -33,14 +41,58 @@ export default function ComponentDetailPage() {
   });
 
   if (isLoading) return <LoadingGrid message="LOADING COMPONENT…" />;
-  if (error)    return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
-  if (!comp)    return null;
+  if (error) return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
+  if (!comp) return null;
 
   const typeColor = COMPONENT_TYPE_COLORS[comp.type] ?? 'text-slate-400';
 
+  const baseSpecs = [
+    { label: 'Mass', value: fmtNum(comp.mass, 'kg', 2) },
+    { label: 'HP', value: fmtNum(comp.hp) },
+    { label: 'Power base', value: fmtNum(comp.power_base, 'W') },
+    { label: 'Power draw', value: fmtNum(comp.power_draw, 'W') },
+    { label: 'Power output', value: fmtNum(comp.power_output, 'W') },
+    { label: 'Heat generation', value: fmtNum(comp.heat_generation) },
+    { label: 'Cooling rate', value: fmtNum(comp.cooling_rate) },
+    { label: 'EM signature', value: fmtNum(comp.em_signature) },
+    { label: 'IR signature', value: fmtNum(comp.ir_signature) },
+  ];
+
+  const combatSpecs = [
+    { label: 'Weapon damage', value: fmtNum(comp.weapon_damage, '', 2) },
+    { label: 'Damage type', value: comp.weapon_damage_type ?? '—' },
+    { label: 'Fire rate', value: fmtNum(comp.weapon_fire_rate, 'rpm', 2) },
+    { label: 'Weapon range', value: fmtNum(comp.weapon_range, 'm', 1) },
+    { label: 'Projectile speed', value: fmtNum(comp.weapon_speed, 'm/s', 1) },
+    { label: 'Ammo', value: fmtNum(comp.weapon_ammo_count) },
+    { label: 'Alpha damage', value: fmtNum(comp.weapon_alpha_damage, '', 2) },
+    { label: 'DPS', value: fmtNum(comp.weapon_dps, '', 2) },
+    { label: 'Burst DPS', value: fmtNum(comp.weapon_burst_dps, '', 2) },
+    { label: 'Sustained DPS', value: fmtNum(comp.weapon_sustained_dps, '', 2) },
+    { label: 'Shield HP', value: fmtNum(comp.shield_hp) },
+    { label: 'Shield regen', value: fmtNum(comp.shield_regen, '', 2) },
+    { label: 'Shield regen delay', value: fmtNum(comp.shield_regen_delay, 's', 2) },
+    { label: 'Missile damage', value: fmtNum(comp.missile_damage, '', 2) },
+    { label: 'Missile speed', value: fmtNum(comp.missile_speed, 'm/s', 1) },
+    { label: 'Missile range', value: fmtNum(comp.missile_range, 'm', 1) },
+  ];
+
+  const utilitySpecs = [
+    { label: 'Quantum speed', value: fmtNum(comp.qd_speed, 'km/s', 2) },
+    { label: 'Quantum spool', value: fmtNum(comp.qd_spool_time, 's', 2) },
+    { label: 'Quantum range', value: fmtNum(comp.qd_range, 'Gm', 2) },
+    { label: 'Quantum fuel rate', value: fmtNum(comp.qd_fuel_rate, 'units/s', 4) },
+    { label: 'Radar range', value: fmtNum(comp.radar_range, 'm', 1) },
+    { label: 'Thruster thrust', value: fmtNum(comp.thruster_max_thrust, 'N', 2) },
+    { label: 'Tractor force', value: fmtNum(comp.tractor_max_force, 'N', 2) },
+    { label: 'Mining speed', value: fmtNum(comp.mining_speed, '', 4) },
+    { label: 'Salvage speed', value: fmtNum(comp.salvage_speed, '', 4) },
+  ];
+
+  const rawPayload = comp.game_data ?? comp.data_json ?? null;
+
   return (
     <div className="max-w-screen-lg mx-auto space-y-6">
-      {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs font-mono-sc text-slate-600">
         <button onClick={() => navigate(-1)} className="hover:text-slate-400 transition-colors flex items-center gap-1"><ArrowLeft size={12} /> Back</button>
         <ChevronRight size={10} />
@@ -49,7 +101,6 @@ export default function ComponentDetailPage() {
         <span className="text-slate-400">{comp.name}</span>
       </div>
 
-      {/* Header */}
       <div className="sci-panel p-6">
         <div className="flex flex-col md:flex-row gap-4">
           <div className="flex-1">
@@ -64,24 +115,13 @@ export default function ComponentDetailPage() {
             </div>
           </div>
         </div>
-        {comp.description && (
-          <p className="mt-4 text-sm text-slate-500 leading-relaxed">{comp.description}</p>
-        )}
+        {comp.description && <p className="mt-4 text-sm text-slate-500 leading-relaxed">{comp.description}</p>}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Stats */}
-        <ScifiPanel title="Specifications">
+        <ScifiPanel title="Core Specifications">
           <div className="grid grid-cols-2 gap-2">
-            {[
-              { label: 'Mass', value: comp.mass != null ? `${Number(comp.mass).toFixed(1)} kg` : '—' },
-              { label: 'HP',   value: comp.hp != null ? Number(comp.hp).toLocaleString('en-US') : '—' },
-              { label: 'Power base', value: comp.power_base  != null ? `${Number(comp.power_base).toFixed(0)} W`  : '—' },
-              { label: 'Power draw', value: comp.power_draw  != null ? `${Number(comp.power_draw).toFixed(0)} W`  : '—' },
-              { label: 'Heat',       value: comp.heat_generation     != null ? `${Number(comp.heat_generation).toFixed(0)}` : '—' },
-              { label: 'EM sig.',    value: comp.em_signature        != null ? `${Number(comp.em_signature).toFixed(0)}`    : '—' },
-              { label: 'IR sig.',    value: comp.ir_signature        != null ? `${Number(comp.ir_signature).toFixed(0)}`    : '—' },
-            ].map(({ label, value }) => (
+            {baseSpecs.map(({ label, value }) => (
               <div key={label} className="sci-panel p-2.5">
                 <p className="text-xs text-slate-600 font-mono-sc uppercase">{label}</p>
                 <p className="text-sm font-mono-sc text-slate-300 mt-0.5">{value}</p>
@@ -90,8 +130,7 @@ export default function ComponentDetailPage() {
           </div>
         </ScifiPanel>
 
-        {/* Buy locations */}
-        <ScifiPanel title="Buy locations" subtitle={buyLocs ? `${buyLocs.length} locations` : undefined} actions={<MapPin size={14} className="text-slate-600" />}>
+        <ScifiPanel title="Buy Locations" subtitle={buyLocs ? `${buyLocs.length} locations` : undefined} actions={<MapPin size={14} className="text-slate-600" />}>
           {!buyLocs?.length ? (
             <p className="text-xs text-slate-600 italic py-4 text-center">No known buy locations</p>
           ) : (
@@ -103,9 +142,7 @@ export default function ComponentDetailPage() {
                       <p className="text-sm text-slate-300 truncate">{loc.shop_name}</p>
                       <p className="text-xs text-slate-600 truncate">{loc.location}</p>
                     </div>
-                    {loc.base_price != null && (
-                      <span className="text-xs font-mono-sc text-amber-400 flex-shrink-0">{fCredits(loc.base_price)}</span>
-                    )}
+                    {loc.base_price != null && <span className="text-xs font-mono-sc text-amber-400 flex-shrink-0">{fCredits(loc.base_price)}</span>}
                   </div>
                 </div>
               ))}
@@ -114,12 +151,41 @@ export default function ComponentDetailPage() {
         </ScifiPanel>
       </div>
 
-      {/* Ships using it */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ScifiPanel title="Combat Stats">
+          <div className="grid grid-cols-2 gap-2">
+            {combatSpecs.map(({ label, value }) => (
+              <div key={label} className="sci-panel p-2.5">
+                <p className="text-xs text-slate-600 font-mono-sc uppercase">{label}</p>
+                <p className="text-sm font-mono-sc text-slate-300 mt-0.5">{value}</p>
+              </div>
+            ))}
+          </div>
+        </ScifiPanel>
+
+        <ScifiPanel title="Flight / Utility Stats">
+          <div className="grid grid-cols-2 gap-2">
+            {utilitySpecs.map(({ label, value }) => (
+              <div key={label} className="sci-panel p-2.5">
+                <p className="text-xs text-slate-600 font-mono-sc uppercase">{label}</p>
+                <p className="text-sm font-mono-sc text-slate-300 mt-0.5">{value}</p>
+              </div>
+            ))}
+          </div>
+        </ScifiPanel>
+      </div>
+
       {ships && ships.length > 0 && (
-        <ScifiPanel title="Equipped ships" subtitle={`${ships.length} ships`} actions={<Rocket size={14} className="text-slate-600" />}>
+        <ScifiPanel title="Equipped Ships" subtitle={`${ships.length} ships`} actions={<Rocket size={14} className="text-slate-600" />}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {ships.map((s, i) => <ShipCard key={s.uuid} ship={s} index={i} />)}
           </div>
+        </ScifiPanel>
+      )}
+
+      {rawPayload && (
+        <ScifiPanel title="Raw Game Data" subtitle="Parsed payload from extractor">
+          <pre className="max-h-96 overflow-auto text-xs text-slate-400 font-mono-sc leading-relaxed">{JSON.stringify(rawPayload, null, 2)}</pre>
         </ScifiPanel>
       )}
     </div>
