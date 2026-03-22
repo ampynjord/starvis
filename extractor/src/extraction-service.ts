@@ -234,7 +234,7 @@ export class ExtractionService {
       const oldItems = new Map(oldItemsRaw.map((i: any) => [i.class_name, i]));
       const oldCommodities = new Map(oldCommoditiesRaw.map((c: any) => [c.class_name, c]));
 
-      const externalData = loadExternalCanonicalData();
+      const externalData = await loadExternalCanonicalData();
 
       // Wrap the entire extraction in a transaction — if anything fails,
       // the old data remains intact (no downtime with empty tables)
