@@ -112,7 +112,7 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
     const q = search.trim().toLowerCase();
     if (!q) return compositions;
     return compositions.filter(
-      (c) => (c.deposit_name || '').toLowerCase().includes(q) || (c.class_name || '').toLowerCase().includes(q),
+      (c) => (c.depositName || '').toLowerCase().includes(q) || (c.className || '').toLowerCase().includes(q),
     );
   }, [compositions, search]);
 
@@ -123,9 +123,9 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
       if (detail?.elements && Array.isArray(detail.elements)) {
         const data: CompositionData = {
           id: comp.uuid,
-          name: comp.deposit_name || comp.class_name || 'Unknown',
-          className: comp.class_name || '',
-          minDistinctElements: comp.min_distinct_elements ?? undefined,
+          name: comp.depositName || comp.className || 'Unknown',
+          className: comp.className || '',
+          minDistinctElements: comp.minDistinctElements,
           elements: detail.elements.map((el: any) => ({
             elementUuid: el.element_uuid || el.elementUuid,
             elementName: el.element_name || el.elementName,
@@ -154,7 +154,7 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
         className="sci-input w-full flex items-center justify-between gap-2 pr-3 text-left"
       >
         <span className={`font-rajdhani font-semibold text-sm ${current ? 'text-slate-100' : 'text-slate-500'}`}>
-          {current?.deposit_name || current?.class_name || 'Select a rock composition…'}
+          {current?.depositName || current?.className || 'Select a rock composition…'}
         </span>
         <ChevronDown size={14} className={`text-slate-500 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -193,10 +193,10 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
                   } ${loadingDetail === comp.uuid ? 'opacity-50' : ''}`}
                 >
                   <span className="font-rajdhani font-semibold text-sm flex-1">
-                    {comp.deposit_name || comp.class_name}
+                    {comp.depositName || comp.className}
                   </span>
-                  {comp.element_count != null && (
-                    <GlowBadge color="slate" size="xs">{comp.element_count} minerals</GlowBadge>
+                  {comp.elementCount != null && (
+                    <GlowBadge color="slate" size="xs">{comp.elementCount} minerals</GlowBadge>
                   )}
                 </button>
               ))}

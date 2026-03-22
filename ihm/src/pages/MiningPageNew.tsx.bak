@@ -13,11 +13,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Pickaxe,
   ChevronDown,
+  ChevronRight,
+  Info,
+  Search,
+  FlaskConical,
+  Layers3,
+  Target,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
   AlertTriangle,
   TrendingUp,
   Beaker,
-  Search,
-  Target,
   type LucideIcon,
 } from 'lucide-react';
 import { useState, useMemo, useCallback } from 'react';
@@ -28,7 +35,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
-import type { MiningComposition } from '@/types/api';
+import type { MiningComposition, MiningElement } from '@/types/api';
 
 // ── WORKFLOW TYPES ─────────────────────────────────────────────────────────────
 
@@ -97,9 +104,10 @@ interface CompositionSelectorProps {
   compositions: MiningComposition[] | undefined;
   selected: string;
   onChange: (compositionId: string, data: CompositionData) => void;
+  isLoading?: boolean;
 }
 
-function CompositionSelector({ compositions, selected, onChange }: CompositionSelectorProps) {
+function CompositionSelector({ compositions, selected, onChange, isLoading }: CompositionSelectorProps) {
   const { env } = useEnv();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -112,7 +120,7 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
     const q = search.trim().toLowerCase();
     if (!q) return compositions;
     return compositions.filter(
-      (c) => (c.deposit_name || '').toLowerCase().includes(q) || (c.class_name || '').toLowerCase().includes(q),
+      (c) => (c.depositName || '').toLowerCase().includes(q) || (c.className || '').toLowerCase().includes(q),
     );
   }, [compositions, search]);
 
@@ -123,9 +131,9 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
       if (detail?.elements && Array.isArray(detail.elements)) {
         const data: CompositionData = {
           id: comp.uuid,
-          name: comp.deposit_name || comp.class_name || 'Unknown',
-          className: comp.class_name || '',
-          minDistinctElements: comp.min_distinct_elements ?? undefined,
+          name: comp.depositName || comp.className || 'Unknown',
+          className: comp.className || '',
+          minDistinctElements: comp.minDistinctElements,
           elements: detail.elements.map((el: any) => ({
             elementUuid: el.element_uuid || el.elementUuid,
             elementName: el.element_name || el.elementName,
@@ -154,7 +162,7 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
         className="sci-input w-full flex items-center justify-between gap-2 pr-3 text-left"
       >
         <span className={`font-rajdhani font-semibold text-sm ${current ? 'text-slate-100' : 'text-slate-500'}`}>
-          {current?.deposit_name || current?.class_name || 'Select a rock composition…'}
+          {current?.depositName || current?.className || 'Select a rock composition…'}
         </span>
         <ChevronDown size={14} className={`text-slate-500 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -193,10 +201,10 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
                   } ${loadingDetail === comp.uuid ? 'opacity-50' : ''}`}
                 >
                   <span className="font-rajdhani font-semibold text-sm flex-1">
-                    {comp.deposit_name || comp.class_name}
+                    {comp.depositName || comp.className}
                   </span>
-                  {comp.element_count != null && (
-                    <GlowBadge color="slate" size="xs">{comp.element_count} minerals</GlowBadge>
+                  {comp.elementCount != null && (
+                    <GlowBadge color="slate" size="xs">{comp.elementCount} minerals</GlowBadge>
                   )}
                 </button>
               ))}
@@ -212,9 +220,10 @@ function CompositionSelector({ compositions, selected, onChange }: CompositionSe
 
 interface CompositionBreakdownProps {
   data: CompositionData | null;
+  isLoading?: boolean;
 }
 
-function CompositionBreakdown({ data }: CompositionBreakdownProps) {
+function CompositionBreakdown({ data, isLoading }: CompositionBreakdownProps) {
   if (!data) {
     return (
       <div className="text-center py-8 text-slate-600">
@@ -306,6 +315,7 @@ function RiskAssessment({ data }: RiskAssessmentProps) {
       avgInstability: instabilities.length ? instabilities.reduce((a, b) => a + b, 0) / instabilities.length : 0,
       maxResistance: Math.max(...resistances, 0),
       avgResistance: resistances.length ? resistances.reduce((a, b) => a + b, 0) / resistances.length : 0,
+      elementCount: allElements.length,
       hasHighRisk: Math.max(...instabilities, 0) > 0.6 || Math.max(...resistances, 0) > 0.6,
     };
   }, [data]);
@@ -526,9 +536,10 @@ const WORKFLOW_PHASES: PhaseConfig[] = [
 
 interface WorkflowProgressProps {
   currentPhase: WorkflowPhase;
+  completed: Partial<Record<WorkflowPhase, boolean>>;
 }
 
-function WorkflowProgress({ currentPhase }: WorkflowProgressProps) {
+function WorkflowProgress({ currentPhase, completed }: WorkflowProgressProps) {
   const currentIndex = WORKFLOW_PHASES.findIndex((p) => p.phase === currentPhase);
 
   return (
@@ -584,6 +595,7 @@ export default function MiningPage() {
   const [currentPhase, setCurrentPhase] = useState<WorkflowPhase>('scan');
   const [selectedCompositionId, setSelectedCompositionId] = useState('');
   const [compositionData, setCompositionData] = useState<CompositionData | null>(null);
+  const [completed, setCompleted] = useState<Partial<Record<WorkflowPhase, boolean>>>({});
 
   // Load all compositions for the scan phase
   const { data: compositions, isLoading: loadingCompositions, error: compositionsError } = useQuery({
@@ -596,6 +608,7 @@ export default function MiningPage() {
     (compositionId: string, data: CompositionData) => {
       setSelectedCompositionId(compositionId);
       setCompositionData(data);
+      setCompleted((prev) => ({ ...prev, scan: true }));
       setCurrentPhase('composition');
     },
     [],
@@ -623,7 +636,7 @@ export default function MiningPage() {
       </div>
 
       {/* Workflow Progress */}
-      <WorkflowProgress currentPhase={currentPhase} />
+      <WorkflowProgress currentPhase={currentPhase} completed={completed} />
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
@@ -641,6 +654,7 @@ export default function MiningPage() {
                 compositions={compositions}
                 selected={selectedCompositionId}
                 onChange={handleCompositionSelect}
+                isLoading={loadingCompositions}
               />
             )}
           </ScifiPanel>
@@ -677,14 +691,16 @@ export default function MiningPage() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: currentPhase === 'composition' || currentPhase === 'risk' || currentPhase === 'yield' ? 1 : 0.5, y: 0 }}
             transition={{ duration: 0.3 }}
-            onClick={() => handlePhaseChange('composition')}
-            className="cursor-pointer"
           >
             <ScifiPanel
               title="2. Composition Breakdown"
               subtitle="Mineral distribution and properties"
+              onClick={() => handlePhaseChange('composition')}
+              className={`cursor-pointer transition-colors ${
+                currentPhase === 'composition' ? 'border-cyan-600/50' : ''
+              }`}
             >
-              <CompositionBreakdown data={compositionData} />
+              <CompositionBreakdown data={compositionData} isLoading={loadingCompositions} />
             </ScifiPanel>
           </motion.div>
 
@@ -693,12 +709,14 @@ export default function MiningPage() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: currentPhase === 'risk' || currentPhase === 'yield' ? 1 : 0.5, y: 0 }}
             transition={{ duration: 0.3 }}
-            onClick={() => handlePhaseChange('risk')}
-            className="cursor-pointer"
           >
             <ScifiPanel
               title="3. Risk Assessment"
               subtitle="Instability, resistance, and hazard zones"
+              onClick={() => handlePhaseChange('risk')}
+              className={`cursor-pointer transition-colors ${
+                currentPhase === 'risk' ? 'border-cyan-600/50' : ''
+              }`}
             >
               <RiskAssessment data={compositionData} />
             </ScifiPanel>
@@ -709,12 +727,14 @@ export default function MiningPage() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: currentPhase === 'yield' ? 1 : 0.5, y: 0 }}
             transition={{ duration: 0.3 }}
-            onClick={() => handlePhaseChange('yield')}
-            className="cursor-pointer"
           >
             <ScifiPanel
               title="4. Yield Optimization"
               subtitle="Optimal laser power windows and expected output"
+              onClick={() => handlePhaseChange('yield')}
+              className={`cursor-pointer transition-colors ${
+                currentPhase === 'yield' ? 'border-cyan-600/50' : ''
+              }`}
             >
               <YieldCalculator data={compositionData} />
             </ScifiPanel>

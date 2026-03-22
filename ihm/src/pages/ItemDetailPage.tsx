@@ -49,6 +49,10 @@ export default function ItemDetailPage() {
     item.type?.toLowerCase().includes('undersuit') ||
     item.type?.toLowerCase().includes('backpack');
 
+  const isFpsCategory = /(helmet|armor|undersuit|clothing|backpack|weapon|ammo|munition|grenade|magazine|tool|module|attachment|medical|medpen|paramed|food|drink|gadget)/i.test(item.type ?? '');
+  const breadcrumbTo = isFpsCategory ? '/fps-gear' : '/other-items';
+  const breadcrumbLabel = isFpsCategory ? 'FPS Gear' : 'Other Items';
+
   const weaponStats = [
     { label: 'Damage', value: fmtNum(item.weapon_damage, '', 2) },
     { label: 'Damage type', value: item.weapon_damage_type ?? '—' },
@@ -72,7 +76,7 @@ export default function ItemDetailPage() {
       <div className="flex items-center gap-2 text-xs font-mono-sc text-slate-600">
         <button onClick={() => navigate(-1)} className="hover:text-slate-400 transition-colors flex items-center gap-1"><ArrowLeft size={12} /> Back</button>
         <ChevronRight size={10} />
-        <Link to="/items" className="hover:text-slate-400">FPS Gear</Link>
+        <Link to={breadcrumbTo} className="hover:text-slate-400">{breadcrumbLabel}</Link>
         <ChevronRight size={10} />
         <span className="text-slate-400">{item.name}</span>
       </div>
