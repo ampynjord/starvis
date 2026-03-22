@@ -255,6 +255,12 @@ export interface ItemListItem {
   uuid: string;
   class_name: string;
   name: string;
+  normalized_name?: string | null;
+  canonical_item_key?: string | null;
+  source_type?: string | null;
+  source_name?: string | null;
+  source_reference?: string | null;
+  confidence_score?: number | null;
   type: string;
   sub_type: string | null;
   size: number | null;
@@ -296,6 +302,12 @@ export interface Commodity {
   uuid: string;
   class_name: string;
   name: string;
+  normalized_name?: string | null;
+  canonical_commodity_key?: string | null;
+  source_type?: string | null;
+  source_name?: string | null;
+  source_reference?: string | null;
+  confidence_score?: number | null;
   type: string | null;
   sub_type: string | null;
   symbol: string | null;

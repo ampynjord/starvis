@@ -15,7 +15,12 @@ import {
   pruneExcludedVariants,
   tagVariantTypes,
 } from './crossref.js';
-import { canonicalizeInventoryRecord, canonicalizeShopRecord } from './canonical-source.js';
+import {
+  canonicalizeCommodityRecord,
+  canonicalizeInventoryRecord,
+  canonicalizeItemRecord,
+  canonicalizeShopRecord,
+} from './canonical-source.js';
 import { classifyPort, type DataForgeService, MANUFACTURER_CODES } from './dataforge-service.js';
 import { LocalizationService } from './localization-service.js';
 import logger from './logger.js';
@@ -1325,6 +1330,12 @@ export class ExtractionService {
         'game_env',
         'class_name',
         'name',
+        'normalized_name',
+        'canonical_item_key',
+        'source_type',
+        'source_name',
+        'source_reference',
+        'confidence_score',
         'type',
         'sub_type',
         'size',
@@ -1356,11 +1367,28 @@ export class ExtractionService {
         const values: unknown[] = [];
 
         for (const it of batch) {
+          const canonical = canonicalizeItemRecord({
+            name: it.name,
+            className: it.className,
+            type: it.type,
+            subType: it.subType,
+            sourceType: 'p4k_datamine',
+            sourceName: 'starvis-dataforge',
+            sourceReference: it.className,
+            confidenceScore: 70,
+          });
+
           values.push(
             it.uuid,
             env,
             it.className,
             it.name,
+            canonical.normalizedName,
+            canonical.canonicalItemKey,
+            canonical.sourceType,
+            canonical.sourceName,
+            canonical.sourceReference,
+            canonical.confidenceScore,
             it.type,
             it.subType,
             it.size,
@@ -1393,7 +1421,23 @@ export class ExtractionService {
 
     // ── Batch upsert commodities ──
     if (commodities.length > 0) {
-      const COMM_COLS = ['uuid', 'game_env', 'class_name', 'name', 'type', 'sub_type', 'symbol', 'occupancy_scu', 'data_json'];
+      const COMM_COLS = [
+        'uuid',
+        'game_env',
+        'class_name',
+        'name',
+        'normalized_name',
+        'canonical_commodity_key',
+        'source_type',
+        'source_name',
+        'source_reference',
+        'confidence_score',
+        'type',
+        'sub_type',
+        'symbol',
+        'occupancy_scu',
+        'data_json',
+      ];
       const COMM_UPDATE = COMM_COLS.filter((c) => c !== 'uuid' && c !== 'game_env')
         .map((c) => `${c}=new.${c}`)
         .join(', ');
@@ -1406,11 +1450,29 @@ export class ExtractionService {
         const values: unknown[] = [];
 
         for (const cm of batch) {
+          const canonical = canonicalizeCommodityRecord({
+            name: cm.name,
+            className: cm.className,
+            type: cm.type,
+            subType: cm.subType,
+            symbol: cm.symbol,
+            sourceType: 'p4k_datamine',
+            sourceName: 'starvis-dataforge',
+            sourceReference: cm.className,
+            confidenceScore: 70,
+          });
+
           values.push(
             cm.uuid,
             env,
             cm.className,
             cm.name,
+            canonical.normalizedName,
+            canonical.canonicalCommodityKey,
+            canonical.sourceType,
+            canonical.sourceName,
+            canonical.sourceReference,
+            canonical.confidenceScore,
             cm.type,
             cm.subType,
             cm.symbol,

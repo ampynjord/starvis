@@ -324,6 +324,12 @@ model Item {
   gameEnv              String   @default("live") @map("game_env") @db.VarChar(10)
   className            String   @map("class_name") @db.VarChar(255)
   name                 String   @db.VarChar(255)
+  normalizedName       String?  @map("normalized_name") @db.VarChar(255)
+  canonicalItemKey     String?  @map("canonical_item_key") @db.VarChar(255)
+  sourceType           String   @default("p4k_datamine") @map("source_type") @db.VarChar(50)
+  sourceName           String   @default("starvis") @map("source_name") @db.VarChar(100)
+  sourceReference      String?  @map("source_reference") @db.VarChar(255)
+  confidenceScore      Int      @default(70) @map("confidence_score")
   type                 String   @db.VarChar(50)
   subType              String?  @map("sub_type") @db.VarChar(100)
   size                 Int?     @db.UnsignedTinyInt
@@ -347,6 +353,7 @@ model Item {
 
   @@id([uuid, gameEnv])
   @@index([gameEnv], map: "idx_game_env")
+  @@index([canonicalItemKey, gameEnv], map: "idx_item_canonical_key_env")
   @@map("items")
 }
 
@@ -355,6 +362,12 @@ model Commodity {
   gameEnv      String   @default("live") @map("game_env") @db.VarChar(10)
   className    String   @map("class_name") @db.VarChar(255)
   name         String   @db.VarChar(255)
+  normalizedName        String?  @map("normalized_name") @db.VarChar(255)
+  canonicalCommodityKey String?  @map("canonical_commodity_key") @db.VarChar(255)
+  sourceType            String   @default("p4k_datamine") @map("source_type") @db.VarChar(50)
+  sourceName            String   @default("starvis") @map("source_name") @db.VarChar(100)
+  sourceReference       String?  @map("source_reference") @db.VarChar(255)
+  confidenceScore       Int      @default(70) @map("confidence_score")
   type         String   @db.VarChar(50)
   subType      String?  @map("sub_type") @db.VarChar(100)
   symbol       String?  @db.VarChar(20)
@@ -365,6 +378,7 @@ model Commodity {
 
   @@id([uuid, gameEnv])
   @@index([gameEnv], map: "idx_game_env")
+  @@index([canonicalCommodityKey, gameEnv], map: "idx_commodity_canonical_key_env")
   @@map("commodities")
 }
 

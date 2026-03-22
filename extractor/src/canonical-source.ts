@@ -38,8 +38,52 @@ export interface CanonicalizedInventoryRecord {
   confidenceScore: number;
 }
 
+export interface CanonicalItemInput {
+  name: string;
+  className: string;
+  type?: string | null;
+  subType?: string | null;
+  sourceType: CanonicalSourceType;
+  sourceName: string;
+  sourceReference?: string | null;
+  confidenceScore?: number | null;
+}
+
+export interface CanonicalizedItemRecord {
+  normalizedName: string;
+  canonicalItemKey: string;
+  sourceType: CanonicalSourceType;
+  sourceName: string;
+  sourceReference: string | null;
+  confidenceScore: number;
+}
+
+export interface CanonicalCommodityInput {
+  name: string;
+  className: string;
+  type?: string | null;
+  subType?: string | null;
+  symbol?: string | null;
+  sourceType: CanonicalSourceType;
+  sourceName: string;
+  sourceReference?: string | null;
+  confidenceScore?: number | null;
+}
+
+export interface CanonicalizedCommodityRecord {
+  normalizedName: string;
+  canonicalCommodityKey: string;
+  sourceType: CanonicalSourceType;
+  sourceName: string;
+  sourceReference: string | null;
+  confidenceScore: number;
+}
+
 function normalizeText(value: string | null | undefined): string {
-  return (value ?? '')
+  const raw = value == null ? '' : String(value);
+  const lower = raw.trim().toLowerCase();
+  const safe = lower === 'undefined' || lower === 'null' || lower === 'n/a' || lower === 'na' ? '' : raw;
+  return safe
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
@@ -80,5 +124,38 @@ export function canonicalizeInventoryRecord(input: CanonicalInventoryInput): Can
     sourceName: input.sourceName,
     sourceReference: input.sourceReference ?? null,
     confidenceScore: clampConfidence(input.confidenceScore, input.sourceType === 'cornerstone' ? 85 : 70),
+  };
+}
+
+export function canonicalizeItemRecord(input: CanonicalItemInput): CanonicalizedItemRecord {
+  const normalizedName = normalizeText(input.name) || normalizeText(input.className) || 'unknown-item';
+  const typeKey = normalizeText(input.type);
+  const subTypeKey = normalizeText(input.subType);
+  const canonicalItemKey = [typeKey, subTypeKey, normalizedName].filter(Boolean).join('::') || normalizedName;
+
+  return {
+    normalizedName,
+    canonicalItemKey,
+    sourceType: input.sourceType,
+    sourceName: input.sourceName,
+    sourceReference: input.sourceReference ?? null,
+    confidenceScore: clampConfidence(input.confidenceScore, input.sourceType === 'p4k_datamine' ? 70 : 85),
+  };
+}
+
+export function canonicalizeCommodityRecord(input: CanonicalCommodityInput): CanonicalizedCommodityRecord {
+  const normalizedName = normalizeText(input.name) || normalizeText(input.className) || 'unknown-commodity';
+  const typeKey = normalizeText(input.type);
+  const subTypeKey = normalizeText(input.subType);
+  const symbolKey = normalizeText(input.symbol);
+  const canonicalCommodityKey = [typeKey, subTypeKey, symbolKey || normalizedName].filter(Boolean).join('::') || normalizedName;
+
+  return {
+    normalizedName,
+    canonicalCommodityKey,
+    sourceType: input.sourceType,
+    sourceName: input.sourceName,
+    sourceReference: input.sourceReference ?? null,
+    confidenceScore: clampConfidence(input.confidenceScore, input.sourceType === 'p4k_datamine' ? 70 : 85),
   };
 }
