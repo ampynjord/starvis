@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Search } from 'lucide-react';
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { FilterPanel } from '@/components/ui/FilterPanel';
@@ -63,7 +64,7 @@ export default function CommoditiesPage() {
               <div className="space-y-1.5">
                 {(data.data ?? []).map((c, i) => (
                   <motion.div key={c.uuid} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }}>
-                    <div className="sci-panel px-4 py-3 hover:border-cyan-800 transition-colors">
+                    <Link to={`/commodities/${c.uuid}`} className="block sci-panel px-4 py-3 hover:border-cyan-800 transition-colors">
                       <div className="flex items-center gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
@@ -77,7 +78,7 @@ export default function CommoditiesPage() {
                           {c.occupancy_scu != null && <p className="text-xs font-mono-sc text-slate-600">{c.occupancy_scu} μSCU</p>}
                         </div>
                       </div>
-                    </div>
+                    </Link>
                   </motion.div>
                 ))}
               </div>
