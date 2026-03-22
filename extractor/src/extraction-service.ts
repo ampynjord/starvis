@@ -8,6 +8,13 @@
 import { createHash } from 'node:crypto';
 import type { Pool, PoolConnection } from 'mysql2/promise';
 import {
+  canonicalizeCommodityRecord,
+  canonicalizeComponentRecord,
+  canonicalizeInventoryRecord,
+  canonicalizeItemRecord,
+  canonicalizeShopRecord,
+} from './canonical-source.js';
+import {
   applyDimensionsFallback,
   applyHullSeriesCargoFallback,
   crossReferenceShipMatrix,
@@ -15,19 +22,12 @@ import {
   pruneExcludedVariants,
   tagVariantTypes,
 } from './crossref.js';
-import {
-  canonicalizeComponentRecord,
-  canonicalizeCommodityRecord,
-  canonicalizeInventoryRecord,
-  canonicalizeItemRecord,
-  canonicalizeShopRecord,
-} from './canonical-source.js';
 import { classifyPort, type DataForgeService, MANUFACTURER_CODES } from './dataforge-service.js';
 import { LocalizationService } from './localization-service.js';
 import logger from './logger.js';
 import { extractMiningCompositions, extractMiningElements } from './mining-extractor.js';
 import { extractMissions } from './mission-extractor.js';
-import { loadExternalCanonicalData, type ExternalCanonicalData } from './source-adapters.js';
+import { type ExternalCanonicalData, loadExternalCanonicalData } from './source-adapters.js';
 
 export type ExtractionModule = 'ships' | 'components' | 'items' | 'commodities' | 'mining' | 'missions' | 'paints' | 'shops';
 
@@ -428,7 +428,7 @@ export class ExtractionService {
       onProgress?.(`Localized ${components.length} component names`);
     }
 
-        const COMP_COLS = `uuid, game_env, class_name, name, normalized_name, canonical_component_key,
+    const COMP_COLS = `uuid, game_env, class_name, name, normalized_name, canonical_component_key,
           source_type, source_name, source_reference, confidence_score,
           type, sub_type, size, grade, manufacturer_code,
             mass, hp,

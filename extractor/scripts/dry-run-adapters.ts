@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { config } from 'dotenv';
-import { loadExternalCanonicalData, type ExternalSourceOverride } from '../src/source-adapters.js';
+import { type ExternalSourceOverride, loadExternalCanonicalData } from '../src/source-adapters.js';
 
 config({ path: '.env.extractor' });
 

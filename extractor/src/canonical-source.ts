@@ -172,9 +172,7 @@ export function canonicalizeCommodityRecord(input: CanonicalCommodityInput): Can
   const subTypeKey = normalizeText(input.subType);
   const symbolKey = normalizeText(input.symbol);
   const classKey = normalizeText(input.className);
-  const canonicalCommodityKey = [typeKey, subTypeKey, symbolKey || normalizedName, classKey]
-    .filter(Boolean)
-    .join('::') || normalizedName;
+  const canonicalCommodityKey = [typeKey, subTypeKey, symbolKey || normalizedName, classKey].filter(Boolean).join('::') || normalizedName;
 
   return {
     normalizedName,
@@ -193,9 +191,8 @@ export function canonicalizeComponentRecord(input: CanonicalComponentInput): Can
   const gradeKey = normalizeText(input.grade);
   const sizeKey = input.size == null ? '' : String(input.size);
   const classKey = normalizeText(input.className);
-  const canonicalComponentKey = [typeKey, subTypeKey, gradeKey, sizeKey, normalizedName, classKey]
-    .filter(Boolean)
-    .join('::') || normalizedName;
+  const canonicalComponentKey =
+    [typeKey, subTypeKey, gradeKey, sizeKey, normalizedName, classKey].filter(Boolean).join('::') || normalizedName;
 
   return {
     normalizedName,
