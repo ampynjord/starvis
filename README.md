@@ -162,7 +162,7 @@ starvis/
 │   ├── backup.sh               # Backup automatisé (mysqldump, gzip, 7j rétention)
 │   └── migrations/             # Migrations SQL numérotées (001…)
 └── .github/workflows/
-    └── ci.yml                  # CI/CD complet (5 jobs + 1 probe manuel)
+    └── ci.yml                  # CI/CD complet (5 jobs + 2 jobs manuels)
 ```
 
 ---
@@ -769,7 +769,7 @@ Les écritures en DB ne se font qu'au démarrage ou via les endpoints admin POST
 | **Quality** | Husky + lint-staged (pre-commit hooks) |
 | **Containerisation** | Docker multi-stage + Docker Compose |
 | **Reverse proxy** | Traefik (Let's Encrypt, HTTPS automatique) |
-| **CI/CD** | GitHub Actions (5 jobs + probe manuel, coverage Codecov) |
+| **CI/CD** | GitHub Actions (5 jobs + 2 jobs manuels, coverage Codecov) |
 | **Registry** | ghcr.io (GitHub Container Registry) |
 | **Logging** | Winston (module tags, durées, filtrage) |
 | **Backup** | mysqldump + gzip, cron quotidien, 7 jours de rétention |
@@ -778,22 +778,27 @@ Les écritures en DB ne se font qu'au démarrage ou via les endpoints admin POST
 
 ## CI/CD
 
-Pipeline GitHub Actions (`.github/workflows/ci.yml`) en 5 jobs :
+Pipeline GitHub Actions (`.github/workflows/ci.yml`) en 5 jobs standards + 2 jobs manuels :
 
 | Job | Description | Déclencheur |
 |-----|-------------|-------------|
 | **🔍 Lint** | Type-check TypeScript (`tsc --noEmit`) API + Extractor + build IHM + `npm audit` | push/PR sur `main` |
 | **🌐 Cornerstone adapter probe** | Dry-run manuel des sources externes CANONICAL (URL/API key) pour valider le mapping avant extraction réelle | `workflow_dispatch` (opt-in) |
+| **🩺 Safe smoke prod** | Vérification API production avec pacing + retries anti-429/5xx (`smoke-prod-safe.mjs`) | `workflow_dispatch` (opt-in) |
 | **🧪 Test** | Tests unitaires Vitest (52 API + 44 Extractor) + E2E Playwright (16+ tests) + coverage Codecov | après Lint |
 | **🐳 Build** | Build Docker + push sur ghcr.io (API + IHM) | push sur `main` uniquement |
 | **🚀 Deploy** | SSH sur VPS : `git pull`, `docker compose pull/up`, health check | après Test + Build |
 
-### Probe manuel des adapters Cornerstone
+### Jobs manuels (Cornerstone + smoke prod)
 
-Le workflow expose 2 inputs lors d'un lancement manuel :
+Le workflow expose ces inputs lors d'un lancement manuel :
 - `run_full_pipeline` : exécute lint/test/build lors d'un `workflow_dispatch` (désactivé par défaut)
 - `run_cornerstone_adapter_probe` : active le job de probe externe
 - `cornerstone_probe_sample` : nombre de lignes d'exemple affichées par `dry-run:adapters`
+- `run_safe_smoke_prod` : active le smoke test API production
+- `safe_smoke_base_url` : URL de base de l'API ciblée par le smoke test
+- `safe_smoke_pace_ms` : délai entre requêtes pour éviter le throttling
+- `safe_smoke_max_retries` : nombre de retries en cas de 429/5xx
 
 Par défaut, un lancement manuel exécute uniquement les jobs explicitement demandés (par ex. le probe) et ne déclenche pas le déploiement.
 

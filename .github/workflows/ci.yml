@@ -24,6 +24,26 @@ on:
         required: false
         default: "3"
         type: string
+      run_safe_smoke_prod:
+        description: "Run safe production smoke test"
+        required: false
+        default: false
+        type: boolean
+      safe_smoke_base_url:
+        description: "Base URL used by safe smoke prod"
+        required: false
+        default: "https://starvis-api.ampynjord.bzh"
+        type: string
+      safe_smoke_pace_ms:
+        description: "Delay between requests in ms"
+        required: false
+        default: "1200"
+        type: string
+      safe_smoke_max_retries:
+        description: "Retries for 429/5xx"
+        required: false
+        default: "4"
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -147,6 +167,29 @@ jobs:
 
       - name: Run external adapter dry-run diagnostics
         run: cd extractor && npm run dry-run:adapters -- --sample ${{ inputs.cornerstone_probe_sample }}
+
+  # ==========================================
+  #  1.c SAFE PRODUCTION SMOKE (manual)
+  # ==========================================
+  safe-smoke-prod:
+    name: "🩺 Safe smoke prod"
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_safe_smoke_prod }}
+    timeout-minutes: 10
+    env:
+      SMOKE_BASE_URL: ${{ inputs.safe_smoke_base_url }}
+      SMOKE_PACE_MS: ${{ inputs.safe_smoke_pace_ms }}
+      SMOKE_MAX_RETRIES: ${{ inputs.safe_smoke_max_retries }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Run safe production smoke test
+        run: node smoke-prod-safe.mjs
 
   # ==========================================
   #  2. UNIT / INTEGRATION TESTS
