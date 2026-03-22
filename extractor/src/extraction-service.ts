@@ -27,6 +27,7 @@ import { LocalizationService } from './localization-service.js';
 import logger from './logger.js';
 import { extractMiningCompositions, extractMiningElements } from './mining-extractor.js';
 import { extractMissions } from './mission-extractor.js';
+import { loadExternalCanonicalData, type ExternalCanonicalData } from './source-adapters.js';
 
 export type ExtractionModule = 'ships' | 'components' | 'items' | 'commodities' | 'mining' | 'missions' | 'paints' | 'shops';
 
@@ -233,6 +234,8 @@ export class ExtractionService {
       const oldItems = new Map(oldItemsRaw.map((i: any) => [i.class_name, i]));
       const oldCommodities = new Map(oldCommoditiesRaw.map((c: any) => [c.class_name, c]));
 
+      const externalData = loadExternalCanonicalData();
+
       // Wrap the entire extraction in a transaction — if anything fails,
       // the old data remains intact (no downtime with empty tables)
       await conn.execute('SET SESSION innodb_lock_wait_timeout = 600');
@@ -269,13 +272,13 @@ export class ExtractionService {
       // 3. Extract & save components
       if (run('components')) {
         onProgress?.('Extracting components…');
-        stats.components = await this.saveComponents(conn, env, onProgress);
+        stats.components = await this.saveComponents(conn, env, onProgress, externalData);
       }
 
       // 3b. Extract & save items (FPS weapons, armor, clothing, gadgets)
       if (run('items') || run('commodities')) {
         onProgress?.('Extracting items (FPS, armor, clothing)…');
-        const itemResult = await this.saveItems(conn, env, onProgress);
+        const itemResult = await this.saveItems(conn, env, onProgress, externalData);
         stats.items = itemResult.items;
         stats.commodities = itemResult.commodities;
       }
@@ -291,7 +294,7 @@ export class ExtractionService {
       // 5. Extract & save shops/vendors
       if (run('shops')) {
         onProgress?.('Extracting shops & prices…');
-        await this.saveShopsData(conn, env, onProgress);
+        await this.saveShopsData(conn, env, onProgress, externalData);
       }
 
       // 5b. Extract & save paints/liveries
@@ -408,7 +411,12 @@ export class ExtractionService {
   //  COMPONENTS → components table
   // ======================================================
 
-  private async saveComponents(conn: PoolConnection, env: GameEnv, onProgress?: (msg: string) => void): Promise<number> {
+  private async saveComponents(
+    conn: PoolConnection,
+    env: GameEnv,
+    onProgress?: (msg: string) => void,
+    externalData?: ExternalCanonicalData,
+  ): Promise<number> {
     const components = this.dfService.extractAllComponents();
     if (!components.length) return 0;
 
@@ -510,34 +518,35 @@ export class ExtractionService {
 
     /** Map a component object to a flat array of values */
     const toCanonicalRow = (c: any): (string | number | null)[] => {
+      const ext = externalData?.components.get(c.className);
       const canonical = canonicalizeComponentRecord({
-        name: c.name,
+        name: ext?.name ?? c.name,
         className: c.className,
-        type: c.type,
-        subType: c.subType,
-        grade: c.grade,
-        size: c.size,
-        sourceType: 'p4k_datamine',
-        sourceName: 'starvis-dataforge',
-        sourceReference: c.className,
-        confidenceScore: 70,
+        type: ext?.type ?? c.type,
+        subType: ext?.subType ?? c.subType,
+        grade: ext?.grade ?? c.grade,
+        size: ext?.size ?? c.size,
+        sourceType: ext?.sourceType ?? 'p4k_datamine',
+        sourceName: ext?.sourceName ?? 'starvis-dataforge',
+        sourceReference: ext?.sourceReference ?? c.className,
+        confidenceScore: ext?.confidenceScore ?? 70,
       });
 
       return [
         c.uuid,
         env,
         c.className,
-        c.name,
+        ext?.name ?? c.name,
         canonical.normalizedName,
         canonical.canonicalComponentKey,
         canonical.sourceType,
         canonical.sourceName,
         canonical.sourceReference,
         canonical.confidenceScore,
-        c.type,
-        c.subType || null,
-        c.size ?? null,
-        c.grade || null,
+        ext?.type ?? c.type,
+        ext?.subType ?? (c.subType || null),
+        ext?.size ?? c.size ?? null,
+        ext?.grade ?? (c.grade || null),
         c.manufacturerCode || null,
         c.mass ?? null,
         c.hp ?? null,
@@ -1324,6 +1333,7 @@ export class ExtractionService {
     conn: PoolConnection,
     env: GameEnv,
     onProgress?: (msg: string) => void,
+    externalData?: ExternalCanonicalData,
   ): Promise<{ items: number; commodities: number }> {
     const { items, commodities } = this.dfService.extractItems();
     let savedItems = 0;
@@ -1396,32 +1406,33 @@ export class ExtractionService {
         const values: unknown[] = [];
 
         for (const it of batch) {
+          const ext = externalData?.items.get(it.className);
           const canonical = canonicalizeItemRecord({
-            name: it.name,
+            name: ext?.name ?? it.name,
             className: it.className,
-            type: it.type,
-            subType: it.subType,
-            sourceType: 'p4k_datamine',
-            sourceName: 'starvis-dataforge',
-            sourceReference: it.className,
-            confidenceScore: 70,
+            type: ext?.type ?? it.type,
+            subType: ext?.subType ?? it.subType,
+            sourceType: ext?.sourceType ?? 'p4k_datamine',
+            sourceName: ext?.sourceName ?? 'starvis-dataforge',
+            sourceReference: ext?.sourceReference ?? it.className,
+            confidenceScore: ext?.confidenceScore ?? 70,
           });
 
           values.push(
             it.uuid,
             env,
             it.className,
-            it.name,
+            ext?.name ?? it.name,
             canonical.normalizedName,
             canonical.canonicalItemKey,
             canonical.sourceType,
             canonical.sourceName,
             canonical.sourceReference,
             canonical.confidenceScore,
-            it.type,
-            it.subType,
-            it.size,
-            it.grade,
+            ext?.type ?? it.type,
+            ext?.subType ?? it.subType,
+            ext?.size ?? it.size,
+            ext?.grade ?? it.grade,
             it.manufacturerCode,
             it.mass,
             it.hp,
@@ -1479,32 +1490,33 @@ export class ExtractionService {
         const values: unknown[] = [];
 
         for (const cm of batch) {
+          const ext = externalData?.commodities.get(cm.className);
           const canonical = canonicalizeCommodityRecord({
-            name: cm.name,
+            name: ext?.name ?? cm.name,
             className: cm.className,
-            type: cm.type,
-            subType: cm.subType,
-            symbol: cm.symbol,
-            sourceType: 'p4k_datamine',
-            sourceName: 'starvis-dataforge',
-            sourceReference: cm.className,
-            confidenceScore: 70,
+            type: ext?.type ?? cm.type,
+            subType: ext?.subType ?? cm.subType,
+            symbol: ext?.symbol ?? cm.symbol,
+            sourceType: ext?.sourceType ?? 'p4k_datamine',
+            sourceName: ext?.sourceName ?? 'starvis-dataforge',
+            sourceReference: ext?.sourceReference ?? cm.className,
+            confidenceScore: ext?.confidenceScore ?? 70,
           });
 
           values.push(
             cm.uuid,
             env,
             cm.className,
-            cm.name,
+            ext?.name ?? cm.name,
             canonical.normalizedName,
             canonical.canonicalCommodityKey,
             canonical.sourceType,
             canonical.sourceName,
             canonical.sourceReference,
             canonical.confidenceScore,
-            cm.type,
-            cm.subType,
-            cm.symbol,
+            ext?.type ?? cm.type,
+            ext?.subType ?? cm.subType,
+            ext?.symbol ?? cm.symbol,
             cm.occupancyScu,
             cm.dataJson ? JSON.stringify(cm.dataJson) : null,
           );
@@ -1531,6 +1543,7 @@ export class ExtractionService {
     conn: PoolConnection,
     env: GameEnv,
     onProgress?: (msg: string) => void,
+    externalData?: ExternalCanonicalData,
   ): Promise<{ shops: number; inventory: number }> {
     const { shops, inventory } = this.dfService.extractShops();
     let savedShops = 0;
@@ -1539,22 +1552,23 @@ export class ExtractionService {
     // Batch insert shops
     const shopRows: any[][] = [];
     for (const shop of shops) {
+      const ext = externalData?.shops.get(shop.className);
       const canonical = canonicalizeShopRecord({
-        name: shop.name,
+        name: ext?.name ?? shop.name,
         className: shop.className,
-        location: shop.location,
-        system: shop.system,
-        planetMoon: shop.planetMoon,
-        city: shop.city,
-        sourceType: 'p4k_datamine',
-        sourceName: 'starvis-dataforge',
-        sourceReference: shop.className,
-        confidenceScore: 70,
+        location: ext?.location ?? shop.location,
+        system: ext?.system ?? shop.system,
+        planetMoon: ext?.planetMoon ?? shop.planetMoon,
+        city: ext?.city ?? shop.city,
+        sourceType: ext?.sourceType ?? 'p4k_datamine',
+        sourceName: ext?.sourceName ?? 'starvis-dataforge',
+        sourceReference: ext?.sourceReference ?? shop.className,
+        confidenceScore: ext?.confidenceScore ?? 70,
       });
 
       shopRows.push([
         env,
-        shop.name,
+        ext?.name ?? shop.name,
         canonical.normalizedName,
         canonical.canonicalShopKey,
         canonical.canonicalLocationKey,
@@ -1562,10 +1576,10 @@ export class ExtractionService {
         canonical.sourceName,
         canonical.sourceReference,
         canonical.confidenceScore,
-        shop.location || null,
-        shop.system || null,
-        shop.planetMoon || null,
-        shop.city || null,
+        ext?.location ?? (shop.location || null),
+        ext?.system ?? (shop.system || null),
+        ext?.planetMoon ?? (shop.planetMoon || null),
+        ext?.city ?? (shop.city || null),
         shop.shopType || null,
         shop.className,
       ]);
