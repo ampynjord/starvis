@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { AddressInfo } from 'node:net';
+import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 import { loadExternalCanonicalData } from '../src/source-adapters.js';
 

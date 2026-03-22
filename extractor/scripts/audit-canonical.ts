@@ -71,7 +71,6 @@ function parseArgs(): { env: GameEnv; strict: boolean } {
 
     if (args[i] === '--strict') {
       strict = true;
-      continue;
     }
   }
 
@@ -96,7 +95,11 @@ async function queryCountByEnv(conn: mysql.Pool, sql: string, params: unknown[])
   return m;
 }
 
-async function queryCollisionsByEnv(conn: mysql.Pool, sql: string, params: unknown[]): Promise<Map<string, { groups: number; rows: number }>> {
+async function queryCollisionsByEnv(
+  conn: mysql.Pool,
+  sql: string,
+  params: unknown[],
+): Promise<Map<string, { groups: number; rows: number }>> {
   const [rows] = await conn.query<CollisionRow[]>(sql, params);
   const m = new Map<string, { groups: number; rows: number }>();
   for (const r of rows) {
