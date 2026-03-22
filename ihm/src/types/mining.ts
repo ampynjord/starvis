@@ -50,6 +50,8 @@ export function mapCompositionToView(composition: MiningComposition): MiningComp
     name: getCompositionDisplayName(composition),
     className: composition.class_name || '',
     minDistinctElements: composition.min_distinct_elements ?? undefined,
-    elements: (composition.elements ?? []).map(mapCompositionPartToView),
+    elements: (composition.elements ?? [])
+      .filter((p) => p != null && p.element_uuid != null)
+      .map(mapCompositionPartToView),
   };
 }
