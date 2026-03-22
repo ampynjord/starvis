@@ -37,13 +37,14 @@ export function setETag(res: Response, jsonStr: string): string {
  *  ETag is computed without volatile fields (meta.responseTime). */
 export function sendWithETag(req: Request, res: Response, payload: Record<string, unknown>): void {
   const { meta, ...stable } = payload;
-  const stableStr = JSON.stringify(stable);
+  const replacer = (_key: string, value: unknown) => (typeof value === 'bigint' ? Number(value) : value);
+  const stableStr = JSON.stringify(stable, replacer);
   const etag = setETag(res, stableStr);
   if (req.headers['if-none-match'] === etag) {
     res.status(304).end();
     return;
   }
-  const fullStr = JSON.stringify(payload);
+  const fullStr = JSON.stringify(payload, replacer);
   res.setHeader('Content-Type', 'application/json');
   res.send(fullStr);
 }

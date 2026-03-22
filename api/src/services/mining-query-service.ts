@@ -8,7 +8,7 @@
  *   GET /api/v1/mining/solver?element=uuid   — rocks sorted by probability for a given mineral
  */
 import type { PrismaClient } from '@prisma/client';
-import type { Row } from './shared.js';
+import { convertBigIntToNumber, type Row } from './shared.js';
 
 export class MiningQueryService {
   constructor(private prisma: PrismaClient) {}
@@ -16,16 +16,25 @@ export class MiningQueryService {
   // ── Elements ──────────────────────────────────────────────
 
   async getAllElements(env = 'live'): Promise<Row[]> {
-    return this.prisma.$queryRawUnsafe<Row[]>(
-      `SELECT uuid, class_name, name, commodity_uuid,
-              instability, resistance,
-              optimal_window_midpoint, optimal_window_thinness,
-              explosion_multiplier, cluster_factor
-       FROM mining_elements
-       WHERE game_env = ?
-       ORDER BY name ASC`,
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+      `SELECT e.uuid, e.class_name, e.name, e.commodity_uuid,
+              e.instability, e.resistance,
+              e.optimal_window_midpoint, e.optimal_window_thinness, e.optimal_window_midpoint_rand,
+              e.explosion_multiplier, e.cluster_factor,
+              CAST(COUNT(DISTINCT mcp.composition_uuid) AS SIGNED) AS rocks_containing,
+              ROUND(AVG(mcp.probability) * 100, 1) AS avg_probability_pct,
+              ROUND(AVG(mcp.min_percentage) * 100, 1) AS avg_min_pct,
+              ROUND(AVG(mcp.max_percentage) * 100, 1) AS avg_max_pct
+       FROM mining_elements e
+       LEFT JOIN mining_composition_parts mcp ON mcp.element_uuid = e.uuid AND mcp.game_env = e.game_env
+       WHERE e.game_env = ?
+       GROUP BY e.uuid, e.class_name, e.name, e.commodity_uuid, e.instability, e.resistance,
+                e.optimal_window_midpoint, e.optimal_window_thinness, e.optimal_window_midpoint_rand,
+                e.explosion_multiplier, e.cluster_factor
+       ORDER BY e.name ASC`,
       env,
     );
+    return convertBigIntToNumber(rows);
   }
 
   async getElementById(uuid: string, env = 'live'): Promise<Row | null> {
@@ -64,18 +73,19 @@ export class MiningQueryService {
   // ── Compositions ──────────────────────────────────────────
 
   async getAllCompositions(includeEmpty = false, env = 'live'): Promise<Row[]> {
+    const havingClause = includeEmpty ? '' : 'HAVING element_count > 0';
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT mc.uuid, mc.class_name, mc.deposit_name, mc.min_distinct_elements,
-              COUNT(mcp.id) AS element_count
+              CAST(COUNT(mcp.id) AS SIGNED) AS element_count
        FROM mining_compositions mc
        LEFT JOIN mining_composition_parts mcp ON mcp.composition_uuid = mc.uuid AND mcp.game_env = mc.game_env
        WHERE mc.game_env = ?
-       ${includeEmpty ? '' : 'HAVING element_count > 0'}
-       GROUP BY mc.uuid
+       GROUP BY mc.uuid, mc.class_name, mc.deposit_name, mc.min_distinct_elements
+       ${havingClause}
        ORDER BY mc.deposit_name ASC`,
       env,
     );
-    return rows;
+    return convertBigIntToNumber(rows);
   }
 
   async getCompositionByUuid(uuid: string, env = 'live'): Promise<Row | null> {
@@ -101,7 +111,7 @@ export class MiningQueryService {
       env,
     );
     if (!rows[0]) return null;
-    const row = rows[0];
+    const row = convertBigIntToNumber(rows[0]);
     if (typeof row.elements === 'string') {
       try {
         row.elements = JSON.parse(row.elements);
@@ -141,7 +151,7 @@ export class MiningQueryService {
       minProb,
       env,
     );
-    return rows;
+    return convertBigIntToNumber(rows);
   }
 
   /**
@@ -149,7 +159,7 @@ export class MiningQueryService {
    * sorted by probability.
    */
   async solveForComposition(compositionUuid: string, env = 'live'): Promise<Row[]> {
-    return this.prisma.$queryRawUnsafe<Row[]>(
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT e.uuid, e.name, e.class_name,
               e.instability, e.resistance,
               e.optimal_window_midpoint, e.optimal_window_thinness,
@@ -162,6 +172,7 @@ export class MiningQueryService {
       compositionUuid,
       env,
     );
+    return convertBigIntToNumber(rows);
   }
 
   async getStats(env = 'live'): Promise<{ elements: number; compositions: number; parts: number }> {
