@@ -25,6 +25,7 @@ const ChangelogPage       = lazy(() => import('@/pages/ChangelogPage'));
 const RankingPage         = lazy(() => import('@/pages/RankingPage'));
 const OutfitterPage       = lazy(() => import('@/pages/OutfitterPage'));
 const MiningPage          = lazy(() => import('@/pages/MiningPage'));
+const FpsCalculatorPage   = lazy(() => import('@/pages/FpsCalculatorPage'));
 const MissionsPage        = lazy(() => import('@/pages/MissionsPage'));
 const NotFoundPage        = lazy(() => import('@/pages/NotFoundPage'));
 
@@ -49,6 +50,7 @@ export const router = createBrowserRouter([
       { path: 'outfitter', element: wrap(OutfitterPage) },
       { path: 'mining', element: wrap(MiningPage) },
       { path: 'fps-gear', element: wrap(ItemsPage) },
+      { path: 'fps-calculator', element: wrap(FpsCalculatorPage) },
       { path: 'other-items', element: wrap(ItemsPage) },
       { path: 'industrial', element: wrap(CommoditiesPage) },
       ...legacyRedirects.map(({ path, to }) => ({ path, element: <Navigate to={to} replace /> })),
