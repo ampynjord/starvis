@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Palette, Search } from 'lucide-react';
-import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
@@ -9,16 +8,14 @@ import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { Pagination } from '@/components/ui/Pagination';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { useDebounce } from '@/hooks/useDebounce';
+import { useListQueryState } from '@/hooks/useListQueryState';
 import type { PaintListItem } from '@/types/api';
 
 const LIMIT = 40;
 
 export default function PaintsPage() {
   const { env } = useEnv();
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
-  const debouncedSearch = useDebounce(search, 350);
+  const { page, search, debouncedSearch, updateSearch, updatePageWithScroll } = useListQueryState();
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['paints.list', env, { page, search: debouncedSearch }],
@@ -43,7 +40,7 @@ export default function PaintsPage() {
           <input
             type="text"
             value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            onChange={e => updateSearch(e.target.value)}
             placeholder="Search paint or ship…"
             className="sci-input w-full pl-8 text-xs"
           />
@@ -100,7 +97,7 @@ export default function PaintsPage() {
               className="mt-6"
               page={data.page}
               totalPages={data.pages}
-              onPageChange={p => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              onPageChange={updatePageWithScroll}
             />
           )}
         </>
