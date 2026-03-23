@@ -73,4 +73,13 @@ test.describe('Commodities API', () => {
     });
     expect(response2.status()).toBe(304);
   });
+
+  test('GET /api/v1/commodities/:uuid should return 404 for unknown commodity', async ({ request }) => {
+    const response = await request.get('/api/v1/commodities/not-a-real-commodity-uuid');
+    expect(response.status()).toBe(404);
+
+    const data = await response.json();
+    expect(data.success).toBe(false);
+    expect(data.error).toBe('Commodity not found');
+  });
 });

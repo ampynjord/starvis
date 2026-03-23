@@ -65,4 +65,22 @@ test.describe('Items API', () => {
     expect(Array.isArray(data.data.sub_types)).toBe(true);
     expect(Array.isArray(data.data.manufacturers)).toBe(true);
   });
+
+  test('GET /api/v1/items/:uuid should return 404 for unknown item', async ({ request }) => {
+    const response = await request.get('/api/v1/items/not-a-real-item-uuid');
+    expect(response.status()).toBe(404);
+
+    const data = await response.json();
+    expect(data.success).toBe(false);
+    expect(data.error).toBe('Item not found');
+  });
+
+  test('GET /api/v1/items/:uuid/buy-locations should return 404 for unknown item', async ({ request }) => {
+    const response = await request.get('/api/v1/items/not-a-real-item-uuid/buy-locations');
+    expect(response.status()).toBe(404);
+
+    const data = await response.json();
+    expect(data.success).toBe(false);
+    expect(data.error).toBe('Item not found');
+  });
 });
