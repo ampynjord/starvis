@@ -15,6 +15,7 @@ import { ItemQueryService } from './item-query-service.js';
 import { LoadoutService } from './loadout-service.js';
 import { MiningQueryService } from './mining-query-service.js';
 import { MissionService } from './mission-service.js';
+import { PaintQueryService } from './paint-query-service.js';
 import type { PaginatedResult, Row } from './shared.js';
 import { ShipQueryService } from './ship-query-service.js';
 import { ShopService } from './shop-service.js';
@@ -39,6 +40,7 @@ export class GameDataService {
   readonly ships: ShipQueryService;
   readonly components: ComponentQueryService;
   readonly loadouts: LoadoutService;
+  readonly paints: PaintQueryService;
   readonly shops: ShopService;
   readonly items: ItemQueryService;
   readonly commodities: CommodityQueryService;
@@ -52,6 +54,7 @@ export class GameDataService {
     this.ships = new ShipQueryService(prisma);
     this.components = new ComponentQueryService(prisma);
     this.loadouts = new LoadoutService(prisma);
+    this.paints = new PaintQueryService(prisma);
     this.shops = new ShopService(prisma);
     this.items = new ItemQueryService(prisma);
     this.commodities = new CommodityQueryService(prisma);
