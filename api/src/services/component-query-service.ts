@@ -2,7 +2,36 @@
  * ComponentQueryService — Component listing, filters, buy locations, ships
  */
 import type { PrismaClient } from '@prisma/client';
-import { COMP_SORT, type PaginatedResult, paginate, type Row } from './shared.js';
+import { type PaginatedResult, paginate, type Row } from './shared.js';
+
+const COMP_SORT = new Set([
+  'name',
+  'class_name',
+  'type',
+  'size',
+  'grade',
+  'manufacturer_code',
+  'weapon_dps',
+  'weapon_burst_dps',
+  'weapon_sustained_dps',
+  'weapon_damage',
+  'weapon_fire_rate',
+  'weapon_range',
+  'weapon_damage_physical',
+  'weapon_damage_energy',
+  'weapon_damage_distortion',
+  'shield_hp',
+  'shield_regen',
+  'qd_speed',
+  'qd_spool_time',
+  'power_output',
+  'cooling_rate',
+  'hp',
+  'mass',
+  'thruster_max_thrust',
+  'radar_range',
+  'fuel_capacity',
+]);
 
 export class ComponentQueryService {
   constructor(private prisma: PrismaClient) {}
