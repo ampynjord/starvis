@@ -322,8 +322,7 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
           if (Array.isArray(fireActions) && fireActions.length > 0) {
             for (const pa of fireActions) {
               if (!pa || typeof pa !== 'object') continue;
-              if (typeof pa.fireRate === 'number' && !item.weaponFireRate)
-                item.weaponFireRate = Math.round(pa.fireRate * 100) / 100;
+              if (typeof pa.fireRate === 'number' && !item.weaponFireRate) item.weaponFireRate = Math.round(pa.fireRate * 100) / 100;
               if (typeof pa.heatPerShot === 'number') extData.weaponHeatPerShot = Math.round(pa.heatPerShot * 100000) / 100000;
               // Store pellet count for shotgun calculations
               const pellets = pa.launchParams?.pelletCount ?? pa.launchParams?.SProjectileLauncher?.pelletCount;
@@ -428,8 +427,7 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
               try {
                 const ammoData = ctx.readRecordByGuid(ammoGuid, 5);
                 if (!ammoData) continue;
-                if (typeof ammoData.speed === 'number' && !item.weaponSpeed)
-                  item.weaponSpeed = Math.round(ammoData.speed * 100) / 100;
+                if (typeof ammoData.speed === 'number' && !item.weaponSpeed) item.weaponSpeed = Math.round(ammoData.speed * 100) / 100;
                 if (typeof ammoData.lifetime === 'number' && item.weaponSpeed && !item.weaponRange)
                   item.weaponRange = Math.round(ammoData.lifetime * item.weaponSpeed * 100) / 100;
                 const pp = ammoData.projectileParams;
@@ -449,10 +447,14 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
                     extData.damageDistortion = Math.round(distortion * pellets * 10000) / 10000;
                   }
                 }
-              } catch { /* non-critical */ }
+              } catch {
+                /* non-critical */
+              }
               break;
             }
-          } catch { /* non-critical */ }
+          } catch {
+            /* non-critical */
+          }
           if (item.weaponDamage) break;
         }
         delete extData._defaultLoadoutEntries;
