@@ -143,7 +143,16 @@ export default function FpsCalculatorPage() {
   const computed = useMemo(() => {
     if (!weaponDetail) return null;
 
-    const baseDamageFromField = Number(weaponDetail.weapon_damage ?? 0);
+    const dj = weaponDetail.data_json as Record<string, unknown> | null | undefined;
+
+    // Prioritize direct fields, fallback to data_json for damage (extracted via launchParams path)
+    const baseDamageFromField =
+      Number(weaponDetail.weapon_damage ?? 0) ||
+      Number(
+        (dj?.damagePhysical as number ?? 0) +
+        (dj?.damageEnergy as number ?? 0) +
+        (dj?.damageDistortion as number ?? 0)
+      );
     const baseDpsFromField = Number(weaponDetail.weapon_dps ?? 0);
     const baseFireRateFromField = Number(weaponDetail.weapon_fire_rate ?? 0);
 
@@ -482,6 +491,22 @@ export default function FpsCalculatorPage() {
                         <div className="flex justify-between"><span className="text-slate-600">Type</span><span>{weaponDetail?.type || '-'}</span></div>
                         <div className="flex justify-between"><span className="text-slate-600">Subtype</span><span>{weaponDetail?.sub_type || '-'}</span></div>
                         <div className="flex justify-between"><span className="text-slate-600">Base RPM</span><span>{computed.baseRpm}</span></div>
+                        <div className="flex justify-between"><span className="text-slate-600">Base damage</span><span className={computed.baseDamage > 0 ? 'text-cyan-300' : 'text-red-400'}>{computed.baseDamage > 0 ? computed.baseDamage : 'N/A'}</span></div>
+                        {weaponDetail?.weapon_damage_type && (
+                          <div className="flex justify-between"><span className="text-slate-600">Dmg type</span><span className="capitalize">{weaponDetail.weapon_damage_type}</span></div>
+                        )}
+                        {(() => {
+                          const dj = weaponDetail?.data_json as Record<string, unknown> | null | undefined;
+                          const p = Number(dj?.damagePhysical ?? 0);
+                          const e = Number(dj?.damageEnergy ?? 0);
+                          const d = Number(dj?.damageDistortion ?? 0);
+                          if (p + e + d <= 0) return null;
+                          return <>
+                            {p > 0 && <div className="flex justify-between"><span className="text-slate-600">Physical</span><span className="text-orange-300">{p}</span></div>}
+                            {e > 0 && <div className="flex justify-between"><span className="text-slate-600">Energy</span><span className="text-yellow-300">{e}</span></div>}
+                            {d > 0 && <div className="flex justify-between"><span className="text-slate-600">Distortion</span><span className="text-purple-300">{d}</span></div>}
+                          </>;
+                        })()}
                         <div className="flex justify-between"><span className="text-slate-600">Mitigation</span><span>{computed.reductionPct}%</span></div>
                       </div>
                     </ScifiPanel>

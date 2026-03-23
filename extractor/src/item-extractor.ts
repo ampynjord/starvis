@@ -320,47 +320,88 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
         if (cType === 'SCItemWeaponComponentParams') {
           const fireActions = c.fireActions;
           if (Array.isArray(fireActions) && fireActions.length > 0) {
-            const pa = fireActions[0];
-            if (pa && typeof pa === 'object') {
-              if (typeof pa.fireRate === 'number') item.weaponFireRate = Math.round(pa.fireRate * 100) / 100;
+            for (const pa of fireActions) {
+              if (!pa || typeof pa !== 'object') continue;
+              if (typeof pa.fireRate === 'number' && !item.weaponFireRate)
+                item.weaponFireRate = Math.round(pa.fireRate * 100) / 100;
               if (typeof pa.heatPerShot === 'number') extData.weaponHeatPerShot = Math.round(pa.heatPerShot * 100000) / 100000;
+
+              // Try to get ammo ref from launchParams (FPS weapons store it here)
+              const launcher =
+                pa.launchParams?.SProjectileLauncher ??
+                pa.launchParams?.SBulletLauncher ??
+                pa.launchParams?.SLaserLauncher ??
+                pa.launchParams;
+              const launchAmmoGuid = launcher?.ammoParamsRecord?.__ref ?? launcher?.ammoParamsRef?.__ref;
+              if (launchAmmoGuid && !item.weaponDamage) {
+                try {
+                  const ammoData = ctx.readRecordByGuid(launchAmmoGuid, 5);
+                  if (ammoData) {
+                    if (typeof ammoData.speed === 'number' && !item.weaponSpeed)
+                      item.weaponSpeed = Math.round(ammoData.speed * 100) / 100;
+                    if (typeof ammoData.lifetime === 'number' && item.weaponSpeed && !item.weaponRange)
+                      item.weaponRange = Math.round(ammoData.lifetime * item.weaponSpeed * 100) / 100;
+                    const pp = ammoData.projectileParams;
+                    if (pp?.damage) {
+                      const dmg = pp.damage;
+                      const physical = typeof dmg.DamagePhysical === 'number' ? dmg.DamagePhysical : 0;
+                      const energy = typeof dmg.DamageEnergy === 'number' ? dmg.DamageEnergy : 0;
+                      const distortion = typeof dmg.DamageDistortion === 'number' ? dmg.DamageDistortion : 0;
+                      const total = physical + energy + distortion;
+                      if (total > 0) {
+                        item.weaponDamage = Math.round(total * 10000) / 10000;
+                        item.weaponDamageType =
+                          physical >= energy && physical >= distortion ? 'physical' : energy >= distortion ? 'energy' : 'distortion';
+                        extData.damagePhysical = Math.round(physical * 10000) / 10000;
+                        extData.damageEnergy = Math.round(energy * 10000) / 10000;
+                        extData.damageDistortion = Math.round(distortion * 10000) / 10000;
+                      }
+                    }
+                  }
+                } catch {
+                  /* non-critical */
+                }
+              }
             }
           }
         }
 
-        // Ammo / damage
+        // Ammo / damage (fallback via magazine SAmmoContainerComponentParams)
         if (cType === 'SAmmoContainerComponentParams') {
           if (typeof c.maxAmmoCount === 'number') item.weaponAmmoCount = c.maxAmmoCount;
           if (typeof c.initialAmmoCount === 'number' && !item.weaponAmmoCount) item.weaponAmmoCount = c.initialAmmoCount;
 
-          const ammoGuid = c.ammoParamsRecord?.__ref;
-          if (ammoGuid) {
-            try {
-              const ammoData = ctx.readRecordByGuid(ammoGuid, 5);
-              if (ammoData) {
-                if (typeof ammoData.speed === 'number') item.weaponSpeed = Math.round(ammoData.speed * 100) / 100;
-                if (typeof ammoData.lifetime === 'number' && item.weaponSpeed) {
-                  item.weaponRange = Math.round(ammoData.lifetime * item.weaponSpeed * 100) / 100;
-                }
-                const pp = ammoData.projectileParams;
-                if (pp?.damage) {
-                  const dmg = pp.damage;
-                  const physical = typeof dmg.DamagePhysical === 'number' ? dmg.DamagePhysical : 0;
-                  const energy = typeof dmg.DamageEnergy === 'number' ? dmg.DamageEnergy : 0;
-                  const distortion = typeof dmg.DamageDistortion === 'number' ? dmg.DamageDistortion : 0;
-                  const total = physical + energy + distortion;
-                  if (total > 0) {
-                    item.weaponDamage = Math.round(total * 10000) / 10000;
-                    item.weaponDamageType =
-                      physical >= energy && physical >= distortion ? 'physical' : energy >= distortion ? 'energy' : 'distortion';
-                    extData.damagePhysical = Math.round(physical * 10000) / 10000;
-                    extData.damageEnergy = Math.round(energy * 10000) / 10000;
-                    extData.damageDistortion = Math.round(distortion * 10000) / 10000;
+          // Only resolve ammo damage if not already found via fireActions
+          if (!item.weaponDamage) {
+            const ammoGuid = c.ammoParamsRecord?.__ref;
+            if (ammoGuid) {
+              try {
+                const ammoData = ctx.readRecordByGuid(ammoGuid, 5);
+                if (ammoData) {
+                  if (typeof ammoData.speed === 'number' && !item.weaponSpeed) item.weaponSpeed = Math.round(ammoData.speed * 100) / 100;
+                  if (typeof ammoData.lifetime === 'number' && item.weaponSpeed && !item.weaponRange) {
+                    item.weaponRange = Math.round(ammoData.lifetime * item.weaponSpeed * 100) / 100;
+                  }
+                  const pp = ammoData.projectileParams;
+                  if (pp?.damage) {
+                    const dmg = pp.damage;
+                    const physical = typeof dmg.DamagePhysical === 'number' ? dmg.DamagePhysical : 0;
+                    const energy = typeof dmg.DamageEnergy === 'number' ? dmg.DamageEnergy : 0;
+                    const distortion = typeof dmg.DamageDistortion === 'number' ? dmg.DamageDistortion : 0;
+                    const total = physical + energy + distortion;
+                    if (total > 0) {
+                      item.weaponDamage = Math.round(total * 10000) / 10000;
+                      item.weaponDamageType =
+                        physical >= energy && physical >= distortion ? 'physical' : energy >= distortion ? 'energy' : 'distortion';
+                      extData.damagePhysical = Math.round(physical * 10000) / 10000;
+                      extData.damageEnergy = Math.round(energy * 10000) / 10000;
+                      extData.damageDistortion = Math.round(distortion * 10000) / 10000;
+                    }
                   }
                 }
+              } catch {
+                /* non-critical */
               }
-            } catch {
-              /* non-critical */
             }
           }
         }
