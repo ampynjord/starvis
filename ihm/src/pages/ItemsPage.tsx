@@ -11,7 +11,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
-import { useDebounce } from '@/hooks/useDebounce';
+import { useListQueryState } from '@/hooks/useListQueryState';
 
 const LIMIT = 30;
 
@@ -62,12 +62,10 @@ function buildModeCategories(rawTypes: string[], mode: 'fps' | 'other'): { label
 export default function ItemsPage() {
   const location = useLocation();
   const { env } = useEnv();
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
+  const { page, search, debouncedSearch, updateSearch, updatePageWithScroll, resetListState, setPage } = useListQueryState();
   const [manufacturer, setManufacturer] = useState('');
   const mode: 'fps' | 'other' = location.pathname.startsWith('/other-items') ? 'other' : 'fps';
   const [activeCategory, setActiveCategory] = useState('');
-  const debouncedSearch = useDebounce(search, 350);
 
   const { data: filters } = useQuery({
     queryKey: ['items.filters', env],
@@ -107,7 +105,7 @@ export default function ItemsPage() {
   const displayedData = data;
 
   const hasFilters = !!(manufacturer || debouncedSearch || (activeCategory && activeCategory !== categories[0]?.label));
-  const resetFilters = () => { setManufacturer(''); setSearch(''); setPage(1); setActiveCategory(categories[0]?.label ?? ''); };
+  const resetFilters = () => { resetListState(); setManufacturer(''); setActiveCategory(categories[0]?.label ?? ''); };
 
   const filterGroups = filters ? [
     { key: 'mfr', label: 'Manufacturer', options: (filters['manufacturers'] ?? []).map((m: string) => ({ label: m, value: m })), value: manufacturer, onChange: (v: string) => { setManufacturer(v); setPage(1); } },
@@ -131,7 +129,7 @@ export default function ItemsPage() {
         </div>
         <div className="relative w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={13} />
-          <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Search an item…" className="sci-input w-full pl-8 text-xs" />
+          <input type="text" value={search} onChange={e => updateSearch(e.target.value)} placeholder="Search an item…" className="sci-input w-full pl-8 text-xs" />
         </div>
       </div>
 
@@ -195,7 +193,7 @@ export default function ItemsPage() {
                   </motion.div>
                 ))}
               </div>
-              {data && <Pagination className="mt-6" page={data.page} totalPages={data.pages} onPageChange={p => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
+              {data && <Pagination className="mt-6" page={data.page} totalPages={data.pages} onPageChange={updatePageWithScroll} />}
             </>
           )}
         </div>

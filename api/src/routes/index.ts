@@ -12,7 +12,6 @@ import { mountShipMatrixRoutes } from './ship-matrix.js';
 import { mountShipRoutes } from './ships.js';
 import { mountShopRoutes } from './shops.js';
 import { mountSystemRoutes } from './system.js';
-import { mountTradeRoutes } from './trade.js';
 import type { RouteDependencies } from './types.js';
 
 export type { RouteDependencies } from './types.js';
@@ -30,7 +29,6 @@ const routeMounts = [
   mountMissionRoutes,
   mountSearchRoutes,
   mountSystemRoutes,
-  mountTradeRoutes,
   mountAdminRoutes,
 ] as const;
 
