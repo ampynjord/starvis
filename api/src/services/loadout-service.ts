@@ -19,6 +19,19 @@ const RELEVANT_TYPES = new Set([
   'QuantumInterdictionGenerator',
 ]);
 
+const SHIP_SELECT_WITH_DISPLAY =
+  'SELECT s.*, COALESCE(sm.name, s.name) as display_name FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id';
+const SHIP_BY_UUID_SQL = `${SHIP_SELECT_WITH_DISPLAY} WHERE s.uuid = ?`;
+const SHIP_BY_UUID_ENV_SQL = `${SHIP_SELECT_WITH_DISPLAY} WHERE s.uuid = ? AND s.game_env = ?`;
+const SHIP_MATRIX_DIMENSIONS_SQL = 'SELECT length, beam, height FROM ship_matrix WHERE id = ?';
+
+const LOADOUT_SELECT = `SELECT sl.id, sl.port_name, sl.port_type, sl.port_min_size, sl.port_max_size,
+        sl.parent_id, sl.component_uuid, sl.component_class_name, sl.port_editable,
+        c.*
+ FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid`;
+const LOADOUT_BY_SHIP_SQL = `${LOADOUT_SELECT} WHERE sl.ship_uuid = ?`;
+const LOADOUT_BY_SHIP_ENV_SQL = `${LOADOUT_SELECT} AND c.game_env = sl.game_env WHERE sl.ship_uuid = ? AND sl.game_env = ?`;
+
 function detectUtilityType(name: string, className: string): string {
   const s = `${name} ${className}`.toLowerCase();
   if (/mining|orion_mining/i.test(s)) return 'MiningLaser';
@@ -621,6 +634,37 @@ function aggregateLoadoutStatsInternal(loadout: Row[], ship: Row, crossX: number
 export class LoadoutService {
   constructor(private prisma: PrismaClient) {}
 
+  private async getShipRow(shipUuid: string, env?: string): Promise<Row | null> {
+    const rows = env
+      ? await this.prisma.$queryRawUnsafe<Row[]>(SHIP_BY_UUID_ENV_SQL, shipUuid, env)
+      : await this.prisma.$queryRawUnsafe<Row[]>(SHIP_BY_UUID_SQL, shipUuid);
+    return rows[0] ?? null;
+  }
+
+  private async resolveCrossSections(ship: Row): Promise<{ crossX: number; crossY: number; crossZ: number }> {
+    let crossX = num(ship.cross_section_x);
+    let crossY = num(ship.cross_section_y);
+    let crossZ = num(ship.cross_section_z);
+
+    if (crossX === 0 && crossY === 0 && crossZ === 0 && ship.ship_matrix_id) {
+      const smRows = await this.prisma.$queryRawUnsafe<Row[]>(SHIP_MATRIX_DIMENSIONS_SQL, ship.ship_matrix_id);
+      if (smRows.length) {
+        crossX = num(smRows[0].length);
+        crossY = num(smRows[0].beam);
+        crossZ = num(smRows[0].height);
+      }
+    }
+
+    return { crossX, crossY, crossZ };
+  }
+
+  private async getLoadoutRows(shipUuid: string, env?: string): Promise<Row[]> {
+    if (env) {
+      return this.prisma.$queryRawUnsafe<Row[]>(LOADOUT_BY_SHIP_ENV_SQL, shipUuid, env);
+    }
+    return this.prisma.$queryRawUnsafe<Row[]>(LOADOUT_BY_SHIP_SQL, shipUuid);
+  }
+
   // ── Read loadout / modules / paints ─────────────────────
 
   async getShipLoadout(shipUuid: string, env = 'live'): Promise<Row[]> {
@@ -687,38 +731,14 @@ export class LoadoutService {
     swaps: { portId?: number; portName?: string; componentUuid: string }[],
   ): Promise<Record<string, unknown>> {
     // 1. Load ship
-    const shipRows = await this.prisma.$queryRawUnsafe<Row[]>(
-      'SELECT s.*, COALESCE(sm.name, s.name) as display_name FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE s.uuid = ?',
-      shipUuid,
-    );
-    if (!shipRows.length) throw new Error('Ship not found');
-    const ship = shipRows[0];
+    const ship = await this.getShipRow(shipUuid);
+    if (!ship) throw new Error('Ship not found');
 
     // 2. Cross-section fallback
-    let crossX = num(ship.cross_section_x),
-      crossY = num(ship.cross_section_y),
-      crossZ = num(ship.cross_section_z);
-    if (crossX === 0 && crossY === 0 && crossZ === 0 && ship.ship_matrix_id) {
-      const smRows = await this.prisma.$queryRawUnsafe<Row[]>(
-        'SELECT length, beam, height FROM ship_matrix WHERE id = ?',
-        ship.ship_matrix_id,
-      );
-      if (smRows.length) {
-        crossX = num(smRows[0].length);
-        crossY = num(smRows[0].beam);
-        crossZ = num(smRows[0].height);
-      }
-    }
+    const { crossX, crossY, crossZ } = await this.resolveCrossSections(ship);
 
     // 3. Load ALL loadout ports
-    const loadoutRows = await this.prisma.$queryRawUnsafe<Row[]>(
-      `SELECT sl.id, sl.port_name, sl.port_type, sl.port_min_size, sl.port_max_size,
-              sl.parent_id, sl.component_uuid, sl.component_class_name, sl.port_editable,
-              c.*
-       FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
-       WHERE sl.ship_uuid = ?`,
-      shipUuid,
-    );
+    const loadoutRows = await this.getLoadoutRows(shipUuid);
     const loadout: Row[] = loadoutRows.map((row) => ({ ...row }) as Row);
 
     // 4. Apply swaps
@@ -819,38 +839,12 @@ export class LoadoutService {
   // ── Ship Stats (standalone, without loadout calculator overhead) ──
 
   async getShipStats(shipUuid: string, env = 'live'): Promise<Record<string, unknown> | null> {
-    const shipRows = await this.prisma.$queryRawUnsafe<Row[]>(
-      'SELECT s.*, COALESCE(sm.name, s.name) as display_name FROM ships s LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id WHERE s.uuid = ? AND s.game_env = ?',
-      shipUuid,
-      env,
-    );
-    if (!shipRows.length) return null;
-    const ship = shipRows[0];
+    const ship = await this.getShipRow(shipUuid, env);
+    if (!ship) return null;
 
-    let crossX = num(ship.cross_section_x),
-      crossY = num(ship.cross_section_y),
-      crossZ = num(ship.cross_section_z);
-    if (crossX === 0 && crossY === 0 && crossZ === 0 && ship.ship_matrix_id) {
-      const smRows = await this.prisma.$queryRawUnsafe<Row[]>(
-        'SELECT length, beam, height FROM ship_matrix WHERE id = ?',
-        ship.ship_matrix_id,
-      );
-      if (smRows.length) {
-        crossX = num(smRows[0].length);
-        crossY = num(smRows[0].beam);
-        crossZ = num(smRows[0].height);
-      }
-    }
+    const { crossX, crossY, crossZ } = await this.resolveCrossSections(ship);
 
-    const loadoutRows = await this.prisma.$queryRawUnsafe<Row[]>(
-      `SELECT sl.id, sl.port_name, sl.port_type, sl.port_min_size, sl.port_max_size,
-              sl.parent_id, sl.component_uuid, sl.component_class_name, sl.port_editable,
-              c.*
-       FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid AND c.game_env = sl.game_env
-       WHERE sl.ship_uuid = ? AND sl.game_env = ?`,
-      shipUuid,
-      env,
-    );
+    const loadoutRows = await this.getLoadoutRows(shipUuid, env);
 
     return {
       ship: { uuid: ship.uuid, name: ship.display_name || ship.name, class_name: ship.class_name },
@@ -864,15 +858,7 @@ export class LoadoutService {
     const shipRows = await this.prisma.$queryRawUnsafe<Row[]>('SELECT uuid FROM ships WHERE uuid = ? AND game_env = ?', shipUuid, env);
     if (!shipRows.length) return null;
 
-    const loadoutRows = await this.prisma.$queryRawUnsafe<Row[]>(
-      `SELECT sl.id, sl.port_name, sl.port_type, sl.port_min_size, sl.port_max_size,
-              sl.parent_id, sl.component_uuid, sl.component_class_name, sl.port_editable,
-              c.*
-       FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid AND c.game_env = sl.game_env
-       WHERE sl.ship_uuid = ? AND sl.game_env = ?`,
-      shipUuid,
-      env,
-    );
+    const loadoutRows = await this.getLoadoutRows(shipUuid, env);
 
     return this.buildHardpoints(loadoutRows as Row[]);
   }
