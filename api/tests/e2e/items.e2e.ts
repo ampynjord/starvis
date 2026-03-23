@@ -1,6 +1,18 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('Items API', () => {
+  test('GET /api/v1/items should return 400 on invalid query (search too long)', async ({ request }) => {
+    const tooLong = 'x'.repeat(201);
+    const response = await request.get(`/api/v1/items?search=${tooLong}`);
+    expect(response.status()).toBe(400);
+
+    const data = await response.json();
+    expect(data.success).toBe(false);
+    expect(data.error).toBe('Validation error');
+    expect(Array.isArray(data.details)).toBe(true);
+    expect(data.details.length).toBeGreaterThan(0);
+  });
+
   test('GET /api/v1/items should return paginated items', async ({ request }) => {
     const response = await request.get('/api/v1/items?page=1&limit=10');
     expect(response.status()).toBe(200);
