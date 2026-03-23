@@ -2,20 +2,43 @@
  * LoadoutService — Loadout calculator, hardpoint builder, stat aggregation
  */
 import type { PrismaClient } from '@prisma/client';
-import {
-  cleanName,
-  detectUtilityType,
-  int,
-  num,
-  type PaginatedResult,
-  RELEVANT_TYPES,
-  type Row,
-  r1,
-  r2,
-  r4,
-  r6,
-  UTILITY_WEAPON_RX,
-} from './shared.js';
+import { int, num, type PaginatedResult, type Row, r1, r2, r4, r6 } from './shared.js';
+
+const UTILITY_WEAPON_RX = /tractor|mining|salvage|repair|grin_tractor|grin_salvage/i;
+
+const RELEVANT_TYPES = new Set([
+  'WeaponGun',
+  'Shield',
+  'PowerPlant',
+  'Cooler',
+  'QuantumDrive',
+  'Countermeasure',
+  'Missile',
+  'Radar',
+  'EMP',
+  'QuantumInterdictionGenerator',
+]);
+
+function detectUtilityType(name: string, className: string): string {
+  const s = `${name} ${className}`.toLowerCase();
+  if (/mining|orion_mining/i.test(s)) return 'MiningLaser';
+  if (/salvage|reclaim/i.test(s)) return 'SalvageHead';
+  if (/tractor|grin_tractor/i.test(s)) return 'TractorBeam';
+  if (/repair/i.test(s)) return 'RepairBeam';
+  return 'UtilityWeapon';
+}
+
+function cleanName(name: string, type: string): string {
+  if (!name) return '—';
+  let c = name;
+  if (['Shield', 'QuantumDrive', 'PowerPlant', 'Cooler', 'Radar', 'Missile'].includes(type)) c = c.replace(/^S\d{2}\s+/, '');
+  if (type === 'Countermeasure') {
+    const m = c.match(/(CML\s+.+)/i);
+    if (m) c = m[1];
+  }
+  c = c.replace(/\s*SCItem.*$/i, '').replace(/\s*_Resist.*$/i, '');
+  return c.trim() || '—';
+}
 
 export class LoadoutService {
   constructor(private prisma: PrismaClient) {}

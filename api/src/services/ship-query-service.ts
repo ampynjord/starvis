@@ -2,16 +2,182 @@
  * ShipQueryService — Ship listing, search, filters, manufacturers
  */
 import type { PrismaClient } from '@prisma/client';
-import {
-  CONCEPT_SELECT,
-  convertBigIntToNumber,
-  num,
-  type PaginatedResult,
-  type Row,
-  SHIP_JOINS,
-  SHIP_SELECT,
-  SHIP_SORT,
-} from './shared.js';
+import { convertBigIntToNumber, num, type PaginatedResult, type Row } from './shared.js';
+
+// prettier-ignore
+const SHIP_SELECT = [
+  // Identity
+  's.uuid',
+  's.class_name',
+  'COALESCE(sm.name, s.name) as name',
+  's.manufacturer_code',
+  'm.name as manufacturer_name',
+  // Role & career
+  's.career',
+  's.role',
+  // Physical
+  's.mass',
+  's.total_hp',
+  's.size_x',
+  's.size_y',
+  's.size_z',
+  // Flight
+  's.scm_speed',
+  's.max_speed',
+  's.boost_speed_forward',
+  's.boost_speed_backward',
+  's.pitch_max',
+  's.yaw_max',
+  's.roll_max',
+  's.boost_ramp_up',
+  's.boost_ramp_down',
+  // Resources
+  's.hydrogen_fuel_capacity',
+  's.quantum_fuel_capacity',
+  's.cargo_capacity',
+  's.crew_size',
+  's.shield_hp',
+  // Combat
+  's.missile_damage_total',
+  's.weapon_damage_total',
+  // Armor & signals
+  's.armor_physical',
+  's.armor_energy',
+  's.armor_distortion',
+  's.armor_hp',
+  's.armor_phys_resist',
+  's.armor_energy_resist',
+  's.armor_signal_ir',
+  's.armor_signal_em',
+  's.armor_signal_cs',
+  's.fuse_penetration',
+  's.component_penetration',
+  // Cross sections
+  's.cross_section_x',
+  's.cross_section_y',
+  's.cross_section_z',
+  // Ship Matrix / media
+  's.ship_matrix_id',
+  'sm.media_store_small as thumbnail',
+  'sm.media_store_large as thumbnail_large',
+  'sm.production_status',
+  'sm.description as sm_description',
+  'sm.url as store_url',
+  'sm.cargocapacity as sm_cargo',
+  'sm.min_crew',
+  'sm.max_crew',
+  // Meta
+  's.vehicle_category',
+  's.insurance_claim_time',
+  's.insurance_expedite_cost',
+  's.short_name',
+  's.variant_type',
+  's.chassis_id',
+  's.game_data',
+].join(', ');
+
+// prettier-ignore
+const CONCEPT_SELECT = [
+  // Identity (derived from ship_matrix alias sm2)
+  "CONCAT('concept-', sm2.id) as uuid",
+  "LOWER(REPLACE(REPLACE(sm2.name, ' ', '_'), '''', '')) as class_name",
+  'sm2.name',
+  'sm2.manufacturer_code',
+  'sm2.manufacturer_name as manufacturer_name',
+  // Role & career (no game data)
+  'NULL as career',
+  'NULL as role',
+  // Physical
+  'sm2.mass',
+  'NULL as total_hp',
+  'NULL as size_x',
+  'NULL as size_y',
+  'NULL as size_z',
+  // Flight
+  'sm2.scm_speed',
+  'sm2.afterburner_speed as max_speed',
+  'NULL as boost_speed_forward',
+  'NULL as boost_speed_backward',
+  'sm2.pitch_max',
+  'sm2.yaw_max',
+  'sm2.roll_max',
+  'NULL as boost_ramp_up',
+  'NULL as boost_ramp_down',
+  // Resources
+  'NULL as hydrogen_fuel_capacity',
+  'NULL as quantum_fuel_capacity',
+  'sm2.cargocapacity as cargo_capacity',
+  'sm2.min_crew as crew_size',
+  'NULL as shield_hp',
+  // Combat
+  'NULL as missile_damage_total',
+  'NULL as weapon_damage_total',
+  // Armor & signals
+  'NULL as armor_physical',
+  'NULL as armor_energy',
+  'NULL as armor_distortion',
+  'NULL as armor_hp',
+  'NULL as armor_phys_resist',
+  'NULL as armor_energy_resist',
+  'NULL as armor_signal_ir',
+  'NULL as armor_signal_em',
+  'NULL as armor_signal_cs',
+  'NULL as fuse_penetration',
+  'NULL as component_penetration',
+  // Cross sections
+  'NULL as cross_section_x',
+  'NULL as cross_section_y',
+  'NULL as cross_section_z',
+  // Ship Matrix / media
+  'sm2.id as ship_matrix_id',
+  'sm2.media_store_small as thumbnail',
+  'sm2.media_store_large as thumbnail_large',
+  'sm2.production_status',
+  'sm2.description as sm_description',
+  'sm2.url as store_url',
+  'sm2.cargocapacity as sm_cargo',
+  'sm2.min_crew',
+  'sm2.max_crew',
+  // Meta
+  'NULL as vehicle_category',
+  'NULL as insurance_claim_time',
+  'NULL as insurance_expedite_cost',
+  'NULL as short_name',
+  'NULL as variant_type',
+  'sm2.chassis_id',
+  'NULL as game_data',
+].join(', ');
+
+const SHIP_JOINS = `FROM ships s
+  LEFT JOIN manufacturers m ON s.manufacturer_code = m.code
+  LEFT JOIN ship_matrix sm ON s.ship_matrix_id = sm.id`;
+
+const SHIP_SORT = new Set([
+  'name',
+  'class_name',
+  'manufacturer_code',
+  'mass',
+  'scm_speed',
+  'max_speed',
+  'total_hp',
+  'shield_hp',
+  'crew_size',
+  'cargo_capacity',
+  'missile_damage_total',
+  'weapon_damage_total',
+  'armor_physical',
+  'armor_energy',
+  'armor_distortion',
+  'cross_section_x',
+  'cross_section_y',
+  'cross_section_z',
+  'hydrogen_fuel_capacity',
+  'quantum_fuel_capacity',
+  'boost_speed_forward',
+  'pitch_max',
+  'yaw_max',
+  'roll_max',
+]);
 
 export class ShipQueryService {
   constructor(private prisma: PrismaClient) {}
