@@ -40,6 +40,584 @@ function cleanName(name: string, type: string): string {
   return c.trim() || '—';
 }
 
+const PORT_CATEGORY_MAP: Record<string, string> = {
+  WeaponGun: 'Weapons',
+  Weapon: 'Weapons',
+  Gimbal: 'Weapons',
+  Turret: 'Turrets',
+  TurretBase: 'Turrets',
+  MissileRack: 'Missiles',
+  Missile: 'Missiles',
+  MissileLauncher: 'Missiles',
+  Shield: 'Shields',
+  ShieldGenerator: 'Shields',
+  PowerPlant: 'Power Plants',
+  Cooler: 'Coolers',
+  QuantumDrive: 'Quantum Drive',
+  Radar: 'Radar',
+  EMP: 'EMP',
+  QuantumInterdictionGenerator: 'QED',
+  Countermeasure: 'Countermeasures',
+  MiningLaser: 'Mining',
+  SalvageHead: 'Salvage',
+  TractorBeam: 'Tractor',
+  RepairBeam: 'Repair',
+};
+
+const CAT_ORDER: Record<string, number> = {
+  Weapons: 1,
+  Turrets: 2,
+  Missiles: 3,
+  Shields: 4,
+  'Power Plants': 5,
+  Coolers: 6,
+  'Quantum Drive': 7,
+  Radar: 8,
+  EMP: 9,
+  QED: 10,
+  Countermeasures: 11,
+  Mining: 12,
+  Salvage: 13,
+  Tractor: 14,
+  Repair: 15,
+};
+
+function portCategory(portType: string): string {
+  return PORT_CATEGORY_MAP[portType] || 'Other';
+}
+
+function cleanPortName(name: string): string {
+  return name
+    .replace(/^hardpoint_/i, '')
+    .replace(/^Hardpoint_/i, '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function buildComponentInfo(row: Row, childMap: Map<number, Row[]>): Record<string, unknown> {
+  const type = String(row.type || row.port_type || '');
+  const isUtility = type === 'WeaponGun' && UTILITY_WEAPON_RX.test(String(row.name || row.class_name || ''));
+  const effectiveType = isUtility ? detectUtilityType(row.name || '', row.class_name || '') : type;
+
+  const isMountItem = !row.component_uuid && row.component_class_name;
+  const portDisplayName = cleanPortName(String(row.port_name || ''));
+  const mountSize = isMountItem ? (String(row.component_class_name).match(/[Ss](\d+)/) || [])[1] : null;
+
+  const subChildren = childMap.get(Number(row.id)) || [];
+  const relevantSubChildren = subChildren.filter((c) => {
+    const cn = String(c.port_name || '');
+    if (cn.startsWith('Screen_') || cn.startsWith('Display_') || cn.startsWith('Annunciator')) return false;
+    if (cn.includes('_MFD') || cn.includes('dashboard') || cn.includes('HUD')) return false;
+    return c.component_uuid || c.type || c.component_class_name;
+  });
+  const subItems = relevantSubChildren.map((c) => {
+    const cIsMountItem = !c.component_uuid && c.component_class_name;
+    const cMountSize = cIsMountItem ? (String(c.component_class_name).match(/[Ss](\d+)/) || [])[1] : null;
+    const cType = String(c.type || c.port_type || '');
+    return {
+      port_id: c.id,
+      port_name: c.port_name,
+      port_max_size: int(c.port_max_size) || null,
+      port_min_size: int(c.port_min_size) || null,
+      uuid: c.component_uuid || null,
+      name: c.name || null,
+      display_name: c.name ? cleanName(c.name || '', cType) : cleanPortName(String(c.port_name || '')),
+      type: cType,
+      sub_type: c.sub_type || null,
+      size: int(c.size) || (cMountSize ? parseInt(cMountSize, 10) : null),
+      grade: c.grade || null,
+      manufacturer_code: c.manufacturer_code || null,
+      hp: r2(num(c.hp)) || null,
+      ...(cType === 'WeaponGun' && {
+        weapon_dps: r2(num(c.weapon_dps)) || null,
+        weapon_burst_dps: r2(num(c.weapon_burst_dps)) || null,
+        weapon_sustained_dps: r2(num(c.weapon_sustained_dps)) || null,
+        weapon_fire_rate: r2(num(c.weapon_fire_rate)) || null,
+        weapon_range: Math.round(num(c.weapon_range)) || null,
+        power_draw: r2(num(c.power_draw)) || null,
+      }),
+      ...(cType === 'Missile' && {
+        missile_damage: r2(num(c.missile_damage)) || null,
+        missile_signal_type: c.missile_signal_type || null,
+        missile_speed: r2(num(c.missile_speed)) || null,
+        missile_range: Math.round(num(c.missile_range)) || null,
+      }),
+      ...(cType !== 'WeaponGun' &&
+        cType !== 'Missile' && {
+          weapon_dps: num(c.weapon_dps) || null,
+          weapon_range: num(c.weapon_range) || null,
+          missile_damage: num(c.missile_damage) || null,
+        }),
+      swapped: !!c._swapped,
+    };
+  });
+
+  return {
+    port_id: row.id,
+    port_name: row.port_name,
+    uuid: row.component_uuid || null,
+    name: row.name || null,
+    display_name: row.name ? cleanName(row.name || '', type) : portDisplayName,
+    type: effectiveType,
+    size: int(row.size) || (mountSize ? parseInt(mountSize, 10) : null),
+    port_max_size: int(row.port_max_size) || null,
+    port_min_size: int(row.port_min_size) || null,
+    grade: row.grade || null,
+    manufacturer_code: row.manufacturer_code || null,
+    hp: r2(num(row.hp)) || null,
+    power_draw: r2(num(row.power_draw)) || null,
+    heat_generation: r2(num(row.heat_generation)) || null,
+    ...(type === 'WeaponGun' &&
+      !isUtility && {
+        weapon_dps: r2(num(row.weapon_dps)) || null,
+        weapon_burst_dps: r2(num(row.weapon_burst_dps)) || null,
+        weapon_sustained_dps: r2(num(row.weapon_sustained_dps)) || null,
+        weapon_fire_rate: r2(num(row.weapon_fire_rate)) || null,
+        weapon_range: Math.round(num(row.weapon_range)) || null,
+        weapon_damage_physical: r2(num(row.weapon_damage_physical)) || null,
+        weapon_damage_energy: r2(num(row.weapon_damage_energy)) || null,
+        weapon_damage_distortion: r2(num(row.weapon_damage_distortion)) || null,
+      }),
+    ...(isUtility && { weapon_dps: r2(num(row.weapon_dps)) || null, weapon_range: Math.round(num(row.weapon_range)) || null }),
+    ...(type === 'Shield' && { shield_hp: r2(num(row.shield_hp)) || null, shield_regen: r2(num(row.shield_regen)) || null }),
+    ...(type === 'PowerPlant' && { power_output: r2(num(row.power_output)) || null }),
+    ...(type === 'Cooler' && { cooling_rate: r2(num(row.cooling_rate)) || null }),
+    ...(type === 'QuantumDrive' && {
+      qd_speed: r2(num(row.qd_speed)) || null,
+      qd_spool_time: r2(num(row.qd_spool_time)) || null,
+      qd_cooldown: r2(num(row.qd_cooldown)) || null,
+      qd_fuel_rate: r2(num(row.qd_fuel_rate)) || null,
+      qd_range: r2(num(row.qd_range)) || null,
+    }),
+    ...(type === 'Missile' && {
+      missile_damage: r2(num(row.missile_damage)) || null,
+      missile_signal_type: row.missile_signal_type || null,
+      missile_speed: r2(num(row.missile_speed)) || null,
+      missile_range: Math.round(num(row.missile_range)) || null,
+      missile_lock_time: r2(num(row.missile_lock_time)) || null,
+    }),
+    ...(type === 'Countermeasure' && { cm_ammo: int(row.cm_ammo_count) || null }),
+    ...(type === 'Radar' && { radar_range: r2(num(row.radar_range)) || null }),
+    ...(type === 'EMP' && { emp_damage: r2(num(row.emp_damage)) || null, emp_radius: r2(num(row.emp_radius)) || null }),
+    ...(type === 'QuantumInterdictionGenerator' && {
+      qig_jammer_range: r2(num(row.qig_jammer_range)) || null,
+      qig_snare_radius: r2(num(row.qig_snare_radius)) || null,
+    }),
+    sub_items: subItems.length ? subItems : undefined,
+    swapped: !!row._swapped,
+  };
+}
+
+function buildHardpoints(loadout: Row[]): Record<string, unknown>[] {
+  const childMap = new Map<number, Row[]>();
+  const rootPorts: Row[] = [];
+
+  for (const port of loadout) {
+    if (port.parent_id != null && port.parent_id !== 0) {
+      const pid = Number(port.parent_id);
+      if (!childMap.has(pid)) childMap.set(pid, []);
+      childMap.get(pid)!.push(port);
+    } else {
+      rootPorts.push(port);
+    }
+  }
+
+  const RELEVANT_ROOT = new Set([
+    'Gimbal',
+    'Turret',
+    'TurretBase',
+    'MissileRack',
+    'WeaponGun',
+    'Weapon',
+    'Shield',
+    'PowerPlant',
+    'Cooler',
+    'QuantumDrive',
+    'Radar',
+    'Countermeasure',
+    'EMP',
+    'QuantumInterdictionGenerator',
+    'WeaponRack',
+  ]);
+  const MOUNT_PORT_TYPES = new Set(['Gimbal', 'Turret', 'TurretBase', 'MissileRack', 'WeaponRack']);
+  const SKIP_TYPES = new Set(['FuelTank', 'FuelIntake', 'FlightController', 'HydrogenFuelTank', 'QuantumFuelTank']);
+
+  const hardpoints: Record<string, unknown>[] = [];
+
+  for (const root of rootPorts) {
+    const portType = String(root.port_type || '');
+    const portName = String(root.port_name || '');
+    const allChildren = childMap.get(Number(root.id)) || [];
+
+    if (portName.includes('controller') || portName.endsWith('_helper')) continue;
+    if (portName.includes('seat') || portName.includes('dashboard')) continue;
+    if (portName.includes('paint') || portName.includes('self_destruct')) continue;
+    if (portName.includes('landing') || portName.includes('relay')) continue;
+
+    const children = allChildren.filter((c) => {
+      const cn = String(c.port_name || '');
+      if (cn.startsWith('Screen_') || cn.startsWith('Display_') || cn.startsWith('Annunciator')) return false;
+      if (cn.includes('_MFD') || cn.includes('dashboard') || cn.includes('HUD')) return false;
+      const cpt = String(c.port_type || '');
+      return (c.component_uuid && c.type) || RELEVANT_ROOT.has(cpt) || c.component_class_name;
+    });
+
+    const hasRelevantChildren = children.length > 0;
+    if (!RELEVANT_ROOT.has(portType) && !hasRelevantChildren) continue;
+
+    let mountType: string | null = null;
+    let mountSize: number | null = null;
+    const compCls = String(root.component_class_name || '');
+
+    if (MOUNT_PORT_TYPES.has(portType)) {
+      if (/turret/i.test(compCls) || portType === 'Turret' || portType === 'TurretBase') mountType = 'Turret';
+      else if (/gimbal/i.test(compCls)) mountType = 'Gimbal';
+      else if (/fixed/i.test(compCls)) mountType = 'Fixed';
+      else if (/mrck|missilerack/i.test(compCls) || portType === 'MissileRack') mountType = 'Rack';
+      else mountType = portType === 'Turret' || portType === 'TurretBase' ? 'Turret' : portType === 'MissileRack' ? 'Rack' : 'Gimbal';
+
+      const sizeMatch = compCls.match(/[Ss](\d+)/);
+      if (sizeMatch) mountSize = parseInt(sizeMatch[1], 10);
+    }
+
+    const componentType = String(root.type || '');
+    if (SKIP_TYPES.has(componentType)) continue;
+
+    let category: string;
+    if (componentType && portCategory(componentType) !== 'Other') {
+      category = portCategory(componentType);
+    } else {
+      category = portCategory(portType);
+    }
+
+    if (hasRelevantChildren && MOUNT_PORT_TYPES.has(portType)) {
+      const childCompTypes = children.map((c) => String(c.type || '')).filter(Boolean);
+      if (childCompTypes.length > 0) {
+        const childCat = portCategory(childCompTypes[0]);
+        if (childCat !== 'Other') {
+          if (childCompTypes.every((t) => t === 'EMP')) category = 'EMP';
+        }
+      }
+    }
+
+    if (category === 'Other' && hasRelevantChildren) {
+      const firstChildType = String(children.find((c) => c.type)?.type || children.find((c) => c.port_type)?.port_type || '');
+      category = portCategory(firstChildType);
+    }
+    if (category === 'Other') continue;
+
+    const componentTypeStr = componentType || String(root.type || '');
+    const isRootUtility =
+      (componentTypeStr === 'WeaponGun' || root.type === 'WeaponGun') && UTILITY_WEAPON_RX.test(String(root.name || root.class_name || ''));
+    if (isRootUtility) {
+      category = portCategory(detectUtilityType(root.name || '', root.class_name || ''));
+    }
+
+    const effectiveMaxSize = int(root.port_max_size) || mountSize || int(root.size) || null;
+    const items = children.map((c) => buildComponentInfo(c, childMap));
+
+    if (hasRelevantChildren || (mountType && children.length > 0)) {
+      const rootComponent = mountType === null && root.component_uuid ? buildComponentInfo(root, new Map()) : null;
+      hardpoints.push({
+        port_id: root.id,
+        port_name: portName,
+        display_name: cleanPortName(portName),
+        category,
+        port_min_size: int(root.port_min_size) || null,
+        port_max_size: effectiveMaxSize,
+        mount_type: mountType,
+        mount_class_name: compCls || null,
+        mount_size: mountSize,
+        component: rootComponent,
+        items,
+        swapped: !!root._swapped,
+      });
+    } else if (root.component_uuid && (root.type || componentType)) {
+      hardpoints.push({
+        port_id: root.id,
+        port_name: portName,
+        display_name: cleanPortName(portName),
+        category,
+        port_min_size: int(root.port_min_size) || null,
+        port_max_size: effectiveMaxSize,
+        mount_type: null,
+        mount_class_name: null,
+        mount_size: null,
+        component: buildComponentInfo(root, childMap),
+        items: [],
+        swapped: !!root._swapped,
+      });
+    }
+  }
+
+  hardpoints.sort((a, b) => {
+    const orderA = CAT_ORDER[a.category as string] || 99;
+    const orderB = CAT_ORDER[b.category as string] || 99;
+    if (orderA !== orderB) return orderA - orderB;
+    return (a.port_name as string).localeCompare(b.port_name as string);
+  });
+
+  return hardpoints;
+}
+
+function aggregateLoadoutStatsInternal(loadout: Row[], ship: Row, crossX: number, crossY: number, crossZ: number): Record<string, unknown> {
+  let totalDps = 0,
+    totalBurstDps = 0,
+    totalSustainedDps = 0;
+  let totalShieldHp = 0,
+    totalShieldRegen = 0;
+  let totalPowerDraw = 0,
+    totalPowerOutput = 0;
+  let totalHeatGen = 0,
+    totalCoolingRate = 0;
+  let totalMissileDmg = 0;
+  let weaponCount = 0,
+    shieldCount = 0,
+    missileCount = 0;
+  let qdSpeed = 0,
+    qdSpoolTime = 0,
+    qdCooldown = 0,
+    qdFuelRate = 0;
+  let qdRange = 0,
+    qdTuningRate = 0,
+    qdAlignmentRate = 0,
+    qdDisconnectRange = 0,
+    qdName = '';
+
+  const weapons: Record<string, unknown>[] = [],
+    shields: Record<string, unknown>[] = [],
+    missiles: Record<string, unknown>[] = [];
+  const powerPlants: Record<string, unknown>[] = [],
+    coolers: Record<string, unknown>[] = [];
+  const cms: Record<string, unknown>[] = [],
+    emps: Record<string, unknown>[] = [],
+    qigs: Record<string, unknown>[] = [];
+  const utilityWeapons: Record<string, unknown>[] = [];
+  let cmFlare = 0,
+    cmChaff = 0;
+
+  for (const l of loadout) {
+    if (!l.component_uuid) continue;
+
+    if (l.type === 'WeaponGun') {
+      if (UTILITY_WEAPON_RX.test(l.name || '') || UTILITY_WEAPON_RX.test(l.class_name || '')) {
+        const uType = detectUtilityType(l.name || '', l.class_name || '');
+        utilityWeapons.push({
+          port_name: l.port_name,
+          name: l.name || '—',
+          size: int(l.size),
+          utility_type: uType,
+          dps: r2(num(l.weapon_dps)),
+          damage: r2(num(l.weapon_damage)),
+          fire_rate: r2(num(l.weapon_fire_rate)),
+          range: Math.round(num(l.weapon_range)),
+        });
+        continue;
+      }
+      const dps = num(l.weapon_dps);
+      if (dps === 0) continue;
+      totalDps += dps;
+      totalBurstDps += num(l.weapon_burst_dps);
+      totalSustainedDps += num(l.weapon_sustained_dps);
+      weaponCount++;
+      weapons.push({
+        port_name: l.port_name,
+        name: l.name || '—',
+        size: int(l.size),
+        grade: l.grade || '—',
+        manufacturer: l.manufacturer_code || '',
+        dps: r2(dps),
+        alpha: r2(num(l.weapon_damage)),
+        fire_rate: r2(num(l.weapon_fire_rate)),
+        range: Math.round(num(l.weapon_range)),
+        dmg_physical: r2(num(l.weapon_damage_physical)),
+        dmg_energy: r2(num(l.weapon_damage_energy)),
+        dmg_distortion: r2(num(l.weapon_damage_distortion)),
+      });
+    }
+    if (l.type === 'Shield') {
+      const hp = num(l.shield_hp),
+        regen = num(l.shield_regen);
+      totalShieldHp += hp;
+      totalShieldRegen += regen;
+      shieldCount++;
+      shields.push({
+        port_name: l.port_name,
+        name: cleanName(l.name, 'Shield'),
+        size: int(l.size),
+        grade: l.grade || '—',
+        manufacturer: l.manufacturer_code || '',
+        hp: r2(hp),
+        regen: r2(regen),
+        regen_delay: r2(num(l.shield_regen_delay)),
+        hardening: r4(num(l.shield_hardening)),
+        time_to_charge: regen > 0 ? r1(hp / regen) : 0,
+      });
+    }
+    if (l.type === 'Missile' || l.type === 'WeaponMissile') {
+      const dmg = num(l.missile_damage);
+      totalMissileDmg += dmg;
+      missileCount++;
+      missiles.push({
+        port_name: l.port_name,
+        name: cleanName(l.name, 'Missile'),
+        size: int(l.size),
+        damage: r2(dmg),
+        speed: r2(num(l.missile_speed)),
+        range: r2(num(l.missile_range)),
+        lock_time: r2(num(l.missile_lock_time)),
+        lock_signal: l.missile_signal_type || '',
+        dmg_physical: r2(num(l.missile_damage_physical)),
+        dmg_energy: r2(num(l.missile_damage_energy)),
+        dmg_distortion: r2(num(l.missile_damage_distortion)),
+      });
+    }
+    if (l.type === 'QuantumDrive') {
+      qdSpeed = num(l.qd_speed);
+      qdSpoolTime = num(l.qd_spool_time);
+      qdCooldown = num(l.qd_cooldown);
+      qdFuelRate = num(l.qd_fuel_rate);
+      qdRange = num(l.qd_range);
+      qdTuningRate = num(l.qd_tuning_rate);
+      qdAlignmentRate = num(l.qd_alignment_rate);
+      qdDisconnectRange = num(l.qd_disconnect_range);
+      qdName = l.name || '';
+    }
+    if (l.type === 'EMP') {
+      emps.push({
+        port_name: l.port_name,
+        name: cleanName(l.name, 'EMP'),
+        size: int(l.size),
+        damage: r2(num(l.emp_damage)),
+        radius: r2(num(l.emp_radius)),
+        charge_time: r2(num(l.emp_charge_time)),
+        cooldown: r2(num(l.emp_cooldown)),
+      });
+    }
+    if (l.type === 'QuantumInterdictionGenerator') {
+      qigs.push({
+        port_name: l.port_name,
+        name: cleanName(l.name, 'QuantumInterdictionGenerator'),
+        size: int(l.size),
+        jammer_range: r2(num(l.qig_jammer_range)),
+        snare_radius: r2(num(l.qig_snare_radius)),
+        charge_time: r2(num(l.qig_charge_time)),
+        cooldown: r2(num(l.qig_cooldown)),
+      });
+    }
+    if (l.type === 'PowerPlant') {
+      const o = num(l.power_output);
+      totalPowerOutput += o;
+      powerPlants.push({
+        port_name: l.port_name,
+        name: cleanName(l.name, 'PowerPlant'),
+        size: int(l.size),
+        grade: l.grade || '—',
+        manufacturer: l.manufacturer_code || '',
+        output: r2(o),
+      });
+    }
+    if (l.type === 'Cooler') {
+      const c = num(l.cooling_rate);
+      totalCoolingRate += c;
+      coolers.push({
+        port_name: l.port_name,
+        name: cleanName(l.name, 'Cooler'),
+        size: int(l.size),
+        grade: l.grade || '—',
+        manufacturer: l.manufacturer_code || '',
+        cooling_rate: r2(c),
+      });
+    }
+    if (l.type === 'Countermeasure') {
+      const ammo = int(l.cm_ammo_count);
+      const isFlare = /flare|decoy/i.test(l.name || ''),
+        isChaff = /chaff|noise/i.test(l.name || '');
+      if (isFlare) cmFlare += ammo;
+      if (isChaff) cmChaff += ammo;
+      cms.push({
+        port_name: l.port_name,
+        name: cleanName(l.name, 'Countermeasure'),
+        type: isFlare ? 'Flare' : isChaff ? 'Chaff' : 'Other',
+        ammo_count: ammo,
+      });
+    }
+    totalPowerDraw += num(l.power_draw);
+    totalHeatGen += num(l.heat_generation);
+  }
+
+  const hullHp = num(ship.total_hp);
+  const armorPhys = num(ship.armor_physical) || 1;
+  const armorEnergy = num(ship.armor_energy) || 1;
+  const avgArmor = (armorPhys + armorEnergy) / 2;
+  const ehp = avgArmor > 0 ? r2(totalShieldHp + hullHp / avgArmor) : totalShieldHp + hullHp;
+
+  return {
+    weapons: {
+      count: weaponCount,
+      total_dps: r2(totalDps),
+      total_burst_dps: r2(totalBurstDps),
+      total_sustained_dps: r2(totalSustainedDps),
+      details: weapons,
+    },
+    shields: {
+      count: shieldCount,
+      total_hp: r2(totalShieldHp),
+      total_regen: r2(totalShieldRegen),
+      time_to_charge: totalShieldRegen > 0 ? r1(totalShieldHp / totalShieldRegen) : 0,
+      details: shields,
+    },
+    missiles: { count: missileCount, total_damage: r2(totalMissileDmg), details: missiles },
+    power: {
+      total_draw: r2(totalPowerDraw),
+      total_output: r2(totalPowerOutput),
+      balance: r2(totalPowerOutput - totalPowerDraw),
+      details: powerPlants,
+    },
+    thermal: {
+      total_heat_generation: r2(totalHeatGen),
+      total_cooling_rate: r2(totalCoolingRate),
+      balance: r2(totalCoolingRate - totalHeatGen),
+      details: coolers,
+    },
+    quantum: {
+      drive_name: cleanName(qdName, 'QuantumDrive'),
+      speed: r2(qdSpeed),
+      spool_time: r2(qdSpoolTime),
+      cooldown: r2(qdCooldown),
+      fuel_rate: r6(qdFuelRate),
+      range: r2(qdRange),
+      tuning_rate: r4(qdTuningRate),
+      alignment_rate: r4(qdAlignmentRate),
+      disconnect_range: r2(qdDisconnectRange),
+      fuel_capacity: num(ship.quantum_fuel_capacity),
+    },
+    countermeasures: { flare_count: cmFlare, chaff_count: cmChaff, details: cms },
+    emp: { count: emps.length, details: emps },
+    quantum_interdiction: { count: qigs.length, details: qigs },
+    utility: { count: utilityWeapons.length, details: utilityWeapons },
+    signatures: { ir: num(ship.armor_signal_ir), em: num(ship.armor_signal_em), cs: num(ship.armor_signal_cs) },
+    armor: {
+      physical: num(ship.armor_physical),
+      energy: num(ship.armor_energy),
+      distortion: num(ship.armor_distortion),
+      thermal: num(ship.armor_thermal),
+    },
+    mobility: {
+      scm_speed: num(ship.scm_speed),
+      max_speed: num(ship.max_speed),
+      boost_forward: num(ship.boost_speed_forward),
+      boost_backward: num(ship.boost_speed_backward),
+      pitch: num(ship.pitch_max),
+      yaw: num(ship.yaw_max),
+      roll: num(ship.roll_max),
+      mass: num(ship.mass),
+    },
+    fuel: { hydrogen: num(ship.hydrogen_fuel_capacity), quantum: num(ship.quantum_fuel_capacity) },
+    hull: { total_hp: hullHp, ehp, cross_section_x: crossX, cross_section_y: crossY, cross_section_z: crossZ },
+  };
+}
+
 export class LoadoutService {
   constructor(private prisma: PrismaClient) {}
 
@@ -299,592 +877,14 @@ export class LoadoutService {
     return this.buildHardpoints(loadoutRows as Row[]);
   }
 
-  // ── Hardpoint category mapping ──────────────────────────
-
-  private portCategory(portType: string): string {
-    const map: Record<string, string> = {
-      WeaponGun: 'Weapons',
-      Weapon: 'Weapons',
-      Gimbal: 'Weapons',
-      Turret: 'Turrets',
-      TurretBase: 'Turrets',
-      MissileRack: 'Missiles',
-      Missile: 'Missiles',
-      MissileLauncher: 'Missiles',
-      Shield: 'Shields',
-      ShieldGenerator: 'Shields',
-      PowerPlant: 'Power Plants',
-      Cooler: 'Coolers',
-      QuantumDrive: 'Quantum Drive',
-      Radar: 'Radar',
-      EMP: 'EMP',
-      QuantumInterdictionGenerator: 'QED',
-      Countermeasure: 'Countermeasures',
-      MiningLaser: 'Mining',
-      SalvageHead: 'Salvage',
-      TractorBeam: 'Tractor',
-      RepairBeam: 'Repair',
-    };
-    return map[portType] || 'Other';
-  }
-
-  private static readonly CAT_ORDER: Record<string, number> = {
-    Weapons: 1,
-    Turrets: 2,
-    Missiles: 3,
-    Shields: 4,
-    'Power Plants': 5,
-    Coolers: 6,
-    'Quantum Drive': 7,
-    Radar: 8,
-    EMP: 9,
-    QED: 10,
-    Countermeasures: 11,
-    Mining: 12,
-    Salvage: 13,
-    Tractor: 14,
-    Repair: 15,
-  };
-
-  // ── Build Erkul-style hierarchical hardpoints ───────────
+  // ── Hardpoint/stats wrappers (logic extracted at module-level) ──
 
   private buildHardpoints(loadout: Row[]): Record<string, unknown>[] {
-    const childMap = new Map<number, Row[]>();
-    const rootPorts: Row[] = [];
-
-    for (const port of loadout) {
-      if (port.parent_id != null && port.parent_id !== 0) {
-        const pid = Number(port.parent_id);
-        if (!childMap.has(pid)) childMap.set(pid, []);
-        childMap.get(pid)!.push(port);
-      } else {
-        rootPorts.push(port);
-      }
-    }
-
-    const RELEVANT_ROOT = new Set([
-      'Gimbal',
-      'Turret',
-      'TurretBase',
-      'MissileRack',
-      'WeaponGun',
-      'Weapon',
-      'Shield',
-      'PowerPlant',
-      'Cooler',
-      'QuantumDrive',
-      'Radar',
-      'Countermeasure',
-      'EMP',
-      'QuantumInterdictionGenerator',
-      'WeaponRack',
-    ]);
-    const MOUNT_PORT_TYPES = new Set(['Gimbal', 'Turret', 'TurretBase', 'MissileRack', 'WeaponRack']);
-    const SKIP_TYPES = new Set(['FuelTank', 'FuelIntake', 'FlightController', 'HydrogenFuelTank', 'QuantumFuelTank']);
-
-    const hardpoints: Record<string, unknown>[] = [];
-
-    for (const root of rootPorts) {
-      const portType = String(root.port_type || '');
-      const portName = String(root.port_name || '');
-      const allChildren = childMap.get(Number(root.id)) || [];
-
-      if (portName.includes('controller') || portName.endsWith('_helper')) continue;
-      if (portName.includes('seat') || portName.includes('dashboard')) continue;
-      if (portName.includes('paint') || portName.includes('self_destruct')) continue;
-      if (portName.includes('landing') || portName.includes('relay')) continue;
-
-      const children = allChildren.filter((c) => {
-        const cn = String(c.port_name || '');
-        if (cn.startsWith('Screen_') || cn.startsWith('Display_') || cn.startsWith('Annunciator')) return false;
-        if (cn.includes('_MFD') || cn.includes('dashboard') || cn.includes('HUD')) return false;
-        const cpt = String(c.port_type || '');
-        return (c.component_uuid && c.type) || RELEVANT_ROOT.has(cpt) || c.component_class_name;
-      });
-
-      const hasRelevantChildren = children.length > 0;
-      if (!RELEVANT_ROOT.has(portType) && !hasRelevantChildren) continue;
-
-      let mountType: string | null = null;
-      let mountSize: number | null = null;
-      const compCls = String(root.component_class_name || '');
-
-      if (MOUNT_PORT_TYPES.has(portType)) {
-        if (/turret/i.test(compCls) || portType === 'Turret' || portType === 'TurretBase') mountType = 'Turret';
-        else if (/gimbal/i.test(compCls)) mountType = 'Gimbal';
-        else if (/fixed/i.test(compCls)) mountType = 'Fixed';
-        else if (/mrck|missilerack/i.test(compCls) || portType === 'MissileRack') mountType = 'Rack';
-        else mountType = portType === 'Turret' || portType === 'TurretBase' ? 'Turret' : portType === 'MissileRack' ? 'Rack' : 'Gimbal';
-
-        const sizeMatch = compCls.match(/[Ss](\d+)/);
-        if (sizeMatch) mountSize = parseInt(sizeMatch[1], 10);
-      }
-
-      const componentType = String(root.type || '');
-      if (SKIP_TYPES.has(componentType)) continue;
-
-      let category: string;
-      if (componentType && this.portCategory(componentType) !== 'Other') {
-        category = this.portCategory(componentType);
-      } else {
-        category = this.portCategory(portType);
-      }
-
-      if (hasRelevantChildren && MOUNT_PORT_TYPES.has(portType)) {
-        const childCompTypes = children.map((c) => String(c.type || '')).filter(Boolean);
-        if (childCompTypes.length > 0) {
-          const childCat = this.portCategory(childCompTypes[0]);
-          if (childCat !== 'Other') {
-            if (childCompTypes.every((t) => t === 'EMP')) category = 'EMP';
-          }
-        }
-      }
-
-      if (category === 'Other' && hasRelevantChildren) {
-        const firstChildType = String(children.find((c) => c.type)?.type || children.find((c) => c.port_type)?.port_type || '');
-        category = this.portCategory(firstChildType);
-      }
-      if (category === 'Other') continue;
-
-      const componentTypeStr = componentType || String(root.type || '');
-      const isRootUtility =
-        (componentTypeStr === 'WeaponGun' || root.type === 'WeaponGun') &&
-        UTILITY_WEAPON_RX.test(String(root.name || root.class_name || ''));
-      if (isRootUtility) {
-        category = this.portCategory(detectUtilityType(root.name || '', root.class_name || ''));
-      }
-
-      const effectiveMaxSize = int(root.port_max_size) || mountSize || int(root.size) || null;
-      const items = children.map((c) => this.buildComponentInfo(c, childMap));
-
-      if (hasRelevantChildren || (mountType && children.length > 0)) {
-        // For non-mount ports (e.g. QuantumDrive with JumpModule children), preserve
-        // the installed component in `component` so the UI can display + swap it.
-        // For actual mounts (Gimbal, Turret…) component stays null — the mount itself
-        // is not a swappable component in the outfitter.
-        const rootComponent = mountType === null && root.component_uuid ? this.buildComponentInfo(root, new Map()) : null;
-        hardpoints.push({
-          port_id: root.id,
-          port_name: portName,
-          display_name: this.cleanPortName(portName),
-          category,
-          port_min_size: int(root.port_min_size) || null,
-          port_max_size: effectiveMaxSize,
-          mount_type: mountType,
-          mount_class_name: compCls || null,
-          mount_size: mountSize,
-          component: rootComponent,
-          items,
-          swapped: !!root._swapped,
-        });
-      } else if (root.component_uuid && (root.type || componentType)) {
-        hardpoints.push({
-          port_id: root.id,
-          port_name: portName,
-          display_name: this.cleanPortName(portName),
-          category,
-          port_min_size: int(root.port_min_size) || null,
-          port_max_size: effectiveMaxSize,
-          mount_type: null,
-          mount_class_name: null,
-          mount_size: null,
-          component: this.buildComponentInfo(root, childMap),
-          items: [],
-          swapped: !!root._swapped,
-        });
-      }
-    }
-
-    hardpoints.sort((a, b) => {
-      const orderA = LoadoutService.CAT_ORDER[a.category as string] || 99;
-      const orderB = LoadoutService.CAT_ORDER[b.category as string] || 99;
-      if (orderA !== orderB) return orderA - orderB;
-      return (a.port_name as string).localeCompare(b.port_name as string);
-    });
-
-    return hardpoints;
-  }
-
-  /** Build component info for a single loadout row */
-  private buildComponentInfo(row: Row, childMap: Map<number, Row[]>): Record<string, unknown> {
-    const type = String(row.type || row.port_type || '');
-    const isUtility = type === 'WeaponGun' && UTILITY_WEAPON_RX.test(String(row.name || row.class_name || ''));
-    const effectiveType = isUtility ? detectUtilityType(row.name || '', row.class_name || '') : type;
-
-    const isMountItem = !row.component_uuid && row.component_class_name;
-    const portDisplayName = this.cleanPortName(String(row.port_name || ''));
-    const mountSize = isMountItem ? (String(row.component_class_name).match(/[Ss](\d+)/) || [])[1] : null;
-
-    const subChildren = childMap.get(Number(row.id)) || [];
-    const relevantSubChildren = subChildren.filter((c) => {
-      const cn = String(c.port_name || '');
-      if (cn.startsWith('Screen_') || cn.startsWith('Display_') || cn.startsWith('Annunciator')) return false;
-      if (cn.includes('_MFD') || cn.includes('dashboard') || cn.includes('HUD')) return false;
-      return c.component_uuid || c.type || c.component_class_name;
-    });
-    const subItems = relevantSubChildren.map((c) => {
-      const cIsMountItem = !c.component_uuid && c.component_class_name;
-      const cMountSize = cIsMountItem ? (String(c.component_class_name).match(/[Ss](\d+)/) || [])[1] : null;
-      const cType = String(c.type || c.port_type || '');
-      return {
-        port_id: c.id,
-        port_name: c.port_name,
-        port_max_size: int(c.port_max_size) || null,
-        port_min_size: int(c.port_min_size) || null,
-        uuid: c.component_uuid || null,
-        name: c.name || null,
-        display_name: c.name ? cleanName(c.name || '', cType) : this.cleanPortName(String(c.port_name || '')),
-        type: cType,
-        sub_type: c.sub_type || null,
-        size: int(c.size) || (cMountSize ? parseInt(cMountSize, 10) : null),
-        grade: c.grade || null,
-        manufacturer_code: c.manufacturer_code || null,
-        hp: r2(num(c.hp)) || null,
-        ...(cType === 'WeaponGun' && {
-          weapon_dps: r2(num(c.weapon_dps)) || null,
-          weapon_burst_dps: r2(num(c.weapon_burst_dps)) || null,
-          weapon_sustained_dps: r2(num(c.weapon_sustained_dps)) || null,
-          weapon_fire_rate: r2(num(c.weapon_fire_rate)) || null,
-          weapon_range: Math.round(num(c.weapon_range)) || null,
-          power_draw: r2(num(c.power_draw)) || null,
-        }),
-        ...(cType === 'Missile' && {
-          missile_damage: r2(num(c.missile_damage)) || null,
-          missile_signal_type: c.missile_signal_type || null,
-          missile_speed: r2(num(c.missile_speed)) || null,
-          missile_range: Math.round(num(c.missile_range)) || null,
-        }),
-        ...(cType !== 'WeaponGun' &&
-          cType !== 'Missile' && {
-            weapon_dps: num(c.weapon_dps) || null,
-            weapon_range: num(c.weapon_range) || null,
-            missile_damage: num(c.missile_damage) || null,
-          }),
-        swapped: !!c._swapped,
-      };
-    });
-
-    return {
-      port_id: row.id,
-      port_name: row.port_name,
-      uuid: row.component_uuid || null,
-      name: row.name || null,
-      display_name: row.name ? cleanName(row.name || '', type) : portDisplayName,
-      type: effectiveType,
-      size: int(row.size) || (mountSize ? parseInt(mountSize, 10) : null),
-      port_max_size: int(row.port_max_size) || null,
-      port_min_size: int(row.port_min_size) || null,
-      grade: row.grade || null,
-      manufacturer_code: row.manufacturer_code || null,
-      hp: r2(num(row.hp)) || null,
-      power_draw: r2(num(row.power_draw)) || null,
-      heat_generation: r2(num(row.heat_generation)) || null,
-      ...(type === 'WeaponGun' &&
-        !isUtility && {
-          weapon_dps: r2(num(row.weapon_dps)) || null,
-          weapon_burst_dps: r2(num(row.weapon_burst_dps)) || null,
-          weapon_sustained_dps: r2(num(row.weapon_sustained_dps)) || null,
-          weapon_fire_rate: r2(num(row.weapon_fire_rate)) || null,
-          weapon_range: Math.round(num(row.weapon_range)) || null,
-          weapon_damage_physical: r2(num(row.weapon_damage_physical)) || null,
-          weapon_damage_energy: r2(num(row.weapon_damage_energy)) || null,
-          weapon_damage_distortion: r2(num(row.weapon_damage_distortion)) || null,
-        }),
-      ...(isUtility && { weapon_dps: r2(num(row.weapon_dps)) || null, weapon_range: Math.round(num(row.weapon_range)) || null }),
-      ...(type === 'Shield' && { shield_hp: r2(num(row.shield_hp)) || null, shield_regen: r2(num(row.shield_regen)) || null }),
-      ...(type === 'PowerPlant' && { power_output: r2(num(row.power_output)) || null }),
-      ...(type === 'Cooler' && { cooling_rate: r2(num(row.cooling_rate)) || null }),
-      ...(type === 'QuantumDrive' && {
-        qd_speed: r2(num(row.qd_speed)) || null,
-        qd_spool_time: r2(num(row.qd_spool_time)) || null,
-        qd_cooldown: r2(num(row.qd_cooldown)) || null,
-        qd_fuel_rate: r2(num(row.qd_fuel_rate)) || null,
-        qd_range: r2(num(row.qd_range)) || null,
-      }),
-      ...(type === 'Missile' && {
-        missile_damage: r2(num(row.missile_damage)) || null,
-        missile_signal_type: row.missile_signal_type || null,
-        missile_speed: r2(num(row.missile_speed)) || null,
-        missile_range: Math.round(num(row.missile_range)) || null,
-        missile_lock_time: r2(num(row.missile_lock_time)) || null,
-      }),
-      ...(type === 'Countermeasure' && { cm_ammo: int(row.cm_ammo_count) || null }),
-      ...(type === 'Radar' && { radar_range: r2(num(row.radar_range)) || null }),
-      ...(type === 'EMP' && { emp_damage: r2(num(row.emp_damage)) || null, emp_radius: r2(num(row.emp_radius)) || null }),
-      ...(type === 'QuantumInterdictionGenerator' && {
-        qig_jammer_range: r2(num(row.qig_jammer_range)) || null,
-        qig_snare_radius: r2(num(row.qig_snare_radius)) || null,
-      }),
-      sub_items: subItems.length ? subItems : undefined,
-      swapped: !!row._swapped,
-    };
-  }
-
-  /** Clean port name for display */
-  private cleanPortName(name: string): string {
-    return name
-      .replace(/^hardpoint_/i, '')
-      .replace(/^Hardpoint_/i, '')
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, (c) => c.toUpperCase());
+    return buildHardpoints(loadout);
   }
 
   /** Aggregate stats from a loadout array */
   aggregateLoadoutStats(loadout: Row[], ship: Row, crossX: number, crossY: number, crossZ: number): Record<string, unknown> {
-    let totalDps = 0,
-      totalBurstDps = 0,
-      totalSustainedDps = 0;
-    let totalShieldHp = 0,
-      totalShieldRegen = 0;
-    let totalPowerDraw = 0,
-      totalPowerOutput = 0;
-    let totalHeatGen = 0,
-      totalCoolingRate = 0;
-    let totalMissileDmg = 0;
-    let weaponCount = 0,
-      shieldCount = 0,
-      missileCount = 0;
-    let qdSpeed = 0,
-      qdSpoolTime = 0,
-      qdCooldown = 0,
-      qdFuelRate = 0;
-    let qdRange = 0,
-      qdTuningRate = 0,
-      qdAlignmentRate = 0,
-      qdDisconnectRange = 0,
-      qdName = '';
-
-    const weapons: Record<string, unknown>[] = [],
-      shields: Record<string, unknown>[] = [],
-      missiles: Record<string, unknown>[] = [];
-    const powerPlants: Record<string, unknown>[] = [],
-      coolers: Record<string, unknown>[] = [];
-    const cms: Record<string, unknown>[] = [],
-      emps: Record<string, unknown>[] = [],
-      qigs: Record<string, unknown>[] = [];
-    const utilityWeapons: Record<string, unknown>[] = [];
-    let cmFlare = 0,
-      cmChaff = 0;
-
-    for (const l of loadout) {
-      if (!l.component_uuid) continue;
-
-      if (l.type === 'WeaponGun') {
-        if (UTILITY_WEAPON_RX.test(l.name || '') || UTILITY_WEAPON_RX.test(l.class_name || '')) {
-          const uType = detectUtilityType(l.name || '', l.class_name || '');
-          utilityWeapons.push({
-            port_name: l.port_name,
-            name: l.name || '—',
-            size: int(l.size),
-            utility_type: uType,
-            dps: r2(num(l.weapon_dps)),
-            damage: r2(num(l.weapon_damage)),
-            fire_rate: r2(num(l.weapon_fire_rate)),
-            range: Math.round(num(l.weapon_range)),
-          });
-          continue;
-        }
-        const dps = num(l.weapon_dps);
-        if (dps === 0) continue;
-        totalDps += dps;
-        totalBurstDps += num(l.weapon_burst_dps);
-        totalSustainedDps += num(l.weapon_sustained_dps);
-        weaponCount++;
-        weapons.push({
-          port_name: l.port_name,
-          name: l.name || '—',
-          size: int(l.size),
-          grade: l.grade || '—',
-          manufacturer: l.manufacturer_code || '',
-          dps: r2(dps),
-          alpha: r2(num(l.weapon_damage)),
-          fire_rate: r2(num(l.weapon_fire_rate)),
-          range: Math.round(num(l.weapon_range)),
-          dmg_physical: r2(num(l.weapon_damage_physical)),
-          dmg_energy: r2(num(l.weapon_damage_energy)),
-          dmg_distortion: r2(num(l.weapon_damage_distortion)),
-        });
-      }
-      if (l.type === 'Shield') {
-        const hp = num(l.shield_hp),
-          regen = num(l.shield_regen);
-        totalShieldHp += hp;
-        totalShieldRegen += regen;
-        shieldCount++;
-        shields.push({
-          port_name: l.port_name,
-          name: cleanName(l.name, 'Shield'),
-          size: int(l.size),
-          grade: l.grade || '—',
-          manufacturer: l.manufacturer_code || '',
-          hp: r2(hp),
-          regen: r2(regen),
-          regen_delay: r2(num(l.shield_regen_delay)),
-          hardening: r4(num(l.shield_hardening)),
-          time_to_charge: regen > 0 ? r1(hp / regen) : 0,
-        });
-      }
-      if (l.type === 'Missile' || l.type === 'WeaponMissile') {
-        const dmg = num(l.missile_damage);
-        totalMissileDmg += dmg;
-        missileCount++;
-        missiles.push({
-          port_name: l.port_name,
-          name: cleanName(l.name, 'Missile'),
-          size: int(l.size),
-          damage: r2(dmg),
-          speed: r2(num(l.missile_speed)),
-          range: r2(num(l.missile_range)),
-          lock_time: r2(num(l.missile_lock_time)),
-          lock_signal: l.missile_signal_type || '',
-          dmg_physical: r2(num(l.missile_damage_physical)),
-          dmg_energy: r2(num(l.missile_damage_energy)),
-          dmg_distortion: r2(num(l.missile_damage_distortion)),
-        });
-      }
-      if (l.type === 'QuantumDrive') {
-        qdSpeed = num(l.qd_speed);
-        qdSpoolTime = num(l.qd_spool_time);
-        qdCooldown = num(l.qd_cooldown);
-        qdFuelRate = num(l.qd_fuel_rate);
-        qdRange = num(l.qd_range);
-        qdTuningRate = num(l.qd_tuning_rate);
-        qdAlignmentRate = num(l.qd_alignment_rate);
-        qdDisconnectRange = num(l.qd_disconnect_range);
-        qdName = l.name || '';
-      }
-      if (l.type === 'EMP') {
-        emps.push({
-          port_name: l.port_name,
-          name: cleanName(l.name, 'EMP'),
-          size: int(l.size),
-          damage: r2(num(l.emp_damage)),
-          radius: r2(num(l.emp_radius)),
-          charge_time: r2(num(l.emp_charge_time)),
-          cooldown: r2(num(l.emp_cooldown)),
-        });
-      }
-      if (l.type === 'QuantumInterdictionGenerator') {
-        qigs.push({
-          port_name: l.port_name,
-          name: cleanName(l.name, 'QuantumInterdictionGenerator'),
-          size: int(l.size),
-          jammer_range: r2(num(l.qig_jammer_range)),
-          snare_radius: r2(num(l.qig_snare_radius)),
-          charge_time: r2(num(l.qig_charge_time)),
-          cooldown: r2(num(l.qig_cooldown)),
-        });
-      }
-      if (l.type === 'PowerPlant') {
-        const o = num(l.power_output);
-        totalPowerOutput += o;
-        powerPlants.push({
-          port_name: l.port_name,
-          name: cleanName(l.name, 'PowerPlant'),
-          size: int(l.size),
-          grade: l.grade || '—',
-          manufacturer: l.manufacturer_code || '',
-          output: r2(o),
-        });
-      }
-      if (l.type === 'Cooler') {
-        const c = num(l.cooling_rate);
-        totalCoolingRate += c;
-        coolers.push({
-          port_name: l.port_name,
-          name: cleanName(l.name, 'Cooler'),
-          size: int(l.size),
-          grade: l.grade || '—',
-          manufacturer: l.manufacturer_code || '',
-          cooling_rate: r2(c),
-        });
-      }
-      if (l.type === 'Countermeasure') {
-        const ammo = int(l.cm_ammo_count);
-        const isFlare = /flare|decoy/i.test(l.name || ''),
-          isChaff = /chaff|noise/i.test(l.name || '');
-        if (isFlare) cmFlare += ammo;
-        if (isChaff) cmChaff += ammo;
-        cms.push({
-          port_name: l.port_name,
-          name: cleanName(l.name, 'Countermeasure'),
-          type: isFlare ? 'Flare' : isChaff ? 'Chaff' : 'Other',
-          ammo_count: ammo,
-        });
-      }
-      totalPowerDraw += num(l.power_draw);
-      totalHeatGen += num(l.heat_generation);
-    }
-
-    const hullHp = num(ship.total_hp);
-    const armorPhys = num(ship.armor_physical) || 1;
-    const armorEnergy = num(ship.armor_energy) || 1;
-    const avgArmor = (armorPhys + armorEnergy) / 2;
-    const ehp = avgArmor > 0 ? r2(totalShieldHp + hullHp / avgArmor) : totalShieldHp + hullHp;
-
-    return {
-      weapons: {
-        count: weaponCount,
-        total_dps: r2(totalDps),
-        total_burst_dps: r2(totalBurstDps),
-        total_sustained_dps: r2(totalSustainedDps),
-        details: weapons,
-      },
-      shields: {
-        count: shieldCount,
-        total_hp: r2(totalShieldHp),
-        total_regen: r2(totalShieldRegen),
-        time_to_charge: totalShieldRegen > 0 ? r1(totalShieldHp / totalShieldRegen) : 0,
-        details: shields,
-      },
-      missiles: { count: missileCount, total_damage: r2(totalMissileDmg), details: missiles },
-      power: {
-        total_draw: r2(totalPowerDraw),
-        total_output: r2(totalPowerOutput),
-        balance: r2(totalPowerOutput - totalPowerDraw),
-        details: powerPlants,
-      },
-      thermal: {
-        total_heat_generation: r2(totalHeatGen),
-        total_cooling_rate: r2(totalCoolingRate),
-        balance: r2(totalCoolingRate - totalHeatGen),
-        details: coolers,
-      },
-      quantum: {
-        drive_name: cleanName(qdName, 'QuantumDrive'),
-        speed: r2(qdSpeed),
-        spool_time: r2(qdSpoolTime),
-        cooldown: r2(qdCooldown),
-        fuel_rate: r6(qdFuelRate),
-        range: r2(qdRange),
-        tuning_rate: r4(qdTuningRate),
-        alignment_rate: r4(qdAlignmentRate),
-        disconnect_range: r2(qdDisconnectRange),
-        fuel_capacity: num(ship.quantum_fuel_capacity),
-      },
-      countermeasures: { flare_count: cmFlare, chaff_count: cmChaff, details: cms },
-      emp: { count: emps.length, details: emps },
-      quantum_interdiction: { count: qigs.length, details: qigs },
-      utility: { count: utilityWeapons.length, details: utilityWeapons },
-      signatures: { ir: num(ship.armor_signal_ir), em: num(ship.armor_signal_em), cs: num(ship.armor_signal_cs) },
-      armor: {
-        physical: num(ship.armor_physical),
-        energy: num(ship.armor_energy),
-        distortion: num(ship.armor_distortion),
-        thermal: num(ship.armor_thermal),
-      },
-      mobility: {
-        scm_speed: num(ship.scm_speed),
-        max_speed: num(ship.max_speed),
-        boost_forward: num(ship.boost_speed_forward),
-        boost_backward: num(ship.boost_speed_backward),
-        pitch: num(ship.pitch_max),
-        yaw: num(ship.yaw_max),
-        roll: num(ship.roll_max),
-        mass: num(ship.mass),
-      },
-      fuel: { hydrogen: num(ship.hydrogen_fuel_capacity), quantum: num(ship.quantum_fuel_capacity) },
-      hull: { total_hp: hullHp, ehp, cross_section_x: crossX, cross_section_y: crossY, cross_section_z: crossZ },
-    };
+    return aggregateLoadoutStatsInternal(loadout, ship, crossX, crossY, crossZ);
   }
 }
