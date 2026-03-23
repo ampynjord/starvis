@@ -17,21 +17,27 @@ import type { RouteDependencies } from './types.js';
 
 export type { RouteDependencies } from './types.js';
 
+const routeMounts = [
+  mountShipMatrixRoutes,
+  mountShipRoutes,
+  mountComponentRoutes,
+  mountManufacturerRoutes,
+  mountPaintRoutes,
+  mountShopRoutes,
+  mountItemRoutes,
+  mountCommodityRoutes,
+  mountMiningRoutes,
+  mountMissionRoutes,
+  mountSearchRoutes,
+  mountSystemRoutes,
+  mountTradeRoutes,
+  mountAdminRoutes,
+] as const;
+
 export function createRoutes(deps: RouteDependencies): Router {
   const router = Router();
-  mountShipMatrixRoutes(router, deps);
-  mountShipRoutes(router, deps);
-  mountComponentRoutes(router, deps);
-  mountManufacturerRoutes(router, deps);
-  mountPaintRoutes(router, deps);
-  mountShopRoutes(router, deps);
-  mountItemRoutes(router, deps);
-  mountCommodityRoutes(router, deps);
-  mountMiningRoutes(router, deps);
-  mountMissionRoutes(router, deps);
-  mountSearchRoutes(router, deps);
-  mountSystemRoutes(router, deps);
-  mountTradeRoutes(router, deps);
-  mountAdminRoutes(router, deps);
+  for (const mount of routeMounts) {
+    mount(router, deps);
+  }
   return router;
 }
