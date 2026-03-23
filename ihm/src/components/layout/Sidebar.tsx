@@ -36,6 +36,7 @@ const SHIP_ITEMS = [
 
 const FPS_ITEMS = [
   { to: '/fps-gear',      icon: Crosshair,     label: 'FPS Gear' },
+  { to: '/fps-calculator', icon: SlidersHorizontal, label: 'FPS Calculator' },
   { to: '/other-items',   icon: Layers3,       label: 'Other Items' },
 ];
 
