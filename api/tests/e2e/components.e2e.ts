@@ -66,4 +66,22 @@ test.describe('Components API', () => {
     expect(Array.isArray(data.data.sizes)).toBe(true);
     expect(Array.isArray(data.data.grades)).toBe(true);
   });
+
+  test('GET /api/v1/components/:uuid should return 404 for unknown component', async ({ request }) => {
+    const response = await request.get('/api/v1/components/not-a-real-component-uuid');
+    expect(response.status()).toBe(404);
+
+    const data = await response.json();
+    expect(data.success).toBe(false);
+    expect(data.error).toBe('Component not found');
+  });
+
+  test('GET /api/v1/components/:uuid/buy-locations should return 404 for unknown component', async ({ request }) => {
+    const response = await request.get('/api/v1/components/not-a-real-component-uuid/buy-locations');
+    expect(response.status()).toBe(404);
+
+    const data = await response.json();
+    expect(data.success).toBe(false);
+    expect(data.error).toBe('Component not found');
+  });
 });
