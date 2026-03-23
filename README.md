@@ -144,7 +144,8 @@ starvis/
 │       │   ├── ui/             # Composants génériques (ScifiPanel, GlowBadge, Pagination…)
 │       │   └── ship/           # Composants spécifiques vaisseaux (ShipCard, ShipLoadout…)
 │       ├── hooks/
-│       │   └── useDebounce.ts
+│       │   ├── useDebounce.ts
+│       │   └── useListQueryState.ts
 │       ├── pages/              # 13 pages (Ships, ShipDetail, Components, Shops, Paints…)
 │       ├── router/
 │       │   └── index.tsx

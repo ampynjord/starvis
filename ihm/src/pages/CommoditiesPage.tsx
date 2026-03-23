@@ -10,7 +10,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
-import { useDebounce } from '@/hooks/useDebounce';
+import { useListQueryState } from '@/hooks/useListQueryState';
 
 const LIMIT = 30;
 
@@ -46,10 +46,8 @@ function buildCommodityCategories(rawTypes: string[]): { label: string; types: s
 export default function CommoditiesPage() {
   const location = useLocation();
   const { env } = useEnv();
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
+  const { page, search, debouncedSearch, updateSearch, updatePageWithScroll, setPage } = useListQueryState();
   const [activeCategory, setActiveCategory] = useState('All');
-  const debouncedSearch = useDebounce(search, 350);
 
   const { data: types } = useQuery({ queryKey: ['commodities.types', env], queryFn: () => api.commodities.types(env), staleTime: Infinity });
 
@@ -87,7 +85,7 @@ export default function CommoditiesPage() {
         </div>
         <div className="relative w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={13} />
-          <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Rechercher…" className="sci-input w-full pl-8 text-xs" />
+          <input type="text" value={search} onChange={e => updateSearch(e.target.value)} placeholder="Rechercher…" className="sci-input w-full pl-8 text-xs" />
         </div>
       </div>
 
@@ -144,7 +142,7 @@ export default function CommoditiesPage() {
                 </motion.div>
               ))}
             </div>
-            {data && <Pagination className="mt-6" page={data.page} totalPages={data.pages} onPageChange={p => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
+            {data && <Pagination className="mt-6" page={data.page} totalPages={data.pages} onPageChange={updatePageWithScroll} />}
           </>
         )}
       </div>

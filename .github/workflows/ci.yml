@@ -244,6 +244,7 @@ jobs:
       DB_PASSWORD: testpass
       DB_NAME: starvis_test
       MYSQL_ROOT_PASSWORD: testroot
+      DATABASE_URL: mysql://starvis_user:testpass@127.0.0.1:3306/starvis_test
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: 6379
       ADMIN_API_KEY: ci_test_key
@@ -279,8 +280,6 @@ jobs:
 
       - name: Generate Prisma Client
         run: cd api && npx prisma generate
-        env:
-          DATABASE_URL: mysql://starvis_user:testpass@127.0.0.1:3306/starvis_test
 
       - name: Wait for services
         run: |
@@ -300,21 +299,10 @@ jobs:
 
       - name: Setup database schema
         run: cd api && npx prisma db push --skip-generate --accept-data-loss --force-reset
-        env:
-          DATABASE_URL: mysql://starvis_user:testpass@127.0.0.1:3306/starvis_test
 
       - name: Run API unit tests with coverage
         run: cd api && npm run test:coverage
         env:
-          DATABASE_URL: mysql://starvis_user:testpass@127.0.0.1:3306/starvis_test
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_USER: starvis_user
-          DB_PASSWORD: testpass
-          DB_NAME: starvis_test
-          REDIS_HOST: 127.0.0.1
-          REDIS_PORT: 6379
-          ADMIN_API_KEY: ci_test_key
           LOG_LEVEL: error
 
       - name: Run Extractor unit tests with coverage
@@ -377,25 +365,12 @@ jobs:
             exit 1
           fi
         env:
-          DATABASE_URL: mysql://starvis_user:testpass@127.0.0.1:3306/starvis_test
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_USER: starvis_user
-          DB_PASSWORD: testpass
-          DB_NAME: starvis_test
-          REDIS_HOST: 127.0.0.1
-          REDIS_PORT: 6379
-          ADMIN_API_KEY: ci_test_key
-          PORT: 3000
-          NODE_ENV: test
-          LOG_LEVEL: warn
           P4K_PATH: ""
 
       - name: Run E2E tests
         run: cd api && npm run test:e2e
         env:
           API_URL: http://localhost:3000
-          ADMIN_API_KEY: ci_test_key
 
       - name: Upload E2E test results
         if: always()
