@@ -9,19 +9,25 @@ import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { Pagination } from '@/components/ui/Pagination';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { useDebounce } from '@/hooks/useDebounce';
+import { useListQueryState } from '@/hooks/useListQueryState';
 
 const LIMIT = 24;
 
 export default function ShipsPage() {
   const { env } = useEnv();
-  const [page, setPage]     = useState(1);
-  const [search, setSearch] = useState('');
+  const {
+    page,
+    search,
+    debouncedSearch,
+    setPage,
+    updateSearch,
+    updatePageWithScroll,
+    resetListState,
+  } = useListQueryState();
   const [manufacturer, setManufacturer] = useState('');
-  const [role, setRole]     = useState('');
+  const [role, setRole] = useState('');
   const [career, setCareer] = useState('');
   const [variantType, setVariantType] = useState('');
-  const debouncedSearch = useDebounce(search, 350);
 
   const { data: filters } = useQuery({
     queryKey: ['ships.filters', env],
@@ -45,8 +51,11 @@ export default function ShipsPage() {
   const hasFilters = !!(manufacturer || role || career || variantType || debouncedSearch);
 
   const resetFilters = () => {
-    setManufacturer(''); setRole(''); setCareer('');
-    setVariantType(''); setSearch(''); setPage(1);
+    setManufacturer('');
+    setRole('');
+    setCareer('');
+    setVariantType('');
+    resetListState();
   };
 
   return (
@@ -69,7 +78,7 @@ export default function ShipsPage() {
           <input
             type="text"
             value={search}
-            onChange={e => { setSearch(e.target.value); setPage(1); }}
+            onChange={(e) => updateSearch(e.target.value)}
             placeholder="Search a ship…"
             className="sci-input w-full pl-8 text-xs"
           />
@@ -135,7 +144,7 @@ export default function ShipsPage() {
                   className="mt-6"
                   page={data.page}
                   totalPages={data.pages}
-                  onPageChange={p => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  onPageChange={updatePageWithScroll}
                 />
               )}
             </>

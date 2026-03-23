@@ -10,7 +10,7 @@ import { Pagination } from '@/components/ui/Pagination';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
-import { useDebounce } from '@/hooks/useDebounce';
+import { useListQueryState } from '@/hooks/useListQueryState';
 import { COMPONENT_TYPE_COLORS } from '@/utils/constants';
 import { motion } from 'framer-motion';
 
@@ -18,13 +18,19 @@ const LIMIT = 30;
 
 export default function ComponentsPage() {
   const { env } = useEnv();
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState('');
+  const {
+    page,
+    search,
+    debouncedSearch,
+    setPage,
+    updateSearch,
+    updatePageWithScroll,
+    resetListState,
+  } = useListQueryState();
   const [type, setType] = useState('');
   const [size, setSize] = useState('');
   const [grade, setGrade] = useState('');
   const [manufacturer, setManufacturer] = useState('');
-  const debouncedSearch = useDebounce(search, 350);
 
   const { data: filters } = useQuery({
     queryKey: ['components.filters', env],
@@ -45,7 +51,13 @@ export default function ComponentsPage() {
   });
 
   const hasFilters = !!(type || size || grade || manufacturer || debouncedSearch);
-  const resetFilters = () => { setType(''); setSize(''); setGrade(''); setManufacturer(''); setSearch(''); setPage(1); };
+  const resetFilters = () => {
+    setType('');
+    setSize('');
+    setGrade('');
+    setManufacturer('');
+    resetListState();
+  };
 
   const filterGroups = filters ? [
     { key: 'type', label: 'Type',         options: (filters['types'] ?? []).map((t: string) => ({ label: t, value: t })),      value: type,         onChange: (v: string) => { setType(v); setPage(1); } },
@@ -63,7 +75,7 @@ export default function ComponentsPage() {
         </div>
         <div className="relative w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={13} />
-          <input type="text" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} placeholder="Search a component…" className="sci-input w-full pl-8 text-xs" />
+          <input type="text" value={search} onChange={(e) => updateSearch(e.target.value)} placeholder="Search a component…" className="sci-input w-full pl-8 text-xs" />
         </div>
       </div>
 
@@ -104,7 +116,7 @@ export default function ComponentsPage() {
                   </motion.div>
                 ))}
               </div>
-              {data && <Pagination className="mt-6" page={data.page} totalPages={data.pages} onPageChange={p => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />}
+              {data && <Pagination className="mt-6" page={data.page} totalPages={data.pages} onPageChange={updatePageWithScroll} />}
             </>
           )}
         </div>
