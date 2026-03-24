@@ -138,7 +138,6 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
             const pa = fireActions[0];
             if (pa && typeof pa === 'object') {
               if (typeof pa.fireRate === 'number') comp.weaponFireRate = Math.round(pa.fireRate * 100) / 100;
-              if (typeof pa.heatPerShot === 'number') comp.weaponHeatPerShot = Math.round(pa.heatPerShot * 100000) / 100000;
               const lp = pa.launchParams;
               if (lp && typeof lp === 'object') {
                 if (typeof lp.pelletCount === 'number') comp.weaponPelletsPerShot = lp.pelletCount;
@@ -148,8 +147,6 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
                 for (const se of pa.sequenceEntries) {
                   const wa = se?.weaponAction;
                   if (wa && typeof wa.fireRate === 'number') totalFR += wa.fireRate;
-                  if (!comp.weaponHeatPerShot && typeof wa?.heatPerShot === 'number')
-                    comp.weaponHeatPerShot = Math.round(wa.heatPerShot * 100000) / 100000;
                   if (!comp.weaponPelletsPerShot && wa?.launchParams?.pelletCount) comp.weaponPelletsPerShot = wa.launchParams.pelletCount;
                 }
                 if (totalFR > 0) comp.weaponFireRate = Math.round(totalFR * 100) / 100;
@@ -222,9 +219,6 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
                     comp.weaponDamagePhysical = Math.round(physical * 10000) / 10000;
                     comp.weaponDamageEnergy = Math.round(energy * 10000) / 10000;
                     comp.weaponDamageDistortion = Math.round(distortion * 10000) / 10000;
-                    comp.weaponDamageThermal = Math.round(thermal * 10000) / 10000;
-                    comp.weaponDamageBiochemical = Math.round(biochemical * 10000) / 10000;
-                    comp.weaponDamageStun = Math.round(stun * 10000) / 10000;
                     const dtypes: [string, number][] = [
                       ['physical', physical],
                       ['energy', energy],
