@@ -1,44 +1,16 @@
-import { useMemo } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
+import type { MiningRiskAggregates } from '@/types/api';
 import type { MiningCompositionView } from '@/types/mining';
 import { dangerBg, dangerColor, fNum, pct } from '@/pages/mining-helpers';
 
 export interface RiskAssessmentProps {
   data: MiningCompositionView | null;
+  risk: MiningRiskAggregates | null;
   selectedElementUuid: string | null;
 }
 
-export function RiskAssessment({ data, selectedElementUuid }: RiskAssessmentProps) {
-  // useMemo must be called unconditionally before any early return
-  const aggregates = useMemo(() => {
-    if (!data?.elements.length) return null;
-    const allElements = data.elements.filter(
-      (el) => el.instability != null || el.resistance != null,
-    );
-    if (!allElements.length) return null;
-
-    const instabilities = allElements
-      .map((el) => Number(el.instability ?? 0))
-      .filter(Number.isFinite);
-    const resistances = allElements
-      .map((el) => Number(el.resistance ?? 0))
-      .filter(Number.isFinite);
-
-    return {
-      maxInstability: Math.max(...instabilities, 0),
-      avgInstability: instabilities.length
-        ? instabilities.reduce((a, b) => a + b, 0) / instabilities.length
-        : 0,
-      maxResistance: Math.max(...resistances, 0),
-      avgResistance: resistances.length
-        ? resistances.reduce((a, b) => a + b, 0) / resistances.length
-        : 0,
-      hasHighRisk:
-        Math.max(...instabilities, 0) > 0.6 || Math.max(...resistances, 0) > 0.6,
-    };
-  }, [data]);
-
+export function RiskAssessment({ data, risk, selectedElementUuid }: RiskAssessmentProps) {
   if (!data || !data.elements.length) {
     return (
       <div className="text-center py-8 text-slate-600">
@@ -47,6 +19,10 @@ export function RiskAssessment({ data, selectedElementUuid }: RiskAssessmentProp
       </div>
     );
   }
+
+  const aggregates = risk
+    ? { ...risk, hasHighRisk: risk.maxInstability > 0.6 || risk.maxResistance > 0.6 }
+    : null;
 
   if (!aggregates) {
     return (

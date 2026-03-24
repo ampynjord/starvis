@@ -28,14 +28,20 @@ export function TopBar() {
     staleTime: 10 * 60_000,
   });
 
-  const handleSelect = useCallback((type: 'ships' | 'components' | 'items', uuid: string) => {
+  const handleSelect = useCallback((type: string, uuid: string) => {
     setQuery('');
     setOpen(false);
     navigate(`/${type}/${uuid}`);
   }, [navigate]);
 
+  const handleSeeAll = useCallback(() => {
+    setOpen(false);
+    navigate(`/search?q=${encodeURIComponent(query)}`);
+  }, [navigate, query]);
+
   const hasResults = results && (
-    results.ships.length + results.components.length + results.items.length > 0
+    results.ships.length + results.components.length + results.items.length +
+    (results.commodities?.length ?? 0) + (results.missions?.length ?? 0) + (results.recipes?.length ?? 0) > 0
   );
 
   return (
@@ -120,6 +126,63 @@ export function TopBar() {
                   ))}
                 </>
               )}
+              {results.commodities && results.commodities.length > 0 && (
+                <>
+                  <div className="px-3 py-1.5 text-xs font-mono-sc text-cyan-700 border-t border-b border-border/50">
+                    COMMODITIES
+                  </div>
+                  {results.commodities.map(c => (
+                    <button
+                      key={c.uuid}
+                      onMouseDown={() => handleSelect('commodities', c.uuid)}
+                      className="w-full flex items-center justify-between px-3 py-2 hover:bg-cyan-950/40 text-left transition-colors"
+                    >
+                      <span className="text-sm text-slate-300">{c.name}</span>
+                      <ChevronRight size={12} className="text-slate-600" />
+                    </button>
+                  ))}
+                </>
+              )}
+              {results.missions && results.missions.length > 0 && (
+                <>
+                  <div className="px-3 py-1.5 text-xs font-mono-sc text-cyan-700 border-t border-b border-border/50">
+                    MISSIONS
+                  </div>
+                  {results.missions.map(m => (
+                    <button
+                      key={m.uuid}
+                      onMouseDown={() => handleSelect('missions', m.uuid)}
+                      className="w-full flex items-center justify-between px-3 py-2 hover:bg-cyan-950/40 text-left transition-colors"
+                    >
+                      <span className="text-sm text-slate-300">{m.name}</span>
+                      <ChevronRight size={12} className="text-slate-600" />
+                    </button>
+                  ))}
+                </>
+              )}
+              {results.recipes && results.recipes.length > 0 && (
+                <>
+                  <div className="px-3 py-1.5 text-xs font-mono-sc text-cyan-700 border-t border-b border-border/50">
+                    CRAFTING
+                  </div>
+                  {results.recipes.map(r => (
+                    <button
+                      key={r.uuid}
+                      onMouseDown={() => { setQuery(''); setOpen(false); navigate(`/crafting?search=${encodeURIComponent(r.name)}`); }}
+                      className="w-full flex items-center justify-between px-3 py-2 hover:bg-cyan-950/40 text-left transition-colors"
+                    >
+                      <span className="text-sm text-slate-300">{r.name}</span>
+                      <ChevronRight size={12} className="text-slate-600" />
+                    </button>
+                  ))}
+                </>
+              )}
+              <button
+                onMouseDown={handleSeeAll}
+                className="w-full px-3 py-2 text-xs text-cyan-500 hover:bg-cyan-950/40 text-center border-t border-border/50 font-mono-sc"
+              >
+                See all results →
+              </button>
             </motion.div>
           )}
         </AnimatePresence>

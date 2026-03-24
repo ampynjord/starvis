@@ -14,6 +14,7 @@ import {
   canonicalizeItemRecord,
   canonicalizeShopRecord,
 } from './canonical-source.js';
+import { extractCraftingRecipes } from './crafting-extractor.js';
 import {
   applyDimensionsFallback,
   applyHullSeriesCargoFallback,
@@ -27,9 +28,8 @@ import { LocalizationService } from './localization-service.js';
 import logger from './logger.js';
 import { extractMiningCompositions, extractMiningElements } from './mining-extractor.js';
 import { extractMissions } from './mission-extractor.js';
-import { type ExternalCanonicalData, loadExternalCanonicalData } from './source-adapters.js';
 
-export type ExtractionModule = 'ships' | 'components' | 'items' | 'commodities' | 'mining' | 'missions' | 'paints' | 'shops';
+export type ExtractionModule = 'ships' | 'components' | 'items' | 'commodities' | 'mining' | 'missions' | 'crafting' | 'paints' | 'shops';
 
 export type GameEnv = 'live' | 'ptu' | 'eptu' | 'custom';
 
@@ -54,6 +54,7 @@ export interface ExtractionStats {
   miningElements: number;
   miningCompositions: number;
   missions: number;
+  craftingRecipes: number;
   errors: string[];
   extractionHash?: string;
   durationMs?: number;
@@ -168,6 +169,7 @@ export class ExtractionService {
       miningElements: 0,
       miningCompositions: 0,
       missions: 0,
+      craftingRecipes: 0,
       errors: [],
     };
 
@@ -234,8 +236,6 @@ export class ExtractionService {
       const oldItems = new Map(oldItemsRaw.map((i: any) => [i.class_name, i]));
       const oldCommodities = new Map(oldCommoditiesRaw.map((c: any) => [c.class_name, c]));
 
-      const externalData = await loadExternalCanonicalData();
-
       // Wrap the entire extraction in a transaction — if anything fails,
       // the old data remains intact (no downtime with empty tables)
       await conn.execute('SET SESSION innodb_lock_wait_timeout = 600');
@@ -264,6 +264,10 @@ export class ExtractionService {
         await conn.execute('DELETE FROM mining_elements WHERE game_env = ?', [env]);
       }
       if (run('missions')) await conn.execute('DELETE FROM missions WHERE game_env = ?', [env]);
+      if (run('crafting')) {
+        await conn.execute('DELETE FROM crafting_ingredients WHERE game_env = ?', [env]);
+        await conn.execute('DELETE FROM crafting_recipes WHERE game_env = ?', [env]);
+      }
 
       // 2. Collect & save manufacturers FIRST (before ships, due to FK constraint)
       onProgress?.('Saving manufacturers…');
@@ -272,13 +276,13 @@ export class ExtractionService {
       // 3. Extract & save components
       if (run('components')) {
         onProgress?.('Extracting components…');
-        stats.components = await this.saveComponents(conn, env, onProgress, externalData);
+        stats.components = await this.saveComponents(conn, env, onProgress);
       }
 
       // 3b. Extract & save items (FPS weapons, armor, clothing, gadgets)
       if (run('items') || run('commodities')) {
         onProgress?.('Extracting items (FPS, armor, clothing)…');
-        const itemResult = await this.saveItems(conn, env, onProgress, externalData);
+        const itemResult = await this.saveItems(conn, env, onProgress);
         stats.items = itemResult.items;
         stats.commodities = itemResult.commodities;
       }
@@ -294,7 +298,7 @@ export class ExtractionService {
       // 5. Extract & save shops/vendors
       if (run('shops')) {
         onProgress?.('Extracting shops & prices…');
-        await this.saveShopsData(conn, env, onProgress, externalData);
+        await this.saveShopsData(conn, env, onProgress);
       }
 
       // 5b. Extract & save paints/liveries
@@ -315,6 +319,12 @@ export class ExtractionService {
       if (run('missions')) {
         onProgress?.('Extracting missions (ContractTemplate)…');
         stats.missions = await this.saveMissions(conn, env, onProgress);
+      }
+
+      // 5e. Extract & save crafting recipes
+      if (run('crafting')) {
+        onProgress?.('Extracting crafting recipes…');
+        stats.craftingRecipes = await this.saveCraftingRecipes(conn, env, onProgress);
       }
 
       // 6. Cross-reference with ship_matrix (only when ships were extracted)
@@ -411,12 +421,7 @@ export class ExtractionService {
   //  COMPONENTS → components table
   // ======================================================
 
-  private async saveComponents(
-    conn: PoolConnection,
-    env: GameEnv,
-    onProgress?: (msg: string) => void,
-    externalData?: ExternalCanonicalData,
-  ): Promise<number> {
+  private async saveComponents(conn: PoolConnection, env: GameEnv, onProgress?: (msg: string) => void): Promise<number> {
     const components = this.dfService.extractAllComponents();
     if (!components.length) return 0;
 
@@ -518,35 +523,34 @@ export class ExtractionService {
 
     /** Map a component object to a flat array of values */
     const toCanonicalRow = (c: any): (string | number | null)[] => {
-      const ext = externalData?.components.get(c.className);
       const canonical = canonicalizeComponentRecord({
-        name: ext?.name ?? c.name,
+        name: c.name,
         className: c.className,
-        type: ext?.type ?? c.type,
-        subType: ext?.subType ?? c.subType,
-        grade: ext?.grade ?? c.grade,
-        size: ext?.size ?? c.size,
-        sourceType: ext?.sourceType ?? 'p4k_datamine',
-        sourceName: ext?.sourceName ?? 'starvis-dataforge',
-        sourceReference: ext?.sourceReference ?? c.className,
-        confidenceScore: ext?.confidenceScore ?? 70,
+        type: c.type,
+        subType: c.subType,
+        grade: c.grade,
+        size: c.size,
+        sourceType: 'p4k_datamine',
+        sourceName: 'starvis-dataforge',
+        sourceReference: c.className,
+        confidenceScore: 70,
       });
 
       return [
         c.uuid,
         env,
         c.className,
-        ext?.name ?? c.name,
+        c.name,
         canonical.normalizedName,
         canonical.canonicalComponentKey,
         canonical.sourceType,
         canonical.sourceName,
         canonical.sourceReference,
         canonical.confidenceScore,
-        ext?.type ?? c.type,
-        ext?.subType ?? (c.subType || null),
-        ext?.size ?? c.size ?? null,
-        ext?.grade ?? (c.grade || null),
+        c.type,
+        c.subType || null,
+        c.size ?? null,
+        c.grade || null,
         c.manufacturerCode || null,
         c.mass ?? null,
         c.hp ?? null,
@@ -1333,7 +1337,6 @@ export class ExtractionService {
     conn: PoolConnection,
     env: GameEnv,
     onProgress?: (msg: string) => void,
-    externalData?: ExternalCanonicalData,
   ): Promise<{ items: number; commodities: number }> {
     const { items, commodities } = this.dfService.extractItems();
     let savedItems = 0;
@@ -1406,33 +1409,32 @@ export class ExtractionService {
         const values: unknown[] = [];
 
         for (const it of batch) {
-          const ext = externalData?.items.get(it.className);
           const canonical = canonicalizeItemRecord({
-            name: ext?.name ?? it.name,
+            name: it.name,
             className: it.className,
-            type: ext?.type ?? it.type,
-            subType: ext?.subType ?? it.subType,
-            sourceType: ext?.sourceType ?? 'p4k_datamine',
-            sourceName: ext?.sourceName ?? 'starvis-dataforge',
-            sourceReference: ext?.sourceReference ?? it.className,
-            confidenceScore: ext?.confidenceScore ?? 70,
+            type: it.type,
+            subType: it.subType,
+            sourceType: 'p4k_datamine',
+            sourceName: 'starvis-dataforge',
+            sourceReference: it.className,
+            confidenceScore: 70,
           });
 
           values.push(
             it.uuid,
             env,
             it.className,
-            ext?.name ?? it.name,
+            it.name,
             canonical.normalizedName,
             canonical.canonicalItemKey,
             canonical.sourceType,
             canonical.sourceName,
             canonical.sourceReference,
             canonical.confidenceScore,
-            ext?.type ?? it.type,
-            ext?.subType ?? it.subType,
-            ext?.size ?? it.size,
-            ext?.grade ?? it.grade,
+            it.type,
+            it.subType,
+            it.size,
+            it.grade,
             it.manufacturerCode,
             it.mass,
             it.hp,
@@ -1490,33 +1492,32 @@ export class ExtractionService {
         const values: unknown[] = [];
 
         for (const cm of batch) {
-          const ext = externalData?.commodities.get(cm.className);
           const canonical = canonicalizeCommodityRecord({
-            name: ext?.name ?? cm.name,
+            name: cm.name,
             className: cm.className,
-            type: ext?.type ?? cm.type,
-            subType: ext?.subType ?? cm.subType,
-            symbol: ext?.symbol ?? cm.symbol,
-            sourceType: ext?.sourceType ?? 'p4k_datamine',
-            sourceName: ext?.sourceName ?? 'starvis-dataforge',
-            sourceReference: ext?.sourceReference ?? cm.className,
-            confidenceScore: ext?.confidenceScore ?? 70,
+            type: cm.type,
+            subType: cm.subType,
+            symbol: cm.symbol,
+            sourceType: 'p4k_datamine',
+            sourceName: 'starvis-dataforge',
+            sourceReference: cm.className,
+            confidenceScore: 70,
           });
 
           values.push(
             cm.uuid,
             env,
             cm.className,
-            ext?.name ?? cm.name,
+            cm.name,
             canonical.normalizedName,
             canonical.canonicalCommodityKey,
             canonical.sourceType,
             canonical.sourceName,
             canonical.sourceReference,
             canonical.confidenceScore,
-            ext?.type ?? cm.type,
-            ext?.subType ?? cm.subType,
-            ext?.symbol ?? cm.symbol,
+            cm.type,
+            cm.subType,
+            cm.symbol,
             cm.occupancyScu,
             cm.dataJson ? JSON.stringify(cm.dataJson) : null,
           );
@@ -1543,7 +1544,6 @@ export class ExtractionService {
     conn: PoolConnection,
     env: GameEnv,
     onProgress?: (msg: string) => void,
-    externalData?: ExternalCanonicalData,
   ): Promise<{ shops: number; inventory: number }> {
     const { shops, inventory } = this.dfService.extractShops();
     let savedShops = 0;
@@ -1552,23 +1552,22 @@ export class ExtractionService {
     // Batch insert shops
     const shopRows: any[][] = [];
     for (const shop of shops) {
-      const ext = externalData?.shops.get(shop.className);
       const canonical = canonicalizeShopRecord({
-        name: ext?.name ?? shop.name,
+        name: shop.name,
         className: shop.className,
-        location: ext?.location ?? shop.location,
-        system: ext?.system ?? shop.system,
-        planetMoon: ext?.planetMoon ?? shop.planetMoon,
-        city: ext?.city ?? shop.city,
-        sourceType: ext?.sourceType ?? 'p4k_datamine',
-        sourceName: ext?.sourceName ?? 'starvis-dataforge',
-        sourceReference: ext?.sourceReference ?? shop.className,
-        confidenceScore: ext?.confidenceScore ?? 70,
+        location: shop.location,
+        system: shop.system,
+        planetMoon: shop.planetMoon,
+        city: shop.city,
+        sourceType: 'p4k_datamine',
+        sourceName: 'starvis-dataforge',
+        sourceReference: shop.className,
+        confidenceScore: 70,
       });
 
       shopRows.push([
         env,
-        ext?.name ?? shop.name,
+        shop.name,
         canonical.normalizedName,
         canonical.canonicalShopKey,
         canonical.canonicalLocationKey,
@@ -1576,10 +1575,10 @@ export class ExtractionService {
         canonical.sourceName,
         canonical.sourceReference,
         canonical.confidenceScore,
-        ext?.location ?? (shop.location || null),
-        ext?.system ?? (shop.system || null),
-        ext?.planetMoon ?? (shop.planetMoon || null),
-        ext?.city ?? (shop.city || null),
+        shop.location || null,
+        shop.system || null,
+        shop.planetMoon || null,
+        shop.city || null,
         shop.shopType || null,
         shop.className,
       ]);
@@ -1923,6 +1922,17 @@ export class ExtractionService {
       m.notForRelease ? 1 : 0,
       m.workInProgress ? 1 : 0,
       env,
+      m.rewardMin,
+      m.rewardMax,
+      m.rewardCurrency,
+      m.faction,
+      m.missionGiver,
+      m.locationSystem,
+      m.locationPlanet,
+      m.locationName,
+      m.dangerLevel,
+      m.requiredReputation,
+      m.reputationReward,
     ]);
 
     const saved = await ExtractionService.batchUpsert(
@@ -1930,19 +1940,97 @@ export class ExtractionService {
       `INSERT INTO missions
          (uuid, class_name, title, description, mission_type,
           can_be_shared, only_owner_complete, is_legal,
-          completion_time_s, not_for_release, work_in_progress, game_env)
+          completion_time_s, not_for_release, work_in_progress, game_env,
+          reward_min, reward_max, reward_currency,
+          faction, mission_giver,
+          location_system, location_planet, location_name,
+          danger_level, required_reputation, reputation_reward)
        VALUES`,
       `ON DUPLICATE KEY UPDATE
          class_name=new.class_name, title=new.title, description=new.description,
          mission_type=new.mission_type, can_be_shared=new.can_be_shared,
          only_owner_complete=new.only_owner_complete, is_legal=new.is_legal,
          completion_time_s=new.completion_time_s, not_for_release=new.not_for_release,
-         work_in_progress=new.work_in_progress, game_env=new.game_env`,
-      12,
+         work_in_progress=new.work_in_progress, game_env=new.game_env,
+         reward_min=new.reward_min, reward_max=new.reward_max,
+         reward_currency=new.reward_currency, faction=new.faction,
+         mission_giver=new.mission_giver, location_system=new.location_system,
+         location_planet=new.location_planet, location_name=new.location_name,
+         danger_level=new.danger_level, required_reputation=new.required_reputation,
+         reputation_reward=new.reputation_reward`,
+      23,
       rows,
     );
 
     onProgress?.(`Missions: ${saved} records saved [${env}]`);
     return saved;
+  }
+
+  private async saveCraftingRecipes(conn: PoolConnection, env: GameEnv, onProgress?: (msg: string) => void): Promise<number> {
+    const locAdapter = this.locService.isLoaded ? { resolveKey: (k: string) => this.locService.resolveKey(k) ?? null } : undefined;
+
+    const recipes = extractCraftingRecipes(this.dfService, locAdapter);
+    if (!recipes.length) {
+      onProgress?.('Crafting: no recipe records found in this build');
+      return 0;
+    }
+
+    onProgress?.(`Crafting: ${recipes.length} recipes found`);
+
+    // Save recipes
+    const recipeRows = recipes.map((r) => [
+      r.uuid,
+      r.className,
+      r.name,
+      r.category,
+      r.outputItemName,
+      r.outputItemUuid,
+      r.outputQuantity,
+      r.craftingTime,
+      r.stationType,
+      r.skillLevel,
+      env,
+    ]);
+
+    const savedRecipes = await ExtractionService.batchUpsert(
+      conn,
+      `INSERT INTO crafting_recipes
+         (uuid, class_name, name, category, output_item_name, output_item_uuid,
+          output_quantity, crafting_time_s, station_type, skill_level, game_env)
+       VALUES`,
+      `ON DUPLICATE KEY UPDATE
+         class_name=new.class_name, name=new.name, category=new.category,
+         output_item_name=new.output_item_name, output_item_uuid=new.output_item_uuid,
+         output_quantity=new.output_quantity, crafting_time_s=new.crafting_time_s,
+         station_type=new.station_type, skill_level=new.skill_level, game_env=new.game_env`,
+      11,
+      recipeRows,
+    );
+
+    // Save ingredients
+    let savedIngredients = 0;
+    const ingredientRows: (string | number | null)[][] = [];
+    for (const r of recipes) {
+      for (const ing of r.ingredients) {
+        ingredientRows.push([r.uuid, env, ing.itemName, ing.itemUuid, ing.quantity, ing.isOptional ? 1 : 0]);
+      }
+    }
+
+    if (ingredientRows.length > 0) {
+      savedIngredients = await ExtractionService.batchUpsert(
+        conn,
+        `INSERT INTO crafting_ingredients
+           (recipe_uuid, game_env, item_name, item_uuid, quantity, is_optional)
+         VALUES`,
+        `ON DUPLICATE KEY UPDATE
+           item_name=new.item_name, item_uuid=new.item_uuid,
+           quantity=new.quantity, is_optional=new.is_optional`,
+        6,
+        ingredientRows,
+      );
+    }
+
+    onProgress?.(`Crafting: ${savedRecipes} recipes, ${savedIngredients} ingredients saved [${env}]`);
+    return savedRecipes;
   }
 }

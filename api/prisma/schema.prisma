@@ -22,6 +22,7 @@ enum ChangelogEntityType {
   commodity
   shop
   module
+  recipe
 }
 
 enum ChangelogChangeType {
@@ -383,6 +384,8 @@ model Commodity {
   createdAt    DateTime @default(now()) @map("created_at") @db.DateTime(0)
   updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
 
+  prices CommodityPrice[]
+
   @@id([uuid, gameEnv])
   @@index([gameEnv], map: "idx_game_env")
   @@index([canonicalCommodityKey, gameEnv], map: "idx_commodity_canonical_key_env")
@@ -411,6 +414,7 @@ model Shop {
 
   // Relations
   inventory ShopInventory[]
+  commodityPrices CommodityPrice[]
 
   @@unique([className, gameEnv], map: "uk_shop_class_env")
   @@index([canonicalShopKey, gameEnv], map: "idx_shop_canonical_key_env")
@@ -457,6 +461,7 @@ model ExtractionLog {
   manufacturersCount Int              @default(0) @map("manufacturers_count")
   loadoutPortsCount  Int              @default(0) @map("loadout_ports_count")
   shopsCount         Int              @default(0) @map("shops_count")
+  recipesCount       Int              @default(0) @map("recipes_count")
   durationMs         Int?             @map("duration_ms")
   status             ExtractionStatus @default(success)
   errorMessage       String?          @map("error_message") @db.Text
@@ -558,8 +563,89 @@ model Mission {
   workInProgress     Boolean  @default(false) @map("work_in_progress")
   gameEnv            String   @default("live") @map("game_env") @db.VarChar(10)
 
+  // SCMDB parity: rewards
+  rewardMin          Int?     @map("reward_min")
+  rewardMax          Int?     @map("reward_max")
+  rewardCurrency     String?  @map("reward_currency") @db.VarChar(20)
+
+  // SCMDB parity: faction / giver
+  faction            String?  @db.VarChar(100)
+  missionGiver       String?  @map("mission_giver") @db.VarChar(200)
+
+  // SCMDB parity: location
+  locationSystem     String?  @map("location_system") @db.VarChar(100)
+  locationPlanet     String?  @map("location_planet") @db.VarChar(100)
+  locationName       String?  @map("location_name") @db.VarChar(200)
+
+  // SCMDB parity: difficulty / reputation
+  dangerLevel        Int?     @map("danger_level") @db.UnsignedTinyInt
+  requiredReputation Int?     @map("required_reputation")
+  reputationReward   Int?     @map("reputation_reward")
+
   @@id([uuid, gameEnv])
   @@index([missionType], map: "idx_mission_type")
   @@index([gameEnv], map: "idx_game_env")
+  @@index([faction], map: "idx_mission_faction")
+  @@index([locationSystem], map: "idx_mission_location_system")
   @@map("missions")
+}
+
+// ─── Crafting ─────────────────────────────────────────────────────────────────
+
+model CraftingRecipe {
+  uuid           String   @db.Char(36)
+  gameEnv        String   @default("live") @map("game_env") @db.VarChar(10)
+  className      String   @map("class_name") @db.VarChar(255)
+  name           String?  @db.VarChar(255)
+  category       String?  @db.VarChar(50)
+  outputItemName String?  @map("output_item_name") @db.VarChar(255)
+  outputItemUuid String?  @map("output_item_uuid") @db.Char(36)
+  outputQuantity Int      @default(1) @map("output_quantity")
+  craftingTime   Int?     @map("crafting_time_s")
+  stationType    String?  @map("station_type") @db.VarChar(100)
+  skillLevel     Int?     @map("skill_level")
+  createdAt      DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+
+  ingredients CraftingIngredient[]
+
+  @@id([uuid, gameEnv])
+  @@index([category], map: "idx_crafting_category")
+  @@index([gameEnv], map: "idx_crafting_game_env")
+  @@map("crafting_recipes")
+}
+
+model CraftingIngredient {
+  id             Int      @id @default(autoincrement())
+  recipeUuid     String   @map("recipe_uuid") @db.Char(36)
+  gameEnv        String   @default("live") @map("game_env") @db.VarChar(10)
+  itemName       String   @map("item_name") @db.VarChar(255)
+  itemUuid       String?  @map("item_uuid") @db.Char(36)
+  quantity       Int      @default(1)
+  isOptional     Boolean  @default(false) @map("is_optional")
+
+  recipe CraftingRecipe @relation(fields: [recipeUuid, gameEnv], references: [uuid, gameEnv], onDelete: Cascade, map: "fk_ingredient_recipe")
+
+  @@index([recipeUuid], map: "idx_ingredient_recipe")
+  @@map("crafting_ingredients")
+}
+
+// ── Trade Prices ──────────────────────────────────────────────────────────────
+
+model CommodityPrice {
+  id              Int      @id @default(autoincrement())
+  commodityUuid   String   @map("commodity_uuid") @db.Char(36)
+  gameEnv         String   @default("live") @map("game_env") @db.VarChar(10)
+  shopId          Int      @map("shop_id")
+  buyPrice        Decimal? @map("buy_price") @db.Decimal(12, 2)
+  sellPrice       Decimal? @map("sell_price") @db.Decimal(12, 2)
+  reportedAt      DateTime @default(now()) @map("reported_at") @db.DateTime(0)
+
+  commodity Commodity @relation(fields: [commodityUuid, gameEnv], references: [uuid, gameEnv], onDelete: Cascade, map: "fk_price_commodity")
+  shop      Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade, map: "fk_price_shop")
+
+  @@unique([commodityUuid, shopId, gameEnv], map: "uk_commodity_shop_env")
+  @@index([shopId], map: "idx_price_shop")
+  @@index([commodityUuid], map: "idx_price_commodity")
+  @@map("commodity_prices")
 }

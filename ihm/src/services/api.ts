@@ -3,20 +3,27 @@ import type {
   ChangelogEntry,
   ChangelogSummary,
   Commodity,
+  CommodityPrice as CommodityPriceRow,
   CompatibleComponent,
   Component,
   ComponentListItem,
+  CraftingCategory,
+  CraftingRecipe,
+  FpsDamageResult,
   Hardpoint,
   Item,
   ItemBuyLocation,
   ItemListItem,
   LoadoutNode,
   LoadoutResult,
+  LocationCommodityPrice,
   Manufacturer,
   MiningComposition,
   MiningElement,
+  MiningLaserInfo,
   MiningSolverResult,
   MiningStats,
+  MiningYieldResult,
   Mission,
   PaginatedResponse,
   PaintListItem,
@@ -30,6 +37,8 @@ import type {
   ShipStats,
   Shop,
   StatsOverview,
+  TradeLocation,
+  TradeRoute,
   Version,
 } from '@/types/api';
 import { API_BASE } from '@/utils/constants';
@@ -165,7 +174,7 @@ export const api = {
 
   // ─── Shops ─────────────────────────────────────────────────────────
   shops: {
-    list: (p?: { env?: string; system?: string; city?: string }) => get<Shop[]>('/shops', p),
+    list: (p?: { env?: string; system?: string; city?: string }) => get<PaginatedResponse<Shop>>('/shops', p),
     inventory: (id: number, env?: string) => get<unknown[]>(`/shops/${id}/inventory`, { env }),
   },
 
@@ -193,6 +202,23 @@ export const api = {
       post<LoadoutResult>('/loadout/calculate', { shipUuid, swaps }),
   },
 
+  // ─── Calculators ───────────────────────────────────────────────────
+  calculate: {
+    fpsDamage: (input: {
+      itemUuid: string;
+      env?: string;
+      fireMode?: 'Single' | 'Burst' | 'Auto';
+      hitbox?: 'head' | 'torso' | 'arm' | 'leg';
+      armorClass?: 'none' | 'light' | 'medium' | 'heavy';
+      health?: number;
+      barrelRateBonus?: number;
+      underbarrelDamageBonus?: number;
+      craftedMitigationBonus?: number;
+    }) => post<FpsDamageResult>('/calculate/fps-damage', input),
+    miningYield: (input: { compositionUuid: string; env?: string; laserUuid?: string; gadgetUuids?: string[] }) =>
+      post<MiningYieldResult>('/calculate/mining-yield', input),
+  },
+
   // ─── Mining ────────────────────────────────────────────────────────
   mining: {
     elements: (env?: string) => get<MiningElement[]>('/mining/elements', { env }),
@@ -200,6 +226,7 @@ export const api = {
     compositions: (includeEmpty = false, env?: string) =>
       get<MiningComposition[]>('/mining/compositions', { include_empty: includeEmpty || undefined, env }),
     composition: (uuid: string, env?: string) => get<MiningComposition>(`/mining/compositions/${uuid}`, { env }),
+    lasers: (env?: string) => get<MiningLaserInfo[]>('/mining/lasers', { env }),
     solveForElement: (elementUuid: string, minProbability?: number, env?: string) =>
       get<MiningSolverResult[]>('/mining/solver', { element: elementUuid, min_probability: minProbability, env }),
     solveForComposition: (compositionUuid: string, env?: string) =>
@@ -210,8 +237,50 @@ export const api = {
   // ─── Missions ──────────────────────────────────────────────────────
   missions: {
     types: (env?: string) => get<string[]>('/missions/types', { env }),
-    list: (filters?: { env?: string; type?: string; legal?: string; shared?: string; search?: string; page?: number; limit?: number }) =>
-      get<PaginatedResponse<Mission>>('/missions', filters as Record<string, string | number | undefined>),
+    factions: (env?: string) => get<string[]>('/missions/factions', { env }),
+    systems: (env?: string) => get<string[]>('/missions/systems', { env }),
+    list: (filters?: {
+      env?: string;
+      type?: string;
+      legal?: string;
+      shared?: string;
+      faction?: string;
+      system?: string;
+      minReward?: number;
+      search?: string;
+      page?: number;
+      limit?: number;
+    }) => get<PaginatedResponse<Mission>>('/missions', filters as Record<string, string | number | undefined>),
     get: (uuid: string) => get<Mission>(`/missions/${uuid}`),
+  },
+
+  // ─── Crafting ────────────────────────────────────────────────────────
+  crafting: {
+    categories: (env?: string) => get<CraftingCategory[]>('/crafting/categories', { env }),
+    stationTypes: (env?: string) => get<string[]>('/crafting/station-types', { env }),
+    recipes: (filters?: {
+      env?: string;
+      category?: string;
+      search?: string;
+      page?: number;
+      limit?: number;
+      skillLevel?: number;
+      stationType?: string;
+    }) => get<PaginatedResponse<CraftingRecipe>>('/crafting/recipes', filters as Record<string, string | number | undefined>),
+    recipe: (uuid: string, env?: string) => get<CraftingRecipe>(`/crafting/recipes/${uuid}`, { env }),
+  },
+
+  // ─── Trade ──────────────────────────────────────────────────────────
+  trade: {
+    locations: (env?: string) => get<TradeLocation[]>('/trade/locations', { env }),
+    systems: (env?: string) => get<string[]>('/trade/systems', { env }),
+    commodityPrices: (commodityUuid: string, env?: string) => get<CommodityPriceRow[]>(`/trade/prices/${commodityUuid}`, { env }),
+    locationPrices: (shopId: number, env?: string) => get<LocationCommodityPrice[]>(`/trade/location/${shopId}/prices`, { env }),
+    reportPrice: (data: { commodityUuid: string; shopId: number; buyPrice?: number; sellPrice?: number; env?: string }) =>
+      post<{ inserted?: boolean; updated?: boolean }>('/trade/prices', data),
+    routes: (
+      scu: number,
+      opts?: { budget?: number; env?: string; limit?: number; commodity?: string; buySystem?: string; sellSystem?: string; sort?: string },
+    ) => get<TradeRoute[]>('/trade/routes', { scu, ...opts }),
   },
 };

@@ -416,6 +416,87 @@ export interface MiningStats {
   parts: number;
 }
 
+// ─── Crafting ─────────────────────────────────────────────────────────────────
+export interface CraftingRecipe {
+  uuid: string;
+  class_name: string;
+  name: string | null;
+  category: string | null;
+  output_item_name: string | null;
+  output_item_uuid: string | null;
+  output_quantity: number;
+  crafting_time_s: number | null;
+  station_type: string | null;
+  skill_level: number | null;
+  game_env: string;
+  ingredients?: CraftingIngredient[];
+}
+
+export interface CraftingIngredient {
+  id: number;
+  item_name: string;
+  item_uuid: string | null;
+  quantity: number;
+  is_optional: boolean;
+}
+
+export interface CraftingCategory {
+  category: string;
+  count: number;
+}
+
+// ─── Trade ────────────────────────────────────────────────────────────────────
+export interface TradeLocation {
+  id: number;
+  name: string;
+  location: string | null;
+  system: string | null;
+  planet_moon: string | null;
+  city: string | null;
+  shop_type: string | null;
+}
+
+export interface CommodityPrice {
+  id: number;
+  buy_price: number | null;
+  sell_price: number | null;
+  reported_at: string;
+  shop_id: number;
+  shop_name: string;
+  system: string | null;
+  planet_moon: string | null;
+  city: string | null;
+}
+
+export interface LocationCommodityPrice {
+  id: number;
+  commodity_uuid: string;
+  commodity_name: string;
+  commodity_type: string;
+  symbol: string | null;
+  occupancy_scu: number | null;
+  buy_price: number | null;
+  sell_price: number | null;
+  reported_at: string;
+}
+
+export interface TradeRoute {
+  buyCommodity: string;
+  buyShop: string;
+  buyLocation: string;
+  buySystem: string | null;
+  buyPrice: number;
+  sellShop: string;
+  sellLocation: string;
+  sellSystem: string | null;
+  sellPrice: number;
+  profitPerUnit: number;
+  profitPerScu: number;
+  totalProfit: number;
+  totalInvestment: number;
+  scu: number;
+}
+
 // ─── Missions ─────────────────────────────────────────────────────────────────
 export interface Mission {
   uuid: string;
@@ -587,10 +668,21 @@ export interface ItemBuyLocation {
 }
 
 // ─── Search ───────────────────────────────────────────────────────────────────
+export interface SearchResultEntity {
+  uuid: string;
+  class_name?: string;
+  name: string;
+  type?: string;
+  sub_type?: string;
+}
+
 export interface SearchResult {
   ships: ShipListItem[];
   components: ComponentListItem[];
   items: ItemListItem[];
+  commodities: SearchResultEntity[];
+  missions: SearchResultEntity[];
+  recipes: SearchResultEntity[];
 }
 
 // ─── Hardpoints ───────────────────────────────────────────────────────────────
@@ -631,4 +723,63 @@ export interface ShipModule {
   module_uuid: string | null;
   is_default: boolean;
   loadout_json: LoadoutNode[] | null;
+}
+
+// ─── Calculator results ───────────────────────────────────────────────────────
+export interface FpsDamageResult {
+  baseDamage: number;
+  baseRpm: number;
+  effectiveRpm: number;
+  reductionPct: number;
+  damagePerShot: number;
+  sustainedDps: number;
+  burstDps: number;
+  shotsToKill: number;
+  ttk: number;
+  timeline: number[];
+  activeModifiers: string[];
+  magazineSize: number | null;
+  effectiveRange: number | null;
+  damagePhysical: number;
+  damageEnergy: number;
+  damageDistortion: number;
+}
+
+export interface MiningElementYield {
+  elementName: string;
+  elementUuid: string;
+  probability: number;
+  baseYield: number;
+  optimizedYield: number;
+  optimalWindow: number;
+  windowStart: number;
+  windowEnd: number;
+}
+
+export interface MiningRiskAggregates {
+  maxInstability: number;
+  avgInstability: number;
+  maxResistance: number;
+  avgResistance: number;
+}
+
+export interface MiningLaserInfo {
+  uuid: string;
+  name: string;
+  size: number | null;
+  grade: string | null;
+  manufacturerCode: string | null;
+  manufacturerName?: string | null;
+  miningSpeed: number;
+  miningRange: number;
+  miningResistance: number;
+  miningInstability: number;
+}
+
+export interface MiningYieldResult {
+  compositionName: string;
+  elements: MiningElementYield[];
+  risk: MiningRiskAggregates | null;
+  laser: MiningLaserInfo | null;
+  gadgets: MiningLaserInfo[];
 }

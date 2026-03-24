@@ -11,6 +11,7 @@
 import type { PrismaClient } from '@prisma/client';
 import { CommodityQueryService } from './commodity-query-service.js';
 import { ComponentQueryService } from './component-query-service.js';
+import { CraftingService } from './crafting-service.js';
 import { ItemQueryService } from './item-query-service.js';
 import { LoadoutService } from './loadout-service.js';
 import { MiningQueryService } from './mining-query-service.js';
@@ -19,6 +20,7 @@ import { PaintQueryService } from './paint-query-service.js';
 import type { PaginatedResult, Row } from './shared.js';
 import { ShipQueryService } from './ship-query-service.js';
 import { ShopService } from './shop-service.js';
+import { TradeService } from './trade-service.js';
 
 export type { PaginatedResult, Row };
 
@@ -46,6 +48,8 @@ export class GameDataService {
   readonly commodities: CommodityQueryService;
   readonly mining: MiningQueryService;
   readonly missions: MissionService;
+  readonly crafting: CraftingService;
+  readonly trade: TradeService;
 
   private statsCache = new TtlCache<Record<string, unknown>>(60_000);
   private publicStatsCache = new TtlCache<Record<string, unknown>>(60_000);
@@ -60,14 +64,20 @@ export class GameDataService {
     this.commodities = new CommodityQueryService(prisma);
     this.mining = new MiningQueryService(prisma);
     this.missions = new MissionService(prisma);
+    this.crafting = new CraftingService(prisma);
+    this.trade = new TradeService(prisma);
   }
 
   // ── Unified search (cross-cutting — queries ships + components + items) ──
 
-  async unifiedSearch(q: string, limit = 10, env = 'live'): Promise<{ ships: Row[]; components: Row[]; items: Row[] }> {
+  async unifiedSearch(
+    q: string,
+    limit = 10,
+    env = 'live',
+  ): Promise<{ ships: Row[]; components: Row[]; items: Row[]; commodities: Row[]; missions: Row[]; recipes: Row[] }> {
     const cap = Math.min(limit, 20);
     const t = `%${q}%`;
-    const [ships, components, items] = await Promise.all([
+    const [ships, components, items, commodities, missions, recipes] = await Promise.all([
       this.ships.searchShipsAutocomplete(q, cap, env),
       this.prisma.$queryRawUnsafe<Row[]>(
         `SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade, c.manufacturer_code,
@@ -87,8 +97,33 @@ export class GameDataService {
         t,
         t,
       ),
+      this.prisma.$queryRawUnsafe<Row[]>(
+        `SELECT co.uuid, co.class_name, co.name, co.type
+         FROM commodities co WHERE co.game_env = ? AND (co.name LIKE ? OR co.class_name LIKE ?)
+         ORDER BY co.name LIMIT ${cap}`,
+        env,
+        t,
+        t,
+      ),
+      this.prisma.$queryRawUnsafe<Row[]>(
+        `SELECT ms.uuid, ms.class_name, ms.title as name, ms.type
+         FROM missions ms WHERE ms.game_env = ? AND (ms.title LIKE ? OR ms.class_name LIKE ?)
+         ORDER BY ms.title LIMIT ${cap}`,
+        env,
+        t,
+        t,
+      ),
+      this.prisma.$queryRawUnsafe<Row[]>(
+        `SELECT cr.uuid, cr.class_name, cr.name, cr.category
+         FROM crafting_recipes cr WHERE cr.game_env = ? AND (cr.name LIKE ? OR cr.class_name LIKE ? OR cr.output_item_name LIKE ?)
+         ORDER BY cr.name LIMIT ${cap}`,
+        env,
+        t,
+        t,
+        t,
+      ),
     ]);
-    return { ships, components, items };
+    return { ships, components, items, commodities, missions, recipes };
   }
 
   // ── Stats & system info ──────────────────────────────────────────────────

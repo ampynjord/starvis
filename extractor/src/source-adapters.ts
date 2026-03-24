@@ -180,14 +180,10 @@ function count(data: ExternalCanonicalData): number {
 }
 
 export async function loadExternalCanonicalData(): Promise<ExternalCanonicalData> {
-  const cornerstonePath = process.env.STARVIS_CORNERSTONE_CANONICAL_JSON?.trim();
   const communityPath = process.env.STARVIS_COMMUNITY_CANONICAL_JSON?.trim();
-  const cornerstoneUrl = process.env.STARVIS_CORNERSTONE_CANONICAL_URL?.trim();
   const communityUrl = process.env.STARVIS_COMMUNITY_CANONICAL_URL?.trim();
-  const apiKey = process.env.STARVIS_CORNERSTONE_API_KEY?.trim();
-  const authHeader = process.env.STARVIS_CORNERSTONE_AUTH_HEADER?.trim() || 'X-API-Key';
 
-  if (!cornerstonePath && !communityPath && !cornerstoneUrl && !communityUrl) return EMPTY_DATA;
+  if (!communityPath && !communityUrl) return EMPTY_DATA;
 
   const result: ExternalCanonicalData = {
     items: new Map(),
@@ -197,12 +193,6 @@ export async function loadExternalCanonicalData(): Promise<ExternalCanonicalData
   };
 
   const sources = [
-    {
-      name: 'cornerstone',
-      path: cornerstonePath,
-      url: cornerstoneUrl,
-      defaults: { sourceType: 'cornerstone' as CanonicalSourceType, sourceName: 'cornerstone' },
-    },
     {
       name: 'community',
       path: communityPath,
@@ -217,9 +207,7 @@ export async function loadExternalCanonicalData(): Promise<ExternalCanonicalData
     if (source.path) payload = readPayload(source.path);
 
     if (!payload && source.url) {
-      const headers: Record<string, string> = {};
-      if (source.name === 'cornerstone' && apiKey) headers[authHeader] = apiKey;
-      payload = await fetchPayload(source.url, headers);
+      payload = await fetchPayload(source.url, {});
     }
 
     if (!payload) continue;

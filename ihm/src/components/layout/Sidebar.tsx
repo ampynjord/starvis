@@ -5,13 +5,17 @@ import {
   Crosshair,
   ExternalLink,
   Factory,
+  FlaskConical,
   Home,
   Layers3,
+  Paintbrush,
   Pickaxe,
   Rocket,
+  Search,
   Settings2,
   ShoppingBag,
   SlidersHorizontal,
+  TrendingUp,
   Trophy,
   Wrench,
   ClipboardList,
@@ -21,7 +25,9 @@ import { useEnv } from '@/contexts/EnvContext';
 
 const CORE_ITEMS = [
   { to: '/',              icon: Home,          label: 'Dashboard' },
+  { to: '/search',        icon: Search,        label: 'Search' },
   { to: '/missions',      icon: ClipboardList, label: 'Missions' },
+  { to: '/crafting',      icon: FlaskConical,  label: 'Crafting' },
   { to: '/manufacturers', icon: Wrench,        label: 'Manufacturers' },
   { to: '/shops',         icon: ShoppingBag,   label: 'Shops' },
 ];
@@ -32,6 +38,7 @@ const SHIP_ITEMS = [
   { to: '/outfitter',     icon: SlidersHorizontal, label: 'Outfitter' },
   { to: '/compare',       icon: BarChart3,     label: 'Compare' },
   { to: '/ranking',       icon: Trophy,        label: 'Ranking' },
+  { to: '/paints',        icon: Paintbrush,    label: 'Paints' },
 ];
 
 const FPS_ITEMS = [
@@ -41,7 +48,8 @@ const FPS_ITEMS = [
 ];
 
 const INDUSTRIAL_ITEMS = [
-  { to: '/industrial',    icon: Factory,       label: 'Industrial' },
+  { to: '/industrial',    icon: Factory,       label: 'Commodities' },
+  { to: '/trade',         icon: TrendingUp,    label: 'Trade Routes' },
   { to: '/mining',        icon: Pickaxe,       label: 'Mining' },
 ];
 

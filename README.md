@@ -779,23 +779,20 @@ Les écritures en DB ne se font qu'au démarrage ou via les endpoints admin POST
 
 ## CI/CD
 
-Pipeline GitHub Actions (`.github/workflows/ci.yml`) en 5 jobs standards + 2 jobs manuels :
+Pipeline GitHub Actions (`.github/workflows/ci.yml`) en 4 jobs standards + 1 job manuel :
 
 | Job | Description | Déclencheur |
 |-----|-------------|-------------|
 | **🔍 Lint** | Type-check TypeScript (`tsc --noEmit`) API + Extractor + build IHM + `npm audit` | push/PR sur `main` |
-| **🌐 Cornerstone adapter probe** | Dry-run manuel des sources externes CANONICAL (URL/API key) pour valider le mapping avant extraction réelle | `workflow_dispatch` (opt-in) |
 | **🩺 Safe smoke prod** | Vérification API production (et routes IHM en option) avec pacing + retries anti-429/5xx (`smoke-prod-safe.mjs`) | `workflow_dispatch` (opt-in) |
 | **🧪 Test** | Tests unitaires Vitest (52 API + 44 Extractor) + E2E Playwright (16+ tests) + coverage Codecov | après Lint |
 | **🐳 Build** | Build Docker + push sur ghcr.io (API + IHM) | push sur `main` uniquement |
 | **🚀 Deploy** | SSH sur VPS : `git pull`, `docker compose pull/up`, health check | après Test + Build |
 
-### Jobs manuels (Cornerstone + smoke prod)
+### Jobs manuels (smoke prod)
 
 Le workflow expose ces inputs lors d'un lancement manuel :
 - `run_full_pipeline` : exécute lint/test/build lors d'un `workflow_dispatch` (désactivé par défaut)
-- `run_cornerstone_adapter_probe` : active le job de probe externe
-- `cornerstone_probe_sample` : nombre de lignes d'exemple affichées par `dry-run:adapters`
 - `run_safe_smoke_prod` : active le smoke test API production
 - `safe_smoke_base_url` : URL de base de l'API ciblée par le smoke test
 - `safe_smoke_pace_ms` : délai entre requêtes pour éviter le throttling
@@ -803,17 +800,7 @@ Le workflow expose ces inputs lors d'un lancement manuel :
 - `safe_smoke_include_frontend` : active aussi le test des routes IHM
 - `safe_smoke_frontend_base_url` : URL de base utilisée pour les routes IHM
 
-Par défaut, un lancement manuel exécute uniquement les jobs explicitement demandés (par ex. le probe) et ne déclenche pas le déploiement.
-
-Secrets GitHub recommandés (Repository ou Environment) :
-- `CANONICAL_SOURCE_COMPONENTS_URL`
-- `CANONICAL_SOURCE_ITEMS_URL`
-- `CANONICAL_SOURCE_COMMODITIES_URL`
-- `CANONICAL_SOURCE_SHOPS_URL`
-- `CANONICAL_SOURCE_API_KEY_HEADER` (optionnel)
-- `CANONICAL_SOURCE_API_KEY` (optionnel)
-
-Le job échoue explicitement si aucune URL `CANONICAL_SOURCE_*_URL` n'est définie.
+Par défaut, un lancement manuel exécute uniquement les jobs explicitement demandés et ne déclenche pas le déploiement.
 
 **Tests E2E** (Playwright) :
 - Health checks (live/ready/metrics/cache)

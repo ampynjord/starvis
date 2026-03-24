@@ -14,6 +14,7 @@ import { CompositionBreakdown } from '@/components/mining/CompositionBreakdown';
 import { RiskAssessment } from '@/components/mining/RiskAssessment';
 import { YieldCalculator } from '@/components/mining/YieldCalculator';
 import { WorkflowProgress, type WorkflowPhase } from '@/components/mining/WorkflowProgress';
+import { LaserSelector } from '@/components/mining/LaserSelector';
 
 export default function MiningPage() {
   const { env } = useEnv();
@@ -22,10 +23,31 @@ export default function MiningPage() {
   const [compositionData, setCompositionData] = useState<MiningCompositionView | null>(null);
   const [selectedElementUuid, setSelectedElementUuid] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [selectedLaserUuid, setSelectedLaserUuid] = useState<string | undefined>();
+  const [selectedGadgetUuids, setSelectedGadgetUuids] = useState<string[]>([]);
 
   const { data: compositions, isLoading: loadingCompositions, error: compositionsError } = useQuery({
     queryKey: ['mining.compositions', env],
     queryFn: () => api.mining.compositions(false, env),
+    staleTime: 30 * 60_000,
+  });
+
+  const { data: lasers } = useQuery({
+    queryKey: ['mining.lasers', env],
+    queryFn: () => api.mining.lasers(env),
+    staleTime: 30 * 60_000,
+  });
+
+  const { data: yieldData } = useQuery({
+    queryKey: ['mining.yield', env, compositionData?.id, selectedLaserUuid, selectedGadgetUuids],
+    queryFn: () =>
+      api.calculate.miningYield({
+        compositionUuid: compositionData!.id,
+        env,
+        laserUuid: selectedLaserUuid,
+        gadgetUuids: selectedGadgetUuids.length > 0 ? selectedGadgetUuids : undefined,
+      }),
+    enabled: !!compositionData?.id,
     staleTime: 30 * 60_000,
   });
 
@@ -54,7 +76,7 @@ export default function MiningPage() {
         <div className="flex items-center gap-3">
           <Pickaxe size={20} className="text-cyan-400" />
           <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">
-            Mining Solver
+            Mining Calculator
           </h1>
         </div>
         <p className="text-sm text-slate-500 mt-1 font-mono-sc">
@@ -113,6 +135,19 @@ export default function MiningPage() {
               </ScifiPanel>
             </motion.div>
           )}
+
+          {/* Laser & Gadget Selector */}
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-4">
+            <ScifiPanel title="Equipment" subtitle="Mining laser & gadgets">
+              <LaserSelector
+                lasers={lasers ?? []}
+                selectedLaserUuid={selectedLaserUuid}
+                selectedGadgetUuids={selectedGadgetUuids}
+                onLaserChange={setSelectedLaserUuid}
+                onGadgetsChange={setSelectedGadgetUuids}
+              />
+            </ScifiPanel>
+          </motion.div>
         </div>
 
         {/* Right: Phase Content (Composition, Risk, Yield) */}
@@ -150,7 +185,7 @@ export default function MiningPage() {
               subtitle="Instability, resistance, and hazard zones"
               className={currentPhase === 'risk' ? 'ring-1 ring-cyan-600/30' : ''}
             >
-              <RiskAssessment data={compositionData} selectedElementUuid={selectedElementUuid} />
+              <RiskAssessment data={compositionData} risk={yieldData?.risk ?? null} selectedElementUuid={selectedElementUuid} />
             </ScifiPanel>
           </motion.div>
 
@@ -165,9 +200,51 @@ export default function MiningPage() {
               title="4. Yield Optimization"
               subtitle="Optimal laser power windows and expected output"
             >
-              <YieldCalculator data={compositionData} selectedElementUuid={selectedElementUuid} />
+              <YieldCalculator yieldResults={yieldData?.elements ?? null} selectedElementUuid={selectedElementUuid} />
             </ScifiPanel>
           </motion.div>
+
+          {/* Laser Comparison Table */}
+          {lasers && lasers.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.15 }}>
+              <ScifiPanel title="Laser Comparison" subtitle="All mining lasers side-by-side">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs font-mono-sc">
+                    <thead>
+                      <tr className="border-b border-slate-800 text-slate-500">
+                        <th className="text-left p-2">Laser</th>
+                        <th className="text-center p-2">Size</th>
+                        <th className="text-center p-2">Grade</th>
+                        <th className="text-right p-2">Speed</th>
+                        <th className="text-right p-2">Range</th>
+                        <th className="text-right p-2">Resistance</th>
+                        <th className="text-right p-2">Instability</th>
+                        <th className="text-left p-2">Manufacturer</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lasers.map((laser) => (
+                        <tr
+                          key={laser.uuid}
+                          onClick={() => setSelectedLaserUuid(laser.uuid)}
+                          className={`border-b border-slate-800/50 cursor-pointer transition-colors ${selectedLaserUuid === laser.uuid ? 'bg-cyan-950/30 border-cyan-800' : 'hover:bg-slate-800/30'}`}
+                        >
+                          <td className="p-2 text-slate-300">{laser.name}</td>
+                          <td className="p-2 text-center text-cyan-400">S{laser.size}</td>
+                          <td className="p-2 text-center text-slate-400">{laser.grade ?? '—'}</td>
+                          <td className="p-2 text-right text-green-400">{laser.miningSpeed.toFixed(2)}</td>
+                          <td className="p-2 text-right text-blue-400">{laser.miningRange.toFixed(0)}m</td>
+                          <td className="p-2 text-right text-amber-400">{laser.miningResistance.toFixed(3)}</td>
+                          <td className="p-2 text-right text-red-400">{laser.miningInstability.toFixed(3)}</td>
+                          <td className="p-2 text-slate-500">{laser.manufacturerName ?? '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </ScifiPanel>
+            </motion.div>
+          )}
         </div>
       </div>
     </div>
