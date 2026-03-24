@@ -20,10 +20,12 @@ export default function ShopsPage() {
 
   if (isLoading) return <LoadingGrid message="LOADING SHOPS…" />;
   if (error)     return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
-  if (!shops?.length) return <EmptyState icon="🛒" title="No shops" />;
+  if (!shops?.data?.length) return <EmptyState icon="🛒" title="No shops" />;
+
+  const shopList = shops.data;
 
   // Group by system
-  const bySystem = shops.reduce<Record<string, Shop[]>>((acc, shop) => {
+  const bySystem = shopList.reduce<Record<string, Shop[]>>((acc, shop) => {
     const key = shop.system ?? 'Inconnu';
     if (!acc[key]) acc[key] = [];
     acc[key].push(shop);
@@ -34,7 +36,7 @@ export default function ShopsPage() {
     <div className="max-w-screen-xl mx-auto space-y-6">
       <div>
         <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Shops</h1>
-        <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">{shops.length} shops</p>
+        <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">{shopList.length} shops</p>
       </div>
 
       {Object.entries(bySystem).sort((a, b) => a[0].localeCompare(b[0])).map(([system, shops]) => (

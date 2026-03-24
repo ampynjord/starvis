@@ -4,9 +4,9 @@
  */
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, ChevronDown, Settings2, X, Zap, Shield, Wind, Cpu, Search, RefreshCw, Copy, ExternalLink } from 'lucide-react';
-import { useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { ChevronRight, ChevronDown, Settings2, X, Zap, Shield, Wind, Cpu, Search, RefreshCw, Copy, ExternalLink, AlertTriangle } from 'lucide-react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
@@ -487,12 +487,14 @@ function HardpointRow({
 
 export default function OutfitterPage() {
   const { env } = useEnv();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [shipSearch, setShipSearch]     = useState('');
   const [selectedShip, setSelectedShip] = useState<ShipListItem | null>(null);
   // swaps: portId (number) → componentUuid
   const [swaps, setSwaps]               = useState<Record<number, string>>({});
   const [activePort, setActivePort]     = useState<ActivePort | null>(null);
   const dShipSearch = useDebounce(shipSearch, 300);
+  const restoredRef = useRef(false);
 
   const { data: shipSuggestions } = useQuery({
     queryKey: ['ships.search', dShipSearch, env],
@@ -507,6 +509,38 @@ export default function OutfitterPage() {
   >({
     mutationFn: (args) => api.loadout.calculate(args.uuid, args.swaps),
   });
+
+  // Restore state from URL params on mount (?ship=UUID&swaps=portId:compUuid,...)
+  useEffect(() => {
+    if (restoredRef.current) return;
+    const shipUuid = searchParams.get('ship');
+    if (!shipUuid) return;
+    restoredRef.current = true;
+
+    const swapsParam = searchParams.get('swaps');
+    const parsedSwaps: Record<number, string> = {};
+    if (swapsParam) {
+      for (const entry of swapsParam.split(',')) {
+        const [portId, compUuid] = entry.split(':');
+        if (portId && compUuid) parsedSwaps[Number(portId)] = compUuid;
+      }
+    }
+
+    // Load ship info and fire calculation
+    api.ships.search(shipUuid, 1, env).then((results) => {
+      const ship = results?.find((s) => s.uuid === shipUuid);
+      if (!ship) return;
+      setSelectedShip(ship);
+      setSwaps(parsedSwaps);
+      calculate({
+        uuid: shipUuid,
+        swaps: Object.entries(parsedSwaps).map(([portId, componentUuid]) => ({
+          portId: Number(portId),
+          componentUuid,
+        })),
+      });
+    });
+  }, [searchParams, env, calculate]);
 
   const loadShip = useCallback((ship: ShipListItem) => {
     setSelectedShip(ship);
@@ -542,15 +576,31 @@ export default function OutfitterPage() {
     const swapEntries = Object.entries(swaps).map(([id, uuid]) => `${id}:${uuid}`).join(',');
     const params = new URLSearchParams({ ship: selectedShip.uuid });
     if (swapEntries) params.set('swaps', swapEntries);
-    navigator.clipboard.writeText(`${window.location.origin}/outfitter?${params}`);
+    const url = `${window.location.origin}/outfitter?${params}`;
+    setSearchParams(params, { replace: true });
+    navigator.clipboard.writeText(url);
   };
 
   const stats = loadout?.stats;
   const totalDps    = stats?.weapons?.total_dps ?? 0;
+  const burstDps    = stats?.weapons?.total_burst_dps ?? 0;
   const totalShield = stats?.shields?.total_hp ?? 0;
+  const shieldRegen = stats?.shields?.total_regen ?? 0;
   const powerDraw   = stats?.power?.total_draw ?? 0;
+  const powerOutput = stats?.power?.total_output ?? 0;
+  const powerBalance = stats?.power?.balance ?? 0;
+  const thermalHeat = stats?.thermal?.total_heat_generation ?? 0;
+  const thermalCool = stats?.thermal?.total_cooling_rate ?? 0;
+  const thermalBalance = stats?.thermal?.balance ?? 0;
   const scmSpeed    = stats?.mobility?.scm_speed || null;
+  const maxSpeed    = stats?.mobility?.max_speed || null;
+  const qdSpeed     = stats?.quantum_drive?.speed || null;
+  const qdSpoolTime = stats?.quantum_drive?.spool_time || null;
+  const ehp         = stats?.hull?.ehp || null;
+  const missileDmg  = stats?.missiles?.total_damage ?? 0;
   const hasSwaps    = Object.keys(swaps).length > 0;
+  const powerOverload = powerBalance < 0;
+  const thermalOverload = thermalBalance < 0;
 
   // Group hardpoints by category, respecting CATEGORY_ORDER
   const hardpointsByCategory = (() => {
@@ -661,14 +711,47 @@ export default function OutfitterPage() {
           {isPending ? (
             <LoadingGrid message="COMPUTING LOADOUT…" />
           ) : loadout && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-wrap gap-2">
-              {totalDps > 0 && <StatChip icon={Zap} label="Total DPS" value={fNumber(totalDps, 1)} accent="red" />}
-              {totalShield > 0 && <StatChip icon={Shield} label="Shield HP" value={fNumber(totalShield, 0)} accent="blue" />}
-              {scmSpeed != null && scmSpeed > 0 && <StatChip icon={Wind} label="SCM" value={fNumber(scmSpeed, 0) + ' m/s'} />}
-              {powerDraw > 0 && <StatChip icon={Cpu} label="Power draw" value={fNumber(powerDraw, 0) + ' W'} accent="red" />}
-              {hasSwaps && (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-950/30 rounded border border-amber-900/60 text-amber-400 text-[10px] font-mono-sc uppercase">
-                  ✦ {Object.keys(swaps).length} custom component{Object.keys(swaps).length > 1 ? 's' : ''}
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-2">
+              <div className="flex flex-wrap gap-2">
+                {totalDps > 0 && <StatChip icon={Zap} label="Total DPS" value={fNumber(totalDps, 1)} accent="red" />}
+                {burstDps > 0 && <StatChip icon={Zap} label="Burst DPS" value={fNumber(burstDps, 1)} accent="red" />}
+                {missileDmg > 0 && <StatChip icon={Zap} label="Missiles" value={fNumber(missileDmg, 0)} accent="amber" />}
+                {totalShield > 0 && <StatChip icon={Shield} label="Shield HP" value={fNumber(totalShield, 0)} accent="blue" />}
+                {shieldRegen > 0 && <StatChip icon={Shield} label="Shield Regen" value={fNumber(shieldRegen, 1) + '/s'} accent="blue" />}
+                {ehp != null && <StatChip icon={Shield} label="EHP" value={fNumber(ehp, 0)} accent="green" />}
+                {scmSpeed != null && scmSpeed > 0 && <StatChip icon={Wind} label="SCM" value={fNumber(scmSpeed, 0) + ' m/s'} />}
+                {maxSpeed != null && maxSpeed > 0 && <StatChip icon={Wind} label="Max" value={fNumber(maxSpeed, 0) + ' m/s'} />}
+                {qdSpeed != null && <StatChip icon={Wind} label="QD Speed" value={fNumber(qdSpeed / 1000, 0) + ' km/s'} accent="purple" />}
+                {qdSpoolTime != null && <StatChip icon={Wind} label="QD Spool" value={fNumber(qdSpoolTime, 1) + 's'} accent="purple" />}
+                {powerOutput > 0 && (
+                  <StatChip icon={Cpu} label="Power" value={`${fNumber(powerDraw, 0)} / ${fNumber(powerOutput, 0)} W`} accent={powerOverload ? 'red' : 'cyan'} />
+                )}
+                {hasSwaps && (
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-950/30 rounded border border-amber-900/60 text-amber-400 text-[10px] font-mono-sc uppercase">
+                    ✦ {Object.keys(swaps).length} custom component{Object.keys(swaps).length > 1 ? 's' : ''}
+                  </div>
+                )}
+              </div>
+
+              {/* Power/Thermal budget warnings */}
+              {(powerOverload || thermalOverload) && (
+                <div className="flex flex-wrap gap-2">
+                  {powerOverload && (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-950/40 rounded border border-red-800/60">
+                      <AlertTriangle size={12} className="text-red-400 shrink-0" />
+                      <span className="text-[10px] text-red-400 font-mono-sc">
+                        Power overload: {fNumber(powerDraw, 0)}W draw &gt; {fNumber(powerOutput, 0)}W output ({fNumber(Math.abs(powerBalance), 0)}W deficit)
+                      </span>
+                    </div>
+                  )}
+                  {thermalOverload && (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-950/40 rounded border border-orange-800/60">
+                      <AlertTriangle size={12} className="text-orange-400 shrink-0" />
+                      <span className="text-[10px] text-orange-400 font-mono-sc">
+                        Thermal overload: {fNumber(thermalHeat, 0)} heat &gt; {fNumber(thermalCool, 0)} cooling ({fNumber(Math.abs(thermalBalance), 0)} deficit)
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
             </motion.div>

@@ -13,7 +13,7 @@ type Props = {
 
 function sourceColor(sourceType?: string | null): 'cyan' | 'amber' | 'slate' {
   if (!sourceType) return 'slate';
-  if (sourceType === 'cornerstone' || sourceType === 'community_log') return 'cyan';
+  if (sourceType === 'community_log') return 'cyan';
   if (sourceType === 'manual' || sourceType === 'derived') return 'amber';
   return 'slate';
 }

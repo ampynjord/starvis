@@ -1,4 +1,4 @@
-export type CanonicalSourceType = 'p4k_datamine' | 'cornerstone' | 'community_log' | 'manual' | 'derived';
+export type CanonicalSourceType = 'p4k_datamine' | 'community_log' | 'manual' | 'derived';
 
 export interface CanonicalShopInput {
   name: string;
@@ -145,7 +145,7 @@ export function canonicalizeInventoryRecord(input: CanonicalInventoryInput): Can
     sourceType: input.sourceType,
     sourceName: input.sourceName,
     sourceReference: input.sourceReference ?? null,
-    confidenceScore: clampConfidence(input.confidenceScore, input.sourceType === 'cornerstone' ? 85 : 70),
+    confidenceScore: clampConfidence(input.confidenceScore, 70),
   };
 }
 
