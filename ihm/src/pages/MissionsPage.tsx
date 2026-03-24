@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Clock, Coins, MapPin, Scale, Search, Share2, Shield, Skull, Star, User } from 'lucide-react';
+import { Clock, Coins, MapPin, Scale, Search, Share2, Shield, Skull, Star } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '@/services/api';

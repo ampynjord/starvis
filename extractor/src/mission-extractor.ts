@@ -148,7 +148,10 @@ export function extractMissions(ctx: DataForgeService, locService?: { resolveKey
       let locationSystem: string | null = null;
       let locationPlanet: string | null = null;
       let locationName: string | null = null;
-      const location = (data.contractLocation ?? data.location ?? cc.targetLocation ?? params.location) as Record<string, unknown> | string | undefined;
+      const location = (data.contractLocation ?? data.location ?? cc.targetLocation ?? params.location) as
+        | Record<string, unknown>
+        | string
+        | undefined;
       if (typeof location === 'string') {
         locationName = location;
       } else if (location && typeof location === 'object') {
@@ -164,7 +167,10 @@ export function extractMissions(ctx: DataForgeService, locService?: { resolveKey
       const danger = data.dangerLevel ?? data.difficultyLevel ?? data.threatLevel ?? params.dangerLevel;
       if (typeof danger === 'number' && danger > 0) dangerLevel = danger;
 
-      const repReq = (data.reputationRequirements ?? data.requiredReputation ?? cc.reputationRequirements) as Record<string, unknown> | number | undefined;
+      const repReq = (data.reputationRequirements ?? data.requiredReputation ?? cc.reputationRequirements) as
+        | Record<string, unknown>
+        | number
+        | undefined;
       if (typeof repReq === 'number') {
         requiredReputation = repReq;
       } else if (repReq && typeof repReq === 'object') {

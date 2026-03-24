@@ -594,8 +594,8 @@ export default function OutfitterPage() {
   const thermalBalance = stats?.thermal?.balance ?? 0;
   const scmSpeed    = stats?.mobility?.scm_speed || null;
   const maxSpeed    = stats?.mobility?.max_speed || null;
-  const qdSpeed     = stats?.quantum_drive?.speed || null;
-  const qdSpoolTime = stats?.quantum_drive?.spool_time || null;
+  const qdSpeed     = stats?.quantum?.speed || null;
+  const qdSpoolTime = stats?.quantum?.spool_time || null;
   const ehp         = stats?.hull?.ehp || null;
   const missileDmg  = stats?.missiles?.total_damage ?? 0;
   const hasSwaps    = Object.keys(swaps).length > 0;
