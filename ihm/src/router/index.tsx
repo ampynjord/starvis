@@ -27,14 +27,17 @@ const OutfitterPage       = lazy(() => import('@/pages/OutfitterPage'));
 const MiningPage          = lazy(() => import('@/pages/MiningPage'));
 const FpsCalculatorPage   = lazy(() => import('@/pages/FpsCalculatorPage'));
 const MissionsPage        = lazy(() => import('@/pages/MissionsPage'));
+const CraftingPage        = lazy(() => import('@/pages/CraftingPage'));
+const TradePage           = lazy(() => import('@/pages/TradePage'));
+const PaintsPage          = lazy(() => import('@/pages/PaintsPage'));
+const MineralsLibraryPage = lazy(() => import('@/pages/MineralsLibraryPage'));
+const SearchResultsPage   = lazy(() => import('@/pages/SearchResultsPage'));
 const NotFoundPage        = lazy(() => import('@/pages/NotFoundPage'));
 
 const legacyRedirects: Array<{ path: string; to: string }> = [
-  { path: 'minerals', to: '/mining' },
   { path: 'equipment', to: '/components' },
   { path: 'items', to: '/fps-gear' },
   { path: 'commodities', to: '/industrial' },
-  { path: 'paints', to: '/ships' },
 ];
 
 export const router = createBrowserRouter([
@@ -55,6 +58,11 @@ export const router = createBrowserRouter([
       { path: 'industrial', element: wrap(CommoditiesPage) },
       ...legacyRedirects.map(({ path, to }) => ({ path, element: <Navigate to={to} replace /> })),
       { path: 'missions', element: wrap(MissionsPage) },
+      { path: 'crafting', element: wrap(CraftingPage) },
+      { path: 'trade', element: wrap(TradePage) },
+      { path: 'paints', element: wrap(PaintsPage) },
+      { path: 'minerals', element: wrap(MineralsLibraryPage) },
+      { path: 'search', element: wrap(SearchResultsPage) },
       { path: 'components', element: wrap(ComponentsPage) },
       { path: 'components/:uuid', element: wrap(ComponentDetailPage) },
       { path: 'items/:uuid', element: wrap(ItemDetailPage) },

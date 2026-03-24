@@ -1,41 +1,16 @@
-import { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { TrendingUp } from 'lucide-react';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
-import type { MiningCompositionView } from '@/types/mining';
+import type { MiningElementYield } from '@/types/api';
 import { fNum } from '@/pages/mining-helpers';
 
 export interface YieldCalculatorProps {
-  data: MiningCompositionView | null;
+  yieldResults: MiningElementYield[] | null;
   selectedElementUuid: string | null;
 }
 
-export function YieldCalculator({ data, selectedElementUuid }: YieldCalculatorProps) {
-  // useMemo must be called unconditionally before any early return
-  const yieldResults = useMemo(() => {
-    if (!data?.elements.length) return [];
-    return data.elements.map((el) => {
-      const optimalWindow = el.optimalWindow ?? 0.5;
-      const windowWidth = 0.15;
-      const baseYield = (el.probability * (el.maxPercentage + el.minPercentage)) / 2;
-      const riskPenalty = Math.max(0, 1 - ((el.instability ?? 0) + (el.resistance ?? 0)) / 2);
-      const optimizedYield = baseYield * riskPenalty * 1.2;
-
-      return {
-        elementName: el.elementName,
-        elementUuid: el.elementUuid,
-        probability: el.probability,
-        baseYield: baseYield * 100,
-        optimizedYield: optimizedYield * 100,
-        optimalWindow,
-        windowWidth,
-        windowStart: Math.max(0, optimalWindow - windowWidth / 2),
-        windowEnd: Math.min(1, optimalWindow + windowWidth / 2),
-      };
-    });
-  }, [data]);
-
-  if (!data || !data.elements.length) {
+export function YieldCalculator({ yieldResults, selectedElementUuid }: YieldCalculatorProps) {
+  if (!yieldResults || !yieldResults.length) {
     return (
       <div className="text-center py-8 text-slate-600">
         <TrendingUp size={32} className="mx-auto mb-3 opacity-20" />
@@ -62,7 +37,7 @@ export function YieldCalculator({ data, selectedElementUuid }: YieldCalculatorPr
               Elements
             </div>
             <div className="font-orbitron text-xl font-bold text-slate-300">
-              {data.elements.length}
+              {yieldResults.length}
             </div>
             <div className="text-[10px] text-slate-600 mt-1">In composition</div>
           </div>

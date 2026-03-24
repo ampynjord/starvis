@@ -8,7 +8,7 @@ import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { api } from '@/services/api';
-import type { Item, ItemListItem } from '@/types/api';
+import type { ItemListItem } from '@/types/api';
 
 const FIRE_RATE_PROFILES = [
   { value: 0, label: 'No boost' },
@@ -39,44 +39,6 @@ function clamp(v: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, v));
 }
 
-function round(v: number, d = 2): number {
-  const p = 10 ** d;
-  return Math.round(v * p) / p;
-}
-
-function inferFireMode(item: Item): FireMode {
-  const probe = `${item.name || ''} ${item.sub_type || ''} ${item.class_name || ''}`.toLowerCase();
-  if (/burst/.test(probe)) return 'Burst';
-  if (/sniper|shotgun|railgun|single/.test(probe)) return 'Single';
-  return 'Auto';
-}
-
-function getHitboxMultiplier(hitbox: Hitbox): number {
-  if (hitbox === 'head') return 1.6;
-  if (hitbox === 'torso') return 1;
-  if (hitbox === 'arm') return 0.85;
-  return 0.75;
-}
-
-function getArmorReduction(armorClass: string): number {
-  if (armorClass === 'light') return 0.25;
-  if (armorClass === 'medium') return 0.4;
-  if (armorClass === 'heavy') return 0.55;
-  return 0.4;
-}
-
-function buildShotTimeline(ttk: number, rpm: number, shotsToKill: number): number[] {
-  if (rpm <= 0 || shotsToKill <= 0) return [];
-  const interval = 60 / rpm;
-  const points: number[] = [];
-  const cap = Math.min(shotsToKill, 40);
-  for (let i = 0; i < cap; i++) {
-    points.push(round(i * interval, 3));
-  }
-  if (ttk > 0 && points[points.length - 1] !== ttk) points.push(round(ttk, 3));
-  return points;
-}
-
 export default function FpsCalculatorPage() {
   const { env } = useEnv();
 
@@ -91,7 +53,7 @@ export default function FpsCalculatorPage() {
   const [barrelRateBonus, setBarrelRateBonus] = useState<number>(0);
   const [underbarrelDamageBonus, setUnderbarrelDamageBonus] = useState<number>(0);
 
-  const { data: itemFilters } = useQuery({
+  const { data: itemFilters, isLoading: loadingFilters } = useQuery({
     queryKey: ['items.filters', env],
     queryFn: () => api.items.filters(env),
     staleTime: Infinity,
@@ -102,11 +64,13 @@ export default function FpsCalculatorPage() {
     return allTypes.filter((t) => /(weapon|gun|rifle|pistol|shotgun|smg|sniper|launcher)/i.test(t));
   }, [itemFilters]);
 
-  const { data: weaponListData, isLoading: loadingWeapons, error: weaponsError, refetch: refetchWeapons } = useQuery({
+  const { data: weaponListData, isLoading: loadingWeaponList, error: weaponsError, refetch: refetchWeapons } = useQuery({
     queryKey: ['fps.weapon-list', env, weaponTypes.join(',')],
     queryFn: () => api.items.list({ env, page: 1, limit: 200, types: weaponTypes.join(',') || undefined }),
     enabled: weaponTypes.length > 0,
   });
+
+  const loadingWeapons = loadingFilters || (weaponTypes.length > 0 && loadingWeaponList);
 
   const weapons = useMemo<WeaponSummary[]>(() => {
     const rows = (weaponListData?.data ?? []) as ItemListItem[];
@@ -140,78 +104,22 @@ export default function FpsCalculatorPage() {
     enabled: !!selectedWeapon?.uuid,
   });
 
-  const computed = useMemo(() => {
-    if (!weaponDetail) return null;
-
-    const dj = weaponDetail.data_json as Record<string, unknown> | null | undefined;
-
-    // Prioritize direct fields, fallback to data_json for damage (extracted via launchParams path)
-    const baseDamageFromField =
-      Number(weaponDetail.weapon_damage ?? 0) ||
-      Number(
-        (dj?.damagePhysical as number ?? 0) +
-        (dj?.damageEnergy as number ?? 0) +
-        (dj?.damageDistortion as number ?? 0)
-      );
-    const baseDpsFromField = Number(weaponDetail.weapon_dps ?? 0);
-    const baseFireRateFromField = Number(weaponDetail.weapon_fire_rate ?? 0);
-
-    const resolvedFireMode = inferFireMode(weaponDetail);
-    const appliedMode = fireMode || resolvedFireMode;
-    const modeRateMultiplier = appliedMode === 'Burst' ? 1.08 : 1;
-    const modeDamageMultiplier = appliedMode === 'Single' ? 1.03 : 1;
-
-    let baseRpm = baseFireRateFromField;
-    let baseDamage = baseDamageFromField;
-
-    if (baseDamage <= 0 && baseDpsFromField > 0 && baseRpm > 0) {
-      baseDamage = (baseDpsFromField * 60) / baseRpm;
-    }
-    if (baseRpm <= 0 && baseDamage > 0 && baseDpsFromField > 0) {
-      baseRpm = (baseDpsFromField / baseDamage) * 60;
-    }
-
-    const fireRateMultiplier = 1 + barrelRateBonus / 100;
-    const damageMultiplier = 1 + underbarrelDamageBonus / 100;
-    const hitboxMultiplier = getHitboxMultiplier(hitbox);
-    const baseReduction = getArmorReduction(armorClass);
-    const mitigation = clamp(baseReduction + craftedMitigationBonus / 100, 0, 0.9);
-
-    const effectiveRpm = baseRpm * fireRateMultiplier * modeRateMultiplier;
-    const damagePerShotRaw = baseDamage * damageMultiplier * modeDamageMultiplier * hitboxMultiplier;
-    const damagePerShot = damagePerShotRaw * (1 - mitigation);
-    const sustainedDps = effectiveRpm > 0 ? (damagePerShot * effectiveRpm) / 60 : 0;
-    const burstDps = sustainedDps * (appliedMode === 'Burst' ? 1.12 : 1.04);
-
-    const safeHealth = Math.max(1, health);
-    const shotsToKill = damagePerShot > 0 ? Math.ceil(safeHealth / damagePerShot) : Infinity;
-    const ttk =
-      Number.isFinite(shotsToKill) && shotsToKill > 1 && effectiveRpm > 0
-        ? (shotsToKill - 1) / (effectiveRpm / 60)
-        : 0;
-
-    const timeline = buildShotTimeline(ttk, effectiveRpm, Number.isFinite(shotsToKill) ? shotsToKill : 0);
-
-    return {
-      baseDamage: round(baseDamage, 2),
-      baseRpm: round(baseRpm, 1),
-      effectiveRpm: round(effectiveRpm, 1),
-      reductionPct: round(mitigation * 100, 1),
-      damagePerShot: round(damagePerShot, 2),
-      sustainedDps: round(sustainedDps, 2),
-      burstDps: round(burstDps, 2),
-      shotsToKill: Number.isFinite(shotsToKill) ? shotsToKill : 0,
-      ttk: round(ttk, 3),
-      timeline,
-      activeModifiers: [
-        barrelRateBonus > 0 ? `Fire rate +${barrelRateBonus}%` : null,
-        underbarrelDamageBonus > 0 ? `Damage +${underbarrelDamageBonus}%` : null,
-        craftedMitigationBonus > 0 ? `Target mitigation +${craftedMitigationBonus}%` : null,
-        hitbox !== 'torso' ? `Hitbox: ${hitbox}` : null,
-        appliedMode !== resolvedFireMode ? `Fire mode override: ${appliedMode}` : null,
-      ].filter(Boolean) as string[],
-    };
-  }, [weaponDetail, fireMode, barrelRateBonus, underbarrelDamageBonus, hitbox, armorClass, craftedMitigationBonus, health]);
+  const { data: computed } = useQuery({
+    queryKey: ['fps.calculate', env, selectedWeapon?.uuid, fireMode, hitbox, armorClass, health, barrelRateBonus, underbarrelDamageBonus, craftedMitigationBonus],
+    queryFn: () =>
+      api.calculate.fpsDamage({
+        itemUuid: selectedWeapon!.uuid,
+        env,
+        fireMode,
+        hitbox,
+        armorClass,
+        health,
+        barrelRateBonus,
+        underbarrelDamageBonus,
+        craftedMitigationBonus,
+      }),
+    enabled: !!selectedWeapon?.uuid,
+  });
 
   const axisMax = useMemo(() => {
     if (!computed) return 3;
@@ -450,6 +358,35 @@ export default function FpsCalculatorPage() {
                     </div>
                   </div>
 
+                  {/* Magazine, Range, Damage Breakdown */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    {computed.magazineSize != null && (
+                      <div className="sci-panel p-3">
+                        <div className="text-[10px] text-slate-600 font-mono-sc uppercase">Magazine</div>
+                        <div className="font-orbitron text-lg text-purple-300">{computed.magazineSize}</div>
+                        <div className="text-[10px] text-slate-600 mt-1">
+                          {computed.magazineSize > 0 && computed.shotsToKill > 0 ? `${Math.ceil(computed.shotsToKill / computed.magazineSize)} reload${Math.ceil(computed.shotsToKill / computed.magazineSize) > 1 ? 's' : ''}` : '—'}
+                        </div>
+                      </div>
+                    )}
+                    {computed.effectiveRange != null && (
+                      <div className="sci-panel p-3">
+                        <div className="text-[10px] text-slate-600 font-mono-sc uppercase">Range</div>
+                        <div className="font-orbitron text-lg text-blue-300">{computed.effectiveRange}m</div>
+                      </div>
+                    )}
+                    {(computed.damagePhysical > 0 || computed.damageEnergy > 0 || computed.damageDistortion > 0) && (
+                      <div className="sci-panel p-3 col-span-2">
+                        <div className="text-[10px] text-slate-600 font-mono-sc uppercase mb-1">Damage Split</div>
+                        <div className="flex gap-3 text-xs font-mono-sc">
+                          {computed.damagePhysical > 0 && <span className="text-orange-300">Phys: {computed.damagePhysical}</span>}
+                          {computed.damageEnergy > 0 && <span className="text-yellow-300">Energy: {computed.damageEnergy}</span>}
+                          {computed.damageDistortion > 0 && <span className="text-purple-300">Dist: {computed.damageDistortion}</span>}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="sci-panel p-3">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-mono-sc text-slate-500 uppercase tracking-wider">
@@ -495,18 +432,11 @@ export default function FpsCalculatorPage() {
                         {weaponDetail?.weapon_damage_type && (
                           <div className="flex justify-between"><span className="text-slate-600">Dmg type</span><span className="capitalize">{weaponDetail.weapon_damage_type}</span></div>
                         )}
-                        {(() => {
-                          const dj = weaponDetail?.data_json as Record<string, unknown> | null | undefined;
-                          const p = Number(dj?.damagePhysical ?? 0);
-                          const e = Number(dj?.damageEnergy ?? 0);
-                          const d = Number(dj?.damageDistortion ?? 0);
-                          if (p + e + d <= 0) return null;
-                          return <>
-                            {p > 0 && <div className="flex justify-between"><span className="text-slate-600">Physical</span><span className="text-orange-300">{p}</span></div>}
-                            {e > 0 && <div className="flex justify-between"><span className="text-slate-600">Energy</span><span className="text-yellow-300">{e}</span></div>}
-                            {d > 0 && <div className="flex justify-between"><span className="text-slate-600">Distortion</span><span className="text-purple-300">{d}</span></div>}
-                          </>;
-                        })()}
+                        {computed.damagePhysical > 0 && <div className="flex justify-between"><span className="text-slate-600">Physical</span><span className="text-orange-300">{computed.damagePhysical}</span></div>}
+                        {computed.damageEnergy > 0 && <div className="flex justify-between"><span className="text-slate-600">Energy</span><span className="text-yellow-300">{computed.damageEnergy}</span></div>}
+                        {computed.damageDistortion > 0 && <div className="flex justify-between"><span className="text-slate-600">Distortion</span><span className="text-purple-300">{computed.damageDistortion}</span></div>}
+                        {computed.magazineSize != null && <div className="flex justify-between"><span className="text-slate-600">Magazine</span><span>{computed.magazineSize}</span></div>}
+                        {computed.effectiveRange != null && <div className="flex justify-between"><span className="text-slate-600">Range</span><span>{computed.effectiveRange}m</span></div>}
                         <div className="flex justify-between"><span className="text-slate-600">Mitigation</span><span>{computed.reductionPct}%</span></div>
                       </div>
                     </ScifiPanel>

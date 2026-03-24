@@ -23,6 +23,18 @@ export interface MissionRecord {
   completionTimeSecs: number | null;
   notForRelease: boolean;
   workInProgress: boolean;
+  // SCMDB parity
+  rewardMin: number | null;
+  rewardMax: number | null;
+  rewardCurrency: string | null;
+  faction: string | null;
+  missionGiver: string | null;
+  locationSystem: string | null;
+  locationPlanet: string | null;
+  locationName: string | null;
+  dangerLevel: number | null;
+  requiredReputation: number | null;
+  reputationReward: number | null;
 }
 
 const TYPE_PATTERNS: [RegExp, string][] = [
@@ -91,6 +103,83 @@ export function extractMissions(ctx: DataForgeService, locService?: { resolveKey
           ? (deadline.missionCompletionTime as number)
           : null;
 
+      // ── Rewards ──
+      const rewards = (data.contractRewards ?? data.rewards ?? cc.contractRewards) as Record<string, unknown> | undefined;
+      let rewardMin: number | null = null;
+      let rewardMax: number | null = null;
+      let rewardCurrency: string | null = null;
+      if (rewards) {
+        const money = (rewards.moneyReward ?? rewards.currencyReward ?? rewards.paymentReward) as Record<string, unknown> | undefined;
+        if (money) {
+          const min = money.min ?? money.minimum ?? money.amount;
+          const max = money.max ?? money.maximum ?? money.amount;
+          if (typeof min === 'number' && min > 0) rewardMin = min;
+          if (typeof max === 'number' && max > 0) rewardMax = max;
+          if (typeof money.currency === 'string') rewardCurrency = money.currency;
+        }
+        // Flat reward fallback
+        if (rewardMin == null) {
+          const flat = rewards.rewardAmount ?? rewards.flatReward;
+          if (typeof flat === 'number' && flat > 0) {
+            rewardMin = flat;
+            rewardMax = flat;
+          }
+        }
+      }
+      if (!rewardCurrency && (rewardMin || rewardMax)) rewardCurrency = 'aUEC';
+
+      // ── Faction / Mission Giver ──
+      let faction: string | null = null;
+      let missionGiver: string | null = null;
+      const giver = (data.missionGiver ?? data.contractGiver ?? cc.missionGiver) as Record<string, unknown> | string | undefined;
+      if (typeof giver === 'string') {
+        missionGiver = giver;
+      } else if (giver && typeof giver === 'object') {
+        missionGiver = (giver.name ?? giver.displayName ?? giver.entityName ?? null) as string | null;
+      }
+      const factionRaw = (data.faction ?? cc.faction ?? params.faction) as string | Record<string, unknown> | undefined;
+      if (typeof factionRaw === 'string') {
+        faction = factionRaw;
+      } else if (factionRaw && typeof factionRaw === 'object') {
+        faction = (factionRaw.name ?? factionRaw.factionName ?? null) as string | null;
+      }
+
+      // ── Location ──
+      let locationSystem: string | null = null;
+      let locationPlanet: string | null = null;
+      let locationName: string | null = null;
+      const location = (data.contractLocation ?? data.location ?? cc.targetLocation ?? params.location) as Record<string, unknown> | string | undefined;
+      if (typeof location === 'string') {
+        locationName = location;
+      } else if (location && typeof location === 'object') {
+        locationSystem = (location.system ?? location.starSystem ?? null) as string | null;
+        locationPlanet = (location.planet ?? location.celestialBody ?? null) as string | null;
+        locationName = (location.name ?? location.locationName ?? location.objectContainer ?? null) as string | null;
+      }
+
+      // ── Difficulty / Reputation ──
+      let dangerLevel: number | null = null;
+      let requiredReputation: number | null = null;
+      let reputationReward: number | null = null;
+      const danger = data.dangerLevel ?? data.difficultyLevel ?? data.threatLevel ?? params.dangerLevel;
+      if (typeof danger === 'number' && danger > 0) dangerLevel = danger;
+
+      const repReq = (data.reputationRequirements ?? data.requiredReputation ?? cc.reputationRequirements) as Record<string, unknown> | number | undefined;
+      if (typeof repReq === 'number') {
+        requiredReputation = repReq;
+      } else if (repReq && typeof repReq === 'object') {
+        const minRep = repReq.minimumReputation ?? repReq.minRep ?? repReq.requiredLevel;
+        if (typeof minRep === 'number') requiredReputation = minRep;
+      }
+
+      const repReward = (data.reputationReward ?? rewards?.reputationReward) as Record<string, unknown> | number | undefined;
+      if (typeof repReward === 'number') {
+        reputationReward = repReward;
+      } else if (repReward && typeof repReward === 'object') {
+        const val = repReward.amount ?? repReward.value;
+        if (typeof val === 'number') reputationReward = val;
+      }
+
       // Resolve title / description
       const displayInfo = (data.contractDisplayInfo as Record<string, unknown>) ?? {};
       const displayStrings: string[] = Array.isArray(displayInfo.displayString) ? (displayInfo.displayString as string[]) : [];
@@ -128,6 +217,17 @@ export function extractMissions(ctx: DataForgeService, locService?: { resolveKey
         completionTimeSecs,
         notForRelease,
         workInProgress,
+        rewardMin,
+        rewardMax,
+        rewardCurrency,
+        faction,
+        missionGiver,
+        locationSystem,
+        locationPlanet,
+        locationName,
+        dangerLevel,
+        requiredReputation,
+        reputationReward,
       });
     } catch (e) {
       logger.debug(`Mission extract error [${r.name}]: ${(e as Error).message}`);

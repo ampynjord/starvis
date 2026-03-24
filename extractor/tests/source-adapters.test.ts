@@ -23,12 +23,8 @@ function startJsonServer(handler: (req: IncomingMessage, res: ServerResponse) =>
 }
 
 function clearEnv() {
-  delete process.env.STARVIS_CORNERSTONE_CANONICAL_JSON;
   delete process.env.STARVIS_COMMUNITY_CANONICAL_JSON;
-  delete process.env.STARVIS_CORNERSTONE_CANONICAL_URL;
   delete process.env.STARVIS_COMMUNITY_CANONICAL_URL;
-  delete process.env.STARVIS_CORNERSTONE_API_KEY;
-  delete process.env.STARVIS_CORNERSTONE_AUTH_HEADER;
 }
 
 afterEach(() => {
@@ -36,16 +32,8 @@ afterEach(() => {
 });
 
 describe('source-adapters (HTTP)', () => {
-  it('loads Cornerstone payload from URL with auth header and maps snake_case fields', async () => {
-    const expectedApiKey = 'secret-token';
-
-    const server = await startJsonServer((req, res) => {
-      if (req.headers['x-api-key'] !== expectedApiKey) {
-        res.statusCode = 401;
-        res.end(JSON.stringify({ error: 'unauthorized' }));
-        return;
-      }
-
+  it('loads community payload from URL and maps snake_case fields', async () => {
+    const server = await startJsonServer((_req, res) => {
       res.setHeader('content-type', 'application/json');
       res.end(
         JSON.stringify({
@@ -55,7 +43,7 @@ describe('source-adapters (HTTP)', () => {
               display_name: 'Test Item Name',
               type: 'Clothing',
               sub_type: 'Helmet',
-              source_reference: 'cornerstone-item-1',
+              source_reference: 'community-item-1',
               confidence_score: 88,
             },
           ],
@@ -91,9 +79,7 @@ describe('source-adapters (HTTP)', () => {
       );
     });
 
-    process.env.STARVIS_CORNERSTONE_CANONICAL_URL = server.url;
-    process.env.STARVIS_CORNERSTONE_API_KEY = expectedApiKey;
-    process.env.STARVIS_CORNERSTONE_AUTH_HEADER = 'X-API-Key';
+    process.env.STARVIS_COMMUNITY_CANONICAL_URL = server.url;
 
     const data = await loadExternalCanonicalData();
 
@@ -105,14 +91,14 @@ describe('source-adapters (HTTP)', () => {
     const item = data.items.get('TEST_Item_Class');
     expect(item?.name).toBe('Test Item Name');
     expect(item?.subType).toBe('Helmet');
-    expect(item?.sourceType).toBe('cornerstone');
-    expect(item?.sourceName).toBe('cornerstone');
+    expect(item?.sourceType).toBe('community_log');
+    expect(item?.sourceName).toBe('community');
     expect(item?.confidenceScore).toBe(88);
 
     const component = data.components.get('TEST_Component_Class');
     expect(component?.grade).toBe('A');
     expect(component?.size).toBe(2);
-    expect(component?.sourceType).toBe('cornerstone');
+    expect(component?.sourceType).toBe('community_log');
 
     await server.close();
   });

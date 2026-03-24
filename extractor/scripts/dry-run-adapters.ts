@@ -59,8 +59,6 @@ async function main() {
 
   console.log(`total overrides: ${total}`);
   console.log(`configured sources:`);
-  console.log(`- STARVIS_CORNERSTONE_CANONICAL_JSON=${process.env.STARVIS_CORNERSTONE_CANONICAL_JSON ? 'set' : 'unset'}`);
-  console.log(`- STARVIS_CORNERSTONE_CANONICAL_URL=${process.env.STARVIS_CORNERSTONE_CANONICAL_URL ? 'set' : 'unset'}`);
   console.log(`- STARVIS_COMMUNITY_CANONICAL_JSON=${process.env.STARVIS_COMMUNITY_CANONICAL_JSON ? 'set' : 'unset'}`);
   console.log(`- STARVIS_COMMUNITY_CANONICAL_URL=${process.env.STARVIS_COMMUNITY_CANONICAL_URL ? 'set' : 'unset'}`);
 

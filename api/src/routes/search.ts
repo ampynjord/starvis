@@ -20,7 +20,13 @@ export function mountSearchRoutes(router: Router, deps: RouteDependencies): void
       sendWithETag(req, res, {
         success: true,
         data,
-        total: data.ships.length + data.components.length + data.items.length,
+        total:
+          data.ships.length +
+          data.components.length +
+          data.items.length +
+          data.commodities.length +
+          data.missions.length +
+          data.recipes.length,
       });
     }),
   );
