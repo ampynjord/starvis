@@ -444,8 +444,7 @@ export class ExtractionService {
             weapon_ammo_count, weapon_pellets_per_shot, weapon_burst_size,
             weapon_alpha_damage, weapon_dps,
             weapon_damage_physical, weapon_damage_energy, weapon_damage_distortion,
-            weapon_damage_thermal, weapon_damage_biochemical, weapon_damage_stun,
-            weapon_heat_per_shot, weapon_burst_dps, weapon_sustained_dps,
+            weapon_burst_dps, weapon_sustained_dps,
             shield_hp, shield_regen, shield_regen_delay, shield_hardening, shield_faces,
             qd_speed, qd_spool_time, qd_cooldown, qd_fuel_rate, qd_range,
             qd_stage1_accel, qd_stage2_accel,
@@ -483,9 +482,7 @@ export class ExtractionService {
             weapon_pellets_per_shot=new.weapon_pellets_per_shot, weapon_burst_size=new.weapon_burst_size,
             weapon_alpha_damage=new.weapon_alpha_damage, weapon_dps=new.weapon_dps,
             weapon_damage_physical=new.weapon_damage_physical, weapon_damage_energy=new.weapon_damage_energy,
-            weapon_damage_distortion=new.weapon_damage_distortion, weapon_damage_thermal=new.weapon_damage_thermal,
-            weapon_damage_biochemical=new.weapon_damage_biochemical, weapon_damage_stun=new.weapon_damage_stun,
-            weapon_heat_per_shot=new.weapon_heat_per_shot,
+            weapon_damage_distortion=new.weapon_damage_distortion,
             weapon_burst_dps=new.weapon_burst_dps, weapon_sustained_dps=new.weapon_sustained_dps,
             shield_hp=new.shield_hp, shield_regen=new.shield_regen,
             shield_regen_delay=new.shield_regen_delay, shield_hardening=new.shield_hardening,
@@ -519,7 +516,7 @@ export class ExtractionService {
             rack_count=new.rack_count, rack_missile_size=new.rack_missile_size,
             updated_at=CURRENT_TIMESTAMP`;
 
-    const COL_COUNT = 94; // number of columns above
+    const COL_COUNT = 90; // number of columns above
 
     /** Map a component object to a flat array of values */
     const toCanonicalRow = (c: any): (string | number | null)[] => {
@@ -574,10 +571,6 @@ export class ExtractionService {
         c.weaponDamagePhysical ?? null,
         c.weaponDamageEnergy ?? null,
         c.weaponDamageDistortion ?? null,
-        c.weaponDamageThermal ?? null,
-        c.weaponDamageBiochemical ?? null,
-        c.weaponDamageStun ?? null,
-        c.weaponHeatPerShot ?? null,
         c.weaponBurstDps ?? null,
         c.weaponSustainedDps ?? null,
         c.shieldHp ?? null,
@@ -745,7 +738,7 @@ export class ExtractionService {
             hydrogen_fuel_capacity, quantum_fuel_capacity,
             shield_hp,
             armor_physical, armor_energy, armor_distortion,
-            armor_thermal, armor_biochemical, armor_stun,
+            armor_thermal,
             armor_signal_ir, armor_signal_em, armor_signal_cs,
             armor_hp, armor_phys_resist, armor_energy_resist,
             fuse_penetration, component_penetration,
@@ -755,7 +748,7 @@ export class ExtractionService {
             insurance_claim_time, insurance_expedite_cost,
             vehicle_category,
             game_data
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) AS new
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) AS new
           ON DUPLICATE KEY UPDATE
             class_name=new.class_name, name=new.name,
             manufacturer_code=new.manufacturer_code,
@@ -772,7 +765,6 @@ export class ExtractionService {
             shield_hp=new.shield_hp,
             armor_physical=new.armor_physical, armor_energy=new.armor_energy,
             armor_distortion=new.armor_distortion, armor_thermal=new.armor_thermal,
-            armor_biochemical=new.armor_biochemical, armor_stun=new.armor_stun,
             armor_signal_ir=new.armor_signal_ir, armor_signal_em=new.armor_signal_em,
             armor_signal_cs=new.armor_signal_cs,
             armor_hp=new.armor_hp, armor_phys_resist=new.armor_phys_resist,
@@ -815,8 +807,6 @@ export class ExtractionService {
             fullData.armor?.data?.armor?.damageMultiplier?.damageEnergy ?? null,
             fullData.armor?.data?.armor?.damageMultiplier?.damageDistortion ?? null,
             fullData.armor?.data?.armor?.damageMultiplier?.damageThermal ?? null,
-            fullData.armor?.data?.armor?.damageMultiplier?.damageBiochemical ?? null,
-            fullData.armor?.data?.armor?.damageMultiplier?.damageStun ?? null,
             fullData.armor?.data?.armor?.signalIR ?? null,
             fullData.armor?.data?.armor?.signalEM ?? null,
             fullData.armor?.data?.armor?.signalCS ?? null,
