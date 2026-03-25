@@ -81,16 +81,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    networks:
-      - default
-      - traefik-network
-    labels:
-      traefik.enable: "true"
-      traefik.docker.network: "traefik-network"
-      traefik.http.routers.starvis-api.rule: "Host(`starvis-api.ampynjord.bzh`)"
-      traefik.http.routers.starvis-api.entrypoints: "websecure"
-      traefik.http.routers.starvis-api.tls.certresolver: "letsencrypt"
-      traefik.http.services.starvis-api.loadbalancer.server.port: "3000"
 
   ihm:
     image: ghcr.io/ampynjord/starvis-ihm:latest

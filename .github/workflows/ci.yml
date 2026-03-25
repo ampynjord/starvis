@@ -22,7 +22,7 @@ on:
       safe_smoke_base_url:
         description: "Base URL used by safe smoke prod"
         required: false
-        default: "https://starvis-api.ampynjord.bzh"
+        default: "https://starvis.ampynjord.bzh"
         type: string
       safe_smoke_pace_ms:
         description: "Delay between requests in ms"

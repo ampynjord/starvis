@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE = 'https://starvis-api.ampynjord.bzh';
+const DEFAULT_API_BASE = 'https://starvis.ampynjord.bzh';
 const DEFAULT_FRONTEND_BASE = 'https://starvis.ampynjord.bzh';
 
 function parseBoolean(value, defaultValue = false) {
