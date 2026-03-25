@@ -26,7 +26,7 @@ export default function ShopsPage() {
 
   // Group by system
   const bySystem = shopList.reduce<Record<string, Shop[]>>((acc, shop) => {
-    const key = shop.system ?? 'Inconnu';
+    const key = shop.system ?? 'Unknown';
     if (!acc[key]) acc[key] = [];
     acc[key].push(shop);
     return acc;

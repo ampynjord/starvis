@@ -19,11 +19,8 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
-# Environment variables
-.env
+# Environment variables (secrets — only .example files are tracked)
 .env.dev
-.env.local
-.env.*.local
 .env.prod
 .env.extractor
 
@@ -60,7 +57,7 @@ test-results/
 # Python virtual environment
 .venv/
 
-# Extractor local data
+# Legacy (kept for safety)
 extractor/.env
 
 # Temporary files

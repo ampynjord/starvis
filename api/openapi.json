@@ -31,6 +31,8 @@
     { "name": "Mining", "description": "Mining elements, rock compositions and solver" },
     { "name": "Missions", "description": "In-game missions" },
     { "name": "Trade", "description": "Commodity prices, trade routes and locations" },
+    { "name": "Crafting", "description": "Crafting recipes, stations and categories" },
+    { "name": "Calculators", "description": "FPS damage and mining yield calculators" },
     { "name": "Admin", "description": "Administrative endpoints (requires X-API-Key)" },
     { "name": "Health", "description": "Liveness, readiness probes and metrics" }
   ],
@@ -956,6 +958,232 @@
         "responses": {
           "200": { "description": "Extraction log entries" },
           "401": { "description": "Missing or invalid API key" },
+          "503": { "description": "Game data not available" }
+        }
+      }
+    },
+    "/api/v1/trade/prices/{commodityUuid}": {
+      "get": {
+        "tags": ["Trade"],
+        "summary": "Get commodity prices",
+        "operationId": "getCommodityPrices",
+        "description": "Returns prices for a commodity across all locations",
+        "parameters": [
+          { "name": "commodityUuid", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Commodity UUID" },
+          { "name": "env", "in": "query", "schema": { "type": "string", "default": "live" }, "description": "Game environment" }
+        ],
+        "responses": {
+          "200": { "description": "Commodity price list" },
+          "503": { "description": "Game data not available" }
+        }
+      }
+    },
+    "/api/v1/trade/location/{shopId}/prices": {
+      "get": {
+        "tags": ["Trade"],
+        "summary": "Get location prices",
+        "operationId": "getLocationPrices",
+        "description": "Returns all commodity prices at a given shop",
+        "parameters": [
+          { "name": "shopId", "in": "path", "required": true, "schema": { "type": "integer" }, "description": "Shop ID" },
+          { "name": "env", "in": "query", "schema": { "type": "string", "default": "live" }, "description": "Game environment" }
+        ],
+        "responses": {
+          "200": { "description": "Location commodity prices" },
+          "400": { "description": "Invalid shop ID" },
+          "503": { "description": "Game data not available" }
+        }
+      }
+    },
+    "/api/v1/trade/systems": {
+      "get": {
+        "tags": ["Trade"],
+        "summary": "Get trade systems",
+        "operationId": "getTradeSystems",
+        "description": "Returns all distinct star systems with trade data",
+        "parameters": [
+          { "name": "env", "in": "query", "schema": { "type": "string", "default": "live" }, "description": "Game environment" }
+        ],
+        "responses": {
+          "200": { "description": "System name list" },
+          "503": { "description": "Game data not available" }
+        }
+      }
+    },
+    "/api/v1/crafting/categories": {
+      "get": {
+        "tags": ["Crafting"],
+        "summary": "List crafting categories",
+        "operationId": "getCraftingCategories",
+        "description": "Returns all crafting categories with recipe counts",
+        "parameters": [
+          { "name": "env", "in": "query", "schema": { "type": "string", "default": "live" }, "description": "Game environment" }
+        ],
+        "responses": {
+          "200": { "description": "Category list with counts" },
+          "503": { "description": "Game data not available" }
+        }
+      }
+    },
+    "/api/v1/crafting/station-types": {
+      "get": {
+        "tags": ["Crafting"],
+        "summary": "List crafting station types",
+        "operationId": "getCraftingStationTypes",
+        "description": "Returns all distinct crafting station types",
+        "parameters": [
+          { "name": "env", "in": "query", "schema": { "type": "string", "default": "live" }, "description": "Game environment" }
+        ],
+        "responses": {
+          "200": { "description": "Station type list" },
+          "503": { "description": "Game data not available" }
+        }
+      }
+    },
+    "/api/v1/crafting/recipes": {
+      "get": {
+        "tags": ["Crafting"],
+        "summary": "List crafting recipes (paginated)",
+        "operationId": "getCraftingRecipes",
+        "description": "Returns crafting recipes with optional filters",
+        "parameters": [
+          { "name": "category", "in": "query", "schema": { "type": "string" }, "description": "Filter by category" },
+          { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Search by name" },
+          { "name": "stationType", "in": "query", "schema": { "type": "string" }, "description": "Filter by station type" },
+          { "name": "skillLevel", "in": "query", "schema": { "type": "integer" }, "description": "Filter by skill level" },
+          { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1 }, "description": "Page number" },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 50 }, "description": "Items per page" },
+          { "name": "env", "in": "query", "schema": { "type": "string", "default": "live" }, "description": "Game environment" }
+        ],
+        "responses": {
+          "200": { "description": "Paginated recipe list" },
+          "503": { "description": "Game data not available" }
+        }
+      }
+    },
+    "/api/v1/crafting/recipes/{uuid}": {
+      "get": {
+        "tags": ["Crafting"],
+        "summary": "Get crafting recipe details",
+        "operationId": "getCraftingRecipe",
+        "description": "Returns a single crafting recipe with ingredients",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Recipe UUID" },
+          { "name": "env", "in": "query", "schema": { "type": "string", "default": "live" }, "description": "Game environment" }
+        ],
+        "responses": {
+          "200": { "description": "Recipe details with ingredients" },
+          "404": { "description": "Recipe not found" },
+          "503": { "description": "Game data not available" }
+        }
+      }
+    },
+    "/api/v1/mining/lasers": {
+      "get": {
+        "tags": ["Mining"],
+        "summary": "List mining lasers and gadgets",
+        "operationId": "getMiningLasers",
+        "description": "Returns all mining laser heads and gadgets with their stats",
+        "parameters": [
+          { "name": "env", "in": "query", "schema": { "type": "string", "default": "live" }, "description": "Game environment" }
+        ],
+        "responses": {
+          "200": { "description": "Mining laser/gadget list" },
+          "503": { "description": "Game data not available" }
+        }
+      }
+    },
+    "/api/v1/missions/factions": {
+      "get": {
+        "tags": ["Missions"],
+        "summary": "List mission factions",
+        "operationId": "getMissionFactions",
+        "description": "Returns all distinct mission factions",
+        "parameters": [
+          { "name": "env", "in": "query", "schema": { "type": "string", "default": "live" }, "description": "Game environment" }
+        ],
+        "responses": {
+          "200": { "description": "Faction name list" },
+          "503": { "description": "Game data not available" }
+        }
+      }
+    },
+    "/api/v1/missions/systems": {
+      "get": {
+        "tags": ["Missions"],
+        "summary": "List mission systems",
+        "operationId": "getMissionSystems",
+        "description": "Returns all distinct star systems with missions",
+        "parameters": [
+          { "name": "env", "in": "query", "schema": { "type": "string", "default": "live" }, "description": "Game environment" }
+        ],
+        "responses": {
+          "200": { "description": "System name list" },
+          "503": { "description": "Game data not available" }
+        }
+      }
+    },
+    "/api/v1/calculate/fps-damage": {
+      "post": {
+        "tags": ["Calculators"],
+        "summary": "Calculate FPS weapon damage",
+        "operationId": "calculateFpsDamage",
+        "description": "Simulates FPS weapon damage with fire mode, hitbox, armor class and other modifiers",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["itemUuid"],
+                "properties": {
+                  "itemUuid": { "type": "string", "description": "FPS weapon item UUID" },
+                  "env": { "type": "string", "default": "live" },
+                  "fireMode": { "type": "string", "enum": ["Single", "Burst", "Auto"] },
+                  "hitbox": { "type": "string", "enum": ["head", "torso", "arm", "leg"] },
+                  "armorClass": { "type": "string", "enum": ["none", "light", "medium", "heavy"] },
+                  "health": { "type": "number" },
+                  "barrelRateBonus": { "type": "number" },
+                  "underbarrelDamageBonus": { "type": "number" },
+                  "craftedMitigationBonus": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Damage simulation results" },
+          "404": { "description": "Item not found" },
+          "503": { "description": "Game data not available" }
+        }
+      }
+    },
+    "/api/v1/calculate/mining-yield": {
+      "post": {
+        "tags": ["Calculators"],
+        "summary": "Calculate mining yield",
+        "operationId": "calculateMiningYield",
+        "description": "Simulates mining yield for a rock composition with optional laser and gadgets",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["compositionUuid"],
+                "properties": {
+                  "compositionUuid": { "type": "string", "description": "Rock composition UUID" },
+                  "env": { "type": "string", "default": "live" },
+                  "laserUuid": { "type": "string", "description": "Mining laser UUID (optional)" },
+                  "gadgetUuids": { "type": "array", "items": { "type": "string" }, "description": "Gadget UUIDs (optional)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Mining yield results" },
+          "404": { "description": "Composition not found" },
           "503": { "description": "Game data not available" }
         }
       }
