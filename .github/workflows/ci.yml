@@ -151,7 +151,7 @@ jobs:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: testroot
-          MYSQL_DATABASE: starvis_test
+          MYSQL_DATABASE: starvis
           MYSQL_USER: starvis_user
           MYSQL_PASSWORD: testpass
         ports:
@@ -177,9 +177,9 @@ jobs:
       DB_PORT: 3306
       DB_USER: starvis_user
       DB_PASSWORD: testpass
-      DB_NAME: starvis_test
+      DB_NAME: starvis
       MYSQL_ROOT_PASSWORD: testroot
-      DATABASE_URL: mysql://starvis_user:testpass@127.0.0.1:3306/starvis_test
+      DATABASE_URL: mysql://starvis_user:testpass@127.0.0.1:3306/starvis
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: 6379
       ADMIN_API_KEY: ci_test_key
@@ -242,7 +242,11 @@ jobs:
             GRANT ALL PRIVILEGES ON ptu.* TO 'starvis_user'@'%';
             FLUSH PRIVILEGES;
           "
-          cd api && npx prisma db push --skip-generate --accept-data-loss --force-reset
+          # Push schema to all 3 databases
+          cd api
+          DATABASE_URL=mysql://starvis_user:testpass@127.0.0.1:3306/starvis npx prisma db push --skip-generate --accept-data-loss --force-reset
+          DATABASE_URL=mysql://starvis_user:testpass@127.0.0.1:3306/live    npx prisma db push --skip-generate --accept-data-loss --force-reset
+          DATABASE_URL=mysql://starvis_user:testpass@127.0.0.1:3306/ptu     npx prisma db push --skip-generate --accept-data-loss --force-reset
 
       - name: Run API unit tests with coverage
         run: cd api && npm run test:coverage
