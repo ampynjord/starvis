@@ -68,7 +68,7 @@ export class CraftingService {
       params.push(stationType);
     }
 
-    const whereClause = where.join(' AND ');
+    const whereClause = where.length ? where.join(' AND ') : '1=1';
 
     const [countRow] = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT COUNT(*) as total FROM crafting_recipes r WHERE ${whereClause}`,
