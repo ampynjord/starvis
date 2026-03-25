@@ -7,7 +7,8 @@
  * and writes everything to a remote MySQL database.
  *
  * Environment variables (or .env.extractor at project root):
- *   DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
+ *   DB_HOST, DB_PORT, DB_USER, DB_PASSWORD
+ *   DB_NAME (optional fallback for --env custom)
  *   P4K_PATH (alternative to --p4k flag)
  *   LOG_LEVEL (debug|info|warn|error, default: info)
  */
@@ -79,7 +80,7 @@ Environment variables:
   DB_PORT       MySQL port (default: 3306)
   DB_USER       MySQL user
   DB_PASSWORD   MySQL password
-  DB_NAME       Database name
+  DB_NAME       Database name (optional, used as fallback for --env custom)
   P4K_PATH      Alternative to --p4k flag
   LOG_LEVEL     debug | info | warn | error (default: info)
 
@@ -160,13 +161,16 @@ async function main() {
     return;
   }
 
-  // Database connection
+  // Database connection — map game environment to database name
+  const GAME_DB_MAP: Record<string, string> = { live: 'live', ptu: 'ptu', eptu: 'ptu' };
+  const gameDatabaseName = GAME_DB_MAP[env] || process.env.DB_NAME || '';
+
   const dbConfig = {
     host: process.env.DB_HOST || 'localhost',
     port: parseInt(process.env.DB_PORT || '3306', 10),
     user: process.env.DB_USER || '',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || '',
+    database: gameDatabaseName,
     waitForConnections: true,
     connectionLimit: 5,
     // Keep TCP connection alive during long extractions (30+ minutes)
@@ -176,7 +180,7 @@ async function main() {
   };
 
   if (!dbConfig.user || !dbConfig.password || !dbConfig.database) {
-    console.error('Error: DB_USER, DB_PASSWORD, and DB_NAME environment variables are required.');
+    console.error('Error: DB_USER and DB_PASSWORD environment variables are required. Database is auto-selected from --env.');
     process.exit(1);
   }
 

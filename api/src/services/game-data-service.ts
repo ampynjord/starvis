@@ -54,18 +54,21 @@ export class GameDataService {
   private statsCache = new TtlCache<Record<string, unknown>>(60_000);
   private publicStatsCache = new TtlCache<Record<string, unknown>>(60_000);
 
-  constructor(private prisma: PrismaClient) {
-    this.ships = new ShipQueryService(prisma);
-    this.components = new ComponentQueryService(prisma);
-    this.loadouts = new LoadoutService(prisma);
-    this.paints = new PaintQueryService(prisma);
-    this.shops = new ShopService(prisma);
-    this.items = new ItemQueryService(prisma);
-    this.commodities = new CommodityQueryService(prisma);
-    this.mining = new MiningQueryService(prisma);
-    this.missions = new MissionService(prisma);
-    this.crafting = new CraftingService(prisma);
-    this.trade = new TradeService(prisma);
+  constructor(
+    private getClient: (env: string) => PrismaClient,
+    private starvisClient: PrismaClient,
+  ) {
+    this.ships = new ShipQueryService(getClient);
+    this.components = new ComponentQueryService(getClient);
+    this.loadouts = new LoadoutService(getClient);
+    this.paints = new PaintQueryService(getClient);
+    this.shops = new ShopService(getClient);
+    this.items = new ItemQueryService(getClient);
+    this.commodities = new CommodityQueryService(getClient);
+    this.mining = new MiningQueryService(getClient);
+    this.missions = new MissionService(getClient);
+    this.crafting = new CraftingService(getClient);
+    this.trade = new TradeService(getClient);
   }
 
   // ── Unified search (cross-cutting — queries ships + components + items) ──
@@ -79,45 +82,40 @@ export class GameDataService {
     const t = `%${q}%`;
     const [ships, components, items, commodities, missions, recipes] = await Promise.all([
       this.ships.searchShipsAutocomplete(q, cap, env),
-      this.prisma.$queryRawUnsafe<Row[]>(
+      this.getClient(env).$queryRawUnsafe<Row[]>(
         `SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade, c.manufacturer_code,
                 m.name as manufacturer_name
-         FROM components c LEFT JOIN manufacturers m ON c.manufacturer_code = m.code
-         WHERE c.game_env = ? AND (c.name LIKE ? OR c.class_name LIKE ?)
+         FROM components c LEFT JOIN starvis.manufacturers m ON c.manufacturer_code = m.code
+         WHERE (c.name LIKE ? OR c.class_name LIKE ?)
          ORDER BY c.name LIMIT ${cap}`,
-        env,
         t,
         t,
       ),
-      this.prisma.$queryRawUnsafe<Row[]>(
+      this.getClient(env).$queryRawUnsafe<Row[]>(
         `SELECT i.uuid, i.class_name, i.name, i.type, i.sub_type, i.manufacturer_code
-         FROM items i WHERE i.game_env = ? AND (i.name LIKE ? OR i.class_name LIKE ?)
+         FROM items i WHERE (i.name LIKE ? OR i.class_name LIKE ?)
          ORDER BY i.name LIMIT ${cap}`,
-        env,
         t,
         t,
       ),
-      this.prisma.$queryRawUnsafe<Row[]>(
+      this.getClient(env).$queryRawUnsafe<Row[]>(
         `SELECT co.uuid, co.class_name, co.name, co.type
-         FROM commodities co WHERE co.game_env = ? AND (co.name LIKE ? OR co.class_name LIKE ?)
+         FROM commodities co WHERE (co.name LIKE ? OR co.class_name LIKE ?)
          ORDER BY co.name LIMIT ${cap}`,
-        env,
         t,
         t,
       ),
-      this.prisma.$queryRawUnsafe<Row[]>(
+      this.getClient(env).$queryRawUnsafe<Row[]>(
         `SELECT ms.uuid, ms.class_name, ms.title as name, ms.type
-         FROM missions ms WHERE ms.game_env = ? AND (ms.title LIKE ? OR ms.class_name LIKE ?)
+         FROM missions ms WHERE (ms.title LIKE ? OR ms.class_name LIKE ?)
          ORDER BY ms.title LIMIT ${cap}`,
-        env,
         t,
         t,
       ),
-      this.prisma.$queryRawUnsafe<Row[]>(
+      this.getClient(env).$queryRawUnsafe<Row[]>(
         `SELECT cr.uuid, cr.class_name, cr.name, cr.category
-         FROM crafting_recipes cr WHERE cr.game_env = ? AND (cr.name LIKE ? OR cr.class_name LIKE ? OR cr.output_item_name LIKE ?)
+         FROM crafting_recipes cr WHERE (cr.name LIKE ? OR cr.class_name LIKE ? OR cr.output_item_name LIKE ?)
          ORDER BY cr.name LIMIT ${cap}`,
-        env,
         t,
         t,
         t,
@@ -146,12 +144,12 @@ export class GameDataService {
     }
 
     const w = where.length ? ` WHERE ${where.join(' AND ')}` : '';
-    const countRows = await this.prisma.$queryRawUnsafe<Row[]>(`SELECT COUNT(*) as total FROM changelog c${w}`, ...p);
+    const countRows = await this.starvisClient.$queryRawUnsafe<Row[]>(`SELECT COUNT(*) as total FROM changelog c${w}`, ...p);
     const total = Number(countRows[0]?.total) || 0;
 
     const limit = Math.min(100, parseInt(params.limit || '50', 10));
     const offset = parseInt(params.offset || '0', 10);
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+    const rows = await this.starvisClient.$queryRawUnsafe<Row[]>(
       `SELECT c.*, e.game_version, e.extracted_at as extraction_date FROM changelog c LEFT JOIN extraction_log e ON c.extraction_id = e.id${w} ORDER BY c.created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
       ...p,
     );
@@ -163,27 +161,19 @@ export class GameDataService {
       const cached = this.statsCache.get();
       if (cached) return cached;
     }
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+    const rows = await this.getClient(env).$queryRawUnsafe<Row[]>(
       `
       SELECT
-        (SELECT COUNT(*) FROM ships WHERE game_env = ?) as ships,
-        (SELECT COUNT(*) FROM components WHERE game_env = ?) as components,
-        (SELECT COUNT(*) FROM items WHERE game_env = ?) as items,
-        (SELECT COUNT(*) FROM commodities WHERE game_env = ?) as commodities,
-        (SELECT COUNT(*) FROM manufacturers) as manufacturers,
-        (SELECT COUNT(*) FROM ship_loadouts WHERE game_env = ?) as loadoutPorts,
-        (SELECT COUNT(*) FROM ship_paints WHERE game_env = ?) as paints,
-        (SELECT COUNT(*) FROM shops WHERE game_env = ?) as shops,
-        (SELECT COUNT(*) FROM ships WHERE ship_matrix_id IS NOT NULL AND game_env = ?) as shipsLinkedToMatrix
+        (SELECT COUNT(*) FROM ships) as ships,
+        (SELECT COUNT(*) FROM components) as components,
+        (SELECT COUNT(*) FROM items) as items,
+        (SELECT COUNT(*) FROM commodities) as commodities,
+        (SELECT COUNT(*) FROM starvis.manufacturers) as manufacturers,
+        (SELECT COUNT(*) FROM ship_loadouts) as loadoutPorts,
+        (SELECT COUNT(*) FROM ship_paints) as paints,
+        (SELECT COUNT(*) FROM shops) as shops,
+        (SELECT COUNT(*) FROM ships WHERE ship_matrix_id IS NOT NULL) as shipsLinkedToMatrix
     `,
-      env,
-      env,
-      env,
-      env,
-      env,
-      env,
-      env,
-      env,
     );
     const latest = await this.getLatestExtraction(env);
     const raw = rows[0];
@@ -205,12 +195,12 @@ export class GameDataService {
   }
 
   async getExtractionLog(): Promise<Row[]> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>('SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 20');
+    const rows = await this.starvisClient.$queryRawUnsafe<Row[]>('SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 20');
     return rows;
   }
 
   async getLatestExtraction(env = 'live'): Promise<Row | null> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+    const rows = await this.starvisClient.$queryRawUnsafe<Row[]>(
       'SELECT * FROM extraction_log WHERE game_env = ? ORDER BY extracted_at DESC LIMIT 1',
       env,
     );
@@ -222,31 +212,21 @@ export class GameDataService {
       const cached = this.publicStatsCache.get();
       if (cached) return cached;
     }
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+    const rows = await this.getClient(env).$queryRawUnsafe<Row[]>(
       `
       SELECT
-        (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL AND game_env = ?) as ships,
-        (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL AND vehicle_category = 'ship' AND game_env = ?) as flyable_ships,
-        (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL AND vehicle_category = 'ground' AND game_env = ?) as ground_vehicles,
-        (SELECT COUNT(*) FROM components WHERE game_env = ?) as components,
-        (SELECT COUNT(*) FROM items WHERE game_env = ?) as items,
-        (SELECT COUNT(*) FROM commodities WHERE game_env = ?) as commodities,
-        (SELECT COUNT(*) FROM manufacturers) as manufacturers,
-        (SELECT COUNT(*) FROM ship_paints WHERE game_env = ?) as paints,
-        (SELECT COUNT(*) FROM shops WHERE game_env = ?) as shops,
-        (SELECT COUNT(DISTINCT type) FROM components WHERE game_env = ?) as component_types,
-        (SELECT COUNT(DISTINCT type) FROM items WHERE game_env = ?) as item_types
+        (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL) as ships,
+        (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL AND vehicle_category = 'ship') as flyable_ships,
+        (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL AND vehicle_category = 'ground') as ground_vehicles,
+        (SELECT COUNT(*) FROM components) as components,
+        (SELECT COUNT(*) FROM items) as items,
+        (SELECT COUNT(*) FROM commodities) as commodities,
+        (SELECT COUNT(*) FROM starvis.manufacturers) as manufacturers,
+        (SELECT COUNT(*) FROM ship_paints) as paints,
+        (SELECT COUNT(*) FROM shops) as shops,
+        (SELECT COUNT(DISTINCT type) FROM components) as component_types,
+        (SELECT COUNT(DISTINCT type) FROM items) as item_types
     `,
-      env,
-      env,
-      env,
-      env,
-      env,
-      env,
-      env,
-      env,
-      env,
-      env,
     );
     const latest = await this.getLatestExtraction(env);
     const raw = rows[0];
@@ -271,12 +251,12 @@ export class GameDataService {
   }
 
   async getChangelogSummary(): Promise<Record<string, unknown>> {
-    const byType = await this.prisma.$queryRawUnsafe<Row[]>(
+    const byType = await this.starvisClient.$queryRawUnsafe<Row[]>(
       `SELECT entity_type, change_type, COUNT(*) as count
        FROM changelog GROUP BY entity_type, change_type ORDER BY entity_type, change_type`,
     );
-    const latest = await this.prisma.$queryRawUnsafe<Row[]>('SELECT extracted_at FROM extraction_log ORDER BY id DESC LIMIT 1');
-    const total = await this.prisma.$queryRawUnsafe<Row[]>('SELECT COUNT(*) as total FROM changelog');
+    const latest = await this.starvisClient.$queryRawUnsafe<Row[]>('SELECT extracted_at FROM extraction_log ORDER BY id DESC LIMIT 1');
+    const total = await this.starvisClient.$queryRawUnsafe<Row[]>('SELECT COUNT(*) as total FROM changelog');
 
     const by_entity: Record<string, number> = {};
     const by_change: Record<string, number> = {};
