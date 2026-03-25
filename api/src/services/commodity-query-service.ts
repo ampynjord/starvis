@@ -7,7 +7,7 @@ import { type PaginatedResult, paginate, type Row } from './shared.js';
 const COMMODITY_SORT = new Set(['name', 'class_name', 'type', 'sub_type', 'symbol', 'occupancy_scu']);
 
 export class CommodityQueryService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private getClient: (env: string) => PrismaClient) {}
 
   async getAllCommodities(filters?: {
     env?: string;
@@ -20,8 +20,9 @@ export class CommodityQueryService {
     limit?: number;
   }): Promise<PaginatedResult> {
     const env = filters?.env ?? 'live';
-    const where: string[] = ['c.game_env = ?'];
-    const params: (string | number)[] = [env];
+    const prisma = this.getClient(env);
+    const where: string[] = [];
+    const params: (string | number)[] = [];
 
     if (filters?.types) {
       const typeList = filters.types
@@ -49,19 +50,18 @@ export class CommodityQueryService {
     const baseSql = `SELECT c.* FROM commodities c${w}`;
     const countSql = `SELECT COUNT(*) as total FROM commodities c${w}`;
 
-    return paginate(this.prisma, baseSql, countSql, params, filters || {}, COMMODITY_SORT, 'c');
+    return paginate(prisma, baseSql, countSql, params, filters || {}, COMMODITY_SORT, 'c');
   }
 
   async getCommodityByUuid(uuid: string, env = 'live'): Promise<Row | null> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>('SELECT * FROM commodities WHERE uuid = ? AND game_env = ?', uuid, env);
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(`SELECT * FROM commodities WHERE uuid = ?`, uuid);
     return rows[0] || null;
   }
 
   async getCommodityTypes(env = 'live'): Promise<{ types: { type: string; count: number }[] }> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-      'SELECT type, COUNT(*) as count FROM commodities WHERE game_env = ? GROUP BY type ORDER BY count DESC',
-      env,
-    );
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(`SELECT type, COUNT(*) as count FROM commodities GROUP BY type ORDER BY count DESC`);
     return { types: rows.map((r) => ({ type: String(r.type), count: Number(r.count) })) };
   }
 }

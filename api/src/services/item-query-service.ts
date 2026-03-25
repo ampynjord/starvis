@@ -24,7 +24,7 @@ const ITEM_SORT = new Set([
 ]);
 
 export class ItemQueryService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private getClient: (env: string) => PrismaClient) {}
 
   async getAllItems(filters?: {
     env?: string;
@@ -39,8 +39,9 @@ export class ItemQueryService {
     limit?: number;
   }): Promise<PaginatedResult> {
     const env = filters?.env ?? 'live';
-    const where: string[] = ['i.game_env = ?'];
-    const params: (string | number)[] = [env];
+    const prisma = this.getClient(env);
+    const where: string[] = [];
+    const params: (string | number)[] = [];
 
     if (filters?.types) {
       const typeList = filters.types
@@ -73,26 +74,26 @@ export class ItemQueryService {
     }
 
     const w = where.length ? ` WHERE ${where.join(' AND ')}` : '';
-    const baseSql = `SELECT i.*, m.name as manufacturer_name FROM items i LEFT JOIN manufacturers m ON i.manufacturer_code = m.code${w}`;
+    const baseSql = `SELECT i.*, m.name as manufacturer_name FROM items i LEFT JOIN starvis.manufacturers m ON i.manufacturer_code = m.code${w}`;
     const countSql = `SELECT COUNT(*) as total FROM items i${w}`;
 
-    return paginate(this.prisma, baseSql, countSql, params, filters || {}, ITEM_SORT, 'i');
+    return paginate(prisma, baseSql, countSql, params, filters || {}, ITEM_SORT, 'i');
   }
 
   async getItemByUuid(uuid: string, env = 'live'): Promise<Row | null> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-      'SELECT i.*, m.name as manufacturer_name FROM items i LEFT JOIN manufacturers m ON i.manufacturer_code = m.code WHERE i.uuid = ? AND i.game_env = ?',
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT i.*, m.name as manufacturer_name FROM items i LEFT JOIN starvis.manufacturers m ON i.manufacturer_code = m.code WHERE i.uuid = ?`,
       uuid,
-      env,
     );
     return rows[0] || null;
   }
 
   async getItemByClassName(className: string, env = 'live'): Promise<Row | null> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-      'SELECT i.*, m.name as manufacturer_name FROM items i LEFT JOIN manufacturers m ON i.manufacturer_code = m.code WHERE i.class_name = ? AND i.game_env = ?',
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT i.*, m.name as manufacturer_name FROM items i LEFT JOIN starvis.manufacturers m ON i.manufacturer_code = m.code WHERE i.class_name = ?`,
       className,
-      env,
     );
     return rows[0] || null;
   }
@@ -102,15 +103,12 @@ export class ItemQueryService {
   }
 
   async getItemFilters(env = 'live'): Promise<{ types: string[]; sub_types: string[]; manufacturers: string[] }> {
+    const prisma = this.getClient(env);
     const [typeRows, subTypeRows, mfrRows] = await Promise.all([
-      this.prisma.$queryRawUnsafe<Row[]>('SELECT DISTINCT type FROM items WHERE type IS NOT NULL AND game_env = ? ORDER BY type', env),
-      this.prisma.$queryRawUnsafe<Row[]>(
-        "SELECT DISTINCT sub_type FROM items WHERE sub_type IS NOT NULL AND sub_type != '' AND game_env = ? ORDER BY sub_type",
-        env,
-      ),
-      this.prisma.$queryRawUnsafe<Row[]>(
-        'SELECT DISTINCT manufacturer_code FROM items WHERE manufacturer_code IS NOT NULL AND game_env = ? ORDER BY manufacturer_code',
-        env,
+      prisma.$queryRawUnsafe<Row[]>(`SELECT DISTINCT type FROM items WHERE type IS NOT NULL ORDER BY type`),
+      prisma.$queryRawUnsafe<Row[]>(`SELECT DISTINCT sub_type FROM items WHERE sub_type IS NOT NULL AND sub_type != '' ORDER BY sub_type`),
+      prisma.$queryRawUnsafe<Row[]>(
+        `SELECT DISTINCT manufacturer_code FROM items WHERE manufacturer_code IS NOT NULL ORDER BY manufacturer_code`,
       ),
     ]);
     return {
@@ -121,15 +119,14 @@ export class ItemQueryService {
   }
 
   async getItemTypes(env = 'live'): Promise<{ types: { type: string; count: number }[] }> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-      'SELECT type, COUNT(*) as count FROM items WHERE game_env = ? GROUP BY type ORDER BY count DESC',
-      env,
-    );
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(`SELECT type, COUNT(*) as count FROM items GROUP BY type ORDER BY count DESC`);
     return { types: rows.map((r) => ({ type: String(r.type), count: Number(r.count) })) };
   }
 
   async getItemBuyLocations(uuid: string, env = 'live'): Promise<Row[]> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT s.id as shop_id, s.name as shop_name, s.location, s.planet_moon,
               s.\`system\` as system_name, s.city, s.shop_type,
               s.source_type as shop_source_type, s.source_name as shop_source_name,
@@ -139,10 +136,9 @@ export class ItemQueryService {
               si.base_price, si.rental_price_1d
        FROM shop_inventory si
        JOIN shops s ON si.shop_id = s.id
-       WHERE si.component_uuid = ? AND si.game_env = ?
+       WHERE si.component_uuid = ?
        ORDER BY si.base_price`,
       uuid,
-      env,
     );
     return rows;
   }

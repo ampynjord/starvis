@@ -67,9 +67,6 @@ model ShipMatrix {
   compiled          Json?
   syncedAt          DateTime @default(now()) @map("synced_at") @db.DateTime(0)
 
-  // Relations
-  ships Ship[]
-
   @@map("ship_matrix")
 }
 
@@ -80,16 +77,11 @@ model Manufacturer {
   knownFor    String?  @map("known_for") @db.VarChar(255)
   createdAt   DateTime @default(now()) @map("created_at") @db.DateTime(0)
 
-  // Relations
-  ships      Ship[]      @relation("ShipManufacturer")
-  components Component[] @relation("ComponentManufacturer")
-
   @@map("manufacturers")
 }
 
 model Ship {
-  uuid                  String   @db.Char(36)
-  gameEnv               String   @default("live") @map("game_env") @db.VarChar(10)
+  uuid                  String   @id @db.Char(36)
   className             String   @map("class_name") @db.VarChar(255)
   name                  String?  @db.VarChar(255)
   manufacturerCode      String?  @map("manufacturer_code") @db.VarChar(10)
@@ -142,23 +134,18 @@ model Ship {
   extractedAt           DateTime @default(now()) @map("extracted_at") @db.DateTime(0)
 
   // Relations
-  manufacturer Manufacturer? @relation("ShipManufacturer", fields: [manufacturerCode], references: [code], onDelete: SetNull, map: "fk_ship_manufacturer")
-  shipMatrix   ShipMatrix?   @relation(fields: [shipMatrixId], references: [id], onDelete: SetNull, map: "fk_ship_matrix")
   loadouts     ShipLoadout[]
   modules      ShipModule[]
   paints       ShipPaint[]
 
-  @@id([uuid, gameEnv])
   @@index([manufacturerCode], map: "idx_ship_manufacturer_code")
   @@index([shipMatrixId], map: "idx_ship_matrix_id")
-  @@index([gameEnv], map: "idx_game_env")
   @@index([chassisId], map: "idx_ship_chassis_id")
   @@map("ships")
 }
 
 model Component {
-  uuid                    String   @db.Char(36)
-  gameEnv                 String   @default("live") @map("game_env") @db.VarChar(10)
+  uuid                    String   @id @db.Char(36)
   className               String   @map("class_name") @db.VarChar(255)
   name                    String   @db.VarChar(255)
   normalizedName          String?  @map("normalized_name") @db.VarChar(255)
@@ -251,23 +238,19 @@ model Component {
   updatedAt               DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
 
   // Relations
-  manufacturer  Manufacturer?   @relation("ComponentManufacturer", fields: [manufacturerCode], references: [code], onDelete: SetNull, map: "fk_component_manufacturer")
   loadouts      ShipLoadout[]
   shopInventory ShopInventory[]
 
-  @@id([uuid, gameEnv])
   @@index([manufacturerCode], map: "idx_component_manufacturer_code")
   @@index([type], map: "idx_component_type")
   @@index([subType], map: "idx_component_sub_type")
-  @@index([gameEnv], map: "idx_game_env")
-  @@index([canonicalComponentKey, gameEnv], map: "idx_component_canonical_key_env")
+  @@index([canonicalComponentKey], map: "idx_component_canonical_key_env")
   @@map("components")
 }
 
 model ShipLoadout {
   id                 Int     @id @default(autoincrement())
   shipUuid           String  @map("ship_uuid") @db.Char(36)
-  gameEnv            String  @default("live") @map("game_env") @db.VarChar(10)
   portName           String  @map("port_name") @db.VarChar(100)
   portMinSize        Int?    @map("port_min_size") @db.UnsignedTinyInt
   portMaxSize        Int?    @map("port_max_size") @db.UnsignedTinyInt
@@ -278,8 +261,8 @@ model ShipLoadout {
   parentId           Int?    @map("parent_id")
 
   // Relations
-  ship      Ship?      @relation(fields: [shipUuid, gameEnv], references: [uuid, gameEnv], onDelete: Cascade, map: "fk_loadout_ship")
-  component Component? @relation(fields: [componentUuid, gameEnv], references: [uuid, gameEnv], onDelete: Cascade, map: "fk_loadout_component")
+  ship      Ship?      @relation(fields: [shipUuid], references: [uuid], onDelete: Cascade, map: "fk_loadout_ship")
+  component Component? @relation(fields: [componentUuid], references: [uuid], onDelete: Cascade, map: "fk_loadout_component")
 
   @@index([shipUuid], map: "idx_loadout_ship")
   @@index([componentUuid], map: "idx_loadout_component")
@@ -289,7 +272,6 @@ model ShipLoadout {
 model ShipModule {
   id              Int     @id @default(autoincrement())
   shipUuid        String  @map("ship_uuid") @db.Char(36)
-  gameEnv         String  @default("live") @map("game_env") @db.VarChar(10)
   slotName        String  @map("slot_name") @db.VarChar(100)
   slotDisplayName String? @map("slot_display_name") @db.VarChar(100)
   slotType        String? @map("slot_type") @db.VarChar(20)
@@ -300,7 +282,7 @@ model ShipModule {
   loadoutJson     Json?   @map("loadout_json")
 
   // Relations
-  ship Ship @relation(fields: [shipUuid, gameEnv], references: [uuid, gameEnv], onDelete: Cascade, map: "fk_module_ship")
+  ship Ship @relation(fields: [shipUuid], references: [uuid], onDelete: Cascade, map: "fk_module_ship")
 
   @@index([shipUuid], map: "idx_module_ship")
   @@map("ship_modules")
@@ -309,21 +291,19 @@ model ShipModule {
 model ShipPaint {
   id             Int     @id @default(autoincrement())
   shipUuid       String  @map("ship_uuid") @db.Char(36)
-  gameEnv        String  @default("live") @map("game_env") @db.VarChar(10)
   paintClassName String  @map("paint_class_name") @db.VarChar(255)
   paintName      String? @map("paint_name") @db.VarChar(255)
   paintUuid      String? @map("paint_uuid") @db.Char(36)
 
   // Relations
-  ship Ship @relation(fields: [shipUuid, gameEnv], references: [uuid, gameEnv], onDelete: Cascade, map: "fk_paint_ship")
+  ship Ship @relation(fields: [shipUuid], references: [uuid], onDelete: Cascade, map: "fk_paint_ship")
 
   @@index([shipUuid], map: "idx_paint_ship")
   @@map("ship_paints")
 }
 
 model Item {
-  uuid                 String   @db.Char(36)
-  gameEnv              String   @default("live") @map("game_env") @db.VarChar(10)
+  uuid                 String   @id @db.Char(36)
   className            String   @map("class_name") @db.VarChar(255)
   name                 String   @db.VarChar(255)
   normalizedName       String?  @map("normalized_name") @db.VarChar(255)
@@ -353,15 +333,12 @@ model Item {
   createdAt            DateTime @default(now()) @map("created_at") @db.DateTime(0)
   updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
 
-  @@id([uuid, gameEnv])
-  @@index([gameEnv], map: "idx_game_env")
-  @@index([canonicalItemKey, gameEnv], map: "idx_item_canonical_key_env")
+  @@index([canonicalItemKey], map: "idx_item_canonical_key_env")
   @@map("items")
 }
 
 model Commodity {
-  uuid         String   @db.Char(36)
-  gameEnv      String   @default("live") @map("game_env") @db.VarChar(10)
+  uuid         String   @id @db.Char(36)
   className    String   @map("class_name") @db.VarChar(255)
   name         String   @db.VarChar(255)
   normalizedName        String?  @map("normalized_name") @db.VarChar(255)
@@ -380,9 +357,7 @@ model Commodity {
 
   prices CommodityPrice[]
 
-  @@id([uuid, gameEnv])
-  @@index([gameEnv], map: "idx_game_env")
-  @@index([canonicalCommodityKey, gameEnv], map: "idx_commodity_canonical_key_env")
+  @@index([canonicalCommodityKey], map: "idx_commodity_canonical_key_env")
   @@map("commodities")
 }
 
@@ -390,7 +365,6 @@ model Shop {
   id         Int      @id @default(autoincrement())
   name       String   @db.VarChar(255)
   className  String   @map("class_name") @db.VarChar(255)
-  gameEnv    String   @default("live") @map("game_env") @db.VarChar(10)
   normalizedName String?  @map("normalized_name") @db.VarChar(255)
   canonicalShopKey String? @map("canonical_shop_key") @db.VarChar(255)
   canonicalLocationKey String? @map("canonical_location_key") @db.VarChar(255)
@@ -410,8 +384,8 @@ model Shop {
   inventory ShopInventory[]
   commodityPrices CommodityPrice[]
 
-  @@unique([className, gameEnv], map: "uk_shop_class_env")
-  @@index([canonicalShopKey, gameEnv], map: "idx_shop_canonical_key_env")
+  @@unique([className], map: "uk_shop_class_env")
+  @@index([canonicalShopKey], map: "idx_shop_canonical_key_env")
   @@index([canonicalLocationKey], map: "idx_shop_canonical_location_key")
   @@map("shops")
 }
@@ -419,7 +393,6 @@ model Shop {
 model ShopInventory {
   id                 Int      @id @default(autoincrement())
   shopId             Int      @map("shop_id")
-  gameEnv            String   @default("live") @map("game_env") @db.VarChar(10)
   componentUuid      String?  @map("component_uuid") @db.Char(36)
   componentClassName String   @map("component_class_name") @db.VarChar(255)
   sourceType         String   @default("p4k_datamine") @map("source_type") @db.VarChar(50)
@@ -436,7 +409,7 @@ model ShopInventory {
 
   // Relations
   shop      Shop       @relation(fields: [shopId], references: [id], onDelete: Cascade, map: "fk_inventory_shop")
-  component Component? @relation(fields: [componentUuid, gameEnv], references: [uuid, gameEnv], onDelete: Cascade, map: "fk_inventory_component")
+  component Component? @relation(fields: [componentUuid], references: [uuid], onDelete: Cascade, map: "fk_inventory_component")
 
   @@unique([shopId, componentClassName], map: "uk_shop_component")
   @@index([shopId], map: "idx_shop_id")
@@ -491,8 +464,7 @@ model Changelog {
 }
 
 model MiningElement {
-  uuid                       String   @db.Char(36)
-  gameEnv                    String   @default("live") @map("game_env") @db.VarChar(10)
+  uuid                       String   @id @db.Char(36)
   className                  String   @map("class_name") @db.VarChar(255)
   name                       String? @db.VarChar(255)
   commodityUuid              String? @map("commodity_uuid") @db.Char(36)
@@ -506,22 +478,17 @@ model MiningElement {
 
   compositionParts MiningCompositionPart[]
 
-  @@id([uuid, gameEnv])
-  @@index([gameEnv], map: "idx_game_env")
   @@map("mining_elements")
 }
 
 model MiningComposition {
-  uuid                  String  @db.Char(36)
-  gameEnv               String  @default("live") @map("game_env") @db.VarChar(10)
+  uuid                  String  @id @db.Char(36)
   className             String  @map("class_name") @db.VarChar(255)
   depositName           String? @map("deposit_name") @db.VarChar(255)
   minDistinctElements   Int?    @map("min_distinct_elements")
 
   parts MiningCompositionPart[]
 
-  @@id([uuid, gameEnv])
-  @@index([gameEnv], map: "idx_game_env")
   @@map("mining_compositions")
 }
 
@@ -529,14 +496,13 @@ model MiningCompositionPart {
   id               Int     @id @default(autoincrement())
   compositionUuid  String  @map("composition_uuid") @db.Char(36)
   elementUuid      String  @map("element_uuid") @db.Char(36)
-  gameEnv          String  @default("live") @map("game_env") @db.VarChar(10)
   minPercentage    Decimal? @map("min_percentage") @db.Decimal(6, 2)
   maxPercentage    Decimal? @map("max_percentage") @db.Decimal(6, 2)
   probability      Decimal? @db.Decimal(6, 4)
   curveExponent    Decimal? @map("curve_exponent") @db.Decimal(6, 4)
 
-  composition MiningComposition @relation(fields: [compositionUuid, gameEnv], references: [uuid, gameEnv], onDelete: Cascade, map: "fk_mcp_composition")
-  element     MiningElement     @relation(fields: [elementUuid, gameEnv], references: [uuid, gameEnv], onDelete: Cascade, map: "fk_mcp_element")
+  composition MiningComposition @relation(fields: [compositionUuid], references: [uuid], onDelete: Cascade, map: "fk_mcp_composition")
+  element     MiningElement     @relation(fields: [elementUuid], references: [uuid], onDelete: Cascade, map: "fk_mcp_element")
 
   @@index([compositionUuid], map: "idx_mcp_composition")
   @@index([elementUuid], map: "idx_mcp_element")
@@ -544,7 +510,7 @@ model MiningCompositionPart {
 }
 
 model Mission {
-  uuid               String   @db.Char(36)
+  uuid               String   @id @db.Char(36)
   className          String   @map("class_name") @db.VarChar(300)
   title              String?  @db.VarChar(500)
   description        String?  @db.Text
@@ -555,7 +521,6 @@ model Mission {
   completionTimeSecs Int?     @map("completion_time_s")
   notForRelease      Boolean  @default(false) @map("not_for_release")
   workInProgress     Boolean  @default(false) @map("work_in_progress")
-  gameEnv            String   @default("live") @map("game_env") @db.VarChar(10)
 
   // SCMDB parity: rewards
   rewardMin          Int?     @map("reward_min")
@@ -576,9 +541,7 @@ model Mission {
   requiredReputation Int?     @map("required_reputation")
   reputationReward   Int?     @map("reputation_reward")
 
-  @@id([uuid, gameEnv])
   @@index([missionType], map: "idx_mission_type")
-  @@index([gameEnv], map: "idx_game_env")
   @@index([faction], map: "idx_mission_faction")
   @@index([locationSystem], map: "idx_mission_location_system")
   @@map("missions")
@@ -587,8 +550,7 @@ model Mission {
 // ─── Crafting ─────────────────────────────────────────────────────────────────
 
 model CraftingRecipe {
-  uuid           String   @db.Char(36)
-  gameEnv        String   @default("live") @map("game_env") @db.VarChar(10)
+  uuid           String   @id @db.Char(36)
   className      String   @map("class_name") @db.VarChar(255)
   name           String?  @db.VarChar(255)
   category       String?  @db.VarChar(50)
@@ -603,22 +565,19 @@ model CraftingRecipe {
 
   ingredients CraftingIngredient[]
 
-  @@id([uuid, gameEnv])
   @@index([category], map: "idx_crafting_category")
-  @@index([gameEnv], map: "idx_crafting_game_env")
   @@map("crafting_recipes")
 }
 
 model CraftingIngredient {
   id             Int      @id @default(autoincrement())
   recipeUuid     String   @map("recipe_uuid") @db.Char(36)
-  gameEnv        String   @default("live") @map("game_env") @db.VarChar(10)
   itemName       String   @map("item_name") @db.VarChar(255)
   itemUuid       String?  @map("item_uuid") @db.Char(36)
   quantity       Int      @default(1)
   isOptional     Boolean  @default(false) @map("is_optional")
 
-  recipe CraftingRecipe @relation(fields: [recipeUuid, gameEnv], references: [uuid, gameEnv], onDelete: Cascade, map: "fk_ingredient_recipe")
+  recipe CraftingRecipe @relation(fields: [recipeUuid], references: [uuid], onDelete: Cascade, map: "fk_ingredient_recipe")
 
   @@index([recipeUuid], map: "idx_ingredient_recipe")
   @@map("crafting_ingredients")
@@ -629,16 +588,15 @@ model CraftingIngredient {
 model CommodityPrice {
   id              Int      @id @default(autoincrement())
   commodityUuid   String   @map("commodity_uuid") @db.Char(36)
-  gameEnv         String   @default("live") @map("game_env") @db.VarChar(10)
   shopId          Int      @map("shop_id")
   buyPrice        Decimal? @map("buy_price") @db.Decimal(12, 2)
   sellPrice       Decimal? @map("sell_price") @db.Decimal(12, 2)
   reportedAt      DateTime @default(now()) @map("reported_at") @db.DateTime(0)
 
-  commodity Commodity @relation(fields: [commodityUuid, gameEnv], references: [uuid, gameEnv], onDelete: Cascade, map: "fk_price_commodity")
+  commodity Commodity @relation(fields: [commodityUuid], references: [uuid], onDelete: Cascade, map: "fk_price_commodity")
   shop      Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade, map: "fk_price_shop")
 
-  @@unique([commodityUuid, shopId, gameEnv], map: "uk_commodity_shop_env")
+  @@unique([commodityUuid, shopId], map: "uk_commodity_shop_env")
   @@index([shopId], map: "idx_price_shop")
   @@index([commodityUuid], map: "idx_price_commodity")
   @@map("commodity_prices")

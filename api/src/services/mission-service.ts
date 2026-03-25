@@ -6,50 +6,50 @@ import { convertBigIntToNumber, type PaginatedResult, type Row } from './shared.
 
 const MISSION_COLS = `m.uuid, m.class_name, m.title, m.description, m.mission_type,
   m.can_be_shared, m.only_owner_complete, m.is_legal,
-  m.completion_time_s, m.game_env,
+  m.completion_time_s,
   m.reward_min, m.reward_max, m.reward_currency,
   m.faction, m.mission_giver,
   m.location_system, m.location_planet, m.location_name,
   m.danger_level, m.required_reputation, m.reputation_reward`;
 
 export class MissionService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private getClient: (env: string) => PrismaClient) {}
 
   /** List all distinct mission types for a given env */
   async getMissionTypes(env = 'live'): Promise<string[]> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT DISTINCT mission_type
        FROM missions
-       WHERE game_env = ? AND not_for_release = 0 AND work_in_progress = 0
+       WHERE not_for_release = 0 AND work_in_progress = 0
          AND mission_type IS NOT NULL
        ORDER BY mission_type`,
-      env,
     );
     return rows.map((r) => String(r.mission_type));
   }
 
   /** List all distinct factions */
   async getFactions(env = 'live'): Promise<string[]> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT DISTINCT faction
        FROM missions
-       WHERE game_env = ? AND not_for_release = 0 AND work_in_progress = 0
+       WHERE not_for_release = 0 AND work_in_progress = 0
          AND faction IS NOT NULL AND faction != ''
        ORDER BY faction`,
-      env,
     );
     return rows.map((r) => String(r.faction));
   }
 
   /** List all distinct location systems */
   async getSystems(env = 'live'): Promise<string[]> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT DISTINCT location_system
        FROM missions
-       WHERE game_env = ? AND not_for_release = 0 AND work_in_progress = 0
+       WHERE not_for_release = 0 AND work_in_progress = 0
          AND location_system IS NOT NULL AND location_system != ''
        ORDER BY location_system`,
-      env,
     );
     return rows.map((r) => String(r.location_system));
   }
@@ -68,11 +68,12 @@ export class MissionService {
     limit?: number;
   }): Promise<PaginatedResult> {
     const { env = 'live', type, legal, shared, faction, system, minReward, search, page = 1, limit = 50 } = opts;
+    const prisma = this.getClient(env);
     const safeLimit = Math.min(Math.max(1, limit), 200);
     const offset = (page - 1) * safeLimit;
 
-    const where: string[] = ['m.game_env = ?', 'm.not_for_release = 0', 'm.work_in_progress = 0'];
-    const params: (string | number)[] = [env];
+    const where: string[] = ['m.not_for_release = 0', 'm.work_in_progress = 0'];
+    const params: (string | number)[] = [];
 
     if (type) {
       where.push('m.mission_type = ?');
@@ -101,10 +102,10 @@ export class MissionService {
 
     const whereClause = where.join(' AND ');
 
-    const [countRow] = await this.prisma.$queryRawUnsafe<Row[]>(`SELECT COUNT(*) as total FROM missions m WHERE ${whereClause}`, ...params);
+    const [countRow] = await prisma.$queryRawUnsafe<Row[]>(`SELECT COUNT(*) as total FROM missions m WHERE ${whereClause}`, ...params);
     const total = Number(countRow?.total ?? 0);
 
-    const data = await this.prisma.$queryRawUnsafe<Row[]>(
+    const data = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT ${MISSION_COLS}
        FROM missions m
        WHERE ${whereClause}
@@ -126,12 +127,12 @@ export class MissionService {
 
   /** Single mission by UUID */
   async getMissionByUuid(uuid: string, env = 'live'): Promise<Row | null> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT ${MISSION_COLS}
        FROM missions m
-       WHERE m.uuid = ? AND m.game_env = ?`,
+       WHERE m.uuid = ?`,
       uuid,
-      env,
     );
     return rows.length ? convertBigIntToNumber(rows[0]) : null;
   }
