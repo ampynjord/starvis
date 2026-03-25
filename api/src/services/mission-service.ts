@@ -100,7 +100,7 @@ export class MissionService {
       params.push(q, q, q);
     }
 
-    const whereClause = where.join(' AND ');
+    const whereClause = where.length ? where.join(' AND ') : '1=1';
 
     const [countRow] = await prisma.$queryRawUnsafe<Row[]>(`SELECT COUNT(*) as total FROM missions m WHERE ${whereClause}`, ...params);
     const total = Number(countRow?.total ?? 0);
