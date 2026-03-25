@@ -233,7 +233,16 @@ jobs:
           echo "✅ Redis ready"
 
       - name: Setup database schema
-        run: cd api && npx prisma db push --skip-generate --accept-data-loss --force-reset
+        run: |
+          # Create the extra game databases (live/ptu) needed by multi-DB architecture
+          mysql -h 127.0.0.1 -u root -ptestroot -e "
+            CREATE DATABASE IF NOT EXISTS live;
+            CREATE DATABASE IF NOT EXISTS ptu;
+            GRANT ALL PRIVILEGES ON live.* TO 'starvis_user'@'%';
+            GRANT ALL PRIVILEGES ON ptu.* TO 'starvis_user'@'%';
+            FLUSH PRIVILEGES;
+          "
+          cd api && npx prisma db push --skip-generate --accept-data-loss --force-reset
 
       - name: Run API unit tests with coverage
         run: cd api && npm run test:coverage
