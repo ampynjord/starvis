@@ -10,7 +10,7 @@ services:
     container_name: starvis-mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_DATABASE: starvis
       MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${DB_PASSWORD}
     # Port exposé en loopback uniquement — pour extractions locales via tunnel SSH
@@ -18,7 +18,7 @@ services:
       - "127.0.0.1:3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./db:/docker-entrypoint-initdb.d:ro
+      - ./db/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
     restart: unless-stopped
     deploy:
       resources:
@@ -57,7 +57,7 @@ services:
       DB_PORT: 3306
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
+      DB_NAME: starvis
       REDIS_HOST: redis
       REDIS_PORT: 6379
       ADMIN_API_KEY: ${ADMIN_API_KEY}

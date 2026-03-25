@@ -18,13 +18,29 @@ export const DB_CONFIG = {
   connectionLimit: 10,
 };
 
+/** Allowed game environment database names. */
+const GAME_DB_NAMES: Record<string, string> = { live: 'live', ptu: 'ptu' };
+
+/** All database names managed by the application. */
+export const ALL_DB_NAMES = ['starvis', 'live', 'ptu'] as const;
+
+/**
+ * Resolve a game environment string to a safe database name.
+ * Throws if the env is unknown (prevents SQL injection via qualified table names).
+ */
+export function gameDb(env: string): string {
+  const db = GAME_DB_NAMES[env];
+  if (!db) throw new Error(`Unknown game env "${env}". Allowed: ${Object.keys(GAME_DB_NAMES).join(', ')}`);
+  return db;
+}
+
 /** Build a mysql:// URL suited for Prisma from individual DB env vars. */
-export function buildDatabaseUrl(): string {
+export function buildDatabaseUrl(dbName?: string): string {
   const user = encodeURIComponent(requireEnv('DB_USER'));
   const pass = encodeURIComponent(requireEnv('DB_PASSWORD'));
   const host = requireEnv('DB_HOST');
   const port = process.env.DB_PORT || '3306';
-  const name = requireEnv('DB_NAME');
+  const name = dbName ?? requireEnv('DB_NAME');
   return `mysql://${user}:${pass}@${host}:${port}/${name}`;
 }
 

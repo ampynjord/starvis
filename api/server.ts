@@ -18,13 +18,13 @@ import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
-import { getPrisma, initPrisma } from './src/db/index.js';
+import { getGamePrisma, getStarvisPrisma, initAllPrisma } from './src/db/index.js';
 import { prometheusMiddleware } from './src/middleware/prometheus.js';
 import { healthRouter } from './src/routes/health.js';
 import { createRoutes } from './src/routes/index.js';
 import { GameDataService, ShipMatrixService } from './src/services/index.js';
 import { redis } from './src/services/redis.js';
-import { buildDatabaseUrl, logger, RATE_LIMITS } from './src/utils/index.js';
+import { ALL_DB_NAMES, buildDatabaseUrl, logger, RATE_LIMITS } from './src/utils/index.js';
 
 const PORT = process.env.PORT || 3000;
 
@@ -142,8 +142,8 @@ app.get('/', (_, res) =>
 
 // ===== STARTUP =====
 async function start() {
-  // 1. Initialise Prisma + connect with retry
-  const prisma = initPrisma(buildDatabaseUrl());
+  // 1. Initialise Prisma clients for all 3 databases + connect with retry
+  const prisma = initAllPrisma(buildDatabaseUrl);
   let dbReady = false;
   for (let i = 0; i < 30; i++) {
     try {
@@ -162,14 +162,16 @@ async function start() {
     process.exit(1);
   }
 
-  // 2. Sync schema via Prisma (CREATE / ALTER tables as needed)
+  // 2. Sync schema via Prisma to all 3 databases (starvis, live, ptu)
   try {
     const { execSync } = await import('node:child_process');
-    execSync('npx prisma db push --skip-generate --accept-data-loss', {
-      stdio: 'pipe',
-      env: { ...process.env, DATABASE_URL: buildDatabaseUrl() },
-    });
-    logger.info('✅ Schema synced (prisma db push)', { module: 'DB' });
+    for (const dbName of ALL_DB_NAMES) {
+      execSync('npx prisma db push --skip-generate --accept-data-loss', {
+        stdio: 'pipe',
+        env: { ...process.env, DATABASE_URL: buildDatabaseUrl(dbName) },
+      });
+      logger.info(`✅ Schema synced → ${dbName}`, { module: 'DB' });
+    }
   } catch (e: any) {
     logger.error(`Schema sync failed: ${e.stderr?.toString() || e.message}`, { module: 'DB' });
     process.exit(1);
@@ -186,14 +188,15 @@ async function start() {
     logger.warn('⚠️  Redis unavailable, cache disabled', { module: 'Redis' });
   }
 
-  // 4. Ship Matrix service (always available)
-  const shipMatrixService = new ShipMatrixService(prisma);
+  // 4. Ship Matrix service (always available — uses starvis DB)
+  const starvisClient = getStarvisPrisma();
+  const shipMatrixService = new ShipMatrixService(starvisClient);
 
   // 5. GameDataService (reads from MySQL — fed by standalone extractor)
-  gameDataService = new GameDataService(prisma);
+  gameDataService = new GameDataService(getGamePrisma, starvisClient);
 
   // 6. Mount routes
-  app.use('/', createRoutes({ prisma, shipMatrixService, gameDataService }));
+  app.use('/', createRoutes({ prisma: starvisClient, shipMatrixService, gameDataService }));
 
   // 7. Start listening BEFORE non-critical sync (so /health is immediately available)
   httpServer = app.listen(PORT, () => logger.info(`✅ Starvis v1.0 listening on :${PORT}`, { module: 'Server' }));
@@ -221,7 +224,7 @@ async function shutdown(signal: string) {
 
   // Disconnect Prisma
   try {
-    await getPrisma().$disconnect();
+    await getStarvisPrisma().$disconnect();
     logger.info('Prisma disconnected', { module: 'DB' });
   } catch {
     /* not initialised */

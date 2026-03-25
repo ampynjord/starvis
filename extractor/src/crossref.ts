@@ -99,7 +99,7 @@ export async function crossReferenceShipMatrix(conn: PoolConnection): Promise<nu
   await conn.execute('UPDATE ships SET ship_matrix_id = NULL WHERE ship_matrix_id IS NOT NULL');
 
   const [ships] = await conn.execute<any[]>('SELECT uuid, class_name, name FROM ships');
-  const [smEntries] = await conn.execute<any[]>('SELECT id, name FROM ship_matrix');
+  const [smEntries] = await conn.execute<any[]>('SELECT id, name FROM starvis.ship_matrix');
 
   const aliasMap = new Map<string, string>();
   for (const [smName, p4kName] of Object.entries(SM_TO_P4K_ALIASES)) {
@@ -192,7 +192,7 @@ export async function crossReferenceShipMatrix(conn: PoolConnection): Promise<nu
 /** Copy chassis_id from ship_matrix to ships for fast variant grouping */
 export async function populateChassisId(conn: PoolConnection): Promise<number> {
   const [result]: any = await conn.execute(
-    `UPDATE ships s JOIN ship_matrix sm ON s.ship_matrix_id = sm.id
+    `UPDATE ships s JOIN starvis.ship_matrix sm ON s.ship_matrix_id = sm.id
      SET s.chassis_id = sm.chassis_id
      WHERE s.ship_matrix_id IS NOT NULL`,
   );
@@ -281,7 +281,7 @@ export async function pruneExcludedVariants(conn: PoolConnection): Promise<numbe
 export async function applyHullSeriesCargoFallback(conn: PoolConnection): Promise<void> {
   try {
     const [updated]: any = await conn.execute(
-      `UPDATE ships s JOIN ship_matrix sm ON s.ship_matrix_id = sm.id
+      `UPDATE ships s JOIN starvis.ship_matrix sm ON s.ship_matrix_id = sm.id
        SET s.cargo_capacity = sm.cargocapacity
        WHERE (s.cargo_capacity IS NULL OR s.cargo_capacity = 0)
          AND sm.cargocapacity IS NOT NULL AND sm.cargocapacity > 0
@@ -302,7 +302,7 @@ export async function applyHullSeriesCargoFallback(conn: PoolConnection): Promis
 export async function applyDimensionsFallback(conn: PoolConnection): Promise<void> {
   try {
     const [updated]: any = await conn.execute(
-      `UPDATE ships s JOIN ship_matrix sm ON s.ship_matrix_id = sm.id
+      `UPDATE ships s JOIN starvis.ship_matrix sm ON s.ship_matrix_id = sm.id
        SET s.size_x = sm.beam, s.size_y = sm.length, s.size_z = sm.height
        WHERE (s.size_y IS NULL OR s.size_y = 0)
          AND sm.length IS NOT NULL AND sm.length > 0`,

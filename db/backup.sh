@@ -1,6 +1,6 @@
 #!/bin/bash
 # ==============================================================
-# MySQL Backup Script — Daily automated backup
+# MySQL Backup Script â€” Daily automated backup
 # Cron: 0 3 * * * /home/debian/starvis/db/backup.sh
 # Keeps last 7 days of backups
 # ==============================================================
@@ -32,13 +32,13 @@ set -e
 
 if [ -n "$DUMP_SIZE" ] && [ "$DUMP_SIZE" -gt 0 ]; then
   SIZE=$(du -h "${BACKUP_DIR}/starvis_${DATE}.sql.gz" | cut -f1)
-  echo "[$(date)] ✅ Backup complete: starvis_${DATE}.sql.gz (${SIZE})"
+  echo "[$(date)] âœ… Backup complete: starvis_${DATE}.sql.gz (${SIZE})"
 else
-  echo "[$(date)] ❌ Backup failed!"
+  echo "[$(date)] âŒ Backup failed!"
   rm -f "${BACKUP_DIR}/starvis_${DATE}.sql.gz"
   exit 1
 fi
 
 # Remove old backups
 find "$BACKUP_DIR" -name "starvis_*.sql.gz" -mtime +${RETENTION_DAYS} -delete
-echo "[$(date)] 🧹 Cleaned backups older than ${RETENTION_DAYS} days"
+echo "[$(date)] ðŸ§¹ Cleaned backups older than ${RETENTION_DAYS} days"

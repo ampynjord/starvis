@@ -1,38 +1,54 @@
 /**
- * Prisma client singleton.
+ * Database clients — Multi-DB architecture.
+ *
+ * Three databases in one MySQL container:
+ *   - starvis : shared/meta (manufacturers, ship_matrix, changelog…)
+ *   - live    : game data for LIVE build
+ *   - ptu     : game data for PTU build
  *
  * Usage:
- *   import { getPrisma, initPrisma } from '@/db/index.js';
+ *   import { initAllPrisma, getGamePrisma, getStarvisPrisma } from '@/db/index.js';
  *
  *   // At startup:
- *   initPrisma();
+ *   initAllPrisma(buildDatabaseUrl);
  *
  *   // In services:
- *   const rows = await getPrisma().$queryRawUnsafe<Row[]>('SELECT ...', ...params);
+ *   const prisma = getGamePrisma(env); // env = 'live' | 'ptu'
+ *   const starvis = getStarvisPrisma();
  */
 
 import { PrismaClient } from '@prisma/client';
 
-let _prisma: PrismaClient | null = null;
+const clients: Record<string, PrismaClient> = {};
 
 /**
- * Initialise the PrismaClient.
- * Call this once at startup.
+ * Initialise Prisma clients for all 3 databases.
+ * Call once at startup.
  */
-export function initPrisma(databaseUrl: string): PrismaClient {
-  _prisma = new PrismaClient({
-    datasources: { db: { url: databaseUrl } },
-  });
-  return _prisma;
+export function initAllPrisma(urlBuilder: (db: string) => string): PrismaClient {
+  clients.starvis = new PrismaClient({ datasources: { db: { url: urlBuilder('starvis') } } });
+  clients.live = new PrismaClient({ datasources: { db: { url: urlBuilder('live') } } });
+  clients.ptu = new PrismaClient({ datasources: { db: { url: urlBuilder('ptu') } } });
+  return clients.starvis;
 }
 
-/**
- * Returns the PrismaClient instance.
- * Throws if initPrisma() has not been called.
- */
+/** Returns the Prisma client for a game environment (live or ptu). */
+export function getGamePrisma(env: string): PrismaClient {
+  const key = env === 'ptu' ? 'ptu' : 'live';
+  const client = clients[key];
+  if (!client) throw new Error(`Prisma not initialised for "${key}" — call initAllPrisma() first`);
+  return client;
+}
+
+/** Returns the Prisma client for the shared "starvis" database. */
+export function getStarvisPrisma(): PrismaClient {
+  if (!clients.starvis) throw new Error('Prisma not initialised — call initAllPrisma() first');
+  return clients.starvis;
+}
+
+/** Returns the starvis Prisma client (backward-compatible alias). */
 export function getPrisma(): PrismaClient {
-  if (!_prisma) throw new Error('Prisma not initialised — call initPrisma(url) first');
-  return _prisma;
+  return getStarvisPrisma();
 }
 
 export { PrismaClient } from '@prisma/client';
