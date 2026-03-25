@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { config } from 'dotenv';
+import { resolve } from 'node:path';
 import * as mysql from 'mysql2/promise';
 
-config({ path: '.env.extractor' });
+config({ path: resolve(import.meta.dirname, '..', '..', '.env.extractor') });
 
 type GameEnv = 'live' | 'ptu' | 'eptu' | 'custom' | 'all';
 

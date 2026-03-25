@@ -85,7 +85,7 @@ export default function CommoditiesPage() {
         </div>
         <div className="relative w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={13} />
-          <input type="text" value={search} onChange={e => updateSearch(e.target.value)} placeholder="Rechercher…" className="sci-input w-full pl-8 text-xs" />
+          <input type="text" value={search} onChange={e => updateSearch(e.target.value)} placeholder="Search…" className="sci-input w-full pl-8 text-xs" />
         </div>
       </div>
 

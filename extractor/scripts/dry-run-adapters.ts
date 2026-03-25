@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { config } from 'dotenv';
+import { resolve } from 'node:path';
 import { type ExternalSourceOverride, loadExternalCanonicalData } from '../src/source-adapters.js';
 
-config({ path: '.env.extractor' });
+config({ path: resolve(import.meta.dirname, '..', '..', '.env.extractor') });
 
 function parseSampleSize(): number {
   const args = process.argv.slice(2);
