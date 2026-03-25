@@ -109,7 +109,7 @@ export default function CraftingPage() {
               setSearch(e.target.value);
               setPage(1);
             }}
-            placeholder="Rechercher recette, ingrédient…"
+            placeholder="Search recipe, ingredient…"
             className="sci-input w-full pl-8 text-xs"
           />
         </div>
@@ -128,7 +128,7 @@ export default function CraftingPage() {
             groups={[
               {
                 key: 'category',
-                label: 'Catégorie',
+                label: 'Category',
                 options: (categories ?? []).map((c) => ({ label: `${c.category} (${c.count})`, value: c.category })),
                 value: category,
                 onChange: (v: string) => {
@@ -154,11 +154,11 @@ export default function CraftingPage() {
           <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 items-start">
             <div>
               {isLoading ? (
-                <LoadingGrid message="CHARGEMENT RECETTES…" />
+                <LoadingGrid message="LOADING RECIPES…" />
               ) : error ? (
                 <ErrorState error={error as Error} onRetry={() => void refetch()} />
               ) : !data?.data?.length ? (
-                <EmptyState icon="🔧" title="Aucune recette trouvée" />
+                <EmptyState icon="🔧" title="No recipes found" />
               ) : (
                 <>
                   <div className="space-y-1.5">
@@ -294,8 +294,8 @@ export default function CraftingPage() {
                   </div>
                 </ScifiPanel>
               ) : (
-                <ScifiPanel title="Détail recette" subtitle="Sélectionnez une recette">
-                  <p className="text-xs text-slate-600 text-center py-8">Aucune recette sélectionnée</p>
+                <ScifiPanel title="Recipe Detail" subtitle="Select a recipe">
+                  <p className="text-xs text-slate-600 text-center py-8">No recipe selected</p>
                 </ScifiPanel>
               )}
             </div>

@@ -14,9 +14,9 @@ import { useDebounce } from '@/hooks/useDebounce';
 
 const SCU_PRESETS = [4, 8, 16, 32, 46, 96, 174, 576, 696];
 const SORT_OPTIONS = [
-  { value: 'totalProfit', label: 'Profit total' },
+  { value: 'totalProfit', label: 'Total Profit' },
   { value: 'profitPerScu', label: 'Profit / SCU' },
-  { value: 'profitPerUnit', label: 'Profit / unité' },
+  { value: 'profitPerUnit', label: 'Profit / Unit' },
 ] as const;
 
 function fmt(n: number | null | undefined): string {
@@ -118,14 +118,14 @@ export default function TradePage() {
     <div className="max-w-screen-2xl mx-auto">
       <div className="mb-4">
         <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Trade Routes</h1>
-        <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">Calculateur de routes commerciales</p>
+        <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">Trade route calculator</p>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4">
         {/* Main content */}
         <div className="space-y-4">
           {/* Route calculator */}
-          <ScifiPanel title="Route Calculator" subtitle="Trouver les routes les plus rentables">
+          <ScifiPanel title="Route Calculator" subtitle="Find the most profitable routes">
             <div className="space-y-3">
               <div className="flex flex-wrap gap-4 items-end">
                 <div>
@@ -158,14 +158,14 @@ export default function TradePage() {
                 <div>
                   <label className="text-xs font-mono-sc text-slate-500 block mb-1">
                     <DollarSign size={12} className="inline mr-1" />
-                    Budget (optionnel)
+                    Budget (optional)
                   </label>
                   <input
                     type="number"
                     min={0}
                     value={budget}
                     onChange={(e) => setBudget(e.target.value)}
-                    placeholder="Sans limite"
+                    placeholder="No limit"
                     className="sci-input w-36 text-xs"
                   />
                 </div>
@@ -176,40 +176,40 @@ export default function TradePage() {
                 <div>
                   <label className="text-xs font-mono-sc text-slate-500 block mb-1">
                     <Search size={12} className="inline mr-1" />
-                    Commodité
+                    Commodity
                   </label>
                   <input
                     type="text"
                     value={commoditySearch}
                     onChange={(e) => setCommoditySearch(e.target.value)}
-                    placeholder="Nom…"
+                    placeholder="Name…"
                     className="sci-input w-40 text-xs"
                   />
                 </div>
                 <div>
                   <label className="text-xs font-mono-sc text-slate-500 block mb-1">
                     <Filter size={12} className="inline mr-1" />
-                    Système achat
+                    Buy System
                   </label>
                   <select value={buySystem} onChange={(e) => setBuySystem(e.target.value)} className="sci-select w-36 text-xs">
-                    <option value="">Tous</option>
+                    <option value="">All</option>
                     {(systems ?? []).map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-xs font-mono-sc text-slate-500 block mb-1">
                     <Filter size={12} className="inline mr-1" />
-                    Système vente
+                    Sell System
                   </label>
                   <select value={sellSystem} onChange={(e) => setSellSystem(e.target.value)} className="sci-select w-36 text-xs">
-                    <option value="">Tous</option>
+                    <option value="">All</option>
                     {(systems ?? []).map((s) => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-xs font-mono-sc text-slate-500 block mb-1">
                     <SortDesc size={12} className="inline mr-1" />
-                    Trier par
+                    Sort by
                   </label>
                   <select value={sort} onChange={(e) => setSort(e.target.value)} className="sci-select w-36 text-xs">
                     {SORT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -221,18 +221,18 @@ export default function TradePage() {
 
           {/* Route results */}
           {routesLoading ? (
-            <LoadingGrid message="CALCUL DES ROUTES…" />
+            <LoadingGrid message="COMPUTING ROUTES…" />
           ) : routesError ? (
             <ErrorState error={routesError as Error} onRetry={() => void refetchRoutes()} />
           ) : !routes?.length ? (
             <EmptyState
               icon="📦"
-              title="Aucune route trouvée"
-              message="Ajoutez des prix de commodités pour calculer les routes (panneau à droite)"
+              title="No routes found"
+              message="Submit commodity prices to compute routes (panel on the right)"
             />
           ) : (
             <div className="space-y-2">
-              <p className="text-xs font-mono-sc text-slate-600">{routes.length} routes trouvées pour {scu} SCU</p>
+              <p className="text-xs font-mono-sc text-slate-600">{routes.length} routes found for {scu} SCU</p>
               {routes.map((route: TradeRoute, i: number) => (
                 <motion.div
                   key={`${route.buyCommodity}-${route.buyShop}-${route.sellShop}`}
@@ -259,19 +259,19 @@ export default function TradePage() {
                   </div>
                   <div className="mt-2 grid grid-cols-3 sm:grid-cols-6 gap-3 text-xs font-mono-sc">
                     <div>
-                      <span className="text-slate-600">Achat</span>
+                      <span className="text-slate-600">Buy</span>
                       <p className="text-amber-400">{fmt(route.buyPrice)} aUEC</p>
                     </div>
                     <div>
-                      <span className="text-slate-600">Vente</span>
+                      <span className="text-slate-600">Sell</span>
                       <p className="text-green-400">{fmt(route.sellPrice)} aUEC</p>
                     </div>
                     <div>
-                      <span className="text-slate-600">Investissement</span>
+                      <span className="text-slate-600">Investment</span>
                       <p className="text-slate-300">{fmt(route.totalInvestment)} aUEC</p>
                     </div>
                     <div>
-                      <span className="text-slate-600">Profit/unité</span>
+                      <span className="text-slate-600">Profit/Unit</span>
                       <p className="text-cyan-400">{fmt(route.profitPerUnit)} aUEC</p>
                     </div>
                     <div>
@@ -279,7 +279,7 @@ export default function TradePage() {
                       <p className="text-cyan-400">{fmt(route.profitPerScu)} aUEC</p>
                     </div>
                     <div>
-                      <span className="text-slate-600">Profit total</span>
+                      <span className="text-slate-600">Total Profit</span>
                       <p className="text-emerald-400 font-bold">
                         <TrendingUp size={12} className="inline mr-1" />
                         {fmt(route.totalProfit)} aUEC
@@ -294,19 +294,19 @@ export default function TradePage() {
 
         {/* Sidebar: Price reporter */}
         <div className="xl:sticky xl:top-6 space-y-4">
-          <ScifiPanel title="Reporter un prix" subtitle="Contribuer aux données de prix">
+          <ScifiPanel title="Report a Price" subtitle="Contribute price data">
             <div className="space-y-3">
               <div>
                 <label className="text-xs font-mono-sc text-slate-500 block mb-1">
                   <Package size={12} className="inline mr-1" />
-                  Commodité
+                  Commodity
                 </label>
                 <select
                   value={reportCommodityUuid}
                   onChange={(e) => setReportCommodityUuid(e.target.value)}
                   className="sci-input w-full text-xs"
                 >
-                  <option value="">Sélectionner…</option>
+                  <option value="">Select…</option>
                   {(commodities?.data ?? []).map((c: Commodity) => (
                     <option key={c.uuid} value={c.uuid}>
                       {c.name} ({c.type})
@@ -318,14 +318,14 @@ export default function TradePage() {
               <div>
                 <label className="text-xs font-mono-sc text-slate-500 block mb-1">
                   <MapPin size={12} className="inline mr-1" />
-                  Magasin
+                  Shop
                 </label>
                 <select
                   value={reportShopId}
                   onChange={(e) => setReportShopId(e.target.value)}
                   className="sci-input w-full text-xs"
                 >
-                  <option value="">Sélectionner…</option>
+                  <option value="">Select…</option>
                   {commodityShops.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name} — {s.city ?? s.planet_moon ?? s.system ?? 'Unknown'}
@@ -336,7 +336,7 @@ export default function TradePage() {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-xs font-mono-sc text-slate-500 block mb-1">Prix achat</label>
+                  <label className="text-xs font-mono-sc text-slate-500 block mb-1">Buy Price</label>
                   <input
                     type="number"
                     min={0}
@@ -348,7 +348,7 @@ export default function TradePage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-mono-sc text-slate-500 block mb-1">Prix vente</label>
+                  <label className="text-xs font-mono-sc text-slate-500 block mb-1">Sell Price</label>
                   <input
                     type="number"
                     min={0}
@@ -368,25 +368,25 @@ export default function TradePage() {
                 className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-mono-sc rounded border border-cyan-700 bg-cyan-950/30 text-cyan-400 hover:bg-cyan-900/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <Plus size={12} />
-                {reportMutation.isPending ? 'Envoi…' : 'Soumettre le prix'}
+                {reportMutation.isPending ? 'Submitting…' : 'Submit Price'}
               </button>
 
               {reportMutation.isSuccess && (
-                <p className="text-xs text-green-500 font-mono-sc text-center">Prix enregistré ✓</p>
+                <p className="text-xs text-green-500 font-mono-sc text-center">Price saved ✓</p>
               )}
               {reportMutation.isError && (
-                <p className="text-xs text-red-500 font-mono-sc text-center">Erreur lors de l'envoi</p>
+                <p className="text-xs text-red-500 font-mono-sc text-center">Error submitting price</p>
               )}
             </div>
           </ScifiPanel>
 
-          <ScifiPanel title="Comment ça marche ?">
+          <ScifiPanel title="How It Works">
             <div className="text-xs text-slate-500 space-y-2">
-              <p>1. Reportez les prix d'achat/vente depuis les kiosques in-game</p>
-              <p>2. Ajustez la capacité cargo de votre vaisseau (SCU)</p>
-              <p>3. Le calculateur trouve les routes les plus rentables</p>
+              <p>1. Report buy/sell prices from in-game kiosks</p>
+              <p>2. Set your ship's cargo capacity (SCU)</p>
+              <p>3. The calculator finds the most profitable routes</p>
               <p className="text-slate-600 italic mt-3">
-                Les prix sont contributifs — plus il y a de rapports, plus les routes sont fiables.
+                Prices are crowd-sourced — the more reports, the more reliable the routes.
               </p>
             </div>
           </ScifiPanel>

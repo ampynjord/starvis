@@ -17,8 +17,8 @@ import { useDebounce } from '@/hooks/useDebounce';
 const LIMIT = 40;
 
 const LEGAL_OPTIONS = [
-  { label: 'Légale', value: 'true' },
-  { label: 'Illégale', value: 'false' },
+  { label: 'Legal', value: 'true' },
+  { label: 'Illegal', value: 'false' },
 ];
 
 function formatDuration(secs: number | null): string {
@@ -111,17 +111,17 @@ export default function MissionsPage() {
       <div className="mb-4 flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Mission Database</h1>
-          {data && <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">{data.total.toLocaleString('en-US')} contrats indexés</p>}
+          {data && <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">{data.total.toLocaleString('en-US')} indexed contracts</p>}
         </div>
         <div className="flex items-center gap-3">
           <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer select-none">
             <input type="checkbox" checked={shared} onChange={(e) => { setShared(e.target.checked); setPage(1); }} className="accent-cyan-500 w-3.5 h-3.5" />
-            <Share2 size={12} /> Partageables
+            <Share2 size={12} /> Shareable
           </label>
           <div className="relative w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={13} />
             <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              placeholder="Rechercher mission, class, description…" className="sci-input w-full pl-8 text-xs" />
+              placeholder="Search mission, class, description…" className="sci-input w-full pl-8 text-xs" />
           </div>
         </div>
       </div>
@@ -129,9 +129,9 @@ export default function MissionsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[200px_1fr] gap-4">
         <FilterPanel hasFilters={hasFilters} onReset={resetAll} groups={[
           { key: 'type', label: 'Type', options: (types ?? []).map((t: string) => ({ label: t, value: t })), value: type, onChange: (v: string) => { setType(v); setPage(1); } },
-          { key: 'legal', label: 'Légalité', options: LEGAL_OPTIONS, value: legal, onChange: (v: string) => { setLegal(v); setPage(1); } },
+          { key: 'legal', label: 'Legality', options: LEGAL_OPTIONS, value: legal, onChange: (v: string) => { setLegal(v); setPage(1); } },
           { key: 'faction', label: 'Faction', options: (factions ?? []).map((f: string) => ({ label: f, value: f })), value: faction, onChange: (v: string) => { setFaction(v); setPage(1); } },
-          { key: 'system', label: 'Système', options: (systems ?? []).map((s: string) => ({ label: s, value: s })), value: system, onChange: (v: string) => { setSystem(v); setPage(1); } },
+          { key: 'system', label: 'System', options: (systems ?? []).map((s: string) => ({ label: s, value: s })), value: system, onChange: (v: string) => { setSystem(v); setPage(1); } },
         ]} />
 
         <div className="min-w-0">
@@ -145,9 +145,9 @@ export default function MissionsPage() {
                 <div className="text-slate-500">w/ Reward <span className="text-amber-400">{summary.withReward}</span></div>
               </div>
 
-              {isLoading ? <LoadingGrid message="CHARGEMENT MISSIONS…" />
+              {isLoading ? <LoadingGrid message="LOADING MISSIONS…" />
                : error ? <ErrorState error={error as Error} onRetry={() => void refetch()} />
-               : !data?.data?.length ? <EmptyState icon="📋" title="Aucune mission trouvée" />
+               : !data?.data?.length ? <EmptyState icon="📋" title="No missions found" />
                : (
                 <>
                   <div className="space-y-1.5">
@@ -163,8 +163,8 @@ export default function MissionsPage() {
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-orbitron text-sm text-slate-200 truncate">{m.title ?? m.class_name}</span>
                                   {m.mission_type && <GlowBadge color={color}>{m.mission_type}</GlowBadge>}
-                                  {!m.is_legal && <GlowBadge color="red" size="xs">Illégale</GlowBadge>}
-                                  {m.can_be_shared && <GlowBadge color="green" size="xs">Partageable</GlowBadge>}
+                                  {!m.is_legal && <GlowBadge color="red" size="xs">Illegal</GlowBadge>}
+                                  {m.can_be_shared && <GlowBadge color="green" size="xs">Shareable</GlowBadge>}
                                   {dangerBadge(m.danger_level)}
                                 </div>
                                 <div className="flex items-center gap-3 mt-1 flex-wrap text-xs">
@@ -254,7 +254,7 @@ export default function MissionsPage() {
                 </ScifiPanel>
               ) : (
                 <ScifiPanel title="Mission Detail" subtitle="Select a mission">
-                  <p className="text-xs text-slate-500">Clique sur une mission dans la liste pour voir son détail complet.</p>
+                  <p className="text-xs text-slate-500">Click a mission in the list to view its details.</p>
                 </ScifiPanel>
               )}
             </div>
