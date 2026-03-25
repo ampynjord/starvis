@@ -47,17 +47,17 @@ export interface MiningYieldResult {
 
 async function fetchMiningComponent(prisma: PrismaClient, uuid: string, env: string): Promise<MiningLaserInfo | null> {
   const comp = await prisma.component.findUnique({
-    where: { uuid_gameEnv: { uuid, gameEnv: env } },
+    where: { uuid },
     select: {
       uuid: true,
       name: true,
       size: true,
       grade: true,
+      manufacturerCode: true,
       miningSpeed: true,
       miningRange: true,
       miningResistance: true,
       miningInstability: true,
-      manufacturer: { select: { code: true } },
     },
   });
   if (!comp || comp.miningSpeed == null) return null;
@@ -66,7 +66,7 @@ async function fetchMiningComponent(prisma: PrismaClient, uuid: string, env: str
     name: comp.name ?? 'Unknown',
     size: comp.size,
     grade: comp.grade,
-    manufacturerCode: comp.manufacturer?.code ?? null,
+    manufacturerCode: comp.manufacturerCode ?? null,
     miningSpeed: Number(comp.miningSpeed),
     miningRange: Number(comp.miningRange ?? 0),
     miningResistance: Number(comp.miningResistance ?? 0),
@@ -78,12 +78,12 @@ export async function calculateMiningYield(prisma: PrismaClient, input: MiningYi
   const env = input.env || 'live';
 
   const composition = await prisma.miningComposition.findUnique({
-    where: { uuid_gameEnv: { uuid: input.compositionUuid, gameEnv: env } },
+    where: { uuid: input.compositionUuid },
   });
   if (!composition) return null;
 
   const parts = await prisma.miningCompositionPart.findMany({
-    where: { compositionUuid: input.compositionUuid, gameEnv: env },
+    where: { compositionUuid: input.compositionUuid },
     include: { element: true },
   });
 

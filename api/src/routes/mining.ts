@@ -95,17 +95,17 @@ export function mountMiningRoutes(router: Router, deps: RouteDependencies): void
     asyncHandler(async (req, res) => {
       const env = String(req.query.env ?? 'live');
       const components = await prisma.component.findMany({
-        where: { gameEnv: env, type: 'MiningLaser', miningSpeed: { not: null } },
+        where: { type: 'MiningLaser', miningSpeed: { not: null } },
         select: {
           uuid: true,
           name: true,
           size: true,
           grade: true,
+          manufacturerCode: true,
           miningSpeed: true,
           miningRange: true,
           miningResistance: true,
           miningInstability: true,
-          manufacturer: { select: { code: true, name: true } },
         },
         orderBy: [{ size: 'asc' }, { name: 'asc' }],
       });
@@ -114,8 +114,8 @@ export function mountMiningRoutes(router: Router, deps: RouteDependencies): void
         name: c.name,
         size: c.size,
         grade: c.grade,
-        manufacturerCode: c.manufacturer?.code ?? null,
-        manufacturerName: c.manufacturer?.name ?? null,
+        manufacturerCode: c.manufacturerCode ?? null,
+        manufacturerName: null,
         miningSpeed: Number(c.miningSpeed),
         miningRange: Number(c.miningRange ?? 0),
         miningResistance: Number(c.miningResistance ?? 0),
