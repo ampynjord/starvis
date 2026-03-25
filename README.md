@@ -20,7 +20,7 @@ Two complementary data sources:
 - **P4K DataForge** — Actual in-game data (~515 ships, ~6 087 components, ~10 624 FPS items, ~474 commodities, ~58 845 loadout ports, ~828 missions), extracted locally by the CLI
 
 Production: **[starvis.ampynjord.bzh](https://starvis.ampynjord.bzh)**
-Public API: **[starvis-api.ampynjord.bzh](https://starvis-api.ampynjord.bzh)**
+Public API: **[starvis.ampynjord.bzh/api-docs](https://starvis.ampynjord.bzh/api-docs)**
 
 ---
 
@@ -623,10 +623,10 @@ Stage 4: production   → npm ci --omit=dev, non-root user, healthcheck
 
 `docker-compose.prod.yml` overrides the dev config:
 - Pre-built GHCR images (`ghcr.io/ampynjord/starvis-api`, `ghcr.io/ampynjord/starvis-ihm`)
-- Ports not exposed (Traefik handles routing)
+- Single domain `starvis.ampynjord.bzh` — IHM serves frontend + nginx proxies `/api`, `/health`, `/admin`, `/api-docs` to the API
+- Ports not exposed (Traefik handles TLS routing to IHM, nginx routes internally)
 - MySQL port closed (Docker internal access only)
-- Traefik labels for automatic HTTPS routing
-- External `traefik-network`
+- External `traefik-network` (IHM only)
 
 ---
 
@@ -682,38 +682,38 @@ gunzip < /home/debian/starvis/backups/starvis_YYYY-MM-DD_HHMM.sql.gz | \
 ### List Aegis fighters
 
 ```bash
-curl 'https://starvis-api.ampynjord.bzh/api/v1/ships?manufacturer=AEGS&role=combat' | jq '.data[] | {name, mass, scm_speed}'
+curl 'https://starvis.ampynjord.bzh/api/v1/ships?manufacturer=AEGS&role=combat' | jq '.data[] | {name, mass, scm_speed}'
 ```
 
 ### View Gladius loadout
 
 ```bash
-curl 'https://starvis-api.ampynjord.bzh/api/v1/ships/AEGS_Gladius/loadout' | jq
+curl 'https://starvis.ampynjord.bzh/api/v1/ships/AEGS_Gladius/loadout' | jq
 ```
 
 ### List S3+ weapons by DPS
 
 ```bash
-curl 'https://starvis-api.ampynjord.bzh/api/v1/components?type=WeaponGun&size=3&sort=weapon_dps&order=desc' | jq
+curl 'https://starvis.ampynjord.bzh/api/v1/components?type=WeaponGun&size=3&sort=weapon_dps&order=desc' | jq
 ```
 
 ### Compare two ships
 
 ```bash
-curl 'https://starvis-api.ampynjord.bzh/api/v1/ships/AEGS_Gladius/compare/AEGS_Sabre' | jq '.data.comparison'
+curl 'https://starvis.ampynjord.bzh/api/v1/ships/AEGS_Gladius/compare/AEGS_Sabre' | jq '.data.comparison'
 ```
 
 ### Export components to CSV
 
 ```bash
-curl 'https://starvis-api.ampynjord.bzh/api/v1/components?type=WeaponGun&format=csv' -o weapons.csv
+curl 'https://starvis.ampynjord.bzh/api/v1/components?type=WeaponGun&format=csv' -o weapons.csv
 ```
 
 ### Admin
 
 ```bash
 # Sync Ship Matrix
-curl -X POST -H "X-API-Key: $ADMIN_API_KEY" https://starvis-api.ampynjord.bzh/admin/sync-ship-matrix | jq
+curl -X POST -H "X-API-Key: $ADMIN_API_KEY" https://starvis.ampynjord.bzh/admin/sync-ship-matrix | jq
 
 # Extract game data (local PC with Star Citizen)
 cd extractor && npx tsx extract.ts --p4k "/path/to/Data.p4k"
