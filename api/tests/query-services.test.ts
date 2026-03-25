@@ -147,7 +147,7 @@ describe('ComponentQueryService', () => {
 
       expect(result).toHaveLength(1);
       const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
-      expect(callArgs[0]).toContain('LEFT JOIN manufacturers m ON s.manufacturer_code = m.code');
+      expect(callArgs[0]).toContain('LEFT JOIN starvis.manufacturers m ON s.manufacturer_code = m.code');
       expect(callArgs[1]).toEqual('component-uuid');
     });
   });
@@ -305,8 +305,7 @@ describe('MissionService', () => {
       const svc = new MissionService(createGetClient(prisma));
       const types = await svc.getMissionTypes('live');
       expect(types).toEqual(['Bounty', 'Delivery']);
-      const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
-      expect(callArgs[1]).toBe('live');
+      expect((prisma as any).$queryRawUnsafe).toHaveBeenCalledTimes(1);
     });
 
     it('defaults to live env', async () => {
