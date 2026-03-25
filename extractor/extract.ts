@@ -50,7 +50,17 @@ function autoDetectP4K(env: GameEnv): string | null {
   return AUTO_P4K[env].find((p) => existsSync(p)) ?? null;
 }
 
-const VALID_MODULES: ExtractionModule[] = ['ships', 'components', 'items', 'commodities', 'mining', 'missions', 'crafting', 'paints', 'shops'];
+const VALID_MODULES: ExtractionModule[] = [
+  'ships',
+  'components',
+  'items',
+  'commodities',
+  'mining',
+  'missions',
+  'crafting',
+  'paints',
+  'shops',
+];
 
 // ── CLI ─────────────────────────────────────────────────────
 const program = new Command()
