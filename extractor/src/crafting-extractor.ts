@@ -33,10 +33,7 @@ export interface CraftingRecipeRecord {
 }
 
 // ── Legacy system: struct type patterns ────────────────────
-const LEGACY_STRUCT_PATTERNS = [
-  'LegacyCraftingRecipeDefRecord',
-  'LegacyCraftingRecipeListRecord',
-];
+const LEGACY_STRUCT_PATTERNS = ['LegacyCraftingRecipeDefRecord', 'LegacyCraftingRecipeListRecord'];
 
 // Category classification from class name (legacy recipes)
 const CATEGORY_PATTERNS: [RegExp, string][] = [
@@ -123,10 +120,7 @@ function blueprintDisplayName(
 
 // ── Blueprint extraction ───────────────────────────────────
 
-function extractBlueprints(
-  ctx: DataForgeService,
-  locService?: { resolveKey(key: string): string | null },
-): CraftingRecipeRecord[] {
+function extractBlueprints(ctx: DataForgeService, locService?: { resolveKey(key: string): string | null }): CraftingRecipeRecord[] {
   const records = ctx.searchByStructType('CraftingBlueprintRecord', 10000);
   if (records.length === 0) return [];
 
@@ -195,10 +189,7 @@ function extractBlueprints(
 
 // ── Legacy extraction ──────────────────────────────────────
 
-function extractLegacyRecipes(
-  ctx: DataForgeService,
-  locService?: { resolveKey(key: string): string | null },
-): CraftingRecipeRecord[] {
+function extractLegacyRecipes(ctx: DataForgeService, locService?: { resolveKey(key: string): string | null }): CraftingRecipeRecord[] {
   const results: CraftingRecipeRecord[] = [];
 
   for (const structPattern of LEGACY_STRUCT_PATTERNS) {
@@ -231,7 +222,8 @@ function extractLegacyRecipes(
         }
 
         const output = (data.output ?? data.outputItem ?? data.result) as Record<string, unknown> | undefined;
-        const outputItemName = safeString(output?.itemName) ?? safeString(output?.name) ?? safeString(data.outputItemName as unknown) ?? null;
+        const outputItemName =
+          safeString(output?.itemName) ?? safeString(output?.name) ?? safeString(data.outputItemName as unknown) ?? null;
         const outputItemUuid = safeString(output?.itemUuid) ?? safeString(output?.uuid) ?? safeString(output?.entityId) ?? null;
         const outputQuantity = typeof output?.quantity === 'number' ? output.quantity : 1;
         const craftingTime = safeNumber(data.craftingTime) ?? safeNumber(data.productionTime) ?? safeNumber(data.craftTime) ?? null;
@@ -244,7 +236,13 @@ function extractLegacyRecipes(
           name = locService.resolveKey(rawName);
         }
         if (!name) {
-          name = rawName ?? outputItemName ?? className.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+          name =
+            rawName ??
+            outputItemName ??
+            className
+              .replace(/_/g, ' ')
+              .replace(/([a-z])([A-Z])/g, '$1 $2')
+              .trim();
         }
 
         results.push({
