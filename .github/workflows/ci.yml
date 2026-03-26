@@ -136,7 +136,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Run safe production smoke test
-        run: node smoke-prod-safe.mjs
+        run: node scripts/smoke-prod-safe.mjs
 
   # ==========================================
   #  2. UNIT / INTEGRATION TESTS
