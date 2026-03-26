@@ -1,231 +1,205 @@
 ﻿import { useQuery } from '@tanstack/react-query';
-import { ChevronDown, ChevronRight, Clock, FlaskConical, Minus, Package, Plus, Search, Settings2, Swords, Trophy } from 'lucide-react';
+import {
+  ChevronDown, ChevronRight, Clock, Coins, FlaskConical,
+  Minus, Package, Plus, Search, Settings2, Swords, Trophy,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { useDebounce } from '@/hooks/useDebounce';
-import type { CraftingIngredient, CraftingRecipe } from '@/types/api';
+import type { CraftingIngredient, CraftingRecipe, CraftingResource, Mission } from '@/types/api';
 
-/* --- Constants --- */
+/* ---------- constants ---------- */
 type Tab = 'blueprint' | 'mission' | 'resources';
 
-const CATEGORY_COLORS: Record<string, 'cyan' | 'amber' | 'green' | 'red' | 'purple' | 'slate'> = {
-  FPSArmours: 'amber',
-  FPSWeapons: 'red',
-  Misc: 'slate',
-  Tool: 'cyan',
-  Food: 'green',
-  Drink: 'cyan',
-  Medicine: 'purple',
-  Ammunition: 'red',
-  Component: 'slate',
-  Refining: 'amber',
-  Explosive: 'red',
+const CAT_COLORS: Record<string, 'cyan' | 'amber' | 'green' | 'red' | 'purple' | 'slate'> = {
+  FPSArmours: 'amber', FPSWeapons: 'red', Misc: 'slate', Tool: 'cyan',
+  Food: 'green', Drink: 'cyan', Medicine: 'purple', Ammunition: 'red',
+  Component: 'slate', Refining: 'amber', Explosive: 'red',
 };
+const Q_LABELS = ['Very Low', 'Low', 'Standard', 'High', 'Very High'];
+const Q_COLORS = ['text-red-500', 'text-orange-500', 'text-slate-300', 'text-cyan-400', 'text-green-400'];
 
-const QUALITY_LABELS = ['Very Low', 'Low', 'Standard', 'High', 'Very High'];
-const QUALITY_COLORS = ['text-red-500', 'text-orange-500', 'text-slate-300', 'text-cyan-400', 'text-green-400'];
-
-/* --- Formatters --- */
-function formatTime(secs: number | null): string {
-  if (!secs) return '\u2014';
-  if (secs < 60) return `${secs}s`;
-  if (secs < 3600) return `${Math.round(secs / 60)}min`;
-  const h = Math.floor(secs / 3600);
-  const m = Math.round((secs % 3600) / 60);
+/* ---------- formatters ---------- */
+function fmtTime(s: number | null): string {
+  if (!s) return '\u2014';
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.round(s / 60)}min`;
+  const h = Math.floor(s / 3600);
+  const m = Math.round((s % 3600) / 60);
   return m > 0 ? `${h}h${m}m` : `${h}h`;
 }
 
-function formatName(recipe: CraftingRecipe): string {
-  if (recipe.name) {
-    return recipe.name
-      .replace(/^bp[_ ]craft[_ ]/i, '')
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, (c) => c.toUpperCase());
-  }
-  return recipe.class_name
-    .replace(/^CraftingBlueprintRecord\.BP_CRAFT_/i, '')
+function fmtName(r: CraftingRecipe): string {
+  const raw = r.name ?? r.class_name;
+  return raw
+    .replace(/^(CraftingBlueprintRecord\.)?BP_CRAFT_/i, '')
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function formatItemName(raw: string): string {
+function fmtItem(raw: string): string {
   return raw.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function formatScu(scu: number | null): string {
+function fmtScu(scu: number | null): string {
   if (!scu) return '\u2014';
   if (scu >= 1) return `${scu.toFixed(1)} SCU`;
   if (scu >= 0.01) return `${(scu * 100).toFixed(0)} cSCU`;
   return `${(scu * 10000).toFixed(0)} \u00b5SCU`;
 }
 
-/* --- Sidebar accordion group --- */
+function fmtReward(min: number | null, max: number | null): string {
+  if (min == null && max == null) return '\u2014';
+  if (min != null && max != null && min !== max) return `${min.toLocaleString()}\u2013${max.toLocaleString()} aUEC`;
+  return `${(max ?? min ?? 0).toLocaleString()} aUEC`;
+}
+
+/* ---------- sidebar group ---------- */
 function SidebarGroup({
-  label,
-  count,
-  items,
-  expanded,
-  onToggle,
-  selectedUuid,
-  onSelect,
+  label, count, items, expanded, onToggle, selectedId, onSelect,
 }: {
   label: string;
   count: number;
-  items: { uuid: string; displayName: string }[];
+  items: { id: string; displayName: string }[];
   expanded: boolean;
   onToggle: () => void;
-  selectedUuid: string | null;
-  onSelect: (uuid: string) => void;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
 }) {
-  const color = CATEGORY_COLORS[label] ?? 'slate';
+  const color = CAT_COLORS[label] ?? 'slate';
   return (
     <div>
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full flex items-center gap-1 px-3 py-2 text-left hover:bg-white/5 transition-colors group"
-      >
-        {expanded ? (
-          <ChevronDown size={11} className="text-slate-600 flex-shrink-0" />
-        ) : (
-          <ChevronRight size={11} className="text-slate-600 flex-shrink-0" />
-        )}
-        <span className={`text-[11px] font-mono-sc uppercase tracking-wider flex-1 truncate ${expanded ? 'text-cyan-400' : 'text-slate-400 group-hover:text-slate-200'}`}>
-          {label}
-        </span>
+      <button type="button" onClick={onToggle}
+        className="w-full flex items-center gap-1 px-3 py-2 text-left hover:bg-white/5 transition-colors group">
+        {expanded
+          ? <ChevronDown size={11} className="text-slate-600 flex-shrink-0" />
+          : <ChevronRight size={11} className="text-slate-600 flex-shrink-0" />}
+        <span className={`text-[11px] font-mono-sc uppercase tracking-wider flex-1 truncate ${expanded ? 'text-cyan-400' : 'text-slate-400 group-hover:text-slate-200'}`}>{label}</span>
         <GlowBadge color={color} size="xs">{count}</GlowBadge>
       </button>
       {expanded && (
         <div className="pb-1 max-h-[50vh] overflow-y-auto">
-          {items.length === 0 ? (
-            <div className="px-6 py-2 text-[10px] font-mono-sc text-slate-700 animate-pulse">Loading\u2026</div>
-          ) : (
-            items.map((item) => (
-              <button
-                key={item.uuid}
-                type="button"
-                onClick={() => onSelect(item.uuid)}
+          {items.length === 0
+            ? <div className="px-6 py-2 text-[10px] font-mono-sc text-slate-700 animate-pulse">Loading\u2026</div>
+            : items.map((it) => (
+              <button key={it.id} type="button" onClick={() => onSelect(it.id)}
                 className={`w-full text-left pl-6 pr-3 py-1.5 text-xs transition-colors truncate ${
-                  selectedUuid === item.uuid
-                    ? 'text-cyan-400 bg-cyan-950/40'
-                    : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'
-                }`}
-              >
-                {item.displayName}
-              </button>
-            ))
-          )}
+                  selectedId === it.id ? 'text-cyan-400 bg-cyan-950/40' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'
+                }`}>{it.displayName}</button>
+            ))}
         </div>
       )}
     </div>
   );
 }
 
-/* --- Part card (sccrafter-identical) --- */
-function PartCard({
-  ingredient,
-  batchCount,
-  quality,
-  onQualityChange,
-}: {
-  ingredient: CraftingIngredient;
-  batchCount: number;
-  quality: number;
-  onQualityChange: (val: number) => void;
+/* ---------- flat sidebar item (no group) ---------- */
+function SidebarItem({ label, selected, onClick, badge }: { label: string; selected: boolean; onClick: () => void; badge?: string }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={`w-full text-left px-4 py-2 text-xs transition-colors flex items-center gap-2 ${
+        selected ? 'text-cyan-400 bg-cyan-950/40' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'
+      }`}>
+      <span className="flex-1 truncate">{label}</span>
+      {badge && <span className="text-[9px] font-mono-sc text-slate-600">{badge}</span>}
+    </button>
+  );
+}
+
+/* ---------- part card ---------- */
+function PartCard({ ingredient, batch, quality, onQuality }: {
+  ingredient: CraftingIngredient; batch: number; quality: number; onQuality: (v: number) => void;
 }) {
   const scu = ingredient.scu ? Number(ingredient.scu) : 0;
-  const totalScu = scu * batchCount;
-  const slotLabel = ingredient.slot_name ? formatItemName(ingredient.slot_name) : null;
-
+  const totalScu = scu * batch;
+  const slot = ingredient.slot_name ? fmtItem(ingredient.slot_name) : null;
   return (
     <div className="sci-panel border-l-2 border-cyan-700 overflow-hidden">
-      {/* Header: slot name + part name */}
       <div className="px-4 pt-3 pb-2">
-        {slotLabel && (
-          <p className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-wider mb-1">{slotLabel}</p>
-        )}
+        {slot && <p className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-wider mb-1">{slot}</p>}
         <div className="flex items-center gap-2 mb-1">
           <div className="w-2 h-2 rounded-full bg-cyan-500 flex-shrink-0" />
-          <span className="text-sm font-medium text-slate-200 truncate">{formatItemName(ingredient.item_name)}</span>
+          <span className="text-sm font-medium text-slate-200 truncate">{fmtItem(ingredient.item_name)}</span>
         </div>
         <p className="text-[10px] font-mono-sc text-slate-600 pl-4">
-          Required: <span className="text-slate-400">{ingredient.quantity * batchCount}</span>
+          Required: <span className="text-slate-400">{ingredient.quantity * batch}</span>
           {ingredient.is_optional && <span className="ml-2 text-amber-500">(optional)</span>}
         </p>
       </div>
-
-      {/* Resource + SCU row */}
       <div className="px-4 py-2 bg-slate-900/50 border-t border-slate-800/40">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[10px] font-mono-sc text-slate-500">{formatItemName(ingredient.item_name)}</span>
-          <span className="text-[10px] font-mono-sc text-cyan-400 font-medium">
-            {scu > 0 ? formatScu(totalScu) : '\u2014'}
-          </span>
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-mono-sc text-slate-500">{fmtItem(ingredient.item_name)}</span>
+          <span className="text-[10px] font-mono-sc text-cyan-400 font-medium">{scu > 0 ? fmtScu(totalScu) : '\u2014'}</span>
         </div>
       </div>
-
-      {/* Quality slider */}
       <div className="px-4 py-2 bg-slate-950/50 border-t border-slate-800/30">
         <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-wider">Quality Adjustment</span>
-          <span className={`text-[10px] font-mono-sc font-medium ${QUALITY_COLORS[quality]}`}>
-            {QUALITY_LABELS[quality]}
-          </span>
+          <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-wider">Quality</span>
+          <span className={`text-[10px] font-mono-sc font-medium ${Q_COLORS[quality]}`}>{Q_LABELS[quality]}</span>
         </div>
-        <input
-          type="range"
-          min={0}
-          max={4}
-          step={1}
-          value={quality}
-          onChange={(e) => onQualityChange(Number(e.target.value))}
+        <input type="range" min={0} max={4} step={1} value={quality} onChange={(e) => onQuality(Number(e.target.value))}
           className="w-full h-1 accent-cyan-500 bg-slate-800 rounded-full appearance-none cursor-pointer
-                     [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3
-                     [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400
-                     [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-slate-900"
-        />
+            [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3
+            [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400
+            [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-slate-900" />
         <div className="flex justify-between mt-0.5">
-          {QUALITY_LABELS.map((_, i) => (
-            <div key={i} className={`w-1.5 h-1.5 rounded-full ${i <= quality ? 'bg-cyan-600' : 'bg-slate-800'}`} />
-          ))}
+          {Q_LABELS.map((_, i) => <div key={i} className={`w-1.5 h-1.5 rounded-full ${i <= quality ? 'bg-cyan-600' : 'bg-slate-800'}`} />)}
         </div>
       </div>
     </div>
   );
 }
 
-/* --- Main page --- */
+/* ---------- mission card (inline) ---------- */
+function MissionRow({ m }: { m: Mission }) {
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 bg-slate-900/40 rounded border border-slate-800/30 hover:bg-slate-900/60 transition-colors">
+      <Swords size={14} className={m.is_legal ? 'text-green-500' : 'text-red-500'} />
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-slate-200 truncate">{m.title ?? m.class_name}</p>
+        <div className="flex items-center gap-3 mt-0.5">
+          {m.mission_type && <span className="text-[9px] font-mono-sc text-slate-600">{m.mission_type}</span>}
+          {m.faction && <span className="text-[9px] font-mono-sc text-slate-600">{m.faction}</span>}
+          {m.location_system && <span className="text-[9px] font-mono-sc text-slate-700">{m.location_system}</span>}
+        </div>
+      </div>
+      <div className="text-right flex-shrink-0">
+        <p className="text-xs font-mono-sc text-amber-400">{fmtReward(m.reward_min, m.reward_max)}</p>
+        {m.danger_level != null && <p className="text-[9px] font-mono-sc text-red-900">Danger {m.danger_level}</p>}
+      </div>
+    </div>
+  );
+}
+
+/* ========== MAIN PAGE ========== */
 export default function CraftingPage() {
   const searchParams = useSearchParams();
   const { env } = useEnv();
 
   const [tab, setTab] = useState<Tab>('blueprint');
   const [search, setSearch] = useState(searchParams.get('search') ?? '');
-  const [rewardsOnly, setRewardsOnly] = useState(false);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [selectedRecipeUuid, setSelectedRecipeUuid] = useState<string | null>(null);
+  const [selectedResource, setSelectedResource] = useState<string | null>(null);
   const [batchCount, setBatchCount] = useState(1);
   const [qualityMap, setQualityMap] = useState<Record<number, number>>({});
+  const [missionPage, setMissionPage] = useState(1);
 
   const debouncedSearch = useDebounce(search, 350);
+  const setIngredientQuality = useCallback((id: number, v: number) => setQualityMap((p) => ({ ...p, [id]: v })), []);
 
-  const setIngredientQuality = useCallback((id: number, val: number) => {
-    setQualityMap((prev) => ({ ...prev, [id]: val }));
-  }, []);
-
-  /* --- Data: categories --- */
+  /* ---- data: categories ---- */
   const { data: categories } = useQuery({
     queryKey: ['crafting.categories', env],
     queryFn: () => api.crafting.categories(env),
     staleTime: Infinity,
   });
-
   const totalRecipes = useMemo(() => (categories ?? []).reduce((s, c) => s + c.count, 0), [categories]);
 
-  /* --- Data: recipes for expanded category --- */
+  /* ---- data: group recipes ---- */
   const { data: groupRecipes } = useQuery({
     queryKey: ['crafting.groupRecipes', env, expandedGroup, tab],
     queryFn: () => api.crafting.recipes({ env, category: expandedGroup!, limit: 1000 }),
@@ -233,11 +207,11 @@ export default function CraftingPage() {
     staleTime: 60_000,
   });
 
-  /* --- Data: search results --- */
+  /* ---- data: search results ---- */
   const { data: searchResults, isLoading: searchLoading } = useQuery({
     queryKey: ['crafting.search', env, debouncedSearch],
     queryFn: () => api.crafting.recipes({ env, search: debouncedSearch, limit: 500 }),
-    enabled: !!debouncedSearch,
+    enabled: !!debouncedSearch && tab === 'blueprint',
     staleTime: 30_000,
   });
 
@@ -252,211 +226,246 @@ export default function CraftingPage() {
     return map;
   }, [debouncedSearch, searchResults]);
 
-  /* --- Data: selected recipe detail --- */
+  /* ---- data: selected recipe detail ---- */
   const { data: selectedRecipe } = useQuery({
     queryKey: ['crafting.recipe', selectedRecipeUuid, env],
     queryFn: () => api.crafting.recipe(selectedRecipeUuid!, env),
     enabled: !!selectedRecipeUuid,
   });
 
-  /* Auto-expand first category on load */
+  /* ---- data: resources ---- */
+  const { data: resources } = useQuery({
+    queryKey: ['crafting.resources', env],
+    queryFn: () => api.crafting.resources(env),
+    enabled: tab === 'resources',
+    staleTime: Infinity,
+  });
+
+  /* ---- data: recipes for selected resource ---- */
+  const { data: resourceRecipes } = useQuery({
+    queryKey: ['crafting.resourceRecipes', env, selectedResource],
+    queryFn: () => api.crafting.recipesByResource(selectedResource!, env),
+    enabled: !!selectedResource && tab === 'resources',
+    staleTime: 60_000,
+  });
+
+  /* ---- data: missions ---- */
+  const { data: missionTypes } = useQuery({
+    queryKey: ['missions.types', env],
+    queryFn: () => api.missions.types(env),
+    enabled: tab === 'mission',
+    staleTime: Infinity,
+  });
+
+  const { data: missionResults } = useQuery({
+    queryKey: ['crafting.missions', env, debouncedSearch, missionPage],
+    queryFn: () => api.missions.list({
+      env,
+      search: debouncedSearch || undefined,
+      page: missionPage,
+      limit: 50,
+    }),
+    enabled: tab === 'mission',
+    staleTime: 30_000,
+  });
+
+  /* ---- data: reward missions (for recipe detail) ---- */
+  const { data: rewardMissions } = useQuery({
+    queryKey: ['crafting.rewardMissions', env, selectedRecipe?.output_item_name],
+    queryFn: () => api.missions.list({
+      env,
+      search: selectedRecipe!.output_item_name!.replace(/_/g, ' '),
+      limit: 20,
+    }),
+    enabled: !!selectedRecipe?.output_item_name && tab === 'blueprint',
+    staleTime: 60_000,
+  });
+
+  /* ---- auto-expand first category ---- */
   useEffect(() => {
     if (categories?.length && !expandedGroup && !debouncedSearch && tab === 'blueprint') {
       setExpandedGroup(categories[0].category);
     }
   }, [categories, expandedGroup, debouncedSearch, tab]);
 
-  /* Auto-select first recipe when group recipes load */
+  /* ---- auto-select first recipe in group ---- */
   useEffect(() => {
-    if (groupRecipes?.data?.length && !debouncedSearch) {
+    if (groupRecipes?.data?.length && !debouncedSearch && tab === 'blueprint') {
       if (!selectedRecipeUuid || !groupRecipes.data.some((r) => r.uuid === selectedRecipeUuid)) {
         setSelectedRecipeUuid(groupRecipes.data[0].uuid);
       }
     }
-  }, [groupRecipes?.data, selectedRecipeUuid, debouncedSearch]);
+  }, [groupRecipes?.data, selectedRecipeUuid, debouncedSearch, tab]);
 
-  /* Auto-select first search result */
+  /* ---- auto-select first search result ---- */
   useEffect(() => {
     if (searchGrouped && searchGrouped.size > 0) {
       const firstCat = searchGrouped.keys().next().value!;
       setExpandedGroup(firstCat);
-      const firstRecipe = searchGrouped.get(firstCat)?.[0];
-      if (firstRecipe) setSelectedRecipeUuid(firstRecipe.uuid);
+      const first = searchGrouped.get(firstCat)?.[0];
+      if (first) setSelectedRecipeUuid(first.uuid);
     }
   }, [searchGrouped]);
 
-  /* Reset quality map on recipe change */
+  /* ---- auto-select first resource ---- */
   useEffect(() => {
-    setQualityMap({});
-  }, [selectedRecipeUuid]);
+    if (resources?.length && !selectedResource && tab === 'resources') {
+      setSelectedResource(resources[0].item_name);
+    }
+  }, [resources, selectedResource, tab]);
 
-  /* Build sidebar items */
+  /* ---- reset quality on recipe change ---- */
+  useEffect(() => { setQualityMap({}); }, [selectedRecipeUuid]);
+
+  /* ---- sidebar groups ---- */
   const sidebarGroups = useMemo(() => {
     if (debouncedSearch && searchGrouped) {
-      return Array.from(searchGrouped.entries()).map(([cat, recipes]) => ({
-        key: cat,
-        label: cat,
-        count: recipes.length,
-        items: recipes.map((r) => ({ uuid: r.uuid, displayName: formatName(r) })),
+      return Array.from(searchGrouped.entries()).map(([cat, recs]) => ({
+        key: cat, label: cat, count: recs.length,
+        items: recs.map((r) => ({ id: r.uuid, displayName: fmtName(r) })),
       }));
     }
     if (tab === 'blueprint' && categories) {
       return categories.map((c) => ({
-        key: c.category,
-        label: c.category,
-        count: c.count,
-        items: expandedGroup === c.category ? (groupRecipes?.data ?? []).map((r) => ({ uuid: r.uuid, displayName: formatName(r) })) : [],
+        key: c.category, label: c.category, count: c.count,
+        items: expandedGroup === c.category ? (groupRecipes?.data ?? []).map((r) => ({ id: r.uuid, displayName: fmtName(r) })) : [],
       }));
     }
     return [];
   }, [tab, categories, expandedGroup, groupRecipes, debouncedSearch, searchGrouped]);
 
-  const hasIngredients = selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0;
+  /* ---- filtered resources sidebar ---- */
+  const filteredResources = useMemo(() => {
+    if (!resources) return [];
+    if (!debouncedSearch) return resources;
+    const q = debouncedSearch.toLowerCase();
+    return resources.filter((r) => r.item_name.toLowerCase().includes(q));
+  }, [resources, debouncedSearch]);
 
-  /* Compute total SCU */
+  /* ---- computed ---- */
+  const hasIngredients = selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0;
   const totalScu = useMemo(() => {
     if (!hasIngredients) return 0;
-    return selectedRecipe!.ingredients!.reduce((acc, ing) => {
-      const scu = ing.scu ? Number(ing.scu) : 0;
-      return acc + scu * batchCount;
-    }, 0);
+    return selectedRecipe!.ingredients!.reduce((a, i) => a + (i.scu ? Number(i.scu) : 0) * batchCount, 0);
   }, [selectedRecipe, batchCount, hasIngredients]);
 
   return (
     <div className="flex h-[calc(100vh-64px)]">
 
-      {/* LEFT SIDEBAR */}
+      {/* === LEFT SIDEBAR === */}
       <div className="w-52 xl:w-60 flex-shrink-0 border-r border-slate-800/60 flex flex-col bg-slate-950/50">
 
-        {/* Tabs */}
+        {/* tabs */}
         <div className="flex border-b border-slate-800/60">
           {([
             { id: 'blueprint' as Tab, label: 'Blueprint' },
             { id: 'mission' as Tab, label: 'Mission' },
             { id: 'resources' as Tab, label: 'Resources' },
           ]).map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => { setTab(t.id); setExpandedGroup(null); setSearch(''); }}
+            <button key={t.id} type="button"
+              onClick={() => { setTab(t.id); setExpandedGroup(null); setSearch(''); setMissionPage(1); }}
               className={`flex-1 py-2 text-[10px] font-mono-sc uppercase tracking-wider text-center transition-colors ${
-                tab === t.id
-                  ? 'text-cyan-400 bg-cyan-950/30 border-b-2 border-cyan-500'
-                  : 'text-slate-600 hover:text-slate-400'
-              }`}
-            >
-              {t.label}
-            </button>
+                tab === t.id ? 'text-cyan-400 bg-cyan-950/30 border-b-2 border-cyan-500' : 'text-slate-600 hover:text-slate-400'
+              }`}>{t.label}</button>
           ))}
         </div>
 
-        {/* Search */}
+        {/* search */}
         <div className="p-2 border-b border-slate-800/40">
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-600" size={11} />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+            <input type="text" value={search} onChange={(e) => { setSearch(e.target.value); setMissionPage(1); }}
               placeholder={`Search ${tab === 'blueprint' ? 'blueprints' : tab === 'mission' ? 'missions' : 'resources'}\u2026`}
-              className="sci-input w-full pl-6 text-[11px] h-7"
-            />
+              className="sci-input w-full pl-6 text-[11px] h-7" />
           </div>
         </div>
 
-        {/* Rewards Only */}
-        <div className="px-2 py-1.5 border-b border-slate-800/40">
-          <button
-            type="button"
-            onClick={() => setRewardsOnly(!rewardsOnly)}
-            className={`w-full py-1.5 text-[10px] font-mono-sc uppercase tracking-wider rounded border transition-colors text-center ${
-              rewardsOnly
-                ? 'border-amber-600 bg-amber-950/40 text-amber-400'
-                : 'border-slate-800 text-slate-600 hover:border-slate-700 hover:text-slate-500'
-            }`}
-          >
-            Rewards Only
-          </button>
-        </div>
-
-        {/* Tree */}
+        {/* tree / list */}
         <div className="flex-1 overflow-y-auto">
-          {tab === 'blueprint' ? (
-            searchLoading && debouncedSearch ? (
-              <div className="p-4 text-xs font-mono-sc text-slate-600 animate-pulse">Searching\u2026</div>
-            ) : sidebarGroups.length > 0 ? (
-              sidebarGroups.map((g) => (
-                <SidebarGroup
-                  key={g.key}
-                  label={g.label}
-                  count={g.count}
-                  items={g.items}
-                  expanded={expandedGroup === g.key}
-                  onToggle={() => setExpandedGroup(expandedGroup === g.key ? null : g.key)}
-                  selectedUuid={selectedRecipeUuid}
-                  onSelect={(uuid) => { setSelectedRecipeUuid(uuid); setBatchCount(1); }}
-                />
-              ))
-            ) : debouncedSearch ? (
-              <div className="p-4 text-xs font-mono-sc text-slate-600">No results</div>
-            ) : null
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full gap-3 px-4">
-              {tab === 'mission' ? <Swords size={24} className="text-slate-800" /> : <Package size={24} className="text-slate-800" />}
-              <p className="text-xs font-mono-sc text-slate-700 text-center">
-                {tab === 'mission' ? 'Mission rewards' : 'Resource grouping'} coming soon
-              </p>
-            </div>
+
+          {/* BLUEPRINT TAB */}
+          {tab === 'blueprint' && (
+            searchLoading && debouncedSearch
+              ? <div className="p-4 text-xs font-mono-sc text-slate-600 animate-pulse">Searching\u2026</div>
+              : sidebarGroups.length > 0
+                ? sidebarGroups.map((g) => (
+                    <SidebarGroup key={g.key} label={g.label} count={g.count} items={g.items}
+                      expanded={expandedGroup === g.key}
+                      onToggle={() => setExpandedGroup(expandedGroup === g.key ? null : g.key)}
+                      selectedId={selectedRecipeUuid}
+                      onSelect={(id) => { setSelectedRecipeUuid(id); setBatchCount(1); }} />
+                  ))
+                : debouncedSearch ? <div className="p-4 text-xs font-mono-sc text-slate-600">No results</div> : null
+          )}
+
+          {/* MISSION TAB */}
+          {tab === 'mission' && (
+            missionResults?.data?.length
+              ? <>
+                  {missionResults.data.map((m) => (
+                    <SidebarItem key={m.uuid} label={m.title ?? m.class_name}
+                      selected={false} onClick={() => {}} badge={m.mission_type ?? undefined} />
+                  ))}
+                  {(missionResults as any).pages > 1 && (
+                    <div className="flex items-center justify-center gap-2 py-2 border-t border-slate-800/40">
+                      <button type="button" disabled={missionPage <= 1} onClick={() => setMissionPage((p) => p - 1)}
+                        className="text-[10px] font-mono-sc text-slate-600 hover:text-slate-400 disabled:opacity-30">\u25c0</button>
+                      <span className="text-[9px] font-mono-sc text-slate-700">{missionPage}/{(missionResults as any).pages}</span>
+                      <button type="button" disabled={missionPage >= (missionResults as any).pages} onClick={() => setMissionPage((p) => p + 1)}
+                        className="text-[10px] font-mono-sc text-slate-600 hover:text-slate-400 disabled:opacity-30">\u25b6</button>
+                    </div>
+                  )}
+                </>
+              : <div className="p-4 text-xs font-mono-sc text-slate-600">{debouncedSearch ? 'No results' : 'Loading\u2026'}</div>
+          )}
+
+          {/* RESOURCES TAB */}
+          {tab === 'resources' && (
+            filteredResources.length > 0
+              ? filteredResources.map((r) => (
+                  <SidebarItem key={r.item_name} label={fmtItem(r.item_name)}
+                    selected={selectedResource === r.item_name}
+                    onClick={() => setSelectedResource(r.item_name)}
+                    badge={String(r.recipe_count)} />
+                ))
+              : <div className="p-4 text-xs font-mono-sc text-slate-600">{resources ? 'No results' : 'Loading\u2026'}</div>
           )}
         </div>
 
         <div className="px-3 py-2 border-t border-slate-800/40 flex items-center justify-between">
-          <span className="text-[9px] font-mono-sc text-slate-700">{totalRecipes} blueprints</span>
+          <span className="text-[9px] font-mono-sc text-slate-700">
+            {tab === 'blueprint' ? `${totalRecipes} blueprints`
+              : tab === 'mission' ? `${(missionResults as any)?.total ?? 0} missions`
+              : `${resources?.length ?? 0} resources`}
+          </span>
         </div>
       </div>
 
-      {/* MAIN DETAIL PANEL */}
+      {/* === MAIN PANEL === */}
       <div className="flex-1 overflow-y-auto">
-        {selectedRecipe ? (
-          <div className="max-w-5xl mx-auto px-6 py-5">
 
-            {/* Breadcrumb */}
+        {/* --- BLUEPRINT detail --- */}
+        {tab === 'blueprint' && selectedRecipe && (
+          <div className="max-w-5xl mx-auto px-6 py-5">
             <div className="flex items-center gap-2 flex-wrap text-xs mb-1">
-              {selectedRecipe.category && (
-                <GlowBadge color={CATEGORY_COLORS[selectedRecipe.category] ?? 'slate'}>
-                  {selectedRecipe.category}
-                </GlowBadge>
-              )}
+              {selectedRecipe.category && <GlowBadge color={CAT_COLORS[selectedRecipe.category] ?? 'slate'}>{selectedRecipe.category}</GlowBadge>}
               {selectedRecipe.crafting_time_s != null && (
-                <span className="flex items-center gap-1 text-slate-500 font-mono-sc">
-                  <Clock size={10} />
-                  {formatTime(selectedRecipe.crafting_time_s)}
-                </span>
+                <span className="flex items-center gap-1 text-slate-500 font-mono-sc"><Clock size={10} />{fmtTime(selectedRecipe.crafting_time_s)}</span>
               )}
             </div>
+            <h1 className="font-orbitron text-2xl lg:text-3xl font-bold text-slate-100 tracking-wide mt-1">{fmtName(selectedRecipe)}</h1>
 
-            {/* Title */}
-            <h1 className="font-orbitron text-2xl lg:text-3xl font-bold text-slate-100 tracking-wide mt-1">
-              {formatName(selectedRecipe)}
-            </h1>
-
-            {/* PARTS */}
+            {/* Parts */}
             <div className="mt-8">
               <div className="flex items-center gap-2 mb-5 justify-center">
                 <Settings2 size={16} className="text-slate-500" />
                 <h2 className="font-orbitron text-xs font-bold text-slate-400 tracking-[0.2em] uppercase">Parts</h2>
               </div>
-
               {hasIngredients ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                   {selectedRecipe.ingredients!.map((ing) => (
-                    <PartCard
-                      key={ing.id}
-                      ingredient={ing}
-                      batchCount={batchCount}
-                      quality={qualityMap[ing.id] ?? 2}
-                      onQualityChange={(v) => setIngredientQuality(ing.id, v)}
-                    />
+                    <PartCard key={ing.id} ingredient={ing} batch={batchCount}
+                      quality={qualityMap[ing.id] ?? 2} onQuality={(v) => setIngredientQuality(ing.id, v)} />
                   ))}
                 </div>
               ) : (
@@ -467,27 +476,22 @@ export default function CraftingPage() {
               )}
             </div>
 
-            {/* FINAL COMBINED MODIFIERS */}
+            {/* Combined modifiers */}
             {hasIngredients && (
               <div className="mt-6 sci-panel p-5">
-                <h3 className="font-orbitron text-xs font-bold text-slate-400 tracking-[0.2em] uppercase text-center mb-4">
-                  Final Combined Modifiers
-                </h3>
+                <h3 className="font-orbitron text-xs font-bold text-slate-400 tracking-[0.2em] uppercase text-center mb-4">Final Combined Modifiers</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {selectedRecipe.ingredients!.map((ing) => {
                     const q = qualityMap[ing.id] ?? 2;
                     const mult = [0.8, 0.9, 1.0, 1.1, 1.2][q];
                     const pct = ((mult - 1) * 100).toFixed(0);
-                    const sign = mult >= 1 ? '+' : '';
                     return (
                       <div key={ing.id} className="bg-slate-900/60 rounded p-3 border border-slate-800/30">
                         <p className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-wider truncate mb-1">
-                          {ing.slot_name ? formatItemName(ing.slot_name) : formatItemName(ing.item_name)}
+                          {ing.slot_name ? fmtItem(ing.slot_name) : fmtItem(ing.item_name)}
                         </p>
-                        <p className={`text-sm font-mono-sc font-bold ${QUALITY_COLORS[q]}`}>
-                          {sign}{pct}%
-                        </p>
-                        <p className="text-[9px] font-mono-sc text-slate-700">{QUALITY_LABELS[q]}</p>
+                        <p className={`text-sm font-mono-sc font-bold ${Q_COLORS[q]}`}>{mult >= 1 ? '+' : ''}{pct}%</p>
+                        <p className="text-[9px] font-mono-sc text-slate-700">{Q_LABELS[q]}</p>
                       </div>
                     );
                   })}
@@ -495,66 +499,44 @@ export default function CraftingPage() {
               </div>
             )}
 
-            {/* OUTPUT + BATCH */}
+            {/* Output + Batch */}
             <div className="mt-6 sci-panel p-5">
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex-1 min-w-0">
                   <p className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-wider mb-1">Output</p>
-                  <p className="text-lg text-slate-200 font-medium">
-                    {formatItemName(selectedRecipe.output_item_name ?? selectedRecipe.name ?? '\u2014')}
-                  </p>
+                  <p className="text-lg text-slate-200 font-medium">{fmtItem(selectedRecipe.output_item_name ?? selectedRecipe.name ?? '\u2014')}</p>
                 </div>
-
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <button type="button" onClick={() => setBatchCount((v) => Math.max(1, v - 1))} className="w-7 h-7 flex items-center justify-center rounded border border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300 transition-colors"><Minus size={12} /></button>
-                  <input
-                    type="number"
-                    min={1}
-                    max={999}
-                    value={batchCount}
+                  <button type="button" onClick={() => setBatchCount((v) => Math.max(1, v - 1))}
+                    className="w-7 h-7 flex items-center justify-center rounded border border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300 transition-colors"><Minus size={12} /></button>
+                  <input type="number" min={1} max={999} value={batchCount}
                     onChange={(e) => setBatchCount(Math.max(1, Number(e.target.value) || 1))}
-                    className="sci-input w-14 text-sm text-center font-mono-sc h-7"
-                  />
-                  <button type="button" onClick={() => setBatchCount((v) => Math.min(999, v + 1))} className="w-7 h-7 flex items-center justify-center rounded border border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300 transition-colors"><Plus size={12} /></button>
-                  <span className="font-mono-sc text-xl font-bold text-cyan-400 ml-1">
-                    {'\u00d7'}{(selectedRecipe.output_quantity ?? 1) * batchCount}
-                  </span>
+                    className="sci-input w-14 text-sm text-center font-mono-sc h-7" />
+                  <button type="button" onClick={() => setBatchCount((v) => Math.min(999, v + 1))}
+                    className="w-7 h-7 flex items-center justify-center rounded border border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300 transition-colors"><Plus size={12} /></button>
+                  <span className="font-mono-sc text-xl font-bold text-cyan-400 ml-1">{'\u00d7'}{(selectedRecipe.output_quantity ?? 1) * batchCount}</span>
                 </div>
               </div>
-
               <div className="flex gap-1.5 mt-3 pt-3 border-t border-slate-800/30">
                 {[1, 5, 10, 25, 50, 100].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => setBatchCount(n)}
+                  <button key={n} type="button" onClick={() => setBatchCount(n)}
                     className={`px-2.5 py-1 text-[10px] font-mono-sc rounded border transition-colors ${
-                      batchCount === n
-                        ? 'border-cyan-500 bg-cyan-950/50 text-cyan-400'
-                        : 'border-slate-800 text-slate-600 hover:border-slate-600 hover:text-slate-400'
-                    }`}
-                  >
-                    {'\u00d7'}{n}
-                  </button>
+                      batchCount === n ? 'border-cyan-500 bg-cyan-950/50 text-cyan-400' : 'border-slate-800 text-slate-600 hover:border-slate-600 hover:text-slate-400'
+                    }`}>{'\u00d7'}{n}</button>
                 ))}
               </div>
             </div>
 
-            {/* CRAFTING DETAILS */}
+            {/* Crafting details */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
               <div className="sci-panel p-4">
                 <p className="text-[10px] text-slate-600 font-mono-sc uppercase tracking-wider mb-1">Total Crafting Time</p>
                 <div className="flex items-center gap-2">
                   <Clock size={16} className="text-amber-500" />
-                  <span className="text-lg font-mono-sc text-slate-200 font-medium">
-                    {formatTime(selectedRecipe.crafting_time_s ? selectedRecipe.crafting_time_s * batchCount : null)}
-                  </span>
+                  <span className="text-lg font-mono-sc text-slate-200 font-medium">{fmtTime(selectedRecipe.crafting_time_s ? selectedRecipe.crafting_time_s * batchCount : null)}</span>
                 </div>
-                {batchCount > 1 && selectedRecipe.crafting_time_s && (
-                  <p className="text-[10px] text-slate-700 font-mono-sc mt-1">{formatTime(selectedRecipe.crafting_time_s)} per unit</p>
-                )}
+                {batchCount > 1 && selectedRecipe.crafting_time_s && <p className="text-[10px] text-slate-700 font-mono-sc mt-1">{fmtTime(selectedRecipe.crafting_time_s)} per unit</p>}
               </div>
-
               <div className="sci-panel p-4">
                 <p className="text-[10px] text-slate-600 font-mono-sc uppercase tracking-wider mb-1">Station</p>
                 <div className="flex items-center gap-2">
@@ -562,7 +544,6 @@ export default function CraftingPage() {
                   <span className="text-lg font-mono-sc text-slate-200 font-medium">{selectedRecipe.station_type ?? '\u2014'}</span>
                 </div>
               </div>
-
               {selectedRecipe.skill_level != null && (
                 <div className="sci-panel p-4">
                   <p className="text-[10px] text-slate-600 font-mono-sc uppercase tracking-wider mb-1">Skill Level</p>
@@ -572,40 +553,160 @@ export default function CraftingPage() {
                   </div>
                 </div>
               )}
-
               <div className="sci-panel p-4">
                 <p className="text-[10px] text-slate-600 font-mono-sc uppercase tracking-wider mb-1">Total Resources</p>
                 <div className="flex items-center gap-2">
                   <Package size={16} className="text-cyan-500" />
-                  <span className="text-lg font-mono-sc text-slate-200 font-medium">
-                    {totalScu > 0 ? formatScu(totalScu) : '\u2014'}
-                  </span>
+                  <span className="text-lg font-mono-sc text-slate-200 font-medium">{totalScu > 0 ? fmtScu(totalScu) : '\u2014'}</span>
                 </div>
               </div>
             </div>
 
-            {/* REWARD MISSIONS */}
+            {/* Reward Missions */}
             <div className="mt-8 sci-panel p-5">
-              <div className="flex items-center gap-2 mb-3 justify-center">
+              <div className="flex items-center gap-2 mb-4 justify-center">
                 <Trophy size={16} className="text-amber-500" />
                 <h2 className="font-orbitron text-xs font-bold text-slate-400 tracking-[0.2em] uppercase">Reward Missions</h2>
               </div>
-              <p className="text-xs text-slate-700 font-mono-sc text-center py-4">
-                Mission reward data coming soon
-              </p>
+              {rewardMissions?.data?.length ? (
+                <div className="space-y-2">
+                  {rewardMissions.data.map((m) => <MissionRow key={m.uuid} m={m} />)}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-700 font-mono-sc text-center py-3">No matching missions found for this item</p>
+              )}
             </div>
 
-            {/* Class name */}
             <div className="mt-6 pt-4 border-t border-slate-800/20">
               <p className="text-[9px] font-mono-sc text-slate-800 break-all">{selectedRecipe.class_name}</p>
             </div>
           </div>
-        ) : (
+        )}
+
+        {/* --- MISSION detail --- */}
+        {tab === 'mission' && (
+          <div className="max-w-5xl mx-auto px-6 py-5">
+            <div className="flex items-center gap-2 mb-6 justify-center">
+              <Swords size={20} className="text-slate-500" />
+              <h1 className="font-orbitron text-lg font-bold text-slate-300 tracking-[0.15em] uppercase">Missions</h1>
+              <GlowBadge color="amber">{(missionResults as any)?.total ?? 0}</GlowBadge>
+            </div>
+
+            {/* Mission type pills */}
+            {missionTypes?.length && (
+              <div className="flex flex-wrap gap-1.5 mb-5 justify-center">
+                {missionTypes.map((t) => (
+                  <button key={t} type="button"
+                    onClick={() => setSearch(search === t ? '' : t)}
+                    className={`px-3 py-1 text-[10px] font-mono-sc rounded-full border transition-colors ${
+                      search === t ? 'border-cyan-500 bg-cyan-950/50 text-cyan-400' : 'border-slate-800 text-slate-600 hover:border-slate-600'
+                    }`}>{t}</button>
+                ))}
+              </div>
+            )}
+
+            {missionResults?.data?.length ? (
+              <div className="space-y-2">
+                {missionResults.data.map((m) => <MissionRow key={m.uuid} m={m} />)}
+              </div>
+            ) : (
+              <div className="sci-panel p-8 text-center">
+                <Swords size={28} className="text-slate-800 mx-auto mb-2" />
+                <p className="text-xs text-slate-600 font-mono-sc">No missions found</p>
+              </div>
+            )}
+
+            {(missionResults as any)?.pages > 1 && (
+              <div className="flex items-center justify-center gap-4 mt-6">
+                <button type="button" disabled={missionPage <= 1} onClick={() => setMissionPage((p) => p - 1)}
+                  className="sci-btn text-xs disabled:opacity-30">\u25c0 Previous</button>
+                <span className="text-xs font-mono-sc text-slate-600">Page {missionPage} / {(missionResults as any).pages}</span>
+                <button type="button" disabled={missionPage >= (missionResults as any).pages} onClick={() => setMissionPage((p) => p + 1)}
+                  className="sci-btn text-xs disabled:opacity-30">Next \u25b6</button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* --- RESOURCES detail --- */}
+        {tab === 'resources' && selectedResource && (
+          <div className="max-w-5xl mx-auto px-6 py-5">
+            {/* Resource header */}
+            {(() => {
+              const res = resources?.find((r) => r.item_name === selectedResource);
+              return res ? (
+                <div className="sci-panel p-5 mb-6">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <Package size={20} className="text-cyan-500" />
+                    <h1 className="font-orbitron text-2xl font-bold text-slate-100 tracking-wide">{fmtItem(res.item_name)}</h1>
+                  </div>
+                  <div className="grid grid-cols-3 gap-4 mt-4">
+                    <div>
+                      <p className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-wider">Used In</p>
+                      <p className="text-lg font-mono-sc text-slate-200 font-medium">{res.recipe_count} <span className="text-xs text-slate-500">recipes</span></p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-wider">Total Quantity</p>
+                      <p className="text-lg font-mono-sc text-slate-200 font-medium">{res.total_quantity}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-wider">Total SCU</p>
+                      <p className="text-lg font-mono-sc text-cyan-400 font-medium">{fmtScu(res.total_scu ? Number(res.total_scu) : null)}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : null;
+            })()}
+
+            {/* Recipes using this resource */}
+            <div className="flex items-center gap-2 mb-4 justify-center">
+              <FlaskConical size={16} className="text-slate-500" />
+              <h2 className="font-orbitron text-xs font-bold text-slate-400 tracking-[0.2em] uppercase">Recipes Using {fmtItem(selectedResource)}</h2>
+            </div>
+
+            {resourceRecipes?.length ? (
+              <div className="space-y-2">
+                {resourceRecipes.map((r: any) => (
+                  <button key={r.uuid} type="button"
+                    onClick={() => { setTab('blueprint'); setSelectedRecipeUuid(r.uuid); setExpandedGroup(r.category); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 bg-slate-900/40 rounded border border-slate-800/30 hover:bg-slate-900/60 hover:border-cyan-900/40 transition-colors text-left">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-slate-200 truncate">{fmtItem(r.output_item_name ?? r.name ?? r.class_name)}</p>
+                      <div className="flex items-center gap-3 mt-0.5">
+                        {r.category && <GlowBadge color={CAT_COLORS[r.category] ?? 'slate'} size="xs">{r.category}</GlowBadge>}
+                        {r.slot_name && <span className="text-[9px] font-mono-sc text-slate-600">{fmtItem(r.slot_name)}</span>}
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-xs font-mono-sc text-cyan-400">{r.quantity}x</p>
+                      {r.scu && <p className="text-[9px] font-mono-sc text-slate-600">{fmtScu(Number(r.scu))}</p>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="sci-panel p-8 text-center">
+                <Package size={24} className="text-slate-800 mx-auto mb-2" />
+                <p className="text-xs text-slate-600 font-mono-sc">Loading recipes\u2026</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* --- empty state --- */}
+        {tab === 'blueprint' && !selectedRecipe && (
           <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <FlaskConical size={40} className="text-slate-800 mx-auto mb-3" />
               <p className="text-sm text-slate-700 font-mono-sc">Select a blueprint</p>
-              <p className="text-[10px] text-slate-800 mt-1">Choose a recipe from the sidebar</p>
+            </div>
+          </div>
+        )}
+        {tab === 'resources' && !selectedResource && (
+          <div className="flex items-center justify-center h-full">
+            <div className="text-center">
+              <Package size={40} className="text-slate-800 mx-auto mb-3" />
+              <p className="text-sm text-slate-700 font-mono-sc">Select a resource</p>
             </div>
           </div>
         )}

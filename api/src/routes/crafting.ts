@@ -67,6 +67,34 @@ export function mountCraftingRoutes(router: Router, deps: RouteDependencies): vo
   );
 
   /**
+   * GET /api/v1/crafting/resources
+   * Lists all distinct crafting resources with usage counts
+   */
+  router.get(
+    '/api/v1/crafting/resources',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = String(req.query.env ?? 'live');
+      const resources = await gameDataService!.crafting.getResources(env);
+      sendWithETag(req, res, { success: true, data: resources });
+    }),
+  );
+
+  /**
+   * GET /api/v1/crafting/resources/:itemName/recipes
+   * Lists all recipes using a given resource
+   */
+  router.get(
+    '/api/v1/crafting/resources/:itemName/recipes',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = String(req.query.env ?? 'live');
+      const recipes = await gameDataService!.crafting.getRecipesByResource(req.params.itemName, env);
+      sendWithETag(req, res, { success: true, data: recipes, count: recipes.length });
+    }),
+  );
+
+  /**
    * GET /api/v1/crafting/recipes/:uuid
    * Single recipe by UUID with ingredients
    */

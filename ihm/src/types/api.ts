@@ -448,6 +448,14 @@ export interface CraftingCategory {
   count: number;
 }
 
+export interface CraftingResource {
+  item_name: string;
+  item_uuid: string | null;
+  recipe_count: number;
+  total_quantity: number;
+  total_scu: number | null;
+}
+
 // ─── Trade ────────────────────────────────────────────────────────────────────
 export interface TradeLocation {
   id: number;
