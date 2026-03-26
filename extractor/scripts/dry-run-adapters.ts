@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { config } from 'dotenv';
 import { type ExternalSourceOverride, loadExternalCanonicalData } from '../src/source-adapters.js';
 
-config({ path: resolve(import.meta.dirname, '..', '..', '.env.extractor') });
+config({ path: resolve(import.meta.dirname, '..', '..', '.env.extractor.dev') });
 
 function parseSampleSize(): number {
   const args = process.argv.slice(2);
