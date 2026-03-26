@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { screen } from '@testing-library/react';
 import { renderWithProviders } from '../utils';
-import NotFoundPage from '@/pages/NotFoundPage';
+import NotFoundPage from '@/views/NotFoundPage';
 
 describe('NotFoundPage', () => {
   it('renders 404 heading', () => {

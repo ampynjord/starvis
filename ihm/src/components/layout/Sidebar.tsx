@@ -1,3 +1,5 @@
+'use client';
+
 import { motion } from 'framer-motion';
 import {
   BarChart3,
@@ -20,7 +22,8 @@ import {
   Wrench,
   ClipboardList,
 } from 'lucide-react';
-import { Link, NavLink } from 'react-router-dom';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useEnv } from '@/contexts/EnvContext';
 
 const CORE_ITEMS = [
@@ -55,39 +58,34 @@ const INDUSTRIAL_ITEMS = [
 
 
 function NavItem({ to, icon: Icon, label }: { to: string; icon: React.ElementType; label: string }) {
+  const pathname = usePathname();
+  const isActive = to === '/' ? pathname === '/' : pathname.startsWith(to);
+
   return (
-    <NavLink
-      key={to}
-      to={to}
-      end={to === '/'}
-      className={({ isActive }) =>
-        [
-          'flex items-center gap-3 px-2 py-2.5 rounded transition-all duration-150 group',
-          isActive
-            ? 'bg-cyan-950/60 border border-cyan-800 text-cyan-400'
-            : 'text-slate-500 hover:text-slate-200 hover:bg-white/5 border border-transparent',
-        ].join(' ')
-      }
+    <Link
+      href={to}
+      className={[
+        'flex items-center gap-3 px-2 py-2.5 rounded transition-all duration-150 group',
+        isActive
+          ? 'bg-cyan-950/60 border border-cyan-800 text-cyan-400'
+          : 'text-slate-500 hover:text-slate-200 hover:bg-white/5 border border-transparent',
+      ].join(' ')}
     >
-      {({ isActive }) => (
-        <>
-          <Icon
-            size={16}
-            className={`flex-shrink-0 ${isActive ? 'text-cyan-400' : 'text-slate-500 group-hover:text-slate-300'}`}
-            strokeWidth={isActive ? 2 : 1.5}
-          />
-          <span className="hidden md:block font-rajdhani font-semibold text-sm uppercase tracking-wider truncate">
-            {label}
-          </span>
-          {isActive && (
-            <motion.div
-              layoutId="nav-indicator"
-              className="hidden md:block ml-auto w-1 h-1 rounded-full bg-cyan-400"
-            />
-          )}
-        </>
+      <Icon
+        size={16}
+        className={`flex-shrink-0 ${isActive ? 'text-cyan-400' : 'text-slate-500 group-hover:text-slate-300'}`}
+        strokeWidth={isActive ? 2 : 1.5}
+      />
+      <span className="hidden md:block font-rajdhani font-semibold text-sm uppercase tracking-wider truncate">
+        {label}
+      </span>
+      {isActive && (
+        <motion.div
+          layoutId="nav-indicator"
+          className="hidden md:block ml-auto w-1 h-1 rounded-full bg-cyan-400"
+        />
       )}
-    </NavLink>
+    </Link>
   );
 }
 
@@ -165,7 +163,7 @@ export function Sidebar() {
       {/* Footer */}
       <div className="px-4 py-3 border-t border-border space-y-2">
         <Link
-          to="/changelog"
+          href="/changelog"
           className="hidden md:flex items-center gap-2 text-xs text-slate-600 hover:text-slate-400 transition-colors"
         >
           <BookOpen size={12} />

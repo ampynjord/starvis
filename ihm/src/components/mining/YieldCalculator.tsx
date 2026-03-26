@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { TrendingUp } from 'lucide-react';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import type { MiningElementYield } from '@/types/api';
-import { fNum } from '@/pages/mining-helpers';
+import { fNum } from '@/views/mining-helpers';
 
 export interface YieldCalculatorProps {
   yieldResults: MiningElementYield[] | null;

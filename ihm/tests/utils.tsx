@@ -1,7 +1,6 @@
 import React from 'react';
 import { render, type RenderOptions } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter } from 'react-router-dom';
 
 /** Creates a QueryClient without retry for tests */
 function makeQueryClient() {
@@ -14,25 +13,20 @@ function makeQueryClient() {
 }
 
 interface WrapperOptions extends Omit<RenderOptions, 'wrapper'> {
-  initialEntries?: string[];
+  pathname?: string;
 }
 
-/** render() avec QueryClientProvider + MemoryRouter (React Router v7 future flags activés) */
+/** render() avec QueryClientProvider (Next.js navigation mockée dans setup.ts) */
 export function renderWithProviders(
   ui: React.ReactElement,
-  { initialEntries = ['/'], ...options }: WrapperOptions = {},
+  { pathname: _pathname = '/', ...options }: WrapperOptions = {},
 ) {
   const queryClient = makeQueryClient();
 
   function Wrapper({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter
-          initialEntries={initialEntries}
-          future={{ v7_startTransition: true, v7_relativeSplatPath: true }}
-        >
-          {children}
-        </MemoryRouter>
+        {children}
       </QueryClientProvider>
     );
   }

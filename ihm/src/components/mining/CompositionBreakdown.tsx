@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { Beaker, Loader2 } from 'lucide-react';
 import type { MiningCompositionView } from '@/types/mining';
-import { dangerColor, fNum, pct, probColor } from '@/pages/mining-helpers';
+import { dangerColor, fNum, pct, probColor } from '@/views/mining-helpers';
 
 export interface CompositionBreakdownProps {
   data: MiningCompositionView | null;

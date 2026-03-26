@@ -2,7 +2,7 @@ import { AlertTriangle } from 'lucide-react';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import type { MiningRiskAggregates } from '@/types/api';
 import type { MiningCompositionView } from '@/types/mining';
-import { dangerBg, dangerColor, fNum, pct } from '@/pages/mining-helpers';
+import { dangerBg, dangerColor, fNum, pct } from '@/views/mining-helpers';
 
 export interface RiskAssessmentProps {
   data: MiningCompositionView | null;
