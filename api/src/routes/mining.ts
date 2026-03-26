@@ -93,7 +93,7 @@ export function mountMiningRoutes(router: Router, deps: RouteDependencies): void
   router.get(
     '/api/v1/mining/lasers',
     asyncHandler(async (req, res) => {
-      const env = String(req.query.env ?? 'live');
+      const _env = String(req.query.env ?? 'live');
       const components = await prisma.component.findMany({
         where: { type: 'MiningLaser', miningSpeed: { not: null } },
         select: {

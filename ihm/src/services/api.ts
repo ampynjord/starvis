@@ -274,7 +274,8 @@ export const api = {
     }) => get<PaginatedResponse<CraftingRecipe>>('/crafting/recipes', filters as Record<string, string | number | undefined>),
     recipe: (uuid: string, env?: string) => get<CraftingRecipe>(`/crafting/recipes/${uuid}`, { env }),
     resources: (env?: string) => get<CraftingResource[]>('/crafting/resources', { env }),
-    recipesByResource: (itemName: string, env?: string) => get<CraftingRecipe[]>(`/crafting/resources/${encodeURIComponent(itemName)}/recipes`, { env }),
+    recipesByResource: (itemName: string, env?: string) =>
+      get<CraftingRecipe[]>(`/crafting/resources/${encodeURIComponent(itemName)}/recipes`, { env }),
   },
 
   // ─── Trade ──────────────────────────────────────────────────────────
