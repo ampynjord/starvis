@@ -23,7 +23,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const lines = res.data.map((c) => {
       const parts = [`**${c.name}**`];
       if (c.type) parts.push(`Type: ${c.type}`);
-      if (c.rarity) parts.push(`Rareté: ${c.rarity}`);
+      if (c.sub_type) parts.push(`Sous-type: ${c.sub_type}`);
+      if (c.class_name) parts.push(`\`${c.class_name}\``);
       return parts.join(' — ');
     });
 
