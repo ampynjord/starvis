@@ -4,7 +4,7 @@ import { config } from 'dotenv';
 import type { RowDataPacket } from 'mysql2/promise';
 import * as mysql from 'mysql2/promise';
 
-config({ path: resolve(import.meta.dirname, '..', '..', '.env.extractor') });
+config({ path: resolve(import.meta.dirname, '..', '..', '.env.extractor.dev') });
 
 type GameEnv = 'live' | 'ptu' | 'eptu';
 
@@ -57,7 +57,7 @@ async function main() {
   };
 
   if (!dbConfig.user || !dbConfig.password) {
-    console.error('Missing DB credentials. Set DB_USER, DB_PASSWORD in .env.extractor');
+    console.error('Missing DB credentials. Set DB_USER, DB_PASSWORD in .env.extractor.dev');
     process.exit(1);
   }
 

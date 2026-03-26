@@ -26,6 +26,7 @@ pnpm-debug.log*
 .env.dev
 .env.prod
 .env.extractor
+.env.extractor.dev
 .env.extractor.prod
 .env*.local
 
