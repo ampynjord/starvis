@@ -1,6 +1,6 @@
 ﻿import { useQuery } from '@tanstack/react-query';
 import {
-  ChevronDown, ChevronRight, Clock, Coins, FlaskConical,
+  ChevronDown, ChevronRight, Clock, FlaskConical,
   Minus, Package, Plus, Search, Settings2, Swords, Trophy,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
