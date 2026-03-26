@@ -35,6 +35,10 @@ export interface MissionRecord {
   dangerLevel: number | null;
   requiredReputation: number | null;
   reputationReward: number | null;
+  baseXp: number | null;
+  category: string | null;
+  isUnique: boolean;
+  hasBlueprintReward: boolean;
 }
 
 const TYPE_PATTERNS: [RegExp, string][] = [
@@ -60,6 +64,22 @@ function deriveMissionType(className: string): string {
     if (pattern.test(className)) return type;
   }
   return 'Misc';
+}
+
+/** Derive high-level category from contract className (SCMDB parity) */
+const CATEGORY_PATTERNS: [RegExp, string][] = [
+  [/^Story_|_Story_|_cinematic|_narrative/i, 'Story'],
+  [/^Wikelo|_Wikelo/i, 'Wikelo'],
+  [/^ASD_|_ASD_/i, 'ASD'],
+  [/^ACE_|_ACE_/i, 'ACE'],
+  [/^Event_|_Event_|_seasonal/i, 'Event'],
+];
+
+function deriveMissionCategory(className: string): string {
+  for (const [pattern, cat] of CATEGORY_PATTERNS) {
+    if (pattern.test(className)) return cat;
+  }
+  return 'Career';
 }
 
 function isLocEmpty(s: string | null | undefined): boolean {
@@ -186,6 +206,36 @@ export function extractMissions(ctx: DataForgeService, locService?: { resolveKey
         if (typeof val === 'number') reputationReward = val;
       }
 
+      // ── Base XP ──
+      let baseXp: number | null = null;
+      const xpReward = (rewards?.experienceReward ?? rewards?.xpReward ?? data.experienceReward) as
+        | Record<string, unknown>
+        | number
+        | undefined;
+      if (typeof xpReward === 'number' && xpReward > 0) {
+        baseXp = xpReward;
+      } else if (xpReward && typeof xpReward === 'object') {
+        const val = xpReward.amount ?? xpReward.value ?? xpReward.baseXP ?? xpReward.base;
+        if (typeof val === 'number' && val > 0) baseXp = val;
+      }
+
+      // ── Category ──
+      const category = deriveMissionCategory(className);
+
+      // ── Unique vs Repeatable ──
+      const isUnique = !!(
+        params.isUnique ??
+        data.isUnique ??
+        (autoFinish.maxCompletions != null && (autoFinish.maxCompletions as number) === 1)
+      );
+
+      // ── Blueprint Reward ──
+      const hasBlueprintReward = !!(
+        rewards?.blueprintReward ??
+        rewards?.craftingBlueprintReward ??
+        rewards?.unlockBlueprintReward
+      );
+
       // Resolve title / description
       const displayInfo = (data.contractDisplayInfo as Record<string, unknown>) ?? {};
       const displayStrings: string[] = Array.isArray(displayInfo.displayString) ? (displayInfo.displayString as string[]) : [];
@@ -234,6 +284,10 @@ export function extractMissions(ctx: DataForgeService, locService?: { resolveKey
         dangerLevel,
         requiredReputation,
         reputationReward,
+        baseXp,
+        category,
+        isUnique,
+        hasBlueprintReward,
       });
     } catch (e) {
       logger.debug(`Mission extract error [${r.name}]: ${(e as Error).message}`);
