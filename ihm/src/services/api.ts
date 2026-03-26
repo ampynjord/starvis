@@ -9,6 +9,7 @@ import type {
   ComponentListItem,
   CraftingCategory,
   CraftingRecipe,
+  CraftingResource,
   FpsDamageResult,
   Hardpoint,
   Item,
@@ -272,6 +273,8 @@ export const api = {
       stationType?: string;
     }) => get<PaginatedResponse<CraftingRecipe>>('/crafting/recipes', filters as Record<string, string | number | undefined>),
     recipe: (uuid: string, env?: string) => get<CraftingRecipe>(`/crafting/recipes/${uuid}`, { env }),
+    resources: (env?: string) => get<CraftingResource[]>('/crafting/resources', { env }),
+    recipesByResource: (itemName: string, env?: string) => get<CraftingRecipe[]>(`/crafting/resources/${encodeURIComponent(itemName)}/recipes`, { env }),
   },
 
   // ─── Trade ──────────────────────────────────────────────────────────
