@@ -118,6 +118,121 @@ function blueprintDisplayName(
     .trim();
 }
 
+// ── Blueprint ingredient extraction ────────────────────────
+
+/**
+ * Blueprint cost structure (4.0+):
+ *   costs.mandatoryCost.options[] = CraftingCost_Select[]
+ *   costs.optionalCosts[]         = CraftingCost_Select[]
+ *
+ *   CraftingCost_Select = {
+ *     nameInfo: { debugName, displayName },
+ *     count: number,
+ *     options: CraftingCost_Resource[]
+ *   }
+ *
+ *   CraftingCost_Resource = {
+ *     resource: { __ref: uuid },
+ *     quantity: { standardCargoUnits: number },
+ *     minQuality: number
+ *   }
+ */
+
+interface CostSlot {
+  slotName: string;
+  count: number;
+  isOptional: boolean;
+  resourceOptions: { resourceRef: string; scu: number; minQuality: number }[];
+}
+
+/** Parse a CraftingCost_Select object into a CostSlot */
+function parseCostSelect(obj: Record<string, unknown>, isOptional: boolean, locService?: { resolveKey(key: string): string | null }): CostSlot | null {
+  if (!obj || typeof obj !== 'object') return null;
+
+  const nameInfo = obj.nameInfo as Record<string, unknown> | undefined;
+  let slotName = safeString(nameInfo?.debugName) ?? 'Unknown';
+  // Try localized display name
+  const displayKey = safeString(nameInfo?.displayName);
+  if (displayKey && locService) {
+    const resolved = locService.resolveKey(displayKey);
+    if (resolved) slotName = resolved;
+  }
+
+  const count = typeof obj.count === 'number' ? obj.count : 1;
+
+  // Inner options: CraftingCost_Resource[]
+  const innerOptions = obj.options as Array<Record<string, unknown>> | undefined;
+  const resourceOptions: CostSlot['resourceOptions'] = [];
+
+  if (Array.isArray(innerOptions)) {
+    for (const res of innerOptions) {
+      if (!res || typeof res !== 'object') continue;
+      const resType = safeString(res.__type);
+      if (resType && resType !== 'CraftingCost_Resource') continue; // skip unknown types
+
+      const resourceRef = (res.resource as Record<string, unknown>)?.__ref as string | undefined;
+      if (!resourceRef || resourceRef === '00000000-0000-0000-0000-000000000000') continue;
+
+      const qty = res.quantity as Record<string, unknown> | undefined;
+      const scu = typeof qty?.standardCargoUnits === 'number' ? qty.standardCargoUnits : 0;
+      const minQuality = typeof res.minQuality === 'number' ? res.minQuality : 0;
+
+      resourceOptions.push({ resourceRef, scu, minQuality });
+    }
+  }
+
+  if (resourceOptions.length === 0) return null;
+  return { slotName, count, isOptional, resourceOptions };
+}
+
+/** Extract ingredients from a blueprint costs structure */
+function extractBlueprintIngredients(
+  costs: Record<string, unknown> | undefined,
+  ctx: DataForgeService,
+  locService?: { resolveKey(key: string): string | null },
+): CraftingIngredientRecord[] {
+  if (!costs) return [];
+
+  const ingredients: CraftingIngredientRecord[] = [];
+  const slots: CostSlot[] = [];
+
+  // Mandatory cost slots
+  const mandatoryCost = costs.mandatoryCost as Record<string, unknown> | undefined;
+  if (mandatoryCost?.options && Array.isArray(mandatoryCost.options)) {
+    for (const opt of mandatoryCost.options as Array<Record<string, unknown>>) {
+      const slot = parseCostSelect(opt, false, locService);
+      if (slot) slots.push(slot);
+    }
+  }
+
+  // Optional cost slots
+  const optionalCosts = costs.optionalCosts as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(optionalCosts)) {
+    for (const opt of optionalCosts) {
+      const slot = parseCostSelect(opt, true, locService);
+      if (slot) slots.push(slot);
+    }
+  }
+
+  // Convert slots to ingredient records
+  // Each slot may have multiple resource options (player picks one), we record the first as default
+  for (const slot of slots) {
+    const res = slot.resourceOptions[0];
+    let itemName = ctx.resolveGuid(res.resourceRef) ?? slot.slotName;
+    // Clean up "ResourceType.Xxx" → "Xxx"
+    itemName = itemName.replace(/^ResourceType\./, '');
+
+    ingredients.push({
+      itemName,
+      itemUuid: res.resourceRef,
+      quantity: slot.count,
+      isOptional: slot.isOptional,
+    });
+  }
+
+  return ingredients;
+}
+
 // ── Blueprint extraction ───────────────────────────────────
 
 function extractBlueprints(ctx: DataForgeService, locService?: { resolveKey(key: string): string | null }): CraftingRecipeRecord[] {
@@ -128,6 +243,7 @@ function extractBlueprints(ctx: DataForgeService, locService?: { resolveKey(key:
   logger.info(`Found ${records.length} CraftingBlueprintRecord records, ${categoryMap.size} categories`);
 
   const results: CraftingRecipeRecord[] = [];
+  let totalIngredients = 0;
 
   for (const r of records) {
     try {
@@ -156,14 +272,21 @@ function extractBlueprints(ctx: DataForgeService, locService?: { resolveKey(key:
       const locKey = safeString(blueprint.blueprintName);
       const name = blueprintDisplayName(className, entityName, locService, locKey);
 
-      // Craft time from first tier
+      // Craft time + ingredients from first tier
       const tiers = blueprint.tiers as Array<Record<string, unknown>> | undefined;
       let craftingTime: number | null = null;
+      let ingredients: CraftingIngredientRecord[] = [];
+
       if (tiers?.length) {
         const recipe = tiers[0].recipe as Record<string, unknown> | undefined;
         const costs = recipe?.costs as Record<string, unknown> | undefined;
         craftingTime = parseCraftTime(costs?.craftTime as Record<string, unknown>);
+
+        // Extract ingredients from the recipe/costs structure
+        ingredients = extractBlueprintIngredients(costs, ctx, locService);
       }
+
+      totalIngredients += ingredients.length;
 
       results.push({
         uuid: r.uuid,
@@ -176,14 +299,14 @@ function extractBlueprints(ctx: DataForgeService, locService?: { resolveKey(key:
         craftingTime,
         stationType: 'FPSCraftingBench',
         skillLevel: null,
-        ingredients: [],
+        ingredients,
       });
     } catch (e) {
       logger.debug(`Blueprint extract error [${r.name}]: ${(e as Error).message}`);
     }
   }
 
-  logger.info(`Extracted ${results.length} blueprint recipes`);
+  logger.info(`Extracted ${results.length} blueprint recipes with ${totalIngredients} total ingredients`);
   return results;
 }
 
