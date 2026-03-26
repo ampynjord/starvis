@@ -99,6 +99,12 @@ jobs:
       - name: Lint IHM (Biome)
         run: cd ihm && npx biome check .
 
+      - name: Install & type-check Bot
+        run: cd bot && npm ci && npx tsc --noEmit
+
+      - name: Lint Bot (Biome)
+        run: cd bot && npx biome check .
+
       - name: Audit API dependencies
         run: cd api && npm audit --audit-level=high
 
@@ -112,6 +118,8 @@ jobs:
           DB_NAME: ci
           MYSQL_ROOT_PASSWORD: ci
           ADMIN_API_KEY: ci
+          DISCORD_TOKEN: ci
+          DISCORD_CLIENT_ID: ci
 
   # ==========================================
   #  1.b SAFE PRODUCTION SMOKE (manual)
