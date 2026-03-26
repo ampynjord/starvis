@@ -1,10 +1,12 @@
+'use client';
+
 import { motion } from 'framer-motion';
-import { Outlet, useLocation } from 'react-router-dom';
+import { usePathname } from 'next/navigation';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 
-export function AppShell() {
-  const location = useLocation();
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   return (
     <div className="flex h-screen overflow-hidden bg-void">
       {/* Scan line */}
@@ -21,14 +23,14 @@ export function AppShell() {
         <TopBar />
         <main className="flex-1 overflow-y-auto bg-void bg-grid">
           <motion.div
-            key={location.pathname}
+            key={pathname}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25 }}
             className="p-6 min-h-full"
           >
-            <Outlet />
+            {children}
           </motion.div>
         </main>
       </div>

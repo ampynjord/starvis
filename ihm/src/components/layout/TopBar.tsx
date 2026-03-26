@@ -1,8 +1,10 @@
+'use client';
+
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, ChevronRight } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { api } from '@/services/api';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useEnv } from '@/contexts/EnvContext';
@@ -12,7 +14,7 @@ export function TopBar() {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const debouncedQuery = useDebounce(query, 300);
-  const navigate = useNavigate();
+  const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const { data: results } = useQuery({
@@ -31,13 +33,13 @@ export function TopBar() {
   const handleSelect = useCallback((type: string, uuid: string) => {
     setQuery('');
     setOpen(false);
-    navigate(`/${type}/${uuid}`);
-  }, [navigate]);
+    router.push(`/${type}/${uuid}`);
+  }, [router]);
 
   const handleSeeAll = useCallback(() => {
     setOpen(false);
-    navigate(`/search?q=${encodeURIComponent(query)}`);
-  }, [navigate, query]);
+    router.push(`/search?q=${encodeURIComponent(query)}`);
+  }, [router, query]);
 
   const hasResults = results && (
     results.ships.length + results.components.length + results.items.length +
@@ -168,7 +170,7 @@ export function TopBar() {
                   {results.recipes.map(r => (
                     <button
                       key={r.uuid}
-                      onMouseDown={() => { setQuery(''); setOpen(false); navigate(`/crafting?search=${encodeURIComponent(r.name)}`); }}
+                      onMouseDown={() => { setQuery(''); setOpen(false); router.push(`/crafting?search=${encodeURIComponent(r.name)}`); }}
                       className="w-full flex items-center justify-between px-3 py-2 hover:bg-cyan-950/40 text-left transition-colors"
                     >
                       <span className="text-sm text-slate-300">{r.name}</span>

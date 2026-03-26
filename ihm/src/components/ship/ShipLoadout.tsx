@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import type { LoadoutNode, ShipModule } from '@/types/api';
 
 // ─────────────────────────────────────────────
@@ -210,14 +210,14 @@ function WeaponCard({ portName, mount, weapon }: {
         {mount && mountName && (
           <p className="text-[9px] font-mono-sc text-slate-600 truncate">
             {mount.component_uuid
-              ? <Link to={`/components/${mount.component_uuid}`} className="hover:text-slate-400 transition-colors">{mountName}</Link>
+              ? <Link href={`/components/${mount.component_uuid}`} className="hover:text-slate-400 transition-colors">{mountName}</Link>
               : mountName}
           </p>
         )}
         {weaponName ? (
           <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">
             {weapon?.component_uuid
-              ? <Link to={`/components/${weapon.component_uuid}`} className="hover:text-cyan-400 transition-colors">{weaponName}</Link>
+              ? <Link href={`/components/${weapon.component_uuid}`} className="hover:text-cyan-400 transition-colors">{weaponName}</Link>
               : weaponName}
           </p>
         ) : (
@@ -280,7 +280,7 @@ function TurretCard({ node }: { node: LoadoutNode }) {
         {turretName && (
           <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">
             {node.component_uuid
-              ? <Link to={`/components/${node.component_uuid}`} className="hover:text-cyan-400 transition-colors">{turretName}</Link>
+              ? <Link href={`/components/${node.component_uuid}`} className="hover:text-cyan-400 transition-colors">{turretName}</Link>
               : turretName}
           </p>
         )}
@@ -311,7 +311,7 @@ function TurretCard({ node }: { node: LoadoutNode }) {
                     {gimbalName ? (
                       <span className="text-[9px] font-mono-sc text-violet-400 truncate flex-1 min-w-0">
                         {g.component_uuid
-                          ? <Link to={`/components/${g.component_uuid}`} className="hover:text-violet-200 transition-colors">{gimbalName}</Link>
+                          ? <Link href={`/components/${g.component_uuid}`} className="hover:text-violet-200 transition-colors">{gimbalName}</Link>
                           : gimbalName}
                       </span>
                     ) : (
@@ -326,7 +326,7 @@ function TurretCard({ node }: { node: LoadoutNode }) {
                     {weaponName ? (
                       <span className="text-[10px] font-semibold text-slate-200 truncate flex-1 min-w-0">
                         {weapon?.component_uuid
-                          ? <Link to={`/components/${weapon.component_uuid}`} className="hover:text-cyan-400 transition-colors">{weaponName}</Link>
+                          ? <Link href={`/components/${weapon.component_uuid}`} className="hover:text-cyan-400 transition-colors">{weaponName}</Link>
                           : weaponName}
                       </span>
                     ) : (
@@ -380,13 +380,13 @@ function RackCard({ rack, missiles }: { rack: LoadoutNode; missiles: LoadoutNode
       <div className="flex-1 px-2 py-1.5 space-y-1">
         <p className="text-[9px] font-mono-sc text-orange-400/70 truncate">
           {rack.component_uuid
-            ? <Link to={`/components/${rack.component_uuid}`} className="hover:text-orange-300 transition-colors">{rackName}</Link>
+            ? <Link href={`/components/${rack.component_uuid}`} className="hover:text-orange-300 transition-colors">{rackName}</Link>
             : rackName}
         </p>
         {missileName ? (
           <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">
             {missileNode?.component_uuid
-              ? <Link to={`/components/${missileNode.component_uuid}`} className="hover:text-cyan-400 transition-colors">{missileName}</Link>
+              ? <Link href={`/components/${missileNode.component_uuid}`} className="hover:text-cyan-400 transition-colors">{missileName}</Link>
               : missileName}
           </p>
         ) : (
@@ -468,14 +468,14 @@ function SystemCard({ node, jumpModule }: { node: LoadoutNode; jumpModule: Loado
       <div className="flex-1 px-2 py-1.5 space-y-1">
         <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">
           {node.component_uuid
-            ? <Link to={`/components/${node.component_uuid}`} className="hover:text-cyan-400 transition-colors">{name}</Link>
+            ? <Link href={`/components/${node.component_uuid}`} className="hover:text-cyan-400 transition-colors">{name}</Link>
             : name}
         </p>
         {jmName && (
           <p className="text-[9px] font-mono-sc text-slate-500 flex items-center gap-1">
             <SizeBadge size={jmSize} />
             {jumpModule?.component_uuid
-              ? <Link to={`/components/${jumpModule.component_uuid}`} className="hover:text-violet-400 transition-colors">{jmName}</Link>
+              ? <Link href={`/components/${jumpModule.component_uuid}`} className="hover:text-violet-400 transition-colors">{jmName}</Link>
               : jmName}
           </p>
         )}
@@ -518,7 +518,7 @@ function ShieldCard({ node }: { node: LoadoutNode }) {
       <div className="flex-1 px-2 py-1.5 space-y-1">
         <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">
           {node.component_uuid
-            ? <Link to={`/components/${node.component_uuid}`} className="hover:text-cyan-400 transition-colors">{name}</Link>
+            ? <Link href={`/components/${node.component_uuid}`} className="hover:text-cyan-400 transition-colors">{name}</Link>
             : name}
         </p>
         {(hp || regen) && (
@@ -927,7 +927,7 @@ function ModuleCard({ entry, onModuleChange }: {
           {uncategorized.map((c, i) => (
             <p key={i} className="text-[10px] font-mono-sc text-slate-400">
               {c.component_uuid
-                ? <Link to={`/components/${c.component_uuid}`} className="hover:text-cyan-400 transition-colors">{cleanCompName(c.component_name)}</Link>
+                ? <Link href={`/components/${c.component_uuid}`} className="hover:text-cyan-400 transition-colors">{cleanCompName(c.component_name)}</Link>
                 : cleanCompName(c.component_name)}
             </p>
           ))}

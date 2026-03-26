@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
-export default {
-  content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+module.exports = {
+  content: ['./src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       colors: {
@@ -34,9 +34,9 @@ export default {
         },
       },
       fontFamily: {
-        orbitron: ['Orbitron', 'sans-serif'],
-        rajdhani: ['Rajdhani', 'sans-serif'],
-        mono: ['"Share Tech Mono"', '"JetBrains Mono"', 'monospace'],
+        orbitron: ['var(--font-orbitron)', 'Orbitron', 'sans-serif'],
+        rajdhani: ['var(--font-rajdhani)', 'Rajdhani', 'sans-serif'],
+        mono: ['var(--font-mono)', '"Share Tech Mono"', '"JetBrains Mono"', 'monospace'],
       },
       animation: {
         scanline: 'scanline 4s linear infinite',

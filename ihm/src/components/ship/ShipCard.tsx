@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Users, Package, Zap } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 import type { ShipListItem } from '@/types/api';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { fSpeed } from '@/utils/formatters';
@@ -18,7 +18,7 @@ export function ShipCard({ ship, index = 0 }: Props) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, delay: Math.min(index * 0.04, 0.4) }}
     >
-      <Link to={`/ships/${ship.uuid}`} className="block">
+      <Link href={`/ships/${ship.uuid}`} className="block">
         {/* Rectangle horizontal : hauteur fixe, plus large que haute */}
         <div className="holo-card flex flex-col overflow-hidden">
           {/* Thumbnail — haut, hauteur fixe */}

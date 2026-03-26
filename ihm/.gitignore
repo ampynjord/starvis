@@ -1,7 +1,10 @@
 node_modules/
 dist/
 dist-ssr/
+.next/
+out/
 *.local
 .env
 .env.*
 !.env.example
+next-env.d.ts

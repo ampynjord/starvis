@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 
 interface Props {
   children: ReactNode;
@@ -14,7 +14,7 @@ export function HoloCard({ children, className = '', to, onClick }: Props) {
   const inner = <>{children}</>;
 
   if (to) return (
-    <Link to={to} className={cls}>
+    <Link href={to} className={cls}>
       <motion.div whileHover={{ scale: 1.01 }} transition={{ duration: 0.15 }}>
         {inner}
       </motion.div>
