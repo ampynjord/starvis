@@ -10,7 +10,8 @@ const MISSION_COLS = `m.uuid, m.class_name, m.title, m.description, m.mission_ty
   m.reward_min, m.reward_max, m.reward_currency,
   m.faction, m.mission_giver,
   m.location_system, m.location_planet, m.location_name,
-  m.danger_level, m.required_reputation, m.reputation_reward`;
+  m.danger_level, m.required_reputation, m.reputation_reward,
+  m.base_xp, m.category, m.is_unique, m.has_blueprint_reward`;
 
 export class MissionService {
   constructor(private getClient: (env: string) => PrismaClient) {}
@@ -54,6 +55,19 @@ export class MissionService {
     return rows.map((r) => String(r.location_system));
   }
 
+  /** List all distinct categories */
+  async getCategories(env = 'live'): Promise<string[]> {
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT DISTINCT category
+       FROM missions
+       WHERE not_for_release = 0 AND work_in_progress = 0
+         AND category IS NOT NULL AND category != ''
+       ORDER BY category`,
+    );
+    return rows.map((r) => String(r.category));
+  }
+
   /** Paginated mission list with filters */
   async getMissions(opts: {
     env?: string;
@@ -62,12 +76,15 @@ export class MissionService {
     shared?: string;
     faction?: string;
     system?: string;
+    category?: string;
+    unique?: string;
     minReward?: number;
+    maxReward?: number;
     search?: string;
     page?: number;
     limit?: number;
   }): Promise<PaginatedResult> {
-    const { env = 'live', type, legal, shared, faction, system, minReward, search, page = 1, limit = 50 } = opts;
+    const { env = 'live', type, legal, shared, faction, system, category, unique, minReward, maxReward, search, page = 1, limit = 50 } = opts;
     const prisma = this.getClient(env);
     const safeLimit = Math.min(Math.max(1, limit), 200);
     const offset = (page - 1) * safeLimit;
@@ -90,9 +107,19 @@ export class MissionService {
       where.push('m.location_system = ?');
       params.push(system);
     }
+    if (category) {
+      where.push('m.category = ?');
+      params.push(category);
+    }
+    if (unique === 'true') where.push('m.is_unique = 1');
+    if (unique === 'false') where.push('m.is_unique = 0');
     if (minReward != null && minReward > 0) {
       where.push('m.reward_max >= ?');
       params.push(minReward);
+    }
+    if (maxReward != null && maxReward > 0) {
+      where.push('(m.reward_max <= ? OR m.reward_min <= ?)');
+      params.push(maxReward, maxReward);
     }
     if (search) {
       where.push('(m.title LIKE ? OR m.class_name LIKE ? OR m.description LIKE ?)');
