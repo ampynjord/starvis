@@ -2,7 +2,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
 import type { LoadoutNode } from '@/types/api';
 import { COMPONENT_TYPE_COLORS } from '@/utils/constants';
-import { Link } from 'react-router-dom';
+import Link from 'next/link';
 
 interface Props {
   node: LoadoutNode;
@@ -42,7 +42,7 @@ export function LoadoutTree({ node, depth = 0 }: Props) {
           {/* Component */}
           {node.component_uuid ? (
             <Link
-              to={`/components/${node.component_uuid}`}
+              href={`/components/${node.component_uuid}`}
               onClick={e => e.stopPropagation()}
               className={`text-xs ${compColor} hover:underline truncate block transition-colors`}
             >

@@ -30,7 +30,7 @@
       linear-gradient(90deg, rgba(0, 212, 255, 0.025) 1px, transparent 1px);
     background-size: 40px 40px;
     min-height: 100vh;
-    font-family: 'Rajdhani', sans-serif;
+    font-family: var(--font-rajdhani), 'Rajdhani', sans-serif;
     color: var(--text);
     overflow-x: hidden;
   }
@@ -41,7 +41,7 @@
   ::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--cyan); }
 
-  h1, h2, h3 { font-family: 'Orbitron', sans-serif; }
+  h1, h2, h3 { font-family: var(--font-orbitron), 'Orbitron', sans-serif; }
 }
 
 /* ─── Sci-fi panel ──────────────────────────────────────────────────────────── */

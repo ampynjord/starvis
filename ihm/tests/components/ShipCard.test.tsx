@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
 import { ShipCard } from '@/components/ship/ShipCard';
 import type { ShipListItem } from '@/types/api';
 
@@ -32,9 +31,7 @@ const baseShip: ShipListItem = {
 
 function renderCard(ship: Partial<ShipListItem> = {}) {
   return render(
-    <MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <ShipCard ship={{ ...baseShip, ...ship }} />
-    </MemoryRouter>,
+    <ShipCard ship={{ ...baseShip, ...ship }} />,
   );
 }
 

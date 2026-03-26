@@ -21,12 +21,33 @@ vi.mock('framer-motion', () => ({
           layout: _l,
           ...rest
         }: Record<string, unknown>) =>
-          React.createElement(prop as string, rest, children),
+          React.createElement(prop as string, rest, children as React.ReactNode),
     },
   ),
   AnimatePresence: ({ children }: { children: React.ReactNode }) => children,
   useAnimation: () => ({ start: vi.fn(), stop: vi.fn() }),
   useInView: () => false,
+}));
+
+// Mock next/navigation
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+  usePathname: () => '/',
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
+}));
+
+// Mock next/link → simple <a>
+vi.mock('next/link', () => ({
+  default: ({ children, href, ...rest }: Record<string, unknown>) =>
+    React.createElement('a', { href, ...rest }, children as React.ReactNode),
 }));
 
 // Mock IntersectionObserver
