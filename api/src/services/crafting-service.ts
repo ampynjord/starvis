@@ -98,6 +98,38 @@ export class CraftingService {
     };
   }
 
+  /** List all distinct resources with usage counts and total SCU */
+  async getResources(env = 'live'): Promise<Row[]> {
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT ci.item_name, ci.item_uuid,
+              COUNT(DISTINCT ci.recipe_uuid) AS recipe_count,
+              SUM(ci.quantity) AS total_quantity,
+              SUM(ci.scu) AS total_scu
+       FROM crafting_ingredients ci
+       GROUP BY ci.item_name, ci.item_uuid
+       ORDER BY recipe_count DESC, ci.item_name`,
+    );
+    return convertBigIntToNumber(rows);
+  }
+
+  /** List recipes that use a given resource (by item_name) */
+  async getRecipesByResource(itemName: string, env = 'live'): Promise<Row[]> {
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT r.uuid, r.class_name, r.name, r.category,
+              r.output_item_name, r.output_item_uuid, r.output_quantity,
+              r.crafting_time_s, r.station_type, r.skill_level,
+              ci.quantity, ci.scu, ci.slot_name
+       FROM crafting_recipes r
+       JOIN crafting_ingredients ci ON ci.recipe_uuid = r.uuid
+       WHERE ci.item_name = ?
+       ORDER BY r.category ASC, r.name ASC`,
+      itemName,
+    );
+    return convertBigIntToNumber(rows);
+  }
+
   /** Single recipe by UUID with ingredients */
   async getRecipeByUuid(uuid: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
