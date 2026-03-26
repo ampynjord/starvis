@@ -1875,6 +1875,10 @@ export class ExtractionService {
       m.dangerLevel,
       m.requiredReputation,
       m.reputationReward,
+      m.baseXp,
+      m.category,
+      m.isUnique ? 1 : 0,
+      m.hasBlueprintReward ? 1 : 0,
     ]);
 
     const saved = await ExtractionService.batchUpsert(
@@ -1886,7 +1890,8 @@ export class ExtractionService {
           reward_min, reward_max, reward_currency,
           faction, mission_giver,
           location_system, location_planet, location_name,
-          danger_level, required_reputation, reputation_reward)
+          danger_level, required_reputation, reputation_reward,
+          base_xp, category, is_unique, has_blueprint_reward)
        VALUES`,
       `ON DUPLICATE KEY UPDATE
          class_name=new.class_name, title=new.title, description=new.description,
@@ -1899,8 +1904,10 @@ export class ExtractionService {
          mission_giver=new.mission_giver, location_system=new.location_system,
          location_planet=new.location_planet, location_name=new.location_name,
          danger_level=new.danger_level, required_reputation=new.required_reputation,
-         reputation_reward=new.reputation_reward`,
-      22,
+         reputation_reward=new.reputation_reward,
+         base_xp=new.base_xp, category=new.category,
+         is_unique=new.is_unique, has_blueprint_reward=new.has_blueprint_reward`,
+      26,
       rows,
     );
 

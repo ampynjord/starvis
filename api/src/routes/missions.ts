@@ -49,9 +49,23 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
   );
 
   /**
+   * GET /api/v1/missions/categories
+   * Lists all distinct mission categories
+   */
+  router.get(
+    '/api/v1/missions/categories',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = String(req.query.env ?? 'live');
+      const categories = await gameDataService!.missions.getCategories(env);
+      sendWithETag(req, res, { success: true, data: categories });
+    }),
+  );
+
+  /**
    * GET /api/v1/missions
    * Paginated mission list with optional filters:
-   *   env, type, legal, shared, faction, system, minReward, search, page, limit
+   *   env, type, legal, shared, faction, system, category, unique, minReward, maxReward, search, page, limit
    */
   router.get(
     '/api/v1/missions',
@@ -65,7 +79,10 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
         shared: req.query.shared ? String(req.query.shared) : undefined,
         faction: req.query.faction ? String(req.query.faction) : undefined,
         system: req.query.system ? String(req.query.system) : undefined,
+        category: req.query.category ? String(req.query.category) : undefined,
+        unique: req.query.unique ? String(req.query.unique) : undefined,
         minReward: req.query.minReward ? Number(req.query.minReward) : undefined,
+        maxReward: req.query.maxReward ? Number(req.query.maxReward) : undefined,
         search: req.query.search ? String(req.query.search) : undefined,
         page: req.query.page ? Number(req.query.page) : undefined,
         limit: req.query.limit ? Number(req.query.limit) : undefined,

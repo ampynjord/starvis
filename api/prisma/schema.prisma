@@ -541,9 +541,16 @@ model Mission {
   requiredReputation Int?     @map("required_reputation")
   reputationReward   Int?     @map("reputation_reward")
 
+  // SCMDB parity: XP, category, availability, blueprint
+  baseXp             Int?     @map("base_xp")
+  category           String?  @db.VarChar(50)
+  isUnique           Boolean  @default(false) @map("is_unique")
+  hasBlueprintReward Boolean  @default(false) @map("has_blueprint_reward")
+
   @@index([missionType], map: "idx_mission_type")
   @@index([faction], map: "idx_mission_faction")
   @@index([locationSystem], map: "idx_mission_location_system")
+  @@index([category], map: "idx_mission_category")
   @@map("missions")
 }
 

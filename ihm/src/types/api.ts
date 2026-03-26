@@ -508,7 +508,21 @@ export interface Mission {
   only_owner_complete: boolean;
   is_legal: boolean;
   completion_time_s: number | null;
-  game_env: string;
+  reward_min: number | null;
+  reward_max: number | null;
+  reward_currency: string | null;
+  faction: string | null;
+  mission_giver: string | null;
+  location_system: string | null;
+  location_planet: string | null;
+  location_name: string | null;
+  danger_level: number | null;
+  required_reputation: number | null;
+  reputation_reward: number | null;
+  base_xp: number | null;
+  category: string | null;
+  is_unique: boolean;
+  has_blueprint_reward: boolean;
 }
 
 export interface ChangelogEntry {

@@ -239,6 +239,7 @@ export const api = {
     types: (env?: string) => get<string[]>('/missions/types', { env }),
     factions: (env?: string) => get<string[]>('/missions/factions', { env }),
     systems: (env?: string) => get<string[]>('/missions/systems', { env }),
+    categories: (env?: string) => get<string[]>('/missions/categories', { env }),
     list: (filters?: {
       env?: string;
       type?: string;
@@ -246,7 +247,10 @@ export const api = {
       shared?: string;
       faction?: string;
       system?: string;
+      category?: string;
+      unique?: string;
       minReward?: number;
+      maxReward?: number;
       search?: string;
       page?: number;
       limit?: number;
