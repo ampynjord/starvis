@@ -106,7 +106,7 @@ export class GameDataService {
         t,
       ),
       this.getClient(env).$queryRawUnsafe<Row[]>(
-        `SELECT ms.uuid, ms.class_name, ms.title as name, ms.type
+        `SELECT ms.uuid, ms.class_name, ms.title as name, ms.mission_type as type
          FROM missions ms WHERE (ms.title LIKE ? OR ms.class_name LIKE ?)
          ORDER BY ms.title LIMIT ${cap}`,
         t,
