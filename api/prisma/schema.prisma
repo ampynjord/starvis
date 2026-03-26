@@ -583,6 +583,9 @@ model CraftingIngredient {
   itemUuid       String?  @map("item_uuid") @db.Char(36)
   quantity       Int      @default(1)
   isOptional     Boolean  @default(false) @map("is_optional")
+  scu            Decimal? @db.Decimal(10, 4)
+  minQuality     Int      @default(0) @map("min_quality")
+  slotName       String?  @map("slot_name") @db.VarChar(255)
 
   recipe CraftingRecipe @relation(fields: [recipeUuid], references: [uuid], onDelete: Cascade, map: "fk_ingredient_recipe")
 

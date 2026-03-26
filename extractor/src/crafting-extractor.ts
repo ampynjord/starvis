@@ -16,6 +16,9 @@ export interface CraftingIngredientRecord {
   itemUuid: string | null;
   quantity: number;
   isOptional: boolean;
+  scu: number;
+  minQuality: number;
+  slotName: string;
 }
 
 export interface CraftingRecipeRecord {
@@ -227,6 +230,9 @@ function extractBlueprintIngredients(
       itemUuid: res.resourceRef,
       quantity: slot.count,
       isOptional: slot.isOptional,
+      scu: res.scu,
+      minQuality: res.minQuality,
+      slotName: slot.slotName,
     });
   }
 
@@ -339,7 +345,7 @@ function extractLegacyRecipes(ctx: DataForgeService, locService?: { resolveKey(k
             const itemUuid = safeString(ingObj.itemUuid) ?? safeString(ingObj.uuid) ?? safeString(ingObj.entityId) ?? null;
             const quantity = typeof ingObj.quantity === 'number' ? ingObj.quantity : typeof ingObj.count === 'number' ? ingObj.count : 1;
             const isOptional = !!(ingObj.isOptional || ingObj.optional);
-            ingredients.push({ itemName, itemUuid, quantity, isOptional });
+            ingredients.push({ itemName, itemUuid, quantity, isOptional, scu: 0, minQuality: 0, slotName: itemName });
           }
           if (ingredients.length > 0) break;
         }

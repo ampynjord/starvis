@@ -438,6 +438,9 @@ export interface CraftingIngredient {
   item_uuid: string | null;
   quantity: number;
   is_optional: boolean;
+  scu: number | null;
+  min_quality: number;
+  slot_name: string | null;
 }
 
 export interface CraftingCategory {
