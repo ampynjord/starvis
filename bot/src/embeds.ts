@@ -14,10 +14,13 @@ const COLORS = {
 const SITE_URL = 'https://starvis.ampynjord.bzh';
 
 export function shipEmbed(ship: ShipResult): EmbedBuilder {
+  const shipId = ship.id ?? ship.ship_matrix_id;
+  const shipUrl = shipId ? `${SITE_URL}/ships/${shipId}` : SITE_URL;
+
   const embed = new EmbedBuilder()
     .setColor(COLORS.ship)
     .setTitle(`${ship.name}`)
-    .setURL(`${SITE_URL}/ships/${ship.id ?? ship.name}`)
+    .setURL(shipUrl)
     .setFooter({ text: 'Starvis — Star Citizen Database' });
 
   // Thumbnail
