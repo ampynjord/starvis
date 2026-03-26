@@ -114,7 +114,7 @@ export class CraftingService {
     const recipe = convertBigIntToNumber(rows[0]);
 
     const ingredients = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT id, item_name, item_uuid, quantity, is_optional
+      `SELECT id, item_name, item_uuid, quantity, is_optional, scu, min_quality, slot_name
        FROM crafting_ingredients
        WHERE recipe_uuid = ?
        ORDER BY item_name`,
