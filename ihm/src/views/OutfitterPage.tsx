@@ -516,11 +516,11 @@ export default function OutfitterPage() {
   // Restore state from URL params on mount (?ship=UUID&swaps=portId:compUuid,...)
   useEffect(() => {
     if (restoredRef.current) return;
-    const shipUuid = searchParams.get('ship');
+    const shipUuid = searchParams?.get('ship');
     if (!shipUuid) return;
     restoredRef.current = true;
 
-    const swapsParam = searchParams.get('swaps');
+    const swapsParam = searchParams?.get('swaps');
     const parsedSwaps: Record<number, string> = {};
     if (swapsParam) {
       for (const entry of swapsParam.split(',')) {

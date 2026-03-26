@@ -23,7 +23,8 @@ import {
 import { VARIANT_TYPE_LABELS } from '@/utils/constants';
 
 export default function ShipDetailPage() {
-  const { uuid } = useParams<{ uuid: string }>();
+  const params = useParams<{ uuid: string }>();
+  const uuid = params?.uuid;
   const router = useRouter();
   const { env } = useEnv();
 

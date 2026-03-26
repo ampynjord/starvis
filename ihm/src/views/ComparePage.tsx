@@ -94,8 +94,8 @@ export default function ComparePage() {
   const searchParams = useSearchParams();
   const { env } = useEnv();
   const [slots, setSlots] = useState<Record<Slot, SlotState>>({
-    a: { ...initSlot(), uuid: searchParams.get('a') ?? '' },
-    b: { ...initSlot(), uuid: searchParams.get('b') ?? '' },
+    a: { ...initSlot(), uuid: searchParams?.get('a') ?? '' },
+    b: { ...initSlot(), uuid: searchParams?.get('b') ?? '' },
     c: initSlot(),
     d: initSlot(),
   });
