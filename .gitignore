@@ -9,6 +9,9 @@ dist/
 
 # Data files
 ships-list.json
+*.dump.sql
+*_dump.sql
+*_changelog.sql
 ptu_*.sql
 
 # Logs
@@ -23,6 +26,8 @@ pnpm-debug.log*
 .env.dev
 .env.prod
 .env.extractor
+.env.extractor.prod
+.env*.local
 
 # IDE & Editor directories
 .vscode/
