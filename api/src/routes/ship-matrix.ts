@@ -34,8 +34,9 @@ export function mountShipMatrixRoutes(router: Router, deps: RouteDependencies): 
   router.get(
     '/api/v1/ship-matrix/:id',
     asyncHandler(async (req, res) => {
-      const id = parseInt(req.params.id, 10);
-      const ship = Number.isNaN(id) ? await shipMatrixService.getByName(req.params.id) : await shipMatrixService.getById(id);
+      const raw = req.params.id;
+      const isNumeric = /^\d+$/.test(raw);
+      const ship = isNumeric ? await shipMatrixService.getById(parseInt(raw, 10)) : await shipMatrixService.getByName(raw);
       if (!ship) return void res.status(404).json({ success: false, error: 'Not found' });
       sendWithETag(req, res, { success: true, data: ship });
     }),
