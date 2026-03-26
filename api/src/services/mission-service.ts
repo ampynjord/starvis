@@ -84,7 +84,21 @@ export class MissionService {
     page?: number;
     limit?: number;
   }): Promise<PaginatedResult> {
-    const { env = 'live', type, legal, shared, faction, system, category, unique, minReward, maxReward, search, page = 1, limit = 50 } = opts;
+    const {
+      env = 'live',
+      type,
+      legal,
+      shared,
+      faction,
+      system,
+      category,
+      unique,
+      minReward,
+      maxReward,
+      search,
+      page = 1,
+      limit = 50,
+    } = opts;
     const prisma = this.getClient(env);
     const safeLimit = Math.min(Math.max(1, limit), 200);
     const offset = (page - 1) * safeLimit;
