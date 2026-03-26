@@ -117,7 +117,6 @@ async function fetchWithRetry(url) {
       const backoffMs = retryAfterMs ?? config.backoffBaseMs * (attempt + 1);
       await sleep(backoffMs);
       attempt += 1;
-      continue;
     } catch (error) {
       clearTimeout(timeout);
 
@@ -185,9 +184,7 @@ async function run() {
   console.log('');
 
   const apiResults = await runSuite('API', config.apiBaseUrl, apiEndpoints);
-  const frontendResults = config.includeFrontend
-    ? await runSuite('Frontend', config.frontendBaseUrl, frontendRoutes)
-    : [];
+  const frontendResults = config.includeFrontend ? await runSuite('Frontend', config.frontendBaseUrl, frontendRoutes) : [];
 
   const results = [...apiResults, ...frontendResults];
 

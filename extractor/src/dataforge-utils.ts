@@ -183,7 +183,7 @@ const ROLE_MAP: Record<string, string> = {
 
 /** Resolve SC localization keys to display strings */
 export function resolveLocKey(locKey: string, type: 'career' | 'role'): string {
-  if (!locKey || !locKey.startsWith('@')) return locKey || '';
+  if (!locKey?.startsWith('@')) return locKey || '';
 
   const key = locKey.toLowerCase();
   if (type === 'career' && CAREER_MAP[key]) return CAREER_MAP[key];

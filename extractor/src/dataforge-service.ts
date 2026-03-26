@@ -956,7 +956,7 @@ export class DataForgeService implements DataForgeContext {
 
       // Navigate: <Vehicle> -> <Parts> -> <Part name="..." mass="..." ...>
       const partsNode = rootNode.children?.find((c) => c.tag === 'Parts');
-      if (!partsNode || !partsNode.children?.length) return null;
+      if (!partsNode?.children?.length) return null;
 
       const mainPart = partsNode.children[0]; // Root Part element
       const mass = parseFloat(mainPart.attributes?.mass || '0');
@@ -1373,7 +1373,7 @@ export class DataForgeService implements DataForgeContext {
       // === Armor (SCItemVehicleArmorParams) - damage multipliers, signals ===
       if (cType === 'SCItemVehicleArmorParams' || cType === 'ArmorParams') {
         // Get or create armor data container
-        if (!result.armor || !result.armor.data) {
+        if (!result.armor?.data) {
           result.armor = {
             calculatorType: 'ArmorData',
             data: {
@@ -1433,7 +1433,7 @@ export class DataForgeService implements DataForgeContext {
       // === Armor Health (SHealthComponentParams on armor port) ===
       if (lp.includes('armor') && cType === 'SHealthComponentParams') {
         // Get or create armor data container
-        if (!result.armor || !result.armor.data) {
+        if (!result.armor?.data) {
           result.armor = {
             calculatorType: 'ArmorData',
             data: {

@@ -102,3 +102,4 @@ crafting_data.sql
 extractor/debug-*.ts
 
 ihm/src/_pages_legacy/
+ihm/src/pages/

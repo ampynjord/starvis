@@ -1960,7 +1960,16 @@ export class ExtractionService {
     const ingredientRows: (string | number | null)[][] = [];
     for (const r of recipes) {
       for (const ing of r.ingredients) {
-        ingredientRows.push([r.uuid, ing.itemName, ing.itemUuid, ing.quantity, ing.isOptional ? 1 : 0, ing.scu, ing.minQuality, ing.slotName]);
+        ingredientRows.push([
+          r.uuid,
+          ing.itemName,
+          ing.itemUuid,
+          ing.quantity,
+          ing.isOptional ? 1 : 0,
+          ing.scu,
+          ing.minQuality,
+          ing.slotName,
+        ]);
       }
     }
 
