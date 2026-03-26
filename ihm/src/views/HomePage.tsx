@@ -1,16 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
+  ArrowRight,
   BarChart3,
   BookOpen,
   ClipboardList,
+  Crosshair,
   Dices,
+  FlaskConical,
   Package,
   Palette,
   Pickaxe,
   Rocket,
   Settings2,
+  Shuffle,
   SlidersHorizontal,
+  TrendingUp,
   Trophy,
   Wrench,
 } from 'lucide-react';
@@ -20,7 +25,7 @@ import { useEnv } from '@/contexts/EnvContext';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { GlowBadge } from '@/components/ui/GlowBadge';
-import { fDateTime } from '@/utils/formatters';
+import { fDateTime, fNumber } from '@/utils/formatters';
 
 // ── Stats cards ───────────────────────────────────────────────────────────────
 
@@ -74,6 +79,29 @@ const TOOL_CARDS: {
     accent: 'border-amber-800 hover:border-amber-600',
   },
   {
+    to: '/trade',
+    icon: TrendingUp,
+    label: 'Trade Routes',
+    description: 'Find the most profitable trade routes, compare commodity prices across locations.',
+    accent: 'border-green-800 hover:border-green-600',
+    badge: 'Profit',
+  },
+  {
+    to: '/crafting',
+    icon: FlaskConical,
+    label: 'Crafting',
+    description: 'Browse crafting recipes, required materials and station types.',
+    accent: 'border-violet-800 hover:border-violet-600',
+  },
+  {
+    to: '/fps-calculator',
+    icon: Crosshair,
+    label: 'FPS Calculator',
+    description: 'Compute TTK, DPS and damage breakdowns for personal weapons.',
+    accent: 'border-orange-800 hover:border-orange-600',
+    badge: 'TTK',
+  },
+  {
     to: '/missions',
     icon: ClipboardList,
     label: 'Missions',
@@ -102,6 +130,21 @@ export default function HomePage() {
     queryKey: ['changelog.summary'],
     queryFn: api.changelog.summary,
   });
+  const { data: randomShip, refetch: refetchRandom } = useQuery({
+    queryKey: ['ships.random', env],
+    queryFn: () => api.ships.random(env),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+
+  const changeCounts = changelog?.data.reduce(
+    (acc, e: { change_type: string }) => {
+      if (e.change_type === 'added') acc.added++;
+      else if (e.change_type === 'removed') acc.removed++;
+      else acc.modified++;
+      return acc;
+    },
+    { added: 0, removed: 0, modified: 0 },
+  );
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -115,7 +158,7 @@ export default function HomePage() {
               STARVIS
             </h1>
             <p className="text-slate-400 text-sm mt-1 font-rajdhani">
-              Star Citizen — ships · components · mining · outfitter
+              Star Citizen — ships · components · mining · outfitter · trade · crafting
             </p>
           </div>
           {version && (
@@ -156,16 +199,78 @@ export default function HomePage() {
         </div>
       )}
 
+      {/* ── Featured ship spotlight ──────────────────────────────────── */}
+      {randomShip && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+          <ScifiPanel
+            title="Ship spotlight"
+            actions={
+              <button
+                type="button"
+                onClick={() => refetchRandom()}
+                className="sci-btn-ghost py-1 px-2 text-xs"
+              >
+                <Shuffle size={11} /> Random
+              </button>
+            }
+          >
+            <Link href={`/ships/${randomShip.uuid}`} className="flex flex-col sm:flex-row gap-4 group">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-3 mb-2">
+                  <h3 className="font-orbitron text-lg font-bold text-slate-200 group-hover:text-cyan-400 transition-colors truncate">
+                    {randomShip.name}
+                  </h3>
+                  {randomShip.manufacturer_code && (
+                    <GlowBadge color="cyan" size="xs">{randomShip.manufacturer_code}</GlowBadge>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {randomShip.role && (
+                    <div>
+                      <p className="text-[10px] font-mono-sc text-slate-600 uppercase">Role</p>
+                      <p className="text-sm text-slate-400">{randomShip.role}</p>
+                    </div>
+                  )}
+                  {randomShip.crew_size != null && (
+                    <div>
+                      <p className="text-[10px] font-mono-sc text-slate-600 uppercase">Crew</p>
+                      <p className="text-sm text-slate-400">{randomShip.crew_size}</p>
+                    </div>
+                  )}
+                  {randomShip.cargo_capacity != null && (
+                    <div>
+                      <p className="text-[10px] font-mono-sc text-slate-600 uppercase">Cargo</p>
+                      <p className="text-sm text-slate-400">{fNumber(randomShip.cargo_capacity)} SCU</p>
+                    </div>
+                  )}
+                  {randomShip.scm_speed != null && (
+                    <div>
+                      <p className="text-[10px] font-mono-sc text-slate-600 uppercase">SCM Speed</p>
+                      <p className="text-sm text-slate-400">{fNumber(randomShip.scm_speed)} m/s</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center flex-shrink-0">
+                <span className="sci-btn-primary py-1.5 px-3 text-xs group-hover:border-cyan-400 transition-colors">
+                  View details <ArrowRight size={12} />
+                </span>
+              </div>
+            </Link>
+          </ScifiPanel>
+        </motion.div>
+      )}
+
       {/* ── Tool cards ───────────────────────────────────────────────── */}
       <div>
         <p className="text-[10px] font-orbitron tracking-widest text-slate-600 uppercase mb-3">Tools</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {TOOL_CARDS.map(({ to, icon: Icon, label, description, accent, badge }, i) => (
             <motion.div
               key={to}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 + i * 0.07 }}
+              transition={{ delay: 0.4 + i * 0.05 }}
             >
               <Link href={to} className="block h-full">
                 <div className={`sci-panel p-4 h-full border transition-colors duration-150 ${accent} group`}>
@@ -219,7 +324,7 @@ export default function HomePage() {
         {/* Changelog */}
         <ScifiPanel
           title="Latest changes"
-          subtitle={changelogSummary ? `${changelogSummary.total} entries total` : undefined}
+          subtitle={changelogSummary ? `${changelogSummary.total.toLocaleString('en-US')} entries total` : undefined}
           className="lg:col-span-2"
           actions={
             <Link href="/changelog" className="sci-btn-ghost py-1 px-2 text-xs">
@@ -227,6 +332,13 @@ export default function HomePage() {
             </Link>
           }
         >
+          {changeCounts && (
+            <div className="flex gap-4 mb-3 text-xs font-mono-sc">
+              <span className="text-green-400">+{changeCounts.added} added</span>
+              <span className="text-amber-400">~{changeCounts.modified} modified</span>
+              <span className="text-red-400">-{changeCounts.removed} removed</span>
+            </div>
+          )}
           <div className="space-y-1 max-h-72 overflow-y-auto">
             {changelog?.data.map((entry: { id: string | number; change_type: string; entity_name: string; entity_type: string; created_at: string }) => (
               <div key={entry.id} className="flex items-center gap-3 px-2 py-1.5 rounded hover:bg-white/5 transition-colors">
