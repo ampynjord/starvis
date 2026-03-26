@@ -74,7 +74,7 @@ function buildShotTimeline(ttk: number, rpm: number, shotsToKill: number): numbe
 }
 
 export async function calculateFpsDamage(prisma: PrismaClient, input: FpsDamageInput): Promise<FpsDamageResult | null> {
-  const env = input.env || 'live';
+  const _env = input.env || 'live';
   const item = await prisma.item.findFirst({
     where: { uuid: input.itemUuid },
   });

@@ -162,7 +162,11 @@ interface CostSlot {
 }
 
 /** Parse a CraftingCost_Select object into a CostSlot */
-function parseCostSelect(obj: Record<string, unknown>, isOptional: boolean, locService?: { resolveKey(key: string): string | null }): CostSlot | null {
+function parseCostSelect(
+  obj: Record<string, unknown>,
+  isOptional: boolean,
+  locService?: { resolveKey(key: string): string | null },
+): CostSlot | null {
   if (!obj || typeof obj !== 'object') return null;
 
   const nameInfo = obj.nameInfo as Record<string, unknown> | undefined;

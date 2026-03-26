@@ -230,11 +230,7 @@ export function extractMissions(ctx: DataForgeService, locService?: { resolveKey
       );
 
       // ── Blueprint Reward ──
-      const hasBlueprintReward = !!(
-        rewards?.blueprintReward ??
-        rewards?.craftingBlueprintReward ??
-        rewards?.unlockBlueprintReward
-      );
+      const hasBlueprintReward = !!(rewards?.blueprintReward ?? rewards?.craftingBlueprintReward ?? rewards?.unlockBlueprintReward);
 
       // Resolve title / description
       const displayInfo = (data.contractDisplayInfo as Record<string, unknown>) ?? {};
