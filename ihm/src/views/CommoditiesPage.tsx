@@ -74,7 +74,7 @@ export default function CommoditiesPage() {
     }),
   });
 
-  const isIndustrial = pathname.startsWith('/industrial');
+  const isIndustrial = pathname?.startsWith('/industrial');
   const title = isIndustrial ? 'Industrial' : 'Trade Goods';
 
   return (

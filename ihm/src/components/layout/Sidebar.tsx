@@ -59,7 +59,7 @@ const INDUSTRIAL_ITEMS = [
 
 function NavItem({ to, icon: Icon, label }: { to: string; icon: React.ElementType; label: string }) {
   const pathname = usePathname();
-  const isActive = to === '/' ? pathname === '/' : pathname.startsWith(to);
+  const isActive = to === '/' ? pathname === '/' : pathname?.startsWith(to);
 
   return (
     <Link

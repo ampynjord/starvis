@@ -239,7 +239,7 @@ export default function MissionsPage() {
   const { env } = useEnv();
 
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState(searchParams.get('search') ?? '');
+  const [search, setSearch] = useState(searchParams?.get('search') ?? '');
   const [type, setType] = useState('');
   const [legal, setLegal] = useState('');
   const [faction, setFaction] = useState('');

@@ -153,6 +153,17 @@ export class CraftingService {
       uuid,
     );
     recipe.ingredients = convertBigIntToNumber(ingredients);
+
+    const modifiers = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT id, slot_name, property_name, property_uuid, unit_format,
+              start_quality, end_quality, modifier_at_start, modifier_at_end
+       FROM crafting_slot_modifiers
+       WHERE recipe_uuid = ?
+       ORDER BY slot_name, property_name`,
+      uuid,
+    );
+    recipe.modifiers = convertBigIntToNumber(modifiers);
+
     return recipe;
   }
 }

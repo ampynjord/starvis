@@ -571,6 +571,7 @@ model CraftingRecipe {
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
 
   ingredients CraftingIngredient[]
+  modifiers   CraftingSlotModifier[]
 
   @@index([category], map: "idx_crafting_category")
   @@map("crafting_recipes")
@@ -591,6 +592,24 @@ model CraftingIngredient {
 
   @@index([recipeUuid], map: "idx_ingredient_recipe")
   @@map("crafting_ingredients")
+}
+
+model CraftingSlotModifier {
+  id             Int      @id @default(autoincrement())
+  recipeUuid     String   @map("recipe_uuid") @db.Char(36)
+  slotName       String   @map("slot_name") @db.VarChar(255)
+  propertyName   String   @map("property_name") @db.VarChar(255)
+  propertyUuid   String   @map("property_uuid") @db.Char(36)
+  unitFormat     String   @default("") @map("unit_format") @db.VarChar(100)
+  startQuality   Int      @default(0) @map("start_quality")
+  endQuality     Int      @default(1000) @map("end_quality")
+  modifierAtStart Decimal @map("modifier_at_start") @db.Decimal(10, 6)
+  modifierAtEnd   Decimal @map("modifier_at_end") @db.Decimal(10, 6)
+
+  recipe CraftingRecipe @relation(fields: [recipeUuid], references: [uuid], onDelete: Cascade, map: "fk_modifier_recipe")
+
+  @@index([recipeUuid], map: "idx_modifier_recipe")
+  @@map("crafting_slot_modifiers")
 }
 
 // ── Trade Prices ──────────────────────────────────────────────────────────────

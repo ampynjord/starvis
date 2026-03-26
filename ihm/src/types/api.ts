@@ -430,6 +430,7 @@ export interface CraftingRecipe {
   skill_level: number | null;
   game_env: string;
   ingredients?: CraftingIngredient[];
+  modifiers?: CraftingSlotModifier[];
 }
 
 export interface CraftingIngredient {
@@ -441,6 +442,18 @@ export interface CraftingIngredient {
   scu: number | null;
   min_quality: number;
   slot_name: string | null;
+}
+
+export interface CraftingSlotModifier {
+  id: number;
+  slot_name: string;
+  property_name: string;
+  property_uuid: string;
+  unit_format: string;
+  start_quality: number;
+  end_quality: number;
+  modifier_at_start: number;
+  modifier_at_end: number;
 }
 
 export interface CraftingCategory {
