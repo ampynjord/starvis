@@ -6,7 +6,7 @@
  * extracts game data (ships, components, paints, shops, missions…)
  * and writes everything to a remote MySQL database.
  *
- * Environment variables (or .env.extractor at project root):
+ * Environment variables (or .env.extractor.dev at project root):
  *   DB_HOST, DB_PORT, DB_USER, DB_PASSWORD
  *   DB_NAME (optional fallback for --env custom)
  *   P4K_PATH (alternative to --p4k flag)
@@ -15,7 +15,7 @@
 import { resolve } from 'node:path';
 import { config } from 'dotenv';
 
-config({ path: resolve(import.meta.dirname, '..', '.env.extractor') });
+config({ path: resolve(import.meta.dirname, '..', '.env.extractor.dev') });
 
 import { existsSync, readFileSync } from 'node:fs';
 import { Command } from 'commander';
