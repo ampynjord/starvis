@@ -45,7 +45,7 @@ export interface MiningYieldResult {
   gadgets: MiningLaserInfo[];
 }
 
-async function fetchMiningComponent(prisma: PrismaClient, uuid: string, env: string): Promise<MiningLaserInfo | null> {
+async function fetchMiningComponent(prisma: PrismaClient, uuid: string, _env: string): Promise<MiningLaserInfo | null> {
   const comp = await prisma.component.findUnique({
     where: { uuid },
     select: {
