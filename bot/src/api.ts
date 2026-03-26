@@ -49,13 +49,46 @@ interface ShipResult {
   max_speed?: number;
   scm_speed?: number;
   production_status?: string;
+  // Ship-matrix fields
+  description?: string;
+  length?: string;
+  beam?: string;
+  height?: string;
+  mass?: number;
+  mediaStoreSmall?: string;
+  mediaStoreLarge?: string;
+  url?: string;
+  type?: string;
+  // Game-data fields
+  thumbnail?: string;
+  thumbnail_large?: string;
+  shield_hp?: number;
+  hydrogen_fuel_capacity?: number;
+  quantum_fuel_capacity?: number;
+  weapon_damage_total?: number;
+  missile_damage_total?: number;
+  career?: string;
+  role?: string;
+  vehicle_category?: string;
+  insurance_claim_time?: number;
+  insurance_expedite_cost?: number;
+  manufacturer_name?: string;
+  sm_description?: string;
+  store_url?: string;
+  min_crew?: number;
+  max_crew?: number;
+  sm_cargo?: number;
+  total_hp?: number;
 }
 
 interface CommodityResult {
   uuid: string;
   name: string;
+  class_name?: string;
   type?: string;
+  sub_type?: string;
   rarity?: string;
+  source_type?: string;
 }
 
 interface ComponentResult {
