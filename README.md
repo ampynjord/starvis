@@ -7,12 +7,13 @@
 
 **REST API + Web Interface for Star Citizen game data**
 
-Monorepo with 4 modules:
+Monorepo with 5 modules:
 
 - **api/** — Express.js + TypeScript + Prisma + MySQL backend (deployed on VPS)
 - **extractor/** — Commander.js CLI for P4K/DataForge extraction (runs locally)
 - **db/** — Database initialization & backup scripts
 - **ihm/** — React 18.3 + TanStack Query + Tailwind CSS web interface
+- **bot/** — Discord bot with slash commands (ship lookup, trade routes, search)
 
 Two complementary data sources:
 
@@ -75,6 +76,22 @@ starvis/
 ├── biome.json                  # Linter/formatter (Biome)
 ├── docker-compose.dev.yml      # Dev orchestration (mysql, api, ihm with hot-reload)
 ├── docker-compose.prod.yml     # Prod override (Traefik, pre-built GHCR images)
+├── bot/
+│   ├── Dockerfile              # Discord bot container
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── src/
+│       ├── index.ts            # Bot entry point (client setup, event handler)
+│       ├── api.ts              # Starvis API client
+│       ├── embeds.ts           # Discord embed builders
+│       ├── deploy-commands.ts  # Slash command registration
+│       └── commands/
+│           ├── index.ts        # Command barrel
+│           ├── ship.ts         # /ship — Ship lookup
+│           ├── commodity.ts    # /commodity — Commodity search
+│           ├── trade.ts        # /trade — Trade routes
+│           ├── search.ts       # /search — Unified search
+│           └── status.ts       # /status — API health
 ├── api/
 │   ├── Dockerfile              # Multi-stage (base → deps → build → production)
 │   ├── server.ts               # Entry point (helmet, rate limiting, Swagger)
@@ -168,6 +185,17 @@ starvis/
         │   ├── ship/           # ShipCard, ShipLoadout, LoadoutTree, CargoGrid, ShipStatsBanner
         │   ├── mining/         # Mining solver components (laser, composition, yield, risk)
         │   └── ui/             # Reusable UI (ErrorBoundary, Pagination, FilterPanel, HoloCard…)
+        ├── pages/              # All page components
+        ├── hooks/
+        │   └── useDebounce.ts
+        ├── services/
+        │   └── api.ts          # API client (fetch wrapper, pagination support)
+        ├── types/
+        │   ├── api.ts          # API response types
+        │   └── mining.ts       # Mining types
+        ├── router/
+        │   └── index.tsx       # React Router config
+        └── utils/
         ├── pages/
         │   ├── ShipsPage.tsx           # Ship browser
         │   ├── ShipDetailPage.tsx      # Ship detail + loadout
@@ -245,6 +273,36 @@ cd api && npm install && npm run dev
 # IHM (separate terminal)
 cd ihm && npm install && npm run dev
 ```
+
+### Discord Bot
+
+1. Create a Discord application at [discord.com/developers](https://discord.com/developers/applications)
+2. Enable the **Bot** feature and copy the token
+3. Invite the bot to your server with the `applications.commands` scope
+4. Add the env vars to your `.env`:
+
+```bash
+DISCORD_TOKEN=your_bot_token
+DISCORD_CLIENT_ID=your_application_id
+DISCORD_GUILD_ID=your_server_id    # optional: deploy commands to one server (instant), omit for global (up to 1h)
+```
+
+5. Deploy slash commands and start:
+
+```bash
+cd bot && npm install
+npm run deploy-commands
+npm run dev
+```
+
+**Available commands:**
+| Command | Description |
+|---------|-------------|
+| `/ship <nom>` | Search for a Star Citizen ship |
+| `/commodity <nom>` | Search for a commodity |
+| `/trade [scu]` | Best trade routes (default: 100 SCU) |
+| `/search <terme>` | Unified search (ships, components, items, commodities) |
+| `/status` | API health and database stats |
 
 ### Data Extraction
 

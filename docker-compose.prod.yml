@@ -112,6 +112,24 @@ services:
       traefik.http.routers.starvis-ihm.tls.certresolver: "letsencrypt"
       traefik.http.services.starvis-ihm.loadbalancer.server.port: "8080"
 
+  bot:
+    build:
+      context: ./bot
+    container_name: starvis-bot
+    environment:
+      DISCORD_TOKEN: ${DISCORD_TOKEN}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
+      API_URL: http://api:3000
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    depends_on:
+      api:
+        condition: service_healthy
+
 volumes:
   mysql_data:
   redis_data:
