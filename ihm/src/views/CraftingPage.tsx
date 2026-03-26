@@ -1,12 +1,12 @@
 ﻿import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronRight, Clock, FlaskConical, Minus, Package, Plus, Search, Settings2, Swords, Trophy } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { useDebounce } from '@/hooks/useDebounce';
-import type { CraftingRecipe } from '@/types/api';
+import type { CraftingIngredient, CraftingRecipe } from '@/types/api';
 
 /* --- Constants --- */
 type Tab = 'blueprint' | 'mission' | 'resources';
@@ -24,6 +24,9 @@ const CATEGORY_COLORS: Record<string, 'cyan' | 'amber' | 'green' | 'red' | 'purp
   Refining: 'amber',
   Explosive: 'red',
 };
+
+const QUALITY_LABELS = ['Very Low', 'Low', 'Standard', 'High', 'Very High'];
+const QUALITY_COLORS = ['text-red-500', 'text-orange-500', 'text-slate-300', 'text-cyan-400', 'text-green-400'];
 
 /* --- Formatters --- */
 function formatTime(secs: number | null): string {
@@ -50,6 +53,13 @@ function formatName(recipe: CraftingRecipe): string {
 
 function formatItemName(raw: string): string {
   return raw.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function formatScu(scu: number | null): string {
+  if (!scu) return '\u2014';
+  if (scu >= 1) return `${scu.toFixed(1)} SCU`;
+  if (scu >= 0.01) return `${(scu * 100).toFixed(0)} cSCU`;
+  return `${(scu * 10000).toFixed(0)} \u00b5SCU`;
 }
 
 /* --- Sidebar accordion group --- */
@@ -114,24 +124,73 @@ function SidebarGroup({
   );
 }
 
-/* --- Part card (sccrafter style) --- */
-function PartCard({ name, quantity, isOptional, batchCount }: { name: string; quantity: number; isOptional: boolean; batchCount: number }) {
+/* --- Part card (sccrafter-identical) --- */
+function PartCard({
+  ingredient,
+  batchCount,
+  quality,
+  onQualityChange,
+}: {
+  ingredient: CraftingIngredient;
+  batchCount: number;
+  quality: number;
+  onQualityChange: (val: number) => void;
+}) {
+  const scu = ingredient.scu ? Number(ingredient.scu) : 0;
+  const totalScu = scu * batchCount;
+  const slotLabel = ingredient.slot_name ? formatItemName(ingredient.slot_name) : null;
+
   return (
     <div className="sci-panel border-l-2 border-cyan-700 overflow-hidden">
+      {/* Header: slot name + part name */}
       <div className="px-4 pt-3 pb-2">
+        {slotLabel && (
+          <p className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-wider mb-1">{slotLabel}</p>
+        )}
         <div className="flex items-center gap-2 mb-1">
           <div className="w-2 h-2 rounded-full bg-cyan-500 flex-shrink-0" />
-          <span className="text-sm font-medium text-slate-200 truncate">{formatItemName(name)}</span>
+          <span className="text-sm font-medium text-slate-200 truncate">{formatItemName(ingredient.item_name)}</span>
         </div>
         <p className="text-[10px] font-mono-sc text-slate-600 pl-4">
-          Required: <span className="text-slate-400">{quantity * batchCount}</span>
-          {isOptional && <span className="ml-2 text-amber-500">(optional)</span>}
+          Required: <span className="text-slate-400">{ingredient.quantity * batchCount}</span>
+          {ingredient.is_optional && <span className="ml-2 text-amber-500">(optional)</span>}
         </p>
       </div>
+
+      {/* Resource + SCU row */}
       <div className="px-4 py-2 bg-slate-900/50 border-t border-slate-800/40">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-mono-sc text-slate-600 uppercase">Resource</span>
-          <span className="text-[10px] font-mono-sc text-slate-700">\u2014</span>
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-[10px] font-mono-sc text-slate-500">{formatItemName(ingredient.item_name)}</span>
+          <span className="text-[10px] font-mono-sc text-cyan-400 font-medium">
+            {scu > 0 ? formatScu(totalScu) : '\u2014'}
+          </span>
+        </div>
+      </div>
+
+      {/* Quality slider */}
+      <div className="px-4 py-2 bg-slate-950/50 border-t border-slate-800/30">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-wider">Quality Adjustment</span>
+          <span className={`text-[10px] font-mono-sc font-medium ${QUALITY_COLORS[quality]}`}>
+            {QUALITY_LABELS[quality]}
+          </span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={4}
+          step={1}
+          value={quality}
+          onChange={(e) => onQualityChange(Number(e.target.value))}
+          className="w-full h-1 accent-cyan-500 bg-slate-800 rounded-full appearance-none cursor-pointer
+                     [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3
+                     [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400
+                     [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-slate-900"
+        />
+        <div className="flex justify-between mt-0.5">
+          {QUALITY_LABELS.map((_, i) => (
+            <div key={i} className={`w-1.5 h-1.5 rounded-full ${i <= quality ? 'bg-cyan-600' : 'bg-slate-800'}`} />
+          ))}
         </div>
       </div>
     </div>
@@ -149,8 +208,13 @@ export default function CraftingPage() {
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [selectedRecipeUuid, setSelectedRecipeUuid] = useState<string | null>(null);
   const [batchCount, setBatchCount] = useState(1);
+  const [qualityMap, setQualityMap] = useState<Record<number, number>>({});
 
   const debouncedSearch = useDebounce(search, 350);
+
+  const setIngredientQuality = useCallback((id: number, val: number) => {
+    setQualityMap((prev) => ({ ...prev, [id]: val }));
+  }, []);
 
   /* --- Data: categories --- */
   const { data: categories } = useQuery({
@@ -161,7 +225,7 @@ export default function CraftingPage() {
 
   const totalRecipes = useMemo(() => (categories ?? []).reduce((s, c) => s + c.count, 0), [categories]);
 
-  /* --- Data: recipes for expanded category (or search) --- */
+  /* --- Data: recipes for expanded category --- */
   const { data: groupRecipes } = useQuery({
     queryKey: ['crafting.groupRecipes', env, expandedGroup, tab],
     queryFn: () => api.crafting.recipes({ env, category: expandedGroup!, limit: 1000 }),
@@ -177,7 +241,6 @@ export default function CraftingPage() {
     staleTime: 30_000,
   });
 
-  /* Group search results by category */
   const searchGrouped = useMemo(() => {
     if (!debouncedSearch || !searchResults?.data) return null;
     const map = new Map<string, CraftingRecipe[]>();
@@ -222,6 +285,11 @@ export default function CraftingPage() {
     }
   }, [searchGrouped]);
 
+  /* Reset quality map on recipe change */
+  useEffect(() => {
+    setQualityMap({});
+  }, [selectedRecipeUuid]);
+
   /* Build sidebar items */
   const sidebarGroups = useMemo(() => {
     if (debouncedSearch && searchGrouped) {
@@ -245,13 +313,22 @@ export default function CraftingPage() {
 
   const hasIngredients = selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0;
 
+  /* Compute total SCU */
+  const totalScu = useMemo(() => {
+    if (!hasIngredients) return 0;
+    return selectedRecipe!.ingredients!.reduce((acc, ing) => {
+      const scu = ing.scu ? Number(ing.scu) : 0;
+      return acc + scu * batchCount;
+    }, 0);
+  }, [selectedRecipe, batchCount, hasIngredients]);
+
   return (
     <div className="flex h-[calc(100vh-64px)]">
 
       {/* LEFT SIDEBAR */}
       <div className="w-52 xl:w-60 flex-shrink-0 border-r border-slate-800/60 flex flex-col bg-slate-950/50">
 
-        {/* Tabs: BLUEPRINT / MISSION / RESOURCES */}
+        {/* Tabs */}
         <div className="flex border-b border-slate-800/60">
           {([
             { id: 'blueprint' as Tab, label: 'Blueprint' },
@@ -287,7 +364,7 @@ export default function CraftingPage() {
           </div>
         </div>
 
-        {/* Rewards Only toggle */}
+        {/* Rewards Only */}
         <div className="px-2 py-1.5 border-b border-slate-800/40">
           <button
             type="button"
@@ -302,7 +379,7 @@ export default function CraftingPage() {
           </button>
         </div>
 
-        {/* Category/Group tree */}
+        {/* Tree */}
         <div className="flex-1 overflow-y-auto">
           {tab === 'blueprint' ? (
             searchLoading && debouncedSearch ? (
@@ -325,22 +402,14 @@ export default function CraftingPage() {
             ) : null
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-3 px-4">
-              {tab === 'mission' ? (
-                <Swords size={24} className="text-slate-800" />
-              ) : (
-                <Package size={24} className="text-slate-800" />
-              )}
+              {tab === 'mission' ? <Swords size={24} className="text-slate-800" /> : <Package size={24} className="text-slate-800" />}
               <p className="text-xs font-mono-sc text-slate-700 text-center">
                 {tab === 'mission' ? 'Mission rewards' : 'Resource grouping'} coming soon
-              </p>
-              <p className="text-[9px] font-mono-sc text-slate-800 text-center">
-                Data extraction in progress
               </p>
             </div>
           )}
         </div>
 
-        {/* Blueprint count */}
         <div className="px-3 py-2 border-t border-slate-800/40 flex items-center justify-between">
           <span className="text-[9px] font-mono-sc text-slate-700">{totalRecipes} blueprints</span>
         </div>
@@ -366,7 +435,7 @@ export default function CraftingPage() {
               )}
             </div>
 
-            {/* Recipe Title */}
+            {/* Title */}
             <h1 className="font-orbitron text-2xl lg:text-3xl font-bold text-slate-100 tracking-wide mt-1">
               {formatName(selectedRecipe)}
             </h1>
@@ -383,10 +452,10 @@ export default function CraftingPage() {
                   {selectedRecipe.ingredients!.map((ing) => (
                     <PartCard
                       key={ing.id}
-                      name={ing.item_name}
-                      quantity={ing.quantity}
-                      isOptional={ing.is_optional}
+                      ingredient={ing}
                       batchCount={batchCount}
+                      quality={qualityMap[ing.id] ?? 2}
+                      onQualityChange={(v) => setIngredientQuality(ing.id, v)}
                     />
                   ))}
                 </div>
@@ -398,8 +467,36 @@ export default function CraftingPage() {
               )}
             </div>
 
+            {/* FINAL COMBINED MODIFIERS */}
+            {hasIngredients && (
+              <div className="mt-6 sci-panel p-5">
+                <h3 className="font-orbitron text-xs font-bold text-slate-400 tracking-[0.2em] uppercase text-center mb-4">
+                  Final Combined Modifiers
+                </h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                  {selectedRecipe.ingredients!.map((ing) => {
+                    const q = qualityMap[ing.id] ?? 2;
+                    const mult = [0.8, 0.9, 1.0, 1.1, 1.2][q];
+                    const pct = ((mult - 1) * 100).toFixed(0);
+                    const sign = mult >= 1 ? '+' : '';
+                    return (
+                      <div key={ing.id} className="bg-slate-900/60 rounded p-3 border border-slate-800/30">
+                        <p className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-wider truncate mb-1">
+                          {ing.slot_name ? formatItemName(ing.slot_name) : formatItemName(ing.item_name)}
+                        </p>
+                        <p className={`text-sm font-mono-sc font-bold ${QUALITY_COLORS[q]}`}>
+                          {sign}{pct}%
+                        </p>
+                        <p className="text-[9px] font-mono-sc text-slate-700">{QUALITY_LABELS[q]}</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* OUTPUT + BATCH */}
-            <div className="mt-8 sci-panel p-5">
+            <div className="mt-6 sci-panel p-5">
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex-1 min-w-0">
                   <p className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-wider mb-1">Output</p>
@@ -444,7 +541,7 @@ export default function CraftingPage() {
             </div>
 
             {/* CRAFTING DETAILS */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mt-5">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-5">
               <div className="sci-panel p-4">
                 <p className="text-[10px] text-slate-600 font-mono-sc uppercase tracking-wider mb-1">Total Crafting Time</p>
                 <div className="flex items-center gap-2">
@@ -475,6 +572,16 @@ export default function CraftingPage() {
                   </div>
                 </div>
               )}
+
+              <div className="sci-panel p-4">
+                <p className="text-[10px] text-slate-600 font-mono-sc uppercase tracking-wider mb-1">Total Resources</p>
+                <div className="flex items-center gap-2">
+                  <Package size={16} className="text-cyan-500" />
+                  <span className="text-lg font-mono-sc text-slate-200 font-medium">
+                    {totalScu > 0 ? formatScu(totalScu) : '\u2014'}
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* REWARD MISSIONS */}

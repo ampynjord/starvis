@@ -1960,7 +1960,7 @@ export class ExtractionService {
     const ingredientRows: (string | number | null)[][] = [];
     for (const r of recipes) {
       for (const ing of r.ingredients) {
-        ingredientRows.push([r.uuid, ing.itemName, ing.itemUuid, ing.quantity, ing.isOptional ? 1 : 0]);
+        ingredientRows.push([r.uuid, ing.itemName, ing.itemUuid, ing.quantity, ing.isOptional ? 1 : 0, ing.scu, ing.minQuality, ing.slotName]);
       }
     }
 
@@ -1968,12 +1968,13 @@ export class ExtractionService {
       savedIngredients = await ExtractionService.batchUpsert(
         conn,
         `INSERT INTO crafting_ingredients
-           (recipe_uuid, item_name, item_uuid, quantity, is_optional)
+           (recipe_uuid, item_name, item_uuid, quantity, is_optional, scu, min_quality, slot_name)
          VALUES`,
         `ON DUPLICATE KEY UPDATE
            item_name=new.item_name, item_uuid=new.item_uuid,
-           quantity=new.quantity, is_optional=new.is_optional`,
-        5,
+           quantity=new.quantity, is_optional=new.is_optional,
+           scu=new.scu, min_quality=new.min_quality, slot_name=new.slot_name`,
+        8,
         ingredientRows,
       );
     }
