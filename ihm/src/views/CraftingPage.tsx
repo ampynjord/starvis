@@ -269,18 +269,6 @@ export default function CraftingPage() {
     staleTime: 30_000,
   });
 
-  /* ---- data: reward missions (for recipe detail) ---- */
-  const { data: rewardMissions } = useQuery({
-    queryKey: ['crafting.rewardMissions', env, selectedRecipe?.output_item_name],
-    queryFn: () => api.missions.list({
-      env,
-      search: selectedRecipe!.output_item_name!.replace(/_/g, ' '),
-      limit: 20,
-    }),
-    enabled: !!selectedRecipe?.output_item_name && tab === 'blueprint',
-    staleTime: 60_000,
-  });
-
   /* ---- auto-expand first category ---- */
   useEffect(() => {
     if (categories?.length && !expandedGroup && !debouncedSearch && tab === 'blueprint') {
@@ -568,13 +556,11 @@ export default function CraftingPage() {
                 <Trophy size={16} className="text-amber-500" />
                 <h2 className="font-orbitron text-xs font-bold text-slate-400 tracking-[0.2em] uppercase">Reward Missions</h2>
               </div>
-              {rewardMissions?.data?.length ? (
-                <div className="space-y-2">
-                  {rewardMissions.data.map((m) => <MissionRow key={m.uuid} m={m} />)}
-                </div>
-              ) : (
-                <p className="text-xs text-slate-700 font-mono-sc text-center py-3">No matching missions found for this item</p>
-              )}
+              <p className="text-xs text-slate-600 font-mono-sc text-center py-3">
+                Blueprint mission rewards are not yet available in Star Citizen 4.0 game data.
+                <br />
+                <span className="text-slate-700 text-[10px]">This section will populate automatically when CIG adds blueprint rewards to mission data.</span>
+              </p>
             </div>
 
             <div className="mt-6 pt-4 border-t border-slate-800/20">
