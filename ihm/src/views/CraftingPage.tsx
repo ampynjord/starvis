@@ -9,7 +9,7 @@ import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { useDebounce } from '@/hooks/useDebounce';
-import type { CraftingIngredient, CraftingRecipe, CraftingResource, Mission } from '@/types/api';
+import type { CraftingIngredient, CraftingRecipe, Mission } from '@/types/api';
 
 /* ---------- constants ---------- */
 type Tab = 'blueprint' | 'mission' | 'resources';
