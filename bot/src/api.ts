@@ -79,6 +79,7 @@ interface ShipResult {
   max_crew?: number;
   sm_cargo?: number;
   total_hp?: number;
+  ship_matrix_id?: number;
 }
 
 interface CommodityResult {
