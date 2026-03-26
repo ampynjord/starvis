@@ -22,7 +22,8 @@ function fmtNum(v: number | null | undefined, unit = '', digits = 0): string {
 }
 
 export default function ComponentDetailPage() {
-  const { uuid } = useParams<{ uuid: string }>();
+  const params = useParams<{ uuid: string }>();
+  const uuid = params?.uuid;
   const router = useRouter();
   const { env } = useEnv();
 

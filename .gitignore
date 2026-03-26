@@ -95,3 +95,10 @@ docs/
 
 # Virtual environments
 .venv/
+
+# Temp files
+crafting_data.sql
+
+extractor/debug-*.ts
+
+ihm/src/_pages_legacy/

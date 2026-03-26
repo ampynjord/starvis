@@ -11,6 +11,17 @@
 import type { DataForgeService } from './dataforge-service.js';
 import logger from './logger.js';
 
+export interface CraftingModifierRecord {
+  slotName: string;
+  propertyName: string;
+  propertyUuid: string;
+  unitFormat: string;
+  startQuality: number;
+  endQuality: number;
+  modifierAtStart: number;
+  modifierAtEnd: number;
+}
+
 export interface CraftingIngredientRecord {
   itemName: string;
   itemUuid: string | null;
@@ -33,6 +44,7 @@ export interface CraftingRecipeRecord {
   stationType: string | null;
   skillLevel: number | null;
   ingredients: CraftingIngredientRecord[];
+  modifiers: CraftingModifierRecord[];
 }
 
 // ── Legacy system: struct type patterns ────────────────────
@@ -146,6 +158,7 @@ interface CostSlot {
   count: number;
   isOptional: boolean;
   resourceOptions: { resourceRef: string; scu: number; minQuality: number }[];
+  modifiers: { propertyRef: string; startQuality: number; endQuality: number; modifierAtStart: number; modifierAtEnd: number }[];
 }
 
 /** Parse a CraftingCost_Select object into a CostSlot */
@@ -184,19 +197,48 @@ function parseCostSelect(obj: Record<string, unknown>, isOptional: boolean, locS
     }
   }
 
+  // Extract modifiers from context
+  const modifiers: CostSlot['modifiers'] = [];
+  const contexts = obj.context as Array<Record<string, unknown>> | undefined;
+  if (Array.isArray(contexts)) {
+    for (const ctx of contexts) {
+      if (ctx?.__type !== 'CraftingCostContext_ResultGameplayPropertyModifiers') continue;
+      const gpm = ctx.gameplayPropertyModifiers as Record<string, unknown> | undefined;
+      const mods = gpm?.gameplayPropertyModifiers as Array<Record<string, unknown>> | undefined;
+      if (!Array.isArray(mods)) continue;
+      for (const mod of mods) {
+        if (!mod || mod.__type !== 'CraftingGameplayPropertyModifierCommon') continue;
+        const propRef = (mod.gameplayPropertyRecord as Record<string, unknown>)?.__ref as string | undefined;
+        if (!propRef) continue;
+        const ranges = mod.valueRanges as Array<Record<string, unknown>> | undefined;
+        if (!Array.isArray(ranges)) continue;
+        for (const range of ranges) {
+          modifiers.push({
+            propertyRef: propRef,
+            startQuality: typeof range.startQuality === 'number' ? range.startQuality : 0,
+            endQuality: typeof range.endQuality === 'number' ? range.endQuality : 1000,
+            modifierAtStart: typeof range.modifierAtStart === 'number' ? range.modifierAtStart : 1,
+            modifierAtEnd: typeof range.modifierAtEnd === 'number' ? range.modifierAtEnd : 1,
+          });
+        }
+      }
+    }
+  }
+
   if (resourceOptions.length === 0) return null;
-  return { slotName, count, isOptional, resourceOptions };
+  return { slotName, count, isOptional, resourceOptions, modifiers };
 }
 
 /** Extract ingredients from a blueprint costs structure */
-function extractBlueprintIngredients(
+function extractBlueprintIngredientsAndModifiers(
   costs: Record<string, unknown> | undefined,
   ctx: DataForgeService,
   locService?: { resolveKey(key: string): string | null },
-): CraftingIngredientRecord[] {
-  if (!costs) return [];
+): { ingredients: CraftingIngredientRecord[]; modifiers: CraftingModifierRecord[] } {
+  if (!costs) return { ingredients: [], modifiers: [] };
 
   const ingredients: CraftingIngredientRecord[] = [];
+  const modifiers: CraftingModifierRecord[] = [];
   const slots: CostSlot[] = [];
 
   // Mandatory cost slots
@@ -217,12 +259,13 @@ function extractBlueprintIngredients(
     }
   }
 
-  // Convert slots to ingredient records
-  // Each slot may have multiple resource options (player picks one), we record the first as default
+  // Property def cache to avoid redundant reads
+  const propertyDefCache = new Map<string, { propertyName: string; unitFormat: string } | null>();
+
+  // Convert slots to ingredient + modifier records
   for (const slot of slots) {
     const res = slot.resourceOptions[0];
     let itemName = ctx.resolveGuid(res.resourceRef) ?? slot.slotName;
-    // Clean up "ResourceType.Xxx" → "Xxx"
     itemName = itemName.replace(/^ResourceType\./, '');
 
     ingredients.push({
@@ -234,9 +277,44 @@ function extractBlueprintIngredients(
       minQuality: res.minQuality,
       slotName: slot.slotName,
     });
+
+    // Resolve modifiers for this slot
+    for (const mod of slot.modifiers) {
+      if (!propertyDefCache.has(mod.propertyRef)) {
+        try {
+          const propData = ctx.readRecordByGuid(mod.propertyRef, 2) as Record<string, unknown> | null;
+          if (propData) {
+            let propName = safeString(propData.propertyName) ?? mod.propertyRef;
+            let unitFmt = safeString(propData.unitFormat) ?? '';
+            if (locService) {
+              propName = locService.resolveKey(propName) ?? propName;
+              unitFmt = locService.resolveKey(unitFmt) ?? unitFmt;
+            }
+            propertyDefCache.set(mod.propertyRef, { propertyName: propName, unitFormat: unitFmt });
+          } else {
+            propertyDefCache.set(mod.propertyRef, null);
+          }
+        } catch {
+          propertyDefCache.set(mod.propertyRef, null);
+        }
+      }
+      const propDef = propertyDefCache.get(mod.propertyRef);
+      if (!propDef) continue;
+
+      modifiers.push({
+        slotName: slot.slotName,
+        propertyName: propDef.propertyName,
+        propertyUuid: mod.propertyRef,
+        unitFormat: propDef.unitFormat,
+        startQuality: mod.startQuality,
+        endQuality: mod.endQuality,
+        modifierAtStart: mod.modifierAtStart,
+        modifierAtEnd: mod.modifierAtEnd,
+      });
+    }
   }
 
-  return ingredients;
+  return { ingredients, modifiers };
 }
 
 // ── Blueprint extraction ───────────────────────────────────
@@ -253,7 +331,7 @@ function extractBlueprints(ctx: DataForgeService, locService?: { resolveKey(key:
 
   for (const r of records) {
     try {
-      const data = ctx.readRecordByGuid(r.uuid, 8) as Record<string, unknown>;
+      const data = ctx.readRecordByGuid(r.uuid, 10) as Record<string, unknown>;
       if (!data) continue;
 
       const className = r.name || r.fileName || '';
@@ -282,14 +360,16 @@ function extractBlueprints(ctx: DataForgeService, locService?: { resolveKey(key:
       const tiers = blueprint.tiers as Array<Record<string, unknown>> | undefined;
       let craftingTime: number | null = null;
       let ingredients: CraftingIngredientRecord[] = [];
+      let modifiers: CraftingModifierRecord[] = [];
 
       if (tiers?.length) {
         const recipe = tiers[0].recipe as Record<string, unknown> | undefined;
         const costs = recipe?.costs as Record<string, unknown> | undefined;
         craftingTime = parseCraftTime(costs?.craftTime as Record<string, unknown>);
 
-        // Extract ingredients from the recipe/costs structure
-        ingredients = extractBlueprintIngredients(costs, ctx, locService);
+        const extracted = extractBlueprintIngredientsAndModifiers(costs, ctx, locService);
+        ingredients = extracted.ingredients;
+        modifiers = extracted.modifiers;
       }
 
       totalIngredients += ingredients.length;
@@ -306,6 +386,7 @@ function extractBlueprints(ctx: DataForgeService, locService?: { resolveKey(key:
         stationType: 'FPSCraftingBench',
         skillLevel: null,
         ingredients,
+        modifiers,
       });
     } catch (e) {
       logger.debug(`Blueprint extract error [${r.name}]: ${(e as Error).message}`);
@@ -386,6 +467,7 @@ function extractLegacyRecipes(ctx: DataForgeService, locService?: { resolveKey(k
           stationType,
           skillLevel,
           ingredients,
+          modifiers: [],
         });
       } catch (e) {
         logger.debug(`Legacy crafting extract error [${r.name}]: ${(e as Error).message}`);

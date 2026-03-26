@@ -18,7 +18,8 @@ function fmtNum(v: number | null | undefined, unit = '', digits = 2): string {
 }
 
 export default function CommodityDetailPage() {
-  const { uuid } = useParams<{ uuid: string }>();
+  const params = useParams<{ uuid: string }>();
+  const uuid = params?.uuid;
   const router = useRouter();
   const { env } = useEnv();
 

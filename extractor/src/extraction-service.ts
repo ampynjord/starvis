@@ -1979,7 +1979,41 @@ export class ExtractionService {
       );
     }
 
-    onProgress?.(`Crafting: ${savedRecipes} recipes, ${savedIngredients} ingredients saved [${env}]`);
+    // Save slot modifiers
+    let savedModifiers = 0;
+    const modifierRows: (string | number | null)[][] = [];
+    for (const r of recipes) {
+      for (const mod of r.modifiers) {
+        modifierRows.push([
+          r.uuid,
+          mod.slotName,
+          mod.propertyName,
+          mod.propertyUuid,
+          mod.unitFormat,
+          mod.startQuality,
+          mod.endQuality,
+          mod.modifierAtStart,
+          mod.modifierAtEnd,
+        ]);
+      }
+    }
+
+    if (modifierRows.length > 0) {
+      savedModifiers = await ExtractionService.batchUpsert(
+        conn,
+        `INSERT INTO crafting_slot_modifiers
+           (recipe_uuid, slot_name, property_name, property_uuid, unit_format, start_quality, end_quality, modifier_at_start, modifier_at_end)
+         VALUES`,
+        `ON DUPLICATE KEY UPDATE
+           property_name=new.property_name, unit_format=new.unit_format,
+           start_quality=new.start_quality, end_quality=new.end_quality,
+           modifier_at_start=new.modifier_at_start, modifier_at_end=new.modifier_at_end`,
+        9,
+        modifierRows,
+      );
+    }
+
+    onProgress?.(`Crafting: ${savedRecipes} recipes, ${savedIngredients} ingredients, ${savedModifiers} modifiers saved [${env}]`);
     return savedRecipes;
   }
 }

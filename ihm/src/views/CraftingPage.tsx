@@ -9,7 +9,7 @@ import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { useDebounce } from '@/hooks/useDebounce';
-import type { CraftingIngredient, CraftingRecipe, Mission } from '@/types/api';
+import type { CraftingIngredient, CraftingRecipe, CraftingSlotModifier, Mission } from '@/types/api';
 
 /* ---------- constants ---------- */
 type Tab = 'blueprint' | 'mission' | 'resources';
@@ -19,8 +19,34 @@ const CAT_COLORS: Record<string, 'cyan' | 'amber' | 'green' | 'red' | 'purple' |
   Food: 'green', Drink: 'cyan', Medicine: 'purple', Ammunition: 'red',
   Component: 'slate', Refining: 'amber', Explosive: 'red',
 };
-const Q_LABELS = ['Very Low', 'Low', 'Standard', 'High', 'Very High'];
-const Q_COLORS = ['text-red-500', 'text-orange-500', 'text-slate-300', 'text-cyan-400', 'text-green-400'];
+const Q_MAX = 1000;
+
+/** Linear interpolation of modifier value based on quality (0-1000) */
+function computeModifier(mod: CraftingSlotModifier, quality: number): number {
+  const t = Math.max(0, Math.min(1, (quality - mod.start_quality) / (mod.end_quality - mod.start_quality)));
+  return mod.modifier_at_start + t * (mod.modifier_at_end - mod.modifier_at_start);
+}
+
+/** Format modifier as percentage string like "+20.00%" or "-5.00%" */
+function fmtModPct(multiplier: number): string {
+  const pct = (multiplier - 1) * 100;
+  const sign = pct >= 0 ? '+' : '';
+  return `${sign}${pct.toFixed(2)}%`;
+}
+
+/** Color class for a modifier multiplier */
+function modColor(multiplier: number): string {
+  const pct = (multiplier - 1) * 100;
+  if (pct > 0.5) return 'text-green-400';
+  if (pct < -0.5) return 'text-red-400';
+  return 'text-slate-400';
+}
+
+/** Clean up unresolved @StatName_GPP_... keys to human-readable */
+function cleanPropName(raw: string): string {
+  if (!raw.startsWith('@')) return raw;
+  return raw.replace(/^@StatName_GPP_(Weapon_|Armor_)?/, '').replace(/_/g, ' ');
+}
 
 /* ---------- formatters ---------- */
 function fmtTime(s: number | null): string {
@@ -110,12 +136,14 @@ function SidebarItem({ label, selected, onClick, badge }: { label: string; selec
 }
 
 /* ---------- part card ---------- */
-function PartCard({ ingredient, batch, quality, onQuality }: {
-  ingredient: CraftingIngredient; batch: number; quality: number; onQuality: (v: number) => void;
+function PartCard({ ingredient, batch, quality, onQuality, modifiers }: {
+  ingredient: CraftingIngredient; batch: number; quality: number; onQuality: (v: number) => void; modifiers: CraftingSlotModifier[];
 }) {
   const scu = ingredient.scu ? Number(ingredient.scu) : 0;
   const totalScu = scu * batch;
   const slot = ingredient.slot_name ? fmtItem(ingredient.slot_name) : null;
+  const clampQ = useCallback((v: number) => Math.max(0, Math.min(Q_MAX, Math.round(v))), []);
+
   return (
     <div className="sci-panel border-l-2 border-cyan-700 overflow-hidden">
       <div className="px-4 pt-3 pb-2">
@@ -135,20 +163,42 @@ function PartCard({ ingredient, batch, quality, onQuality }: {
           <span className="text-[10px] font-mono-sc text-cyan-400 font-medium">{scu > 0 ? fmtScu(totalScu) : '\u2014'}</span>
         </div>
       </div>
-      <div className="px-4 py-2 bg-slate-950/50 border-t border-slate-800/30">
-        <div className="flex items-center justify-between mb-1.5">
-          <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-wider">Quality</span>
-          <span className={`text-[10px] font-mono-sc font-medium ${Q_COLORS[quality]}`}>{Q_LABELS[quality]}</span>
+      {modifiers.length > 0 ? (
+        <div className="px-4 py-2 bg-slate-950/50 border-t border-slate-800/30 space-y-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-wider">Quality Adjustment</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button type="button" onClick={() => onQuality(clampQ(quality - 10))}
+              className="w-5 h-5 flex items-center justify-center rounded border border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300 transition-colors flex-shrink-0"><Minus size={9} /></button>
+            <input type="range" min={0} max={Q_MAX} value={quality} onChange={(e) => onQuality(clampQ(Number(e.target.value)))}
+              className="flex-1 h-1 accent-cyan-500 bg-slate-800 rounded-full appearance-none cursor-pointer
+                [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3
+                [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400
+                [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-slate-900" />
+            <button type="button" onClick={() => onQuality(clampQ(quality + 10))}
+              className="w-5 h-5 flex items-center justify-center rounded border border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300 transition-colors flex-shrink-0"><Plus size={9} /></button>
+            <input type="number" min={0} max={Q_MAX} value={quality}
+              onChange={(e) => onQuality(clampQ(Number(e.target.value) || 0))}
+              className="sci-input w-14 text-[11px] text-center py-0.5 font-mono-sc" />
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {modifiers.map((m) => {
+              const val = computeModifier(m, quality);
+              return (
+                <span key={m.id}
+                  className={`inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-900/50 px-1.5 py-0.5 text-[10px] font-mono-sc ${modColor(val)}`}
+                  title={`${m.property_name} \u2014 ${m.unit_format}`}
+                >{cleanPropName(m.property_name)} {fmtModPct(val)}</span>
+              );
+            })}
+          </div>
         </div>
-        <input type="range" min={0} max={4} step={1} value={quality} onChange={(e) => onQuality(Number(e.target.value))}
-          className="w-full h-1 accent-cyan-500 bg-slate-800 rounded-full appearance-none cursor-pointer
-            [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3
-            [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400
-            [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-slate-900" />
-        <div className="flex justify-between mt-0.5">
-          {Q_LABELS.map((_, i) => <div key={i} className={`w-1.5 h-1.5 rounded-full ${i <= quality ? 'bg-cyan-600' : 'bg-slate-800'}`} />)}
+      ) : (
+        <div className="px-4 py-2 bg-slate-950/50 border-t border-slate-800/30">
+          <span className="text-[9px] font-mono-sc text-slate-700">No quality modifiers</span>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -180,7 +230,7 @@ export default function CraftingPage() {
   const { env } = useEnv();
 
   const [tab, setTab] = useState<Tab>('blueprint');
-  const [search, setSearch] = useState(searchParams.get('search') ?? '');
+  const [search, setSearch] = useState(searchParams?.get('search') ?? '');
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [selectedRecipeUuid, setSelectedRecipeUuid] = useState<string | null>(null);
   const [selectedResource, setSelectedResource] = useState<string | null>(null);
@@ -304,6 +354,37 @@ export default function CraftingPage() {
 
   /* ---- reset quality on recipe change ---- */
   useEffect(() => { setQualityMap({}); }, [selectedRecipeUuid]);
+
+  /* ---- group modifiers by slot ---- */
+  const modifiersBySlot = useMemo(() => {
+    const map: Record<string, CraftingSlotModifier[]> = {};
+    if (selectedRecipe?.modifiers) {
+      for (const m of selectedRecipe.modifiers) {
+        (map[m.slot_name] ??= []).push(m);
+      }
+    }
+    return map;
+  }, [selectedRecipe?.modifiers]);
+
+  /* ---- combined modifiers across all slots ---- */
+  const combinedModifiers = useMemo(() => {
+    if (!selectedRecipe?.modifiers?.length) return [];
+    const map = new Map<string, { propertyName: string; unitFormat: string; totalMultiplier: number }>();
+    for (const ing of selectedRecipe.ingredients ?? []) {
+      const slotMods = modifiersBySlot[ing.slot_name ?? ''] ?? [];
+      const q = qualityMap[ing.id] ?? 500;
+      for (const m of slotMods) {
+        const val = computeModifier(m, q);
+        const existing = map.get(m.property_name);
+        if (existing) {
+          existing.totalMultiplier *= val;
+        } else {
+          map.set(m.property_name, { propertyName: m.property_name, unitFormat: m.unit_format, totalMultiplier: val });
+        }
+      }
+    }
+    return Array.from(map.values());
+  }, [selectedRecipe?.modifiers, selectedRecipe?.ingredients, modifiersBySlot, qualityMap]);
 
   /* ---- sidebar groups ---- */
   const sidebarGroups = useMemo(() => {
@@ -453,7 +534,8 @@ export default function CraftingPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
                   {selectedRecipe.ingredients!.map((ing) => (
                     <PartCard key={ing.id} ingredient={ing} batch={batchCount}
-                      quality={qualityMap[ing.id] ?? 2} onQuality={(v) => setIngredientQuality(ing.id, v)} />
+                      quality={qualityMap[ing.id] ?? 500} onQuality={(v) => setIngredientQuality(ing.id, v)}
+                      modifiers={modifiersBySlot[ing.slot_name ?? ''] ?? []} />
                   ))}
                 </div>
               ) : (
@@ -465,21 +547,24 @@ export default function CraftingPage() {
             </div>
 
             {/* Combined modifiers */}
-            {hasIngredients && (
+            {combinedModifiers.length > 0 && (
               <div className="mt-6 sci-panel p-5">
                 <h3 className="font-orbitron text-xs font-bold text-slate-400 tracking-[0.2em] uppercase text-center mb-4">Final Combined Modifiers</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {selectedRecipe.ingredients!.map((ing) => {
-                    const q = qualityMap[ing.id] ?? 2;
-                    const mult = [0.8, 0.9, 1.0, 1.1, 1.2][q];
-                    const pct = ((mult - 1) * 100).toFixed(0);
+                  {combinedModifiers.map((cm) => {
+                    const pct = (cm.totalMultiplier - 1) * 100;
+                    const sign = pct >= 0 ? '+' : '';
                     return (
-                      <div key={ing.id} className="bg-slate-900/60 rounded p-3 border border-slate-800/30">
+                      <div key={cm.propertyName} className="bg-slate-900/60 rounded p-3 border border-slate-800/30">
                         <p className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-wider truncate mb-1">
-                          {ing.slot_name ? fmtItem(ing.slot_name) : fmtItem(ing.item_name)}
+                          {cleanPropName(cm.propertyName)}
                         </p>
-                        <p className={`text-sm font-mono-sc font-bold ${Q_COLORS[q]}`}>{mult >= 1 ? '+' : ''}{pct}%</p>
-                        <p className="text-[9px] font-mono-sc text-slate-700">{Q_LABELS[q]}</p>
+                        <p className={`text-sm font-mono-sc font-bold ${pct > 0.5 ? 'text-green-400' : pct < -0.5 ? 'text-red-400' : 'text-slate-400'}`}>
+                          {sign}{pct.toFixed(2)}%
+                        </p>
+                        {cm.unitFormat && cm.unitFormat !== 'LOC_EMPTY' && (
+                          <p className="text-[9px] font-mono-sc text-slate-700">{cm.unitFormat}</p>
+                        )}
                       </div>
                     );
                   })}

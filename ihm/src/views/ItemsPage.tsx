@@ -65,7 +65,7 @@ export default function ItemsPage() {
   const { env } = useEnv();
   const { page, search, debouncedSearch, updateSearch, updatePageWithScroll, resetListState, setPage } = useListQueryState();
   const [manufacturer, setManufacturer] = useState('');
-  const mode: 'fps' | 'other' = pathname.startsWith('/other-items') ? 'other' : 'fps';
+  const mode: 'fps' | 'other' = pathname?.startsWith('/other-items') ? 'other' : 'fps';
   const [activeCategory, setActiveCategory] = useState('');
 
   const { data: filters } = useQuery({
