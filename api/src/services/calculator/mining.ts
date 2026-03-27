@@ -46,7 +46,7 @@ export interface MiningYieldResult {
 }
 
 async function fetchMiningComponent(prisma: PrismaClient, uuid: string, _env: string): Promise<MiningLaserInfo | null> {
-  const comp = await prisma.component.findUnique({
+  const comp = await prisma.component.findFirst({
     where: { uuid },
     select: {
       uuid: true,
@@ -77,7 +77,7 @@ async function fetchMiningComponent(prisma: PrismaClient, uuid: string, _env: st
 export async function calculateMiningYield(prisma: PrismaClient, input: MiningYieldInput): Promise<MiningYieldResult | null> {
   const env = input.env || 'live';
 
-  const composition = await prisma.miningComposition.findUnique({
+  const composition = await prisma.miningComposition.findFirst({
     where: { uuid: input.compositionUuid },
   });
   if (!composition) return null;
