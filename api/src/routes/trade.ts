@@ -4,7 +4,15 @@
  */
 
 import type { Router } from 'express';
-import { asyncHandler, makeGameDataGuard, sendWithETag } from './helpers.js';
+import {
+  asyncHandler,
+  getQueryNumber,
+  getQueryString,
+  makeGameDataGuard,
+  mountEnvDataRoute,
+  sendDataWithETag,
+  sendWithETag,
+} from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
 export function mountTradeRoutes(router: Router, deps: RouteDependencies): void {
@@ -15,15 +23,7 @@ export function mountTradeRoutes(router: Router, deps: RouteDependencies): void 
    * GET /api/v1/trade/locations
    * All shops that have commodity price data
    */
-  router.get(
-    '/api/v1/trade/locations',
-    requireGameData,
-    asyncHandler(async (req, res) => {
-      const env = String(req.query.env ?? 'live');
-      const locations = await gameDataService!.trade.getTradeLocations(env);
-      sendWithETag(req, res, { success: true, data: locations });
-    }),
-  );
+  mountEnvDataRoute(router, '/api/v1/trade/locations', requireGameData, (env) => gameDataService!.trade.getTradeLocations(env));
 
   /**
    * GET /api/v1/trade/prices/:commodityUuid
@@ -33,9 +33,9 @@ export function mountTradeRoutes(router: Router, deps: RouteDependencies): void 
     '/api/v1/trade/prices/:commodityUuid',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const env = String(req.query.env ?? 'live');
+      const env = getQueryString(req, 'env') ?? 'live';
       const prices = await gameDataService!.trade.getCommodityPrices(req.params.commodityUuid, env);
-      sendWithETag(req, res, { success: true, data: prices });
+      sendDataWithETag(req, res, prices);
     }),
   );
 
@@ -47,11 +47,11 @@ export function mountTradeRoutes(router: Router, deps: RouteDependencies): void 
     '/api/v1/trade/location/:shopId/prices',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const env = String(req.query.env ?? 'live');
+      const env = getQueryString(req, 'env') ?? 'live';
       const shopId = parseInt(req.params.shopId, 10);
       if (Number.isNaN(shopId)) return void res.status(400).json({ success: false, error: 'Invalid shop ID' });
       const prices = await gameDataService!.trade.getLocationPrices(shopId, env);
-      sendWithETag(req, res, { success: true, data: prices });
+      sendDataWithETag(req, res, prices);
     }),
   );
 
@@ -86,15 +86,7 @@ export function mountTradeRoutes(router: Router, deps: RouteDependencies): void 
    * GET /api/v1/trade/systems
    * All distinct systems with trade data
    */
-  router.get(
-    '/api/v1/trade/systems',
-    requireGameData,
-    asyncHandler(async (req, res) => {
-      const env = String(req.query.env ?? 'live');
-      const systems = await gameDataService!.trade.getTradeSystems(env);
-      sendWithETag(req, res, { success: true, data: systems });
-    }),
-  );
+  mountEnvDataRoute(router, '/api/v1/trade/systems', requireGameData, (env) => gameDataService!.trade.getTradeSystems(env));
 
   /**
    * GET /api/v1/trade/routes
@@ -105,21 +97,22 @@ export function mountTradeRoutes(router: Router, deps: RouteDependencies): void 
     '/api/v1/trade/routes',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const scu = Number(req.query.scu);
+      const scu = getQueryNumber(req, 'scu');
+      const sortParam = getQueryString(req, 'sort');
       if (!scu || scu <= 0) {
         return void res.status(400).json({ success: false, error: 'scu query parameter is required (positive number)' });
       }
       const t = Date.now();
       const routes = await gameDataService!.trade.findBestRoutes({
         scu,
-        budget: req.query.budget ? Number(req.query.budget) : undefined,
-        env: req.query.env ? String(req.query.env) : undefined,
-        limit: req.query.limit ? Number(req.query.limit) : undefined,
-        commodity: req.query.commodity ? String(req.query.commodity) : undefined,
-        buySystem: req.query.buySystem ? String(req.query.buySystem) : undefined,
-        sellSystem: req.query.sellSystem ? String(req.query.sellSystem) : undefined,
-        sort: (['totalProfit', 'profitPerScu', 'profitPerUnit'] as const).includes(req.query.sort as 'totalProfit')
-          ? (req.query.sort as 'totalProfit' | 'profitPerScu' | 'profitPerUnit')
+        budget: getQueryNumber(req, 'budget'),
+        env: getQueryString(req, 'env'),
+        limit: getQueryNumber(req, 'limit'),
+        commodity: getQueryString(req, 'commodity'),
+        buySystem: getQueryString(req, 'buySystem'),
+        sellSystem: getQueryString(req, 'sellSystem'),
+        sort: (['totalProfit', 'profitPerScu', 'profitPerUnit'] as const).includes(sortParam as 'totalProfit')
+          ? (sortParam as 'totalProfit' | 'profitPerScu' | 'profitPerUnit')
           : undefined,
       });
       sendWithETag(req, res, {
