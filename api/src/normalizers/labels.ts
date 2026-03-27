@@ -16,6 +16,11 @@ function capitalizeWord(word: string): string {
 /** Convert snake_case / kebab-case / camelCase enum values to readable labels. */
 export function formatEnumLabel(raw: string | null | undefined): string {
   if (!raw) return '';
-  const spaced = collapseWhitespace(raw.replace(/[_-]+/g, ' ').replace(/([a-z\d])([A-Z])/g, '$1 $2'));
+  const spaced = collapseWhitespace(
+    raw
+      .replace(/[_-]+/g, ' ')
+      .replace(/([a-z\d])([A-Z])/g, '$1 $2')
+      .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2'),
+  );
   return spaced.split(' ').map(capitalizeWord).join(' ');
 }
