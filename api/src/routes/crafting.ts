@@ -1,5 +1,13 @@
 import type { Router } from 'express';
-import { asyncHandler, getQueryNumber, getQueryString, makeGameDataGuard, sendDataWithETag, sendPaginatedWithETag } from './helpers.js';
+import {
+  asyncHandler,
+  getQueryNumber,
+  getQueryString,
+  makeGameDataGuard,
+  mountEnvDataRoute,
+  sendDataWithETag,
+  sendPaginatedWithETag,
+} from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
 export function mountCraftingRoutes(router: Router, deps: RouteDependencies): void {
@@ -10,29 +18,13 @@ export function mountCraftingRoutes(router: Router, deps: RouteDependencies): vo
    * GET /api/v1/crafting/categories
    * Lists all distinct crafting categories with count
    */
-  router.get(
-    '/api/v1/crafting/categories',
-    requireGameData,
-    asyncHandler(async (req, res) => {
-      const env = getQueryString(req, 'env') ?? 'live';
-      const categories = await gameDataService!.crafting.getCategories(env);
-      sendDataWithETag(req, res, categories);
-    }),
-  );
+  mountEnvDataRoute(router, '/api/v1/crafting/categories', requireGameData, (env) => gameDataService!.crafting.getCategories(env));
 
   /**
    * GET /api/v1/crafting/station-types
    * Lists all distinct station types
    */
-  router.get(
-    '/api/v1/crafting/station-types',
-    requireGameData,
-    asyncHandler(async (req, res) => {
-      const env = getQueryString(req, 'env') ?? 'live';
-      const types = await gameDataService!.crafting.getStationTypes(env);
-      sendDataWithETag(req, res, types);
-    }),
-  );
+  mountEnvDataRoute(router, '/api/v1/crafting/station-types', requireGameData, (env) => gameDataService!.crafting.getStationTypes(env));
 
   /**
    * GET /api/v1/crafting/recipes
@@ -61,15 +53,7 @@ export function mountCraftingRoutes(router: Router, deps: RouteDependencies): vo
    * GET /api/v1/crafting/resources
    * Lists all distinct crafting resources with usage counts
    */
-  router.get(
-    '/api/v1/crafting/resources',
-    requireGameData,
-    asyncHandler(async (req, res) => {
-      const env = getQueryString(req, 'env') ?? 'live';
-      const resources = await gameDataService!.crafting.getResources(env);
-      sendDataWithETag(req, res, resources);
-    }),
-  );
+  mountEnvDataRoute(router, '/api/v1/crafting/resources', requireGameData, (env) => gameDataService!.crafting.getResources(env));
 
   /**
    * GET /api/v1/crafting/resources/:itemName/recipes

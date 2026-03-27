@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { NextFunction, Request, Response } from 'express';
+import type { NextFunction, Request, RequestHandler, Response, Router } from 'express';
 import { ZodError } from 'zod';
 import { arrayToCsv } from '../schemas.js';
 import type { GameDataService } from '../services/game-data-service.js';
@@ -130,4 +130,25 @@ export function getQueryNumber(req: Request, key: string): number | undefined {
   if (!raw) return undefined;
   const n = Number(raw);
   return Number.isFinite(n) ? n : undefined;
+}
+
+/**
+ * Mount a GET route that only depends on the optional `env` query parameter
+ * and returns `{ success: true, data }` with ETag support.
+ */
+export function mountEnvDataRoute<T>(
+  router: Router,
+  path: string,
+  requireGameData: RequestHandler,
+  fetcher: (env: string) => Promise<T>,
+): void {
+  router.get(
+    path,
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = getQueryString(req, 'env') ?? 'live';
+      const data = await fetcher(env);
+      sendDataWithETag(req, res, data);
+    }),
+  );
 }
