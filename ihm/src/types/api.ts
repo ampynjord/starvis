@@ -421,8 +421,10 @@ export interface CraftingRecipe {
   uuid: string;
   class_name: string;
   name: string | null;
+  display_name?: string;
   category: string | null;
   output_item_name: string | null;
+  display_output_item_name?: string;
   output_item_uuid: string | null;
   output_quantity: number;
   crafting_time_s: number | null;
@@ -436,18 +438,21 @@ export interface CraftingRecipe {
 export interface CraftingIngredient {
   id: number;
   item_name: string;
+  display_item_name?: string;
   item_uuid: string | null;
   quantity: number;
   is_optional: boolean;
   scu: number | null;
   min_quality: number;
   slot_name: string | null;
+  display_slot_name?: string | null;
 }
 
 export interface CraftingSlotModifier {
   id: number;
   slot_name: string;
   property_name: string;
+  display_property_name?: string;
   property_uuid: string;
   unit_format: string;
   start_quality: number;
@@ -463,6 +468,7 @@ export interface CraftingCategory {
 
 export interface CraftingResource {
   item_name: string;
+  display_item_name?: string;
   item_uuid: string | null;
   recipe_count: number;
   total_quantity: number;

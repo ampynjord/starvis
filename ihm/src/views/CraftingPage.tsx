@@ -42,12 +42,6 @@ function modColor(multiplier: number): string {
   return 'text-slate-400';
 }
 
-/** Clean up unresolved @StatName_GPP_... keys to human-readable */
-function cleanPropName(raw: string): string {
-  if (!raw.startsWith('@')) return raw;
-  return raw.replace(/^@StatName_GPP_(Weapon_|Armor_)?/, '').replace(/_/g, ' ');
-}
-
 /* ---------- formatters ---------- */
 function fmtTime(s: number | null): string {
   if (!s) return '\u2014';
@@ -59,15 +53,11 @@ function fmtTime(s: number | null): string {
 }
 
 function fmtName(r: CraftingRecipe): string {
-  const raw = r.name ?? r.class_name;
-  return raw
-    .replace(/^(CraftingBlueprintRecord\.)?BP_CRAFT_/i, '')
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase());
+  return r.display_name ?? r.name ?? r.class_name;
 }
 
 function fmtItem(raw: string): string {
-  return raw.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+  return raw;
 }
 
 function fmtScu(scu: number | null): string {
@@ -141,7 +131,7 @@ function PartCard({ ingredient, batch, quality, onQuality, modifiers }: {
 }) {
   const scu = ingredient.scu ? Number(ingredient.scu) : 0;
   const totalScu = scu * batch;
-  const slot = ingredient.slot_name ? fmtItem(ingredient.slot_name) : null;
+  const slot = ingredient.display_slot_name ?? (ingredient.slot_name ? fmtItem(ingredient.slot_name) : null);
   const clampQ = useCallback((v: number) => Math.max(0, Math.min(Q_MAX, Math.round(v))), []);
 
   return (
@@ -150,7 +140,7 @@ function PartCard({ ingredient, batch, quality, onQuality, modifiers }: {
         {slot && <p className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-wider mb-1">{slot}</p>}
         <div className="flex items-center gap-2 mb-1">
           <div className="w-2 h-2 rounded-full bg-cyan-500 flex-shrink-0" />
-          <span className="text-sm font-medium text-slate-200 truncate">{fmtItem(ingredient.item_name)}</span>
+          <span className="text-sm font-medium text-slate-200 truncate">{ingredient.display_item_name ?? fmtItem(ingredient.item_name)}</span>
         </div>
         <p className="text-[10px] font-mono-sc text-slate-600 pl-4">
           Required: <span className="text-slate-400">{ingredient.quantity * batch}</span>
@@ -159,7 +149,7 @@ function PartCard({ ingredient, batch, quality, onQuality, modifiers }: {
       </div>
       <div className="px-4 py-2 bg-slate-900/50 border-t border-slate-800/40">
         <div className="flex items-center justify-between">
-          <span className="text-[10px] font-mono-sc text-slate-500">{fmtItem(ingredient.item_name)}</span>
+          <span className="text-[10px] font-mono-sc text-slate-500">{ingredient.display_item_name ?? fmtItem(ingredient.item_name)}</span>
           <span className="text-[10px] font-mono-sc text-cyan-400 font-medium">{scu > 0 ? fmtScu(totalScu) : '\u2014'}</span>
         </div>
       </div>
@@ -189,7 +179,7 @@ function PartCard({ ingredient, batch, quality, onQuality, modifiers }: {
                 <span key={m.id}
                   className={`inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-900/50 px-1.5 py-0.5 text-[10px] font-mono-sc ${modColor(val)}`}
                   title={`${m.property_name} \u2014 ${m.unit_format}`}
-                >{cleanPropName(m.property_name)} {fmtModPct(val)}</span>
+                >{m.display_property_name ?? m.property_name} {fmtModPct(val)}</span>
               );
             })}
           </div>
@@ -379,7 +369,11 @@ export default function CraftingPage() {
         if (existing) {
           existing.totalMultiplier *= val;
         } else {
-          map.set(m.property_name, { propertyName: m.property_name, unitFormat: m.unit_format, totalMultiplier: val });
+          map.set(m.property_name, {
+            propertyName: m.display_property_name ?? m.property_name,
+            unitFormat: m.unit_format,
+            totalMultiplier: val,
+          });
         }
       }
     }
@@ -492,7 +486,7 @@ export default function CraftingPage() {
           {tab === 'resources' && (
             filteredResources.length > 0
               ? filteredResources.map((r) => (
-                  <SidebarItem key={r.item_name} label={fmtItem(r.item_name)}
+                  <SidebarItem key={r.item_name} label={r.display_item_name ?? fmtItem(r.item_name)}
                     selected={selectedResource === r.item_name}
                     onClick={() => setSelectedResource(r.item_name)}
                     badge={String(r.recipe_count)} />
@@ -557,7 +551,7 @@ export default function CraftingPage() {
                     return (
                       <div key={cm.propertyName} className="bg-slate-900/60 rounded p-3 border border-slate-800/30">
                         <p className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-wider truncate mb-1">
-                          {cleanPropName(cm.propertyName)}
+                          {cm.propertyName}
                         </p>
                         <p className={`text-sm font-mono-sc font-bold ${pct > 0.5 ? 'text-green-400' : pct < -0.5 ? 'text-red-400' : 'text-slate-400'}`}>
                           {sign}{pct.toFixed(2)}%
@@ -577,7 +571,9 @@ export default function CraftingPage() {
               <div className="flex items-center gap-3 flex-wrap">
                 <div className="flex-1 min-w-0">
                   <p className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-wider mb-1">Output</p>
-                  <p className="text-lg text-slate-200 font-medium">{fmtItem(selectedRecipe.output_item_name ?? selectedRecipe.name ?? '\u2014')}</p>
+                  <p className="text-lg text-slate-200 font-medium">
+                    {selectedRecipe.display_output_item_name ?? fmtItem(selectedRecipe.output_item_name ?? selectedRecipe.name ?? '\u2014')}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   <button type="button" onClick={() => setBatchCount((v) => Math.max(1, v - 1))}
@@ -709,7 +705,7 @@ export default function CraftingPage() {
                 <div className="sci-panel p-5 mb-6">
                   <div className="flex items-center gap-3 flex-wrap">
                     <Package size={20} className="text-cyan-500" />
-                    <h1 className="font-orbitron text-2xl font-bold text-slate-100 tracking-wide">{fmtItem(res.item_name)}</h1>
+                    <h1 className="font-orbitron text-2xl font-bold text-slate-100 tracking-wide">{res.display_item_name ?? fmtItem(res.item_name)}</h1>
                   </div>
                   <div className="grid grid-cols-3 gap-4 mt-4">
                     <div>
@@ -742,10 +738,12 @@ export default function CraftingPage() {
                     onClick={() => { setTab('blueprint'); setSelectedRecipeUuid(r.uuid); setExpandedGroup(r.category); }}
                     className="w-full flex items-center gap-3 px-4 py-3 bg-slate-900/40 rounded border border-slate-800/30 hover:bg-slate-900/60 hover:border-cyan-900/40 transition-colors text-left">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-slate-200 truncate">{fmtItem(r.output_item_name ?? r.name ?? r.class_name)}</p>
+                      <p className="text-xs text-slate-200 truncate">{r.display_output_item_name ?? fmtItem(r.output_item_name ?? r.name ?? r.class_name)}</p>
                       <div className="flex items-center gap-3 mt-0.5">
                         {r.category && <GlowBadge color={CAT_COLORS[r.category] ?? 'slate'} size="xs">{r.category}</GlowBadge>}
-                        {r.slot_name && <span className="text-[9px] font-mono-sc text-slate-600">{fmtItem(r.slot_name)}</span>}
+                        {(r.display_slot_name ?? r.slot_name) && (
+                          <span className="text-[9px] font-mono-sc text-slate-600">{r.display_slot_name ?? fmtItem(r.slot_name)}</span>
+                        )}
                       </div>
                     </div>
                     <div className="text-right flex-shrink-0">
