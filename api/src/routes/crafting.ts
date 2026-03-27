@@ -1,5 +1,5 @@
 import type { Router } from 'express';
-import { asyncHandler, getQueryNumber, getQueryString, makeGameDataGuard, sendPaginatedWithETag, sendWithETag } from './helpers.js';
+import { asyncHandler, getQueryNumber, getQueryString, makeGameDataGuard, sendDataWithETag, sendPaginatedWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
 export function mountCraftingRoutes(router: Router, deps: RouteDependencies): void {
@@ -16,7 +16,7 @@ export function mountCraftingRoutes(router: Router, deps: RouteDependencies): vo
     asyncHandler(async (req, res) => {
       const env = getQueryString(req, 'env') ?? 'live';
       const categories = await gameDataService!.crafting.getCategories(env);
-      sendWithETag(req, res, { success: true, data: categories });
+      sendDataWithETag(req, res, categories);
     }),
   );
 
@@ -30,7 +30,7 @@ export function mountCraftingRoutes(router: Router, deps: RouteDependencies): vo
     asyncHandler(async (req, res) => {
       const env = getQueryString(req, 'env') ?? 'live';
       const types = await gameDataService!.crafting.getStationTypes(env);
-      sendWithETag(req, res, { success: true, data: types });
+      sendDataWithETag(req, res, types);
     }),
   );
 
@@ -67,7 +67,7 @@ export function mountCraftingRoutes(router: Router, deps: RouteDependencies): vo
     asyncHandler(async (req, res) => {
       const env = getQueryString(req, 'env') ?? 'live';
       const resources = await gameDataService!.crafting.getResources(env);
-      sendWithETag(req, res, { success: true, data: resources });
+      sendDataWithETag(req, res, resources);
     }),
   );
 
@@ -81,7 +81,7 @@ export function mountCraftingRoutes(router: Router, deps: RouteDependencies): vo
     asyncHandler(async (req, res) => {
       const env = getQueryString(req, 'env') ?? 'live';
       const recipes = await gameDataService!.crafting.getRecipesByResource(req.params.itemName, env);
-      sendWithETag(req, res, { success: true, data: recipes, count: recipes.length });
+      sendDataWithETag(req, res, recipes, recipes.length);
     }),
   );
 
@@ -96,7 +96,7 @@ export function mountCraftingRoutes(router: Router, deps: RouteDependencies): vo
       const env = getQueryString(req, 'env') ?? 'live';
       const recipe = await gameDataService!.crafting.getRecipeByUuid(req.params.uuid, env);
       if (!recipe) return void res.status(404).json({ success: false, error: 'Recipe not found' });
-      sendWithETag(req, res, { success: true, data: recipe });
+      sendDataWithETag(req, res, recipe);
     }),
   );
 }

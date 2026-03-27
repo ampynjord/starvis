@@ -71,6 +71,13 @@ export function sendPaginatedWithETag<T>(req: Request, res: Response, result: Pa
   });
 }
 
+/** Send standard success payload with data and optional count. */
+export function sendDataWithETag<T>(req: Request, res: Response, data: T, count?: number): void {
+  const payload: Record<string, unknown> = { success: true, data };
+  if (count != null) payload.count = count;
+  sendWithETag(req, res, payload);
+}
+
 export function sendCsvOrJson(req: Request, res: Response, data: Record<string, unknown>[], jsonPayload: unknown): void {
   if (req.query.format === 'csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
