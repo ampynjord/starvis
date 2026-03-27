@@ -1,11 +1,10 @@
 # Dependencies
 node_modules/
-**/node_modules/
 
 # Build output
 dist/
-**/dist/
 *.tsbuildinfo
+.next/
 
 # Data files
 ships-list.json
@@ -13,16 +12,12 @@ ships-list.json
 *_dump.sql
 *_changelog.sql
 ptu_*.sql
+crafting_data.sql
 
 # Logs
-logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
 
-# Environment variables (secrets — only .example files are tracked)
+# Environment variables (only .example files are tracked)
 .env.dev
 .env.prod
 .env.extractor
@@ -30,7 +25,7 @@ pnpm-debug.log*
 .env.extractor.prod
 .env*.local
 
-# IDE & Editor directories
+# IDE & Editor
 .vscode/
 !.vscode/settings.json
 !.vscode/extensions.json
@@ -38,43 +33,34 @@ pnpm-debug.log*
 *.swp
 *.swo
 *~
-.DS_Store
 
 # OS files
 .DS_Store
 Thumbs.db
-Desktop.ini
 
-# Test files
-test-*.ts
-test-*.json
-*-sample.html
+# Debug / scratch scripts
+extractor/debug-*.ts
+extractor/test-*.ts
 analyze-*.ts
 check-*.ts
 find-*.ts
 
 # Test reports & coverage
 coverage/
-.nyc_output/
 playwright-report/
 test-results/
 *.lcov
 
-# Python virtual environment
-.venv/
-
-# Legacy (kept for safety)
-extractor/.env
-
 # Temporary files
 *.tmp
+*.temp
 
-# Cache directories
+# Cache
 .cache/
 .eslintcache
 .turbo/
 
-# Model cache (local downloads from P4K)
+# Model cache (local P4K downloads)
 model-cache/
 !model-cache/.gitkeep
 
@@ -83,23 +69,6 @@ model-cache/
 *.sql.backup
 db-backup/
 
-# Coverage reports
-coverage/
-.nyc_output/
-*.temp
-.cache/
-backups/
-
-# Docs
-docs/
-
-# Virtual environments
-.venv/
-
-# Temp files
-crafting_data.sql
-
-extractor/debug-*.ts
-
+# Legacy IHM directories
 ihm/src/_pages_legacy/
 ihm/src/pages/
