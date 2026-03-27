@@ -55,7 +55,7 @@ export class CraftingService {
       params.push(category);
     }
     if (search) {
-      where.push('(r.name LIKE ? OR r.class_name LIKE ? OR r.output_item_name LIKE ?)');
+      where.push('(r.name LIKE ? OR r.class_name LIKE ? OR COALESCE(oi.name, r.output_item_name) LIKE ?)');
       const q = `%${search.replace(/[%_\\]/g, '\\$&')}%`;
       params.push(q, q, q);
     }
@@ -71,16 +71,18 @@ export class CraftingService {
     const whereClause = where.length ? where.join(' AND ') : '1=1';
 
     const [countRow] = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT COUNT(*) as total FROM crafting_recipes r WHERE ${whereClause}`,
+      `SELECT COUNT(*) as total FROM crafting_recipes r LEFT JOIN items oi ON oi.uuid = r.output_item_uuid WHERE ${whereClause}`,
       ...params,
     );
     const total = Number(countRow?.total ?? 0);
 
     const data = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT r.uuid, r.class_name, r.name, r.category,
-              r.output_item_name, r.output_item_uuid, r.output_quantity,
+              COALESCE(oi.name, r.output_item_name) AS output_item_name,
+              r.output_item_uuid, r.output_quantity,
               r.crafting_time_s, r.station_type, r.skill_level
        FROM crafting_recipes r
+       LEFT JOIN items oi ON oi.uuid = r.output_item_uuid
        WHERE ${whereClause}
        ORDER BY r.category ASC, r.name ASC
        LIMIT ? OFFSET ?`,
@@ -102,13 +104,14 @@ export class CraftingService {
   async getResources(env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT ci.item_name, ci.item_uuid,
+      `SELECT COALESCE(i.name, ci.item_name) AS item_name, ci.item_uuid,
               COUNT(DISTINCT ci.recipe_uuid) AS recipe_count,
               SUM(ci.quantity) AS total_quantity,
               SUM(ci.scu) AS total_scu
        FROM crafting_ingredients ci
-       GROUP BY ci.item_name, ci.item_uuid
-       ORDER BY recipe_count DESC, ci.item_name`,
+       LEFT JOIN items i ON i.uuid = ci.item_uuid
+       GROUP BY ci.item_uuid, i.name, ci.item_name
+       ORDER BY recipe_count DESC, item_name`,
     );
     return convertBigIntToNumber(rows);
   }
@@ -118,13 +121,16 @@ export class CraftingService {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT r.uuid, r.class_name, r.name, r.category,
-              r.output_item_name, r.output_item_uuid, r.output_quantity,
+              COALESCE(oi.name, r.output_item_name) AS output_item_name,
+              r.output_item_uuid, r.output_quantity,
               r.crafting_time_s, r.station_type, r.skill_level,
               ci.quantity, ci.scu, ci.slot_name
        FROM crafting_recipes r
        JOIN crafting_ingredients ci ON ci.recipe_uuid = r.uuid
-       WHERE ci.item_name = ?
+       LEFT JOIN items oi ON oi.uuid = r.output_item_uuid
+       WHERE ci.item_name = ? OR ci.item_uuid IN (SELECT uuid FROM items WHERE name = ?)
        ORDER BY r.category ASC, r.name ASC`,
+      itemName,
       itemName,
     );
     return convertBigIntToNumber(rows);
@@ -134,11 +140,13 @@ export class CraftingService {
   async getRecipeByUuid(uuid: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT uuid, class_name, name, category,
-              output_item_name, output_item_uuid, output_quantity,
-              crafting_time_s, station_type, skill_level
-       FROM crafting_recipes
-       WHERE uuid = ?`,
+      `SELECT r.uuid, r.class_name, r.name, r.category,
+              COALESCE(oi.name, r.output_item_name) AS output_item_name,
+              r.output_item_uuid, r.output_quantity,
+              r.crafting_time_s, r.station_type, r.skill_level
+       FROM crafting_recipes r
+       LEFT JOIN items oi ON oi.uuid = r.output_item_uuid
+       WHERE r.uuid = ?`,
       uuid,
     );
     if (!rows.length) return null;
@@ -146,9 +154,11 @@ export class CraftingService {
     const recipe = convertBigIntToNumber(rows[0]);
 
     const ingredients = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT id, item_name, item_uuid, quantity, is_optional, scu, min_quality, slot_name
-       FROM crafting_ingredients
-       WHERE recipe_uuid = ?
+      `SELECT ci.id, COALESCE(i.name, ci.item_name) AS item_name, ci.item_uuid,
+              ci.quantity, ci.is_optional, ci.scu, ci.min_quality, ci.slot_name
+       FROM crafting_ingredients ci
+       LEFT JOIN items i ON i.uuid = ci.item_uuid
+       WHERE ci.recipe_uuid = ?
        ORDER BY item_name`,
       uuid,
     );
