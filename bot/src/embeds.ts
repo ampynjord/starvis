@@ -89,10 +89,10 @@ export function shipEmbed(ship: ShipResult): EmbedBuilder {
 
   // Fuel
   if (ship.hydrogen_fuel_capacity) {
-    fields.push({ name: '⛽ Hydrogène', value: `${ship.hydrogen_fuel_capacity} L`, inline: true });
+    fields.push({ name: '⛽ Hydrogène', value: `${ship.hydrogen_fuel_capacity} SCU`, inline: true });
   }
   if (ship.quantum_fuel_capacity) {
-    fields.push({ name: '🌀 Quantum', value: `${ship.quantum_fuel_capacity} L`, inline: true });
+    fields.push({ name: '🌀 Quantum', value: `${ship.quantum_fuel_capacity} SCU`, inline: true });
   }
 
   // Dimensions (ship-matrix format)
