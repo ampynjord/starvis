@@ -1,6 +1,6 @@
 import type { Router } from 'express';
 import { ChangelogQuery } from '../schemas.js';
-import { asyncHandler, makeGameDataGuard, sendWithETag } from './helpers.js';
+import { asyncHandler, getQueryString, makeGameDataGuard, mountEnvDataRoute, sendDataWithETag, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
 export function mountSystemRoutes(router: Router, deps: RouteDependencies): void {
@@ -31,23 +31,15 @@ export function mountSystemRoutes(router: Router, deps: RouteDependencies): void
     }),
   );
 
-  router.get(
-    '/api/v1/stats/overview',
-    requireGameData,
-    asyncHandler(async (req, res) => {
-      const env = String(req.query.env ?? 'live');
-      const data = await gameDataService!.getPublicStats(env);
-      sendWithETag(req, res, { success: true, data });
-    }),
-  );
+  mountEnvDataRoute(router, '/api/v1/stats/overview', requireGameData, (env) => gameDataService!.getPublicStats(env));
 
   router.get(
     '/api/v1/version',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const env = String(req.query.env ?? 'live');
+      const env = getQueryString(req, 'env') ?? 'live';
       const latest = await gameDataService!.getLatestExtraction(env);
-      res.json({ success: true, data: latest || { message: 'No extraction yet' } });
+      sendDataWithETag(req, res, latest || { message: 'No extraction yet' });
     }),
   );
 }
