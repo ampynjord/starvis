@@ -10,7 +10,6 @@ const nextConfig: NextConfig = {
       { source: '/api/:path*', destination: `${process.env.API_URL || 'http://api:3000'}/api/:path*` },
       { source: '/health', destination: `${process.env.API_URL || 'http://api:3000'}/health` },
       { source: '/admin/:path*', destination: `${process.env.API_URL || 'http://api:3000'}/admin/:path*` },
-
     ];
   },
   async redirects() {
