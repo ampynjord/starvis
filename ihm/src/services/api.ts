@@ -65,6 +65,115 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return json as unknown as T;
 }
 
+function mapMission(item: Mission): Mission {
+  return {
+    ...item,
+    className: item.class_name,
+    missionType: item.mission_type,
+    displayMissionType: item.display_mission_type,
+    canBeShared: item.can_be_shared,
+    onlyOwnerComplete: item.only_owner_complete,
+    isLegal: item.is_legal,
+    completionTimeS: item.completion_time_s,
+    rewardMin: item.reward_min,
+    rewardMax: item.reward_max,
+    rewardCurrency: item.reward_currency,
+    missionGiver: item.mission_giver,
+    locationSystem: item.location_system,
+    locationPlanet: item.location_planet,
+    locationName: item.location_name,
+    dangerLevel: item.danger_level,
+    requiredReputation: item.required_reputation,
+    reputationReward: item.reputation_reward,
+    baseXp: item.base_xp,
+    displayCategory: item.display_category,
+    isUnique: item.is_unique,
+    hasBlueprintReward: item.has_blueprint_reward,
+  };
+}
+
+function mapCraftingIngredient(item: NonNullable<CraftingRecipe['ingredients']>[number]) {
+  return {
+    ...item,
+    itemName: item.item_name,
+    displayItemName: item.display_item_name,
+    itemUuid: item.item_uuid,
+    isOptional: item.is_optional,
+    minQuality: item.min_quality,
+    slotName: item.slot_name,
+    displaySlotName: item.display_slot_name,
+  };
+}
+
+function mapCraftingModifier(item: NonNullable<CraftingRecipe['modifiers']>[number]) {
+  return {
+    ...item,
+    slotName: item.slot_name,
+    propertyName: item.property_name,
+    displayPropertyName: item.display_property_name,
+    propertyUuid: item.property_uuid,
+    unitFormat: item.unit_format,
+    startQuality: item.start_quality,
+    endQuality: item.end_quality,
+    modifierAtStart: item.modifier_at_start,
+    modifierAtEnd: item.modifier_at_end,
+  };
+}
+
+function mapCraftingRecipe(item: CraftingRecipe): CraftingRecipe {
+  return {
+    ...item,
+    className: item.class_name,
+    displayName: item.display_name,
+    displayCategory: item.display_category,
+    outputItemName: item.output_item_name,
+    displayOutputItemName: item.display_output_item_name,
+    outputItemUuid: item.output_item_uuid,
+    outputQuantity: item.output_quantity,
+    craftingTimeS: item.crafting_time_s,
+    stationType: item.station_type,
+    displayStationType: item.display_station_type,
+    skillLevel: item.skill_level,
+    gameEnv: item.game_env,
+    ingredients: item.ingredients?.map(mapCraftingIngredient),
+    modifiers: item.modifiers?.map(mapCraftingModifier),
+  };
+}
+
+function mapCraftingCategory(item: CraftingCategory): CraftingCategory {
+  return {
+    ...item,
+    displayCategory: item.display_category,
+  };
+}
+
+function mapCraftingResource(item: CraftingResource): CraftingResource {
+  return {
+    ...item,
+    itemName: item.item_name,
+    displayItemName: item.display_item_name,
+    itemUuid: item.item_uuid,
+    recipeCount: item.recipe_count,
+    totalQuantity: item.total_quantity,
+    totalScu: item.total_scu,
+  };
+}
+
+function mapShop(item: Shop): Shop {
+  return {
+    ...item,
+    className: item.class_name,
+    parentLocation: item.parent_location,
+    planetMoon: item.planet_moon,
+    shopType: item.shop_type,
+    displayShopType: item.display_shop_type,
+  };
+}
+
+function mapPaginated<T>(result: PaginatedResponse<T>, mapItem: (item: T) => T): PaginatedResponse<T> {
+  return { ...result, data: result.data.map(mapItem) };
+}
+
 // ─── Stats / Version ─────────────────────────────────────────────────────────
 export const api = {
   stats: {
@@ -159,7 +268,8 @@ export const api = {
 
   // ─── Shops ─────────────────────────────────────────────────────────
   shops: {
-    list: (p?: { env?: string; system?: string; city?: string }) => get<PaginatedResponse<Shop>>('/shops', p),
+    list: async (p?: { env?: string; system?: string; city?: string }) =>
+      mapPaginated(await get<PaginatedResponse<Shop>>('/shops', p), mapShop),
   },
 
   // ─── Commodities ───────────────────────────────────────────────────
@@ -218,7 +328,7 @@ export const api = {
     factions: (env?: string) => get<string[]>('/missions/factions', { env }),
     systems: (env?: string) => get<string[]>('/missions/systems', { env }),
     categories: (env?: string) => get<string[]>('/missions/categories', { env }),
-    list: (filters?: {
+    list: async (filters?: {
       env?: string;
       type?: string;
       legal?: string;
@@ -232,14 +342,15 @@ export const api = {
       search?: string;
       page?: number;
       limit?: number;
-    }) => get<PaginatedResponse<Mission>>('/missions', filters as Record<string, string | number | undefined>),
+    }) =>
+      mapPaginated(await get<PaginatedResponse<Mission>>('/missions', filters as Record<string, string | number | undefined>), mapMission),
   },
 
   // ─── Crafting ────────────────────────────────────────────────────────
   crafting: {
-    categories: (env?: string) => get<CraftingCategory[]>('/crafting/categories', { env }),
+    categories: async (env?: string) => (await get<CraftingCategory[]>('/crafting/categories', { env })).map(mapCraftingCategory),
     stationTypes: (env?: string) => get<string[]>('/crafting/station-types', { env }),
-    recipes: (filters?: {
+    recipes: async (filters?: {
       env?: string;
       category?: string;
       search?: string;
@@ -247,11 +358,15 @@ export const api = {
       limit?: number;
       skillLevel?: number;
       stationType?: string;
-    }) => get<PaginatedResponse<CraftingRecipe>>('/crafting/recipes', filters as Record<string, string | number | undefined>),
-    recipe: (uuid: string, env?: string) => get<CraftingRecipe>(`/crafting/recipes/${uuid}`, { env }),
-    resources: (env?: string) => get<CraftingResource[]>('/crafting/resources', { env }),
-    recipesByResource: (itemName: string, env?: string) =>
-      get<CraftingRecipe[]>(`/crafting/resources/${encodeURIComponent(itemName)}/recipes`, { env }),
+    }) =>
+      mapPaginated(
+        await get<PaginatedResponse<CraftingRecipe>>('/crafting/recipes', filters as Record<string, string | number | undefined>),
+        mapCraftingRecipe,
+      ),
+    recipe: async (uuid: string, env?: string) => mapCraftingRecipe(await get<CraftingRecipe>(`/crafting/recipes/${uuid}`, { env })),
+    resources: async (env?: string) => (await get<CraftingResource[]>('/crafting/resources', { env })).map(mapCraftingResource),
+    recipesByResource: async (itemName: string, env?: string) =>
+      (await get<CraftingRecipe[]>(`/crafting/resources/${encodeURIComponent(itemName)}/recipes`, { env })).map(mapCraftingRecipe),
   },
 
   // ─── Trade ──────────────────────────────────────────────────────────

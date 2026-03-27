@@ -324,7 +324,9 @@ export interface Commodity {
 export interface Shop {
   id: number;
   name: string;
+  shopType?: string | null;
   display_shop_type?: string;
+  displayShopType?: string;
   normalized_name?: string | null;
   canonical_shop_key?: string | null;
   canonical_location_key?: string | null;
@@ -334,11 +336,14 @@ export interface Shop {
   confidence_score?: number | null;
   location: string | null;
   parent_location: string | null;
+  parentLocation?: string | null;
   system: string | null;
   planet_moon: string | null;
+  planetMoon?: string | null;
   city: string | null;
   shop_type: string | null;
   class_name: string;
+  className?: string;
 }
 
 // ─── Changelog ────────────────────────────────────────────────────────────────
@@ -420,19 +425,31 @@ export interface MiningStats {
 export interface CraftingRecipe {
   uuid: string;
   class_name: string;
+  className?: string;
   name: string | null;
   display_name?: string;
+  displayName?: string;
   category: string | null;
   display_category?: string;
+  displayCategory?: string;
   output_item_name: string | null;
   display_output_item_name?: string;
+  outputItemName?: string | null;
+  displayOutputItemName?: string;
   output_item_uuid: string | null;
+  outputItemUuid?: string | null;
   output_quantity: number;
+  outputQuantity?: number;
   crafting_time_s: number | null;
+  craftingTimeS?: number | null;
   station_type: string | null;
   display_station_type?: string;
+  stationType?: string | null;
+  displayStationType?: string;
   skill_level: number | null;
+  skillLevel?: number | null;
   game_env: string;
+  gameEnv?: string;
   ingredients?: CraftingIngredient[];
   modifiers?: CraftingSlotModifier[];
 }
@@ -441,41 +458,64 @@ export interface CraftingIngredient {
   id: number;
   item_name: string;
   display_item_name?: string;
+  itemName?: string;
+  displayItemName?: string;
   item_uuid: string | null;
+  itemUuid?: string | null;
   quantity: number;
   is_optional: boolean;
+  isOptional?: boolean;
   scu: number | null;
   min_quality: number;
+  minQuality?: number;
   slot_name: string | null;
   display_slot_name?: string | null;
+  slotName?: string | null;
+  displaySlotName?: string | null;
 }
 
 export interface CraftingSlotModifier {
   id: number;
   slot_name: string;
+  slotName?: string;
   property_name: string;
   display_property_name?: string;
+  propertyName?: string;
+  displayPropertyName?: string;
   property_uuid: string;
+  propertyUuid?: string;
   unit_format: string;
+  unitFormat?: string;
   start_quality: number;
+  startQuality?: number;
   end_quality: number;
+  endQuality?: number;
   modifier_at_start: number;
+  modifierAtStart?: number;
   modifier_at_end: number;
+  modifierAtEnd?: number;
 }
 
 export interface CraftingCategory {
   category: string;
   count: number;
   display_category?: string;
+  displayCategory?: string;
 }
 
 export interface CraftingResource {
   item_name: string;
   display_item_name?: string;
+  itemName?: string;
+  displayItemName?: string;
   item_uuid: string | null;
+  itemUuid?: string | null;
   recipe_count: number;
+  recipeCount?: number;
   total_quantity: number;
+  totalQuantity?: number;
   total_scu: number | null;
+  totalScu?: number | null;
 }
 
 // ─── Trade ────────────────────────────────────────────────────────────────────
@@ -534,30 +574,51 @@ export interface TradeRoute {
 export interface Mission {
   uuid: string;
   class_name: string;
+  className?: string;
   title: string | null;
   description: string | null;
   mission_type: string | null;
   display_mission_type?: string;
+  missionType?: string | null;
+  displayMissionType?: string;
   can_be_shared: boolean;
+  canBeShared?: boolean;
   only_owner_complete: boolean;
+  onlyOwnerComplete?: boolean;
   is_legal: boolean;
+  isLegal?: boolean;
   completion_time_s: number | null;
+  completionTimeS?: number | null;
   reward_min: number | null;
+  rewardMin?: number | null;
   reward_max: number | null;
+  rewardMax?: number | null;
   reward_currency: string | null;
+  rewardCurrency?: string | null;
   faction: string | null;
   mission_giver: string | null;
+  missionGiver?: string | null;
   location_system: string | null;
+  locationSystem?: string | null;
   location_planet: string | null;
+  locationPlanet?: string | null;
   location_name: string | null;
+  locationName?: string | null;
   danger_level: number | null;
+  dangerLevel?: number | null;
   required_reputation: number | null;
+  requiredReputation?: number | null;
   reputation_reward: number | null;
+  reputationReward?: number | null;
   base_xp: number | null;
+  baseXp?: number | null;
   category: string | null;
   display_category?: string;
+  displayCategory?: string;
   is_unique: boolean;
+  isUnique?: boolean;
   has_blueprint_reward: boolean;
+  hasBlueprintReward?: boolean;
 }
 
 export interface ChangelogEntry {
