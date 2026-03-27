@@ -2,7 +2,7 @@
  * ComponentQueryService — Component listing, filters, buy locations, ships
  */
 import type { PrismaClient } from '@prisma/client';
-import { type PaginatedResult, paginate, type Row } from './shared.js';
+import { type PaginatedResult, paginate, type Row, stripInternal } from './shared.js';
 
 const COMP_SORT = new Set([
   'name',
@@ -103,7 +103,7 @@ export class ComponentQueryService {
       'SELECT c.*, m.name as manufacturer_name FROM components c LEFT JOIN starvis.manufacturers m ON c.manufacturer_code = m.code WHERE c.uuid = ?',
       uuid,
     );
-    return rows[0] || null;
+    return rows[0] ? stripInternal(rows[0]) : null;
   }
 
   async getComponentByClassName(className: string, env = 'live'): Promise<Row | null> {
@@ -112,7 +112,7 @@ export class ComponentQueryService {
       'SELECT c.*, m.name as manufacturer_name FROM components c LEFT JOIN starvis.manufacturers m ON c.manufacturer_code = m.code WHERE c.class_name = ?',
       className,
     );
-    return rows[0] || null;
+    return rows[0] ? stripInternal(rows[0]) : null;
   }
 
   /** Resolve UUID or class_name → component */

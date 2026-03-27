@@ -65,6 +65,30 @@ export const r2 = (v: number): number => Math.round(v * 100) / 100;
 export const r4 = (v: number): number => Math.round(v * 10000) / 10000;
 export const r6 = (v: number): number => Math.round(v * 1000000) / 1000000;
 
+// ── Internal-field stripping ──────────────────────────────
+
+const INTERNAL_FIELDS = new Set([
+  'canonical_component_key',
+  'canonical_item_key',
+  'canonical_commodity_key',
+  'canonical_shop_key',
+  'canonical_location_key',
+  'source_type',
+  'source_name',
+  'source_reference',
+  'confidence_score',
+  'normalized_name',
+]);
+
+/** Remove internal/metadata columns that should not be exposed via the API */
+export function stripInternal(row: Row): Row {
+  const result: Row = {};
+  for (const [key, value] of Object.entries(row)) {
+    if (!INTERNAL_FIELDS.has(key)) result[key] = value;
+  }
+  return result;
+}
+
 // ── Pagination helper ─────────────────────────────────────
 
 export async function paginate(
@@ -87,5 +111,5 @@ export async function paginate(
 
   const sql = `${baseSql} ORDER BY ${alias}.${sortCol} ${order} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
   const rows = await prisma.$queryRawUnsafe<Row[]>(sql, ...params);
-  return { data: rows, total: Number(total), page, limit, pages: Math.ceil(Number(total) / limit) };
+  return { data: rows.map(stripInternal), total: Number(total), page, limit, pages: Math.ceil(Number(total) / limit) };
 }

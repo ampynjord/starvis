@@ -72,8 +72,6 @@ const SHIP_SELECT = [
   's.insurance_expedite_cost',
   's.short_name',
   's.variant_type',
-  's.chassis_id',
-  's.game_data',
 ].join(', ');
 
 // prettier-ignore
@@ -144,8 +142,6 @@ const CONCEPT_SELECT = [
   'NULL as insurance_expedite_cost',
   'NULL as short_name',
   'NULL as variant_type',
-  'sm2.chassis_id',
-  'NULL as game_data',
 ].join(', ');
 
 const SHIP_JOINS = `FROM ships s
@@ -305,7 +301,7 @@ export class ShipQueryService {
     }
 
     const rows = await prisma.$queryRawUnsafe<Row[]>(sql, ...allParams);
-    const data = rows.map(({ game_data, ...rest }) => convertBigIntToNumber(rest as Row));
+    const data = rows.map(convertBigIntToNumber);
     return { data, total: totalCount, page, limit, pages: Math.ceil(totalCount / limit) };
   }
 
@@ -320,7 +316,7 @@ export class ShipQueryService {
       return rows[0] ? convertBigIntToNumber(rows[0]) : null;
     }
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT ${SHIP_SELECT}, FALSE as is_concept_only,
+      `SELECT ${SHIP_SELECT}, s.game_data, FALSE as is_concept_only,
               sm.length as sm_length, sm.beam as sm_beam, sm.height as sm_height
        ${SHIP_JOINS} WHERE s.uuid = ?`,
       uuid,
@@ -424,7 +420,7 @@ export class ShipQueryService {
        ORDER BY s.name`,
       code.toUpperCase(),
     );
-    return rows.map(({ game_data, ...rest }) => convertBigIntToNumber(rest));
+    return rows.map(convertBigIntToNumber);
   }
 
   async getManufacturerComponents(code: string, env = 'live'): Promise<Row[]> {
@@ -474,8 +470,7 @@ export class ShipQueryService {
        LIMIT 1 OFFSET ${offset}`,
     );
     if (!rows[0]) return null;
-    const { game_data, ...rest } = rows[0];
-    return convertBigIntToNumber(rest);
+    return convertBigIntToNumber(rows[0]);
   }
 
   async getSimilarShips(uuid: string, limit = 5, env = 'live'): Promise<Row[]> {
@@ -500,7 +495,7 @@ export class ShipQueryService {
       ship.manufacturer_code,
       ship.role,
     );
-    return rows.map(({ game_data, ...rest }) => convertBigIntToNumber(rest));
+    return rows.map(convertBigIntToNumber);
   }
 
   /** Get all ships sharing the same chassis_id (variants of the same hull) */
@@ -517,7 +512,7 @@ export class ShipQueryService {
       chassisId,
       uuid,
     );
-    return rows.map(({ game_data, ...rest }) => convertBigIntToNumber(rest));
+    return rows.map(convertBigIntToNumber);
   }
 
   /** Get a lightweight variant summary for a ship (uuid, name, thumbnail) */
