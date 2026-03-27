@@ -2,7 +2,38 @@
  * CraftingService — Crafting recipe queries
  */
 import type { PrismaClient } from '@prisma/client';
+import { cleanItemName, cleanPropertyName, cleanRecipeName } from '../normalizers/crafting.js';
 import { convertBigIntToNumber, type PaginatedResult, type Row } from './shared.js';
+
+function normalizeRecipeRow(row: Row): Row {
+  return {
+    ...row,
+    display_name: cleanRecipeName(String(row.name ?? row.class_name ?? '')),
+    display_output_item_name: cleanItemName(String(row.output_item_name ?? row.name ?? row.class_name ?? '')),
+  };
+}
+
+function normalizeIngredientRow(row: Row): Row {
+  return {
+    ...row,
+    display_item_name: cleanItemName(String(row.item_name ?? '')),
+    display_slot_name: row.slot_name ? cleanItemName(String(row.slot_name)) : null,
+  };
+}
+
+function normalizeModifierRow(row: Row): Row {
+  return {
+    ...row,
+    display_property_name: cleanPropertyName(String(row.property_name ?? '')),
+  };
+}
+
+function normalizeResourceRow(row: Row): Row {
+  return {
+    ...row,
+    display_item_name: cleanItemName(String(row.item_name ?? '')),
+  };
+}
 
 export class CraftingService {
   constructor(private getClient: (env: string) => PrismaClient) {}
@@ -92,7 +123,7 @@ export class CraftingService {
     );
 
     return {
-      data: convertBigIntToNumber(data),
+      data: convertBigIntToNumber(data).map(normalizeRecipeRow),
       total,
       page,
       limit: safeLimit,
@@ -113,7 +144,7 @@ export class CraftingService {
        GROUP BY ci.item_uuid, i.name, ci.item_name
        ORDER BY recipe_count DESC, item_name`,
     );
-    return convertBigIntToNumber(rows);
+    return convertBigIntToNumber(rows).map(normalizeResourceRow);
   }
 
   /** List recipes that use a given resource (by item_name) */
@@ -133,7 +164,7 @@ export class CraftingService {
       itemName,
       itemName,
     );
-    return convertBigIntToNumber(rows);
+    return convertBigIntToNumber(rows).map((row) => normalizeRecipeRow(normalizeIngredientRow(row)));
   }
 
   /** Single recipe by UUID with ingredients */
@@ -151,7 +182,7 @@ export class CraftingService {
     );
     if (!rows.length) return null;
 
-    const recipe = convertBigIntToNumber(rows[0]);
+    const recipe = normalizeRecipeRow(convertBigIntToNumber(rows[0]));
 
     const ingredients = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT ci.id, COALESCE(i.name, ci.item_name) AS item_name, ci.item_uuid,
@@ -162,7 +193,7 @@ export class CraftingService {
        ORDER BY item_name`,
       uuid,
     );
-    recipe.ingredients = convertBigIntToNumber(ingredients);
+    recipe.ingredients = convertBigIntToNumber(ingredients).map(normalizeIngredientRow);
 
     const modifiers = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT id, slot_name, property_name, property_uuid, unit_format,
@@ -172,7 +203,7 @@ export class CraftingService {
        ORDER BY slot_name, property_name`,
       uuid,
     );
-    recipe.modifiers = convertBigIntToNumber(modifiers);
+    recipe.modifiers = convertBigIntToNumber(modifiers).map(normalizeModifierRow);
 
     return recipe;
   }
