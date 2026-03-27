@@ -9,8 +9,23 @@ function collapseWhitespace(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
+const KNOWN_ACRONYMS = new Set(['api', 'fps', 'ptu', 'rsi', 'scu', 'uee', 'ui']);
+
+function toDisplayToken(token: string): string {
+  const lower = token.toLowerCase();
+  if (!token) return token;
+  if (/^\d+$/.test(token)) return token;
+  if (KNOWN_ACRONYMS.has(lower)) return lower.toUpperCase();
+  // Common 3-letter manufacturer-like shortcodes found in crafting records (e.g. ccc, cds).
+  if (/^[a-z]{3}$/.test(lower) && new Set(lower).size <= 2) return lower.toUpperCase();
+  return `${lower[0].toUpperCase()}${lower.slice(1)}`;
+}
+
 function titleCaseWords(value: string): string {
-  return value.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  return value
+    .split(' ')
+    .map((token) => toDisplayToken(token))
+    .join(' ');
 }
 
 export function cleanRecipeName(raw: string | null | undefined): string {
