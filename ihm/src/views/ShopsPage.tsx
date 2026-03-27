@@ -55,7 +55,7 @@ export default function ShopsPage() {
                       )}
                       {shop.shop_type && (
                         <div className="mt-1">
-                          <GlowBadge color="slate">{shop.shop_type}</GlowBadge>
+                          <GlowBadge color="slate">{shop.display_shop_type ?? shop.shop_type}</GlowBadge>
                         </div>
                       )}
                       <CanonicalMeta
