@@ -170,6 +170,56 @@ function mapShop(item: Shop): Shop {
   };
 }
 
+function mapMiningCompositionRef(item: NonNullable<MiningElement['found_in']>[number]) {
+  return {
+    ...item,
+    compositionUuid: item.composition_uuid,
+    depositName: item.deposit_name,
+    className: item.class_name,
+    minPercentage: item.min_percentage,
+    maxPercentage: item.max_percentage,
+  };
+}
+
+function mapMiningCompositionPart(item: NonNullable<MiningComposition['elements']>[number]) {
+  return {
+    ...item,
+    elementUuid: item.element_uuid,
+    elementName: item.element_name,
+    minPercentage: item.min_percentage,
+    maxPercentage: item.max_percentage,
+  };
+}
+
+function mapMiningElement(item: MiningElement): MiningElement {
+  return {
+    ...item,
+    className: item.class_name,
+    commodityUuid: item.commodity_uuid,
+    optimalWindowMidpoint: item.optimal_window_midpoint,
+    optimalWindowMidpointRand: item.optimal_window_midpoint_rand,
+    optimalWindowThinness: item.optimal_window_thinness,
+    explosionMultiplier: item.explosion_multiplier,
+    clusterFactor: item.cluster_factor,
+    rocksContaining: item.rocks_containing,
+    avgProbabilityPct: item.avg_probability_pct,
+    avgMinPct: item.avg_min_pct,
+    avgMaxPct: item.avg_max_pct,
+    foundIn: item.found_in?.map(mapMiningCompositionRef),
+  };
+}
+
+function mapMiningComposition(item: MiningComposition): MiningComposition {
+  return {
+    ...item,
+    className: item.class_name,
+    depositName: item.deposit_name,
+    minDistinctElements: item.min_distinct_elements,
+    elementCount: item.element_count,
+    elements: item.elements?.map(mapMiningCompositionPart),
+  };
+}
+
 function mapPaginated<T>(result: PaginatedResponse<T>, mapItem: (item: T) => T): PaginatedResponse<T> {
   return { ...result, data: result.data.map(mapItem) };
 }
@@ -315,10 +365,11 @@ export const api = {
 
   // ─── Mining ────────────────────────────────────────────────────────
   mining: {
-    elements: (env?: string) => get<MiningElement[]>('/mining/elements', { env }),
-    compositions: (includeEmpty = false, env?: string) =>
-      get<MiningComposition[]>('/mining/compositions', { include_empty: includeEmpty || undefined, env }),
-    composition: (uuid: string, env?: string) => get<MiningComposition>(`/mining/compositions/${uuid}`, { env }),
+    elements: async (env?: string) => (await get<MiningElement[]>('/mining/elements', { env })).map(mapMiningElement),
+    compositions: async (includeEmpty = false, env?: string) =>
+      (await get<MiningComposition[]>('/mining/compositions', { include_empty: includeEmpty || undefined, env })).map(mapMiningComposition),
+    composition: async (uuid: string, env?: string) =>
+      mapMiningComposition(await get<MiningComposition>(`/mining/compositions/${uuid}`, { env })),
     lasers: (env?: string) => get<MiningLaserInfo[]>('/mining/lasers', { env }),
   },
 
