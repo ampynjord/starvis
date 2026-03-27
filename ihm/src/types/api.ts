@@ -351,49 +351,74 @@ export interface Shop {
 export interface MiningElement {
   uuid: string;
   class_name: string;
+  className?: string;
   name: string;
   commodity_uuid: string | null;
+  commodityUuid?: string | null;
   instability: number | null;
   resistance: number | null;
   optimal_window_midpoint: number | null;
+  optimalWindowMidpoint?: number | null;
   optimal_window_midpoint_rand: number | null;
+  optimalWindowMidpointRand?: number | null;
   optimal_window_thinness: number | null;
+  optimalWindowThinness?: number | null;
   explosion_multiplier: number | null;
+  explosionMultiplier?: number | null;
   cluster_factor: number | null;
+  clusterFactor?: number | null;
   /** Aggregated — present in getAllElements */
   rocks_containing?: number;
+  rocksContaining?: number;
   avg_probability_pct?: number;
+  avgProbabilityPct?: number;
   avg_min_pct?: number;
+  avgMinPct?: number;
   avg_max_pct?: number;
+  avgMaxPct?: number;
   /** Only present when fetched via /elements/:uuid */
   found_in?: MiningCompositionRef[];
+  foundIn?: MiningCompositionRef[];
 }
 
 export interface MiningCompositionRef {
   composition_uuid: string;
+  compositionUuid?: string;
   deposit_name: string;
+  depositName?: string;
   class_name: string;
+  className?: string;
   min_percentage: number;
+  minPercentage?: number;
   max_percentage: number;
+  maxPercentage?: number;
   probability: number;
 }
 
 export interface MiningCompositionPart {
   element_uuid: string;
+  elementUuid?: string;
   element_name: string;
+  elementName?: string;
   instability: number | null;
   resistance: number | null;
   min_percentage: number;
+  minPercentage?: number;
   max_percentage: number;
+  maxPercentage?: number;
   probability: number;
 }
 
 export interface MiningComposition {
   uuid: string;
   class_name: string;
+  className?: string;
   deposit_name: string;
+  depositName?: string;
   min_distinct_elements: number | null;
+  minDistinctElements?: number | null;
   element_count?: number;
+  elementCount?: number;
   /** Only present when fetched via /compositions/:uuid */
   elements?: MiningCompositionPart[];
 }
@@ -401,18 +426,28 @@ export interface MiningComposition {
 export interface MiningSolverResult {
   uuid: string;
   class_name: string;
+  className?: string;
   deposit_name: string;
+  depositName?: string;
   min_distinct_elements: number | null;
+  minDistinctElements?: number | null;
   element_name: string;
+  elementName?: string;
   instability: number | null;
   resistance: number | null;
   optimal_window_midpoint: number | null;
+  optimalWindowMidpoint?: number | null;
   optimal_window_thinness: number | null;
+  optimalWindowThinness?: number | null;
   explosion_multiplier: number | null;
+  explosionMultiplier?: number | null;
   min_percentage: number;
+  minPercentage?: number;
   max_percentage: number;
+  maxPercentage?: number;
   probability: number;
   curve_exponent: number | null;
+  curveExponent?: number | null;
 }
 
 export interface MiningStats {
@@ -525,32 +560,47 @@ export interface TradeLocation {
   location: string | null;
   system: string | null;
   planet_moon: string | null;
+  planetMoon?: string | null;
   city: string | null;
   shop_type: string | null;
+  shopType?: string | null;
 }
 
 export interface CommodityPrice {
   id: number;
   buy_price: number | null;
+  buyPrice?: number | null;
   sell_price: number | null;
+  sellPrice?: number | null;
   reported_at: string;
+  reportedAt?: string;
   shop_id: number;
+  shopId?: number;
   shop_name: string;
+  shopName?: string;
   system: string | null;
   planet_moon: string | null;
+  planetMoon?: string | null;
   city: string | null;
 }
 
 export interface LocationCommodityPrice {
   id: number;
   commodity_uuid: string;
+  commodityUuid?: string;
   commodity_name: string;
+  commodityName?: string;
   commodity_type: string;
+  commodityType?: string;
   symbol: string | null;
   occupancy_scu: number | null;
+  occupancyScu?: number | null;
   buy_price: number | null;
+  buyPrice?: number | null;
   sell_price: number | null;
+  sellPrice?: number | null;
   reported_at: string;
+  reportedAt?: string;
 }
 
 export interface TradeRoute {
