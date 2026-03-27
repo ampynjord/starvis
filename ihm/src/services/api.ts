@@ -3,7 +3,6 @@ import type {
   ChangelogEntry,
   ChangelogSummary,
   Commodity,
-  CommodityPrice as CommodityPriceRow,
   CompatibleComponent,
   Component,
   ComponentListItem,
@@ -11,34 +10,27 @@ import type {
   CraftingRecipe,
   CraftingResource,
   FpsDamageResult,
-  Hardpoint,
   Item,
   ItemBuyLocation,
   ItemListItem,
   LoadoutNode,
   LoadoutResult,
-  LocationCommodityPrice,
   Manufacturer,
   MiningComposition,
   MiningElement,
   MiningLaserInfo,
-  MiningSolverResult,
-  MiningStats,
   MiningYieldResult,
   Mission,
   PaginatedResponse,
   PaintListItem,
   SearchResult,
   Ship,
-  ShipComparison,
   ShipFilters,
   ShipListItem,
   ShipModule,
   ShipPaint,
-  ShipStats,
   Shop,
   StatsOverview,
-  TradeLocation,
   TradeRoute,
   Version,
 } from '@/types/api';
@@ -96,14 +88,10 @@ export const api = {
     filters: (env?: string) => get<ShipFilters>('/ships/filters', { env }),
     search: (search: string, limit = 8, env?: string) => get<ShipListItem[]>('/ships/search', { search, limit, env }),
     random: (env?: string) => get<ShipListItem>('/ships/random', { env }),
-    manufacturers: (env?: string) => get<{ code: string; name: string }[]>('/ships/manufacturers', { env }),
     get: (uuid: string, env?: string) => get<Ship>(`/ships/${uuid}`, { env }),
     loadout: (uuid: string, env?: string) => get<LoadoutNode[]>(`/ships/${uuid}/loadout`, { env }),
     paints: (uuid: string, env?: string) => get<ShipPaint[]>(`/ships/${uuid}/paints`, { env }),
-    stats: (uuid: string, env?: string) => get<ShipStats>(`/ships/${uuid}/stats`, { env }),
-    hardpoints: (uuid: string, env?: string) => get<Hardpoint[]>(`/ships/${uuid}/hardpoints`, { env }),
     similar: (uuid: string, limit = 6, env?: string) => get<ShipListItem[]>(`/ships/${uuid}/similar`, { limit, env }),
-    compare: (uuid1: string, uuid2: string, env?: string) => get<ShipComparison>(`/ships/${uuid1}/compare/${uuid2}`, { env }),
     modules: (uuid: string, env?: string) => get<ShipModule[]>(`/ships/${uuid}/modules`, { env }),
     ranking: (sort_by: string, order: 'asc' | 'desc', category?: string, env?: string) =>
       get<ShipListItem[]>('/ships/ranking', { sort_by, order, category, env }),
@@ -122,7 +110,6 @@ export const api = {
       grade?: string;
       manufacturer?: string;
     }) => get<PaginatedResponse<ComponentListItem>>('/components', p),
-    types: (env?: string) => get<string[]>('/components/types', { env }),
     filters: (env?: string) => get<Record<string, string[]>>('/components/filters', { env }),
     get: (uuid: string, env?: string) => get<Component>(`/components/${uuid}`, { env }),
     buyLocations: (uuid: string, env?: string) => get<BuyLocation[]>(`/components/${uuid}/buy-locations`, { env }),
@@ -153,7 +140,6 @@ export const api = {
       grade?: string;
       manufacturer?: string;
     }) => get<PaginatedResponse<ItemListItem>>('/items', p),
-    types: (env?: string) => get<string[]>('/items/types', { env }),
     filters: (env?: string) => get<Record<string, string[]>>('/items/filters', { env }),
     get: (uuid: string, env?: string) => get<Item>(`/items/${uuid}`, { env }),
     buyLocations: (uuid: string, env?: string) => get<ItemBuyLocation[]>(`/items/${uuid}/buy-locations`, { env }),
@@ -162,9 +148,7 @@ export const api = {
   // ─── Manufacturers ─────────────────────────────────────────────────
   manufacturers: {
     list: (env?: string) => get<Manufacturer[]>('/manufacturers', { env }),
-    get: (code: string, env?: string) => get<Manufacturer>(`/manufacturers/${code}`, { env }),
     ships: (code: string, env?: string) => get<ShipListItem[]>(`/manufacturers/${code}/ships`, { env }),
-    components: (code: string, env?: string) => get<ComponentListItem[]>(`/manufacturers/${code}/components`, { env }),
   },
 
   // ─── Paints ────────────────────────────────────────────────────────
@@ -176,7 +160,6 @@ export const api = {
   // ─── Shops ─────────────────────────────────────────────────────────
   shops: {
     list: (p?: { env?: string; system?: string; city?: string }) => get<PaginatedResponse<Shop>>('/shops', p),
-    inventory: (id: number, env?: string) => get<unknown[]>(`/shops/${id}/inventory`, { env }),
   },
 
   // ─── Commodities ───────────────────────────────────────────────────
@@ -223,16 +206,10 @@ export const api = {
   // ─── Mining ────────────────────────────────────────────────────────
   mining: {
     elements: (env?: string) => get<MiningElement[]>('/mining/elements', { env }),
-    element: (uuid: string, env?: string) => get<MiningElement>(`/mining/elements/${uuid}`, { env }),
     compositions: (includeEmpty = false, env?: string) =>
       get<MiningComposition[]>('/mining/compositions', { include_empty: includeEmpty || undefined, env }),
     composition: (uuid: string, env?: string) => get<MiningComposition>(`/mining/compositions/${uuid}`, { env }),
     lasers: (env?: string) => get<MiningLaserInfo[]>('/mining/lasers', { env }),
-    solveForElement: (elementUuid: string, minProbability?: number, env?: string) =>
-      get<MiningSolverResult[]>('/mining/solver', { element: elementUuid, min_probability: minProbability, env }),
-    solveForComposition: (compositionUuid: string, env?: string) =>
-      get<MiningSolverResult[]>('/mining/solver', { composition: compositionUuid, env }),
-    stats: (env?: string) => get<MiningStats>('/mining/stats', { env }),
   },
 
   // ─── Missions ──────────────────────────────────────────────────────
@@ -256,7 +233,6 @@ export const api = {
       page?: number;
       limit?: number;
     }) => get<PaginatedResponse<Mission>>('/missions', filters as Record<string, string | number | undefined>),
-    get: (uuid: string) => get<Mission>(`/missions/${uuid}`),
   },
 
   // ─── Crafting ────────────────────────────────────────────────────────
@@ -280,10 +256,7 @@ export const api = {
 
   // ─── Trade ──────────────────────────────────────────────────────────
   trade: {
-    locations: (env?: string) => get<TradeLocation[]>('/trade/locations', { env }),
     systems: (env?: string) => get<string[]>('/trade/systems', { env }),
-    commodityPrices: (commodityUuid: string, env?: string) => get<CommodityPriceRow[]>(`/trade/prices/${commodityUuid}`, { env }),
-    locationPrices: (shopId: number, env?: string) => get<LocationCommodityPrice[]>(`/trade/location/${shopId}/prices`, { env }),
     reportPrice: (data: { commodityUuid: string; shopId: number; buyPrice?: number; sellPrice?: number; env?: string }) =>
       post<{ inserted?: boolean; updated?: boolean }>('/trade/prices', data),
     routes: (
