@@ -1,5 +1,5 @@
 import type { Router } from 'express';
-import { asyncHandler, getQueryNumber, getQueryString, makeGameDataGuard, sendPaginatedWithETag, sendWithETag } from './helpers.js';
+import { asyncHandler, getQueryNumber, getQueryString, makeGameDataGuard, sendDataWithETag, sendPaginatedWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
 export function mountMissionRoutes(router: Router, deps: RouteDependencies): void {
@@ -16,7 +16,7 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
     asyncHandler(async (req, res) => {
       const env = getQueryString(req, 'env') ?? 'live';
       const types = await gameDataService!.missions.getMissionTypes(env);
-      sendWithETag(req, res, { success: true, data: types });
+      sendDataWithETag(req, res, types);
     }),
   );
 
@@ -30,7 +30,7 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
     asyncHandler(async (req, res) => {
       const env = getQueryString(req, 'env') ?? 'live';
       const factions = await gameDataService!.missions.getFactions(env);
-      sendWithETag(req, res, { success: true, data: factions });
+      sendDataWithETag(req, res, factions);
     }),
   );
 
@@ -44,7 +44,7 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
     asyncHandler(async (req, res) => {
       const env = getQueryString(req, 'env') ?? 'live';
       const systems = await gameDataService!.missions.getSystems(env);
-      sendWithETag(req, res, { success: true, data: systems });
+      sendDataWithETag(req, res, systems);
     }),
   );
 
@@ -58,7 +58,7 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
     asyncHandler(async (req, res) => {
       const env = getQueryString(req, 'env') ?? 'live';
       const categories = await gameDataService!.missions.getCategories(env);
-      sendWithETag(req, res, { success: true, data: categories });
+      sendDataWithETag(req, res, categories);
     }),
   );
 
@@ -102,7 +102,7 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
       const env = getQueryString(req, 'env') ?? 'live';
       const mission = await gameDataService!.missions.getMissionByUuid(req.params.uuid, env);
       if (!mission) return void res.status(404).json({ success: false, error: 'Mission not found' });
-      sendWithETag(req, res, { success: true, data: mission });
+      sendDataWithETag(req, res, mission);
     }),
   );
 }
