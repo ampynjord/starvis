@@ -76,6 +76,17 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+    networks:
+      - default
+      - traefik-network
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: "traefik-network"
+      traefik.http.routers.starvis-api-docs.rule: "Host(`starvis.ampynjord.bzh`) && PathPrefix(`/api-docs`)"
+      traefik.http.routers.starvis-api-docs.entrypoints: "websecure"
+      traefik.http.routers.starvis-api-docs.tls.certresolver: "letsencrypt"
+      traefik.http.routers.starvis-api-docs.priority: "100"
+      traefik.http.services.starvis-api-docs.loadbalancer.server.port: "3000"
     depends_on:
       mysql:
         condition: service_healthy
