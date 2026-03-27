@@ -260,18 +260,7 @@ export function parseCryXml(buf: Buffer): CryXmlNode {
   }
 
   // -----------------------------------------------------------------------
-  // 7. Parse child table (order table)
-  //    Each entry is the node-ID of a child.  Not strictly needed for
-  //    reconstruction since nodes carry ParentNodeID, but kept for
-  //    completeness / future use.
-  // -----------------------------------------------------------------------
-  // const childEntries: number[] = [];
-  // for (let i = 0; i < childTableCount; i++) {
-  //   childEntries.push(readInt32(buf, childTableOffset + i * CHILD_ENTRY_SIZE, order));
-  // }
-
-  // -----------------------------------------------------------------------
-  // 8. Reconstruct the XML tree
+  // 7. Reconstruct the XML tree
   //
   //    The reference C# implementation iterates nodes in order, uses a
   //    running attributeIndex, and links children via ParentNodeID.

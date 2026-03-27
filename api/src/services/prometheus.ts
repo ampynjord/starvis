@@ -27,30 +27,6 @@ export const httpRequestCounter = new Counter({
   registers: [register],
 });
 
-// Database Query Duration
-export const dbQueryDuration = new Histogram({
-  name: 'starvis_db_query_duration_seconds',
-  help: 'Duration of database queries in seconds',
-  labelNames: ['query_type', 'table'],
-  buckets: [0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 2],
-  registers: [register],
-});
-
-// Database Query Counter
-export const dbQueryCounter = new Counter({
-  name: 'starvis_db_queries_total',
-  help: 'Total number of database queries',
-  labelNames: ['query_type', 'table', 'status'],
-  registers: [register],
-});
-
-// Active Database Connections
-export const dbConnectionsGauge = new Gauge({
-  name: 'starvis_db_connections_active',
-  help: 'Number of active database connections',
-  registers: [register],
-});
-
 // Cache Hit/Miss Counter
 export const cacheCounter = new Counter({
   name: 'starvis_cache_operations_total',
