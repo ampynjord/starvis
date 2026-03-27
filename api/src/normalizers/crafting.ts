@@ -4,9 +4,14 @@
 
 const CRAFTING_PREFIX_RE = /^(CraftingBlueprintRecord\.)?BP_CRAFT_/i;
 const GPP_PREFIX_RE = /^@StatName_GPP_(Weapon_|Armor_)?/;
+const TRAILING_VARIANT_CODE_RE = /\s\d{2}(?:\s\d{2})+(?=\s+[a-z][a-z0-9-]*$|$)/gi;
 
 function collapseWhitespace(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
+}
+
+function stripVariantCodes(value: string): string {
+  return collapseWhitespace(value.replace(TRAILING_VARIANT_CODE_RE, ''));
 }
 
 const KNOWN_ACRONYMS = new Set(['api', 'fps', 'ptu', 'rsi', 'scu', 'uee', 'ui']);
@@ -30,13 +35,13 @@ function titleCaseWords(value: string): string {
 
 export function cleanRecipeName(raw: string | null | undefined): string {
   if (!raw) return '';
-  const cleaned = collapseWhitespace(raw.replace(CRAFTING_PREFIX_RE, '').replace(/_/g, ' '));
+  const cleaned = stripVariantCodes(collapseWhitespace(raw.replace(CRAFTING_PREFIX_RE, '').replace(/_/g, ' ')));
   return titleCaseWords(cleaned);
 }
 
 export function cleanItemName(raw: string | null | undefined): string {
   if (!raw) return '';
-  return titleCaseWords(collapseWhitespace(raw.replace(/_/g, ' ')));
+  return titleCaseWords(stripVariantCodes(collapseWhitespace(raw.replace(/_/g, ' '))));
 }
 
 export function cleanPropertyName(raw: string | null | undefined): string {
