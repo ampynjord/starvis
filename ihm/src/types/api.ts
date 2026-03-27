@@ -83,7 +83,6 @@ export interface Ship extends ShipListItem {
   insurance_expedite_cost: number | null;
   sm_description: string | null;
   store_url: string | null;
-  sm_cargo: number | null;
   thumbnail_large: string | null;
   game_data: Record<string, unknown> | null;
   armor_signal_ir: number | null;
