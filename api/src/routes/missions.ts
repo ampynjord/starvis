@@ -1,5 +1,5 @@
 import type { Router } from 'express';
-import { asyncHandler, getQueryNumber, getQueryString, makeGameDataGuard, sendWithETag } from './helpers.js';
+import { asyncHandler, getQueryNumber, getQueryString, makeGameDataGuard, sendPaginatedWithETag, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
 export function mountMissionRoutes(router: Router, deps: RouteDependencies): void {
@@ -87,16 +87,7 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
         page: getQueryNumber(req, 'page'),
         limit: getQueryNumber(req, 'limit'),
       });
-      sendWithETag(req, res, {
-        success: true,
-        count: result.data.length,
-        total: result.total,
-        page: result.page,
-        limit: result.limit,
-        pages: result.pages,
-        data: result.data,
-        meta: { responseTime: `${Date.now() - t}ms` },
-      });
+      sendPaginatedWithETag(req, res, result, t);
     }),
   );
 

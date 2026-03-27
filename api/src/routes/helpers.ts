@@ -49,6 +49,28 @@ export function sendWithETag(req: Request, res: Response, payload: Record<string
   res.send(fullStr);
 }
 
+export interface PaginatedData<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  pages: number;
+}
+
+/** Send standard paginated payload with ETag and response time metadata. */
+export function sendPaginatedWithETag<T>(req: Request, res: Response, result: PaginatedData<T>, startedAtMs: number): void {
+  sendWithETag(req, res, {
+    success: true,
+    count: result.data.length,
+    total: result.total,
+    page: result.page,
+    limit: result.limit,
+    pages: result.pages,
+    data: result.data,
+    meta: { responseTime: `${Date.now() - startedAtMs}ms` },
+  });
+}
+
 export function sendCsvOrJson(req: Request, res: Response, data: Record<string, unknown>[], jsonPayload: unknown): void {
   if (req.query.format === 'csv') {
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
