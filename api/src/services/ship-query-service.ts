@@ -18,9 +18,9 @@ const SHIP_SELECT = [
   // Physical
   's.mass',
   's.total_hp',
-  's.size_x',
-  's.size_y',
-  's.size_z',
+  'COALESCE(s.size_x, sm.beam) as size_x',
+  'COALESCE(s.size_y, sm.length) as size_y',
+  'COALESCE(s.size_z, sm.height) as size_z',
   // Flight
   's.scm_speed',
   's.max_speed',
@@ -34,7 +34,7 @@ const SHIP_SELECT = [
   // Resources
   's.hydrogen_fuel_capacity',
   's.quantum_fuel_capacity',
-  's.cargo_capacity',
+  'COALESCE(s.cargo_capacity, sm.cargocapacity) as cargo_capacity',
   's.crew_size',
   's.shield_hp',
   // Combat
@@ -63,7 +63,6 @@ const SHIP_SELECT = [
   'sm.production_status',
   'sm.description as sm_description',
   'sm.url as store_url',
-  'sm.cargocapacity as sm_cargo',
   'sm.min_crew',
   'sm.max_crew',
   // Meta
@@ -88,9 +87,9 @@ const CONCEPT_SELECT = [
   // Physical
   'sm2.mass',
   'NULL as total_hp',
-  'NULL as size_x',
-  'NULL as size_y',
-  'NULL as size_z',
+  'sm2.beam as size_x',
+  'sm2.length as size_y',
+  'sm2.height as size_z',
   // Flight
   'sm2.scm_speed',
   'sm2.afterburner_speed as max_speed',
@@ -133,7 +132,6 @@ const CONCEPT_SELECT = [
   'sm2.production_status',
   'sm2.description as sm_description',
   'sm2.url as store_url',
-  'sm2.cargocapacity as sm_cargo',
   'sm2.min_crew',
   'sm2.max_crew',
   // Meta
