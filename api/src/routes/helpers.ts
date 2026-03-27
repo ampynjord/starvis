@@ -79,3 +79,26 @@ export function makeShipResolver(ships: ShipQueryService) {
     },
   };
 }
+
+function firstQueryValue(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    const first = value[0];
+    return typeof first === 'string' ? first : undefined;
+  }
+  return undefined;
+}
+
+/** Read an optional string query parameter. */
+export function getQueryString(req: Request, key: string): string | undefined {
+  const raw = firstQueryValue(req.query[key]);
+  return raw && raw.trim() !== '' ? raw : undefined;
+}
+
+/** Read an optional number query parameter (undefined when missing/invalid). */
+export function getQueryNumber(req: Request, key: string): number | undefined {
+  const raw = firstQueryValue(req.query[key]);
+  if (!raw) return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
