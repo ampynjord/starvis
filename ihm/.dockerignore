@@ -1,0 +1,5 @@
+node_modules
+.next
+coverage
+src/pages
+src/_pages_legacy
