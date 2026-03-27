@@ -2,7 +2,7 @@
  * ShopService — Shop & inventory queries
  */
 import type { PrismaClient } from '@prisma/client';
-import type { PaginatedResult, Row } from './shared.js';
+import { type PaginatedResult, type Row, stripInternal } from './shared.js';
 
 export class ShopService {
   constructor(private getClient: (env: string) => PrismaClient) {}
@@ -47,17 +47,14 @@ export class ShopService {
       ...params,
     );
 
-    return { data: rows, total, page, limit, pages: Math.ceil(total / limit) };
+    return { data: rows.map(stripInternal), total, page, limit, pages: Math.ceil(total / limit) };
   }
 
   async getShopInventory(shopId: number, env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT si.*, c.name as component_name, c.type as component_type, c.size as component_size,
-              s.source_type as shop_source_type, s.source_name as shop_source_name,
-              s.canonical_shop_key, s.canonical_location_key
+      `SELECT si.*, c.name as component_name, c.type as component_type, c.size as component_size
        FROM shop_inventory si LEFT JOIN components c ON si.component_uuid = c.uuid
-       JOIN shops s ON si.shop_id = s.id
        WHERE si.shop_id = ? ORDER BY c.type, c.name`,
       shopId,
     );

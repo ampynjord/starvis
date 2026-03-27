@@ -2,7 +2,7 @@
  * CommodityQueryService — Tradeable/mineable goods (metals, minerals, gas, food, etc.)
  */
 import type { PrismaClient } from '@prisma/client';
-import { type PaginatedResult, paginate, type Row } from './shared.js';
+import { type PaginatedResult, paginate, type Row, stripInternal } from './shared.js';
 
 const COMMODITY_SORT = new Set(['name', 'class_name', 'type', 'sub_type', 'symbol', 'occupancy_scu']);
 
@@ -56,7 +56,7 @@ export class CommodityQueryService {
   async getCommodityByUuid(uuid: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(`SELECT * FROM commodities WHERE uuid = ?`, uuid);
-    return rows[0] || null;
+    return rows[0] ? stripInternal(rows[0]) : null;
   }
 
   async getCommodityTypes(env = 'live'): Promise<{ types: { type: string; count: number }[] }> {
