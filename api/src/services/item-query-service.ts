@@ -2,7 +2,7 @@
  * ItemQueryService — FPS weapons, armor, clothing, attachments, gadgets, consumables
  */
 import type { PrismaClient } from '@prisma/client';
-import { type PaginatedResult, paginate, type Row } from './shared.js';
+import { type PaginatedResult, paginate, type Row, stripInternal } from './shared.js';
 
 const ITEM_SORT = new Set([
   'name',
@@ -86,7 +86,7 @@ export class ItemQueryService {
       `SELECT i.*, m.name as manufacturer_name FROM items i LEFT JOIN starvis.manufacturers m ON i.manufacturer_code = m.code WHERE i.uuid = ?`,
       uuid,
     );
-    return rows[0] || null;
+    return rows[0] ? stripInternal(rows[0]) : null;
   }
 
   async getItemByClassName(className: string, env = 'live'): Promise<Row | null> {
@@ -95,7 +95,7 @@ export class ItemQueryService {
       `SELECT i.*, m.name as manufacturer_name FROM items i LEFT JOIN starvis.manufacturers m ON i.manufacturer_code = m.code WHERE i.class_name = ?`,
       className,
     );
-    return rows[0] || null;
+    return rows[0] ? stripInternal(rows[0]) : null;
   }
 
   async resolveItem(id: string, env = 'live'): Promise<Row | null> {
