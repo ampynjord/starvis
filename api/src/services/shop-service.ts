@@ -2,7 +2,15 @@
  * ShopService — Shop & inventory queries
  */
 import type { PrismaClient } from '@prisma/client';
+import { formatEnumLabel } from '../normalizers/labels.js';
 import { type PaginatedResult, type Row, stripInternal } from './shared.js';
+
+function normalizeShopRow(row: Row): Row {
+  return {
+    ...row,
+    display_shop_type: formatEnumLabel(String(row.shop_type ?? '')),
+  };
+}
 
 export class ShopService {
   constructor(private getClient: (env: string) => PrismaClient) {}
@@ -47,7 +55,7 @@ export class ShopService {
       ...params,
     );
 
-    return { data: rows.map(stripInternal), total, page, limit, pages: Math.ceil(total / limit) };
+    return { data: rows.map(stripInternal).map(normalizeShopRow), total, page, limit, pages: Math.ceil(total / limit) };
   }
 
   async getShopInventory(shopId: number, env = 'live'): Promise<Row[]> {
