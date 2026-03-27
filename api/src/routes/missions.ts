@@ -1,5 +1,13 @@
 import type { Router } from 'express';
-import { asyncHandler, getQueryNumber, getQueryString, makeGameDataGuard, sendDataWithETag, sendPaginatedWithETag } from './helpers.js';
+import {
+  asyncHandler,
+  getQueryNumber,
+  getQueryString,
+  makeGameDataGuard,
+  mountEnvDataRoute,
+  sendDataWithETag,
+  sendPaginatedWithETag,
+} from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
 export function mountMissionRoutes(router: Router, deps: RouteDependencies): void {
@@ -10,57 +18,25 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
    * GET /api/v1/missions/types
    * Lists all distinct mission types
    */
-  router.get(
-    '/api/v1/missions/types',
-    requireGameData,
-    asyncHandler(async (req, res) => {
-      const env = getQueryString(req, 'env') ?? 'live';
-      const types = await gameDataService!.missions.getMissionTypes(env);
-      sendDataWithETag(req, res, types);
-    }),
-  );
+  mountEnvDataRoute(router, '/api/v1/missions/types', requireGameData, (env) => gameDataService!.missions.getMissionTypes(env));
 
   /**
    * GET /api/v1/missions/factions
    * Lists all distinct factions
    */
-  router.get(
-    '/api/v1/missions/factions',
-    requireGameData,
-    asyncHandler(async (req, res) => {
-      const env = getQueryString(req, 'env') ?? 'live';
-      const factions = await gameDataService!.missions.getFactions(env);
-      sendDataWithETag(req, res, factions);
-    }),
-  );
+  mountEnvDataRoute(router, '/api/v1/missions/factions', requireGameData, (env) => gameDataService!.missions.getFactions(env));
 
   /**
    * GET /api/v1/missions/systems
    * Lists all distinct mission location systems
    */
-  router.get(
-    '/api/v1/missions/systems',
-    requireGameData,
-    asyncHandler(async (req, res) => {
-      const env = getQueryString(req, 'env') ?? 'live';
-      const systems = await gameDataService!.missions.getSystems(env);
-      sendDataWithETag(req, res, systems);
-    }),
-  );
+  mountEnvDataRoute(router, '/api/v1/missions/systems', requireGameData, (env) => gameDataService!.missions.getSystems(env));
 
   /**
    * GET /api/v1/missions/categories
    * Lists all distinct mission categories
    */
-  router.get(
-    '/api/v1/missions/categories',
-    requireGameData,
-    asyncHandler(async (req, res) => {
-      const env = getQueryString(req, 'env') ?? 'live';
-      const categories = await gameDataService!.missions.getCategories(env);
-      sendDataWithETag(req, res, categories);
-    }),
-  );
+  mountEnvDataRoute(router, '/api/v1/missions/categories', requireGameData, (env) => gameDataService!.missions.getCategories(env));
 
   /**
    * GET /api/v1/missions
