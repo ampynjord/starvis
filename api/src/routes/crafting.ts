@@ -1,5 +1,5 @@
 import type { Router } from 'express';
-import { asyncHandler, makeGameDataGuard, sendWithETag } from './helpers.js';
+import { asyncHandler, getQueryNumber, getQueryString, makeGameDataGuard, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
 export function mountCraftingRoutes(router: Router, deps: RouteDependencies): void {
@@ -14,7 +14,7 @@ export function mountCraftingRoutes(router: Router, deps: RouteDependencies): vo
     '/api/v1/crafting/categories',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const env = String(req.query.env ?? 'live');
+      const env = getQueryString(req, 'env') ?? 'live';
       const categories = await gameDataService!.crafting.getCategories(env);
       sendWithETag(req, res, { success: true, data: categories });
     }),
@@ -28,7 +28,7 @@ export function mountCraftingRoutes(router: Router, deps: RouteDependencies): vo
     '/api/v1/crafting/station-types',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const env = String(req.query.env ?? 'live');
+      const env = getQueryString(req, 'env') ?? 'live';
       const types = await gameDataService!.crafting.getStationTypes(env);
       sendWithETag(req, res, { success: true, data: types });
     }),
@@ -45,13 +45,13 @@ export function mountCraftingRoutes(router: Router, deps: RouteDependencies): vo
     asyncHandler(async (req, res) => {
       const t = Date.now();
       const result = await gameDataService!.crafting.getRecipes({
-        env: req.query.env ? String(req.query.env) : undefined,
-        category: req.query.category ? String(req.query.category) : undefined,
-        search: req.query.search ? String(req.query.search) : undefined,
-        page: req.query.page ? Number(req.query.page) : undefined,
-        limit: req.query.limit ? Number(req.query.limit) : undefined,
-        skillLevel: req.query.skillLevel ? Number(req.query.skillLevel) : undefined,
-        stationType: req.query.stationType ? String(req.query.stationType) : undefined,
+        env: getQueryString(req, 'env'),
+        category: getQueryString(req, 'category'),
+        search: getQueryString(req, 'search'),
+        page: getQueryNumber(req, 'page'),
+        limit: getQueryNumber(req, 'limit'),
+        skillLevel: getQueryNumber(req, 'skillLevel'),
+        stationType: getQueryString(req, 'stationType'),
       });
       sendWithETag(req, res, {
         success: true,
@@ -74,7 +74,7 @@ export function mountCraftingRoutes(router: Router, deps: RouteDependencies): vo
     '/api/v1/crafting/resources',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const env = String(req.query.env ?? 'live');
+      const env = getQueryString(req, 'env') ?? 'live';
       const resources = await gameDataService!.crafting.getResources(env);
       sendWithETag(req, res, { success: true, data: resources });
     }),
@@ -88,7 +88,7 @@ export function mountCraftingRoutes(router: Router, deps: RouteDependencies): vo
     '/api/v1/crafting/resources/:itemName/recipes',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const env = String(req.query.env ?? 'live');
+      const env = getQueryString(req, 'env') ?? 'live';
       const recipes = await gameDataService!.crafting.getRecipesByResource(req.params.itemName, env);
       sendWithETag(req, res, { success: true, data: recipes, count: recipes.length });
     }),
@@ -102,7 +102,7 @@ export function mountCraftingRoutes(router: Router, deps: RouteDependencies): vo
     '/api/v1/crafting/recipes/:uuid',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const env = String(req.query.env ?? 'live');
+      const env = getQueryString(req, 'env') ?? 'live';
       const recipe = await gameDataService!.crafting.getRecipeByUuid(req.params.uuid, env);
       if (!recipe) return void res.status(404).json({ success: false, error: 'Recipe not found' });
       sendWithETag(req, res, { success: true, data: recipe });

@@ -1,5 +1,5 @@
 import type { Router } from 'express';
-import { asyncHandler, makeGameDataGuard, sendWithETag } from './helpers.js';
+import { asyncHandler, getQueryNumber, getQueryString, makeGameDataGuard, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
 export function mountMissionRoutes(router: Router, deps: RouteDependencies): void {
@@ -14,7 +14,7 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
     '/api/v1/missions/types',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const env = String(req.query.env ?? 'live');
+      const env = getQueryString(req, 'env') ?? 'live';
       const types = await gameDataService!.missions.getMissionTypes(env);
       sendWithETag(req, res, { success: true, data: types });
     }),
@@ -28,7 +28,7 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
     '/api/v1/missions/factions',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const env = String(req.query.env ?? 'live');
+      const env = getQueryString(req, 'env') ?? 'live';
       const factions = await gameDataService!.missions.getFactions(env);
       sendWithETag(req, res, { success: true, data: factions });
     }),
@@ -42,7 +42,7 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
     '/api/v1/missions/systems',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const env = String(req.query.env ?? 'live');
+      const env = getQueryString(req, 'env') ?? 'live';
       const systems = await gameDataService!.missions.getSystems(env);
       sendWithETag(req, res, { success: true, data: systems });
     }),
@@ -56,7 +56,7 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
     '/api/v1/missions/categories',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const env = String(req.query.env ?? 'live');
+      const env = getQueryString(req, 'env') ?? 'live';
       const categories = await gameDataService!.missions.getCategories(env);
       sendWithETag(req, res, { success: true, data: categories });
     }),
@@ -73,19 +73,19 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
     asyncHandler(async (req, res) => {
       const t = Date.now();
       const result = await gameDataService!.missions.getMissions({
-        env: req.query.env ? String(req.query.env) : undefined,
-        type: req.query.type ? String(req.query.type) : undefined,
-        legal: req.query.legal ? String(req.query.legal) : undefined,
-        shared: req.query.shared ? String(req.query.shared) : undefined,
-        faction: req.query.faction ? String(req.query.faction) : undefined,
-        system: req.query.system ? String(req.query.system) : undefined,
-        category: req.query.category ? String(req.query.category) : undefined,
-        unique: req.query.unique ? String(req.query.unique) : undefined,
-        minReward: req.query.minReward ? Number(req.query.minReward) : undefined,
-        maxReward: req.query.maxReward ? Number(req.query.maxReward) : undefined,
-        search: req.query.search ? String(req.query.search) : undefined,
-        page: req.query.page ? Number(req.query.page) : undefined,
-        limit: req.query.limit ? Number(req.query.limit) : undefined,
+        env: getQueryString(req, 'env'),
+        type: getQueryString(req, 'type'),
+        legal: getQueryString(req, 'legal'),
+        shared: getQueryString(req, 'shared'),
+        faction: getQueryString(req, 'faction'),
+        system: getQueryString(req, 'system'),
+        category: getQueryString(req, 'category'),
+        unique: getQueryString(req, 'unique'),
+        minReward: getQueryNumber(req, 'minReward'),
+        maxReward: getQueryNumber(req, 'maxReward'),
+        search: getQueryString(req, 'search'),
+        page: getQueryNumber(req, 'page'),
+        limit: getQueryNumber(req, 'limit'),
       });
       sendWithETag(req, res, {
         success: true,
@@ -108,7 +108,7 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
     '/api/v1/missions/:uuid',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const env = String(req.query.env ?? 'live');
+      const env = getQueryString(req, 'env') ?? 'live';
       const mission = await gameDataService!.missions.getMissionByUuid(req.params.uuid, env);
       if (!mission) return void res.status(404).json({ success: false, error: 'Mission not found' });
       sendWithETag(req, res, { success: true, data: mission });
