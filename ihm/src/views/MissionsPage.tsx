@@ -190,7 +190,7 @@ function MissionCard({
             )}
             {m.mission_type && (
               <GlowBadge color={typeColor} size="xs">
-                {m.mission_type}
+                {m.display_mission_type ?? m.mission_type}
               </GlowBadge>
             )}
             {!m.is_legal && (
@@ -607,10 +607,10 @@ export default function MissionsPage() {
                 {/* Badges */}
                 <div className="flex flex-wrap gap-2">
                   {sel.mission_type && (
-                    <GlowBadge color={TYPE_COLORS[sel.mission_type] ?? 'slate'}>{sel.mission_type}</GlowBadge>
+                    <GlowBadge color={TYPE_COLORS[sel.mission_type] ?? 'slate'}>{sel.display_mission_type ?? sel.mission_type}</GlowBadge>
                   )}
                   {sel.category && (
-                    <GlowBadge color={CATEGORY_COLORS[sel.category] ?? 'slate'}>{sel.category}</GlowBadge>
+                    <GlowBadge color={CATEGORY_COLORS[sel.category] ?? 'slate'}>{sel.display_category ?? sel.category}</GlowBadge>
                   )}
                   <GlowBadge color={sel.is_legal ? 'green' : 'red'}>
                     {sel.is_legal ? (

@@ -2,6 +2,7 @@
  * MissionService — Mission / contract template queries
  */
 import type { PrismaClient } from '@prisma/client';
+import { formatEnumLabel } from '../normalizers/labels.js';
 import { convertBigIntToNumber, type PaginatedResult, type Row } from './shared.js';
 
 const MISSION_COLS = `m.uuid, m.class_name, m.title, m.description, m.mission_type,
@@ -12,6 +13,14 @@ const MISSION_COLS = `m.uuid, m.class_name, m.title, m.description, m.mission_ty
   m.location_system, m.location_planet, m.location_name,
   m.danger_level, m.required_reputation, m.reputation_reward,
   m.base_xp, m.category, m.is_unique, m.has_blueprint_reward`;
+
+function normalizeMissionRow(row: Row): Row {
+  return {
+    ...row,
+    display_mission_type: formatEnumLabel(String(row.mission_type ?? '')),
+    display_category: formatEnumLabel(String(row.category ?? '')),
+  };
+}
 
 export class MissionService {
   constructor(private getClient: (env: string) => PrismaClient) {}
@@ -158,7 +167,7 @@ export class MissionService {
     );
 
     return {
-      data: convertBigIntToNumber(data),
+      data: convertBigIntToNumber(data).map(normalizeMissionRow),
       total,
       page,
       limit: safeLimit,
@@ -175,6 +184,6 @@ export class MissionService {
        WHERE m.uuid = ?`,
       uuid,
     );
-    return rows.length ? convertBigIntToNumber(rows[0]) : null;
+    return rows.length ? normalizeMissionRow(convertBigIntToNumber(rows[0])) : null;
   }
 }

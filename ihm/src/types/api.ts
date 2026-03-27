@@ -324,6 +324,7 @@ export interface Commodity {
 export interface Shop {
   id: number;
   name: string;
+  display_shop_type?: string;
   normalized_name?: string | null;
   canonical_shop_key?: string | null;
   canonical_location_key?: string | null;
@@ -422,12 +423,14 @@ export interface CraftingRecipe {
   name: string | null;
   display_name?: string;
   category: string | null;
+  display_category?: string;
   output_item_name: string | null;
   display_output_item_name?: string;
   output_item_uuid: string | null;
   output_quantity: number;
   crafting_time_s: number | null;
   station_type: string | null;
+  display_station_type?: string;
   skill_level: number | null;
   game_env: string;
   ingredients?: CraftingIngredient[];
@@ -463,6 +466,7 @@ export interface CraftingSlotModifier {
 export interface CraftingCategory {
   category: string;
   count: number;
+  display_category?: string;
 }
 
 export interface CraftingResource {
@@ -533,6 +537,7 @@ export interface Mission {
   title: string | null;
   description: string | null;
   mission_type: string | null;
+  display_mission_type?: string;
   can_be_shared: boolean;
   only_owner_complete: boolean;
   is_legal: boolean;
@@ -550,6 +555,7 @@ export interface Mission {
   reputation_reward: number | null;
   base_xp: number | null;
   category: string | null;
+  display_category?: string;
   is_unique: boolean;
   has_blueprint_reward: boolean;
 }

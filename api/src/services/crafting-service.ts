@@ -3,6 +3,7 @@
  */
 import type { PrismaClient } from '@prisma/client';
 import { cleanItemName, cleanPropertyName, cleanRecipeName } from '../normalizers/crafting.js';
+import { formatEnumLabel } from '../normalizers/labels.js';
 import { convertBigIntToNumber, type PaginatedResult, type Row } from './shared.js';
 
 function normalizeRecipeRow(row: Row): Row {
@@ -10,6 +11,8 @@ function normalizeRecipeRow(row: Row): Row {
     ...row,
     display_name: cleanRecipeName(String(row.name ?? row.class_name ?? '')),
     display_output_item_name: cleanItemName(String(row.output_item_name ?? row.name ?? row.class_name ?? '')),
+    display_category: formatEnumLabel(String(row.category ?? '')),
+    display_station_type: formatEnumLabel(String(row.station_type ?? '')),
   };
 }
 
@@ -51,6 +54,7 @@ export class CraftingService {
     return convertBigIntToNumber(rows).map((r) => ({
       category: String(r.category),
       count: Number(r.count),
+      display_category: formatEnumLabel(String(r.category ?? '')),
     }));
   }
 

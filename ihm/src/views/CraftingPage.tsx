@@ -511,7 +511,11 @@ export default function CraftingPage() {
         {tab === 'blueprint' && selectedRecipe && (
           <div className="max-w-5xl mx-auto px-6 py-5">
             <div className="flex items-center gap-2 flex-wrap text-xs mb-1">
-              {selectedRecipe.category && <GlowBadge color={CAT_COLORS[selectedRecipe.category] ?? 'slate'}>{selectedRecipe.category}</GlowBadge>}
+                {selectedRecipe.category && (
+                  <GlowBadge color={CAT_COLORS[selectedRecipe.category] ?? 'slate'}>
+                    {selectedRecipe.display_category ?? selectedRecipe.category}
+                  </GlowBadge>
+                )}
               {selectedRecipe.crafting_time_s != null && (
                 <span className="flex items-center gap-1 text-slate-500 font-mono-sc"><Clock size={10} />{fmtTime(selectedRecipe.crafting_time_s)}</span>
               )}
@@ -610,7 +614,9 @@ export default function CraftingPage() {
                 <p className="text-[10px] text-slate-600 font-mono-sc uppercase tracking-wider mb-1">Station</p>
                 <div className="flex items-center gap-2">
                   <FlaskConical size={16} className="text-purple-500" />
-                  <span className="text-lg font-mono-sc text-slate-200 font-medium">{selectedRecipe.station_type ?? '\u2014'}</span>
+                  <span className="text-lg font-mono-sc text-slate-200 font-medium">
+                    {selectedRecipe.display_station_type ?? selectedRecipe.station_type ?? '\u2014'}
+                  </span>
                 </div>
               </div>
               {selectedRecipe.skill_level != null && (
@@ -740,7 +746,11 @@ export default function CraftingPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-slate-200 truncate">{r.display_output_item_name ?? fmtItem(r.output_item_name ?? r.name ?? r.class_name)}</p>
                       <div className="flex items-center gap-3 mt-0.5">
-                        {r.category && <GlowBadge color={CAT_COLORS[r.category] ?? 'slate'} size="xs">{r.category}</GlowBadge>}
+                        {r.category && (
+                          <GlowBadge color={CAT_COLORS[r.category] ?? 'slate'} size="xs">
+                            {r.display_category ?? r.category}
+                          </GlowBadge>
+                        )}
                         {(r.display_slot_name ?? r.slot_name) && (
                           <span className="text-[9px] font-mono-sc text-slate-600">{r.display_slot_name ?? fmtItem(r.slot_name)}</span>
                         )}
