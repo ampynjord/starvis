@@ -76,7 +76,7 @@ export default function FpsCalculatorPage() {
     const rows = (weaponListData?.data ?? []) as ItemListItem[];
     return rows.map((w) => ({
       uuid: w.uuid,
-      name: w.name,
+      name: w.displayName ?? w.display_name ?? w.name,
       type: w.type,
       sub_type: w.sub_type,
     }));

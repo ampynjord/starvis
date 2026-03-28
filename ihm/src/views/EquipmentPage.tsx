@@ -35,6 +35,8 @@ type Tab = 'components' | 'items';
 interface EquipmentItem {
   uuid: string;
   name: string;
+  display_name?: string;
+  displayName?: string;
   type: string;
   sub_type?: string | null;
   manufacturer_name?: string | null;
@@ -83,6 +85,7 @@ interface EquipmentCardProps {
 
 function EquipmentCard({ item, href }: EquipmentCardProps) {
   const Icon = getCategoryIcon(item.type);
+  const itemDisplayName = item.displayName ?? item.display_name ?? item.name;
 
   return (
     <Link href={href}>
@@ -99,7 +102,7 @@ function EquipmentCard({ item, href }: EquipmentCardProps) {
           )}
         </div>
 
-        <h3 className="font-mono-sc text-sm text-cyan-300 mb-2 line-clamp-2">{item.name}</h3>
+        <h3 className="font-mono-sc text-sm text-cyan-300 mb-2 line-clamp-2">{itemDisplayName}</h3>
 
         <div className="space-y-1 flex-1 text-xs text-slate-400 mb-3">
           {item.type && <p>Type: <span className="text-slate-300">{item.type}</span></p>}
@@ -159,7 +162,12 @@ export default function EquipmentPage() {
     const data = tab === 'components' ? (components as EquipmentItem[]) : (items as EquipmentItem[]);
 
     return data
-      .filter((item) => !search || item.name?.toLowerCase().includes(search.toLowerCase()))
+      .filter((item) => {
+        if (!search) return true;
+        const q = search.toLowerCase();
+        const displayName = (item.displayName ?? item.display_name ?? item.name ?? '').toLowerCase();
+        return displayName.includes(q) || (item.name ?? '').toLowerCase().includes(q);
+      })
       .filter((item) => !typeFilter || item.type === typeFilter)
       .slice(0, 100); // Limit display for performance
   }, [tab, components, items, search, typeFilter]);

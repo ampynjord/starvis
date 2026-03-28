@@ -260,6 +260,8 @@ export interface ItemListItem {
   uuid: string;
   class_name: string;
   name: string;
+  display_name?: string;
+  displayName?: string;
   normalized_name?: string | null;
   canonical_item_key?: string | null;
   source_type?: string | null;

@@ -41,6 +41,8 @@ export default function ItemDetailPage() {
   if (error) return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
   if (!item) return null;
 
+  const itemDisplayName = item.displayName ?? item.display_name ?? item.name;
+
   const isWeapon = !!item.weapon_damage || !!item.weapon_fire_rate || item.type?.toLowerCase().includes('weapon') || item.sub_type?.toLowerCase().includes('fps');
   const isArmor =
     !!item.armor_damage_reduction ||
@@ -81,12 +83,12 @@ export default function ItemDetailPage() {
         <ChevronRight size={10} />
         <Link href={breadcrumbTo} className="hover:text-slate-400">{breadcrumbLabel}</Link>
         <ChevronRight size={10} />
-        <span className="text-slate-400">{item.name}</span>
+        <span className="text-slate-400">{itemDisplayName}</span>
       </div>
 
       <div className="sci-panel p-6">
         <p className="text-xs font-mono-sc text-cyan-700 uppercase tracking-widest mb-1">{item.type}</p>
-        <h1 className="font-orbitron text-2xl font-black text-slate-100">{item.name}</h1>
+        <h1 className="font-orbitron text-2xl font-black text-slate-100">{itemDisplayName}</h1>
         <div className="flex flex-wrap gap-2 mt-3">
           {item.grade && <GlowBadge color="amber">{item.grade}</GlowBadge>}
           {item.size != null && <GlowBadge color="slate">S{item.size}</GlowBadge>}

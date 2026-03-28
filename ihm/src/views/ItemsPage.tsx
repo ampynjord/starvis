@@ -114,6 +114,9 @@ export default function ItemsPage() {
 
   const pageTitle = mode === 'other' ? 'Other Items' : 'FPS Gear';
 
+  const getItemDisplayName = (item: { displayName?: string; display_name?: string; name: string }) =>
+    item.displayName ?? item.display_name ?? item.name;
+
   useEffect(() => {
     if (!categories.length) return;
     if (!activeCategory || !categories.some((c) => c.label === activeCategory)) {
@@ -173,7 +176,7 @@ export default function ItemsPage() {
                       <div className="flex items-center gap-3">
                         <Link href={`/items/${item.uuid}`} className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-orbitron text-sm text-slate-200 truncate">{item.name}</span>
+                            <span className="font-orbitron text-sm text-slate-200 truncate">{getItemDisplayName(item)}</span>
                             {item.grade && <GlowBadge color="amber">{item.grade}</GlowBadge>}
                             {item.size != null && <GlowBadge color="slate">S{item.size}</GlowBadge>}
                           </div>
@@ -184,7 +187,7 @@ export default function ItemsPage() {
                           </div>
                         </Link>
                         <Link
-                          href={`/missions?search=${encodeURIComponent(item.name)}`}
+                          href={`/missions?search=${encodeURIComponent(getItemDisplayName(item))}`}
                           className="text-xs text-amber-500 hover:text-amber-300 flex-shrink-0"
                         >
                           Mission leads
