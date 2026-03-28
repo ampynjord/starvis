@@ -29,9 +29,10 @@ export class ItemQueryService {
 
   private normalizeItemRow(row: Row): Row {
     const name = String(row.name ?? '');
+    const className = String(row.class_name ?? '');
     return {
       ...row,
-      display_name: cleanItemDisplayName(name),
+      display_name: cleanItemDisplayName(name, className),
     };
   }
 
@@ -77,9 +78,18 @@ export class ItemQueryService {
       params.push(filters.manufacturer.toUpperCase());
     }
     if (filters?.search) {
-      where.push('(i.name LIKE ? OR i.class_name LIKE ?)');
+      const qRaw = filters.search.trim().toLowerCase();
+      const searchParts: string[] = ['i.name LIKE ?', 'i.class_name LIKE ?'];
       const t = `%${filters.search}%`;
       params.push(t, t);
+
+      // Alias support: users search for in-game set names that aren't stored verbatim.
+      if (qRaw.includes('morozov')) {
+        searchParts.push("(i.class_name LIKE '%cds%' AND i.class_name LIKE '%heavy%' AND i.class_name LIKE '%armor%')");
+        searchParts.push("(i.name LIKE 'CDS%Heavy%')");
+      }
+
+      where.push(`(${searchParts.join(' OR ')})`);
     }
 
     const w = where.length ? ` WHERE ${where.join(' AND ')}` : '';
