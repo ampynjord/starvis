@@ -1840,7 +1840,12 @@ export class ExtractionService {
   // ======================================================
 
   private async saveMissions(conn: PoolConnection, env: GameEnv, onProgress?: (msg: string) => void): Promise<number> {
-    const locAdapter = this.locService.isLoaded ? { resolveKey: (k: string) => this.locService.resolveKey(k) ?? null } : undefined;
+    const locAdapter = this.locService.isLoaded
+      ? {
+          resolveKey: (k: string) => this.locService.resolveKey(k) ?? null,
+          resolveComponentName: (className: string) => this.locService.resolveComponentName(className),
+        }
+      : undefined;
 
     const missions = extractMissions(this.dfService, locAdapter);
     if (!missions.length) {
@@ -1916,7 +1921,12 @@ export class ExtractionService {
   }
 
   private async saveCraftingRecipes(conn: PoolConnection, env: GameEnv, onProgress?: (msg: string) => void): Promise<number> {
-    const locAdapter = this.locService.isLoaded ? { resolveKey: (k: string) => this.locService.resolveKey(k) ?? null } : undefined;
+    const locAdapter = this.locService.isLoaded
+      ? {
+          resolveKey: (k: string) => this.locService.resolveKey(k) ?? null,
+          resolveComponentName: (className: string) => this.locService.resolveComponentName(className),
+        }
+      : undefined;
 
     const recipes = extractCraftingRecipes(this.dfService, locAdapter);
     if (!recipes.length) {

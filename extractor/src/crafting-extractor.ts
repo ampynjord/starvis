@@ -11,6 +11,11 @@
 import type { DataForgeService } from './dataforge-service.js';
 import logger from './logger.js';
 
+interface CraftingLocalizationAdapter {
+  resolveKey(key: string): string | null;
+  resolveComponentName?(className: string): string | null;
+}
+
 export interface CraftingModifierRecord {
   slotName: string;
   propertyName: string;
@@ -81,6 +86,19 @@ function safeNumber(val: unknown): number | null {
   return null;
 }
 
+function humanizeIdentifier(value: string): string {
+  return value
+    .replace(/^EntityClassDefinition\./i, '')
+    .replace(/^CraftingBlueprintRecord\./i, '')
+    .replace(/^BP_CRAFT_/i, '')
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Za-z])(\d)/g, '$1 $2')
+    .replace(/(\d)([A-Za-z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 // ── Blueprint system helpers ───────────────────────────────
 
 /** Build UUID → category name map from BlueprintCategoryRecord */
@@ -109,7 +127,7 @@ function parseCraftTime(ct: Record<string, unknown> | null | undefined): number 
 function blueprintDisplayName(
   className: string,
   entityName: string | undefined,
-  locService?: { resolveKey(key: string): string | null },
+  locService?: CraftingLocalizationAdapter,
   locKey?: string | null,
 ): string {
   // Try localization first
@@ -119,18 +137,12 @@ function blueprintDisplayName(
   }
   // Use entity class name if available (e.g. "Volt_Sniper_Energy_01")
   if (entityName) {
-    return entityName
-      .replace(/_/g, ' ')
-      .replace(/([a-z])([A-Z])/g, '$1 $2')
-      .trim();
+    const resolvedEntityName = locService?.resolveComponentName?.(entityName);
+    if (resolvedEntityName) return resolvedEntityName;
+    return humanizeIdentifier(entityName);
   }
   // Fallback: parse from BP_CRAFT_xxx
-  return className
-    .replace(/^CraftingBlueprintRecord\./, '')
-    .replace(/^BP_CRAFT_/, '')
-    .replace(/_/g, ' ')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
-    .trim();
+  return humanizeIdentifier(className);
 }
 
 // ── Blueprint ingredient extraction ────────────────────────
@@ -165,7 +177,7 @@ interface CostSlot {
 function parseCostSelect(
   obj: Record<string, unknown>,
   isOptional: boolean,
-  locService?: { resolveKey(key: string): string | null },
+  locService?: CraftingLocalizationAdapter,
 ): CostSlot | null {
   if (!obj || typeof obj !== 'object') return null;
 
@@ -175,7 +187,13 @@ function parseCostSelect(
   const displayKey = safeString(nameInfo?.displayName);
   if (displayKey && locService) {
     const resolved = locService.resolveKey(displayKey);
-    if (resolved) slotName = resolved;
+    if (resolved) {
+      slotName = resolved;
+    } else {
+      slotName = humanizeIdentifier(slotName);
+    }
+  } else {
+    slotName = humanizeIdentifier(slotName);
   }
 
   const count = typeof obj.count === 'number' ? obj.count : 1;
@@ -237,7 +255,7 @@ function parseCostSelect(
 function extractBlueprintIngredientsAndModifiers(
   costs: Record<string, unknown> | undefined,
   ctx: DataForgeService,
-  locService?: { resolveKey(key: string): string | null },
+  locService?: CraftingLocalizationAdapter,
 ): { ingredients: CraftingIngredientRecord[]; modifiers: CraftingModifierRecord[] } {
   if (!costs) return { ingredients: [], modifiers: [] };
 
@@ -269,8 +287,15 @@ function extractBlueprintIngredientsAndModifiers(
   // Convert slots to ingredient + modifier records
   for (const slot of slots) {
     const res = slot.resourceOptions[0];
-    let itemName = ctx.resolveGuid(res.resourceRef) ?? slot.slotName;
+    const rawItemName = ctx.resolveGuid(res.resourceRef) ?? slot.slotName;
+    let itemName = rawItemName;
     itemName = itemName.replace(/^ResourceType\./, '');
+    const localizedItem = locService?.resolveComponentName?.(itemName);
+    if (localizedItem) {
+      itemName = localizedItem;
+    } else {
+      itemName = humanizeIdentifier(itemName);
+    }
 
     ingredients.push({
       itemName,
@@ -323,7 +348,7 @@ function extractBlueprintIngredientsAndModifiers(
 
 // ── Blueprint extraction ───────────────────────────────────
 
-function extractBlueprints(ctx: DataForgeService, locService?: { resolveKey(key: string): string | null }): CraftingRecipeRecord[] {
+function extractBlueprints(ctx: DataForgeService, locService?: CraftingLocalizationAdapter): CraftingRecipeRecord[] {
   const records = ctx.searchByStructType('CraftingBlueprintRecord', 10000);
   if (records.length === 0) return [];
 
@@ -355,6 +380,9 @@ function extractBlueprints(ctx: DataForgeService, locService?: { resolveKey(key:
       const entityRef = (processData?.entityClass as Record<string, unknown>)?.__ref as string | undefined;
       const outputItemUuid = entityRef ?? null;
       const entityName = entityRef ? ctx.resolveGuid(entityRef) : undefined;
+      const outputDisplayName = entityName
+        ? locService?.resolveComponentName?.(entityName) ?? humanizeIdentifier(entityName)
+        : null;
 
       // Localized name
       const locKey = safeString(blueprint.blueprintName);
@@ -383,7 +411,7 @@ function extractBlueprints(ctx: DataForgeService, locService?: { resolveKey(key:
         className,
         name,
         category,
-        outputItemName: entityName ?? null,
+        outputItemName: outputDisplayName,
         outputItemUuid,
         outputQuantity: 1,
         craftingTime,
@@ -403,7 +431,7 @@ function extractBlueprints(ctx: DataForgeService, locService?: { resolveKey(key:
 
 // ── Legacy extraction ──────────────────────────────────────
 
-function extractLegacyRecipes(ctx: DataForgeService, locService?: { resolveKey(key: string): string | null }): CraftingRecipeRecord[] {
+function extractLegacyRecipes(ctx: DataForgeService, locService?: CraftingLocalizationAdapter): CraftingRecipeRecord[] {
   const results: CraftingRecipeRecord[] = [];
 
   for (const structPattern of LEGACY_STRUCT_PATTERNS) {
@@ -486,7 +514,7 @@ function extractLegacyRecipes(ctx: DataForgeService, locService?: { resolveKey(k
 
 export function extractCraftingRecipes(
   ctx: DataForgeService,
-  locService?: { resolveKey(key: string): string | null },
+  locService?: CraftingLocalizationAdapter,
 ): CraftingRecipeRecord[] {
   // Extract both systems and merge
   const blueprints = extractBlueprints(ctx, locService);
