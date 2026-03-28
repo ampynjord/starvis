@@ -282,9 +282,8 @@ export function extractMissions(ctx: DataForgeService, locService?: MissionLocal
       const resDesc = resolveLocalizedText(resolveStr(rawDesc), locService);
 
       const localizedClassName = locService?.resolveComponentName?.(className) ?? null;
-      const fallbackTitle = localizedClassName && !hasRuntimePlaceholderTokens(localizedClassName)
-        ? localizedClassName
-        : humanizeMissionClassName(className);
+      const fallbackTitle =
+        localizedClassName && !hasRuntimePlaceholderTokens(localizedClassName) ? localizedClassName : humanizeMissionClassName(className);
 
       const title = isLocEmpty(resTitle) || hasRuntimePlaceholderTokens(resTitle) ? fallbackTitle : resTitle;
 

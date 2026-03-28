@@ -174,11 +174,7 @@ interface CostSlot {
 }
 
 /** Parse a CraftingCost_Select object into a CostSlot */
-function parseCostSelect(
-  obj: Record<string, unknown>,
-  isOptional: boolean,
-  locService?: CraftingLocalizationAdapter,
-): CostSlot | null {
+function parseCostSelect(obj: Record<string, unknown>, isOptional: boolean, locService?: CraftingLocalizationAdapter): CostSlot | null {
   if (!obj || typeof obj !== 'object') return null;
 
   const nameInfo = obj.nameInfo as Record<string, unknown> | undefined;
@@ -380,9 +376,7 @@ function extractBlueprints(ctx: DataForgeService, locService?: CraftingLocalizat
       const entityRef = (processData?.entityClass as Record<string, unknown>)?.__ref as string | undefined;
       const outputItemUuid = entityRef ?? null;
       const entityName = entityRef ? ctx.resolveGuid(entityRef) : undefined;
-      const outputDisplayName = entityName
-        ? locService?.resolveComponentName?.(entityName) ?? humanizeIdentifier(entityName)
-        : null;
+      const outputDisplayName = entityName ? (locService?.resolveComponentName?.(entityName) ?? humanizeIdentifier(entityName)) : null;
 
       // Localized name
       const locKey = safeString(blueprint.blueprintName);
@@ -512,10 +506,7 @@ function extractLegacyRecipes(ctx: DataForgeService, locService?: CraftingLocali
 
 // ── Public API ──────────────────────────────────────────────
 
-export function extractCraftingRecipes(
-  ctx: DataForgeService,
-  locService?: CraftingLocalizationAdapter,
-): CraftingRecipeRecord[] {
+export function extractCraftingRecipes(ctx: DataForgeService, locService?: CraftingLocalizationAdapter): CraftingRecipeRecord[] {
   // Extract both systems and merge
   const blueprints = extractBlueprints(ctx, locService);
   const legacy = extractLegacyRecipes(ctx, locService);
