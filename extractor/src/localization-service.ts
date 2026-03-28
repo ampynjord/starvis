@@ -21,8 +21,47 @@ export class LocalizationService {
   private classNameIndex = new Map<string, string>();
   /** className (normalized) → description */
   private classNameDescIndex = new Map<string, string>();
+  /** Canonical className → display name (separator/case-insensitive) */
+  private classNameCanonicalIndex = new Map<string, string>();
+  /** Canonical className → description (separator/case-insensitive) */
+  private classNameDescCanonicalIndex = new Map<string, string>();
 
   private loaded = false;
+
+  private static canonicalizeClassName(value: string): string {
+    return value
+      .toLowerCase()
+      .replace(/^entityclassdefinition\./, '')
+      .replace(/^@+/, '')
+      .replace(/_?scitem$/i, '')
+      .replace(/^[^a-z0-9]+/, '')
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  private static buildClassNameCandidates(className: string): string[] {
+    const seed = className.replace(/^entityclassdefinition\./i, '');
+    const candidates = new Set<string>([seed]);
+
+    const queue = [seed];
+    while (queue.length) {
+      const current = queue.pop()!;
+      const trimmed = current.replace(/^_+/, '');
+      const withLeading = current.startsWith('_') ? current : `_${current}`;
+      const noScItem = current.replace(/_?scitem$/i, '');
+      const withScItem = /_scitem$/i.test(current) ? current : `${current}_SCItem`;
+      const noMfg = current.replace(/^[A-Z]{3,5}_/, '');
+      const variants = [trimmed, withLeading, noScItem, withScItem, noMfg];
+
+      for (const v of variants) {
+        if (v && !candidates.has(v)) {
+          candidates.add(v);
+          queue.push(v);
+        }
+      }
+    }
+
+    return [...candidates];
+  }
 
   get isLoaded(): boolean {
     return this.loaded;
@@ -107,6 +146,10 @@ export class LocalizationService {
         if (className) {
           this.nameIndex.set(key, value);
           this.classNameIndex.set(className.toLowerCase(), value);
+          const canonical = LocalizationService.canonicalizeClassName(className);
+          if (canonical && !this.classNameCanonicalIndex.has(canonical)) {
+            this.classNameCanonicalIndex.set(canonical, value);
+          }
           parsed++;
         }
       }
@@ -116,6 +159,10 @@ export class LocalizationService {
         if (className) {
           this.descIndex.set(key, value);
           this.classNameDescIndex.set(className.toLowerCase(), value);
+          const canonical = LocalizationService.canonicalizeClassName(className);
+          if (canonical && !this.classNameDescCanonicalIndex.has(canonical)) {
+            this.classNameDescCanonicalIndex.set(canonical, value);
+          }
         }
       }
       // Vehicle names: vehicle_Name_{className}=Display Name
@@ -124,6 +171,10 @@ export class LocalizationService {
         if (className) {
           this.nameIndex.set(key, value);
           this.classNameIndex.set(className.toLowerCase(), value);
+          const canonical = LocalizationService.canonicalizeClassName(className);
+          if (canonical && !this.classNameCanonicalIndex.has(canonical)) {
+            this.classNameCanonicalIndex.set(canonical, value);
+          }
           parsed++;
         }
       }
@@ -150,25 +201,17 @@ export class LocalizationService {
    */
   resolveComponentName(className: string): string | null {
     if (!className) return null;
-    const cn = className.toLowerCase();
-
-    // Direct match
-    const direct = this.classNameIndex.get(cn);
-    if (direct) return direct;
-
-    // Try without manufacturer prefix (e.g., BEHR_LaserRepeater_S2 → LaserRepeater_S2)
-    const withoutMfg = className.replace(/^[A-Z]{3,5}_/, '');
-    if (withoutMfg !== className) {
-      const mfgStripped = this.classNameIndex.get(withoutMfg.toLowerCase());
-      if (mfgStripped) return mfgStripped;
+    for (const candidate of LocalizationService.buildClassNameCandidates(className)) {
+      const direct = this.classNameIndex.get(candidate.toLowerCase());
+      if (direct) return direct;
     }
 
-    // Try variants with/without SCItem suffix
-    const withSCItem = this.classNameIndex.get(cn.endsWith('_scitem') ? cn : `${cn}_scitem`);
-    if (withSCItem) return withSCItem;
-
-    const withoutSCItem = cn.endsWith('_scitem') ? this.classNameIndex.get(cn.replace(/_scitem$/, '')) : null;
-    if (withoutSCItem) return withoutSCItem;
+    for (const candidate of LocalizationService.buildClassNameCandidates(className)) {
+      const canonical = LocalizationService.canonicalizeClassName(candidate);
+      if (!canonical) continue;
+      const mapped = this.classNameCanonicalIndex.get(canonical);
+      if (mapped) return mapped;
+    }
 
     return null;
   }
@@ -197,7 +240,17 @@ export class LocalizationService {
    */
   resolveDescription(className: string): string | null {
     if (!className) return null;
-    return this.classNameDescIndex.get(className.toLowerCase()) || null;
+    for (const candidate of LocalizationService.buildClassNameCandidates(className)) {
+      const direct = this.classNameDescIndex.get(candidate.toLowerCase());
+      if (direct) return direct;
+    }
+    for (const candidate of LocalizationService.buildClassNameCandidates(className)) {
+      const canonical = LocalizationService.canonicalizeClassName(candidate);
+      if (!canonical) continue;
+      const mapped = this.classNameDescCanonicalIndex.get(canonical);
+      if (mapped) return mapped;
+    }
+    return null;
   }
 
   /**
