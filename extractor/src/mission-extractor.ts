@@ -11,6 +11,11 @@
 import type { DataForgeService } from './dataforge-service.js';
 import logger from './logger.js';
 
+interface MissionLocalizationAdapter {
+  resolveKey(key: string): string | null;
+  resolveComponentName?(className: string): string | null;
+}
+
 export interface MissionRecord {
   uuid: string;
   className: string;
@@ -90,7 +95,35 @@ function isLocEmpty(s: string | null | undefined): boolean {
   return t.includes('UNINITIALIZED') || t === '<= UNINITIALIZED =>' || t.startsWith('<= UNINITIALIZED');
 }
 
-export function extractMissions(ctx: DataForgeService, locService?: { resolveKey(key: string): string | null }): MissionRecord[] {
+function hasRuntimePlaceholderTokens(s: string | null | undefined): boolean {
+  if (!s) return false;
+  return /~[a-z0-9_]+\(/i.test(s);
+}
+
+function humanizeMissionClassName(className: string): string {
+  const withSpaces = className
+    .replace(/_/g, ' ')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Za-z])(\d)/g, '$1 $2')
+    .replace(/(\d)([A-Za-z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return withSpaces.replace(/\b([a-z][a-z']*)\b/g, (m) => m.charAt(0).toUpperCase() + m.slice(1));
+}
+
+function resolveLocalizedText(raw: string | null, locService?: MissionLocalizationAdapter): string | null {
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  if (trimmed.startsWith('@') && locService) {
+    const resolved = locService.resolveKey(trimmed);
+    return resolved?.trim() || null;
+  }
+  return trimmed;
+}
+
+export function extractMissions(ctx: DataForgeService, locService?: MissionLocalizationAdapter): MissionRecord[] {
   const records = ctx.searchByStructType('^ContractTemplate$', 99999);
   if (!records.length) {
     logger.warn('ContractTemplate: no records found in DataForge');
@@ -245,17 +278,30 @@ export function extractMissions(ctx: DataForgeService, locService?: { resolveKey
         return raw;
       };
 
-      const resTitle = resolveStr(rawTitle);
-      const resDesc = resolveStr(rawDesc);
+      const resTitle = resolveLocalizedText(resolveStr(rawTitle), locService);
+      const resDesc = resolveLocalizedText(resolveStr(rawDesc), locService);
 
-      const title = isLocEmpty(resTitle)
-        ? className
-            .replace(/_/g, ' ')
-            .replace(/([a-z])([A-Z])/g, '$1 $2')
-            .trim()
-        : resTitle;
+      const localizedClassName = locService?.resolveComponentName?.(className) ?? null;
+      const fallbackTitle = localizedClassName && !hasRuntimePlaceholderTokens(localizedClassName)
+        ? localizedClassName
+        : humanizeMissionClassName(className);
 
-      const description = isLocEmpty(resDesc) ? null : resDesc;
+      const title = isLocEmpty(resTitle) || hasRuntimePlaceholderTokens(resTitle) ? fallbackTitle : resTitle;
+
+      const description = isLocEmpty(resDesc) || hasRuntimePlaceholderTokens(resDesc) ? null : resDesc;
+
+      const resolveEntityLabel = (value: string | null): string | null => {
+        if (!value) return null;
+        const resolved = resolveLocalizedText(value, locService);
+        if (!resolved || hasRuntimePlaceholderTokens(resolved) || isLocEmpty(resolved)) return null;
+        return resolved;
+      };
+
+      faction = resolveEntityLabel(faction);
+      missionGiver = resolveEntityLabel(missionGiver);
+      locationSystem = resolveEntityLabel(locationSystem);
+      locationPlanet = resolveEntityLabel(locationPlanet);
+      locationName = resolveEntityLabel(locationName);
 
       results.push({
         uuid: r.uuid,
