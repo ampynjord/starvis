@@ -1,6 +1,6 @@
 import mysql from 'mysql2/promise';
-import { P4KProvider } from '../src/p4k-provider.js';
 import { LocalizationService } from '../src/localization-service.js';
+import { P4KProvider } from '../src/p4k-provider.js';
 
 async function main() {
   const pool = mysql.createPool({
