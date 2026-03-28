@@ -13,7 +13,6 @@ import {
   Paintbrush,
   Pickaxe,
   Rocket,
-  Search,
   Settings2,
   ShoppingBag,
   SlidersHorizontal,
@@ -28,7 +27,6 @@ import { useEnv } from '@/contexts/EnvContext';
 
 const CORE_ITEMS = [
   { to: '/',              icon: Home,          label: 'Dashboard' },
-  { to: '/search',        icon: Search,        label: 'Search' },
   { to: '/missions',      icon: ClipboardList, label: 'Missions' },
   { to: '/crafting',      icon: FlaskConical,  label: 'Crafting' },
   { to: '/manufacturers', icon: Wrench,        label: 'Manufacturers' },
