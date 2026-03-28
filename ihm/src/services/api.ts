@@ -170,6 +170,13 @@ function mapShop(item: Shop): Shop {
   };
 }
 
+function mapItem<T extends ItemListItem>(item: T): T {
+  return {
+    ...item,
+    displayName: item.display_name,
+  };
+}
+
 function mapMiningCompositionRef(item: NonNullable<MiningElement['found_in']>[number]) {
   return {
     ...item,
@@ -287,7 +294,7 @@ export const api = {
 
   // ─── Items ─────────────────────────────────────────────────────────
   items: {
-    list: (p: {
+    list: async (p: {
       env?: string;
       page?: number;
       limit?: number;
@@ -298,9 +305,9 @@ export const api = {
       size?: number;
       grade?: string;
       manufacturer?: string;
-    }) => get<PaginatedResponse<ItemListItem>>('/items', p),
+    }) => mapPaginated(await get<PaginatedResponse<ItemListItem>>('/items', p), mapItem),
     filters: (env?: string) => get<Record<string, string[]>>('/items/filters', { env }),
-    get: (uuid: string, env?: string) => get<Item>(`/items/${uuid}`, { env }),
+    get: async (uuid: string, env?: string) => mapItem(await get<Item>(`/items/${uuid}`, { env })),
     buyLocations: (uuid: string, env?: string) => get<ItemBuyLocation[]>(`/items/${uuid}/buy-locations`, { env }),
   },
 
