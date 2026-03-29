@@ -18,7 +18,7 @@ import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
-import { getGamePrisma, getStarvisPrisma, initAllPrisma } from './src/db/index.js';
+import { getGamePrisma, getStarvisPrisma, initAllPrisma } from '@starvis/db';
 import { prometheusMiddleware } from './src/middleware/prometheus.js';
 import { healthRouter } from './src/routes/health.js';
 import { createRoutes } from './src/routes/index.js';
