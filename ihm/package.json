@@ -8,8 +8,7 @@
     "start": "next start",
     "lint": "biome check --write .",
     "test": "vitest",
-    "test:run": "vitest run",
-    "coverage": "vitest run --coverage"
+    "test:run": "vitest run"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.56.2",
@@ -30,7 +29,6 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^6.0.1",
-    "@vitest/coverage-v8": "^4.1.2",
     "jsdom": "^28.1.0",
     "postcss": "^8.4.45",
     "tailwindcss": "^4.2.2",

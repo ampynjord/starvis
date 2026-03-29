@@ -8,13 +8,11 @@
     "extract": "tsx extract.ts",
     "audit:quality": "tsx scripts/audit-quality.ts",
     "dry-run:adapters": "tsx scripts/dry-run-adapters.ts",
-
     "dev": "tsx watch extract.ts",
     "lint": "biome check --write .",
     "lint:ci": "biome check .",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:watch": "vitest"
   },
   "author": "ampynjord - Dawnstar",
   "license": "MIT",
@@ -27,7 +25,6 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.9",
     "@types/node": "^20.19.35",
-    "@vitest/coverage-v8": "^4.1.2",
     "tsx": "^4.21.0",
     "typescript": "^5.3.3",
     "vitest": "^4.0.18"
