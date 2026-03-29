@@ -268,7 +268,7 @@ jobs:
         run: cd ihm && npm run coverage
 
       - name: Upload API coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v6
         with:
           files: ./api/coverage/lcov.info
           flags: api
@@ -277,7 +277,7 @@ jobs:
           fail_ci_if_error: false
 
       - name: Upload Extractor coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v6
         with:
           files: ./extractor/coverage/lcov.info
           flags: extractor
@@ -286,7 +286,7 @@ jobs:
           fail_ci_if_error: false
 
       - name: Upload IHM coverage to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v6
         with:
           files: ./ihm/coverage/lcov.info
           flags: ihm
