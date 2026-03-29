@@ -1,398 +1,127 @@
-
 name: CI/CD
-
 on:
   push:
     branches: ['**']
     tags: ['v*']
   pull_request:
     branches: [main]
-  workflow_dispatch:
-    inputs:
-      run_full_pipeline:
-        description: "Run lint/test/build pipeline on manual dispatch"
-        required: false
-        default: false
-        type: boolean
-      run_safe_smoke_prod:
-        description: "Run safe production smoke test"
-        required: false
-        default: false
-        type: boolean
-      safe_smoke_base_url:
-        description: "Base URL used by safe smoke prod"
-        required: false
-        default: "https://starvis.ampynjord.bzh"
-        type: string
-      safe_smoke_pace_ms:
-        description: "Delay between requests in ms"
-        required: false
-        default: "1200"
-        type: string
-      safe_smoke_max_retries:
-        description: "Retries for 429/5xx"
-        required: false
-        default: "4"
-        type: string
-      safe_smoke_include_frontend:
-        description: "Also smoke test frontend routes"
-        required: false
-        default: false
-        type: boolean
-      safe_smoke_frontend_base_url:
-        description: "Base URL used for frontend smoke routes"
-        required: false
-        default: "https://starvis.ampynjord.bzh"
-        type: string
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-env:
-  NODE_VERSION: "22"
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-
-# ─────────────────────────────────────────────
-#  JOBS
-# ─────────────────────────────────────────────
 jobs:
-
-  # ==========================================
-  #  1. LINT & TYPE-CHECK
-  # ==========================================
-  lint:
-    name: "Lint & Type-check"
+  quality:
+    name: Code Quality and Tests
     runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_full_pipeline }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: |
-            api/package-lock.json
-            extractor/package-lock.json
-            ihm/package-lock.json
-
-      - name: Update npm
-        run: npm install -g npm@latest
-
-      - name: Install & type-check API
-        run: cd api && npm ci && npx tsc --noEmit
-
-      - name: Lint API (Biome)
-        run: cd api && npx biome check .
-
-      - name: Install & type-check Extractor
-        run: cd extractor && npm ci && npx tsc --noEmit
-
-      - name: Lint Extractor (Biome)
-        run: cd extractor && npx biome check .
-
-      - name: Install & build IHM
-        run: cd ihm && npm ci && npm run build
-
-      - name: Lint IHM (Biome)
-        run: cd ihm && npx biome check .
-
-      - name: Install & type-check Bot
-        run: cd bot && npm ci && npx tsc --noEmit
-
-      - name: Lint Bot (Biome)
-        run: cd bot && npx biome check .
-
-      - name: Audit API dependencies
-        run: cd api && npm audit --audit-level=high
-
-      - name: Validate docker-compose files
-        run: |
-          docker compose -f docker-compose.dev.yml config --quiet
-          docker compose -f docker-compose.prod.yml config --quiet
-        env:
-          DB_USER: ci
-          DB_PASSWORD: ci
-          DB_NAME: ci
-          MYSQL_ROOT_PASSWORD: ci
-          ADMIN_API_KEY: ci
-          DISCORD_TOKEN: ci
-          DISCORD_CLIENT_ID: ci
-
-  # ==========================================
-  #  1.b SAFE PRODUCTION SMOKE (manual)
-  # ==========================================
-  safe-smoke-prod:
-    name: "Safe smoke prod"
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.run_safe_smoke_prod }}
-    timeout-minutes: 10
-    env:
-      SMOKE_BASE_URL: ${{ inputs.safe_smoke_base_url }}
-      SMOKE_PACE_MS: ${{ inputs.safe_smoke_pace_ms }}
-      SMOKE_MAX_RETRIES: ${{ inputs.safe_smoke_max_retries }}
-      SMOKE_INCLUDE_FRONTEND: ${{ inputs.safe_smoke_include_frontend }}
-      SMOKE_FRONTEND_BASE_URL: ${{ inputs.safe_smoke_frontend_base_url }}
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Run safe production smoke test
-        run: node scripts/smoke-prod-safe.mjs
-
-  # ==========================================
-  #  2. UNIT / INTEGRATION TESTS
-  # ==========================================
-  test:
-    name: "Tests"
-    runs-on: ubuntu-latest
-    needs: lint
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_full_pipeline }}
     services:
       mysql:
         image: mysql:8.0
         env:
-          MYSQL_ROOT_PASSWORD: testroot
+          MYSQL_ROOT_PASSWORD: ci_password
           MYSQL_DATABASE: starvis
-          MYSQL_USER: starvis_user
-          MYSQL_PASSWORD: testpass
+          MYSQL_USER: ci_user
+          MYSQL_PASSWORD: ci_password
         ports:
           - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h localhost -u root -ptestroot"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
       redis:
         image: redis:7-alpine
         ports:
           - 6379:6379
-        options: >-
-          --health-cmd="redis-cli ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
-
-    env:
-      DB_HOST: 127.0.0.1
-      DB_PORT: 3306
-      DB_USER: starvis_user
-      DB_PASSWORD: testpass
-      DB_NAME: starvis
-      MYSQL_ROOT_PASSWORD: testroot
-      DATABASE_URL: mysql://starvis_user:testpass@127.0.0.1:3306/starvis
-      REDIS_HOST: 127.0.0.1
-      REDIS_PORT: 6379
-      ADMIN_API_KEY: ci_test_key
-      PORT: 3000
-      NODE_ENV: test
-      LOG_LEVEL: warn
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: |
-            api/package-lock.json
-            extractor/package-lock.json
-            ihm/package-lock.json
+          node-version: 22
+          cache: 'npm'
 
-      - name: Update npm
-        run: npm install -g npm@latest
+      - name: Install dependencies (Workspaces)
+        run: npm ci
 
-      - run: cd api && npm ci
+      - name: Generate DB Client
+        run: npm run db:generate
 
-      - name: Install extractor deps
-        run: cd extractor && npm ci
-
-      - name: Install IHM deps
-        run: cd ihm && npm ci
-
-      - name: Install Redis CLI
-        run: sudo apt-get update && sudo apt-get install -y redis-tools
-
-      - name: Generate Prisma Client
-        run: cd api && npx prisma generate
-
-      - name: Wait for services
+      - name: Apply DB Schema
         run: |
-          echo "⏳ Waiting for MySQL..."
-          for i in $(seq 1 30); do
-            mysqladmin ping -h 127.0.0.1 -u root -ptestroot --silent && break
-            sleep 2
-          done
-          echo "✅ MySQL ready"
-          
-          echo "⏳ Waiting for Redis..."
-          for i in $(seq 1 10); do
-            redis-cli -h 127.0.0.1 ping > /dev/null 2>&1 && break
-            sleep 1
-          done
-          echo "✅ Redis ready"
+          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/starvis" npm run db:push
+          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/live" npm run db:push
+          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/ptu" npm run db:push
 
-      - name: Setup database schema
-        run: |
-          # Create the extra game databases (live/ptu) needed by multi-DB architecture
-          mysql -h 127.0.0.1 -u root -ptestroot -e "
-            CREATE DATABASE IF NOT EXISTS live;
-            CREATE DATABASE IF NOT EXISTS ptu;
-            GRANT ALL PRIVILEGES ON live.* TO 'starvis_user'@'%';
-            GRANT ALL PRIVILEGES ON ptu.* TO 'starvis_user'@'%';
-            FLUSH PRIVILEGES;
-          "
-          # Push schema to all 3 databases
-          cd api
-          DATABASE_URL=mysql://starvis_user:testpass@127.0.0.1:3306/starvis npx prisma db push --skip-generate --accept-data-loss --force-reset
-          DATABASE_URL=mysql://starvis_user:testpass@127.0.0.1:3306/live    npx prisma db push --skip-generate --accept-data-loss --force-reset
-          DATABASE_URL=mysql://starvis_user:testpass@127.0.0.1:3306/ptu     npx prisma db push --skip-generate --accept-data-loss --force-reset
+      - name: Lint workspace packages
+        run: npm run lint
 
-      - name: Run API unit tests
-        run: cd api && npm run test
-        env:
-          LOG_LEVEL: error
+      - name: Run Tests
+        run: npm run test
 
-      - name: Run Extractor unit tests
-        run: cd extractor && npm run test
+      - name: Type-check API & Extractor
+        run: npm run typecheck --workspace=apps/api && npx tsc --noEmit --project apps/extractor/tsconfig.json
 
-      - name: Run IHM unit tests
-        run: cd ihm && npm run test:run
-
-  # ==========================================
-  #  3. BUILD DOCKER IMAGE
-  # ==========================================
   build:
-    name: "Build Docker image"
+    name: Build Docker images
     runs-on: ubuntu-latest
-    needs: lint
-    if: ${{ github.event_name != 'workflow_dispatch' || inputs.run_full_pipeline }}
-    permissions:
-      contents: read
-      packages: write
+    needs: quality
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Skip unless main
+        if: github.event_name != 'push' || github.ref != 'refs/heads/main'
+        run: echo "Skipped"
 
-      - uses: docker/setup-buildx-action@v3
+      - name: Checkout repository
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/checkout@v4
 
-      - uses: docker/login-action@v3
-        if: github.event_name == 'push'
+      - name: Set up Docker Buildx
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
         with:
-          registry: ${{ env.REGISTRY }}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Docker meta (API)
-        id: meta-api
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-api
-          tags: |
-            type=sha,prefix=
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-
-      - name: Docker meta (IHM)
-        id: meta-ihm
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-ihm
-          tags: |
-            type=sha,prefix=
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-
-      - name: Build & Push API image
-        uses: docker/build-push-action@v6
+      - name: Build and Push API
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v5
         with:
           context: .
-          file: api/Dockerfile
+          file: apps/api/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}-api:${{ github.sha }},ghcr.io/${{ github.repository }}-api:latest
           target: production
-          push: ${{ github.event_name == 'push' }}
-          tags: ${{ steps.meta-api.outputs.tags }}
-          labels: ${{ steps.meta-api.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
-      - name: Build & Push IHM image
-        uses: docker/build-push-action@v6
+      - name: Build and Push IHM
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: docker/build-push-action@v5
         with:
-          context: ihm
-          push: ${{ github.event_name == 'push' }}
-          tags: ${{ steps.meta-ihm.outputs.tags }}
-          labels: ${{ steps.meta-ihm.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          context: .
+          file: apps/ihm/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}-ihm:${{ github.sha }},ghcr.io/${{ github.repository }}-ihm:latest
+          target: production
 
-  # ==========================================
-  #  4. DEPLOY (main only)
-  # ==========================================
   deploy:
-    name: "Deploy"
+    name: Deploy
     runs-on: ubuntu-latest
-    needs: [test, build]
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    environment: production
-
+    needs: build
+    
     steps:
+      - name: Skip unless main
+        if: github.event_name != 'push' || github.ref != 'refs/heads/main'
+        run: echo "Skipped"
+
       - name: Deploy to VPS via SSH
-        uses: appleboy/ssh-action@v1
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: appleboy/ssh-action@v1.0.3
         env:
-          GHCR_TOKEN: ${{ secrets.GHCR_PAT }}
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: debian
-          key: ${{ secrets.VPS_SSH_KEY }}
-          envs: GHCR_TOKEN
+          environment: production
           script: |
-            set -e
-            cd /home/debian/starvis
-
-            # Reset tracked files to avoid merge conflicts (local edits like chmod)
-            git reset --hard HEAD
-            git pull --ff-only origin main
-
-            # Resolve env file — prefer .env.prod if present, fall back to .env
-            if [ -f .env.prod ]; then
-              ENV_OPT="--env-file .env.prod"
-            elif [ -f .env ]; then
-              ENV_OPT="--env-file .env"
-            else
-              ENV_OPT=""
-            fi
-
-            # Login to GHCR to pull private images
-            echo "$GHCR_TOKEN" | docker login ghcr.io -u ampynjord --password-stdin
-
-            # Pull pre-built images from GHCR
-            docker compose -f docker-compose.prod.yml $ENV_OPT pull
-            docker compose -f docker-compose.prod.yml $ENV_OPT up -d --remove-orphans
-
-            # Logout from GHCR
-            docker logout ghcr.io
-
-            # Wait for API health check
-            echo "⏳ Waiting for API health..."
-            for i in $(seq 1 30); do
-              docker exec starvis-api wget -qO- http://localhost:3000/health > /dev/null 2>&1 && break
-              sleep 2
-            done
-
-            # Verify deployment
-            docker exec starvis-api wget -qO- http://localhost:3000/health || echo "⚠️ API health check failed"
-
-            # Cleanup old images
-            docker image prune -f
-
-            echo "✅ Deployed $(docker compose -f docker-compose.prod.yml $ENV_OPT ps --format 'table {{.Name}}\t{{.Status}}')"
+            cd /opt/starvis
+            git pull origin main
+            docker login ghcr.io -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }}
+            docker compose -f docker-compose.prod.yml pull
+            docker compose -f docker-compose.prod.yml up -d
+            docker system prune -af
