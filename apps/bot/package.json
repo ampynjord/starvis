@@ -1,5 +1,5 @@
 {
-  "name": "starvis-bot",
+  "name": "@starvis/bot",
   "version": "1.0.0",
   "description": "Discord bot for Starvis — Star Citizen database",
   "type": "module",
@@ -11,7 +11,8 @@
     "lint:fix": "biome check --write ."
   },
   "dependencies": {
-    "discord.js": "^14.18.0"
+    "discord.js": "^14.18.0",
+    "@starvis/db": "*"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.4",
