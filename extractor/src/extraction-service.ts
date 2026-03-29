@@ -1366,7 +1366,7 @@ export class ExtractionService {
       for (let i = 0; i < items.length; i += batchSize) {
         const batch = items.slice(i, i + batchSize);
         const placeholders = batch.map(() => `(${ITEM_PH})`).join(', ');
-        const values: unknown[] = [];
+        const values: any[] = [];
 
         for (const it of batch) {
           const canonical = canonicalizeItemRecord({
@@ -1447,7 +1447,7 @@ export class ExtractionService {
       for (let i = 0; i < commodities.length; i += batchSize) {
         const batch = commodities.slice(i, i + batchSize);
         const placeholders = batch.map(() => `(${COMM_PH})`).join(', ');
-        const values: unknown[] = [];
+        const values: any[] = [];
 
         for (const cm of batch) {
           const canonical = canonicalizeCommodityRecord({
