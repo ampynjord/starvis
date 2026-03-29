@@ -7,8 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "biome check --write .",
-    "test": "vitest",
-    "test:run": "vitest run"
+    "test": "vitest run",
+    "test:run": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.56.2",
