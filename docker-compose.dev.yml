@@ -49,7 +49,7 @@ services:
     # Sources montées → tsx watch recharge à chaque modification
     # node_modules dans un named volume pour ne pas être écrasé par le montage ./api
     volumes:
-      - ./apps/api:/app
+      - ./:/app
       - api_node_modules:/app/node_modules
     ports:
       - "${API_PORT:-3000}:3000"
@@ -87,9 +87,9 @@ services:
     working_dir: /app
     # Source montée en volume → Vite HMR recharge le navigateur à chaque modification
     volumes:
-      - ./apps/ihm:/app
+      - ./:/app
       - ihm_node_modules:/app/node_modules
-    command: sh -c "npm install --prefer-offline && npm run dev -- -p 5173 -H 0.0.0.0"
+    command: sh -c "npm install --prefer-offline && npm run dev --workspace=starvis-ihm -- -p 5173 -H 0.0.0.0"
     ports:
       - "${IHM_DEV_PORT:-5173}:5173"
     environment:
@@ -107,9 +107,9 @@ services:
     container_name: starvis-bot
     working_dir: /app
     volumes:
-      - ./apps/bot:/app
+      - ./:/app
       - bot_node_modules:/app/node_modules
-    command: sh -c "npm install --prefer-offline && npm run dev"
+    command: sh -c "npm install --prefer-offline --silent && npm run dev --workspace=@starvis/bot"
     environment:
       DISCORD_TOKEN: ${DISCORD_TOKEN}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}

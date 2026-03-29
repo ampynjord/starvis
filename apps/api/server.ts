@@ -166,7 +166,7 @@ async function start() {
   try {
     const { execSync } = await import('node:child_process');
     for (const dbName of ALL_DB_NAMES) {
-      execSync('npx prisma db push --skip-generate --accept-data-loss', {
+      execSync('npx prisma db push --schema=../../packages/db/prisma/schema.prisma --skip-generate --accept-data-loss', {
         stdio: 'pipe',
         env: { ...process.env, DATABASE_URL: buildDatabaseUrl(dbName) },
       });
