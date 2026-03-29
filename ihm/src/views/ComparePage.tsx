@@ -132,7 +132,7 @@ export default function ComparePage() {
   const canShowComparison = activeSlots.length >= 2;
 
   return (
-    <div className="max-w-screen-xl mx-auto space-y-6">
+    <div className="max-w-(--breakpoint-xl) mx-auto space-y-6">
       <div>
         <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest">COMPARE</h1>
         <p className="text-sm text-slate-500 mt-0.5">Compare up to 4 ships side by side</p>
@@ -159,7 +159,7 @@ export default function ComparePage() {
                   </div>
                   <button
                     onClick={() => updateSlot(slot, { uuid: '', ship: null })}
-                    className="text-slate-600 hover:text-red-400 transition-colors flex-shrink-0"
+                    className="text-slate-600 hover:text-red-400 transition-colors shrink-0"
                     type="button"
                   >
                     <X size={12} />

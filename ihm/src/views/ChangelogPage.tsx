@@ -81,10 +81,10 @@ function EntityCard({ entityKey, entries }: { entityKey: string; entries: Change
     type === 'item'      ? `/items/${uuid}` : null;
 
   return (
-    <div className="border border-slate-800 rounded overflow-hidden">
+    <div className="border border-slate-800 rounded-sm overflow-hidden">
       <button
         onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/[0.02] transition-colors text-left"
+        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/2 transition-colors text-left"
       >
         <Icon size={13} className="text-slate-600 shrink-0" />
         <div className="flex-1 min-w-0">
@@ -161,7 +161,7 @@ function VersionSection({ version, entries }: { version: string; entries: Change
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
       <button
         onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center gap-3 px-4 py-3 bg-slate-900/60 border border-slate-800 rounded hover:border-slate-700 transition-all text-left"
+        className="w-full flex items-center gap-3 px-4 py-3 bg-slate-900/60 border border-slate-800 rounded-sm hover:border-slate-700 transition-all text-left"
       >
         <div className="flex-1">
           <span className="font-orbitron text-sm text-cyan-400">{version}</span>
@@ -230,7 +230,7 @@ export default function ChangelogPage() {
   const grouped = historyQuery.data ? groupByVersion(historyQuery.data.data) : new Map<string, ChangelogEntry[]>();
 
   return (
-    <div className="max-w-screen-xl mx-auto space-y-5">
+    <div className="max-w-(--breakpoint-xl) mx-auto space-y-5">
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -248,7 +248,7 @@ export default function ChangelogPage() {
         </div>
 
         {/* View toggle */}
-        <div className="flex items-center gap-1 bg-slate-900/60 border border-slate-800 rounded p-1">
+        <div className="flex items-center gap-1 bg-slate-900/60 border border-slate-800 rounded-sm p-1">
           <button
             onClick={() => setView('history')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono-sc uppercase transition-all ${
@@ -291,7 +291,7 @@ export default function ChangelogPage() {
 
           {/* Inline filters */}
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1 bg-slate-900/60 border border-slate-800 rounded p-1">
+            <div className="flex items-center gap-1 bg-slate-900/60 border border-slate-800 rounded-sm p-1">
               {ENTITY_TYPES_HISTORY.map(t => (
                 <button
                   key={t || 'all'}
@@ -306,7 +306,7 @@ export default function ChangelogPage() {
                 </button>
               ))}
             </div>
-            <div className="flex items-center gap-1 bg-slate-900/60 border border-slate-800 rounded p-1">
+            <div className="flex items-center gap-1 bg-slate-900/60 border border-slate-800 rounded-sm p-1">
               {CHANGE_TYPES_HISTORY.map(t => (
                 <button
                   key={t || 'all'}
@@ -363,7 +363,7 @@ export default function ChangelogPage() {
           )}
 
           <div className="flex gap-4">
-            <div className="w-44 flex-shrink-0">
+            <div className="w-44 shrink-0">
               <FilterPanel
                 hasFilters={hasFeedFilters}
                 onReset={() => { setEntityType(''); setChangeType(''); setPage(1); }}
@@ -404,7 +404,7 @@ export default function ChangelogPage() {
                           {entry.game_version && (
                             <span className="text-xs font-mono-sc text-slate-600 hidden md:block">{entry.game_version}</span>
                           )}
-                          <span className="text-xs font-mono-sc text-slate-700 flex-shrink-0 hidden lg:block">
+                          <span className="text-xs font-mono-sc text-slate-700 shrink-0 hidden lg:block">
                             {fDateTime(entry.created_at)}
                           </span>
                         </div>

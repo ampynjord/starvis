@@ -63,7 +63,7 @@ function NavItem({ to, icon: Icon, label }: { to: string; icon: React.ElementTyp
     <Link
       href={to}
       className={[
-        'flex items-center gap-3 px-2 py-2.5 rounded transition-all duration-150 group',
+        'flex items-center gap-3 px-2 py-2.5 rounded-sm transition-all duration-150 group',
         isActive
           ? 'bg-cyan-950/60 border border-cyan-800 text-cyan-400'
           : 'text-slate-500 hover:text-slate-200 hover:bg-white/5 border border-transparent',
@@ -71,7 +71,7 @@ function NavItem({ to, icon: Icon, label }: { to: string; icon: React.ElementTyp
     >
       <Icon
         size={16}
-        className={`flex-shrink-0 ${isActive ? 'text-cyan-400' : 'text-slate-500 group-hover:text-slate-300'}`}
+        className={`shrink-0 ${isActive ? 'text-cyan-400' : 'text-slate-500 group-hover:text-slate-300'}`}
         strokeWidth={isActive ? 2 : 1.5}
       />
       <span className="hidden md:block font-rajdhani font-semibold text-sm uppercase tracking-wider truncate">
@@ -105,11 +105,11 @@ export function Sidebar() {
   const { env, setEnv } = useEnv();
 
   return (
-    <aside className="w-16 md:w-56 flex-shrink-0 flex flex-col border-r border-border bg-panel/80 backdrop-blur">
+    <aside className="w-16 md:w-56 shrink-0 flex flex-col border-r border-border bg-panel/80 backdrop-blur-sm">
       {/* Logo */}
       <div className="h-14 flex items-center px-4 border-b border-border">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 border-2 border-cyan-400 rounded flex items-center justify-center flex-shrink-0">
+          <div className="w-8 h-8 border-2 border-cyan-400 rounded-sm flex items-center justify-center shrink-0">
             <span className="font-orbitron text-cyan-400 text-xs font-bold">SV</span>
           </div>
           <span className="hidden md:block font-orbitron text-cyan-400 text-sm font-bold tracking-widest glow-text truncate">
@@ -129,7 +129,7 @@ export function Sidebar() {
             <button
               onClick={() => setEnv('live')}
               className={[
-                'flex-1 py-1.5 rounded text-[10px] font-orbitron font-bold tracking-widest uppercase transition-all duration-150 border',
+                'flex-1 py-1.5 rounded-sm text-[10px] font-orbitron font-bold tracking-widest uppercase transition-all duration-150 border',
                 env === 'live'
                   ? 'bg-cyan-950/60 border-cyan-700 text-cyan-400'
                   : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/5',
@@ -141,7 +141,7 @@ export function Sidebar() {
             <button
               onClick={() => setEnv('ptu')}
               className={[
-                'flex-1 py-1.5 rounded text-[10px] font-orbitron font-bold tracking-widest uppercase transition-all duration-150 border',
+                'flex-1 py-1.5 rounded-sm text-[10px] font-orbitron font-bold tracking-widest uppercase transition-all duration-150 border',
                 env === 'ptu'
                   ? 'bg-orange-950/60 border-orange-700 text-orange-400'
                   : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/5',

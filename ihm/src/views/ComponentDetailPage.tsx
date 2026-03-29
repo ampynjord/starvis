@@ -95,7 +95,7 @@ export default function ComponentDetailPage() {
   const rawPayload = comp.game_data ?? comp.data_json ?? null;
 
   return (
-    <div className="max-w-screen-lg mx-auto space-y-6">
+    <div className="max-w-(--breakpoint-lg) mx-auto space-y-6">
       <div className="flex items-center gap-2 text-xs font-mono-sc text-slate-600">
         <button onClick={() => router.back()} className="hover:text-slate-400 transition-colors flex items-center gap-1"><ArrowLeft size={12} /> Back</button>
         <ChevronRight size={10} />
@@ -160,7 +160,7 @@ export default function ComponentDetailPage() {
                         confidenceScore={loc.confidence_score}
                       />
                     </div>
-                    {loc.base_price != null && <span className="text-xs font-mono-sc text-amber-400 flex-shrink-0">{fCredits(loc.base_price)}</span>}
+                    {loc.base_price != null && <span className="text-xs font-mono-sc text-amber-400 shrink-0">{fCredits(loc.base_price)}</span>}
                   </div>
                 </div>
               ))}

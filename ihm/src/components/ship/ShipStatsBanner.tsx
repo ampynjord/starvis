@@ -153,7 +153,7 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
         {/* Ruler bar avec marqueurs */}
         <div className="relative h-7 bg-slate-900 rounded-md border border-slate-800 overflow-hidden mb-3">
           {/* gradient de fond */}
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-800/20 to-violet-950/30" />
+          <div className="absolute inset-0 bg-linear-to-r from-slate-900 via-slate-800/20 to-violet-950/30" />
 
           {/* Remplissage boost fwd */}
           <div
@@ -167,7 +167,7 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
               className="absolute top-0 bottom-0 w-0.5 bg-cyan-500/70"
               style={{ left: `${pctOf(ship.scm_speed)}%` }}
             >
-              <span className="absolute -top-0 left-1 text-[9px] font-mono-sc text-cyan-400 whitespace-nowrap">
+              <span className="absolute top-0 left-1 text-[9px] font-mono-sc text-cyan-400 whitespace-nowrap">
                 {fV(ship.scm_speed)}
               </span>
             </div>
@@ -283,14 +283,14 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
               <div className="flex items-center gap-3">
                 {shieldHp > 0 && (
                   <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-sm bg-cyan-500" />
+                    <span className="w-2 h-2 rounded-xs bg-cyan-500" />
                     <span className="text-[10px] font-mono-sc text-cyan-600">Shield</span>
                     <span className="text-[10px] font-mono-sc text-cyan-400 tabular-nums">{fK(shieldHp)} HP</span>
                   </span>
                 )}
                 {hullHp > 0 && (
                   <span className="flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-sm bg-slate-500" />
+                    <span className="w-2 h-2 rounded-xs bg-slate-500" />
                     <span className="text-[10px] font-mono-sc text-slate-500">Hull</span>
                     <span className="text-[10px] font-mono-sc text-slate-400 tabular-nums">{fK(hullHp)} HP</span>
                   </span>

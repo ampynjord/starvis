@@ -67,7 +67,7 @@ interface HeaderStatProps {
 function HeaderStat({ icon: Icon, label, value }: HeaderStatProps) {
   return (
     <div className="sci-panel p-3 flex items-start gap-2">
-      <Icon className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+      <Icon className="w-4 h-4 text-cyan-400 mt-0.5 shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-xs text-slate-500 uppercase tracking-wider">{label}</p>
         <p className="text-sm font-mono-sc text-cyan-300 truncate">{value}</p>
@@ -247,7 +247,7 @@ export default function EquipmentPage() {
               placeholder={`Search ${tab}...`}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-600 rounded text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-500"
+              className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-600 rounded-sm text-sm text-slate-100 placeholder-slate-600 focus:outline-hidden focus:border-cyan-500"
             />
           </div>
 
@@ -257,7 +257,7 @@ export default function EquipmentPage() {
               <select
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-600 rounded text-sm text-slate-100 focus:outline-none focus:border-cyan-500 appearance-none cursor-pointer"
+                className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-600 rounded-sm text-sm text-slate-100 focus:outline-hidden focus:border-cyan-500 appearance-none cursor-pointer"
               >
                 <option value="">All Types ({uniqueTypes.length})</option>
                 {uniqueTypes.map((type) => (

@@ -28,12 +28,12 @@ export default function ManufacturersPage() {
   if (error)     return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
 
   return (
-    <div className="max-w-screen-xl mx-auto space-y-6">
+    <div className="max-w-(--breakpoint-xl) mx-auto space-y-6">
       <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Manufacturers</h1>
 
       <div className="flex gap-6">
         {/* List */}
-        <div className="w-64 flex-shrink-0">
+        <div className="w-64 shrink-0">
           <div className="sci-panel overflow-hidden">
             <div className="px-3 py-2 border-b border-border">
               <p className="text-xs font-mono-sc text-slate-600 uppercase">
@@ -55,7 +55,7 @@ export default function ManufacturersPage() {
                     <p className="font-orbitron text-xs font-bold truncate">{m.code}</p>
                     <p className="text-xs text-slate-600 truncate">{m.name}</p>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
                     <span className="text-xs font-mono-sc text-slate-600">{m.ship_count}</span>
                     <ChevronRight size={10} className="text-slate-700" />
                   </div>
@@ -81,7 +81,7 @@ export default function ManufacturersPage() {
                       <p className="text-sm text-slate-400 mt-2 leading-relaxed">{selectedMfr.description}</p>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-2 flex-shrink-0">
+                  <div className="grid grid-cols-2 gap-2 shrink-0">
                     <div className="sci-panel p-3 text-center">
                       <Rocket size={16} className="text-cyan-400 mx-auto mb-1" />
                       <p className="font-orbitron text-lg text-slate-200">{selectedMfr.ship_count}</p>

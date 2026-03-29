@@ -53,7 +53,7 @@ export function RiskAssessment({ data, risk, selectedElementUuid }: RiskAssessme
 
       <ScifiPanel title="Overall Risk Profile">
         <div className="grid grid-cols-2 gap-3">
-          <div className="border border-border/50 rounded p-3">
+          <div className="border border-border/50 rounded-sm p-3">
             <div className="text-[10px] text-slate-600 font-mono-sc uppercase tracking-wider mb-1">
               Max Instability
             </div>
@@ -67,7 +67,7 @@ export function RiskAssessment({ data, risk, selectedElementUuid }: RiskAssessme
               />
             </div>
           </div>
-          <div className="border border-border/50 rounded p-3">
+          <div className="border border-border/50 rounded-sm p-3">
             <div className="text-[10px] text-slate-600 font-mono-sc uppercase tracking-wider mb-1">
               Max Resistance
             </div>
@@ -86,7 +86,7 @@ export function RiskAssessment({ data, risk, selectedElementUuid }: RiskAssessme
 
       {aggregates.hasHighRisk && (
         <div className="sci-panel border-red-600/50 p-3 flex gap-3">
-          <AlertTriangle size={16} className="text-red-400 flex-shrink-0 mt-0.5" />
+          <AlertTriangle size={16} className="text-red-400 shrink-0 mt-0.5" />
           <div className="text-xs text-red-300">
             <div className="font-semibold mb-1">⚠ High Risk Zone</div>
             <div className="text-[11px] text-red-200/80">

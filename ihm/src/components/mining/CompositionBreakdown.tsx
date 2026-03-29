@@ -71,7 +71,7 @@ export function CompositionBreakdown({
               <div className="font-rajdhani font-semibold text-sm text-slate-100">{el.elementName}</div>
               <div className="text-[10px] text-slate-600 font-mono-sc">Probability of finding</div>
             </div>
-            <div className="text-right flex-shrink-0">
+            <div className="text-right shrink-0">
               <div className="font-orbitron text-sm font-bold text-green-400">{pct(el.probability)}</div>
               <div className="text-[10px] text-slate-600 font-mono-sc">
                 {pct(el.minPercentage)} – {pct(el.maxPercentage)}

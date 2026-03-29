@@ -151,7 +151,7 @@ export default function HomePage() {
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <div className="sci-panel p-6 border-cyan-900 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-cyan-950/20 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-linear-to-r from-cyan-950/20 via-transparent to-transparent pointer-events-none" />
         <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h1 className="font-orbitron text-3xl font-black text-cyan-400 glow-text tracking-widest">
@@ -162,7 +162,7 @@ export default function HomePage() {
             </p>
           </div>
           {version && (
-            <div className="sci-panel p-3 text-right flex-shrink-0 border-cyan-900">
+            <div className="sci-panel p-3 text-right shrink-0 border-cyan-900">
               <p className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest">Game version</p>
               <p className="font-orbitron text-cyan-400 text-sm mt-0.5">{version.game_version}</p>
               <p className="text-xs text-slate-600 mt-0.5">{fDateTime(version.extracted_at)}</p>
@@ -251,7 +251,7 @@ export default function HomePage() {
                   )}
                 </div>
               </div>
-              <div className="flex items-center flex-shrink-0">
+              <div className="flex items-center shrink-0">
                 <span className="sci-btn-primary py-1.5 px-3 text-xs group-hover:border-cyan-400 transition-colors">
                   View details <ArrowRight size={12} />
                 </span>
@@ -275,9 +275,9 @@ export default function HomePage() {
               <Link href={to} className="block h-full">
                 <div className={`sci-panel p-4 h-full border transition-colors duration-150 ${accent} group`}>
                   <div className="flex items-start justify-between mb-3">
-                    <Icon size={20} className="text-slate-400 group-hover:text-slate-200 transition-colors flex-shrink-0" />
+                    <Icon size={20} className="text-slate-400 group-hover:text-slate-200 transition-colors shrink-0" />
                     {badge && (
-                      <span className="text-[9px] font-orbitron tracking-widest text-slate-600 border border-slate-700 rounded px-1 py-0.5 uppercase">
+                      <span className="text-[9px] font-orbitron tracking-widest text-slate-600 border border-slate-700 rounded-sm px-1 py-0.5 uppercase">
                         {badge}
                       </span>
                     )}
@@ -305,7 +305,7 @@ export default function HomePage() {
               <Link
                 key={label}
                 href={to}
-                className="flex items-center gap-3 px-3 py-2.5 rounded border border-transparent hover:border-border hover:bg-white/5 transition-all group"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-sm border border-transparent hover:border-border hover:bg-white/5 transition-all group"
               >
                 <Icon size={14} className={color} />
                 <span className="font-rajdhani font-semibold text-sm text-slate-400 group-hover:text-slate-200 uppercase tracking-wide transition-colors">
@@ -341,7 +341,7 @@ export default function HomePage() {
           )}
           <div className="space-y-1 max-h-72 overflow-y-auto">
             {changelog?.data.map((entry: { id: string | number; change_type: string; entity_name: string; entity_type: string; created_at: string }) => (
-              <div key={entry.id} className="flex items-center gap-3 px-2 py-1.5 rounded hover:bg-white/5 transition-colors">
+              <div key={entry.id} className="flex items-center gap-3 px-2 py-1.5 rounded-sm hover:bg-white/5 transition-colors">
                 <GlowBadge
                   color={
                     entry.change_type === 'added' ? 'green' :
@@ -352,10 +352,10 @@ export default function HomePage() {
                   {entry.change_type}
                 </GlowBadge>
                 <span className="flex-1 text-sm text-slate-400 truncate">{entry.entity_name}</span>
-                <span className="text-xs font-mono-sc text-slate-600 flex-shrink-0">
+                <span className="text-xs font-mono-sc text-slate-600 shrink-0">
                   {entry.entity_type}
                 </span>
-                <span className="text-xs font-mono-sc text-slate-700 flex-shrink-0 hidden md:block">
+                <span className="text-xs font-mono-sc text-slate-700 shrink-0 hidden md:block">
                   {fDateTime(entry.created_at)}
                 </span>
               </div>

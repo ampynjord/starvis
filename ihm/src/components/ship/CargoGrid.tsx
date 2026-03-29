@@ -27,7 +27,7 @@ export function CargoGrid({ scu, shipName }: { scu: number; shipName: string }) 
             <button
               onClick={() => setFullscreen(true)}
               title="Plein écran"
-              className="flex items-center justify-center w-5 h-5 rounded border border-slate-700 bg-slate-900 text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-colors"
+              className="flex items-center justify-center w-5 h-5 rounded-sm border border-slate-700 bg-slate-900 text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-colors"
             >
               <Maximize2 size={10} />
             </button>
@@ -35,7 +35,7 @@ export function CargoGrid({ scu, shipName }: { scu: number; shipName: string }) 
         </div>
 
         {/* Viewer 3D sc-cargo.space */}
-        <div className="rounded border border-slate-800/80 overflow-hidden bg-slate-950">
+        <div className="rounded-sm border border-slate-800/80 overflow-hidden bg-slate-950">
           <iframe
             key={iframeSrc}
             src={iframeSrc}
@@ -92,7 +92,7 @@ export function CargoGrid({ scu, shipName }: { scu: number; shipName: string }) 
               </span>
               <button
                 onClick={() => setFullscreen(false)}
-                className="flex items-center justify-center w-6 h-6 rounded border border-slate-700 bg-slate-900 text-slate-400 hover:text-white hover:border-slate-500 transition-colors"
+                className="flex items-center justify-center w-6 h-6 rounded-sm border border-slate-700 bg-slate-900 text-slate-400 hover:text-white hover:border-slate-500 transition-colors"
               >
                 <X size={12} />
               </button>
