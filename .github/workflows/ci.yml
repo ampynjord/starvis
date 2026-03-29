@@ -44,9 +44,9 @@ jobs:
 
       - name: Apply DB Schema
         run: |
-          DATABASE_URL="mysql://ci_user:ci_password@127.0.0.1:3306/starvis" npm run db:push
-          DATABASE_URL="mysql://ci_user:ci_password@127.0.0.1:3306/live" npm run db:push
-          DATABASE_URL="mysql://ci_user:ci_password@127.0.0.1:3306/ptu" npm run db:push
+          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/starvis" npm run db:push
+          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/live" npm run db:push
+          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/ptu" npm run db:push
 
       - name: Lint workspace packages
         run: npm run lint
