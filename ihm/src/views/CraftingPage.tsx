@@ -91,8 +91,8 @@ function SidebarGroup({
       <button type="button" onClick={onToggle}
         className="w-full flex items-center gap-1 px-3 py-2 text-left hover:bg-white/5 transition-colors group">
         {expanded
-          ? <ChevronDown size={11} className="text-slate-600 flex-shrink-0" />
-          : <ChevronRight size={11} className="text-slate-600 flex-shrink-0" />}
+          ? <ChevronDown size={11} className="text-slate-600 shrink-0" />
+          : <ChevronRight size={11} className="text-slate-600 shrink-0" />}
         <span className={`text-[11px] font-mono-sc uppercase tracking-wider flex-1 truncate ${expanded ? 'text-cyan-400' : 'text-slate-400 group-hover:text-slate-200'}`}>{label}</span>
         <GlowBadge color={color} size="xs">{count}</GlowBadge>
       </button>
@@ -103,7 +103,7 @@ function SidebarGroup({
             : items.map((it) => (
               <button key={it.id} type="button" onClick={() => onSelect(it.id)}
                 className={`w-full text-left pl-6 pr-3 py-1.5 text-xs transition-colors truncate ${
-                  selectedId === it.id ? 'text-cyan-400 bg-cyan-950/40' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'
+                  selectedId === it.id ? 'text-cyan-400 bg-cyan-950/40' : 'text-slate-500 hover:text-slate-300 hover:bg-white/3'
                 }`}>{it.displayName}</button>
             ))}
         </div>
@@ -117,7 +117,7 @@ function SidebarItem({ label, selected, onClick, badge }: { label: string; selec
   return (
     <button type="button" onClick={onClick}
       className={`w-full text-left px-4 py-2 text-xs transition-colors flex items-center gap-2 ${
-        selected ? 'text-cyan-400 bg-cyan-950/40' : 'text-slate-500 hover:text-slate-300 hover:bg-white/[0.03]'
+        selected ? 'text-cyan-400 bg-cyan-950/40' : 'text-slate-500 hover:text-slate-300 hover:bg-white/3'
       }`}>
       <span className="flex-1 truncate">{label}</span>
       {badge && <span className="text-[9px] font-mono-sc text-slate-600">{badge}</span>}
@@ -139,7 +139,7 @@ function PartCard({ ingredient, batch, quality, onQuality, modifiers }: {
       <div className="px-4 pt-3 pb-2">
         {slot && <p className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-wider mb-1">{slot}</p>}
         <div className="flex items-center gap-2 mb-1">
-          <div className="w-2 h-2 rounded-full bg-cyan-500 flex-shrink-0" />
+          <div className="w-2 h-2 rounded-full bg-cyan-500 shrink-0" />
           <span className="text-sm font-medium text-slate-200 truncate">{ingredient.display_item_name ?? fmtItem(ingredient.item_name)}</span>
         </div>
         <p className="text-[10px] font-mono-sc text-slate-600 pl-4">
@@ -160,14 +160,14 @@ function PartCard({ ingredient, batch, quality, onQuality, modifiers }: {
           </div>
           <div className="flex items-center gap-1.5">
             <button type="button" onClick={() => onQuality(clampQ(quality - 10))}
-              className="w-5 h-5 flex items-center justify-center rounded border border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300 transition-colors flex-shrink-0"><Minus size={9} /></button>
+              className="w-5 h-5 flex items-center justify-center rounded-sm border border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300 transition-colors shrink-0"><Minus size={9} /></button>
             <input type="range" min={0} max={Q_MAX} value={quality} onChange={(e) => onQuality(clampQ(Number(e.target.value)))}
               className="flex-1 h-1 accent-cyan-500 bg-slate-800 rounded-full appearance-none cursor-pointer
                 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3
                 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-cyan-400
                 [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-slate-900" />
             <button type="button" onClick={() => onQuality(clampQ(quality + 10))}
-              className="w-5 h-5 flex items-center justify-center rounded border border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300 transition-colors flex-shrink-0"><Plus size={9} /></button>
+              className="w-5 h-5 flex items-center justify-center rounded-sm border border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300 transition-colors shrink-0"><Plus size={9} /></button>
             <input type="number" min={0} max={Q_MAX} value={quality}
               onChange={(e) => onQuality(clampQ(Number(e.target.value) || 0))}
               className="sci-input w-14 text-[11px] text-center py-0.5 font-mono-sc" />
@@ -177,7 +177,7 @@ function PartCard({ ingredient, batch, quality, onQuality, modifiers }: {
               const val = computeModifier(m, quality);
               return (
                 <span key={m.id}
-                  className={`inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-900/50 px-1.5 py-0.5 text-[10px] font-mono-sc ${modColor(val)}`}
+                  className={`inline-flex items-center gap-1 rounded-sm border border-slate-700 bg-slate-900/50 px-1.5 py-0.5 text-[10px] font-mono-sc ${modColor(val)}`}
                   title={`${m.property_name} \u2014 ${m.unit_format}`}
                 >{m.display_property_name ?? m.property_name} {fmtModPct(val)}</span>
               );
@@ -196,7 +196,7 @@ function PartCard({ ingredient, batch, quality, onQuality, modifiers }: {
 /* ---------- mission card (inline) ---------- */
 function MissionRow({ m }: { m: Mission }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3 bg-slate-900/40 rounded border border-slate-800/30 hover:bg-slate-900/60 transition-colors">
+    <div className="flex items-center gap-3 px-4 py-3 bg-slate-900/40 rounded-sm border border-slate-800/30 hover:bg-slate-900/60 transition-colors">
       <Swords size={14} className={m.is_legal ? 'text-green-500' : 'text-red-500'} />
       <div className="flex-1 min-w-0">
         <p className="text-xs text-slate-200 truncate">{m.title ?? m.class_name}</p>
@@ -206,7 +206,7 @@ function MissionRow({ m }: { m: Mission }) {
           {m.location_system && <span className="text-[9px] font-mono-sc text-slate-700">{m.location_system}</span>}
         </div>
       </div>
-      <div className="text-right flex-shrink-0">
+      <div className="text-right shrink-0">
         <p className="text-xs font-mono-sc text-amber-400">{fmtReward(m.reward_min, m.reward_max)}</p>
         {m.danger_level != null && <p className="text-[9px] font-mono-sc text-red-900">Danger {m.danger_level}</p>}
       </div>
@@ -416,7 +416,7 @@ export default function CraftingPage() {
     <div className="flex h-[calc(100vh-64px)]">
 
       {/* === LEFT SIDEBAR === */}
-      <div className="w-52 xl:w-60 flex-shrink-0 border-r border-slate-800/60 flex flex-col bg-slate-950/50">
+      <div className="w-52 xl:w-60 shrink-0 border-r border-slate-800/60 flex flex-col bg-slate-950/50">
 
         {/* tabs */}
         <div className="flex border-b border-slate-800/60">
@@ -553,7 +553,7 @@ export default function CraftingPage() {
                     const pct = (cm.totalMultiplier - 1) * 100;
                     const sign = pct >= 0 ? '+' : '';
                     return (
-                      <div key={cm.propertyName} className="bg-slate-900/60 rounded p-3 border border-slate-800/30">
+                      <div key={cm.propertyName} className="bg-slate-900/60 rounded-sm p-3 border border-slate-800/30">
                         <p className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-wider truncate mb-1">
                           {cm.propertyName}
                         </p>
@@ -579,14 +579,14 @@ export default function CraftingPage() {
                     {selectedRecipe.display_output_item_name ?? fmtItem(selectedRecipe.output_item_name ?? selectedRecipe.name ?? '\u2014')}
                   </p>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2 shrink-0">
                   <button type="button" onClick={() => setBatchCount((v) => Math.max(1, v - 1))}
-                    className="w-7 h-7 flex items-center justify-center rounded border border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300 transition-colors"><Minus size={12} /></button>
+                    className="w-7 h-7 flex items-center justify-center rounded-sm border border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300 transition-colors"><Minus size={12} /></button>
                   <input type="number" min={1} max={999} value={batchCount}
                     onChange={(e) => setBatchCount(Math.max(1, Number(e.target.value) || 1))}
                     className="sci-input w-14 text-sm text-center font-mono-sc h-7" />
                   <button type="button" onClick={() => setBatchCount((v) => Math.min(999, v + 1))}
-                    className="w-7 h-7 flex items-center justify-center rounded border border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300 transition-colors"><Plus size={12} /></button>
+                    className="w-7 h-7 flex items-center justify-center rounded-sm border border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300 transition-colors"><Plus size={12} /></button>
                   <span className="font-mono-sc text-xl font-bold text-cyan-400 ml-1">{'\u00d7'}{(selectedRecipe.output_quantity ?? 1) * batchCount}</span>
                 </div>
               </div>
@@ -742,7 +742,7 @@ export default function CraftingPage() {
                 {resourceRecipes.map((r: any) => (
                   <button key={r.uuid} type="button"
                     onClick={() => { setTab('blueprint'); setSelectedRecipeUuid(r.uuid); setExpandedGroup(r.category); }}
-                    className="w-full flex items-center gap-3 px-4 py-3 bg-slate-900/40 rounded border border-slate-800/30 hover:bg-slate-900/60 hover:border-cyan-900/40 transition-colors text-left">
+                    className="w-full flex items-center gap-3 px-4 py-3 bg-slate-900/40 rounded-sm border border-slate-800/30 hover:bg-slate-900/60 hover:border-cyan-900/40 transition-colors text-left">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-slate-200 truncate">{r.display_output_item_name ?? fmtItem(r.output_item_name ?? r.name ?? r.class_name)}</p>
                       <div className="flex items-center gap-3 mt-0.5">
@@ -756,7 +756,7 @@ export default function CraftingPage() {
                         )}
                       </div>
                     </div>
-                    <div className="text-right flex-shrink-0">
+                    <div className="text-right shrink-0">
                       <p className="text-xs font-mono-sc text-cyan-400">{r.quantity}x</p>
                       {r.scu && <p className="text-[9px] font-mono-sc text-slate-600">{fmtScu(Number(r.scu))}</p>}
                     </div>

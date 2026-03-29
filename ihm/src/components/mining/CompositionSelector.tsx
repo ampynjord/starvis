@@ -93,7 +93,7 @@ export function CompositionSelector({
         </span>
         <ChevronDown
           size={14}
-          className={`text-slate-500 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`text-slate-500 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`}
         />
       </button>
 
@@ -103,7 +103,7 @@ export function CompositionSelector({
             initial={{ opacity: 0, y: -4 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
-            className="absolute z-50 top-full mt-1 left-0 right-0 bg-panel border border-border rounded shadow-xl"
+            className="absolute z-50 top-full mt-1 left-0 right-0 bg-panel border border-border rounded-sm shadow-xl"
           >
             <div className="sticky top-0 bg-panel border-b border-border p-2">
               <div className="relative">

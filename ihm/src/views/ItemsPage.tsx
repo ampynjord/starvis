@@ -125,7 +125,7 @@ export default function ItemsPage() {
   }, [categories, activeCategory]);
 
   return (
-    <div className="max-w-screen-2xl mx-auto">
+    <div className="max-w-(--breakpoint-2xl) mx-auto">
       <div className="mb-4 flex items-center justify-between gap-4">
         <div>
           <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">{pageTitle}</h1>
@@ -145,7 +145,7 @@ export default function ItemsPage() {
             type="button"
             onClick={() => selectCategory(chip.label)}
             className={[
-              'px-3 py-1 rounded text-xs font-rajdhani font-semibold tracking-wider transition-all border',
+              'px-3 py-1 rounded-sm text-xs font-rajdhani font-semibold tracking-wider transition-all border',
               activeCategory === chip.label
                 ? 'bg-cyan-950/60 border-cyan-700 text-cyan-400'
                 : 'border-border text-slate-500 hover:text-slate-300 hover:border-slate-600',
@@ -157,7 +157,7 @@ export default function ItemsPage() {
       </div>
 
       <div className="flex gap-4">
-        <div className="w-44 flex-shrink-0">
+        <div className="w-44 shrink-0">
           {filterGroups.length > 0
             ? <FilterPanel hasFilters={hasFilters} onReset={resetFilters} groups={filterGroups} />
             : <div className="sci-panel p-3 text-xs text-slate-600 animate-pulse">Loading…</div>}
@@ -188,7 +188,7 @@ export default function ItemsPage() {
                         </Link>
                         <Link
                           href={`/missions?search=${encodeURIComponent(getItemDisplayName(item))}`}
-                          className="text-xs text-amber-500 hover:text-amber-300 flex-shrink-0"
+                          className="text-xs text-amber-500 hover:text-amber-300 shrink-0"
                         >
                           Mission leads
                         </Link>

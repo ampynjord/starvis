@@ -34,7 +34,7 @@ export default function CommodityDetailPage() {
   if (!commodity) return null;
 
   return (
-    <div className="max-w-screen-lg mx-auto space-y-6">
+    <div className="max-w-(--breakpoint-lg) mx-auto space-y-6">
       <div className="flex items-center gap-2 text-xs font-mono-sc text-slate-600">
         <button onClick={() => router.back()} className="hover:text-slate-400 transition-colors flex items-center gap-1"><ArrowLeft size={12} /> Back</button>
         <ChevronRight size={10} />
@@ -74,7 +74,7 @@ export default function CommodityDetailPage() {
           ].map(({ label, value }) => (
             <div key={label} className="sci-panel p-2.5">
               <p className="text-xs text-slate-600 font-mono-sc uppercase">{label}</p>
-              <p className="text-sm font-mono-sc text-slate-300 mt-0.5 break-words">{value}</p>
+              <p className="text-sm font-mono-sc text-slate-300 mt-0.5 wrap-break-word">{value}</p>
             </div>
           ))}
         </div>

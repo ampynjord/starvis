@@ -94,7 +94,7 @@ export default function ShipDetailPage() {
   if (!ship)    return null;
 
   return (
-    <div className="max-w-screen-xl mx-auto space-y-6">
+    <div className="max-w-(--breakpoint-xl) mx-auto space-y-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs font-mono-sc text-slate-600">
         <button onClick={() => router.back()} className="hover:text-slate-400 transition-colors flex items-center gap-1">
@@ -116,7 +116,7 @@ export default function ShipDetailPage() {
               className="w-full h-full object-cover opacity-80"
               loading="lazy"
             />
-            <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#0A1628] to-transparent" />
+            <div className="absolute inset-x-0 bottom-0 h-20 bg-linear-to-t from-[#0A1628] to-transparent" />
           </div>
         )}
         <div className="p-6">
@@ -142,7 +142,7 @@ export default function ShipDetailPage() {
                 {ship.ship_matrix_id != null && <GlowBadge color="green">RSI Link</GlowBadge>}
               </div>
             </div>
-            <div className="flex flex-col items-start gap-2 flex-shrink-0">
+            <div className="flex flex-col items-start gap-2 shrink-0">
               <Link href={`/compare?a=${uuid}`} className="sci-btn-amber text-sm">
                 <BarChart3 size={13} /> Compare
               </Link>
@@ -337,14 +337,14 @@ export default function ShipDetailPage() {
                 </div>
                 <div className="flex gap-1 flex-wrap">
                   {Array.from({ length: pipCount }).map((_, i) => (
-                    <div key={i} className={`w-4 h-4 rounded-sm border flex items-center justify-center ${
+                    <div key={i} className={`w-4 h-4 rounded-xs border flex items-center justify-center ${
                       minC != null && i < minC ? 'bg-teal-900/60 border-teal-700/50' : 'bg-teal-900/30 border-teal-800/40'
                     }`}>
                       <div className={`w-1.5 h-1.5 rounded-full ${minC != null && i < minC ? 'bg-teal-500' : 'bg-teal-700'}`} />
                     </div>
                   ))}
                   {maxC > 16 && (
-                    <div className="w-4 h-4 rounded-sm bg-teal-900/40 border border-teal-800/40 flex items-center justify-center">
+                    <div className="w-4 h-4 rounded-xs bg-teal-900/40 border border-teal-800/40 flex items-center justify-center">
                       <span className="text-[7px] font-mono-sc text-teal-600">+{maxC - 16}</span>
                     </div>
                   )}
@@ -408,7 +408,7 @@ export default function ShipDetailPage() {
             <ScifiPanel title="Available paints" subtitle={`${paints.length} paints`} actions={<Palette size={14} className="text-slate-600" />}>
               <div className="space-y-0.5 max-h-64 overflow-y-auto">
                 {paints.map(p => (
-                  <div key={p.paint_uuid} className="px-2 py-1.5 rounded hover:bg-white/5">
+                  <div key={p.paint_uuid} className="px-2 py-1.5 rounded-sm hover:bg-white/5">
                     <span className="text-xs font-mono-sc text-slate-400">{p.paint_name}</span>
                   </div>
                 ))}

@@ -100,7 +100,7 @@ function StatChip({ icon: Icon, label, value, accent = 'cyan' }: {
 }) {
   const accentCls = accent === 'red' ? 'text-red-400' : accent === 'blue' ? 'text-blue-400' : 'text-cyan-400';
   return (
-    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/60 rounded border border-slate-800">
+    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/60 rounded-sm border border-slate-800">
       <Icon size={12} className={accentCls} />
       <span className="text-[10px] font-mono-sc text-slate-500 uppercase">{label}</span>
       <span className={`text-xs font-bold font-mono-sc ml-1 ${accentCls}`}>{value}</span>
@@ -342,8 +342,8 @@ function SlotButton({
           : isActive
           ? 'border-cyan-700 bg-cyan-950/30'
           : isEmpty
-          ? 'border-slate-800/40 border-dashed hover:border-slate-600 hover:bg-white/[0.01]'
-          : 'border-slate-800 hover:border-slate-700 hover:bg-white/[0.02]'
+          ? 'border-slate-800/40 border-dashed hover:border-slate-600 hover:bg-white/1'
+          : 'border-slate-800 hover:border-slate-700 hover:bg-white/2'
       }`}
     >
       <span className={`text-sm shrink-0 ${typeColor(compType)}`}>{typeIcon(compType)}</span>
@@ -434,7 +434,7 @@ function HardpointRow({
       <div>
         <button
           onClick={() => setExpanded(v => !v)}
-          className="w-full flex items-center gap-2 px-3 py-1.5 rounded border border-slate-800/60 bg-slate-900/20 hover:border-slate-700 transition-colors text-left"
+          className="w-full flex items-center gap-2 px-3 py-1.5 rounded-sm border border-slate-800/60 bg-slate-900/20 hover:border-slate-700 transition-colors text-left"
         >
           <span className="text-sm shrink-0 text-slate-500">⚙</span>
           <div className="flex-1 min-w-0">
@@ -476,7 +476,7 @@ function HardpointRow({
 
   // Cas 3: mount vide
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded border border-dashed border-slate-800/30 text-slate-700">
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm border border-dashed border-slate-800/30 text-slate-700">
       <span className="text-sm">⚙</span>
       <span className="text-xs font-rajdhani truncate">{hp.display_name}</span>
       {mountLabel && <span className="text-[10px] font-mono-sc ml-auto shrink-0">{mountLabel}</span>}
@@ -623,7 +623,7 @@ export default function OutfitterPage() {
   const swappedIds = new Set(Object.keys(swaps).map(Number));
 
   return (
-    <div className="max-w-screen-xl mx-auto space-y-4">
+    <div className="max-w-(--breakpoint-xl) mx-auto space-y-4">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -636,11 +636,11 @@ export default function OutfitterPage() {
         {selectedShip && (
           <div className="flex items-center gap-2">
             {hasSwaps && (
-              <button onClick={handleReset} className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-500 hover:text-slate-300 border border-slate-800 hover:border-slate-600 rounded transition-all">
+              <button onClick={handleReset} className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-500 hover:text-slate-300 border border-slate-800 hover:border-slate-600 rounded-sm transition-all">
                 <RefreshCw size={12} /> Reset loadout
               </button>
             )}
-            <button onClick={copyLoadoutUrl} className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-cyan-600 hover:text-cyan-400 border border-cyan-900 hover:border-cyan-700 rounded transition-all">
+            <button onClick={copyLoadoutUrl} className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-cyan-600 hover:text-cyan-400 border border-cyan-900 hover:border-cyan-700 rounded-sm transition-all">
               <Copy size={12} /> Copy link
             </button>
           </div>
@@ -652,7 +652,7 @@ export default function OutfitterPage() {
         {selectedShip ? (
           <div className="flex items-center gap-3">
             {selectedShip.thumbnail && (
-              <img src={selectedShip.thumbnail} alt={selectedShip.name ?? ''} className="w-20 h-12 object-cover rounded opacity-80" />
+              <img src={selectedShip.thumbnail} alt={selectedShip.name ?? ''} className="w-20 h-12 object-cover rounded-sm opacity-80" />
             )}
             <div className="flex-1">
               <div className="flex items-center gap-2">
@@ -691,9 +691,9 @@ export default function OutfitterPage() {
                       className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-slate-800/60 text-left transition-colors border-b border-slate-900 last:border-0"
                     >
                       {ship.thumbnail ? (
-                        <img src={ship.thumbnail} alt="" className="w-10 h-6 object-cover rounded opacity-70 shrink-0" />
+                        <img src={ship.thumbnail} alt="" className="w-10 h-6 object-cover rounded-sm opacity-70 shrink-0" />
                       ) : (
-                        <div className="w-10 h-6 bg-slate-800 rounded shrink-0" />
+                        <div className="w-10 h-6 bg-slate-800 rounded-sm shrink-0" />
                       )}
                       <div>
                         <div className="text-sm font-rajdhani font-semibold text-slate-200">{ship.name}</div>
@@ -730,7 +730,7 @@ export default function OutfitterPage() {
                   <StatChip icon={Cpu} label="Power" value={`${fNumber(powerDraw, 0)} / ${fNumber(powerOutput, 0)} W`} accent={powerOverload ? 'red' : 'cyan'} />
                 )}
                 {hasSwaps && (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-950/30 rounded border border-amber-900/60 text-amber-400 text-[10px] font-mono-sc uppercase">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-950/30 rounded-sm border border-amber-900/60 text-amber-400 text-[10px] font-mono-sc uppercase">
                     ✦ {Object.keys(swaps).length} custom component{Object.keys(swaps).length > 1 ? 's' : ''}
                   </div>
                 )}
@@ -740,7 +740,7 @@ export default function OutfitterPage() {
               {(powerOverload || thermalOverload) && (
                 <div className="flex flex-wrap gap-2">
                   {powerOverload && (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-950/40 rounded border border-red-800/60">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-950/40 rounded-sm border border-red-800/60">
                       <AlertTriangle size={12} className="text-red-400 shrink-0" />
                       <span className="text-[10px] text-red-400 font-mono-sc">
                         Power overload: {fNumber(powerDraw, 0)}W draw &gt; {fNumber(powerOutput, 0)}W output ({fNumber(Math.abs(powerBalance), 0)}W deficit)
@@ -748,7 +748,7 @@ export default function OutfitterPage() {
                     </div>
                   )}
                   {thermalOverload && (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-950/40 rounded border border-orange-800/60">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-950/40 rounded-sm border border-orange-800/60">
                       <AlertTriangle size={12} className="text-orange-400 shrink-0" />
                       <span className="text-[10px] text-orange-400 font-mono-sc">
                         Thermal overload: {fNumber(thermalHeat, 0)} heat &gt; {fNumber(thermalCool, 0)} cooling ({fNumber(Math.abs(thermalBalance), 0)} deficit)
