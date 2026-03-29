@@ -1,5 +1,5 @@
 {
-  "name": "starvis-extractor",
+  "name": "@starvis/extractor",
   "version": "1.0.0",
   "description": "Starvis P4K/DataForge extractor — runs locally, pushes game data to MySQL",
   "main": "extract.ts",
@@ -20,7 +20,8 @@
     "commander": "^13.1.0",
     "dotenv": "^16.3.1",
     "fzstd": "^0.1.1",
-    "mysql2": "^3.20.0"
+    "mysql2": "^3.20.0",
+    "@starvis/db": "*"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.9",
