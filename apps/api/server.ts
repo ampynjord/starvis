@@ -11,6 +11,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getGamePrisma, getStarvisPrisma, initAllPrisma } from '@starvis/db';
 import compression from 'compression';
 import cors from 'cors';
 import express from 'express';
@@ -18,7 +19,6 @@ import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
-import { getGamePrisma, getStarvisPrisma, initAllPrisma } from './src/db/index.js';
 import { prometheusMiddleware } from './src/middleware/prometheus.js';
 import { healthRouter } from './src/routes/health.js';
 import { createRoutes } from './src/routes/index.js';
@@ -166,7 +166,7 @@ async function start() {
   try {
     const { execSync } = await import('node:child_process');
     for (const dbName of ALL_DB_NAMES) {
-      execSync('npx prisma db push --skip-generate --accept-data-loss', {
+      execSync('npx prisma db push --schema=../../packages/db/prisma/schema.prisma --skip-generate --accept-data-loss', {
         stdio: 'pipe',
         env: { ...process.env, DATABASE_URL: buildDatabaseUrl(dbName) },
       });
