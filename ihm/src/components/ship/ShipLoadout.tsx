@@ -103,12 +103,12 @@ function GradePill({ grade }: { grade: string | null }) {
   if (!grade) return null;
   const info = GRADE_INFO[grade];
   if (!info) return (
-    <span className="text-[9px] font-mono-sc font-bold border rounded px-1 py-0.5 leading-none text-slate-500 bg-slate-900 border-slate-700">
+    <span className="text-[9px] font-mono-sc font-bold border rounded-sm px-1 py-0.5 leading-none text-slate-500 bg-slate-900 border-slate-700">
       {grade}
     </span>
   );
   return (
-    <span className={`text-[9px] font-mono-sc font-bold border rounded px-1 py-0.5 leading-none ${info.color}`}>
+    <span className={`text-[9px] font-mono-sc font-bold border rounded-sm px-1 py-0.5 leading-none ${info.color}`}>
       {info.abbr} {grade}
     </span>
   );
@@ -117,7 +117,7 @@ function GradePill({ grade }: { grade: string | null }) {
 function SizeBadge({ size }: { size: number | null | undefined }) {
   if (size == null) return null;
   return (
-    <span className="text-[9px] font-mono-sc font-bold bg-slate-800 text-slate-400 border border-slate-700 rounded px-1.5 py-0.5 leading-none flex-shrink-0">
+    <span className="text-[9px] font-mono-sc font-bold bg-slate-800 text-slate-400 border border-slate-700 rounded-sm px-1.5 py-0.5 leading-none shrink-0">
       S{size}
     </span>
   );
@@ -185,19 +185,19 @@ function WeaponCard({ portName, mount, weapon }: {
         <span className="text-[9px] font-mono-sc text-slate-600 truncate flex-1 min-w-0">
           {cleanPortName(portName)}
         </span>
-        <div className="flex items-center gap-1 flex-shrink-0">
+        <div className="flex items-center gap-1 shrink-0">
           {mountType && (
-            <span className={`text-[8px] font-mono-sc border rounded px-1 py-0.5 leading-none ${mountStyle}`}>
+            <span className={`text-[8px] font-mono-sc border rounded-sm px-1 py-0.5 leading-none ${mountStyle}`}>
               {mountType}
             </span>
           )}
           {wLabel && (
-            <span className="text-[8px] font-mono-sc text-slate-500 border border-slate-700 rounded px-1 py-0.5 leading-none">
+            <span className="text-[8px] font-mono-sc text-slate-500 border border-slate-700 rounded-sm px-1 py-0.5 leading-none">
               {wLabel}
             </span>
           )}
           {dmgTypeInfo && (
-            <span className={`text-[8px] font-mono-sc border rounded px-1 py-0.5 leading-none ${dmgTypeInfo.color}`}>
+            <span className={`text-[8px] font-mono-sc border rounded-sm px-1 py-0.5 leading-none ${dmgTypeInfo.color}`}>
               {dmgTypeInfo.label}
             </span>
           )}
@@ -215,7 +215,7 @@ function WeaponCard({ portName, mount, weapon }: {
           </p>
         )}
         {weaponName ? (
-          <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">
+          <p className="text-[11px] font-semibold text-slate-200 leading-tight wrap-break-word">
             {weapon?.component_uuid
               ? <Link href={`/components/${weapon.component_uuid}`} className="hover:text-cyan-400 transition-colors">{weaponName}</Link>
               : weaponName}
@@ -267,8 +267,8 @@ function TurretCard({ node }: { node: LoadoutNode }) {
         <span className="text-[9px] font-mono-sc text-slate-600 truncate flex-1 min-w-0">
           {cleanPortName(node.port_name)}
         </span>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <span className="text-[8px] font-mono-sc text-amber-400 bg-amber-950/40 border border-amber-900/60 rounded px-1 py-0.5 leading-none">
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="text-[8px] font-mono-sc text-amber-400 bg-amber-950/40 border border-amber-900/60 rounded-sm px-1 py-0.5 leading-none">
             Turret
           </span>
           <SizeBadge size={node.component_size ?? node.port_max_size} />
@@ -278,7 +278,7 @@ function TurretCard({ node }: { node: LoadoutNode }) {
       {/* Body */}
       <div className="flex-1 px-2 py-1.5 space-y-1.5">
         {turretName && (
-          <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">
+          <p className="text-[11px] font-semibold text-slate-200 leading-tight wrap-break-word">
             {node.component_uuid
               ? <Link href={`/components/${node.component_uuid}`} className="hover:text-cyan-400 transition-colors">{turretName}</Link>
               : turretName}
@@ -318,7 +318,7 @@ function TurretCard({ node }: { node: LoadoutNode }) {
                       <span className="text-[9px] font-mono-sc text-slate-600 italic flex-1">— empty gimbal —</span>
                     )}
                     {dmgTypeInfo && (
-                      <span className={`text-[7px] font-mono-sc border rounded px-1 leading-tight flex-shrink-0 ${dmgTypeInfo.color}`}>{dmgTypeInfo.label}</span>
+                      <span className={`text-[7px] font-mono-sc border rounded-sm px-1 leading-tight shrink-0 ${dmgTypeInfo.color}`}>{dmgTypeInfo.label}</span>
                     )}
                   </div>
                   {/* Ligne arme */}
@@ -332,7 +332,7 @@ function TurretCard({ node }: { node: LoadoutNode }) {
                     ) : (
                       <span className="text-[9px] font-mono-sc text-slate-700 italic flex-1">— empty —</span>
                     )}
-                    {pwr != null && <span className="text-[8px] font-mono-sc text-yellow-600 tabular-nums flex-shrink-0">{pwr}⚡</span>}
+                    {pwr != null && <span className="text-[8px] font-mono-sc text-yellow-600 tabular-nums shrink-0">{pwr}⚡</span>}
                   </div>
                   {/* Stats arme */}
                   {(dps != null || dmg != null || fr != null || rng != null || ammo != null) && (
@@ -384,7 +384,7 @@ function RackCard({ rack, missiles }: { rack: LoadoutNode; missiles: LoadoutNode
             : rackName}
         </p>
         {missileName ? (
-          <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">
+          <p className="text-[11px] font-semibold text-slate-200 leading-tight wrap-break-word">
             {missileNode?.component_uuid
               ? <Link href={`/components/${missileNode.component_uuid}`} className="hover:text-cyan-400 transition-colors">{missileName}</Link>
               : missileName}
@@ -466,7 +466,7 @@ function SystemCard({ node, jumpModule }: { node: LoadoutNode; jumpModule: Loado
         <GradePill grade={node.grade ?? null} />
       </div>
       <div className="flex-1 px-2 py-1.5 space-y-1">
-        <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">
+        <p className="text-[11px] font-semibold text-slate-200 leading-tight wrap-break-word">
           {node.component_uuid
             ? <Link href={`/components/${node.component_uuid}`} className="hover:text-cyan-400 transition-colors">{name}</Link>
             : name}
@@ -516,7 +516,7 @@ function ShieldCard({ node }: { node: LoadoutNode }) {
         <GradePill grade={node.grade ?? null} />
       </div>
       <div className="flex-1 px-2 py-1.5 space-y-1">
-        <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">
+        <p className="text-[11px] font-semibold text-slate-200 leading-tight wrap-break-word">
           {node.component_uuid
             ? <Link href={`/components/${node.component_uuid}`} className="hover:text-cyan-400 transition-colors">{name}</Link>
             : name}
@@ -839,13 +839,13 @@ function ModuleCard({ entry, onModuleChange }: {
       {/* Header */}
       <div className="flex items-center gap-2 px-2.5 pt-2 pb-1.5 bg-purple-950/20 border-b border-purple-900/30">
         {slotStyle && (
-          <span className={`text-[8px] font-mono-sc uppercase border rounded px-1.5 py-0.5 leading-none ${slotStyle}`}>
+          <span className={`text-[8px] font-mono-sc uppercase border rounded-sm px-1.5 py-0.5 leading-none ${slotStyle}`}>
             {slotType}
           </span>
         )}
         <span className="text-[10px] font-mono-sc text-purple-300/80 flex-1 truncate">{slotLabel}</span>
         {tier != null && (
-          <span className="text-[8px] font-mono-sc text-purple-200 bg-purple-800/40 border border-purple-700/50 rounded px-1.5 py-0.5 leading-none">
+          <span className="text-[8px] font-mono-sc text-purple-200 bg-purple-800/40 border border-purple-700/50 rounded-sm px-1.5 py-0.5 leading-none">
             T{tier}
           </span>
         )}
@@ -862,7 +862,7 @@ function ModuleCard({ entry, onModuleChange }: {
                 type="button"
                 onClick={() => onModuleChange?.(m.slot_name, m.module_class_name)}
                 className={[
-                  'px-2 py-0.5 text-[9px] font-mono-sc rounded border transition-colors',
+                  'px-2 py-0.5 text-[9px] font-mono-sc rounded-sm border transition-colors',
                   isActive
                     ? 'bg-purple-900/50 border-purple-500 text-purple-200'
                     : 'bg-slate-900/40 border-slate-700 text-slate-400 hover:border-purple-700 hover:text-purple-300',
@@ -875,14 +875,14 @@ function ModuleCard({ entry, onModuleChange }: {
         </div>
       ) : (
         <div className="px-2.5 py-2">
-          <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">{moduleName}</p>
+          <p className="text-[11px] font-semibold text-slate-200 leading-tight wrap-break-word">{moduleName}</p>
         </div>
       )}
 
       {/* Active module name (when selector shown) */}
       {sortedOptions.length > 1 && (
         <div className="px-2.5 pb-1.5 -mt-1">
-          <p className="text-[11px] font-semibold text-slate-200 leading-tight break-words">{moduleName}</p>
+          <p className="text-[11px] font-semibold text-slate-200 leading-tight wrap-break-word">{moduleName}</p>
         </div>
       )}
 
@@ -988,7 +988,7 @@ export function ShipLoadout({
             type="button"
             onClick={() => setActiveTab(tab.key)}
             className={[
-              'flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono-sc rounded border transition-colors whitespace-nowrap',
+              'flex items-center gap-1.5 px-3 py-1 text-[10px] font-mono-sc rounded-sm border transition-colors whitespace-nowrap',
               validTab === tab.key
                 ? 'bg-cyan-950/40 border-cyan-700/50 text-cyan-300'
                 : 'bg-slate-900/40 border-slate-800 text-slate-500 hover:border-slate-600 hover:text-slate-300',

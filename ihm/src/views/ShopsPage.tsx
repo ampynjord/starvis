@@ -33,7 +33,7 @@ export default function ShopsPage() {
   }, {});
 
   return (
-    <div className="max-w-screen-xl mx-auto space-y-6">
+    <div className="max-w-(--breakpoint-xl) mx-auto space-y-6">
       <div>
         <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Shops</h1>
         <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">{shopList.length} shops</p>
@@ -46,7 +46,7 @@ export default function ShopsPage() {
               <motion.div key={shop.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
                 <div className="sci-panel px-3 py-2.5">
                   <div className="flex items-start gap-2">
-                    <ShoppingBag size={13} className="text-cyan-700 mt-0.5 flex-shrink-0" />
+                    <ShoppingBag size={13} className="text-cyan-700 mt-0.5 shrink-0" />
                     <div className="min-w-0">
                       <p className="text-sm text-slate-300 font-rajdhani font-semibold truncate">{shop.name}</p>
                       <p className="text-xs text-slate-600 truncate">{shop.location}</p>

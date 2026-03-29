@@ -33,7 +33,7 @@ function FilterGroup({ label, options, value, onChange }: FilterGroup) {
         <div className="px-2 pb-2 space-y-0.5">
           <button
             onClick={() => onChange('')}
-            className={`w-full text-left px-2 py-1.5 rounded text-xs transition-colors ${!value ? 'text-cyan-400 bg-cyan-950/40' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}
+            className={`w-full text-left px-2 py-1.5 rounded-sm text-xs transition-colors ${!value ? 'text-cyan-400 bg-cyan-950/40' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}
           >
             Tous
           </button>
@@ -41,7 +41,7 @@ function FilterGroup({ label, options, value, onChange }: FilterGroup) {
             <button
               key={`${String(opt.value)}-${idx}`}
               onClick={() => onChange(String(opt.value))}
-              className={`w-full text-left px-2 py-1.5 rounded text-xs truncate transition-colors ${String(value) === String(opt.value) ? 'text-cyan-400 bg-cyan-950/40' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}
+              className={`w-full text-left px-2 py-1.5 rounded-sm text-xs truncate transition-colors ${String(value) === String(opt.value) ? 'text-cyan-400 bg-cyan-950/40' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}
             >
               {opt.label}
             </button>

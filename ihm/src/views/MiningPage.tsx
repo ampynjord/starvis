@@ -70,7 +70,7 @@ export default function MiningPage() {
   }, []);
 
   return (
-    <div className="max-w-screen-2xl mx-auto">
+    <div className="max-w-(--breakpoint-2xl) mx-auto">
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center gap-3">

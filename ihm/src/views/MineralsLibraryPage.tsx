@@ -65,7 +65,7 @@ interface HeaderStatProps {
 function HeaderStat({ icon: Icon, label, value, className = '' }: HeaderStatProps) {
   return (
     <div className={`sci-panel p-3 flex items-start gap-2 ${className}`}>
-      <Icon className="w-4 h-4 text-cyan-400 mt-0.5 flex-shrink-0" />
+      <Icon className="w-4 h-4 text-cyan-400 mt-0.5 shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-xs text-slate-500 uppercase tracking-wider">{label}</p>
         <p className="text-sm font-mono-sc text-cyan-300 truncate">{value}</p>
@@ -128,11 +128,11 @@ function MineralRow({ mineral }: MineralRowProps) {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="p-2 bg-black/20 rounded">
+          <div className="p-2 bg-black/20 rounded-sm">
             <p className="text-slate-500">Instability</p>
             <p className="text-amber-400 font-mono-sc">{formatNumber(mineral.instability, 2)}</p>
           </div>
-          <div className="p-2 bg-black/20 rounded">
+          <div className="p-2 bg-black/20 rounded-sm">
             <p className="text-slate-500">Resistance</p>
             <p className="text-blue-400 font-mono-sc">{formatNumber(mineral.resistance, 4)}</p>
           </div>
@@ -140,11 +140,11 @@ function MineralRow({ mineral }: MineralRowProps) {
 
         {/* Rocks & Probability */}
         <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="p-2 bg-black/20 rounded">
+          <div className="p-2 bg-black/20 rounded-sm">
             <p className="text-slate-500">Found In</p>
             <p className="text-cyan-400 font-mono-sc">{mineral.rocks_containing ?? 0} rocks</p>
           </div>
-          <div className="p-2 bg-black/20 rounded">
+          <div className="p-2 bg-black/20 rounded-sm">
             <p className="text-slate-500">Avg Prob</p>
             <p className="text-cyan-400 font-mono-sc">{mineral.avg_probability_pct != null ? `${mineral.avg_probability_pct}%` : '—'}</p>
           </div>
@@ -154,7 +154,7 @@ function MineralRow({ mineral }: MineralRowProps) {
         <div className="flex items-center justify-end">
           <Link
             href={`/mining`}
-            className="p-2 rounded bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/40 transition-colors flex gap-2 items-center text-xs"
+            className="p-2 rounded-sm bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/40 transition-colors flex gap-2 items-center text-xs"
           >
             View Details
             <ChevronRight className="w-3 h-3" />
@@ -239,7 +239,7 @@ export default function MineralsLibraryPage() {
               placeholder="Search minerals..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-600 rounded text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-cyan-500"
+              className="w-full pl-10 pr-4 py-2 bg-slate-800 border border-slate-600 rounded-sm text-sm text-slate-100 placeholder-slate-600 focus:outline-hidden focus:border-cyan-500"
             />
           </div>
 

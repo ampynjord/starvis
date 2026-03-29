@@ -62,7 +62,7 @@ export function LaserSelector({
           <button
             type="button"
             onClick={() => setOpen(!open)}
-            className="w-full flex items-center justify-between px-3 py-2 bg-slate-900/50 border border-slate-700/50 rounded text-xs font-mono-sc text-slate-300 hover:border-cyan-600/30 transition-colors"
+            className="w-full flex items-center justify-between px-3 py-2 bg-slate-900/50 border border-slate-700/50 rounded-sm text-xs font-mono-sc text-slate-300 hover:border-cyan-600/30 transition-colors"
           >
             <span className={selectedLaser ? 'text-cyan-400' : 'text-slate-600'}>
               {selectedLaser ? `${selectedLaser.name} (S${selectedLaser.size})` : 'No laser selected'}
@@ -76,7 +76,7 @@ export function LaserSelector({
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -4 }}
-                className="absolute z-20 mt-1 w-full bg-slate-900 border border-slate-700/50 rounded shadow-xl max-h-48 overflow-hidden"
+                className="absolute z-20 mt-1 w-full bg-slate-900 border border-slate-700/50 rounded-sm shadow-xl max-h-48 overflow-hidden"
               >
                 <div className="flex items-center gap-2 px-2 py-1.5 border-b border-slate-800">
                   <Search size={12} className="text-slate-600" />
@@ -85,7 +85,7 @@ export function LaserSelector({
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Search lasers..."
-                    className="bg-transparent text-xs text-slate-300 outline-none w-full font-mono-sc"
+                    className="bg-transparent text-xs text-slate-300 outline-hidden w-full font-mono-sc"
                   />
                 </div>
                 <div className="overflow-y-auto max-h-36">
@@ -174,7 +174,7 @@ function StatBadge({ label, value, good, bad }: { label: string; value: string; 
   if (good) color = 'text-emerald-400';
   if (bad) color = 'text-red-400';
   return (
-    <div className="bg-slate-900/50 border border-slate-800/50 rounded px-2 py-1">
+    <div className="bg-slate-900/50 border border-slate-800/50 rounded-sm px-2 py-1">
       <div className="text-[9px] uppercase tracking-wider text-slate-600">{label}</div>
       <div className={`text-xs font-semibold ${color}`}>{value}</div>
     </div>

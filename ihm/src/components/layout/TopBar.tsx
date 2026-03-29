@@ -47,7 +47,7 @@ export function TopBar() {
   );
 
   return (
-    <header className="h-14 flex items-center gap-4 px-4 border-b border-border bg-panel/60 backdrop-blur z-10">
+    <header className="h-14 flex items-center gap-4 px-4 border-b border-border bg-panel/60 backdrop-blur-sm z-10">
       {/* Search */}
       <div className="relative flex-1 max-w-xl">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={14} />

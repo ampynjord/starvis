@@ -67,7 +67,7 @@ export default function ComponentsPage() {
   ] : [];
 
   return (
-    <div className="max-w-screen-2xl mx-auto">
+    <div className="max-w-(--breakpoint-2xl) mx-auto">
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Components</h1>
@@ -80,7 +80,7 @@ export default function ComponentsPage() {
       </div>
 
       <div className="flex gap-4">
-        <div className="w-44 flex-shrink-0">
+        <div className="w-44 shrink-0">
           {filterGroups.length > 0 ? (
             <FilterPanel hasFilters={hasFilters} onReset={resetFilters} groups={filterGroups} />
           ) : (

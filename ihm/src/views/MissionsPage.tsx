@@ -104,7 +104,7 @@ function ChipGroup({
       <button
         type="button"
         onClick={() => onChange('')}
-        className={`px-2 py-1 rounded text-xs font-mono-sc transition-colors ${!value ? 'bg-cyan-950/60 text-cyan-400 border border-cyan-800' : 'text-slate-500 hover:text-slate-300 border border-transparent hover:border-border'}`}
+        className={`px-2 py-1 rounded-sm text-xs font-mono-sc transition-colors ${!value ? 'bg-cyan-950/60 text-cyan-400 border border-cyan-800' : 'text-slate-500 hover:text-slate-300 border border-transparent hover:border-border'}`}
       >
         All
       </button>
@@ -113,7 +113,7 @@ function ChipGroup({
           key={opt}
           type="button"
           onClick={() => onChange(value === opt ? '' : opt)}
-          className={`px-2 py-1 rounded text-xs font-mono-sc transition-colors ${value === opt ? 'bg-cyan-950/60 text-cyan-400 border border-cyan-800' : 'text-slate-500 hover:text-slate-300 border border-transparent hover:border-border'}`}
+          className={`px-2 py-1 rounded-sm text-xs font-mono-sc transition-colors ${value === opt ? 'bg-cyan-950/60 text-cyan-400 border border-cyan-800' : 'text-slate-500 hover:text-slate-300 border border-transparent hover:border-border'}`}
         >
           {opt}
         </button>
@@ -173,7 +173,7 @@ function MissionCard({
           {/* Row 1: faction prefix + title */}
           <div className="flex items-center gap-2 flex-wrap">
             {m.faction && (
-              <span className="text-[10px] font-mono-sc text-purple-400 uppercase tracking-wider flex-shrink-0">
+              <span className="text-[10px] font-mono-sc text-purple-400 uppercase tracking-wider shrink-0">
                 {m.faction}
               </span>
             )}
@@ -184,7 +184,7 @@ function MissionCard({
           {/* Row 2: system + type + badges */}
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
             {m.location_system && (
-              <span className="text-[10px] font-mono-sc text-slate-500 bg-slate-800/40 px-1.5 py-0.5 rounded">
+              <span className="text-[10px] font-mono-sc text-slate-500 bg-slate-800/40 px-1.5 py-0.5 rounded-sm">
                 {m.location_system}
               </span>
             )}
@@ -211,7 +211,7 @@ function MissionCard({
           </div>
         </div>
         {/* Right column: reward + XP */}
-        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+        <div className="flex flex-col items-end gap-1 shrink-0">
           {reward && (
             <div className="text-right">
               <p className="text-[10px] font-mono-sc text-slate-600 uppercase">Reward</p>
@@ -318,7 +318,7 @@ export default function MissionsPage() {
   };
 
   return (
-    <div className="max-w-screen-2xl mx-auto">
+    <div className="max-w-(--breakpoint-2xl) mx-auto">
       {/* ── Header ─────────────────────────────────── */}
       <div className="mb-4 flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4 flex-wrap">

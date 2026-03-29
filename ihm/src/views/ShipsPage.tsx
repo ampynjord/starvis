@@ -59,7 +59,7 @@ export default function ShipsPage() {
   };
 
   return (
-    <div className="max-w-screen-2xl mx-auto">
+    <div className="max-w-(--breakpoint-2xl) mx-auto">
       {/* Page header */}
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
@@ -87,7 +87,7 @@ export default function ShipsPage() {
 
       <div className="flex gap-4">
         {/* Filters */}
-        <div className="w-44 flex-shrink-0">
+        <div className="w-44 shrink-0">
           {filters ? (
             <FilterPanel
               hasFilters={hasFilters}

@@ -128,7 +128,7 @@ export default function FpsCalculatorPage() {
   }, [computed]);
 
   return (
-    <div className="max-w-screen-2xl mx-auto space-y-6">
+    <div className="max-w-(--breakpoint-2xl) mx-auto space-y-6">
       <div>
         <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">
           FPS Calculator
@@ -395,7 +395,7 @@ export default function FpsCalculatorPage() {
                       <span className="text-xs text-slate-600">0s - {axisMax}s</span>
                     </div>
 
-                    <div className="relative h-14 border border-border rounded bg-panel overflow-hidden">
+                    <div className="relative h-14 border border-border rounded-sm bg-panel overflow-hidden">
                       <div className="absolute inset-0 flex">
                         {Array.from({ length: axisMax + 1 }).map((_, i) => (
                           <div key={i} className="flex-1 border-r border-border/40 relative">
@@ -412,7 +412,7 @@ export default function FpsCalculatorPage() {
                             initial={{ opacity: 0, y: 6 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: Math.min(idx * 0.02, 0.35) }}
-                            className="absolute bottom-1 w-1.5 h-8 bg-cyan-400/70 border border-cyan-300/80 rounded-sm"
+                            className="absolute bottom-1 w-1.5 h-8 bg-cyan-400/70 border border-cyan-300/80 rounded-xs"
                             style={{ left: `calc(${leftPct}% - 3px)` }}
                             title={`Shot ${idx + 1}: ${t}s`}
                           />

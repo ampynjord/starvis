@@ -115,7 +115,7 @@ export default function TradePage() {
   };
 
   return (
-    <div className="max-w-screen-2xl mx-auto">
+    <div className="max-w-(--breakpoint-2xl) mx-auto">
       <div className="mb-4">
         <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Trade Routes</h1>
         <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">Trade route calculator</p>
@@ -365,7 +365,7 @@ export default function TradePage() {
                 type="button"
                 onClick={handleReport}
                 disabled={!reportCommodityUuid || !reportShopId || (!reportBuyPrice && !reportSellPrice) || reportMutation.isPending}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-mono-sc rounded border border-cyan-700 bg-cyan-950/30 text-cyan-400 hover:bg-cyan-900/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-mono-sc rounded-sm border border-cyan-700 bg-cyan-950/30 text-cyan-400 hover:bg-cyan-900/40 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <Plus size={12} />
                 {reportMutation.isPending ? 'Submitting…' : 'Submit Price'}

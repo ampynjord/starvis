@@ -1,6 +1,253 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@theme {
+  --color-void: #050b14;
+  --color-panel: #0a1628;
+
+  --color-border: #1a3a5c;
+  --color-border-bright: #2a5f8f;
+
+  --color-cyan-50: #e0fffe;
+  --color-cyan-100: #b8fffe;
+  --color-cyan-200: #7bfffe;
+  --color-cyan-300: #3cf7fd;
+  --color-cyan-400: #00d4ff;
+  --color-cyan-500: #00b4d8;
+  --color-cyan-600: #0096b7;
+  --color-cyan-700: #006f87;
+  --color-cyan-800: #005068;
+  --color-cyan-900: #003b4d;
+  --color-cyan-950: #001f2d;
+
+  --color-amber-400: #ffb800;
+  --color-amber-500: #e5a500;
+
+  --color-neon-green: #00ff88;
+  --color-neon-red: #ff4444;
+  --color-neon-blue: #00d4ff;
+
+  --font-orbitron: var(--font-orbitron), Orbitron, sans-serif;
+  --font-rajdhani: var(--font-rajdhani), Rajdhani, sans-serif;
+  --font-mono: var(--font-mono), 'Share Tech Mono', 'JetBrains Mono', monospace;
+
+  --animate-scanline: scanline 4s linear infinite;
+  --animate-pulse_slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-glow: glow 2s ease-in-out infinite alternate;
+  --animate-flicker: flicker 0.15s infinite;
+  --animate-fade-in: fadeIn 0.4s ease-out;
+  --animate-slide-up: slideUp 0.4s ease-out;
+
+  --background-image-grid-void:
+    linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+
+  --background-size-grid-void: 40px 40px;
+
+  --shadow-cyan-glow:
+    0 0 10px rgba(0, 212, 255, 0.3), 0 0 30px rgba(0, 212, 255, 0.1);
+  --shadow-amber-glow:
+    0 0 10px rgba(255, 184, 0, 0.3), 0 0 30px rgba(255, 184, 0, 0.1);
+  --shadow-panel:
+    0 4px 24px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(0, 212, 255, 0.1);
+  --shadow-panel-hover:
+    0 8px 32px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 212, 255, 0.15);
+
+  @keyframes scanline {
+    0% {
+      transform: translateY(-100%);
+    }
+    100% {
+      transform: translateY(100vh);
+    }
+  }
+  @keyframes glow {
+    from {
+      text-shadow:
+        0 0 5px #00d4ff,
+        0 0 10px #00d4ff;
+    }
+    to {
+      text-shadow:
+        0 0 10px #00d4ff,
+        0 0 25px #00d4ff,
+        0 0 40px #00d4ff;
+    }
+  }
+  @keyframes flicker {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.92;
+    }
+  }
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+/* ─── Sci-fi panel ──────────────────────────────────────────────────────────── */
+@utility sci-panel {
+  @apply relative bg-panel border border-border rounded-sm;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(0, 212, 255, 0.08);
+  &::before {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-color: var(--cyan);
+    border-style: solid;
+  }
+  &::after {
+    content: '';
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-color: var(--cyan);
+    border-style: solid;
+  }
+  &::before {
+    top: -1px;
+    left: -1px;
+    border-width: 2px 0 0 2px;
+  }
+  &::after {
+    bottom: -1px;
+    right: -1px;
+    border-width: 0 2px 2px 0;
+  }
+}
+@utility holo-card {
+  /* Hover glow card */
+  @apply sci-panel transition-all duration-300 cursor-pointer;
+  &:hover {
+    @apply border-cyan-400;
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.8),
+      0 0 20px rgba(0, 212, 255, 0.15);
+    transform: translateY(-2px);
+  }
+}
+@utility glow-text {
+  /* Glow text */
+  text-shadow:
+    0 0 8px rgba(0, 212, 255, 0.6),
+    0 0 20px rgba(0, 212, 255, 0.3);
+  color: var(--cyan);
+}
+@utility stat-bar-track {
+  /* Stat bar */
+  @apply h-1.5 rounded-full bg-panel border border-border overflow-hidden;
+}
+@utility stat-bar-fill {
+  @apply h-full rounded-full transition-all duration-700;
+  background: linear-gradient(90deg, var(--cyan), rgba(0, 212, 255, 0.5));
+  box-shadow: 0 0 6px rgba(0, 212, 255, 0.4);
+}
+@utility sci-badge {
+  /* Badge */
+  @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs font-mono border uppercase tracking-wider;
+}
+@utility sci-separator {
+  /* Separator */
+  @apply border-t border-border my-4 relative;
+  &::before {
+    content: '';
+    @apply absolute left-0 top-0 h-px w-16;
+    background: linear-gradient(90deg, var(--cyan), transparent);
+  }
+}
+@utility sci-input {
+  /* Input */
+  @apply bg-panel border border-border rounded-sm px-3 py-2 text-sm text-slate-200
+           placeholder-slate-600 focus:outline-hidden focus:border-cyan-400 transition-colors;
+}
+@utility sci-select {
+  /* Select */
+  @apply sci-input appearance-none cursor-pointer pr-8;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2300D4FF' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  background-size: 1.25em;
+}
+@utility sci-btn {
+  /* Button */
+  @apply relative inline-flex items-center gap-2 px-4 py-2 border border-border
+           rounded-sm text-sm font-rajdhani font-semibold uppercase tracking-wider
+           transition-all duration-200 focus:outline-hidden;
+}
+@utility sci-btn-primary {
+  @apply sci-btn border-cyan-600 text-cyan-400 hover:bg-cyan-950/50 hover:border-cyan-400;
+}
+@utility sci-btn-ghost {
+  @apply sci-btn text-slate-400 hover:text-slate-200 hover:border-slate-500;
+}
+@utility sci-btn-amber {
+  @apply sci-btn border-amber-700 text-amber-400 hover:bg-amber-950/50 hover:border-amber-400;
+}
+@utility font-orbitron {
+  font-family: 'Orbitron', sans-serif;
+}
+@utility font-rajdhani {
+  font-family: 'Rajdhani', sans-serif;
+}
+@utility font-mono-sc {
+  font-family: 'Share Tech Mono', monospace;
+}
+@utility bg-grid {
+  background-image:
+    linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+@utility text-glow-cyan {
+  text-shadow: 0 0 8px rgba(0, 212, 255, 0.5);
+}
+@utility border-glow-cyan {
+  box-shadow: 0 0 8px rgba(0, 212, 255, 0.3);
+}
+@utility truncate-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
 /* ─── Fonts ────────────────────────────────────────────────────────────────── */
 @layer base {
@@ -44,150 +291,47 @@
   h1, h2, h3 { font-family: var(--font-orbitron), 'Orbitron', sans-serif; }
 }
 
-/* ─── Sci-fi panel ──────────────────────────────────────────────────────────── */
-@layer components {
-  .sci-panel {
-    @apply relative bg-panel border border-border rounded;
-    box-shadow: 0 4px 24px rgba(0,0,0,0.6), inset 0 1px 0 rgba(0,212,255,0.08);
-  }
-  .sci-panel::before,
-  .sci-panel::after {
-    content: '';
-    position: absolute;
-    width: 12px;
-    height: 12px;
-    border-color: var(--cyan);
-    border-style: solid;
-  }
-  .sci-panel::before {
-    top: -1px; left: -1px;
-    border-width: 2px 0 0 2px;
-  }
-  .sci-panel::after {
-    bottom: -1px; right: -1px;
-    border-width: 0 2px 2px 0;
-  }
-
-  /* Hover glow card */
-  .holo-card {
-    @apply sci-panel transition-all duration-300 cursor-pointer;
-  }
-  .holo-card:hover {
-    @apply border-cyan-400;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.8), 0 0 20px rgba(0,212,255,0.15);
-    transform: translateY(-2px);
-  }
-
-  /* Glow text */
-  .glow-text {
-    text-shadow: 0 0 8px rgba(0, 212, 255, 0.6), 0 0 20px rgba(0, 212,255, 0.3);
-    color: var(--cyan);
-  }
-
-  /* Stat bar */
-  .stat-bar-track {
-    @apply h-1.5 rounded-full bg-panel border border-border overflow-hidden;
-  }
-  .stat-bar-fill {
-    @apply h-full rounded-full transition-all duration-700;
-    background: linear-gradient(90deg, var(--cyan), rgba(0,212,255,0.5));
-    box-shadow: 0 0 6px rgba(0, 212, 255, 0.4);
-  }
-
-  /* Badge */
-  .sci-badge {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-mono border uppercase tracking-wider;
-  }
-
-  /* Separator */
-  .sci-separator {
-    @apply border-t border-border my-4 relative;
-  }
-  .sci-separator::before {
-    content: '';
-    @apply absolute left-0 top-0 h-px w-16;
-    background: linear-gradient(90deg, var(--cyan), transparent);
-  }
-
-  /* Input */
-  .sci-input {
-    @apply bg-panel border border-border rounded px-3 py-2 text-sm text-slate-200
-           placeholder-slate-600 focus:outline-none focus:border-cyan-400 transition-colors;
-  }
-
-  /* Select */
-  .sci-select {
-    @apply sci-input appearance-none cursor-pointer pr-8;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%2300D4FF' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 0.5rem center;
-    background-size: 1.25em;
-  }
-
-  /* Button */
-  .sci-btn {
-    @apply relative inline-flex items-center gap-2 px-4 py-2 border border-border
-           rounded text-sm font-rajdhani font-semibold uppercase tracking-wider
-           transition-all duration-200 focus:outline-none;
-  }
-  .sci-btn-primary {
-    @apply sci-btn border-cyan-600 text-cyan-400 hover:bg-cyan-950/50 hover:border-cyan-400;
-  }
-  .sci-btn-ghost {
-    @apply sci-btn text-slate-400 hover:text-slate-200 hover:border-slate-500;
-  }
-  .sci-btn-amber {
-    @apply sci-btn border-amber-700 text-amber-400 hover:bg-amber-950/50 hover:border-amber-400;
-  }
-}
-
-/* ─── Animations ────────────────────────────────────────────────────────────── */
-@keyframes scanline {
-  0%   { transform: translateY(-100%); opacity: 0; }
-  10%  { opacity: 0.03; }
-  90%  { opacity: 0.03; }
-  100% { transform: translateY(100vh); opacity: 0; }
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.2; }
-}
-
-@keyframes dataFill {
-  from { width: 0; }
-}
-
-.animate-scanline {
-  animation: scanline 6s linear infinite;
-}
-.animate-blink {
-  animation: blink 1.2s ease-in-out infinite;
-}
-
-/* ─── Utilities ─────────────────────────────────────────────────────────────── */
 @layer utilities {
-  .font-orbitron { font-family: 'Orbitron', sans-serif; }
-  .font-rajdhani { font-family: 'Rajdhani', sans-serif; }
-  .font-mono-sc  { font-family: 'Share Tech Mono', monospace; }
-
-  .bg-grid {
-    background-image:
-      linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
-    background-size: 40px 40px;
+  /* ─── Animations ────────────────────────────────────────────────────────────── */
+  @keyframes scanline {
+    0% {
+      transform: translateY(-100%);
+      opacity: 0;
+    }
+    10% {
+      opacity: 0.03;
+    }
+    90% {
+      opacity: 0.03;
+    }
+    100% {
+      transform: translateY(100vh);
+      opacity: 0;
+    }
   }
 
-  .text-glow-cyan {
-    text-shadow: 0 0 8px rgba(0,212,255,0.5);
+  @keyframes blink {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.2;
+    }
   }
-  .border-glow-cyan {
-    box-shadow: 0 0 8px rgba(0,212,255,0.3);
+
+  @keyframes dataFill {
+    from {
+      width: 0;
+    }
   }
-  .truncate-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+
+  .animate-scanline {
+    animation: scanline 6s linear infinite;
   }
+  .animate-blink {
+    animation: blink 1.2s ease-in-out infinite;
+  }
+
+  /* ─── Utilities ─────────────────────────────────────────────────────────────── */
 }

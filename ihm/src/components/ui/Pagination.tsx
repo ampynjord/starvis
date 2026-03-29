@@ -39,7 +39,7 @@ export function Pagination({ page, totalPages, onPageChange, className = '' }: P
             key={p}
             onClick={() => onPageChange(p)}
             className={[
-              'w-8 h-8 text-xs font-mono-sc rounded transition-all border',
+              'w-8 h-8 text-xs font-mono-sc rounded-sm transition-all border',
               p === page
                 ? 'border-cyan-500 text-cyan-400 bg-cyan-950/50'
                 : 'border-border text-slate-500 hover:border-slate-500 hover:text-slate-300',

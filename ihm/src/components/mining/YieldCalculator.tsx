@@ -25,14 +25,14 @@ export function YieldCalculator({ yieldResults, selectedElementUuid }: YieldCalc
     <div className="space-y-3">
       <ScifiPanel title="Expected Total Yield">
         <div className="grid grid-cols-2 gap-3">
-          <div className="text-center px-3 py-2 border border-cyan-600/50 rounded">
+          <div className="text-center px-3 py-2 border border-cyan-600/50 rounded-sm">
             <div className="text-[10px] text-slate-600 font-mono-sc uppercase tracking-wider mb-1">
               Per Extraction
             </div>
             <div className="font-orbitron text-xl font-bold text-cyan-400">{fNum(totalYield, 1)}%</div>
             <div className="text-[10px] text-slate-600 mt-1">Average optimized</div>
           </div>
-          <div className="text-center px-3 py-2 border border-slate-600/50 rounded">
+          <div className="text-center px-3 py-2 border border-slate-600/50 rounded-sm">
             <div className="text-[10px] text-slate-600 font-mono-sc uppercase tracking-wider mb-1">
               Elements
             </div>
@@ -74,7 +74,7 @@ export function YieldCalculator({ yieldResults, selectedElementUuid }: YieldCalc
                       {(result.windowEnd * 100).toFixed(0)}%
                     </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
+                  <div className="text-right shrink-0">
                     <div className="font-orbitron text-sm font-bold text-green-400">
                       {fNum(result.optimizedYield, 1)}%
                     </div>
@@ -88,7 +88,7 @@ export function YieldCalculator({ yieldResults, selectedElementUuid }: YieldCalc
                   <div className="text-[10px] text-slate-600 font-mono-sc">
                     Laser power window (0–100%)
                   </div>
-                  <div className="h-6 bg-slate-800 rounded border border-slate-700/50 overflow-hidden relative">
+                  <div className="h-6 bg-slate-800 rounded-sm border border-slate-700/50 overflow-hidden relative">
                     <div
                       className="absolute h-full bg-green-900/30 border-r border-green-600/50"
                       style={{

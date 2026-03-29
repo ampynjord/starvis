@@ -16,7 +16,7 @@ export function LoadingGrid({ rows = 3, cols = 4, message = 'LOADING…' }: Prop
         {Array.from({ length: rows * cols }).map((_, i) => (
           <motion.div
             key={i}
-            className="w-8 h-8 border border-cyan-900 rounded"
+            className="w-8 h-8 border border-cyan-900 rounded-sm"
             animate={{ opacity: [0.1, 0.6, 0.1], borderColor: ['#1A3A5C', '#00D4FF', '#1A3A5C'] }}
             transition={{
               duration: 1.5,

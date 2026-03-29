@@ -73,7 +73,7 @@ export default function SearchResultsPage() {
   const totalCount = sections.reduce((sum, s) => sum + s.items.length, 0);
 
   return (
-    <div className="max-w-screen-lg mx-auto space-y-4">
+    <div className="max-w-(--breakpoint-lg) mx-auto space-y-4">
       <div className="flex items-center gap-3 mb-2">
         <Search size={18} className="text-cyan-400" />
         <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">

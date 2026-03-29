@@ -19,11 +19,11 @@ export function LoadoutTree({ node, depth = 0 }: Props) {
   return (
     <div className={depth > 0 ? 'ml-3 border-l border-border/40 pl-2' : ''}>
       <div
-        className={`flex items-start gap-1.5 px-1.5 py-1 rounded transition-colors ${hasChildren ? 'cursor-pointer hover:bg-white/5' : ''}`}
+        className={`flex items-start gap-1.5 px-1.5 py-1 rounded-sm transition-colors ${hasChildren ? 'cursor-pointer hover:bg-white/5' : ''}`}
         onClick={() => hasChildren && setExpanded(e => !e)}
       >
         {/* Expand toggle */}
-        <span className="flex-shrink-0 mt-0.5 text-slate-600">
+        <span className="shrink-0 mt-0.5 text-slate-600">
           {hasChildren
             ? expanded ? <ChevronDown size={10} /> : <ChevronRight size={10} />
             : <span className="w-2.5 inline-block" />

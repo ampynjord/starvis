@@ -23,7 +23,7 @@ export function ScifiPanel({ children, className = '', title, subtitle, actions 
               <p className="text-xs text-slate-500 mt-0.5 font-mono-sc">{subtitle}</p>
             )}
           </div>
-          {actions && <div className="flex-shrink-0">{actions}</div>}
+          {actions && <div className="shrink-0">{actions}</div>}
         </div>
       )}
       {children}

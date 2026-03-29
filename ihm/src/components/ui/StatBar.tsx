@@ -35,7 +35,7 @@ export function StatBar({ value, max = 100, color = 'cyan', label, displayValue,
       )}
       <div className="stat-bar-track">
         <motion.div
-          className={`stat-bar-fill bg-gradient-to-r ${COLOR_MAP[color]}`}
+          className={`stat-bar-fill bg-linear-to-r ${COLOR_MAP[color]}`}
           style={{ boxShadow: GLOW_MAP[color] }}
           initial={animate ? { width: '0%' } : { width: `${pct}%` }}
           animate={{ width: `${pct}%` }}

@@ -125,7 +125,7 @@ export default function RankingPage() {
   }
 
   return (
-    <div className="max-w-screen-2xl mx-auto space-y-4">
+    <div className="max-w-(--breakpoint-2xl) mx-auto space-y-4">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -140,12 +140,12 @@ export default function RankingPage() {
 
         <div className="flex items-center gap-2">
           {/* View mode toggle */}
-          <div className="flex gap-1 border border-slate-800 rounded p-0.5">
+          <div className="flex gap-1 border border-slate-800 rounded-sm p-0.5">
             <button
               type="button"
               onClick={() => setViewMode('table')}
               title="Table view"
-              className={`p-1.5 rounded transition-colors ${viewMode === 'table' ? 'bg-cyan-950/60 text-cyan-400' : 'text-slate-600 hover:text-slate-300'}`}
+              className={`p-1.5 rounded-sm transition-colors ${viewMode === 'table' ? 'bg-cyan-950/60 text-cyan-400' : 'text-slate-600 hover:text-slate-300'}`}
             >
               <Table2 size={14} />
             </button>
@@ -153,7 +153,7 @@ export default function RankingPage() {
               type="button"
               onClick={() => setViewMode('chart')}
               title="Chart view"
-              className={`p-1.5 rounded transition-colors ${viewMode === 'chart' ? 'bg-cyan-950/60 text-cyan-400' : 'text-slate-600 hover:text-slate-300'}`}
+              className={`p-1.5 rounded-sm transition-colors ${viewMode === 'chart' ? 'bg-cyan-950/60 text-cyan-400' : 'text-slate-600 hover:text-slate-300'}`}
             >
               <BarChart2 size={14} />
             </button>
@@ -180,7 +180,7 @@ export default function RankingPage() {
 
       <div className="flex gap-4">
         {/* Left filter: stat categories */}
-        <div className="w-40 flex-shrink-0">
+        <div className="w-40 shrink-0">
           <FilterPanel
             hasFilters={statCat !== 'All'}
             onReset={() => setStatCat('All')}
@@ -304,7 +304,7 @@ export default function RankingPage() {
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: Math.min(i * 0.015, 0.5) }}
-                    className="border-b border-slate-900 hover:bg-white/[0.02] group"
+                    className="border-b border-slate-900 hover:bg-white/2 group"
                   >
                     <td className="px-3 py-1.5 text-slate-600 font-mono-sc text-center">
                       {i === 0 ? <span className="text-amber-400 font-bold">1</span>

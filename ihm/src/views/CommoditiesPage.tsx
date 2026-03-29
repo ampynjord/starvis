@@ -78,7 +78,7 @@ export default function CommoditiesPage() {
   const title = isIndustrial ? 'Industrial' : 'Trade Goods';
 
   return (
-    <div className="max-w-screen-2xl mx-auto">
+    <div className="max-w-(--breakpoint-2xl) mx-auto">
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">{title}</h1>
@@ -104,7 +104,7 @@ export default function CommoditiesPage() {
             type="button"
             onClick={() => { setActiveCategory(chip.label); setPage(1); }}
             className={[
-              'px-3 py-1 rounded text-xs font-rajdhani font-semibold tracking-wider transition-all border',
+              'px-3 py-1 rounded-sm text-xs font-rajdhani font-semibold tracking-wider transition-all border',
               activeCategory === chip.label
                 ? 'bg-cyan-950/60 border-cyan-700 text-cyan-400'
                 : 'border-border text-slate-500 hover:text-slate-300 hover:border-slate-600',
@@ -134,7 +134,7 @@ export default function CommoditiesPage() {
                         </div>
                         {c.symbol && <p className="text-xs font-mono-sc text-slate-600 mt-0.5">{c.symbol}</p>}
                       </Link>
-                      <div className="text-right flex-shrink-0 space-y-1">
+                      <div className="text-right shrink-0 space-y-1">
                         {c.occupancy_scu != null && <p className="text-xs font-mono-sc text-slate-600">{c.occupancy_scu} μSCU</p>}
                         <Link href={`/missions?search=${encodeURIComponent(c.name)}`} className="text-[10px] text-amber-500 hover:text-amber-300">Mission leads</Link>
                       </div>

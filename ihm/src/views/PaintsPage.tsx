@@ -23,7 +23,7 @@ export default function PaintsPage() {
   });
 
   return (
-    <div className="max-w-screen-2xl mx-auto">
+    <div className="max-w-(--breakpoint-2xl) mx-auto">
       <div className="mb-6 flex items-center justify-between gap-4">
         <div>
           <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">
@@ -65,7 +65,7 @@ export default function PaintsPage() {
               >
                 <div className="sci-panel px-4 py-3 hover:border-cyan-800 transition-colors h-full">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded flex-shrink-0 border border-cyan-800/50 bg-gradient-to-br from-cyan-900/60 to-blue-900/60 flex items-center justify-center">
+                    <div className="w-8 h-8 rounded-sm shrink-0 border border-cyan-800/50 bg-linear-to-br from-cyan-900/60 to-blue-900/60 flex items-center justify-center">
                       <Palette size={12} className="text-cyan-600" />
                     </div>
                     <div className="min-w-0 flex-1">

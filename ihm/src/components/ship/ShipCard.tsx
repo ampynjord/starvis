@@ -22,7 +22,7 @@ export function ShipCard({ ship, index = 0 }: Props) {
         {/* Rectangle horizontal : hauteur fixe, plus large que haute */}
         <div className="holo-card flex flex-col overflow-hidden">
           {/* Thumbnail — haut, hauteur fixe */}
-          <div className="relative h-28 flex-shrink-0 bg-slate-900/80">
+          <div className="relative h-28 shrink-0 bg-slate-900/80">
             {ship.thumbnail ? (
               <img
                 src={ship.thumbnail}
@@ -52,7 +52,7 @@ export function ShipCard({ ship, index = 0 }: Props) {
               </div>
             )}
             {/* Gradient fondu vers le bas */}
-            <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#0A1628] to-transparent pointer-events-none" />
+            <div className="absolute inset-x-0 bottom-0 h-10 bg-linear-to-t from-[#0A1628] to-transparent pointer-events-none" />
           </div>
 
           {/* Infos — bas */}
@@ -93,7 +93,7 @@ export function ShipCard({ ship, index = 0 }: Props) {
                   <GlowBadge color="slate" size="xs">{ship.vehicle_category}</GlowBadge>
                 )}
               </div>
-              <span className="text-xs font-mono-sc flex-shrink-0">
+              <span className="text-xs font-mono-sc shrink-0">
                 {ship.ship_matrix_id != null
                   ? <span className="text-green-500">◆ RSI</span>
                   : <span className="text-slate-700">◇</span>
