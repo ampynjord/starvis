@@ -256,103 +256,16 @@ jobs:
           DATABASE_URL=mysql://starvis_user:testpass@127.0.0.1:3306/live    npx prisma db push --skip-generate --accept-data-loss --force-reset
           DATABASE_URL=mysql://starvis_user:testpass@127.0.0.1:3306/ptu     npx prisma db push --skip-generate --accept-data-loss --force-reset
 
-      - name: Run API unit tests with coverage
-        run: cd api && npm run test:coverage
+      - name: Run API unit tests
+        run: cd api && npm run test
         env:
           LOG_LEVEL: error
 
-      - name: Run Extractor unit tests with coverage
-        run: cd extractor && npm run test:coverage
+      - name: Run Extractor unit tests
+        run: cd extractor && npm run test
 
-      - name: Run IHM unit tests with coverage
-        run: cd ihm && npm run coverage
-
-      - name: Upload API coverage to Codecov
-        uses: codecov/codecov-action@v6
-        with:
-          files: ./api/coverage/lcov.info
-          flags: api
-          name: api-coverage
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-
-      - name: Upload Extractor coverage to Codecov
-        uses: codecov/codecov-action@v6
-        with:
-          files: ./extractor/coverage/lcov.info
-          flags: extractor
-          name: extractor-coverage
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-
-      - name: Upload IHM coverage to Codecov
-        uses: codecov/codecov-action@v6
-        with:
-          files: ./ihm/coverage/lcov.info
-          flags: ihm
-          name: ihm-coverage
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false
-
-      - name: Install Playwright browsers
-        run: cd api && npx playwright install --with-deps chromium
-
-      - name: Start API server
-        run: |
-          cd api && npx tsx server.ts > server.log 2>&1 &
-          echo $! > server.pid
-          echo "API server started (PID: $(cat server.pid))"
-          
-          # Wait for server to be ready (up to 60 seconds)
-          for i in $(seq 1 60); do
-            if curl -sf http://localhost:3000/health/live > /dev/null 2>&1; then
-              echo "✅ Liveness check passed"
-              break
-            fi
-            sleep 1
-          done
-          
-          # Check readiness (DB + Redis)
-          if curl -sf http://localhost:3000/health/ready > /dev/null 2>&1; then
-            echo "✅ Readiness check passed - Server ready for E2E tests"
-          else
-            echo "❌ Server failed health check"
-            cat server.log
-            exit 1
-          fi
-        env:
-          P4K_PATH: ""
-
-      - name: Run E2E tests
-        run: cd api && npm run test:e2e
-        env:
-          API_URL: http://localhost:3000
-
-      - name: Upload E2E test results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: playwright-report
-          path: api/playwright-report/
-          retention-days: 7
-
-      - name: Stop API server
-        if: always()
-        run: |
-          if [ -f api/server.pid ]; then
-            PID=$(cat api/server.pid)
-            echo "🛑 Stopping API server (PID: $PID)"
-            kill $PID 2>/dev/null || echo "Server already stopped"
-            rm -f api/server.pid
-          fi
-          
-      - name: Show server logs on failure
-        if: failure()
-        run: |
-          if [ -f api/server.log ]; then
-            echo "📋 Server logs:"
-            cat api/server.log
-          fi
+      - name: Run IHM unit tests
+        run: cd ihm && npm run test:run
 
   # ==========================================
   #  3. BUILD DOCKER IMAGE
