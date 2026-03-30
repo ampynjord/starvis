@@ -97,8 +97,12 @@ function isLocEmpty(s: string | null | undefined): boolean {
 
 function cleanRuntimePlaceholderTokens(s: string | null | undefined): string | null {
   if (!s) return null;
-  // Remplace ~mission(TargetName) etc... par [TargetName]
-  return s.replace(/~[a-zA-Z0-9_]+\(([^)]+)\)/g, '[$1]');
+  return s.replace(/~[a-zA-Z0-9_]+\(([^)]+)\)/g, (match, inner) => {
+    const parts = inner.split('|');
+    const varName = parts[parts.length - 1];
+    const spaced = varName.replace(/([A-Z])/g, ' $1').trim();
+    return `<${spaced}>`;
+  });
 }
 
 function hasRuntimePlaceholderTokens(s: string | null | undefined): boolean {
