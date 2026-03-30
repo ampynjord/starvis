@@ -198,12 +198,12 @@ function MissionCard({
                 Illegal
               </GlowBadge>
             )}
-            {m.has_blueprint_reward && (
+            {!!m.has_blueprint_reward && (
               <GlowBadge color="purple" size="xs">
                 <FlaskConical size={9} className="inline -mt-0.5" /> Blueprint
               </GlowBadge>
             )}
-            {m.is_unique && (
+            {!!m.is_unique && (
               <GlowBadge color="slate" size="xs">
                 Unique
               </GlowBadge>
@@ -629,7 +629,7 @@ export default function MissionsPage() {
                   <GlowBadge color={sel.is_unique ? 'amber' : 'slate'}>
                     {sel.is_unique ? 'Unique' : 'Repeatable'}
                   </GlowBadge>
-                  {sel.has_blueprint_reward && (
+                  {!!sel.has_blueprint_reward && (
                     <GlowBadge color="purple">
                       <FlaskConical size={10} /> Blueprint
                     </GlowBadge>
