@@ -127,7 +127,7 @@ jobs:
           script: |
             cd /home/debian/starvis
             git pull origin main
-            cd /home/debian/starvis
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ampynjord --password-stdin
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d
             docker system prune -af
