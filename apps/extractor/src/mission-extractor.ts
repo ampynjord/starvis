@@ -95,6 +95,12 @@ function isLocEmpty(s: string | null | undefined): boolean {
   return t.includes('UNINITIALIZED') || t === '<= UNINITIALIZED =>' || t.startsWith('<= UNINITIALIZED');
 }
 
+function cleanRuntimePlaceholderTokens(s: string | null | undefined): string | null {
+  if (!s) return null;
+  // Remplace ~mission(TargetName) etc... par [TargetName]
+  return s.replace(/~[a-zA-Z0-9_]+\(([^)]+)\)/g, '[$1]');
+}
+
 function hasRuntimePlaceholderTokens(s: string | null | undefined): boolean {
   if (!s) return false;
   return /~[a-z0-9_]+\(/i.test(s);
@@ -179,6 +185,25 @@ export function extractMissions(ctx: DataForgeService, locService?: MissionLocal
           }
         }
       }
+
+      // -------------------------------------------------------------
+      // NEW: Retrieve rewards from properties (Alpha 3.23 / 4.0 data)
+      // -------------------------------------------------------------
+      const props = (data.contractProperties as Array<any>) || [];
+      const rewardProps = props.filter(p => /(reward|payout|Price_BP)/i.test(p.missionVariableName || ''));
+      for (const p of rewardProps) {
+        const pOpts = p.value?.options;
+        if (Array.isArray(pOpts)) {
+          for (const opt of pOpts) {
+             const val = opt.value;
+             if (typeof val === 'number' && val > 0) {
+               if (rewardMin === null || val < rewardMin) rewardMin = val;
+               if (rewardMax === null || val > rewardMax) rewardMax = val;
+             }
+          }
+        }
+      }
+
       if (!rewardCurrency && (rewardMin || rewardMax)) rewardCurrency = 'aUEC';
 
       // ── Faction / Mission Giver ──
@@ -282,18 +307,16 @@ export function extractMissions(ctx: DataForgeService, locService?: MissionLocal
       const resDesc = resolveLocalizedText(resolveStr(rawDesc), locService);
 
       const localizedClassName = locService?.resolveComponentName?.(className) ?? null;
-      const fallbackTitle =
-        localizedClassName && !hasRuntimePlaceholderTokens(localizedClassName) ? localizedClassName : humanizeMissionClassName(className);
+      let title = isLocEmpty(resTitle) ? (localizedClassName || humanizeMissionClassName(className)) : resTitle;
+      title = cleanRuntimePlaceholderTokens(title);
 
-      const title = isLocEmpty(resTitle) || hasRuntimePlaceholderTokens(resTitle) ? fallbackTitle : resTitle;
-
-      const description = isLocEmpty(resDesc) || hasRuntimePlaceholderTokens(resDesc) ? null : resDesc;
+      const description = isLocEmpty(resDesc) ? null : cleanRuntimePlaceholderTokens(resDesc);
 
       const resolveEntityLabel = (value: string | null): string | null => {
         if (!value) return null;
-        const resolved = resolveLocalizedText(value, locService);
-        if (!resolved || hasRuntimePlaceholderTokens(resolved) || isLocEmpty(resolved)) return null;
-        return resolved;
+        let resolved = resolveLocalizedText(value, locService);
+        if (isLocEmpty(resolved)) return null;
+        return cleanRuntimePlaceholderTokens(resolved);
       };
 
       faction = resolveEntityLabel(faction);
