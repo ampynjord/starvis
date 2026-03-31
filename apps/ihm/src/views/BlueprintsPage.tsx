@@ -21,7 +21,7 @@ import {
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import type { CraftingRecipe, Mission } from '@/types/api';
+import type { CraftingRecipe } from '@/types/api';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -155,9 +155,9 @@ function BlueprintCard({
                 <Trophy size={8} /> Lvl {r.skill_level}
               </span>
             )}
-            {(r.unlock_missions?.length ?? 0) > 0 && (
+            {((r.missions_count ?? r.unlock_missions?.length ?? 0) > 0) && (
               <span className="inline-flex items-center gap-0.5 text-[10px] font-mono-sc px-1.5 py-0.5 rounded-sm border bg-cyan-950/40 border-cyan-900/60 text-cyan-400">
-                <ClipboardList size={8} /> {r.unlock_missions!.length} mission{r.unlock_missions!.length > 1 ? 's' : ''}
+                <ClipboardList size={8} /> {r.missions_count ?? r.unlock_missions!.length} mission{(r.missions_count ?? r.unlock_missions!.length) > 1 ? 's' : ''}
               </span>
             )}
           </div>
@@ -308,7 +308,7 @@ function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
               <ClipboardList size={10} /> Unlock Missions ({recipe.unlock_missions.length})
             </p>
             <div className="space-y-1.5">
-              {recipe.unlock_missions.map((m: Mission) => (
+              {recipe.unlock_missions.map((m) => (
                 <Link
                   key={m.uuid}
                   href={`/missions?selected=${m.uuid}`}

@@ -98,6 +98,7 @@ services:
       # Nécessaire sur Windows : Docker Desktop ne propage pas inotify vers le conteneur
       CHOKIDAR_USEPOLLING: "true"
       CHOKIDAR_INTERVAL: "300"
+      WATCHPACK_POLLING: "true"
     depends_on:
       api:
         condition: service_healthy

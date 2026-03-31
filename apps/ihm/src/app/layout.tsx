@@ -31,7 +31,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={`dark ${orbitron.variable} ${rajdhani.variable} ${shareTechMono.variable}`}>
+    <html lang="fr" className={`dark ${orbitron.variable} ${rajdhani.variable} ${shareTechMono.variable}`} suppressHydrationWarning>
       <body className="bg-void text-slate-200">
         <Providers>{children}</Providers>
       </body>
