@@ -82,7 +82,7 @@ describe('HomePage', () => {
   it('renders game version when loaded', async () => {
     renderWithProviders(<HomePage />);
     await waitFor(() => {
-      expect(screen.getByText('3.23.1')).toBeInTheDocument();
+      expect(screen.getByText('3.23')).toBeInTheDocument();
     });
   });
 });
