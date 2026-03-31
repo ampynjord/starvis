@@ -3,18 +3,30 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
+  AlertTriangle,
+  Archive,
+  Bell,
   BookOpen,
+  Calendar,
   Clock,
   Coins,
+  Crosshair,
+  Eye,
   FlaskConical,
+  Gauge,
   MapPin,
+  Package,
+  Radio,
   Scale,
   Search,
   Share2,
-  Shield,
   Skull,
-  Star,
+  Truck,
+  User,
+  Users,
+  Wrench,
   X,
+  Zap,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -50,49 +62,62 @@ function formatReward(min: number | null, max: number | null, currency?: string 
   return '';
 }
 
-function rankLabel(rep: number | null): string {
-  if (rep == null) return '—';
-  if (rep <= 0) return '0';
-  if (rep <= 50) return '1';
-  if (rep <= 100) return '2';
-  if (rep <= 200) return '3';
-  if (rep <= 400) return '4';
-  if (rep <= 800) return '5';
-  return '6';
+// ── Type meta (color + icon + label) ────────────────────────────────────────
+
+type BadgeColor = 'cyan' | 'amber' | 'green' | 'red' | 'purple' | 'slate';
+
+interface TypeMeta {
+  color: BadgeColor;
+  icon: React.ReactNode;
+  label: string;
+  /** Does this type typically have a danger_level? */
+  hasDanger: boolean;
+  /** Does this type typically have a buy-in? */
+  hasBuyin: boolean;
 }
 
-// ── Color maps ──────────────────────────────────────────────────────────────
-
-const TYPE_COLORS: Record<string, 'cyan' | 'amber' | 'green' | 'red' | 'purple' | 'slate'> = {
-  Bounty: 'amber',
-  Combat: 'red',
-  Delivery: 'cyan',
-  Escort: 'green',
-  Infiltration: 'purple',
-  Salvage: 'slate',
-  Mining: 'cyan',
-  Investigation: 'slate',
-  Recovery: 'green',
-  Trade: 'cyan',
-  Patrol: 'green',
-  Race: 'amber',
-  Espionage: 'purple',
-  Siege: 'red',
-  Construction: 'slate',
-  Maintenance: 'slate',
-  Misc: 'slate',
+const TYPE_META: Record<string, TypeMeta> = {
+  Hauling:               { color: 'cyan',   icon: <Truck size={11} />,       label: 'Hauling',              hasDanger: true,  hasBuyin: false },
+  Hauling_Interstellar:  { color: 'cyan',   icon: <Truck size={11} />,       label: 'Interstellar Hauling', hasDanger: true,  hasBuyin: false },
+  Hauling_Planetary:     { color: 'cyan',   icon: <Truck size={11} />,       label: 'Planetary Hauling',    hasDanger: true,  hasBuyin: false },
+  Hauling_Solar:         { color: 'cyan',   icon: <Truck size={11} />,       label: 'Solar Hauling',        hasDanger: true,  hasBuyin: false },
+  Collection:            { color: 'amber',  icon: <Archive size={11} />,     label: 'Collection',           hasDanger: false, hasBuyin: true  },
+  Mercenary:             { color: 'red',    icon: <Crosshair size={11} />,   label: 'Mercenary',            hasDanger: true,  hasBuyin: true  },
+  Delivery:              { color: 'cyan',   icon: <Package size={11} />,     label: 'Delivery',             hasDanger: false, hasBuyin: false },
+  Investigation:         { color: 'purple', icon: <Eye size={11} />,         label: 'Investigation',        hasDanger: false, hasBuyin: false },
+  Priority:              { color: 'amber',  icon: <AlertTriangle size={11}/>, label: 'Priority',            hasDanger: true,  hasBuyin: true  },
+  Salvage:               { color: 'slate',  icon: <Wrench size={11} />,      label: 'Salvage',              hasDanger: false, hasBuyin: true  },
+  'Service Beacons':     { color: 'green',  icon: <Radio size={11} />,       label: 'Service Beacon',       hasDanger: false, hasBuyin: false },
+  'Bounty Hunter':       { color: 'amber',  icon: <Skull size={11} />,       label: 'Bounty Hunter',        hasDanger: false, hasBuyin: false },
+  Racing:                { color: 'green',  icon: <Gauge size={11} />,       label: 'Racing',               hasDanger: false, hasBuyin: true  },
+  Maintenance:           { color: 'slate',  icon: <Wrench size={11} />,      label: 'Maintenance',          hasDanger: false, hasBuyin: false },
+  Appointment:           { color: 'slate',  icon: <Calendar size={11} />,    label: 'Appointment',          hasDanger: false, hasBuyin: false },
+  'ECN Alert':           { color: 'red',    icon: <Bell size={11} />,        label: 'ECN Alert',            hasDanger: false, hasBuyin: false },
+  local:                 { color: 'slate',  icon: <MapPin size={11} />,      label: 'Local',                hasDanger: false, hasBuyin: false },
 };
 
-const CATEGORY_COLORS: Record<string, 'cyan' | 'amber' | 'green' | 'red' | 'purple' | 'slate'> = {
-  Career: 'cyan',
-  Story: 'amber',
-  Wikelo: 'purple',
-  ASD: 'green',
-  ACE: 'red',
-  Event: 'amber',
-};
+function getTypeMeta(type: string | null): TypeMeta {
+  return TYPE_META[type ?? ''] ?? { color: 'slate', icon: <Zap size={11} />, label: type ?? '?', hasDanger: false, hasBuyin: false };
+}
 
-// ── ChipGroup ────────────────────────────────────────────────────────────────
+// ── DangerPips ───────────────────────────────────────────────────────────────
+
+function DangerPips({ level }: { level: number | null }) {
+  if (level == null) return null;
+  const MAX = 5;
+  return (
+    <div className="flex items-center gap-0.5">
+      {Array.from({ length: MAX }, (_, i) => (
+        <span
+          key={i}
+          className={`w-1.5 h-1.5 rounded-full ${i < level ? 'bg-red-500' : 'bg-slate-700'}`}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ── ChipGroup ─────────────────────────────────────────────────────────────────
 
 function ChipGroup({
   options,
@@ -122,7 +147,45 @@ function ChipGroup({
   );
 }
 
-// ── ToggleGroup ──────────────────────────────────────────────────────────────
+// ── TypeChipGroup ─────────────────────────────────────────────────────────────
+
+function TypeChipGroup({
+  options,
+  value,
+  onChange,
+}: { options: string[]; value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      <button
+        type="button"
+        onClick={() => onChange('')}
+        className={`flex items-center gap-1 px-2 py-1 rounded-sm text-xs font-mono-sc transition-colors ${!value ? 'bg-cyan-950/60 text-cyan-400 border border-cyan-800' : 'text-slate-500 hover:text-slate-300 border border-transparent hover:border-border'}`}
+      >
+        All
+      </button>
+      {options.map((opt) => {
+        const meta = getTypeMeta(opt);
+        const active = value === opt;
+        const activeCls = active
+          ? `bg-${meta.color}-950/60 text-${meta.color}-400 border-${meta.color}-800`
+          : 'text-slate-500 hover:text-slate-300 border-transparent hover:border-border';
+        return (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => onChange(active ? '' : opt)}
+            className={`flex items-center gap-1 px-2 py-1 rounded-sm text-xs font-mono-sc transition-colors border ${activeCls}`}
+          >
+            {meta.icon}
+            {meta.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── ToggleGroup ───────────────────────────────────────────────────────────────
 
 function ToggleGroup({
   options,
@@ -152,7 +215,7 @@ function ToggleGroup({
   );
 }
 
-// ── MissionCard ──────────────────────────────────────────────────────────────
+// ── MissionCard ───────────────────────────────────────────────────────────────
 
 function MissionCard({
   m,
@@ -160,79 +223,226 @@ function MissionCard({
   onClick,
 }: { m: Mission; isSelected: boolean; onClick: () => void }) {
   const reward = formatReward(m.reward_min, m.reward_max, m.reward_currency);
-  const typeColor = TYPE_COLORS[m.mission_type ?? ''] ?? 'slate';
+  const meta = getTypeMeta(m.mission_type);
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`sci-panel w-full text-left px-4 py-3 transition-colors ${isSelected ? 'border-cyan-600' : 'hover:border-cyan-800'}`}
+      className={`sci-panel w-full text-left px-4 py-3 transition-colors ${isSelected ? 'border-cyan-600 bg-cyan-950/10' : 'hover:border-slate-700'}`}
     >
       <div className="flex items-start gap-3">
+        {/* Type icon pill */}
+        <div className={`shrink-0 mt-0.5 flex items-center justify-center w-7 h-7 rounded sci-panel border-${meta.color}-900/50 text-${meta.color}-500`}>
+          {meta.icon}
+        </div>
+
+        {/* Main content */}
         <div className="flex-1 min-w-0">
-          {/* Row 1: faction prefix + title */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {m.faction && (
+          {/* Row 1: giver / faction + title */}
+          <div className="flex items-baseline gap-1.5 flex-wrap">
+            {(m.mission_giver || m.faction) && (
               <span className="text-[10px] font-mono-sc text-purple-400 uppercase tracking-wider shrink-0">
-                {m.faction}
+                {m.mission_giver ?? m.faction}
               </span>
             )}
-            <span className="font-orbitron text-sm text-slate-200 truncate">
+            <span className="font-orbitron text-sm text-slate-200 truncate leading-tight">
               {m.title ?? m.class_name}
             </span>
           </div>
-          {/* Row 2: system + type + badges */}
+
+          {/* Row 2: meta tags */}
           <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-            {m.location_system && (
-              <span className="text-[10px] font-mono-sc text-slate-500 bg-slate-800/40 px-1.5 py-0.5 rounded-sm">
-                {m.location_system}
-              </span>
-            )}
-            {m.mission_type && (
-              <GlowBadge color={typeColor} size="xs">
-                {m.display_mission_type ?? m.mission_type}
-              </GlowBadge>
-            )}
+            <GlowBadge color={meta.color} size="xs">
+              {meta.icon} {meta.label}
+            </GlowBadge>
             {!m.is_legal && (
-              <GlowBadge color="red" size="xs">
-                Illegal
-              </GlowBadge>
+              <GlowBadge color="red" size="xs">Illegal</GlowBadge>
+            )}
+            {!!m.can_be_shared && (
+              <GlowBadge color="cyan" size="xs"><Share2 size={9} /> Group</GlowBadge>
             )}
             {!!m.has_blueprint_reward && (
-              <GlowBadge color="purple" size="xs">
-                <FlaskConical size={9} className="inline -mt-0.5" /> Blueprint
-              </GlowBadge>
+              <GlowBadge color="purple" size="xs"><FlaskConical size={9} /> Blueprint</GlowBadge>
             )}
-            {!!m.is_unique && (
-              <GlowBadge color="slate" size="xs">
-                Unique
+            {m.buy_in_amount != null && m.buy_in_amount > 0 && (
+              <GlowBadge color="amber" size="xs">
+                <Coins size={9} /> {m.buy_in_amount.toLocaleString('en-US')} buy-in
               </GlowBadge>
             )}
           </div>
         </div>
-        {/* Right column: reward + XP */}
-        <div className="flex flex-col items-end gap-1 shrink-0">
+
+        {/* Right column */}
+        <div className="flex flex-col items-end gap-1.5 shrink-0 text-right">
           {reward && (
-            <div className="text-right">
-              <p className="text-[10px] font-mono-sc text-slate-600 uppercase">Reward</p>
-              <p className="text-sm font-orbitron text-amber-400">{reward}</p>
+            <div>
+              <p className="text-sm font-orbitron text-amber-400 leading-tight">{reward}</p>
             </div>
           )}
-          {m.base_xp != null && (
-            <div className="text-right">
-              <p className="text-[10px] font-mono-sc text-slate-600 uppercase">Base XP</p>
-              <p className="text-xs font-mono-sc text-green-400">
-                {m.base_xp.toLocaleString('en-US')}
-              </p>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {m.danger_level != null && <DangerPips level={m.danger_level} />}
+            {m.completion_time_s != null && (
+              <span className="text-[10px] font-mono-sc text-slate-600 flex items-center gap-0.5">
+                <Clock size={9} />{formatDuration(m.completion_time_s)}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </button>
   );
 }
 
-// ── Main Page ────────────────────────────────────────────────────────────────
+// ── DetailPanel ───────────────────────────────────────────────────────────────
+
+function DetailPanel({ m }: { m: Mission }) {
+  const meta = getTypeMeta(m.mission_type);
+  const reward = formatReward(m.reward_min, m.reward_max, m.reward_currency);
+
+  return (
+    <ScifiPanel
+      title="Mission Detail"
+      subtitle={m.class_name}
+    >
+      {/* Mission title + type */}
+      <div className="mb-4">
+        <div className="flex items-center gap-2 flex-wrap mb-2">
+          <GlowBadge color={meta.color}>{meta.icon} {meta.label}</GlowBadge>
+          {m.category && <GlowBadge color="slate">{m.display_category ?? m.category}</GlowBadge>}
+          <GlowBadge color={m.is_legal ? 'green' : 'red'}>
+            <Scale size={10} /> {m.is_legal ? 'Legal' : 'Illegal'}
+          </GlowBadge>
+          <GlowBadge color={m.can_be_shared ? 'cyan' : 'slate'}>
+            <Share2 size={10} /> {m.can_be_shared ? 'Group' : 'Solo'}
+          </GlowBadge>
+          {!!m.is_unique && <GlowBadge color="amber">Unique</GlowBadge>}
+          {!!m.has_blueprint_reward && (
+            <GlowBadge color="purple"><FlaskConical size={10} /> Blueprint</GlowBadge>
+          )}
+        </div>
+        {m.title && (
+          <h3 className="font-orbitron text-base text-slate-100 leading-snug">{m.title}</h3>
+        )}
+      </div>
+
+      <div className="space-y-2">
+        {/* Reward block */}
+        {reward && (
+          <div className="sci-panel p-3 bg-amber-950/20 border-amber-900/30">
+            <p className="text-[10px] font-mono-sc text-amber-600 uppercase flex items-center gap-1 mb-1">
+              <Coins size={10} /> Reward
+            </p>
+            <p className="text-xl font-orbitron text-amber-400">{reward}</p>
+          </div>
+        )}
+
+        {/* Buy-in */}
+        {m.buy_in_amount != null && m.buy_in_amount > 0 && (
+          <div className="sci-panel p-3 bg-orange-950/20 border-orange-900/30">
+            <p className="text-[10px] font-mono-sc text-orange-500 uppercase flex items-center gap-1 mb-1">
+              <Coins size={10} /> Buy-In Required
+            </p>
+            <p className="text-lg font-orbitron text-orange-400">
+              {m.buy_in_amount.toLocaleString('en-US')} {m.reward_currency ?? 'aUEC'}
+            </p>
+          </div>
+        )}
+
+        {/* Faction / Giver */}
+        {(m.faction || m.mission_giver) && (
+          <div className="grid grid-cols-2 gap-2">
+            {m.faction && (
+              <div className="sci-panel p-2.5">
+                <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
+                  <Users size={9} /> Faction
+                </p>
+                <p className="text-sm font-mono-sc text-purple-400">{m.faction}</p>
+              </div>
+            )}
+            {m.mission_giver && m.mission_giver !== m.faction && (
+              <div className="sci-panel p-2.5">
+                <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
+                  <User size={9} /> Mission Giver
+                </p>
+                <p className="text-sm font-mono-sc text-slate-300">{m.mission_giver}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Danger + Duration */}
+        {(m.danger_level != null || m.completion_time_s != null) && (
+          <div className="grid grid-cols-2 gap-2">
+            {m.danger_level != null && (
+              <div className="sci-panel p-2.5">
+                <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-1.5">
+                  <Skull size={9} /> Danger Level
+                </p>
+                <div className="flex items-center gap-2">
+                  <DangerPips level={m.danger_level} />
+                  <span className="text-sm font-orbitron text-red-400">{m.danger_level}/5</span>
+                </div>
+              </div>
+            )}
+            {m.completion_time_s != null && (
+              <div className="sci-panel p-2.5">
+                <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
+                  <Clock size={9} /> Time Limit
+                </p>
+                <p className="text-sm font-orbitron text-slate-300">{formatDuration(m.completion_time_s)}</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Location: shown only when non-null (currently always null — runtime data) */}
+        {(m.location_system || m.location_planet || m.location_name) && (
+          <div className="sci-panel p-2.5">
+            <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
+              <MapPin size={9} /> Location
+            </p>
+            <p className="text-sm font-mono-sc text-slate-300">
+              {[m.location_system, m.location_planet, m.location_name].filter(Boolean).join(' › ')}
+            </p>
+          </div>
+        )}
+
+        {/* Blueprint reward */}
+        {!!m.has_blueprint_reward && (
+          <div
+            className="sci-panel p-2.5 bg-purple-950/20 border-purple-900/30 cursor-pointer hover:border-purple-500/50 transition-colors"
+            onClick={() => m.blueprint_reward_uuid && window.open(`/crafting?recipe=${m.blueprint_reward_uuid}`, '_blank')}
+          >
+            <p className="text-[10px] text-purple-500 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
+              <FlaskConical size={9} /> Blueprint Reward
+            </p>
+            <p className="text-sm font-mono-sc text-purple-200">
+              {m.blueprint_name ?? m.blueprint_output ?? 'Unknown Blueprint'}
+            </p>
+          </div>
+        )}
+
+        {/* Description */}
+        {m.description && (
+          <div className="sci-panel p-2.5">
+            <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-1">
+              <BookOpen size={9} /> Description
+            </p>
+            <p className="text-sm text-slate-400 leading-relaxed whitespace-pre-wrap">{m.description}</p>
+          </div>
+        )}
+
+        {/* Technical footer */}
+        <div className="sci-panel p-2 border-slate-800/40 bg-slate-900/30">
+          <p className="text-[10px] font-mono-sc text-slate-600 break-all">{m.class_name}</p>
+        </div>
+      </div>
+    </ScifiPanel>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function MissionsPage() {
   const searchParams = useSearchParams();
@@ -243,11 +453,10 @@ export default function MissionsPage() {
   const [type, setType] = useState('');
   const [legal, setLegal] = useState('');
   const [faction, setFaction] = useState('');
-  const [system, setSystem] = useState('');
   const [category, setCategory] = useState('');
-  const [availability, setAvailability] = useState('');
   const [sharing, setSharing] = useState('');
-  const [selectedUuid, setSelectedUuid] = useState<string | null>(null);
+  const [availability, setAvailability] = useState('');
+  const [selectedUuid, setSelectedUuid] = useState<string | null>(searchParams?.get('selected') ?? null);
   const debouncedSearch = useDebounce(search, 350);
 
   const { data: types } = useQuery({
@@ -260,11 +469,6 @@ export default function MissionsPage() {
     queryFn: () => api.missions.factions(env),
     staleTime: Number.POSITIVE_INFINITY,
   });
-  const { data: systems } = useQuery({
-    queryKey: ['missions.systems', env],
-    queryFn: () => api.missions.systems(env),
-    staleTime: Number.POSITIVE_INFINITY,
-  });
   const { data: categories } = useQuery({
     queryKey: ['missions.categories', env],
     queryFn: () => api.missions.categories(env),
@@ -275,7 +479,7 @@ export default function MissionsPage() {
     queryKey: [
       'missions.list',
       env,
-      { page, search: debouncedSearch, type, legal, sharing, faction, system, category, availability },
+      { page, search: debouncedSearch, type, legal, sharing, faction, category, availability },
     ],
     queryFn: () =>
       api.missions.list({
@@ -287,14 +491,20 @@ export default function MissionsPage() {
         legal: legal || undefined,
         shared: sharing || undefined,
         faction: faction || undefined,
-        system: system || undefined,
         category: category || undefined,
         unique: availability === 'unique' ? 'true' : availability === 'repeatable' ? 'false' : undefined,
       }),
   });
 
-  const hasFilters = !!(type || debouncedSearch || legal || sharing || faction || system || category || availability);
-  const sel: Mission | null = (data?.data?.find((m) => m.uuid === selectedUuid) ?? null);
+  const hasFilters = !!(type || debouncedSearch || legal || sharing || faction || category || availability);
+
+  const { data: selectedMissionFallback } = useQuery({
+    queryKey: ['missions.single', selectedUuid, env],
+    queryFn: () => api.missions.single(selectedUuid!, env),
+    enabled: !!selectedUuid && !data?.data?.find((m) => m.uuid === selectedUuid),
+  });
+
+  const sel: Mission | null = data?.data?.find((m) => m.uuid === selectedUuid) ?? selectedMissionFallback ?? null;
 
   useEffect(() => {
     if (data?.data?.length && !selectedUuid) setSelectedUuid(data.data[0].uuid);
@@ -306,20 +516,13 @@ export default function MissionsPage() {
   }, [data]);
 
   const resetAll = () => {
-    setType('');
-    setSearch('');
-    setLegal('');
-    setFaction('');
-    setSystem('');
-    setCategory('');
-    setAvailability('');
-    setSharing('');
-    setPage(1);
+    setType(''); setSearch(''); setLegal(''); setFaction('');
+    setCategory(''); setAvailability(''); setSharing(''); setPage(1);
   };
 
   return (
     <div className="max-w-(--breakpoint-2xl) mx-auto">
-      {/* ── Header ─────────────────────────────────── */}
+      {/* Header */}
       <div className="mb-4 flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4 flex-wrap">
           <div>
@@ -337,137 +540,75 @@ export default function MissionsPage() {
             <input
               type="text"
               value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              placeholder="Search mission, class, description…"
+              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              placeholder="Search mission, giver, class name…"
               className="sci-input w-full pl-8 text-xs"
             />
           </div>
         </div>
 
-        {/* ── Filter bar (SCMDB style) ─────────────── */}
+        {/* Filter bar */}
         <div className="sci-panel p-3 space-y-3">
-          {/* Category chips */}
-          {categories && categories.length > 0 && (
-            <div>
-              <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">Category</p>
-              <ChipGroup
-                options={categories}
-                value={category}
-                onChange={(v) => {
-                  setCategory(v);
-                  setPage(1);
-                }}
-              />
-            </div>
-          )}
-          {/* System chips */}
-          {systems && systems.length > 0 && (
+          {/* Mission type chips with icons */}
+          {types && types.length > 0 && (
             <div>
               <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">
-                Star System
+                Mission Type
               </p>
-              <ChipGroup
-                options={systems}
-                value={system}
-                onChange={(v) => {
-                  setSystem(v);
-                  setPage(1);
-                }}
+              <TypeChipGroup
+                options={types}
+                value={type}
+                onChange={(v) => { setType(v); setPage(1); }}
               />
             </div>
           )}
-          {/* Selects row */}
-          <div className="flex flex-wrap gap-6">
-            {types && types.length > 0 && (
-              <div>
-                <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">
-                  Mission Type
-                </p>
-                <select
-                  value={type}
-                  onChange={(e) => {
-                    setType(e.target.value);
-                    setPage(1);
-                  }}
-                  className="sci-select text-xs w-44"
-                >
-                  <option value="">All types</option>
-                  {types.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            {factions && factions.length > 0 && (
-              <div>
-                <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">Faction</p>
-                <select
-                  value={faction}
-                  onChange={(e) => {
-                    setFaction(e.target.value);
-                    setPage(1);
-                  }}
-                  className="sci-select text-xs w-44"
-                >
-                  <option value="">All factions</option>
-                  {factions.map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-          {/* Toggles row */}
+
+          {/* Faction chips (collapsible if many) */}
+          {factions && factions.length > 0 && (
+            <div>
+              <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">Faction</p>
+              <ChipGroup
+                options={factions}
+                value={faction}
+                onChange={(v) => { setFaction(v); setPage(1); }}
+              />
+            </div>
+          )}
+
+          {/* Category + toggles row */}
           <div className="flex flex-wrap gap-4 items-end">
+            {categories && categories.length > 0 && (
+              <div>
+                <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">Category</p>
+                <ChipGroup
+                  options={categories}
+                  value={category}
+                  onChange={(v) => { setCategory(v); setPage(1); }}
+                />
+              </div>
+            )}
             <div>
               <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">Legality</p>
               <ToggleGroup
-                options={[
-                  { label: 'Legal', value: 'true' },
-                  { label: 'Illegal', value: 'false' },
-                ]}
+                options={[{ label: 'Legal', value: 'true' }, { label: 'Illegal', value: 'false' }]}
                 value={legal}
-                onChange={(v) => {
-                  setLegal(v);
-                  setPage(1);
-                }}
+                onChange={(v) => { setLegal(v); setPage(1); }}
               />
             </div>
             <div>
-              <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">Sharing</p>
+              <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">Group play</p>
               <ToggleGroup
-                options={[
-                  { label: 'Sharable', value: 'true' },
-                  { label: 'Solo', value: 'false' },
-                ]}
+                options={[{ label: 'Group', value: 'true' }, { label: 'Solo', value: 'false' }]}
                 value={sharing}
-                onChange={(v) => {
-                  setSharing(v);
-                  setPage(1);
-                }}
+                onChange={(v) => { setSharing(v); setPage(1); }}
               />
             </div>
             <div>
-              <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">
-                Availability
-              </p>
+              <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">Recurrence</p>
               <ToggleGroup
-                options={[
-                  { label: 'Unique', value: 'unique' },
-                  { label: 'Repeatable', value: 'repeatable' },
-                ]}
+                options={[{ label: 'Unique', value: 'unique' }, { label: 'Repeatable', value: 'repeatable' }]}
                 value={availability}
-                onChange={(v) => {
-                  setAvailability(v);
-                  setPage(1);
-                }}
+                onChange={(v) => { setAvailability(v); setPage(1); }}
               />
             </div>
             {hasFilters && (
@@ -476,15 +617,15 @@ export default function MissionsPage() {
                 onClick={resetAll}
                 className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition-colors ml-auto"
               >
-                <X size={12} /> Reset filters
+                <X size={12} /> Reset
               </button>
             )}
           </div>
         </div>
       </div>
 
-      {/* ── Content ────────────────────────────────── */}
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-4 items-start">
+      {/* Content */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 items-start">
         {/* Mission list */}
         <div>
           {isLoading ? (
@@ -520,139 +661,10 @@ export default function MissionsPage() {
           )}
         </div>
 
-        {/* ── Detail Panel ─────────────────────────── */}
+        {/* Detail panel */}
         <div className="xl:sticky xl:top-6">
           {sel ? (
-            <ScifiPanel title="Mission Detail" subtitle={sel.title ?? sel.class_name}>
-              <div className="grid grid-cols-1 gap-2">
-                {/* Reward */}
-                {(sel.reward_min != null || sel.reward_max != null) && (
-                  <div className="sci-panel p-3 bg-amber-950/20 border-amber-900/30">
-                    <p className="text-xs text-amber-600 font-mono-sc uppercase flex items-center gap-1">
-                      <Coins size={11} /> Reward
-                    </p>
-                    <p className="text-lg font-orbitron text-amber-400 mt-1">
-                      {formatReward(sel.reward_min, sel.reward_max, sel.reward_currency)}
-                    </p>
-                  </div>
-                )}
-                {/* XP + Rep row */}
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="sci-panel p-2.5">
-                    <p className="text-xs text-slate-600 font-mono-sc uppercase flex items-center gap-1">
-                      <Star size={10} /> Base XP
-                    </p>
-                    <p className="text-sm font-mono-sc text-green-400 mt-0.5">
-                      {sel.base_xp != null ? sel.base_xp.toLocaleString('en-US') : '—'}
-                    </p>
-                  </div>
-                  <div className="sci-panel p-2.5">
-                    <p className="text-xs text-slate-600 font-mono-sc uppercase">Rep Reward</p>
-                    <p className="text-sm font-mono-sc text-green-400 mt-0.5">
-                      {sel.reputation_reward != null ? `+${sel.reputation_reward}` : '—'}
-                    </p>
-                  </div>
-                </div>
-                {/* Faction / Giver */}
-                {(sel.mission_giver || sel.faction) && (
-                  <div className="sci-panel p-2.5">
-                    {sel.faction && (
-                      <>
-                        <p className="text-xs text-slate-600 font-mono-sc uppercase">Faction</p>
-                        <p className="text-sm font-mono-sc text-purple-400">{sel.faction}</p>
-                      </>
-                    )}
-                    {sel.mission_giver && (
-                      <>
-                        <p className="text-xs text-slate-600 font-mono-sc uppercase mt-1">Mission Giver</p>
-                        <p className="text-sm font-mono-sc text-slate-300">{sel.mission_giver}</p>
-                      </>
-                    )}
-                  </div>
-                )}
-                {/* Location */}
-                {(sel.location_system || sel.location_name) && (
-                  <div className="sci-panel p-2.5">
-                    <p className="text-xs text-slate-600 font-mono-sc uppercase flex items-center gap-1">
-                      <MapPin size={10} /> Location
-                    </p>
-                    <p className="text-sm font-mono-sc text-slate-300 mt-0.5">
-                      {[sel.location_system, sel.location_planet, sel.location_name].filter(Boolean).join(' › ')}
-                    </p>
-                  </div>
-                )}
-                {/* Properties */}
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="sci-panel p-2.5 text-center">
-                    <p className="text-xs text-slate-600 font-mono-sc uppercase">
-                      <Skull size={10} className="inline -mt-0.5" /> Danger
-                    </p>
-                    <p className="text-sm font-mono-sc text-slate-300 mt-0.5">{sel.danger_level ?? '—'}</p>
-                  </div>
-                  <div className="sci-panel p-2.5 text-center">
-                    <p className="text-xs text-slate-600 font-mono-sc uppercase">Rank</p>
-                    <p className="text-sm font-mono-sc text-cyan-400 mt-0.5">
-                      {rankLabel(sel.required_reputation)}
-                    </p>
-                  </div>
-                  <div className="sci-panel p-2.5 text-center">
-                    <p className="text-xs text-slate-600 font-mono-sc uppercase">
-                      <Clock size={10} className="inline -mt-0.5" /> Duration
-                    </p>
-                    <p className="text-sm font-mono-sc text-slate-300 mt-0.5">
-                      {formatDuration(sel.completion_time_s) || '—'}
-                    </p>
-                  </div>
-                </div>
-                {/* Badges */}
-                <div className="flex flex-wrap gap-2">
-                  {sel.mission_type && (
-                    <GlowBadge color={TYPE_COLORS[sel.mission_type] ?? 'slate'}>{sel.display_mission_type ?? sel.mission_type}</GlowBadge>
-                  )}
-                  {sel.category && (
-                    <GlowBadge color={CATEGORY_COLORS[sel.category] ?? 'slate'}>{sel.display_category ?? sel.category}</GlowBadge>
-                  )}
-                  <GlowBadge color={sel.is_legal ? 'green' : 'red'}>
-                    {sel.is_legal ? (
-                      <>
-                        <Shield size={10} /> Legal
-                      </>
-                    ) : (
-                      <>
-                        <Scale size={10} /> Illegal
-                      </>
-                    )}
-                  </GlowBadge>
-                  <GlowBadge color={sel.can_be_shared ? 'cyan' : 'slate'}>
-                    <Share2 size={10} /> {sel.can_be_shared ? 'Sharable' : 'Solo'}
-                  </GlowBadge>
-                  <GlowBadge color={sel.is_unique ? 'amber' : 'slate'}>
-                    {sel.is_unique ? 'Unique' : 'Repeatable'}
-                  </GlowBadge>
-                  {!!sel.has_blueprint_reward && (
-                    <GlowBadge color="purple">
-                      <FlaskConical size={10} /> Blueprint
-                    </GlowBadge>
-                  )}
-                </div>
-                {/* Description */}
-                {sel.description && (
-                  <div className="sci-panel p-2.5">
-                    <p className="text-xs text-slate-600 font-mono-sc uppercase flex items-center gap-1">
-                      <BookOpen size={10} /> Description
-                    </p>
-                    <p className="text-sm text-slate-400 mt-1 leading-relaxed whitespace-pre-wrap">
-                      {sel.description}
-                    </p>
-                  </div>
-                )}
-                {/* Class name */}
-                <div className="sci-panel p-2.5 border-slate-800/50">
-                  <p className="text-xs text-slate-600 font-mono-sc uppercase">Class Name</p>
-                  <p className="text-[10px] font-mono-sc text-slate-500 mt-0.5 break-all">{sel.class_name}</p>
-                </div>
-              </div>
-            </ScifiPanel>
+            <DetailPanel m={sel} />
           ) : (
             <ScifiPanel title="Mission Detail" subtitle="Select a mission">
               <p className="text-xs text-slate-500">Click a mission in the list to view its details.</p>
@@ -663,3 +675,4 @@ export default function MissionsPage() {
     </div>
   );
 }
+

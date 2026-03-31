@@ -209,6 +209,16 @@ export class CraftingService {
     );
     recipe.modifiers = convertBigIntToNumber(modifiers).map(normalizeModifierRow);
 
+    const unlockMissions = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT m.uuid, m.class_name, m.title, m.mission_type, m.faction, m.mission_giver
+       FROM missions m
+       JOIN mission_blueprint_rewards mbr ON m.uuid = mbr.mission_uuid
+       WHERE mbr.blueprint_uuid = ?
+       ORDER BY m.title ASC`,
+      uuid,
+    );
+    recipe.unlock_missions = convertBigIntToNumber(unlockMissions);
+
     return recipe;
   }
 }

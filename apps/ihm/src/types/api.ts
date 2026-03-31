@@ -84,6 +84,7 @@ export interface Ship extends ShipListItem {
   sm_description: string | null;
   store_url: string | null;
   thumbnail_large: string | null;
+  ctm_url: string | null;
   game_data: Record<string, unknown> | null;
   armor_signal_ir: number | null;
   armor_signal_em: number | null;
@@ -489,6 +490,7 @@ export interface CraftingRecipe {
   gameEnv?: string;
   ingredients?: CraftingIngredient[];
   modifiers?: CraftingSlotModifier[];
+  unlock_missions?: any[];
 }
 
 export interface CraftingIngredient {
@@ -671,6 +673,12 @@ export interface Mission {
   isUnique?: boolean;
   has_blueprint_reward: boolean;
   hasBlueprintReward?: boolean;
+  blueprint_reward_uuid?: string | null;
+  blueprintRewardUuid?: string | null;
+  blueprint_name?: string | null;
+  blueprint_output?: string | null;
+  buy_in_amount?: number | null;
+  buyInAmount?: number | null;
 }
 
 export interface ChangelogEntry {

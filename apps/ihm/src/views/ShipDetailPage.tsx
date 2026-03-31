@@ -17,6 +17,7 @@ import { ShipCard } from '@/components/ship/ShipCard';
 import { ShipLoadout } from '@/components/ship/ShipLoadout';
 import { ShipStatsBanner } from '@/components/ship/ShipStatsBanner';
 import { CargoGrid } from '@/components/ship/CargoGrid';
+import { HoloViewer } from '@/components/ship/HoloViewer';
 import {
   fCredits, fMass,
 } from '@/utils/formatters';
@@ -289,6 +290,14 @@ export default function ShipDetailPage() {
               );
             })()}
           </ScifiPanel>
+
+          {/* Holoviewer */}
+          {ship.ctm_url && (
+            <HoloViewer
+              shipUuid={ship.uuid}
+              shipName={ship.name}
+            />
+          )}
 
           {/* Cargo */}
           {ship.cargo_capacity != null && ship.cargo_capacity > 0 && (

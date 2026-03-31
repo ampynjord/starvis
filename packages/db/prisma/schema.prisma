@@ -131,12 +131,13 @@ model Ship {
   insuranceExpediteCost Decimal? @map("insurance_expedite_cost") @db.Decimal(10, 2)
   gameData              Json?    @map("game_data")
   shipMatrixId          Int?     @map("ship_matrix_id")
+  ctmUrl                String?  @map("ctm_url") @db.VarChar(500)
   extractedAt           DateTime @default(now()) @map("extracted_at") @db.DateTime(0)
 
   // Relations
-  loadouts     ShipLoadout[]
-  modules      ShipModule[]
-  paints       ShipPaint[]
+  loadouts ShipLoadout[]
+  modules  ShipModule[]
+  paints   ShipPaint[]
 
   @@index([manufacturerCode], map: "idx_ship_manufacturer_code")
   @@index([shipMatrixId], map: "idx_ship_matrix_id")
@@ -338,22 +339,22 @@ model Item {
 }
 
 model Commodity {
-  uuid         String   @id @db.Char(36)
-  className    String   @map("class_name") @db.VarChar(255)
-  name         String   @db.VarChar(255)
+  uuid                  String   @id @db.Char(36)
+  className             String   @map("class_name") @db.VarChar(255)
+  name                  String   @db.VarChar(255)
   normalizedName        String?  @map("normalized_name") @db.VarChar(255)
   canonicalCommodityKey String?  @map("canonical_commodity_key") @db.VarChar(255)
   sourceType            String   @default("p4k_datamine") @map("source_type") @db.VarChar(50)
   sourceName            String   @default("starvis") @map("source_name") @db.VarChar(100)
   sourceReference       String?  @map("source_reference") @db.VarChar(255)
   confidenceScore       Int      @default(70) @map("confidence_score")
-  type         String   @db.VarChar(50)
-  subType      String?  @map("sub_type") @db.VarChar(100)
-  symbol       String?  @db.VarChar(20)
-  occupancyScu Decimal? @map("occupancy_scu") @db.Decimal(10, 4)
-  dataJson     Json?    @map("data_json")
-  createdAt    DateTime @default(now()) @map("created_at") @db.DateTime(0)
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+  type                  String   @db.VarChar(50)
+  subType               String?  @map("sub_type") @db.VarChar(100)
+  symbol                String?  @db.VarChar(20)
+  occupancyScu          Decimal? @map("occupancy_scu") @db.Decimal(10, 4)
+  dataJson              Json?    @map("data_json")
+  createdAt             DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt             DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
 
   prices CommodityPrice[]
 
@@ -362,26 +363,26 @@ model Commodity {
 }
 
 model Shop {
-  id         Int      @id @default(autoincrement())
-  name       String   @db.VarChar(255)
-  className  String   @map("class_name") @db.VarChar(255)
-  normalizedName String?  @map("normalized_name") @db.VarChar(255)
-  canonicalShopKey String? @map("canonical_shop_key") @db.VarChar(255)
-  canonicalLocationKey String? @map("canonical_location_key") @db.VarChar(255)
-  sourceType String   @default("p4k_datamine") @map("source_type") @db.VarChar(50)
-  sourceName String   @default("starvis") @map("source_name") @db.VarChar(100)
-  sourceReference String? @map("source_reference") @db.VarChar(255)
-  confidenceScore Int  @default(70) @map("confidence_score")
-  location   String?  @db.VarChar(255)
-  system     String?  @db.VarChar(50)
-  planetMoon String?  @map("planet_moon") @db.VarChar(100)
-  city       String?  @db.VarChar(100)
-  shopType   String?  @map("shop_type") @db.VarChar(50)
-  createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(0)
-  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
+  id                   Int      @id @default(autoincrement())
+  name                 String   @db.VarChar(255)
+  className            String   @map("class_name") @db.VarChar(255)
+  normalizedName       String?  @map("normalized_name") @db.VarChar(255)
+  canonicalShopKey     String?  @map("canonical_shop_key") @db.VarChar(255)
+  canonicalLocationKey String?  @map("canonical_location_key") @db.VarChar(255)
+  sourceType           String   @default("p4k_datamine") @map("source_type") @db.VarChar(50)
+  sourceName           String   @default("starvis") @map("source_name") @db.VarChar(100)
+  sourceReference      String?  @map("source_reference") @db.VarChar(255)
+  confidenceScore      Int      @default(70) @map("confidence_score")
+  location             String?  @db.VarChar(255)
+  system               String?  @db.VarChar(50)
+  planetMoon           String?  @map("planet_moon") @db.VarChar(100)
+  city                 String?  @db.VarChar(100)
+  shopType             String?  @map("shop_type") @db.VarChar(50)
+  createdAt            DateTime @default(now()) @map("created_at") @db.DateTime(0)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
 
   // Relations
-  inventory ShopInventory[]
+  inventory       ShopInventory[]
   commodityPrices CommodityPrice[]
 
   @@unique([className], map: "uk_shop_class_env")
@@ -464,17 +465,17 @@ model Changelog {
 }
 
 model MiningElement {
-  uuid                       String   @id @db.Char(36)
-  className                  String   @map("class_name") @db.VarChar(255)
-  name                       String? @db.VarChar(255)
-  commodityUuid              String? @map("commodity_uuid") @db.Char(36)
-  instability                Decimal? @db.Decimal(8, 2)
-  resistance                 Decimal? @db.Decimal(6, 4)
-  optimalWindowMidpoint      Decimal? @map("optimal_window_midpoint") @db.Decimal(6, 4)
-  optimalWindowMidpointRand  Decimal? @map("optimal_window_midpoint_rand") @db.Decimal(6, 4)
-  optimalWindowThinness      Decimal? @map("optimal_window_thinness") @db.Decimal(6, 4)
-  explosionMultiplier        Decimal? @map("explosion_multiplier") @db.Decimal(8, 2)
-  clusterFactor              Decimal? @map("cluster_factor") @db.Decimal(6, 4)
+  uuid                      String   @id @db.Char(36)
+  className                 String   @map("class_name") @db.VarChar(255)
+  name                      String?  @db.VarChar(255)
+  commodityUuid             String?  @map("commodity_uuid") @db.Char(36)
+  instability               Decimal? @db.Decimal(8, 2)
+  resistance                Decimal? @db.Decimal(6, 4)
+  optimalWindowMidpoint     Decimal? @map("optimal_window_midpoint") @db.Decimal(6, 4)
+  optimalWindowMidpointRand Decimal? @map("optimal_window_midpoint_rand") @db.Decimal(6, 4)
+  optimalWindowThinness     Decimal? @map("optimal_window_thinness") @db.Decimal(6, 4)
+  explosionMultiplier       Decimal? @map("explosion_multiplier") @db.Decimal(8, 2)
+  clusterFactor             Decimal? @map("cluster_factor") @db.Decimal(6, 4)
 
   compositionParts MiningCompositionPart[]
 
@@ -482,10 +483,10 @@ model MiningElement {
 }
 
 model MiningComposition {
-  uuid                  String  @id @db.Char(36)
-  className             String  @map("class_name") @db.VarChar(255)
-  depositName           String? @map("deposit_name") @db.VarChar(255)
-  minDistinctElements   Int?    @map("min_distinct_elements")
+  uuid                String  @id @db.Char(36)
+  className           String  @map("class_name") @db.VarChar(255)
+  depositName         String? @map("deposit_name") @db.VarChar(255)
+  minDistinctElements Int?    @map("min_distinct_elements")
 
   parts MiningCompositionPart[]
 
@@ -493,13 +494,13 @@ model MiningComposition {
 }
 
 model MiningCompositionPart {
-  id               Int     @id @default(autoincrement())
-  compositionUuid  String  @map("composition_uuid") @db.Char(36)
-  elementUuid      String  @map("element_uuid") @db.Char(36)
-  minPercentage    Decimal? @map("min_percentage") @db.Decimal(6, 2)
-  maxPercentage    Decimal? @map("max_percentage") @db.Decimal(6, 2)
-  probability      Decimal? @db.Decimal(6, 4)
-  curveExponent    Decimal? @map("curve_exponent") @db.Decimal(6, 4)
+  id              Int      @id @default(autoincrement())
+  compositionUuid String   @map("composition_uuid") @db.Char(36)
+  elementUuid     String   @map("element_uuid") @db.Char(36)
+  minPercentage   Decimal? @map("min_percentage") @db.Decimal(6, 2)
+  maxPercentage   Decimal? @map("max_percentage") @db.Decimal(6, 2)
+  probability     Decimal? @db.Decimal(6, 4)
+  curveExponent   Decimal? @map("curve_exponent") @db.Decimal(6, 4)
 
   composition MiningComposition @relation(fields: [compositionUuid], references: [uuid], onDelete: Cascade, map: "fk_mcp_composition")
   element     MiningElement     @relation(fields: [elementUuid], references: [uuid], onDelete: Cascade, map: "fk_mcp_element")
@@ -510,42 +511,46 @@ model MiningCompositionPart {
 }
 
 model Mission {
-  uuid               String   @id @db.Char(36)
-  className          String   @map("class_name") @db.VarChar(300)
-  title              String?  @db.VarChar(500)
-  description        String?  @db.Text
-  missionType        String?  @map("mission_type") @db.VarChar(100)
-  canBeShared        Boolean  @default(false) @map("can_be_shared")
-  onlyOwnerComplete  Boolean  @default(false) @map("only_owner_complete")
-  isLegal            Boolean  @default(true) @map("is_legal")
-  completionTimeSecs Int?     @map("completion_time_s")
-  notForRelease      Boolean  @default(false) @map("not_for_release")
-  workInProgress     Boolean  @default(false) @map("work_in_progress")
+  uuid               String  @id @db.Char(36)
+  className          String  @map("class_name") @db.VarChar(300)
+  title              String? @db.VarChar(500)
+  description        String? @db.Text
+  missionType        String? @map("mission_type") @db.VarChar(100)
+  canBeShared        Boolean @default(false) @map("can_be_shared")
+  onlyOwnerComplete  Boolean @default(false) @map("only_owner_complete")
+  isLegal            Boolean @default(true) @map("is_legal")
+  completionTimeSecs Int?    @map("completion_time_s")
+  notForRelease      Boolean @default(false) @map("not_for_release")
+  workInProgress     Boolean @default(false) @map("work_in_progress")
 
   // SCMDB parity: rewards
-  rewardMin          Int?     @map("reward_min")
-  rewardMax          Int?     @map("reward_max")
-  rewardCurrency     String?  @map("reward_currency") @db.VarChar(20)
+  rewardMin      Int?    @map("reward_min")
+  rewardMax      Int?    @map("reward_max")
+  rewardCurrency String? @map("reward_currency") @db.VarChar(20)
 
   // SCMDB parity: faction / giver
-  faction            String?  @db.VarChar(100)
-  missionGiver       String?  @map("mission_giver") @db.VarChar(200)
+  faction      String? @db.VarChar(100)
+  missionGiver String? @map("mission_giver") @db.VarChar(200)
 
   // SCMDB parity: location
-  locationSystem     String?  @map("location_system") @db.VarChar(100)
-  locationPlanet     String?  @map("location_planet") @db.VarChar(100)
-  locationName       String?  @map("location_name") @db.VarChar(200)
+  locationSystem String? @map("location_system") @db.VarChar(100)
+  locationPlanet String? @map("location_planet") @db.VarChar(100)
+  locationName   String? @map("location_name") @db.VarChar(200)
 
   // SCMDB parity: difficulty / reputation
-  dangerLevel        Int?     @map("danger_level") @db.UnsignedTinyInt
-  requiredReputation Int?     @map("required_reputation")
-  reputationReward   Int?     @map("reputation_reward")
+  dangerLevel        Int? @map("danger_level") @db.UnsignedTinyInt
+  requiredReputation Int? @map("required_reputation")
+  reputationReward   Int? @map("reputation_reward")
+  buyInAmount        Int? @map("buy_in_amount")
 
   // SCMDB parity: XP, category, availability, blueprint
-  baseXp             Int?     @map("base_xp")
-  category           String?  @db.VarChar(50)
-  isUnique           Boolean  @default(false) @map("is_unique")
-  hasBlueprintReward Boolean  @default(false) @map("has_blueprint_reward")
+  baseXp              Int?            @map("base_xp")
+  category            String?         @db.VarChar(50)
+  isUnique            Boolean         @default(false) @map("is_unique")
+  hasBlueprintReward  Boolean         @default(false) @map("has_blueprint_reward")
+  blueprintRewardUuid String?         @map("blueprint_reward_uuid") @db.Char(36)
+  blueprint           CraftingRecipe? @relation("MissionLegacyBlueprint", fields: [blueprintRewardUuid], references: [uuid])
+  blueprintRewards    MissionBlueprintReward[]
 
   @@index([missionType], map: "idx_mission_type")
   @@index([faction], map: "idx_mission_faction")
@@ -570,23 +575,38 @@ model CraftingRecipe {
   createdAt      DateTime @default(now()) @map("created_at") @db.DateTime(0)
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
 
-  ingredients CraftingIngredient[]
-  modifiers   CraftingSlotModifier[]
+  ingredients    CraftingIngredient[]
+  modifiers      CraftingSlotModifier[]
+  missions       Mission[]               @relation("MissionLegacyBlueprint")
+  missionRewards MissionBlueprintReward[]
 
   @@index([category], map: "idx_crafting_category")
   @@map("crafting_recipes")
 }
 
+model MissionBlueprintReward {
+  id            Int    @id @default(autoincrement())
+  missionUuid   String @map("mission_uuid") @db.Char(36)
+  blueprintUuid String @map("blueprint_uuid") @db.Char(36)
+
+  mission   Mission        @relation(fields: [missionUuid], references: [uuid], onDelete: Cascade)
+  blueprint CraftingRecipe @relation(fields: [blueprintUuid], references: [uuid], onDelete: Cascade)
+
+  @@unique([missionUuid, blueprintUuid])
+  @@index([blueprintUuid], map: "idx_mbr_blueprint_uuid")
+  @@map("mission_blueprint_rewards")
+}
+
 model CraftingIngredient {
-  id             Int      @id @default(autoincrement())
-  recipeUuid     String   @map("recipe_uuid") @db.Char(36)
-  itemName       String   @map("item_name") @db.VarChar(255)
-  itemUuid       String?  @map("item_uuid") @db.Char(36)
-  quantity       Int      @default(1)
-  isOptional     Boolean  @default(false) @map("is_optional")
-  scu            Decimal? @db.Decimal(10, 4)
-  minQuality     Int      @default(0) @map("min_quality")
-  slotName       String?  @map("slot_name") @db.VarChar(255)
+  id         Int      @id @default(autoincrement())
+  recipeUuid String   @map("recipe_uuid") @db.Char(36)
+  itemName   String   @map("item_name") @db.VarChar(255)
+  itemUuid   String?  @map("item_uuid") @db.Char(36)
+  quantity   Int      @default(1)
+  isOptional Boolean  @default(false) @map("is_optional")
+  scu        Decimal? @db.Decimal(10, 4)
+  minQuality Int      @default(0) @map("min_quality")
+  slotName   String?  @map("slot_name") @db.VarChar(255)
 
   recipe CraftingRecipe @relation(fields: [recipeUuid], references: [uuid], onDelete: Cascade, map: "fk_ingredient_recipe")
 
@@ -595,14 +615,14 @@ model CraftingIngredient {
 }
 
 model CraftingSlotModifier {
-  id             Int      @id @default(autoincrement())
-  recipeUuid     String   @map("recipe_uuid") @db.Char(36)
-  slotName       String   @map("slot_name") @db.VarChar(255)
-  propertyName   String   @map("property_name") @db.VarChar(255)
-  propertyUuid   String   @map("property_uuid") @db.Char(36)
-  unitFormat     String   @default("") @map("unit_format") @db.VarChar(100)
-  startQuality   Int      @default(0) @map("start_quality")
-  endQuality     Int      @default(1000) @map("end_quality")
+  id              Int     @id @default(autoincrement())
+  recipeUuid      String  @map("recipe_uuid") @db.Char(36)
+  slotName        String  @map("slot_name") @db.VarChar(255)
+  propertyName    String  @map("property_name") @db.VarChar(255)
+  propertyUuid    String  @map("property_uuid") @db.Char(36)
+  unitFormat      String  @default("") @map("unit_format") @db.VarChar(100)
+  startQuality    Int     @default(0) @map("start_quality")
+  endQuality      Int     @default(1000) @map("end_quality")
   modifierAtStart Decimal @map("modifier_at_start") @db.Decimal(10, 6)
   modifierAtEnd   Decimal @map("modifier_at_end") @db.Decimal(10, 6)
 
@@ -615,12 +635,12 @@ model CraftingSlotModifier {
 // ── Trade Prices ──────────────────────────────────────────────────────────────
 
 model CommodityPrice {
-  id              Int      @id @default(autoincrement())
-  commodityUuid   String   @map("commodity_uuid") @db.Char(36)
-  shopId          Int      @map("shop_id")
-  buyPrice        Decimal? @map("buy_price") @db.Decimal(12, 2)
-  sellPrice       Decimal? @map("sell_price") @db.Decimal(12, 2)
-  reportedAt      DateTime @default(now()) @map("reported_at") @db.DateTime(0)
+  id            Int      @id @default(autoincrement())
+  commodityUuid String   @map("commodity_uuid") @db.Char(36)
+  shopId        Int      @map("shop_id")
+  buyPrice      Decimal? @map("buy_price") @db.Decimal(12, 2)
+  sellPrice     Decimal? @map("sell_price") @db.Decimal(12, 2)
+  reportedAt    DateTime @default(now()) @map("reported_at") @db.DateTime(0)
 
   commodity Commodity @relation(fields: [commodityUuid], references: [uuid], onDelete: Cascade, map: "fk_price_commodity")
   shop      Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade, map: "fk_price_shop")

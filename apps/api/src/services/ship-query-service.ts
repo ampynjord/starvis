@@ -65,6 +65,8 @@ const SHIP_SELECT = [
   'sm.url as store_url',
   'sm.min_crew',
   'sm.max_crew',
+  // 3D model
+  's.ctm_url',
   // Meta
   's.vehicle_category',
   's.insurance_claim_time',
@@ -134,6 +136,8 @@ const CONCEPT_SELECT = [
   'sm2.url as store_url',
   'sm2.min_crew',
   'sm2.max_crew',
+  // 3D model
+  'NULL as ctm_url',
   // Meta
   'NULL as vehicle_category',
   'NULL as insurance_claim_time',

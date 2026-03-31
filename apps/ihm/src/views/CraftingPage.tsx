@@ -222,7 +222,7 @@ export default function CraftingPage() {
   const [tab, setTab] = useState<Tab>('blueprint');
   const [search, setSearch] = useState(searchParams?.get('search') ?? '');
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
-  const [selectedRecipeUuid, setSelectedRecipeUuid] = useState<string | null>(null);
+  const [selectedRecipeUuid, setSelectedRecipeUuid] = useState<string | null>(searchParams?.get('recipe') ?? null);
   const [selectedResource, setSelectedResource] = useState<string | null>(null);
   const [batchCount, setBatchCount] = useState(1);
   const [qualityMap, setQualityMap] = useState<Record<number, number>>({});
@@ -312,18 +312,28 @@ export default function CraftingPage() {
   /* ---- auto-expand first category ---- */
   useEffect(() => {
     if (categories?.length && !expandedGroup && !debouncedSearch && tab === 'blueprint') {
-      setExpandedGroup(categories[0].category);
+      if (selectedRecipeUuid && !selectedRecipe) return; // Wait for initial recipe load
+      if (selectedRecipe && selectedRecipeUuid === selectedRecipe.uuid) {
+        setExpandedGroup(selectedRecipe.category ?? categories[0].category);
+      } else {
+        setExpandedGroup(categories[0].category);
+      }
     }
-  }, [categories, expandedGroup, debouncedSearch, tab]);
+  }, [categories, expandedGroup, debouncedSearch, tab, selectedRecipeUuid, selectedRecipe]);
 
   /* ---- auto-select first recipe in group ---- */
   useEffect(() => {
     if (groupRecipes?.data?.length && !debouncedSearch && tab === 'blueprint') {
-      if (!selectedRecipeUuid || !groupRecipes.data.some((r) => r.uuid === selectedRecipeUuid)) {
+      if (!selectedRecipeUuid) {
         setSelectedRecipeUuid(groupRecipes.data[0].uuid);
+      } else if (!groupRecipes.data.some((r) => r.uuid === selectedRecipeUuid)) {
+        // Only overwrite if the user actively switched groups (meaning selectedRecipe category differs from expanded)
+        if (selectedRecipe && expandedGroup && selectedRecipe.category !== expandedGroup) {
+          setSelectedRecipeUuid(groupRecipes.data[0].uuid);
+        }
       }
     }
-  }, [groupRecipes?.data, selectedRecipeUuid, debouncedSearch, tab]);
+  }, [groupRecipes?.data, selectedRecipeUuid, debouncedSearch, tab, selectedRecipe, expandedGroup]);
 
   /* ---- auto-select first search result ---- */
   useEffect(() => {
@@ -641,13 +651,26 @@ export default function CraftingPage() {
             <div className="mt-8 sci-panel p-5">
               <div className="flex items-center gap-2 mb-4 justify-center">
                 <Trophy size={16} className="text-amber-500" />
-                <h2 className="font-orbitron text-xs font-bold text-slate-400 tracking-[0.2em] uppercase">Reward Missions</h2>
+                <h2 className="font-orbitron text-xs font-bold text-slate-400 tracking-[0.2em] uppercase">Rewarded by Missions</h2>
               </div>
-              <p className="text-xs text-slate-600 font-mono-sc text-center py-3">
-                Blueprint mission rewards are not yet available in Star Citizen 4.0 game data.
-                <br />
-                <span className="text-slate-700 text-[10px]">This section will populate automatically when CIG adds blueprint rewards to mission data.</span>
-              </p>
+              {(selectedRecipe.unlock_missions?.length ?? 0) > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {selectedRecipe.unlock_missions?.map((m: any) => (
+                    <div key={m.uuid} className="bg-slate-900/60 p-3 rounded-sm border border-slate-800/50 flex flex-col gap-1 hover:border-cyan-500/30 transition-colors cursor-pointer" onClick={() => window.open(`/missions?selected=${m.uuid}`, '_blank')}>
+                      <p className="text-sm font-mono-sc text-cyan-400 truncate">{m.title || m.class_name}</p>
+                      <div className="flex flex-wrap gap-2 text-[10px] uppercase font-mono-sc text-slate-500">
+                        {m.mission_type && <span>{m.mission_type}</span>}
+                        {m.faction && <span className="text-purple-400">{m.faction}</span>}
+                        {m.mission_giver && <span className="text-slate-400">{m.mission_giver}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-600 font-mono-sc text-center py-3">
+                  No known missions reward this blueprint directly.
+                </p>
+              )}
             </div>
 
             <div className="mt-6 pt-4 border-t border-slate-800/20">
