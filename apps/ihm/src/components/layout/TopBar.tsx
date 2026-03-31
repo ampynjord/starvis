@@ -194,7 +194,7 @@ export function TopBar() {
       {version && (
         <div className="hidden md:flex items-center gap-2 text-xs font-mono-sc text-slate-600">
           <div className="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse" />
-          <span>{version.game_version}</span>
+          <span>{version.game_version.split('.').slice(0, 2).join('.')}</span>
         </div>
       )}
     </header>
