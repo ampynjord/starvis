@@ -115,7 +115,8 @@ export class CraftingService {
       `SELECT r.uuid, r.class_name, r.name, r.category,
               COALESCE(oi.name, r.output_item_name) AS output_item_name,
               r.output_item_uuid, r.output_quantity,
-              r.crafting_time_s, r.station_type, r.skill_level
+              r.crafting_time_s, r.station_type, r.skill_level,
+              (SELECT COUNT(*) FROM missions m WHERE m.blueprint_reward_uuid = r.uuid) AS missions_count
        FROM crafting_recipes r
        LEFT JOIN items oi ON oi.uuid = r.output_item_uuid
        WHERE ${whereClause}
@@ -210,10 +211,10 @@ export class CraftingService {
     recipe.modifiers = convertBigIntToNumber(modifiers).map(normalizeModifierRow);
 
     const unlockMissions = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT m.uuid, m.class_name, m.title, m.mission_type, m.faction, m.mission_giver
+      `SELECT m.uuid, m.class_name, m.title, m.mission_type, m.faction, m.mission_giver,
+              m.reward_min, m.reward_max, m.reward_currency, m.is_legal
        FROM missions m
-       JOIN mission_blueprint_rewards mbr ON m.uuid = mbr.mission_uuid
-       WHERE mbr.blueprint_uuid = ?
+       WHERE m.blueprint_reward_uuid = ?
        ORDER BY m.title ASC`,
       uuid,
     );
