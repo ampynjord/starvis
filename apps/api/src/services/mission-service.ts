@@ -12,7 +12,8 @@ const MISSION_COLS = `m.uuid, m.class_name, m.title, m.description, m.mission_ty
   m.faction, m.mission_giver,
   m.location_system, m.location_planet, m.location_name,
   m.danger_level, m.required_reputation, m.reputation_reward,
-  m.base_xp, m.category, m.is_unique, m.has_blueprint_reward`;
+  m.base_xp, m.category, m.is_unique, m.has_blueprint_reward, m.blueprint_reward_uuid,
+  m.buy_in_amount, m.not_for_release, m.work_in_progress`;
 
 function normalizeMissionRow(row: Row): Row {
   return {
@@ -179,8 +180,11 @@ export class MissionService {
   async getMissionByUuid(uuid: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT ${MISSION_COLS}
+      `SELECT ${MISSION_COLS},
+              r.name as blueprint_name,
+              r.output_item_name as blueprint_output
        FROM missions m
+       LEFT JOIN crafting_recipes r ON m.blueprint_reward_uuid = r.uuid
        WHERE m.uuid = ?`,
       uuid,
     );

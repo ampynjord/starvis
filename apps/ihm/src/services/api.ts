@@ -89,6 +89,7 @@ function mapMission(item: Mission): Mission {
     displayCategory: item.display_category,
     isUnique: item.is_unique,
     hasBlueprintReward: item.has_blueprint_reward,
+    buyInAmount: item.buy_in_amount,
   };
 }
 
@@ -382,6 +383,7 @@ export const api = {
 
   // ─── Missions ──────────────────────────────────────────────────────
   missions: {
+    single: async (uuid: string, env?: string) => mapMission(await get<Mission>(`/missions/${uuid}`, { env })),
     types: (env?: string) => get<string[]>('/missions/types', { env }),
     factions: (env?: string) => get<string[]>('/missions/factions', { env }),
     systems: (env?: string) => get<string[]>('/missions/systems', { env }),

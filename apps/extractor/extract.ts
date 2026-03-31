@@ -62,6 +62,7 @@ const VALID_MODULES: ExtractionModule[] = [
   'crafting',
   'paints',
   'shops',
+  'ctm',
 ];
 
 // ── CLI ─────────────────────────────────────────────────────
@@ -113,7 +114,7 @@ function parseArgs(): { p4kPath: string; env: GameEnv; modules: Set<ExtractionMo
   }
   const modules = new Set(modParts as (ExtractionModule | 'all')[]);
 
-  // Resolve P4K path
+  // Resolve P4K path — not required when only P4K-free modules (e.g. ctm) are selected
   let p4kPath = opts.p4k || process.env.P4K_PATH || '';
   if (!opts.p4k) {
     const detected = autoDetectP4K(envVal);
@@ -124,13 +125,23 @@ function parseArgs(): { p4kPath: string; env: GameEnv; modules: Set<ExtractionMo
   }
 
   if (!p4kPath) {
-    console.error(
-      'Error: P4K path required. Use --p4k <path>, set P4K_PATH env var, or use --env live|ptu|eptu with RSI installed at default location.',
-    );
-    process.exit(1);
+    if (!isP4kFree(modules)) {
+      console.error(
+        'Error: P4K path required. Use --p4k <path>, set P4K_PATH env var, or use --env live|ptu|eptu with RSI installed at default location.',
+      );
+      process.exit(1);
+    }
+    // P4K-free modules (e.g. ctm) don't need the P4K file
   }
 
   return { p4kPath, env: envVal, modules, dryRun: !!opts.dryRun };
+}
+
+/** True when all requested modules are network/DB-only (no P4K access required) */
+function isP4kFree(modules: Set<ExtractionModule | 'all'>): boolean {
+  if (modules.has('all')) return false;
+  const P4K_FREE_MODULES = new Set<ExtractionModule>(['ctm']);
+  return [...modules].every((m) => P4K_FREE_MODULES.has(m as ExtractionModule));
 }
 
 // ── Main ────────────────────────────────────────────────────
@@ -141,23 +152,27 @@ async function main() {
 
   logger.info(`Mode: ${env.toUpperCase()} | Modules: ${onlyAll ? 'all' : [...modules].join(', ')}${dryRun ? ' | DRY RUN' : ''}`);
 
-  // Validate P4K file
-  if (!existsSync(p4kPath)) {
-    console.error(`Error: P4K file not found: ${p4kPath}`);
-    process.exit(1);
+  // Validate P4K file (only required for P4K-based modules)
+  if (!isP4kFree(selectedModules)) {
+    if (!existsSync(p4kPath)) {
+      console.error(`Error: P4K file not found: ${p4kPath}`);
+      process.exit(1);
+    }
+    logger.info(`P4K file: ${p4kPath}`);
   }
 
-  logger.info(`P4K file: ${p4kPath}`);
-
-  // Initialize DataForge
-  logger.info('Initializing DataForge…');
-  const dfService = new DataForgeService(p4kPath);
-  await dfService.init();
-  logger.info('✅ DataForge initialized');
+  // Initialize DataForge (skipped for P4K-free modules like ctm)
+  let dfService: DataForgeService | null = null;
+  if (!isP4kFree(selectedModules)) {
+    logger.info('Initializing DataForge…');
+    dfService = new DataForgeService(p4kPath);
+    await dfService.init();
+    logger.info('✅ DataForge initialized');
+  }
 
   if (dryRun) {
     logger.info('DRY RUN — skipping database write');
-    await dfService.close();
+    await dfService?.close();
     return;
   }
 
@@ -221,7 +236,7 @@ async function main() {
     logger.error(`Extraction failed: ${(e as Error).message}`);
     process.exit(1);
   } finally {
-    await dfService.close();
+    await dfService?.close();
     await pool.end();
   }
 }
