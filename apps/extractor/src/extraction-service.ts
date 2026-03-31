@@ -27,9 +27,10 @@ import { classifyPort, type DataForgeService, MANUFACTURER_CODES } from './dataf
 import { LocalizationService } from './localization-service.js';
 import logger from './logger.js';
 import { extractMiningCompositions, extractMiningElements } from './mining-extractor.js';
-import { extractMissions } from './mission-extractor.js';
+import { extractMissions, extractMissionBlueprintLinks, extractMissionFactionData, extractMissionMbeEnrichment } from './mission-extractor.js';
+import { scrapeShipCtmUrls, type ShipToScrape } from './ctm-scraper.js';
 
-export type ExtractionModule = 'ships' | 'components' | 'items' | 'commodities' | 'mining' | 'missions' | 'crafting' | 'paints' | 'shops';
+export type ExtractionModule = 'ships' | 'components' | 'items' | 'commodities' | 'mining' | 'missions' | 'crafting' | 'paints' | 'shops' | 'ctm';
 
 export type GameEnv = 'live' | 'ptu' | 'eptu' | 'custom';
 
@@ -69,9 +70,14 @@ export class ExtractionService {
 
   constructor(
     private pool: Pool,
-    private dfService: DataForgeService,
+    private dfService: DataForgeService | null,
   ) {
     this.locService = new LocalizationService();
+  }
+
+  /** Non-null accessor — only call from methods that run with P4K modules (not 'ctm'). */
+  private get df(): DataForgeService {
+    return this.dfService!;
   }
 
   // ── Batch INSERT helper ──
@@ -173,15 +179,15 @@ export class ExtractionService {
       errors: [],
     };
 
-    // 1. Load DataForge if needed
-    if (!this.dfService.isDataForgeLoaded()) {
+    // 1. Load DataForge if needed (skipped for ctm-only runs)
+    if (this.dfService && !this.df.isDataForgeLoaded()) {
       onProgress?.('Loading DataForge…');
-      const info = await this.dfService.loadDataForge(onProgress);
+      const info = await this.df.loadDataForge(onProgress);
       onProgress?.(`DataForge loaded: ${info.vehicleCount} vehicles, v${info.version}`);
     }
 
     // 1a. Load localization from P4K (global.ini)
-    const provider = this.dfService.getProvider();
+    const provider = this.dfService?.getProvider() ?? null;
     if (!this.locService.isLoaded && provider) {
       onProgress?.('Loading localization (global.ini)…');
       try {
@@ -195,7 +201,7 @@ export class ExtractionService {
 
     // Compute extraction hash from DataForge metadata
     const extractionHash = createHash('sha256')
-      .update(`${this.dfService.getVersion?.() || 'unknown'}-${Date.now()}`)
+      .update(`${this.dfService?.getVersion?.() || 'unknown'}-${Date.now()}`)
       .digest('hex');
     stats.extractionHash = extractionHash;
 
@@ -256,15 +262,21 @@ export class ExtractionService {
         await conn.execute('DELETE FROM mining_compositions');
         await conn.execute('DELETE FROM mining_elements');
       }
-      if (run('missions')) await conn.execute('DELETE FROM missions');
+      if (run('missions')) {
+        await conn.execute('DELETE FROM mission_blueprint_rewards');
+        await conn.execute('DELETE FROM missions');
+      }
       if (run('crafting')) {
         await conn.execute('DELETE FROM crafting_ingredients');
         await conn.execute('DELETE FROM crafting_recipes');
       }
 
       // 2. Collect & save manufacturers FIRST (before ships, due to FK constraint)
-      onProgress?.('Saving manufacturers…');
-      stats.manufacturers = await this.saveManufacturersFromData(conn);
+      // Skip for P4K-free modules (e.g. ctm) that don't need DataForge data
+      if (this.dfService) {
+        onProgress?.('Saving manufacturers…');
+        stats.manufacturers = await this.saveManufacturersFromData(conn);
+      }
 
       // 3. Extract & save components
       if (run('components')) {
@@ -320,6 +332,18 @@ export class ExtractionService {
         stats.craftingRecipes = await this.saveCraftingRecipes(conn, env, onProgress);
       }
 
+      // 5f. Link missions → blueprint rewards (ContractGenerator)
+      if (run('missions') || run('crafting')) {
+        onProgress?.('Linking missions → blueprint rewards (ContractGenerator)…');
+        await this.saveMissionBlueprintLinks(conn, onProgress);
+      }
+
+      // 5g. Scrape CTM (3D model) URLs from RSI website
+      if (run('ctm')) {
+        onProgress?.('Scraping 3D model URLs (CTM) from RSI…');
+        await this.saveShipCtmModels(conn, onProgress);
+      }
+
       // 6. Cross-reference with ship_matrix (only when ships were extracted)
       if (run('ships')) {
         onProgress?.('Cross-referencing with Ship Matrix…');
@@ -341,7 +365,7 @@ export class ExtractionService {
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             extractionHash,
-            this.dfService.getVersion?.() || null,
+            this.dfService?.getVersion?.() || null,
             env,
             stats.ships,
             stats.components,
@@ -415,7 +439,7 @@ export class ExtractionService {
   // ======================================================
 
   private async saveComponents(conn: PoolConnection, onProgress?: (msg: string) => void): Promise<number> {
-    const components = this.dfService.extractAllComponents();
+    const components = this.df.extractAllComponents();
     if (!components.length) return 0;
 
     if (this.locService.isLoaded) {
@@ -631,7 +655,7 @@ export class ExtractionService {
   // ======================================================
 
   private async saveShips(conn: PoolConnection, onProgress?: (msg: string) => void): Promise<{ ships: number; loadoutPorts: number }> {
-    const vehicles = this.dfService.getVehicleDefinitions();
+    const vehicles = this.df.getVehicleDefinitions();
     let savedShips = 0;
     let totalPorts = 0;
     let skippedNonPlayable = 0;
@@ -644,7 +668,7 @@ export class ExtractionService {
 
     for (const [, veh] of vehicles) {
       try {
-        const fullData = await this.dfService.extractFullShipData(veh.className);
+        const fullData = await this.df.extractFullShipData(veh.className);
         if (!fullData) continue;
 
         // === FILTER: only keep playable/flyable ships ===
@@ -818,7 +842,7 @@ export class ExtractionService {
         savedShips++;
 
         // Extract & save loadout
-        const loadout = this.dfService.extractVehicleLoadout(veh.className);
+        const loadout = this.df.extractVehicleLoadout(veh.className);
         if (loadout && loadout.length > 0) {
           await conn.execute('DELETE FROM ship_loadouts WHERE ship_uuid = ?', [fullData.ref]);
           totalPorts += await this.saveLoadout(conn, fullData.ref, loadout, componentUuidCache);
@@ -1027,7 +1051,7 @@ export class ExtractionService {
       await conn.execute('DELETE FROM ship_modules WHERE ship_uuid = ?', [fullData.ref]);
 
       for (const slotDef of config) {
-        const allModuleNames = this.dfService.findEntityClassNamesByPrefix(slotDef.modulePrefix);
+        const allModuleNames = this.df.findEntityClassNamesByPrefix(slotDef.modulePrefix);
         if (allModuleNames.length === 0) {
           logger.warn(`No modules found for prefix "${slotDef.modulePrefix}" on ${shipClassName}`);
           continue;
@@ -1047,7 +1071,7 @@ export class ExtractionService {
           // Extract the module's own internal ports (racks, weapons, missiles) for tier-correct display
           let loadoutJson: string | null = null;
           try {
-            const modulePorts = this.dfService.extractVehicleLoadout(moduleName);
+            const modulePorts = this.df.extractVehicleLoadout(moduleName);
             if (modulePorts && modulePorts.length > 0) {
               loadoutJson = JSON.stringify(modulePorts);
             }
@@ -1101,7 +1125,7 @@ export class ExtractionService {
       /cargo_module/i,
       /modular_bed/i,
     ];
-    const loadout = this.dfService.extractVehicleLoadout(shipClassName);
+    const loadout = this.df.extractVehicleLoadout(shipClassName);
     if (!loadout) return;
 
     const shipShort = shipClassName.replace(/^[A-Z]{2,5}_/, '').replace(/_/g, ' ');
@@ -1150,7 +1174,7 @@ export class ExtractionService {
   // ======================================================
 
   private async savePaints(conn: PoolConnection, onProgress?: (msg: string) => void): Promise<void> {
-    const paints = this.dfService.extractPaints();
+    const paints = this.df.extractPaints();
     if (!paints.length) {
       onProgress?.('No paints found');
       return;
@@ -1263,13 +1287,13 @@ export class ExtractionService {
   private async saveManufacturersFromData(conn: PoolConnection): Promise<number> {
     const codes = new Set<string>();
 
-    const vehicles = this.dfService.getVehicleDefinitions();
+    const vehicles = this.df.getVehicleDefinitions();
     for (const [, veh] of vehicles) {
       const m = veh.className.match(/^([A-Z]{3,5})_/);
       if (m) codes.add(m[1]);
     }
 
-    const components = this.dfService.extractAllComponents();
+    const components = this.df.extractAllComponents();
     for (const c of components) {
       if (c.manufacturerCode) codes.add(c.manufacturerCode);
     }
@@ -1299,7 +1323,7 @@ export class ExtractionService {
   // ======================================================
 
   private async saveItems(conn: PoolConnection, onProgress?: (msg: string) => void): Promise<{ items: number; commodities: number }> {
-    const { items, commodities } = this.dfService.extractItems();
+    const { items, commodities } = this.df.extractItems();
     let savedItems = 0;
     let savedCommodities = 0;
 
@@ -1498,7 +1522,7 @@ export class ExtractionService {
   // ======================================================
 
   private async saveShopsData(conn: PoolConnection, onProgress?: (msg: string) => void): Promise<{ shops: number; inventory: number }> {
-    const { shops, inventory } = this.dfService.extractShops();
+    const { shops, inventory } = this.df.extractShops();
     let savedShops = 0;
     let savedInventory = 0;
 
@@ -1749,11 +1773,11 @@ export class ExtractionService {
   ): Promise<{ elements: number; compositions: number }> {
     const locAdapter = this.locService.isLoaded ? { resolve: (k: string) => this.locService.resolveKey(k) ?? null } : undefined;
 
-    const allElements = extractMiningElements(this.dfService, locAdapter);
+    const allElements = extractMiningElements(this.df, locAdapter);
     // Filter out test/template entries
     const elements = allElements.filter((e) => !e.className.toLowerCase().includes('test') && !e.name?.toLowerCase().includes('template'));
 
-    const allCompositions = extractMiningCompositions(this.dfService, elements, locAdapter);
+    const allCompositions = extractMiningCompositions(this.df, elements, locAdapter);
     // Filter out test/template compositions
     const compositions = allCompositions.filter(
       (c) => !c.className.toLowerCase().includes('test') && !c.depositName?.toLowerCase().includes('test'),
@@ -1847,7 +1871,7 @@ export class ExtractionService {
         }
       : undefined;
 
-    const missions = extractMissions(this.dfService, locAdapter);
+    const missions = extractMissions(this.df, locAdapter);
     if (!missions.length) {
       onProgress?.('Missions: no ContractTemplate records found');
       return 0;
@@ -1884,6 +1908,8 @@ export class ExtractionService {
       m.category,
       m.isUnique ? 1 : 0,
       m.hasBlueprintReward ? 1 : 0,
+      m.blueprintRewardUuid,
+      m.buyInAmount,
     ]);
 
     const saved = await ExtractionService.batchUpsert(
@@ -1896,7 +1922,8 @@ export class ExtractionService {
           faction, mission_giver,
           location_system, location_planet, location_name,
           danger_level, required_reputation, reputation_reward,
-          base_xp, category, is_unique, has_blueprint_reward)
+          base_xp, category, is_unique, has_blueprint_reward, blueprint_reward_uuid,
+          buy_in_amount)
        VALUES`,
       `ON DUPLICATE KEY UPDATE
          class_name=new.class_name, title=new.title, description=new.description,
@@ -1911,13 +1938,148 @@ export class ExtractionService {
          danger_level=new.danger_level, required_reputation=new.required_reputation,
          reputation_reward=new.reputation_reward,
          base_xp=new.base_xp, category=new.category,
-         is_unique=new.is_unique, has_blueprint_reward=new.has_blueprint_reward`,
-      26,
+         is_unique=new.is_unique, has_blueprint_reward=new.has_blueprint_reward,
+         blueprint_reward_uuid=new.blueprint_reward_uuid,
+         buy_in_amount=new.buy_in_amount`,
+      28,
       rows,
     );
 
     onProgress?.(`Missions: ${saved} records saved [${env}]`);
+
+    // Enrich faction/missionGiver from ContractGenerator
+    if (locAdapter) {
+      onProgress?.('Missions: enriching faction/giver from ContractGenerator…');
+      const factionData = extractMissionFactionData(this.df, locAdapter);
+      if (factionData.size > 0) {
+        let enriched = 0;
+        for (const [uuid, d] of factionData.entries()) {
+          if (!d.faction) continue;
+          await conn.execute(
+            'UPDATE missions SET faction=?, mission_giver=? WHERE uuid=?',
+            [d.faction, d.missionGiver, uuid],
+          );
+          enriched++;
+        }
+        if (enriched > 0) {
+          onProgress?.(`Missions: faction enriched for ${enriched} missions`);
+        }
+      }
+    }
+
+    // Enrich rewards/difficulty/buy-in/reputation from MissionBrokerEntry matching
+    onProgress?.('Missions: enriching rewards/difficulty/buy-in/reputation from MissionBrokerEntry…');
+    const mbeData = extractMissionMbeEnrichment(this.df, locAdapter);
+    if (mbeData.size > 0) {
+      let mbeEnriched = 0;
+      for (const [uuid, d] of mbeData.entries()) {
+        await conn.execute(
+          `UPDATE missions SET
+             reward_min        = COALESCE(reward_min, ?),
+             reward_max        = COALESCE(reward_max, ?),
+             reward_currency   = COALESCE(reward_currency, 'aUEC'),
+             danger_level      = COALESCE(danger_level, ?),
+             buy_in_amount     = COALESCE(buy_in_amount, ?),
+             reputation_reward = COALESCE(reputation_reward, ?),
+             mission_giver     = COALESCE(mission_giver, ?)
+           WHERE uuid = ?`,
+          [d.rewardMin, d.rewardMax, d.dangerLevel, d.buyInAmount, d.reputationReward, d.missionGiver, uuid],
+        );
+        mbeEnriched++;
+      }
+      onProgress?.(`Missions: MBE enrichment applied to ${mbeEnriched} missions`);
+    }
+
+    // Type-level fallback: fill missing reward_min/max with median of enriched missions of same type,
+    // and missing danger_level with mode of enriched missions of same type.
+    // Only applies to mission types with at least 3 enriched missions to ensure reliable estimates.
+    onProgress?.('Missions: applying type-level median fallback for missing rewards/danger…');
+    {
+      const [enrichedRows]: any = await conn.execute(
+        'SELECT mission_type, reward_min, reward_max, danger_level FROM missions WHERE reward_min IS NOT NULL OR danger_level IS NOT NULL',
+      );
+      const byType = new Map<string, { rewardMins: number[]; rewardMaxs: number[]; dangers: number[] }>();
+      for (const row of enrichedRows as { mission_type: string; reward_min: number | null; reward_max: number | null; danger_level: number | null }[]) {
+        if (!row.mission_type) continue;
+        if (!byType.has(row.mission_type)) byType.set(row.mission_type, { rewardMins: [], rewardMaxs: [], dangers: [] });
+        const entry = byType.get(row.mission_type)!;
+        if (row.reward_min != null) entry.rewardMins.push(row.reward_min);
+        if (row.reward_max != null) entry.rewardMaxs.push(row.reward_max);
+        if (row.danger_level != null) entry.dangers.push(row.danger_level);
+      }
+
+      const median = (arr: number[]): number => {
+        const s = [...arr].sort((a, b) => a - b);
+        return s[Math.floor(s.length / 2)];
+      };
+      const mode = (arr: number[]): number => {
+        const freq = new Map<number, number>();
+        for (const v of arr) freq.set(v, (freq.get(v) ?? 0) + 1);
+        return [...freq.entries()].sort((a, b) => b[1] - a[1])[0][0];
+      };
+
+      let typeFallbackCount = 0;
+      for (const [missionType, { rewardMins, rewardMaxs, dangers }] of byType.entries()) {
+        if (rewardMins.length >= 3) {
+          const medMin = median(rewardMins);
+          const medMax = rewardMaxs.length >= 3 ? median(rewardMaxs) : medMin;
+          const [r] = await conn.execute(
+            `UPDATE missions SET reward_min=?, reward_max=?, reward_currency=COALESCE(reward_currency,'aUEC')
+               WHERE mission_type=? AND reward_min IS NULL`,
+            [medMin, medMax, missionType],
+          ) as any[];
+          typeFallbackCount += r.affectedRows ?? 0;
+        }
+        if (dangers.length >= 3) {
+          const modeVal = mode(dangers);
+          await conn.execute(
+            'UPDATE missions SET danger_level=? WHERE mission_type=? AND danger_level IS NULL',
+            [modeVal, missionType],
+          );
+        }
+      }
+      if (typeFallbackCount > 0) {
+        onProgress?.(`Missions: type-level fallback applied to ${typeFallbackCount} missions without reward`);
+      }
+    }
+
+    // Ensure all missions have reward_currency set (aUEC is universal in SC)
+    await conn.execute("UPDATE missions SET reward_currency='aUEC' WHERE reward_currency IS NULL");
+
     return saved;
+  }
+
+  private async saveMissionBlueprintLinks(conn: PoolConnection, onProgress?: (msg: string) => void): Promise<void> {
+    const links = extractMissionBlueprintLinks(this.df);
+    if (!links.length) {
+      onProgress?.('Mission blueprint links: none found');
+      return;
+    }
+
+    // Fetch UUIDs that actually exist in DB to avoid FK violations
+    const [missionRows]: any = await conn.execute('SELECT uuid FROM missions');
+    const [blueprintRows]: any = await conn.execute('SELECT uuid FROM crafting_recipes');
+    const missionSet = new Set((missionRows as { uuid: string }[]).map((r) => r.uuid));
+    const blueprintSet = new Set((blueprintRows as { uuid: string }[]).map((r) => r.uuid));
+
+    const validRows = links
+      .filter((l) => missionSet.has(l.missionUuid) && blueprintSet.has(l.blueprintUuid))
+      .map((l) => [l.missionUuid, l.blueprintUuid]);
+
+    if (!validRows.length) {
+      onProgress?.('Mission blueprint links: none matched existing missions/blueprints');
+      return;
+    }
+
+    await ExtractionService.batchUpsert(
+      conn,
+      `INSERT INTO mission_blueprint_rewards (mission_uuid, blueprint_uuid) VALUES`,
+      `ON DUPLICATE KEY UPDATE mission_uuid=VALUES(mission_uuid)`,
+      2,
+      validRows,
+    );
+
+    onProgress?.(`Mission blueprint links: ${validRows.length} pairs saved (${links.length - validRows.length} skipped)`);
   }
 
   private async saveCraftingRecipes(conn: PoolConnection, env: GameEnv, onProgress?: (msg: string) => void): Promise<number> {
@@ -1928,7 +2090,7 @@ export class ExtractionService {
         }
       : undefined;
 
-    const recipes = extractCraftingRecipes(this.dfService, locAdapter);
+    const recipes = extractCraftingRecipes(this.df, locAdapter);
     if (!recipes.length) {
       onProgress?.('Crafting: no recipe records found in this build');
       return 0;
@@ -2034,5 +2196,51 @@ export class ExtractionService {
 
     onProgress?.(`Crafting: ${savedRecipes} recipes, ${savedIngredients} ingredients, ${savedModifiers} modifiers saved [${env}]`);
     return savedRecipes;
+  }
+
+  // ======================================================
+  //  CTM SCRAPER → ships.ctm_url
+  // ======================================================
+
+  /**
+   * Scrape 3D model (.ctm) URLs from the RSI website and persist them to ships.ctm_url.
+   *
+   * Only processes ships that have a ship_matrix URL (RSI page known).
+   * Skip nothing in the DB: previously scraped URLs are kept unless overwritten.
+   */
+  private async saveShipCtmModels(conn: PoolConnection, onProgress?: (msg: string) => void): Promise<void> {
+    // Fetch ships that have a known RSI store page
+    const [rows] = await conn.execute<any[]>(
+      `SELECT s.class_name, s.name, sm.url as rsi_url
+       FROM ships s
+       INNER JOIN starvis.ship_matrix sm ON s.ship_matrix_id = sm.id
+       WHERE s.vehicle_category = 'ship'
+         AND sm.url IS NOT NULL
+       ORDER BY s.name`,
+    );
+
+    if (!rows.length) {
+      onProgress?.('CTM: no ships with RSI URL found, skipping');
+      return;
+    }
+
+    const ships: ShipToScrape[] = rows.map((r: any) => ({
+      className: r.class_name as string,
+      name: r.name as string,
+      rsiUrl: r.rsi_url as string,
+    }));
+
+    onProgress?.(`CTM: scraping ${ships.length} ships…`);
+    const ctmMap = await scrapeShipCtmUrls(ships, onProgress);
+    onProgress?.(`CTM: found ${ctmMap.size}/${ships.length} CTM URLs`);
+
+    if (!ctmMap.size) return;
+
+    let updated = 0;
+    for (const [className, ctmUrl] of ctmMap) {
+      await conn.execute('UPDATE ships SET ctm_url = ? WHERE class_name = ?', [ctmUrl, className]);
+      updated++;
+    }
+    onProgress?.(`CTM: ${updated} ships updated with CTM URL`);
   }
 }

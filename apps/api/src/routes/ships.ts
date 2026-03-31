@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { request as httpsRequest } from 'node:https';
 import type { Router } from 'express';
 import { SearchQuery, ShipQuery } from '../schemas.js';
 import { asyncHandler, makeGameDataGuard, makeShipResolver, sendCsvOrJson, sendWithETag } from './helpers.js';
@@ -316,6 +318,94 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
           comparison: deltas,
           full: { ship1, ship2 },
         },
+      });
+    }),
+  );
+
+  // ── 3D model routes ─────────────────────────────────────────────────────────
+
+  /**
+   * GET /api/v1/ships/:uuid/model
+   * Retourne les métadonnées du modèle 3D (url, format, taille estimée).
+   */
+  router.get(
+    '/api/v1/ships/:uuid/model',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = String(req.query.env ?? 'live');
+      const uuid = await resolveShipUuid(req.params.uuid, env);
+      if (!uuid) return void res.status(404).json({ success: false, error: 'Ship not found' });
+
+      const ship = await resolveShip(req.params.uuid, env);
+      if (!ship) return void res.status(404).json({ success: false, error: 'Ship not found' });
+
+      const ctmUrl = ship.ctm_url as string | null;
+      if (!ctmUrl) return void res.status(404).json({ success: false, error: 'No 3D model available for this ship' });
+
+      sendWithETag(req, res, {
+        success: true,
+        data: {
+          uuid,
+          name: ship.name,
+          format: 'ctm',
+          url: ctmUrl,
+          proxy_url: `/api/v1/ships/${req.params.uuid}/model/file`,
+        },
+      });
+    }),
+  );
+
+  /**
+   * GET /api/v1/ships/:uuid/model/file
+   * Proxy du fichier .ctm binaire depuis RSI — l'IHM peut l'appeler sans
+   * dépendre du CORS de robertsspaceindustries.com.
+   * Headers mis en cache 24h (les fichiers CTM ne changent pas souvent).
+   */
+  router.get(
+    '/api/v1/ships/:uuid/model/file',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = String(req.query.env ?? 'live');
+      const uuid = await resolveShipUuid(req.params.uuid, env);
+      if (!uuid) return void res.status(404).json({ success: false, error: 'Ship not found' });
+
+      const ship = await resolveShip(req.params.uuid, env);
+      if (!ship) return void res.status(404).json({ success: false, error: 'Ship not found' });
+
+      const ctmUrl = ship.ctm_url as string | null;
+      if (!ctmUrl) return void res.status(404).json({ success: false, error: 'No 3D model available for this ship' });
+
+      const url = new URL(ctmUrl);
+
+      // ETag basé sur l'URL du fichier (stable tant que RSI ne change pas le fichier)
+      const etag = `"${createHash('md5').update(ctmUrl).digest('hex').slice(0, 16)}"`;
+      if (req.headers['if-none-match'] === etag) {
+        res.status(304).end();
+        return;
+      }
+
+      await new Promise<void>((resolve, reject) => {
+        const proxyReq = httpsRequest(
+          { hostname: url.hostname, path: url.pathname, method: 'GET', headers: { 'User-Agent': 'starvis/1.0' } },
+          (upstream) => {
+            if (upstream.statusCode !== 200) {
+              res.status(upstream.statusCode ?? 502).json({ success: false, error: 'Upstream error' });
+              upstream.resume();
+              resolve();
+              return;
+            }
+            res.setHeader('Content-Type', 'application/octet-stream');
+            res.setHeader('Content-Disposition', `attachment; filename="${ship.class_name}.ctm"`);
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+            res.setHeader('ETag', etag);
+            if (upstream.headers['content-length']) res.setHeader('Content-Length', upstream.headers['content-length']);
+            upstream.pipe(res);
+            upstream.on('end', resolve);
+            upstream.on('error', reject);
+          },
+        );
+        proxyReq.on('error', reject);
+        proxyReq.end();
       });
     }),
   );

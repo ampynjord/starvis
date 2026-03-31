@@ -242,6 +242,88 @@
         }
       }
     },
+    "/api/v1/ships/{uuid}/model": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get 3D model metadata for a ship",
+        "operationId": "getShipModel",
+        "description": "Returns the 3D model URL, proxy URL and format for a ship that has a CTM model available. Only ships with an extracted `ctm_url` will return a result.",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Ship UUID or class_name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "3D model metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "url": { "type": "string", "description": "Original CTM file URL (RSI CDN)" },
+                        "proxy_url": { "type": "string", "description": "Proxied URL via this API (cached 24 h)" },
+                        "format": { "type": "string", "enum": ["ctm"], "description": "3D file format" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Ship not found or no 3D model available" }
+        }
+      }
+    },
+    "/api/v1/ships/{uuid}/model/file": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Download 3D model file for a ship",
+        "operationId": "getShipModelFile",
+        "description": "Proxies and streams the binary CTM model file from the RSI CDN. Responses are cached for 24 hours. Supports conditional requests via ETag.",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Ship UUID or class_name"
+          },
+          {
+            "name": "If-None-Match",
+            "in": "header",
+            "schema": { "type": "string" },
+            "description": "ETag for conditional GET (returns 304 if unchanged)"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Binary CTM file",
+            "headers": {
+              "Content-Type": { "schema": { "type": "string" }, "description": "application/octet-stream" },
+              "Cache-Control": { "schema": { "type": "string" }, "description": "public, max-age=86400" },
+              "ETag": { "schema": { "type": "string" }, "description": "MD5 hash of the CTM URL" }
+            },
+            "content": {
+              "application/octet-stream": {
+                "schema": { "type": "string", "format": "binary" }
+              }
+            }
+          },
+          "304": { "description": "Not Modified (ETag match)" },
+          "404": { "description": "Ship not found or no 3D model available" },
+          "502": { "description": "Failed to fetch model from upstream CDN" }
+        }
+      }
+    },
     "/api/v1/components": {
       "get": {
         "tags": ["Components"],

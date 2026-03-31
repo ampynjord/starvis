@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 
 export type GameEnv = 'live' | 'ptu';
 
@@ -9,12 +9,15 @@ interface EnvContextType {
 
 const EnvContext = createContext<EnvContextType>({ env: 'live', setEnv: () => {} });
 
-export function EnvProvider({ children }: { children: ReactNode }) {
-  const [env, setEnvState] = useState<GameEnv>(() => {
-    if (typeof window === 'undefined') return 'live';
+export function EnvProvider({ children }: { children: ReactNode }) {  
+  const [env, setEnvState] = useState<GameEnv>('live');
+
+  useEffect(() => {
     const stored = localStorage.getItem('starvis-env');
-    return stored === 'ptu' ? 'ptu' : 'live';
-  });
+    if (stored === 'ptu' || stored === 'live') {
+      setEnvState(stored);
+    }
+  }, []);
 
   const setEnv = (e: GameEnv) => {
     setEnvState(e);
