@@ -1,8 +1,10 @@
 'use client';
 
-import { Suspense } from 'react';
-import CraftingPage from '@/views/CraftingPage';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function Page() {
-  return <Suspense><CraftingPage /></Suspense>;
+  const router = useRouter();
+  useEffect(() => { router.replace('/blueprints'); }, [router]);
+  return null;
 }

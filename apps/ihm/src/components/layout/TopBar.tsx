@@ -165,12 +165,12 @@ export function TopBar() {
               {results.recipes && results.recipes.length > 0 && (
                 <>
                   <div className="px-3 py-1.5 text-xs font-mono-sc text-cyan-700 border-t border-b border-border/50">
-                    CRAFTING
+                    BLUEPRINTS
                   </div>
                   {results.recipes.map(r => (
                     <button
                       key={r.uuid}
-                      onMouseDown={() => { setQuery(''); setOpen(false); router.push(`/crafting?search=${encodeURIComponent(r.name)}`); }}
+                      onMouseDown={() => { setQuery(''); setOpen(false); router.push(`/blueprints?search=${encodeURIComponent(r.name)}`); }}
                       className="w-full flex items-center justify-between px-3 py-2 hover:bg-cyan-950/40 text-left transition-colors"
                     >
                       <span className="text-sm text-slate-300">{r.name}</span>

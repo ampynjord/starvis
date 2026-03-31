@@ -9,17 +9,20 @@ import {
   BookOpen,
   Calendar,
   Clock,
+  ClipboardList,
   Coins,
   Crosshair,
   Eye,
   FlaskConical,
   Gauge,
+  Link as LinkIcon,
   MapPin,
   Package,
   Radio,
   Scale,
   Search,
   Share2,
+  Shield,
   Skull,
   Truck,
   User,
@@ -28,6 +31,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
+import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { Mission } from '@/types/api';
@@ -105,12 +109,13 @@ function getTypeMeta(type: string | null): TypeMeta {
 function DangerPips({ level }: { level: number | null }) {
   if (level == null) return null;
   const MAX = 5;
+  const colors = ['bg-yellow-500', 'bg-amber-500', 'bg-orange-500', 'bg-red-500', 'bg-red-600'];
   return (
     <div className="flex items-center gap-0.5">
       {Array.from({ length: MAX }, (_, i) => (
         <span
           key={i}
-          className={`w-1.5 h-1.5 rounded-full ${i < level ? 'bg-red-500' : 'bg-slate-700'}`}
+          className={`w-1.5 h-1.5 rounded-full transition-colors ${i < (level ?? 0) ? colors[Math.min(i, colors.length - 1)] : 'bg-slate-700'}`}
         />
       ))}
     </div>
@@ -217,6 +222,15 @@ function ToggleGroup({
 
 // ── MissionCard ───────────────────────────────────────────────────────────────
 
+const TYPE_BORDER: Record<string, string> = {
+  cyan: 'border-l-cyan-600',
+  amber: 'border-l-amber-500',
+  green: 'border-l-green-500',
+  red: 'border-l-red-500',
+  purple: 'border-l-purple-500',
+  slate: 'border-l-slate-600',
+};
+
 function MissionCard({
   m,
   isSelected,
@@ -224,61 +238,71 @@ function MissionCard({
 }: { m: Mission; isSelected: boolean; onClick: () => void }) {
   const reward = formatReward(m.reward_min, m.reward_max, m.reward_currency);
   const meta = getTypeMeta(m.mission_type);
+  const borderColor = TYPE_BORDER[meta.color] ?? 'border-l-slate-600';
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`sci-panel w-full text-left px-4 py-3 transition-colors ${isSelected ? 'border-cyan-600 bg-cyan-950/10' : 'hover:border-slate-700'}`}
+      className={[
+        'group w-full text-left px-4 py-3 rounded-sm border border-l-2 transition-all duration-150',
+        borderColor,
+        isSelected
+          ? 'bg-cyan-950/20 border-t-cyan-900/60 border-r-cyan-900/60 border-b-cyan-900/60 shadow-[inset_0_0_20px_rgba(6,182,212,0.04)]'
+          : 'bg-panel/60 border-t-border border-r-border border-b-border hover:border-t-slate-700 hover:border-r-slate-700 hover:border-b-slate-700 hover:bg-white/[0.02]',
+      ].join(' ')}
     >
       <div className="flex items-start gap-3">
-        {/* Type icon pill */}
-        <div className={`shrink-0 mt-0.5 flex items-center justify-center w-7 h-7 rounded sci-panel border-${meta.color}-900/50 text-${meta.color}-500`}>
+        {/* Type icon */}
+        <div className={`shrink-0 mt-0.5 flex items-center justify-center w-6 h-6 rounded-sm bg-${meta.color}-950/60 border border-${meta.color}-900/60 text-${meta.color}-400`}>
           {meta.icon}
         </div>
 
         {/* Main content */}
         <div className="flex-1 min-w-0">
-          {/* Row 1: giver / faction + title */}
-          <div className="flex items-baseline gap-1.5 flex-wrap">
-            {(m.mission_giver || m.faction) && (
-              <span className="text-[10px] font-mono-sc text-purple-400 uppercase tracking-wider shrink-0">
-                {m.mission_giver ?? m.faction}
+          {/* Giver / faction */}
+          {(m.mission_giver || m.faction) && (
+            <p className="text-[10px] font-mono-sc text-purple-400/80 uppercase tracking-widest truncate leading-tight mb-0.5">
+              {m.mission_giver ?? m.faction}
+            </p>
+          )}
+          {/* Title */}
+          <p className={`font-rajdhani font-semibold text-sm leading-tight truncate ${isSelected ? 'text-cyan-100' : 'text-slate-200 group-hover:text-slate-100'}`}>
+            {m.title ?? m.class_name}
+          </p>
+
+          {/* Tags */}
+          <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+            <span className={`inline-flex items-center gap-0.5 text-[10px] font-mono-sc px-1.5 py-0.5 rounded-sm border bg-${meta.color}-950/40 border-${meta.color}-900/60 text-${meta.color}-400`}>
+              {meta.icon} {meta.label}
+            </span>
+            {!m.is_legal && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-mono-sc px-1.5 py-0.5 rounded-sm border bg-red-950/40 border-red-900/60 text-red-400">
+                <Skull size={8} /> Illegal
               </span>
             )}
-            <span className="font-orbitron text-sm text-slate-200 truncate leading-tight">
-              {m.title ?? m.class_name}
-            </span>
-          </div>
-
-          {/* Row 2: meta tags */}
-          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-            <GlowBadge color={meta.color} size="xs">
-              {meta.icon} {meta.label}
-            </GlowBadge>
-            {!m.is_legal && (
-              <GlowBadge color="red" size="xs">Illegal</GlowBadge>
-            )}
             {!!m.can_be_shared && (
-              <GlowBadge color="cyan" size="xs"><Share2 size={9} /> Group</GlowBadge>
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-mono-sc px-1.5 py-0.5 rounded-sm border bg-cyan-950/40 border-cyan-900/60 text-cyan-400">
+                <Share2 size={8} /> Group
+              </span>
             )}
             {!!m.has_blueprint_reward && (
-              <GlowBadge color="purple" size="xs"><FlaskConical size={9} /> Blueprint</GlowBadge>
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-mono-sc px-1.5 py-0.5 rounded-sm border bg-purple-950/40 border-purple-900/60 text-purple-400">
+                <FlaskConical size={8} /> Blueprint
+              </span>
             )}
             {m.buy_in_amount != null && m.buy_in_amount > 0 && (
-              <GlowBadge color="amber" size="xs">
-                <Coins size={9} /> {m.buy_in_amount.toLocaleString('en-US')} buy-in
-              </GlowBadge>
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-mono-sc px-1.5 py-0.5 rounded-sm border bg-amber-950/40 border-amber-900/60 text-amber-400">
+                <Coins size={8} /> {m.buy_in_amount.toLocaleString('en-US')}
+              </span>
             )}
           </div>
         </div>
 
-        {/* Right column */}
-        <div className="flex flex-col items-end gap-1.5 shrink-0 text-right">
+        {/* Right */}
+        <div className="flex flex-col items-end gap-1.5 shrink-0 min-w-[72px]">
           {reward && (
-            <div>
-              <p className="text-sm font-orbitron text-amber-400 leading-tight">{reward}</p>
-            </div>
+            <p className="text-sm font-orbitron text-amber-400 leading-tight whitespace-nowrap">{reward}</p>
           )}
           <div className="flex items-center gap-2">
             {m.danger_level != null && <DangerPips level={m.danger_level} />}
@@ -410,17 +434,18 @@ function DetailPanel({ m }: { m: Mission }) {
 
         {/* Blueprint reward */}
         {!!m.has_blueprint_reward && (
-          <div
-            className="sci-panel p-2.5 bg-purple-950/20 border-purple-900/30 cursor-pointer hover:border-purple-500/50 transition-colors"
-            onClick={() => m.blueprint_reward_uuid && window.open(`/crafting?recipe=${m.blueprint_reward_uuid}`, '_blank')}
+          <Link
+            href={m.blueprint_reward_uuid ? `/blueprints?recipe=${m.blueprint_reward_uuid}` : '/blueprints'}
+            className="block sci-panel p-2.5 bg-purple-950/20 border-purple-900/30 hover:border-purple-500/50 transition-colors"
           >
             <p className="text-[10px] text-purple-500 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
               <FlaskConical size={9} /> Blueprint Reward
+              <LinkIcon size={9} className="ml-auto text-purple-600" />
             </p>
             <p className="text-sm font-mono-sc text-purple-200">
               {m.blueprint_name ?? m.blueprint_output ?? 'Unknown Blueprint'}
             </p>
-          </div>
+          </Link>
         )}
 
         {/* Description */}
@@ -524,16 +549,35 @@ export default function MissionsPage() {
     <div className="max-w-(--breakpoint-2xl) mx-auto">
       {/* Header */}
       <div className="mb-4 flex flex-col gap-4">
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">
-              Mission Database
-            </h1>
-            {summary && (
-              <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">
-                {summary.showing} of {summary.total.toLocaleString('en-US')} missions
-              </p>
-            )}
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-sm border border-cyan-800 bg-cyan-950/40 flex items-center justify-center shrink-0">
+              <ClipboardList size={18} className="text-cyan-400" />
+            </div>
+            <div>
+              <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase leading-none">
+                Mission Database
+              </h1>
+              {summary && (
+                <p className="text-xs text-slate-500 mt-0.5 font-mono-sc">
+                  {summary.showing.toLocaleString('en-US')} / {summary.total.toLocaleString('en-US')} missions
+                  {data && (
+                    <span className="ml-3 text-slate-600">
+                      ·{' '}
+                      <span className="text-green-600">{data.data.filter(m => m.is_legal).length} legal</span>
+                      {' '}·{' '}
+                      <span className="text-red-600">{data.data.filter(m => !m.is_legal).length} illegal</span>
+                      {data.data.some(m => m.has_blueprint_reward) && (
+                        <>
+                          {' '}·{' '}
+                          <span className="text-purple-500">{data.data.filter(m => m.has_blueprint_reward).length} blueprints</span>
+                        </>
+                      )}
+                    </span>
+                  )}
+                </p>
+              )}
+            </div>
           </div>
           <div className="relative w-72">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={13} />
@@ -563,10 +607,12 @@ export default function MissionsPage() {
             </div>
           )}
 
-          {/* Faction chips (collapsible if many) */}
+          {/* Faction chips */}
           {factions && factions.length > 0 && (
             <div>
-              <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">Faction</p>
+              <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">
+                <Shield size={9} className="inline mr-1" />Faction
+              </p>
               <ChipGroup
                 options={factions}
                 value={faction}
@@ -617,7 +663,7 @@ export default function MissionsPage() {
                 onClick={resetAll}
                 className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition-colors ml-auto"
               >
-                <X size={12} /> Reset
+                <X size={12} /> Reset filters
               </button>
             )}
           </div>
