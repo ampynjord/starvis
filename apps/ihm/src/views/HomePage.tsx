@@ -7,7 +7,7 @@ import {
   ClipboardList,
   Crosshair,
   Dices,
-  FlaskConical,
+  Scroll,
   Package,
   Palette,
   Pickaxe,
@@ -87,9 +87,9 @@ const TOOL_CARDS: {
     badge: 'Profit',
   },
   {
-    to: '/crafting',
-    icon: FlaskConical,
-    label: 'Crafting',
+    to: '/blueprints',
+    icon: Scroll,
+    label: 'Blueprints',
     description: 'Browse crafting recipes, required materials and station types.',
     accent: 'border-violet-800 hover:border-violet-600',
   },
@@ -158,7 +158,7 @@ export default function HomePage() {
               STARVIS
             </h1>
             <p className="text-slate-400 text-sm mt-1 font-rajdhani">
-              Star Citizen — ships · components · mining · outfitter · trade · crafting
+              Star Citizen — ships · components · mining · outfitter · trade · blueprints
             </p>
           </div>
           {version && (
