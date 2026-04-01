@@ -1,9 +1,12 @@
 import { createHash } from 'node:crypto';
+import { createWriteStream, existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { request as httpsRequest } from 'node:https';
+import { join } from 'node:path';
 import type { Router } from 'express';
 import { SearchQuery, ShipQuery } from '../schemas.js';
 import { asyncHandler, makeGameDataGuard, makeShipResolver, sendCsvOrJson, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
+import { CTM_CACHE_DIR } from '../utils/config.js';
 
 export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
   const { gameDataService } = deps;
@@ -357,9 +360,11 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
 
   /**
    * GET /api/v1/ships/:uuid/model/file
-   * Proxy du fichier .ctm binaire depuis RSI — l'IHM peut l'appeler sans
-   * dépendre du CORS de robertsspaceindustries.com.
-   * Headers mis en cache 24h (les fichiers CTM ne changent pas souvent).
+   * Sert le fichier .ctm binaire avec cache disque (lazy).
+   * - 1ère requête : télécharge depuis RSI, sauvegarde dans CTM_CACHE_DIR/{uuid}.ctm
+   * - Requêtes suivantes : sert le fichier local directement
+   * - Si ctm_url change en DB (nouvelle extraction) : le sidecar {uuid}.url détecte
+   *   le changement et re-télécharge automatiquement
    */
   router.get(
     '/api/v1/ships/:uuid/model/file',
@@ -375,15 +380,39 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
       const ctmUrl = ship.ctm_url as string | null;
       if (!ctmUrl) return void res.status(404).json({ success: false, error: 'No 3D model available for this ship' });
 
-      const url = new URL(ctmUrl);
+      // ── Cache disque ──────────────────────────────────────────────────────
+      mkdirSync(CTM_CACHE_DIR, { recursive: true });
+      const cacheFile = join(CTM_CACHE_DIR, `${uuid}.ctm`);
+      const sidecar   = join(CTM_CACHE_DIR, `${uuid}.url`);
 
-      // ETag basé sur l'URL du fichier (stable tant que RSI ne change pas le fichier)
+      // Invalide le cache si l'URL a changé depuis le dernier téléchargement
+      const cachedUrl = existsSync(sidecar) ? readFileSync(sidecar, 'utf-8').trim() : null;
+      if (cachedUrl && cachedUrl !== ctmUrl && existsSync(cacheFile)) {
+        unlinkSync(cacheFile);
+        unlinkSync(sidecar);
+      }
+
       const etag = `"${createHash('md5').update(ctmUrl).digest('hex').slice(0, 16)}"`;
-      if (req.headers['if-none-match'] === etag) {
-        res.status(304).end();
+      const headers = {
+        'Content-Type': 'application/octet-stream',
+        'Content-Disposition': `attachment; filename="${ship.class_name}.ctm"`,
+        'Cache-Control': 'public, max-age=86400',
+        'ETag': etag,
+      };
+
+      // ── Servir depuis le cache ────────────────────────────────────────────
+      if (existsSync(cacheFile)) {
+        if (req.headers['if-none-match'] === etag) { res.status(304).end(); return; }
+        for (const [k, v] of Object.entries(headers)) res.setHeader(k, v);
+        res.setHeader('X-CTM-Cache', 'HIT');
+        res.sendFile(cacheFile);
         return;
       }
 
+      // ── Téléchargement depuis RSI + sauvegarde ────────────────────────────
+      if (req.headers['if-none-match'] === etag) { res.status(304).end(); return; }
+
+      const url = new URL(ctmUrl);
       await new Promise<void>((resolve, reject) => {
         const proxyReq = httpsRequest(
           { hostname: url.hostname, path: url.pathname, method: 'GET', headers: { 'User-Agent': 'starvis/1.0' } },
@@ -394,14 +423,18 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
               resolve();
               return;
             }
-            res.setHeader('Content-Type', 'application/octet-stream');
-            res.setHeader('Content-Disposition', `attachment; filename="${ship.class_name}.ctm"`);
-            res.setHeader('Cache-Control', 'public, max-age=86400');
-            res.setHeader('ETag', etag);
+            for (const [k, v] of Object.entries(headers)) res.setHeader(k, v);
+            res.setHeader('X-CTM-Cache', 'MISS');
             if (upstream.headers['content-length']) res.setHeader('Content-Length', upstream.headers['content-length']);
+
+            // Écriture simultanée vers le client ET le cache disque
+            const writer = createWriteStream(cacheFile);
             upstream.pipe(res);
+            upstream.pipe(writer);
+            writer.on('finish', () => writeFileSync(sidecar, ctmUrl, 'utf-8'));
+            writer.on('error', () => { try { unlinkSync(cacheFile); } catch {} });
             upstream.on('end', resolve);
-            upstream.on('error', reject);
+            upstream.on('error', (err) => { try { unlinkSync(cacheFile); } catch {} reject(err); });
           },
         );
         proxyReq.on('error', reject);
