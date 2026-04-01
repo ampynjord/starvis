@@ -34,19 +34,27 @@ const holoFragmentShader = /* glsl */`
   varying vec3 vWorldPos;
 
   void main() {
-    // Fresnel — lumineux sur les arêtes de silhouette
     vec3 viewDir = normalize(cameraPos - vWorldPos);
     float NdotV   = max(dot(normalize(vNormal), viewDir), 0.0);
-    float fresnel = pow(1.0 - NdotV, 2.8);
 
-    // Scanline subtile
-    float scan = sin(vWorldPos.y * 22.0 + time * 1.8) * 0.025 + 0.975;
+    // Fresnel puissant — seulement les vraies silhouettes s'illuminent
+    float fresnel = pow(1.0 - NdotV, 4.5);
 
-    // Couleurs RSI : gris-acier bleuté en face, cyan vif sur les bords
-    vec3 faceColor = vec3(0.22, 0.42, 0.60);
-    vec3 rimColor  = vec3(0.20, 0.82, 1.00);
+    // Relief — variation d'angle pour voir les surfaces et détails
+    float relief = NdotV * 0.35;
 
-    vec3 color = mix(faceColor, rimColor, fresnel);
+    // Scanlines marquées (RSI a des bandes horizontales visibles)
+    float scan = sin(vWorldPos.y * 28.0 + time * 2.2) * 0.055 + 0.945;
+
+    // Corps très sombre bleu nuit · silhouette = cyan pur
+    vec3 darkBody = vec3(0.018, 0.060, 0.135);
+    vec3 litBody  = vec3(0.055, 0.210, 0.470);
+    vec3 rimColor = vec3(0.18,  0.82,  1.00);
+
+    // Corps avec relief (faces orientées caméra légèrement plus claires)
+    vec3 body  = mix(darkBody, litBody, relief);
+    // Silhouettes → cyan vif
+    vec3 color = mix(body, rimColor, fresnel);
     color *= scan;
 
     gl_FragColor = vec4(color, 1.0);
@@ -69,21 +77,9 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
 
     // ── Scene ──────────────────────────────────────────────────────────
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x030b15);
+    scene.background = new THREE.Color(0x020810);
 
-    // Grid (style RSI — teinte bleue sombre)
-    const grid = new THREE.GridHelper(200, 60, 0x0a2a42, 0x061525);
-    grid.position.y = -10;
-    scene.add(grid);
-
-    // Lumières complémentaires au shader (le fresnel gère l'essentiel)
-    scene.add(new THREE.AmbientLight(0x0d2035, 3));
-    const key = new THREE.DirectionalLight(0x4ab8e8, 1.2);
-    key.position.set(6, 10, 4);
-    scene.add(key);
-    const fill = new THREE.DirectionalLight(0x0a2a60, 0.6);
-    fill.position.set(-5, 3, -6);
-    scene.add(fill);
+    // Pas de lumières — le shader gère tout via NdotV et Fresnel
 
     // ── Renderer ───────────────────────────────────────────────────────
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -129,16 +125,16 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
         const mesh = new THREE.Mesh(geometry, holoMaterial);
         pivot.add(mesh);
 
-        // Couche rim-glow (coque inversée légèrement élargie — technique RSI)
+        // Couche rim-glow (coque inversée légèrement élargie)
         const rimMat = new THREE.MeshBasicMaterial({
           color: 0x00c8f0,
           side: THREE.BackSide,
           transparent: true,
-          opacity: 0.18,
+          opacity: 0.10,
           depthWrite: false,
         });
         const rimMesh = new THREE.Mesh(geometry, rimMat);
-        rimMesh.scale.setScalar(1.012);
+        rimMesh.scale.setScalar(1.008);
         pivot.add(rimMesh);
 
         scene.add(pivot);
@@ -168,7 +164,20 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
         controls.target.set(0, 0, 0);
         controls.update();
 
-        grid.position.y = -r;
+        // ── Grille de sol dynamique (taille calée sur le vaisseau) ────────
+        const floorY = -r;
+        const gridSize = r * 6;
+
+        // Grille grossière (quadrillage principal visible)
+        const gridMain = new THREE.GridHelper(gridSize, 40, 0x1c5880, 0x0c2535);
+        gridMain.position.y = floorY;
+        scene.add(gridMain);
+
+        // Grille fine (subdivisions plus petites, moins visibles)
+        const gridFine = new THREE.GridHelper(gridSize, 160, 0x071a28, 0x071a28);
+        gridFine.position.y = floorY - 0.02;
+        scene.add(gridFine);
+
         setLoadState('ready');
       },
       undefined,
