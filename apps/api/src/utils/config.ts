@@ -57,3 +57,10 @@ export const RATE_LIMITS = {
   // Slow-down: start adding delay after this many requests
   slowAfter: 100,
 };
+
+/**
+ * Directory where CTM model files are cached on disk.
+ * Cache key: {uuid}.ctm + {uuid}.url (sidecar containing the source URL)
+ * When ctm_url changes in DB, the sidecar mismatch triggers a re-fetch.
+ */
+export const CTM_CACHE_DIR = process.env.CTM_CACHE_DIR ?? '/tmp/ctm-cache';
