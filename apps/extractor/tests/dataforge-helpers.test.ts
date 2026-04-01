@@ -2,7 +2,7 @@
  * Tests for DataForge utility helpers
  */
 import { describe, expect, it } from 'vitest';
-import { MANUFACTURER_CODES, resolveComponentName, resolveLocKey } from '../src/dataforge-utils.js';
+import { resolveComponentName, resolveLocKey } from '../src/dataforge-utils.js';
 
 // ── resolveLocKey ──
 describe('resolveLocKey', () => {
@@ -67,26 +67,6 @@ describe('resolveComponentName', () => {
   });
 });
 
-// ── MANUFACTURER_CODES ──
-describe('MANUFACTURER_CODES', () => {
-  it('contains all major ship manufacturers', () => {
-    const requiredCodes = ['AEGS', 'ANVL', 'ARGO', 'CNOU', 'CRUS', 'DRAK', 'MISC', 'ORIG', 'RSI'];
-    for (const code of requiredCodes) {
-      expect(MANUFACTURER_CODES).toHaveProperty(code);
-      expect(MANUFACTURER_CODES[code]).toBeTruthy();
-    }
-  });
-
-  it('contains all major component manufacturers', () => {
-    const componentCodes = ['BEHR', 'KLWE', 'GATS', 'MXOX', 'HRST'];
-    for (const code of componentCodes) {
-      expect(MANUFACTURER_CODES).toHaveProperty(code);
-    }
-  });
-
-  it('maps codes to full names (not abbreviations)', () => {
-    expect(MANUFACTURER_CODES.AEGS).toBe('Aegis Dynamics');
-    expect(MANUFACTURER_CODES.RSI).toBe('Roberts Space Industries');
-    expect(MANUFACTURER_CODES.BEHR).toBe('Behring Applied Technology');
-  });
-});
+// ── MANUFACTURER_CODES (legacy) ──
+// MANUFACTURER_CODES is kept for backward compatibility but is no longer the source of truth.
+// Manufacturer data is now extracted directly from the DataForge (Manufacturer struct records).

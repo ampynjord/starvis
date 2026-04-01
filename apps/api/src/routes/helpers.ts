@@ -11,6 +11,7 @@ export function asyncHandler(fn: (req: Request, res: Response) => Promise<void>)
   return (req: Request, res: Response, _next: NextFunction) => {
     fn(req, res).catch((e: unknown) => {
       if (e instanceof ZodError) {
+        if (res.headersSent) return;
         return res.status(400).json({
           success: false,
           error: 'Validation error',
@@ -18,7 +19,10 @@ export function asyncHandler(fn: (req: Request, res: Response) => Promise<void>)
         });
       }
       const err = e instanceof Error ? e : new Error(String(e));
+      // Client disconnected mid-stream — not an application error
+      if (err.message === 'aborted' || (err as NodeJS.ErrnoException).code === 'ECONNRESET') return;
       logger.error(`${req.method} ${req.path} error`, err);
+      if (res.headersSent) return;
       const isProduction = process.env.NODE_ENV === 'production';
       res.status(500).json({ success: false, error: isProduction ? 'Internal server error' : err.message });
     });

@@ -117,20 +117,40 @@ export class ItemQueryService {
     return id.length === 36 ? this.getItemByUuid(id, env) : this.getItemByClassName(id, env);
   }
 
-  async getItemFilters(env = 'live'): Promise<{ types: string[]; sub_types: string[]; manufacturers: string[] }> {
+  async getItemFilters(env = 'live'): Promise<{ types: string[]; sub_types: string[]; manufacturers: { code: string; name: string }[] }> {
     const prisma = this.getClient(env);
     const [typeRows, subTypeRows, mfrRows] = await Promise.all([
       prisma.$queryRawUnsafe<Row[]>(`SELECT DISTINCT type FROM items WHERE type IS NOT NULL ORDER BY type`),
       prisma.$queryRawUnsafe<Row[]>(`SELECT DISTINCT sub_type FROM items WHERE sub_type IS NOT NULL AND sub_type != '' ORDER BY sub_type`),
       prisma.$queryRawUnsafe<Row[]>(
-        `SELECT DISTINCT manufacturer_code FROM items WHERE manufacturer_code IS NOT NULL ORDER BY manufacturer_code`,
+        `SELECT i.manufacturer_code as code, COALESCE(m.name, i.manufacturer_code) as name
+         FROM items i
+         LEFT JOIN starvis.manufacturers m ON m.code = i.manufacturer_code
+         WHERE i.manufacturer_code IS NOT NULL
+         GROUP BY i.manufacturer_code, m.name
+         ORDER BY COALESCE(m.name, i.manufacturer_code)`,
       ),
     ]);
     return {
       types: typeRows.map((r) => String(r.type)),
       sub_types: subTypeRows.map((r) => String(r.sub_type)),
-      manufacturers: mfrRows.map((r) => String(r.manufacturer_code)),
+      manufacturers: mfrRows.map((r) => ({ code: String(r.code), name: String(r.name) })),
     };
+  }
+
+  async getItemsByManufacturer(code: string, env = 'live'): Promise<Row[]> {
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT i.uuid, i.class_name, i.name, i.type, i.sub_type, i.size, i.grade,
+              i.manufacturer_code, m.name as manufacturer_name,
+              i.weapon_damage, i.weapon_dps, i.weapon_fire_rate, i.weapon_range,
+              i.armor_damage_reduction, i.armor_temp_min, i.armor_temp_max
+       FROM items i LEFT JOIN starvis.manufacturers m ON i.manufacturer_code = m.code
+       WHERE i.manufacturer_code = ?
+       ORDER BY i.type, i.sub_type, i.name`,
+      code.toUpperCase(),
+    );
+    return rows.map((row) => this.normalizeItemRow(row));
   }
 
   async getItemTypes(env = 'live'): Promise<{ types: { type: string; count: number }[] }> {

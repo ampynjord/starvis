@@ -16,49 +16,37 @@ import { useListQueryState } from '@/hooks/useListQueryState';
 
 const LIMIT = 30;
 
-interface ItemCategoryDef {
-  label: string;
-  test: (type: string) => boolean;
-}
-
-const FPS_CATEGORY_DEFS: ItemCategoryDef[] = [
-  { label: 'Helmets / Armor / Undersuits', test: (t) => /(helmet|armor|undersuit|plastron|leg|jambiere|wearable)/i.test(t) },
-  { label: 'Weapons / Ammo / Grenades', test: (t) => /(weapon|ammo|munition|grenade|magazine)/i.test(t) },
-  { label: 'Tools / Tool Modules', test: (t) => /(tool|mining|salvage|tractor|module)/i.test(t) },
-  { label: 'Attachments', test: (t) => /(attachment|scope|barrel|underbarrel|muzzle)/i.test(t) },
-  { label: 'Medical', test: (t) => /(medical|medpen|paramed|med)/i.test(t) },
-  { label: 'Clothing / Backpacks', test: (t) => /(clothing|backpack|wear)/i.test(t) },
+/** Maps raw DB type(s) → display category label */
+const ITEM_CATEGORY_MAP: { label: string; types: string[] }[] = [
+  { label: 'Weapons',     types: ['FPS_Weapon'] },
+  { label: 'Helmet',      types: ['Armor_Helmet'] },
+  { label: 'Core',        types: ['Armor_Torso'] },
+  { label: 'Arms',        types: ['Armor_Arms'] },
+  { label: 'Legs',        types: ['Armor_Legs'] },
+  { label: 'Undersuit',   types: ['Undersuit'] },
+  { label: 'Clothing',    types: ['Clothing'] },
+  { label: 'Gadgets',     types: ['Gadget'] },
+  { label: 'Tools',       types: ['Tool'] },
+  { label: 'Consumables', types: ['Consumable'] },
+  { label: 'Attachments', types: ['Attachment'] },
+  { label: 'Magazines',   types: ['Magazine'] },
 ];
 
-function isFpsType(t: string): boolean {
-  return /(helmet|armor|undersuit|clothing|backpack|weapon|ammo|munition|grenade|magazine|tool|module|attachment|medical|medpen|paramed|food|drink|gadget)/i.test(t);
-}
-
-function buildModeCategories(rawTypes: string[], mode: 'fps' | 'other'): { label: string; types: string[] }[] {
-  const source = rawTypes.filter(Boolean);
-  const normalized = mode === 'fps' ? source.filter(isFpsType) : source.filter((t) => !isFpsType(t));
-
-  if (mode === 'other') {
-    return [
-      { label: 'All Other Items', types: normalized },
-      { label: 'Mission / Objective Objects', types: normalized.filter((t) => /(mission|objective|token|key|data|artifact)/i.test(t)) },
-      { label: 'Misc Unclassified', types: normalized.filter((t) => !/(mission|objective|token|key|data|artifact)/i.test(t)) },
-    ].filter((c) => c.types.length > 0);
-  }
-
-  const used = new Set<string>();
-
-  const categories = FPS_CATEGORY_DEFS.map((def) => {
-    const types = normalized.filter((t) => def.test(t));
-    types.forEach((t) => used.add(t));
-    return { label: def.label, types };
-  }).filter((c) => c.types.length > 0);
-
-  const remaining = normalized.filter((t) => !used.has(t));
-  if (remaining.length > 0) categories.push({ label: 'Other FPS Gear', types: remaining });
-
-  return [{ label: 'All FPS Gear', types: normalized }, ...categories];
-}
+/** Friendly label for a raw DB type, used in the item card */
+const TYPE_LABEL: Record<string, string> = {
+  FPS_Weapon:    'Weapon',
+  Armor_Torso:   'Core',
+  Armor_Arms:    'Arms',
+  Armor_Legs:    'Legs',
+  Armor_Helmet:  'Helmet',
+  Undersuit:     'Undersuit',
+  Clothing:      'Clothing',
+  Gadget:        'Gadget',
+  Tool:          'Tool',
+  Consumable:    'Consumable',
+  Attachment:    'Attachment',
+  Magazine:      'Magazine',
+};
 
 export default function ItemsPage() {
   const pathname = usePathname();
@@ -71,13 +59,24 @@ export default function ItemsPage() {
   const { data: filters } = useQuery({
     queryKey: ['items.filters', env],
     queryFn: () => api.items.filters(env),
-    staleTime: Infinity,
+    staleTime: 5 * 60_000,
   });
 
-  const categories = useMemo(
-    () => buildModeCategories(filters?.types ?? [], mode),
-    [filters?.types, mode],
-  );
+  // Build available category chips from the DB types actually present
+  const categories = useMemo(() => {
+    const rawTypes = new Set<string>(filters?.types ?? []);
+    if (mode === 'fps') {
+      const all = ITEM_CATEGORY_MAP.flatMap((c) => c.types);
+      const available = ITEM_CATEGORY_MAP.filter((c) => c.types.some((t) => rawTypes.has(t)));
+      const allTypes = [...new Set(available.flatMap((c) => c.types))];
+      const chips = [{ label: 'All', types: allTypes }, ...available];
+      return chips;
+    }
+    // "other items" mode: anything not in the FPS categories
+    const fpsCovered = new Set(ITEM_CATEGORY_MAP.flatMap((c) => c.types));
+    const otherTypes = [...rawTypes].filter((t) => !fpsCovered.has(t));
+    return [{ label: 'All', types: otherTypes }];
+  }, [filters?.types, mode]);
 
   const selectedCategory = categories.find((c) => c.label === activeCategory) ?? categories[0] ?? { label: '', types: [] };
 
@@ -109,7 +108,14 @@ export default function ItemsPage() {
   const resetFilters = () => { resetListState(); setManufacturer(''); setActiveCategory(categories[0]?.label ?? ''); };
 
   const filterGroups = filters ? [
-    { key: 'mfr', label: 'Manufacturer', options: (filters['manufacturers'] ?? []).map((m: string) => ({ label: m, value: m })), value: manufacturer, onChange: (v: string) => { setManufacturer(v); setPage(1); } },
+    {
+      key: 'mfr',
+      label: 'Manufacturer',
+      defaultOpen: true,
+      options: (filters.manufacturers ?? []).map((m) => ({ label: m.name, value: m.code })),
+      value: manufacturer,
+      onChange: (v: string) => { setManufacturer(v); setPage(1); },
+    },
   ] : [];
 
   const pageTitle = mode === 'other' ? 'Other Items' : 'FPS Gear';
@@ -181,7 +187,7 @@ export default function ItemsPage() {
                             {item.size != null && <GlowBadge color="slate">S{item.size}</GlowBadge>}
                           </div>
                           <div className="flex items-center gap-3 mt-1">
-                            <span className="text-xs font-mono-sc text-cyan-700">{item.type}</span>
+                            <span className="text-xs font-mono-sc text-cyan-700">{TYPE_LABEL[item.type] ?? item.type}</span>
                             {item.sub_type && <span className="text-xs text-slate-600">{item.sub_type}</span>}
                             {item.manufacturer_name && <span className="text-xs text-slate-600">{item.manufacturer_name}</span>}
                           </div>
@@ -205,3 +211,4 @@ export default function ItemsPage() {
     </div>
   );
 }
+

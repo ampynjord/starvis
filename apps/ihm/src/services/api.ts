@@ -15,6 +15,7 @@ import type {
   ItemListItem,
   LoadoutNode,
   LoadoutResult,
+  Location,
   Manufacturer,
   MiningComposition,
   MiningElement,
@@ -307,7 +308,7 @@ export const api = {
       grade?: string;
       manufacturer?: string;
     }) => mapPaginated(await get<PaginatedResponse<ItemListItem>>('/items', p), mapItem),
-    filters: (env?: string) => get<Record<string, string[]>>('/items/filters', { env }),
+    filters: (env?: string) => get<{ types: string[]; sub_types: string[]; manufacturers: { code: string; name: string }[] }>('/items/filters', { env }),
     get: async (uuid: string, env?: string) => mapItem(await get<Item>(`/items/${uuid}`, { env })),
     buyLocations: (uuid: string, env?: string) => get<ItemBuyLocation[]>(`/items/${uuid}/buy-locations`, { env }),
   },
@@ -316,6 +317,8 @@ export const api = {
   manufacturers: {
     list: (env?: string) => get<Manufacturer[]>('/manufacturers', { env }),
     ships: (code: string, env?: string) => get<ShipListItem[]>(`/manufacturers/${code}/ships`, { env }),
+    components: (code: string, env?: string) => get<ComponentListItem[]>(`/manufacturers/${code}/components`, { env }),
+    items: (code: string, env?: string) => get<ItemListItem[]>(`/manufacturers/${code}/items`, { env }),
   },
 
   // ─── Paints ────────────────────────────────────────────────────────
@@ -438,5 +441,26 @@ export const api = {
       scu: number,
       opts?: { budget?: number; env?: string; limit?: number; commodity?: string; buySystem?: string; sellSystem?: string; sort?: string },
     ) => get<TradeRoute[]>('/trade/routes', { scu, ...opts }),
+  },
+
+  // ─── Locations ──────────────────────────────────────────────────────
+  locations: {
+    types: (env?: string) => get<string[]>('/locations/types', { env }),
+    systems: (env?: string) => get<string[]>('/locations/systems', { env }),
+    list: (filters?: {
+      env?: string;
+      type?: string;
+      types?: string;
+      system?: string;
+      search?: string;
+      hideInStarmap?: string;
+      sort?: string;
+      order?: string;
+      page?: number;
+      limit?: number;
+    }) => get<PaginatedResponse<Location>>('/locations', filters as Record<string, string | number | undefined>),
+    all: (env?: string) => get<Location[]>('/locations/all', { env }),
+    get: (uuid: string, env?: string) => get<Location>(`/locations/${uuid}`, { env }),
+    children: (uuid: string, env?: string) => get<Location[]>(`/locations/${uuid}/children`, { env }),
   },
 };

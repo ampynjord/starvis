@@ -7,7 +7,7 @@
  *   - commodities[] → Tradeable goods (metals, minerals, gas, food, etc.)
  */
 import type { DataForgeContext } from './dataforge-utils.js';
-import { MANUFACTURER_CODES, resolveComponentName } from './dataforge-utils.js';
+import { resolveComponentName } from './dataforge-utils.js';
 import logger from './logger.js';
 
 // ── Type classification helpers ──
@@ -299,6 +299,11 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
             }
             if (typeof ad.Manufacturer === 'string' && ad.Manufacturer) {
               extData.manufacturerRef = ad.Manufacturer;
+              // Resolve GUID immediately so manufacturer_code is set from game data
+              const mfgInfo = ctx.extractAllManufacturers().get(ad.Manufacturer);
+              if (mfgInfo) {
+                item.manufacturerCode = mfgInfo.code;
+              }
             }
           }
         }
@@ -466,11 +471,15 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
         item.weaponDps = rawDps < 999999 ? Math.round(rawDps * 10000) / 10000 : null;
       }
 
-      // Manufacturer from className prefix
+      // Manufacturer fallback: try to match className prefix against DataForge manufacturer records.
+      // Only assigns if the code is known to be a real manufacturer (in DataForge SCItemManufacturer),
+      // to avoid false positives like DOOR_, SEAT_, RACK_, etc.
       if (!item.manufacturerCode) {
-        const mfgMatch = className.match(/^([A-Z]{3,5})_/);
-        if (mfgMatch && MANUFACTURER_CODES[mfgMatch[1]]) {
-          item.manufacturerCode = mfgMatch[1];
+        const mfgMatch = className.match(/^([A-Za-z]{3,6})_/);
+        if (mfgMatch) {
+          const code = mfgMatch[1].toUpperCase();
+          const mfgInfo = [...ctx.extractAllManufacturers().values()].find((m) => m.code === code);
+          if (mfgInfo) item.manufacturerCode = code;
         }
       }
 

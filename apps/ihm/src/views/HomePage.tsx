@@ -164,7 +164,7 @@ export default function HomePage() {
           {version && (
             <div className="sci-panel p-3 text-right shrink-0 border-cyan-900">
               <p className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest">Game version</p>
-              <p className="font-orbitron text-cyan-400 text-sm mt-0.5">{version.game_version.split('.').slice(0, 2).join('.')}</p>
+              <p className="font-orbitron text-cyan-400 text-sm mt-0.5">{version.game_version}</p>
               <p className="text-xs text-slate-600 mt-0.5">{fDateTime(version.extracted_at)}</p>
             </div>
           )}

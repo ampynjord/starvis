@@ -9,6 +9,7 @@ interface FilterGroup {
   options: FilterOption[];
   value: string | number | undefined;
   onChange: (v: string) => void;
+  defaultOpen?: boolean;
 }
 
 interface Props {
@@ -18,8 +19,8 @@ interface Props {
   className?: string;
 }
 
-function FilterGroup({ label, options, value, onChange }: FilterGroup) {
-  const [open, setOpen] = useState(false);
+function FilterGroup({ label, options, value, onChange, defaultOpen = false }: FilterGroup) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="border-b border-border last:border-0">
       <button
