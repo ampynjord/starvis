@@ -66,7 +66,6 @@ export default function ItemsPage() {
   const categories = useMemo(() => {
     const rawTypes = new Set<string>(filters?.types ?? []);
     if (mode === 'fps') {
-      const all = ITEM_CATEGORY_MAP.flatMap((c) => c.types);
       const available = ITEM_CATEGORY_MAP.filter((c) => c.types.some((t) => rawTypes.has(t)));
       const allTypes = [...new Set(available.flatMap((c) => c.types))];
       const chips = [{ label: 'All', types: allTypes }, ...available];
