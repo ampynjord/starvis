@@ -104,6 +104,10 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
         cameraPos: { value: camera.position },
       },
       side: THREE.DoubleSide,
+      // Pousse le mesh solide derrière les lignes wireframe
+      polygonOffset: true,
+      polygonOffsetFactor: 2,
+      polygonOffsetUnits: 2,
     });
 
     // Wireframe geometry ref pour le cleanup
@@ -122,16 +126,33 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
         const mesh = new THREE.Mesh(geometry, holoMaterial);
         pivot.add(mesh);
 
-        // ── Wireframe overlay : révèle tous les détails structurels ──
+        // ── Wireframe : double couche pour lignes épaisses lumineuses ──
         wireGeo = new THREE.WireframeGeometry(geometry);
-        const wireMat = new THREE.LineBasicMaterial({
-          color: 0x00e5ff,   // cyan hologramme saturé
-          transparent: true,
-          opacity: 0.90,
-          depthWrite: false,
-        });
-        const wireframe = new THREE.LineSegments(wireGeo, wireMat);
-        pivot.add(wireframe);
+
+        // Couche core : blanc-cyan, pleine opacité
+        const wireCore = new THREE.LineSegments(
+          wireGeo,
+          new THREE.LineBasicMaterial({
+            color: 0xaaf5ff,
+            transparent: true,
+            opacity: 1.0,
+            depthWrite: false,
+          }),
+        );
+        pivot.add(wireCore);
+
+        // Couche glow : cyan pur légèrement élargie (halo autour des lignes)
+        const wireGlow = new THREE.LineSegments(
+          wireGeo,
+          new THREE.LineBasicMaterial({
+            color: 0x00cfff,
+            transparent: true,
+            opacity: 0.35,
+            depthWrite: false,
+          }),
+        );
+        wireGlow.scale.setScalar(1.003);
+        pivot.add(wireGlow);
 
         scene.add(pivot);
 
