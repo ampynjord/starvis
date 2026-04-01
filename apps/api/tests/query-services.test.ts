@@ -170,13 +170,13 @@ describe('ItemQueryService', () => {
       const prisma = createMockPrisma([
         [row({ type: 'WeaponPersonal' })],
         [row({ sub_type: 'Rifle' })],
-        [row({ manufacturer_code: 'BEHR' })],
+        [row({ code: 'BEHR', name: 'Behring' })],
       ]);
       const svc = new ItemQueryService(createGetClient(prisma));
       const f = await svc.getItemFilters();
       expect(f.types).toEqual(['WeaponPersonal']);
       expect(f.sub_types).toEqual(['Rifle']);
-      expect(f.manufacturers).toEqual(['BEHR']);
+      expect(f.manufacturers).toEqual([{ code: 'BEHR', name: 'Behring' }]);
     });
   });
 
