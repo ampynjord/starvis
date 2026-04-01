@@ -13,48 +13,6 @@ interface Props {
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
-// ── Hologram shaders (style RSI Holoviewer) ────────────────────────────────
-const holoVertexShader = /* glsl */`
-  varying vec3 vNormal;
-  varying vec3 vWorldPos;
-
-  void main() {
-    vec4 worldPos = modelMatrix * vec4(position, 1.0);
-    vWorldPos = worldPos.xyz;
-    vNormal = normalize(mat3(transpose(inverse(modelMatrix))) * normal);
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-const holoFragmentShader = /* glsl */`
-  uniform float time;
-  uniform vec3 cameraPos;
-
-  varying vec3 vNormal;
-  varying vec3 vWorldPos;
-
-  void main() {
-    vec3 N = normalize(vNormal);
-    vec3 V = normalize(cameraPos - vWorldPos);
-
-    // Fresnel : seules les silhouettes s'illuminent
-    float NdotV   = max(dot(N, V), 0.0);
-    float fresnel = pow(1.0 - NdotV, 5.0);
-
-    // Corps noir profond — seul le wireframe donne la forme
-    vec3 body = vec3(0.003, 0.010, 0.028);
-    // Rim : cyan-blanc intense sur les silhouettes
-    vec3 rim  = fresnel * vec3(0.15, 0.88, 1.00) * 1.6;
-
-    // Scanline
-    float scan = sin(vWorldPos.y * 12.0 + time * 1.2) * 0.022 + 0.978;
-
-    vec3 color = (body + rim) * scan;
-
-    gl_FragColor = vec4(color, 1.0);
-  }
-`;
-
 export function HoloViewer({ shipUuid, shipName }: Props) {
   const ctmUrl = `/api/v1/ships/${shipUuid}/model/file`;
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -71,9 +29,21 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
 
     // ── Scene ──────────────────────────────────────────────────────────
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x020810);
+    scene.background = new THREE.Color(0x08111e);
 
-    // Pas de lumières — le shader gère tout via NdotV et Fresnel
+    // ── Éclairage (calqué sur le Holoviewer RSI) ───────────────────────
+    // Ambiance très sombre — les creux du vaisseau restent quasi-noirs
+    scene.add(new THREE.AmbientLight(0x0a2535, 2.5));
+
+    // Lumière principale : dessus-avant, blanc-cyan fort → surfaces planes lumineuses
+    const key = new THREE.DirectionalLight(0x60d8ef, 4.5);
+    key.position.set(0.4, 1.0, 0.6);
+    scene.add(key);
+
+    // Fill très doux sur le côté opposé (évite le noir total sur les flancs)
+    const fill = new THREE.DirectionalLight(0x1060a0, 0.6);
+    fill.position.set(-1, 0.2, -0.8);
+    scene.add(fill);
 
     // ── Renderer ───────────────────────────────────────────────────────
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -95,23 +65,14 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
     controls.autoRotateSpeed = 0.5;
     controls.enablePan = false;
 
-    // ── Shared hologram material ───────────────────────────────────────
-    const holoMaterial = new THREE.ShaderMaterial({
-      vertexShader: holoVertexShader,
-      fragmentShader: holoFragmentShader,
-      uniforms: {
-        time: { value: 0 },
-        cameraPos: { value: camera.position },
-      },
+    // ── Matériau hologramme RSI (MeshPhong — ombre douce, specular léger) ─
+    const holoMaterial = new THREE.MeshPhongMaterial({
+      color: 0x1aa8c0,      // cyan-turquoise hologramme
+      emissive: 0x041828,   // légère auto-luminescence pour éviter le noir total
+      specular: 0x66ddff,   // reflets brillants blanc-bleu
+      shininess: 55,
       side: THREE.DoubleSide,
-      // Pousse le mesh solide derrière les lignes wireframe
-      polygonOffset: true,
-      polygonOffsetFactor: 2,
-      polygonOffsetUnits: 2,
     });
-
-    // Wireframe geometry ref pour le cleanup
-    let wireGeo: THREE.WireframeGeometry | null = null;
 
     // ── Load CTM ───────────────────────────────────────────────────────
     setLoadState('loading');
@@ -122,48 +83,17 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
         const pivot = new THREE.Group();
         pivot.rotation.set(0, Math.PI / 2, 0);
 
-        // Maillage principal (quasi-noir, sert de fond)
         const mesh = new THREE.Mesh(geometry, holoMaterial);
         pivot.add(mesh);
-
-        // ── Wireframe : double couche pour lignes épaisses lumineuses ──
-        wireGeo = new THREE.WireframeGeometry(geometry);
-
-        // Couche core : blanc-cyan, pleine opacité
-        const wireCore = new THREE.LineSegments(
-          wireGeo,
-          new THREE.LineBasicMaterial({
-            color: 0xaaf5ff,
-            transparent: true,
-            opacity: 1.0,
-            depthWrite: false,
-          }),
-        );
-        pivot.add(wireCore);
-
-        // Couche glow : cyan pur légèrement élargie (halo autour des lignes)
-        const wireGlow = new THREE.LineSegments(
-          wireGeo,
-          new THREE.LineBasicMaterial({
-            color: 0x00cfff,
-            transparent: true,
-            opacity: 0.35,
-            depthWrite: false,
-          }),
-        );
-        wireGlow.scale.setScalar(1.003);
-        pivot.add(wireGlow);
-
         scene.add(pivot);
 
-        // Centrer en world space (après rotation)
+        // Centrer en world space
         pivot.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(pivot);
         const center = new THREE.Vector3();
         box.getCenter(center);
         pivot.position.sub(center);
 
-        // Recalculer pour adapter la caméra
         pivot.updateMatrixWorld(true);
         const box2 = new THREE.Box3().setFromObject(pivot);
         const sphere = new THREE.Sphere();
@@ -172,7 +102,6 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
 
         camera.near = r * 0.001;
         camera.far  = r * 200;
-        // Angle RSI : légèrement au-dessus, sur le côté avant
         camera.position.set(r * 0.3, r * 0.45, r * 1.6);
         camera.updateProjectionMatrix();
 
@@ -181,18 +110,14 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
         controls.target.set(0, 0, 0);
         controls.update();
 
-        // ── Grille de sol (ancrée au bas du mesh, calibrée sur la taille) ─
-        // Sol = bas de la bounding box, légèrement sous le vaisseau
+        // ── Grille de sol ─────────────────────────────────────────────
         const floorY = box2.min.y - r * 0.04;
-
-        // Taille fixe grande, mais nbr de divisions proportionnel
-        // → carrés d'environ r/3 de côté (lisibles quelle que soit la taille)
         const gridSize = r * 8;
-        const divs = Math.round(gridSize / (r / 3));
+        const divs = Math.max(10, Math.round(gridSize / (r / 2)));
 
-        const gridMain = new THREE.GridHelper(gridSize, divs, 0x1a5472, 0x0a2233);
-        gridMain.position.y = floorY;
-        scene.add(gridMain);
+        const grid = new THREE.GridHelper(gridSize, divs, 0x1a5472, 0x0a2233);
+        grid.position.y = floorY;
+        scene.add(grid);
 
         setLoadState('ready');
       },
@@ -201,18 +126,14 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
     );
 
     // ── Render loop ────────────────────────────────────────────────────
-    const clock = new THREE.Clock();
     const animate = () => {
       frameRef.current = requestAnimationFrame(animate);
       controls.update();
-      // Uniforms hologramme
-      holoMaterial.uniforms.time.value = clock.getElapsedTime();
-      holoMaterial.uniforms.cameraPos.value.copy(camera.position);
       renderer.render(scene, camera);
     };
     animate();
 
-    // ── Resize ────────────────────────────────────────────────────────
+    // ── Resize ─────────────────────────────────────────────────────────
     const onResize = () => {
       const w = container.clientWidth;
       const h = container.clientHeight;
@@ -228,7 +149,6 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
       ro.disconnect();
       controls.dispose();
       holoMaterial.dispose();
-      wireGeo?.dispose();
       renderer.dispose();
       container.removeChild(renderer.domElement);
       rendererRef.current = null;
