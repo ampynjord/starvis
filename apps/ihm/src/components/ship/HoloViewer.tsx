@@ -13,6 +13,46 @@ interface Props {
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
+// ── Hologram shaders (style RSI Holoviewer) ────────────────────────────────
+const holoVertexShader = /* glsl */`
+  varying vec3 vNormal;
+  varying vec3 vWorldPos;
+
+  void main() {
+    vec4 worldPos = modelMatrix * vec4(position, 1.0);
+    vWorldPos = worldPos.xyz;
+    vNormal = normalize(mat3(transpose(inverse(modelMatrix))) * normal);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+
+const holoFragmentShader = /* glsl */`
+  uniform float time;
+  uniform vec3 cameraPos;
+
+  varying vec3 vNormal;
+  varying vec3 vWorldPos;
+
+  void main() {
+    // Fresnel — lumineux sur les arêtes de silhouette
+    vec3 viewDir = normalize(cameraPos - vWorldPos);
+    float NdotV   = max(dot(normalize(vNormal), viewDir), 0.0);
+    float fresnel = pow(1.0 - NdotV, 2.8);
+
+    // Scanline subtile
+    float scan = sin(vWorldPos.y * 22.0 + time * 1.8) * 0.025 + 0.975;
+
+    // Couleurs RSI : gris-acier bleuté en face, cyan vif sur les bords
+    vec3 faceColor = vec3(0.22, 0.42, 0.60);
+    vec3 rimColor  = vec3(0.20, 0.82, 1.00);
+
+    vec3 color = mix(faceColor, rimColor, fresnel);
+    color *= scan;
+
+    gl_FragColor = vec4(color, 1.0);
+  }
+`;
+
 export function HoloViewer({ shipUuid, shipName }: Props) {
   const ctmUrl = `/api/v1/ships/${shipUuid}/model/file`;
   const canvasRef = useRef<HTMLDivElement>(null);
@@ -29,29 +69,27 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
 
     // ── Scene ──────────────────────────────────────────────────────────
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x040d18);
+    scene.background = new THREE.Color(0x030b15);
 
-    // Grid
-    const grid = new THREE.GridHelper(60, 30, 0x0d2d40, 0x071520);
+    // Grid (style RSI — teinte bleue sombre)
+    const grid = new THREE.GridHelper(200, 60, 0x0a2a42, 0x061525);
     grid.position.y = -10;
     scene.add(grid);
 
-    // Lights
-    scene.add(new THREE.AmbientLight(0x1a3a55, 2));
-    const key = new THREE.DirectionalLight(0x60d0ff, 3);
-    key.position.set(5, 8, 3);
+    // Lumières complémentaires au shader (le fresnel gère l'essentiel)
+    scene.add(new THREE.AmbientLight(0x0d2035, 3));
+    const key = new THREE.DirectionalLight(0x4ab8e8, 1.2);
+    key.position.set(6, 10, 4);
     scene.add(key);
-    const fill = new THREE.DirectionalLight(0x1040a0, 1.5);
-    fill.position.set(-4, 2, -5);
+    const fill = new THREE.DirectionalLight(0x0a2a60, 0.6);
+    fill.position.set(-5, 3, -6);
     scene.add(fill);
-    const rim = new THREE.DirectionalLight(0x00ffcc, 1);
-    rim.position.set(0, -3, -8);
-    scene.add(rim);
 
     // ── Renderer ───────────────────────────────────────────────────────
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(width, height);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
@@ -64,8 +102,19 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.6;
+    controls.autoRotateSpeed = 0.5;
     controls.enablePan = false;
+
+    // ── Shared hologram material ───────────────────────────────────────
+    const holoMaterial = new THREE.ShaderMaterial({
+      vertexShader: holoVertexShader,
+      fragmentShader: holoFragmentShader,
+      uniforms: {
+        time: { value: 0 },
+        cameraPos: { value: camera.position },
+      },
+      side: THREE.DoubleSide,
+    });
 
     // ── Load CTM ───────────────────────────────────────────────────────
     setLoadState('loading');
@@ -73,22 +122,25 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
     loader.load(
       ctmUrl,
       (geometry) => {
-        // Axes réels Arrow CTM (MG2Header bounding box) :
-        //   span Z=1779 (nez+longueur), X=1202 (ailes), Y=306 (hauteur)
-        //   → nose = +Z, up = +Y  (convention OpenGL standard)
-        // Ry(90°) : nose (0,0,1) → (1,0,0), up (0,1,0) → (0,1,0) ✓
         const pivot = new THREE.Group();
         pivot.rotation.set(0, Math.PI / 2, 0);
-        const mesh = new THREE.Mesh(
-          geometry,
-          new THREE.MeshStandardMaterial({
-            color: 0x8ab4cc,
-            metalness: 0.6,
-            roughness: 0.4,
-            side: THREE.DoubleSide,
-          }),
-        );
+
+        // Maillage principal avec shader hologramme
+        const mesh = new THREE.Mesh(geometry, holoMaterial);
         pivot.add(mesh);
+
+        // Couche rim-glow (coque inversée légèrement élargie — technique RSI)
+        const rimMat = new THREE.MeshBasicMaterial({
+          color: 0x00c8f0,
+          side: THREE.BackSide,
+          transparent: true,
+          opacity: 0.18,
+          depthWrite: false,
+        });
+        const rimMesh = new THREE.Mesh(geometry, rimMat);
+        rimMesh.scale.setScalar(1.012);
+        pivot.add(rimMesh);
+
         scene.add(pivot);
 
         // Centrer en world space (après rotation)
@@ -124,9 +176,13 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
     );
 
     // ── Render loop ────────────────────────────────────────────────────
+    const clock = new THREE.Clock();
     const animate = () => {
       frameRef.current = requestAnimationFrame(animate);
       controls.update();
+      // Uniforms hologramme
+      holoMaterial.uniforms.time.value = clock.getElapsedTime();
+      holoMaterial.uniforms.cameraPos.value.copy(camera.position);
       renderer.render(scene, camera);
     };
     animate();
@@ -146,6 +202,7 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
       cancelAnimationFrame(frameRef.current);
       ro.disconnect();
       controls.dispose();
+      holoMaterial.dispose();
       renderer.dispose();
       container.removeChild(renderer.domElement);
       rendererRef.current = null;
