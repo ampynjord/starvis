@@ -34,26 +34,32 @@ const holoFragmentShader = /* glsl */`
   varying vec3 vWorldPos;
 
   void main() {
-    vec3 viewDir = normalize(cameraPos - vWorldPos);
-    float NdotV   = max(dot(normalize(vNormal), viewDir), 0.0);
+    vec3 N = normalize(vNormal);
+    vec3 V = normalize(cameraPos - vWorldPos);
 
-    // Fresnel très concentré — illuminate uniquement les silhouettes
-    float fresnel = pow(1.0 - NdotV, 6.0);
+    // ── Fresnel : rim cyan uniquement sur les vraies silhouettes ──────
+    float NdotV  = max(dot(N, V), 0.0);
+    float fresnel = pow(1.0 - NdotV, 5.5);
 
-    // Ombrage sombre : léger dégradé selon l'angle pour lire les volumes
-    float shade = NdotV * 0.12;
+    // ── Éclairage directionnel fixe (lumière de dessus-avant comme RSI) ──
+    vec3 L     = normalize(vec3(0.35, 1.0, 0.55));
+    float NdotL = max(dot(N, L), 0.0);
+    // Légère rétro-lumière pour ne pas avoir de faces totalement noires
+    float back = max(dot(-N, L), 0.0) * 0.06;
+    float light = NdotL + back;
+
+    // ── Palette ────────────────────────────────────────────────────────
+    // Ambiance quasi-noire
+    vec3 ambient = vec3(0.003, 0.012, 0.032);
+    // Surfaces éclairées : bleu acier moyen (lisible)
+    vec3 diffuse = light * vec3(0.030, 0.140, 0.360);
+    // Silhouettes : cyan vif
+    vec3 rim     = fresnel * vec3(0.08, 0.60, 1.00);
 
     // Scanline subtile
-    float scan = sin(vWorldPos.y * 18.0 + time * 1.6) * 0.03 + 0.97;
+    float scan = sin(vWorldPos.y * 14.0 + time * 1.4) * 0.025 + 0.975;
 
-    // Corps quasi noir bleu nuit — détails lisibles grâce au shade
-    vec3 darkBody = vec3(0.008, 0.025, 0.065);
-    vec3 litBody  = vec3(0.025, 0.095, 0.230);
-    vec3 rimColor = vec3(0.12,  0.72,  1.00);
-
-    vec3 body  = mix(darkBody, litBody, shade);
-    vec3 color = mix(body, rimColor, fresnel);
-    color *= scan;
+    vec3 color = (ambient + diffuse + rim) * scan;
 
     gl_FragColor = vec4(color, 1.0);
   }
