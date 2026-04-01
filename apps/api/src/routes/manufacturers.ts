@@ -11,7 +11,10 @@ export function mountManufacturerRoutes(router: Router, deps: RouteDependencies)
     requireGameData,
     asyncHandler(async (req, res) => {
       const env = (req.query.env as string) || 'live';
-      const data = await gameDataService!.ships.getAllManufacturers(env);
+      // By default, only return manufacturers with at least one ship, component, or item.
+      // Pass ?all=1 to include empty manufacturers (for admin/debug purposes).
+      const onlyWithData = req.query.all !== '1';
+      const data = await gameDataService!.ships.getAllManufacturers(env, onlyWithData);
       if (req.query.format === 'csv')
         return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
       sendWithETag(req, res, { success: true, count: data.length, data });
@@ -51,6 +54,20 @@ export function mountManufacturerRoutes(router: Router, deps: RouteDependencies)
       const mfr = await gameDataService!.ships.getManufacturerByCode(req.params.code, env);
       if (!mfr) return void res.status(404).json({ success: false, error: 'Manufacturer not found' });
       const data = await gameDataService!.ships.getManufacturerComponents(req.params.code, env);
+      if (req.query.format === 'csv')
+        return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
+      sendWithETag(req, res, { success: true, count: data.length, data });
+    }),
+  );
+
+  router.get(
+    '/api/v1/manufacturers/:code/items',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = (req.query.env as string) || 'live';
+      const mfr = await gameDataService!.ships.getManufacturerByCode(req.params.code, env);
+      if (!mfr) return void res.status(404).json({ success: false, error: 'Manufacturer not found' });
+      const data = await gameDataService!.items.getItemsByManufacturer(req.params.code, env);
       if (req.query.format === 'csv')
         return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
       sendWithETag(req, res, { success: true, count: data.length, data });

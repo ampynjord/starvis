@@ -650,3 +650,24 @@ model CommodityPrice {
   @@index([commodityUuid], map: "idx_price_commodity")
   @@map("commodity_prices")
 }
+
+// ─── Locations ────────────────────────────────────────────────────────────────
+
+model Location {
+  uuid          String   @id @db.Char(36)
+  className     String   @map("class_name") @db.VarChar(255)
+  name          String   @db.VarChar(255)
+  type          String   @db.VarChar(50)
+  systemCode    String?  @map("system_code") @db.VarChar(20)
+  parentUuid    String?  @map("parent_uuid") @db.Char(36)
+  locKey        String?  @map("loc_key") @db.VarChar(255)
+  description   String?  @db.Text
+  isScannable   Boolean  @default(false) @map("is_scannable")
+  hideInStarmap Boolean  @default(false) @map("hide_in_starmap")
+  extractedAt   DateTime @default(now()) @map("extracted_at") @db.DateTime(0)
+
+  @@index([type], map: "idx_location_type")
+  @@index([systemCode], map: "idx_location_system")
+  @@index([parentUuid], map: "idx_location_parent")
+  @@map("locations")
+}

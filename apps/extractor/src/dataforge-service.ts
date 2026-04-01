@@ -17,7 +17,7 @@ import {
   type RecordDef,
   readInstance as readInstancePure,
 } from './dataforge-parser.js';
-import { type DataForgeContext, resolveLocKey } from './dataforge-utils.js';
+import { type DataForgeContext, type ManufacturerInfo, resolveLocKey } from './dataforge-utils.js';
 import { extractItems as _extractItems } from './item-extractor.js';
 import { LoadoutParser, type LoadoutPortEntry } from './loadout-parser.js';
 import logger from './logger.js';
@@ -35,6 +35,7 @@ export class DataForgeService implements DataForgeContext {
   private loadoutParser: LoadoutParser = new LoadoutParser(this);
   private vehicleIndex = new Map<string, { uuid: string; name: string; className: string }>();
   private guidIndex = new Map<string, string>();
+  private manufacturerCache: Map<string, ManufacturerInfo> | null = null;
   private scVersion: string | null = null;
 
   constructor(private p4kPath: string) {}
@@ -77,10 +78,19 @@ export class DataForgeService implements DataForgeContext {
       const manifestPath = join(dirname(this.p4kPath), 'build_manifest.id');
       const raw = await readFile(manifestPath, 'utf8');
       const parsed = JSON.parse(raw);
-      const ver = parsed?.Data?.Version || parsed?.Version;
-      if (ver) {
-        this.scVersion = String(ver);
-        logger.info(`SC game version: ${this.scVersion} (from build_manifest.id)`, { module: 'dataforge' });
+      const data = parsed?.Data ?? parsed;
+      // Prefer the public-facing version from Branch (e.g. "sc-alpha-4.7.0-hotfix" → "4.7.0")
+      const branch: string | undefined = data?.Branch;
+      const branchMatch = branch?.match(/(\d+\.\d+(?:\.\d+)*)/);
+      if (branchMatch) {
+        this.scVersion = branchMatch[1];
+        logger.info(`SC game version: ${this.scVersion} (from Branch "${branch}")`, { module: 'dataforge' });
+      } else {
+        const ver = data?.Version;
+        if (ver) {
+          this.scVersion = String(ver);
+          logger.info(`SC game version: ${this.scVersion} (from Version field)`, { module: 'dataforge' });
+        }
       }
     } catch (_e) {
       // file not found or parse error — fall through to P4K search
@@ -210,6 +220,53 @@ export class DataForgeService implements DataForgeContext {
     const record = this.dfData.records.find((r) => r.id === guid);
     if (!record) return null;
     return this.readInstance(record.structIndex, record.instanceIndex, 0, maxDepth);
+  }
+
+  /**
+   * Extracts all Manufacturer records from the DataForge.
+   * Returns a Map keyed by GUID → { guid, code, locKey, name }.
+   * Result is cached after first call.
+   */
+  extractAllManufacturers(): Map<string, ManufacturerInfo> {
+    if (this.manufacturerCache) return this.manufacturerCache;
+    const cache = new Map<string, ManufacturerInfo>();
+    if (!this.dfData || !this.dcbBuffer) return cache;
+
+    const mfgStructIdx = this.dfData.structDefs.findIndex((s) => s.name === 'SCItemManufacturer');
+    if (mfgStructIdx === -1) {
+      logger.warn('DataForge: no "SCItemManufacturer" struct found', { module: 'dataforge' });
+      this.manufacturerCache = cache;
+      return cache;
+    }
+
+    // Exclude paint logos, shops, hangar entities and UI-only entries
+    const EXCLUDED_SEGMENTS = ['/paintcolorlogos/', '/shop/', '/hangars/', '/uistyleonly/'];
+
+    const ZERO_GUID = '00000000-0000-0000-0000-000000000000';
+    for (const record of this.dfData.records) {
+      if (record.structIndex !== mfgStructIdx) continue;
+      if (!record.id || record.id === ZERO_GUID) continue;
+      const filePath = record.fileName ?? '';
+      if (EXCLUDED_SEGMENTS.some((seg) => filePath.includes(seg))) continue;
+
+      // Derive code from record name (e.g. "SCItemManufacturer.AEGS" → "AEGS")
+      const code = (record.name ?? '').replace('SCItemManufacturer.', '');
+      // Skip non-manufacturer entries and codes exceeding DB column limit (VARCHAR 10)
+      if (!code || code.length > 10 || /^paint_test/i.test(code)) continue;
+
+      const data = this.readInstance(record.structIndex, record.instanceIndex, 0, 2);
+      const locKey = (data?.Localization?.Name ?? '') as string;
+
+      cache.set(record.id, {
+        guid: record.id,
+        code,
+        locKey,
+        name: code, // placeholder — resolved to human-readable name by ExtractionService
+      });
+    }
+    logger.info(`Extracted ${cache.size} manufacturers from DataForge`, { module: 'dataforge' });
+    this.manufacturerCache = cache;
+    return cache;
   }
 
   searchRecords(pattern: string, limit = 100) {

@@ -5,7 +5,7 @@
  * Depends on DataForgeContext interface (no circular dependency with DataForgeService).
  */
 import type { DataForgeContext } from './dataforge-utils.js';
-import { MANUFACTURER_CODES, resolveComponentName } from './dataforge-utils.js';
+import { resolveComponentName } from './dataforge-utils.js';
 import logger from './logger.js';
 
 /**
@@ -113,7 +113,13 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
                 comp.name = resolveComponentName(className);
               }
             }
-            if (typeof ad.Manufacturer === 'string' && ad.Manufacturer) comp.manufacturer = ad.Manufacturer;
+            if (typeof ad.Manufacturer === 'string' && ad.Manufacturer) {
+              const mfgInfo = ctx.extractAllManufacturers().get(ad.Manufacturer);
+              if (mfgInfo) {
+                comp.manufacturerCode = mfgInfo.code;
+                comp.manufacturer = mfgInfo.name;
+              }
+            }
           }
         }
         if (cType === 'EntityComponentPowerConnection') {
@@ -522,14 +528,15 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
         }
       }
 
-      // Manufacturer from className prefix
-      // Only assign manufacturer if the prefix is a known manufacturer code.
-      // This avoids false positives where the prefix is a component type (COOL_, SHLD_, HTNK_…)
+      // Manufacturer fallback: try to match className prefix against DataForge manufacturer records.
+      // Only assigns if the code is known to be a real manufacturer (in DataForge SCItemManufacturer),
+      // to avoid false positives like DOOR_, SEAT_, RACK_, etc.
       if (!comp.manufacturerCode) {
-        const mfgMatch = className.match(/^([A-Z]{3,5})_/);
-        if (mfgMatch && MANUFACTURER_CODES[mfgMatch[1]]) {
-          comp.manufacturerCode = mfgMatch[1];
-          comp.manufacturer = MANUFACTURER_CODES[mfgMatch[1]];
+        const mfgMatch = className.match(/^([A-Za-z]{3,6})_/);
+        if (mfgMatch) {
+          const code = mfgMatch[1].toUpperCase();
+          const mfgInfo = [...ctx.extractAllManufacturers().values()].find((m) => m.code === code);
+          if (mfgInfo) comp.manufacturerCode = code;
         }
       }
 
