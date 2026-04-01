@@ -41,9 +41,10 @@ const holoFragmentShader = /* glsl */`
     float NdotV   = max(dot(N, V), 0.0);
     float fresnel = pow(1.0 - NdotV, 5.0);
 
-    // Corps quasi-noir — le wireframe overlay affiche les details
-    vec3 body = vec3(0.005, 0.018, 0.048);
-    vec3 rim  = fresnel * vec3(0.08, 0.62, 1.00);
+    // Corps noir profond — seul le wireframe donne la forme
+    vec3 body = vec3(0.003, 0.010, 0.028);
+    // Rim : cyan-blanc intense sur les silhouettes
+    vec3 rim  = fresnel * vec3(0.15, 0.88, 1.00) * 1.6;
 
     // Scanline
     float scan = sin(vWorldPos.y * 12.0 + time * 1.2) * 0.022 + 0.978;
@@ -124,9 +125,9 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
         // ── Wireframe overlay : révèle tous les détails structurels ──
         wireGeo = new THREE.WireframeGeometry(geometry);
         const wireMat = new THREE.LineBasicMaterial({
-          color: 0x1d8ab8,
+          color: 0x00e5ff,   // cyan hologramme saturé
           transparent: true,
-          opacity: 0.55,
+          opacity: 0.90,
           depthWrite: false,
         });
         const wireframe = new THREE.LineSegments(wireGeo, wireMat);
