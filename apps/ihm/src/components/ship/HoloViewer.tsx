@@ -37,23 +37,21 @@ const holoFragmentShader = /* glsl */`
     vec3 viewDir = normalize(cameraPos - vWorldPos);
     float NdotV   = max(dot(normalize(vNormal), viewDir), 0.0);
 
-    // Fresnel puissant — seulement les vraies silhouettes s'illuminent
-    float fresnel = pow(1.0 - NdotV, 4.5);
+    // Fresnel très concentré — illuminate uniquement les silhouettes
+    float fresnel = pow(1.0 - NdotV, 6.0);
 
-    // Relief — variation d'angle pour voir les surfaces et détails
-    float relief = NdotV * 0.35;
+    // Ombrage sombre : léger dégradé selon l'angle pour lire les volumes
+    float shade = NdotV * 0.12;
 
-    // Scanlines marquées (RSI a des bandes horizontales visibles)
-    float scan = sin(vWorldPos.y * 28.0 + time * 2.2) * 0.055 + 0.945;
+    // Scanline subtile
+    float scan = sin(vWorldPos.y * 18.0 + time * 1.6) * 0.03 + 0.97;
 
-    // Corps très sombre bleu nuit · silhouette = cyan pur
-    vec3 darkBody = vec3(0.018, 0.060, 0.135);
-    vec3 litBody  = vec3(0.055, 0.210, 0.470);
-    vec3 rimColor = vec3(0.18,  0.82,  1.00);
+    // Corps quasi noir bleu nuit — détails lisibles grâce au shade
+    vec3 darkBody = vec3(0.008, 0.025, 0.065);
+    vec3 litBody  = vec3(0.025, 0.095, 0.230);
+    vec3 rimColor = vec3(0.12,  0.72,  1.00);
 
-    // Corps avec relief (faces orientées caméra légèrement plus claires)
-    vec3 body  = mix(darkBody, litBody, relief);
-    // Silhouettes → cyan vif
+    vec3 body  = mix(darkBody, litBody, shade);
     vec3 color = mix(body, rimColor, fresnel);
     color *= scan;
 
@@ -125,18 +123,6 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
         const mesh = new THREE.Mesh(geometry, holoMaterial);
         pivot.add(mesh);
 
-        // Couche rim-glow (coque inversée légèrement élargie)
-        const rimMat = new THREE.MeshBasicMaterial({
-          color: 0x00c8f0,
-          side: THREE.BackSide,
-          transparent: true,
-          opacity: 0.10,
-          depthWrite: false,
-        });
-        const rimMesh = new THREE.Mesh(geometry, rimMat);
-        rimMesh.scale.setScalar(1.008);
-        pivot.add(rimMesh);
-
         scene.add(pivot);
 
         // Centrer en world space (après rotation)
@@ -164,19 +150,18 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
         controls.target.set(0, 0, 0);
         controls.update();
 
-        // ── Grille de sol dynamique (taille calée sur le vaisseau) ────────
-        const floorY = -r;
-        const gridSize = r * 6;
+        // ── Grille de sol (ancrée au bas du mesh, calibrée sur la taille) ─
+        // Sol = bas de la bounding box, légèrement sous le vaisseau
+        const floorY = box2.min.y - r * 0.04;
 
-        // Grille grossière (quadrillage principal visible)
-        const gridMain = new THREE.GridHelper(gridSize, 40, 0x1c5880, 0x0c2535);
+        // Taille fixe grande, mais nbr de divisions proportionnel
+        // → carrés d'environ r/3 de côté (lisibles quelle que soit la taille)
+        const gridSize = r * 8;
+        const divs = Math.round(gridSize / (r / 3));
+
+        const gridMain = new THREE.GridHelper(gridSize, divs, 0x1a5472, 0x0a2233);
         gridMain.position.y = floorY;
         scene.add(gridMain);
-
-        // Grille fine (subdivisions plus petites, moins visibles)
-        const gridFine = new THREE.GridHelper(gridSize, 160, 0x071a28, 0x071a28);
-        gridFine.position.y = floorY - 0.02;
-        scene.add(gridFine);
 
         setLoadState('ready');
       },
