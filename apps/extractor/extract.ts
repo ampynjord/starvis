@@ -63,6 +63,7 @@ const VALID_MODULES: ExtractionModule[] = [
   'paints',
   'shops',
   'ctm',
+  'locations',
 ];
 
 // ── CLI ─────────────────────────────────────────────────────

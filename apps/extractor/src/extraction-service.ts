@@ -23,14 +23,15 @@ import {
   pruneExcludedVariants,
   tagVariantTypes,
 } from './crossref.js';
-import { classifyPort, type DataForgeService, MANUFACTURER_CODES } from './dataforge-service.js';
+import { classifyPort, type DataForgeService } from './dataforge-service.js';
 import { LocalizationService } from './localization-service.js';
 import logger from './logger.js';
 import { extractMiningCompositions, extractMiningElements } from './mining-extractor.js';
 import { extractMissions, extractMissionBlueprintLinks, extractMissionFactionData, extractMissionMbeEnrichment } from './mission-extractor.js';
+import { extractLocations } from './location-extractor.js';
 import { scrapeShipCtmUrls, type ShipToScrape } from './ctm-scraper.js';
 
-export type ExtractionModule = 'ships' | 'components' | 'items' | 'commodities' | 'mining' | 'missions' | 'crafting' | 'paints' | 'shops' | 'ctm';
+export type ExtractionModule = 'ships' | 'components' | 'items' | 'commodities' | 'mining' | 'missions' | 'crafting' | 'paints' | 'shops' | 'ctm' | 'locations';
 
 export type GameEnv = 'live' | 'ptu' | 'eptu' | 'custom';
 
@@ -56,6 +57,7 @@ export interface ExtractionStats {
   miningCompositions: number;
   missions: number;
   craftingRecipes: number;
+  locations: number;
   errors: string[];
   extractionHash?: string;
   durationMs?: number;
@@ -176,6 +178,7 @@ export class ExtractionService {
       miningCompositions: 0,
       missions: 0,
       craftingRecipes: 0,
+      locations: 0,
       errors: [],
     };
 
@@ -247,10 +250,18 @@ export class ExtractionService {
         // shop_inventory is deleted via CASCADE from shops
       }
       if (run('ships')) {
+        // Preserve ctm_url values before wiping ships — they won't be re-scraped
+        const [ctmRows] = await conn.execute<any[]>('SELECT class_name, ctm_url FROM ships WHERE ctm_url IS NOT NULL');
+        const savedCtmUrls: Array<{ className: string; ctmUrl: string }> = ctmRows.map((r: any) => ({
+          className: r.class_name,
+          ctmUrl: r.ctm_url,
+        }));
         await conn.execute('DELETE FROM ship_modules');
         await conn.execute('DELETE FROM ship_loadouts');
         await conn.execute('DELETE FROM ship_paints');
         await conn.execute('DELETE FROM ships');
+        // Immediately store for later restore (after re-insert)
+        (this as any)._savedCtmUrls = savedCtmUrls;
       }
       if (run('components')) await conn.execute('DELETE FROM components');
       if (run('items') || run('commodities')) {
@@ -269,6 +280,9 @@ export class ExtractionService {
       if (run('crafting')) {
         await conn.execute('DELETE FROM crafting_ingredients');
         await conn.execute('DELETE FROM crafting_recipes');
+      }
+      if (run('locations')) {
+        await conn.execute('DELETE FROM locations');
       }
 
       // 2. Collect & save manufacturers FIRST (before ships, due to FK constraint)
@@ -298,6 +312,15 @@ export class ExtractionService {
         const shipResult = await this.saveShips(conn, onProgress);
         stats.ships = shipResult.ships;
         stats.loadoutPorts = shipResult.loadoutPorts;
+        // Restore preserved ctm_url values
+        const savedCtmUrls: Array<{ className: string; ctmUrl: string }> = (this as any)._savedCtmUrls ?? [];
+        if (savedCtmUrls.length > 0) {
+          for (const { className, ctmUrl } of savedCtmUrls) {
+            await conn.execute('UPDATE ships SET ctm_url = ? WHERE class_name = ?', [ctmUrl, className]);
+          }
+          onProgress?.(`CTM: restored ${savedCtmUrls.length} cached URLs`);
+          delete (this as any)._savedCtmUrls;
+        }
       }
 
       // 5. Extract & save shops/vendors
@@ -338,7 +361,13 @@ export class ExtractionService {
         await this.saveMissionBlueprintLinks(conn, onProgress);
       }
 
-      // 5g. Scrape CTM (3D model) URLs from RSI website
+      // 5g. Extract & save locations (StarMapObject)
+      if (run('locations')) {
+        onProgress?.('Extracting locations (StarMapObject)…');
+        stats.locations = await this.saveLocations(conn, onProgress);
+      }
+
+      // 5h. Scrape CTM (3D model) URLs from RSI website
       if (run('ctm')) {
         onProgress?.('Scraping 3D model URLs (CTM) from RSI…');
         await this.saveShipCtmModels(conn, onProgress);
@@ -1285,34 +1314,30 @@ export class ExtractionService {
   // ======================================================
 
   private async saveManufacturersFromData(conn: PoolConnection): Promise<number> {
-    const codes = new Set<string>();
+    // Source: Manufacturer records extracted directly from the DataForge (SCItemManufacturer struct).
+    const manufacturers = this.df.extractAllManufacturers();
 
-    const vehicles = this.df.getVehicleDefinitions();
-    for (const [, veh] of vehicles) {
-      const m = veh.className.match(/^([A-Z]{3,5})_/);
-      if (m) codes.add(m[1]);
-    }
-
-    const components = this.df.extractAllComponents();
-    for (const c of components) {
-      if (c.manufacturerCode) codes.add(c.manufacturerCode);
-    }
-
-    for (const code of Object.keys(MANUFACTURER_CODES)) {
-      codes.add(code);
+    if (manufacturers.size === 0) {
+      logger.warn('No manufacturer records found in DataForge — manufacturer table may be incomplete', { module: 'extraction' });
     }
 
     let saved = 0;
-    for (const code of codes) {
-      const name = MANUFACTURER_CODES[code] || code;
+    for (const mfg of manufacturers.values()) {
+      // Resolve loc key (e.g. "@manufacturer_NameAEGS") → human-readable name via global.ini
+      let name = mfg.code;
+      if (mfg.locKey && this.locService.isLoaded) {
+        const resolved = this.locService.resolveKey(mfg.locKey);
+        // Reject CIG placeholder strings (e.g. "<= PLACEHOLDER =>")
+        if (resolved && !resolved.startsWith('<=')) name = resolved;
+      }
       try {
-        await conn.execute(`INSERT INTO starvis.manufacturers (code, name) VALUES (?, ?) AS new ON DUPLICATE KEY UPDATE name=new.name`, [
-          code,
-          name,
-        ]);
+        await conn.execute(
+          `INSERT INTO starvis.manufacturers (code, name) VALUES (?, ?) AS new ON DUPLICATE KEY UPDATE name=new.name`,
+          [mfg.code, name],
+        );
         saved++;
       } catch (e: unknown) {
-        logger.error(`Manufacturer ${code}: ${e instanceof Error ? e.message : String(e)}`);
+        logger.error(`Manufacturer ${mfg.code}: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
     return saved;
@@ -2080,6 +2105,42 @@ export class ExtractionService {
     );
 
     onProgress?.(`Mission blueprint links: ${validRows.length} pairs saved (${links.length - validRows.length} skipped)`);
+  }
+
+  private async saveLocations(conn: PoolConnection, onProgress?: (msg: string) => void): Promise<number> {
+    const locAdapter = this.locService.isLoaded
+      ? { resolveKey: (k: string) => this.locService.resolveKey(k) ?? null }
+      : { resolveKey: () => null };
+
+    const records = extractLocations(this.df, locAdapter, onProgress);
+    if (!records.length) {
+      onProgress?.('Locations: 0 found');
+      return 0;
+    }
+
+    const rows: (string | number | null)[][] = records.map((r) => [
+      r.uuid,
+      r.className.substring(0, 255),
+      r.name.substring(0, 255),
+      r.type.substring(0, 50),
+      r.systemCode,
+      r.parentUuid,
+      r.locKey,
+      r.description,
+      r.isScannable ? 1 : 0,
+      r.hideInStarmap ? 1 : 0,
+    ]);
+
+    const affected = await ExtractionService.batchUpsert(
+      conn,
+      'INSERT INTO locations (uuid, class_name, name, type, system_code, parent_uuid, loc_key, description, is_scannable, hide_in_starmap) VALUES',
+      'ON DUPLICATE KEY UPDATE class_name=new.class_name, name=new.name, type=new.type, system_code=new.system_code, parent_uuid=new.parent_uuid, loc_key=new.loc_key, description=new.description, is_scannable=new.is_scannable, hide_in_starmap=new.hide_in_starmap',
+      10,
+      rows,
+    );
+
+    onProgress?.(`Locations: ${affected} upserted`);
+    return records.length;
   }
 
   private async saveCraftingRecipes(conn: PoolConnection, env: GameEnv, onProgress?: (msg: string) => void): Promise<number> {

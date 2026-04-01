@@ -6,6 +6,17 @@ import type { DataForgeData, RecordDef } from './dataforge-parser.js';
 
 // ============ Shared context interface for extractors ============
 
+/** Manufacturer data extracted directly from DataForge records */
+export interface ManufacturerInfo {
+  guid: string;
+  /** Record name without struct prefix, used as DB code (e.g. "AEGS", "BEHR", "VOLT") */
+  code: string;
+  /** Localization key for the human-readable name (e.g. "@manufacturer_NameAEGS") */
+  locKey: string;
+  /** Resolved human-readable name — populated by ExtractionService after loc resolution */
+  name: string;
+}
+
 /**
  * Interface exposing the DataForgeService capabilities needed by extraction modules.
  * Avoids circular dependency: extractors depend on this interface, not the concrete class.
@@ -16,51 +27,20 @@ export interface DataForgeContext {
   readRecordByGuid(guid: string, maxDepth?: number): Record<string, any> | null;
   resolveGuid(guid: string): string | undefined;
   findEntityRecord(entityClassName: string): RecordDef | null;
+  /** Returns all manufacturer records from the DataForge, keyed by GUID */
+  extractAllManufacturers(): Map<string, ManufacturerInfo>;
 }
 
 // ============ Manufacturer codes ============
 
 /** Manufacturer code → full name mapping (from SC game data prefixes) */
-export const MANUFACTURER_CODES: Record<string, string> = {
-  // Vehicle manufacturers (ship_matrix + P4K)
-  AEGS: 'Aegis Dynamics',
-  ANVL: 'Anvil Aerospace',
-  ARGO: 'ARGO Astronautics',
-  BANU: 'Banu',
-  CNOU: 'Consolidated Outland',
-  CRUS: 'Crusader Industries',
-  DRAK: 'Drake Interplanetary',
-  ESPR: 'Esperia',
-  GAMA: 'Gatac Manufacture',
-  GLSN: "Grey's Market",
-  GREY: "Grey's Market",
-  GRIN: 'Greycat Industrial',
-  KRIG: 'Kruger Intergalactic',
-  MISC: 'Musashi Industrial & Starflight Concern',
-  MRAI: 'Mirai',
-  ORIG: 'Origin Jumpworks',
-  RSI: 'Roberts Space Industries',
-  TMBL: 'Tumbril Land Systems',
-  VNCL: 'Vanduul',
-  XIAN: 'Aopoa',
-  XNAA: 'Aopoa',
-  // Component manufacturers (P4K only)
-  AMRS: 'Amon & Reese Co.',
-  APAR: 'Apocalypse Arms',
-  BEHR: 'Behring Applied Technology',
-  BRRA: 'Basilisk',
-  GATS: 'Gallenson Tactical Systems',
-  HRST: 'Hurston Dynamics',
-  JOKR: 'Joker Engineering',
-  KBAR: 'KnightBridge Arms',
-  KLWE: 'Klaus & Werner',
-  KRON: 'Kroneg',
-  MXOX: 'MaxOx',
-  NOVP: 'Nova Pyrotechnik',
-  PRAR: 'Preacher Armaments',
-  TALN: 'Talon',
-  TOAG: 'Thermyte Concern',
-};
+/**
+ * @deprecated No longer used as source of truth for manufacturer names.
+ * Manufacturer data is now extracted directly from DataForge Manufacturer struct records
+ * via DataForgeService.extractAllManufacturers(). This dict is kept only for backward
+ * compatibility with any external code that may import it.
+ */
+export const MANUFACTURER_CODES: Record<string, string> = {};
 
 // ============ Shop localization names ============
 

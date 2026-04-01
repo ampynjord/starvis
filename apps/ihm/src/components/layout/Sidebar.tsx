@@ -9,6 +9,7 @@ import {
   Factory,
   Home,
   Layers3,
+  MapPin,
   Paintbrush,
   Pickaxe,
   Rocket,
@@ -29,6 +30,7 @@ import { useEnv } from '@/contexts/EnvContext';
 const CORE_ITEMS = [
   { to: '/',              icon: Home,          label: 'Dashboard' },
   { to: '/missions',      icon: ClipboardList, label: 'Missions' },
+  { to: '/locations',     icon: MapPin,        label: 'Locations' },
   { to: '/blueprints',    icon: Scroll,        label: 'Blueprints' },
   { to: '/factions',      icon: Shield,        label: 'Factions' },
   { to: '/manufacturers', icon: Wrench,        label: 'Manufacturers' },

@@ -14,6 +14,7 @@ import { ComponentQueryService } from './component-query-service.js';
 import { CraftingService } from './crafting-service.js';
 import { ItemQueryService } from './item-query-service.js';
 import { LoadoutService } from './loadout-service.js';
+import { LocationQueryService } from './location-query-service.js';
 import { MiningQueryService } from './mining-query-service.js';
 import { MissionService } from './mission-service.js';
 import { PaintQueryService } from './paint-query-service.js';
@@ -50,6 +51,7 @@ export class GameDataService {
   readonly missions: MissionService;
   readonly crafting: CraftingService;
   readonly trade: TradeService;
+  readonly locations: LocationQueryService;
 
   private statsCache = new TtlCache<Record<string, unknown>>(60_000);
   private publicStatsCache = new TtlCache<Record<string, unknown>>(60_000);
@@ -69,6 +71,7 @@ export class GameDataService {
     this.missions = new MissionService(getClient);
     this.crafting = new CraftingService(getClient);
     this.trade = new TradeService(getClient);
+    this.locations = new LocationQueryService(getClient);
   }
 
   // ── Unified search (cross-cutting — queries ships + components + items) ──

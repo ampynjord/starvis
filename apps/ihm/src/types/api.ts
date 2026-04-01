@@ -303,6 +303,7 @@ export interface Manufacturer {
   known_for: string | null;
   ship_count: number;
   component_count: number;
+  item_count: number;
 }
 
 // ─── Commodities ──────────────────────────────────────────────────────────────
@@ -953,4 +954,18 @@ export interface MiningYieldResult {
   risk: MiningRiskAggregates | null;
   laser: MiningLaserInfo | null;
   gadgets: MiningLaserInfo[];
+}
+
+// ─── Locations ────────────────────────────────────────────────────────────────
+export interface Location {
+  uuid: string;
+  class_name: string;
+  name: string;
+  type: string;
+  system_code: string | null;
+  parent_uuid: string | null;
+  loc_key: string | null;
+  description?: string | null;
+  is_scannable: boolean;
+  hide_in_starmap: boolean;
 }
