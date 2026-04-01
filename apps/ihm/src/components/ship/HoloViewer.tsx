@@ -37,29 +37,18 @@ const holoFragmentShader = /* glsl */`
     vec3 N = normalize(vNormal);
     vec3 V = normalize(cameraPos - vWorldPos);
 
-    // ── Fresnel : rim cyan uniquement sur les vraies silhouettes ──────
-    float NdotV  = max(dot(N, V), 0.0);
-    float fresnel = pow(1.0 - NdotV, 5.5);
+    // Fresnel : seules les silhouettes s'illuminent
+    float NdotV   = max(dot(N, V), 0.0);
+    float fresnel = pow(1.0 - NdotV, 5.0);
 
-    // ── Éclairage directionnel fixe (lumière de dessus-avant comme RSI) ──
-    vec3 L     = normalize(vec3(0.35, 1.0, 0.55));
-    float NdotL = max(dot(N, L), 0.0);
-    // Légère rétro-lumière pour ne pas avoir de faces totalement noires
-    float back = max(dot(-N, L), 0.0) * 0.06;
-    float light = NdotL + back;
+    // Corps quasi-noir — le wireframe overlay affiche les details
+    vec3 body = vec3(0.005, 0.018, 0.048);
+    vec3 rim  = fresnel * vec3(0.08, 0.62, 1.00);
 
-    // ── Palette ────────────────────────────────────────────────────────
-    // Ambiance quasi-noire
-    vec3 ambient = vec3(0.003, 0.012, 0.032);
-    // Surfaces éclairées : bleu acier moyen (lisible)
-    vec3 diffuse = light * vec3(0.030, 0.140, 0.360);
-    // Silhouettes : cyan vif
-    vec3 rim     = fresnel * vec3(0.08, 0.60, 1.00);
+    // Scanline
+    float scan = sin(vWorldPos.y * 12.0 + time * 1.2) * 0.022 + 0.978;
 
-    // Scanline subtile
-    float scan = sin(vWorldPos.y * 14.0 + time * 1.4) * 0.025 + 0.975;
-
-    vec3 color = (ambient + diffuse + rim) * scan;
+    vec3 color = (body + rim) * scan;
 
     gl_FragColor = vec4(color, 1.0);
   }
@@ -116,6 +105,9 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
       side: THREE.DoubleSide,
     });
 
+    // Wireframe geometry ref pour le cleanup
+    let wireGeo: THREE.WireframeGeometry | null = null;
+
     // ── Load CTM ───────────────────────────────────────────────────────
     setLoadState('loading');
     const loader = new CTMLoader();
@@ -125,9 +117,20 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
         const pivot = new THREE.Group();
         pivot.rotation.set(0, Math.PI / 2, 0);
 
-        // Maillage principal avec shader hologramme
+        // Maillage principal (quasi-noir, sert de fond)
         const mesh = new THREE.Mesh(geometry, holoMaterial);
         pivot.add(mesh);
+
+        // ── Wireframe overlay : révèle tous les détails structurels ──
+        wireGeo = new THREE.WireframeGeometry(geometry);
+        const wireMat = new THREE.LineBasicMaterial({
+          color: 0x1d8ab8,
+          transparent: true,
+          opacity: 0.55,
+          depthWrite: false,
+        });
+        const wireframe = new THREE.LineSegments(wireGeo, wireMat);
+        pivot.add(wireframe);
 
         scene.add(pivot);
 
@@ -203,6 +206,7 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
       ro.disconnect();
       controls.dispose();
       holoMaterial.dispose();
+      wireGeo?.dispose();
       renderer.dispose();
       container.removeChild(renderer.domElement);
       rendererRef.current = null;
