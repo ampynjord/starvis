@@ -335,6 +335,7 @@ model Item {
   updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.DateTime(0)
 
   @@index([canonicalItemKey], map: "idx_item_canonical_key_env")
+  @@index([manufacturerCode], map: "idx_item_manufacturer_code")
   @@map("items")
 }
 
