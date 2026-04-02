@@ -377,19 +377,20 @@ export class ShipQueryService {
 
   async getAllManufacturers(env = 'live', onlyWithData = true): Promise<Row[]> {
     const prisma = this.getClient(env);
-    const having = onlyWithData
-      ? 'HAVING ship_count > 0 OR component_count > 0 OR item_count > 0'
+    const where = onlyWithData
+      ? 'WHERE COALESCE(s.cnt, 0) > 0 OR COALESCE(c.cnt, 0) > 0 OR COALESCE(i.cnt, 0) > 0'
       : '';
+    // Use pre-aggregated subqueries to avoid cartesian cross-product between ships/components/items
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT m.*,
-              COUNT(DISTINCT s.uuid) as ship_count,
-              COUNT(DISTINCT c.uuid) as component_count,
-              COUNT(DISTINCT i.uuid) as item_count
+              COALESCE(s.cnt, 0) as ship_count,
+              COALESCE(c.cnt, 0) as component_count,
+              COALESCE(i.cnt, 0) as item_count
        FROM starvis.manufacturers m
-       LEFT JOIN ships s ON m.code = s.manufacturer_code
-       LEFT JOIN components c ON m.code = c.manufacturer_code
-       LEFT JOIN items i ON m.code = i.manufacturer_code
-       GROUP BY m.code ${having} ORDER BY m.name`,
+       LEFT JOIN (SELECT manufacturer_code, COUNT(uuid) cnt FROM ships GROUP BY manufacturer_code) s ON s.manufacturer_code = m.code
+       LEFT JOIN (SELECT manufacturer_code, COUNT(uuid) cnt FROM components GROUP BY manufacturer_code) c ON c.manufacturer_code = m.code
+       LEFT JOIN (SELECT manufacturer_code, COUNT(uuid) cnt FROM items GROUP BY manufacturer_code) i ON i.manufacturer_code = m.code
+       ${where} ORDER BY m.name`,
     );
     // Convert BigInt to Number for JSON serialization
     return rows.map((r) => ({
@@ -413,17 +414,20 @@ export class ShipQueryService {
 
   async getManufacturerByCode(code: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
+    // Use pre-aggregated subqueries to avoid cartesian cross-product between ships/components/items
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT m.*,
-              COUNT(DISTINCT s.uuid) as ship_count,
-              COUNT(DISTINCT c.uuid) as component_count,
-              COUNT(DISTINCT i.uuid) as item_count
+              COALESCE(s.cnt, 0) as ship_count,
+              COALESCE(c.cnt, 0) as component_count,
+              COALESCE(i.cnt, 0) as item_count
        FROM starvis.manufacturers m
-       LEFT JOIN ships s ON m.code = s.manufacturer_code
-       LEFT JOIN components c ON m.code = c.manufacturer_code
-       LEFT JOIN items i ON m.code = i.manufacturer_code
-       WHERE m.code = ?
-       GROUP BY m.code`,
+       LEFT JOIN (SELECT manufacturer_code, COUNT(uuid) cnt FROM ships WHERE manufacturer_code = ? GROUP BY manufacturer_code) s ON s.manufacturer_code = m.code
+       LEFT JOIN (SELECT manufacturer_code, COUNT(uuid) cnt FROM components WHERE manufacturer_code = ? GROUP BY manufacturer_code) c ON c.manufacturer_code = m.code
+       LEFT JOIN (SELECT manufacturer_code, COUNT(uuid) cnt FROM items WHERE manufacturer_code = ? GROUP BY manufacturer_code) i ON i.manufacturer_code = m.code
+       WHERE m.code = ?`,
+      code.toUpperCase(),
+      code.toUpperCase(),
+      code.toUpperCase(),
       code.toUpperCase(),
     );
     const raw = rows[0];
