@@ -305,7 +305,7 @@ function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
         {recipe.unlock_missions && recipe.unlock_missions.length > 0 && (
           <div className="sci-panel p-3 bg-cyan-950/10 border-cyan-900/30">
             <p className="text-[10px] font-mono-sc text-cyan-500 uppercase flex items-center gap-1 mb-2">
-              <ClipboardList size={10} /> Unlock Missions ({recipe.unlock_missions.length})
+              <ClipboardList size={10} /> Unlock Blueprint ({recipe.unlock_missions.length})
             </p>
             <div className="space-y-1.5">
               {recipe.unlock_missions.map((m) => (

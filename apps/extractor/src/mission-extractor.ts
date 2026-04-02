@@ -454,7 +454,7 @@ export function extractMissionBlueprintLinks(ctx: DataForgeService): MissionBlue
   function getBlueprintsForPool(poolUuid: string): string[] {
     if (poolBlueprintsCache.has(poolUuid)) return poolBlueprintsCache.get(poolUuid)!;
     try {
-      const poolData = ctx.readRecordByGuid(poolUuid, 6) as Record<string, unknown>;
+      const poolData = ctx.readRecordByGuid(poolUuid, 8) as Record<string, unknown>;
       const poolJson = JSON.stringify(poolData);
       const refs: string[] = [];
       for (const m of poolJson.matchAll(/"__ref":\s*"([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})"/g)) {
@@ -476,7 +476,7 @@ export function extractMissionBlueprintLinks(ctx: DataForgeService): MissionBlue
 
   for (const g of generators) {
     try {
-      const data = ctx.readRecordByGuid(g.uuid, 6) as Record<string, unknown>;
+      const data = ctx.readRecordByGuid(g.uuid, 10) as Record<string, unknown>;
       const json = JSON.stringify(data);
 
       const missionUuids: string[] = [];
