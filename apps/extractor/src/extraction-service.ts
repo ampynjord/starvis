@@ -2076,20 +2076,43 @@ export class ExtractionService {
 
   private async saveMissionBlueprintLinks(conn: PoolConnection, onProgress?: (msg: string) => void): Promise<void> {
     const links = extractMissionBlueprintLinks(this.df);
-    if (!links.length) {
-      onProgress?.('Mission blueprint links: none found');
-      return;
-    }
 
     // Fetch UUIDs that actually exist in DB to avoid FK violations
-    const [missionRows]: any = await conn.execute('SELECT uuid FROM missions');
-    const [blueprintRows]: any = await conn.execute('SELECT uuid FROM crafting_recipes');
+    const [missionRows]: any = await conn.execute('SELECT uuid, class_name FROM missions');
+    const [blueprintRows]: any = await conn.execute('SELECT uuid, class_name FROM crafting_recipes');
     const missionSet = new Set((missionRows as { uuid: string }[]).map((r) => r.uuid));
     const blueprintSet = new Set((blueprintRows as { uuid: string }[]).map((r) => r.uuid));
 
     const validRows = links
       .filter((l) => missionSet.has(l.missionUuid) && blueprintSet.has(l.blueprintUuid))
-      .map((l) => [l.missionUuid, l.blueprintUuid]);
+      .map((l) => [l.missionUuid, l.blueprintUuid] as [string, string]);
+
+    // ── Manual overrides: loot-based links not present in DataForge ──────────
+    // ADP (cds_legacy_armor) blueprints are dropped as loot in UGF Unlawful missions.
+    // These links are not encoded in ContractGenerator/BlueprintPoolRecord.
+    const UGF_UNLAWFUL_CLASS_NAMES = [
+      'EliminateAll_Unlawful_UGF',
+      'EliminateBoss_Unlawful_UGF',
+      'EliminateSpecific_Unlawful_UGF',
+    ];
+    const ugfMissionUuids = (missionRows as { uuid: string; class_name: string }[])
+      .filter((r) => UGF_UNLAWFUL_CLASS_NAMES.includes(r.class_name))
+      .map((r) => r.uuid);
+    const adpBlueprintUuids = (blueprintRows as { uuid: string; class_name: string }[])
+      .filter((r) => r.class_name.includes('cds_legacy_armor'))
+      .map((r) => r.uuid);
+
+    const seenKeys = new Set(validRows.map(([m, b]) => `${m}:${b}`));
+    for (const missionUuid of ugfMissionUuids) {
+      for (const blueprintUuid of adpBlueprintUuids) {
+        const key = `${missionUuid}:${blueprintUuid}`;
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key);
+          validRows.push([missionUuid, blueprintUuid]);
+        }
+      }
+    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     if (!validRows.length) {
       onProgress?.('Mission blueprint links: none matched existing missions/blueprints');
@@ -2104,7 +2127,9 @@ export class ExtractionService {
       validRows,
     );
 
-    onProgress?.(`Mission blueprint links: ${validRows.length} pairs saved (${links.length - validRows.length} skipped)`);
+    const dfCount = links.filter((l) => missionSet.has(l.missionUuid) && blueprintSet.has(l.blueprintUuid)).length;
+    const manualCount = ugfMissionUuids.length * adpBlueprintUuids.length;
+    onProgress?.(`Mission blueprint links: ${validRows.length} pairs saved (${dfCount} DataForge + ${manualCount} manual UGF/ADP)`);
   }
 
   private async saveLocations(conn: PoolConnection, onProgress?: (msg: string) => void): Promise<number> {
