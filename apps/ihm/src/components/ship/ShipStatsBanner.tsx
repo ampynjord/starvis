@@ -78,9 +78,10 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 }
 
 // ── Component ────────────────────────────────────────────
-interface Props { ship: Ship; loadout: LoadoutNode[] }
+interface Props { ship: Ship; loadout: LoadoutNode[]; category?: string }
 
-export function ShipStatsBanner({ ship, loadout }: Props) {
+export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
+  const isGround = category === 'ground' || category === 'gravlev';
   const ls = computeStats(loadout);
   const shieldHp = ls.shieldHp > 0 ? ls.shieldHp : n(ship.shield_hp);
   const hullHp   = n(ship.total_hp);
@@ -197,12 +198,15 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
 
         {/* Légende sous la ruler */}
         <div className="flex gap-3 mb-3">
-          {[
+          {(isGround ? [
+            { label: 'Speed', color: 'bg-cyan-500',   value: fV(ship.scm_speed) + ' m/s' },
+            { label: 'Top',   color: 'bg-violet-500', value: fV(ship.max_speed) + ' m/s' },
+          ] : [
             { label: 'SCM',  color: 'bg-cyan-500',   value: fV(ship.scm_speed) + ' m/s' },
             { label: 'Boost',color: 'bg-amber-400',  value: fV(ship.boost_speed_forward) + ' m/s' },
             { label: 'Ret.', color: 'bg-amber-700',  value: fV(ship.boost_speed_backward ?? 0) + ' m/s' },
             { label: 'Nav',  color: 'bg-violet-500', value: fV(ship.max_speed) + ' m/s' },
-          ].map(({ label, color, value }) => (
+          ]).map(({ label, color, value }) => (
             <div key={label} className="flex items-center gap-1 min-w-0">
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${color}`} />
               <span className="text-[9px] font-mono-sc text-slate-600 shrink-0">{label}</span>
@@ -211,29 +215,30 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
           ))}
         </div>
 
-        {/* Agilité — 3 mini barres verticales */}
-        <div className="grid grid-cols-3 gap-1.5">
-          {[
-            { label: 'Pitch', val: ship.pitch_max, max: 130, color: 'bg-emerald-600' },
-            { label: 'Yaw',   val: ship.yaw_max,   max: 130, color: 'bg-emerald-600' },
-            { label: 'Roll',  val: ship.roll_max,  max: 260, color: 'bg-teal-600' },
-          ].map(({ label, val, max, color }) => (
-            <div key={label} className="flex flex-col items-center gap-1 rounded-md border border-slate-800 bg-slate-900/40 py-2 px-1">
-              <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest">{label}</span>
-              {/* Barre verticale */}
-              <div className="w-3 h-10 bg-slate-800 rounded-full overflow-hidden flex flex-col-reverse">
-                <div
-                  className={`w-full rounded-full ${color}`}
-                  style={{ height: `${Math.min(100, (n(val) / max) * 100)}%` }}
-                />
+        {/* Agilité — ships uniquement */}
+        {!isGround && (
+          <div className="grid grid-cols-3 gap-1.5">
+            {[
+              { label: 'Pitch', val: ship.pitch_max, max: 130, color: 'bg-emerald-600' },
+              { label: 'Yaw',   val: ship.yaw_max,   max: 130, color: 'bg-emerald-600' },
+              { label: 'Roll',  val: ship.roll_max,  max: 260, color: 'bg-teal-600' },
+            ].map(({ label, val, max, color }) => (
+              <div key={label} className="flex flex-col items-center gap-1 rounded-md border border-slate-800 bg-slate-900/40 py-2 px-1">
+                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest">{label}</span>
+                <div className="w-3 h-10 bg-slate-800 rounded-full overflow-hidden flex flex-col-reverse">
+                  <div
+                    className={`w-full rounded-full ${color}`}
+                    style={{ height: `${Math.min(100, (n(val) / max) * 100)}%` }}
+                  />
+                </div>
+                <span className="text-[10px] font-mono-sc text-slate-300 tabular-nums">{fV(val)}°</span>
               </div>
-              <span className="text-[10px] font-mono-sc text-slate-300 tabular-nums">{fV(val)}°</span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
-        {/* G-force + boost */}
-        {gForce != null && (
+        {/* G-force + boost — ships uniquement */}
+        {!isGround && gForce != null && (
           <div className="flex items-center justify-between mt-2 rounded-md border border-slate-800 bg-slate-900/40 px-3 py-1.5">
             <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest">Accel (fwd)</span>
             <div className="flex items-baseline gap-2">
@@ -245,8 +250,8 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
           </div>
         )}
 
-        {/* Angles boostés + ramp */}
-        {(boostedPitch != null || rampUp != null) && (
+        {/* Angles boostés + ramp — ships uniquement */}
+        {!isGround && (boostedPitch != null || rampUp != null) && (
           <div className="grid grid-cols-2 gap-1.5 mt-2">
             {boostedPitch != null && (
               <div className="flex flex-col items-center rounded-md border border-amber-900/30 bg-amber-950/10 py-1.5 px-1">
@@ -521,7 +526,7 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
       {/* ════════════════════════════════════════
           RADAR
       ════════════════════════════════════════ */}
-      {radarNode && (radarNode.radar_tracking_signal || radarNode.radar_detection_lifetime) && (
+      {!isGround && radarNode && (radarNode.radar_tracking_signal || radarNode.radar_detection_lifetime) && (
         <div>
           <SectionLabel>Radar</SectionLabel>
           <div className="grid grid-cols-2 gap-1.5">
@@ -550,7 +555,7 @@ export function ShipStatsBanner({ ship, loadout }: Props) {
       {/* ════════════════════════════════════════
           FUEL + CARGO
       ════════════════════════════════════════ */}
-      {(ship.hydrogen_fuel_capacity != null || ship.quantum_fuel_capacity != null || qdNode?.qd_range != null) && (
+      {!isGround && (ship.hydrogen_fuel_capacity != null || ship.quantum_fuel_capacity != null || qdNode?.qd_range != null) && (
         <div>
           <SectionLabel>Fuel</SectionLabel>
           <div className="grid grid-cols-2 gap-1.5">
