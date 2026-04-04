@@ -13,6 +13,7 @@ vi.mock('@/services/api', () => ({
         careers: [],
         variant_types: [],
         sizes: [],
+        vehicle_categories: [],
       }),
       list: vi.fn().mockResolvedValue({
         data: [{ uuid: 's1', name: 'Aurora MR', manufacturer_code: 'RSI', role: 'Multi-Role', size: 1 }],
@@ -28,14 +29,14 @@ vi.mock('@/services/api', () => ({
 describe('ShipsPage', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  it('renders the Ships heading', async () => {
+  it('renders the Ships tab', async () => {
     renderWithProviders(<ShipsPage />);
-    await waitFor(() => expect(screen.getByRole('heading', { name: /ships/i })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('button', { name: /^ships$/i })).toBeInTheDocument());
   });
 
   it('renders ship count from API response', async () => {
     renderWithProviders(<ShipsPage />);
-    await waitFor(() => expect(screen.getByText(/1 ship/i)).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText(/1 results/i)).toBeInTheDocument());
   });
 
   it('renders the ship name from API', async () => {
