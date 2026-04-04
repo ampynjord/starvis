@@ -382,9 +382,7 @@ export class ShipQueryService {
 
   async getAllManufacturers(env = 'live', onlyWithData = true): Promise<Row[]> {
     const prisma = this.getClient(env);
-    const where = onlyWithData
-      ? 'WHERE COALESCE(s.cnt, 0) > 0 OR COALESCE(c.cnt, 0) > 0 OR COALESCE(i.cnt, 0) > 0'
-      : '';
+    const where = onlyWithData ? 'WHERE COALESCE(s.cnt, 0) > 0 OR COALESCE(c.cnt, 0) > 0 OR COALESCE(i.cnt, 0) > 0' : '';
     // Use pre-aggregated subqueries to avoid cartesian cross-product between ships/components/items
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT m.*,

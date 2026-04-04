@@ -57,8 +57,12 @@ function classifyByPath(filePath: string): string | null {
 
   // ── Asteroid-related ──
   if (
-    fp.includes('asteroidcluster') || fp.includes('asteroidring') || fp.includes('asteroidbelt') ||
-    fp.includes('glaciemring') || fp.includes('keegebelt') || fp.includes('keegerbelt') ||
+    fp.includes('asteroidcluster') ||
+    fp.includes('asteroidring') ||
+    fp.includes('asteroidbelt') ||
+    fp.includes('glaciemring') ||
+    fp.includes('keegebelt') ||
+    fp.includes('keegerbelt') ||
     fp.includes('nyx_kaboos')
   )
     return 'asteroid_field';
@@ -199,11 +203,7 @@ function fallbackName(className: string): string {
   return name.trim() || className;
 }
 
-export function extractLocations(
-  df: DataForgeContext,
-  loc: LocationLocAdapter,
-  onProgress?: (msg: string) => void,
-): LocationRecord[] {
+export function extractLocations(df: DataForgeContext, loc: LocationLocAdapter, onProgress?: (msg: string) => void): LocationRecord[] {
   const dfData = df.getDfData();
   if (!dfData) return [];
 

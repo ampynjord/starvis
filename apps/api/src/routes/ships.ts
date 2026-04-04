@@ -4,9 +4,9 @@ import { request as httpsRequest } from 'node:https';
 import { join } from 'node:path';
 import type { Router } from 'express';
 import { SearchQuery, ShipQuery } from '../schemas.js';
+import { CTM_CACHE_DIR } from '../utils/config.js';
 import { asyncHandler, makeGameDataGuard, makeShipResolver, sendCsvOrJson, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
-import { CTM_CACHE_DIR } from '../utils/config.js';
 
 export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
   const { gameDataService } = deps;
@@ -383,7 +383,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
       // ── Cache disque ──────────────────────────────────────────────────────
       mkdirSync(CTM_CACHE_DIR, { recursive: true });
       const cacheFile = join(CTM_CACHE_DIR, `${uuid}.ctm`);
-      const sidecar   = join(CTM_CACHE_DIR, `${uuid}.url`);
+      const sidecar = join(CTM_CACHE_DIR, `${uuid}.url`);
 
       // Invalide le cache si l'URL a changé depuis le dernier téléchargement
       const cachedUrl = existsSync(sidecar) ? readFileSync(sidecar, 'utf-8').trim() : null;
@@ -397,12 +397,15 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
         'Content-Type': 'application/octet-stream',
         'Content-Disposition': `attachment; filename="${ship.class_name}.ctm"`,
         'Cache-Control': 'public, max-age=86400',
-        'ETag': etag,
+        ETag: etag,
       };
 
       // ── Servir depuis le cache ────────────────────────────────────────────
       if (existsSync(cacheFile)) {
-        if (req.headers['if-none-match'] === etag) { res.status(304).end(); return; }
+        if (req.headers['if-none-match'] === etag) {
+          res.status(304).end();
+          return;
+        }
         for (const [k, v] of Object.entries(headers)) res.setHeader(k, v);
         res.setHeader('X-CTM-Cache', 'HIT');
         res.sendFile(cacheFile);
@@ -410,7 +413,10 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
       }
 
       // ── Téléchargement depuis RSI + sauvegarde ────────────────────────────
-      if (req.headers['if-none-match'] === etag) { res.status(304).end(); return; }
+      if (req.headers['if-none-match'] === etag) {
+        res.status(304).end();
+        return;
+      }
 
       const url = new URL(ctmUrl);
       await new Promise<void>((resolve, reject) => {
@@ -432,9 +438,18 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
             upstream.pipe(res);
             upstream.pipe(writer);
             writer.on('finish', () => writeFileSync(sidecar, ctmUrl, 'utf-8'));
-            writer.on('error', () => { try { unlinkSync(cacheFile); } catch {} });
+            writer.on('error', () => {
+              try {
+                unlinkSync(cacheFile);
+              } catch {}
+            });
             upstream.on('end', resolve);
-            upstream.on('error', (err) => { try { unlinkSync(cacheFile); } catch {} reject(err); });
+            upstream.on('error', (err) => {
+              try {
+                unlinkSync(cacheFile);
+              } catch {}
+              reject(err);
+            });
           },
         );
         proxyReq.on('error', reject);

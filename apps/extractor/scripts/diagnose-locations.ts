@@ -4,9 +4,7 @@
  */
 import { DataForgeService } from '../src/dataforge-service.js';
 
-const p4kPath =
-  process.env.P4K_PATH ||
-  'C:/Program Files/Roberts Space Industries/StarCitizen/LIVE/Data.p4k';
+const p4kPath = process.env.P4K_PATH || 'C:/Program Files/Roberts Space Industries/StarCitizen/LIVE/Data.p4k';
 
 const LOCATION_PATTERNS = [
   /starsystem/i,
@@ -109,4 +107,7 @@ async function main() {
   await svc.close();
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

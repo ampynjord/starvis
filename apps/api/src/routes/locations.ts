@@ -16,14 +16,10 @@ export function mountLocationRoutes(router: Router, deps: RouteDependencies): vo
   const requireGameData = makeGameDataGuard(gameDataService);
 
   /** GET /api/v1/locations/types */
-  mountEnvDataRoute(router, '/api/v1/locations/types', requireGameData, (env) =>
-    gameDataService!.locations.getLocationTypes(env),
-  );
+  mountEnvDataRoute(router, '/api/v1/locations/types', requireGameData, (env) => gameDataService!.locations.getLocationTypes(env));
 
   /** GET /api/v1/locations/systems */
-  mountEnvDataRoute(router, '/api/v1/locations/systems', requireGameData, (env) =>
-    gameDataService!.locations.getLocationSystems(env),
-  );
+  mountEnvDataRoute(router, '/api/v1/locations/systems', requireGameData, (env) => gameDataService!.locations.getLocationSystems(env));
 
   /** GET /api/v1/locations/all — full unpaginated list for tree views */
   router.get(
@@ -81,4 +77,3 @@ export function mountLocationRoutes(router: Router, deps: RouteDependencies): vo
     }),
   );
 }
-

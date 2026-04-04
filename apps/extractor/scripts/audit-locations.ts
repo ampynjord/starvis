@@ -1,31 +1,37 @@
 /**
  * audit-locations.ts
- * 
+ *
  * Analyse les StarMapObject ignorés par classifyByPath() pour détecter des
  * locations manquantes. Groupe les chemins skippés par pattern de dossier.
  */
 import { DataForgeService } from '../src/dataforge-service.js';
 
-const p4kPath =
-  process.env.P4K_PATH ||
-  'C:/Program Files/Roberts Space Industries/StarCitizen/LIVE/Data.p4k';
+const p4kPath = process.env.P4K_PATH || 'C:/Program Files/Roberts Space Industries/StarCitizen/LIVE/Data.p4k';
 
 const MAX_SAMPLES = 5;
 
 function classifyByPath(filePath: string): string | null {
   const fp = filePath.replace(/\\/g, '/').toLowerCase();
   if (
-    fp.includes('/mission_item/') || fp.includes('/test/') ||
-    fp.includes('/template') || fp.includes('template.xml') ||
+    fp.includes('/mission_item/') ||
+    fp.includes('/test/') ||
+    fp.includes('/template') ||
+    fp.includes('template.xml') ||
     fp.endsWith('_template.xml')
-  ) return null;
+  )
+    return null;
   if (/solarsystem\.xml$/.test(fp)) return 'system';
   if (fp.includes('jumppoint')) return 'jump_point';
   if (
-    fp.includes('asteroidcluster') || fp.includes('asteroidring') || fp.includes('asteroidbelt') ||
-    fp.includes('glaciemring') || fp.includes('keegebelt') || fp.includes('keegerbelt') ||
+    fp.includes('asteroidcluster') ||
+    fp.includes('asteroidring') ||
+    fp.includes('asteroidbelt') ||
+    fp.includes('glaciemring') ||
+    fp.includes('keegebelt') ||
+    fp.includes('keegerbelt') ||
     fp.includes('nyx_kaboos')
-  ) return 'asteroid_field';
+  )
+    return 'asteroid_field';
   const celestialMatch = fp.match(/\/system\/[^/]+\/([^/]+)\/(?:starmapobject\.\1|\1)\.xml$/);
   if (celestialMatch) {
     const folder = celestialMatch[1];
@@ -72,10 +78,16 @@ async function main() {
   await svc.loadDataForge((m) => process.stdout.write(`  ${m}\n`));
 
   const dfData = svc.getDfData();
-  if (!dfData) { console.error('No DfData'); process.exit(1); }
+  if (!dfData) {
+    console.error('No DfData');
+    process.exit(1);
+  }
 
   const smoIdx = dfData.structDefs.findIndex((s: { name: string }) => s.name === 'StarMapObject');
-  if (smoIdx === -1) { console.error('No StarMapObject struct'); process.exit(1); }
+  if (smoIdx === -1) {
+    console.error('No StarMapObject struct');
+    process.exit(1);
+  }
 
   const extracted: string[] = [];
   const skipped: string[] = [];
@@ -85,8 +97,10 @@ async function main() {
     if (rec.structIndex !== smoIdx) continue;
     const fp = rec.fileName.replace(/\\/g, '/').toLowerCase();
     const isTemplate =
-      fp.includes('/mission_item/') || fp.includes('/test/') ||
-      fp.includes('/template') || fp.includes('template.xml') ||
+      fp.includes('/mission_item/') ||
+      fp.includes('/test/') ||
+      fp.includes('/template') ||
+      fp.includes('template.xml') ||
       fp.endsWith('_template.xml');
     const type = classifyByPath(rec.fileName);
     if (type !== null) {
@@ -141,4 +155,7 @@ async function main() {
   }
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

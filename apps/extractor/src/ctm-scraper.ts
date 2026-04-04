@@ -46,10 +46,7 @@ const COOKIE_SELECTORS = [
  * @param onProgress Optional progress callback
  * @returns Map of className → ctmUrl (only ships for which a CTM was found)
  */
-export async function scrapeShipCtmUrls(
-  ships: ShipToScrape[],
-  onProgress?: (msg: string) => void,
-): Promise<Map<string, string>> {
+export async function scrapeShipCtmUrls(ships: ShipToScrape[], onProgress?: (msg: string) => void): Promise<Map<string, string>> {
   const results = new Map<string, string>();
 
   for (let i = 0; i < ships.length; i++) {
@@ -86,8 +83,7 @@ async function scrapeOnePage(ship: ShipToScrape): Promise<string | null> {
   const browser = await chromium.launch({ headless: false });
   try {
     const context = await browser.newContext({
-      userAgent:
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     });
     const page = await context.newPage();
 

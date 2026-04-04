@@ -2,7 +2,7 @@
  * LocationQueryService — Navigable locations from the Star Citizen universe
  */
 import type { PrismaClient } from '@prisma/client';
-import { type Row, convertBigIntToNumber, paginate, type PaginatedResult, stripInternal } from './shared.js';
+import { convertBigIntToNumber, type PaginatedResult, paginate, type Row, stripInternal } from './shared.js';
 
 const LOCATION_SORT = new Set(['name', 'class_name', 'type', 'system_code', 'is_scannable']);
 
@@ -11,9 +11,7 @@ export class LocationQueryService {
 
   async getLocationTypes(env = 'live'): Promise<string[]> {
     const prisma = this.getClient(env);
-    const rows = await prisma.$queryRawUnsafe<{ type: string }[]>(
-      'SELECT DISTINCT type FROM locations ORDER BY type ASC',
-    );
+    const rows = await prisma.$queryRawUnsafe<{ type: string }[]>('SELECT DISTINCT type FROM locations ORDER BY type ASC');
     return rows.map((r) => r.type);
   }
 
@@ -123,4 +121,3 @@ export class LocationQueryService {
     return rows.map(convertBigIntToNumber).map(stripInternal);
   }
 }
-

@@ -1,5 +1,5 @@
-import express, { type Request, type Response } from 'express';
 import { getPrisma } from '@starvis/db';
+import express, { type Request, type Response } from 'express';
 import { register } from '../services/prometheus.js';
 import { getCacheStats, redis } from '../services/redis.js';
 import logger from '../utils/logger.js';

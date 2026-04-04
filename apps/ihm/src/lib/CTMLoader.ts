@@ -43,9 +43,20 @@ const LZMA = (() => {
         this._streamPos = this._pos;
       }
     }
-    releaseStream() { this.flush(); this._stream = null; }
-    setStream(stream: OutStream) { this.releaseStream(); this._stream = stream; }
-    init(solid: boolean) { if (!solid) { this._streamPos = 0; this._pos = 0; } }
+    releaseStream() {
+      this.flush();
+      this._stream = null;
+    }
+    setStream(stream: OutStream) {
+      this.releaseStream();
+      this._stream = stream;
+    }
+    init(solid: boolean) {
+      if (!solid) {
+        this._streamPos = 0;
+        this._pos = 0;
+      }
+    }
     copyBlock(distance: number, len: number) {
       let pos = this._pos - distance - 1;
       if (pos < 0) pos += this._windowSize;
@@ -70,15 +81,21 @@ const LZMA = (() => {
     _stream: CTMStream | null = null;
     _code = 0;
     _range = -1;
-    setStream(stream: CTMStream) { this._stream = stream; }
-    releaseStream() { this._stream = null; }
+    setStream(stream: CTMStream) {
+      this._stream = stream;
+    }
+    releaseStream() {
+      this._stream = null;
+    }
     init() {
       let i = 5;
-      this._code = 0; this._range = -1;
+      this._code = 0;
+      this._range = -1;
       while (i--) this._code = (this._code << 8) | this._stream!.readByte();
     }
     decodeDirectBits(numTotalBits: number) {
-      let result = 0, i = numTotalBits;
+      let result = 0,
+        i = numTotalBits;
       while (i--) {
         this._range >>>= 1;
         const t = (this._code - this._range) >>> 31;
@@ -121,14 +138,19 @@ const LZMA = (() => {
       this._models = [];
       this._numBitLevels = numBitLevels;
     }
-    init() { initBitModels(this._models, 1 << this._numBitLevels); }
+    init() {
+      initBitModels(this._models, 1 << this._numBitLevels);
+    }
     decode(rd: RangeDecoder) {
-      let m = 1, i = this._numBitLevels;
+      let m = 1,
+        i = this._numBitLevels;
       while (i--) m = (m << 1) | rd.decodeBit(this._models, m);
       return m - (1 << this._numBitLevels);
     }
     reverseDecode(rd: RangeDecoder) {
-      let m = 1, symbol = 0, i = 0;
+      let m = 1,
+        symbol = 0,
+        i = 0;
       for (; i < this._numBitLevels; i++) {
         const bit = rd.decodeBit(this._models, m);
         m = (m << 1) | bit;
@@ -139,7 +161,9 @@ const LZMA = (() => {
   }
 
   function reverseDecode2(models: number[], startIndex: number, rd: RangeDecoder, numBitLevels: number) {
-    let m = 1, symbol = 0, i = 0;
+    let m = 1,
+      symbol = 0,
+      i = 0;
     for (; i < numBitLevels; i++) {
       const bit = rd.decodeBit(models, startIndex + m);
       m = (m << 1) | bit;
@@ -150,14 +174,20 @@ const LZMA = (() => {
 
   class Decoder2 {
     _decoders: number[] = [];
-    init() { initBitModels(this._decoders, 0x300); }
+    init() {
+      initBitModels(this._decoders, 0x300);
+    }
     decodeNormal(rd: RangeDecoder) {
       let symbol = 1;
-      do { symbol = (symbol << 1) | rd.decodeBit(this._decoders, symbol); } while (symbol < 0x100);
+      do {
+        symbol = (symbol << 1) | rd.decodeBit(this._decoders, symbol);
+      } while (symbol < 0x100);
       return symbol & 0xff;
     }
     decodeWithMatchByte(rd: RangeDecoder, matchByte: number) {
-      let symbol = 1, matchBit: number, bit: number;
+      let symbol = 1,
+        matchBit: number,
+        bit: number;
       do {
         matchBit = (matchByte >> 7) & 1;
         matchByte <<= 1;
@@ -210,7 +240,10 @@ const LZMA = (() => {
     init() {
       let i = this._numPosStates;
       initBitModels(this._choice, 2);
-      while (i--) { this._lowCoder[i].init(); this._midCoder[i].init(); }
+      while (i--) {
+        this._lowCoder[i].init();
+        this._midCoder[i].init();
+      }
       this._highCoder.init();
     }
     decode(rd: RangeDecoder, posState: number) {
@@ -222,7 +255,9 @@ const LZMA = (() => {
 
   class OutStream {
     data: number[] = [];
-    writeByte(b: number) { this.data.push(b); }
+    writeByte(b: number) {
+      this.data.push(b);
+    }
   }
 
   class LZMADecoder {
@@ -280,8 +315,13 @@ const LZMA = (() => {
       this._rangeDecoder.init();
     }
     decode(inStream: CTMStream, outStream: OutStream, outSize: number) {
-      let state = 0, rep0 = 0, rep1 = 0, rep2 = 0, rep3 = 0;
-      let nowPos64 = 0, prevByte = 0;
+      let state = 0,
+        rep0 = 0,
+        rep1 = 0,
+        rep2 = 0,
+        rep3 = 0;
+      let nowPos64 = 0,
+        prevByte = 0;
 
       this._rangeDecoder.setStream(inStream);
       this._outWindow.setStream(outStream);
@@ -291,9 +331,10 @@ const LZMA = (() => {
         const posState = nowPos64 & this._posStateMask;
         if (this._rangeDecoder.decodeBit(this._isMatchDecoders, (state << 4) + posState) === 0) {
           const decoder2 = this._literalDecoder.getDecoder(nowPos64++, prevByte);
-          prevByte = state >= 7
-            ? decoder2.decodeWithMatchByte(this._rangeDecoder, this._outWindow.getByte(rep0))
-            : decoder2.decodeNormal(this._rangeDecoder);
+          prevByte =
+            state >= 7
+              ? decoder2.decodeWithMatchByte(this._rangeDecoder, this._outWindow.getByte(rep0))
+              : decoder2.decodeNormal(this._rangeDecoder);
           this._outWindow.putByte(prevByte);
           state = state < 4 ? 0 : state - (state < 10 ? 3 : 6);
         } else {
@@ -312,18 +353,22 @@ const LZMA = (() => {
                 if (this._rangeDecoder.decodeBit(this._isRepG2Decoders, state) === 0) {
                   distance = rep2;
                 } else {
-                  distance = rep3; rep3 = rep2;
+                  distance = rep3;
+                  rep3 = rep2;
                 }
                 rep2 = rep1;
               }
-              rep1 = rep0; rep0 = distance!;
+              rep1 = rep0;
+              rep0 = distance!;
             }
             if (len === 0) {
               len = 2 + this._repLenDecoder.decode(this._rangeDecoder, posState);
               state = state < 7 ? 8 : 11;
             }
           } else {
-            rep3 = rep2; rep2 = rep1; rep1 = rep0;
+            rep3 = rep2;
+            rep2 = rep1;
+            rep1 = rep0;
             len = 2 + this._lenDecoder.decode(this._rangeDecoder, posState);
             state = state < 7 ? 7 : 10;
             const posSlot = this._posSlotDecoder[len <= 5 ? len - 2 : 3].decode(this._rangeDecoder);
@@ -335,7 +380,10 @@ const LZMA = (() => {
               } else {
                 rep0 += this._rangeDecoder.decodeDirectBits(numDirectBits - 4) << 4;
                 rep0 += this._posAlignDecoder.reverseDecode(this._rangeDecoder);
-                if (rep0 < 0) { if (rep0 === -1) break; return false; }
+                if (rep0 < 0) {
+                  if (rep0 === -1) break;
+                  return false;
+                }
               }
             } else {
               rep0 = posSlot;
@@ -354,7 +402,10 @@ const LZMA = (() => {
     }
     setDecoderProperties(properties: CTMStream) {
       const value = properties.readByte();
-      const lc = value % 9, rem = ~~(value / 9), lp = rem % 5, pb = ~~(rem / 5);
+      const lc = value % 9,
+        rem = ~~(value / 9),
+        lp = rem % 5,
+        pb = ~~(rem / 5);
       if (!this.setLcLpPb(lc, lp, pb)) return false;
       let dictSize = properties.readByte();
       dictSize |= properties.readByte() << 8;
@@ -381,23 +432,28 @@ const LZMA = (() => {
 const CTM_COMPRESSION_RAW = 0x00574152;
 const CTM_COMPRESSION_MG1 = 0x0031474d;
 const CTM_COMPRESSION_MG2 = 0x0032474d;
-const CTM_FLAG_NORMALS     = 0x00000001;
+const CTM_FLAG_NORMALS = 0x00000001;
 const IS_LITTLE_ENDIAN = (() => {
-  const buf = new ArrayBuffer(2), bytes = new Uint8Array(buf), ints = new Uint16Array(buf);
-  bytes[0] = 1; return ints[0] === 1;
+  const buf = new ArrayBuffer(2),
+    bytes = new Uint8Array(buf),
+    ints = new Uint16Array(buf);
+  bytes[0] = 1;
+  return ints[0] === 1;
 })();
 
 class CTMStream {
   data: Uint8Array;
   offset: number;
-  TWO_POW_MINUS23 = Math.pow(2, -23);
-  TWO_POW_MINUS126 = Math.pow(2, -126);
+  TWO_POW_MINUS23 = 2 ** -23;
+  TWO_POW_MINUS126 = 2 ** -126;
 
   constructor(data: Uint8Array, offset = 0) {
     this.data = data;
     this.offset = offset;
   }
-  readByte() { return this.data[this.offset++] & 0xff; }
+  readByte() {
+    return this.data[this.offset++] & 0xff;
+  }
   readInt32() {
     let i = this.readByte();
     i |= this.readByte() << 8;
@@ -407,12 +463,13 @@ class CTMStream {
   readFloat32() {
     let m = this.readByte();
     m += this.readByte() << 8;
-    const b1 = this.readByte(), b2 = this.readByte();
+    const b1 = this.readByte(),
+      b2 = this.readByte();
     m += (b1 & 0x7f) << 16;
     const e = ((b2 & 0x7f) << 1) | ((b1 & 0x80) >>> 7);
     const s = b2 & 0x80 ? -1 : 1;
     if (e === 255) return m !== 0 ? NaN : s * Infinity;
-    if (e > 0) return s * (1 + m * this.TWO_POW_MINUS23) * Math.pow(2, e - 127);
+    if (e > 0) return s * (1 + m * this.TWO_POW_MINUS23) * 2 ** (e - 127);
     if (m !== 0) return s * m * this.TWO_POW_MINUS126;
     return s * 0;
   }
@@ -463,10 +520,18 @@ interface CTMBody {
 interface MG2Header {
   vertexPrecision: number;
   normalPrecision: number;
-  lowerBoundx: number; lowerBoundy: number; lowerBoundz: number;
-  higherBoundx: number; higherBoundy: number; higherBoundz: number;
-  divx: number; divy: number; divz: number;
-  sizex: number; sizey: number; sizez: number;
+  lowerBoundx: number;
+  lowerBoundy: number;
+  lowerBoundz: number;
+  higherBoundx: number;
+  higherBoundy: number;
+  higherBoundz: number;
+  divx: number;
+  divy: number;
+  divz: number;
+  sizex: number;
+  sizey: number;
+  sizez: number;
 }
 
 function lzmaDecompress(stream: CTMStream, interleavedOut: CTMInterleavedStream, outSize: number) {
@@ -477,7 +542,10 @@ function lzmaDecompress(stream: CTMStream, interleavedOut: CTMInterleavedStream,
 
 function ctmRestoreIndices(indices: Uint32Array, len: number) {
   let i = 3;
-  if (len > 0) { indices[2] += indices[0]; indices[1] += indices[0]; }
+  if (len > 0) {
+    indices[2] += indices[0];
+    indices[1] += indices[0];
+  }
   for (; i < len; i += 3) {
     indices[i] += indices[i - 3];
     if (indices[i] === indices[i - 3]) indices[i + 1] += indices[i - 2];
@@ -492,30 +560,38 @@ function ctmRestoreGridIndices(gridIndices: Uint32Array, len: number) {
 
 function ctmRestoreVertices(vertices: Float32Array, grid: MG2Header, gridIndices: Uint32Array, precision: number) {
   const intVertices = new Uint32Array(vertices.buffer, vertices.byteOffset, vertices.length);
-  const ydiv = grid.divx, zdiv = ydiv * grid.divy;
-  let prevGridIdx = 0x7fffffff, prevDelta = 0;
-  let i = 0, j = 0;
+  const ydiv = grid.divx,
+    zdiv = ydiv * grid.divy;
+  let prevGridIdx = 0x7fffffff,
+    prevDelta = 0;
+  let i = 0,
+    j = 0;
   const len = gridIndices.length;
   for (; i < len; j += 3) {
     let x = gridIndices[i++];
     const gridIdx = x;
-    const z = ~~(x / zdiv); x -= ~~(z * zdiv);
-    const y = ~~(x / ydiv); x -= ~~(y * ydiv);
+    const z = ~~(x / zdiv);
+    x -= ~~(z * zdiv);
+    const y = ~~(x / ydiv);
+    x -= ~~(y * ydiv);
     let delta = intVertices[j];
     if (gridIdx === prevGridIdx) delta += prevDelta;
-    vertices[j]     = grid.lowerBoundx + x * grid.sizex + precision * delta;
+    vertices[j] = grid.lowerBoundx + x * grid.sizex + precision * delta;
     vertices[j + 1] = grid.lowerBoundy + y * grid.sizey + precision * intVertices[j + 1];
     vertices[j + 2] = grid.lowerBoundz + z * grid.sizez + precision * intVertices[j + 2];
-    prevGridIdx = gridIdx; prevDelta = delta;
+    prevGridIdx = gridIdx;
+    prevDelta = delta;
   }
 }
 
 function ctmCalcSmoothNormals(indices: Uint32Array, vertices: Float32Array) {
   const smooth = new Float32Array(vertices.length);
-  for (let i = 0, k = indices.length; i < k;) {
-    const indx = indices[i++] * 3, indy = indices[i++] * 3, indz = indices[i++] * 3;
-    const v1x = vertices[indy]     - vertices[indx];
-    const v2x = vertices[indz]     - vertices[indx];
+  for (let i = 0, k = indices.length; i < k; ) {
+    const indx = indices[i++] * 3,
+      indy = indices[i++] * 3,
+      indz = indices[i++] * 3;
+    const v1x = vertices[indy] - vertices[indx];
+    const v2x = vertices[indz] - vertices[indx];
     const v1y = vertices[indy + 1] - vertices[indx + 1];
     const v2y = vertices[indz + 1] - vertices[indx + 1];
     const v1z = vertices[indy + 2] - vertices[indx + 2];
@@ -527,13 +603,23 @@ function ctmCalcSmoothNormals(indices: Uint32Array, vertices: Float32Array) {
     const nx2 = len > 1e-10 ? nx / len : nx;
     const ny2 = len > 1e-10 ? ny / len : ny;
     const nz2 = len > 1e-10 ? nz / len : nz;
-    smooth[indx] += nx2; smooth[indx + 1] += ny2; smooth[indx + 2] += nz2;
-    smooth[indy] += nx2; smooth[indy + 1] += ny2; smooth[indy + 2] += nz2;
-    smooth[indz] += nx2; smooth[indz + 1] += ny2; smooth[indz + 2] += nz2;
+    smooth[indx] += nx2;
+    smooth[indx + 1] += ny2;
+    smooth[indx + 2] += nz2;
+    smooth[indy] += nx2;
+    smooth[indy + 1] += ny2;
+    smooth[indy + 2] += nz2;
+    smooth[indz] += nx2;
+    smooth[indz + 1] += ny2;
+    smooth[indz + 2] += nz2;
   }
   for (let i = 0, k = smooth.length; i < k; i += 3) {
     const len = Math.sqrt(smooth[i] ** 2 + smooth[i + 1] ** 2 + smooth[i + 2] ** 2);
-    if (len > 1e-10) { smooth[i] /= len; smooth[i + 1] /= len; smooth[i + 2] /= len; }
+    if (len > 1e-10) {
+      smooth[i] /= len;
+      smooth[i + 1] /= len;
+      smooth[i + 2] /= len;
+    }
   }
   return smooth;
 }
@@ -545,19 +631,22 @@ function ctmRestoreNormals(normals: Float32Array, smooth: Float32Array, precisio
     const ro = intNormals[i] * precision;
     const phi = intNormals[i + 1];
     if (phi === 0) {
-      normals[i] = smooth[i] * ro; normals[i + 1] = smooth[i + 1] * ro; normals[i + 2] = smooth[i + 2] * ro;
+      normals[i] = smooth[i] * ro;
+      normals[i + 1] = smooth[i + 1] * ro;
+      normals[i + 2] = smooth[i + 2] * ro;
     } else {
-      const theta = phi <= 4
-        ? (intNormals[i + 2] - 2) * PI_DIV_2
-        : ((intNormals[i + 2] * 4 / phi) - 2) * PI_DIV_2;
+      const theta = phi <= 4 ? (intNormals[i + 2] - 2) * PI_DIV_2 : ((intNormals[i + 2] * 4) / phi - 2) * PI_DIV_2;
       const phiRad = phi * precision * PI_DIV_2;
       const sinPhi = ro * Math.sin(phiRad);
-      const nx = sinPhi * Math.cos(theta), ny = sinPhi * Math.sin(theta), nz = ro * Math.cos(phiRad);
-      const bz = smooth[i + 1], byVal = smooth[i] - smooth[i + 2];
+      const nx = sinPhi * Math.cos(theta),
+        ny = sinPhi * Math.sin(theta),
+        nz = ro * Math.cos(phiRad);
+      const bz = smooth[i + 1],
+        byVal = smooth[i] - smooth[i + 2];
       const len = Math.sqrt(2 * bz * bz + byVal * byVal);
       const by = len > 1e-20 ? byVal / len : byVal;
       const bz2 = len > 1e-20 ? bz / len : bz;
-      normals[i]     = smooth[i]     * nz + (smooth[i + 1] * bz2 - smooth[i + 2] * by) * ny - bz2 * nx;
+      normals[i] = smooth[i] * nz + (smooth[i + 1] * bz2 - smooth[i + 2] * by) * ny - bz2 * nx;
       normals[i + 1] = smooth[i + 1] * nz - (smooth[i + 2] + smooth[i]) * bz2 * ny + by * nx;
       normals[i + 2] = smooth[i + 2] * nz + (smooth[i] * by + smooth[i + 1] * bz2) * ny + bz2 * nx;
     }
@@ -595,7 +684,11 @@ function parseCTM(data: Uint8Array): CTMBody {
   const hasNormals = !!(flags & CTM_FLAG_NORMALS);
 
   // Allocate body
-  const triLen = triangleCount * 3, vertLen = vertexCount * 3, normLen = hasNormals ? vertexCount * 3 : 0, uvLen = vertexCount * 2, attrLen = vertexCount * 4;
+  const triLen = triangleCount * 3,
+    vertLen = vertexCount * 3,
+    normLen = hasNormals ? vertexCount * 3 : 0,
+    uvLen = vertexCount * 2,
+    attrLen = vertexCount * 4;
   const totalWords = triLen + vertLen + normLen + uvLen * uvMapCount + attrLen * attrMapCount;
   const buf = new ArrayBuffer(totalWords * 4);
 
@@ -612,7 +705,10 @@ function parseCTM(data: Uint8Array): CTMBody {
   if (attrMapCount) {
     body.attrMaps = [];
     for (let j = 0; j < attrMapCount; j++)
-      body.attrMaps.push({ name: '', attr: new Float32Array(buf, (triLen + vertLen + normLen + uvLen * uvMapCount + j * attrLen) * 4, attrLen) });
+      body.attrMaps.push({
+        name: '',
+        attr: new Float32Array(buf, (triLen + vertLen + normLen + uvLen * uvMapCount + j * attrLen) * 4, attrLen),
+      });
   }
 
   if (compressionMethod === CTM_COMPRESSION_RAW) {
@@ -629,11 +725,27 @@ function parseCTM(data: Uint8Array): CTMBody {
 }
 
 function readRAW(stream: CTMStream, body: CTMBody) {
-  stream.readInt32(); stream.readArrayInt32(body.indices);
-  stream.readInt32(); stream.readArrayFloat32(body.vertices);
-  if (body.normals) { stream.readInt32(); stream.readArrayFloat32(body.normals); }
-  if (body.uvMaps) for (const uv of body.uvMaps) { stream.readInt32(); uv.name = stream.readString(); uv.filename = stream.readString(); stream.readArrayFloat32(uv.uv); }
-  if (body.attrMaps) for (const attr of body.attrMaps) { stream.readInt32(); attr.name = stream.readString(); stream.readArrayFloat32(attr.attr); }
+  stream.readInt32();
+  stream.readArrayInt32(body.indices);
+  stream.readInt32();
+  stream.readArrayFloat32(body.vertices);
+  if (body.normals) {
+    stream.readInt32();
+    stream.readArrayFloat32(body.normals);
+  }
+  if (body.uvMaps)
+    for (const uv of body.uvMaps) {
+      stream.readInt32();
+      uv.name = stream.readString();
+      uv.filename = stream.readString();
+      stream.readArrayFloat32(uv.uv);
+    }
+  if (body.attrMaps)
+    for (const attr of body.attrMaps) {
+      stream.readInt32();
+      attr.name = stream.readString();
+      stream.readArrayFloat32(attr.attr);
+    }
 }
 
 function lzmaBlock(stream: CTMStream, arr: Float32Array | Uint32Array, stride: number) {
@@ -643,29 +755,56 @@ function lzmaBlock(stream: CTMStream, arr: Float32Array | Uint32Array, stride: n
 }
 
 function readMG1(stream: CTMStream, body: CTMBody) {
-  stream.readInt32(); lzmaBlock(stream, body.indices, 3);   ctmRestoreIndices(body.indices, body.indices.length);
-  stream.readInt32(); lzmaBlock(stream, body.vertices, 1);
-  if (body.normals) { stream.readInt32(); lzmaBlock(stream, body.normals, 3); }
-  if (body.uvMaps) for (const uv of body.uvMaps) { stream.readInt32(); uv.name = stream.readString(); uv.filename = stream.readString(); lzmaBlock(stream, uv.uv, 2); }
-  if (body.attrMaps) for (const attr of body.attrMaps) { stream.readInt32(); attr.name = stream.readString(); lzmaBlock(stream, attr.attr, 4); }
+  stream.readInt32();
+  lzmaBlock(stream, body.indices, 3);
+  ctmRestoreIndices(body.indices, body.indices.length);
+  stream.readInt32();
+  lzmaBlock(stream, body.vertices, 1);
+  if (body.normals) {
+    stream.readInt32();
+    lzmaBlock(stream, body.normals, 3);
+  }
+  if (body.uvMaps)
+    for (const uv of body.uvMaps) {
+      stream.readInt32();
+      uv.name = stream.readString();
+      uv.filename = stream.readString();
+      lzmaBlock(stream, uv.uv, 2);
+    }
+  if (body.attrMaps)
+    for (const attr of body.attrMaps) {
+      stream.readInt32();
+      attr.name = stream.readString();
+      lzmaBlock(stream, attr.attr, 4);
+    }
 }
 
 function readMG2(stream: CTMStream, body: CTMBody, vertexCount: number) {
   // MG2 header
   stream.readInt32(); // "MG2H"
   const mg2: MG2Header = {
-    vertexPrecision: stream.readFloat32(), normalPrecision: stream.readFloat32(),
-    lowerBoundx: stream.readFloat32(), lowerBoundy: stream.readFloat32(), lowerBoundz: stream.readFloat32(),
-    higherBoundx: stream.readFloat32(), higherBoundy: stream.readFloat32(), higherBoundz: stream.readFloat32(),
-    divx: stream.readInt32(), divy: stream.readInt32(), divz: stream.readInt32(),
-    sizex: 0, sizey: 0, sizez: 0,
+    vertexPrecision: stream.readFloat32(),
+    normalPrecision: stream.readFloat32(),
+    lowerBoundx: stream.readFloat32(),
+    lowerBoundy: stream.readFloat32(),
+    lowerBoundz: stream.readFloat32(),
+    higherBoundx: stream.readFloat32(),
+    higherBoundy: stream.readFloat32(),
+    higherBoundz: stream.readFloat32(),
+    divx: stream.readInt32(),
+    divy: stream.readInt32(),
+    divz: stream.readInt32(),
+    sizex: 0,
+    sizey: 0,
+    sizez: 0,
   };
   mg2.sizex = (mg2.higherBoundx - mg2.lowerBoundx) / mg2.divx;
   mg2.sizey = (mg2.higherBoundy - mg2.lowerBoundy) / mg2.divy;
   mg2.sizez = (mg2.higherBoundz - mg2.lowerBoundz) / mg2.divz;
 
   // Vertices
-  stream.readInt32(); lzmaBlock(stream, body.vertices, 3);
+  stream.readInt32();
+  lzmaBlock(stream, body.vertices, 3);
   // Grid indices
   stream.readInt32();
   const gridIndices = new Uint32Array(vertexCount);
@@ -674,11 +813,14 @@ function readMG2(stream: CTMStream, body: CTMBody, vertexCount: number) {
   ctmRestoreVertices(body.vertices, mg2, gridIndices, mg2.vertexPrecision);
 
   // Indices
-  stream.readInt32(); lzmaBlock(stream, body.indices, 3); ctmRestoreIndices(body.indices, body.indices.length);
+  stream.readInt32();
+  lzmaBlock(stream, body.indices, 3);
+  ctmRestoreIndices(body.indices, body.indices.length);
 
   // Normals
   if (body.normals) {
-    stream.readInt32(); lzmaBlock(stream, body.normals, 3);
+    stream.readInt32();
+    lzmaBlock(stream, body.normals, 3);
     const smooth = ctmCalcSmoothNormals(body.indices, body.vertices);
     ctmRestoreNormals(body.normals, smooth, mg2.normalPrecision);
   }
@@ -686,7 +828,9 @@ function readMG2(stream: CTMStream, body: CTMBody, vertexCount: number) {
   // UV maps
   if (body.uvMaps) {
     for (const uv of body.uvMaps) {
-      stream.readInt32(); uv.name = stream.readString(); uv.filename = stream.readString();
+      stream.readInt32();
+      uv.name = stream.readString();
+      uv.filename = stream.readString();
       const precision = stream.readFloat32();
       lzmaBlock(stream, uv.uv, 2);
       ctmRestoreMap(uv.uv, 2, precision);
@@ -696,7 +840,8 @@ function readMG2(stream: CTMStream, body: CTMBody, vertexCount: number) {
   // Attr maps
   if (body.attrMaps) {
     for (const attr of body.attrMaps) {
-      stream.readInt32(); attr.name = stream.readString();
+      stream.readInt32();
+      attr.name = stream.readString();
       const precision = stream.readFloat32();
       lzmaBlock(stream, attr.attr, 4);
       ctmRestoreMap(attr.attr, 4, precision);
@@ -720,8 +865,9 @@ export class CTMLoader extends THREE.Loader {
     loader.load(
       url,
       (buffer) => {
-        try { onLoad(this.parse(buffer as ArrayBuffer)); }
-        catch (e) {
+        try {
+          onLoad(this.parse(buffer as ArrayBuffer));
+        } catch (e) {
           if (onError) onError(e);
           else console.error(e);
           this.manager.itemError(url);
