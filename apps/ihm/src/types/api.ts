@@ -331,6 +331,14 @@ export interface ItemListItem {
   grade: string | null;
   manufacturer_code: string | null;
   manufacturer_name: string | null;
+  // Key stats in list
+  weapon_dps?: number | null;
+  weapon_damage_type?: string | null;
+  weapon_range?: number | null;
+  weapon_fire_rate?: number | null;
+  armor_damage_reduction?: number | null;
+  armor_temp_min?: number | null;
+  armor_temp_max?: number | null;
 }
 
 export interface Item extends ItemListItem {
