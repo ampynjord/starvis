@@ -196,6 +196,28 @@ export interface ComponentListItem {
   grade: string | null;
   manufacturer_code: string | null;
   manufacturer_name: string | null;
+  // Key stats (populated by list endpoint)
+  shield_hp: number | null;
+  shield_regen: number | null;
+  weapon_dps: number | null;
+  weapon_damage_type: string | null;
+  weapon_range: number | null;
+  qd_speed: number | null;
+  qd_spool_time: number | null;
+  qd_range: number | null;
+  power_output: number | null;
+  cooling_rate: number | null;
+  fuel_capacity: number | null;
+  fuel_intake_rate: number | null;
+  missile_damage: number | null;
+  radar_range: number | null;
+  cm_ammo_count: number | null;
+  thruster_max_thrust: number | null;
+  emp_damage: number | null;
+  emp_radius: number | null;
+  mining_speed: number | null;
+  rack_count: number | null;
+  rack_missile_size: number | null;
 }
 
 export interface Component extends ComponentListItem {
