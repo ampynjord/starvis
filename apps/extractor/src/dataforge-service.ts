@@ -746,6 +746,40 @@ export class DataForgeService implements DataForgeContext {
                   }
                 }
               }
+              // Ground vehicle drive controller — speed stored in movement params
+              if (portName === 'hardpoint_controller_drive' && entCN && this.dfData) {
+                const driveRecord = this.findEntityRecord(entCN);
+                if (driveRecord) {
+                  const driveData = this.readInstance(driveRecord.structIndex, driveRecord.instanceIndex, 0, 5);
+                  if (driveData && Array.isArray(driveData.Components)) {
+                    for (const fc of driveData.Components) {
+                      if (!fc?.__type) continue;
+                      // Try known ground vehicle movement component types
+                      const topSpeed =
+                        fc.topSpeed ??
+                        fc.maxSpeed ??
+                        fc.params?.topSpeed ??
+                        fc.params?.maxSpeed ??
+                        fc.movementParams?.topSpeed ??
+                        fc.movementParams?.maxSpeed ??
+                        null;
+                      if (typeof topSpeed === 'number' && topSpeed > 0) {
+                        stats.scm_speed = Math.round(topSpeed);
+                        stats.max_speed = Math.round(topSpeed);
+                      }
+                      const boostSpeed =
+                        fc.boostTopSpeed ??
+                        fc.sprintSpeed ??
+                        fc.params?.boostTopSpeed ??
+                        fc.movementParams?.boostTopSpeed ??
+                        null;
+                      if (typeof boostSpeed === 'number' && boostSpeed > 0) {
+                        stats.max_speed = Math.round(boostSpeed);
+                      }
+                    }
+                  }
+                }
+              }
             }
           }
         }
@@ -970,6 +1004,11 @@ export class DataForgeService implements DataForgeContext {
           if (vehicleXml.totalHp > 0) result.hull.totalHp = vehicleXml.totalHp;
           if (vehicleXml.hullParts?.length > 0) result.hull.hp.body.parts = vehicleXml.hullParts;
           if (vehicleXml.bodyHp > 0) result.hull.hp.body.hp = vehicleXml.bodyHp;
+          // Ground vehicle speed: only set if IFCS is empty (non-flight vehicle)
+          if (vehicleXml.groundTopSpeed && !result.ifcs.scmSpeed) {
+            result.ifcs.scmSpeed = vehicleXml.groundTopSpeed;
+            result.ifcs.maxSpeed = vehicleXml.groundBoostSpeed ?? vehicleXml.groundTopSpeed;
+          }
           xmlUsedWasVariantSpecific = xmlName === entities.vehicleXmlName && xmlName !== className;
           break; // Found XML, stop trying
         }
@@ -996,7 +1035,7 @@ export class DataForgeService implements DataForgeContext {
    */
   private async readVehicleImplementationXml(
     className: string,
-  ): Promise<{ mass: number; totalHp: number; bodyHp: number; hullParts: any[] } | null> {
+  ): Promise<{ mass: number; totalHp: number; bodyHp: number; hullParts: any[]; groundTopSpeed: number | null; groundBoostSpeed: number | null } | null> {
     if (!this.provider) return null;
     const xmlPath = `Data\\Scripts\\Entities\\Vehicles\\Implementations\\Xml\\${className}.xml`;
     try {
@@ -1021,7 +1060,22 @@ export class DataForgeService implements DataForgeContext {
       // Extract hull parts tree and sum damageMax
       const { totalHp, bodyHp, parts } = this.extractVehicleXmlParts(mainPart);
 
-      return { mass, totalHp, bodyHp, hullParts: parts };
+      // Extract ground vehicle top speed from <MovementParams><PhysicalWheeled v0SteerMax="...">
+      // v0SteerMax is the top speed in m/s at low steering angle (straight line max speed)
+      let groundTopSpeed: number | null = null;
+      let groundBoostSpeed: number | null = null;
+      const movementNode = rootNode.children?.find((c) => c.tag === 'MovementParams');
+      if (movementNode) {
+        const wheeledNode = movementNode.children?.find((c) => c.tag === 'PhysicalWheeled');
+        if (wheeledNode) {
+          const v0 = parseFloat(wheeledNode.attributes?.v0SteerMax || '0');
+          const boost = parseFloat(wheeledNode.attributes?.vMaxSteerMax || '0');
+          if (v0 > 0) groundTopSpeed = Math.round(v0);
+          if (boost > 0 && boost !== v0) groundBoostSpeed = Math.round(boost);
+        }
+      }
+
+      return { mass, totalHp, bodyHp, hullParts: parts, groundTopSpeed, groundBoostSpeed };
     } catch (_e) {
       return null;
     }
@@ -1392,6 +1446,36 @@ export class DataForgeService implements DataForgeContext {
           }
         }
         result.ifcs = ifcs;
+      }
+
+      // === Ground vehicle movement (speed from drive controller) ===
+      if (
+        cType === 'SVehicleMovementParams' ||
+        cType === 'SGroundVehicleMovementParams' ||
+        cType === 'SWheeledVehicleMovementParams' ||
+        cType === 'SHoverVehicleMovementParams' ||
+        cType.includes('VehicleMovement') ||
+        cType.includes('DriveParams')
+      ) {
+        const topSpeed =
+          comp.topSpeed ?? comp.maxSpeed ?? comp.maxLinearVelocity ??
+          comp.params?.topSpeed ?? comp.params?.maxSpeed ??
+          comp.movementParams?.topSpeed ?? comp.movementParams?.maxSpeed ??
+          null;
+        if (typeof topSpeed === 'number' && topSpeed > 0 && !result.ifcs.scmSpeed) {
+          result.ifcs = {
+            ...result.ifcs,
+            scmSpeed: Math.round(topSpeed),
+            maxSpeed: Math.round(topSpeed),
+          };
+        }
+        const boostSpeed =
+          comp.boostTopSpeed ?? comp.sprintSpeed ?? comp.afterburnerSpeed ??
+          comp.params?.boostTopSpeed ?? comp.movementParams?.boostTopSpeed ??
+          null;
+        if (typeof boostSpeed === 'number' && boostSpeed > 0) {
+          result.ifcs = { ...result.ifcs, maxSpeed: Math.round(boostSpeed) };
+        }
       }
 
       // === Physics (mass) ===

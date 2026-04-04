@@ -352,9 +352,10 @@ export class ShipQueryService {
     roles: string[];
     careers: string[];
     variant_types: string[];
+    vehicle_categories: { value: string; count: number }[];
   }> {
     const prisma = this.getClient(env);
-    const [mfgRows, roleRows, careerRows, variantRows] = await Promise.all([
+    const [mfgRows, roleRows, careerRows, variantRows, categoryRows] = await Promise.all([
       prisma.$queryRawUnsafe<Row[]>(
         `SELECT DISTINCT s.manufacturer_code as code, COALESCE(m.name, s.manufacturer_code) as name
          FROM ships s LEFT JOIN starvis.manufacturers m ON s.manufacturer_code = m.code
@@ -366,12 +367,16 @@ export class ShipQueryService {
       prisma.$queryRawUnsafe<Row[]>(
         "SELECT DISTINCT variant_type FROM ships WHERE variant_type IS NOT NULL AND variant_type != '' AND variant_type != 'npc' ORDER BY variant_type",
       ),
+      prisma.$queryRawUnsafe<Row[]>(
+        "SELECT COALESCE(vehicle_category, 'ship') as value, COUNT(*) as count FROM ships GROUP BY vehicle_category",
+      ),
     ]);
     return {
       manufacturers: mfgRows.map((r) => ({ code: String(r.code), name: String(r.name) })),
       roles: roleRows.map((r) => String(r.role)),
       careers: careerRows.map((r) => String(r.career)),
       variant_types: variantRows.map((r) => String(r.variant_type)),
+      vehicle_categories: categoryRows.map((r) => ({ value: String(r.value), count: Number(r.count) })),
     };
   }
 

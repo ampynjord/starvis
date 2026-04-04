@@ -176,6 +176,7 @@ export interface ShipFilters {
   roles: string[];
   careers: string[];
   variant_types: string[];
+  vehicle_categories: { value: string; count: number }[];
 }
 
 // ─── Components ───────────────────────────────────────────────────────────────

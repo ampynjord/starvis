@@ -252,6 +252,9 @@ export const api = {
       career?: string;
       size?: number;
       variant_type?: string;
+      vehicle_category?: string;
+      sort?: string;
+      order?: string;
     }) => get<PaginatedResponse<ShipListItem>>('/ships', p),
     filters: (env?: string) => get<ShipFilters>('/ships/filters', { env }),
     search: (search: string, limit = 8, env?: string) => get<ShipListItem[]>('/ships/search', { search, limit, env }),

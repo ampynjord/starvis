@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowLeft, BarChart3, ChevronRight, Clock, ExternalLink,
-  Layers, Palette, Ruler, Users,
+  ArrowLeft, BarChart3, ChevronRight, Clock,
+  ExternalLink, Layers, Package, Palette, Ruler, Users, Zap,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -18,11 +18,109 @@ import { ShipLoadout } from '@/components/ship/ShipLoadout';
 import { ShipStatsBanner } from '@/components/ship/ShipStatsBanner';
 import { CargoGrid } from '@/components/ship/CargoGrid';
 import { HoloViewer } from '@/components/ship/HoloViewer';
-import {
-  fCredits, fMass,
-} from '@/utils/formatters';
+import { fCredits, fMass } from '@/utils/formatters';
 import { VARIANT_TYPE_LABELS } from '@/utils/constants';
 
+// ── helpers ──────────────────────────────────────────────────────────────────
+function fV(v: number | null | undefined, dec = 0) {
+  if (v == null || Number.isNaN(Number(v))) return '—';
+  return Number(v).toFixed(dec);
+}
+
+function crewLabel(min: number | null | undefined, max: number | null | undefined, size: number | null | undefined) {
+  const lo = min ?? size;
+  const hi = max ?? size;
+  if (lo == null) return null;
+  return lo !== hi && hi != null ? `${lo}–${hi}` : String(lo);
+}
+
+// ── Quick stat pill ───────────────────────────────────────────────────────────
+function QuickStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex flex-col items-center gap-1 rounded-md border border-slate-800 bg-slate-900/60 px-4 py-3 min-w-[72px]">
+      <div className="flex items-center gap-1 text-slate-600">
+        {icon}
+        <span className="text-[9px] font-mono-sc uppercase tracking-widest">{label}</span>
+      </div>
+      <span className="text-sm font-orbitron font-bold text-slate-200 tabular-nums">{value}</span>
+    </div>
+  );
+}
+
+// ── Dimension SVG ─────────────────────────────────────────────────────────────
+function DimensionBox({ L, W, H, mass }: { L: number; W: number; H: number; mass: number | null }) {
+  const maxDim = Math.max(L, W, H, 1);
+  const scale = 48;
+  const lp = Math.max((L / maxDim) * scale, 4);
+  const wp = Math.max((W / maxDim) * scale, 4);
+  const hp = Math.max((H / maxDim) * scale, 4);
+  const c = 0.866, s = 0.5;
+  const pad = 20;
+  const ax = lp * c + pad;
+  const ay = (lp + wp) * s + hp + pad;
+  type V = [number, number];
+  const Bf: V = [ax, ay];
+  const Bl: V = [ax - lp * c, ay - lp * s];
+  const Br: V = [ax + wp * c, ay - wp * s];
+  const Bb: V = [ax - lp * c + wp * c, ay - lp * s - wp * s];
+  const Tf: V = [Bf[0], Bf[1] - hp];
+  const Tl: V = [Bl[0], Bl[1] - hp];
+  const Tr: V = [Br[0], Br[1] - hp];
+  const Tb: V = [Bb[0], Bb[1] - hp];
+  const svgW = (lp + wp) * c + pad * 2;
+  const svgH = (lp + wp) * s + hp + pad * 2;
+  const seg = (a: V, b: V, props: React.SVGProps<SVGLineElement>) => (
+    <line x1={a[0].toFixed(1)} y1={a[1].toFixed(1)} x2={b[0].toFixed(1)} y2={b[1].toFixed(1)} {...props} />
+  );
+  return (
+    <div className="space-y-2">
+      <svg viewBox={`0 0 ${svgW.toFixed(0)} ${svgH.toFixed(0)}`} className="w-full" style={{ maxHeight: 140 }}>
+        <defs>
+          {(['aL', 'aW', 'aH'] as const).map((id, i) => (
+            <marker key={id} id={id} markerWidth="4" markerHeight="4" refX="2" refY="2" orient="auto">
+              <polygon points="0,0 4,2 0,4" fill={['rgb(52,211,153)', 'rgb(251,191,36)', 'rgb(34,211,238)'][i]} />
+            </marker>
+          ))}
+        </defs>
+        {seg(Bl, Bb, { stroke: 'rgba(100,116,139,0.35)', strokeWidth: '0.7', strokeDasharray: '2,2' })}
+        {seg(Br, Bb, { stroke: 'rgba(100,116,139,0.35)', strokeWidth: '0.7', strokeDasharray: '2,2' })}
+        {seg(Bf, Bb, { stroke: 'rgba(100,116,139,0.35)', strokeWidth: '0.7', strokeDasharray: '2,2' })}
+        {seg(Bf, Bl, { stroke: 'rgba(148,163,184,0.55)', strokeWidth: '0.8' })}
+        {seg(Bf, Br, { stroke: 'rgba(148,163,184,0.55)', strokeWidth: '0.8' })}
+        {seg(Bf, Tf, { stroke: 'rgba(148,163,184,0.55)', strokeWidth: '0.8' })}
+        {seg(Bl, Tl, { stroke: 'rgba(148,163,184,0.55)', strokeWidth: '0.8' })}
+        {seg(Br, Tr, { stroke: 'rgba(148,163,184,0.55)', strokeWidth: '0.8' })}
+        {seg(Tf, Tl, { stroke: 'rgba(148,163,184,0.55)', strokeWidth: '0.8' })}
+        {seg(Tf, Tr, { stroke: 'rgba(148,163,184,0.55)', strokeWidth: '0.8' })}
+        {seg(Tl, Tb, { stroke: 'rgba(148,163,184,0.55)', strokeWidth: '0.8' })}
+        {seg(Tr, Tb, { stroke: 'rgba(148,163,184,0.55)', strokeWidth: '0.8' })}
+        {L > 0 && <>
+          {seg(Bf, Bl, { stroke: 'rgb(52,211,153)', strokeWidth: '1', markerEnd: 'url(#aL)', opacity: 0.7 })}
+          <text x={((Bf[0] + Bl[0]) / 2 - lp * s * 0.22).toFixed(1)} y={((Bf[1] + Bl[1]) / 2 - lp * c * 0.10 + 3).toFixed(1)}
+            fontSize="6.5" fill="rgb(52,211,153)" textAnchor="middle" fontFamily="monospace" fontWeight="bold">{L.toFixed(0)} m</text>
+        </>}
+        {W > 0 && <>
+          {seg(Bf, Br, { stroke: 'rgb(251,191,36)', strokeWidth: '1', markerEnd: 'url(#aW)', opacity: 0.7 })}
+          <text x={((Bf[0] + Br[0]) / 2 + wp * s * 0.22).toFixed(1)} y={((Bf[1] + Br[1]) / 2 - wp * c * 0.10 + 3).toFixed(1)}
+            fontSize="6.5" fill="rgb(251,191,36)" textAnchor="middle" fontFamily="monospace" fontWeight="bold">{W.toFixed(0)} m</text>
+        </>}
+        {H > 0 && <>
+          {seg(Br, Tr, { stroke: 'rgb(34,211,238)', strokeWidth: '1', markerEnd: 'url(#aH)', opacity: 0.7 })}
+          <text x={(Br[0] + 8).toFixed(1)} y={((Br[1] + Tr[1]) / 2 + 2).toFixed(1)}
+            fontSize="6.5" fill="rgb(34,211,238)" textAnchor="start" fontFamily="monospace" fontWeight="bold">{H.toFixed(0)} m</text>
+        </>}
+      </svg>
+      <div className="flex gap-4 items-center">
+        <span className="flex items-center gap-1 text-[9px] font-mono-sc text-emerald-600"><span className="w-3 h-px bg-emerald-600 inline-block" /> L</span>
+        <span className="flex items-center gap-1 text-[9px] font-mono-sc text-amber-500"><span className="w-3 h-px bg-amber-500 inline-block" /> W</span>
+        <span className="flex items-center gap-1 text-[9px] font-mono-sc text-cyan-500"><span className="w-3 h-px bg-cyan-500 inline-block" /> H</span>
+        {mass != null && <span className="text-[9px] font-mono-sc text-slate-700 ml-auto">{fMass(mass)}</span>}
+      </div>
+    </div>
+  );
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
 export default function ShipDetailPage() {
   const params = useParams<{ uuid: string }>();
   const uuid = params?.uuid;
@@ -55,7 +153,6 @@ export default function ShipDetailPage() {
     enabled: !!uuid,
   });
 
-  // Group module options by slot; track per-slot selection (default = is_default row)
   const moduleSlots = useMemo(() => {
     if (!modules || modules.length === 0) return [];
     const slotMap = new Map<string, ShipModule[]>();
@@ -76,52 +173,68 @@ export default function ShipDetailPage() {
   }, [moduleSlots]);
 
   const [selectedModules, setSelectedModules] = useState<Record<string, string>>({});
-  const effectiveSelection = useMemo(
-    () => ({ ...defaultSelected, ...selectedModules }),
-    [defaultSelected, selectedModules],
-  );
-
-  // Résoudre le module actif pour chaque slot (utilisé dans ShipLoadout)
+  const effectiveSelection = useMemo(() => ({ ...defaultSelected, ...selectedModules }), [defaultSelected, selectedModules]);
   const activeModules = useMemo(
-    () =>
-      moduleSlots.map((slot) => {
-        const sel = effectiveSelection[slot[0].slot_name];
-        return slot.find((m) => m.module_class_name === sel) ?? slot.find((m) => m.is_default) ?? slot[0];
-      }),
+    () => moduleSlots.map((slot) => {
+      const sel = effectiveSelection[slot[0].slot_name];
+      return slot.find((m) => m.module_class_name === sel) ?? slot.find((m) => m.is_default) ?? slot[0];
+    }),
     [moduleSlots, effectiveSelection],
   );
-  if (isLoading) return <LoadingGrid message="LOADING SHIP…" />;
-  if (error)    return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
-  if (!ship)    return null;
+
+  if (isLoading) return <LoadingGrid message="LOADING…" />;
+  if (error) return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
+  if (!ship) return null;
+
+  const category = ship.vehicle_category ?? 'ship';
+  const isGround = category === 'ground' || category === 'gravlev';
+
+  const categoryLabel = category === 'ground' ? 'Ground Vehicles' : category === 'gravlev' ? 'Grav-Lev' : 'Ships';
+  const categoryHref = category === 'ground' ? '/ships?cat=ground' : category === 'gravlev' ? '/ships?cat=gravlev' : '/ships';
+
+  const crew = crewLabel(ship.min_crew, ship.max_crew, ship.crew_size);
+  const hasDimensions = (ship.size_x || ship.size_y || ship.size_z);
+  const hasCargo = ship.cargo_capacity != null && Number(ship.cargo_capacity) > 0;
+  const hasInsurance = ship.insurance_claim_time != null || ship.insurance_expedite_cost != null;
 
   return (
     <div className="max-w-(--breakpoint-xl) mx-auto space-y-6">
-      {/* Breadcrumb */}
+
+      {/* ── Breadcrumb ─────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 text-xs font-mono-sc text-slate-600">
         <button onClick={() => router.back()} className="hover:text-slate-400 transition-colors flex items-center gap-1">
           <ArrowLeft size={12} /> Back
         </button>
         <ChevronRight size={10} />
-        <Link href="/ships" className="hover:text-slate-400 transition-colors">Ships</Link>
+        <Link href={categoryHref} className="hover:text-slate-400 transition-colors">{categoryLabel}</Link>
         <ChevronRight size={10} />
         <span className="text-slate-400">{ship.name}</span>
       </div>
 
-      {/* ── Hero ── */}
+      {/* ── Hero ───────────────────────────────────────────────────────────── */}
       <div className="sci-panel overflow-hidden">
-        {(ship.thumbnail_large ?? ship.thumbnail) && (
-          <div className="relative w-full h-52 bg-slate-900/80">
+        {/* Image ou placeholder */}
+        <div className="relative w-full h-48 bg-slate-900">
+          {(ship.thumbnail_large ?? ship.thumbnail) ? (
             <img
               src={(ship.thumbnail_large ?? ship.thumbnail)!}
               alt={ship.name}
               className="w-full h-full object-cover opacity-80"
               loading="lazy"
             />
-            <div className="absolute inset-x-0 bottom-0 h-20 bg-linear-to-t from-[#0A1628] to-transparent" />
-          </div>
-        )}
-        <div className="p-6">
-          <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="font-orbitron text-6xl font-black text-slate-800 select-none tracking-widest">
+                {ship.manufacturer_code ?? ship.name.slice(0, 3).toUpperCase()}
+              </span>
+            </div>
+          )}
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-[#0A1628] to-transparent" />
+        </div>
+
+        {/* Header info */}
+        <div className="px-6 pb-6 -mt-8 relative">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
               <p className="text-xs font-mono-sc text-cyan-700 uppercase tracking-widest mb-1">
                 {ship.manufacturer_name}
@@ -132,28 +245,22 @@ export default function ShipDetailPage() {
               <div className="flex flex-wrap gap-2 mt-3">
                 {ship.career && <GlowBadge color="cyan">{ship.career}</GlowBadge>}
                 {ship.role && ship.role !== ship.career && <GlowBadge color="slate">{ship.role}</GlowBadge>}
-                {ship.vehicle_category && ship.vehicle_category !== 'ship' && <GlowBadge color="slate">{ship.vehicle_category}</GlowBadge>}
+                {isGround && <GlowBadge color="slate">{category}</GlowBadge>}
                 {ship.variant_type && ship.variant_type !== 'standard' && (
-                  <GlowBadge
-                    color={ship.variant_type === 'collector' ? 'amber' : ship.variant_type === 'wikelo' ? 'green' : ship.variant_type === 'pyam_exec' ? 'purple' : 'slate'}
-                  >
+                  <GlowBadge color={ship.variant_type === 'collector' ? 'amber' : ship.variant_type === 'wikelo' ? 'green' : ship.variant_type === 'pyam_exec' ? 'purple' : 'slate'}>
                     {VARIANT_TYPE_LABELS[ship.variant_type] ?? ship.variant_type}
                   </GlowBadge>
                 )}
-                {ship.ship_matrix_id != null && <GlowBadge color="green">RSI Link</GlowBadge>}
+                {ship.ship_matrix_id != null && <GlowBadge color="green">RSI</GlowBadge>}
               </div>
             </div>
-            <div className="flex flex-col items-start gap-2 shrink-0">
+            <div className="flex items-center gap-3 shrink-0">
               <Link href={`/compare?a=${uuid}`} className="sci-btn-amber text-sm">
                 <BarChart3 size={13} /> Compare
               </Link>
               {ship.store_url && (
-                <a
-                  href={ship.store_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-mono-sc text-slate-500 hover:text-cyan-400 transition-colors"
-                >
+                <a href={ship.store_url} target="_blank" rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-mono-sc text-slate-500 hover:text-cyan-400 transition-colors">
                   <ExternalLink size={11} /> RSI Store
                 </a>
               )}
@@ -162,151 +269,82 @@ export default function ShipDetailPage() {
         </div>
       </div>
 
-      {/* ── Description (ship matrix) ── */}
+      {/* ── Description ────────────────────────────────────────────────────── */}
       {ship.sm_description && (
-        <p className="text-sm text-slate-400 leading-relaxed px-1 border-l-2 border-cyan-900/40 pl-4">
+        <p className="text-sm text-slate-400 leading-relaxed border-l-2 border-cyan-900/40 pl-4">
           {ship.sm_description}
         </p>
       )}
 
-      {/* ── Main layout: left content (2/3) + right sidebar (1/3) ── */}
+      {/* ── Quick stats bar ────────────────────────────────────────────────── */}
+      <div className="flex gap-2 flex-wrap">
+        {crew != null && (
+          <QuickStat icon={<Users size={9} />} label="Crew" value={crew} />
+        )}
+        {isGround ? (
+          <>
+            {(ship.max_speed ?? ship.scm_speed) != null && (
+              <QuickStat icon={<Zap size={9} />} label="Speed" value={`${fV(ship.max_speed ?? ship.scm_speed)} m/s`} />
+            )}
+          </>
+        ) : (
+          <>
+            {ship.scm_speed != null && (
+              <QuickStat icon={<Zap size={9} />} label="SCM" value={`${fV(ship.scm_speed)} m/s`} />
+            )}
+            {ship.boost_speed_forward != null && (
+              <QuickStat icon={<Zap size={9} />} label="Boost" value={`${fV(ship.boost_speed_forward)} m/s`} />
+            )}
+            {ship.max_speed != null && (
+              <QuickStat icon={<Zap size={9} />} label="Nav" value={`${fV(ship.max_speed)} m/s`} />
+            )}
+          </>
+        )}
+        {hasCargo && (
+          <QuickStat icon={<Package size={9} />} label="Cargo" value={`${ship.cargo_capacity} SCU`} />
+        )}
+        {ship.total_hp != null && Number(ship.total_hp) > 0 && (
+          <QuickStat icon={<span className="text-[8px]">HP</span>} label="Hull" value={String(ship.total_hp)} />
+        )}
+        {ship.shield_hp != null && Number(ship.shield_hp) > 0 && (
+          <QuickStat icon={<span className="text-[8px]">SH</span>} label="Shield" value={String(ship.shield_hp)} />
+        )}
+        {ship.mass != null && (
+          <QuickStat icon={<span className="text-[8px]">kg</span>} label="Mass" value={fMass(ship.mass)} />
+        )}
+      </div>
+
+      {/* ── Main layout ────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-        {/* ════ LEFT — Dimensions · Cargo · Loadout ════ */}
+        {/* ════ LEFT — 3D · Dimensions · Cargo · Loadout ════ */}
         <div className="lg:col-span-2 space-y-6">
 
-          {/* Dimensions */}
-          <ScifiPanel title="Dimensions" actions={<Ruler size={13} className="text-slate-600" />}>
-            {(() => {
-              const L = Number(ship.size_y) || 0;
-              const W = Number(ship.size_x) || 0;
-              const H = Number(ship.size_z) || 0;
-              const maxDim = Math.max(L, W, H, 1);
-              const scale = 48;
-              const lp = Math.max((L / maxDim) * scale, 4);
-              const wp = Math.max((W / maxDim) * scale, 4);
-              const hp = Math.max((H / maxDim) * scale, 4);
-              const c = 0.866, s = 0.5;
-              const pad = 20;
-              const ax = lp * c + pad;
-              const ay = (lp + wp) * s + hp + pad;
-              type V = [number, number];
-              const Bf: V = [ax,                    ay           ];
-              const Bl: V = [ax - lp*c,             ay - lp*s    ];
-              const Br: V = [ax + wp*c,             ay - wp*s    ];
-              const Bb: V = [ax - lp*c + wp*c,      ay - lp*s - wp*s];
-              const Tf: V = [Bf[0],                 Bf[1] - hp   ];
-              const Tl: V = [Bl[0],                 Bl[1] - hp   ];
-              const Tr: V = [Br[0],                 Br[1] - hp   ];
-              const Tb: V = [Bb[0],                 Bb[1] - hp   ];
-              const svgW = (lp + wp) * c + pad * 2;
-              const svgH = (lp + wp) * s + hp + pad * 2;
-              const seg = (a: V, b: V, props: React.SVGProps<SVGLineElement>) => (
-                <line x1={a[0].toFixed(1)} y1={a[1].toFixed(1)}
-                      x2={b[0].toFixed(1)} y2={b[1].toFixed(1)} {...props} />
-              );
-              const tick = (a: V, b: V, d: V) => {
-                const mx = (a[0]+b[0])/2, my = (a[1]+b[1])/2;
-                return <line x1={(mx+d[0]).toFixed(1)} y1={(my+d[1]).toFixed(1)}
-                             x2={(mx-d[0]).toFixed(1)} y2={(my-d[1]).toFixed(1)}
-                             stroke="rgba(100,116,139,0.6)" strokeWidth="0.6" />;
-              };
-              return (
-                <div className="space-y-2">
-                  <svg viewBox={`0 0 ${svgW.toFixed(0)} ${svgH.toFixed(0)}`}
-                       className="w-full" style={{ maxHeight: '140px' }}>
-                    <defs>
-                      <marker id="aL" markerWidth="4" markerHeight="4" refX="2" refY="2" orient="auto">
-                        <polygon points="0,0 4,2 0,4" fill="rgb(52,211,153)" />
-                      </marker>
-                      <marker id="aW" markerWidth="4" markerHeight="4" refX="2" refY="2" orient="auto">
-                        <polygon points="0,0 4,2 0,4" fill="rgb(251,191,36)" />
-                      </marker>
-                      <marker id="aH" markerWidth="4" markerHeight="4" refX="2" refY="2" orient="auto">
-                        <polygon points="0,0 4,2 0,4" fill="rgb(34,211,238)" />
-                      </marker>
-                    </defs>
-                    {seg(Bl, Bb, { stroke:'rgba(100,116,139,0.35)', strokeWidth:'0.7', strokeDasharray:'2,2' })}
-                    {seg(Br, Bb, { stroke:'rgba(100,116,139,0.35)', strokeWidth:'0.7', strokeDasharray:'2,2' })}
-                    {seg(Bf, Bb, { stroke:'rgba(100,116,139,0.35)', strokeWidth:'0.7', strokeDasharray:'2,2' })}
-                    {seg(Bf, Bl, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
-                    {seg(Bf, Br, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
-                    {seg(Bf, Tf, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
-                    {seg(Bl, Tl, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
-                    {seg(Br, Tr, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
-                    {seg(Tf, Tl, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
-                    {seg(Tf, Tr, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
-                    {seg(Tl, Tb, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
-                    {seg(Tr, Tb, { stroke:'rgba(148,163,184,0.55)', strokeWidth:'0.8' })}
-                    {L > 0 && <>
-                      {seg(Bf, Bl, { stroke:'rgb(52,211,153)', strokeWidth:'1', markerEnd:'url(#aL)', opacity:0.7 })}
-                      {tick(Bf, Bl, [lp*s*0.15, -lp*c*0.15] as V)}
-                      {tick(Bl, Bf, [lp*s*0.15, -lp*c*0.15] as V)}
-                      <text x={((Bf[0]+Bl[0])/2 - lp*s*0.22).toFixed(1)}
-                            y={((Bf[1]+Bl[1])/2 - lp*c*0.10 + 3).toFixed(1)}
-                            fontSize="6.5" fill="rgb(52,211,153)" textAnchor="middle"
-                            fontFamily="monospace" fontWeight="bold">
-                        {L.toFixed(0)} m
-                      </text>
-                    </>}
-                    {W > 0 && <>
-                      {seg(Bf, Br, { stroke:'rgb(251,191,36)', strokeWidth:'1', markerEnd:'url(#aW)', opacity:0.7 })}
-                      {tick(Bf, Br, [wp*s*0.15, wp*c*0.15] as V)}
-                      {tick(Br, Bf, [wp*s*0.15, wp*c*0.15] as V)}
-                      <text x={((Bf[0]+Br[0])/2 + wp*s*0.22).toFixed(1)}
-                            y={((Bf[1]+Br[1])/2 - wp*c*0.10 + 3).toFixed(1)}
-                            fontSize="6.5" fill="rgb(251,191,36)" textAnchor="middle"
-                            fontFamily="monospace" fontWeight="bold">
-                        {W.toFixed(0)} m
-                      </text>
-                    </>}
-                    {H > 0 && <>
-                      {seg(Br, Tr, { stroke:'rgb(34,211,238)', strokeWidth:'1', markerEnd:'url(#aH)', opacity:0.7 })}
-                      {tick(Br, Tr, [3, 0] as V)}
-                      {tick(Tr, Br, [3, 0] as V)}
-                      <text x={(Br[0] + 8).toFixed(1)}
-                            y={((Br[1]+Tr[1])/2 + 2).toFixed(1)}
-                            fontSize="6.5" fill="rgb(34,211,238)" textAnchor="start"
-                            fontFamily="monospace" fontWeight="bold">
-                        {H.toFixed(0)} m
-                      </text>
-                    </>}
-                  </svg>
-                  <div className="flex gap-4 items-center">
-                    <span className="flex items-center gap-1 text-[9px] font-mono-sc text-emerald-600">
-                      <span className="w-3 h-px bg-emerald-600 inline-block" /> L
-                    </span>
-                    <span className="flex items-center gap-1 text-[9px] font-mono-sc text-amber-500">
-                      <span className="w-3 h-px bg-amber-500 inline-block" /> W
-                    </span>
-                    <span className="flex items-center gap-1 text-[9px] font-mono-sc text-cyan-500">
-                      <span className="w-3 h-px bg-cyan-500 inline-block" /> H
-                    </span>
-                    {ship.mass != null && (
-                      <span className="text-[9px] font-mono-sc text-slate-700 ml-auto">{fMass(ship.mass)}</span>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
-          </ScifiPanel>
-
-          {/* Holoviewer */}
+          {/* HoloViewer — uniquement si modèle 3D disponible */}
           {ship.ctm_url && (
-            <HoloViewer
-              shipUuid={ship.uuid}
-              shipName={ship.name}
-            />
+            <HoloViewer shipUuid={ship.uuid} shipName={ship.name} />
+          )}
+
+          {/* Dimensions */}
+          {hasDimensions && (
+            <ScifiPanel title="Dimensions" actions={<Ruler size={13} className="text-slate-600" />}>
+              <DimensionBox
+                L={Number(ship.size_y) || 0}
+                W={Number(ship.size_x) || 0}
+                H={Number(ship.size_z) || 0}
+                mass={ship.mass}
+              />
+            </ScifiPanel>
           )}
 
           {/* Cargo */}
-          {ship.cargo_capacity != null && ship.cargo_capacity > 0 && (
-            <ScifiPanel title="Cargo">
+          {hasCargo && (
+            <ScifiPanel title="Cargo" actions={<Package size={13} className="text-slate-600" />}>
               <CargoGrid scu={Number(ship.cargo_capacity)} shipName={ship.name} />
             </ScifiPanel>
           )}
 
-          {/* Loadout (tabbed) */}
+          {/* Loadout */}
           {loadout && loadout.length > 0 && (
             <ScifiPanel title="Loadout" subtitle="Stock equipment" actions={<Layers size={14} className="text-slate-600" />}>
               <ShipLoadout
@@ -321,20 +359,20 @@ export default function ShipDetailPage() {
           )}
         </div>
 
-        {/* ════ RIGHT sidebar — Stats · Crew · Insurance · Paints ════ */}
+        {/* ════ RIGHT sidebar ════ */}
         <div className="lg:col-span-1 space-y-4">
 
-          {/* Combat & Speed */}
-          <ScifiPanel title="Combat & Speed">
-            <ShipStatsBanner ship={ship} loadout={loadout ?? []} />
+          {/* Stats */}
+          <ScifiPanel title={isGround ? 'Performance' : 'Combat & Speed'}>
+            <ShipStatsBanner ship={ship} loadout={loadout ?? []} category={category} />
           </ScifiPanel>
 
-          {/* Crew */}
+          {/* Crew widget */}
           {(() => {
             const minC = ship.min_crew != null ? Number(ship.min_crew) : (ship.crew_size ?? null);
             const maxC = ship.max_crew != null ? Number(ship.max_crew) : (ship.crew_size ?? null);
             if (maxC == null) return null;
-            const crewLabel = minC != null && maxC !== minC ? `${minC} – ${maxC}` : String(maxC);
+            const label = minC != null && maxC !== minC ? `${minC} – ${maxC}` : String(maxC);
             const pipCount = Math.min(maxC, 16);
             return (
               <ScifiPanel>
@@ -342,7 +380,7 @@ export default function ShipDetailPage() {
                   <span className="flex items-center gap-1.5 text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest">
                     <Users size={10} /> Crew
                   </span>
-                  <span className="text-sm font-orbitron font-bold text-teal-400 tabular-nums">{crewLabel}</span>
+                  <span className="text-sm font-orbitron font-bold text-teal-400 tabular-nums">{label}</span>
                 </div>
                 <div className="flex gap-1 flex-wrap">
                   {Array.from({ length: pipCount }).map((_, i) => (
@@ -368,15 +406,14 @@ export default function ShipDetailPage() {
           })()}
 
           {/* Insurance */}
-          {(ship.insurance_claim_time != null || ship.insurance_expedite_cost != null) && (
+          {hasInsurance && (
             <ScifiPanel title="Insurance" actions={<Clock size={13} className="text-slate-600" />}>
               {ship.insurance_claim_time != null && (() => {
                 const claimMin = Number(ship.insurance_claim_time);
                 const MAX_CLAIM = 253;
-                const color     = claimMin < 60 ? 'bg-emerald-600' : claimMin < 120 ? 'bg-amber-500' : 'bg-red-600';
+                const color = claimMin < 60 ? 'bg-emerald-600' : claimMin < 120 ? 'bg-amber-500' : 'bg-red-600';
                 const textColor = claimMin < 60 ? 'text-emerald-400' : claimMin < 120 ? 'text-amber-400' : 'text-red-400';
                 const pct = Math.min(100, (claimMin / MAX_CLAIM) * 100);
-                const ticks = [60, 120, 180].map(t => ({ min: t, pct: (t / MAX_CLAIM) * 100 }));
                 return (
                   <div className="mb-3">
                     <div className="flex items-baseline justify-between mb-1">
@@ -387,16 +424,10 @@ export default function ShipDetailPage() {
                     </div>
                     <div className="relative h-2 bg-slate-800 rounded-full overflow-hidden">
                       <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
-                      {ticks.map(({ min, pct: tp }) => (
-                        <div key={min} className="absolute top-0 bottom-0 w-px bg-slate-700/50" style={{ left: `${tp}%` }} />
+                      {[60, 120, 180].map(t => (
+                        <div key={t} className="absolute top-0 bottom-0 w-px bg-slate-700/50"
+                          style={{ left: `${(t / MAX_CLAIM) * 100}%` }} />
                       ))}
-                    </div>
-                    <div className="flex justify-between mt-0.5">
-                      <span className="text-[8px] font-mono-sc text-slate-800">0</span>
-                      {ticks.map(({ min }) => (
-                        <span key={min} className="text-[8px] font-mono-sc text-slate-800">{min}</span>
-                      ))}
-                      <span className="text-[8px] font-mono-sc text-slate-800">253min</span>
                     </div>
                   </div>
                 );
@@ -414,8 +445,8 @@ export default function ShipDetailPage() {
 
           {/* Paints */}
           {paints && paints.length > 0 && (
-            <ScifiPanel title="Available paints" subtitle={`${paints.length} paints`} actions={<Palette size={14} className="text-slate-600" />}>
-              <div className="space-y-0.5 max-h-64 overflow-y-auto">
+            <ScifiPanel title="Paints" subtitle={`${paints.length} available`} actions={<Palette size={14} className="text-slate-600" />}>
+              <div className="space-y-0.5 max-h-56 overflow-y-auto">
                 {paints.map(p => (
                   <div key={p.paint_uuid} className="px-2 py-1.5 rounded-sm hover:bg-white/5">
                     <span className="text-xs font-mono-sc text-slate-400">{p.paint_name}</span>
@@ -427,9 +458,12 @@ export default function ShipDetailPage() {
         </div>
       </div>
 
-      {/* ── Similar ships (full width) ── */}
+      {/* ── Similar ────────────────────────────────────────────────────────── */}
       {similar && similar.length > 0 && (
-        <ScifiPanel title="Similar ships" subtitle="Same role or size class">
+        <ScifiPanel
+          title={isGround ? 'Similar vehicles' : 'Similar ships'}
+          subtitle="Same role or manufacturer"
+        >
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {similar.map((s, i) => (
               <ShipCard key={s.uuid} ship={s} index={i} />
@@ -440,4 +474,3 @@ export default function ShipDetailPage() {
     </div>
   );
 }
-
