@@ -72,3 +72,6 @@ db-backup/
 # Legacy IHM directories
 ihm/src/_pages_legacy/
 ihm/src/pages/
+
+# AI
+.claude
