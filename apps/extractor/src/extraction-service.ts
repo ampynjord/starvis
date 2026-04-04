@@ -23,15 +23,31 @@ import {
   pruneExcludedVariants,
   tagVariantTypes,
 } from './crossref.js';
+import { type ShipToScrape, scrapeShipCtmUrls } from './ctm-scraper.js';
 import { classifyPort, type DataForgeService } from './dataforge-service.js';
 import { LocalizationService } from './localization-service.js';
+import { extractLocations } from './location-extractor.js';
 import logger from './logger.js';
 import { extractMiningCompositions, extractMiningElements } from './mining-extractor.js';
-import { extractMissions, extractMissionBlueprintLinks, extractMissionFactionData, extractMissionMbeEnrichment } from './mission-extractor.js';
-import { extractLocations } from './location-extractor.js';
-import { scrapeShipCtmUrls, type ShipToScrape } from './ctm-scraper.js';
+import {
+  extractMissionBlueprintLinks,
+  extractMissionFactionData,
+  extractMissionMbeEnrichment,
+  extractMissions,
+} from './mission-extractor.js';
 
-export type ExtractionModule = 'ships' | 'components' | 'items' | 'commodities' | 'mining' | 'missions' | 'crafting' | 'paints' | 'shops' | 'ctm' | 'locations';
+export type ExtractionModule =
+  | 'ships'
+  | 'components'
+  | 'items'
+  | 'commodities'
+  | 'mining'
+  | 'missions'
+  | 'crafting'
+  | 'paints'
+  | 'shops'
+  | 'ctm'
+  | 'locations';
 
 export type GameEnv = 'live' | 'ptu' | 'eptu' | 'custom';
 
@@ -1331,10 +1347,10 @@ export class ExtractionService {
         if (resolved && !resolved.startsWith('<=')) name = resolved;
       }
       try {
-        await conn.execute(
-          `INSERT INTO starvis.manufacturers (code, name) VALUES (?, ?) AS new ON DUPLICATE KEY UPDATE name=new.name`,
-          [mfg.code, name],
-        );
+        await conn.execute(`INSERT INTO starvis.manufacturers (code, name) VALUES (?, ?) AS new ON DUPLICATE KEY UPDATE name=new.name`, [
+          mfg.code,
+          name,
+        ]);
         saved++;
       } catch (e: unknown) {
         logger.error(`Manufacturer ${mfg.code}: ${e instanceof Error ? e.message : String(e)}`);
@@ -1980,10 +1996,7 @@ export class ExtractionService {
         let enriched = 0;
         for (const [uuid, d] of factionData.entries()) {
           if (!d.faction) continue;
-          await conn.execute(
-            'UPDATE missions SET faction=?, mission_giver=? WHERE uuid=?',
-            [d.faction, d.missionGiver, uuid],
-          );
+          await conn.execute('UPDATE missions SET faction=?, mission_giver=? WHERE uuid=?', [d.faction, d.missionGiver, uuid]);
           enriched++;
         }
         if (enriched > 0) {
@@ -2024,7 +2037,12 @@ export class ExtractionService {
         'SELECT mission_type, reward_min, reward_max, danger_level FROM missions WHERE reward_min IS NOT NULL OR danger_level IS NOT NULL',
       );
       const byType = new Map<string, { rewardMins: number[]; rewardMaxs: number[]; dangers: number[] }>();
-      for (const row of enrichedRows as { mission_type: string; reward_min: number | null; reward_max: number | null; danger_level: number | null }[]) {
+      for (const row of enrichedRows as {
+        mission_type: string;
+        reward_min: number | null;
+        reward_max: number | null;
+        danger_level: number | null;
+      }[]) {
         if (!row.mission_type) continue;
         if (!byType.has(row.mission_type)) byType.set(row.mission_type, { rewardMins: [], rewardMaxs: [], dangers: [] });
         const entry = byType.get(row.mission_type)!;
@@ -2048,19 +2066,16 @@ export class ExtractionService {
         if (rewardMins.length >= 3) {
           const medMin = median(rewardMins);
           const medMax = rewardMaxs.length >= 3 ? median(rewardMaxs) : medMin;
-          const [r] = await conn.execute(
+          const [r] = (await conn.execute(
             `UPDATE missions SET reward_min=?, reward_max=?, reward_currency=COALESCE(reward_currency,'aUEC')
                WHERE mission_type=? AND reward_min IS NULL`,
             [medMin, medMax, missionType],
-          ) as any[];
+          )) as any[];
           typeFallbackCount += r.affectedRows ?? 0;
         }
         if (dangers.length >= 3) {
           const modeVal = mode(dangers);
-          await conn.execute(
-            'UPDATE missions SET danger_level=? WHERE mission_type=? AND danger_level IS NULL',
-            [modeVal, missionType],
-          );
+          await conn.execute('UPDATE missions SET danger_level=? WHERE mission_type=? AND danger_level IS NULL', [modeVal, missionType]);
         }
       }
       if (typeFallbackCount > 0) {
@@ -2090,11 +2105,7 @@ export class ExtractionService {
     // ── Manual overrides: loot-based links not present in DataForge ──────────
     // ADP (cds_legacy_armor) blueprints are dropped as loot in UGF Unlawful missions.
     // These links are not encoded in ContractGenerator/BlueprintPoolRecord.
-    const UGF_UNLAWFUL_CLASS_NAMES = [
-      'EliminateAll_Unlawful_UGF',
-      'EliminateBoss_Unlawful_UGF',
-      'EliminateSpecific_Unlawful_UGF',
-    ];
+    const UGF_UNLAWFUL_CLASS_NAMES = ['EliminateAll_Unlawful_UGF', 'EliminateBoss_Unlawful_UGF', 'EliminateSpecific_Unlawful_UGF'];
     const ugfMissionUuids = (missionRows as { uuid: string; class_name: string }[])
       .filter((r) => UGF_UNLAWFUL_CLASS_NAMES.includes(r.class_name))
       .map((r) => r.uuid);

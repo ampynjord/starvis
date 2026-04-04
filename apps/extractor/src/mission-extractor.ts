@@ -100,13 +100,13 @@ function isLocEmpty(s: string | null | undefined): boolean {
 function cleanRuntimePlaceholderTokens(s: string | null | undefined): string | null {
   if (!s) return null;
   // Strip runtime tokens and any immediately preceding separator/whitespace (e.g., ": <Target Name>")
-  let result = s.replace(/\s*[:\-]\s*~[a-zA-Z0-9_]+\([^)]*\)/g, '');
+  let result = s.replace(/\s*[:-]\s*~[a-zA-Z0-9_]+\([^)]*\)/g, '');
   result = result.replace(/~[a-zA-Z0-9_]+\([^)]*\)/g, '');
   result = result.trim();
   return result || null;
 }
 
-function hasRuntimePlaceholderTokens(s: string | null | undefined): boolean {
+function _hasRuntimePlaceholderTokens(s: string | null | undefined): boolean {
   if (!s) return false;
   return /~[a-z0-9_]+\(/i.test(s);
 }
@@ -215,16 +215,16 @@ export function extractMissions(ctx: DataForgeService, locService?: MissionLocal
       // NEW: Retrieve rewards from properties (Alpha 3.23 / 4.0 data)
       // -------------------------------------------------------------
       const props = (data.contractProperties as Array<any>) || [];
-      const rewardProps = props.filter(p => /(reward|payout|Price_BP)/i.test(p.missionVariableName || ''));
+      const rewardProps = props.filter((p) => /(reward|payout|Price_BP)/i.test(p.missionVariableName || ''));
       for (const p of rewardProps) {
         const pOpts = p.value?.options;
         if (Array.isArray(pOpts)) {
           for (const opt of pOpts) {
-             const val = opt.value;
-             if (typeof val === 'number' && val > 0) {
-               if (rewardMin === null || val < rewardMin) rewardMin = val;
-               if (rewardMax === null || val > rewardMax) rewardMax = val;
-             }
+            const val = opt.value;
+            if (typeof val === 'number' && val > 0) {
+              if (rewardMin === null || val < rewardMin) rewardMin = val;
+              if (rewardMax === null || val > rewardMax) rewardMax = val;
+            }
           }
         }
       }
@@ -317,23 +317,17 @@ export function extractMissions(ctx: DataForgeService, locService?: MissionLocal
       let blueprintRewardUuid: string | null = null;
       if (rewards?.unlockBlueprintReward) {
         hasBlueprintReward = true;
-        const u = Array.isArray(rewards.unlockBlueprintReward) 
-          ? rewards.unlockBlueprintReward[0] 
-          : rewards.unlockBlueprintReward;
+        const u = Array.isArray(rewards.unlockBlueprintReward) ? rewards.unlockBlueprintReward[0] : rewards.unlockBlueprintReward;
         if (u?.value) blueprintRewardUuid = u.value;
       }
       if (!blueprintRewardUuid && rewards?.craftingBlueprintReward) {
         hasBlueprintReward = true;
-        const c = Array.isArray(rewards.craftingBlueprintReward) 
-          ? rewards.craftingBlueprintReward[0] 
-          : rewards.craftingBlueprintReward;
+        const c = Array.isArray(rewards.craftingBlueprintReward) ? rewards.craftingBlueprintReward[0] : rewards.craftingBlueprintReward;
         if (c?.value) blueprintRewardUuid = c.value;
       }
       if (!blueprintRewardUuid && rewards?.blueprintReward) {
         hasBlueprintReward = true;
-        const b = Array.isArray(rewards.blueprintReward) 
-          ? rewards.blueprintReward[0] 
-          : rewards.blueprintReward;
+        const b = Array.isArray(rewards.blueprintReward) ? rewards.blueprintReward[0] : rewards.blueprintReward;
         if (b?.value) blueprintRewardUuid = b.value;
       }
 
@@ -354,7 +348,7 @@ export function extractMissions(ctx: DataForgeService, locService?: MissionLocal
       const resDesc = resolveLocalizedText(resolveStr(rawDesc), locService);
 
       const localizedClassName = locService?.resolveComponentName?.(className) ?? null;
-      let title = isLocEmpty(resTitle) ? (localizedClassName || humanizeMissionClassName(className)) : resTitle;
+      let title = isLocEmpty(resTitle) ? localizedClassName || humanizeMissionClassName(className) : resTitle;
       title = cleanRuntimePlaceholderTokens(title);
       // After stripping, if title is null/empty or still a bare `<…>` placeholder, fall back to class name
       if (!title || /^<[^<>]+>$/.test(title.trim())) {
@@ -365,7 +359,7 @@ export function extractMissions(ctx: DataForgeService, locService?: MissionLocal
 
       const resolveEntityLabel = (value: string | null): string | null => {
         if (!value) return null;
-        let resolved = resolveLocalizedText(value, locService);
+        const resolved = resolveLocalizedText(value, locService);
         if (isLocEmpty(resolved)) return null;
         return cleanRuntimePlaceholderTokens(resolved);
       };
@@ -527,10 +521,7 @@ export interface MissionFactionData {
  *
  * Returns a Map of mission UUID → faction/giver data.
  */
-export function extractMissionFactionData(
-  ctx: DataForgeService,
-  locService: MissionLocalizationAdapter,
-): Map<string, MissionFactionData> {
+export function extractMissionFactionData(ctx: DataForgeService, locService: MissionLocalizationAdapter): Map<string, MissionFactionData> {
   const missionRecs = ctx.searchByStructType('^ContractTemplate$', 99999);
   const missionUuidSet = new Set(missionRecs.map((r) => r.uuid));
 
@@ -545,8 +536,9 @@ export function extractMissionFactionData(
 
       let contractorKey = '';
       for (const gen of gens) {
-        const overrides = (gen.contractParams as Record<string, unknown> | undefined)
-          ?.stringParamOverrides as Array<Record<string, unknown>> | undefined;
+        const overrides = (gen.contractParams as Record<string, unknown> | undefined)?.stringParamOverrides as
+          | Array<Record<string, unknown>>
+          | undefined;
         const cp = overrides?.find((p) => p.param === 'Contractor');
         if (cp?.value && typeof cp.value === 'string') {
           contractorKey = cp.value;
@@ -623,10 +615,7 @@ function tokenMatchScore(a: string[], b: string[]): number {
  * Also extracts faction/missionGiver from MBE when the value is a static string
  * (not a runtime ~mission() token) — used as fallback when ContractGenerator has no data.
  */
-export function extractMissionMbeEnrichment(
-  ctx: DataForgeService,
-  locService?: MissionLocalizationAdapter,
-): Map<string, MissionMbeData> {
+export function extractMissionMbeEnrichment(ctx: DataForgeService, locService?: MissionLocalizationAdapter): Map<string, MissionMbeData> {
   const ctRecords = ctx.searchByStructType('^ContractTemplate$', 99999);
   const mbeRecords = ctx.searchByStructType('^MissionBrokerEntry$', 99999);
 
@@ -663,7 +652,13 @@ export function extractMissionMbeEnrichment(
     const giverKey = d.missionGiver as string | undefined;
     if (giverKey && giverKey !== '@LOC_UNINITIALIZED' && giverKey !== '@LOC_EMPTY' && locService) {
       const resolved = giverKey.startsWith('@') ? (locService.resolveKey(giverKey) ?? null) : giverKey;
-      if (resolved && !resolved.includes('~mission(') && !resolved.includes('UNINITIALIZED') && !resolved.includes('PLACEHOLDER') && resolved !== 'null') {
+      if (
+        resolved &&
+        !resolved.includes('~mission(') &&
+        !resolved.includes('UNINITIALIZED') &&
+        !resolved.includes('PLACEHOLDER') &&
+        resolved !== 'null'
+      ) {
         giverResolved = resolved;
       }
     }

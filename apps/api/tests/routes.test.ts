@@ -2,15 +2,16 @@
  * STARVIS - HTTP route integration tests (supertest)
  * Tests all API routes against a mock GameDataService / ShipMatrixService
  */
-import express, { type Express } from 'express';
+
 import type { PrismaClient } from '@prisma/client';
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import express, { type Express } from 'express';
 import request from 'supertest';
-import { createRoutes } from '../src/routes/index.js';
-import { healthRouter } from '../src/routes/health.js';
-import { mountManufacturerRoutes } from '../src/routes/manufacturers.js';
-import { mountLocationRoutes } from '../src/routes/locations.js';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { mountCommodityRoutes } from '../src/routes/commodities.js';
+import { healthRouter } from '../src/routes/health.js';
+import { createRoutes } from '../src/routes/index.js';
+import { mountLocationRoutes } from '../src/routes/locations.js';
+import { mountManufacturerRoutes } from '../src/routes/manufacturers.js';
 import type { RouteDependencies } from '../src/routes/types.js';
 
 // ── Mock factory helpers ─────────────────────────────────
@@ -708,7 +709,7 @@ describe('503 when gameDataService is unavailable', () => {
       getShipByUuid: vi.fn(),
       getShipByClassName: vi.fn(),
     };
-    const stubGds = { ships: minimalShips } as any;
+    const _stubGds = { ships: minimalShips } as any;
     // Wrap in a Proxy so the guard treats it as unavailable
     // The guard does: if (!gameDataService) → 503
     // We achieve 503 by passing undefined, but only for routes that don't crash

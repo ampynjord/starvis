@@ -768,11 +768,7 @@ export class DataForgeService implements DataForgeContext {
                         stats.max_speed = Math.round(topSpeed);
                       }
                       const boostSpeed =
-                        fc.boostTopSpeed ??
-                        fc.sprintSpeed ??
-                        fc.params?.boostTopSpeed ??
-                        fc.movementParams?.boostTopSpeed ??
-                        null;
+                        fc.boostTopSpeed ?? fc.sprintSpeed ?? fc.params?.boostTopSpeed ?? fc.movementParams?.boostTopSpeed ?? null;
                       if (typeof boostSpeed === 'number' && boostSpeed > 0) {
                         stats.max_speed = Math.round(boostSpeed);
                       }
@@ -1033,9 +1029,14 @@ export class DataForgeService implements DataForgeContext {
    * Read vehicle implementation XML from P4K to extract mass, hull parts, and totalHp.
    * File path: Data\Scripts\Entities\Vehicles\Implementations\Xml\{className}.xml
    */
-  private async readVehicleImplementationXml(
-    className: string,
-  ): Promise<{ mass: number; totalHp: number; bodyHp: number; hullParts: any[]; groundTopSpeed: number | null; groundBoostSpeed: number | null } | null> {
+  private async readVehicleImplementationXml(className: string): Promise<{
+    mass: number;
+    totalHp: number;
+    bodyHp: number;
+    hullParts: any[];
+    groundTopSpeed: number | null;
+    groundBoostSpeed: number | null;
+  } | null> {
     if (!this.provider) return null;
     const xmlPath = `Data\\Scripts\\Entities\\Vehicles\\Implementations\\Xml\\${className}.xml`;
     try {
@@ -1458,9 +1459,13 @@ export class DataForgeService implements DataForgeContext {
         cType.includes('DriveParams')
       ) {
         const topSpeed =
-          comp.topSpeed ?? comp.maxSpeed ?? comp.maxLinearVelocity ??
-          comp.params?.topSpeed ?? comp.params?.maxSpeed ??
-          comp.movementParams?.topSpeed ?? comp.movementParams?.maxSpeed ??
+          comp.topSpeed ??
+          comp.maxSpeed ??
+          comp.maxLinearVelocity ??
+          comp.params?.topSpeed ??
+          comp.params?.maxSpeed ??
+          comp.movementParams?.topSpeed ??
+          comp.movementParams?.maxSpeed ??
           null;
         if (typeof topSpeed === 'number' && topSpeed > 0 && !result.ifcs.scmSpeed) {
           result.ifcs = {
@@ -1470,8 +1475,11 @@ export class DataForgeService implements DataForgeContext {
           };
         }
         const boostSpeed =
-          comp.boostTopSpeed ?? comp.sprintSpeed ?? comp.afterburnerSpeed ??
-          comp.params?.boostTopSpeed ?? comp.movementParams?.boostTopSpeed ??
+          comp.boostTopSpeed ??
+          comp.sprintSpeed ??
+          comp.afterburnerSpeed ??
+          comp.params?.boostTopSpeed ??
+          comp.movementParams?.boostTopSpeed ??
           null;
         if (typeof boostSpeed === 'number' && boostSpeed > 0) {
           result.ifcs = { ...result.ifcs, maxSpeed: Math.round(boostSpeed) };

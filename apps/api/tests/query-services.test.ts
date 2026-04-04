@@ -4,14 +4,14 @@
  */
 import type { PrismaClient } from '@prisma/client';
 import { describe, expect, it, vi } from 'vitest';
+import { CommodityQueryService } from '../src/services/commodity-query-service.js';
 import { ComponentQueryService } from '../src/services/component-query-service.js';
 import { GameDataService } from '../src/services/game-data-service.js';
 import { ItemQueryService } from '../src/services/item-query-service.js';
+import { LocationQueryService } from '../src/services/location-query-service.js';
 import { MissionService } from '../src/services/mission-service.js';
 import { ShipQueryService } from '../src/services/ship-query-service.js';
 import { ShopService } from '../src/services/shop-service.js';
-import { CommodityQueryService } from '../src/services/commodity-query-service.js';
-import { LocationQueryService } from '../src/services/location-query-service.js';
 
 // ── Mock PrismaClient Factory ────────────────────────────
 
@@ -463,7 +463,9 @@ describe('ShipQueryService manufacturers', () => {
     });
 
     it('uses pre-aggregated subqueries (no cartesian cross-join)', async () => {
-      const prisma = createMockPrisma([[{ code: 'RSI', name: 'RSI', ship_count: BigInt(1), component_count: BigInt(0), item_count: BigInt(0) }]]);
+      const prisma = createMockPrisma([
+        [{ code: 'RSI', name: 'RSI', ship_count: BigInt(1), component_count: BigInt(0), item_count: BigInt(0) }],
+      ]);
       const svc = new ShipQueryService(createGetClient(prisma));
       await svc.getAllManufacturers();
       const sql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
@@ -507,10 +509,18 @@ describe('ShipQueryService manufacturers', () => {
 
   describe('getManufacturerByCode', () => {
     it('returns manufacturer when found', async () => {
-      const prisma = createMockPrisma([[{
-        code: 'AEGS', name: 'Aegis', description: 'Military ships',
-        ship_count: BigInt(12), component_count: BigInt(45), item_count: BigInt(0),
-      }]]);
+      const prisma = createMockPrisma([
+        [
+          {
+            code: 'AEGS',
+            name: 'Aegis',
+            description: 'Military ships',
+            ship_count: BigInt(12),
+            component_count: BigInt(45),
+            item_count: BigInt(0),
+          },
+        ],
+      ]);
       const svc = new ShipQueryService(createGetClient(prisma));
       const result = await svc.getManufacturerByCode('aegs');
       expect(result).not.toBeNull();
@@ -526,7 +536,9 @@ describe('ShipQueryService manufacturers', () => {
     });
 
     it('uppercases the code before query', async () => {
-      const prisma = createMockPrisma([[{ code: 'AEGS', name: 'Aegis', ship_count: BigInt(1), component_count: BigInt(0), item_count: BigInt(0) }]]);
+      const prisma = createMockPrisma([
+        [{ code: 'AEGS', name: 'Aegis', ship_count: BigInt(1), component_count: BigInt(0), item_count: BigInt(0) }],
+      ]);
       const svc = new ShipQueryService(createGetClient(prisma));
       await svc.getManufacturerByCode('aegs');
       const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
@@ -640,10 +652,7 @@ describe('LocationQueryService', () => {
 
   describe('getLocations', () => {
     it('returns paginated locations', async () => {
-      const prisma = createMockPrisma([
-        [row({ total: 3 })],
-        [row({ uuid: 'l1', name: 'New Babbage', type: 'City', system: 'Stanton' })],
-      ]);
+      const prisma = createMockPrisma([[row({ total: 3 })], [row({ uuid: 'l1', name: 'New Babbage', type: 'City', system: 'Stanton' })]]);
       const svc = new LocationQueryService(createGetClient(prisma));
       const result = await svc.getLocations({});
       expect(result.total).toBe(3);
