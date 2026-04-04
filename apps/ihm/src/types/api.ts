@@ -226,37 +226,70 @@ export interface Component extends ComponentListItem {
   hp: number | null;
   power_base: number | null;
   power_draw: number | null;
-  power_output: number | null;
   heat_generation: number | null;
-  cooling_rate: number | null;
   em_signature: number | null;
   ir_signature: number | null;
   cross_section_signature: number | null;
+  // Weapon extended
   weapon_damage: number | null;
-  weapon_damage_type: string | null;
   weapon_fire_rate: number | null;
-  weapon_range: number | null;
   weapon_speed: number | null;
   weapon_ammo_count: number | null;
   weapon_alpha_damage: number | null;
-  weapon_dps: number | null;
   weapon_burst_dps: number | null;
   weapon_sustained_dps: number | null;
-  shield_hp: number | null;
-  shield_regen: number | null;
+  weapon_pellets_per_shot: number | null;
+  weapon_burst_size: number | null;
+  weapon_damage_physical: number | null;
+  weapon_damage_energy: number | null;
+  weapon_damage_distortion: number | null;
+  // Shield extended
   shield_regen_delay: number | null;
-  qd_speed: number | null;
-  qd_spool_time: number | null;
-  qd_range: number | null;
+  shield_hardening: number | null;
+  shield_faces: number | null;
+  // QD extended
   qd_fuel_rate: number | null;
-  missile_damage: number | null;
+  qd_cooldown: number | null;
+  qd_stage1_accel: number | null;
+  qd_stage2_accel: number | null;
+  qd_tuning_rate: number | null;
+  qd_alignment_rate: number | null;
+  qd_disconnect_range: number | null;
+  // Missile extended
+  missile_signal_type: string | null;
   missile_speed: number | null;
-  missile_range: number | null;
-  radar_range: number | null;
-  thruster_max_thrust: number | null;
-  tractor_max_force: number | null;
-  mining_speed: number | null;
+  missile_lock_time: number | null;
+  missile_lock_range: number | null;
+  missile_damage_physical: number | null;
+  missile_damage_energy: number | null;
+  missile_damage_distortion: number | null;
+  // EMP
+  emp_charge_time: number | null;
+  emp_cooldown: number | null;
+  // Quantum Interdiction Generator
+  qig_jammer_range: number | null;
+  qig_snare_radius: number | null;
+  qig_charge_time: number | null;
+  qig_cooldown: number | null;
+  // Mining
+  mining_range: number | null;
+  mining_resistance: number | null;
+  mining_instability: number | null;
+  // Salvage
   salvage_speed: number | null;
+  salvage_radius: number | null;
+  // Tractor
+  tractor_max_force: number | null;
+  tractor_max_range: number | null;
+  // Gimbal
+  gimbal_type: string | null;
+  // Radar (extended from list)
+  radar_detection_lifetime: number | null;
+  radar_tracking_signal: number | null;
+  // Thruster
+  thruster_type: string | null;
+  // Missile
+  missile_range: number | null;
   data_json?: Record<string, unknown> | null;
   game_data: Record<string, unknown> | null;
 }
