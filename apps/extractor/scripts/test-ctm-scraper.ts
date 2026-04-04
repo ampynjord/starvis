@@ -7,16 +7,17 @@
 
 import { resolve } from 'node:path';
 import { config } from 'dotenv';
+
 config({ path: resolve(import.meta.dirname, '..', '..', '..', '.env.extractor.dev') });
 
 import * as mysql from 'mysql2/promise';
-import { scrapeShipCtmUrls, type ShipToScrape } from '../src/ctm-scraper.js';
+import { type ShipToScrape, scrapeShipCtmUrls } from '../src/ctm-scraper.js';
 
 async function main() {
   // 3 vaisseaux connus avec viewer 3D sur RSI
   const testShips: ShipToScrape[] = [
-    { className: 'ANVL_Arrow',  name: 'Arrow',   rsiUrl: '/pledge/ships/anvil-arrow/Arrow' },
-    { className: 'ORIG_300i',   name: '300i',    rsiUrl: '/pledge/ships/origin-300/300i' },
+    { className: 'ANVL_Arrow', name: 'Arrow', rsiUrl: '/pledge/ships/anvil-arrow/Arrow' },
+    { className: 'ORIG_300i', name: '300i', rsiUrl: '/pledge/ships/origin-300/300i' },
     { className: 'DRAK_Cutlass_Black', name: 'Cutlass Black', rsiUrl: '/pledge/ships/drake-cutlass/Cutlass-Black' },
   ];
 

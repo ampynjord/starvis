@@ -311,7 +311,8 @@ export const api = {
       grade?: string;
       manufacturer?: string;
     }) => mapPaginated(await get<PaginatedResponse<ItemListItem>>('/items', p), mapItem),
-    filters: (env?: string) => get<{ types: string[]; sub_types: string[]; manufacturers: { code: string; name: string }[] }>('/items/filters', { env }),
+    filters: (env?: string) =>
+      get<{ types: string[]; sub_types: string[]; manufacturers: { code: string; name: string }[] }>('/items/filters', { env }),
     get: async (uuid: string, env?: string) => mapItem(await get<Item>(`/items/${uuid}`, { env })),
     buyLocations: (uuid: string, env?: string) => get<ItemBuyLocation[]>(`/items/${uuid}/buy-locations`, { env }),
   },

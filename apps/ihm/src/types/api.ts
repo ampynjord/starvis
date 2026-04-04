@@ -493,7 +493,19 @@ export interface CraftingRecipe {
   missions_count?: number;
   ingredients?: CraftingIngredient[];
   modifiers?: CraftingSlotModifier[];
-  unlock_missions?: Pick<Mission, 'uuid' | 'class_name' | 'title' | 'mission_type' | 'faction' | 'mission_giver' | 'reward_min' | 'reward_max' | 'reward_currency' | 'is_legal'>[];
+  unlock_missions?: Pick<
+    Mission,
+    | 'uuid'
+    | 'class_name'
+    | 'title'
+    | 'mission_type'
+    | 'faction'
+    | 'mission_giver'
+    | 'reward_min'
+    | 'reward_max'
+    | 'reward_currency'
+    | 'is_legal'
+  >[];
 }
 
 export interface CraftingIngredient {
