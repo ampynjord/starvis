@@ -118,7 +118,7 @@ jobs:
 
       - name: Deploy to VPS via SSH
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.VPS_HOST }}
           username: debian
