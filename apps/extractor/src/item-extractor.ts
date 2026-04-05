@@ -67,16 +67,15 @@ const ITEM_PATH_PATTERNS: Array<{ regex: RegExp; type: string; subType?: string 
   { regex: /scitem\/weapons\/magazines\//i, type: 'Magazine' },
   // Devices
   { regex: /scitem\/weapons\/devices\//i, type: 'Gadget', subType: 'Device' },
-  // Personal armor + clothing (from scitem/characters/human/)
-  { regex: /scitem\/characters\/.*\/armor\/.*helmet/i, type: 'Armor_Helmet' },
-  { regex: /scitem\/characters\/.*\/armor\/.*torso|.*core/i, type: 'Armor_Torso' },
-  { regex: /scitem\/characters\/.*\/armor\/.*arm/i, type: 'Armor_Arms' },
-  { regex: /scitem\/characters\/.*\/armor\/.*leg/i, type: 'Armor_Legs' },
-  { regex: /scitem\/characters\/.*\/armor\/.*backpack/i, type: 'Armor_Backpack' },
+  // Undersuit BEFORE the broad armor pattern (undersuits live under /armor/ in the P4K)
   { regex: /scitem\/characters\/.*undersuit/i, type: 'Undersuit' },
+  // Personal armor — ONE broad pattern; specific type is always refined via AttachDef.Type below
+  // Do NOT split by helmet/torso/arms/legs here: manufacturer folder names (e.g. "kastak_arms")
+  // would cause false matches on `.*arm`, `.*leg` etc.
+  { regex: /scitem\/characters\/.*\/armor\//i, type: 'Armor_Torso' },
   { regex: /scitem\/characters\/.*\/clothing\//i, type: 'Clothing' },
   // Tools & gadgets from carryables
-  { regex: /scitem\/carryables\/1h\/.*tool|.*multitool/i, type: 'Tool' },
+  { regex: /scitem\/carryables\/1h\/(?:.*tool|.*multitool)/i, type: 'Tool' },
   { regex: /scitem\/carryables\/1h\//i, type: 'Gadget', subType: 'Handheld' },
   { regex: /scitem\/carryables\/2h\//i, type: 'Gadget', subType: 'Two-handed' },
   // Consumables
@@ -273,23 +272,29 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
           if (ad && typeof ad === 'object') {
             if (typeof ad.Size === 'number') item.size = ad.Size;
             if (typeof ad.Grade === 'number') item.grade = String.fromCharCode(65 + ad.Grade);
-            if (ad.SubType && typeof ad.SubType === 'string') {
-              item.subType = item.subType || ad.SubType;
-            }
+            // Apply AttachDef.Type FIRST (authoritative source), BEFORE subType assignment.
+            // The guard `if (!item.subType)` was removed: armor items with a weight subType (Light/Medium/Heavy)
+            // were never re-typed because subType was already set when this code ran.
             if (ad.Type && typeof ad.Type === 'string') {
               extData.attachType = ad.Type;
-              // Refine type from AttachDef.Type
-              if (!item.subType) {
-                if (ad.Type === 'Char_Armor_Helmet') item.type = 'Armor_Helmet';
-                else if (ad.Type === 'Char_Armor_Torso') item.type = 'Armor_Torso';
-                else if (ad.Type === 'Char_Armor_Arms') item.type = 'Armor_Arms';
-                else if (ad.Type === 'Char_Armor_Legs') item.type = 'Armor_Legs';
-                else if (ad.Type === 'Char_Armor_Backpack') item.type = 'Armor_Backpack';
-                else if (ad.Type === 'Char_Clothing_Torso') item.type = 'Clothing';
-                else if (ad.Type === 'Char_Clothing_Legs') item.type = 'Clothing';
-                else if (ad.Type === 'Char_Clothing_Feet') item.type = 'Clothing';
-                else if (ad.Type === 'Char_Clothing_Hat') item.type = 'Clothing';
-              }
+              if (ad.Type === 'Char_Armor_Helmet') item.type = 'Armor_Helmet';
+              else if (ad.Type === 'Char_Armor_Torso') item.type = 'Armor_Torso';
+              else if (ad.Type === 'Char_Armor_Arms') item.type = 'Armor_Arms';
+              else if (ad.Type === 'Char_Armor_Legs') item.type = 'Armor_Legs';
+              else if (ad.Type === 'Char_Armor_Backpack') item.type = 'Armor_Backpack';
+              else if (
+                ad.Type === 'Char_Clothing_Torso' ||
+                ad.Type === 'Char_Clothing_Legs' ||
+                ad.Type === 'Char_Clothing_Feet' ||
+                ad.Type === 'Char_Clothing_Hat' ||
+                ad.Type === 'Char_Clothing_Hands' ||
+                ad.Type === 'Char_Clothing_Neck'
+              )
+                item.type = 'Clothing';
+              else if (ad.Type === 'Char_Undersuit') item.type = 'Undersuit';
+            }
+            if (ad.SubType && typeof ad.SubType === 'string') {
+              item.subType = item.subType || ad.SubType;
             }
             const loc = ad.Localization;
             if (loc?.Name && typeof loc.Name === 'string') {
