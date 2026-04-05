@@ -40,6 +40,7 @@ export class ItemQueryService {
     type?: string;
     types?: string;
     sub_type?: string;
+    sub_types?: string;
     manufacturer?: string;
     search?: string;
     sort?: string;
@@ -68,7 +69,19 @@ export class ItemQueryService {
       where.push('i.type = ?');
       params.push(filters.type);
     }
-    if (filters?.sub_type) {
+    if (filters?.sub_types) {
+      const stList = filters.sub_types
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (stList.length === 1) {
+        where.push('i.sub_type = ?');
+        params.push(stList[0]);
+      } else if (stList.length > 1) {
+        where.push(`i.sub_type IN (${stList.map(() => '?').join(', ')})`);
+        params.push(...stList);
+      }
+    } else if (filters?.sub_type) {
       where.push('i.sub_type = ?');
       params.push(filters.sub_type);
     }
@@ -157,6 +170,32 @@ export class ItemQueryService {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(`SELECT type, COUNT(*) as count FROM items GROUP BY type ORDER BY count DESC`);
     return { types: rows.map((r) => ({ type: String(r.type), count: Number(r.count) })) };
+  }
+
+  async getItemSubTypes(type?: string, env = 'live'): Promise<{ sub_types: { value: string; count: number }[] }> {
+    const prisma = this.getClient(env);
+    const sql = type
+      ? `SELECT sub_type as value, COUNT(*) as count FROM items WHERE type = ? AND sub_type IS NOT NULL AND sub_type != '' GROUP BY sub_type ORDER BY count DESC`
+      : `SELECT sub_type as value, COUNT(*) as count FROM items WHERE sub_type IS NOT NULL AND sub_type != '' GROUP BY sub_type ORDER BY count DESC`;
+    const rows = type ? await prisma.$queryRawUnsafe<Row[]>(sql, type) : await prisma.$queryRawUnsafe<Row[]>(sql);
+    return { sub_types: rows.map((r) => ({ value: String(r.value), count: Number(r.count) })) };
+  }
+
+  async getItemManufacturers(type?: string, env = 'live'): Promise<{ manufacturers: { code: string; name: string; count: number }[] }> {
+    const prisma = this.getClient(env);
+    const sql = type
+      ? `SELECT i.manufacturer_code as code, COALESCE(m.name, i.manufacturer_code) as name, COUNT(*) as count
+         FROM items i LEFT JOIN starvis.manufacturers m ON m.code = i.manufacturer_code
+         WHERE i.type = ? AND i.manufacturer_code IS NOT NULL
+         GROUP BY i.manufacturer_code, m.name
+         ORDER BY COALESCE(m.name, i.manufacturer_code)`
+      : `SELECT i.manufacturer_code as code, COALESCE(m.name, i.manufacturer_code) as name, COUNT(*) as count
+         FROM items i LEFT JOIN starvis.manufacturers m ON m.code = i.manufacturer_code
+         WHERE i.manufacturer_code IS NOT NULL
+         GROUP BY i.manufacturer_code, m.name
+         ORDER BY COALESCE(m.name, i.manufacturer_code)`;
+    const rows = type ? await prisma.$queryRawUnsafe<Row[]>(sql, type) : await prisma.$queryRawUnsafe<Row[]>(sql);
+    return { manufacturers: rows.map((r) => ({ code: String(r.code), name: String(r.name), count: Number(r.count) })) };
   }
 
   async getItemBuyLocations(uuid: string, env = 'live'): Promise<Row[]> {
