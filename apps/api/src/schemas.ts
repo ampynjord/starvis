@@ -122,6 +122,7 @@ export const ItemQuery = z
     type: qStr,
     types: qStr,
     sub_type: qStr,
+    sub_types: qStr,
     manufacturer: qStr,
     search: qStr,
     sort: qStr,

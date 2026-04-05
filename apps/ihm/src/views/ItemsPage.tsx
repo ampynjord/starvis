@@ -17,56 +17,68 @@ import type { ItemListItem } from "@/types/api";
 
 const LIMIT = 30;
 
-/** FPS categories: display label → DB type(s) */
-const FPS_CATEGORIES: { label: string; types: string[]; color: string }[] = [
-	{ label: "Weapons",     types: ["FPS_Weapon"],   color: "bg-red-500" },
-	{ label: "Helmet",      types: ["Armor_Helmet"],  color: "bg-blue-500" },
-	{ label: "Core",        types: ["Armor_Torso"],   color: "bg-blue-500" },
-	{ label: "Arms",        types: ["Armor_Arms"],    color: "bg-blue-500" },
-	{ label: "Legs",        types: ["Armor_Legs"],    color: "bg-blue-500" },
-	{ label: "Undersuit",   types: ["Undersuit"],     color: "bg-teal-500" },
-	{ label: "Clothing",    types: ["Clothing"],      color: "bg-slate-500" },
-	{ label: "Gadgets",     types: ["Gadget"],        color: "bg-yellow-500" },
-	{ label: "Tools",       types: ["Tool"],          color: "bg-green-500" },
-	{ label: "Consumables", types: ["Consumable"],    color: "bg-orange-500" },
-	{ label: "Attachments", types: ["Attachment"],    color: "bg-purple-500" },
-	{ label: "Magazines",   types: ["Magazine"],      color: "bg-amber-500" },
+interface FpsCategory {
+	label: string;
+	/** DB item types to include */
+	types: string[];
+	/** If set, additionally filter sub_type IN (subTypes) */
+	subTypes?: string[];
+	color: string;
+}
+
+/** FPS categories in user-requested order */
+const FPS_CATEGORIES: FpsCategory[] = [
+	{ label: "Tools & Medics", types: ["Tool", "Consumable"],  color: "bg-green-500" },
+	{ label: "Arms",           types: ["Armor_Arms"],           color: "bg-blue-500" },
+	{ label: "Weapons",        types: ["FPS_Weapon"],           color: "bg-red-500" },
+	{ label: "Helmet",         types: ["Armor_Helmet"],         color: "bg-blue-400" },
+	{ label: "Core",           types: ["Armor_Torso"],          color: "bg-blue-500" },
+	{ label: "Legs",           types: ["Armor_Legs"],           color: "bg-blue-600" },
+	{ label: "Backpack",       types: ["Armor_Backpack"],       color: "bg-blue-700" },
+	{ label: "Droppables",     types: ["FPS_Weapon"], subTypes: ["Throwable", "Mine"], color: "bg-orange-500" },
+	{ label: "Magazines",      types: ["Magazine"],             color: "bg-amber-500" },
+	{ label: "Attachments",    types: ["Attachment"],           color: "bg-purple-500" },
+	{ label: "Gadgets",        types: ["Gadget"],               color: "bg-yellow-500" },
+	{ label: "Clothing",       types: ["Clothing"],             color: "bg-slate-500" },
+	{ label: "Undersuit",      types: ["Undersuit"],            color: "bg-teal-500" },
 ];
 
 const TYPE_LABEL: Record<string, string> = {
-	FPS_Weapon:   "Weapon",
-	Armor_Torso:  "Core",
-	Armor_Arms:   "Arms",
-	Armor_Legs:   "Legs",
-	Armor_Helmet: "Helmet",
-	Undersuit:    "Undersuit",
-	Clothing:     "Clothing",
-	Gadget:       "Gadget",
-	Tool:         "Tool",
-	Consumable:   "Consumable",
-	Attachment:   "Attachment",
-	Magazine:     "Magazine",
+	FPS_Weapon:     "Weapon",
+	Armor_Torso:    "Core",
+	Armor_Arms:     "Arms",
+	Armor_Legs:     "Legs",
+	Armor_Helmet:   "Helmet",
+	Armor_Backpack: "Backpack",
+	Undersuit:      "Undersuit",
+	Clothing:       "Clothing",
+	Gadget:         "Gadget",
+	Tool:           "Tool",
+	Consumable:     "Consumable",
+	Attachment:     "Attachment",
+	Magazine:       "Magazine",
 };
 
 const TYPE_COLOR: Record<string, string> = {
-	FPS_Weapon:   "bg-red-500",
-	Armor_Torso:  "bg-blue-500",
-	Armor_Arms:   "bg-blue-500",
-	Armor_Legs:   "bg-blue-500",
-	Armor_Helmet: "bg-blue-500",
-	Undersuit:    "bg-teal-500",
-	Clothing:     "bg-slate-500",
-	Gadget:       "bg-yellow-500",
-	Tool:         "bg-green-500",
-	Consumable:   "bg-orange-500",
-	Attachment:   "bg-purple-500",
-	Magazine:     "bg-amber-500",
+	FPS_Weapon:     "bg-red-500",
+	Armor_Torso:    "bg-blue-500",
+	Armor_Arms:     "bg-blue-500",
+	Armor_Legs:     "bg-blue-600",
+	Armor_Helmet:   "bg-blue-400",
+	Armor_Backpack: "bg-blue-700",
+	Undersuit:      "bg-teal-500",
+	Clothing:       "bg-slate-500",
+	Gadget:         "bg-yellow-500",
+	Tool:           "bg-green-500",
+	Consumable:     "bg-green-400",
+	Attachment:     "bg-purple-500",
+	Magazine:       "bg-amber-500",
 };
 
 const ARMOR_SUBTYPES = ["Light", "Medium", "Heavy"];
 const WEAPON_SUBTYPES = [
-	"Pistol", "SMG", "Medium", "Large", "LMG",
-	"Shotgun", "Sniper Rifle", "Launcher", "Melee", "Throwable", "Mine", "Gadget",
+	"Pistol", "SMG", "Rifle", "Sniper Rifle", "Assault Rifle",
+	"Shotgun", "LMG", "Launcher", "Melee", "Large", "Medium",
 ];
 
 function fNum(v: number | string | null | undefined, dec = 0): string {
@@ -161,11 +173,11 @@ export default function ItemsPage() {
 				c.types.some((t) => rawTypes.has(t)),
 			);
 			const allTypes = [...new Set(available.flatMap((c) => c.types))];
-			return [{ label: "All", types: allTypes, color: "bg-cyan-500" }, ...available];
+			return [{ label: "All", types: allTypes, color: "bg-cyan-500" } as FpsCategory, ...available];
 		}
 		const fpsCovered = new Set(FPS_CATEGORIES.flatMap((c) => c.types));
 		const otherTypes = [...rawTypes].filter((t) => !fpsCovered.has(t));
-		return [{ label: "All", types: otherTypes, color: "bg-slate-500" }];
+		return [{ label: "All", types: otherTypes, color: "bg-slate-500" } as FpsCategory];
 	}, [filters?.types, mode]);
 
 	const selectedCategory =
@@ -178,14 +190,23 @@ export default function ItemsPage() {
 	};
 
 	const chipTypes = selectedCategory.types ?? [];
-	const effectiveType = chipTypes.length === 1 ? chipTypes[0] : undefined;
-	const effectiveTypes = chipTypes.length > 1 ? chipTypes.join(",") : undefined;
+	const chipSubTypes = (selectedCategory as FpsCategory).subTypes ?? [];
+
+	// Build API type/types params
+	const effectiveType = chipTypes.length === 1 && chipSubTypes.length === 0 ? chipTypes[0] : undefined;
+	const effectiveTypes = chipTypes.length > 1 || (chipTypes.length === 1 && chipSubTypes.length > 0)
+		? chipTypes.join(",")
+		: undefined;
+	// Droppables category has fixed subTypes; otherwise use user-selected filter
+	const effectiveSubTypes = chipSubTypes.length > 0 ? chipSubTypes.join(",") : undefined;
+	const effectiveSubType = chipSubTypes.length === 0 ? (subType || undefined) : undefined;
 
 	const isWeaponCategory = selectedCategory.label === "Weapons";
 	const isArmorCategory = ["Helmet", "Core", "Arms", "Legs"].includes(selectedCategory.label);
+	const hasFixedSubTypes = chipSubTypes.length > 0;
 
 	const { data, isLoading, error, refetch } = useQuery({
-		queryKey: ["items.list", env, { page, search: debouncedSearch, type: effectiveType, types: effectiveTypes, manufacturer, subType }],
+		queryKey: ["items.list", env, { page, search: debouncedSearch, type: effectiveType, types: effectiveTypes, sub_types: effectiveSubTypes, sub_type: effectiveSubType, manufacturer }],
 		queryFn: () =>
 			api.items.list({
 				env,
@@ -194,8 +215,9 @@ export default function ItemsPage() {
 				search: debouncedSearch || undefined,
 				type: effectiveType,
 				types: effectiveTypes,
+				sub_types: effectiveSubTypes,
+				sub_type: effectiveSubType,
 				manufacturer: manufacturer || undefined,
-				sub_type: subType || undefined,
 			}),
 		enabled: !!filters && categories.length > 0,
 	});
@@ -208,11 +230,13 @@ export default function ItemsPage() {
 		setActiveCategory(categories[0]?.label ?? "");
 	};
 
-	const subTypeOptions = isWeaponCategory
-		? WEAPON_SUBTYPES.map((s) => ({ label: s, value: s }))
-		: isArmorCategory
-			? ARMOR_SUBTYPES.map((s) => ({ label: s, value: s }))
-			: [];
+	const subTypeOptions = hasFixedSubTypes
+		? []
+		: isWeaponCategory
+			? WEAPON_SUBTYPES.map((s) => ({ label: s, value: s }))
+			: isArmorCategory
+				? ARMOR_SUBTYPES.map((s) => ({ label: s, value: s }))
+				: [];
 
 	const filterGroups = filters
 		? [

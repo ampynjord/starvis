@@ -28,11 +28,33 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
   );
 
   router.get(
+    '/api/v1/items/sub-types',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = String(req.query.env ?? 'live');
+      const type = req.query.type ? String(req.query.type) : undefined;
+      const data = await gameDataService!.items.getItemSubTypes(type, env);
+      sendWithETag(req, res, { success: true, ...data });
+    }),
+  );
+
+  router.get(
+    '/api/v1/items/manufacturers',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = String(req.query.env ?? 'live');
+      const type = req.query.type ? String(req.query.type) : undefined;
+      const data = await gameDataService!.items.getItemManufacturers(type, env);
+      sendWithETag(req, res, { success: true, ...data });
+    }),
+  );
+
+  router.get(
     '/api/v1/items',
     requireGameData,
     asyncHandler(async (req, res) => {
       const t = Date.now();
-      const filters = ItemQuery.parse(req.query);
+      const filters = ItemQuery.parse(req.query) as { sub_types?: string; [key: string]: unknown };
       const result = await gameDataService!.items.getAllItems(filters);
       const payload = {
         success: true,

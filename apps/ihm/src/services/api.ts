@@ -307,10 +307,14 @@ export const api = {
       type?: string;
       types?: string;
       sub_type?: string;
+      sub_types?: string;
       size?: number;
       grade?: string;
       manufacturer?: string;
     }) => mapPaginated(await get<PaginatedResponse<ItemListItem>>('/items', p), mapItem),
+    subTypes: (type?: string, env?: string) => get<{ sub_types: { value: string; count: number }[] }>('/items/sub-types', { type, env }),
+    manufacturers: (type?: string, env?: string) =>
+      get<{ manufacturers: { code: string; name: string; count: number }[] }>('/items/manufacturers', { type, env }),
     filters: (env?: string) =>
       get<{ types: string[]; sub_types: string[]; manufacturers: { code: string; name: string }[] }>('/items/filters', { env }),
     get: async (uuid: string, env?: string) => mapItem(await get<Item>(`/items/${uuid}`, { env })),
