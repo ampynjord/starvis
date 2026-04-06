@@ -93,7 +93,12 @@ export function stripInternal(row: Row): Row {
  */
 export function parseIncludes(include?: string): Set<string> {
   if (!include) return new Set();
-  return new Set(include.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean));
+  return new Set(
+    include
+      .split(',')
+      .map((s) => s.trim().toLowerCase())
+      .filter(Boolean),
+  );
 }
 
 // ── Filters helper ────────────────────────────────────────

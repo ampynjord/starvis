@@ -6,8 +6,8 @@
  *   rsi client     → rsi_website  (ship_matrix, galactapedia, comm_links, starmap_locations)
  */
 import { PrismaClient as GamePrismaClient } from '../generated/game/index.js';
-import { PrismaClient as StarvisPrismaClient } from '../generated/starvis/index.js';
 import { PrismaClient as RsiPrismaClient } from '../generated/rsi/index.js';
+import { PrismaClient as StarvisPrismaClient } from '../generated/starvis/index.js';
 
 /** Minimal interface covering the raw-SQL methods used across all services. */
 export interface PrismaLike {
@@ -19,7 +19,7 @@ export interface PrismaLike {
 /** @deprecated Use PrismaLike or a specific typed client instead. */
 export type { GamePrismaClient as PrismaClient };
 
-export { GamePrismaClient, StarvisPrismaClient, RsiPrismaClient };
+export { GamePrismaClient, RsiPrismaClient, StarvisPrismaClient };
 
 const gameClients: Record<string, GamePrismaClient> = {};
 let starvisClient: StarvisPrismaClient | null = null;

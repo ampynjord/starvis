@@ -123,12 +123,16 @@ export class ComponentQueryService {
   async getComponentFilters(env = 'live'): Promise<FiltersResult> {
     const prisma = this.getClient(env);
     const [typeRows, subTypeRows, sizeRows, gradeRows, mfrRows] = await Promise.all([
-      prisma.$queryRawUnsafe<Row[]>("SELECT type as value, COUNT(*) as count FROM components WHERE type IS NOT NULL AND type != '' GROUP BY type ORDER BY type"),
+      prisma.$queryRawUnsafe<Row[]>(
+        "SELECT type as value, COUNT(*) as count FROM components WHERE type IS NOT NULL AND type != '' GROUP BY type ORDER BY type",
+      ),
       prisma.$queryRawUnsafe<Row[]>(
         "SELECT sub_type as value, COUNT(*) as count FROM components WHERE sub_type IS NOT NULL AND sub_type != '' GROUP BY sub_type ORDER BY sub_type",
       ),
       prisma.$queryRawUnsafe<Row[]>('SELECT DISTINCT size as value FROM components WHERE size IS NOT NULL ORDER BY size'),
-      prisma.$queryRawUnsafe<Row[]>("SELECT DISTINCT grade as value FROM components WHERE grade IS NOT NULL AND grade != '' ORDER BY grade"),
+      prisma.$queryRawUnsafe<Row[]>(
+        "SELECT DISTINCT grade as value FROM components WHERE grade IS NOT NULL AND grade != '' ORDER BY grade",
+      ),
       prisma.$queryRawUnsafe<Row[]>(
         "SELECT c.manufacturer_code as value, COALESCE(m.name, c.manufacturer_code) as label, COUNT(c.uuid) as count FROM components c LEFT JOIN starvis.manufacturers m ON m.code = c.manufacturer_code WHERE c.manufacturer_code IS NOT NULL AND c.manufacturer_code != '' GROUP BY c.manufacturer_code, m.name ORDER BY label",
       ),

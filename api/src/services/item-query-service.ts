@@ -6,11 +6,11 @@ import { cleanItemDisplayName } from '../normalizers/items.js';
 import { type FiltersResult, type PaginatedResult, paginate, type Row, stripInternal } from './shared.js';
 
 const ITEM_JSON_SORT_MAP: Record<string, string> = {
-  'game_data.weapon_damage':    "JSON_EXTRACT(i.game_data, '$.weapon_damage')",
-  'game_data.weapon_dps':       "JSON_EXTRACT(i.game_data, '$.weapon_dps')",
+  'game_data.weapon_damage': "JSON_EXTRACT(i.game_data, '$.weapon_damage')",
+  'game_data.weapon_dps': "JSON_EXTRACT(i.game_data, '$.weapon_dps')",
   'game_data.weapon_fire_rate': "JSON_EXTRACT(i.game_data, '$.weapon_fire_rate')",
-  'game_data.weapon_range':     "JSON_EXTRACT(i.game_data, '$.weapon_range')",
-  'game_data.armor_dr':         "JSON_EXTRACT(i.game_data, '$.armor_damage_reduction')",
+  'game_data.weapon_range': "JSON_EXTRACT(i.game_data, '$.weapon_range')",
+  'game_data.armor_dr': "JSON_EXTRACT(i.game_data, '$.armor_damage_reduction')",
 };
 
 const ITEM_SORT = new Set([
@@ -155,8 +155,12 @@ export class ItemQueryService {
   async getItemFilters(env = 'live'): Promise<FiltersResult> {
     const prisma = this.getClient(env);
     const [typeRows, subTypeRows, mfrRows] = await Promise.all([
-      prisma.$queryRawUnsafe<Row[]>(`SELECT type as value, COUNT(*) as count FROM items WHERE type IS NOT NULL GROUP BY type ORDER BY type`),
-      prisma.$queryRawUnsafe<Row[]>(`SELECT sub_type as value, COUNT(*) as count FROM items WHERE sub_type IS NOT NULL AND sub_type != '' GROUP BY sub_type ORDER BY sub_type`),
+      prisma.$queryRawUnsafe<Row[]>(
+        `SELECT type as value, COUNT(*) as count FROM items WHERE type IS NOT NULL GROUP BY type ORDER BY type`,
+      ),
+      prisma.$queryRawUnsafe<Row[]>(
+        `SELECT sub_type as value, COUNT(*) as count FROM items WHERE sub_type IS NOT NULL AND sub_type != '' GROUP BY sub_type ORDER BY sub_type`,
+      ),
       prisma.$queryRawUnsafe<Row[]>(
         `SELECT i.manufacturer_code as value, COALESCE(m.name, i.manufacturer_code) as label, COUNT(i.uuid) as count
          FROM items i

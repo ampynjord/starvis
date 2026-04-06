@@ -27,7 +27,7 @@ export const data = new SlashCommandBuilder()
   .addIntegerOption((opt) =>
     opt
       .setName('limite')
-      .setDescription('Nombre d\'entrées à afficher (défaut: 8, max: 20)')
+      .setDescription("Nombre d'entrées à afficher (défaut: 8, max: 20)")
       .setRequired(false)
       .setMinValue(1)
       .setMaxValue(20),

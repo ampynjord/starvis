@@ -126,12 +126,8 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
         includes.has('manufacturer') && ship.manufacturer_code
           ? gameDataService!.ships.getManufacturerByCode(String(ship.manufacturer_code), env)
           : null,
-        includes.has('paints')
-          ? gameDataService!.paints.getAllPaints({ env, ship_uuid: String(ship.uuid), limit: 200 })
-          : null,
-        includes.has('similar')
-          ? gameDataService!.ships.getSimilarShips(String(ship.uuid), 5, env)
-          : null,
+        includes.has('paints') ? gameDataService!.paints.getAllPaints({ env, ship_uuid: String(ship.uuid), limit: 200 }) : null,
+        includes.has('similar') ? gameDataService!.ships.getSimilarShips(String(ship.uuid), 5, env) : null,
       ]);
       if (extras[0]) ship.manufacturer = extras[0];
       if (extras[1]) ship.paints = extras[1].data;

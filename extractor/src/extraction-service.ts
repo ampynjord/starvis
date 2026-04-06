@@ -7,13 +7,8 @@
  */
 import { createHash } from 'node:crypto';
 import type { Pool, PoolConnection } from 'mysql2/promise';
-import {
-  canonicalizeCommodityRecord,
-  canonicalizeComponentRecord,
-  canonicalizeItemRecord,
-} from './canonical-source.js';
+import { canonicalizeCommodityRecord, canonicalizeComponentRecord, canonicalizeItemRecord } from './canonical-source.js';
 import { extractCraftingRecipes } from './crafting-extractor.js';
-import { buildLocationSlugIndex, extractShopsFromPrefabs } from './shop-extractor.js';
 import {
   applyDimensionsFallback,
   applyHullSeriesCargoFallback,
@@ -35,6 +30,7 @@ import {
   extractMissions,
 } from './mission-extractor.js';
 import { RsiSyncService } from './rsi-sync-service.js';
+import { buildLocationSlugIndex, extractShopsFromPrefabs } from './shop-extractor.js';
 
 export type ExtractionModule =
   | 'ships'
@@ -1628,9 +1624,7 @@ export class ExtractionService {
     const [allLocRows]: any = await conn.execute(
       `SELECT uuid, class_name, name, loc_key, \`type\`, system_code, parent_uuid FROM locations`,
     );
-    const locByUuid = new Map<string, any>(
-      (allLocRows as any[]).map((r: any) => [r.uuid, r]),
-    );
+    const locByUuid = new Map<string, any>((allLocRows as any[]).map((r: any) => [r.uuid, r]));
 
     for (const row of allLocRows as any[]) {
       if (!row.loc_key) continue;
@@ -1639,7 +1633,7 @@ export class ExtractionService {
       let system: string | null = row.system_code || null;
       let planet_moon: string | null = null;
       let city: string | null = null;
-      let location = row.name || row.class_name;
+      const location = row.name || row.class_name;
 
       // Resolve human-readable system name from system_code
       if (system) {
@@ -1684,15 +1678,13 @@ export class ExtractionService {
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
 
-      const canonicalShopKey = locKey
-        ? `${locKey}::${normalizedName}`
-        : normalizedName;
+      const canonicalShopKey = locKey ? `${locKey}::${normalizedName}` : normalizedName;
 
       shopRows.push([
         shop.name,
         normalizedName,
         canonicalShopKey,
-        locKey,                         // canonical_location_key = game loc_key (e.g. "@ui_pregame_port_Area18_name")
+        locKey, // canonical_location_key = game loc_key (e.g. "@ui_pregame_port_Area18_name")
         meta?.location ?? null,
         meta?.system ?? null,
         meta?.planet_moon ?? null,

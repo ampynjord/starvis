@@ -186,9 +186,7 @@ export async function loadExternalCanonicalData(): Promise<ExternalCanonicalData
     shops: new Map(),
   };
 
-  const sources = [
-    { name: 'community', path: communityPath, url: communityUrl },
-  ];
+  const sources = [{ name: 'community', path: communityPath, url: communityUrl }];
 
   for (const source of sources) {
     let payload: SourcePayload | null = null;

@@ -155,18 +155,18 @@ const SHIP_JOINS = `FROM ships s
  * These supplement the SHIP_SORT whitelist for column-level sorting.
  */
 const SHIP_JSON_SORT_MAP: Record<string, string> = {
-  'game_data.scm_speed':              "JSON_EXTRACT(s.game_data, '$.ifcs.scm_speed')",
-  'game_data.max_speed':              "JSON_EXTRACT(s.game_data, '$.ifcs.max_speed')",
-  'game_data.cargo_capacity':         "JSON_EXTRACT(s.game_data, '$.cargoGrid.cargoCapacity')",
-  'game_data.hydrogen_fuel':          "JSON_EXTRACT(s.game_data, '$.hydro_fuel_capacity')",
-  'game_data.quantum_fuel':           "JSON_EXTRACT(s.game_data, '$.quantum_fuel_capacity')",
-  'game_data.shield_hp':              "JSON_EXTRACT(s.game_data, '$.shield_hp')",
-  'game_data.total_hp':               "JSON_EXTRACT(s.game_data, '$.total_hp')",
-  'game_data.missile_damage_total':   "JSON_EXTRACT(s.game_data, '$.missile_damage_total')",
-  'game_data.weapon_damage_total':    "JSON_EXTRACT(s.game_data, '$.weapon_damage_total')",
-  'game_data.pitch_max':              "JSON_EXTRACT(s.game_data, '$.ifcs.pitch_max')",
-  'game_data.yaw_max':                "JSON_EXTRACT(s.game_data, '$.ifcs.yaw_max')",
-  'game_data.roll_max':               "JSON_EXTRACT(s.game_data, '$.ifcs.roll_max')",
+  'game_data.scm_speed': "JSON_EXTRACT(s.game_data, '$.ifcs.scm_speed')",
+  'game_data.max_speed': "JSON_EXTRACT(s.game_data, '$.ifcs.max_speed')",
+  'game_data.cargo_capacity': "JSON_EXTRACT(s.game_data, '$.cargoGrid.cargoCapacity')",
+  'game_data.hydrogen_fuel': "JSON_EXTRACT(s.game_data, '$.hydro_fuel_capacity')",
+  'game_data.quantum_fuel': "JSON_EXTRACT(s.game_data, '$.quantum_fuel_capacity')",
+  'game_data.shield_hp': "JSON_EXTRACT(s.game_data, '$.shield_hp')",
+  'game_data.total_hp': "JSON_EXTRACT(s.game_data, '$.total_hp')",
+  'game_data.missile_damage_total': "JSON_EXTRACT(s.game_data, '$.missile_damage_total')",
+  'game_data.weapon_damage_total': "JSON_EXTRACT(s.game_data, '$.weapon_damage_total')",
+  'game_data.pitch_max': "JSON_EXTRACT(s.game_data, '$.ifcs.pitch_max')",
+  'game_data.yaw_max': "JSON_EXTRACT(s.game_data, '$.ifcs.yaw_max')",
+  'game_data.roll_max': "JSON_EXTRACT(s.game_data, '$.ifcs.roll_max')",
 };
 
 const SHIP_SORT = new Set([
@@ -303,16 +303,12 @@ export class ShipQueryService {
 
     const sortKey = filters?.sort || '';
     const jsonExpr = SHIP_JSON_SORT_MAP[sortKey];
-    const sortCol = jsonExpr ? null : (SHIP_SORT.has(sortKey) ? sortKey : 'name');
+    const sortCol = jsonExpr ? null : SHIP_SORT.has(sortKey) ? sortKey : 'name';
 
     // nullSafeOrder: used for UNION queries (no table alias possible)
-    const nullSafeOrder = jsonExpr
-      ? `${jsonExpr} IS NULL, ${jsonExpr} ${order}`
-      : `${sortCol} IS NULL, ${sortCol} ${order}`;
+    const nullSafeOrder = jsonExpr ? `${jsonExpr} IS NULL, ${jsonExpr} ${order}` : `${sortCol} IS NULL, ${sortCol} ${order}`;
     // qualifiedOrder: used for single-table queries to avoid ambiguity with joined ship_matrix
-    const qualifiedOrder = jsonExpr
-      ? `${jsonExpr} IS NULL, ${jsonExpr} ${order}`
-      : `s.${sortCol} IS NULL, s.${sortCol} ${order}`;
+    const qualifiedOrder = jsonExpr ? `${jsonExpr} IS NULL, ${jsonExpr} ${order}` : `s.${sortCol} IS NULL, s.${sortCol} ${order}`;
 
     let sql: string;
     let allParams: (string | number)[];

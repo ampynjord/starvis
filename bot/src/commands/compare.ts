@@ -8,12 +8,8 @@ const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
 export const data = new SlashCommandBuilder()
   .setName('compare')
   .setDescription('Comparer deux vaisseaux côte à côte')
-  .addStringOption((opt) =>
-    opt.setName('vaisseau1').setDescription('Premier vaisseau (ex: Hornet F7C)').setRequired(true),
-  )
-  .addStringOption((opt) =>
-    opt.setName('vaisseau2').setDescription('Deuxième vaisseau (ex: Arrow)').setRequired(true),
-  );
+  .addStringOption((opt) => opt.setName('vaisseau1').setDescription('Premier vaisseau (ex: Hornet F7C)').setRequired(true))
+  .addStringOption((opt) => opt.setName('vaisseau2').setDescription('Deuxième vaisseau (ex: Arrow)').setRequired(true));
 
 const COMPARE_FIELDS: Array<{ key: string; label: string; unit?: string }> = [
   { key: 'scm_speed', label: '🚀 SCM', unit: 'm/s' },
@@ -66,8 +62,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
       if (v1 == null && v2 == null) continue;
 
-      const fmt = (v: number | undefined) =>
-        v == null ? '—' : `${v.toLocaleString('fr-FR')}${unit ? ` ${unit}` : ''}`;
+      const fmt = (v: number | undefined) => (v == null ? '—' : `${v.toLocaleString('fr-FR')}${unit ? ` ${unit}` : ''}`);
 
       const winner = v1 != null && v2 != null ? (v1 > v2 ? '← 🏆' : v1 < v2 ? '🏆 →' : '=') : '';
 

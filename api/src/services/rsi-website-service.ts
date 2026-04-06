@@ -14,12 +14,7 @@ export class RsiWebsiteService {
 
   // ── Galactapedia ───────────────────────────────────────────────────────────
 
-  async getGalactapediaEntries(opts: {
-    search?: string;
-    category?: string;
-    page?: number;
-    limit?: number;
-  } = {}): Promise<PaginatedResult> {
+  async getGalactapediaEntries(opts: { search?: string; category?: string; page?: number; limit?: number } = {}): Promise<PaginatedResult> {
     const where: string[] = [];
     const params: (string | number)[] = [];
 
@@ -50,22 +45,13 @@ export class RsiWebsiteService {
   }
 
   async getGalactapediaEntry(id: string): Promise<Row | null> {
-    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-      `SELECT * FROM galactapedia WHERE id = ? OR slug = ? LIMIT 1`,
-      id,
-      id,
-    );
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(`SELECT * FROM galactapedia WHERE id = ? OR slug = ? LIMIT 1`, id, id);
     return rows[0] ?? null;
   }
 
   // ── Comm-links ─────────────────────────────────────────────────────────────
 
-  async getCommLinks(opts: {
-    search?: string;
-    category?: string;
-    page?: number;
-    limit?: number;
-  } = {}): Promise<PaginatedResult> {
+  async getCommLinks(opts: { search?: string; category?: string; page?: number; limit?: number } = {}): Promise<PaginatedResult> {
     const where: string[] = [];
     const params: (string | number)[] = [];
 
@@ -98,9 +84,7 @@ export class RsiWebsiteService {
   async getCommLink(id: string): Promise<Row | null> {
     const isNumeric = /^\d+$/.test(id);
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-      isNumeric
-        ? `SELECT * FROM comm_links WHERE id = ? LIMIT 1`
-        : `SELECT * FROM comm_links WHERE slug = ? OR rsi_id = ? LIMIT 1`,
+      isNumeric ? `SELECT * FROM comm_links WHERE id = ? LIMIT 1` : `SELECT * FROM comm_links WHERE slug = ? OR rsi_id = ? LIMIT 1`,
       ...(isNumeric ? [parseInt(id, 10)] : [id, id]),
     );
     return rows[0] ?? null;
@@ -115,11 +99,7 @@ export class RsiWebsiteService {
 
   // ── Starmap (RSI web version) ──────────────────────────────────────────────
 
-  async getStarmapSystems(opts: {
-    search?: string;
-    page?: number;
-    limit?: number;
-  } = {}): Promise<PaginatedResult> {
+  async getStarmapSystems(opts: { search?: string; page?: number; limit?: number } = {}): Promise<PaginatedResult> {
     const where: string[] = ["sl.type = 'star'"];
     const params: (string | number)[] = [];
 

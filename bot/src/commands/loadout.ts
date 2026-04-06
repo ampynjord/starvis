@@ -7,10 +7,8 @@ const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
 
 export const data = new SlashCommandBuilder()
   .setName('loadout')
-  .setDescription('Afficher le loadout par défaut d\'un vaisseau')
-  .addStringOption((opt) =>
-    opt.setName('vaisseau').setDescription('Nom du vaisseau (ex: Hornet F7C, Carrack)').setRequired(true),
-  );
+  .setDescription("Afficher le loadout par défaut d'un vaisseau")
+  .addStringOption((opt) => opt.setName('vaisseau').setDescription('Nom du vaisseau (ex: Hornet F7C, Carrack)').setRequired(true));
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const name = interaction.options.getString('vaisseau', true);
@@ -39,7 +37,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const byType: Record<string, typeof ports> = {};
     for (const port of ports) {
       const t = port.port_type ?? 'Autre';
-      (byType[t] ??= []).push(port);
+      if (!byType[t]) byType[t] = [];
+      byType[t].push(port);
     }
 
     const embed = new EmbedBuilder()

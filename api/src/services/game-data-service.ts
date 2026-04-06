@@ -265,7 +265,19 @@ export class GameDataService {
        FROM extraction_log ${where} ORDER BY extracted_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
       ...params,
     );
-    return { data: rows.map((r) => ({ ...r, id: Number(r.id), ships: Number(r.ships), components: Number(r.components), items: Number(r.items), commodities: Number(r.commodities), shops: Number(r.shops), total_records: Number(r.total_records) })), total };
+    return {
+      data: rows.map((r) => ({
+        ...r,
+        id: Number(r.id),
+        ships: Number(r.ships),
+        components: Number(r.components),
+        items: Number(r.items),
+        commodities: Number(r.commodities),
+        shops: Number(r.shops),
+        total_records: Number(r.total_records),
+      })),
+      total,
+    };
   }
 
   async getChangelogSummary(): Promise<Record<string, unknown>> {

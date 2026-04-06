@@ -30,8 +30,8 @@ import { prometheusMiddleware } from './src/middleware/prometheus.js';
 import { healthRouter } from './src/routes/health.js';
 import { createRoutes } from './src/routes/index.js';
 import { GameDataService, ShipMatrixService } from './src/services/index.js';
-import { RsiWebsiteService } from './src/services/rsi-website-service.js';
 import { redis } from './src/services/redis.js';
+import { RsiWebsiteService } from './src/services/rsi-website-service.js';
 import { ALL_DB_NAMES, buildDatabaseUrl, logger, RATE_LIMITS, SCHEMA_DB_MAP } from './src/utils/index.js';
 
 const PORT = process.env.PORT || 3000;
