@@ -24,6 +24,8 @@ crafting_data.sql
 .env.extractor.dev
 .env.extractor.prod
 .env*.local
+extractor/.env.dev
+extractor/.env.prod
 
 # IDE & Editor
 .vscode/
@@ -60,6 +62,10 @@ test-results/
 .eslintcache
 .turbo/
 
+# CTM model cache (3D models downloaded from RSI CDN)
+ctm-cache/
+extractor/ctm-cache/
+
 # Model cache (local P4K downloads)
 model-cache/
 !model-cache/.gitkeep
@@ -69,9 +75,8 @@ model-cache/
 *.sql.backup
 db-backup/
 
-# Legacy IHM directories
-ihm/src/_pages_legacy/
-ihm/src/pages/
+# Prisma generated clients (rebuilt on npm install)
+db/generated/
 
 # AI
 .claude

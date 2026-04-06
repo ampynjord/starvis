@@ -73,166 +73,91 @@ Public API: **[starvis.ampynjord.bzh/api-docs](https://starvis.ampynjord.bzh/api
 
 ```
 starvis/
+├── .env.dev.example            # Dev environment template (copy → .env.dev)
+├── .env.prod.example           # Prod environment template (copy → .env.prod)
 ├── biome.json                  # Linter/formatter (Biome)
-├── docker-compose.dev.yml      # Dev orchestration (mysql, api, ihm with hot-reload)
-├── docker-compose.prod.yml     # Prod override (Traefik, pre-built GHCR images)
+├── docker-compose.dev.yml      # Dev orchestration (hot-reload, all configurable via .env.dev)
+├── docker-compose.prod.yml     # Prod (Traefik, GHCR images, all configurable via .env.prod)
 ├── bot/
-│   ├── Dockerfile              # Discord bot container
+│   ├── Dockerfile
 │   ├── package.json
-│   ├── tsconfig.json
 │   └── src/
-│       ├── index.ts            # Bot entry point (client setup, event handler)
+│       ├── index.ts            # Bot entry point
 │       ├── api.ts              # Starvis API client
 │       ├── embeds.ts           # Discord embed builders
 │       ├── deploy-commands.ts  # Slash command registration
 │       └── commands/
-│           ├── index.ts        # Command barrel
-│           ├── ship.ts         # /ship — Ship lookup
-│           ├── commodity.ts    # /commodity — Commodity search
-│           ├── trade.ts        # /trade — Trade routes
-│           ├── search.ts       # /search — Unified search
-│           └── status.ts       # /status — API health
+│           ├── ship.ts         # /ship        — Fiche vaisseau complète
+│           ├── compare.ts      # /compare     — Comparaison côte à côte
+│           ├── loadout.ts      # /loadout     — Loadout par défaut
+│           ├── component.ts    # /component   — Recherche composant
+│           ├── item.ts         # /item        — Recherche item FPS
+│           ├── commodity.ts    # /commodity   — Recherche commodité
+│           ├── trade.ts        # /trade       — Meilleures routes commerciales
+│           ├── mission.ts      # /mission     — Recherche missions
+│           ├── search.ts       # /search      — Recherche unifiée
+│           ├── manufacturers.ts# /manufacturers — Liste constructeurs
+│           ├── changelog.ts    # /changelog   — Dernières modifications
+│           ├── version.ts      # /version     — Version SC extraite
+│           └── status.ts       # /status      — État de l'API
 ├── api/
-│   ├── Dockerfile              # Multi-stage (base → deps → build → production)
+│   ├── Dockerfile              # Multi-stage (dev → production)
 │   ├── server.ts               # Entry point (helmet, rate limiting, Swagger)
-│   ├── openapi.json            # OpenAPI 3.0 spec (~79 endpoints)
+│   ├── openapi.json            # OpenAPI 3.0 spec
 │   ├── package.json
 │   ├── tsconfig.json
 │   ├── vitest.config.ts
-│   ├── playwright.config.ts    # E2E test config
-│   ├── prisma/
-│   │   └── schema.prisma       # Database schema (18 models)
 │   └── src/
-│       ├── routes.ts           # Routes barrel
-│       ├── schemas.ts          # Zod validation schemas
-│       ├── db/
-│       │   └── index.ts        # Prisma client
-│       ├── middleware/
-│       │   ├── auth.ts         # X-API-Key auth (timing-safe)
-│       │   ├── prometheus.ts   # HTTP metrics middleware
-│       │   └── index.ts
 │       ├── routes/
-│       │   ├── index.ts        # Route mounting
-│       │   ├── ships.ts        # Ships CRUD + compare + loadout
-│       │   ├── components.ts   # Components + filters
-│       │   ├── items.ts        # FPS items
-│       │   ├── commodities.ts  # Commodities
-│       │   ├── shops.ts        # Shops + inventory
-│       │   ├── trade.ts        # Trade prices + routes
-│       │   ├── ship-matrix.ts  # RSI Ship Matrix
-│       │   ├── manufacturers.ts
-│       │   ├── paints.ts       # Ship paints
-│       │   ├── search.ts       # Global search
-│       │   ├── admin.ts        # Admin endpoints (sync, extraction)
-│       │   ├── health.ts       # Health checks (live/ready/metrics)
-│       │   ├── system.ts       # System info
-│       │   └── types.ts        # Route dependency types
+│       │   ├── ships.ts, components.ts, items.ts, commodities.ts
+│       │   ├── shops.ts, trade.ts, missions.ts, crafting.ts
+│       │   ├── locations.ts, mining.ts, paints.ts, search.ts
+│       │   ├── ship-matrix.ts, manufacturers.ts, rsi-website.ts
+│       │   ├── admin.ts, health.ts, system.ts
+│       │   └── types.ts        # RouteDependencies interface
 │       ├── services/
-│       │   ├── ship-matrix-service.ts      # RSI API → ship_matrix
-│       │   ├── game-data-service.ts        # Read-only facade → REST API
-│       │   ├── ship-query-service.ts       # Ship queries
-│       │   ├── component-query-service.ts  # Component queries
-│       │   ├── item-query-service.ts       # FPS item queries
-│       │   ├── commodity-query-service.ts  # Commodity queries
-│       │   ├── loadout-service.ts          # Loadout + module queries
-│       │   ├── shop-service.ts             # Shop queries
-│       │   ├── prometheus.ts               # Prometheus metrics
-│       │   ├── redis.ts                    # Redis cache (graceful fallback)
-│       │   ├── schema.ts                   # DB init + auto-migrations
-│       │   └── shared.ts                   # Shared query helpers
+│       │   ├── game-data-service.ts    # Read-only facade (ships, components…)
+│       │   ├── ship-matrix-service.ts  # RSI Ship Matrix sync
+│       │   ├── rsi-website-service.ts  # Galactapedia, comm-links, starmap
+│       │   ├── redis.ts                # Cache (graceful fallback)
+│       │   └── shared.ts               # PrismaLike type, stripInternal
 │       └── utils/
-│           ├── config.ts       # Environment config
-│           ├── logger.ts       # Winston logger
-│           └── index.ts
+│           └── config.ts       # SCHEMA_DB_MAP, RATE_LIMITS, buildDatabaseUrl
 ├── extractor/
+│   ├── .env.example            # Env template (copy → .env.dev ou .env.prod)
 │   ├── extract.ts              # CLI entry point (Commander.js)
 │   ├── package.json
-│   ├── tsconfig.json
-│   ├── vitest.config.ts
-│   ├── scripts/
-│   │   └── apply-migrations.ts
 │   └── src/
-│       ├── extraction-service.ts   # Main extraction orchestrator
-│       ├── p4k-provider.ts         # P4K archive reader
-│       ├── dataforge-parser.ts     # DataForge binary parser
-│       ├── dataforge-service.ts    # DataForge record queries
-│       ├── dataforge-utils.ts      # DataForge helpers
-│       ├── cryxml-parser.ts        # CryXML binary parser
-│       ├── component-extractor.ts  # Component extraction
-│       ├── item-extractor.ts       # FPS item extraction
-│       ├── shop-paint-extractor.ts # Shop + paint extraction
-│       ├── loadout-parser.ts       # Ship loadout parser
-│       ├── crossref.ts             # Ship ↔ Ship Matrix linking
-│       ├── localization-service.ts # In-game text localization
-│       └── logger.ts               # Winston logger
+│       ├── extraction-service.ts   # Main orchestrator (P4K modules)
+│       ├── rsi-sync-service.ts     # RSI/SC Wiki sync (galactapedia, comm-links, starmap)
+│       ├── canonical-source.ts     # Canonical key derivation (dedup)
+│       ├── source-adapters.ts      # External override loader
+│       └── …                       # Parsers, extractors, localization
 ├── db/
-│   ├── init.sh                 # MySQL user/privileges init
+│   ├── prisma/
+│   │   ├── game.prisma         # live/ptu — ships, components, items, etc.
+│   │   ├── starvis.prisma      # starvis  — extraction_log, changelog
+│   │   └── rsi.prisma          # rsi_website — ship_matrix, galactapedia, comm_links, starmap
+│   ├── generated/              # Generated Prisma clients (gitignored, rebuilt on install)
+│   ├── init.sh                 # MySQL user/privileges init (4 databases)
 │   └── backup.sh               # mysqldump + gzip + retention
 └── ihm/
-    ├── Dockerfile              # Multi-stage (build → nginx)
-    ├── nginx.conf              # Nginx config (rate limiting, security)
-    ├── index.html
-    ├── package.json
-    ├── vite.config.ts
-    ├── vitest.config.ts
-    ├── tailwind.config.js
+    ├── Dockerfile              # Multi-stage (Vite build → nginx)
     └── src/
-        ├── App.tsx             # Root (ErrorBoundary, routing)
-        ├── main.tsx            # React entry point
-        ├── index.css           # Tailwind + custom styles
-        ├── components/
-        │   ├── layout/         # AppShell, Sidebar, TopBar
-        │   ├── ship/           # ShipCard, ShipLoadout, LoadoutTree, CargoGrid, ShipStatsBanner
-        │   ├── mining/         # Mining solver components (laser, composition, yield, risk)
-        │   └── ui/             # Reusable UI (ErrorBoundary, Pagination, FilterPanel, HoloCard…)
-        ├── pages/              # All page components
-        ├── hooks/
-        │   └── useDebounce.ts
-        ├── services/
-        │   └── api.ts          # API client (fetch wrapper, pagination support)
-        ├── types/
-        │   ├── api.ts          # API response types
-        │   └── mining.ts       # Mining types
-        ├── router/
-        │   └── index.tsx       # React Router config
-        └── utils/
-        ├── pages/
-        │   ├── ShipsPage.tsx           # Ship browser
-        │   ├── ShipDetailPage.tsx      # Ship detail + loadout
-        │   ├── ComparePage.tsx         # Ship comparison
-        │   ├── RankingPage.tsx         # Ship ranking
-        │   ├── ComponentsPage.tsx      # Component browser
-        │   ├── ComponentDetailPage.tsx # Component detail
-        │   ├── ItemsPage.tsx           # FPS item browser
-        │   ├── ItemDetailPage.tsx      # Item detail
-        │   ├── CommoditiesPage.tsx     # Commodity browser
-        │   ├── CommodityDetailPage.tsx # Commodity detail
-        │   ├── TradePage.tsx           # Trade route finder
-        │   ├── MissionsPage.tsx        # Mission browser
-        │   ├── CraftingPage.tsx        # Crafting recipes
-        │   ├── MiningPage.tsx          # Mining solver
-        │   ├── MineralsLibraryPage.tsx # Mineral library
-        │   ├── ShopsPage.tsx           # Shop browser
-        │   ├── PaintsPage.tsx          # Paint browser
-        │   ├── ManufacturersPage.tsx   # Manufacturer browser
-        │   ├── EquipmentPage.tsx       # Equipment browser
-        │   ├── OutfitterPage.tsx       # Ship outfitter
-        │   ├── FpsCalculatorPage.tsx   # FPS damage calculator
-        │   ├── ChangelogPage.tsx       # Extraction changelog
-        │   ├── SearchResultsPage.tsx   # Global search results
-        │   ├── HomePage.tsx            # Landing page
-        │   └── NotFoundPage.tsx        # 404 page
-        ├── hooks/
-        │   └── useDebounce.ts
-        ├── services/
-        │   └── api.ts          # API client (fetch wrapper, pagination support)
-        ├── types/
-        │   ├── api.ts          # API response types
-        │   └── mining.ts       # Mining types
-        ├── router/
-        │   └── index.tsx       # React Router config
-        └── utils/
+        ├── components/         # layout/, ship/, mining/, ui/
+        ├── views/              # 25+ page components
+        ├── services/api.ts     # Typed API client
+        └── types/api.ts        # API response types
 ```
+
+### Databases
+
+| Database | Schema | Content |
+|---|---|---|
+| `live` | `game.prisma` | Ships, components, items, shops, missions, crafting (LIVE) |
+| `ptu` | `game.prisma` | Same schema — PTU branch data |
+| `starvis` | `starvis.prisma` | Extraction logs, changelog |
+| `rsi_website` | `rsi.prisma` | Ship Matrix, Galactapedia, Comm-links, Starmap |
 
 ---
 
@@ -242,14 +167,18 @@ starvis/
 
 - Node.js 22+
 - Docker & Docker Compose
-- Star Citizen installation (for extraction only)
+- Star Citizen installation (for P4K extraction only)
 
 ### Environment Setup
 
-Copy the example `.env` file and adjust values:
-
 ```bash
+# Développement
 cp .env.dev.example .env.dev
+# Éditez .env.dev : DB_PASSWORD, ADMIN_API_KEY, DISCORD_TOKEN (optionnel)
+
+# Extractor (outil séparé)
+cp extractor/.env.example extractor/.env.dev
+# Éditez extractor/.env.dev : DB_PASSWORD, P4K_PATH
 ```
 
 ### Development (Docker)
@@ -259,10 +188,11 @@ docker compose -f docker-compose.dev.yml --env-file .env.dev up
 ```
 
 This starts:
-- **MySQL** on port 3306
-- **Redis** on port 6379
-- **API** on port 3000 (hot-reload via tsx watch)
-- **IHM** on port 5173 (Vite HMR)
+- **MySQL** on `:${DB_EXTERNAL_PORT:-3306}` (4 databases auto-created)
+- **Redis** on `:${REDIS_EXTERNAL_PORT:-6379}`
+- **API** on `:${API_PORT:-3000}` (hot-reload via tsx watch)
+- **IHM** on `:${IHM_DEV_PORT:-5173}` (Vite HMR)
+- **Bot** (Discord slash commands, optional token)
 
 ### Development (local)
 
@@ -295,14 +225,23 @@ npm run deploy-commands
 npm run dev
 ```
 
-**Available commands:**
+**Available commands (13 slash commands):**
+
 | Command | Description |
 |---------|-------------|
-| `/ship <nom>` | Search for a Star Citizen ship |
-| `/commodity <nom>` | Search for a commodity |
-| `/trade [scu]` | Best trade routes (default: 100 SCU) |
-| `/search <terme>` | Unified search (ships, components, items, commodities) |
-| `/status` | API health and database stats |
+| `/ship <nom>` | Fiche vaisseau complète (stats, vitesses, équipage, cargo…) |
+| `/compare <v1> <v2>` | Comparaison côte à côte avec highlight du gagnant |
+| `/loadout <nom>` | Loadout par défaut (ports d'équipement) |
+| `/component <nom>` | Recherche composant (arme, bouclier, moteur…) |
+| `/item <nom>` | Recherche item FPS (armure, arme, gadget…) |
+| `/commodity <nom>` | Recherche commodité avec type |
+| `/trade [scu]` | Meilleures routes commerciales (défaut: 100 SCU) |
+| `/mission [terme] [type]` | Recherche missions par titre, type, légalité |
+| `/search <terme>` | Recherche unifiée (vaisseaux, composants, items, commodités) |
+| `/manufacturers` | Liste de tous les constructeurs avec leur spécialité |
+| `/changelog [limite]` | Dernières modifications de la base (ajouts/suppressions/modifs) |
+| `/version [env]` | Version SC extraite + stats de la base |
+| `/status` | État de l'API et statistiques de la base |
 
 ### Data Extraction
 
@@ -317,8 +256,8 @@ CLI options:
 
 | Option | Description |
 |--------|-------------|
-| `-p, --p4k <path>` | Path to Data.p4k (required) |
-| `-e, --env <path>` | Path to .env file (default: `../.env.extractor`) |
+| `-p, --p4k <path>` | Path to Data.p4k (required for P4K modules) |
+| `--prod-db` | Load `extractor/.env.prod` instead of `extractor/.env.dev` |
 | `-m, --modules <list>` | Comma-separated modules to extract (e.g. `ships,components`) |
 | `--dry-run` | Initialize DataForge without writing to DB |
 | `-V, --version` | Print version |
@@ -328,7 +267,7 @@ CLI options:
 
 ## Environment Variables
 
-All configuration is done through `.env` files at the project root.
+Configuration via `.env` files. See `.env.dev.example`, `.env.prod.example`, and `extractor/.env.example` for all options.
 
 | Variable | Description | Default |
 |----------|-------------|---------|

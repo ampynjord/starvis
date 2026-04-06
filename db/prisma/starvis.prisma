@@ -1,0 +1,95 @@
+// ============================================================
+// starvis.prisma — Schema for the starvis database
+// Contains: extraction metadata and changelogs only.
+// Does NOT contain: game data (live/ptu), RSI website data (rsi_website)
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/starvis"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum ExtractionStatus {
+  success
+  partial
+  failed
+}
+
+enum ChangelogEntityType {
+  ship
+  component
+  item
+  commodity
+  shop
+  module
+  recipe
+}
+
+enum ChangelogChangeType {
+  added
+  removed
+  modified
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model Manufacturer {
+  code      String  @id @db.VarChar(20)
+  name      String  @db.VarChar(100)
+  knownFor  String? @map("known_for") @db.VarChar(255)
+  logoUrl   String? @map("logo_url") @db.VarChar(500)
+  websiteUrl String? @map("website_url") @db.VarChar(500)
+
+  @@map("manufacturers")
+}
+
+model ExtractionLog {
+  id                 Int              @id @default(autoincrement())
+  extractionHash     String           @map("extraction_hash") @db.Char(64)
+  gameVersion        String?          @map("game_version") @db.VarChar(50)
+  shipsCount         Int              @default(0) @map("ships_count")
+  componentsCount    Int              @default(0) @map("components_count")
+  itemsCount         Int              @default(0) @map("items_count")
+  commoditiesCount   Int              @default(0) @map("commodities_count")
+  manufacturersCount Int              @default(0) @map("manufacturers_count")
+  loadoutPortsCount  Int              @default(0) @map("loadout_ports_count")
+  shopsCount         Int              @default(0) @map("shops_count")
+  recipesCount       Int              @default(0) @map("recipes_count")
+  durationMs         Int?             @map("duration_ms")
+  status             ExtractionStatus @default(success)
+  errorMessage       String?          @map("error_message") @db.Text
+  extractedAt        DateTime         @default(now()) @map("extracted_at") @db.DateTime(0)
+  gameEnv            String           @default("live") @map("game_env") @db.VarChar(10)
+
+  changelogs Changelog[]
+
+  @@index([extractionHash], map: "idx_extraction_hash")
+  @@index([gameEnv], map: "idx_game_env")
+  @@map("extraction_log")
+}
+
+model Changelog {
+  id           Int                 @id @default(autoincrement())
+  extractionId Int                 @map("extraction_id")
+  entityType   ChangelogEntityType @map("entity_type")
+  entityUuid   String              @map("entity_uuid") @db.VarChar(255)
+  entityName   String?             @map("entity_name") @db.VarChar(255)
+  changeType   ChangelogChangeType @map("change_type")
+  fieldName    String?             @map("field_name") @db.VarChar(100)
+  oldValue     String?             @map("old_value") @db.Text
+  newValue     String?             @map("new_value") @db.Text
+  createdAt    DateTime            @default(now()) @map("created_at") @db.DateTime(0)
+
+  extraction ExtractionLog @relation(fields: [extractionId], references: [id], onDelete: Cascade, map: "fk_changelog_extraction")
+
+  @@index([extractionId], map: "idx_changelog_extraction")
+  @@index([entityType, entityUuid], map: "idx_changelog_entity")
+  @@map("changelog")
+}
