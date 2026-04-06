@@ -114,7 +114,9 @@ export class LocationQueryService {
     const prisma = this.getClient(env);
     const [typeRows, systemRows] = await Promise.all([
       prisma.$queryRawUnsafe<Row[]>(`SELECT type as value, COUNT(*) as count FROM locations GROUP BY type ORDER BY type`),
-      prisma.$queryRawUnsafe<Row[]>(`SELECT DISTINCT system_code as value FROM locations WHERE system_code IS NOT NULL ORDER BY system_code`),
+      prisma.$queryRawUnsafe<Row[]>(
+        `SELECT DISTINCT system_code as value FROM locations WHERE system_code IS NOT NULL ORDER BY system_code`,
+      ),
     ]);
     return {
       filters: {

@@ -8,9 +8,7 @@ const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
 export const data = new SlashCommandBuilder()
   .setName('mission')
   .setDescription('Rechercher des missions Star Citizen')
-  .addStringOption((opt) =>
-    opt.setName('terme').setDescription('Titre ou mot-clé de la mission').setRequired(false),
-  )
+  .addStringOption((opt) => opt.setName('terme').setDescription('Titre ou mot-clé de la mission').setRequired(false))
   .addStringOption((opt) =>
     opt
       .setName('type')
@@ -26,9 +24,7 @@ export const data = new SlashCommandBuilder()
         { name: 'Investigation', value: 'Investigation' },
       ),
   )
-  .addBooleanOption((opt) =>
-    opt.setName('legal').setDescription('Uniquement les missions légales').setRequired(false),
-  );
+  .addBooleanOption((opt) => opt.setName('legal').setDescription('Uniquement les missions légales').setRequired(false));
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const term = interaction.options.getString('terme') ?? undefined;
@@ -39,7 +35,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const res = await getMissions({ search: term, type, limit: 6 });
 
     if (!res.data || res.data.length === 0) {
-      const what = term ? `« ${term} »` : type ?? 'ces critères';
+      const what = term ? `« ${term} »` : (type ?? 'ces critères');
       await interaction.editReply({ embeds: [errorEmbed(`Aucune mission trouvée pour ${what}.`)] });
       return;
     }
@@ -65,9 +61,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     embed.setDescription(lines.join('\n'));
 
     if (res.total > res.data.length) {
-      embed.addFields([
-        { name: '…', value: `_${res.total - res.data.length} autres missions non affichées_`, inline: false },
-      ]);
+      embed.addFields([{ name: '…', value: `_${res.total - res.data.length} autres missions non affichées_`, inline: false }]);
     }
 
     await interaction.editReply({ embeds: [embed] });

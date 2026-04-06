@@ -126,8 +126,12 @@ export class RsiSyncService {
           const rsiUrlPath: string = item.rsi_url ?? '';
           const slug = rsiUrlPath.split('/').pop() ?? null;
           const content = item.translations?.en_EN ?? item.content ?? null;
-          const category = item.channel && item.channel !== 'Undefined' ? item.channel
-            : item.category && item.category !== 'Undefined' ? item.category : null;
+          const category =
+            item.channel && item.channel !== 'Undefined'
+              ? item.channel
+              : item.category && item.category !== 'Undefined'
+                ? item.category
+                : null;
           const excerpt = content ? (content as string).slice(0, 400).replace(/\n/g, ' ') : null;
           const publishedAt = item.published_at ?? item.created_at ?? item.time ?? null;
           const publishedAtSql = publishedAt ? new Date(publishedAt).toISOString().slice(0, 19).replace('T', ' ') : null;
@@ -141,10 +145,17 @@ export class RsiSyncService {
                  excerpt=VALUES(excerpt), category=VALUES(category),
                  thumbnail_url=VALUES(thumbnail_url), rsi_url=VALUES(rsi_url),
                  published_at=VALUES(published_at)`,
-              [rsiId, slug, String(item.title ?? item.name ?? rsiId), content, excerpt, category,
-               item.thumbnail?.url ?? item.image ?? null,
-               item.rsi_url ?? `https://robertsspaceindustries.com/comm-link/${rsiId}`,
-               publishedAtSql],
+              [
+                rsiId,
+                slug,
+                String(item.title ?? item.name ?? rsiId),
+                content,
+                excerpt,
+                category,
+                item.thumbnail?.url ?? item.image ?? null,
+                item.rsi_url ?? `https://robertsspaceindustries.com/comm-link/${rsiId}`,
+                publishedAtSql,
+              ],
             );
             if (result.affectedRows === 1) stats.inserted++;
             else stats.updated++;
@@ -195,10 +206,14 @@ export class RsiSyncService {
           const media = ship.media?.[0] || {};
           const images = media.images || {};
           const storeSmall = images.store_small
-            ? images.store_small.startsWith('http') ? images.store_small : `https://robertsspaceindustries.com${images.store_small}`
+            ? images.store_small.startsWith('http')
+              ? images.store_small
+              : `https://robertsspaceindustries.com${images.store_small}`
             : null;
           const storeLarge = images.store_large
-            ? images.store_large.startsWith('http') ? images.store_large : `https://robertsspaceindustries.com${images.store_large}`
+            ? images.store_large.startsWith('http')
+              ? images.store_large
+              : `https://robertsspaceindustries.com${images.store_large}`
             : null;
 
           await conn.execute(
@@ -228,18 +243,36 @@ export class RsiSyncService {
               media_store_large=VALUES(media_store_large), compiled=VALUES(compiled),
               synced_at=CURRENT_TIMESTAMP`,
             [
-              ship.id, ship.name, ship.chassis_id || null,
-              mfg.code || null, mfg.name || null,
-              ship.focus || null, ship.type || null, ship.description || null,
-              ship.production_status || null, ship.production_note || null,
-              ship.size || null, ship.url || null,
-              ship.length || null, ship.beam || null, ship.height || null,
-              ship.mass || null, ship.cargocapacity || null,
-              ship.min_crew ?? 1, ship.max_crew ?? 1,
-              ship.scm_speed || null, ship.afterburner_speed || null,
-              ship.pitch_max || null, ship.yaw_max || null, ship.roll_max || null,
-              ship.xaxis_acceleration || null, ship.yaxis_acceleration || null, ship.zaxis_acceleration || null,
-              media.source_url || null, storeSmall, storeLarge,
+              ship.id,
+              ship.name,
+              ship.chassis_id || null,
+              mfg.code || null,
+              mfg.name || null,
+              ship.focus || null,
+              ship.type || null,
+              ship.description || null,
+              ship.production_status || null,
+              ship.production_note || null,
+              ship.size || null,
+              ship.url || null,
+              ship.length || null,
+              ship.beam || null,
+              ship.height || null,
+              ship.mass || null,
+              ship.cargocapacity || null,
+              ship.min_crew ?? 1,
+              ship.max_crew ?? 1,
+              ship.scm_speed || null,
+              ship.afterburner_speed || null,
+              ship.pitch_max || null,
+              ship.yaw_max || null,
+              ship.roll_max || null,
+              ship.xaxis_acceleration || null,
+              ship.yaxis_acceleration || null,
+              ship.zaxis_acceleration || null,
+              media.source_url || null,
+              storeSmall,
+              storeLarge,
               ship.compiled ? JSON.stringify(ship.compiled) : null,
             ],
           );
@@ -265,10 +298,18 @@ export class RsiSyncService {
     const conn = await this.pool.getConnection();
 
     const upsert = async (row: {
-      rsi_id: string; name: string; type: string; system_code: string | null;
-      system_name: string | null; parent_id: string | null; faction_name: string | null;
-      affiliations: string | null; thumbnail: string | null; description: string | null;
-      coordinates: string | null; jump_points: string | null;
+      rsi_id: string;
+      name: string;
+      type: string;
+      system_code: string | null;
+      system_name: string | null;
+      parent_id: string | null;
+      faction_name: string | null;
+      affiliations: string | null;
+      thumbnail: string | null;
+      description: string | null;
+      coordinates: string | null;
+      jump_points: string | null;
     }) => {
       await conn.execute(
         `INSERT INTO starmap_locations (rsi_id, name, type, system_code, system_name, parent_id, faction_name, affiliations, thumbnail, description, coordinates, jump_points)
@@ -280,8 +321,20 @@ export class RsiSyncService {
            thumbnail=VALUES(thumbnail), description=VALUES(description),
            coordinates=VALUES(coordinates), jump_points=VALUES(jump_points),
            synced_at=NOW()`,
-        [row.rsi_id, row.name, row.type, row.system_code, row.system_name, row.parent_id,
-         row.faction_name, row.affiliations, row.thumbnail, row.description, row.coordinates, row.jump_points],
+        [
+          row.rsi_id,
+          row.name,
+          row.type,
+          row.system_code,
+          row.system_name,
+          row.parent_id,
+          row.faction_name,
+          row.affiliations,
+          row.thumbnail,
+          row.description,
+          row.coordinates,
+          row.jump_points,
+        ],
       );
     };
 
@@ -333,7 +386,8 @@ export class RsiSyncService {
           if (sys.code && sys.system_api_url) {
             try {
               const bodiesData = await fetchJson(`${sys.system_api_url}?with=celestialObjects`);
-              const bodies: any[] = bodiesData.data?.celestial_objects ?? bodiesData.data?.celestialObjects ?? bodiesData.celestial_objects ?? [];
+              const bodies: any[] =
+                bodiesData.data?.celestial_objects ?? bodiesData.data?.celestialObjects ?? bodiesData.celestial_objects ?? [];
               for (const body of bodies) {
                 const bodyRsiId = String(body.id ?? body.rsi_id ?? '');
                 if (!bodyRsiId) continue;

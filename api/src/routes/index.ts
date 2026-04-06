@@ -10,12 +10,12 @@ import { mountManufacturerRoutes } from './manufacturers.js';
 import { mountMiningRoutes } from './mining.js';
 import { mountMissionRoutes } from './missions.js';
 import { mountPaintRoutes } from './paints.js';
+import { mountRsiWebsiteRoutes } from './rsi-website.js';
 import { mountSearchRoutes } from './search.js';
 import { mountShipMatrixRoutes } from './ship-matrix.js';
 import { mountShipRoutes } from './ships.js';
 import { mountShopRoutes } from './shops.js';
 import { mountSystemRoutes } from './system.js';
-import { mountRsiWebsiteRoutes } from './rsi-website.js';
 import { mountTradeRoutes } from './trade.js';
 import type { RouteDependencies } from './types.js';
 
