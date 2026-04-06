@@ -15,12 +15,37 @@
     },
     "parameters": {
       "page": { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1, "minimum": 1 }, "description": "Page number" },
-      "limit": { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20, "minimum": 1, "maximum": 200 }, "description": "Items per page" },
+      "limit": {
+        "name": "limit",
+        "in": "query",
+        "schema": { "type": "integer", "default": 20, "minimum": 1, "maximum": 200 },
+        "description": "Items per page"
+      },
       "search": { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Full-text search query" },
-      "format": { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] }, "description": "Response format" },
-      "sort": { "name": "sort", "in": "query", "schema": { "type": "string" }, "description": "Field to sort by (supports dot-notation for JSON fields, e.g. `game_data.scm_speed`)" },
-      "order": { "name": "order", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"], "default": "asc" }, "description": "Sort direction" },
-      "env": { "name": "env", "in": "query", "schema": { "type": "string", "enum": ["live", "ptu"], "default": "live" }, "description": "Game environment" }
+      "format": {
+        "name": "format",
+        "in": "query",
+        "schema": { "type": "string", "enum": ["json", "csv"] },
+        "description": "Response format"
+      },
+      "sort": {
+        "name": "sort",
+        "in": "query",
+        "schema": { "type": "string" },
+        "description": "Field to sort by (supports dot-notation for JSON fields, e.g. `game_data.scm_speed`)"
+      },
+      "order": {
+        "name": "order",
+        "in": "query",
+        "schema": { "type": "string", "enum": ["asc", "desc"], "default": "asc" },
+        "description": "Sort direction"
+      },
+      "env": {
+        "name": "env",
+        "in": "query",
+        "schema": { "type": "string", "enum": ["live", "ptu"], "default": "live" },
+        "description": "Game environment"
+      }
     },
     "schemas": {
       "Error": {
@@ -518,10 +543,19 @@
           { "name": "manufacturer", "in": "query", "schema": { "type": "string" }, "description": "Manufacturer code (e.g. AEGS, RSI)" },
           { "name": "career", "in": "query", "schema": { "type": "string" }, "description": "Career (Combat, Transport, …)" },
           { "name": "role", "in": "query", "schema": { "type": "string" }, "description": "Role (Light Fighter, Medium Freight, …)" },
-          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["flight-ready", "in-concept", "in-production", "in-game-only"] } },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": { "type": "string", "enum": ["flight-ready", "in-concept", "in-production", "in-game-only"] }
+          },
           { "name": "vehicle_category", "in": "query", "schema": { "type": "string", "enum": ["ship", "ground", "gravlev"] } },
           { "name": "variant_type", "in": "query", "schema": { "type": "string" } },
-          { "name": "include", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated relations: manufacturer, paints, similar, matrix" },
+          {
+            "name": "include",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Comma-separated relations: manufacturer, paints, similar, matrix"
+          },
           { "$ref": "#/components/parameters/sort" },
           { "$ref": "#/components/parameters/order" },
           { "$ref": "#/components/parameters/page" },
@@ -575,7 +609,20 @@
           { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10, "maximum": 20 } }
         ],
         "responses": {
-          "200": { "description": "Matching ships (lightweight)", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Ship" } } } } } } },
+          "200": {
+            "description": "Matching ships (lightweight)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Ship" } }
+                  }
+                }
+              }
+            }
+          },
           "400": { "description": "Search query too short" }
         }
       }
@@ -604,10 +651,25 @@
         "operationId": "getShipByUuid",
         "parameters": [
           { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Ship UUID or class_name" },
-          { "name": "include", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated relations: manufacturer, paints, similar, matrix" }
+          {
+            "name": "include",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Comma-separated relations: manufacturer, paints, similar, matrix"
+          }
         ],
         "responses": {
-          "200": { "description": "Ship details", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/ShipDetail" } } } } } },
+          "200": {
+            "description": "Ship details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/ShipDetail" } }
+                }
+              }
+            }
+          },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
@@ -620,7 +682,20 @@
         "description": "Returns recursive port tree with resolved components (turret→gimbal→weapon, etc.)",
         "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
         "responses": {
-          "200": { "description": "Hierarchical loadout tree", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/LoadoutPort" } } } } } } },
+          "200": {
+            "description": "Hierarchical loadout tree",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/LoadoutPort" } }
+                  }
+                }
+              }
+            }
+          },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
@@ -646,7 +721,22 @@
           { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
           { "$ref": "#/components/parameters/format" }
         ],
-        "responses": { "200": { "description": "Paint list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Paint" } } } } } } } }
+        "responses": {
+          "200": {
+            "description": "Paint list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Paint" } }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/ships/{uuid}/stats": {
@@ -655,7 +745,10 @@
         "summary": "Get aggregated ship stats",
         "operationId": "getShipStats",
         "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Aggregated weapon DPS, shield HP, power draw, cooling" }, "404": { "$ref": "#/components/responses/NotFound" } }
+        "responses": {
+          "200": { "description": "Aggregated weapon DPS, shield HP, power draw, cooling" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
       }
     },
     "/api/v1/ships/{uuid}/hardpoints": {
@@ -664,7 +757,10 @@
         "summary": "Get ship hardpoints",
         "operationId": "getShipHardpoints",
         "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": { "200": { "description": "Hardpoint/port list (type, size, equipped component)" }, "404": { "$ref": "#/components/responses/NotFound" } }
+        "responses": {
+          "200": { "description": "Hardpoint/port list (type, size, equipped component)" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
       }
     },
     "/api/v1/ships/{uuid}/similar": {
@@ -688,7 +784,10 @@
           { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
           { "name": "uuid2", "in": "path", "required": true, "schema": { "type": "string" } }
         ],
-        "responses": { "200": { "description": "Side-by-side comparison of both ships" }, "404": { "$ref": "#/components/responses/NotFound" } }
+        "responses": {
+          "200": { "description": "Side-by-side comparison of both ships" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
       }
     },
     "/api/v1/ships/ranking": {
@@ -697,7 +796,12 @@
         "summary": "Get ship rankings",
         "operationId": "getShipRanking",
         "parameters": [
-          { "name": "metric", "in": "query", "schema": { "type": "string" }, "description": "Ranking metric (scm_speed, cargo_capacity, shield_hp, …)" },
+          {
+            "name": "metric",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Ranking metric (scm_speed, cargo_capacity, shield_hp, …)"
+          },
           { "name": "career", "in": "query", "schema": { "type": "string" } },
           { "$ref": "#/components/parameters/limit" }
         ],
@@ -711,7 +815,12 @@
         "operationId": "getComponents",
         "parameters": [
           { "$ref": "#/components/parameters/search" },
-          { "name": "type", "in": "query", "schema": { "type": "string" }, "description": "Component type (WeaponGun, Shield, QuantumDrive, …)" },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Component type (WeaponGun, Shield, QuantumDrive, …)"
+          },
           { "name": "sub_type", "in": "query", "schema": { "type": "string" } },
           { "name": "size", "in": "query", "schema": { "type": "integer" } },
           { "name": "grade", "in": "query", "schema": { "type": "string" } },
@@ -722,7 +831,25 @@
           { "$ref": "#/components/parameters/limit" },
           { "$ref": "#/components/parameters/format" }
         ],
-        "responses": { "200": { "description": "Paginated component list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Component" } }, "total": { "type": "integer" }, "page": { "type": "integer" }, "pages": { "type": "integer" } } } } } } }
+        "responses": {
+          "200": {
+            "description": "Paginated component list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Component" } },
+                    "total": { "type": "integer" },
+                    "page": { "type": "integer" },
+                    "pages": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/components/compatible": {
@@ -757,7 +884,12 @@
         "tags": ["Components"],
         "summary": "Get component filter values",
         "operationId": "getComponentFilters",
-        "responses": { "200": { "description": "Available filter values", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } } } }
+        "responses": {
+          "200": {
+            "description": "Available filter values",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } }
+          }
+        }
       }
     },
     "/api/v1/components/{uuid}": {
@@ -770,7 +902,17 @@
           { "name": "include", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated: manufacturer" }
         ],
         "responses": {
-          "200": { "description": "Component details", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/Component" } } } } } },
+          "200": {
+            "description": "Component details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/Component" } }
+                }
+              }
+            }
+          },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
@@ -806,7 +948,12 @@
         "operationId": "getItems",
         "parameters": [
           { "$ref": "#/components/parameters/search" },
-          { "name": "type", "in": "query", "schema": { "type": "string" }, "description": "Item type (Weapon_Personal, Char_Armor_Helmet, …)" },
+          {
+            "name": "type",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Item type (Weapon_Personal, Char_Armor_Helmet, …)"
+          },
           { "name": "sub_type", "in": "query", "schema": { "type": "string" } },
           { "name": "manufacturer", "in": "query", "schema": { "type": "string" } },
           { "$ref": "#/components/parameters/sort" },
@@ -815,7 +962,22 @@
           { "$ref": "#/components/parameters/limit" },
           { "$ref": "#/components/parameters/format" }
         ],
-        "responses": { "200": { "description": "Paginated item list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Item" } } } } } } } }
+        "responses": {
+          "200": {
+            "description": "Paginated item list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Item" } }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/items/types": {
@@ -833,7 +995,12 @@
         "summary": "Get item filter values",
         "operationId": "getItemFilters",
         "parameters": [{ "$ref": "#/components/parameters/env" }],
-        "responses": { "200": { "description": "Available filter values", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } } } }
+        "responses": {
+          "200": {
+            "description": "Available filter values",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } }
+          }
+        }
       }
     },
     "/api/v1/items/sub-types": {
@@ -853,10 +1020,7 @@
         "tags": ["Items"],
         "summary": "List manufacturers for a given item type",
         "operationId": "getItemManufacturers",
-        "parameters": [
-          { "name": "type", "in": "query", "schema": { "type": "string" } },
-          { "$ref": "#/components/parameters/env" }
-        ],
+        "parameters": [{ "name": "type", "in": "query", "schema": { "type": "string" } }, { "$ref": "#/components/parameters/env" }],
         "responses": { "200": { "description": "Manufacturers list" } }
       }
     },
@@ -875,7 +1039,13 @@
         "summary": "Get items by semantic category slug",
         "operationId": "getItemsByCategory",
         "parameters": [
-          { "name": "slug", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Category slug (weapons, helmet, core, arms, legs, backpack, undersuit, tools-medics, magazines, attachments, clothing, other, throwable)" },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Category slug (weapons, helmet, core, arms, legs, backpack, undersuit, tools-medics, magazines, attachments, clothing, other, throwable)"
+          },
           { "$ref": "#/components/parameters/env" },
           { "$ref": "#/components/parameters/search" },
           { "$ref": "#/components/parameters/sort" },
@@ -896,7 +1066,17 @@
           { "name": "include", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated: manufacturer" }
         ],
         "responses": {
-          "200": { "description": "Item details", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/Item" } } } } } },
+          "200": {
+            "description": "Item details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/Item" } }
+                }
+              }
+            }
+          },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
@@ -928,7 +1108,22 @@
           { "$ref": "#/components/parameters/limit" },
           { "$ref": "#/components/parameters/format" }
         ],
-        "responses": { "200": { "description": "Paginated commodity list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Commodity" } } } } } } } }
+        "responses": {
+          "200": {
+            "description": "Paginated commodity list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Commodity" } }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/commodities/types": {
@@ -946,7 +1141,12 @@
         "summary": "Get commodity filter values",
         "operationId": "getCommodityFilters",
         "parameters": [{ "$ref": "#/components/parameters/env" }],
-        "responses": { "200": { "description": "Available filter values", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } } } }
+        "responses": {
+          "200": {
+            "description": "Available filter values",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } }
+          }
+        }
       }
     },
     "/api/v1/commodities/{uuid}": {
@@ -956,7 +1156,17 @@
         "operationId": "getCommodityByUuid",
         "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
         "responses": {
-          "200": { "description": "Commodity details", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/Commodity" } } } } } },
+          "200": {
+            "description": "Commodity details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/Commodity" } }
+                }
+              }
+            }
+          },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
@@ -981,7 +1191,12 @@
         "summary": "Get paint filter values",
         "operationId": "getPaintFilters",
         "description": "Returns ships that have paints available",
-        "responses": { "200": { "description": "Available filter values", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } } } }
+        "responses": {
+          "200": {
+            "description": "Available filter values",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } }
+          }
+        }
       }
     },
     "/api/v1/shops": {
@@ -996,7 +1211,22 @@
           { "$ref": "#/components/parameters/page" },
           { "$ref": "#/components/parameters/limit" }
         ],
-        "responses": { "200": { "description": "Paginated shop list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Shop" } } } } } } } }
+        "responses": {
+          "200": {
+            "description": "Paginated shop list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Shop" } }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/shops/filters": {
@@ -1004,7 +1234,12 @@
         "tags": ["Shops"],
         "summary": "Get shop filter values",
         "operationId": "getShopFilters",
-        "responses": { "200": { "description": "Available filter values", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } } } }
+        "responses": {
+          "200": {
+            "description": "Available filter values",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } }
+          }
+        }
       }
     },
     "/api/v1/shops/{id}": {
@@ -1014,7 +1249,17 @@
         "operationId": "getShopById",
         "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
         "responses": {
-          "200": { "description": "Shop details with full inventory", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/ShopDetail" } } } } } },
+          "200": {
+            "description": "Shop details with full inventory",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/ShopDetail" } }
+                }
+              }
+            }
+          },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
@@ -1031,7 +1276,22 @@
           { "$ref": "#/components/parameters/page" },
           { "$ref": "#/components/parameters/limit" }
         ],
-        "responses": { "200": { "description": "Paginated location list with political affiliations", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Location" } } } } } } } }
+        "responses": {
+          "200": {
+            "description": "Paginated location list with political affiliations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Location" } }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/locations/filters": {
@@ -1039,7 +1299,12 @@
         "tags": ["Locations"],
         "summary": "Get location filter values",
         "operationId": "getLocationFilters",
-        "responses": { "200": { "description": "Available filter values", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } } } }
+        "responses": {
+          "200": {
+            "description": "Available filter values",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } }
+          }
+        }
       }
     },
     "/api/v1/locations/{id}": {
@@ -1047,9 +1312,21 @@
         "tags": ["Locations"],
         "summary": "Get location by ID or class_name",
         "operationId": "getLocationById",
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Location ID or class_name" }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Location ID or class_name" }
+        ],
         "responses": {
-          "200": { "description": "Location details with political affiliation", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/Location" } } } } } },
+          "200": {
+            "description": "Location details with political affiliation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/Location" } }
+                }
+              }
+            }
+          },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
@@ -1076,7 +1353,22 @@
           { "$ref": "#/components/parameters/page" },
           { "$ref": "#/components/parameters/limit" }
         ],
-        "responses": { "200": { "description": "Paginated mission list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Mission" } } } } } } } }
+        "responses": {
+          "200": {
+            "description": "Paginated mission list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Mission" } }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/missions/filters": {
@@ -1084,7 +1376,12 @@
         "tags": ["Missions"],
         "summary": "Get mission filter values",
         "operationId": "getMissionFilters",
-        "responses": { "200": { "description": "Available filter values", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } } } }
+        "responses": {
+          "200": {
+            "description": "Available filter values",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } }
+          }
+        }
       }
     },
     "/api/v1/missions/{id}": {
@@ -1110,7 +1407,22 @@
           { "$ref": "#/components/parameters/limit" },
           { "$ref": "#/components/parameters/format" }
         ],
-        "responses": { "200": { "description": "Manufacturer list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Manufacturer" } } } } } } } }
+        "responses": {
+          "200": {
+            "description": "Manufacturer list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/Manufacturer" } }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/manufacturers/{code}": {
@@ -1173,7 +1485,22 @@
           { "$ref": "#/components/parameters/limit" },
           { "$ref": "#/components/parameters/format" }
         ],
-        "responses": { "200": { "description": "Paginated Ship Matrix list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/ShipMatrixEntry" } } } } } } } }
+        "responses": {
+          "200": {
+            "description": "Paginated Ship Matrix list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/ShipMatrixEntry" } }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/mining/elements": {
@@ -1181,7 +1508,22 @@
         "tags": ["Mining"],
         "summary": "List mining elements",
         "operationId": "getMiningElements",
-        "responses": { "200": { "description": "Mining elements list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/MiningElement" } } } } } } } }
+        "responses": {
+          "200": {
+            "description": "Mining elements list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/MiningElement" } }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/mining/compositions": {
@@ -1200,7 +1542,13 @@
         "operationId": "solveMining",
         "description": "Returns rocks sorted by estimated yield value for specified elements",
         "parameters": [
-          { "name": "elements", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Comma-separated element names (e.g. Quantainium,Bexalite)" }
+          {
+            "name": "elements",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "Comma-separated element names (e.g. Quantainium,Bexalite)"
+          }
         ],
         "responses": { "200": { "description": "Ranked mining targets" } }
       }
@@ -1215,7 +1563,22 @@
           { "name": "start_location", "in": "query", "schema": { "type": "string" }, "description": "Starting location name or ID" },
           { "$ref": "#/components/parameters/limit" }
         ],
-        "responses": { "200": { "description": "Trade routes sorted by profit", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/TradeRoute" } } } } } } } }
+        "responses": {
+          "200": {
+            "description": "Trade routes sorted by profit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/TradeRoute" } }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/trade/locations": {
@@ -1271,7 +1634,10 @@
             }
           }
         },
-        "responses": { "200": { "description": "Price report accepted" }, "400": { "description": "Bad request — missing or invalid parameters" } }
+        "responses": {
+          "200": { "description": "Price report accepted" },
+          "400": { "description": "Bad request — missing or invalid parameters" }
+        }
       }
     },
     "/api/v1/trade/location/{shopId}/prices": {
@@ -1283,7 +1649,10 @@
           { "name": "shopId", "in": "path", "required": true, "schema": { "type": "integer" } },
           { "$ref": "#/components/parameters/env" }
         ],
-        "responses": { "200": { "description": "All commodity prices at the shop" }, "400": { "description": "Bad request — missing or invalid parameters" } }
+        "responses": {
+          "200": { "description": "All commodity prices at the shop" },
+          "400": { "description": "Bad request — missing or invalid parameters" }
+        }
       }
     },
     "/api/v1/crafting/recipes": {
@@ -1297,7 +1666,22 @@
           { "$ref": "#/components/parameters/page" },
           { "$ref": "#/components/parameters/limit" }
         ],
-        "responses": { "200": { "description": "Crafting recipes list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/CraftingRecipe" } } } } } } } }
+        "responses": {
+          "200": {
+            "description": "Crafting recipes list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/CraftingRecipe" } }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/crafting/station-types": {
@@ -1336,7 +1720,10 @@
           { "name": "itemName", "in": "path", "required": true, "schema": { "type": "string" } },
           { "$ref": "#/components/parameters/env" }
         ],
-        "responses": { "200": { "description": "Recipes using the specified resource" }, "404": { "$ref": "#/components/responses/NotFound" } }
+        "responses": {
+          "200": { "description": "Recipes using the specified resource" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
       }
     },
     "/api/v1/crafting/recipes/{uuid}": {
@@ -1404,10 +1791,31 @@
         "description": "Searches across ships, components, items, commodities, locations and missions simultaneously.",
         "parameters": [
           { "name": "q", "in": "query", "required": true, "schema": { "type": "string", "minLength": 2 }, "description": "Search query" },
-          { "name": "types", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated entity types to search (default: all)" },
+          {
+            "name": "types",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Comma-separated entity types to search (default: all)"
+          },
           { "$ref": "#/components/parameters/limit" }
         ],
-        "responses": { "200": { "description": "Search results grouped by entity type", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/SearchResult" } }, "total": { "type": "integer" } } } } } } }
+        "responses": {
+          "200": {
+            "description": "Search results grouped by entity type",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/SearchResult" } },
+                    "total": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/game-versions": {
@@ -1445,7 +1853,17 @@
         "summary": "Get latest LIVE game version",
         "operationId": "getDefaultGameVersion",
         "responses": {
-          "200": { "description": "Latest live extraction entry", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/GameVersion" } } } } } },
+          "200": {
+            "description": "Latest live extraction entry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/GameVersion" } }
+                }
+              }
+            }
+          },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
@@ -1489,7 +1907,17 @@
         "operationId": "getGalactapediaEntry",
         "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Entry ID or slug" }],
         "responses": {
-          "200": { "description": "Full Galactapedia article with content", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/GalactapediaEntry" } } } } } },
+          "200": {
+            "description": "Full Galactapedia article with content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/GalactapediaEntry" } }
+                }
+              }
+            }
+          },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
@@ -1499,7 +1927,19 @@
         "tags": ["Comm-links"],
         "summary": "List comm-link categories",
         "operationId": "getCommLinkCategories",
-        "responses": { "200": { "description": "Distinct categories (Transmission, Comm-Link, etc.)", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } } } } } } }
+        "responses": {
+          "200": {
+            "description": "Distinct categories (Transmission, Comm-Link, etc.)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/comm-links": {
@@ -1539,9 +1979,27 @@
         "tags": ["Comm-links"],
         "summary": "Get comm-link by ID or slug",
         "operationId": "getCommLink",
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "RSI article ID, numeric ID, or slug" }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "RSI article ID, numeric ID, or slug"
+          }
+        ],
         "responses": {
-          "200": { "description": "Full comm-link article with content", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/CommLink" } } } } } },
+          "200": {
+            "description": "Full comm-link article with content",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/CommLink" } }
+                }
+              }
+            }
+          },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
@@ -1582,9 +2040,27 @@
         "tags": ["Starmap"],
         "summary": "Get star system with celestial bodies",
         "operationId": "getStarmapSystem",
-        "parameters": [{ "name": "code", "in": "path", "required": true, "schema": { "type": "string" }, "description": "System code (e.g. SOL, STANTON) or RSI ID" }],
+        "parameters": [
+          {
+            "name": "code",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" },
+            "description": "System code (e.g. SOL, STANTON) or RSI ID"
+          }
+        ],
         "responses": {
-          "200": { "description": "Star system with all celestial children", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/StarmapSystemDetail" } } } } } },
+          "200": {
+            "description": "Star system with all celestial children",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/StarmapSystemDetail" } }
+                }
+              }
+            }
+          },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
@@ -1641,10 +2117,7 @@
         "tags": ["Game Versions"],
         "summary": "Get data changelog",
         "operationId": "getChangelog",
-        "parameters": [
-          { "name": "env", "in": "query", "schema": { "type": "string" } },
-          { "$ref": "#/components/parameters/limit" }
-        ],
+        "parameters": [{ "name": "env", "in": "query", "schema": { "type": "string" } }, { "$ref": "#/components/parameters/limit" }],
         "responses": { "200": { "description": "Recent data changes (added/removed ships, components, etc.)" } }
       }
     },
