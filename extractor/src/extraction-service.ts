@@ -227,6 +227,20 @@ export class ExtractionService {
       .digest('hex');
     stats.extractionHash = extractionHash;
 
+    // ── Ship Matrix pre-sync (before main transaction so crossReferenceShipMatrix has data) ──
+    // ship_matrix lives in rsi_website (separate DB/pool) — safe to populate before the P4K tx.
+    if (run('ship-matrix') && options.rsiPool) {
+      onProgress?.('Pre-syncing Ship Matrix from RSI website (needed for cross-reference)…');
+      try {
+        const rsiSync = new RsiSyncService(options.rsiPool);
+        const s = await rsiSync.syncShipMatrix(onProgress);
+        onProgress?.(`✅ Ship Matrix pre-sync: synced=${s.synced}, errors=${s.errors}`);
+        if (s.errors) stats.errors.push(`Ship Matrix pre-sync: ${s.errors} errors`);
+      } catch (e) {
+        stats.errors.push(`Ship Matrix pre-sync failed: ${(e as Error).message}`);
+      }
+    }
+
     const conn = await this.pool.getConnection();
     // Keepalive: send a harmless SELECT every 30 s to prevent the MySQL server
     // (or the SSH tunnel in front of it) from closing the connection during the
@@ -489,17 +503,6 @@ export class ExtractionService {
         logger.warn('RSI sync modules requested but no rsiPool provided — skipping');
       } else {
         const rsiSync = new RsiSyncService(options.rsiPool);
-
-        if (run('ship-matrix')) {
-          onProgress?.('Syncing Ship Matrix from RSI website…');
-          try {
-            const s = await rsiSync.syncShipMatrix(onProgress);
-            onProgress?.(`✅ Ship Matrix: synced=${s.synced}, errors=${s.errors}`);
-            if (s.errors) stats.errors.push(`Ship Matrix: ${s.errors} errors`);
-          } catch (e) {
-            stats.errors.push(`Ship Matrix sync failed: ${(e as Error).message}`);
-          }
-        }
 
         if (run('galactapedia')) {
           onProgress?.('Syncing galactapedia from SC Wiki…');
