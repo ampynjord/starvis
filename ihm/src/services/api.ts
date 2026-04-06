@@ -250,7 +250,17 @@ export const api = {
       sort?: string;
       order?: string;
     }) => get<PaginatedResponse<ShipListItem>>('/ships', p),
-    filters: (env?: string) => get<ShipFilters>('/ships/filters', { env }),
+    filters: async (env?: string): Promise<ShipFilters> => {
+      const raw = await get<{ filters?: Record<string, { value: string; label?: string; count?: number }[]> }>('/ships/filters', { env });
+      const f = (raw as any).filters ?? raw as any;
+      return {
+        manufacturers: (f.manufacturer ?? []).map((m: any) => ({ code: m.value, name: m.label ?? m.value })),
+        roles: (f.role ?? []).map((r: any) => r.value),
+        careers: (f.career ?? []).map((c: any) => c.value),
+        variant_types: (f.variant_type ?? []).map((v: any) => v.value),
+        vehicle_categories: (f.vehicle_category ?? []).map((c: any) => ({ value: c.value, count: c.count ?? 0 })),
+      };
+    },
     search: (search: string, limit = 8, env?: string) => get<ShipListItem[]>('/ships/search', { search, limit, env }),
     random: (env?: string) => get<ShipListItem>('/ships/random', { env }),
     get: (uuid: string, env?: string) => get<Ship>(`/ships/${uuid}`, { env }),
