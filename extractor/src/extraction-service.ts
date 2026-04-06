@@ -635,7 +635,7 @@ export class ExtractionService {
             rack_count=new.rack_count, rack_missile_size=new.rack_missile_size,
             updated_at=CURRENT_TIMESTAMP`;
 
-    const COL_COUNT = 89; // number of columns above
+    const COL_COUNT = 85; // number of columns above
 
     /** Map a component object to a flat array of values */
     const toCanonicalRow = (c: any): (string | number | null)[] => {
