@@ -4,11 +4,11 @@
  * Data is populated by the extractor (`npx tsx extract.ts --modules ship-matrix`).
  * This service only serves cached reads — no external HTTP calls.
  */
-import type { PrismaLike as PrismaClient } from '@starvis/db';
+import type { RsiPrismaClient } from '@starvis/db';
 import { buildCacheKey, CACHE_TTL, cacheGet, cacheSet } from './redis.js';
 
 export class ShipMatrixService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: RsiPrismaClient) {}
 
   /** Get all ship_matrix entries */
   async getAll(): Promise<any[]> {
