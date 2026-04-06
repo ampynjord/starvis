@@ -1,4 +1,4 @@
-import type { PrismaLike as PrismaClient } from '@starvis/db';
+import type { GamePrismaClient as PrismaClient } from '@starvis/db';
 
 export interface MiningYieldInput {
   compositionUuid: string;
