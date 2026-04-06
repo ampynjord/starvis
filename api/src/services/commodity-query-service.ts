@@ -67,7 +67,9 @@ export class CommodityQueryService {
 
   async getCommodityFilters(env = 'live'): Promise<FiltersResult> {
     const prisma = this.getClient(env);
-    const rows = await prisma.$queryRawUnsafe<Row[]>(`SELECT type as value, COUNT(*) as count FROM commodities GROUP BY type ORDER BY type`);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      `SELECT type as value, COUNT(*) as count FROM commodities GROUP BY type ORDER BY type`,
+    );
     return {
       filters: {
         type: rows.map((r) => ({ value: String(r.value), label: String(r.value), count: Number(r.count) })),

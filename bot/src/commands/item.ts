@@ -9,9 +9,7 @@ const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
 export const data = new SlashCommandBuilder()
   .setName('item')
   .setDescription('Rechercher un item FPS (armure, arme, gadget…)')
-  .addStringOption((opt) =>
-    opt.setName('nom').setDescription('Nom de l\'item (ex: Pyro RYT, Hurston Dynamics)').setRequired(true),
-  );
+  .addStringOption((opt) => opt.setName('nom').setDescription("Nom de l'item (ex: Pyro RYT, Hurston Dynamics)").setRequired(true));
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const name = interaction.options.getString('nom', true);

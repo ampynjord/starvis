@@ -181,7 +181,9 @@ export async function getChangelog(limit = 5): Promise<ChangelogResponse> {
   return apiFetch<ChangelogResponse>(`/api/v1/changelog?limit=${limit}`);
 }
 
-export async function getMissions(opts: { search?: string; type?: string; limit?: number } = {}): Promise<PaginatedResponse<MissionResult>> {
+export async function getMissions(
+  opts: { search?: string; type?: string; limit?: number } = {},
+): Promise<PaginatedResponse<MissionResult>> {
   const params = new URLSearchParams();
   if (opts.search) params.set('search', opts.search);
   if (opts.type) params.set('type', opts.type);
@@ -281,8 +283,8 @@ export type {
   ChangelogEntry,
   ChangelogResponse,
   CommodityResult,
-  ComponentResult,
   CompareResponse,
+  ComponentResult,
   ItemResult,
   LoadoutResponse,
   PaginatedResponse,

@@ -5,9 +5,7 @@ import { errorEmbed } from '../embeds.js';
 
 const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
 
-export const data = new SlashCommandBuilder()
-  .setName('manufacturers')
-  .setDescription('Liste des constructeurs de vaisseaux Star Citizen');
+export const data = new SlashCommandBuilder().setName('manufacturers').setDescription('Liste des constructeurs de vaisseaux Star Citizen');
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   await interaction.deferReply();

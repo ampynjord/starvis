@@ -9,9 +9,7 @@ const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
 export const data = new SlashCommandBuilder()
   .setName('component')
   .setDescription('Rechercher un composant vaisseau (arme, bouclier, moteur…)')
-  .addStringOption((opt) =>
-    opt.setName('nom').setDescription('Nom du composant (ex: CF-557, 9-Series Longsword)').setRequired(true),
-  )
+  .addStringOption((opt) => opt.setName('nom').setDescription('Nom du composant (ex: CF-557, 9-Series Longsword)').setRequired(true))
   .addStringOption((opt) =>
     opt
       .setName('type')
