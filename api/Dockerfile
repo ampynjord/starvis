@@ -34,7 +34,7 @@ COPY api/package*.json ./api/
 COPY db/prisma/ ./db/prisma/
 
 RUN npm ci --omit=dev --workspace=api --workspace=@starvis/db --ignore-scripts
-RUN cd db && npx prisma generate
+RUN npm run generate --workspace=@starvis/db
 
 COPY db/ ./db/
 COPY api/ ./api/
