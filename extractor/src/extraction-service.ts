@@ -401,12 +401,6 @@ export class ExtractionService {
         stats.shops = shopResult.shops;
       }
 
-      // 5h. Scrape CTM (3D model) URLs from RSI website
-      if (run('ctm')) {
-        onProgress?.('Scraping 3D model URLs (CTM) from RSI…');
-        await this.saveShipCtmModels(conn, onProgress);
-      }
-
       // 6. Cross-reference with ship_matrix (only when ships were extracted)
       if (run('ships')) {
         onProgress?.('Cross-referencing with Ship Matrix…');
@@ -417,6 +411,12 @@ export class ExtractionService {
         const pruned = await pruneExcludedVariants(conn);
         if (pruned > 0) onProgress?.(`Pruned ${pruned} excluded variant ships`);
         await applyHullSeriesCargoFallback(conn);
+      }
+
+      // 6b. Scrape CTM (3D model) URLs — after cross-reference so ship_matrix_id is populated
+      if (run('ctm')) {
+        onProgress?.('Scraping 3D model URLs (CTM) from RSI…');
+        await this.saveShipCtmModels(conn, onProgress);
       }
 
       // 6c. Log extraction to extraction_log
