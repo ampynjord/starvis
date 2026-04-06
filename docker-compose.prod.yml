@@ -1,21 +1,21 @@
-# Production — VPS derrière Traefik
+# ============================================================
+# STARVIS — Production (VPS derrière Traefik)
 # Images pré-buildées depuis GHCR, routage via Traefik
-#
-# Usage: docker compose -f docker-compose.prod.yml up -d
-# Env:   cp .env.prod.example .env.prod && edit, puis passer --env-file .env.prod
+# Usage : docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
+# ============================================================
 
 services:
   mysql:
-    image: mysql:8.0
-    container_name: starvis-mysql
+    image: ${MYSQL_IMAGE:-mysql:8.0}
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: starvis
+      MYSQL_DATABASE: ${DB_NAME:-starvis}
       MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${DB_PASSWORD}
     # Port exposé en loopback uniquement — pour extractions locales via tunnel SSH
     ports:
-      - "127.0.0.1:3306:3306"
+      - "127.0.0.1:${DB_EXTERNAL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./db/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
@@ -23,7 +23,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: ${MYSQL_MEMORY_LIMIT:-512M}
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD || exit 1"]
       interval: 10s
@@ -31,25 +31,25 @@ services:
       retries: 5
 
   redis:
-    image: redis:7-alpine
-    container_name: starvis-redis
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-redis
     volumes:
       - redis_data:/data
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 64M
+          memory: ${REDIS_MEMORY_LIMIT:-64M}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
-    command: redis-server --appendonly yes --maxmemory 32mb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory ${REDIS_MAXMEMORY:-32mb} --maxmemory-policy allkeys-lru
 
   api:
-    image: ghcr.io/ampynjord/starvis-api:latest
-    container_name: starvis-api
+    image: ${API_IMAGE:-ghcr.io/ampynjord/starvis-api:latest}
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-api
     volumes:
       - ctm_cache:/app/ctm-cache
     environment:
@@ -59,12 +59,12 @@ services:
       DB_PORT: 3306
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: starvis
+      DB_NAME: ${DB_NAME:-starvis}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       ADMIN_API_KEY: ${ADMIN_API_KEY}
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      CORS_ORIGIN: ${CORS_ORIGIN:-https://starvis.ampynjord.bzh}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://${DOMAIN}}
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-200}
       RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-30}
       CTM_CACHE_DIR: /app/ctm-cache
@@ -72,9 +72,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: ${API_MEMORY_LIMIT:-256M}
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:${API_INTERNAL_PORT:-3000}/health/live"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -84,12 +84,17 @@ services:
       - traefik-network
     labels:
       traefik.enable: "true"
-      traefik.docker.network: "traefik-network"
-      traefik.http.routers.starvis-api-docs.rule: "Host(`starvis.ampynjord.bzh`) && PathPrefix(`/api-docs`)"
+      traefik.docker.network: "${TRAEFIK_NETWORK:-traefik-network}"
+      traefik.http.routers.starvis-api-docs.rule: "Host(`${DOMAIN}`) && PathPrefix(`/api-docs`)"
       traefik.http.routers.starvis-api-docs.entrypoints: "websecure"
-      traefik.http.routers.starvis-api-docs.tls.certresolver: "letsencrypt"
+      traefik.http.routers.starvis-api-docs.tls.certresolver: "${TRAEFIK_CERT_RESOLVER:-letsencrypt}"
       traefik.http.routers.starvis-api-docs.priority: "100"
-      traefik.http.services.starvis-api-docs.loadbalancer.server.port: "3000"
+      traefik.http.services.starvis-api-docs.loadbalancer.server.port: "${API_INTERNAL_PORT:-3000}"
+      traefik.http.routers.starvis-api.rule: "Host(`${DOMAIN}`) && PathPrefix(`/api`, `/health`, `/admin`)"
+      traefik.http.routers.starvis-api.entrypoints: "websecure"
+      traefik.http.routers.starvis-api.tls.certresolver: "${TRAEFIK_CERT_RESOLVER:-letsencrypt}"
+      traefik.http.routers.starvis-api.priority: "90"
+      traefik.http.services.starvis-api.loadbalancer.server.port: "${API_INTERNAL_PORT:-3000}"
     depends_on:
       mysql:
         condition: service_healthy
@@ -97,16 +102,13 @@ services:
         condition: service_healthy
 
   ihm:
-    image: ghcr.io/ampynjord/starvis-ihm:latest
-    container_name: starvis-ihm
-    environment:
-      API_URL: http://api:3000
+    image: ${IHM_IMAGE:-ghcr.io/ampynjord/starvis-ihm:latest}
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-ihm
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 256M
-    # 127.0.0.1 explicite : Alpine résout localhost en IPv6
+          memory: ${IHM_MEMORY_LIMIT:-128M}
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/"]
       interval: 30s
@@ -120,26 +122,26 @@ services:
       - traefik-network
     labels:
       traefik.enable: "true"
-      traefik.docker.network: "traefik-network"
-      traefik.http.routers.starvis-ihm.rule: "Host(`starvis.ampynjord.bzh`)"
+      traefik.docker.network: "${TRAEFIK_NETWORK:-traefik-network}"
+      traefik.http.routers.starvis-ihm.rule: "Host(`${DOMAIN}`)"
       traefik.http.routers.starvis-ihm.entrypoints: "websecure"
-      traefik.http.routers.starvis-ihm.tls.certresolver: "letsencrypt"
+      traefik.http.routers.starvis-ihm.tls.certresolver: "${TRAEFIK_CERT_RESOLVER:-letsencrypt}"
       traefik.http.services.starvis-ihm.loadbalancer.server.port: "8080"
 
   bot:
-    build:
-      context: ./bot
-    container_name: starvis-bot
+    image: ${BOT_IMAGE:-ghcr.io/ampynjord/starvis-bot:latest}
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-bot
     environment:
       DISCORD_TOKEN: ${DISCORD_TOKEN}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
       DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
-      API_URL: http://api:3000
+      API_URL: http://${COMPOSE_PROJECT_NAME:-starvis}-api:${API_INTERNAL_PORT:-3000}
+      SITE_URL: https://${DOMAIN}
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 128M
+          memory: ${BOT_MEMORY_LIMIT:-128M}
     depends_on:
       api:
         condition: service_healthy
@@ -152,3 +154,4 @@ volumes:
 networks:
   traefik-network:
     external: true
+    name: ${TRAEFIK_NETWORK:-traefik-network}

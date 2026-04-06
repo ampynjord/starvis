@@ -1,0 +1,163 @@
+/**
+ * RsiWebsiteService — Queries the rsi_website database.
+ *
+ * Contains data scraped from the RSI website and SC Wiki API:
+ *   - galactapedia     (lore encyclopedia)
+ *   - starmap_locations (RSI web starmap, distinct from in-game)
+ *   - comm_links       (RSI communications / news)
+ */
+import type { PrismaLike as PrismaClient } from '@starvis/db';
+import type { PaginatedResult, Row } from './shared.js';
+
+export class RsiWebsiteService {
+  constructor(private prisma: PrismaClient) {}
+
+  // ── Galactapedia ───────────────────────────────────────────────────────────
+
+  async getGalactapediaEntries(opts: {
+    search?: string;
+    category?: string;
+    page?: number;
+    limit?: number;
+  } = {}): Promise<PaginatedResult> {
+    const where: string[] = [];
+    const params: (string | number)[] = [];
+
+    if (opts.search) {
+      where.push('(g.title LIKE ? OR g.excerpt LIKE ?)');
+      const t = `%${opts.search}%`;
+      params.push(t, t);
+    }
+    if (opts.category) {
+      where.push('JSON_CONTAINS(g.categories, JSON_QUOTE(?))');
+      params.push(opts.category);
+    }
+
+    const w = where.length ? ` WHERE ${where.join(' AND ')}` : '';
+    const page = Math.max(1, opts.page || 1);
+    const limit = Math.min(100, Math.max(1, opts.limit || 20));
+    const offset = (page - 1) * limit;
+
+    const countRows = await this.prisma.$queryRawUnsafe<Row[]>(`SELECT COUNT(*) as total FROM galactapedia g${w}`, ...params);
+    const total = Number(countRows[0]?.total) || 0;
+
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+      `SELECT g.id, g.slug, g.title, g.excerpt, g.categories, g.tags, g.thumbnail_url, g.rsi_url, g.updated_at
+       FROM galactapedia g${w} ORDER BY g.title LIMIT ${limit} OFFSET ${offset}`,
+      ...params,
+    );
+    return { data: rows, total, page, limit, pages: Math.ceil(total / limit) };
+  }
+
+  async getGalactapediaEntry(id: string): Promise<Row | null> {
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+      `SELECT * FROM galactapedia WHERE id = ? OR slug = ? LIMIT 1`,
+      id,
+      id,
+    );
+    return rows[0] ?? null;
+  }
+
+  // ── Comm-links ─────────────────────────────────────────────────────────────
+
+  async getCommLinks(opts: {
+    search?: string;
+    category?: string;
+    page?: number;
+    limit?: number;
+  } = {}): Promise<PaginatedResult> {
+    const where: string[] = [];
+    const params: (string | number)[] = [];
+
+    if (opts.search) {
+      where.push('(cl.title LIKE ? OR cl.excerpt LIKE ?)');
+      const t = `%${opts.search}%`;
+      params.push(t, t);
+    }
+    if (opts.category) {
+      where.push('cl.category = ?');
+      params.push(opts.category);
+    }
+
+    const w = where.length ? ` WHERE ${where.join(' AND ')}` : '';
+    const page = Math.max(1, opts.page || 1);
+    const limit = Math.min(100, Math.max(1, opts.limit || 20));
+    const offset = (page - 1) * limit;
+
+    const countRows = await this.prisma.$queryRawUnsafe<Row[]>(`SELECT COUNT(*) as total FROM comm_links cl${w}`, ...params);
+    const total = Number(countRows[0]?.total) || 0;
+
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+      `SELECT cl.id, cl.rsi_id, cl.slug, cl.title, cl.excerpt, cl.category, cl.thumbnail_url, cl.rsi_url, cl.published_at
+       FROM comm_links cl${w} ORDER BY cl.published_at DESC LIMIT ${limit} OFFSET ${offset}`,
+      ...params,
+    );
+    return { data: rows, total, page, limit, pages: Math.ceil(total / limit) };
+  }
+
+  async getCommLink(id: string): Promise<Row | null> {
+    const isNumeric = /^\d+$/.test(id);
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+      isNumeric
+        ? `SELECT * FROM comm_links WHERE id = ? LIMIT 1`
+        : `SELECT * FROM comm_links WHERE slug = ? OR rsi_id = ? LIMIT 1`,
+      ...(isNumeric ? [parseInt(id, 10)] : [id, id]),
+    );
+    return rows[0] ?? null;
+  }
+
+  async getCommLinkCategories(): Promise<string[]> {
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+      `SELECT DISTINCT category FROM comm_links WHERE category IS NOT NULL ORDER BY category`,
+    );
+    return rows.map((r) => String(r.category));
+  }
+
+  // ── Starmap (RSI web version) ──────────────────────────────────────────────
+
+  async getStarmapSystems(opts: {
+    search?: string;
+    page?: number;
+    limit?: number;
+  } = {}): Promise<PaginatedResult> {
+    const where: string[] = ["sl.type = 'star'"];
+    const params: (string | number)[] = [];
+
+    if (opts.search) {
+      where.push('(sl.name LIKE ? OR sl.system_name LIKE ?)');
+      const t = `%${opts.search}%`;
+      params.push(t, t);
+    }
+
+    const w = ` WHERE ${where.join(' AND ')}`;
+    const page = Math.max(1, opts.page || 1);
+    const limit = Math.min(100, Math.max(1, opts.limit || 20));
+    const offset = (page - 1) * limit;
+
+    const countRows = await this.prisma.$queryRawUnsafe<Row[]>(`SELECT COUNT(*) as total FROM starmap_locations sl${w}`, ...params);
+    const total = Number(countRows[0]?.total) || 0;
+
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+      `SELECT sl.id, sl.rsi_id, sl.name, sl.system_code, sl.faction_name, sl.affiliations,
+              sl.thumbnail, sl.description, sl.coordinates, sl.jump_points
+       FROM starmap_locations sl${w} ORDER BY sl.name LIMIT ${limit} OFFSET ${offset}`,
+      ...params,
+    );
+    return { data: rows, total, page, limit, pages: Math.ceil(total / limit) };
+  }
+
+  async getStarmapSystem(codeOrId: string): Promise<Row | null> {
+    const rows = await this.prisma.$queryRawUnsafe<Row[]>(
+      `SELECT sl.*, (
+        SELECT JSON_ARRAYAGG(JSON_OBJECT('id', c.id, 'name', c.name, 'type', c.type, 'rsi_id', c.rsi_id))
+        FROM starmap_locations c WHERE c.system_code = sl.system_code AND c.type != 'star'
+       ) as children
+       FROM starmap_locations sl
+       WHERE (sl.system_code = ? OR sl.rsi_id = ?) AND sl.type = 'star'
+       LIMIT 1`,
+      codeOrId.toUpperCase(),
+      codeOrId,
+    );
+    return rows[0] ?? null;
+  }
+}

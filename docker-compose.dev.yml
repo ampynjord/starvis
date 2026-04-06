@@ -1,16 +1,16 @@
 # ============================================================
 # STARVIS — Développement local (hot reload)
 # Usage : docker compose -f docker-compose.dev.yml --env-file .env.dev up
-# L'API et l'IHM se rechargent automatiquement à chaque modification source.
+# Toutes les valeurs configurables via .env.dev (voir .env.dev.example)
 # ============================================================
 
 services:
   mysql:
-    image: mysql:8.0
-    container_name: starvis-mysql
+    image: ${MYSQL_IMAGE:-mysql:8.0}
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-mysql
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: starvis
+      MYSQL_DATABASE: ${DB_NAME:-starvis}
       MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${DB_PASSWORD}
     ports:
@@ -26,8 +26,8 @@ services:
       retries: 5
 
   redis:
-    image: redis:7-alpine
-    container_name: starvis-redis
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-redis
     ports:
       - "${REDIS_EXTERNAL_PORT:-6379}:6379"
     volumes:
@@ -43,11 +43,9 @@ services:
   api:
     build:
       context: .
-      dockerfile: apps/api/Dockerfile
+      dockerfile: api/Dockerfile
       target: development
-    container_name: starvis-api
-    # Sources montées → tsx watch recharge à chaque modification
-    # node_modules dans un named volume pour ne pas être écrasé par le montage ./api
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-api
     volumes:
       - ./:/app
       - api_node_modules:/app/node_modules
@@ -61,7 +59,7 @@ services:
       DB_PORT: 3306
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: starvis
+      DB_NAME: ${DB_NAME:-starvis}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       ADMIN_API_KEY: ${ADMIN_API_KEY}
@@ -85,17 +83,15 @@ services:
 
   ihm:
     image: node:22-alpine
-    container_name: starvis-ihm
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-ihm
     working_dir: /app
-    # Source montée en volume → Vite HMR recharge le navigateur à chaque modification
     volumes:
       - ./:/app
       - ihm_node_modules:/app/node_modules
-    command: sh -c "npm install --prefer-offline && npm run dev --workspace=starvis-ihm -- -p 5173 -H 0.0.0.0"
+    command: sh -c "npm install --prefer-offline && npm run dev --workspace=ihm -- -p 5173 -H 0.0.0.0"
     ports:
       - "${IHM_DEV_PORT:-5173}:5173"
     environment:
-      # Le proxy Vite forward /api vers le service 'api' interne Docker
       VITE_API_URL: http://api:3000
       # Nécessaire sur Windows : Docker Desktop ne propage pas inotify vers le conteneur
       CHOKIDAR_USEPOLLING: "true"
@@ -107,17 +103,18 @@ services:
 
   bot:
     image: node:22-alpine
-    container_name: starvis-bot
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-bot
     working_dir: /app
     volumes:
       - ./:/app
       - bot_node_modules:/app/node_modules
     command: sh -c "npm install --prefer-offline --silent && npm run dev --workspace=@starvis/bot"
     environment:
-      DISCORD_TOKEN: ${DISCORD_TOKEN}
-      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      DISCORD_TOKEN: ${DISCORD_TOKEN:-}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
       DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
       API_URL: http://api:3000
+      SITE_URL: ${SITE_URL:-http://localhost:5173}
     depends_on:
       api:
         condition: service_healthy

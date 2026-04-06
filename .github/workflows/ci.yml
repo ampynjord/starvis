@@ -39,23 +39,48 @@ jobs:
       - name: Install dependencies (Workspaces)
         run: npm ci
 
-      - name: Generate DB Client
+      - name: Generate DB Clients
         run: npm run db:generate
 
-      - name: Apply DB Schema
+      - name: Apply DB Schemas
         run: |
-          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/starvis" npm run db:push
-          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/live" npm run db:push
-          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/ptu" npm run db:push
+          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/live"        npm run generate:game --workspace=@starvis/db
+          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/ptu"         npm run push:game --workspace=@starvis/db
+          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/live"        npm run push:game --workspace=@starvis/db
+          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/starvis"     npm run push:starvis --workspace=@starvis/db
+          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/rsi_website" npm run push:rsi --workspace=@starvis/db
 
       - name: Lint workspace packages
         run: npm run lint
 
-      - name: Run Tests
-        run: npm run test
+      - name: Run Tests with coverage
+        run: npm run test -- --coverage
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: ci_user
+          DB_PASSWORD: ci_password
+          DB_NAME: starvis
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+          NODE_ENV: test
 
-      - name: Type-check API & Extractor
-        run: npm run typecheck --workspace=apps/api && npx tsc --noEmit --project apps/extractor/tsconfig.json
+      - name: Type-check API
+        run: npm run typecheck --workspace=api
+
+      - name: Type-check Extractor
+        run: npx tsc --noEmit --project extractor/tsconfig.json
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage
+          path: |
+            api/coverage/
+            extractor/coverage/
+            ihm/coverage/
+          retention-days: 7
 
   build:
     name: Build Docker images
@@ -91,26 +116,30 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: apps/api/Dockerfile
+          file: api/Dockerfile
           push: true
           tags: ghcr.io/${{ github.repository }}-api:${{ github.sha }},ghcr.io/${{ github.repository }}-api:latest
           target: production
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Build and Push IHM
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: apps/ihm/Dockerfile
+          file: ihm/Dockerfile
           push: true
           tags: ghcr.io/${{ github.repository }}-ihm:${{ github.sha }},ghcr.io/${{ github.repository }}-ihm:latest
           target: production
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
     needs: build
-    
+
     steps:
       - name: Skip unless main
         if: github.event_name != 'push' || github.ref != 'refs/heads/main'

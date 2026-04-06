@@ -1,0 +1,1690 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Starvis API",
+    "version": "1.0.0",
+    "description": "Star Citizen Ships, Components, Items & Game Data API.\n\nData sources:\n- **P4K game data** (ships, components, items, commodities, shops, missions, mining, crafting, locations)\n- **RSI Website** (ship matrix, galactapedia, comm-links, starmap)\n\n### Authentication\nMost endpoints are public. Admin endpoints require an `X-API-Key` header.\n\n### Pagination\nAll list endpoints support `page` and `limit` query parameters and return `{ data, total, page, limit, pages }`.\n\n### Filters\nEvery domain has a `/filters` endpoint returning `{ filters: { fieldName: [{ value, label, count? }] } }`."
+  },
+  "components": {
+    "securitySchemes": {
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      }
+    },
+    "parameters": {
+      "page": { "name": "page", "in": "query", "schema": { "type": "integer", "default": 1, "minimum": 1 }, "description": "Page number" },
+      "limit": { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 20, "minimum": 1, "maximum": 200 }, "description": "Items per page" },
+      "search": { "name": "search", "in": "query", "schema": { "type": "string" }, "description": "Full-text search query" },
+      "format": { "name": "format", "in": "query", "schema": { "type": "string", "enum": ["json", "csv"] }, "description": "Response format" },
+      "sort": { "name": "sort", "in": "query", "schema": { "type": "string" }, "description": "Field to sort by (supports dot-notation for JSON fields, e.g. `game_data.scm_speed`)" },
+      "order": { "name": "order", "in": "query", "schema": { "type": "string", "enum": ["asc", "desc"], "default": "asc" }, "description": "Sort direction" },
+      "env": { "name": "env", "in": "query", "schema": { "type": "string", "enum": ["live", "ptu"], "default": "live" }, "description": "Game environment" }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": ["success", "error"],
+        "properties": {
+          "success": { "type": "boolean", "example": false },
+          "error": { "type": "string", "example": "Not found" }
+        }
+      },
+      "FilterOption": {
+        "type": "object",
+        "required": ["value", "label"],
+        "properties": {
+          "value": { "type": "string" },
+          "label": { "type": "string" },
+          "count": { "type": "integer", "description": "Number of matching records (when available)" }
+        }
+      },
+      "FiltersResult": {
+        "type": "object",
+        "required": ["success", "filters"],
+        "properties": {
+          "success": { "type": "boolean", "example": true },
+          "filters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/FilterOption" }
+            },
+            "example": {
+              "manufacturer": [{ "value": "AEGS", "label": "Aegis Dynamics", "count": 22 }],
+              "career": [{ "value": "Combat", "label": "Combat", "count": 45 }]
+            }
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "required": ["total", "page", "limit", "pages"],
+        "properties": {
+          "total": { "type": "integer", "description": "Total number of matching records" },
+          "page": { "type": "integer" },
+          "limit": { "type": "integer" },
+          "pages": { "type": "integer", "description": "Total number of pages" }
+        }
+      },
+      "Ship": {
+        "type": "object",
+        "properties": {
+          "uuid": { "type": "string", "format": "uuid" },
+          "class_name": { "type": "string", "example": "AEGS_Gladius" },
+          "name": { "type": "string", "example": "Gladius" },
+          "manufacturer_code": { "type": "string", "example": "AEGS" },
+          "manufacturer_name": { "type": "string", "example": "Aegis Dynamics" },
+          "career": { "type": "string", "example": "Combat" },
+          "role": { "type": "string", "example": "Light Fighter" },
+          "vehicle_category": { "type": "string", "enum": ["ship", "ground", "gravlev"] },
+          "variant_type": { "type": "string", "nullable": true },
+          "affiliation": { "type": "string", "nullable": true, "description": "Political affiliation (UEE, Hurston, etc.)" },
+          "mass": { "type": "number", "nullable": true },
+          "total_hp": { "type": "number", "nullable": true },
+          "size_x": { "type": "number", "nullable": true, "description": "Beam (m)" },
+          "size_y": { "type": "number", "nullable": true, "description": "Length (m)" },
+          "size_z": { "type": "number", "nullable": true, "description": "Height (m)" },
+          "scm_speed": { "type": "number", "nullable": true, "description": "SCM speed (m/s)" },
+          "max_speed": { "type": "number", "nullable": true, "description": "Max speed (m/s)" },
+          "boost_speed_forward": { "type": "number", "nullable": true },
+          "cargo_capacity": { "type": "number", "nullable": true, "description": "Cargo capacity (SCU)" },
+          "crew_size": { "type": "integer", "nullable": true },
+          "shield_hp": { "type": "number", "nullable": true },
+          "missile_damage_total": { "type": "number", "nullable": true },
+          "weapon_damage_total": { "type": "number", "nullable": true },
+          "hydrogen_fuel_capacity": { "type": "number", "nullable": true },
+          "quantum_fuel_capacity": { "type": "number", "nullable": true },
+          "ctm_url": { "type": "string", "nullable": true, "description": "3D model URL (.ctm)" },
+          "game_data": { "type": "object", "nullable": true, "description": "Raw JSON game data from P4K" },
+          "status": { "type": "string", "enum": ["flight-ready", "in-concept", "in-production", "in-game-only"], "nullable": true },
+          "ship_matrix_id": { "type": "integer", "nullable": true },
+          "chassis_id": { "type": "integer", "nullable": true },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "ShipDetail": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Ship" },
+          {
+            "type": "object",
+            "properties": {
+              "manufacturer": { "$ref": "#/components/schemas/Manufacturer" },
+              "paints": { "type": "array", "items": { "$ref": "#/components/schemas/Paint" } },
+              "similar": { "type": "array", "items": { "$ref": "#/components/schemas/Ship" } },
+              "matrix": { "$ref": "#/components/schemas/ShipMatrixEntry" }
+            }
+          }
+        ]
+      },
+      "Component": {
+        "type": "object",
+        "properties": {
+          "uuid": { "type": "string", "format": "uuid" },
+          "class_name": { "type": "string" },
+          "name": { "type": "string" },
+          "type": { "type": "string", "example": "WeaponGun" },
+          "sub_type": { "type": "string", "nullable": true },
+          "size": { "type": "integer", "nullable": true },
+          "grade": { "type": "string", "nullable": true },
+          "manufacturer_code": { "type": "string", "nullable": true },
+          "manufacturer_name": { "type": "string", "nullable": true },
+          "damage_physical": { "type": "number", "nullable": true },
+          "damage_energy": { "type": "number", "nullable": true },
+          "dps_physical": { "type": "number", "nullable": true },
+          "dps_energy": { "type": "number", "nullable": true },
+          "shield_hp": { "type": "number", "nullable": true },
+          "shield_regen_rate": { "type": "number", "nullable": true },
+          "quantum_speed": { "type": "number", "nullable": true },
+          "quantum_range": { "type": "number", "nullable": true },
+          "game_data": { "type": "object", "nullable": true }
+        }
+      },
+      "Item": {
+        "type": "object",
+        "properties": {
+          "uuid": { "type": "string", "format": "uuid" },
+          "class_name": { "type": "string" },
+          "name": { "type": "string" },
+          "type": { "type": "string", "example": "Weapon_Personal" },
+          "sub_type": { "type": "string", "nullable": true },
+          "manufacturer_code": { "type": "string", "nullable": true },
+          "manufacturer_name": { "type": "string", "nullable": true },
+          "description": { "type": "string", "nullable": true },
+          "game_data": { "type": "object", "nullable": true }
+        }
+      },
+      "Commodity": {
+        "type": "object",
+        "properties": {
+          "uuid": { "type": "string", "format": "uuid" },
+          "class_name": { "type": "string" },
+          "name": { "type": "string" },
+          "type": { "type": "string", "example": "Metal" },
+          "sub_type": { "type": "string", "nullable": true },
+          "description": { "type": "string", "nullable": true },
+          "is_illegal": { "type": "boolean" },
+          "is_raw": { "type": "boolean" },
+          "buy_price_avg": { "type": "number", "nullable": true },
+          "sell_price_avg": { "type": "number", "nullable": true }
+        }
+      },
+      "Paint": {
+        "type": "object",
+        "properties": {
+          "uuid": { "type": "string", "format": "uuid" },
+          "class_name": { "type": "string" },
+          "name": { "type": "string" },
+          "ship_uuid": { "type": "string", "format": "uuid", "nullable": true },
+          "ship_name": { "type": "string", "nullable": true },
+          "thumbnail_url": { "type": "string", "nullable": true }
+        }
+      },
+      "Manufacturer": {
+        "type": "object",
+        "properties": {
+          "code": { "type": "string", "example": "AEGS" },
+          "name": { "type": "string", "example": "Aegis Dynamics" },
+          "description": { "type": "string", "nullable": true },
+          "logo_url": { "type": "string", "nullable": true }
+        }
+      },
+      "Shop": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "class_name": { "type": "string" },
+          "shop_type": { "type": "string", "example": "WeaponShop" },
+          "location_id": { "type": "integer", "nullable": true },
+          "location_name": { "type": "string", "nullable": true },
+          "system_name": { "type": "string", "nullable": true }
+        }
+      },
+      "ShopDetail": {
+        "allOf": [
+          { "$ref": "#/components/schemas/Shop" },
+          {
+            "type": "object",
+            "properties": {
+              "inventory": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "item_uuid": { "type": "string", "format": "uuid" },
+                    "item_name": { "type": "string" },
+                    "item_type": { "type": "string" },
+                    "buy_price": { "type": "number", "nullable": true },
+                    "sell_price": { "type": "number", "nullable": true },
+                    "rent_price_1d": { "type": "number", "nullable": true },
+                    "rent_price_3d": { "type": "number", "nullable": true },
+                    "rent_price_7d": { "type": "number", "nullable": true },
+                    "rent_price_30d": { "type": "number", "nullable": true }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "Location": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "class_name": { "type": "string" },
+          "name": { "type": "string" },
+          "type": { "type": "string", "example": "SpaceStation" },
+          "system_name": { "type": "string", "nullable": true },
+          "parent_id": { "type": "integer", "nullable": true },
+          "is_available": { "type": "boolean" },
+          "affiliation": { "type": "string", "nullable": true, "description": "Political affiliation (UEE, Hurston, Outlaw, etc.)" }
+        }
+      },
+      "Mission": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "class_name": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string", "nullable": true },
+          "mission_type": { "type": "string", "nullable": true },
+          "faction": { "type": "string", "nullable": true },
+          "is_lawful": { "type": "boolean" },
+          "reward_aUEC": { "type": "number", "nullable": true },
+          "reward_reputation": { "type": "number", "nullable": true }
+        }
+      },
+      "MiningElement": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "class_name": { "type": "string" },
+          "name": { "type": "string" },
+          "symbol": { "type": "string", "nullable": true },
+          "percentage_min": { "type": "number", "nullable": true },
+          "percentage_max": { "type": "number", "nullable": true },
+          "sell_price": { "type": "number", "nullable": true }
+        }
+      },
+      "MiningComposition": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "class_name": { "type": "string" },
+          "name": { "type": "string" },
+          "instability": { "type": "number", "nullable": true },
+          "resistance": { "type": "number", "nullable": true },
+          "parts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "element_name": { "type": "string" },
+                "percentage": { "type": "number" }
+              }
+            }
+          }
+        }
+      },
+      "CraftingRecipe": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "output_item_name": { "type": "string" },
+          "output_item_uuid": { "type": "string", "format": "uuid", "nullable": true },
+          "output_quantity": { "type": "integer" },
+          "crafting_time_sec": { "type": "number", "nullable": true },
+          "station_type": { "type": "string", "nullable": true },
+          "ingredients": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "item_name": { "type": "string" },
+                "quantity": { "type": "integer" }
+              }
+            }
+          }
+        }
+      },
+      "ShipMatrixEntry": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "name": { "type": "string" },
+          "manufacturer": { "type": "string" },
+          "focus": { "type": "string", "nullable": true },
+          "length": { "type": "number", "nullable": true },
+          "beam": { "type": "number", "nullable": true },
+          "height": { "type": "number", "nullable": true },
+          "cargocapacity": { "type": "number", "nullable": true },
+          "min_crew": { "type": "integer", "nullable": true },
+          "max_crew": { "type": "integer", "nullable": true },
+          "price_usd": { "type": "number", "nullable": true },
+          "url": { "type": "string", "nullable": true },
+          "synced_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "GameVersion": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "game_version": { "type": "string", "example": "4.0.1-LIVE.9893416" },
+          "game_env": { "type": "string", "enum": ["live", "ptu", "eptu", "custom"] },
+          "ships_count": { "type": "integer" },
+          "components_count": { "type": "integer" },
+          "items_count": { "type": "integer" },
+          "commodities_count": { "type": "integer" },
+          "status": { "type": "string" },
+          "extracted_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "GalactapediaEntry": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "slug": { "type": "string" },
+          "title": { "type": "string" },
+          "excerpt": { "type": "string", "nullable": true },
+          "content": { "type": "string", "nullable": true, "description": "Full article text (only on detail endpoint)" },
+          "categories": { "type": "array", "items": { "type": "string" }, "nullable": true },
+          "tags": { "type": "array", "items": { "type": "string" }, "nullable": true },
+          "thumbnail_url": { "type": "string", "nullable": true },
+          "rsi_url": { "type": "string" },
+          "updated_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "CommLink": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "rsi_id": { "type": "string" },
+          "slug": { "type": "string", "nullable": true },
+          "title": { "type": "string" },
+          "excerpt": { "type": "string", "nullable": true },
+          "content": { "type": "string", "nullable": true, "description": "Full article text (only on detail endpoint)" },
+          "category": { "type": "string", "nullable": true, "example": "Transmission" },
+          "thumbnail_url": { "type": "string", "nullable": true },
+          "rsi_url": { "type": "string" },
+          "published_at": { "type": "string", "format": "date-time", "nullable": true }
+        }
+      },
+      "StarmapSystem": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "rsi_id": { "type": "string" },
+          "name": { "type": "string" },
+          "system_code": { "type": "string", "nullable": true, "example": "SOL" },
+          "faction_name": { "type": "string", "nullable": true },
+          "affiliations": { "type": "array", "items": { "type": "string" }, "nullable": true },
+          "thumbnail": { "type": "string", "nullable": true },
+          "description": { "type": "string", "nullable": true },
+          "coordinates": {
+            "type": "object",
+            "nullable": true,
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" }
+            }
+          },
+          "jump_points": { "type": "array", "items": { "type": "string" }, "nullable": true }
+        }
+      },
+      "StarmapSystemDetail": {
+        "allOf": [
+          { "$ref": "#/components/schemas/StarmapSystem" },
+          {
+            "type": "object",
+            "properties": {
+              "children": {
+                "type": "array",
+                "description": "Celestial bodies (planets, moons, stations, jump points)",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "integer" },
+                    "rsi_id": { "type": "string" },
+                    "name": { "type": "string" },
+                    "type": { "type": "string", "example": "planet" }
+                  }
+                }
+              }
+            }
+          }
+        ]
+      },
+      "TradeRoute": {
+        "type": "object",
+        "properties": {
+          "commodity_name": { "type": "string" },
+          "commodity_uuid": { "type": "string", "format": "uuid" },
+          "buy_location": { "type": "string" },
+          "sell_location": { "type": "string" },
+          "buy_price": { "type": "number" },
+          "sell_price": { "type": "number" },
+          "profit_per_unit": { "type": "number" },
+          "profit_per_scu": { "type": "number" }
+        }
+      },
+      "SearchResult": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string", "enum": ["ship", "component", "item", "commodity", "location", "mission"] },
+          "uuid": { "type": "string" },
+          "name": { "type": "string" },
+          "class_name": { "type": "string" },
+          "manufacturer_name": { "type": "string", "nullable": true },
+          "score": { "type": "number", "description": "Relevance score" }
+        }
+      },
+      "LoadoutPort": {
+        "type": "object",
+        "properties": {
+          "port_name": { "type": "string" },
+          "port_type": { "type": "string" },
+          "size_min": { "type": "integer" },
+          "size_max": { "type": "integer" },
+          "equipped_uuid": { "type": "string", "format": "uuid", "nullable": true },
+          "equipped_name": { "type": "string", "nullable": true },
+          "children": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/LoadoutPort" }
+          }
+        }
+      }
+    },
+    "responses": {
+      "NotFound": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "description": "Game data not yet available (extractor hasn't run)",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Missing or invalid API key",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    { "name": "Ships", "description": "Ship database — game data + RSI Ship Matrix" },
+    { "name": "Components", "description": "Ship components (weapons, shields, drives, missiles, thrusters…)" },
+    { "name": "Items", "description": "FPS items (weapons, armor, clothing, gadgets, consumables)" },
+    { "name": "Commodities", "description": "Tradeable commodities (metals, minerals, food, contraband…)" },
+    { "name": "Paints", "description": "Ship paint/livery database" },
+    { "name": "Shops", "description": "In-game shops with inventory & prices" },
+    { "name": "Locations", "description": "In-game locations with political affiliations" },
+    { "name": "Missions", "description": "In-game missions (ContractTemplate)" },
+    { "name": "Mining", "description": "Mining elements, rock compositions and yield solver" },
+    { "name": "Trade", "description": "Commodity prices, trade routes and profit calculator" },
+    { "name": "Crafting", "description": "Crafting recipes, stations and categories" },
+    { "name": "Manufacturers", "description": "Ship & component manufacturers" },
+    { "name": "Ship Matrix", "description": "RSI Ship Matrix — official ship specs mirror" },
+    { "name": "Galactapedia", "description": "RSI Galactapedia lore encyclopedia (synced from SC Wiki)" },
+    { "name": "Comm-links", "description": "RSI Comm-links news articles (synced from SC Wiki)" },
+    { "name": "Starmap", "description": "RSI web starmap — star systems and celestial bodies" },
+    { "name": "Game Versions", "description": "Extraction history and game versions" },
+    { "name": "Loadout", "description": "Ship loadout simulator (DPS, shield, power aggregation)" },
+    { "name": "Search", "description": "Unified multi-entity cross-search" },
+    { "name": "Calculators", "description": "FPS damage and mining yield calculators" },
+    { "name": "Admin", "description": "Administrative endpoints (require X-API-Key)" },
+    { "name": "Health", "description": "Liveness, readiness probes and Prometheus metrics" }
+  ],
+  "paths": {
+    "/api/v1/ships": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "List ships",
+        "operationId": "getShips",
+        "parameters": [
+          { "$ref": "#/components/parameters/search" },
+          { "name": "manufacturer", "in": "query", "schema": { "type": "string" }, "description": "Manufacturer code (e.g. AEGS, RSI)" },
+          { "name": "career", "in": "query", "schema": { "type": "string" }, "description": "Career (Combat, Transport, …)" },
+          { "name": "role", "in": "query", "schema": { "type": "string" }, "description": "Role (Light Fighter, Medium Freight, …)" },
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["flight-ready", "in-concept", "in-production", "in-game-only"] } },
+          { "name": "vehicle_category", "in": "query", "schema": { "type": "string", "enum": ["ship", "ground", "gravlev"] } },
+          { "name": "variant_type", "in": "query", "schema": { "type": "string" } },
+          { "name": "include", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated relations: manufacturer, paints, similar, matrix" },
+          { "$ref": "#/components/parameters/sort" },
+          { "$ref": "#/components/parameters/order" },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" },
+          { "$ref": "#/components/parameters/format" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated ship list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "type": "object", "properties": { "success": { "type": "boolean" } } },
+                    { "$ref": "#/components/schemas/Pagination" },
+                    { "type": "object", "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/Ship" } } } }
+                  ]
+                }
+              }
+            }
+          },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/api/v1/ships/filters": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get ship filter values",
+        "operationId": "getShipFilters",
+        "description": "Returns distinct manufacturers, careers, roles, statuses and vehicle categories with counts.",
+        "responses": {
+          "200": {
+            "description": "Available filter values",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/FiltersResult" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ships/search": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Autocomplete ship search",
+        "operationId": "searchShipsAutocomplete",
+        "parameters": [
+          { "name": "search", "in": "query", "required": true, "schema": { "type": "string", "minLength": 2 } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 10, "maximum": 20 } }
+        ],
+        "responses": {
+          "200": { "description": "Matching ships (lightweight)", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Ship" } } } } } } },
+          "400": { "description": "Search query too short" }
+        }
+      }
+    },
+    "/api/v1/ships/random": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get a random ship",
+        "operationId": "getRandomShip",
+        "responses": { "200": { "description": "Random ship" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/v1/ships/manufacturers": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get manufacturers with ships",
+        "operationId": "getShipManufacturers",
+        "parameters": [{ "$ref": "#/components/parameters/format" }],
+        "responses": { "200": { "description": "Manufacturer list with ship count" } }
+      }
+    },
+    "/api/v1/ships/{uuid}": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get ship by UUID or class_name",
+        "operationId": "getShipByUuid",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Ship UUID or class_name" },
+          { "name": "include", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated relations: manufacturer, paints, similar, matrix" }
+        ],
+        "responses": {
+          "200": { "description": "Ship details", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/ShipDetail" } } } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/ships/{uuid}/loadout": {
+      "get": {
+        "tags": ["Loadout"],
+        "summary": "Get ship loadout (component tree)",
+        "operationId": "getShipLoadout",
+        "description": "Returns recursive port tree with resolved components (turret→gimbal→weapon, etc.)",
+        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Hierarchical loadout tree", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/LoadoutPort" } } } } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/ships/{uuid}/modules": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get ship modules (Retaliator, Apollo, etc.)",
+        "operationId": "getShipModules",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/format" }
+        ],
+        "responses": { "200": { "description": "Module list" } }
+      }
+    },
+    "/api/v1/ships/{uuid}/paints": {
+      "get": {
+        "tags": ["Paints"],
+        "summary": "Get paints for a ship",
+        "operationId": "getShipPaints",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/format" }
+        ],
+        "responses": { "200": { "description": "Paint list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Paint" } } } } } } } }
+      }
+    },
+    "/api/v1/ships/{uuid}/stats": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get aggregated ship stats",
+        "operationId": "getShipStats",
+        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Aggregated weapon DPS, shield HP, power draw, cooling" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/v1/ships/{uuid}/hardpoints": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get ship hardpoints",
+        "operationId": "getShipHardpoints",
+        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Hardpoint/port list (type, size, equipped component)" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/v1/ships/{uuid}/similar": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get similar ships",
+        "operationId": "getSimilarShips",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 5, "maximum": 10 } }
+        ],
+        "responses": { "200": { "description": "Ships with same role/career" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/v1/ships/{uuid}/compare/{uuid2}": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Compare two ships",
+        "operationId": "compareShips",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "uuid2", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Side-by-side comparison of both ships" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/v1/ships/ranking": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get ship rankings",
+        "operationId": "getShipRanking",
+        "parameters": [
+          { "name": "metric", "in": "query", "schema": { "type": "string" }, "description": "Ranking metric (scm_speed, cargo_capacity, shield_hp, …)" },
+          { "name": "career", "in": "query", "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/limit" }
+        ],
+        "responses": { "200": { "description": "Ranked ship list" } }
+      }
+    },
+    "/api/v1/components": {
+      "get": {
+        "tags": ["Components"],
+        "summary": "List components",
+        "operationId": "getComponents",
+        "parameters": [
+          { "$ref": "#/components/parameters/search" },
+          { "name": "type", "in": "query", "schema": { "type": "string" }, "description": "Component type (WeaponGun, Shield, QuantumDrive, …)" },
+          { "name": "sub_type", "in": "query", "schema": { "type": "string" } },
+          { "name": "size", "in": "query", "schema": { "type": "integer" } },
+          { "name": "grade", "in": "query", "schema": { "type": "string" } },
+          { "name": "manufacturer", "in": "query", "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/sort" },
+          { "$ref": "#/components/parameters/order" },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" },
+          { "$ref": "#/components/parameters/format" }
+        ],
+        "responses": { "200": { "description": "Paginated component list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Component" } }, "total": { "type": "integer" }, "page": { "type": "integer" }, "pages": { "type": "integer" } } } } } } }
+      }
+    },
+    "/api/v1/components/compatible": {
+      "get": {
+        "tags": ["Components"],
+        "summary": "List compatible components by type and size",
+        "operationId": "getCompatibleComponents",
+        "parameters": [
+          { "$ref": "#/components/parameters/env" },
+          { "name": "type", "in": "query", "schema": { "type": "string" }, "description": "Component type" },
+          { "name": "min_size", "in": "query", "schema": { "type": "integer" } },
+          { "name": "max_size", "in": "query", "schema": { "type": "integer" } },
+          { "$ref": "#/components/parameters/search" },
+          { "$ref": "#/components/parameters/sort" },
+          { "$ref": "#/components/parameters/order" },
+          { "$ref": "#/components/parameters/limit" }
+        ],
+        "responses": { "200": { "description": "Compatible component list" } }
+      }
+    },
+    "/api/v1/components/types": {
+      "get": {
+        "tags": ["Components"],
+        "summary": "List component types",
+        "operationId": "getComponentTypes",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Available component types" } }
+      }
+    },
+    "/api/v1/components/filters": {
+      "get": {
+        "tags": ["Components"],
+        "summary": "Get component filter values",
+        "operationId": "getComponentFilters",
+        "responses": { "200": { "description": "Available filter values", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } } } }
+      }
+    },
+    "/api/v1/components/{uuid}": {
+      "get": {
+        "tags": ["Components"],
+        "summary": "Get component by UUID or class_name",
+        "operationId": "getComponentByUuid",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "include", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated: manufacturer" }
+        ],
+        "responses": {
+          "200": { "description": "Component details", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/Component" } } } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/components/{uuid}/buy-locations": {
+      "get": {
+        "tags": ["Components"],
+        "summary": "Where to buy a component",
+        "operationId": "getComponentBuyLocations",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": { "200": { "description": "Buy locations list" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/v1/components/{uuid}/ships": {
+      "get": {
+        "tags": ["Components"],
+        "summary": "Ships that equip a given component",
+        "operationId": "getComponentShips",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": { "200": { "description": "Ships list" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/v1/items": {
+      "get": {
+        "tags": ["Items"],
+        "summary": "List FPS items",
+        "operationId": "getItems",
+        "parameters": [
+          { "$ref": "#/components/parameters/search" },
+          { "name": "type", "in": "query", "schema": { "type": "string" }, "description": "Item type (Weapon_Personal, Char_Armor_Helmet, …)" },
+          { "name": "sub_type", "in": "query", "schema": { "type": "string" } },
+          { "name": "manufacturer", "in": "query", "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/sort" },
+          { "$ref": "#/components/parameters/order" },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" },
+          { "$ref": "#/components/parameters/format" }
+        ],
+        "responses": { "200": { "description": "Paginated item list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Item" } } } } } } } }
+      }
+    },
+    "/api/v1/items/types": {
+      "get": {
+        "tags": ["Items"],
+        "summary": "List item types",
+        "operationId": "getItemTypes",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Available item types" } }
+      }
+    },
+    "/api/v1/items/filters": {
+      "get": {
+        "tags": ["Items"],
+        "summary": "Get item filter values",
+        "operationId": "getItemFilters",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Available filter values", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } } } }
+      }
+    },
+    "/api/v1/items/sub-types": {
+      "get": {
+        "tags": ["Items"],
+        "summary": "List item sub-types for a given type",
+        "operationId": "getItemSubTypes",
+        "parameters": [
+          { "name": "type", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": { "200": { "description": "Sub-types for the requested type" } }
+      }
+    },
+    "/api/v1/items/manufacturers": {
+      "get": {
+        "tags": ["Items"],
+        "summary": "List manufacturers for a given item type",
+        "operationId": "getItemManufacturers",
+        "parameters": [
+          { "name": "type", "in": "query", "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": { "200": { "description": "Manufacturers list" } }
+      }
+    },
+    "/api/v1/items/categories": {
+      "get": {
+        "tags": ["Items"],
+        "summary": "Get item counts per semantic category",
+        "operationId": "getItemCategoryCounts",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Category → count map" } }
+      }
+    },
+    "/api/v1/items/category/{slug}": {
+      "get": {
+        "tags": ["Items"],
+        "summary": "Get items by semantic category slug",
+        "operationId": "getItemsByCategory",
+        "parameters": [
+          { "name": "slug", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Category slug (weapons, helmet, core, arms, legs, backpack, undersuit, tools-medics, magazines, attachments, clothing, other, throwable)" },
+          { "$ref": "#/components/parameters/env" },
+          { "$ref": "#/components/parameters/search" },
+          { "$ref": "#/components/parameters/sort" },
+          { "$ref": "#/components/parameters/order" },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" }
+        ],
+        "responses": { "200": { "description": "Items in the category" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/v1/items/{uuid}": {
+      "get": {
+        "tags": ["Items"],
+        "summary": "Get item by UUID or class_name",
+        "operationId": "getItemByUuid",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "include", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated: manufacturer" }
+        ],
+        "responses": {
+          "200": { "description": "Item details", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/Item" } } } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/items/{uuid}/buy-locations": {
+      "get": {
+        "tags": ["Items"],
+        "summary": "Where to buy an item",
+        "operationId": "getItemBuyLocations",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": { "200": { "description": "Buy locations list" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/v1/commodities": {
+      "get": {
+        "tags": ["Commodities"],
+        "summary": "List commodities",
+        "operationId": "getCommodities",
+        "parameters": [
+          { "$ref": "#/components/parameters/search" },
+          { "name": "type", "in": "query", "schema": { "type": "string" } },
+          { "name": "is_illegal", "in": "query", "schema": { "type": "boolean" } },
+          { "$ref": "#/components/parameters/sort" },
+          { "$ref": "#/components/parameters/order" },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" },
+          { "$ref": "#/components/parameters/format" }
+        ],
+        "responses": { "200": { "description": "Paginated commodity list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Commodity" } } } } } } } }
+      }
+    },
+    "/api/v1/commodities/types": {
+      "get": {
+        "tags": ["Commodities"],
+        "summary": "List commodity types",
+        "operationId": "getCommodityTypes",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Available commodity types" } }
+      }
+    },
+    "/api/v1/commodities/filters": {
+      "get": {
+        "tags": ["Commodities"],
+        "summary": "Get commodity filter values",
+        "operationId": "getCommodityFilters",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Available filter values", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } } } }
+      }
+    },
+    "/api/v1/commodities/{uuid}": {
+      "get": {
+        "tags": ["Commodities"],
+        "summary": "Get commodity by UUID or class_name",
+        "operationId": "getCommodityByUuid",
+        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Commodity details", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/Commodity" } } } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/paints": {
+      "get": {
+        "tags": ["Paints"],
+        "summary": "List all ship paints",
+        "operationId": "getPaints",
+        "parameters": [
+          { "name": "ship_uuid", "in": "query", "schema": { "type": "string" }, "description": "Filter by ship UUID" },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" },
+          { "$ref": "#/components/parameters/format" }
+        ],
+        "responses": { "200": { "description": "Paginated paint list" } }
+      }
+    },
+    "/api/v1/paints/filters": {
+      "get": {
+        "tags": ["Paints"],
+        "summary": "Get paint filter values",
+        "operationId": "getPaintFilters",
+        "description": "Returns ships that have paints available",
+        "responses": { "200": { "description": "Available filter values", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } } } }
+      }
+    },
+    "/api/v1/shops": {
+      "get": {
+        "tags": ["Shops"],
+        "summary": "List shops",
+        "operationId": "getShops",
+        "parameters": [
+          { "$ref": "#/components/parameters/search" },
+          { "name": "shop_type", "in": "query", "schema": { "type": "string" } },
+          { "name": "system", "in": "query", "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" }
+        ],
+        "responses": { "200": { "description": "Paginated shop list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Shop" } } } } } } } }
+      }
+    },
+    "/api/v1/shops/filters": {
+      "get": {
+        "tags": ["Shops"],
+        "summary": "Get shop filter values",
+        "operationId": "getShopFilters",
+        "responses": { "200": { "description": "Available filter values", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } } } }
+      }
+    },
+    "/api/v1/shops/{id}": {
+      "get": {
+        "tags": ["Shops"],
+        "summary": "Get shop details with inventory",
+        "operationId": "getShopById",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": {
+          "200": { "description": "Shop details with full inventory", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/ShopDetail" } } } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/locations": {
+      "get": {
+        "tags": ["Locations"],
+        "summary": "List locations",
+        "operationId": "getLocations",
+        "parameters": [
+          { "$ref": "#/components/parameters/search" },
+          { "name": "type", "in": "query", "schema": { "type": "string" }, "description": "Location type (SpaceStation, Planet, Moon, …)" },
+          { "name": "system", "in": "query", "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" }
+        ],
+        "responses": { "200": { "description": "Paginated location list with political affiliations", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Location" } } } } } } } }
+      }
+    },
+    "/api/v1/locations/filters": {
+      "get": {
+        "tags": ["Locations"],
+        "summary": "Get location filter values",
+        "operationId": "getLocationFilters",
+        "responses": { "200": { "description": "Available filter values", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } } } }
+      }
+    },
+    "/api/v1/locations/{id}": {
+      "get": {
+        "tags": ["Locations"],
+        "summary": "Get location by ID or class_name",
+        "operationId": "getLocationById",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Location ID or class_name" }],
+        "responses": {
+          "200": { "description": "Location details with political affiliation", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/Location" } } } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/locations/{id}/children": {
+      "get": {
+        "tags": ["Locations"],
+        "summary": "Get child locations",
+        "operationId": "getLocationChildren",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": { "200": { "description": "Child locations list" } }
+      }
+    },
+    "/api/v1/missions": {
+      "get": {
+        "tags": ["Missions"],
+        "summary": "List missions",
+        "operationId": "getMissions",
+        "parameters": [
+          { "$ref": "#/components/parameters/search" },
+          { "name": "mission_type", "in": "query", "schema": { "type": "string" } },
+          { "name": "faction", "in": "query", "schema": { "type": "string" } },
+          { "name": "is_lawful", "in": "query", "schema": { "type": "boolean" } },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" }
+        ],
+        "responses": { "200": { "description": "Paginated mission list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Mission" } } } } } } } }
+      }
+    },
+    "/api/v1/missions/filters": {
+      "get": {
+        "tags": ["Missions"],
+        "summary": "Get mission filter values",
+        "operationId": "getMissionFilters",
+        "responses": { "200": { "description": "Available filter values", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/FiltersResult" } } } } }
+      }
+    },
+    "/api/v1/missions/{id}": {
+      "get": {
+        "tags": ["Missions"],
+        "summary": "Get mission by ID",
+        "operationId": "getMissionById",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }],
+        "responses": {
+          "200": { "description": "Mission details" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/manufacturers": {
+      "get": {
+        "tags": ["Manufacturers"],
+        "summary": "List manufacturers",
+        "operationId": "getManufacturers",
+        "parameters": [
+          { "$ref": "#/components/parameters/search" },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" },
+          { "$ref": "#/components/parameters/format" }
+        ],
+        "responses": { "200": { "description": "Manufacturer list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/Manufacturer" } } } } } } } }
+      }
+    },
+    "/api/v1/manufacturers/{code}": {
+      "get": {
+        "tags": ["Manufacturers"],
+        "summary": "Get manufacturer by code",
+        "operationId": "getManufacturerByCode",
+        "parameters": [{ "name": "code", "in": "path", "required": true, "schema": { "type": "string" }, "example": "AEGS" }],
+        "responses": {
+          "200": { "description": "Manufacturer details" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/manufacturers/{code}/ships": {
+      "get": {
+        "tags": ["Manufacturers"],
+        "summary": "Ships made by a manufacturer",
+        "operationId": "getManufacturerShips",
+        "parameters": [
+          { "name": "code", "in": "path", "required": true, "schema": { "type": "string" }, "example": "AEGS" },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": { "200": { "description": "Ship list" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/v1/manufacturers/{code}/components": {
+      "get": {
+        "tags": ["Manufacturers"],
+        "summary": "Components made by a manufacturer",
+        "operationId": "getManufacturerComponents",
+        "parameters": [
+          { "name": "code", "in": "path", "required": true, "schema": { "type": "string" }, "example": "AEGS" },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": { "200": { "description": "Component list" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/v1/manufacturers/{code}/items": {
+      "get": {
+        "tags": ["Manufacturers"],
+        "summary": "FPS items made by a manufacturer",
+        "operationId": "getManufacturerItems",
+        "parameters": [
+          { "name": "code", "in": "path", "required": true, "schema": { "type": "string" }, "example": "AEGS" },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": { "200": { "description": "Items list" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/v1/ship-matrix": {
+      "get": {
+        "tags": ["Ship Matrix"],
+        "summary": "List RSI Ship Matrix entries",
+        "operationId": "getShipMatrix",
+        "description": "Returns the official RSI Ship Matrix data, auto-synced daily.",
+        "parameters": [
+          { "$ref": "#/components/parameters/search" },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" },
+          { "$ref": "#/components/parameters/format" }
+        ],
+        "responses": { "200": { "description": "Paginated Ship Matrix list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/ShipMatrixEntry" } } } } } } } }
+      }
+    },
+    "/api/v1/mining/elements": {
+      "get": {
+        "tags": ["Mining"],
+        "summary": "List mining elements",
+        "operationId": "getMiningElements",
+        "responses": { "200": { "description": "Mining elements list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/MiningElement" } } } } } } } }
+      }
+    },
+    "/api/v1/mining/compositions": {
+      "get": {
+        "tags": ["Mining"],
+        "summary": "List rock compositions",
+        "operationId": "getMiningCompositions",
+        "parameters": [{ "name": "element", "in": "query", "schema": { "type": "string" }, "description": "Filter by element name" }],
+        "responses": { "200": { "description": "Rock composition list with element parts" } }
+      }
+    },
+    "/api/v1/mining/solve": {
+      "get": {
+        "tags": ["Mining"],
+        "summary": "Find best mining targets",
+        "operationId": "solveMining",
+        "description": "Returns rocks sorted by estimated yield value for specified elements",
+        "parameters": [
+          { "name": "elements", "in": "query", "required": true, "schema": { "type": "string" }, "description": "Comma-separated element names (e.g. Quantainium,Bexalite)" }
+        ],
+        "responses": { "200": { "description": "Ranked mining targets" } }
+      }
+    },
+    "/api/v1/trade/routes": {
+      "get": {
+        "tags": ["Trade"],
+        "summary": "Get trade routes",
+        "operationId": "getTradeRoutes",
+        "parameters": [
+          { "name": "cargo", "in": "query", "schema": { "type": "integer", "default": 1 }, "description": "Cargo capacity in SCU" },
+          { "name": "start_location", "in": "query", "schema": { "type": "string" }, "description": "Starting location name or ID" },
+          { "$ref": "#/components/parameters/limit" }
+        ],
+        "responses": { "200": { "description": "Trade routes sorted by profit", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/TradeRoute" } } } } } } } }
+      }
+    },
+    "/api/v1/trade/locations": {
+      "get": {
+        "tags": ["Trade"],
+        "summary": "List all shops with commodity price data",
+        "operationId": "getTradeLocations",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Shops that have commodity price records" } }
+      }
+    },
+    "/api/v1/trade/systems": {
+      "get": {
+        "tags": ["Trade"],
+        "summary": "List distinct systems with trade data",
+        "operationId": "getTradeSystems",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Distinct system names" } }
+      }
+    },
+    "/api/v1/trade/prices/{commodityUuid}": {
+      "get": {
+        "tags": ["Trade"],
+        "summary": "Get prices for a commodity across all locations",
+        "operationId": "getCommodityPrices",
+        "parameters": [
+          { "name": "commodityUuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": { "200": { "description": "Buy/sell prices per location" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/v1/trade/prices": {
+      "post": {
+        "tags": ["Trade"],
+        "summary": "Submit a commodity price report",
+        "operationId": "reportTradePrices",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["commodityUuid", "shopId"],
+                "properties": {
+                  "commodityUuid": { "type": "string" },
+                  "shopId": { "type": "integer" },
+                  "buyPrice": { "type": "number" },
+                  "sellPrice": { "type": "number" },
+                  "env": { "type": "string", "enum": ["live", "ptu"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Price report accepted" }, "400": { "description": "Bad request — missing or invalid parameters" } }
+      }
+    },
+    "/api/v1/trade/location/{shopId}/prices": {
+      "get": {
+        "tags": ["Trade"],
+        "summary": "Get all commodity prices at a given shop",
+        "operationId": "getLocationPrices",
+        "parameters": [
+          { "name": "shopId", "in": "path", "required": true, "schema": { "type": "integer" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": { "200": { "description": "All commodity prices at the shop" }, "400": { "description": "Bad request — missing or invalid parameters" } }
+      }
+    },
+    "/api/v1/crafting/recipes": {
+      "get": {
+        "tags": ["Crafting"],
+        "summary": "List crafting recipes",
+        "operationId": "getCraftingRecipes",
+        "parameters": [
+          { "$ref": "#/components/parameters/search" },
+          { "name": "station_type", "in": "query", "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" }
+        ],
+        "responses": { "200": { "description": "Crafting recipes list", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/CraftingRecipe" } } } } } } } }
+      }
+    },
+    "/api/v1/crafting/station-types": {
+      "get": {
+        "tags": ["Crafting"],
+        "summary": "List crafting station types",
+        "operationId": "getCraftingStationTypes",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Distinct station types with recipe counts" } }
+      }
+    },
+    "/api/v1/crafting/categories": {
+      "get": {
+        "tags": ["Crafting"],
+        "summary": "List crafting categories",
+        "operationId": "getCraftingCategories",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Crafting category list" } }
+      }
+    },
+    "/api/v1/crafting/resources": {
+      "get": {
+        "tags": ["Crafting"],
+        "summary": "List items used as crafting ingredients",
+        "operationId": "getCraftingResources",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Items used as crafting ingredients" } }
+      }
+    },
+    "/api/v1/crafting/resources/{itemName}/recipes": {
+      "get": {
+        "tags": ["Crafting"],
+        "summary": "Get recipes that use a given resource",
+        "operationId": "getRecipesByResource",
+        "parameters": [
+          { "name": "itemName", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": { "200": { "description": "Recipes using the specified resource" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/v1/crafting/recipes/{uuid}": {
+      "get": {
+        "tags": ["Crafting"],
+        "summary": "Get a crafting recipe by UUID",
+        "operationId": "getCraftingRecipeByUuid",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": { "200": { "description": "Recipe details" }, "404": { "$ref": "#/components/responses/NotFound" } }
+      }
+    },
+    "/api/v1/calculate/fps-damage": {
+      "post": {
+        "tags": ["Calculators"],
+        "summary": "Calculate FPS weapon damage",
+        "operationId": "calcFpsDamage",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "weapon_uuid": { "type": "string" },
+                  "target_armor": { "type": "string" },
+                  "shots": { "type": "integer", "default": 1 }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Damage calculation result" } }
+      }
+    },
+    "/api/v1/calculate/mining-yield": {
+      "post": {
+        "tags": ["Calculators"],
+        "summary": "Calculate mining yield",
+        "operationId": "calcMiningYield",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "composition_id": { "type": "integer" },
+                  "rock_mass": { "type": "number" }
+                }
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Yield breakdown by element" } }
+      }
+    },
+    "/api/v1/search": {
+      "get": {
+        "tags": ["Search"],
+        "summary": "Unified multi-entity search",
+        "operationId": "search",
+        "description": "Searches across ships, components, items, commodities, locations and missions simultaneously.",
+        "parameters": [
+          { "name": "q", "in": "query", "required": true, "schema": { "type": "string", "minLength": 2 }, "description": "Search query" },
+          { "name": "types", "in": "query", "schema": { "type": "string" }, "description": "Comma-separated entity types to search (default: all)" },
+          { "$ref": "#/components/parameters/limit" }
+        ],
+        "responses": { "200": { "description": "Search results grouped by entity type", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "$ref": "#/components/schemas/SearchResult" } }, "total": { "type": "integer" } } } } } } }
+      }
+    },
+    "/api/v1/game-versions": {
+      "get": {
+        "tags": ["Game Versions"],
+        "summary": "List game version extraction history",
+        "operationId": "getGameVersions",
+        "parameters": [
+          { "name": "env", "in": "query", "schema": { "type": "string", "enum": ["live", "ptu", "eptu", "custom"] } },
+          { "$ref": "#/components/parameters/limit" },
+          { "name": "offset", "in": "query", "schema": { "type": "integer", "default": 0 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Extraction log entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/GameVersion" } },
+                    "total": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/game-versions/default": {
+      "get": {
+        "tags": ["Game Versions"],
+        "summary": "Get latest LIVE game version",
+        "operationId": "getDefaultGameVersion",
+        "responses": {
+          "200": { "description": "Latest live extraction entry", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/GameVersion" } } } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/galactapedia": {
+      "get": {
+        "tags": ["Galactapedia"],
+        "summary": "List Galactapedia entries",
+        "operationId": "getGalactapediaEntries",
+        "parameters": [
+          { "$ref": "#/components/parameters/search" },
+          { "name": "category", "in": "query", "schema": { "type": "string" }, "description": "Filter by category name" },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated Galactapedia entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/GalactapediaEntry" } },
+                    "total": { "type": "integer" },
+                    "page": { "type": "integer" },
+                    "pages": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/galactapedia/{id}": {
+      "get": {
+        "tags": ["Galactapedia"],
+        "summary": "Get Galactapedia entry by ID or slug",
+        "operationId": "getGalactapediaEntry",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Entry ID or slug" }],
+        "responses": {
+          "200": { "description": "Full Galactapedia article with content", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/GalactapediaEntry" } } } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/comm-links/categories": {
+      "get": {
+        "tags": ["Comm-links"],
+        "summary": "List comm-link categories",
+        "operationId": "getCommLinkCategories",
+        "responses": { "200": { "description": "Distinct categories (Transmission, Comm-Link, etc.)", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } } } } } } }
+      }
+    },
+    "/api/v1/comm-links": {
+      "get": {
+        "tags": ["Comm-links"],
+        "summary": "List RSI comm-links",
+        "operationId": "getCommLinks",
+        "parameters": [
+          { "$ref": "#/components/parameters/search" },
+          { "name": "category", "in": "query", "schema": { "type": "string" }, "description": "Filter by category" },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated comm-links (sorted by published date desc)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/CommLink" } },
+                    "total": { "type": "integer" },
+                    "page": { "type": "integer" },
+                    "pages": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/comm-links/{id}": {
+      "get": {
+        "tags": ["Comm-links"],
+        "summary": "Get comm-link by ID or slug",
+        "operationId": "getCommLink",
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "RSI article ID, numeric ID, or slug" }],
+        "responses": {
+          "200": { "description": "Full comm-link article with content", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/CommLink" } } } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/starmap/systems": {
+      "get": {
+        "tags": ["Starmap"],
+        "summary": "List star systems",
+        "operationId": "getStarmapSystems",
+        "parameters": [
+          { "$ref": "#/components/parameters/search" },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated star systems",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/StarmapSystem" } },
+                    "total": { "type": "integer" },
+                    "page": { "type": "integer" },
+                    "pages": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/starmap/systems/{code}": {
+      "get": {
+        "tags": ["Starmap"],
+        "summary": "Get star system with celestial bodies",
+        "operationId": "getStarmapSystem",
+        "parameters": [{ "name": "code", "in": "path", "required": true, "schema": { "type": "string" }, "description": "System code (e.g. SOL, STANTON) or RSI ID" }],
+        "responses": {
+          "200": { "description": "Star system with all celestial children", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/StarmapSystemDetail" } } } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/version": {
+      "get": {
+        "tags": ["Game Versions"],
+        "summary": "Get current game version",
+        "operationId": "getVersion",
+        "responses": { "200": { "description": "Current game version string" } }
+      }
+    },
+    "/api/v1/stats": {
+      "get": {
+        "tags": ["Game Versions"],
+        "summary": "Get database statistics",
+        "operationId": "getStats",
+        "description": "Returns counts of all data types in the database.",
+        "responses": {
+          "200": {
+            "description": "Entity counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "ships": { "type": "integer" },
+                        "components": { "type": "integer" },
+                        "items": { "type": "integer" },
+                        "commodities": { "type": "integer" },
+                        "manufacturers": { "type": "integer" },
+                        "missions": { "type": "integer" },
+                        "locations": { "type": "integer" },
+                        "shops": { "type": "integer" },
+                        "galactapedia": { "type": "integer" },
+                        "comm_links": { "type": "integer" },
+                        "starmap_systems": { "type": "integer" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/changelog": {
+      "get": {
+        "tags": ["Game Versions"],
+        "summary": "Get data changelog",
+        "operationId": "getChangelog",
+        "parameters": [
+          { "name": "env", "in": "query", "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/limit" }
+        ],
+        "responses": { "200": { "description": "Recent data changes (added/removed ships, components, etc.)" } }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health check",
+        "operationId": "health",
+        "responses": {
+          "200": { "description": "Service healthy" },
+          "503": { "description": "Service unhealthy" }
+        }
+      }
+    },
+    "/health/live": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Liveness probe",
+        "operationId": "healthLive",
+        "responses": { "200": { "description": "Service is alive" } }
+      }
+    },
+    "/health/ready": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Readiness probe",
+        "operationId": "healthReady",
+        "responses": {
+          "200": { "description": "Service is ready to accept traffic" },
+          "503": { "description": "Service not ready (DB or data not available)" }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Prometheus metrics",
+        "operationId": "metrics",
+        "responses": { "200": { "description": "Prometheus text format metrics" } }
+      }
+    }
+  }
+}

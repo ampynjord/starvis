@@ -11,17 +11,19 @@
 
 echo "ðŸ“¦ Creating databases..."
 mysql -u root -p"${MYSQL_ROOT_PASSWORD}" <<-EOSQL
-    CREATE DATABASE IF NOT EXISTS starvis CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-    CREATE DATABASE IF NOT EXISTS live    CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-    CREATE DATABASE IF NOT EXISTS ptu     CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE DATABASE IF NOT EXISTS starvis      CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE DATABASE IF NOT EXISTS live         CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE DATABASE IF NOT EXISTS ptu          CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+    CREATE DATABASE IF NOT EXISTS rsi_website  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 EOSQL
 
 echo "ðŸ‘¤ Configuring user permissions..."
 mysql -u root -p"${MYSQL_ROOT_PASSWORD}" <<-EOSQL
     CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
-    GRANT ALL PRIVILEGES ON starvis.* TO '${MYSQL_USER}'@'%';
-    GRANT ALL PRIVILEGES ON live.*    TO '${MYSQL_USER}'@'%';
-    GRANT ALL PRIVILEGES ON ptu.*     TO '${MYSQL_USER}'@'%';
+    GRANT ALL PRIVILEGES ON starvis.*     TO '${MYSQL_USER}'@'%';
+    GRANT ALL PRIVILEGES ON live.*        TO '${MYSQL_USER}'@'%';
+    GRANT ALL PRIVILEGES ON ptu.*         TO '${MYSQL_USER}'@'%';
+    GRANT ALL PRIVILEGES ON rsi_website.* TO '${MYSQL_USER}'@'%';
     FLUSH PRIVILEGES;
 EOSQL
 

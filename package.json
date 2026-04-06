@@ -2,8 +2,11 @@
   "name": "starvis-monorepo",
   "private": true,
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "api",
+    "ihm",
+    "extractor",
+    "bot",
+    "db"
   ],
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
@@ -12,7 +15,8 @@
     "test": "npm run test --workspaces --if-present",
     "db:generate": "npm run generate --workspace=@starvis/db",
     "db:push": "npm run push --workspace=@starvis/db",
-    "db:studio": "npm run studio --workspace=@starvis/db"
+    "db:studio": "npm run studio --workspace=@starvis/db",
+    "sync": "npm run extract --workspace=@starvis/extractor -- --modules galactapedia,comm-links,starmap"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.9"
