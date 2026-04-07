@@ -263,6 +263,10 @@ CLI options:
 | `-V, --version` | Print version |
 | `-h, --help` | Show help |
 
+Available modules: `ships`, `components`, `items`, `commodities`, `shops`, `missions`, `crafting`, `mining`, `paints`, `galactapedia`, `comm-links`, `starmap`, `ship-matrix`, `ctm`.
+
+> **Note:** The `ctm` module does **not** require the P4K file — it only scrapes the RSI website. Run it standalone with `-m ctm` after ships have been extracted and cross-referenced with the Ship Matrix.
+
 ---
 
 ## Environment Variables
@@ -305,6 +309,8 @@ Base URL: `/api/v1`
 | GET | `/ships/:id` | Ship detail |
 | GET | `/ships/:id/loadout` | Ship default loadout (hierarchical) |
 | GET | `/ships/:id/compare/:otherId` | Compare two ships |
+| GET | `/ships/:id/model` | 3D model metadata (CTM URL + proxy URL) |
+| GET | `/ships/:id/model/file` | 3D model binary file (.ctm), served with disk cache |
 
 ### Ship Matrix
 
@@ -519,10 +525,97 @@ Local PC (Extractor — manual run):
   ├── saveMiningData()               → elements + compositions
   ├── crossReferenceShipMatrix()     → ship ↔ ship_matrix linking
   └── INSERT extraction_log          → SHA-256 hash + stats + duration
+
+Local PC (CTM scraping — separate run, no P4K required):
+  npx tsx extract.ts -m ctm
+  └── saveShipCtmModels()            → Playwright (Chromium, headful) scrapes RSI ship
+                                       pledge pages, intercepts .ctm network responses,
+                                       updates ships.ctm_url for each matched ship
+
+VPS (API — serving 3D models):
+  GET /api/v1/ships/:uuid/model       → returns ctm_url + proxy_url from DB
+  GET /api/v1/ships/:uuid/model/file  → proxies the .ctm binary from RSI, with
+                                        disk cache (CTM_CACHE_DIR) + ETag support;
+                                        sidecar .url file detects URL changes
 ```
 
 All GET endpoints read from MySQL (no direct P4K/RSI access).
 DB writes only happen at startup or via admin POST endpoints.
+
+### CTM — 3D Ship Models
+
+**CTM** (OpenCTM format) is the 3D model format used by the RSI website for its interactive ship viewer. STARVIS harvests these models and re-exposes them through its own API with caching.
+
+#### Full pipeline
+
+```
+1. Extractor (local PC, no P4K needed)
+   npx tsx extract.ts -m ctm
+   └── extractor/src/ctm-scraper.ts
+       ├── For each ship that has a ship_matrix RSI URL:
+       │     • Launches Chromium in headful mode (required for RSI's 3D viewer — WebGL is often disabled in headless mode)
+       │     • Navigates to the RSI pledge page (e.g. /pledge/ships/anvil-arrow/Arrow)
+       │     • Dismisses cookie consent banners if present
+       │     • Reloads with networkidle, scrolls to the 3D viewer, interacts with the
+       │       canvas (zoom + rotate) to trigger model streaming
+       │     • Intercepts all network responses and captures any URL containing ".ctm"
+       │       (excluding /static/ctm/ thumbnails and *man.ctm LOD-marker meshes)
+       │     • Waits 15 seconds for the full model to stream
+       └── Writes the captured URL to ships.ctm_url (MySQL column VARCHAR 500)
+
+2. Database
+   ships.ctm_url  VARCHAR(500) NULL
+   ├── Populated by the extractor `ctm` module
+   ├── Preserved across full re-extractions (backed up before DELETE, restored after
+   │   INSERT) so CTM URLs survive a complete game data re-extraction
+   └── Used by the API to serve/proxy the 3D model
+
+3. API (VPS)
+   GET /api/v1/ships/:uuid/model
+   └── Returns metadata: { uuid, name, format: "ctm", url, proxy_url }
+
+   GET /api/v1/ships/:uuid/model/file          (binary proxy with disk cache)
+   ├── First request  → downloads from RSI, streams to client, saves to
+   │                    CTM_CACHE_DIR/{uuid}.ctm + sidecar {uuid}.url
+   ├── Later requests → served directly from disk (X-CTM-Cache: HIT)
+   ├── Cache-Control: public, max-age=86400 + ETag (MD5 of ctm_url — URL-based,
+   │                    so a silent RSI model update without URL change won't bust the cache)
+   └── If ctm_url changes in DB (new extraction), the sidecar mismatch auto-invalidates
+       the cached file and triggers a fresh download
+
+4. Frontend (IHM)
+   ihm/src/components/ship/HoloViewer.tsx
+   ├── Fetches /api/v1/ships/:uuid/model/file via CTMLoader
+   ├── CTMLoader (ihm/src/lib/CTMLoader.ts) — port of the Three.js r92 CTMLoader
+   │   Supports RAW, MG1, and MG2 (LZMA-compressed) streams
+   └── Renders in a Three.js scene with OrbitControls, holographic cyan material,
+       auto-rotation, and a grid floor — styled to match the RSI holoviewer aesthetic
+```
+
+#### Key files
+
+| File | Role |
+|------|------|
+| `extractor/src/ctm-scraper.ts` | Playwright scraper — discovers CTM URLs from RSI |
+| `extractor/src/extraction-service.ts` → `saveShipCtmModels()` | Orchestrates scraping + DB update |
+| `extractor/scripts/test-ctm-scraper.ts` | Quick test script for 3 ships |
+| `api/src/routes/ships.ts` → `/model` + `/model/file` | API endpoints |
+| `api/src/utils/config.ts` → `CTM_CACHE_DIR` | Cache directory (default: `/tmp/ctm-cache`) |
+| `ihm/src/lib/CTMLoader.ts` | OpenCTM binary parser (LZMA, MG1, MG2) |
+| `ihm/src/components/ship/HoloViewer.tsx` | React 3D viewer component |
+
+#### Running CTM scraping
+
+```bash
+# Standalone CTM scrape (after full extraction + cross-reference)
+cd extractor
+npx tsx extract.ts -m ctm
+
+# Test on 3 known ships (no DB write unless DB_HOST is set)
+npx tsx scripts/test-ctm-scraper.ts
+```
+
+> **Requirement:** A display must be available (headful Chromium). On a headless server, use `Xvfb` or run the scraper on a local machine and push the results to the remote DB.
 
 ### Tech Stack
 
