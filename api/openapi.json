@@ -790,6 +790,75 @@
         }
       }
     },
+    "/api/v1/ships/{uuid}/variants": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get ship variants",
+        "operationId": "getShipVariants",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": {
+          "200": { "description": "List of variants (bis, event, special…) sharing the same chassis" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/ships/{uuid}/model": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get 3D model metadata",
+        "operationId": "getShipModel",
+        "description": "Returns metadata for the ship's 3D model (.ctm). Use `/model/file` to download the binary.",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Ship UUID or slug" },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": {
+          "200": {
+            "description": "3D model metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "uuid": { "type": "string" },
+                        "name": { "type": "string" },
+                        "format": { "type": "string", "example": "ctm" },
+                        "url": { "type": "string", "description": "Original RSI CDN URL" },
+                        "proxy_url": { "type": "string", "description": "Cached proxy URL via this API" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/ships/{uuid}/model/file": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Download 3D model file",
+        "operationId": "getShipModelFile",
+        "description": "Streams the .ctm binary. First request downloads from RSI and caches on disk; subsequent requests are served from cache.",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": {
+          "200": { "description": "CTM binary file", "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } } },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
     "/api/v1/ships/ranking": {
       "get": {
         "tags": ["Ships"],
@@ -1531,26 +1600,90 @@
         "tags": ["Mining"],
         "summary": "List rock compositions",
         "operationId": "getMiningCompositions",
-        "parameters": [{ "name": "element", "in": "query", "schema": { "type": "string" }, "description": "Filter by element name" }],
+        "parameters": [
+          { "name": "element", "in": "query", "schema": { "type": "string" }, "description": "Filter by element name" },
+          { "name": "include_empty", "in": "query", "schema": { "type": "boolean" }, "description": "Include rocks with no mineral data" },
+          { "$ref": "#/components/parameters/env" }
+        ],
         "responses": { "200": { "description": "Rock composition list with element parts" } }
       }
     },
-    "/api/v1/mining/solve": {
+    "/api/v1/mining/compositions/{uuid}": {
+      "get": {
+        "tags": ["Mining"],
+        "summary": "Get a single rock composition",
+        "operationId": "getMiningComposition",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": {
+          "200": { "description": "Rock composition with all mineral parts" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/mining/elements/{uuid}": {
+      "get": {
+        "tags": ["Mining"],
+        "summary": "Get a single mining element",
+        "operationId": "getMiningElement",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": {
+          "200": { "description": "Element detail + rocks that contain it" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/mining/solver": {
       "get": {
         "tags": ["Mining"],
         "summary": "Find best mining targets",
         "operationId": "solveMining",
-        "description": "Returns rocks sorted by estimated yield value for specified elements",
+        "description": "Returns rocks sorted by probability for a given element or composition",
         "parameters": [
           {
-            "name": "elements",
+            "name": "element",
             "in": "query",
-            "required": true,
             "schema": { "type": "string" },
-            "description": "Comma-separated element names (e.g. Quantainium,Bexalite)"
-          }
+            "description": "Element UUID to optimise for"
+          },
+          {
+            "name": "composition",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Rock composition UUID to match"
+          },
+          {
+            "name": "min_probability",
+            "in": "query",
+            "schema": { "type": "number", "minimum": 0, "maximum": 1 },
+            "description": "Minimum element probability (0–1)"
+          },
+          { "$ref": "#/components/parameters/env" }
         ],
         "responses": { "200": { "description": "Ranked mining targets" } }
+      }
+    },
+    "/api/v1/mining/stats": {
+      "get": {
+        "tags": ["Mining"],
+        "summary": "Mining statistics",
+        "operationId": "getMiningStats",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Counts of elements, compositions, and rocks" } }
+      }
+    },
+    "/api/v1/mining/lasers": {
+      "get": {
+        "tags": ["Mining"],
+        "summary": "List mining lasers and gadgets",
+        "operationId": "getMiningLasers",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Mining laser and gadget components with stats" } }
       }
     },
     "/api/v1/trade/routes": {
@@ -2073,7 +2206,7 @@
         "responses": { "200": { "description": "Current game version string" } }
       }
     },
-    "/api/v1/stats": {
+    "/api/v1/stats/overview": {
       "get": {
         "tags": ["Game Versions"],
         "summary": "Get database statistics",
@@ -2112,12 +2245,26 @@
         }
       }
     },
+    "/api/v1/changelog/summary": {
+      "get": {
+        "tags": ["Game Versions"],
+        "summary": "Changelog summary",
+        "operationId": "getChangelogSummary",
+        "description": "Returns a grouped summary of the latest data changes.",
+        "responses": { "200": { "description": "Grouped changelog summary" } }
+      }
+    },
     "/api/v1/changelog": {
       "get": {
         "tags": ["Game Versions"],
         "summary": "Get data changelog",
         "operationId": "getChangelog",
-        "parameters": [{ "name": "env", "in": "query", "schema": { "type": "string" } }, { "$ref": "#/components/parameters/limit" }],
+        "parameters": [
+          { "name": "env", "in": "query", "schema": { "type": "string" } },
+          { "name": "entity_type", "in": "query", "schema": { "type": "string" }, "description": "Filter by entity type (ship, component, …)" },
+          { "name": "change_type", "in": "query", "schema": { "type": "string" }, "description": "Filter by change type (added, removed, modified)" },
+          { "$ref": "#/components/parameters/limit" }
+        ],
         "responses": { "200": { "description": "Recent data changes (added/removed ships, components, etc.)" } }
       }
     },
