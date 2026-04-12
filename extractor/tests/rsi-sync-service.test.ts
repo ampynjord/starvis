@@ -6,11 +6,11 @@ import { describe, expect, it, vi } from 'vitest';
 // ── DB pool mock ────────────────────────────────────────────────────────────
 
 function makePoolMock() {
-  const execute = vi.fn().mockResolvedValue([{ affectedRows: 1 }, []]);
+  const query = vi.fn().mockResolvedValue({ rows: [], rowCount: 0 });
   const release = vi.fn();
-  const conn = { execute, release };
-  const getConnection = vi.fn().mockResolvedValue(conn);
-  return { pool: { getConnection } as any, execute, getConnection };
+  const conn = { query, release };
+  const connect = vi.fn().mockResolvedValue(conn);
+  return { pool: { connect } as any, query, connect };
 }
 
 // ── Stub fetch to fail fast (no real HTTP in unit tests) ───────────────────
@@ -19,9 +19,9 @@ vi.stubGlobal('fetch', async (_url: string) => {
 });
 
 describe('RsiSyncService.syncGalactapedia', () => {
-  it('calls getConnection and execute for each item', async () => {
+  it('calls connect and query for each item', async () => {
     const { RsiSyncService } = await import('../src/rsi-sync-service.js');
-    const { pool, execute } = makePoolMock();
+    const { pool } = makePoolMock();
 
     // We cannot easily change the base URL without refactoring the module,
     // so we test that the service handles empty data gracefully (no HTTP call succeeds
