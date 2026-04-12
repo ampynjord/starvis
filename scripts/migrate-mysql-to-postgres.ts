@@ -26,9 +26,14 @@
 
 import { config } from 'dotenv';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-config({ path: resolve(import.meta.dirname, '..', '.env') });
-config({ path: resolve(import.meta.dirname, '..', '.env.migration') });
+const __dirname = typeof import.meta.dirname !== 'undefined'
+  ? import.meta.dirname
+  : resolve(fileURLToPath(import.meta.url), '..');
+
+config({ path: resolve(__dirname, '..', '.env') });
+config({ path: resolve(__dirname, '..', '.env.migration') });
 
 import mysql from 'mysql2/promise';
 import pg from 'pg';
@@ -76,13 +81,22 @@ async function mysqlQuery<T = any>(conn: mysql.Connection, sql: string, params?:
   return rows as T[];
 }
 
+/** Converts JS objects/arrays (mysql2 auto-parsed JSON) to JSON strings for pg JSONB columns */
+function pgVal(v: unknown): unknown {
+  if (v == null) return null;
+  if (Array.isArray(v) || (typeof v === 'object' && !(v instanceof Date) && !(Buffer.isBuffer(v)))) {
+    return JSON.stringify(v);
+  }
+  return v;
+}
+
 async function pgInsertBatch(
   client: pg.PoolClient,
   table: string,
   columns: string[],
   rows: any[][],
-  conflictTarget: string,
-  updateClause: string,
+  conflictTarget: string | null,
+  updateClause?: string,
 ) {
   if (!rows.length) return 0;
   let total = 0;
@@ -92,9 +106,13 @@ async function pgInsertBatch(
     const valPlaceholders = batch
       .map((_, ri) => `(${columns.map((_, ci) => `$${ri * columns.length + ci + 1}`).join(', ')})`)
       .join(', ');
-    const params = batch.flat();
-    const sql = `INSERT INTO ${table} (${colList}) VALUES ${valPlaceholders}
-      ON CONFLICT ${conflictTarget} DO UPDATE SET ${updateClause}`;
+    const params = batch.flat().map(pgVal);
+    const conflict = conflictTarget && updateClause
+      ? `ON CONFLICT ${conflictTarget} DO UPDATE SET ${updateClause}`
+      : conflictTarget
+        ? `ON CONFLICT ${conflictTarget} DO NOTHING`
+        : '';
+    const sql = `INSERT INTO ${table} (${colList}) VALUES ${valPlaceholders} ${conflict}`;
     const result = await client.query(sql, params);
     total += result.rowCount ?? batch.length;
   }
@@ -104,7 +122,7 @@ async function pgInsertBatch(
 // ── Game table migration (live / ptu) ─────────────────────────────────────────
 
 async function migrateGameDb(mysqlConn: mysql.Connection, pgClient: pg.PoolClient, env: 'live' | 'ptu') {
-  const db = env === 'live' ? 'starvis_live' : 'starvis_ptu';
+  const db = env === 'live' ? 'live' : 'ptu';
   log(`  ── ${env.toUpperCase()} (${db}) ──`);
 
   // manufacturers (also in starvis DB, but game DBs may have some too)
@@ -182,7 +200,7 @@ async function migrateGameDb(mysqlConn: mysql.Connection, pgClient: pg.PoolClien
         const valPlaceholders = batch
           .map((_, ri) => `(${cols.map((_, ci) => `$${ri * cols.length + ci + 1}`).join(', ')})`)
           .join(', ');
-        await pgClient.query(`INSERT INTO game.ship_loadouts (${colList}) VALUES ${valPlaceholders}`, batch.flat());
+        await pgClient.query(`INSERT INTO game.ship_loadouts (${colList}) VALUES ${valPlaceholders}`, batch.flat().map(pgVal));
       }
     }
   }
@@ -202,7 +220,7 @@ async function migrateGameDb(mysqlConn: mysql.Connection, pgClient: pg.PoolClien
         const valPlaceholders = batch
           .map((_, ri) => `(${cols.map((_, ci) => `$${ri * cols.length + ci + 1}`).join(', ')})`)
           .join(', ');
-        await pgClient.query(`INSERT INTO game.ship_modules (${colList}) VALUES ${valPlaceholders}`, batch.flat());
+        await pgClient.query(`INSERT INTO game.ship_modules (${colList}) VALUES ${valPlaceholders}`, batch.flat().map(pgVal));
       }
     }
   }
@@ -222,7 +240,7 @@ async function migrateGameDb(mysqlConn: mysql.Connection, pgClient: pg.PoolClien
         const valPlaceholders = batch
           .map((_, ri) => `(${cols.map((_, ci) => `$${ri * cols.length + ci + 1}`).join(', ')})`)
           .join(', ');
-        await pgClient.query(`INSERT INTO game.ship_paints (${colList}) VALUES ${valPlaceholders}`, batch.flat());
+        await pgClient.query(`INSERT INTO game.ship_paints (${colList}) VALUES ${valPlaceholders}`, batch.flat().map(pgVal));
       }
     }
   }
@@ -232,11 +250,11 @@ async function migrateGameDb(mysqlConn: mysql.Connection, pgClient: pg.PoolClien
     const rows = await mysqlQuery(mysqlConn, `SELECT * FROM ${db}.shops`);
     log(`    shops: ${rows.length} rows`);
     if (!DRY_RUN && rows.length) {
+      await pgClient.query('DELETE FROM game.shops WHERE env = $1', [env]);
       const cols = Object.keys(rows[0]).filter((c) => c !== 'id');
       if (!cols.includes('env')) cols.push('env');
       const data = rows.map((r) => cols.map((c) => (c === 'env' ? env : r[c] ?? null)));
-      const updated = cols.filter((c) => c !== 'uuid' && c !== 'env').map((c) => `${c} = EXCLUDED.${c}`).join(', ');
-      await pgInsertBatch(pgClient, 'game.shops', cols, data, '(uuid, env)', updated);
+      await pgInsertBatch(pgClient, 'game.shops', cols, data, null);
     }
   }
 
@@ -255,7 +273,7 @@ async function migrateGameDb(mysqlConn: mysql.Connection, pgClient: pg.PoolClien
         const valPlaceholders = batch
           .map((_, ri) => `(${cols.map((_, ci) => `$${ri * cols.length + ci + 1}`).join(', ')})`)
           .join(', ');
-        await pgClient.query(`INSERT INTO game.shop_inventory (${colList}) VALUES ${valPlaceholders}`, batch.flat());
+        await pgClient.query(`INSERT INTO game.shop_inventory (${colList}) VALUES ${valPlaceholders}`, batch.flat().map(pgVal));
       }
     }
   }
@@ -275,7 +293,7 @@ async function migrateGameDb(mysqlConn: mysql.Connection, pgClient: pg.PoolClien
         const valPlaceholders = batch
           .map((_, ri) => `(${cols.map((_, ci) => `$${ri * cols.length + ci + 1}`).join(', ')})`)
           .join(', ');
-        await pgClient.query(`INSERT INTO game.commodity_prices (${colList}) VALUES ${valPlaceholders}`, batch.flat());
+        await pgClient.query(`INSERT INTO game.commodity_prices (${colList}) VALUES ${valPlaceholders}`, batch.flat().map(pgVal));
       }
     }
   }
@@ -319,22 +337,22 @@ async function migrateGameDb(mysqlConn: mysql.Connection, pgClient: pg.PoolClien
     }
   }
 
-  // mining_composition_parts (no uuid)
+  // mining_composition_parts — MySQL has no env col; PG has composition_env + element_env
   {
     const rows = await mysqlQuery(mysqlConn, `SELECT * FROM ${db}.mining_composition_parts`);
     log(`    mining_composition_parts: ${rows.length} rows`);
     if (!DRY_RUN && rows.length) {
-      await pgClient.query('DELETE FROM game.mining_composition_parts WHERE env = $1', [env]);
-      const cols = Object.keys(rows[0]).filter((c) => c !== 'id');
-      if (!cols.includes('env')) cols.push('env');
-      const data = rows.map((r) => cols.map((c) => (c === 'env' ? env : r[c] ?? null)));
+      await pgClient.query('DELETE FROM game.mining_composition_parts WHERE composition_env = $1', [env]);
+      const mysqlCols = Object.keys(rows[0]).filter((c) => c !== 'id' && c !== 'env');
+      const cols = [...mysqlCols, 'composition_env', 'element_env'];
+      const data = rows.map((r) => [...mysqlCols.map((c) => r[c] ?? null), env, env]);
       for (let i = 0; i < data.length; i += BATCH) {
         const batch = data.slice(i, i + BATCH);
         const colList = cols.join(', ');
         const valPlaceholders = batch
           .map((_, ri) => `(${cols.map((_, ci) => `$${ri * cols.length + ci + 1}`).join(', ')})`)
           .join(', ');
-        await pgClient.query(`INSERT INTO game.mining_composition_parts (${colList}) VALUES ${valPlaceholders}`, batch.flat());
+        await pgClient.query(`INSERT INTO game.mining_composition_parts (${colList}) VALUES ${valPlaceholders}`, batch.flat().map(pgVal));
       }
     }
   }
@@ -365,28 +383,42 @@ async function migrateGameDb(mysqlConn: mysql.Connection, pgClient: pg.PoolClien
     }
   }
 
-  // crafting_ingredients, mission_blueprint_rewards, crafting_slot_modifiers — delete+reinsert
-  for (const tbl of ['crafting_ingredients', 'mission_blueprint_rewards', 'crafting_slot_modifiers'] as const) {
-    const mysqlTbl = tbl === 'crafting_slot_modifiers' ? `${db}.${tbl}` : `${db}.${tbl}`;
-    try {
-      const rows = await mysqlQuery(mysqlConn, `SELECT * FROM ${mysqlTbl}`);
-      log(`    ${tbl}: ${rows.length} rows`);
-      if (!DRY_RUN && rows.length) {
-        await pgClient.query(`DELETE FROM game.${tbl} WHERE env = $1`, [env]);
-        const cols = Object.keys(rows[0]).filter((c) => c !== 'id');
-        if (!cols.includes('env')) cols.push('env');
-        const data = rows.map((r) => cols.map((c) => (c === 'env' ? env : r[c] ?? null)));
-        for (let i = 0; i < data.length; i += BATCH) {
-          const batch = data.slice(i, i + BATCH);
-          const colList = cols.join(', ');
-          const valPlaceholders = batch
-            .map((_, ri) => `(${cols.map((_, ci) => `$${ri * cols.length + ci + 1}`).join(', ')})`)
-            .join(', ');
-          await pgClient.query(`INSERT INTO game.${tbl} (${colList}) VALUES ${valPlaceholders}`, batch.flat());
-        }
-      }
-    } catch (e) {
-      log(`    WARN: ${tbl} not found in ${db} — skipping (${(e as Error).message})`);
+  // crafting_ingredients — MySQL has no env col; PG has recipe_env
+  {
+    const rows = await mysqlQuery(mysqlConn, `SELECT * FROM ${db}.crafting_ingredients`);
+    log(`    crafting_ingredients: ${rows.length} rows`);
+    if (!DRY_RUN && rows.length) {
+      await pgClient.query('DELETE FROM game.crafting_ingredients WHERE recipe_env = $1', [env]);
+      const mysqlCols = Object.keys(rows[0]).filter((c) => c !== 'id' && c !== 'env');
+      const cols = [...mysqlCols, 'recipe_env'];
+      const data = rows.map((r) => [...mysqlCols.map((c) => r[c] ?? null), env]);
+      await pgInsertBatch(pgClient, 'game.crafting_ingredients', cols, data, null);
+    }
+  }
+
+  // crafting_slot_modifiers — MySQL has no env col; PG has recipe_env
+  {
+    const rows = await mysqlQuery(mysqlConn, `SELECT * FROM ${db}.crafting_slot_modifiers`);
+    log(`    crafting_slot_modifiers: ${rows.length} rows`);
+    if (!DRY_RUN && rows.length) {
+      await pgClient.query('DELETE FROM game.crafting_slot_modifiers WHERE recipe_env = $1', [env]);
+      const mysqlCols = Object.keys(rows[0]).filter((c) => c !== 'id' && c !== 'env');
+      const cols = [...mysqlCols, 'recipe_env'];
+      const data = rows.map((r) => [...mysqlCols.map((c) => r[c] ?? null), env]);
+      await pgInsertBatch(pgClient, 'game.crafting_slot_modifiers', cols, data, null);
+    }
+  }
+
+  // mission_blueprint_rewards — MySQL has no env col; PG has mission_env + blueprint_env
+  {
+    const rows = await mysqlQuery(mysqlConn, `SELECT * FROM ${db}.mission_blueprint_rewards`);
+    log(`    mission_blueprint_rewards: ${rows.length} rows`);
+    if (!DRY_RUN && rows.length) {
+      await pgClient.query('DELETE FROM game.mission_blueprint_rewards WHERE mission_env = $1', [env]);
+      const mysqlCols = Object.keys(rows[0]).filter((c) => c !== 'id' && c !== 'env');
+      const cols = [...mysqlCols, 'mission_env', 'blueprint_env'];
+      const data = rows.map((r) => [...mysqlCols.map((c) => r[c] ?? null), env, env]);
+      await pgInsertBatch(pgClient, 'game.mission_blueprint_rewards', cols, data, null);
     }
   }
 }
@@ -417,13 +449,15 @@ async function migrateMetaDb(mysqlConn: mysql.Connection, pgClient: pg.PoolClien
       //              manufacturers, loadout_ports, shops, duration_ms, status, created_at
       // New columns: ships_count, components_count, items_count, commodities_count, manufacturers_count,
       //              loadout_ports_count, shops_count
+      // Include original id to preserve FK references from changelog
       const cols = [
-        'extraction_hash', 'game_version', 'game_env',
+        'id', 'extraction_hash', 'game_version', 'game_env',
         'ships_count', 'components_count', 'items_count', 'commodities_count',
-        'manufacturers_count', 'loadout_ports_count', 'shops_count',
-        'duration_ms', 'status', 'created_at',
+        'manufacturers_count', 'loadout_ports_count', 'shops_count', 'recipes_count',
+        'duration_ms', 'status', 'error_message', 'extracted_at',
       ];
       const data = rows.map((r) => [
+        r.id,
         r.extraction_hash,
         r.game_version,
         r.game_env,
@@ -434,12 +468,16 @@ async function migrateMetaDb(mysqlConn: mysql.Connection, pgClient: pg.PoolClien
         r.manufacturers ?? r.manufacturers_count ?? 0,
         r.loadout_ports ?? r.loadout_ports_count ?? 0,
         r.shops ?? r.shops_count ?? 0,
+        r.recipes ?? r.recipes_count ?? 0,
         r.duration_ms ?? null,
         r.status ?? 'success',
-        r.created_at ?? new Date(),
+        r.error_message ?? null,
+        r.extracted_at ?? r.created_at ?? new Date(),
       ]);
-      const updated = 'game_version = EXCLUDED.game_version, status = EXCLUDED.status';
-      await pgInsertBatch(pgClient, 'meta.extraction_log', cols, data, '(extraction_hash)', updated);
+      await pgInsertBatch(pgClient, 'meta.extraction_log', cols, data, null);
+      // Reset sequence to max id so next inserts don't collide
+      const maxId = Math.max(...rows.map((r) => r.id));
+      await pgClient.query(`SELECT setval(pg_get_serial_sequence('meta.extraction_log', 'id'), $1)`, [maxId]);
     }
   }
 
@@ -450,8 +488,7 @@ async function migrateMetaDb(mysqlConn: mysql.Connection, pgClient: pg.PoolClien
     if (!DRY_RUN && rows.length) {
       const cols = Object.keys(rows[0]).filter((c) => c !== 'id');
       const data = rows.map((r) => cols.map((c) => r[c] ?? null));
-      const updated = cols.filter((c) => c !== 'extraction_hash').map((c) => `${c} = EXCLUDED.${c}`).join(', ');
-      await pgInsertBatch(pgClient, 'meta.changelog', cols, data, '(extraction_hash)', updated);
+      await pgInsertBatch(pgClient, 'meta.changelog', cols, data, null);
     }
   }
 }
@@ -479,13 +516,16 @@ async function migrateRsiDb(mysqlConn: mysql.Connection, pgClient: pg.PoolClient
     log(`    galactapedia: ${rows.length} rows`);
     if (!DRY_RUN && rows.length) {
       // MySQL stores JSON as strings; PostgreSQL JSONB needs valid JSON
+      const JSON_COLS = new Set(['categories', 'tags']);
       const cols = Object.keys(rows[0]);
       const data = rows.map((r) =>
         cols.map((c) => {
           const v = r[c];
-          // categories is a JSON array stored as string in MySQL
-          if (c === 'categories' && typeof v === 'string') {
-            try { return JSON.parse(v); } catch { return null; }
+          if (JSON_COLS.has(c)) {
+            if (v == null) return null;
+            // mysql2 may already parse JSON columns → re-stringify for pg JSONB
+            if (typeof v !== 'string') return JSON.stringify(v);
+            try { JSON.parse(v); return v; } catch { return null; }
           }
           return v ?? null;
         }),
@@ -512,12 +552,15 @@ async function migrateRsiDb(mysqlConn: mysql.Connection, pgClient: pg.PoolClient
     const rows = await mysqlQuery(mysqlConn, 'SELECT * FROM rsi_website.starmap_locations');
     log(`    starmap_locations: ${rows.length} rows`);
     if (!DRY_RUN && rows.length) {
+      const JSON_COLS = new Set(['affiliations', 'coordinates', 'jump_points']);
       const cols = Object.keys(rows[0]);
       const data = rows.map((r) =>
         cols.map((c) => {
           const v = r[c];
-          if ((c === 'children' || c === 'tags') && typeof v === 'string') {
-            try { return JSON.parse(v); } catch { return null; }
+          if (JSON_COLS.has(c)) {
+            if (v == null) return null;
+            if (typeof v !== 'string') return JSON.stringify(v);
+            try { JSON.parse(v); return v; } catch { return null; }
           }
           return v ?? null;
         }),
