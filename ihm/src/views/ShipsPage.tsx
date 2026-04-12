@@ -54,8 +54,8 @@ export default function ShipsPage() {
   const [order, setOrder] = useState<'asc' | 'desc'>('asc');
 
   const { data: filters } = useQuery({
-    queryKey: ['ships.filters', env],
-    queryFn: () => api.ships.filters(env),
+    queryKey: ['ships.filters', env, category],
+    queryFn: () => api.ships.filters(env, category),
     staleTime: Infinity,
   });
 

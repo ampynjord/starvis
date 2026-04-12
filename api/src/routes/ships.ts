@@ -14,27 +14,36 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
   const requireGameData = makeGameDataGuard(gameDataService);
   const { resolveShipUuid, resolveShip } = makeShipResolver(gameDataService!.ships);
 
-  router.get(
-    '/api/v1/ships',
-    requireGameData,
-    asyncHandler(async (req, res) => {
-      const t = Date.now();
-      const filters = ShipQuery.parse(req.query);
-      const result = await gameDataService!.ships.getAllShips(filters);
-      const payload = {
-        success: true,
-        count: result.data.length,
-        total: result.total,
-        page: result.page,
-        limit: result.limit,
-        pages: result.pages,
-        data: result.data,
-        meta: { source: 'Game Data', responseTime: `${Date.now() - t}ms` },
-      };
-      if (req.query.format === 'csv') return void sendCsvOrJson(req, res, result.data as Record<string, unknown>[], payload);
-      sendWithETag(req, res, payload);
-    }),
-  );
+  // ── Helper for vehicle listing routes (ships / ground-vehicles / gravlev) ──
+  function mountVehicleListing(path: string, category: 'ship' | 'ground' | 'gravlev'): void {
+    router.get(
+      path,
+      requireGameData,
+      asyncHandler(async (req, res) => {
+        const t = Date.now();
+        const filters = ShipQuery.parse(req.query);
+        // Override vehicle_category to the route's category (ignore query param)
+        filters.vehicle_category = category;
+        const result = await gameDataService!.ships.getAllShips(filters);
+        const payload = {
+          success: true,
+          count: result.data.length,
+          total: result.total,
+          page: result.page,
+          limit: result.limit,
+          pages: result.pages,
+          data: result.data,
+          meta: { source: 'Game Data', responseTime: `${Date.now() - t}ms` },
+        };
+        if (req.query.format === 'csv') return void sendCsvOrJson(req, res, result.data as Record<string, unknown>[], payload);
+        sendWithETag(req, res, payload);
+      }),
+    );
+  }
+
+  mountVehicleListing('/api/v1/ships', 'ship');
+  mountVehicleListing('/api/v1/ground-vehicles', 'ground');
+  mountVehicleListing('/api/v1/gravlev', 'gravlev');
 
   router.get(
     '/api/v1/ships/ranking',
@@ -57,15 +66,22 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
     }),
   );
 
-  router.get(
-    '/api/v1/ships/filters',
-    requireGameData,
-    asyncHandler(async (req, res) => {
-      const env = String(req.query.env ?? 'live');
-      const result = await gameDataService!.ships.getShipFilters(env);
-      sendWithETag(req, res, { success: true, ...result });
-    }),
-  );
+  // Filters endpoints — ships, ground-vehicles, gravlev each get their own
+  for (const [path, cat] of [
+    ['/api/v1/ships/filters', 'ship'],
+    ['/api/v1/ground-vehicles/filters', 'ground'],
+    ['/api/v1/gravlev/filters', 'gravlev'],
+  ] as const) {
+    router.get(
+      path,
+      requireGameData,
+      asyncHandler(async (req, res) => {
+        const env = String(req.query.env ?? 'live');
+        const result = await gameDataService!.ships.getShipFilters(env, cat);
+        sendWithETag(req, res, { success: true, ...result });
+      }),
+    );
+  }
 
   router.get(
     '/api/v1/ships/search',

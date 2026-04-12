@@ -369,19 +369,21 @@ export class ShipQueryService {
     return rows[0] ? convertBigIntToNumber(rows[0]) : null;
   }
 
-  async getShipFilters(env = 'live'): Promise<FiltersResult> {
+  async getShipFilters(env = 'live', category?: string): Promise<FiltersResult> {
     const prisma = this.getClient(env);
+    const catWhere = category ? `AND s.vehicle_category = '${category.replace(/'/g, '')}'` : '';
+    const catWhereNoAlias = category ? `AND vehicle_category = '${category.replace(/'/g, '')}'` : '';
     const [mfgRows, roleRows, careerRows, variantRows, categoryRows] = await Promise.all([
       prisma.$queryRawUnsafe<Row[]>(
         `SELECT s.manufacturer_code as value, COALESCE(m.name, s.manufacturer_code) as label, COUNT(s.uuid) as count
          FROM ships s LEFT JOIN starvis.manufacturers m ON s.manufacturer_code = m.code
-         WHERE s.manufacturer_code IS NOT NULL AND s.manufacturer_code != ''
+         WHERE s.manufacturer_code IS NOT NULL AND s.manufacturer_code != '' ${catWhere}
          GROUP BY s.manufacturer_code, m.name ORDER BY label`,
       ),
-      prisma.$queryRawUnsafe<Row[]>("SELECT DISTINCT role as value FROM ships WHERE role IS NOT NULL AND role != '' ORDER BY role"),
-      prisma.$queryRawUnsafe<Row[]>("SELECT DISTINCT career as value FROM ships WHERE career IS NOT NULL AND career != '' ORDER BY career"),
+      prisma.$queryRawUnsafe<Row[]>(`SELECT DISTINCT role as value FROM ships WHERE role IS NOT NULL AND role != '' ${catWhereNoAlias} ORDER BY role`),
+      prisma.$queryRawUnsafe<Row[]>(`SELECT DISTINCT career as value FROM ships WHERE career IS NOT NULL AND career != '' ${catWhereNoAlias} ORDER BY career`),
       prisma.$queryRawUnsafe<Row[]>(
-        "SELECT DISTINCT variant_type as value FROM ships WHERE variant_type IS NOT NULL AND variant_type != '' AND variant_type != 'npc' ORDER BY variant_type",
+        `SELECT DISTINCT variant_type as value FROM ships WHERE variant_type IS NOT NULL AND variant_type != '' AND variant_type != 'npc' ${catWhereNoAlias} ORDER BY variant_type`,
       ),
       prisma.$queryRawUnsafe<Row[]>(
         "SELECT COALESCE(vehicle_category, 'ship') as value, COUNT(*) as count FROM ships GROUP BY vehicle_category ORDER BY value",
