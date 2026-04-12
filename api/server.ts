@@ -1,16 +1,11 @@
 /**
- * STARVIS v1.0 - Star Citizen Ships & Components API
+ * STARVIS v2.0 - Star Citizen Ships & Components API
  *
- * Architecture:
- *   rsi_website DB:
- *     ship_matrix          ← ShipMatrixService   ← RSI Ship Matrix API
- *     galactapedia          ← RsiWebsiteService   ← SC Wiki API / RSI website
- *     starmap_locations     ← RsiWebsiteService   ← RSI web starmap
- *     comm_links            ← RsiWebsiteService   ← RSI comm-links
- *   starvis DB:
- *     extraction_log, changelog, manufacturers
- *   live/ptu DB:
- *     ships, components, items, etc  ← GameDataService  ← standalone extractor
+ * Architecture (PostgreSQL multi-schema):
+ *   Single PostgreSQL database with schemas:
+ *     game  ← ships, components, items, etc. (env column: 'live' | 'ptu')
+ *     rsi   ← ship_matrix, galactapedia, comm_links, starmap_locations
+ *     meta  ← extraction_log, changelog, manufacturers
  *
  * Features: Pagination, ETag caching, CSV export, Rate limiting, Swagger docs
  */
@@ -18,7 +13,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getGamePrisma, getRsiWebsitePrisma, getStarvisPrisma, initAllPrisma } from '@starvis/db';
+import { getPrisma, initPrisma } from '@starvis/db';
 import compression from 'compression';
 import cors from 'cors';
 import express from 'express';
@@ -32,7 +27,7 @@ import { createRoutes } from './src/routes/index.js';
 import { GameDataService, ShipMatrixService } from './src/services/index.js';
 import { redis } from './src/services/redis.js';
 import { RsiWebsiteService } from './src/services/rsi-website-service.js';
-import { buildDatabaseUrl, logger, RATE_LIMITS, SCHEMA_DB_MAP } from './src/utils/index.js';
+import { buildDatabaseUrl, logger, RATE_LIMITS } from './src/utils/index.js';
 
 const PORT = process.env.PORT || 3000;
 
@@ -42,13 +37,11 @@ let httpServer: ReturnType<typeof app.listen> | null = null;
 
 // ===== MIDDLEWARE =====
 
-// Trust proxy (Traefik/nginx in front)
 app.set('trust proxy', 1);
 
-// Security headers (XSS, clickjacking, MIME sniffing, etc.)
 app.use(
   helmet({
-    contentSecurityPolicy: false, // API returns JSON, not HTML
+    contentSecurityPolicy: false,
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   }),
 );
@@ -57,17 +50,12 @@ app.use(cors({ origin: process.env.CORS_ORIGIN || '*', credentials: true }));
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
 
-// ──Prometheus metrics middleware ────────────────────────
 app.use(prometheusMiddleware);
 
-// ── Health checks (liveness, readiness, metrics) ─────────
 app.use('/health', healthRouter);
-
-// ── Rate limiting (multi-layer, disabled in test) ────────
 
 const isTest = process.env.NODE_ENV === 'test';
 
-// Layer 1: Speed limiter — after slowAfter req/window, add 500ms delay per request
 const speedLimiter = slowDown({
   windowMs: RATE_LIMITS.windowMs,
   delayAfter: RATE_LIMITS.slowAfter,
@@ -76,7 +64,6 @@ const speedLimiter = slowDown({
   skip: () => isTest,
 });
 
-// Layer 2: Hard rate limit — max req/15min per IP (then 429)
 const apiLimiter = rateLimit({
   windowMs: RATE_LIMITS.windowMs,
   max: RATE_LIMITS.max,
@@ -87,7 +74,6 @@ const apiLimiter = rateLimit({
   skip: () => isTest,
 });
 
-// Layer 3: Strict limit on admin endpoints
 const adminLimiter = rateLimit({
   windowMs: RATE_LIMITS.windowMs,
   max: RATE_LIMITS.adminMax,
@@ -97,7 +83,6 @@ const adminLimiter = rateLimit({
   skip: () => isTest,
 });
 
-// Layer 4: Burst protection — max requests per minute per IP
 const burstLimiter = rateLimit({
   windowMs: RATE_LIMITS.burstWindowMs,
   max: RATE_LIMITS.burst,
@@ -110,7 +95,6 @@ const burstLimiter = rateLimit({
 app.use('/api', burstLimiter, speedLimiter, apiLimiter);
 app.use('/admin', adminLimiter);
 
-// Request logging (skip /health to avoid noise)
 app.use((req, res, next) => {
   if (req.path === '/health') return next();
   const start = Date.now();
@@ -133,14 +117,14 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 app.get('/', (_, res) =>
   res.json({
     name: 'Starvis',
-    version: '1.0.0',
+    version: '2.0.0',
     endpoints: {
       shipMatrix: '/api/v1/ship-matrix',
       ships: '/api/v1/ships',
+      groundVehicles: '/api/v1/ground-vehicles',
+      gravlev: '/api/v1/gravlev',
       components: '/api/v1/components',
       manufacturers: '/api/v1/manufacturers',
-      compare: '/api/v1/ships/:uuid/compare/:uuid2',
-      version: '/api/v1/version',
       docs: '/api-docs',
       admin: '/admin/* (requires X-API-Key)',
       health: '/health',
@@ -150,13 +134,14 @@ app.get('/', (_, res) =>
 
 // ===== STARTUP =====
 async function start() {
-  // 0. Ensure CTM cache directory exists (created on first run, ignored by git)
+  // 0. Ensure CTM cache directory exists
   const { mkdirSync } = await import('node:fs');
   const ctmCacheDir = process.env.CTM_CACHE_DIR || '/tmp/ctm-cache';
   mkdirSync(ctmCacheDir, { recursive: true });
   logger.info(`CTM cache dir: ${ctmCacheDir}`, { module: 'Server' });
-  // 1. Initialise Prisma clients for all 3 databases + connect with retry
-  const prisma = initAllPrisma(buildDatabaseUrl);
+
+  // 1. Initialise single Prisma client and connect with retry
+  const prisma = initPrisma(buildDatabaseUrl());
   let dbReady = false;
   for (let i = 0; i < 30; i++) {
     try {
@@ -175,25 +160,21 @@ async function start() {
     process.exit(1);
   }
 
-  // 2. Sync each Prisma schema to its target database(s)
+  // 2. Push schema to PostgreSQL
   try {
     const { execSync } = await import('node:child_process');
-    for (const { schema, dbs } of SCHEMA_DB_MAP) {
-      for (const dbName of dbs) {
-        const schemaPath = path.resolve(__dirname, '..', 'db', 'prisma', schema);
-        execSync(`npx prisma db push --schema=${schemaPath} --skip-generate --accept-data-loss`, {
-          stdio: 'pipe',
-          env: { ...process.env, DATABASE_URL: buildDatabaseUrl(dbName) },
-        });
-        logger.info(`✅ Schema synced (${schema}) → ${dbName}`, { module: 'DB' });
-      }
-    }
+    const schemaPath = path.resolve(__dirname, '..', 'db', 'prisma', 'schema.prisma');
+    execSync(`npx prisma db push --schema=${schemaPath} --skip-generate --accept-data-loss`, {
+      stdio: 'pipe',
+      env: { ...process.env, DATABASE_URL: buildDatabaseUrl() },
+    });
+    logger.info('✅ Schema synced → PostgreSQL', { module: 'DB' });
   } catch (e: any) {
     logger.error(`Schema sync failed: ${e.stderr?.toString() || e.message}`, { module: 'DB' });
     process.exit(1);
   }
 
-  // 3. Initialize Redis (non-blocking, cache disabled if unavailable)
+  // 3. Initialize Redis (non-blocking)
   const redisReady = await redis
     .connect()
     .then(() => true)
@@ -204,36 +185,30 @@ async function start() {
     logger.warn('⚠️  Redis unavailable, cache disabled', { module: 'Redis' });
   }
 
-  // 4. Ship Matrix service (always available — uses rsi_website DB)
-  const starvisClient = getStarvisPrisma();
-  const rsiClient = getRsiWebsitePrisma();
-  const shipMatrixService = new ShipMatrixService(rsiClient);
-  const rsiWebsiteService = new RsiWebsiteService(rsiClient);
+  // 4. Services — all use the same single Prisma client
+  const shipMatrixService = new ShipMatrixService(prisma);
+  const rsiWebsiteService = new RsiWebsiteService(prisma);
+  gameDataService = new GameDataService(() => prisma, prisma);
 
-  // 5. GameDataService (reads from MySQL — fed by standalone extractor)
-  gameDataService = new GameDataService(getGamePrisma, starvisClient);
+  // 5. Mount routes
+  app.use('/', createRoutes({ prisma, getGamePrisma: () => prisma, shipMatrixService, gameDataService, rsiWebsiteService }));
 
-  // 6. Mount routes
-  app.use('/', createRoutes({ prisma: starvisClient, getGamePrisma, shipMatrixService, gameDataService, rsiWebsiteService }));
-
-  // 7. Start listening
-  httpServer = app.listen(PORT, () => logger.info(`✅ Starvis v1.0 listening on :${PORT}`, { module: 'Server' }));
+  // 6. Start listening
+  httpServer = app.listen(PORT, () => logger.info(`✅ Starvis v2.0 listening on :${PORT}`, { module: 'Server' }));
 }
 
-// Graceful shutdown: close HTTP server + disconnect Prisma + Redis
+// Graceful shutdown
 async function shutdown(signal: string) {
   logger.info(`${signal} received — shutting down…`, { module: 'Server' });
   if (httpServer) httpServer.close();
 
-  // Disconnect Prisma
   try {
-    await getStarvisPrisma().$disconnect();
+    await getPrisma().$disconnect();
     logger.info('Prisma disconnected', { module: 'DB' });
   } catch {
     /* not initialised */
   }
 
-  // Disconnect Redis
   try {
     await redis.quit();
     logger.info('Redis disconnected', { module: 'Redis' });

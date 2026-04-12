@@ -126,6 +126,17 @@ export function rowsToFilterOptions(rows: Row[], valueKey: string, labelKey?: st
   }));
 }
 
+// ── PostgreSQL helper ─────────────────────────────────────
+
+/**
+ * Convert MySQL-style `?` positional placeholders to PostgreSQL-style `$1, $2, …`
+ * Call this on every raw SQL string before passing it to `$queryRawUnsafe`.
+ */
+export function toPostgres(sql: string): string {
+  let i = 0;
+  return sql.replace(/\?/g, () => `$${++i}`);
+}
+
 // ── Pagination helper ─────────────────────────────────────
 
 export async function paginate(
@@ -139,7 +150,7 @@ export async function paginate(
   /** Optional map of dot-notation sort keys (e.g. "game_data.scm_speed") to SQL expressions */
   jsonSortMap?: Record<string, string>,
 ): Promise<PaginatedResult> {
-  const countRows = await prisma.$queryRawUnsafe<Row[]>(countSql, ...params);
+  const countRows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(countSql), ...params);
   const total = countRows[0]?.total ?? countRows[0]?.count ?? 0;
 
   const order = opts.order === 'desc' ? 'DESC' : 'ASC';
@@ -157,6 +168,6 @@ export async function paginate(
   }
 
   const sql = `${baseSql} ORDER BY ${orderExpr} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
-  const rows = await prisma.$queryRawUnsafe<Row[]>(sql, ...params);
+  const rows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(sql), ...params);
   return { data: rows.map(stripInternal), total: Number(total), page, limit, pages: Math.ceil(Number(total) / limit) };
 }

@@ -3,7 +3,7 @@
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
 import { annotateWithAffiliation } from '../data/location-affiliations.js';
-import { convertBigIntToNumber, type FiltersResult, type PaginatedResult, paginate, type Row, stripInternal } from './shared.js';
+import { convertBigIntToNumber, type FiltersResult, type PaginatedResult, paginate, type Row, stripInternal, toPostgres } from './shared.js';
 
 const LOCATION_SORT = new Set(['name', 'class_name', 'type', 'system_code', 'is_scannable']);
 
@@ -12,14 +12,18 @@ export class LocationQueryService {
 
   async getLocationTypes(env = 'live'): Promise<string[]> {
     const prisma = this.getClient(env);
-    const rows = await prisma.$queryRawUnsafe<{ type: string }[]>('SELECT DISTINCT type FROM locations ORDER BY type ASC');
+    const rows = await prisma.$queryRawUnsafe<{ type: string }[]>(
+      toPostgres('SELECT DISTINCT type FROM game.locations WHERE env = ? ORDER BY type ASC'),
+      env,
+    );
     return rows.map((r) => r.type);
   }
 
   async getLocationSystems(env = 'live'): Promise<string[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<{ system_code: string }[]>(
-      'SELECT DISTINCT system_code FROM locations WHERE system_code IS NOT NULL ORDER BY system_code ASC',
+      toPostgres('SELECT DISTINCT system_code FROM game.locations WHERE env = ? AND system_code IS NOT NULL ORDER BY system_code ASC'),
+      env,
     );
     return rows.map((r) => r.system_code);
   }
@@ -38,8 +42,8 @@ export class LocationQueryService {
   }): Promise<PaginatedResult> {
     const env = filters?.env ?? 'live';
     const prisma = this.getClient(env);
-    const where: string[] = [];
-    const params: (string | number)[] = [];
+    const where: string[] = ['l.env = ?'];
+    const params: (string | number)[] = [env];
 
     if (filters?.types) {
       const typeList = filters.types
@@ -63,26 +67,25 @@ export class LocationQueryService {
       params.push(filters.system.toUpperCase());
     }
 
-    // By default, omit mining claims from generic listing (too numerous)
     if (!filters?.type && !filters?.types) {
       where.push("l.type NOT IN ('mining_claim')");
     }
 
     if (filters?.search) {
-      where.push('l.name LIKE ?');
+      where.push('l.name ILIKE ?');
       params.push(`%${filters.search}%`);
     }
 
     if (filters?.hideInStarmap === 'false') {
-      where.push('l.hide_in_starmap = 0');
+      where.push('l.hide_in_starmap = false');
     } else if (filters?.hideInStarmap === 'true') {
-      where.push('l.hide_in_starmap = 1');
+      where.push('l.hide_in_starmap = true');
     }
 
-    const w = where.length ? ` WHERE ${where.join(' AND ')}` : '';
+    const w = ` WHERE ${where.join(' AND ')}`;
 
-    const baseSql = `SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid, l.loc_key, l.is_scannable, l.hide_in_starmap FROM locations l${w}`;
-    const countSql = `SELECT COUNT(*) as total FROM locations l${w}`;
+    const baseSql = `SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid, l.loc_key, l.is_scannable, l.hide_in_starmap FROM game.locations l${w}`;
+    const countSql = `SELECT COUNT(*) as total FROM game.locations l${w}`;
 
     const result = await paginate(prisma, baseSql, countSql, params, filters || {}, LOCATION_SORT, 'l');
     return { ...result, data: result.data.map(annotateWithAffiliation) };
@@ -91,11 +94,12 @@ export class LocationQueryService {
   async getLocation(uuid: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid,
+      toPostgres(`SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid,
               l.loc_key, l.description, l.is_scannable, l.hide_in_starmap, l.extracted_at
-       FROM locations l
-       WHERE l.uuid = ?
-       LIMIT 1`,
+       FROM game.locations l
+       WHERE l.env = ? AND l.uuid = ?
+       LIMIT 1`),
+      env,
       uuid,
     );
     if (!rows.length) return null;
@@ -105,7 +109,8 @@ export class LocationQueryService {
   async getAll(env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      'SELECT uuid, class_name, name, type, system_code, parent_uuid, loc_key, is_scannable, hide_in_starmap FROM locations ORDER BY name ASC',
+      toPostgres('SELECT uuid, class_name, name, type, system_code, parent_uuid, loc_key, is_scannable, hide_in_starmap FROM game.locations WHERE env = ? ORDER BY name ASC'),
+      env,
     );
     return rows.map(convertBigIntToNumber).map(stripInternal).map(annotateWithAffiliation);
   }
@@ -113,9 +118,13 @@ export class LocationQueryService {
   async getLocationFilters(env = 'live'): Promise<FiltersResult> {
     const prisma = this.getClient(env);
     const [typeRows, systemRows] = await Promise.all([
-      prisma.$queryRawUnsafe<Row[]>(`SELECT type as value, COUNT(*) as count FROM locations GROUP BY type ORDER BY type`),
       prisma.$queryRawUnsafe<Row[]>(
-        `SELECT DISTINCT system_code as value FROM locations WHERE system_code IS NOT NULL ORDER BY system_code`,
+        toPostgres(`SELECT type as value, COUNT(*) as count FROM game.locations WHERE env = ? GROUP BY type ORDER BY type`),
+        env,
+      ),
+      prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT DISTINCT system_code as value FROM game.locations WHERE env = ? AND system_code IS NOT NULL ORDER BY system_code`),
+        env,
       ),
     ]);
     return {
@@ -129,11 +138,12 @@ export class LocationQueryService {
   async getLocationChildren(uuid: string, env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid, l.is_scannable, l.hide_in_starmap
-       FROM locations l
-       WHERE l.parent_uuid = ?
+      toPostgres(`SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid, l.is_scannable, l.hide_in_starmap
+       FROM game.locations l
+       WHERE l.env = ? AND l.parent_uuid = ?
          AND l.type NOT IN ('mining_claim')
-       ORDER BY l.type ASC, l.name ASC`,
+       ORDER BY l.type ASC, l.name ASC`),
+      env,
       uuid,
     );
     return rows.map(convertBigIntToNumber).map(stripInternal).map(annotateWithAffiliation);

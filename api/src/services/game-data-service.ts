@@ -19,6 +19,7 @@ import { MiningQueryService } from './mining-query-service.js';
 import { MissionService } from './mission-service.js';
 import { PaintQueryService } from './paint-query-service.js';
 import type { PaginatedResult, Row } from './shared.js';
+import { toPostgres } from './shared.js';
 import { ShipQueryService } from './ship-query-service.js';
 import { ShopService } from './shop-service.js';
 import { TradeService } from './trade-service.js';
@@ -39,7 +40,6 @@ class TtlCache<T> {
 }
 
 export class GameDataService {
-  // Sub-services — access directly from route handlers
   readonly ships: ShipQueryService;
   readonly components: ComponentQueryService;
   readonly loadouts: LoadoutService;
@@ -58,7 +58,8 @@ export class GameDataService {
 
   constructor(
     private getClient: (env: string) => PrismaClient,
-    private starvisClient: PrismaClient,
+    /** @deprecated same as getClient('live') — kept for backwards compat */
+    private _metaClient: PrismaClient,
   ) {
     this.ships = new ShipQueryService(getClient);
     this.components = new ComponentQueryService(getClient);
@@ -86,39 +87,44 @@ export class GameDataService {
     const [ships, components, items, commodities, missions, recipes] = await Promise.all([
       this.ships.searchShipsAutocomplete(q, cap, env),
       this.getClient(env).$queryRawUnsafe<Row[]>(
-        `SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade, c.manufacturer_code,
+        toPostgres(`SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade, c.manufacturer_code,
                 m.name as manufacturer_name
-         FROM components c LEFT JOIN starvis.manufacturers m ON c.manufacturer_code = m.code
-         WHERE (c.name LIKE ? OR c.class_name LIKE ?)
-         ORDER BY c.name LIMIT ${cap}`,
+         FROM game.components c LEFT JOIN meta.manufacturers m ON c.manufacturer_code = m.code
+         WHERE c.env = ? AND (c.name ILIKE ? OR c.class_name ILIKE ?)
+         ORDER BY c.name LIMIT ${cap}`),
+        env,
         t,
         t,
       ),
       this.getClient(env).$queryRawUnsafe<Row[]>(
-        `SELECT i.uuid, i.class_name, i.name, i.type, i.sub_type, i.manufacturer_code
-         FROM items i WHERE (i.name LIKE ? OR i.class_name LIKE ?)
-         ORDER BY i.name LIMIT ${cap}`,
+        toPostgres(`SELECT i.uuid, i.class_name, i.name, i.type, i.sub_type, i.manufacturer_code
+         FROM game.items i WHERE i.env = ? AND (i.name ILIKE ? OR i.class_name ILIKE ?)
+         ORDER BY i.name LIMIT ${cap}`),
+        env,
         t,
         t,
       ),
       this.getClient(env).$queryRawUnsafe<Row[]>(
-        `SELECT co.uuid, co.class_name, co.name, co.type
-         FROM commodities co WHERE (co.name LIKE ? OR co.class_name LIKE ?)
-         ORDER BY co.name LIMIT ${cap}`,
+        toPostgres(`SELECT co.uuid, co.class_name, co.name, co.type
+         FROM game.commodities co WHERE co.env = ? AND (co.name ILIKE ? OR co.class_name ILIKE ?)
+         ORDER BY co.name LIMIT ${cap}`),
+        env,
         t,
         t,
       ),
       this.getClient(env).$queryRawUnsafe<Row[]>(
-        `SELECT ms.uuid, ms.class_name, ms.title as name, ms.mission_type as type
-         FROM missions ms WHERE (ms.title LIKE ? OR ms.class_name LIKE ?)
-         ORDER BY ms.title LIMIT ${cap}`,
+        toPostgres(`SELECT ms.uuid, ms.class_name, ms.title as name, ms.mission_type as type
+         FROM game.missions ms WHERE ms.env = ? AND (ms.title ILIKE ? OR ms.class_name ILIKE ?)
+         ORDER BY ms.title LIMIT ${cap}`),
+        env,
         t,
         t,
       ),
       this.getClient(env).$queryRawUnsafe<Row[]>(
-        `SELECT cr.uuid, cr.class_name, cr.name, cr.category
-         FROM crafting_recipes cr WHERE (cr.name LIKE ? OR cr.class_name LIKE ? OR cr.output_item_name LIKE ?)
-         ORDER BY cr.name LIMIT ${cap}`,
+        toPostgres(`SELECT cr.uuid, cr.class_name, cr.name, cr.category
+         FROM game.crafting_recipes cr WHERE cr.env = ? AND (cr.name ILIKE ? OR cr.class_name ILIKE ? OR cr.output_item_name ILIKE ?)
+         ORDER BY cr.name LIMIT ${cap}`),
+        env,
         t,
         t,
         t,
@@ -135,6 +141,7 @@ export class GameDataService {
     entityType?: string;
     changeType?: string;
   }): Promise<{ data: Row[]; total: number }> {
+    const prisma = this.getClient('live');
     const where: string[] = [];
     const p: (string | number)[] = [];
     if (params.entityType) {
@@ -147,13 +154,13 @@ export class GameDataService {
     }
 
     const w = where.length ? ` WHERE ${where.join(' AND ')}` : '';
-    const countRows = await this.starvisClient.$queryRawUnsafe<Row[]>(`SELECT COUNT(*) as total FROM changelog c${w}`, ...p);
+    const countRows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(`SELECT COUNT(*) as total FROM meta.changelog c${w}`), ...p);
     const total = Number(countRows[0]?.total) || 0;
 
     const limit = Math.min(100, parseInt(params.limit || '50', 10));
     const offset = parseInt(params.offset || '0', 10);
-    const rows = await this.starvisClient.$queryRawUnsafe<Row[]>(
-      `SELECT c.*, e.game_version, e.extracted_at as extraction_date FROM changelog c LEFT JOIN extraction_log e ON c.extraction_id = e.id${w} ORDER BY c.created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT c.*, e.game_version, e.extracted_at as extraction_date FROM meta.changelog c LEFT JOIN meta.extraction_log e ON c.extraction_id = e.id${w} ORDER BY c.created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`),
       ...p,
     );
     return { data: rows, total };
@@ -164,23 +171,24 @@ export class GameDataService {
       const cached = this.statsCache.get();
       if (cached) return cached;
     }
-    const rows = await this.getClient(env).$queryRawUnsafe<Row[]>(
-      `
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`
       SELECT
-        (SELECT COUNT(*) FROM ships) as ships,
-        (SELECT COUNT(*) FROM components) as components,
-        (SELECT COUNT(*) FROM items) as items,
-        (SELECT COUNT(*) FROM commodities) as commodities,
-        (SELECT COUNT(*) FROM starvis.manufacturers) as manufacturers,
-        (SELECT COUNT(*) FROM ship_loadouts) as loadoutPorts,
-        (SELECT COUNT(*) FROM ship_paints) as paints,
-        (SELECT COUNT(*) FROM shops) as shops,
-        (SELECT COUNT(*) FROM ships WHERE ship_matrix_id IS NOT NULL) as shipsLinkedToMatrix
-    `,
+        (SELECT COUNT(*) FROM game.ships WHERE env = ?) as ships,
+        (SELECT COUNT(*) FROM game.components WHERE env = ?) as components,
+        (SELECT COUNT(*) FROM game.items WHERE env = ?) as items,
+        (SELECT COUNT(*) FROM game.commodities WHERE env = ?) as commodities,
+        (SELECT COUNT(*) FROM meta.manufacturers) as manufacturers,
+        (SELECT COUNT(*) FROM game.ship_loadouts WHERE env = ?) as loadoutPorts,
+        (SELECT COUNT(*) FROM game.ship_paints WHERE env = ?) as paints,
+        (SELECT COUNT(*) FROM game.shops WHERE env = ?) as shops,
+        (SELECT COUNT(*) FROM game.ships WHERE env = ? AND ship_matrix_id IS NOT NULL) as shipsLinkedToMatrix
+    `),
+      env, env, env, env, env, env, env, env,
     );
     const latest = await this.getLatestExtraction(env);
     const raw = rows[0];
-    // Convert BigInt to Number for JSON serialization
     const result = {
       ships: Number(raw.ships),
       components: Number(raw.components),
@@ -198,13 +206,15 @@ export class GameDataService {
   }
 
   async getExtractionLog(): Promise<Row[]> {
-    const rows = await this.starvisClient.$queryRawUnsafe<Row[]>('SELECT * FROM extraction_log ORDER BY extracted_at DESC LIMIT 20');
+    const rows = await this.getClient('live').$queryRawUnsafe<Row[]>(
+      'SELECT * FROM meta.extraction_log ORDER BY extracted_at DESC LIMIT 20',
+    );
     return rows;
   }
 
   async getLatestExtraction(env = 'live'): Promise<Row | null> {
-    const rows = await this.starvisClient.$queryRawUnsafe<Row[]>(
-      'SELECT * FROM extraction_log WHERE game_env = ? ORDER BY extracted_at DESC LIMIT 1',
+    const rows = await this.getClient('live').$queryRawUnsafe<Row[]>(
+      toPostgres('SELECT * FROM meta.extraction_log WHERE game_env = ? ORDER BY extracted_at DESC LIMIT 1'),
       env,
     );
     return rows[0] || null;
@@ -215,25 +225,26 @@ export class GameDataService {
       const cached = this.publicStatsCache.get();
       if (cached) return cached;
     }
-    const rows = await this.getClient(env).$queryRawUnsafe<Row[]>(
-      `
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`
       SELECT
-        (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL) as ships,
-        (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL AND vehicle_category = 'ship') as flyable_ships,
-        (SELECT COUNT(*) FROM ships WHERE variant_type IS NULL AND vehicle_category = 'ground') as ground_vehicles,
-        (SELECT COUNT(*) FROM components) as components,
-        (SELECT COUNT(*) FROM items) as items,
-        (SELECT COUNT(*) FROM commodities) as commodities,
-        (SELECT COUNT(*) FROM starvis.manufacturers) as manufacturers,
-        (SELECT COUNT(*) FROM ship_paints) as paints,
-        (SELECT COUNT(*) FROM shops) as shops,
-        (SELECT COUNT(DISTINCT type) FROM components) as component_types,
-        (SELECT COUNT(DISTINCT type) FROM items) as item_types
-    `,
+        (SELECT COUNT(*) FROM game.ships WHERE env = ? AND variant_type IS NULL) as ships,
+        (SELECT COUNT(*) FROM game.ships WHERE env = ? AND variant_type IS NULL AND vehicle_category = 'ship') as flyable_ships,
+        (SELECT COUNT(*) FROM game.ships WHERE env = ? AND variant_type IS NULL AND vehicle_category = 'ground') as ground_vehicles,
+        (SELECT COUNT(*) FROM game.components WHERE env = ?) as components,
+        (SELECT COUNT(*) FROM game.items WHERE env = ?) as items,
+        (SELECT COUNT(*) FROM game.commodities WHERE env = ?) as commodities,
+        (SELECT COUNT(*) FROM meta.manufacturers) as manufacturers,
+        (SELECT COUNT(*) FROM game.ship_paints WHERE env = ?) as paints,
+        (SELECT COUNT(*) FROM game.shops WHERE env = ?) as shops,
+        (SELECT COUNT(DISTINCT type) FROM game.components WHERE env = ?) as component_types,
+        (SELECT COUNT(DISTINCT type) FROM game.items WHERE env = ?) as item_types
+    `),
+      env, env, env, env, env, env, env, env, env, env,
     );
     const latest = await this.getLatestExtraction(env);
     const raw = rows[0];
-    // Convert BigInt to Number for JSON serialization
     const result = {
       ships: Number(raw.ships),
       flyable_ships: Number(raw.flyable_ships),
@@ -254,15 +265,22 @@ export class GameDataService {
   }
 
   async getGameVersions(opts: { env?: string; limit?: number; offset?: number } = {}): Promise<{ data: Row[]; total: number }> {
+    const prisma = this.getClient('live');
     const limit = Math.min(100, opts.limit || 20);
     const offset = Math.max(0, opts.offset || 0);
     const where = opts.env ? 'WHERE game_env = ?' : '';
     const params: (string | number)[] = opts.env ? [opts.env] : [];
-    const countRows = await this.starvisClient.$queryRawUnsafe<Row[]>(`SELECT COUNT(*) as total FROM extraction_log ${where}`, ...params);
+    const countRows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT COUNT(*) as total FROM meta.extraction_log ${where}`),
+      ...params,
+    );
     const total = Number(countRows[0]?.total) || 0;
-    const rows = await this.starvisClient.$queryRawUnsafe<Row[]>(
-      `SELECT id, game_version, game_env, extracted_at, ships, components, items, commodities, shops, total_records
-       FROM extraction_log ${where} ORDER BY extracted_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT id, game_version, game_env, extracted_at,
+             ships_count as ships, components_count as components,
+             items_count as items, commodities_count as commodities,
+             shops_count as shops
+       FROM meta.extraction_log ${where} ORDER BY extracted_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`),
       ...params,
     );
     return {
@@ -274,19 +292,19 @@ export class GameDataService {
         items: Number(r.items),
         commodities: Number(r.commodities),
         shops: Number(r.shops),
-        total_records: Number(r.total_records),
       })),
       total,
     };
   }
 
   async getChangelogSummary(): Promise<Record<string, unknown>> {
-    const byType = await this.starvisClient.$queryRawUnsafe<Row[]>(
+    const prisma = this.getClient('live');
+    const byType = await prisma.$queryRawUnsafe<Row[]>(
       `SELECT entity_type, change_type, COUNT(*) as count
-       FROM changelog GROUP BY entity_type, change_type ORDER BY entity_type, change_type`,
+       FROM meta.changelog GROUP BY entity_type, change_type ORDER BY entity_type, change_type`,
     );
-    const latest = await this.starvisClient.$queryRawUnsafe<Row[]>('SELECT extracted_at FROM extraction_log ORDER BY id DESC LIMIT 1');
-    const total = await this.starvisClient.$queryRawUnsafe<Row[]>('SELECT COUNT(*) as total FROM changelog');
+    const latest = await prisma.$queryRawUnsafe<Row[]>('SELECT extracted_at FROM meta.extraction_log ORDER BY id DESC LIMIT 1');
+    const total = await prisma.$queryRawUnsafe<Row[]>('SELECT COUNT(*) as total FROM meta.changelog');
 
     const by_entity: Record<string, number> = {};
     const by_change: Record<string, number> = {};

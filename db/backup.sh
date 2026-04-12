@@ -1,13 +1,13 @@
 #!/bin/bash
 # ==============================================================
-# MySQL Backup Script â€” Daily automated backup
+# PostgreSQL Backup Script — Daily automated backup
 # Cron: 0 3 * * * /home/debian/starvis/db/backup.sh
 # Keeps last 7 days of backups
 # ==============================================================
 set -euo pipefail
 
 BACKUP_DIR="/home/debian/starvis/backups"
-CONTAINER="starvis-mysql"
+CONTAINER="starvis-postgres"
 RETENTION_DAYS=7
 DATE=$(date +%Y-%m-%d_%H%M)
 
@@ -16,29 +16,26 @@ source /home/debian/starvis/.env
 
 mkdir -p "$BACKUP_DIR"
 
-echo "[$(date)] Starting MySQL backup..."
+echo "[$(date)] Starting PostgreSQL backup..."
 
-# Dump all tables (password passed via temp config to avoid exposure in ps aux)
-docker exec "$CONTAINER" sh -c "
-  echo '[client]' > /tmp/.backup_cnf && echo \"password=\$1\" >> /tmp/.backup_cnf && chmod 600 /tmp/.backup_cnf
-  mysqldump --defaults-extra-file=/tmp/.backup_cnf -u root --single-transaction --routines --triggers \"\$2\"
-  rm -f /tmp/.backup_cnf
-" -- "${MYSQL_ROOT_PASSWORD}" "${DB_NAME}" | gzip > "${BACKUP_DIR}/starvis_${DATE}.sql.gz"
+PGPASSWORD="$DB_PASSWORD" docker exec -e PGPASSWORD="$DB_PASSWORD" "$CONTAINER" \
+  pg_dump -U "$DB_USER" -d "$DB_NAME" --no-password \
+  | gzip > "${BACKUP_DIR}/starvis_${DATE}.sql.gz"
 
-# Check dump succeeded (set +e temporarily to handle the check manually)
+# Check dump succeeded
 set +e
 DUMP_SIZE=$(stat -c%s "${BACKUP_DIR}/starvis_${DATE}.sql.gz" 2>/dev/null)
 set -e
 
 if [ -n "$DUMP_SIZE" ] && [ "$DUMP_SIZE" -gt 0 ]; then
   SIZE=$(du -h "${BACKUP_DIR}/starvis_${DATE}.sql.gz" | cut -f1)
-  echo "[$(date)] âœ… Backup complete: starvis_${DATE}.sql.gz (${SIZE})"
+  echo "[$(date)] ✅ Backup complete: starvis_${DATE}.sql.gz (${SIZE})"
 else
-  echo "[$(date)] âŒ Backup failed!"
+  echo "[$(date)] ❌ Backup failed!"
   rm -f "${BACKUP_DIR}/starvis_${DATE}.sql.gz"
   exit 1
 fi
 
 # Remove old backups
 find "$BACKUP_DIR" -name "starvis_*.sql.gz" -mtime +${RETENTION_DAYS} -delete
-echo "[$(date)] ðŸ§¹ Cleaned backups older than ${RETENTION_DAYS} days"
+echo "[$(date)] 🧹 Cleaned backups older than ${RETENTION_DAYS} days"

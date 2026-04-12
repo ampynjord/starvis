@@ -2,7 +2,7 @@
  * LoadoutService — Loadout calculator, hardpoint builder, stat aggregation
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
-import { int, num, type Row, r1, r2, r4, r6 } from './shared.js';
+import { int, num, type Row, r1, r2, r4, r6, toPostgres } from './shared.js';
 
 const UTILITY_WEAPON_RX = /tractor|mining|salvage|repair|grin_tractor|grin_salvage/i;
 
@@ -20,15 +20,15 @@ const RELEVANT_TYPES = new Set([
 ]);
 
 const SHIP_SELECT_WITH_DISPLAY =
-  'SELECT s.*, COALESCE(sm.name, s.name) as display_name FROM ships s LEFT JOIN rsi_website.ship_matrix sm ON s.ship_matrix_id = sm.id';
-const SHIP_BY_UUID_SQL = `${SHIP_SELECT_WITH_DISPLAY} WHERE s.uuid = ?`;
-const SHIP_MATRIX_DIMENSIONS_SQL = 'SELECT length, beam, height FROM rsi_website.ship_matrix WHERE id = ?';
+  'SELECT s.*, COALESCE(sm.name, s.name) as display_name FROM game.ships s LEFT JOIN rsi.ship_matrix sm ON s.ship_matrix_id = sm.id';
+const SHIP_BY_UUID_SQL = `${SHIP_SELECT_WITH_DISPLAY} WHERE s.uuid = ? AND s.env = ?`;
+const SHIP_MATRIX_DIMENSIONS_SQL = 'SELECT length, beam, height FROM rsi.ship_matrix WHERE id = ?';
 
 const LOADOUT_SELECT = `SELECT sl.id, sl.port_name, sl.port_type, sl.port_min_size, sl.port_max_size,
         sl.parent_id, sl.component_uuid, sl.component_class_name, sl.port_editable,
         c.*
- FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid`;
-const LOADOUT_BY_SHIP_SQL = `${LOADOUT_SELECT} WHERE sl.ship_uuid = ?`;
+ FROM game.ship_loadouts sl LEFT JOIN game.components c ON sl.component_uuid = c.uuid`;
+const LOADOUT_BY_SHIP_SQL = `${LOADOUT_SELECT} WHERE sl.ship_uuid = ? AND sl.env = ?`;
 
 function detectUtilityType(name: string, className: string): string {
   const s = `${name} ${className}`.toLowerCase();
@@ -634,7 +634,7 @@ export class LoadoutService {
 
   private async getShipRow(shipUuid: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
-    const rows = await prisma.$queryRawUnsafe<Row[]>(SHIP_BY_UUID_SQL, shipUuid);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(SHIP_BY_UUID_SQL), shipUuid, env);
     return rows[0] ?? null;
   }
 
@@ -645,7 +645,7 @@ export class LoadoutService {
 
     if (crossX === 0 && crossY === 0 && crossZ === 0 && ship.ship_matrix_id) {
       const prisma = this.getClient(env);
-      const smRows = await prisma.$queryRawUnsafe<Row[]>(SHIP_MATRIX_DIMENSIONS_SQL, ship.ship_matrix_id);
+      const smRows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(SHIP_MATRIX_DIMENSIONS_SQL), ship.ship_matrix_id);
       if (smRows.length) {
         crossX = num(smRows[0].length);
         crossY = num(smRows[0].beam);
@@ -658,7 +658,7 @@ export class LoadoutService {
 
   private async getLoadoutRows(shipUuid: string, env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
-    return prisma.$queryRawUnsafe<Row[]>(LOADOUT_BY_SHIP_SQL, shipUuid);
+    return prisma.$queryRawUnsafe<Row[]>(toPostgres(LOADOUT_BY_SHIP_SQL), shipUuid, env);
   }
 
   // ── Read loadout / modules / paints ─────────────────────
@@ -666,7 +666,7 @@ export class LoadoutService {
   async getShipLoadout(shipUuid: string, env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT sl.id, sl.port_name, sl.port_type, sl.component_class_name, sl.component_uuid,
+      toPostgres(`SELECT sl.id, sl.port_name, sl.port_type, sl.component_class_name, sl.component_uuid,
               sl.port_min_size, sl.port_max_size, sl.parent_id,
               c.name as component_name, c.type as component_type, c.sub_type,
               c.size as component_size, c.grade, c.manufacturer_code,
@@ -680,9 +680,10 @@ export class LoadoutService {
               c.rack_count, c.rack_missile_size,
               c.cm_ammo_count,
               c.radar_range, c.radar_detection_lifetime, c.radar_tracking_signal
-       FROM ship_loadouts sl LEFT JOIN components c ON sl.component_uuid = c.uuid
-       WHERE sl.ship_uuid = ? ORDER BY sl.port_type, sl.port_name`,
+       FROM game.ship_loadouts sl LEFT JOIN game.components c ON sl.component_uuid = c.uuid
+       WHERE sl.ship_uuid = ? AND sl.env = ? ORDER BY sl.port_type, sl.port_name`),
       shipUuid,
+      env,
     );
     return rows as Row[];
   }
@@ -701,21 +702,19 @@ export class LoadoutService {
     ];
     const noiseClauses = NOISE_PATTERNS.map((p) => `slot_name NOT LIKE '%${p}%'`).join(' AND ');
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT * FROM ship_modules WHERE ship_uuid = ? AND ${noiseClauses} ORDER BY slot_name`,
+      toPostgres(`SELECT * FROM game.ship_modules WHERE ship_uuid = ? AND env = ? AND ${noiseClauses} ORDER BY slot_name`),
       shipUuid,
+      env,
     );
-    // MySQL returns JSON columns as strings — parse them so the API sends proper objects
-    return (rows as Record<string, unknown>[]).map((row) => ({
-      ...row,
-      loadout_json: typeof row.loadout_json === 'string' ? JSON.parse(row.loadout_json) : (row.loadout_json ?? null),
-    })) as unknown as Row[];
+    return rows;
   }
 
   async getShipPaints(shipUuid: string, env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      'SELECT paint_class_name, paint_name, paint_uuid FROM ship_paints WHERE ship_uuid = ? ORDER BY paint_name',
+      toPostgres('SELECT paint_class_name, paint_name, paint_uuid FROM game.ship_paints WHERE ship_uuid = ? AND env = ? ORDER BY paint_name'),
       shipUuid,
+      env,
     );
     return rows;
   }
@@ -747,7 +746,11 @@ export class LoadoutService {
       if (swapUuids.length) {
         const ph = swapUuids.map(() => '?').join(',');
         const prisma = this.getClient('live');
-        const compRows = await prisma.$queryRawUnsafe<Row[]>(`SELECT * FROM components WHERE uuid IN (${ph})`, ...swapUuids);
+        const compRows = await prisma.$queryRawUnsafe<Row[]>(
+          toPostgres(`SELECT * FROM game.components WHERE uuid IN (${ph}) AND env = ?`),
+          ...swapUuids,
+          'live',
+        );
         for (const c of compRows) swapComponents.set(c.uuid, c);
       }
 
@@ -853,7 +856,7 @@ export class LoadoutService {
 
   async getShipHardpoints(shipUuid: string, env = 'live'): Promise<Record<string, unknown>[] | null> {
     const prisma = this.getClient(env);
-    const shipRows = await prisma.$queryRawUnsafe<Row[]>('SELECT uuid FROM ships WHERE uuid = ?', shipUuid);
+    const shipRows = await prisma.$queryRawUnsafe<Row[]>(toPostgres('SELECT uuid FROM game.ships WHERE uuid = ? AND env = ?'), shipUuid, env);
     if (!shipRows.length) return null;
 
     const loadoutRows = await this.getLoadoutRows(shipUuid, env);

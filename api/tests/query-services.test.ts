@@ -81,9 +81,9 @@ describe('ShipQueryService', () => {
       const results = await svc.searchShipsAutocomplete('aurora', 5);
       expect(results).toHaveLength(1);
       expect((prisma as any).$queryRawUnsafe).toHaveBeenCalledTimes(1);
-      // Verify LIKE pattern is passed
+      // Verify LIKE pattern is passed (env is first arg, search term is second)
       const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
-      expect(callArgs[1]).toContain('%aurora%');
+      expect(callArgs[2]).toContain('%aurora%');
     });
   });
 
@@ -151,8 +151,8 @@ describe('ComponentQueryService', () => {
 
       expect(result).toHaveLength(1);
       const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
-      expect(callArgs[0]).toContain('LEFT JOIN starvis.manufacturers m ON s.manufacturer_code = m.code');
-      expect(callArgs[1]).toEqual('component-uuid');
+      expect(callArgs[0]).toContain('LEFT JOIN meta.manufacturers m ON s.manufacturer_code = m.code');
+      expect(callArgs[3]).toEqual('component-uuid');
     });
   });
 
@@ -224,7 +224,7 @@ describe('ItemQueryService', () => {
       const svc = new ItemQueryService(createGetClient(prisma));
       await svc.getAllItems({ types: 'WeaponPersonal' });
       const countSql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
-      expect(countSql).toContain('i.type = ?');
+      expect(countSql).toContain('i.type = $');
     });
 
     it('types param takes priority over type param', async () => {
@@ -362,7 +362,7 @@ describe('MissionService', () => {
       const svc = new MissionService(createGetClient(prisma));
       await svc.getMissions({ legal: 'true' });
       const sql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
-      expect(sql).toContain('is_legal = 1');
+      expect(sql).toContain('is_legal = true');
     });
 
     it('applies is_legal = false filter', async () => {
@@ -370,7 +370,7 @@ describe('MissionService', () => {
       const svc = new MissionService(createGetClient(prisma));
       await svc.getMissions({ legal: 'false' });
       const sql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
-      expect(sql).toContain('is_legal = 0');
+      expect(sql).toContain('is_legal = false');
     });
 
     it('clamps limit to 200', async () => {
@@ -440,7 +440,7 @@ describe('ShopService', () => {
       const result = await svc.getShopInventory(42);
       expect(result).toHaveLength(1);
       const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
-      expect(callArgs[1]).toBe(42);
+      expect(callArgs[2]).toBe(42);
     });
   });
 });
@@ -484,12 +484,12 @@ describe('ShipQueryService manufacturers', () => {
       expect(sql).toContain('WHERE');
     });
 
-    it('omits WHERE filter when onlyWithData=false', async () => {
+    it('omits outer WHERE filter when onlyWithData=false', async () => {
       const prisma = createMockPrisma([[]]);
       const svc = new ShipQueryService(createGetClient(prisma));
       await svc.getAllManufacturers('live', false);
       const sql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
-      expect(sql).not.toContain('WHERE');
+      expect(sql).not.toContain('WHERE COALESCE');
     });
 
     it('orders by m.name', async () => {
@@ -553,7 +553,7 @@ describe('ShipQueryService manufacturers', () => {
       await svc.getManufacturerByCode('RSI');
       const sql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
       expect(sql).not.toContain('COUNT(DISTINCT');
-      expect(sql).toContain('WHERE manufacturer_code = ?');
+      expect(sql).toContain('WHERE manufacturer_code = $');
     });
   });
 

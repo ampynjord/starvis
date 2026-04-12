@@ -11,16 +11,15 @@ jobs:
     name: Code Quality and Tests
     runs-on: ubuntu-latest
     services:
-      mysql:
-        image: mysql:8.0
+      postgres:
+        image: postgres:16-alpine
         env:
-          MYSQL_ROOT_PASSWORD: ci_password
-          MYSQL_DATABASE: starvis
-          MYSQL_USER: ci_user
-          MYSQL_PASSWORD: ci_password
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_USER: ci_user
+          POSTGRES_DB: starvis
         ports:
-          - 3306:3306
-        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+          - 5432:5432
+        options: --health-cmd="pg_isready -U ci_user" --health-interval=10s --health-timeout=5s --health-retries=5
       redis:
         image: redis:7-alpine
         ports:
@@ -42,13 +41,8 @@ jobs:
       - name: Generate DB Clients
         run: npm run db:generate
 
-      - name: Apply DB Schemas
-        run: |
-          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/live"        npm run generate:game --workspace=@starvis/db
-          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/ptu"         npm run push:game --workspace=@starvis/db
-          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/live"        npm run push:game --workspace=@starvis/db
-          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/starvis"     npm run push:starvis --workspace=@starvis/db
-          DATABASE_URL="mysql://root:ci_password@127.0.0.1:3306/rsi_website" npm run push:rsi --workspace=@starvis/db
+      - name: Apply DB Schema
+        run: DATABASE_URL="postgresql://ci_user:ci_password@127.0.0.1:5432/starvis" npm run push --workspace=@starvis/db
 
       - name: Lint workspace packages
         run: npm run lint
@@ -56,11 +50,7 @@ jobs:
       - name: Run Tests with coverage
         run: npm run test -- --coverage
         env:
-          DB_HOST: 127.0.0.1
-          DB_PORT: 3306
-          DB_USER: ci_user
-          DB_PASSWORD: ci_password
-          DB_NAME: starvis
+          DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/starvis
           REDIS_HOST: 127.0.0.1
           REDIS_PORT: 6379
           NODE_ENV: test

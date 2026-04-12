@@ -4,11 +4,11 @@
  *
  * Standalone tool that reads Star Citizen's P4K file locally,
  * extracts game data (ships, components, paints, shops, missions…)
- * and writes everything to a remote MySQL database.
+ * and writes everything to a remote PostgreSQL database.
  *
  * Environment variables (or .env.extractor.dev at project root):
- *   DB_HOST, DB_PORT, DB_USER, DB_PASSWORD
- *   DB_NAME (optional fallback for --env custom)
+ *   DATABASE_URL (optional, overrides individual params)
+ *   DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
  *   P4K_PATH (alternative to --p4k flag)
  *   LOG_LEVEL (debug|info|warn|error, default: info)
  */
@@ -21,7 +21,7 @@ config({ path: resolve(import.meta.dirname, envFile) });
 
 import { existsSync, readFileSync } from 'node:fs';
 import { Command } from 'commander';
-import * as mysql from 'mysql2/promise';
+import { Pool } from 'pg';
 import { DataForgeService } from './src/dataforge-service.js';
 import { type ExtractionModule, ExtractionService, type GameEnv } from './src/extraction-service.js';
 import logger from './src/logger.js';
@@ -82,7 +82,7 @@ const RSI_MODULES = new Set<ExtractionModule>(['galactapedia', 'comm-links', 'st
 // ── CLI ─────────────────────────────────────────────────────
 const program = new Command()
   .name('starvis-extractor')
-  .description('Star Citizen P4K → MySQL game data extractor')
+  .description('Star Citizen P4K → PostgreSQL game data extractor')
   .version(pkg.version)
   .option('-p, --p4k <path>', 'path to Data.p4k (overrides auto-detection)')
   .option('-e, --env <env>', 'game environment: live | ptu | eptu | custom', 'live')
@@ -93,11 +93,12 @@ const program = new Command()
     'after',
     `
 Environment variables:
-  DB_HOST       MySQL host (default: localhost)
-  DB_PORT       MySQL port (default: 3306)
-  DB_USER       MySQL user
-  DB_PASSWORD   MySQL password
-  DB_NAME       Database name (optional, used as fallback for --env custom)
+  DATABASE_URL  PostgreSQL connection string (overrides individual params)
+  DB_HOST       PostgreSQL host (default: localhost)
+  DB_PORT       PostgreSQL port (default: 5432)
+  DB_USER       PostgreSQL user
+  DB_PASSWORD   PostgreSQL password
+  DB_NAME       PostgreSQL database name (default: starvis)
   P4K_PATH      Alternative to --p4k flag
   LOG_LEVEL     debug | info | warn | error (default: info)
 
@@ -106,10 +107,10 @@ Available modules (P4K game data):
 
 Network-only modules (no P4K required):
   ctm              — scrape 3D model URLs from RSI website
-  ship-matrix      — sync RSI Ship Matrix from RSI website → rsi_website.ship_matrix
-  galactapedia     — sync RSI Galactapedia from SC Wiki API → rsi_website.galactapedia
-  comm-links       — sync RSI Comm-Links from SC Wiki API  → rsi_website.comm_links
-  starmap          — sync RSI Starmap from SC Wiki API     → rsi_website.starmap_locations
+  ship-matrix      — sync RSI Ship Matrix from RSI website → rsi.ship_matrix
+  galactapedia     — sync RSI Galactapedia from SC Wiki API → rsi.galactapedia
+  comm-links       — sync RSI Comm-Links from SC Wiki API  → rsi.comm_links
+  starmap          — sync RSI Starmap from SC Wiki API     → rsi.starmap_locations
 
 Examples:
   npx tsx extract.ts --env live
@@ -210,55 +211,36 @@ async function main() {
     return;
   }
 
-  const baseDbConfig = {
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '3306', 10),
-    user: process.env.DB_USER || '',
-    password: process.env.DB_PASSWORD || '',
-    waitForConnections: true,
-    connectionLimit: 5,
-    enableKeepAlive: true,
-    keepAliveInitialDelay: 10000,
-    connectTimeout: 60000,
-  };
+  // ── PostgreSQL pool (single DB, all schemas: game / rsi / meta) ──
+  let pool: Pool | undefined;
 
-  if (!baseDbConfig.user || !baseDbConfig.password) {
-    console.error('Error: DB_USER and DB_PASSWORD environment variables are required.');
+  const pgConfig = process.env.DATABASE_URL
+    ? { connectionString: process.env.DATABASE_URL, max: 5 }
+    : {
+        host: process.env.DB_HOST || 'localhost',
+        port: parseInt(process.env.DB_PORT || '5432', 10),
+        user: process.env.DB_USER || '',
+        password: process.env.DB_PASSWORD || '',
+        database: process.env.DB_NAME || 'starvis',
+        max: 5,
+      };
+
+  if (!process.env.DATABASE_URL && (!process.env.DB_USER || !process.env.DB_PASSWORD)) {
+    console.error('Error: DB_USER and DB_PASSWORD (or DATABASE_URL) environment variables are required.');
     process.exit(1);
   }
 
-  // ── Game DB pool (live/ptu) ──
-  let pool: mysql.Pool | undefined;
-  if (needsGameDb(selectedModules)) {
-    const GAME_DB_MAP: Record<string, string> = { live: 'live', ptu: 'ptu', eptu: 'ptu' };
-    const gameDatabaseName = GAME_DB_MAP[env] || process.env.DB_NAME || '';
-    if (!gameDatabaseName) {
-      console.error('Error: Database name is required. Use --env live|ptu|eptu or set DB_NAME.');
-      process.exit(1);
-    }
-    logger.info(`Connecting to MySQL ${baseDbConfig.host}:${baseDbConfig.port}/${gameDatabaseName}…`);
+  if (needsGameDb(selectedModules) || needsRsiDb(selectedModules)) {
+    logger.info(
+      `Connecting to PostgreSQL ${process.env.DATABASE_URL ? '(DATABASE_URL)' : `${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || '5432'}/${process.env.DB_NAME || 'starvis'}`}…`,
+    );
     try {
-      pool = mysql.createPool({ ...baseDbConfig, database: gameDatabaseName });
-      const conn = await pool.getConnection();
-      conn.release();
-      logger.info('✅ Game DB connected');
+      pool = new Pool(pgConfig);
+      const client = await pool.connect();
+      client.release();
+      logger.info('✅ PostgreSQL connected');
     } catch (e) {
-      console.error(`Error: Cannot connect to game database: ${(e as Error).message}`);
-      process.exit(1);
-    }
-  }
-
-  // ── RSI website DB pool ──
-  let rsiPool: mysql.Pool | undefined;
-  if (needsRsiDb(selectedModules)) {
-    logger.info(`Connecting to MySQL ${baseDbConfig.host}:${baseDbConfig.port}/rsi_website…`);
-    try {
-      rsiPool = mysql.createPool({ ...baseDbConfig, database: 'rsi_website' });
-      const conn = await rsiPool.getConnection();
-      conn.release();
-      logger.info('✅ RSI website DB connected');
-    } catch (e) {
-      console.error(`Error: Cannot connect to rsi_website database: ${(e as Error).message}`);
+      console.error(`Error: Cannot connect to PostgreSQL: ${(e as Error).message}`);
       process.exit(1);
     }
   }
@@ -268,7 +250,7 @@ async function main() {
   const startTime = Date.now();
 
   try {
-    const stats = await extractor.extractAll((msg) => logger.info(msg), { modules: selectedModules, env, rsiPool });
+    const stats = await extractor.extractAll((msg) => logger.info(msg), { modules: selectedModules, env, rsiPool: pool });
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     logger.info('═══════════════════════════════════════════');
@@ -290,7 +272,6 @@ async function main() {
   } finally {
     await dfService?.close();
     await pool?.end();
-    await rsiPool?.end();
   }
 }
 

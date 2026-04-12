@@ -16,9 +16,15 @@
     "db:generate": "npm run generate --workspace=@starvis/db",
     "db:push": "npm run push --workspace=@starvis/db",
     "db:studio": "npm run studio --workspace=@starvis/db",
-    "sync": "npm run extract --workspace=@starvis/extractor -- --modules galactapedia,comm-links,starmap"
+    "sync": "npm run extract --workspace=@starvis/extractor -- --modules galactapedia,comm-links,starmap",
+    "migrate:mysql-to-pg": "npx tsx scripts/migrate-mysql-to-postgres.ts",
+    "migrate:mysql-to-pg:dry-run": "npx tsx scripts/migrate-mysql-to-postgres.ts --dry-run"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.9"
+    "@biomejs/biome": "^2.4.9",
+    "mysql2": "^3.20.0",
+    "pg": "^8.12.0",
+    "@types/pg": "^8.11.0",
+    "tsx": "^4.21.0"
   }
 }

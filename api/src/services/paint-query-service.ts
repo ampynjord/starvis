@@ -3,6 +3,7 @@
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
 import type { FiltersResult, PaginatedResult, Row } from './shared.js';
+import { toPostgres } from './shared.js';
 
 export class PaintQueryService {
   constructor(private getClient: (env: string) => PrismaClient) {}
@@ -10,11 +11,11 @@ export class PaintQueryService {
   async getAllPaints(opts: { env?: string; search?: string; ship_uuid?: string; page?: number; limit?: number }): Promise<PaginatedResult> {
     const env = opts.env ?? 'live';
     const prisma = this.getClient(env);
-    const where: string[] = [];
-    const params: (string | number)[] = [];
+    const where: string[] = ['sp.env = ?'];
+    const params: (string | number)[] = [env];
 
     if (opts.search) {
-      where.push('(sp.paint_name LIKE ? OR sp.paint_class_name LIKE ? OR s.name LIKE ?)');
+      where.push('(sp.paint_name ILIKE ? OR sp.paint_class_name ILIKE ? OR s.name ILIKE ?)');
       const t = `%${opts.search}%`;
       params.push(t, t, t);
     }
@@ -23,16 +24,16 @@ export class PaintQueryService {
       params.push(opts.ship_uuid);
     }
 
-    const w = where.length ? ` WHERE ${where.join(' AND ')}` : '';
+    const w = ` WHERE ${where.join(' AND ')}`;
     const baseSql = `SELECT sp.id, sp.ship_uuid, sp.paint_class_name, sp.paint_name, sp.paint_uuid,
       s.name as ship_name, s.class_name as ship_class_name,
       m.name as manufacturer_name, m.code as manufacturer_code
-      FROM ship_paints sp
-      LEFT JOIN ships s ON sp.ship_uuid = s.uuid
-      LEFT JOIN starvis.manufacturers m ON s.manufacturer_code = m.code${w}`;
-    const countSql = `SELECT COUNT(*) as total FROM ship_paints sp LEFT JOIN ships s ON sp.ship_uuid = s.uuid${w}`;
+      FROM game.ship_paints sp
+      LEFT JOIN game.ships s ON sp.ship_uuid = s.uuid AND s.env = sp.env
+      LEFT JOIN meta.manufacturers m ON s.manufacturer_code = m.code${w}`;
+    const countSql = `SELECT COUNT(*) as total FROM game.ship_paints sp LEFT JOIN game.ships s ON sp.ship_uuid = s.uuid AND s.env = sp.env${w}`;
 
-    const countRows = await prisma.$queryRawUnsafe<Row[]>(countSql, ...params);
+    const countRows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(countSql), ...params);
     const total = Number(countRows[0]?.total) || 0;
 
     const page = Math.max(1, opts.page || 1);
@@ -40,19 +41,20 @@ export class PaintQueryService {
     const offset = (page - 1) * limit;
 
     const sql = `${baseSql} ORDER BY s.name, sp.paint_name LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
-    const rows = await prisma.$queryRawUnsafe<Row[]>(sql, ...params);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(sql), ...params);
     return { data: rows, total, page, limit, pages: Math.ceil(total / limit) };
   }
 
   async getPaintFilters(env = 'live'): Promise<FiltersResult> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT s.uuid as value, COALESCE(sm.name, s.name) as label, COUNT(sp.id) as count
-       FROM ship_paints sp
-       JOIN ships s ON sp.ship_uuid = s.uuid
-       LEFT JOIN rsi_website.ship_matrix sm ON s.ship_matrix_id = sm.id
+      toPostgres(`SELECT s.uuid as value, COALESCE(sm.name, s.name) as label, COUNT(sp.id) as count
+       FROM game.ship_paints sp
+       JOIN game.ships s ON sp.ship_uuid = s.uuid AND s.env = ?
+       LEFT JOIN rsi.ship_matrix sm ON s.ship_matrix_id = sm.id
        GROUP BY s.uuid, s.name, sm.name
-       ORDER BY COALESCE(sm.name, s.name)`,
+       ORDER BY COALESCE(sm.name, s.name)`),
+      env,
     );
     return {
       filters: {

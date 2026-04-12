@@ -1,14 +1,8 @@
 /**
  * MiningQueryService — Mineral elements and rock compositions from P4K DataForge
- *
- * Endpoints:
- *   GET /api/v1/mining/elements              — all minerals with properties
- *   GET /api/v1/mining/elements/:uuid        — single element + rocks containing it
- *   GET /api/v1/mining/compositions          — all rock types with parts
- *   GET /api/v1/mining/solver?element=uuid   — rocks sorted by probability for a given mineral
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
-import { convertBigIntToNumber, type Row } from './shared.js';
+import { convertBigIntToNumber, type Row, toPostgres } from './shared.js';
 
 export class MiningQueryService {
   constructor(private getClient: (env: string) => PrismaClient) {}
@@ -18,20 +12,22 @@ export class MiningQueryService {
   async getAllElements(env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT e.uuid, e.class_name, e.name, e.commodity_uuid,
+      toPostgres(`SELECT e.uuid, e.class_name, e.name, e.commodity_uuid,
               e.instability, e.resistance,
               e.optimal_window_midpoint, e.optimal_window_thinness, e.optimal_window_midpoint_rand,
               e.explosion_multiplier, e.cluster_factor,
-              CAST(COUNT(DISTINCT mcp.composition_uuid) AS SIGNED) AS rocks_containing,
+              COUNT(DISTINCT mcp.composition_uuid) AS rocks_containing,
               ROUND(AVG(mcp.probability) * 100, 1) AS avg_probability_pct,
               ROUND(AVG(mcp.min_percentage) * 100, 1) AS avg_min_pct,
               ROUND(AVG(mcp.max_percentage) * 100, 1) AS avg_max_pct
-       FROM mining_elements e
-       LEFT JOIN mining_composition_parts mcp ON mcp.element_uuid = e.uuid
+       FROM game.mining_elements e
+       LEFT JOIN game.mining_composition_parts mcp ON mcp.element_uuid = e.uuid AND mcp.element_env = e.env
+       WHERE e.env = ?
        GROUP BY e.uuid, e.class_name, e.name, e.commodity_uuid, e.instability, e.resistance,
                 e.optimal_window_midpoint, e.optimal_window_thinness, e.optimal_window_midpoint_rand,
                 e.explosion_multiplier, e.cluster_factor
-       ORDER BY e.name ASC`,
+       ORDER BY e.name ASC`),
+      env,
     );
     return convertBigIntToNumber(rows);
   }
@@ -39,9 +35,9 @@ export class MiningQueryService {
   async getElementById(uuid: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT e.*,
-              JSON_ARRAYAGG(
-                JSON_OBJECT(
+      toPostgres(`SELECT e.*,
+              json_agg(
+                json_build_object(
                   'composition_uuid', p.composition_uuid,
                   'deposit_name',     c.deposit_name,
                   'class_name',       c.class_name,
@@ -49,27 +45,18 @@ export class MiningQueryService {
                   'max_percentage',   p.max_percentage,
                   'probability',      p.probability
                 )
-              ) AS found_in
-       FROM mining_elements e
-       LEFT JOIN mining_composition_parts p ON p.element_uuid = e.uuid
-       LEFT JOIN mining_compositions c      ON c.uuid = p.composition_uuid
-       WHERE e.uuid = ?
-       GROUP BY e.uuid`,
+              ) FILTER (WHERE p.composition_uuid IS NOT NULL) AS found_in
+       FROM game.mining_elements e
+       LEFT JOIN game.mining_composition_parts p ON p.element_uuid = e.uuid AND p.element_env = e.env
+       LEFT JOIN game.mining_compositions c      ON c.uuid = p.composition_uuid AND c.env = p.composition_env
+       WHERE e.env = ? AND e.uuid = ?
+       GROUP BY e.uuid`),
+      env,
       uuid,
     );
     if (!rows[0]) return null;
     const row = rows[0];
-    if (typeof row.found_in === 'string') {
-      try {
-        row.found_in = JSON.parse(row.found_in);
-      } catch {
-        row.found_in = [];
-      }
-    }
-    // Filter out null-element entries produced by LEFT JOIN miss on mining_elements
-    if (Array.isArray(row.elements)) {
-      row.elements = (row.elements as Record<string, unknown>[]).filter((e) => e != null && e.element_uuid != null);
-    }
+    if (!row.found_in) row.found_in = [];
     return row;
   }
 
@@ -77,15 +64,17 @@ export class MiningQueryService {
 
   async getAllCompositions(includeEmpty = false, env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
-    const havingClause = includeEmpty ? '' : 'HAVING element_count > 0';
+    const havingClause = includeEmpty ? '' : 'HAVING COUNT(mcp.id) > 0';
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT mc.uuid, mc.class_name, mc.deposit_name, mc.min_distinct_elements,
-              CAST(COUNT(mcp.id) AS SIGNED) AS element_count
-       FROM mining_compositions mc
-       LEFT JOIN mining_composition_parts mcp ON mcp.composition_uuid = mc.uuid
+      toPostgres(`SELECT mc.uuid, mc.class_name, mc.deposit_name, mc.min_distinct_elements,
+              COUNT(mcp.id) AS element_count
+       FROM game.mining_compositions mc
+       LEFT JOIN game.mining_composition_parts mcp ON mcp.composition_uuid = mc.uuid AND mcp.composition_env = mc.env
+       WHERE mc.env = ?
        GROUP BY mc.uuid, mc.class_name, mc.deposit_name, mc.min_distinct_elements
        ${havingClause}
-       ORDER BY mc.deposit_name ASC`,
+       ORDER BY mc.deposit_name ASC`),
+      env,
     );
     return convertBigIntToNumber(rows);
   }
@@ -93,9 +82,9 @@ export class MiningQueryService {
   async getCompositionByUuid(uuid: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT mc.*,
-              JSON_ARRAYAGG(
-                JSON_OBJECT(
+      toPostgres(`SELECT mc.*,
+              json_agg(
+                json_build_object(
                   'element_uuid',    e.uuid,
                   'element_name',    e.name,
                   'instability',     e.instability,
@@ -104,73 +93,61 @@ export class MiningQueryService {
                   'max_percentage',  mcp.max_percentage,
                   'probability',     mcp.probability
                 )
-              ) AS elements
-       FROM mining_compositions mc
-       LEFT JOIN mining_composition_parts mcp ON mcp.composition_uuid = mc.uuid
-       LEFT JOIN mining_elements e            ON e.uuid = mcp.element_uuid
-       WHERE mc.uuid = ?
-       GROUP BY mc.uuid`,
+              ) FILTER (WHERE e.uuid IS NOT NULL) AS elements
+       FROM game.mining_compositions mc
+       LEFT JOIN game.mining_composition_parts mcp ON mcp.composition_uuid = mc.uuid AND mcp.composition_env = mc.env
+       LEFT JOIN game.mining_elements e            ON e.uuid = mcp.element_uuid AND e.env = mcp.element_env
+       WHERE mc.env = ? AND mc.uuid = ?
+       GROUP BY mc.uuid`),
+      env,
       uuid,
     );
     if (!rows[0]) return null;
     const row = convertBigIntToNumber(rows[0]);
-    if (typeof row.elements === 'string') {
-      try {
-        row.elements = JSON.parse(row.elements);
-      } catch {
-        row.elements = [];
-      }
-    }
+    if (!row.elements) row.elements = [];
     return row;
   }
 
   // ── Mining Solver ─────────────────────────────────────────
 
-  /**
-   * For a given mineral element UUID, returns all rock compositions
-   * that contain it, sorted by probability descending.
-   * Optionally filter by min probability threshold.
-   */
   async solveForElement(elementUuid: string, opts?: { minProbability?: number; env?: string }): Promise<Row[]> {
     const minProb = opts?.minProbability ?? 0;
     const env = opts?.env ?? 'live';
     const prisma = this.getClient(env);
 
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT mc.uuid, mc.class_name, mc.deposit_name, mc.min_distinct_elements,
+      toPostgres(`SELECT mc.uuid, mc.class_name, mc.deposit_name, mc.min_distinct_elements,
               mcp.min_percentage, mcp.max_percentage, mcp.probability, mcp.curve_exponent,
               e.name   AS element_name,
               e.instability, e.resistance,
               e.optimal_window_midpoint, e.optimal_window_thinness,
               e.explosion_multiplier
-       FROM mining_composition_parts mcp
-       JOIN mining_compositions mc ON mc.uuid = mcp.composition_uuid
-       JOIN mining_elements e      ON e.uuid  = mcp.element_uuid
-       WHERE mcp.element_uuid = ?
+       FROM game.mining_composition_parts mcp
+       JOIN game.mining_compositions mc ON mc.uuid = mcp.composition_uuid AND mc.env = mcp.composition_env
+       JOIN game.mining_elements e      ON e.uuid  = mcp.element_uuid AND e.env = mcp.element_env
+       WHERE mcp.composition_env = ? AND mcp.element_uuid = ?
          AND mcp.probability >= ?
-       ORDER BY mcp.probability DESC, mcp.max_percentage DESC`,
+       ORDER BY mcp.probability DESC, mcp.max_percentage DESC`),
+      env,
       elementUuid,
       minProb,
     );
     return convertBigIntToNumber(rows);
   }
 
-  /**
-   * Returns all minerals present in a given rock composition,
-   * sorted by probability.
-   */
   async solveForComposition(compositionUuid: string, env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT e.uuid, e.name, e.class_name,
+      toPostgres(`SELECT e.uuid, e.name, e.class_name,
               e.instability, e.resistance,
               e.optimal_window_midpoint, e.optimal_window_thinness,
               e.explosion_multiplier, e.cluster_factor,
               mcp.min_percentage, mcp.max_percentage, mcp.probability
-       FROM mining_composition_parts mcp
-       JOIN mining_elements e ON e.uuid = mcp.element_uuid
-       WHERE mcp.composition_uuid = ?
-       ORDER BY mcp.probability DESC, mcp.max_percentage DESC`,
+       FROM game.mining_composition_parts mcp
+       JOIN game.mining_elements e ON e.uuid = mcp.element_uuid AND e.env = mcp.element_env
+       WHERE mcp.composition_env = ? AND mcp.composition_uuid = ?
+       ORDER BY mcp.probability DESC, mcp.max_percentage DESC`),
+      env,
       compositionUuid,
     );
     return convertBigIntToNumber(rows);
@@ -179,10 +156,13 @@ export class MiningQueryService {
   async getStats(env = 'live'): Promise<{ elements: number; compositions: number; parts: number }> {
     const prisma = this.getClient(env);
     const [r] = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT
-         (SELECT COUNT(*) FROM mining_elements)         AS elements,
-         (SELECT COUNT(*) FROM mining_compositions)     AS compositions,
-         (SELECT COUNT(*) FROM mining_composition_parts) AS parts`,
+      toPostgres(`SELECT
+         (SELECT COUNT(*) FROM game.mining_elements WHERE env = ?)         AS elements,
+         (SELECT COUNT(*) FROM game.mining_compositions WHERE env = ?)     AS compositions,
+         (SELECT COUNT(*) FROM game.mining_composition_parts WHERE composition_env = ?) AS parts`),
+      env,
+      env,
+      env,
     );
     return {
       elements: Number(r.elements),

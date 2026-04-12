@@ -2,7 +2,7 @@
  * CommodityQueryService — Tradeable/mineable goods (metals, minerals, gas, food, etc.)
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
-import { type FiltersResult, type PaginatedResult, paginate, type Row, stripInternal } from './shared.js';
+import { type FiltersResult, type PaginatedResult, paginate, type Row, stripInternal, toPostgres } from './shared.js';
 
 const COMMODITY_SORT = new Set(['name', 'class_name', 'type', 'sub_type', 'symbol', 'occupancy_scu']);
 
@@ -21,8 +21,8 @@ export class CommodityQueryService {
   }): Promise<PaginatedResult> {
     const env = filters?.env ?? 'live';
     const prisma = this.getClient(env);
-    const where: string[] = [];
-    const params: (string | number)[] = [];
+    const where: string[] = ['c.env = ?'];
+    const params: (string | number)[] = [env];
 
     if (filters?.types) {
       const typeList = filters.types
@@ -41,34 +41,42 @@ export class CommodityQueryService {
       params.push(filters.type);
     }
     if (filters?.search) {
-      where.push('(c.name LIKE ? OR c.class_name LIKE ?)');
+      where.push('(c.name ILIKE ? OR c.class_name ILIKE ?)');
       const t = `%${filters.search}%`;
       params.push(t, t);
     }
 
-    const w = where.length ? ` WHERE ${where.join(' AND ')}` : '';
-    const baseSql = `SELECT c.* FROM commodities c${w}`;
-    const countSql = `SELECT COUNT(*) as total FROM commodities c${w}`;
+    const w = ` WHERE ${where.join(' AND ')}`;
+    const baseSql = `SELECT c.* FROM game.commodities c${w}`;
+    const countSql = `SELECT COUNT(*) as total FROM game.commodities c${w}`;
 
     return paginate(prisma, baseSql, countSql, params, filters || {}, COMMODITY_SORT, 'c');
   }
 
   async getCommodityByUuid(uuid: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
-    const rows = await prisma.$queryRawUnsafe<Row[]>(`SELECT * FROM commodities WHERE uuid = ?`, uuid);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT * FROM game.commodities WHERE uuid = ? AND env = ?`),
+      uuid,
+      env,
+    );
     return rows[0] ? stripInternal(rows[0]) : null;
   }
 
   async getCommodityTypes(env = 'live'): Promise<{ types: { type: string; count: number }[] }> {
     const prisma = this.getClient(env);
-    const rows = await prisma.$queryRawUnsafe<Row[]>(`SELECT type, COUNT(*) as count FROM commodities GROUP BY type ORDER BY count DESC`);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT type, COUNT(*) as count FROM game.commodities WHERE env = ? GROUP BY type ORDER BY count DESC`),
+      env,
+    );
     return { types: rows.map((r) => ({ type: String(r.type), count: Number(r.count) })) };
   }
 
   async getCommodityFilters(env = 'live'): Promise<FiltersResult> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT type as value, COUNT(*) as count FROM commodities GROUP BY type ORDER BY type`,
+      toPostgres(`SELECT type as value, COUNT(*) as count FROM game.commodities WHERE env = ? GROUP BY type ORDER BY type`),
+      env,
     );
     return {
       filters: {

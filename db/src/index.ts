@@ -1,13 +1,14 @@
 /**
- * Database clients — Multi-DB architecture.
+ * Database client — single PostgreSQL connection using multi-schema Prisma.
  *
- *   game client    → live / ptu   (game data: ships, components, items, etc.)
- *   starvis client → starvis      (extraction_log, changelog)
- *   rsi client     → rsi_website  (ship_matrix, galactapedia, comm_links, starmap_locations)
+ * Schemas:
+ *   game  — game data (ships, components, items, etc.)  env = "live" | "ptu"
+ *   rsi   — RSI website scraped data
+ *   meta  — extraction logs, changelogs, manufacturers
  */
-import { PrismaClient as GamePrismaClient } from '../generated/game/index.js';
-import { PrismaClient as RsiPrismaClient } from '../generated/rsi/index.js';
-import { PrismaClient as StarvisPrismaClient } from '../generated/starvis/index.js';
+import { PrismaClient } from '../generated/client/index.js';
+
+export { PrismaClient };
 
 /** Minimal interface covering the raw-SQL methods used across all services. */
 export interface PrismaLike {
@@ -16,41 +17,62 @@ export interface PrismaLike {
   $disconnect(): Promise<void>;
 }
 
-/** @deprecated Use PrismaLike or a specific typed client instead. */
-export type { GamePrismaClient as PrismaClient };
+let prismaClient: PrismaClient | null = null;
 
-export { GamePrismaClient, RsiPrismaClient, StarvisPrismaClient };
-
-const gameClients: Record<string, GamePrismaClient> = {};
-let starvisClient: StarvisPrismaClient | null = null;
-let rsiClient: RsiPrismaClient | null = null;
-
-export function initAllPrisma(urlBuilder: (db: string) => string): StarvisPrismaClient {
-  gameClients.live = new GamePrismaClient({ datasources: { db: { url: urlBuilder('live') } } });
-  gameClients.ptu = new GamePrismaClient({ datasources: { db: { url: urlBuilder('ptu') } } });
-  starvisClient = new StarvisPrismaClient({ datasources: { db: { url: urlBuilder('starvis') } } });
-  rsiClient = new RsiPrismaClient({ datasources: { db: { url: urlBuilder('rsi_website') } } });
-  return starvisClient;
+/**
+ * Initialise the global Prisma client with the given DATABASE_URL.
+ * Must be called once at startup before any other helper.
+ */
+export function initPrisma(databaseUrl: string): PrismaClient {
+  prismaClient = new PrismaClient({
+    datasources: { db: { url: databaseUrl } },
+  });
+  return prismaClient;
 }
 
-export function getGamePrisma(env: string): GamePrismaClient {
-  const key = env === 'ptu' ? 'ptu' : 'live';
-  const client = gameClients[key];
-  if (!client) throw new Error(`GamePrismaClient not initialised for "${key}" — call initAllPrisma() first`);
-  return client;
+/** Return the singleton Prisma client (throws if not yet initialised). */
+export function getPrisma(): PrismaClient {
+  if (!prismaClient) throw new Error('PrismaClient not initialised — call initPrisma() first');
+  return prismaClient;
 }
 
-export function getStarvisPrisma(): StarvisPrismaClient {
-  if (!starvisClient) throw new Error('StarvisPrismaClient not initialised — call initAllPrisma() first');
-  return starvisClient;
+/**
+ * Normalise an env string to the two canonical values used in the `env` column.
+ * Anything that isn't explicitly "ptu" is treated as "live".
+ */
+export function resolveEnv(env: string | undefined): 'live' | 'ptu' {
+  return env === 'ptu' ? 'ptu' : 'live';
 }
 
-export function getRsiWebsitePrisma(): RsiPrismaClient {
-  if (!rsiClient) throw new Error('RsiPrismaClient not initialised — call initAllPrisma() first');
-  return rsiClient;
+// ── Legacy aliases kept for backwards-compat while the rest of the codebase migrates ──
+
+/** @deprecated Use getPrisma() */
+export function getStarvisPrisma(): PrismaClient {
+  return getPrisma();
 }
 
-/** @deprecated Use getStarvisPrisma() */
-export function getPrisma(): StarvisPrismaClient {
-  return getStarvisPrisma();
+/** @deprecated Use getPrisma() */
+export function getGamePrisma(_env?: string): PrismaClient {
+  return getPrisma();
 }
+
+/** @deprecated Use getPrisma() */
+export function getRsiWebsitePrisma(): PrismaClient {
+  return getPrisma();
+}
+
+/**
+ * @deprecated Use initPrisma(databaseUrl) instead.
+ * Kept only so existing call sites compile; returns the new singleton client.
+ */
+export function initAllPrisma(urlBuilder: (db: string) => string): PrismaClient {
+  return initPrisma(urlBuilder('starvis'));
+}
+
+// Re-export legacy type aliases so existing imports still resolve
+/** @deprecated Use PrismaClient directly. */
+export type GamePrismaClient = PrismaClient;
+/** @deprecated Use PrismaClient directly. */
+export type RsiPrismaClient = PrismaClient;
+/** @deprecated Use PrismaClient directly. */
+export type StarvisPrismaClient = PrismaClient;

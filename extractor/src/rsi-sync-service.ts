@@ -1,14 +1,14 @@
 /**
- * RsiSyncService — Synchronise les données RSI/SC Wiki vers rsi_website.
+ * RsiSyncService — Synchronise les données RSI/SC Wiki vers rsi.*.
  *
  * Modules:
- *   galactapedia   → rsi_website.galactapedia
- *   comm-links     → rsi_website.comm_links
- *   starmap        → rsi_website.starmap_locations
+ *   galactapedia   → rsi.galactapedia
+ *   comm-links     → rsi.comm_links
+ *   starmap        → rsi.starmap_locations
  *
  * Source: https://api.star-citizen.wiki/api/
  */
-import type { Pool } from 'mysql2/promise';
+import { type Pool, type PoolClient } from 'pg';
 import logger from './logger.js';
 
 const SC_WIKI_BASE = 'https://api.star-citizen.wiki/api';
@@ -35,7 +35,7 @@ export class RsiSyncService {
 
   async syncGalactapedia(onProgress?: (msg: string) => void): Promise<SyncStats> {
     const stats: SyncStats = { inserted: 0, updated: 0, errors: 0 };
-    const conn = await this.pool.getConnection();
+    const conn = await this.pool.connect();
     try {
       let page = 1;
       while (true) {
@@ -68,17 +68,17 @@ export class RsiSyncService {
           const rsiUrl = `https://robertsspaceindustries.com/galactapedia/article/${id}-${slug}`;
 
           try {
-            const [result] = await conn.execute<any>(
-              `INSERT INTO galactapedia (id, slug, title, content, excerpt, categories, tags, thumbnail_url, rsi_url)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-               ON DUPLICATE KEY UPDATE
-                 slug=VALUES(slug), title=VALUES(title), content=VALUES(content),
-                 excerpt=VALUES(excerpt), categories=VALUES(categories), tags=VALUES(tags),
-                 thumbnail_url=VALUES(thumbnail_url), rsi_url=VALUES(rsi_url),
+            const result = await conn.query<any>(
+              `INSERT INTO rsi.galactapedia (id, slug, title, content, excerpt, categories, tags, thumbnail_url, rsi_url)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+               ON CONFLICT (id) DO UPDATE SET
+                 slug=EXCLUDED.slug, title=EXCLUDED.title, content=EXCLUDED.content,
+                 excerpt=EXCLUDED.excerpt, categories=EXCLUDED.categories, tags=EXCLUDED.tags,
+                 thumbnail_url=EXCLUDED.thumbnail_url, rsi_url=EXCLUDED.rsi_url,
                  updated_at=NOW()`,
               [String(id), String(slug), String(item.title ?? item.name ?? slug), content, excerpt, categories, tags, thumbnailUrl, rsiUrl],
             );
-            if (result.affectedRows === 1) stats.inserted++;
+            if (result.rowCount === 1) stats.inserted++;
             else stats.updated++;
           } catch (err) {
             logger.warn(`[galactapedia] upsert error ${id}: ${(err as Error).message}`);
@@ -99,7 +99,7 @@ export class RsiSyncService {
 
   async syncCommLinks(onProgress?: (msg: string) => void): Promise<SyncStats> {
     const stats: SyncStats = { inserted: 0, updated: 0, errors: 0 };
-    const conn = await this.pool.getConnection();
+    const conn = await this.pool.connect();
     try {
       let page = 1;
       while (true) {
@@ -137,14 +137,14 @@ export class RsiSyncService {
           const publishedAtSql = publishedAt ? new Date(publishedAt).toISOString().slice(0, 19).replace('T', ' ') : null;
 
           try {
-            const [result] = await conn.execute<any>(
-              `INSERT INTO comm_links (rsi_id, slug, title, content, excerpt, category, thumbnail_url, rsi_url, published_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-               ON DUPLICATE KEY UPDATE
-                 slug=VALUES(slug), title=VALUES(title), content=VALUES(content),
-                 excerpt=VALUES(excerpt), category=VALUES(category),
-                 thumbnail_url=VALUES(thumbnail_url), rsi_url=VALUES(rsi_url),
-                 published_at=VALUES(published_at)`,
+            const result = await conn.query<any>(
+              `INSERT INTO rsi.comm_links (rsi_id, slug, title, content, excerpt, category, thumbnail_url, rsi_url, published_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+               ON CONFLICT (rsi_id) DO UPDATE SET
+                 slug=EXCLUDED.slug, title=EXCLUDED.title, content=EXCLUDED.content,
+                 excerpt=EXCLUDED.excerpt, category=EXCLUDED.category,
+                 thumbnail_url=EXCLUDED.thumbnail_url, rsi_url=EXCLUDED.rsi_url,
+                 published_at=EXCLUDED.published_at`,
               [
                 rsiId,
                 slug,
@@ -157,7 +157,7 @@ export class RsiSyncService {
                 publishedAtSql,
               ],
             );
-            if (result.affectedRows === 1) stats.inserted++;
+            if (result.rowCount === 1) stats.inserted++;
             else stats.updated++;
           } catch (err) {
             logger.warn(`[comm-links] upsert error ${rsiId}: ${(err as Error).message}`);
@@ -198,7 +198,7 @@ export class RsiSyncService {
     onProgress?.(`  [ship-matrix] ${ships.length} ships from RSI`);
     if (!ships.length) return stats;
 
-    const conn = await this.pool.getConnection();
+    const conn = await this.pool.connect();
     try {
       for (const ship of ships) {
         try {
@@ -216,8 +216,8 @@ export class RsiSyncService {
               : `https://robertsspaceindustries.com${images.store_large}`
             : null;
 
-          await conn.execute(
-            `INSERT INTO ship_matrix (
+          await conn.query(
+            `INSERT INTO rsi.ship_matrix (
               id, name, chassis_id,
               manufacturer_code, manufacturer_name,
               focus, type, description, production_status, production_note, size, url,
@@ -225,22 +225,22 @@ export class RsiSyncService {
               scm_speed, afterburner_speed, pitch_max, yaw_max, roll_max,
               xaxis_acceleration, yaxis_acceleration, zaxis_acceleration,
               media_source_url, media_store_small, media_store_large, compiled
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            ON DUPLICATE KEY UPDATE
-              name=VALUES(name), chassis_id=VALUES(chassis_id),
-              manufacturer_code=VALUES(manufacturer_code), manufacturer_name=VALUES(manufacturer_name),
-              focus=VALUES(focus), type=VALUES(type), description=VALUES(description),
-              production_status=VALUES(production_status), production_note=VALUES(production_note),
-              size=VALUES(size), url=VALUES(url),
-              length=VALUES(length), beam=VALUES(beam), height=VALUES(height),
-              mass=VALUES(mass), cargocapacity=VALUES(cargocapacity),
-              min_crew=VALUES(min_crew), max_crew=VALUES(max_crew),
-              scm_speed=VALUES(scm_speed), afterburner_speed=VALUES(afterburner_speed),
-              pitch_max=VALUES(pitch_max), yaw_max=VALUES(yaw_max), roll_max=VALUES(roll_max),
-              xaxis_acceleration=VALUES(xaxis_acceleration), yaxis_acceleration=VALUES(yaxis_acceleration),
-              zaxis_acceleration=VALUES(zaxis_acceleration),
-              media_source_url=VALUES(media_source_url), media_store_small=VALUES(media_store_small),
-              media_store_large=VALUES(media_store_large), compiled=VALUES(compiled),
+            ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
+            ON CONFLICT (id) DO UPDATE SET
+              name=EXCLUDED.name, chassis_id=EXCLUDED.chassis_id,
+              manufacturer_code=EXCLUDED.manufacturer_code, manufacturer_name=EXCLUDED.manufacturer_name,
+              focus=EXCLUDED.focus, type=EXCLUDED.type, description=EXCLUDED.description,
+              production_status=EXCLUDED.production_status, production_note=EXCLUDED.production_note,
+              size=EXCLUDED.size, url=EXCLUDED.url,
+              length=EXCLUDED.length, beam=EXCLUDED.beam, height=EXCLUDED.height,
+              mass=EXCLUDED.mass, cargocapacity=EXCLUDED.cargocapacity,
+              min_crew=EXCLUDED.min_crew, max_crew=EXCLUDED.max_crew,
+              scm_speed=EXCLUDED.scm_speed, afterburner_speed=EXCLUDED.afterburner_speed,
+              pitch_max=EXCLUDED.pitch_max, yaw_max=EXCLUDED.yaw_max, roll_max=EXCLUDED.roll_max,
+              xaxis_acceleration=EXCLUDED.xaxis_acceleration, yaxis_acceleration=EXCLUDED.yaxis_acceleration,
+              zaxis_acceleration=EXCLUDED.zaxis_acceleration,
+              media_source_url=EXCLUDED.media_source_url, media_store_small=EXCLUDED.media_store_small,
+              media_store_large=EXCLUDED.media_store_large, compiled=EXCLUDED.compiled,
               synced_at=CURRENT_TIMESTAMP`,
             [
               ship.id,
@@ -295,7 +295,7 @@ export class RsiSyncService {
   async syncStarmap(onProgress?: (msg: string) => void): Promise<{ upserted: number; errors: number }> {
     let upserted = 0;
     let errors = 0;
-    const conn = await this.pool.getConnection();
+    const conn = await this.pool.connect();
 
     const upsert = async (row: {
       rsi_id: string;
@@ -311,15 +311,15 @@ export class RsiSyncService {
       coordinates: string | null;
       jump_points: string | null;
     }) => {
-      await conn.execute(
-        `INSERT INTO starmap_locations (rsi_id, name, type, system_code, system_name, parent_id, faction_name, affiliations, thumbnail, description, coordinates, jump_points)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON DUPLICATE KEY UPDATE
-           name=VALUES(name), type=VALUES(type), system_code=VALUES(system_code),
-           system_name=VALUES(system_name), parent_id=VALUES(parent_id),
-           faction_name=VALUES(faction_name), affiliations=VALUES(affiliations),
-           thumbnail=VALUES(thumbnail), description=VALUES(description),
-           coordinates=VALUES(coordinates), jump_points=VALUES(jump_points),
+      await conn.query(
+        `INSERT INTO rsi.starmap_locations (rsi_id, name, type, system_code, system_name, parent_id, faction_name, affiliations, thumbnail, description, coordinates, jump_points)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         ON CONFLICT (rsi_id) DO UPDATE SET
+           name=EXCLUDED.name, type=EXCLUDED.type, system_code=EXCLUDED.system_code,
+           system_name=EXCLUDED.system_name, parent_id=EXCLUDED.parent_id,
+           faction_name=EXCLUDED.faction_name, affiliations=EXCLUDED.affiliations,
+           thumbnail=EXCLUDED.thumbnail, description=EXCLUDED.description,
+           coordinates=EXCLUDED.coordinates, jump_points=EXCLUDED.jump_points,
            synced_at=NOW()`,
         [
           row.rsi_id,

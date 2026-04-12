@@ -1,14 +1,14 @@
 /**
- * ShipMatrixService — READ-ONLY access to rsi_website.ship_matrix
+ * ShipMatrixService — READ-ONLY access to rsi.ship_matrix
  *
  * Data is populated by the extractor (`npx tsx extract.ts --modules ship-matrix`).
  * This service only serves cached reads — no external HTTP calls.
  */
-import type { RsiPrismaClient } from '@starvis/db';
+import type { PrismaClient } from '@starvis/db';
 import { buildCacheKey, CACHE_TTL, cacheGet, cacheSet } from './redis.js';
 
 export class ShipMatrixService {
-  constructor(private prisma: RsiPrismaClient) {}
+  constructor(private prisma: PrismaClient) {}
 
   /** Get all ship_matrix entries */
   async getAll(): Promise<any[]> {
@@ -81,15 +81,15 @@ export class ShipMatrixService {
     const cached = await cacheGet<any>(cacheKey);
     if (cached) return cached;
 
-    // Keep raw SQL for complex aggregations with conditional SUM
+    // Keep raw SQL for complex aggregations with conditional COUNT
     const rows = await this.prisma.$queryRawUnsafe<any[]>(`
-      SELECT 
+      SELECT
         COUNT(*) as total,
-        SUM(production_status = 'flight-ready') as flight_ready,
-        SUM(production_status = 'in-concept') as in_concept,
-        SUM(production_status = 'in-production') as in_production,
+        COUNT(*) FILTER (WHERE production_status = 'flight-ready') as flight_ready,
+        COUNT(*) FILTER (WHERE production_status = 'in-concept') as in_concept,
+        COUNT(*) FILTER (WHERE production_status = 'in-production') as in_production,
         COUNT(DISTINCT manufacturer_code) as manufacturers
-      FROM ship_matrix
+      FROM rsi.ship_matrix
     `);
 
     const raw = rows[0];
