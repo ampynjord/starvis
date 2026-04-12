@@ -747,28 +747,48 @@ export class DataForgeService implements DataForgeContext {
                 }
               }
               // Ground vehicle drive controller — speed stored in movement params
-              if (portName === 'hardpoint_controller_drive' && entCN && this.dfData) {
+              // Try common port names: controller_drive (Cyclone/ROC), controller_wheel (Nova/Storm/Mule)
+              if (
+                (portName === 'hardpoint_controller_drive' ||
+                  portName === 'hardpoint_controller_wheel' ||
+                  portName.includes('controller_movement')) &&
+                entCN &&
+                this.dfData
+              ) {
                 const driveRecord = this.findEntityRecord(entCN);
                 if (driveRecord) {
                   const driveData = this.readInstance(driveRecord.structIndex, driveRecord.instanceIndex, 0, 5);
                   if (driveData && Array.isArray(driveData.Components)) {
                     for (const fc of driveData.Components) {
                       if (!fc?.__type) continue;
-                      // Try known ground vehicle movement component types
+                      // Try known ground vehicle movement component types (wheeled, tracked, hover, etc.)
                       const topSpeed =
                         fc.topSpeed ??
                         fc.maxSpeed ??
+                        fc.maxLinearVelocity ??
                         fc.params?.topSpeed ??
                         fc.params?.maxSpeed ??
+                        fc.params?.maxLinearVelocity ??
                         fc.movementParams?.topSpeed ??
                         fc.movementParams?.maxSpeed ??
+                        fc.movementParams?.maxLinearVelocity ??
+                        fc.trackedParams?.topSpeed ??
+                        fc.trackedParams?.maxSpeed ??
+                        fc.wheelParams?.topSpeed ??
+                        fc.wheelParams?.maxSpeed ??
                         null;
                       if (typeof topSpeed === 'number' && topSpeed > 0) {
                         stats.scm_speed = Math.round(topSpeed);
                         stats.max_speed = Math.round(topSpeed);
                       }
                       const boostSpeed =
-                        fc.boostTopSpeed ?? fc.sprintSpeed ?? fc.params?.boostTopSpeed ?? fc.movementParams?.boostTopSpeed ?? null;
+                        fc.boostTopSpeed ??
+                        fc.sprintSpeed ??
+                        fc.params?.boostTopSpeed ??
+                        fc.params?.sprintSpeed ??
+                        fc.movementParams?.boostTopSpeed ??
+                        fc.trackedParams?.boostTopSpeed ??
+                        null;
                       if (typeof boostSpeed === 'number' && boostSpeed > 0) {
                         stats.max_speed = Math.round(boostSpeed);
                       }
@@ -1456,7 +1476,13 @@ export class DataForgeService implements DataForgeContext {
         cType === 'SWheeledVehicleMovementParams' ||
         cType === 'SHoverVehicleMovementParams' ||
         cType.includes('VehicleMovement') ||
-        cType.includes('DriveParams')
+        cType.includes('DriveParams') ||
+        cType.includes('Tracked') ||
+        cType.includes('Tank') ||
+        cType.includes('Sprint') ||
+        // Fallback: any controller-like component with a direct topSpeed/maxSpeed field
+        (lp.includes('wheel') || lp.includes('drive') || lp.includes('movement')) &&
+          (typeof comp.topSpeed === 'number' || typeof comp.maxSpeed === 'number' || typeof comp.maxLinearVelocity === 'number')
       ) {
         const topSpeed =
           comp.topSpeed ??

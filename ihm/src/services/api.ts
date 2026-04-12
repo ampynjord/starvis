@@ -246,12 +246,18 @@ export const api = {
       career?: string;
       size?: number;
       variant_type?: string;
+      /** Routes to /ships, /ground-vehicles, or /gravlev automatically */
       vehicle_category?: string;
       sort?: string;
       order?: string;
-    }) => get<PaginatedResponse<ShipListItem>>('/ships', p),
-    filters: async (env?: string): Promise<ShipFilters> => {
-      const raw = await get<{ filters?: Record<string, { value: string; label?: string; count?: number }[]> }>('/ships/filters', { env });
+    }) => {
+      const { vehicle_category, ...rest } = p;
+      const base = vehicle_category === 'ground' ? '/ground-vehicles' : vehicle_category === 'gravlev' ? '/gravlev' : '/ships';
+      return get<PaginatedResponse<ShipListItem>>(base, rest);
+    },
+    filters: async (env?: string, vehicle_category?: string): Promise<ShipFilters> => {
+      const base = vehicle_category === 'ground' ? '/ground-vehicles/filters' : vehicle_category === 'gravlev' ? '/gravlev/filters' : '/ships/filters';
+      const raw = await get<{ filters?: Record<string, { value: string; label?: string; count?: number }[]> }>(base, { env });
       const f = (raw as any).filters ?? raw as any;
       return {
         manufacturers: (f.manufacturer ?? []).map((m: any) => ({ code: m.value, name: m.label ?? m.value })),
