@@ -57,8 +57,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     ];
 
     for (const { key, label, unit } of COMPARE_FIELDS) {
-      const v1 = (ship1 as Record<string, unknown>)[key] as number | undefined;
-      const v2 = (ship2 as Record<string, unknown>)[key] as number | undefined;
+      const v1 = (ship1 as unknown as Record<string, unknown>)[key] as number | undefined;
+      const v2 = (ship2 as unknown as Record<string, unknown>)[key] as number | undefined;
 
       if (v1 == null && v2 == null) continue;
 

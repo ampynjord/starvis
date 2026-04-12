@@ -37,6 +37,7 @@ interface SearchResponse {
 
 interface ShipResult {
   id: number;
+  uuid?: string;
   name: string;
   manufacturer?: string;
   manufacturer_code?: string;
