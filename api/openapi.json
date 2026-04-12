@@ -509,7 +509,9 @@
     }
   },
   "tags": [
-    { "name": "Ships", "description": "Ship database — game data + RSI Ship Matrix" },
+    { "name": "Ships", "description": "Space ships — game data + RSI Ship Matrix" },
+    { "name": "Ground Vehicles", "description": "Ground vehicles — buggies, tanks, rovers, carriers" },
+    { "name": "Grav-lev", "description": "Grav-lev vehicles — hovercycles, hoverbikes" },
     { "name": "Components", "description": "Ship components (weapons, shields, drives, missiles, thrusters…)" },
     { "name": "Items", "description": "FPS items (weapons, armor, clothing, gadgets, consumables)" },
     { "name": "Commodities", "description": "Tradeable commodities (metals, minerals, food, contraband…)" },
@@ -536,8 +538,9 @@
     "/api/v1/ships": {
       "get": {
         "tags": ["Ships"],
-        "summary": "List ships",
+        "summary": "List space ships",
         "operationId": "getShips",
+        "description": "Returns space ships only (`vehicle_category = ship`). Use `/ground-vehicles` or `/gravlev` for other vehicle types.",
         "parameters": [
           { "$ref": "#/components/parameters/search" },
           { "name": "manufacturer", "in": "query", "schema": { "type": "string" }, "description": "Manufacturer code (e.g. AEGS, RSI)" },
@@ -548,7 +551,6 @@
             "in": "query",
             "schema": { "type": "string", "enum": ["flight-ready", "in-concept", "in-production", "in-game-only"] }
           },
-          { "name": "vehicle_category", "in": "query", "schema": { "type": "string", "enum": ["ship", "ground", "gravlev"] } },
           { "name": "variant_type", "in": "query", "schema": { "type": "string" } },
           {
             "name": "include",
@@ -586,7 +588,8 @@
         "tags": ["Ships"],
         "summary": "Get ship filter values",
         "operationId": "getShipFilters",
-        "description": "Returns distinct manufacturers, careers, roles, statuses and vehicle categories with counts.",
+        "description": "Returns distinct manufacturers, careers, roles, statuses for space ships.",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
         "responses": {
           "200": {
             "description": "Available filter values",
@@ -597,6 +600,68 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/ground-vehicles": {
+      "get": {
+        "tags": ["Ground Vehicles"],
+        "summary": "List ground vehicles",
+        "operationId": "getGroundVehicles",
+        "description": "Returns ground vehicles only (`vehicle_category = ground`): buggies, tanks, rovers, etc.",
+        "parameters": [
+          { "$ref": "#/components/parameters/search" },
+          { "name": "manufacturer", "in": "query", "schema": { "type": "string" } },
+          { "name": "career", "in": "query", "schema": { "type": "string" } },
+          { "name": "role", "in": "query", "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/sort" },
+          { "$ref": "#/components/parameters/order" },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": {
+          "200": { "description": "Paginated ground vehicle list", "content": { "application/json": { "schema": { "allOf": [{ "$ref": "#/components/schemas/Pagination" }, { "type": "object", "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/Ship" } } } }] } } } },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/api/v1/ground-vehicles/filters": {
+      "get": {
+        "tags": ["Ground Vehicles"],
+        "summary": "Get ground vehicle filter values",
+        "operationId": "getGroundVehicleFilters",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Available filter values for ground vehicles" } }
+      }
+    },
+    "/api/v1/gravlev": {
+      "get": {
+        "tags": ["Grav-lev"],
+        "summary": "List grav-lev vehicles",
+        "operationId": "getGravlev",
+        "description": "Returns grav-lev vehicles only (`vehicle_category = gravlev`): hovercycles, nox bikes, etc.",
+        "parameters": [
+          { "$ref": "#/components/parameters/search" },
+          { "name": "manufacturer", "in": "query", "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/sort" },
+          { "$ref": "#/components/parameters/order" },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": {
+          "200": { "description": "Paginated grav-lev vehicle list", "content": { "application/json": { "schema": { "allOf": [{ "$ref": "#/components/schemas/Pagination" }, { "type": "object", "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/Ship" } } } }] } } } },
+          "503": { "$ref": "#/components/responses/ServiceUnavailable" }
+        }
+      }
+    },
+    "/api/v1/gravlev/filters": {
+      "get": {
+        "tags": ["Grav-lev"],
+        "summary": "Get grav-lev filter values",
+        "operationId": "getGravlevFilters",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Available filter values for grav-lev vehicles" } }
       }
     },
     "/api/v1/ships/search": {
