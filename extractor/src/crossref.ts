@@ -3,7 +3,8 @@
  *
  * Extracted from ExtractionService to keep the main pipeline lean.
  */
-import type { PoolConnection } from 'mysql2/promise';
+import type { PoolClient } from 'pg';
+import type { GameEnv } from './extraction-service.js';
 import logger from './logger.js';
 
 /** Ship Matrix name → P4K ship name mapping for non-obvious matches */
@@ -95,11 +96,11 @@ function normalizeForMatch(name: string): string {
  * Cross-reference P4K ships with Ship Matrix entries.
  * Uses exact name matching, alias resolution, and token-based fuzzy matching.
  */
-export async function crossReferenceShipMatrix(conn: PoolConnection): Promise<number> {
-  await conn.execute('UPDATE ships SET ship_matrix_id = NULL WHERE ship_matrix_id IS NOT NULL');
+export async function crossReferenceShipMatrix(conn: PoolClient, env: GameEnv): Promise<number> {
+  await conn.query('UPDATE game.ships SET ship_matrix_id = NULL WHERE ship_matrix_id IS NOT NULL AND env = $1', [env]);
 
-  const [ships] = await conn.execute<any[]>('SELECT uuid, class_name, name FROM ships');
-  const [smEntries] = await conn.execute<any[]>('SELECT id, name FROM rsi_website.ship_matrix');
+  const { rows: ships } = await conn.query<any>('SELECT uuid, class_name, name FROM game.ships WHERE env = $1', [env]);
+  const { rows: smEntries } = await conn.query<any>('SELECT id, name FROM rsi.ship_matrix');
 
   const aliasMap = new Map<string, string>();
   for (const [smName, p4kName] of Object.entries(SM_TO_P4K_ALIASES)) {
@@ -183,29 +184,31 @@ export async function crossReferenceShipMatrix(conn: PoolConnection): Promise<nu
   }
 
   for (const { smId, uuid } of results) {
-    await conn.execute('UPDATE ships SET ship_matrix_id = ? WHERE uuid = ?', [smId, uuid]);
+    await conn.query('UPDATE game.ships SET ship_matrix_id = $1 WHERE uuid = $2 AND env = $3', [smId, uuid, env]);
   }
 
   return results.length;
 }
 
 /** Copy chassis_id from ship_matrix to ships for fast variant grouping */
-export async function populateChassisId(conn: PoolConnection): Promise<number> {
-  const [result]: any = await conn.execute(
-    `UPDATE ships s JOIN rsi_website.ship_matrix sm ON s.ship_matrix_id = sm.id
-     SET s.chassis_id = sm.chassis_id
-     WHERE s.ship_matrix_id IS NOT NULL`,
+export async function populateChassisId(conn: PoolClient, env: GameEnv): Promise<number> {
+  const result = await conn.query<any>(
+    `UPDATE game.ships s SET chassis_id = sm.chassis_id
+     FROM rsi.ship_matrix sm
+     WHERE s.ship_matrix_id = sm.id AND s.env = $1 AND s.ship_matrix_id IS NOT NULL`,
+    [env],
   );
-  const count = result.affectedRows as number;
+  const count = result.rowCount ?? 0;
   if (count > 0) logger.info(`Populated chassis_id for ${count} ships`);
   return count;
 }
 
 /** Tag variant types for ships not linked to Ship Matrix */
-export async function tagVariantTypes(conn: PoolConnection): Promise<void> {
+export async function tagVariantTypes(conn: PoolClient, env: GameEnv): Promise<void> {
   // Tag SM-linked ships that are ultra-rare collectors
-  await conn.execute(
-    "UPDATE ships SET variant_type = 'collector' WHERE class_name IN ('VNCL_Scythe', 'ANVL_Lightning_F8C_Exec') AND variant_type IS NULL",
+  await conn.query(
+    "UPDATE game.ships SET variant_type = 'collector' WHERE class_name IN ('VNCL_Scythe', 'ANVL_Lightning_F8C_Exec') AND variant_type IS NULL AND env = $1",
+    [env],
   );
   const rules: Array<{ type: string; patterns: string[] }> = [
     // collector: true limited/exclusive editions (only 2 today)
@@ -241,14 +244,17 @@ export async function tagVariantTypes(conn: PoolConnection): Promise<void> {
   ];
 
   for (const rule of rules) {
-    const conditions = rule.patterns.map(() => 'class_name LIKE ?').join(' OR ');
-    await conn.execute(`UPDATE ships SET variant_type = ? WHERE ship_matrix_id IS NULL AND variant_type IS NULL AND (${conditions})`, [
-      rule.type,
-      ...rule.patterns,
-    ]);
+    // $1 = type, $2 .. $N = patterns, $(N+1) = env
+    let paramIdx = 1;
+    const conditions = rule.patterns.map(() => `class_name LIKE $${++paramIdx}`).join(' OR ');
+    const envIdx = ++paramIdx;
+    await conn.query(
+      `UPDATE game.ships SET variant_type = $1 WHERE ship_matrix_id IS NULL AND variant_type IS NULL AND (${conditions}) AND env = $${envIdx}`,
+      [rule.type, ...rule.patterns, env],
+    );
   }
 
-  await conn.execute("UPDATE ships SET variant_type = 'special' WHERE ship_matrix_id IS NULL AND variant_type IS NULL");
+  await conn.query("UPDATE game.ships SET variant_type = 'special' WHERE ship_matrix_id IS NULL AND variant_type IS NULL AND env = $1", [env]);
 }
 
 /**
@@ -268,27 +274,33 @@ export async function tagVariantTypes(conn: PoolConnection): Promise<void> {
  * Ships tagged pyam_exec, collector, or wikelo are kept.
  * Cascading FK deletes will clean ship_loadouts, ship_modules, ship_paints automatically.
  */
-export async function pruneExcludedVariants(conn: PoolConnection): Promise<number> {
+export async function pruneExcludedVariants(conn: PoolClient, env: GameEnv): Promise<number> {
   const EXCLUDED = ['bis_edition', 'event', 'military', 'tutorial', 'special', 'arena_ai', 'npc'];
-  const placeholders = EXCLUDED.map(() => '?').join(', ');
-  const [result]: any = await conn.execute(`DELETE FROM ships WHERE variant_type IN (${placeholders})`, EXCLUDED);
-  const count = result.affectedRows as number;
+  const placeholders = EXCLUDED.map((_, i) => `$${i + 1}`).join(', ');
+  const result = await conn.query<any>(
+    `DELETE FROM game.ships WHERE variant_type IN (${placeholders}) AND env = $${EXCLUDED.length + 1}`,
+    [...EXCLUDED, env],
+  );
+  const count = result.rowCount ?? 0;
   if (count > 0) logger.info(`Pruned ${count} ships with excluded variant types (bis, event, military, tutorial, special, arena, npc)`);
   return count;
 }
 
 /** Apply Hull series cargo fallback from Ship Matrix data */
-export async function applyHullSeriesCargoFallback(conn: PoolConnection): Promise<void> {
+export async function applyHullSeriesCargoFallback(conn: PoolClient, env: GameEnv): Promise<void> {
   try {
-    const [updated]: any = await conn.execute(
-      `UPDATE ships s JOIN rsi_website.ship_matrix sm ON s.ship_matrix_id = sm.id
-       SET s.cargo_capacity = sm.cargocapacity
-       WHERE (s.cargo_capacity IS NULL OR s.cargo_capacity = 0)
+    const result = await conn.query<any>(
+      `UPDATE game.ships s SET cargo_capacity = sm.cargocapacity
+       FROM rsi.ship_matrix sm
+       WHERE s.ship_matrix_id = sm.id
+         AND s.env = $1
+         AND (s.cargo_capacity IS NULL OR s.cargo_capacity = 0)
          AND sm.cargocapacity IS NOT NULL AND sm.cargocapacity > 0
          AND s.class_name LIKE '%Hull_%'`,
+      [env],
     );
-    if (updated.affectedRows > 0) {
-      logger.info(`Hull series cargo fallback applied to ${updated.affectedRows} ships`);
+    if ((result.rowCount ?? 0) > 0) {
+      logger.info(`Hull series cargo fallback applied to ${result.rowCount} ships`);
     }
   } catch (e: unknown) {
     logger.warn(`Hull cargo fallback failed: ${e instanceof Error ? e.message : String(e)}`);
@@ -299,16 +311,19 @@ export async function applyHullSeriesCargoFallback(conn: PoolConnection): Promis
  * Apply dimensions fallback from Ship Matrix when P4K bbox is missing (size_y = NULL or 0).
  * Maps SM columns: beam → size_x (width), length → size_y (length), height → size_z (height).
  */
-export async function applyDimensionsFallback(conn: PoolConnection): Promise<void> {
+export async function applyDimensionsFallback(conn: PoolClient, env: GameEnv): Promise<void> {
   try {
-    const [updated]: any = await conn.execute(
-      `UPDATE ships s JOIN rsi_website.ship_matrix sm ON s.ship_matrix_id = sm.id
-       SET s.size_x = sm.beam, s.size_y = sm.length, s.size_z = sm.height
-       WHERE (s.size_y IS NULL OR s.size_y = 0)
+    const result = await conn.query<any>(
+      `UPDATE game.ships s SET size_x = sm.beam, size_y = sm.length, size_z = sm.height
+       FROM rsi.ship_matrix sm
+       WHERE s.ship_matrix_id = sm.id
+         AND s.env = $1
+         AND (s.size_y IS NULL OR s.size_y = 0)
          AND sm.length IS NOT NULL AND sm.length > 0`,
+      [env],
     );
-    if (updated.affectedRows > 0) {
-      logger.info(`Dimensions fallback (Ship Matrix) applied to ${updated.affectedRows} ships`);
+    if ((result.rowCount ?? 0) > 0) {
+      logger.info(`Dimensions fallback (Ship Matrix) applied to ${result.rowCount} ships`);
     }
   } catch (e: unknown) {
     logger.warn(`Dimensions fallback failed: ${e instanceof Error ? e.message : String(e)}`);

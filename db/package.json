@@ -5,17 +5,11 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
-    "generate": "npm run generate:game && npm run generate:starvis && npm run generate:rsi",
-    "generate:game": "prisma generate --schema=prisma/game.prisma",
-    "generate:starvis": "prisma generate --schema=prisma/starvis.prisma",
-    "generate:rsi": "prisma generate --schema=prisma/rsi.prisma",
-    "push": "npm run push:game && npm run push:starvis && npm run push:rsi",
-    "push:game": "prisma db push --schema=prisma/game.prisma",
-    "push:starvis": "prisma db push --schema=prisma/starvis.prisma",
-    "push:rsi": "prisma db push --schema=prisma/rsi.prisma",
-    "studio:game": "prisma studio --schema=prisma/game.prisma",
-    "studio:starvis": "prisma studio --schema=prisma/starvis.prisma",
-    "studio:rsi": "prisma studio --schema=prisma/rsi.prisma",
+    "generate": "prisma generate --schema=prisma/schema.prisma",
+    "push": "prisma db push --schema=prisma/schema.prisma",
+    "migrate": "prisma migrate dev --schema=prisma/schema.prisma",
+    "migrate:deploy": "prisma migrate deploy --schema=prisma/schema.prisma",
+    "studio": "prisma studio --schema=prisma/schema.prisma",
     "postinstall": "npm run generate"
   },
   "dependencies": {

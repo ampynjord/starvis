@@ -1,30 +1,24 @@
 #!/bin/bash
 # ==============================================================
-# DB Init Script â€” First MySQL start only
+# DB Init Script — First PostgreSQL start only
 # Mounted into /docker-entrypoint-initdb.d/
-# Creates 3 databases in a single MySQL instance:
-#   - starvis : shared/meta data (manufacturers, ship_matrix, changelogâ€¦)
-#   - live    : game data extracted from LIVE build
-#   - ptu     : game data extracted from PTU build
-# Schema is managed by Prisma (prisma db push at API startup).
+# Creates the 3 schemas in the single 'starvis' database:
+#   - game : ships, components, items, etc.  (env column: live | ptu)
+#   - rsi  : ship_matrix, galactapedia, comm_links, starmap_locations
+#   - meta : manufacturers, extraction_log, changelog
+# Schema tables are managed by Prisma (prisma db push at API startup).
 # ==============================================================
 
-echo "ðŸ“¦ Creating databases..."
-mysql -u root -p"${MYSQL_ROOT_PASSWORD}" <<-EOSQL
-    CREATE DATABASE IF NOT EXISTS starvis      CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-    CREATE DATABASE IF NOT EXISTS live         CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-    CREATE DATABASE IF NOT EXISTS ptu          CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-    CREATE DATABASE IF NOT EXISTS rsi_website  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+set -e
+
+echo "📦 Creating schemas in database '${POSTGRES_DB}'..."
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+    CREATE SCHEMA IF NOT EXISTS game;
+    CREATE SCHEMA IF NOT EXISTS rsi;
+    CREATE SCHEMA IF NOT EXISTS meta;
+    GRANT ALL ON SCHEMA game TO "$POSTGRES_USER";
+    GRANT ALL ON SCHEMA rsi  TO "$POSTGRES_USER";
+    GRANT ALL ON SCHEMA meta TO "$POSTGRES_USER";
 EOSQL
 
-echo "ðŸ‘¤ Configuring user permissions..."
-mysql -u root -p"${MYSQL_ROOT_PASSWORD}" <<-EOSQL
-    CREATE USER IF NOT EXISTS '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';
-    GRANT ALL PRIVILEGES ON starvis.*     TO '${MYSQL_USER}'@'%';
-    GRANT ALL PRIVILEGES ON live.*        TO '${MYSQL_USER}'@'%';
-    GRANT ALL PRIVILEGES ON ptu.*         TO '${MYSQL_USER}'@'%';
-    GRANT ALL PRIVILEGES ON rsi_website.* TO '${MYSQL_USER}'@'%';
-    FLUSH PRIVILEGES;
-EOSQL
-
-echo "âœ… Databases and user configured"
+echo "✅ Schemas game / rsi / meta created"

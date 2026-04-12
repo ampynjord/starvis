@@ -4,7 +4,7 @@
 import type { PrismaLike as PrismaClient } from '@starvis/db';
 import { cleanItemName, cleanPropertyName, cleanRecipeName } from '../normalizers/crafting.js';
 import { formatEnumLabel } from '../normalizers/labels.js';
-import { convertBigIntToNumber, type PaginatedResult, type Row } from './shared.js';
+import { convertBigIntToNumber, type PaginatedResult, type Row, toPostgres } from './shared.js';
 
 function normalizeRecipeRow(row: Row): Row {
   return {
@@ -41,15 +41,15 @@ function normalizeResourceRow(row: Row): Row {
 export class CraftingService {
   constructor(private getClient: (env: string) => PrismaClient) {}
 
-  /** List all distinct recipe categories for a given env */
   async getCategories(env = 'live'): Promise<{ category: string; count: number }[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT category, COUNT(*) as count
-       FROM crafting_recipes
-       WHERE category IS NOT NULL
+      toPostgres(`SELECT category, COUNT(*) as count
+       FROM game.crafting_recipes
+       WHERE env = ? AND category IS NOT NULL
        GROUP BY category
-       ORDER BY category`,
+       ORDER BY category`),
+      env,
     );
     return convertBigIntToNumber(rows).map((r) => ({
       category: String(r.category),
@@ -58,16 +58,15 @@ export class CraftingService {
     }));
   }
 
-  /** List all distinct station types */
   async getStationTypes(env = 'live'): Promise<string[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT DISTINCT station_type FROM crafting_recipes WHERE station_type IS NOT NULL AND station_type != '' ORDER BY station_type`,
+      toPostgres(`SELECT DISTINCT station_type FROM game.crafting_recipes WHERE env = ? AND station_type IS NOT NULL AND station_type != '' ORDER BY station_type`),
+      env,
     );
     return rows.map((r) => String(r.station_type));
   }
 
-  /** Paginated recipe list with filters */
   async getRecipes(opts: {
     env?: string;
     category?: string;
@@ -82,16 +81,16 @@ export class CraftingService {
     const safeLimit = Math.min(Math.max(1, limit), 200);
     const offset = (page - 1) * safeLimit;
 
-    const where: string[] = [];
-    const params: (string | number)[] = [];
+    const where: string[] = ['r.env = ?'];
+    const params: (string | number)[] = [env];
 
     if (category) {
       where.push('r.category = ?');
       params.push(category);
     }
     if (search) {
-      where.push('(r.name LIKE ? OR r.class_name LIKE ? OR COALESCE(oi.name, r.output_item_name) LIKE ?)');
-      const q = `%${search.replace(/[%_\\]/g, '\\$&')}%`;
+      where.push('(r.name ILIKE ? OR r.class_name ILIKE ? OR COALESCE(oi.name, r.output_item_name) ILIKE ?)');
+      const q = `%${search.replace(/[%_]/g, '\\$&')}%`;
       params.push(q, q, q);
     }
     if (skillLevel != null) {
@@ -103,29 +102,29 @@ export class CraftingService {
       params.push(stationType);
     }
 
-    const whereClause = where.length ? where.join(' AND ') : '1=1';
+    const whereClause = where.join(' AND ');
 
     const [countRow] = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT COUNT(*) as total FROM crafting_recipes r LEFT JOIN items oi ON oi.uuid = r.output_item_uuid WHERE ${whereClause}`,
+      toPostgres(`SELECT COUNT(*) as total FROM game.crafting_recipes r LEFT JOIN game.items oi ON oi.uuid = r.output_item_uuid AND oi.env = r.env WHERE ${whereClause}`),
       ...params,
     );
     const total = Number(countRow?.total ?? 0);
 
     const data = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT r.uuid, r.class_name, r.name, r.category,
+      toPostgres(`SELECT r.uuid, r.class_name, r.name, r.category,
               COALESCE(oi.name, r.output_item_name) AS output_item_name,
               r.output_item_uuid, r.output_quantity,
               r.crafting_time_s, r.station_type, r.skill_level,
               (SELECT COUNT(DISTINCT sub_m.uuid) FROM (
-          SELECT uuid FROM missions WHERE blueprint_reward_uuid = r.uuid
-          UNION ALL
-          SELECT mission_uuid FROM mission_blueprint_rewards WHERE blueprint_uuid = r.uuid
-        ) sub_m) AS missions_count
-       FROM crafting_recipes r
-       LEFT JOIN items oi ON oi.uuid = r.output_item_uuid
+                SELECT uuid FROM game.missions WHERE blueprint_reward_uuid = r.uuid AND env = r.env
+                UNION ALL
+                SELECT mission_uuid FROM game.mission_blueprint_rewards WHERE blueprint_uuid = r.uuid AND blueprint_env = r.env
+              ) sub_m) AS missions_count
+       FROM game.crafting_recipes r
+       LEFT JOIN game.items oi ON oi.uuid = r.output_item_uuid AND oi.env = r.env
        WHERE ${whereClause}
        ORDER BY r.category ASC, r.name ASC
-       LIMIT ? OFFSET ?`,
+       LIMIT ? OFFSET ?`),
       ...params,
       safeLimit,
       offset,
@@ -140,53 +139,55 @@ export class CraftingService {
     };
   }
 
-  /** List all distinct resources with usage counts and total SCU */
   async getResources(env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT COALESCE(i.name, ci.item_name) AS item_name, ci.item_uuid,
+      toPostgres(`SELECT COALESCE(i.name, ci.item_name) AS item_name, ci.item_uuid,
               COUNT(DISTINCT ci.recipe_uuid) AS recipe_count,
               SUM(ci.quantity) AS total_quantity,
               SUM(ci.scu) AS total_scu
-       FROM crafting_ingredients ci
-       LEFT JOIN items i ON i.uuid = ci.item_uuid
+       FROM game.crafting_ingredients ci
+       LEFT JOIN game.items i ON i.uuid = ci.item_uuid AND i.env = ci.recipe_env
+       WHERE ci.recipe_env = ?
        GROUP BY ci.item_uuid, i.name, ci.item_name
-       ORDER BY recipe_count DESC, item_name`,
+       ORDER BY recipe_count DESC, item_name`),
+      env,
     );
     return convertBigIntToNumber(rows).map(normalizeResourceRow);
   }
 
-  /** List recipes that use a given resource (by item_name) */
   async getRecipesByResource(itemName: string, env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT r.uuid, r.class_name, r.name, r.category,
+      toPostgres(`SELECT r.uuid, r.class_name, r.name, r.category,
               COALESCE(oi.name, r.output_item_name) AS output_item_name,
               r.output_item_uuid, r.output_quantity,
               r.crafting_time_s, r.station_type, r.skill_level,
               ci.quantity, ci.scu, ci.slot_name
-       FROM crafting_recipes r
-       JOIN crafting_ingredients ci ON ci.recipe_uuid = r.uuid
-       LEFT JOIN items oi ON oi.uuid = r.output_item_uuid
-       WHERE ci.item_name = ? OR ci.item_uuid IN (SELECT uuid FROM items WHERE name = ?)
-       ORDER BY r.category ASC, r.name ASC`,
+       FROM game.crafting_recipes r
+       JOIN game.crafting_ingredients ci ON ci.recipe_uuid = r.uuid AND ci.recipe_env = r.env
+       LEFT JOIN game.items oi ON oi.uuid = r.output_item_uuid AND oi.env = r.env
+       WHERE r.env = ? AND (ci.item_name = ? OR ci.item_uuid IN (SELECT uuid FROM game.items WHERE env = ? AND name = ?))
+       ORDER BY r.category ASC, r.name ASC`),
+      env,
       itemName,
+      env,
       itemName,
     );
     return convertBigIntToNumber(rows).map((row) => normalizeRecipeRow(normalizeIngredientRow(row)));
   }
 
-  /** Single recipe by UUID with ingredients */
   async getRecipeByUuid(uuid: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT r.uuid, r.class_name, r.name, r.category,
+      toPostgres(`SELECT r.uuid, r.class_name, r.name, r.category,
               COALESCE(oi.name, r.output_item_name) AS output_item_name,
               r.output_item_uuid, r.output_quantity,
               r.crafting_time_s, r.station_type, r.skill_level
-       FROM crafting_recipes r
-       LEFT JOIN items oi ON oi.uuid = r.output_item_uuid
-       WHERE r.uuid = ?`,
+       FROM game.crafting_recipes r
+       LEFT JOIN game.items oi ON oi.uuid = r.output_item_uuid AND oi.env = r.env
+       WHERE r.env = ? AND r.uuid = ?`),
+      env,
       uuid,
     );
     if (!rows.length) return null;
@@ -194,39 +195,43 @@ export class CraftingService {
     const recipe = normalizeRecipeRow(convertBigIntToNumber(rows[0]));
 
     const ingredients = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT ci.id, COALESCE(i.name, ci.item_name) AS item_name, ci.item_uuid,
+      toPostgres(`SELECT ci.id, COALESCE(i.name, ci.item_name) AS item_name, ci.item_uuid,
               ci.quantity, ci.is_optional, ci.scu, ci.min_quality, ci.slot_name
-       FROM crafting_ingredients ci
-       LEFT JOIN items i ON i.uuid = ci.item_uuid
-       WHERE ci.recipe_uuid = ?
-       ORDER BY item_name`,
+       FROM game.crafting_ingredients ci
+       LEFT JOIN game.items i ON i.uuid = ci.item_uuid AND i.env = ci.recipe_env
+       WHERE ci.recipe_env = ? AND ci.recipe_uuid = ?
+       ORDER BY item_name`),
+      env,
       uuid,
     );
     recipe.ingredients = convertBigIntToNumber(ingredients).map(normalizeIngredientRow);
 
     const modifiers = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT id, slot_name, property_name, property_uuid, unit_format,
+      toPostgres(`SELECT id, slot_name, property_name, property_uuid, unit_format,
               start_quality, end_quality, modifier_at_start, modifier_at_end
-       FROM crafting_slot_modifiers
-       WHERE recipe_uuid = ?
-       ORDER BY slot_name, property_name`,
+       FROM game.crafting_slot_modifiers
+       WHERE recipe_env = ? AND recipe_uuid = ?
+       ORDER BY slot_name, property_name`),
+      env,
       uuid,
     );
     recipe.modifiers = convertBigIntToNumber(modifiers).map(normalizeModifierRow);
 
     const unlockMissions = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT DISTINCT m.uuid, m.class_name, m.title, m.mission_type, m.faction, m.mission_giver,
+      toPostgres(`SELECT DISTINCT m.uuid, m.class_name, m.title, m.mission_type, m.faction, m.mission_giver,
               m.reward_min, m.reward_max, m.reward_currency, m.is_legal
-       FROM missions m
-       WHERE m.blueprint_reward_uuid = ?
+       FROM game.missions m
+       WHERE m.env = ? AND m.blueprint_reward_uuid = ?
        UNION
        SELECT DISTINCT m.uuid, m.class_name, m.title, m.mission_type, m.faction, m.mission_giver,
               m.reward_min, m.reward_max, m.reward_currency, m.is_legal
-       FROM missions m
-       JOIN mission_blueprint_rewards mbr ON mbr.mission_uuid = m.uuid
-       WHERE mbr.blueprint_uuid = ?
-       ORDER BY title ASC`,
+       FROM game.missions m
+       JOIN game.mission_blueprint_rewards mbr ON mbr.mission_uuid = m.uuid AND mbr.mission_env = m.env
+       WHERE m.env = ? AND mbr.blueprint_uuid = ?
+       ORDER BY title ASC`),
+      env,
       uuid,
+      env,
       uuid,
     );
     recipe.unlock_missions = convertBigIntToNumber(unlockMissions);
