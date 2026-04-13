@@ -85,11 +85,20 @@ export function ChatWidget() {
                 if (msg) next[assistantIdx] = { ...msg, content: msg.content + evt.text };
                 return next;
               });
-            } else if (evt.type === 'done' || evt.type === 'error') {
+            } else if (evt.type === 'done') {
               setMessages((prev) => {
                 const next = [...prev];
                 const msg = next[assistantIdx];
                 if (msg) next[assistantIdx] = { ...msg, streaming: false };
+                return next;
+              });
+            } else if (evt.type === 'error') {
+              const errMsg = evt.message?.includes('Rate limit') || evt.message?.includes('rate_limit')
+                ? '⚠️ Limite de tokens Groq atteinte pour aujourd\'hui. Réessayez dans ~1h (quota gratuit : 100k tokens/jour).'
+                : `⚠️ ${evt.message ?? 'Erreur inconnue'}`;
+              setMessages((prev) => {
+                const next = [...prev];
+                next[assistantIdx] = { role: 'assistant', content: errMsg, streaming: false };
                 return next;
               });
             }
