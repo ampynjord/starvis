@@ -29,7 +29,12 @@ export async function POST(req: Request) {
     });
     return res;
   } catch (e: any) {
-    console.error('[auth/register]', e);
-    return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
+    const msg = e?.cause?.code ?? e?.message ?? String(e);
+    console.error('[auth/register]', API_BASE, msg);
+    const isDev = process.env.NODE_ENV !== 'production';
+    return NextResponse.json(
+      { error: isDev ? `API unreachable (${API_BASE}): ${msg}` : 'Service unavailable' },
+      { status: 503 },
+    );
   }
 }
