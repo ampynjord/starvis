@@ -28,7 +28,7 @@ export function ChatWidget() {
       setMessages([
         {
           role: 'assistant',
-          content: 'Bonjour, je suis **ARIA** — l\'IA de Starvis. Posez-moi vos questions sur les vaisseaux, composants, armes, missions, recettes de craft ou ressources minières de Star Citizen.',
+          content: 'Bonjour, je suis **Starvis** — votre assistant Star Citizen. Posez-moi vos questions sur les vaisseaux, composants, armes, missions, recettes de craft ou ressources minières.',
         },
       ]);
     }
@@ -151,9 +151,9 @@ export function ChatWidget() {
                   style={{ background: '#00d4ff', boxShadow: '0 0 6px #00d4ff' }}
                 />
                 <span className="font-orbitron text-xs tracking-widest uppercase" style={{ color: '#00d4ff' }}>
-                  ARIA
+                  STARVIS
                 </span>
-                <span className="text-xs text-slate-500 font-mono">— Starvis AI</span>
+                <span className="text-xs text-slate-500 font-mono">— AI</span>
               </div>
               <button
                 onClick={() => setOpen(false)}
@@ -232,7 +232,7 @@ export function ChatWidget() {
                 </button>
               </div>
               <p className="text-center text-slate-700 text-[10px] mt-1.5 font-mono">
-                Groq · Llama 3.3 70B · données live SC
+                Starvis AI · données live Star Citizen
               </p>
             </div>
           </motion.div>
@@ -244,7 +244,7 @@ export function ChatWidget() {
         onClick={() => setOpen((v) => !v)}
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.95 }}
-        aria-label={open ? 'Fermer le chat' : 'Ouvrir le chat ARIA'}
+        aria-label={open ? 'Fermer le chat' : 'Ouvrir le chat Starvis'}
         className="relative w-14 h-14 rounded-full flex items-center justify-center transition-all"
         style={{
           background: open ? 'rgba(0,212,255,0.15)' : 'rgba(0,212,255,0.1)',
