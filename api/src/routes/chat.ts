@@ -16,9 +16,10 @@ import type { RouteDependencies } from './types.js';
 
 export function mountChatRoutes(router: Router, deps: RouteDependencies): void {
   if (!deps.gameDataService) return;
+  if (!deps.rsiWebsiteService) return;
   if (!process.env.GROQ_API_KEY) return;
 
-  const chatService = new ChatService(deps.gameDataService);
+  const chatService = new ChatService(deps.gameDataService, deps.shipMatrixService, deps.rsiWebsiteService);
 
   router.post('/api/v1/chat', (req, res) => {
     const { messages } = req.body as { messages?: { role: string; content: string }[] };
