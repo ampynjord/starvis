@@ -1,8 +1,10 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bot, ChevronDown, Send, X } from 'lucide-react';
+import { Bot, ChevronDown, LogIn, Send, X } from 'lucide-react';
+import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -11,6 +13,7 @@ interface Message {
 }
 
 export function ChatWidget() {
+  const { user, loading: authLoading } = useAuth();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -130,10 +133,42 @@ export function ChatWidget() {
     }
   };
 
+  if (authLoading) return null;
+
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-3">
       <AnimatePresence>
-        {open && (
+        {open && !user && (
+          <motion.div
+            key="login-prompt"
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="w-72 flex flex-col items-center gap-4 p-6 text-center"
+            style={{
+              background: 'rgba(8,12,20,0.97)',
+              border: '1px solid rgba(0,212,255,0.3)',
+              borderRadius: '8px',
+              boxShadow: '0 0 40px rgba(0,0,0,0.8), 0 0 20px rgba(0,212,255,0.1)',
+            }}
+          >
+            <Bot size={28} style={{ color: '#00d4ff' }} />
+            <div>
+              <p className="font-orbitron text-xs tracking-widest text-cyan-400 uppercase mb-1">STARVIS AI</p>
+              <p className="text-sm text-slate-400">Connectez-vous pour accéder à l'assistant Star Citizen.</p>
+            </div>
+            <Link
+              href="/login"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2 px-4 py-2 border border-cyan-700/50 hover:border-cyan-500/70 bg-cyan-900/20 hover:bg-cyan-900/40 text-cyan-400 hover:text-cyan-300 font-mono-sc text-xs rounded transition-colors"
+            >
+              <LogIn size={13} />
+              SE CONNECTER
+            </Link>
+          </motion.div>
+        )}
+        {open && user && (
           <motion.div
             key="chat-panel"
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
