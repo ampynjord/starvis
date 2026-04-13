@@ -1,7 +1,5 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
 import { motion } from 'framer-motion';
 import { CheckCircle, Lock, Mail, UserPlus, User, XCircle } from 'lucide-react';
 import Link from 'next/link';
