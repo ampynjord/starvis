@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Orbitron, Rajdhani, Share_Tech_Mono } from 'next/font/google';
+import { ChatWidget } from '@/components/ui/ChatWidget';
 import { Providers } from './providers';
 import '@/index.css';
 
@@ -34,6 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr" className={`dark ${orbitron.variable} ${rajdhani.variable} ${shareTechMono.variable}`} suppressHydrationWarning>
       <body className="bg-void text-slate-200">
         <Providers>{children}</Providers>
+        <ChatWidget />
       </body>
     </html>
   );
