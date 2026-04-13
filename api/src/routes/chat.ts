@@ -38,16 +38,22 @@ export function mountChatRoutes(router: Router, deps: RouteDependencies): void {
       return void res.status(400).json({ success: false, error: 'Last message must be from user' });
     }
 
-    // Set up SSE
+    // Set up SSE — désactive la compression Express pour ce endpoint
+    // (le middleware compression() bufferise tout, ce qui casse le streaming)
     res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
     res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // disable Nginx buffering
+    res.setHeader('X-Accel-Buffering', 'no'); // disable Nginx/Traefik buffering
+    res.setHeader('Content-Encoding', 'identity'); // force no compression
     res.flushHeaders();
 
     const send = (data: object) => {
       if (!res.writableEnded) {
         res.write(`data: ${JSON.stringify(data)}\n\n`);
+        // Flush explicite pour bypasser tout buffer intermédiaire
+        if (typeof (res as unknown as { flush?: () => void }).flush === 'function') {
+          (res as unknown as { flush: () => void }).flush();
+        }
       }
     };
 
