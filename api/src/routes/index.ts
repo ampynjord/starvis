@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { mountAdminRoutes } from './admin.js';
+import { mountAuthRoutes } from './auth.js';
 import { mountCalculateRoutes } from './calculate.js';
 import { mountChatRoutes } from './chat.js';
 import { mountCommodityRoutes } from './commodities.js';
@@ -42,6 +43,7 @@ const routeMounts = [
   mountAdminRoutes,
   mountRsiWebsiteRoutes,
   mountChatRoutes,
+  mountAuthRoutes,
 ] as const;
 
 export function createRoutes(deps: RouteDependencies): Router {

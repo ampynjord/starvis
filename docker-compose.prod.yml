@@ -63,6 +63,7 @@ services:
       RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-30}
       CTM_CACHE_DIR: /app/ctm-cache
       GROQ_API_KEY: ${GROQ_API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
     restart: unless-stopped
     deploy:
       resources:
@@ -99,6 +100,9 @@ services:
   ihm:
     image: ${IHM_IMAGE:-ghcr.io/ampynjord/starvis-ihm:latest}
     container_name: ${COMPOSE_PROJECT_NAME:-starvis}-ihm
+    environment:
+      API_URL: http://${COMPOSE_PROJECT_NAME:-starvis}-api:${API_INTERNAL_PORT:-3000}
+      JWT_SECRET: ${JWT_SECRET}
     restart: unless-stopped
     deploy:
       resources:
