@@ -236,6 +236,21 @@ const TOOLS: Groq.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'compare_ships',
+      description: 'Compare 2 à 4 vaisseaux côte-à-côte : stats brutes ET stats agrégées du loadout (DPS, boucliers, QD). UTILISER en priorité pour toute demande de comparaison — évite plusieurs appels séparés.',
+      parameters: {
+        type: 'object',
+        properties: {
+          names: { type: 'array', items: { type: 'string' }, description: 'Liste des noms de vaisseaux à comparer (2-4)' },
+          env: { type: 'string', description: '"live" | "ptu"' },
+        },
+        required: ['names'],
+      },
+    },
+  },
   // ── Components ───────────────────────────────────────────────────────────
   {
     type: 'function',
@@ -522,6 +537,27 @@ export class ChatService {
     return { uuid: ship['uuid'] as string, data: ship };
   }
 
+  /** Supprime les champs lourds inutiles pour le LLM (blobs, URLs longues, JSON brut) */
+  private trim(obj: unknown): unknown {
+    const SKIP = new Set(['game_data', 'thumbnail_large', 'ctm_url', 'loadout', 'hardpoints_raw']);
+    const TRUNC_KEYS = new Set(['sm_description', 'description', 'content', 'lore']);
+    const MAX_STR = 300;
+    const MAX_ARR = 15;
+
+    if (Array.isArray(obj)) return obj.slice(0, MAX_ARR).map((v) => this.trim(v));
+    if (obj && typeof obj === 'object') {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
+        if (SKIP.has(k)) continue;
+        if (TRUNC_KEYS.has(k) && typeof v === 'string') { out[k] = v.slice(0, MAX_STR); continue; }
+        out[k] = this.trim(v);
+      }
+      return out;
+    }
+    if (typeof obj === 'string' && obj.length > 600) return obj.slice(0, 600) + '…';
+    return obj;
+  }
+
   // ── Tool executor ─────────────────────────────────────────────────────────
 
   private async executeTool(name: string, args: Record<string, unknown>): Promise<unknown> {
@@ -587,6 +623,22 @@ export class ChatService {
           if (!found) return { error: `Vaisseau "${args.name}" introuvable` };
           const variants = await this.gameDataService.ships.getShipVariants(found.uuid, env);
           return { base_ship: found.data['name'], variants };
+        }
+
+        case 'compare_ships': {
+          const names = (args.names as string[]).slice(0, 4);
+          const results = await Promise.all(
+            names.map(async (n) => {
+              const found = await this.resolveShipUuid(n, env);
+              if (!found) return { name: n, error: 'introuvable' };
+              const [details, stats] = await Promise.all([
+                this.gameDataService.ships.getShipByUuid(found.uuid, env),
+                this.gameDataService.loadouts.getShipStats(found.uuid, env),
+              ]);
+              return { details, loadout_stats: stats?.stats ?? null };
+            }),
+          );
+          return { comparison: results };
         }
 
         case 'get_ship_matrix': {
@@ -799,15 +851,16 @@ export class ChatService {
 
     try {
       // Phase 1 — boucle agentique : résolution des tool calls (non-streaming)
+      // Les tool calls d'une même réponse sont exécutés EN PARALLÈLE.
       let iterations = 0;
-      while (iterations < 6) {
+      while (iterations < 3) {
         const response = await this.groq.chat.completions.create({
           model: 'llama-3.3-70b-versatile',
           messages: groqMessages,
           tools: TOOLS,
           tool_choice: 'auto',
-          max_tokens: 1024,
-          temperature: 0.2,
+          max_tokens: 512,   // réduit : on veut juste les tool calls, pas de prose
+          temperature: 0.1,
           stream: false,
         });
 
@@ -817,11 +870,24 @@ export class ChatService {
         if (msg.tool_calls && msg.tool_calls.length > 0) {
           iterations++;
           groqMessages.push(msg);
-          for (const tc of msg.tool_calls) {
-            let args: Record<string, unknown> = {};
-            try { args = JSON.parse(tc.function.arguments); } catch { /* ignore */ }
-            const result = await this.executeTool(tc.function.name, args);
-            groqMessages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
+
+          // Exécution PARALLÈLE de tous les tool calls de la réponse
+          const results = await Promise.all(
+            msg.tool_calls.map(async (tc) => {
+              let args: Record<string, unknown> = {};
+              try { args = JSON.parse(tc.function.arguments); } catch { /* ignore */ }
+              const result = await this.executeTool(tc.function.name, args);
+              return { id: tc.id, result };
+            }),
+          );
+
+          // Injecter les résultats dans l'ordre (requis par l'API)
+          for (const { id, result } of results) {
+            groqMessages.push({
+              role: 'tool',
+              tool_call_id: id,
+              content: JSON.stringify(this.trim(result)),
+            });
           }
           continue;
         }
