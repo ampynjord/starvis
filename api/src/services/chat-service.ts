@@ -1,59 +1,162 @@
 /**
- * ChatService — AI chatbot backed by Groq (Llama 3.3 70B) with tool use.
+ * ChatService — IA Starvis, Groq Llama 3.3 70B avec tool use exhaustif.
  *
- * Tools give the LLM live access to the Starvis database:
- *   search_ships       — search ships by name/manufacturer/category
- *   get_ship_details   — full ship data by uuid or name
- *   search_components  — search weapon/shield/thruster components
- *   search_items       — search items (armor, clothing, gadgets…)
- *   search_crafting    — search crafting recipes
- *   search_mining      — list mineable elements
- *   search_missions    — search missions
- *   search_locations   — search in-game locations
- *   search_commodities — search tradeable commodities
+ * Couverture DB complète (schémas game + rsi + meta) :
+ *   Ships / Ground / Gravlev — stats complètes, loadout, hardpoints, variants
+ *   Components              — armes, boucliers, thrusters, QD, coolers…
+ *   Items                   — armures, casques, armes FPS, gadgets
+ *   Crafting                — recettes, ingrédients, slot modifiers
+ *   Mining                  — éléments, compositions rocheuses
+ *   Missions                — types, factions, récompenses
+ *   Locations               — planètes, lunes, stations, avant-postes
+ *   Commodities             — matières premières, prix d'achat/vente
+ *   Trade routes            — meilleurs itinéraires de commerce
+ *   Shops                   — inventaires
+ *   Manufacturers           — constructeurs
+ *   Ship Matrix (RSI)       — données officielles RSI (dimensions, prix, lore)
+ *   Galactapedia            — lore RSI
+ *   Comm-links              — communications CIG
+ *   Starmap                 — systèmes stellaires
  */
 
 import Groq from 'groq-sdk';
 import type { GameDataService } from './game-data-service.js';
+import type { RsiWebsiteService } from './rsi-website-service.js';
+import type { ShipMatrixService } from './ship-matrix-service.js';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
 }
 
-const SYSTEM_PROMPT = `Tu es Starvis, l'IA officielle de la base de données Starvis pour Star Citizen.
+// ─────────────────────────────────────────────────────────────────────────────
+// System Prompt — expert Star Citizen + guide d'utilisation des outils
+// ─────────────────────────────────────────────────────────────────────────────
 
-Tu réponds en **français** par défaut, mais tu t'adaptes à la langue de l'utilisateur.
+const SYSTEM_PROMPT = `Tu es Starvis, l'IA officielle de la base de données Starvis — données extraites directement du jeu Star Citizen (version LIVE).
 
-Ton rôle :
-- Répondre aux questions sur les vaisseaux, composants, armes, armures, objets, recettes de craft, missions, ressources minières et lieux du jeu Star Citizen.
-- Utiliser tes outils pour consulter la base de données Starvis en temps réel — les données sont extraites directement du jeu (version LIVE).
-- Être concis, précis et utile. Évite les longues introductions.
+## Langue
+Réponds en **français** par défaut. Adapte-toi à la langue de l'utilisateur.
 
-Règles :
-- Si une question concerne Star Citizen, utilise **toujours** un outil pour chercher dans la base avant de répondre.
-- Ne pas inventer de statistiques — utilise uniquement les données de tes outils.
-- Pour comparer des vaisseaux, utilise search_ships puis get_ship_details.
-- Formate les réponses en markdown pour la lisibilité (tableaux, listes).
-- Si tu ne trouves pas la donnée, dis-le clairement.
+## Règle absolue
+Pour toute question sur Star Citizen, **utilise toujours un outil** pour interroger la base avant de répondre. Ne jamais inventer de statistiques.
 
-Tu es un expert Star Citizen. Tu connais le lore, les mécaniques de jeu et le contexte de chaque objet.`;
+---
+
+## Données disponibles & champs importants
+
+### Vaisseaux (schema game, table ships)
+Identité : uuid, class_name, name, manufacturer_code, manufacturer_name, career, role, vehicle_category (ship/ground/gravlev), variant_type, production_status, short_name
+Physique : mass (kg), total_hp, size_x (largeur m), size_y (longueur m), size_z (hauteur m)
+Vol : scm_speed (m/s), max_speed (m/s), boost_speed_forward, boost_speed_backward, pitch_max, yaw_max, roll_max (degrés/s), boost_ramp_up/down (s)
+Ressources : hydrogen_fuel_capacity (L), quantum_fuel_capacity (L), cargo_capacity (SCU), crew_size
+Combat : shield_hp (HP total boucliers), weapon_damage_total (DPS armes), missile_damage_total (dégâts missiles)
+Armure : armor_physical, armor_energy, armor_distortion, armor_hp, armor_phys_resist, armor_energy_resist
+Signatures : armor_signal_ir (chaleur), armor_signal_em (électromagnétique), armor_signal_cs (cross-section)
+Assurance : insurance_claim_time (min), insurance_expedite_cost (aUEC)
+RSI : ship_matrix_id, thumbnail, production_status (Flight Ready / In Production / In Concept), store_url, min_crew, max_crew, sm_description
+
+### Stats agrégées du loadout (via get_ship_full_stats)
+weapons_dps_total, weapons_alpha_total, shield_capacity_total, shield_regen_total, shield_faces, power_output_total, heat_dissipation_total, qd_range (AU), qd_speed (m/s), qd_cooldown (s), countermeasure_count, missile_damage_total, hardpoints (liste des emplacements)
+
+### Composants (schema game, table components)
+uuid, name, class_name, type (WeaponGun/Shield/PowerPlant/Cooler/QuantumDrive/Countermeasure/Missile/Radar/MainThruster/ManoThrust…), sub_type, size (1-10), grade (1-4, A=meilleur), manufacturer_code, mass
+Armes : fire_rate (coups/min), ammo_speed (m/s), ammo_lifetime (s), range (m), dmg_physical, dmg_energy, dmg_distortion, dmg_thermal, dmg_biochemical, burst_dps, sustained_dps, alpha_damage
+Boucliers : shield_capacity, shield_regen, face_coverage (faces protégées)
+QD : qd_range (AU), qd_speed (m/s), qd_cooldown (s), qd_fuel_rate
+Power plants : power_output
+Coolers : cooling_rate
+
+### Items (schema game, table items)
+uuid, name, class_name, type (Char_Armor_Torso/Char_Helmet/WeaponPersonal/FoodProduct…), sub_type, manufacturer_code, mass
+Armures FPS : armor_physical, armor_energy, armor_distortion, armor_signal_ir, armor_signal_em
+
+### Crafting (schema game, table crafting_recipes)
+uuid, name, output_item_name, output_item_uuid, category, station_type, craft_time (s), quantity_produced, schematic_uuid
+Ingrédients : item_name, quantity, is_optional, scu
+Slot modifiers : slot_name, property_name, start_quality, end_quality, modifier_at_start, modifier_at_end
+
+### Mining (schema game)
+Éléments : uuid, name, description, instability, resistance, mass, inert_material
+Compositions rocheuses : liste d'éléments avec pourcentages
+
+### Missions (schema game, table missions)
+uuid, name, type, faction, system_name, category, danger_level (1-5), completion_time_secs, reward_min, reward_max, required_reputation, reputation_reward, base_xp
+
+### Locations (schema game, table locations)
+uuid, name, type (Planet/Moon/Station/Outpost/City/LagrangePoint…), system, parent_name, has_shops, has_landing_zone, has_refuel, has_restock, has_repair
+
+### Commodities (schema game, table commodities)
+uuid, name, type, description, occupancy_scu (SCU par unité), is_illegal, is_volatile
+
+### Prix de commodités (schema game, table commodity_prices)
+buy_price (aUEC/unité), sell_price, stock, demand, shop_name, system, city
+
+### Trade routes (calculées à la volée)
+commodity_name, buy_price, buy_shop, buy_system, sell_price, sell_shop, sell_system, profit_per_unit, profit_per_scu, total_profit (pour N SCU)
+
+### Ship Matrix RSI (schema rsi, table ship_matrix)
+name, manufacturer_code, manufacturer_name, length, beam, height, mass, cargo_capacity, min_crew, max_crew, scm_speed, afterburner_speed, pitch_max, yaw_max, roll_max, price_usd, price_uec (prix ingame), production_status, description, url
+
+### Galactapedia (schema rsi)
+id, title, content (texte lore), category, tags
+
+### Comm-links (schema rsi)
+id, title, content, url, published_at, category
+
+### Starmap (schema rsi)
+id, code, name, type, description, affiliation
+
+---
+
+## Calculs courants
+
+**DPS d'une arme** = burst_dps (rafale) ou sustained_dps (soutenu) — déjà calculés en DB
+**DPS total vaisseau** = weapon_damage_total (déjà calculé via loadout)
+**Portée effective d'une arme** = ammo_speed × ammo_lifetime (en mètres)
+**Profit trade** = (sell_price - buy_price) × scu_quantity / occupancy_scu
+**Ratio SCU/budget** = budget / buy_price = SCU max achetables
+**Autonomie QD** = quantum_fuel_capacity / qd_fuel_rate (en AU)
+
+---
+
+## Stratégie d'utilisation des outils
+
+1. Question vaisseau → search_ships (liste) puis get_ship_details (stats brutes) et/ou get_ship_full_stats (loadout agrégé)
+2. Comparer des vaisseaux → search_ships pour chacun puis get_ship_full_stats
+3. Meilleure arme d'un calibre → search_components avec type+size, trier par sustained_dps
+4. Route commerciale → find_trade_routes
+5. Prix d'une commodité → get_commodity_prices
+6. Recette de craft → search_crafting puis get_recipe_details
+7. Lore / histoire → search_galactapedia ou search_comm_links
+8. Où acheter un item → search_shops
+9. Variants d'un vaisseau → get_ship_variants
+
+Formate les réponses avec markdown : tableaux pour comparer, listes pour énumérer, **gras** pour les chiffres clés.`;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tool definitions
+// ─────────────────────────────────────────────────────────────────────────────
 
 const TOOLS: Groq.Chat.Completions.ChatCompletionTool[] = [
+  // ── Ships ────────────────────────────────────────────────────────────────
   {
     type: 'function',
     function: {
       name: 'search_ships',
-      description: 'Search ships, ground vehicles, and gravlev vehicles in the Starvis database. Use for questions about ship stats, comparisons, or finding ships matching criteria.',
+      description: 'Recherche des vaisseaux, véhicules terrestres ou gravlev. Retourne les stats de base de plusieurs résultats.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Ship name or partial name to search (optional)' },
-          manufacturer: { type: 'string', description: 'Manufacturer code or name (e.g. "ORIG", "ANVL", "RSI")' },
-          category: { type: 'string', description: 'Vehicle category: "ship", "ground", or "gravlev"' },
-          role: { type: 'string', description: 'Ship role (e.g. "fighter", "mining", "cargo", "exploration")' },
-          env: { type: 'string', description: 'Game environment: "live" (default) or "ptu"' },
-          limit: { type: 'number', description: 'Max results (default 10, max 20)' },
+          query: { type: 'string', description: 'Nom partiel du vaisseau' },
+          manufacturer: { type: 'string', description: 'Code constructeur (ORIG, ANVL, RSI, CRUS, DRAK, MISC, BANU, XI-AN, VANDUL…)' },
+          category: { type: 'string', description: '"ship" | "ground" | "gravlev"' },
+          role: { type: 'string', description: 'Rôle (fighter, bomber, mining, cargo, exploration, stealth, support…)' },
+          career: { type: 'string', description: 'Carrière (Combat, Transport, Exploration, Industrial, Support…)' },
+          env: { type: 'string', description: '"live" (défaut) | "ptu"' },
+          limit: { type: 'number', description: 'Max résultats (défaut 10, max 20)' },
+          sort: { type: 'string', description: 'Champ de tri (scm_speed, cargo_capacity, shield_hp, mass…)' },
+          order: { type: 'string', description: '"asc" | "desc"' },
         },
         required: [],
       },
@@ -63,12 +166,12 @@ const TOOLS: Groq.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_ship_details',
-      description: 'Get full detailed stats for a specific ship by name. Use after search_ships to get complete information.',
+      description: 'Stats complètes d\'un vaisseau spécifique (données brutes jeu + RSI). Inclut toutes les colonnes : vitesses, HP, cargo, armure, signaux, assurance.',
       parameters: {
         type: 'object',
         properties: {
-          name: { type: 'string', description: 'Exact or partial ship name (e.g. "Constellation Andromeda", "Carrack")' },
-          env: { type: 'string', description: 'Game environment: "live" (default) or "ptu"' },
+          name: { type: 'string', description: 'Nom exact ou partiel du vaisseau (ex: "Carrack", "Constellation Andromeda")' },
+          env: { type: 'string', description: '"live" | "ptu"' },
         },
         required: ['name'],
       },
@@ -77,99 +180,203 @@ const TOOLS: Groq.Chat.Completions.ChatCompletionTool[] = [
   {
     type: 'function',
     function: {
-      name: 'search_components',
-      description: 'Search ship components (weapons, shields, thrusters, coolers, power plants, quantum drives, etc.)',
+      name: 'get_ship_full_stats',
+      description: 'Stats agrégées du loadout d\'un vaisseau : DPS total, capacité de bouclier totale, puissance, refroidissement, portée QD, liste des hardpoints. UTILISER pour comparer les performances de combat ou de vol.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Component name to search' },
-          type: { type: 'string', description: 'Component type (e.g. "WeaponGun", "Shield", "MainThruster", "QuantumDrive")' },
-          grade: { type: 'number', description: 'Component grade (1-4)' },
-          size: { type: 'number', description: 'Component size (1-10)' },
-          manufacturer: { type: 'string', description: 'Manufacturer code' },
-          env: { type: 'string', description: '"live" (default) or "ptu"' },
-          limit: { type: 'number', description: 'Max results (default 10)' },
+          name: { type: 'string', description: 'Nom du vaisseau' },
+          env: { type: 'string', description: '"live" | "ptu"' },
+        },
+        required: ['name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_ship_loadout',
+      description: 'Liste détaillée de tous les hardpoints d\'un vaisseau et les composants actuellement équipés (type, taille, nom, stats).',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Nom du vaisseau' },
+          env: { type: 'string', description: '"live" | "ptu"' },
+        },
+        required: ['name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_ship_variants',
+      description: 'Liste tous les variants d\'un vaisseau (même châssis, rôles différents). Ex: Cutlass Black/Blue/Red/Steel.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Nom du vaisseau de base' },
+          env: { type: 'string', description: '"live" | "ptu"' },
+        },
+        required: ['name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'get_ship_matrix',
+      description: 'Données officielles RSI d\'un vaisseau : dimensions officielles, prix ($USD et aUEC), lore, statut de production, description officielle.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Nom du vaisseau' },
+        },
+        required: ['name'],
+      },
+    },
+  },
+  // ── Components ───────────────────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'search_components',
+      description: 'Recherche des composants vaisseau. Retourne stats détaillées (DPS, portée, capacité bouclier, output power…).',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Nom du composant' },
+          type: { type: 'string', description: 'Type : WeaponGun | Shield | PowerPlant | Cooler | QuantumDrive | Countermeasure | Missile | Radar | MainThruster | ManoThrust | EMP | QuantumInterdictionGenerator' },
+          size: { type: 'number', description: 'Taille 1-10' },
+          grade: { type: 'number', description: 'Grade 1-4 (4=grade A, meilleur)' },
+          manufacturer: { type: 'string', description: 'Code constructeur' },
+          env: { type: 'string', description: '"live" | "ptu"' },
+          sort: { type: 'string', description: 'Tri : sustained_dps, burst_dps, shield_capacity, qd_range, power_output…' },
+          order: { type: 'string', description: '"asc" | "desc" (défaut desc)' },
+          limit: { type: 'number', description: 'Max résultats (défaut 15)' },
         },
         required: [],
       },
     },
   },
+  // ── Items ────────────────────────────────────────────────────────────────
   {
     type: 'function',
     function: {
       name: 'search_items',
-      description: 'Search items: armor, helmets, clothing, gadgets, FPS weapons, medical supplies, etc.',
+      description: 'Recherche items FPS : armures, casques, armes, gadgets, nourriture, équipements médicaux…',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Item name to search' },
-          type: { type: 'string', description: 'Item type (e.g. "Char_Armor_Torso", "Char_Helmet", "WeaponPersonal")' },
-          env: { type: 'string', description: '"live" (default) or "ptu"' },
-          limit: { type: 'number', description: 'Max results (default 10)' },
+          query: { type: 'string', description: 'Nom de l\'item' },
+          type: { type: 'string', description: 'Type : Char_Armor_Torso | Char_Armor_Legs | Char_Armor_Arms | Char_Helmet | Char_Armor_Backpack | WeaponPersonal | FoodProduct | MedicalDevice…' },
+          env: { type: 'string', description: '"live" | "ptu"' },
+          limit: { type: 'number', description: 'Max résultats (défaut 15)' },
         },
         required: [],
       },
     },
   },
+  // ── Crafting ─────────────────────────────────────────────────────────────
   {
     type: 'function',
     function: {
       name: 'search_crafting',
-      description: 'Search crafting recipes — what can be crafted and what ingredients are needed.',
+      description: 'Recherche de recettes de craft. Retourne nom, catégorie, station, temps de craft, quantité produite.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Recipe or output item name to search' },
-          env: { type: 'string', description: '"live" (default) or "ptu"' },
-          limit: { type: 'number', description: 'Max results (default 10)' },
+          query: { type: 'string', description: 'Nom de la recette ou de l\'item craftable' },
+          category: { type: 'string', description: 'Catégorie de craft' },
+          env: { type: 'string', description: '"live" | "ptu"' },
+          limit: { type: 'number', description: 'Max résultats (défaut 10)' },
         },
         required: [],
       },
     },
   },
+  {
+    type: 'function',
+    function: {
+      name: 'get_recipe_details',
+      description: 'Détails complets d\'une recette de craft : ingrédients (quantités, optionnels), slot modifiers (qualité, modificateurs), station requise.',
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Nom exact de la recette' },
+          env: { type: 'string', description: '"live" | "ptu"' },
+        },
+        required: ['name'],
+      },
+    },
+  },
+  // ── Mining ───────────────────────────────────────────────────────────────
   {
     type: 'function',
     function: {
       name: 'search_mining',
-      description: 'Search mineable elements and their properties (instability, resistance, mass, etc.)',
+      description: 'Recherche des éléments minables : instabilité, résistance, masse, matière inerte.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Element name to search (e.g. "Quantanium", "Laranite")' },
-          env: { type: 'string', description: '"live" (default) or "ptu"' },
+          query: { type: 'string', description: 'Nom de l\'élément (Quantanium, Laranite, Bexalite, Taranite…)' },
+          env: { type: 'string', description: '"live" | "ptu"' },
         },
         required: [],
       },
     },
   },
+  // ── Missions ─────────────────────────────────────────────────────────────
   {
     type: 'function',
     function: {
       name: 'search_missions',
-      description: 'Search available missions in the game.',
+      description: 'Recherche de missions : type, faction, danger, récompenses aUEC et XP, réputation requise.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Mission name or type to search' },
-          env: { type: 'string', description: '"live" (default) or "ptu"' },
-          limit: { type: 'number', description: 'Max results (default 10)' },
+          query: { type: 'string', description: 'Nom ou type de mission' },
+          faction: { type: 'string', description: 'Faction (Crusader Security, Advocacy, Nine Tails, Violent Nomad…)' },
+          type: { type: 'string', description: 'Type de mission' },
+          env: { type: 'string', description: '"live" | "ptu"' },
+          limit: { type: 'number', description: 'Max résultats (défaut 10)' },
         },
         required: [],
       },
     },
   },
+  // ── Locations ────────────────────────────────────────────────────────────
   {
     type: 'function',
     function: {
       name: 'search_locations',
-      description: 'Search in-game locations: planets, moons, stations, outposts, cities.',
+      description: 'Recherche de lieux in-game : planètes, lunes, stations, avant-postes, villes. Indique si ravitaillement/réparations/atterrissage disponibles.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Location name to search' },
-          type: { type: 'string', description: 'Location type (e.g. "Planet", "Moon", "Station", "Outpost")' },
-          env: { type: 'string', description: '"live" (default) or "ptu"' },
-          limit: { type: 'number', description: 'Max results (default 10)' },
+          query: { type: 'string', description: 'Nom du lieu' },
+          type: { type: 'string', description: 'Type : Planet | Moon | Station | Outpost | City | LagrangePoint | JumpPoint' },
+          system: { type: 'string', description: 'Système stellaire (Stanton, Pyro, Nyx…)' },
+          env: { type: 'string', description: '"live" | "ptu"' },
+          limit: { type: 'number', description: 'Max résultats (défaut 15)' },
+        },
+        required: [],
+      },
+    },
+  },
+  // ── Economy ──────────────────────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'search_commodities',
+      description: 'Recherche de commodités échangeables : type, SCU/unité, légalité.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Nom de la commodité' },
+          type: { type: 'string', description: 'Type de commodité' },
+          env: { type: 'string', description: '"live" | "ptu"' },
+          limit: { type: 'number', description: 'Max résultats (défaut 15)' },
         },
         required: [],
       },
@@ -178,14 +385,112 @@ const TOOLS: Groq.Chat.Completions.ChatCompletionTool[] = [
   {
     type: 'function',
     function: {
-      name: 'search_commodities',
-      description: 'Search tradeable commodities and their prices at shops.',
+      name: 'get_commodity_prices',
+      description: 'Prix d\'achat et de vente d\'une commodité dans tous les shops. Utile pour identifier où acheter au meilleur prix ou vendre le plus cher.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Commodity name to search' },
-          env: { type: 'string', description: '"live" (default) or "ptu"' },
-          limit: { type: 'number', description: 'Max results (default 10)' },
+          name: { type: 'string', description: 'Nom de la commodité (ex: "Quantanium", "Medical Supplies")' },
+          env: { type: 'string', description: '"live" | "ptu"' },
+        },
+        required: ['name'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'find_trade_routes',
+      description: 'Calcule les meilleures routes commerciales selon ton SCU et budget. Retourne profit/unité, profit/SCU et profit total.',
+      parameters: {
+        type: 'object',
+        properties: {
+          scu: { type: 'number', description: 'Capacité cargo disponible en SCU' },
+          budget: { type: 'number', description: 'Budget d\'achat en aUEC (optionnel)' },
+          commodity: { type: 'string', description: 'Filtrer sur une commodité spécifique (optionnel)' },
+          buy_system: { type: 'string', description: 'Système d\'achat (Stanton, Pyro…)' },
+          sell_system: { type: 'string', description: 'Système de vente' },
+          limit: { type: 'number', description: 'Nombre de routes retournées (défaut 10)' },
+          env: { type: 'string', description: '"live" | "ptu"' },
+        },
+        required: ['scu'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_shops',
+      description: 'Recherche des magasins (shops) et leur inventaire. Utile pour savoir où acheter un item ou composant.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Nom du shop ou de la location' },
+          system: { type: 'string', description: 'Système stellaire' },
+          env: { type: 'string', description: '"live" | "ptu"' },
+          limit: { type: 'number', description: 'Max résultats (défaut 10)' },
+        },
+        required: [],
+      },
+    },
+  },
+  // ── RSI / Lore ───────────────────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'search_galactapedia',
+      description: 'Recherche dans la Galactapedia RSI : articles de lore sur les races, factions, lieux, vaisseaux, histoire de l\'univers Star Citizen.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Sujet à rechercher' },
+          category: { type: 'string', description: 'Catégorie Galactapedia' },
+          limit: { type: 'number', description: 'Max résultats (défaut 5)' },
+        },
+        required: ['query'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_comm_links',
+      description: 'Recherche dans les Comm-links CIG : annonces officielles, lettres des fondateurs, notes de patch, lore.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Sujet à rechercher' },
+          limit: { type: 'number', description: 'Max résultats (défaut 5)' },
+        },
+        required: ['query'],
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'search_starmap',
+      description: 'Recherche des systèmes stellaires dans la Starmap RSI : description, affiliation, type.',
+      parameters: {
+        type: 'object',
+        properties: {
+          query: { type: 'string', description: 'Nom du système (Stanton, Pyro, Terra, Magnus…)' },
+          limit: { type: 'number', description: 'Max résultats (défaut 5)' },
+        },
+        required: [],
+      },
+    },
+  },
+  // ── Manufacturers ────────────────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'get_manufacturers',
+      description: 'Liste tous les constructeurs avec leur code, nom et nombre de vaisseaux.',
+      parameters: {
+        type: 'object',
+        properties: {
+          env: { type: 'string', description: '"live" | "ptu"' },
         },
         required: [],
       },
@@ -193,64 +498,104 @@ const TOOLS: Groq.Chat.Completions.ChatCompletionTool[] = [
   },
 ];
 
+// ─────────────────────────────────────────────────────────────────────────────
+// ChatService
+// ─────────────────────────────────────────────────────────────────────────────
+
 export class ChatService {
   private groq: Groq;
 
-  constructor(private gameDataService: GameDataService) {
+  constructor(
+    private gameDataService: GameDataService,
+    private shipMatrixService: ShipMatrixService,
+    private rsiWebsiteService: RsiWebsiteService,
+  ) {
     this.groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
   }
 
-  /** Execute a tool call and return JSON-serialisable result */
+  // ── Helpers ───────────────────────────────────────────────────────────────
+
+  private async resolveShipUuid(name: string, env: string): Promise<{ uuid: string; data: Record<string, unknown> } | null> {
+    const result = await this.gameDataService.ships.getAllShips({ env, search: name, limit: 1, page: 1 });
+    if (!result.data.length) return null;
+    const ship = result.data[0] as Record<string, unknown>;
+    return { uuid: ship['uuid'] as string, data: ship };
+  }
+
+  // ── Tool executor ─────────────────────────────────────────────────────────
+
   private async executeTool(name: string, args: Record<string, unknown>): Promise<unknown> {
     const env = (args.env as string | undefined) ?? 'live';
-    const limit = Math.min(Number(args.limit ?? 10), 20);
+    const limit = Math.min(Number(args.limit ?? 15), 25);
 
     try {
       switch (name) {
+        // ── Ships ──────────────────────────────────────────────────────────
         case 'search_ships': {
           const result = await this.gameDataService.ships.getAllShips({
             env,
             search: (args.query as string | undefined) ?? '',
             manufacturer: args.manufacturer as string | undefined,
             role: args.role as string | undefined,
+            career: args.career as string | undefined,
             vehicle_category: args.category as string | undefined,
+            sort: args.sort as string | undefined,
+            order: args.order as string | undefined,
             limit,
             page: 1,
           });
           return {
             total: result.total,
             ships: result.data.map((s: Record<string, unknown>) => ({
-              uuid: s['uuid'],
-              name: s['name'],
-              manufacturer: s['manufacturer'],
-              role: s['role'],
-              size: s['size'],
-              career: s['career'],
-              scm_speed: s['scm_speed'],
-              max_speed: s['max_speed'],
-              cargo_scu: s['cargo_scu'],
-              crew_min: s['crew_min'],
-              crew_max: s['crew_max'],
-              price_uec: s['price_uec'],
-              price_usd: s['price_usd'],
-              vehicle_category: s['vehicle_category'],
+              name: s['name'], manufacturer: s['manufacturer_code'], role: s['role'], career: s['career'],
+              vehicle_category: s['vehicle_category'], size_y: s['size_y'],
+              scm_speed: s['scm_speed'], max_speed: s['max_speed'],
+              cargo_capacity: s['cargo_capacity'], crew_size: s['crew_size'],
+              shield_hp: s['shield_hp'], total_hp: s['total_hp'],
+              weapon_damage_total: s['weapon_damage_total'],
+              production_status: s['production_status'], uuid: s['uuid'],
             })),
           };
         }
 
         case 'get_ship_details': {
-          const search = await this.gameDataService.ships.getAllShips({
-            env,
-            search: args.name as string,
-            limit: 1,
-            page: 1,
-          });
-          if (!search.data.length) return { error: `Ship "${args.name}" not found` };
-          const ship = search.data[0] as Record<string, unknown>;
-          const details = await this.gameDataService.ships.getShipByUuid(ship['uuid'] as string, env);
-          return details ?? { error: 'Details not available' };
+          const found = await this.resolveShipUuid(args.name as string, env);
+          if (!found) return { error: `Vaisseau "${args.name}" introuvable` };
+          const details = await this.gameDataService.ships.getShipByUuid(found.uuid, env);
+          return details ?? found.data;
         }
 
+        case 'get_ship_full_stats': {
+          const found = await this.resolveShipUuid(args.name as string, env);
+          if (!found) return { error: `Vaisseau "${args.name}" introuvable` };
+          const stats = await this.gameDataService.loadouts.getShipStats(found.uuid, env);
+          return stats ?? { error: 'Stats de loadout non disponibles' };
+        }
+
+        case 'get_ship_loadout': {
+          const found = await this.resolveShipUuid(args.name as string, env);
+          if (!found) return { error: `Vaisseau "${args.name}" introuvable` };
+          const [loadout, hardpoints] = await Promise.all([
+            this.gameDataService.loadouts.getShipLoadout(found.uuid, env),
+            this.gameDataService.loadouts.getShipHardpoints(found.uuid, env),
+          ]);
+          return { ship: found.data['name'], loadout, hardpoints };
+        }
+
+        case 'get_ship_variants': {
+          const found = await this.resolveShipUuid(args.name as string, env);
+          if (!found) return { error: `Vaisseau "${args.name}" introuvable` };
+          const variants = await this.gameDataService.ships.getShipVariants(found.uuid, env);
+          return { base_ship: found.data['name'], variants };
+        }
+
+        case 'get_ship_matrix': {
+          const entry = await this.shipMatrixService.getByName(args.name as string);
+          if (!entry) return { error: `"${args.name}" non trouvé dans la Ship Matrix RSI` };
+          return entry;
+        }
+
+        // ── Components ────────────────────────────────────────────────────
         case 'search_components': {
           const result = await this.gameDataService.components.getAllComponents({
             env,
@@ -259,12 +604,15 @@ export class ChatService {
             grade: args.grade != null ? String(args.grade) : undefined,
             size: args.size != null ? String(args.size) : undefined,
             manufacturer: args.manufacturer as string | undefined,
+            sort: args.sort as string | undefined,
+            order: (args.order as string | undefined) ?? 'desc',
             limit,
             page: 1,
           });
           return { total: result.total, components: result.data };
         }
 
+        // ── Items ─────────────────────────────────────────────────────────
         case 'search_items': {
           const result = await this.gameDataService.items.getAllItems({
             env,
@@ -276,35 +624,55 @@ export class ChatService {
           return { total: result.total, items: result.data };
         }
 
+        // ── Crafting ──────────────────────────────────────────────────────
         case 'search_crafting': {
           const result = await this.gameDataService.crafting.getRecipes({
             env,
             search: (args.query as string | undefined) ?? '',
+            category: args.category as string | undefined,
             limit,
             page: 1,
           });
           return { total: result.total, recipes: result.data };
         }
 
+        case 'get_recipe_details': {
+          const search = await this.gameDataService.crafting.getRecipes({
+            env,
+            search: args.name as string,
+            limit: 1,
+            page: 1,
+          });
+          if (!search.data.length) return { error: `Recette "${args.name}" introuvable` };
+          const recipe = search.data[0] as Record<string, unknown>;
+          const full = await this.gameDataService.crafting.getRecipeByUuid(recipe['uuid'] as string, env);
+          return full ?? recipe;
+        }
+
+        // ── Mining ────────────────────────────────────────────────────────
         case 'search_mining': {
           const elements = await this.gameDataService.mining.getAllElements(env);
           const query = ((args.query as string | undefined) ?? '').toLowerCase();
           const filtered = query
             ? elements.filter((e: Record<string, unknown>) => String(e['name'] ?? '').toLowerCase().includes(query))
             : elements;
-          return { elements: filtered.slice(0, 20) };
+          return { elements: filtered.slice(0, 25) };
         }
 
+        // ── Missions ──────────────────────────────────────────────────────
         case 'search_missions': {
           const result = await this.gameDataService.missions.getMissions({
             env,
             search: (args.query as string | undefined) ?? '',
+            type: args.type as string | undefined,
+            faction: args.faction as string | undefined,
             limit,
             page: 1,
           });
           return { total: result.total, missions: result.data };
         }
 
+        // ── Locations ─────────────────────────────────────────────────────
         case 'search_locations': {
           const result = await this.gameDataService.locations.getLocations({
             env,
@@ -316,28 +684,108 @@ export class ChatService {
           return { total: result.total, locations: result.data };
         }
 
+        // ── Economy ───────────────────────────────────────────────────────
         case 'search_commodities': {
           const result = await this.gameDataService.commodities.getAllCommodities({
             env,
             search: (args.query as string | undefined) ?? '',
+            type: args.type as string | undefined,
             limit,
             page: 1,
           });
           return { total: result.total, commodities: result.data };
         }
 
+        case 'get_commodity_prices': {
+          // Find the commodity uuid first
+          const comms = await this.gameDataService.commodities.getAllCommodities({
+            env,
+            search: args.name as string,
+            limit: 1,
+            page: 1,
+          });
+          if (!comms.data.length) return { error: `Commodité "${args.name}" introuvable` };
+          const comm = comms.data[0] as Record<string, unknown>;
+          const prices = await this.gameDataService.trade.getCommodityPrices(comm['uuid'] as string, env);
+          return {
+            commodity: comm['name'],
+            occupancy_scu: comm['occupancy_scu'],
+            prices: prices.map((p: Record<string, unknown>) => ({
+              shop: p['shop_name'], system: p['system'], city: p['city'],
+              buy_price: p['buy_price'], sell_price: p['sell_price'],
+              stock: p['stock'], demand: p['demand'],
+            })),
+          };
+        }
+
+        case 'find_trade_routes': {
+          const routes = await this.gameDataService.trade.findBestRoutes({
+            scu: Number(args.scu),
+            budget: args.budget != null ? Number(args.budget) : undefined,
+            commodity: args.commodity as string | undefined,
+            buySystem: args.buy_system as string | undefined,
+            sellSystem: args.sell_system as string | undefined,
+            limit: Math.min(limit, 20),
+            env,
+          });
+          return { routes };
+        }
+
+        case 'search_shops': {
+          const result = await this.gameDataService.shops.getShops({
+            env,
+            search: (args.query as string | undefined) ?? (args.system as string | undefined) ?? '',
+            limit,
+            page: 1,
+          });
+          return { total: result.total, shops: result.data };
+        }
+
+        // ── RSI / Lore ────────────────────────────────────────────────────
+        case 'search_galactapedia': {
+          const result = await this.rsiWebsiteService.getGalactapediaEntries({
+            search: args.query as string,
+            category: args.category as string | undefined,
+            limit: Math.min(limit, 5),
+            page: 1,
+          });
+          return { total: result.total, entries: result.data };
+        }
+
+        case 'search_comm_links': {
+          const result = await this.rsiWebsiteService.getCommLinks({
+            search: args.query as string,
+            limit: Math.min(limit, 5),
+            page: 1,
+          });
+          return { total: result.total, comm_links: result.data };
+        }
+
+        case 'search_starmap': {
+          const result = await this.rsiWebsiteService.getStarmapSystems({
+            search: (args.query as string | undefined) ?? '',
+            limit: Math.min(limit, 10),
+            page: 1,
+          });
+          return { total: result.total, systems: result.data };
+        }
+
+        // ── Manufacturers ─────────────────────────────────────────────────
+        case 'get_manufacturers': {
+          const list = await this.gameDataService.ships.getShipManufacturers(env);
+          return { manufacturers: list };
+        }
+
         default:
-          return { error: `Unknown tool: ${name}` };
+          return { error: `Outil inconnu : ${name}` };
       }
     } catch (e) {
       return { error: String(e) };
     }
   }
 
-  /**
-   * Stream a chat response with tool use to a writable stream.
-   * Calls `onChunk` for each text delta and `onDone` when finished.
-   */
+  // ── Stream ────────────────────────────────────────────────────────────────
+
   async streamChat(
     messages: ChatMessage[],
     onChunk: (text: string) => void,
@@ -350,54 +798,42 @@ export class ChatService {
     ];
 
     try {
-      // Phase 1 — agentic loop: resolve all tool calls (non-streaming)
-      let toolIterations = 0;
-      while (toolIterations < 5) {
+      // Phase 1 — boucle agentique : résolution des tool calls (non-streaming)
+      let iterations = 0;
+      while (iterations < 6) {
         const response = await this.groq.chat.completions.create({
           model: 'llama-3.3-70b-versatile',
           messages: groqMessages,
           tools: TOOLS,
           tool_choice: 'auto',
           max_tokens: 1024,
-          temperature: 0.3,
+          temperature: 0.2,
           stream: false,
         });
 
-        const choice = response.choices[0];
-        if (!choice) break;
-
-        const msg = choice.message;
+        const msg = response.choices[0]?.message;
+        if (!msg) break;
 
         if (msg.tool_calls && msg.tool_calls.length > 0) {
-          toolIterations++;
+          iterations++;
           groqMessages.push(msg);
-
           for (const tc of msg.tool_calls) {
             let args: Record<string, unknown> = {};
-            try {
-              args = JSON.parse(tc.function.arguments);
-            } catch {
-              /* ignore */
-            }
+            try { args = JSON.parse(tc.function.arguments); } catch { /* ignore */ }
             const result = await this.executeTool(tc.function.name, args);
-            groqMessages.push({
-              role: 'tool',
-              tool_call_id: tc.id,
-              content: JSON.stringify(result),
-            });
+            groqMessages.push({ role: 'tool', tool_call_id: tc.id, content: JSON.stringify(result) });
           }
           continue;
         }
-        // No more tool calls — exit loop
         break;
       }
 
-      // Phase 2 — stream the final answer
+      // Phase 2 — stream la réponse finale
       const stream = await this.groq.chat.completions.create({
         model: 'llama-3.3-70b-versatile',
         messages: groqMessages,
-        max_tokens: 1024,
-        temperature: 0.3,
+        max_tokens: 1500,
+        temperature: 0.2,
         stream: true,
       });
 
