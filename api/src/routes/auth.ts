@@ -1,36 +1,25 @@
 /**
- * POST /auth/register  — créer un compte
- * POST /auth/login     — se connecter
- * GET  /auth/me        — récupérer l'utilisateur courant (via Bearer token)
- * PUT  /auth/me        — modifier son profil
+ * POST /auth/register         — créer un compte
+ * POST /auth/login            — se connecter
+ * GET  /auth/me               — profil courant (Bearer)
+ * PUT  /auth/me               — modifier son profil (Bearer)
+ * POST /auth/api-token        — générer un token longue durée (Bearer, pour projets externes)
+ *
+ * Admin (Bearer role=admin ou X-Api-Key) :
+ * GET  /admin/users           — liste des utilisateurs
+ * PUT  /admin/users/:id/role  — modifier le rôle d'un utilisateur
  */
 import type { NextFunction, Request, Response, Router } from 'express';
+import { requireJwt, requireJwtAdmin } from '../middleware/index.js';
 import { AuthService } from '../services/auth-service.js';
 import type { RouteDependencies } from './types.js';
-
-function extractToken(req: Request): string | null {
-  const auth = req.headers.authorization;
-  if (auth?.startsWith('Bearer ')) return auth.slice(7);
-  return null;
-}
-
-function requireAuth(authService: AuthService) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const token = extractToken(req);
-    if (!token) return void res.status(401).json({ success: false, error: 'Authentication required' });
-    try {
-      (req as any).jwtPayload = authService.verifyToken(token);
-      next();
-    } catch {
-      res.status(401).json({ success: false, error: 'Invalid or expired token' });
-    }
-  };
-}
 
 export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   if (!process.env.JWT_SECRET) return;
 
   const authService = new AuthService(deps.prisma);
+
+  // ── Authentification ───────────────────────────────────────────────────────
 
   // POST /auth/register
   router.post('/auth/register', async (req, res) => {
@@ -45,11 +34,9 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     if (typeof username !== 'string' || username.length < 3 || username.length > 50 || !/^[a-zA-Z0-9_-]+$/.test(username)) {
       return void res.status(400).json({ success: false, error: 'Username must be 3-50 chars, letters/numbers/_ only' });
     }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return void res.status(400).json({ success: false, error: 'Invalid email address' });
     }
-
     try {
       const result = await authService.register(email, username, password);
       res.status(201).json({ success: true, ...result });
@@ -76,7 +63,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   });
 
   // GET /auth/me
-  router.get('/auth/me', requireAuth(authService), async (req, res) => {
+  router.get('/auth/me', requireJwt, async (req, res) => {
     const payload = (req as any).jwtPayload;
     const user = await authService.me(payload.sub);
     if (!user) return void res.status(404).json({ success: false, error: 'User not found' });
@@ -84,7 +71,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   });
 
   // PUT /auth/me
-  router.put('/auth/me', requireAuth(authService), async (req, res) => {
+  router.put('/auth/me', requireJwt, async (req, res) => {
     const payload = (req as any).jwtPayload;
     const { username, avatarUrl } = req.body ?? {};
     try {
@@ -95,6 +82,43 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
       res.json({ success: true, user });
     } catch {
       res.status(500).json({ success: false, error: 'Profile update failed' });
+    }
+  });
+
+  // ── API Token (accès projets externes) ────────────────────────────────────
+  // POST /auth/api-token — génère un JWT longue durée (1 an)
+  router.post('/auth/api-token', requireJwt, async (req, res) => {
+    const payload = (req as any).jwtPayload;
+    const user = await authService.me(payload.sub);
+    if (!user) return void res.status(404).json({ success: false, error: 'User not found' });
+    const token = authService.generateApiToken(user);
+    res.json({ success: true, token, expiresIn: '1y', note: 'Store this token securely — it will not be shown again.' });
+  });
+
+  // ── Admin : gestion des utilisateurs ─────────────────────────────────────
+
+  // GET /admin/users
+  router.get('/admin/users', requireJwtAdmin, async (_req, res) => {
+    try {
+      const users = await authService.listUsers();
+      res.json({ success: true, data: users });
+    } catch {
+      res.status(500).json({ success: false, error: 'Failed to fetch users' });
+    }
+  });
+
+  // PUT /admin/users/:id/role
+  router.put('/admin/users/:id/role', requireJwtAdmin, async (req, res) => {
+    const id = Number(req.params.id);
+    const { role } = req.body ?? {};
+    if (!['user', 'admin'].includes(role)) {
+      return void res.status(400).json({ success: false, error: 'role must be "user" or "admin"' });
+    }
+    try {
+      const user = await authService.setRole(id, role);
+      res.json({ success: true, user });
+    } catch {
+      res.status(500).json({ success: false, error: 'Failed to update role' });
     }
   });
 }

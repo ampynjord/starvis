@@ -22,6 +22,7 @@ export interface PublicUser {
 
 const SALT_ROUNDS = 12;
 const JWT_EXPIRES = '7d';
+const JWT_API_TOKEN_EXPIRES = '1y';
 
 function getSecret(): string {
   const s = process.env.JWT_SECRET;
@@ -83,6 +84,26 @@ export class AuthService {
       data: updates,
     });
     return toPublicUser(user);
+  }
+
+  async listUsers(): Promise<PublicUser[]> {
+    const users = await (this.prisma as any).user.findMany({
+      orderBy: { createdAt: 'desc' },
+    });
+    return users.map(toPublicUser);
+  }
+
+  async setRole(userId: number, role: string): Promise<PublicUser> {
+    const user = await (this.prisma as any).user.update({
+      where: { id: userId },
+      data: { role },
+    });
+    return toPublicUser(user);
+  }
+
+  generateApiToken(user: PublicUser): string {
+    const payload: JwtPayload = { sub: user.id, uuid: user.uuid, email: user.email, username: user.username, role: user.role };
+    return jwt.sign(payload, getSecret(), { expiresIn: JWT_API_TOKEN_EXPIRES });
   }
 
   verifyToken(token: string): JwtPayload {
