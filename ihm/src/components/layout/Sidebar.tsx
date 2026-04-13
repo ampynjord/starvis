@@ -167,6 +167,9 @@ export function Sidebar() {
         <NavGroup label="Ships" items={SHIP_ITEMS} />
         <NavGroup label="FPS" items={FPS_ITEMS} />
         <NavGroup label="Industrial" items={INDUSTRIAL_ITEMS} />
+        {user?.role === 'admin' && (
+          <NavGroup label="Admin" items={[{ to: '/admin', icon: Shield, label: 'Administration' }]} />
+        )}
       </nav>
 
       {/* Footer */}

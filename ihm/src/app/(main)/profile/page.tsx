@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { LogOut, Save, Shield, User } from 'lucide-react';
+import { Copy, Key, LogOut, Save, Shield, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,6 +14,9 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [apiToken, setApiToken] = useState<string | null>(null);
+  const [generatingToken, setGeneratingToken] = useState(false);
+  const [tokenCopied, setTokenCopied] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -46,6 +49,28 @@ export default function ProfilePage() {
   const handleLogout = async () => {
     await logout();
     router.push('/');
+  };
+
+  const handleGenerateApiToken = async () => {
+    setGeneratingToken(true);
+    setApiToken(null);
+    try {
+      const res = await fetch('/api/auth/api-token', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Failed');
+      setApiToken(data.token);
+    } catch (err: any) {
+      setMessage({ type: 'error', text: err.message });
+    } finally {
+      setGeneratingToken(false);
+    }
+  };
+
+  const handleCopyToken = () => {
+    if (!apiToken) return;
+    navigator.clipboard.writeText(apiToken);
+    setTokenCopied(true);
+    setTimeout(() => setTokenCopied(false), 2000);
   };
 
   if (!user) return null;
@@ -135,6 +160,46 @@ export default function ProfilePage() {
             {saving ? 'SAUVEGARDE...' : 'SAUVEGARDER'}
           </button>
         </form>
+      </motion.div>
+
+      {/* API Token */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="sci-panel p-5 space-y-4"
+      >
+        <div className="space-y-1">
+          <h2 className="text-sm font-mono-sc text-cyan-700 uppercase tracking-wider">Token API externe</h2>
+          <p className="text-xs text-slate-600">Génère un token longue durée (1 an) pour accéder à l'API depuis des projets externes.</p>
+        </div>
+
+        {apiToken ? (
+          <div className="space-y-2">
+            <p className="text-xs text-amber-400 font-mono-sc">Copiez ce token maintenant — il ne sera plus affiché.</p>
+            <div className="flex items-center gap-2">
+              <code className="flex-1 text-[10px] font-mono text-slate-300 bg-slate-900 border border-slate-700 rounded px-3 py-2 truncate">
+                {apiToken}
+              </code>
+              <button
+                onClick={handleCopyToken}
+                className="shrink-0 p-2 rounded border border-slate-700 hover:border-cyan-700/50 hover:bg-white/5 transition-colors"
+                title="Copier"
+              >
+                <Copy size={14} className={tokenCopied ? 'text-green-400' : 'text-slate-400'} />
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={handleGenerateApiToken}
+            disabled={generatingToken}
+            className="flex items-center gap-2 py-2 px-4 bg-cyan-900/40 border border-cyan-700/50 hover:border-cyan-500/70 hover:bg-cyan-900/60 text-cyan-300 font-mono-sc text-sm rounded transition-colors disabled:opacity-50"
+          >
+            <Key size={14} />
+            {generatingToken ? 'GÉNÉRATION...' : 'GÉNÉRER UN TOKEN API'}
+          </button>
+        )}
       </motion.div>
 
       {/* Logout */}
