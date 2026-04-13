@@ -1,5 +1,5 @@
 import type { Router } from 'express';
-import { authMiddleware } from '../middleware/index.js';
+import { requireJwtAdmin } from '../middleware/index.js';
 import { asyncHandler, makeGameDataGuard } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
@@ -7,7 +7,8 @@ export function mountAdminRoutes(router: Router, deps: RouteDependencies): void 
   const { prisma, shipMatrixService, gameDataService } = deps;
   const requireGameData = makeGameDataGuard(gameDataService);
 
-  router.use('/admin', authMiddleware);
+  // Admin routes — accepte ADMIN_API_KEY (X-Api-Key) OU JWT avec role=admin
+  router.use('/admin', requireJwtAdmin);
 
   router.get(
     '/admin/stats',
