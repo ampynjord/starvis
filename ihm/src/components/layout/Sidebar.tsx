@@ -9,6 +9,7 @@ import {
   Factory,
   Home,
   Layers3,
+  Lock,
   MapPin,
   Paintbrush,
   Pickaxe,
@@ -19,12 +20,14 @@ import {
   SlidersHorizontal,
   TrendingUp,
   Trophy,
+  User,
   Wrench,
   ClipboardList,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEnv } from '@/contexts/EnvContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 const CORE_ITEMS = [
   { to: '/',              icon: Home,          label: 'Dashboard' },
@@ -38,7 +41,7 @@ const CORE_ITEMS = [
 const SHIP_ITEMS = [
   { to: '/ships',         icon: Rocket,        label: 'Ships & Vehicles' },
   { to: '/components',    icon: Settings2,     label: 'Ship Components' },
-  { to: '/outfitter',     icon: SlidersHorizontal, label: 'Outfitter' },
+  { to: '/outfitter',     icon: SlidersHorizontal, label: 'Outfitter', auth: true },
   { to: '/compare',       icon: BarChart3,     label: 'Compare' },
   { to: '/ranking',       icon: Trophy,        label: 'Ranking' },
   { to: '/paints',        icon: Paintbrush,    label: 'Paints' },
@@ -57,9 +60,11 @@ const INDUSTRIAL_ITEMS = [
 ];
 
 
-function NavItem({ to, icon: Icon, label }: { to: string; icon: React.ElementType; label: string }) {
+function NavItem({ to, icon: Icon, label, auth: requiresAuth }: { to: string; icon: React.ElementType; label: string; auth?: boolean }) {
   const pathname = usePathname();
+  const { user } = useAuth();
   const isActive = to === '/' ? pathname === '/' : pathname?.startsWith(to);
+  const locked = requiresAuth && !user;
 
   return (
     <Link
@@ -76,10 +81,13 @@ function NavItem({ to, icon: Icon, label }: { to: string; icon: React.ElementTyp
         className={`shrink-0 ${isActive ? 'text-cyan-400' : 'text-slate-500 group-hover:text-slate-300'}`}
         strokeWidth={isActive ? 2 : 1.5}
       />
-      <span className="hidden md:block font-rajdhani font-semibold text-sm uppercase tracking-wider truncate">
+      <span className="hidden md:block font-rajdhani font-semibold text-sm uppercase tracking-wider truncate flex-1">
         {label}
       </span>
-      {isActive && (
+      {locked && (
+        <Lock size={10} className="hidden md:block shrink-0 text-slate-600" />
+      )}
+      {isActive && !locked && (
         <motion.div
           layoutId="nav-indicator"
           className="hidden md:block ml-auto w-1 h-1 rounded-full bg-cyan-400"
@@ -105,6 +113,7 @@ function NavGroup({ label, items }: { label: string; items: typeof CORE_ITEMS })
 
 export function Sidebar() {
   const { env, setEnv } = useEnv();
+  const { user } = useAuth();
 
   return (
     <aside className="w-16 md:w-56 shrink-0 flex flex-col border-r border-border bg-panel/80 backdrop-blur-sm">
@@ -162,6 +171,15 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="px-4 py-3 border-t border-border space-y-2">
+        {user && (
+          <Link
+            href="/profile"
+            className="hidden md:flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition-colors"
+          >
+            <User size={12} />
+            <span className="font-mono-sc truncate">{user.username}</span>
+          </Link>
+        )}
         <Link
           href="/changelog"
           className="hidden md:flex items-center gap-2 text-xs text-slate-600 hover:text-slate-400 transition-colors"
