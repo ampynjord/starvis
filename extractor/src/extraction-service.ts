@@ -308,16 +308,17 @@ export class ExtractionService {
         await conn.query('DELETE FROM game.commodities WHERE env = $1', [env]);
       }
       if (run('mining')) {
-        await conn.query('DELETE FROM game.mining_composition_parts WHERE env = $1', [env]);
+        await conn.query('DELETE FROM game.mining_composition_parts WHERE composition_env = $1', [env]);
         await conn.query('DELETE FROM game.mining_compositions WHERE env = $1', [env]);
         await conn.query('DELETE FROM game.mining_elements WHERE env = $1', [env]);
       }
       if (run('missions')) {
-        await conn.query('DELETE FROM game.mission_blueprint_rewards WHERE env = $1', [env]);
+        await conn.query('DELETE FROM game.mission_blueprint_rewards WHERE mission_env = $1', [env]);
         await conn.query('DELETE FROM game.missions WHERE env = $1', [env]);
       }
       if (run('crafting')) {
-        await conn.query('DELETE FROM game.crafting_ingredients WHERE env = $1', [env]);
+        await conn.query('DELETE FROM game.crafting_ingredients WHERE recipe_env = $1', [env]);
+        await conn.query('DELETE FROM game.crafting_slot_modifiers WHERE recipe_env = $1', [env]);
         await conn.query('DELETE FROM game.crafting_recipes WHERE env = $1', [env]);
       }
       if (run('locations')) {
@@ -909,17 +910,17 @@ export class ExtractionService {
             fullData.vehicle?.size?.y || null,
             fullData.vehicle?.size?.z || null,
             fullData.hull?.mass || null,
-            fullData.ifcs?.scmSpeed || null,
-            fullData.ifcs?.maxSpeed || null,
-            fullData.ifcs?.boostSpeedForward || null,
-            fullData.ifcs?.boostSpeedBackward || null,
+            fullData.ifcs?.scmSpeed != null ? Math.round(fullData.ifcs.scmSpeed) : null,
+            fullData.ifcs?.maxSpeed != null ? Math.round(fullData.ifcs.maxSpeed) : null,
+            fullData.ifcs?.boostSpeedForward != null ? Math.round(fullData.ifcs.boostSpeedForward) : null,
+            fullData.ifcs?.boostSpeedBackward != null ? Math.round(fullData.ifcs.boostSpeedBackward) : null,
             fullData.ifcs?.angularVelocity?.x || null,
             fullData.ifcs?.angularVelocity?.z || null,
             fullData.ifcs?.angularVelocity?.y || null,
-            fullData.hull?.totalHp || null,
+            fullData.hull?.totalHp != null ? Math.round(fullData.hull.totalHp) : null,
             fullData.fuelCapacity || null,
             fullData.qtFuelCapacity || null,
-            fullData.shield?.maxShieldHealth || fullData.shield?.maxHp || null,
+            (fullData.shield?.maxShieldHealth ?? fullData.shield?.maxHp) != null ? Math.round(fullData.shield!.maxShieldHealth ?? fullData.shield!.maxHp!) : null,
             fullData.armor?.data?.armor?.damageMultiplier?.damagePhysical ?? null,
             fullData.armor?.data?.armor?.damageMultiplier?.damageEnergy ?? null,
             fullData.armor?.data?.armor?.damageMultiplier?.damageDistortion ?? null,
@@ -1194,14 +1195,7 @@ export class ExtractionService {
             await conn.query(
               `INSERT INTO game.ship_modules
                  (env, ship_uuid, slot_name, slot_display_name, slot_type, module_class_name, module_name, module_tier, is_default, loadout_json)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-               ON CONFLICT (env, ship_uuid, slot_name, module_class_name) DO UPDATE SET
-                 slot_display_name = EXCLUDED.slot_display_name,
-                 slot_type         = EXCLUDED.slot_type,
-                 module_name       = EXCLUDED.module_name,
-                 module_tier       = EXCLUDED.module_tier,
-                 is_default        = EXCLUDED.is_default,
-                 loadout_json      = EXCLUDED.loadout_json`,
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
               [
                 env,
                 fullData.ref,
@@ -1268,10 +1262,7 @@ export class ExtractionService {
       try {
         await conn.query(
           `INSERT INTO game.ship_modules (env, ship_uuid, slot_name, slot_display_name, module_class_name, module_name, is_default)
-           VALUES ($1, $2, $3, $4, $5, $6, TRUE)
-           ON CONFLICT (env, ship_uuid, slot_name, module_class_name) DO UPDATE SET
-             slot_display_name = EXCLUDED.slot_display_name,
-             module_name       = EXCLUDED.module_name`,
+           VALUES ($1, $2, $3, $4, $5, $6, TRUE)`,
           [env, fullData.ref, port.portName, slotDisplay, port.componentClassName, moduleName],
         );
       } catch (e: unknown) {
@@ -1389,7 +1380,7 @@ export class ExtractionService {
     await ExtractionService.batchUpsert(
       conn,
       'INSERT INTO game.ship_paints (env, ship_uuid, paint_class_name, paint_name, paint_uuid)',
-      '(env, ship_uuid, paint_class_name) DO NOTHING',
+      '',
       5,
       paintRows,
       ExtractionService.BATCH_SIZE,
@@ -1739,16 +1730,7 @@ export class ExtractionService {
       savedShops = await ExtractionService.batchUpsert(
         conn,
         `INSERT INTO game.shops (env, name, normalized_name, canonical_shop_key, canonical_location_key, location, system, planet_moon, city, shop_type, class_name)`,
-        `(env, canonical_shop_key) DO UPDATE SET
-           name=EXCLUDED.name,
-           normalized_name=EXCLUDED.normalized_name,
-           canonical_location_key=EXCLUDED.canonical_location_key,
-           location=EXCLUDED.location,
-           system=EXCLUDED.system,
-           planet_moon=EXCLUDED.planet_moon,
-           city=EXCLUDED.city,
-           shop_type=EXCLUDED.shop_type,
-           updated_at=CURRENT_TIMESTAMP`,
+        '',
         11,
         shopRows,
       );
@@ -1962,7 +1944,7 @@ export class ExtractionService {
     for (const comp of compositions) {
       for (const part of comp.parts) {
         if (elementUuidSet.has(part.elementUuid)) {
-          partRows.push([env, comp.uuid, part.elementUuid, part.minPercentage, part.maxPercentage, part.probability, part.curveExponent]);
+          partRows.push([env, env, comp.uuid, part.elementUuid, part.minPercentage, part.maxPercentage, part.probability, part.curveExponent]);
         }
       }
     }
@@ -1970,11 +1952,9 @@ export class ExtractionService {
       await ExtractionService.batchUpsert(
         conn,
         `INSERT INTO game.mining_composition_parts
-           (env, composition_uuid, element_uuid, min_percentage, max_percentage, probability, curve_exponent)`,
-        `(env, composition_uuid, element_uuid) DO UPDATE SET
-           min_percentage=EXCLUDED.min_percentage, max_percentage=EXCLUDED.max_percentage,
-           probability=EXCLUDED.probability, curve_exponent=EXCLUDED.curve_exponent`,
-        7,
+           (composition_env, element_env, composition_uuid, element_uuid, min_percentage, max_percentage, probability, curve_exponent)`,
+        '',
+        8,
         partRows,
       );
     }
@@ -2015,26 +1995,26 @@ export class ExtractionService {
       m.canBeShared ? 1 : 0,
       m.onlyOwnerComplete ? 1 : 0,
       m.isLegal ? 1 : 0,
-      m.completionTimeSecs,
+      m.completionTimeSecs != null ? Math.round(m.completionTimeSecs) : null,
       m.notForRelease ? 1 : 0,
       m.workInProgress ? 1 : 0,
-      m.rewardMin,
-      m.rewardMax,
+      m.rewardMin != null ? Math.round(m.rewardMin) : null,
+      m.rewardMax != null ? Math.round(m.rewardMax) : null,
       m.rewardCurrency,
       m.faction,
       m.missionGiver,
       m.locationSystem,
       m.locationPlanet,
       m.locationName,
-      m.dangerLevel,
-      m.requiredReputation,
-      m.reputationReward,
-      m.baseXp,
+      m.dangerLevel != null ? Math.round(m.dangerLevel) : null,
+      m.requiredReputation != null ? Math.round(m.requiredReputation) : null,
+      m.reputationReward != null ? Math.round(m.reputationReward) : null,
+      m.baseXp != null ? Math.round(m.baseXp) : null,
       m.category,
       m.isUnique ? 1 : 0,
       m.hasBlueprintReward ? 1 : 0,
       m.blueprintRewardUuid,
-      m.buyInAmount,
+      m.buyInAmount != null ? Math.round(m.buyInAmount) : null,
     ]);
 
     const saved = await ExtractionService.batchUpsert(
@@ -2214,12 +2194,12 @@ export class ExtractionService {
       return;
     }
 
-    const mbrRows = validRows.map(([m, b]) => [env, m, b]);
+    const mbrRows = validRows.map(([m, b]) => [env, env, m, b]);
     await ExtractionService.batchUpsert(
       conn,
-      `INSERT INTO game.mission_blueprint_rewards (env, mission_uuid, blueprint_uuid)`,
-      `(env, mission_uuid, blueprint_uuid) DO NOTHING`,
-      3,
+      `INSERT INTO game.mission_blueprint_rewards (mission_env, blueprint_env, mission_uuid, blueprint_uuid)`,
+      '(mission_uuid, blueprint_uuid) DO NOTHING',
+      4,
       mbrRows,
     );
 
@@ -2334,11 +2314,8 @@ export class ExtractionService {
       savedIngredients = await ExtractionService.batchUpsert(
         conn,
         `INSERT INTO game.crafting_ingredients
-           (env, recipe_uuid, item_name, item_uuid, quantity, is_optional, scu, min_quality, slot_name)`,
-        `(env, recipe_uuid, slot_name) DO UPDATE SET
-           item_name=EXCLUDED.item_name, item_uuid=EXCLUDED.item_uuid,
-           quantity=EXCLUDED.quantity, is_optional=EXCLUDED.is_optional,
-           scu=EXCLUDED.scu, min_quality=EXCLUDED.min_quality`,
+           (recipe_env, recipe_uuid, item_name, item_uuid, quantity, is_optional, scu, min_quality, slot_name)`,
+        '',
         9,
         ingredientRowsWithEnv,
       );
@@ -2369,11 +2346,8 @@ export class ExtractionService {
       savedModifiers = await ExtractionService.batchUpsert(
         conn,
         `INSERT INTO game.crafting_slot_modifiers
-           (env, recipe_uuid, slot_name, property_name, property_uuid, unit_format, start_quality, end_quality, modifier_at_start, modifier_at_end)`,
-        `(env, recipe_uuid, slot_name, property_uuid) DO UPDATE SET
-           property_name=EXCLUDED.property_name, unit_format=EXCLUDED.unit_format,
-           start_quality=EXCLUDED.start_quality, end_quality=EXCLUDED.end_quality,
-           modifier_at_start=EXCLUDED.modifier_at_start, modifier_at_end=EXCLUDED.modifier_at_end`,
+           (recipe_env, recipe_uuid, slot_name, property_name, property_uuid, unit_format, start_quality, end_quality, modifier_at_start, modifier_at_end)`,
+        '',
         10,
         modifierRowsWithEnv,
       );
