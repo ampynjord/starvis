@@ -2,10 +2,10 @@
 // schema.prisma — Unified PostgreSQL multi-schema definition
 //
 // Schemas:
-//   game  — game data extracted from P4K (ships, components, etc.)
+//   game  — game data extracted from P4K (ships, components, manufacturers…)
 //            env = "live" | "ptu" replaces the live/ptu DB split
 //   rsi   — data scraped from RSI website / SC Wiki
-//   meta  — extraction metadata, changelogs, shared manufacturers
+//   meta  — extraction metadata, changelogs, users
 //
 // Run: npm run generate --workspace=@starvis/db
 // ============================================================
@@ -23,19 +23,8 @@ datasource db {
 }
 
 // ╔══════════════════════════════════════════════════════════════╗
-// ║  META SCHEMA — manufacturers, extraction log, changelog      ║
+// ║  META SCHEMA — extraction log, changelog, users              ║
 // ╚══════════════════════════════════════════════════════════════╝
-
-model Manufacturer {
-  code       String  @id @db.VarChar(20)
-  name       String  @db.VarChar(100)
-  knownFor   String? @map("known_for") @db.VarChar(255)
-  logoUrl    String? @map("logo_url") @db.VarChar(500)
-  websiteUrl String? @map("website_url") @db.VarChar(500)
-
-  @@map("manufacturers")
-  @@schema("meta")
-}
 
 enum ExtractionStatus {
   success
@@ -240,6 +229,19 @@ model StarmapLocation {
 //  All models have env String @default("live").
 //  UUID-keyed tables use @@id([uuid, env]).
 //  Int-id tables keep autoincrement PK and add env + unique constraints.
+
+// ─── Manufacturers ────────────────────────────────────────────────────────────
+
+model Manufacturer {
+  code       String  @id @db.VarChar(20)
+  name       String  @db.VarChar(100)
+  knownFor   String? @map("known_for") @db.VarChar(255)
+  logoUrl    String? @map("logo_url") @db.VarChar(500)
+  websiteUrl String? @map("website_url") @db.VarChar(500)
+
+  @@map("manufacturers")
+  @@schema("game")
+}
 
 // ─── Ships ────────────────────────────────────────────────────────────────────
 

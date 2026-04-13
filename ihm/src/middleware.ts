@@ -2,7 +2,17 @@ import { jwtVerify } from 'jose';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-const PROTECTED_PATHS = ['/outfitter', '/profile'];
+// Chemins publics (pas de connexion requise)
+const PUBLIC_PATHS = ['/login', '/register'];
+
+// Préfixes toujours accessibles (assets, API Next.js, Next.js internals)
+const PUBLIC_PREFIXES = [
+  '/api/',        // route handlers Next.js (auth, chat proxy…)
+  '/_next/',      // assets Next.js
+  '/favicon',
+  '/robots',
+  '/sitemap',
+];
 
 function getSecret(): Uint8Array | null {
   const s = process.env.JWT_SECRET;
@@ -13,11 +23,13 @@ function getSecret(): Uint8Array | null {
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  const isProtected = PROTECTED_PATHS.some((p) => pathname === p || pathname.startsWith(p + '/'));
-  if (!isProtected) return NextResponse.next();
+  // Laisser passer les chemins publics
+  if (PUBLIC_PATHS.includes(pathname)) return NextResponse.next();
+  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
   const secret = getSecret();
-  if (!secret) return NextResponse.next(); // auth désactivée si pas de secret
+  // Si JWT_SECRET non configuré, on laisse tout passer (mode dégradé)
+  if (!secret) return NextResponse.next();
 
   const token = req.cookies.get('starvis_token')?.value;
   if (!token) {
@@ -39,5 +51,6 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/outfitter', '/outfitter/:path*', '/profile', '/profile/:path*'],
+  // Matcher : tout sauf les fichiers statiques gérés par Next.js
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
