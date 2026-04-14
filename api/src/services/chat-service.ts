@@ -25,8 +25,8 @@ import type { GameDataService } from './game-data-service.js';
 import type { RsiWebsiteService } from './rsi-website-service.js';
 import type { ShipMatrixService } from './ship-matrix-service.js';
 
-const TOOL_MODEL = 'mistral-small-latest';
-const RESPONSE_MODEL = 'mistral-small-latest';
+const TOOL_MODEL = 'mistral-large-latest';
+const RESPONSE_MODEL = 'mistral-large-latest';
 const MAX_ITER = 2;
 
 export interface ChatMessage {
@@ -950,10 +950,12 @@ export class ChatService {
         stream: true,
       });
 
+      let hasContent = false;
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta?.content;
-        if (delta) onChunk(delta);
+        if (delta) { onChunk(delta); hasContent = true; }
       }
+      if (!hasContent) onChunk('Aucune réponse générée.');
 
       onDone();
     } catch (e) {
@@ -1012,7 +1014,8 @@ export class ChatService {
         stream: false,
       });
 
-      return final.choices[0]?.message?.content ?? 'Aucune réponse générée.';
+      const content = final.choices[0]?.message?.content;
+      return content && content.trim() ? content : 'Aucune réponse générée.';
     } catch (e) {
       throw e instanceof Error ? e : new Error(String(e));
     }
