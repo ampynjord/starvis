@@ -21,7 +21,7 @@ function sanitize(messages: { role: string; content: string }[]) {
 export function mountChatRoutes(router: Router, deps: RouteDependencies): void {
   if (!deps.gameDataService) return;
   if (!deps.rsiWebsiteService) return;
-  if (!process.env.GROQ_API_KEY) return;
+  if (!process.env.MISTRAL_API_KEY) return;
 
   const chatService = new ChatService(
     deps.gameDataService,

@@ -1,5 +1,5 @@
 /**
- * ChatService — IA Starvis, Groq Llama 3.3 70B avec tool use exhaustif.
+ * ChatService — IA Starvis, Mistral AI avec tool use exhaustif.
  *
  * Couverture DB complète (schémas game + rsi + meta) :
  *   Ships / Ground / Gravlev — stats complètes, loadout, hardpoints, variants
@@ -19,14 +19,14 @@
  *   Starmap                 — systèmes stellaires
  */
 
-import Groq from 'groq-sdk';
+import OpenAI from 'openai';
 import type { PrismaLike } from '@starvis/db';
 import type { GameDataService } from './game-data-service.js';
 import type { RsiWebsiteService } from './rsi-website-service.js';
 import type { ShipMatrixService } from './ship-matrix-service.js';
 
-const TOOL_MODEL = 'llama-3.3-70b-versatile';
-const RESPONSE_MODEL = 'llama-3.3-70b-versatile';
+const TOOL_MODEL = 'mistral-small-latest';
+const RESPONSE_MODEL = 'mistral-small-latest';
 const MAX_ITER = 2;
 
 export interface ChatMessage {
@@ -143,7 +143,7 @@ Formate les réponses avec markdown : tableaux pour comparer, listes pour énum�
 // Tool definitions
 // ─────────────────────────────────────────────────────────────────────────────
 
-const TOOLS: Groq.Chat.Completions.ChatCompletionTool[] = [
+const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
   // ── Ships ────────────────────────────────────────────────────────────────
   {
     type: 'function',
@@ -554,7 +554,7 @@ Uniquement SELECT. Utilise $1, $2… pour les paramètres.`,
 // ─────────────────────────────────────────────────────────────────────────────
 
 export class ChatService {
-  private groq: Groq;
+  private openai: OpenAI;
 
   constructor(
     private gameDataService: GameDataService,
@@ -562,7 +562,7 @@ export class ChatService {
     private rsiWebsiteService: RsiWebsiteService,
     private prisma: PrismaLike,
   ) {
-    this.groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    this.openai = new OpenAI({ apiKey: process.env.MISTRAL_API_KEY, baseURL: 'https://api.mistral.ai/v1' });
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
@@ -891,7 +891,7 @@ export class ChatService {
     onDone: () => void,
     onError: (err: Error) => void,
   ): Promise<void> {
-    const groqMessages: Groq.Chat.ChatCompletionMessageParam[] = [
+    const groqMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: 'system', content: SYSTEM_PROMPT },
       ...messages.map((m) => ({ role: m.role, content: m.content })),
     ];
@@ -901,7 +901,7 @@ export class ChatService {
       // Les tool calls d'une même réponse sont exécutés EN PARALLÈLE.
       let iterations = 0;
       while (iterations < MAX_ITER) {
-        const response = await this.groq.chat.completions.create({
+        const response = await this.openai.chat.completions.create({
           model: TOOL_MODEL,
           messages: groqMessages,
           tools: TOOLS,
@@ -942,7 +942,7 @@ export class ChatService {
       }
 
       // Phase 2 — stream la réponse finale
-      const stream = await this.groq.chat.completions.create({
+      const stream = await this.openai.chat.completions.create({
         model: RESPONSE_MODEL,
         messages: groqMessages,
         max_tokens: 1500,
@@ -964,7 +964,7 @@ export class ChatService {
   // ── Ask (non-streaming, pour Discord) ────────────────────────────────────
 
   async ask(messages: ChatMessage[]): Promise<string> {
-    const groqMessages: Groq.Chat.ChatCompletionMessageParam[] = [
+    const groqMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
       { role: 'system', content: SYSTEM_PROMPT },
       ...messages.map((m) => ({ role: m.role, content: m.content })),
     ];
@@ -972,7 +972,7 @@ export class ChatService {
     try {
       let iterations = 0;
       while (iterations < MAX_ITER) {
-        const response = await this.groq.chat.completions.create({
+        const response = await this.openai.chat.completions.create({
           model: TOOL_MODEL,
           messages: groqMessages,
           tools: TOOLS,
@@ -1004,7 +1004,7 @@ export class ChatService {
         break;
       }
 
-      const final = await this.groq.chat.completions.create({
+      const final = await this.openai.chat.completions.create({
         model: RESPONSE_MODEL,
         messages: groqMessages,
         max_tokens: 1500,

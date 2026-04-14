@@ -63,7 +63,7 @@ services:
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-500}
       RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-200}
       CTM_CACHE_DIR: /app/ctm-cache
-      GROQ_API_KEY: ${GROQ_API_KEY}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
       JWT_SECRET: ${JWT_SECRET}
     restart: unless-stopped
     healthcheck:
