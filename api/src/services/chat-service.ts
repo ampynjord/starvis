@@ -20,9 +20,16 @@
  */
 
 import Groq from 'groq-sdk';
+import type { PrismaLike } from '@starvis/db';
 import type { GameDataService } from './game-data-service.js';
 import type { RsiWebsiteService } from './rsi-website-service.js';
 import type { ShipMatrixService } from './ship-matrix-service.js';
+
+// Modèle rapide pour la sélection des outils (phase agentique)
+const TOOL_MODEL = 'llama-3.1-8b-instant';
+// Modèle de qualité pour la réponse finale
+const RESPONSE_MODEL = 'llama-3.3-70b-versatile';
+const MAX_ITER = 2;
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -511,6 +518,37 @@ const TOOLS: Groq.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
+  // ── DB brute ─────────────────────────────────────────────────────────────
+  {
+    type: 'function',
+    function: {
+      name: 'query_database',
+      description: `Exécute une requête SQL SELECT libre sur la base de données du jeu.
+Utilise cet outil pour des agrégations complexes, classements, statistiques croisées ou toute requête non couverte par les autres outils.
+Schémas disponibles : game, rsi.
+Tables principales :
+  game.ships, game.components, game.items, game.missions, game.locations,
+  game.commodities, game.commodity_prices, game.crafting_recipes, game.crafting_ingredients,
+  game.ship_loadouts, game.ship_paints, game.shops, game.shop_inventory, game.manufacturers,
+  rsi.ship_matrix, rsi.galactapedia, rsi.comm_links, rsi.starmap
+Uniquement SELECT. Utilise $1, $2… pour les paramètres.`,
+      parameters: {
+        type: 'object',
+        properties: {
+          sql: {
+            type: 'string',
+            description: 'Requête SELECT SQL paramétrée (pas de INSERT/UPDATE/DELETE)',
+          },
+          params: {
+            type: 'array',
+            items: { type: ['string', 'number', 'boolean'] },
+            description: 'Paramètres de la requête ($1, $2…)',
+          },
+        },
+        required: ['sql'],
+      },
+    },
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -524,6 +562,7 @@ export class ChatService {
     private gameDataService: GameDataService,
     private shipMatrixService: ShipMatrixService,
     private rsiWebsiteService: RsiWebsiteService,
+    private prisma: PrismaLike,
   ) {
     this.groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
   }
@@ -828,6 +867,16 @@ export class ChatService {
           return { manufacturers: list };
         }
 
+        // ── DB brute ──────────────────────────────────────────────────────
+        case 'query_database': {
+          const sql = (args.sql as string).trim();
+          if (!/^\s*SELECT\b/i.test(sql)) return { error: 'Seules les requêtes SELECT sont autorisées' };
+          const params = Array.isArray(args.params) ? args.params : [];
+          const rows = await (this.prisma as any).$queryRawUnsafe(sql, ...params);
+          const data = Array.isArray(rows) ? rows.slice(0, 50) : rows;
+          return { rows: data, count: Array.isArray(data) ? data.length : 1 };
+        }
+
         default:
           return { error: `Outil inconnu : ${name}` };
       }
@@ -853,13 +902,13 @@ export class ChatService {
       // Phase 1 — boucle agentique : résolution des tool calls (non-streaming)
       // Les tool calls d'une même réponse sont exécutés EN PARALLÈLE.
       let iterations = 0;
-      while (iterations < 3) {
+      while (iterations < MAX_ITER) {
         const response = await this.groq.chat.completions.create({
-          model: 'llama-3.3-70b-versatile',
+          model: TOOL_MODEL,
           messages: groqMessages,
           tools: TOOLS,
           tool_choice: 'auto',
-          max_tokens: 512,   // réduit : on veut juste les tool calls, pas de prose
+          max_tokens: 512,
           temperature: 0.1,
           stream: false,
         });
@@ -896,7 +945,7 @@ export class ChatService {
 
       // Phase 2 — stream la réponse finale
       const stream = await this.groq.chat.completions.create({
-        model: 'llama-3.3-70b-versatile',
+        model: RESPONSE_MODEL,
         messages: groqMessages,
         max_tokens: 1500,
         temperature: 0.2,
@@ -911,6 +960,63 @@ export class ChatService {
       onDone();
     } catch (e) {
       onError(e instanceof Error ? e : new Error(String(e)));
+    }
+  }
+
+  // ── Ask (non-streaming, pour Discord) ────────────────────────────────────
+
+  async ask(messages: ChatMessage[]): Promise<string> {
+    const groqMessages: Groq.Chat.ChatCompletionMessageParam[] = [
+      { role: 'system', content: SYSTEM_PROMPT },
+      ...messages.map((m) => ({ role: m.role, content: m.content })),
+    ];
+
+    try {
+      let iterations = 0;
+      while (iterations < MAX_ITER) {
+        const response = await this.groq.chat.completions.create({
+          model: TOOL_MODEL,
+          messages: groqMessages,
+          tools: TOOLS,
+          tool_choice: 'auto',
+          max_tokens: 512,
+          temperature: 0.1,
+          stream: false,
+        });
+
+        const msg = response.choices[0]?.message;
+        if (!msg) break;
+
+        if (msg.tool_calls && msg.tool_calls.length > 0) {
+          iterations++;
+          groqMessages.push(msg);
+          const results = await Promise.all(
+            msg.tool_calls.map(async (tc) => {
+              let args: Record<string, unknown> = {};
+              try { args = JSON.parse(tc.function.arguments); } catch { /* ignore */ }
+              const result = await this.executeTool(tc.function.name, args);
+              return { id: tc.id, result };
+            }),
+          );
+          for (const { id, result } of results) {
+            groqMessages.push({ role: 'tool', tool_call_id: id, content: JSON.stringify(this.trim(result)) });
+          }
+          continue;
+        }
+        break;
+      }
+
+      const final = await this.groq.chat.completions.create({
+        model: RESPONSE_MODEL,
+        messages: groqMessages,
+        max_tokens: 1500,
+        temperature: 0.2,
+        stream: false,
+      });
+
+      return final.choices[0]?.message?.content ?? 'Aucune réponse générée.';
+    } catch (e) {
+      throw e instanceof Error ? e : new Error(String(e));
     }
   }
 }
