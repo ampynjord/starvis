@@ -25,9 +25,7 @@ import type { GameDataService } from './game-data-service.js';
 import type { RsiWebsiteService } from './rsi-website-service.js';
 import type { ShipMatrixService } from './ship-matrix-service.js';
 
-// Modèle rapide pour la sélection des outils (phase agentique)
-const TOOL_MODEL = 'llama-3.1-8b-instant';
-// Modèle de qualité pour la réponse finale
+const TOOL_MODEL = 'llama-3.3-70b-versatile';
 const RESPONSE_MODEL = 'llama-3.3-70b-versatile';
 const MAX_ITER = 2;
 
