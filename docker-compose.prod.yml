@@ -136,6 +136,7 @@ services:
       DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
       API_URL: http://${COMPOSE_PROJECT_NAME:-starvis}-api:${API_INTERNAL_PORT:-3000}
       SITE_URL: https://${DOMAIN}
+      API_TOKEN: ${API_TOKEN:-}
     restart: unless-stopped
     deploy:
       resources:
