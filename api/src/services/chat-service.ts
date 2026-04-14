@@ -25,8 +25,8 @@ import type { GameDataService } from './game-data-service.js';
 import type { RsiWebsiteService } from './rsi-website-service.js';
 import type { ShipMatrixService } from './ship-matrix-service.js';
 
-const TOOL_MODEL = 'mistral-large-latest';
-const RESPONSE_MODEL = 'mistral-large-latest';
+const TOOL_MODEL = 'mistral-small-latest';
+const RESPONSE_MODEL = 'mistral-small-latest';
 const MAX_ITER = 2;
 
 export interface ChatMessage {
