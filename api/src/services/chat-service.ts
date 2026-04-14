@@ -941,10 +941,12 @@ export class ChatService {
         break;
       }
 
-      // Phase 2 — stream la réponse finale
+      // Phase 2 — stream la réponse finale (tool_choice: none pour forcer une réponse textuelle)
       const stream = await this.openai.chat.completions.create({
         model: RESPONSE_MODEL,
         messages: groqMessages,
+        tools: TOOLS,
+        tool_choice: 'none',
         max_tokens: 1500,
         temperature: 0.2,
         stream: true,
@@ -1009,6 +1011,8 @@ export class ChatService {
       const final = await this.openai.chat.completions.create({
         model: RESPONSE_MODEL,
         messages: groqMessages,
+        tools: TOOLS,
+        tool_choice: 'none',
         max_tokens: 1500,
         temperature: 0.2,
         stream: false,
