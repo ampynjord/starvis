@@ -151,7 +151,7 @@ describe('ComponentQueryService', () => {
 
       expect(result).toHaveLength(1);
       const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
-      expect(callArgs[0]).toContain('LEFT JOIN meta.manufacturers m ON s.manufacturer_code = m.code');
+      expect(callArgs[0]).toContain('LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code');
       expect(callArgs[3]).toEqual('component-uuid');
     });
   });
