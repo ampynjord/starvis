@@ -147,7 +147,7 @@ const CONCEPT_SELECT = [
 ].join(', ');
 
 const SHIP_JOINS = `FROM game.ships s
-  LEFT JOIN meta.manufacturers m ON s.manufacturer_code = m.code
+  LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code
   LEFT JOIN rsi.ship_matrix sm ON s.ship_matrix_id = sm.id`;
 
 /**
@@ -374,7 +374,7 @@ export class ShipQueryService {
     const [mfgRows, roleRows, careerRows, variantRows, categoryRows] = await Promise.all([
       prisma.$queryRawUnsafe<Row[]>(
         toPostgres(`SELECT s.manufacturer_code as value, COALESCE(m.name, s.manufacturer_code) as label, COUNT(s.uuid) as count
-         FROM game.ships s LEFT JOIN meta.manufacturers m ON s.manufacturer_code = m.code
+         FROM game.ships s LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code
          WHERE s.env = ? AND s.manufacturer_code IS NOT NULL AND s.manufacturer_code != '' ${catWhere}
          GROUP BY s.manufacturer_code, m.name ORDER BY label`),
         env,
@@ -415,7 +415,7 @@ export class ShipQueryService {
               COALESCE(s.cnt, 0) as ship_count,
               COALESCE(c.cnt, 0) as component_count,
               COALESCE(i.cnt, 0) as item_count
-       FROM meta.manufacturers m
+       FROM game.manufacturers m
        LEFT JOIN (SELECT manufacturer_code, COUNT(uuid) cnt FROM game.ships WHERE env = ? GROUP BY manufacturer_code) s ON s.manufacturer_code = m.code
        LEFT JOIN (SELECT manufacturer_code, COUNT(uuid) cnt FROM game.components WHERE env = ? GROUP BY manufacturer_code) c ON c.manufacturer_code = m.code
        LEFT JOIN (SELECT manufacturer_code, COUNT(uuid) cnt FROM game.items WHERE env = ? GROUP BY manufacturer_code) i ON i.manufacturer_code = m.code
@@ -436,7 +436,7 @@ export class ShipQueryService {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT m.code, m.name, COUNT(s.uuid) as ship_count
-       FROM meta.manufacturers m INNER JOIN game.ships s ON m.code = s.manufacturer_code AND s.env = ?
+       FROM game.manufacturers m INNER JOIN game.ships s ON m.code = s.manufacturer_code AND s.env = ?
        GROUP BY m.code, m.name ORDER BY m.name`),
       env,
     );
@@ -450,7 +450,7 @@ export class ShipQueryService {
               COALESCE(s.cnt, 0) as ship_count,
               COALESCE(c.cnt, 0) as component_count,
               COALESCE(i.cnt, 0) as item_count
-       FROM meta.manufacturers m
+       FROM game.manufacturers m
        LEFT JOIN (SELECT manufacturer_code, COUNT(uuid) cnt FROM game.ships WHERE manufacturer_code = ? AND env = ? GROUP BY manufacturer_code) s ON s.manufacturer_code = m.code
        LEFT JOIN (SELECT manufacturer_code, COUNT(uuid) cnt FROM game.components WHERE manufacturer_code = ? AND env = ? GROUP BY manufacturer_code) c ON c.manufacturer_code = m.code
        LEFT JOIN (SELECT manufacturer_code, COUNT(uuid) cnt FROM game.items WHERE manufacturer_code = ? AND env = ? GROUP BY manufacturer_code) i ON i.manufacturer_code = m.code
@@ -485,7 +485,7 @@ export class ShipQueryService {
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade, c.manufacturer_code,
               m.name as manufacturer_name
-       FROM game.components c LEFT JOIN meta.manufacturers m ON c.manufacturer_code = m.code
+       FROM game.components c LEFT JOIN game.manufacturers m ON c.manufacturer_code = m.code
        WHERE c.env = ? AND c.manufacturer_code = ? ORDER BY c.type, c.size, c.name`),
       env,
       code.toUpperCase(),

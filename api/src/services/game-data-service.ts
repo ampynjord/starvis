@@ -89,7 +89,7 @@ export class GameDataService {
       this.getClient(env).$queryRawUnsafe<Row[]>(
         toPostgres(`SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade, c.manufacturer_code,
                 m.name as manufacturer_name
-         FROM game.components c LEFT JOIN meta.manufacturers m ON c.manufacturer_code = m.code
+         FROM game.components c LEFT JOIN game.manufacturers m ON c.manufacturer_code = m.code
          WHERE c.env = ? AND (c.name ILIKE ? OR c.class_name ILIKE ?)
          ORDER BY c.name LIMIT ${cap}`),
         env,
@@ -179,7 +179,7 @@ export class GameDataService {
         (SELECT COUNT(*) FROM game.components WHERE env = ?) as components,
         (SELECT COUNT(*) FROM game.items WHERE env = ?) as items,
         (SELECT COUNT(*) FROM game.commodities WHERE env = ?) as commodities,
-        (SELECT COUNT(*) FROM meta.manufacturers) as manufacturers,
+        (SELECT COUNT(*) FROM game.manufacturers) as manufacturers,
         (SELECT COUNT(*) FROM game.ship_loadouts WHERE env = ?) as loadoutPorts,
         (SELECT COUNT(*) FROM game.ship_paints WHERE env = ?) as paints,
         (SELECT COUNT(*) FROM game.shops WHERE env = ?) as shops,
@@ -235,7 +235,7 @@ export class GameDataService {
         (SELECT COUNT(*) FROM game.components WHERE env = ?) as components,
         (SELECT COUNT(*) FROM game.items WHERE env = ?) as items,
         (SELECT COUNT(*) FROM game.commodities WHERE env = ?) as commodities,
-        (SELECT COUNT(*) FROM meta.manufacturers) as manufacturers,
+        (SELECT COUNT(*) FROM game.manufacturers) as manufacturers,
         (SELECT COUNT(*) FROM game.ship_paints WHERE env = ?) as paints,
         (SELECT COUNT(*) FROM game.shops WHERE env = ?) as shops,
         (SELECT COUNT(DISTINCT type) FROM game.components WHERE env = ?) as component_types,

@@ -91,7 +91,7 @@ export class ComponentQueryService {
     }
 
     const w = ` WHERE ${where.join(' AND ')}`;
-    const baseSql = `SELECT c.*, m.name as manufacturer_name FROM game.components c LEFT JOIN meta.manufacturers m ON c.manufacturer_code = m.code${w}`;
+    const baseSql = `SELECT c.*, m.name as manufacturer_name FROM game.components c LEFT JOIN game.manufacturers m ON c.manufacturer_code = m.code${w}`;
     const countSql = `SELECT COUNT(*) as total FROM game.components c${w}`;
 
     return paginate(prisma, baseSql, countSql, params, filters || {}, COMP_SORT, 'c');
@@ -100,7 +100,7 @@ export class ComponentQueryService {
   async getComponentByUuid(uuid: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres('SELECT c.*, m.name as manufacturer_name FROM game.components c LEFT JOIN meta.manufacturers m ON c.manufacturer_code = m.code WHERE c.uuid = ? AND c.env = ?'),
+      toPostgres('SELECT c.*, m.name as manufacturer_name FROM game.components c LEFT JOIN game.manufacturers m ON c.manufacturer_code = m.code WHERE c.uuid = ? AND c.env = ?'),
       uuid,
       env,
     );
@@ -110,7 +110,7 @@ export class ComponentQueryService {
   async getComponentByClassName(className: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres('SELECT c.*, m.name as manufacturer_name FROM game.components c LEFT JOIN meta.manufacturers m ON c.manufacturer_code = m.code WHERE c.class_name = ? AND c.env = ?'),
+      toPostgres('SELECT c.*, m.name as manufacturer_name FROM game.components c LEFT JOIN game.manufacturers m ON c.manufacturer_code = m.code WHERE c.class_name = ? AND c.env = ?'),
       className,
       env,
     );
@@ -141,7 +141,7 @@ export class ComponentQueryService {
         env,
       ),
       prisma.$queryRawUnsafe<Row[]>(
-        toPostgres("SELECT c.manufacturer_code as value, COALESCE(m.name, c.manufacturer_code) as label, COUNT(c.uuid) as count FROM game.components c LEFT JOIN meta.manufacturers m ON m.code = c.manufacturer_code WHERE c.env = ? AND c.manufacturer_code IS NOT NULL AND c.manufacturer_code != '' GROUP BY c.manufacturer_code, m.name ORDER BY label"),
+        toPostgres("SELECT c.manufacturer_code as value, COALESCE(m.name, c.manufacturer_code) as label, COUNT(c.uuid) as count FROM game.components c LEFT JOIN game.manufacturers m ON m.code = c.manufacturer_code WHERE c.env = ? AND c.manufacturer_code IS NOT NULL AND c.manufacturer_code != '' GROUP BY c.manufacturer_code, m.name ORDER BY label"),
         env,
       ),
     ]);
@@ -176,7 +176,7 @@ export class ComponentQueryService {
       toPostgres(`SELECT DISTINCT s.uuid, s.name, s.class_name, s.manufacturer_code, m.name as manufacturer_name
        FROM game.ship_loadouts sl
        JOIN game.ships s ON sl.ship_uuid = s.uuid AND s.env = ?
-       LEFT JOIN meta.manufacturers m ON s.manufacturer_code = m.code
+       LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code
        WHERE sl.env = ? AND sl.component_uuid = ? ORDER BY s.name`),
       env,
       env,
@@ -244,7 +244,7 @@ export class ComponentQueryService {
              c.thruster_max_thrust, c.radar_range, c.fuel_capacity,
              c.cm_ammo_count, c.missile_damage, c.mass, c.hp
       FROM game.components c
-      LEFT JOIN meta.manufacturers m ON c.manufacturer_code = m.code
+      LEFT JOIN game.manufacturers m ON c.manufacturer_code = m.code
       ${wSql}
       ORDER BY c.${sortCol} ${order}
       LIMIT ${limit}`;
