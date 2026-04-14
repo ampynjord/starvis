@@ -84,7 +84,9 @@ export function mountChatRoutes(router: Router, deps: RouteDependencies): void {
       const reply = await chatService.ask(sanitized);
       res.json({ success: true, reply });
     } catch (e: any) {
-      res.status(500).json({ success: false, error: e.message ?? 'Chat error' });
+      const msg: string = e.message ?? 'Chat error';
+      const isRateLimit = msg.includes('429') || msg.includes('rate_limit') || msg.includes('Rate limit');
+      res.status(isRateLimit ? 429 : 500).json({ success: false, error: isRateLimit ? '⏳ Limite Groq atteinte, réessaie dans ~1h.' : msg });
     }
   });
 }
