@@ -215,8 +215,8 @@ export async function chatAsk(messages: { role: 'user' | 'assistant'; content: s
     body: JSON.stringify({ messages }),
     signal: AbortSignal.timeout(60_000),
   });
-  if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
   const data = (await res.json()) as { success: boolean; reply?: string; error?: string };
+  if (!res.ok) throw new Error(data.error ?? `API ${res.status}: ${res.statusText}`);
   if (!data.success) throw new Error(data.error ?? 'Chat error');
   return data.reply ?? '';
 }
