@@ -1,6 +1,6 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
 import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
-import { compareShips, getShips } from '../api.js';
+import { getShips } from '../api.js';
 import { errorEmbed } from '../embeds.js';
 
 const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';

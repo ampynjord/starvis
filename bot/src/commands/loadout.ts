@@ -19,7 +19,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const res = await getShips(name);
     const ship = res.data?.[0];
 
-    if (!ship || !ship.uuid) {
+    if (!ship?.uuid) {
       await interaction.editReply({ embeds: [errorEmbed(`Vaisseau introuvable : « ${name} »`)] });
       return;
     }
