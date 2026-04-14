@@ -204,22 +204,19 @@ export async function getManufacturers(): Promise<PaginatedResponse<Manufacturer
   return apiFetch<PaginatedResponse<ManufacturerResult>>('/api/v1/manufacturers?limit=50');
 }
 
-export async function chatAsk(
-  messages: { role: 'user' | 'assistant'; content: string }[],
-  apiToken: string,
-): Promise<string> {
+export async function chatAsk(messages: { role: 'user' | 'assistant'; content: string }[], apiToken: string): Promise<string> {
   const url = `${API_BASE_URL}/api/v1/chat/ask`;
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiToken}`,
+      Authorization: `Bearer ${apiToken}`,
     },
     body: JSON.stringify({ messages }),
     signal: AbortSignal.timeout(60_000),
   });
   if (!res.ok) throw new Error(`API ${res.status}: ${res.statusText}`);
-  const data = await res.json() as { success: boolean; reply?: string; error?: string };
+  const data = (await res.json()) as { success: boolean; reply?: string; error?: string };
   if (!data.success) throw new Error(data.error ?? 'Chat error');
   return data.reply ?? '';
 }
