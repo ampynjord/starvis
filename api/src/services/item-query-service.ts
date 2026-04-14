@@ -118,7 +118,7 @@ export class ItemQueryService {
     }
 
     const w = ` WHERE ${where.join(' AND ')}`;
-    const baseSql = `SELECT i.*, m.name as manufacturer_name FROM game.items i LEFT JOIN meta.manufacturers m ON i.manufacturer_code = m.code${w}`;
+    const baseSql = `SELECT i.*, m.name as manufacturer_name FROM game.items i LEFT JOIN game.manufacturers m ON i.manufacturer_code = m.code${w}`;
     const countSql = `SELECT COUNT(*) as total FROM game.items i${w}`;
 
     const result = await paginate(prisma, baseSql, countSql, params, filters || {}, ITEM_SORT, 'i', ITEM_JSON_SORT_MAP);
@@ -131,7 +131,7 @@ export class ItemQueryService {
   async getItemByUuid(uuid: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT i.*, m.name as manufacturer_name FROM game.items i LEFT JOIN meta.manufacturers m ON i.manufacturer_code = m.code WHERE i.uuid = ? AND i.env = ?`),
+      toPostgres(`SELECT i.*, m.name as manufacturer_name FROM game.items i LEFT JOIN game.manufacturers m ON i.manufacturer_code = m.code WHERE i.uuid = ? AND i.env = ?`),
       uuid,
       env,
     );
@@ -141,7 +141,7 @@ export class ItemQueryService {
   async getItemByClassName(className: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT i.*, m.name as manufacturer_name FROM game.items i LEFT JOIN meta.manufacturers m ON i.manufacturer_code = m.code WHERE i.class_name = ? AND i.env = ?`),
+      toPostgres(`SELECT i.*, m.name as manufacturer_name FROM game.items i LEFT JOIN game.manufacturers m ON i.manufacturer_code = m.code WHERE i.class_name = ? AND i.env = ?`),
       className,
       env,
     );
@@ -166,7 +166,7 @@ export class ItemQueryService {
       prisma.$queryRawUnsafe<Row[]>(
         toPostgres(`SELECT i.manufacturer_code as value, COALESCE(m.name, i.manufacturer_code) as label, COUNT(i.uuid) as count
          FROM game.items i
-         LEFT JOIN meta.manufacturers m ON m.code = i.manufacturer_code
+         LEFT JOIN game.manufacturers m ON m.code = i.manufacturer_code
          WHERE i.env = ? AND i.manufacturer_code IS NOT NULL
          GROUP BY i.manufacturer_code, m.name
          ORDER BY COALESCE(m.name, i.manufacturer_code)`),
@@ -189,7 +189,7 @@ export class ItemQueryService {
               i.manufacturer_code, m.name as manufacturer_name,
               i.weapon_damage, i.weapon_dps, i.weapon_fire_rate, i.weapon_range,
               i.armor_damage_reduction, i.armor_temp_min, i.armor_temp_max
-       FROM game.items i LEFT JOIN meta.manufacturers m ON i.manufacturer_code = m.code
+       FROM game.items i LEFT JOIN game.manufacturers m ON i.manufacturer_code = m.code
        WHERE i.env = ? AND i.manufacturer_code = ?
        ORDER BY i.type, i.sub_type, i.name`),
       env,
@@ -256,12 +256,12 @@ export class ItemQueryService {
     const prisma = this.getClient(env);
     const sql = type
       ? `SELECT i.manufacturer_code as code, COALESCE(m.name, i.manufacturer_code) as name, COUNT(*) as count
-         FROM game.items i LEFT JOIN meta.manufacturers m ON m.code = i.manufacturer_code
+         FROM game.items i LEFT JOIN game.manufacturers m ON m.code = i.manufacturer_code
          WHERE i.env = ? AND i.type = ? AND i.manufacturer_code IS NOT NULL
          GROUP BY i.manufacturer_code, m.name
          ORDER BY COALESCE(m.name, i.manufacturer_code)`
       : `SELECT i.manufacturer_code as code, COALESCE(m.name, i.manufacturer_code) as name, COUNT(*) as count
-         FROM game.items i LEFT JOIN meta.manufacturers m ON m.code = i.manufacturer_code
+         FROM game.items i LEFT JOIN game.manufacturers m ON m.code = i.manufacturer_code
          WHERE i.env = ? AND i.manufacturer_code IS NOT NULL
          GROUP BY i.manufacturer_code, m.name
          ORDER BY COALESCE(m.name, i.manufacturer_code)`;

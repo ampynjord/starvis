@@ -30,7 +30,7 @@ export class PaintQueryService {
       m.name as manufacturer_name, m.code as manufacturer_code
       FROM game.ship_paints sp
       LEFT JOIN game.ships s ON sp.ship_uuid = s.uuid AND s.env = sp.env
-      LEFT JOIN meta.manufacturers m ON s.manufacturer_code = m.code${w}`;
+      LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code${w}`;
     const countSql = `SELECT COUNT(*) as total FROM game.ship_paints sp LEFT JOIN game.ships s ON sp.ship_uuid = s.uuid AND s.env = sp.env${w}`;
 
     const countRows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(countSql), ...params);
