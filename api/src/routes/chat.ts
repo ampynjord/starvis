@@ -86,7 +86,7 @@ export function mountChatRoutes(router: Router, deps: RouteDependencies): void {
     } catch (e: any) {
       const msg: string = e.message ?? 'Chat error';
       const isRateLimit = msg.includes('429') || msg.includes('rate_limit') || msg.includes('Rate limit');
-      res.status(isRateLimit ? 429 : 500).json({ success: false, error: isRateLimit ? '⏳ Limite Groq atteinte, réessaie dans ~1h.' : msg });
+      res.status(isRateLimit ? 429 : 500).json({ success: false, error: isRateLimit ? '⏳ Limite Mistral atteinte, réessaie dans quelques instants.' : msg });
     }
   });
 }
