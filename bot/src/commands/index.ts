@@ -1,4 +1,4 @@
-import * as aria from './aria.js';
+import * as starvis from './starvis.js';
 import * as changelog from './changelog.js';
 import * as commodity from './commodity.js';
 import * as compare from './compare.js';
@@ -14,7 +14,7 @@ import * as trade from './trade.js';
 import * as version from './version.js';
 
 export const commands = [
-  aria,
+  starvis,
   ship,
   compare,
   loadout,
