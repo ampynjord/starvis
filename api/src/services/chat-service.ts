@@ -137,7 +137,15 @@ id, code, name, type, description, affiliation
 8. Où acheter un item → search_shops
 9. Variants d'un vaisseau → get_ship_variants
 
-Formate les réponses avec markdown : tableaux pour comparer, listes pour énumérer, **gras** pour les chiffres clés.`;
+## Formatage des réponses
+
+- **Gras** pour les chiffres clés et noms importants.
+- **Listes à puces** pour énumérer.
+- **Tableaux** : utilise TOUJOURS des blocs de code (triple backtick) pour les tableaux — jamais la syntaxe pipe/markdown qui ne s'affiche pas correctement sur Discord et l'interface web. Exemple de rendu attendu dans un bloc code :
+  Vaisseau      | SCM   | Cargo
+  Carrack       | 120   | 456 SCU
+  Constellation | 185   | 96 SCU
+- Réponds de façon **concise** : pas de section inutile si l'info tient en quelques lignes.`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tool definitions
@@ -947,7 +955,7 @@ export class ChatService {
         messages: groqMessages,
         tools: TOOLS,
         tool_choice: 'none',
-        max_tokens: 1500,
+        max_tokens: 4096,
         temperature: 0.2,
         stream: true,
       });
@@ -1013,7 +1021,7 @@ export class ChatService {
         messages: groqMessages,
         tools: TOOLS,
         tool_choice: 'none',
-        max_tokens: 1500,
+        max_tokens: 4096,
         temperature: 0.2,
         stream: false,
       });
