@@ -558,6 +558,36 @@ Uniquement SELECT. Utilise $1, $2… pour les paramètres.`,
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Post-processing
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Convertit les tableaux markdown pipe (| col | col |) en blocs de code,
+ * qui s'affichent correctement sur Discord et dans les embeds web.
+ */
+function wrapTablesInCodeBlock(text: string): string {
+  const lines = text.split('\n');
+  const out: string[] = [];
+  let inTable = false;
+
+  for (const line of lines) {
+    const isTableLine = /^\s*\|/.test(line);
+    if (isTableLine && !inTable) {
+      inTable = true;
+      out.push('```');
+    } else if (!isTableLine && inTable) {
+      inTable = false;
+      out.push('```');
+    }
+    // Nettoie le gras (**text**) à l'intérieur des cellules de tableau
+    out.push(inTable ? line.replace(/\*\*(.*?)\*\*/g, '$1') : line);
+  }
+  if (inTable) out.push('```');
+
+  return out.join('\n');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // ChatService
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -960,13 +990,12 @@ export class ChatService {
         stream: true,
       });
 
-      let hasContent = false;
+      let fullText = '';
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta?.content;
-        if (delta) { onChunk(delta); hasContent = true; }
+        if (delta) fullText += delta;
       }
-      if (!hasContent) onChunk('Aucune réponse générée.');
-
+      onChunk(wrapTablesInCodeBlock(fullText || 'Aucune réponse générée.'));
       onDone();
     } catch (e) {
       onError(e instanceof Error ? e : new Error(String(e)));
@@ -1027,7 +1056,8 @@ export class ChatService {
       });
 
       const content = final.choices[0]?.message?.content;
-      return content && content.trim() ? content : 'Aucune réponse générée.';
+      const text = content && content.trim() ? content : 'Aucune réponse générée.';
+      return wrapTablesInCodeBlock(text);
     } catch (e) {
       throw e instanceof Error ? e : new Error(String(e));
     }
