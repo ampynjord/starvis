@@ -564,13 +564,28 @@ Uniquement SELECT. Utilise $1, $2… pour les paramètres.`,
 /**
  * Convertit les tableaux markdown pipe (| col | col |) en blocs de code,
  * qui s'affichent correctement sur Discord et dans les embeds web.
+ * Les tableaux déjà dans un bloc de code existant sont ignorés.
  */
 function wrapTablesInCodeBlock(text: string): string {
   const lines = text.split('\n');
   const out: string[] = [];
+  let inCodeBlock = false;
   let inTable = false;
 
   for (const line of lines) {
+    // Suivi des blocs de code existants
+    if (/^\s*```/.test(line)) {
+      if (inTable) { inTable = false; out.push('```'); }
+      inCodeBlock = !inCodeBlock;
+      out.push(line);
+      continue;
+    }
+
+    if (inCodeBlock) {
+      out.push(line);
+      continue;
+    }
+
     const isTableLine = /^\s*\|/.test(line);
     if (isTableLine && !inTable) {
       inTable = true;
