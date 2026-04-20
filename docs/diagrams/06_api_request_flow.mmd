@@ -1,58 +1,40 @@
----
-title: STARVIS — Flux de traitement d'une requête API
----
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '13px', 'fontFamily': 'Arial'}, 'flowchart': {'nodeSpacing': 30, 'rankSpacing': 40, 'useMaxWidth': true}}}%%
 flowchart TD
-    A([Requête HTTP entrante]) --> B
+    A([Requête HTTP]) --> B
 
-    B{Burst limiter\n30 req/min\n60s window}
+    B{Burst limiter\n30 req / min}
     B -- Dépassé --> C[429 Too Many Requests]
     B -- OK --> D
 
-    D{Speed limiter\nDélai progressif\naprès 20 req}
-    D --> E
+    D{Rate limiter\n200 req / 15 min}
+    D -- Dépassé --> C
+    D -- OK --> E
 
-    E{Rate limiter standard\n200 req / 15 min}
-    E -- Dépassé --> C
-    E -- OK --> F
+    E[Speed limiter\nDélai progressif après 20 req]
+    E --> F
 
-    F[Prometheus middleware\nLog + métriques temps de réponse]
-    F --> G
+    F{Route protégée ?}
+    F -- Oui --> G
+    F -- Non --> I
 
-    G{Route protégée ?}
-    G -- Oui --> H
-    G -- Non, route publique --> K
+    G{JWT valide ?}
+    G -- Non --> H[401 Unauthorized]
+    G -- Oui --> I
 
-    H{JWT présent\net valide ?}
-    H -- Non / Expiré --> I[401 Unauthorized]
-    H -- Oui --> J[Extraire uuid + role\ndepuis payload JWT]
-    J --> K
+    I[Service appelé\nPrisma Query]
+    I --> J
 
-    K[Appel GameDataService\nou AuthService]
-    K --> L
+    J{ETag match ?}
+    J -- Oui --> K[304 Not Modified]
+    J -- Non --> L[Requête PostgreSQL]
 
-    L{ETag If-None-Match\nprésent dans headers ?}
-    L -- Match ETag actuel --> M[304 Not Modified\ncorps vide]
-    L -- Pas de match --> N
-
-    N[Prisma Query\nPostgreSQL multi-schéma]
-    N --> O
-
-    O{Redis disponible ?}
-    O -- Oui --> P[Stocker résultat\nen cache Redis]
-    O -- Non --> Q[Continuer sans Redis]
-    P --> R
-    Q --> R
-
-    R{Format demandé ?}
-    R -- JSON default --> S[Sérialiser JSON\n+ pagination meta]
-    R -- format=csv --> T[Sérialiser CSV\nContent-Disposition: attachment]
-    S --> U
-    T --> U
-
-    U[Calculer ETag\nSet-Cookie ETag header]
-    U --> V[200 OK\n+ données + meta]
+    L --> M{Format ?}
+    M -- JSON --> N[Sérialise JSON\n+ pagination]
+    M -- CSV --> O[Sérialise CSV\nContent-Disposition]
+    N --> P[Set ETag header\n200 OK]
+    O --> P
 
     style C fill:#e74c3c,color:#fff
-    style I fill:#e74c3c,color:#fff
-    style M fill:#27ae60,color:#fff
-    style V fill:#27ae60,color:#fff
+    style H fill:#e74c3c,color:#fff
+    style K fill:#27ae60,color:#fff
+    style P fill:#27ae60,color:#fff

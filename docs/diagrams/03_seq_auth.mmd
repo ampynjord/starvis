@@ -1,54 +1,40 @@
----
-title: STARVIS — Séquence Authentification & accès admin
----
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '13px', 'fontFamily': 'Arial'}, 'sequence': {'actorFontSize': 13, 'messageFontSize': 12, 'mirrorActors': false, 'useMaxWidth': true, 'boxMargin': 8, 'noteMargin': 8}}}%%
 sequenceDiagram
     actor U as Utilisateur
-    participant IHM as Next.js (IHM)
-    participant API as Express API
-    participant Auth as AuthService
-    participant DB as PostgreSQL (meta)
+    participant IHM as Next.js
+    participant API as API Express
+    participant DB as PostgreSQL
 
-    U->>IHM: Saisit email + mot de passe
+    U->>IHM: POST /login {email, password}
     IHM->>API: POST /auth/login
-    API->>Auth: login(email, password)
-    Auth->>DB: SELECT user WHERE email = ?
-    DB-->>Auth: User {id, passwordHash, role}
+    API->>DB: SELECT user WHERE email = ?
+    DB-->>API: User {passwordHash, role}
 
-    alt Utilisateur introuvable
-        Auth-->>API: Error 404
+    alt Identifiants invalides
         API-->>IHM: 401 Unauthorized
-        IHM-->>U: Affiche message erreur
-    else Utilisateur trouvé
-        Auth->>Auth: bcrypt.compare(password, hash)
-        alt Mot de passe incorrect
-            Auth-->>API: Error 401
-            API-->>IHM: 401 Unauthorized
-            IHM-->>U: Affiche message erreur
-        else Authentification réussie
-            Auth->>Auth: jwt.sign({uuid, role}, secret, 7d)
-            Auth-->>API: {token, user}
-            API-->>IHM: 200 OK {token, user}
-            IHM->>IHM: Stocke token (cookie httpOnly)
-            IHM-->>U: Redirige vers /dashboard
+        IHM-->>U: Affiche erreur
+    else Succès
+        API->>API: bcrypt.compare(pwd, hash)
+        API->>API: jwt.sign({uuid, role}, 7j)
+        API-->>IHM: 200 OK {token, user}
+        IHM->>IHM: Stocke token (cookie httpOnly)
+        IHM-->>U: Redirige vers dashboard
+    end
 
-            U->>IHM: Accède à /admin
-            IHM->>API: GET /admin/users\nAuthorization: Bearer token
-            API->>API: verifyJWT(token)
+    Note over U,DB: Accès à une route protégée
+    U->>IHM: GET /admin/users
+    IHM->>API: GET /admin/users\n[Authorization: Bearer token]
+    API->>API: verifyJWT(token)
 
-            alt Token invalide / expiré
-                API-->>IHM: 401 Unauthorized
-                IHM-->>U: Redirige vers /login
-            else Token valide
-                API->>API: Vérifie role == admin
-                alt Role insuffisant
-                    API-->>IHM: 403 Forbidden
-                    IHM-->>U: Affiche accès refusé
-                else Admin confirmé
-                    API->>DB: SELECT users ORDER BY createdAt
-                    DB-->>API: users[]
-                    API-->>IHM: 200 OK {data: users[]}
-                    IHM-->>U: Affiche panneau admin
-                end
-            end
-        end
+    alt Token invalide / expiré
+        API-->>IHM: 401 Unauthorized
+        IHM-->>U: Redirige vers /login
+    else Role insuffisant
+        API-->>IHM: 403 Forbidden
+        IHM-->>U: Accès refusé
+    else Admin confirmé
+        API->>DB: SELECT users
+        DB-->>API: users[]
+        API-->>IHM: 200 OK {data: users[]}
+        IHM-->>U: Affiche panneau admin
     end
