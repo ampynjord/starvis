@@ -1,0 +1,58 @@
+---
+title: STARVIS — Flux de traitement d'une requête API
+---
+flowchart TD
+    A([Requête HTTP entrante]) --> B
+
+    B{Burst limiter\n30 req/min\n60s window}
+    B -- Dépassé --> C[429 Too Many Requests]
+    B -- OK --> D
+
+    D{Speed limiter\nDélai progressif\naprès 20 req}
+    D --> E
+
+    E{Rate limiter standard\n200 req / 15 min}
+    E -- Dépassé --> C
+    E -- OK --> F
+
+    F[Prometheus middleware\nLog + métriques temps de réponse]
+    F --> G
+
+    G{Route protégée ?}
+    G -- Oui --> H
+    G -- Non, route publique --> K
+
+    H{JWT présent\net valide ?}
+    H -- Non / Expiré --> I[401 Unauthorized]
+    H -- Oui --> J[Extraire uuid + role\ndepuis payload JWT]
+    J --> K
+
+    K[Appel GameDataService\nou AuthService]
+    K --> L
+
+    L{ETag If-None-Match\nprésent dans headers ?}
+    L -- Match ETag actuel --> M[304 Not Modified\ncorps vide]
+    L -- Pas de match --> N
+
+    N[Prisma Query\nPostgreSQL multi-schéma]
+    N --> O
+
+    O{Redis disponible ?}
+    O -- Oui --> P[Stocker résultat\nen cache Redis]
+    O -- Non --> Q[Continuer sans Redis]
+    P --> R
+    Q --> R
+
+    R{Format demandé ?}
+    R -- JSON default --> S[Sérialiser JSON\n+ pagination meta]
+    R -- format=csv --> T[Sérialiser CSV\nContent-Disposition: attachment]
+    S --> U
+    T --> U
+
+    U[Calculer ETag\nSet-Cookie ETag header]
+    U --> V[200 OK\n+ données + meta]
+
+    style C fill:#e74c3c,color:#fff
+    style I fill:#e74c3c,color:#fff
+    style M fill:#27ae60,color:#fff
+    style V fill:#27ae60,color:#fff

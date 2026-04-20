@@ -1,0 +1,304 @@
+---
+title: STARVIS — Schéma relationnel de la base de données
+---
+erDiagram
+    Manufacturer {
+        string code PK
+        string name
+        string knownFor
+        string logoUrl
+        string websiteUrl
+    }
+
+    Ship {
+        string uuid PK
+        string env PK
+        string className
+        string name
+        string manufacturerCode FK
+        string role
+        string career
+        int crewSize
+        float sizeX
+        float sizeY
+        float sizeZ
+        float mass
+        float scmSpeed
+        float maxSpeed
+        float hp
+        int shipMatrixId FK
+        datetime extractedAt
+    }
+
+    ShipLoadout {
+        int id PK
+        string shipUuid FK
+        string env FK
+        string portName
+        string portType
+        int portMinSize
+        int portMaxSize
+        string componentClassName
+        string componentUuid
+        bool portEditable
+        int parentId
+    }
+
+    ShipModule {
+        int id PK
+        string shipUuid FK
+        string env FK
+        string slotName
+        string moduleClassName
+        bool isDefault
+    }
+
+    ShipPaint {
+        int id PK
+        string shipUuid FK
+        string env FK
+        string paintClassName
+        string paintName
+    }
+
+    Component {
+        string uuid PK
+        string env PK
+        string className
+        string name
+        string canonicalComponentKey
+        string type
+        string subType
+        int size
+        string grade
+        string manufacturerCode FK
+        float mass
+        float powerDraw
+        float powerOutput
+        float heatGeneration
+        float coolingRate
+        float shieldHp
+        float shieldRegen
+        float weaponDps
+        float alphaDamage
+        datetime updatedAt
+    }
+
+    Item {
+        string uuid PK
+        string env PK
+        string className
+        string name
+        string canonicalItemKey
+        string type
+        string subType
+        int size
+        string grade
+        string manufacturerCode FK
+        float mass
+        float hp
+    }
+
+    Commodity {
+        string uuid PK
+        string env PK
+        string className
+        string name
+        string canonicalCommodityKey
+        string type
+        string subType
+        float occupancyScu
+    }
+
+    Shop {
+        int id PK
+        string env
+        string name
+        string canonicalShopKey
+        string canonicalLocationKey
+        string location
+        string system
+        string shopType
+        datetime createdAt
+    }
+
+    ShopInventory {
+        int id PK
+        int shopId FK
+        string componentUuid FK
+        float basePrice
+        float rental1d
+        float rental3d
+        float rental7d
+        float rental30d
+    }
+
+    CommodityPrice {
+        int id PK
+        string commodityUuid FK
+        string env FK
+        int shopId FK
+        float buyPrice
+        float sellPrice
+        datetime reportedAt
+    }
+
+    Mission {
+        string uuid PK
+        string env PK
+        string className
+        string title
+        string missionType
+        bool isLegal
+        float rewardMin
+        float rewardMax
+        string faction
+        string missionGiver
+        string locationSystem
+    }
+
+    CraftingRecipe {
+        string uuid PK
+        string env PK
+        string className
+        string name
+        string category
+        string outputItemUuid FK
+        int outputQuantity
+        int craftingTime
+        string stationType
+        int skillLevel
+    }
+
+    CraftingIngredient {
+        int id PK
+        string recipeUuid FK
+        string env FK
+        string itemName
+        string itemUuid FK
+        int quantity
+        bool isOptional
+    }
+
+    MiningElement {
+        string uuid PK
+        string env PK
+        string className
+        string name
+        string commodityUuid FK
+        float instability
+        float resistance
+        float optimalWindowMidpoint
+    }
+
+    MiningComposition {
+        string uuid PK
+        string env PK
+        string className
+        string depositName
+        int minDistinctElements
+    }
+
+    MiningCompositionPart {
+        int id PK
+        string compositionUuid FK
+        string elementUuid FK
+        float minPercentage
+        float maxPercentage
+        float probability
+    }
+
+    Location {
+        string uuid PK
+        string env PK
+        string className
+        string name
+        string type
+        string systemCode
+        string parentUuid FK
+    }
+
+    ShipMatrix {
+        int id PK
+        string name
+        string chassisId
+        string manufacturerCode
+        string focus
+        string type
+        string productionStatus
+        float length
+        float beam
+        float height
+        int cargocapacity
+        int crewMin
+        int crewMax
+        datetime syncedAt
+    }
+
+    ExtractionLog {
+        int id PK
+        string extractionHash
+        string gameVersion
+        string gameEnv
+        int shipsCount
+        int componentsCount
+        int itemsCount
+        int commoditiesCount
+        int loadoutPortsCount
+        int shopsCount
+        int recipesCount
+        string status
+        int durationMs
+        datetime extractedAt
+    }
+
+    Changelog {
+        int id PK
+        int extractionId FK
+        string entityType
+        string entityUuid
+        string entityName
+        string changeType
+        string fieldName
+        string oldValue
+        string newValue
+        datetime createdAt
+    }
+
+    User {
+        int id PK
+        string uuid
+        string email
+        string username
+        string passwordHash
+        string role
+        string avatarUrl
+        datetime createdAt
+        datetime updatedAt
+    }
+
+    Manufacturer ||--o{ Ship : "fabrique"
+    Manufacturer ||--o{ Component : "produit"
+    Manufacturer ||--o{ Item : "fabrique"
+
+    Ship ||--o{ ShipLoadout : "possède"
+    Ship ||--o{ ShipModule : "a modules"
+    Ship ||--o{ ShipPaint : "a livrées"
+    Ship }o--o| ShipMatrix : "liée à"
+
+    Shop ||--o{ ShopInventory : "vend"
+    Shop ||--o{ CommodityPrice : "cote"
+    Component ||--o{ ShopInventory : "disponible dans"
+    Commodity ||--o{ CommodityPrice : "a prix"
+
+    CraftingRecipe ||--o{ CraftingIngredient : "nécessite"
+    Item ||--o{ CraftingIngredient : "utilisé comme ingrédient"
+    Item ||--o{ CraftingRecipe : "produit par"
+
+    MiningElement }o--o| Commodity : "correspond à"
+    MiningComposition ||--o{ MiningCompositionPart : "contient"
+    MiningElement ||--o{ MiningCompositionPart : "fait partie de"
+
+    Location }o--o| Location : "parent de"
+
+    ExtractionLog ||--o{ Changelog : "génère"

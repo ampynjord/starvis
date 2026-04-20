@@ -1,0 +1,79 @@
+---
+title: STARVIS — Diagramme de cas d'utilisation
+---
+graph TD
+    subgraph Acteurs
+        U["👤 Utilisateur"]
+        A["🔑 Admin"]
+        B["🤖 Bot Discord"]
+        E["⚙️ Extracteur CLI"]
+    end
+
+    subgraph Système STARVIS
+        subgraph Navigation["Navigation publique"]
+            UC1["Rechercher un vaisseau"]
+            UC2["Consulter les composants"]
+            UC3["Parcourir les commodités"]
+            UC4["Voir les missions"]
+            UC5["Explorer les recettes de craft"]
+            UC6["Calcul mining"]
+            UC7["Recherche unifiée"]
+        end
+
+        subgraph Avancé["Fonctionnalités avancées"]
+            UC8["Simuler un loadout"]
+            UC9["Comparer des vaisseaux"]
+            UC10["Routes commerciales"]
+            UC11["Chatbot IA Mistral"]
+        end
+
+        subgraph Auth["Authentification"]
+            UC12["S'inscrire"]
+            UC13["Se connecter"]
+            UC14["Obtenir un token API"]
+        end
+
+        subgraph Admin["Administration"]
+            UC15["Gérer les utilisateurs"]
+            UC16["Consulter les logs d'extraction"]
+            UC17["Voir le changelog"]
+        end
+
+        subgraph Extraction["Extraction données"]
+            UC18["Parser Data.p4k"]
+            UC19["Synchroniser RSI Ship Matrix"]
+            UC20["Scraper RSI / CTM"]
+            UC21["Journaliser l'extraction"]
+        end
+    end
+
+    U --> UC1
+    U --> UC2
+    U --> UC3
+    U --> UC4
+    U --> UC5
+    U --> UC6
+    U --> UC7
+    U --> UC8
+    U --> UC9
+    U --> UC10
+    U --> UC11
+    U --> UC12
+    U --> UC13
+    U --> UC14
+
+    A --> UC15
+    A --> UC16
+    A --> UC17
+    A --> UC13
+
+    B --> UC1
+    B --> UC2
+    B --> UC3
+    B --> UC7
+    B --> UC11
+
+    E --> UC18
+    E --> UC19
+    E --> UC20
+    E --> UC21
