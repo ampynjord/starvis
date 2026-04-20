@@ -1,0 +1,54 @@
+---
+title: STARVIS — Séquence Authentification & accès admin
+---
+sequenceDiagram
+    actor U as Utilisateur
+    participant IHM as Next.js (IHM)
+    participant API as Express API
+    participant Auth as AuthService
+    participant DB as PostgreSQL (meta)
+
+    U->>IHM: Saisit email + mot de passe
+    IHM->>API: POST /auth/login
+    API->>Auth: login(email, password)
+    Auth->>DB: SELECT user WHERE email = ?
+    DB-->>Auth: User {id, passwordHash, role}
+
+    alt Utilisateur introuvable
+        Auth-->>API: Error 404
+        API-->>IHM: 401 Unauthorized
+        IHM-->>U: Affiche message erreur
+    else Utilisateur trouvé
+        Auth->>Auth: bcrypt.compare(password, hash)
+        alt Mot de passe incorrect
+            Auth-->>API: Error 401
+            API-->>IHM: 401 Unauthorized
+            IHM-->>U: Affiche message erreur
+        else Authentification réussie
+            Auth->>Auth: jwt.sign({uuid, role}, secret, 7d)
+            Auth-->>API: {token, user}
+            API-->>IHM: 200 OK {token, user}
+            IHM->>IHM: Stocke token (cookie httpOnly)
+            IHM-->>U: Redirige vers /dashboard
+
+            U->>IHM: Accède à /admin
+            IHM->>API: GET /admin/users\nAuthorization: Bearer token
+            API->>API: verifyJWT(token)
+
+            alt Token invalide / expiré
+                API-->>IHM: 401 Unauthorized
+                IHM-->>U: Redirige vers /login
+            else Token valide
+                API->>API: Vérifie role == admin
+                alt Role insuffisant
+                    API-->>IHM: 403 Forbidden
+                    IHM-->>U: Affiche accès refusé
+                else Admin confirmé
+                    API->>DB: SELECT users ORDER BY createdAt
+                    DB-->>API: users[]
+                    API-->>IHM: 200 OK {data: users[]}
+                    IHM-->>U: Affiche panneau admin
+                end
+            end
+        end
+    end
