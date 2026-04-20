@@ -1,52 +1,34 @@
----
-title: STARVIS — Séquence Calcul de loadout vaisseau
----
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '13px', 'fontFamily': 'Arial'}, 'sequence': {'actorFontSize': 13, 'messageFontSize': 12, 'mirrorActors': false, 'useMaxWidth': true, 'boxMargin': 8}}}%%
 sequenceDiagram
     actor U as Utilisateur
-    participant IHM as Next.js (IHM)
-    participant API as Express API
+    participant IHM as Next.js
+    participant API as API Express
     participant LS as LoadoutService
-    participant DB as PostgreSQL (game)
-    participant Cache as ETag Cache
+    participant DB as PostgreSQL
 
-    U->>IHM: Sélectionne un vaisseau
-    IHM->>API: GET /api/v1/ships/{uuid}?env=live
-    API->>Cache: Vérifier ETag (If-None-Match)
-    alt Cache valide
-        Cache-->>API: ETag match
-        API-->>IHM: 304 Not Modified
-    else Cache expiré
-        API->>DB: SELECT ship + loadouts + shipMatrix
-        DB-->>API: Ship complet
-        API->>Cache: Stocker ETag
-        API-->>IHM: 200 OK {ship, loadouts[]}
-    end
+    U->>IHM: Sélectionne vaisseau + composants
+    IHM->>API: GET /api/v1/ships/{uuid}
+    API->>DB: SELECT ship + loadouts
+    DB-->>API: Ship {hardpoints, portSizes}
+    API-->>IHM: 200 OK ship complet
+    IHM-->>U: Affiche ports disponibles
 
-    IHM-->>U: Affiche vaisseau + ports de composants
-    U->>IHM: Sélectionne composants sur les hardpoints
-    IHM->>API: POST /api/v1/calculate/ship-loadout\n{shipUuid, env, components[{portName, uuid}]}
-
+    U->>IHM: Assigne composants aux ports
+    IHM->>API: POST /api/v1/calculate/ship-loadout\n{shipUuid, env, components[]}
     API->>LS: calculateLoadout(params)
-    LS->>DB: SELECT ship WHERE uuid=? AND env=?
-    DB-->>LS: Ship {hardpoints, portSizes}
 
     LS->>DB: SELECT components WHERE uuid IN (?)
-    DB-->>LS: Component[] {powerDraw, powerOutput,\nshieldHp, shieldRegen, weaponDps,\nalphaDamage, fireRate, heatGeneration}
+    DB-->>LS: Component[] {powerDraw, shieldHp, weaponDps...}
 
-    loop Pour chaque composant sélectionné
-        LS->>LS: Vérifier compatibilité taille\n(portMinSize ≤ size ≤ portMaxSize)
-        alt Incompatible
-            LS->>LS: Marquer erreur port
-        else Compatible
-            LS->>LS: Assigner composant → hardpoint
-        end
+    loop Chaque composant
+        LS->>LS: Vérifie taille (portMin ≤ size ≤ portMax)
     end
 
-    LS->>LS: Calcul DPS = Σ(alphaDamage × fireRate)
-    LS->>LS: Calcul bilan puissance =\nΣ(powerOutput) - Σ(powerDraw)
-    LS->>LS: Calcul boucliers =\nΣ(shieldHp), regenRate moyen
-    LS->>LS: Calcul bilan thermique =\ncoolingRate - Σ(heatGeneration)
+    LS->>LS: DPS = Σ(alphaDamage × fireRate)
+    LS->>LS: Puissance = Σ(powerOutput) − Σ(powerDraw)
+    LS->>LS: Boucliers = Σ(shieldHp), regenRate moyen
+    LS->>LS: Chaleur = coolingRate − Σ(heatGeneration)
 
-    LS-->>API: LoadoutResult {dps, powerBalance,\nshieldTotal, shieldRegen,\nheatBalance, assignments[], errors[]}
+    LS-->>API: {dps, powerBalance, shieldTotal,\nheatBalance, assignments[], errors[]}
     API-->>IHM: 200 OK {data: loadoutResult}
-    IHM-->>U: Affiche stats temps réel\n(DPS, boucliers, puissance, chaleur)
+    IHM-->>U: Affiche stats en temps réel

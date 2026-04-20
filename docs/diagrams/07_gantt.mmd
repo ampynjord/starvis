@@ -1,50 +1,47 @@
----
-title: STARVIS — Diagramme de Gantt
----
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '12px', 'fontFamily': 'Arial'}, 'gantt': {'useMaxWidth': true, 'barHeight': 18, 'fontSize': 12, 'sectionFontSize': 13}}}%%
 gantt
     dateFormat  YYYY-MM-DD
     axisFormat  %b %Y
 
-    section Phase 1 — Fondations
-    Architecture & choix technologiques       :done, arch,   2024-01-01, 14d
-    Schéma BDD Prisma (3 schémas)             :done, db,     after arch,  21d
-    Setup Docker Compose dev/prod             :done, docker, after arch,  10d
-    CI/CD GitHub Actions                      :done, cicd,   after docker, 7d
+    section Fondations
+    Architecture & choix tech         :done, arch,   2024-01-01, 14d
+    Schéma BDD Prisma (3 schémas)     :done, db,     after arch,  21d
+    Docker Compose dev/prod            :done, docker, after arch,  10d
+    CI/CD GitHub Actions               :done, cicd,   after docker, 7d
 
-    section Phase 2 — Extracteur de données
-    Étude format Data.p4k / DataForge         :done, p4k,  after db,   14d
-    Extracteur ships & ShipMatrix RSI         :done, ext1, after p4k,  14d
-    Extracteurs components et items           :done, ext2, after ext1, 14d
-    Extracteurs missions, crafting, mining    :done, ext3, after ext2, 14d
-    Extraction shops, locations, paints       :done, ext4, after ext3, 10d
-    Changelog & versioning extraction         :done, chg,  after ext4,  7d
+    section Extracteur P4K
+    Étude format DataForge             :done, p4k,  after db,   14d
+    Ships + RSI Ship Matrix            :done, ext1, after p4k,  14d
+    Components, Items                  :done, ext2, after ext1, 14d
+    Missions, Crafting, Mining         :done, ext3, after ext2, 14d
+    Shops, Locations, Paints           :done, ext4, after ext3, 10d
+    Changelog & versioning             :done, chg,  after ext4,  7d
 
-    section Phase 3 — API Backend
-    Structure Express + middleware stack      :done, api1, after db,   7d
-    Routes ships, components, items           :done, api2, after ext1, 14d
-    Routes commodités, shops, trade           :done, api3, after ext2, 14d
-    Routes missions, crafting, mining         :done, api4, after ext3, 10d
-    Calculateurs loadout / mining / FPS       :done, api5, after api3, 14d
-    Auth JWT + Panel admin                    :done, auth, after api2, 10d
-    Chatbot Mistral AI                        :done, chat, after api4,  7d
-    Documentation OpenAPI / Swagger           :done, swag, after api5,  7d
+    section API Backend
+    Express + middleware               :done, api1, after db,   7d
+    Routes ships, components, items    :done, api2, after ext1, 14d
+    Routes commodités, shops, trade    :done, api3, after ext2, 14d
+    Routes missions, crafting, mining  :done, api4, after ext3, 10d
+    Calculateurs loadout/mining/FPS    :done, api5, after api3, 14d
+    Auth JWT + Admin                   :done, auth, after api2, 10d
+    Chatbot Mistral AI                 :done, chat, after api4,  7d
+    OpenAPI Swagger                    :done, swag, after api5,  7d
 
-    section Phase 4 — Interface Web
-    Setup Next.js 15 + Tailwind               :done, ihm1, after api1,  7d
-    Pages ships, components, items            :done, ihm2, after api2, 14d
-    Simulateur de loadout                     :done, ihm3, after api5, 14d
-    Pages trade, missions, crafting, mining   :done, ihm4, after api3, 14d
-    Comparateur de vaisseaux                  :done, ihm5, after ihm2, 10d
-    Panel admin                               :done, ihm6, after auth,  7d
+    section Interface Web (Next.js)
+    Setup Next.js 15 + Tailwind        :done, ihm1, after api1,  7d
+    Pages ships, components, items     :done, ihm2, after api2, 14d
+    Simulateur de loadout              :done, ihm3, after api5, 14d
+    Pages trade, missions, crafting    :done, ihm4, after api3, 14d
+    Comparateur de vaisseaux           :done, ihm5, after ihm2, 10d
+    Panel admin                        :done, ihm6, after auth,  7d
 
-    section Phase 5 — Bot Discord
-    Setup discord.js + commandes de base      :done, bot1, after api2, 10d
-    Commandes avancées loadout et compare     :done, bot2, after api5, 10d
-    Intégration chatbot /starvis              :done, bot3, after chat,  5d
+    section Bot Discord
+    Setup discord.js + commandes       :done, bot1, after api2, 10d
+    Commandes avancées                 :done, bot2, after api5, 10d
+    Chatbot /starvis                   :done, bot3, after chat,  5d
 
-    section Phase 6 — Production & Qualité
-    Tests unitaires Vitest                    :done, tests,   2024-08-01, 21d
-    Déploiement VPS + Traefik                 :done, deploy,  2024-08-15, 14d
-    Optimisations perf + rate limiting        :done, perf,    after deploy, 10d
-    Migration MySQL vers PostgreSQL           :done, migrate, after deploy,  7d
-    Monitoring Prometheus                     :done, monit,   after perf,   5d
+    section Production & Qualité
+    Tests Vitest                       :done, tests,  2024-08-01, 21d
+    Déploiement VPS + Traefik          :done, dep,    2024-08-15, 14d
+    Migration MySQL → PostgreSQL       :done, mig,    after dep,   7d
+    Monitoring Prometheus              :done, mon,    after dep,  10d

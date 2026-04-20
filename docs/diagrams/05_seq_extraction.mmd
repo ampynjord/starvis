@@ -1,62 +1,40 @@
----
-title: STARVIS — Séquence Pipeline d'extraction P4K
----
+%%{init: {'theme': 'base', 'themeVariables': {'fontSize': '12px', 'fontFamily': 'Arial'}, 'sequence': {'actorFontSize': 12, 'messageFontSize': 11, 'mirrorActors': false, 'useMaxWidth': true, 'boxMargin': 6}}}%%
 sequenceDiagram
     actor Dev as Développeur
     participant CLI as Extractor CLI
     participant DFS as DataForgeService
     participant ES as ExtractionService
-    participant RSI as RSI Ship Matrix API
-    participant Scraper as Playwright Scraper
+    participant RSI as RSI API
     participant DB as PostgreSQL
-    participant ML as MetaLogger
 
-    Dev->>CLI: npx tsx extract.ts --env live --modules all
-    CLI->>DB: Connexion (retry ×30, backoff 2s)
-    DB-->>CLI: Connected
-
-    Note over CLI,RSI: Pré-synchronisation RSI
+    Dev->>CLI: tsx extract.ts --env live --modules all
+    CLI->>DB: Connexion (retry ×30)
     CLI->>RSI: GET ship-matrix.json
-    RSI-->>CLI: ShipMatrix[] (JSON officiel)
-    CLI->>DB: UPSERT rsi.ship_matrix ON CONFLICT
+    RSI-->>CLI: ShipMatrix[] JSON
+    CLI->>DB: UPSERT rsi.ship_matrix
 
-    Note over CLI,DFS: Ouverture Data.p4k
-    CLI->>DFS: openP4K(/path/Data.p4k)
-    DFS->>DFS: Décompression Zstd (fzstd)
-    DFS->>DFS: Parser DataForge XML records
+    CLI->>DFS: openP4K(Data.p4k)
+    DFS->>DFS: Décompression Zstd + parse XML
     DFS-->>CLI: Index records prêt
 
-    CLI->>DB: BEGIN TRANSACTION ATOMIQUE
+    CLI->>DB: BEGIN TRANSACTION
 
-    loop Pour chaque module [ships, components, items, commodities, missions, crafting, mining, shops, locations, paints]
-        CLI->>ES: extract(module, env='live')
+    loop Pour chaque module [ships, components, items, commodities, missions, crafting, mining, shops, locations]
+        CLI->>ES: extract(module, env)
         ES->>DFS: queryRecords(entityType)
         DFS-->>ES: RawRecord[]
-        ES->>ES: canonicalize(record)
-        ES->>ES: normalize(name, key)
-        ES->>DB: INSERT ON CONFLICT DO UPDATE\n(batch 50 rows)
-        DB-->>ES: rowsUpserted
+        ES->>ES: canonicalize + normalize
+        ES->>DB: INSERT ON CONFLICT (batch 50 lignes)
     end
 
-    Note over CLI,Scraper: Scraping CTM (modèles 3D)
-    CLI->>Scraper: scrapeShipCtmUrls()
-    Scraper->>Scraper: Playwright headless browser
-    Scraper-->>CLI: {shipName → ctmUrl}[]
-    CLI->>DB: UPDATE ships SET ctmUrl
+    ES->>ES: crossReference ShipMatrix\n+ generateChangelog
 
-    Note over ES: Post-traitement
-    ES->>ES: crossReferenceShipMatrix()\nship.uuid ↔ shipMatrix.id
-    ES->>ES: applyDimensionsFallback()
-    ES->>ES: pruneExcludedVariants()
-    ES->>ES: generateChangelogEntries()\ncompare old ↔ new values
-
-    alt Succès complet
-        CLI->>DB: COMMIT TRANSACTION
-        CLI->>ML: ExtractionLog.create({status:'success',\nshipsCount, componentsCount, durationMs})
-        CLI->>DB: INSERT changelog entries
-        CLI-->>Dev: Extraction réussie\nShips: 515 | Components: 6087\nItems: 10624 | Durée: Xs
-    else Erreur détectée
-        CLI->>DB: ROLLBACK TRANSACTION
-        CLI->>ML: ExtractionLog.create({status:'failed',\nerrorMessage})
-        CLI-->>Dev: Extraction échouée\n(DB inchangée, rollback complet)
+    alt Succès
+        CLI->>DB: COMMIT
+        CLI->>DB: INSERT ExtractionLog {status: success}
+        CLI-->>Dev: Ships: 515 | Components: 6087 | OK
+    else Erreur
+        CLI->>DB: ROLLBACK
+        CLI->>DB: INSERT ExtractionLog {status: failed}
+        CLI-->>Dev: Extraction échouée (DB inchangée)
     end
