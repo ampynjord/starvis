@@ -1,0 +1,52 @@
+---
+title: STARVIS — Séquence Calcul de loadout vaisseau
+---
+sequenceDiagram
+    actor U as Utilisateur
+    participant IHM as Next.js (IHM)
+    participant API as Express API
+    participant LS as LoadoutService
+    participant DB as PostgreSQL (game)
+    participant Cache as ETag Cache
+
+    U->>IHM: Sélectionne un vaisseau
+    IHM->>API: GET /api/v1/ships/{uuid}?env=live
+    API->>Cache: Vérifier ETag (If-None-Match)
+    alt Cache valide
+        Cache-->>API: ETag match
+        API-->>IHM: 304 Not Modified
+    else Cache expiré
+        API->>DB: SELECT ship + loadouts + shipMatrix
+        DB-->>API: Ship complet
+        API->>Cache: Stocker ETag
+        API-->>IHM: 200 OK {ship, loadouts[]}
+    end
+
+    IHM-->>U: Affiche vaisseau + ports de composants
+    U->>IHM: Sélectionne composants sur les hardpoints
+    IHM->>API: POST /api/v1/calculate/ship-loadout\n{shipUuid, env, components[{portName, uuid}]}
+
+    API->>LS: calculateLoadout(params)
+    LS->>DB: SELECT ship WHERE uuid=? AND env=?
+    DB-->>LS: Ship {hardpoints, portSizes}
+
+    LS->>DB: SELECT components WHERE uuid IN (?)
+    DB-->>LS: Component[] {powerDraw, powerOutput,\nshieldHp, shieldRegen, weaponDps,\nalphaDamage, fireRate, heatGeneration}
+
+    loop Pour chaque composant sélectionné
+        LS->>LS: Vérifier compatibilité taille\n(portMinSize ≤ size ≤ portMaxSize)
+        alt Incompatible
+            LS->>LS: Marquer erreur port
+        else Compatible
+            LS->>LS: Assigner composant → hardpoint
+        end
+    end
+
+    LS->>LS: Calcul DPS = Σ(alphaDamage × fireRate)
+    LS->>LS: Calcul bilan puissance =\nΣ(powerOutput) - Σ(powerDraw)
+    LS->>LS: Calcul boucliers =\nΣ(shieldHp), regenRate moyen
+    LS->>LS: Calcul bilan thermique =\ncoolingRate - Σ(heatGeneration)
+
+    LS-->>API: LoadoutResult {dps, powerBalance,\nshieldTotal, shieldRegen,\nheatBalance, assignments[], errors[]}
+    API-->>IHM: 200 OK {data: loadoutResult}
+    IHM-->>U: Affiche stats temps réel\n(DPS, boucliers, puissance, chaleur)
