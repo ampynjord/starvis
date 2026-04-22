@@ -1412,7 +1412,7 @@ export class ExtractionService {
       }
       try {
         await conn.query(
-          `INSERT INTO meta.manufacturers (code, name) VALUES ($1, $2)
+          `INSERT INTO game.manufacturers (code, name) VALUES ($1, $2)
            ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name`,
           [mfg.code, name],
         );
