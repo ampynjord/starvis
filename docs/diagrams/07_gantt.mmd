@@ -1,47 +1,43 @@
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'fontSize': '12px', 'fontFamily': 'Arial'}, 'gantt': {'useMaxWidth': true, 'barHeight': 18, 'fontSize': 12, 'sectionFontSize': 13}}}%%
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'fontSize': '13px', 'fontFamily': 'Arial'}, 'gantt': {'useMaxWidth': true, 'barHeight': 22, 'barGap': 6, 'topPadding': 50}}}%%
 gantt
+    title Historique de développement STARVIS — Avril 2026
     dateFormat  YYYY-MM-DD
-    axisFormat  %b %Y
-
-    section Fondations
-    Architecture & choix tech         :done, arch,   2024-01-01, 14d
-    Schéma BDD Prisma (3 schémas)     :done, db,     after arch,  21d
-    Docker Compose dev/prod            :done, docker, after arch,  10d
-    CI/CD GitHub Actions               :done, cicd,   after docker, 7d
-
-    section Extracteur P4K
-    Étude format DataForge             :done, p4k,  after db,   14d
-    Ships + RSI Ship Matrix            :done, ext1, after p4k,  14d
-    Components, Items                  :done, ext2, after ext1, 14d
-    Missions, Crafting, Mining         :done, ext3, after ext2, 14d
-    Shops, Locations, Paints           :done, ext4, after ext3, 10d
-    Changelog & versioning             :done, chg,  after ext4,  7d
-
-    section API Backend
-    Express + middleware               :done, api1, after db,   7d
-    Routes ships, components, items    :done, api2, after ext1, 14d
-    Routes commodités, shops, trade    :done, api3, after ext2, 14d
-    Routes missions, crafting, mining  :done, api4, after ext3, 10d
-    Calculateurs loadout/mining/FPS    :done, api5, after api3, 14d
-    Auth JWT + Admin                   :done, auth, after api2, 10d
-    Chatbot Mistral AI                 :done, chat, after api4,  7d
-    OpenAPI Swagger                    :done, swag, after api5,  7d
+    axisFormat  %d/%m
 
     section Interface Web (Next.js)
-    Setup Next.js 15 + Tailwind        :done, ihm1, after api1,  7d
-    Pages ships, components, items     :done, ihm2, after api2, 14d
-    Simulateur de loadout              :done, ihm3, after api5, 14d
-    Pages trade, missions, crafting    :done, ihm4, after api3, 14d
-    Comparateur de vaisseaux           :done, ihm5, after ihm2, 10d
-    Panel admin                        :done, ihm6, after auth,  7d
+    FPS Gear — stats clés, filtre sub_type, UX          :done, ihm1, 2026-04-05, 1d
+
+    section API Backend
+    Endpoints items sous-types + fabricants              :done, api1, 2026-04-05, 1d
+    Routes séparées ships / véhicules / grav-lev        :done, api2, 2026-04-12, 1d
+    Déplacement Manufacturer vers schéma game            :done, api3, 2026-04-14, 1d
+
+    section Infrastructure & DevOps
+    Restructuration monorepo (apps/ihm → ihm)            :done, inf1, 2026-04-06, 1d
+    Corrections Docker Compose + Dockerfiles             :done, inf2, 2026-04-06, 1d
+    Ajout build + push image Docker bot (CI)             :done, inf3, 2026-04-06, 1d
+    Migration MySQL → PostgreSQL multi-schéma            :done, inf4, 2026-04-12, 2d
+    Corrections CI/CD deploy (--env-file)                :done, inf5, 2026-04-14, 1d
+
+    section Extracteur de données
+    Corrections CTM scraping + ship-matrix pre-sync     :done, ext1, 2026-04-06, 1d
+    Corrections ON CONFLICT + coercions PostgreSQL       :done, ext2, 2026-04-12, 2d
 
     section Bot Discord
-    Setup discord.js + commandes       :done, bot1, after api2, 10d
-    Commandes avancées                 :done, bot2, after api5, 10d
-    Chatbot /starvis                   :done, bot3, after chat,  5d
+    Correction bot (uuid ShipResult, types TS)           :done, bot1, 2026-04-12, 1d
+    Chatbot Discord /aria (rework + toolbox)             :done, bot2, 2026-04-14, 1d
+    Renommage commande /aria → /starvis                  :done, bot3, 2026-04-14, 1d
 
-    section Production & Qualité
-    Tests Vitest                       :done, tests,  2024-08-01, 21d
-    Déploiement VPS + Traefik          :done, dep,    2024-08-15, 14d
-    Migration MySQL → PostgreSQL       :done, mig,    after dep,   7d
-    Monitoring Prometheus              :done, mon,    after dep,  10d
+    section Chatbot IA
+    ARIA v1 — Groq Llama 3.3 70B + tool use             :done, cha1, 2026-04-13, 1d
+    Couverture DB complète (18 outils, appels parallèles):done, cha2, 2026-04-13, 1d
+    Migration provider Groq → Mistral AI                 :done, cha3, 2026-04-14, 1d
+    Correctifs formatage réponses (tables, tokens)       :done, cha4, 2026-04-15, 1d
+
+    section Authentification & Admin
+    Système auth — JWT, register, login, profil          :done, aut1, 2026-04-13, 1d
+    Rôles (user/admin), panel admin, tokens API          :done, aut2, 2026-04-14, 1d
+    Protection routes + mots de passe renforcés          :done, aut3, 2026-04-14, 1d
+
+    section Documentation
+    Génération diagrammes (use case, ER, séquences)      :done, doc1, 2026-04-20, 5d
