@@ -636,17 +636,13 @@ export class ChatService {
       const ship = result.data[0] as Record<string, unknown>;
       return { uuid: ship['uuid'] as string, data: ship };
     }
-    // Fallback: try removing leading words one by one to handle "Anvil Arrow" → "Arrow"
-    const words = name.trim().split(/\s+/);
-    for (let i = 1; i < words.length; i++) {
-      const shorter = words.slice(i).join(' ');
-      const r = await this.gameDataService.ships.getAllShips({ env, search: shorter, limit: 1, page: 1 });
-      if (r.data.length) {
-        const ship = r.data[0] as Record<string, unknown>;
-        return { uuid: ship['uuid'] as string, data: ship };
-      }
-    }
-    return null;
+    // Fallback: strip the first word to handle "Anvil Arrow" → "Arrow", "Drake Cutlass Black" → "Cutlass Black"
+    if (!name.includes(' ')) return null;
+    const shorter = name.slice(name.indexOf(' ') + 1);
+    const r2 = await this.gameDataService.ships.getAllShips({ env, search: shorter, limit: 1, page: 1 });
+    if (!r2.data.length) return null;
+    const ship = r2.data[0] as Record<string, unknown>;
+    return { uuid: ship['uuid'] as string, data: ship };
   }
 
   /** Supprime les champs lourds inutiles pour le LLM (blobs, URLs longues, JSON brut) */
@@ -693,14 +689,11 @@ export class ChatService {
             page: 1,
           };
           let result = await this.gameDataService.ships.getAllShips({ ...shipFilters, search: rawQuery });
-          // Fallback: "Anvil Arrow" → "Arrow" — try removing leading words
+          // Fallback: "Anvil Arrow" → "Arrow" — strip first word and retry once
           if (result.data.length === 0 && rawQuery.includes(' ')) {
-            const words = rawQuery.trim().split(/\s+/);
-            for (let i = 1; i < words.length; i++) {
-              const shorter = words.slice(i).join(' ');
-              const r = await this.gameDataService.ships.getAllShips({ ...shipFilters, search: shorter });
-              if (r.data.length > 0) { result = r; break; }
-            }
+            const shorter = rawQuery.slice(rawQuery.indexOf(' ') + 1);
+            const fallback = await this.gameDataService.ships.getAllShips({ ...shipFilters, search: shorter });
+            if (fallback.data.length > 0) result = fallback;
           }
           return {
             total: result.total,
