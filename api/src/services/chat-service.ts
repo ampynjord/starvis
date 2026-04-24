@@ -127,13 +127,13 @@ id, code, name, type, description, affiliation
 
 ## Noms de vaisseaux avec fabricant
 
-Quand l'utilisateur mentionne un vaisseau avec son fabricant (ex : "Anvil Arrow", "Origin 300i", "Drake Cutlass Black"), utilise **le code constructeur dans `manufacturer`** et **le modèle seul dans `query`** :
-- "Anvil Arrow" → `manufacturer: "ANVL", query: "Arrow"`
-- "Origin 300i" → `manufacturer: "ORIG", query: "300i"`
-- "Drake Cutlass Black" → `manufacturer: "DRAK", query: "Cutlass Black"`
-- "RSI Constellation Andromeda" → `manufacturer: "RSI", query: "Constellation Andromeda"`
+Quand l'utilisateur mentionne un vaisseau avec son fabricant, passe le code constructeur dans le paramètre manufacturer et le modèle seul dans query :
+- "Anvil Arrow" → manufacturer: "ANVL", query: "Arrow"
+- "Origin 300i" → manufacturer: "ORIG", query: "300i"
+- "Drake Cutlass Black" → manufacturer: "DRAK", query: "Cutlass Black"
+- "RSI Constellation Andromeda" → manufacturer: "RSI", query: "Constellation Andromeda"
 
-Si tu ne connais pas le code constructeur, passe juste le modèle dans `query` sans le nom du fabricant.
+Si tu ne connais pas le code constructeur, passe juste le modèle dans query sans le nom du fabricant.
 
 ## Stratégie d'utilisation des outils
 
