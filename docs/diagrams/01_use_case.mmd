@@ -1,0 +1,54 @@
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'fontSize': '12px', 'fontFamily': 'Arial'}, 'flowchart': {'nodeSpacing': 22, 'rankSpacing': 55, 'useMaxWidth': true}}}%%
+graph LR
+    U["👤 Utilisateur"]
+    A["🔑 Admin"]
+    B["🤖 Bot Discord"]
+    E["⚙️ Extracteur CLI"]
+
+    subgraph PUB["Navigation publique"]
+        UC1["Rechercher un vaisseau"]
+        UC2["Consulter les composants"]
+        UC3["Parcourir les commodités"]
+        UC4["Voir les missions"]
+        UC5["Recettes de craft"]
+        UC6["Calcul mining"]
+        UC7["Recherche unifiée"]
+    end
+
+    subgraph ADV["Fonctionnalités avancées"]
+        UC8["Simuler un loadout"]
+        UC9["Comparer des vaisseaux"]
+        UC10["Routes commerciales"]
+        UC11["Chatbot IA Mistral"]
+    end
+
+    subgraph AUTHZ["Compte utilisateur"]
+        UC12["S'inscrire"]
+        UC13["Se connecter"]
+        UC14["Token API"]
+    end
+
+    subgraph ADMIN["Administration"]
+        UC15["Gérer les utilisateurs"]
+        UC16["Logs d'extraction"]
+        UC17["Changelog"]
+    end
+
+    subgraph EXT["Extraction des données"]
+        UC18["Parser Data.p4k"]
+        UC19["Sync Ship Matrix RSI"]
+        UC20["Scraping CTM / RSI"]
+        UC21["Journaliser l'extraction"]
+    end
+
+    U --> PUB
+    U --> ADV
+    U --> AUTHZ
+    A --> ADMIN
+    A --> UC13
+    B --> UC1
+    B --> UC2
+    B --> UC3
+    B --> UC9
+    B --> UC11
+    E --> EXT
