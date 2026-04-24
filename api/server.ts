@@ -112,9 +112,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const swaggerSpec = JSON.parse(readFileSync(path.join(__dirname, 'openapi.json'), 'utf-8'));
 swaggerSpec.servers = [{ url: '/', description: 'Current host' }];
 const swaggerSetup = swaggerUi.setup(swaggerSpec);
-// Intercept GET /api-docs (no trailing slash) before Express's router generates an
-// absolute-URL redirect using the internal Docker hostname (starvis-api) as Host.
-app.get('/api-docs', (req, res, next) => { req.url = '/'; swaggerSetup(req, res, next); });
+// Redirect /api-docs → /api-docs/ so relative asset paths (./swagger-ui.css etc.) resolve correctly.
+// Traefik forwards X-Forwarded-Host + X-Forwarded-Proto so the redirect lands on the right domain.
+app.get('/api-docs', (_, res) => res.redirect(301, '/api-docs/'));
 app.use('/api-docs', swaggerUi.serve, swaggerSetup);
 
 // ===== ROOT =====
