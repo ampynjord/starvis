@@ -125,6 +125,16 @@ id, code, name, type, description, affiliation
 
 ---
 
+## Noms de vaisseaux avec fabricant
+
+Quand l'utilisateur mentionne un vaisseau avec son fabricant (ex : "Anvil Arrow", "Origin 300i", "Drake Cutlass Black"), utilise **le code constructeur dans `manufacturer`** et **le modèle seul dans `query`** :
+- "Anvil Arrow" → `manufacturer: "ANVL", query: "Arrow"`
+- "Origin 300i" → `manufacturer: "ORIG", query: "300i"`
+- "Drake Cutlass Black" → `manufacturer: "DRAK", query: "Cutlass Black"`
+- "RSI Constellation Andromeda" → `manufacturer: "RSI", query: "Constellation Andromeda"`
+
+Si tu ne connais pas le code constructeur, passe juste le modèle dans `query` sans le nom du fabricant.
+
 ## Stratégie d'utilisation des outils
 
 1. Question vaisseau → search_ships (liste) puis get_ship_details (stats brutes) et/ou get_ship_full_stats (loadout agrégé)
@@ -622,9 +632,21 @@ export class ChatService {
 
   private async resolveShipUuid(name: string, env: string): Promise<{ uuid: string; data: Record<string, unknown> } | null> {
     const result = await this.gameDataService.ships.getAllShips({ env, search: name, limit: 1, page: 1 });
-    if (!result.data.length) return null;
-    const ship = result.data[0] as Record<string, unknown>;
-    return { uuid: ship['uuid'] as string, data: ship };
+    if (result.data.length) {
+      const ship = result.data[0] as Record<string, unknown>;
+      return { uuid: ship['uuid'] as string, data: ship };
+    }
+    // Fallback: try removing leading words one by one to handle "Anvil Arrow" → "Arrow"
+    const words = name.trim().split(/\s+/);
+    for (let i = 1; i < words.length; i++) {
+      const shorter = words.slice(i).join(' ');
+      const r = await this.gameDataService.ships.getAllShips({ env, search: shorter, limit: 1, page: 1 });
+      if (r.data.length) {
+        const ship = r.data[0] as Record<string, unknown>;
+        return { uuid: ship['uuid'] as string, data: ship };
+      }
+    }
+    return null;
   }
 
   /** Supprime les champs lourds inutiles pour le LLM (blobs, URLs longues, JSON brut) */
@@ -658,9 +680,9 @@ export class ChatService {
       switch (name) {
         // ── Ships ──────────────────────────────────────────────────────────
         case 'search_ships': {
-          const result = await this.gameDataService.ships.getAllShips({
+          const rawQuery = (args.query as string | undefined) ?? '';
+          const shipFilters = {
             env,
-            search: (args.query as string | undefined) ?? '',
             manufacturer: args.manufacturer as string | undefined,
             role: args.role as string | undefined,
             career: args.career as string | undefined,
@@ -669,7 +691,17 @@ export class ChatService {
             order: args.order as string | undefined,
             limit,
             page: 1,
-          });
+          };
+          let result = await this.gameDataService.ships.getAllShips({ ...shipFilters, search: rawQuery });
+          // Fallback: "Anvil Arrow" → "Arrow" — try removing leading words
+          if (result.data.length === 0 && rawQuery.includes(' ')) {
+            const words = rawQuery.trim().split(/\s+/);
+            for (let i = 1; i < words.length; i++) {
+              const shorter = words.slice(i).join(' ');
+              const r = await this.gameDataService.ships.getAllShips({ ...shipFilters, search: shorter });
+              if (r.data.length > 0) { result = r; break; }
+            }
+          }
           return {
             total: result.total,
             ships: result.data.map((s: Record<string, unknown>) => ({
