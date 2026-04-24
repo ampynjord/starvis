@@ -1,0 +1,52 @@
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'fontSize': '12px', 'fontFamily': 'Arial'}, 'gantt': {'useMaxWidth': true, 'barHeight': 20, 'barGap': 5, 'topPadding': 50}}}%%
+gantt
+    title Développement STARVIS — 2025 à aujourd'hui
+    dateFormat  YYYY-MM-DD
+    axisFormat  %b %Y
+
+    section Conception & Fondations
+    Architecture monorepo TypeScript         :done, fnd1, 2025-01-01, 35d
+    Schéma BDD Prisma + Docker Compose       :done, fnd2, after fnd1, 25d
+    CI/CD GitHub Actions initial             :done, fnd3, after fnd2, 14d
+
+    section Extraction de données P4K
+    Étude format DataForge / fzstd           :done, ext1, 2025-02-20, 21d
+    Extracteur ships + RSI Ship Matrix       :done, ext2, after ext1, 28d
+    Extracteurs components, items            :done, ext3, after ext2, 21d
+    Extracteurs missions, crafting, mining   :done, ext4, after ext3, 21d
+    Shops, locations, paints + Changelog     :done, ext5, after ext4, 14d
+
+    section API Backend Express.js
+    Routes ships, components, items          :done, api1, 2025-04-15, 30d
+    Routes commodités, shops, trade          :done, api2, after api1, 21d
+    Routes missions, crafting, mining        :done, api3, after api2, 21d
+    Calculateurs loadout / mining / FPS      :done, api4, after api3, 21d
+    OpenAPI Swagger + monitoring Prometheus  :done, api5, after api4, 14d
+
+    section Interface Web Next.js
+    Pages vaisseaux, composants, items       :done, ihm1, 2025-07-01, 30d
+    Simulateur de loadout                    :done, ihm2, after ihm1, 21d
+    Pages trade, missions, crafting, mining  :done, ihm3, after ihm2, 21d
+    Comparateur + recherche unifiée          :done, ihm4, after ihm3, 14d
+
+    section Bot Discord & Production
+    Bot Discord — commandes slash            :done, bot1, 2025-09-15, 21d
+    Déploiement VPS + Traefik HTTPS          :done, dep1, after bot1, 21d
+    Mise en production starvis.ampynjord.bzh :milestone, done, prod, 2025-11-15, 0d
+
+    section Maintenance
+    Dependabot configuré + premières MAJ     :done, mnt1, 2026-03-12, 5d
+    CI/CD fixes + correctifs IHM             :done, mnt2, 2026-03-17, 5d
+    Merge dev→main — missions, UI            :done, mnt3, 2026-03-29, 2d
+    FPS Gear + endpoints items               :done, mnt4, 2026-04-05, 1d
+
+    section Évolutions majeures Avril 2026
+    Restructuration monorepo                 :done, ev1, 2026-04-06, 1d
+    Migration MySQL → PostgreSQL multi-schéma:done, ev2, 2026-04-12, 2d
+    Routes ships/véhicules/grav-lev séparées :done, ev3, 2026-04-12, 1d
+    Chatbot IA ARIA puis Mistral AI          :done, ev4, 2026-04-13, 3d
+    Auth JWT + rôles + panel admin           :done, ev5, 2026-04-13, 2d
+    Tokens API + protection routes           :done, ev6, 2026-04-14, 1d
+
+    section Documentation
+    Diagrammes et schémas du projet          :done, doc1, 2026-04-20, 5d

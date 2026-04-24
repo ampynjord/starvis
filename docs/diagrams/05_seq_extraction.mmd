@@ -1,0 +1,40 @@
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'fontSize': '12px', 'fontFamily': 'Arial'}, 'sequence': {'actorFontSize': 12, 'messageFontSize': 11, 'mirrorActors': false, 'useMaxWidth': true, 'boxMargin': 6}}}%%
+sequenceDiagram
+    actor Dev as Développeur
+    participant CLI as Extractor CLI
+    participant DFS as DataForgeService
+    participant ES as ExtractionService
+    participant RSI as RSI API
+    participant DB as PostgreSQL
+
+    Dev->>CLI: tsx extract.ts --env live --modules all
+    CLI->>DB: Connexion (retry ×30)
+    CLI->>RSI: GET ship-matrix.json
+    RSI-->>CLI: ShipMatrix[] JSON
+    CLI->>DB: UPSERT rsi.ship_matrix
+
+    CLI->>DFS: openP4K(Data.p4k)
+    DFS->>DFS: Décompression Zstd + parse XML
+    DFS-->>CLI: Index records prêt
+
+    CLI->>DB: BEGIN TRANSACTION
+
+    loop Pour chaque module [ships, components, items, commodities, missions, crafting, mining, shops, locations]
+        CLI->>ES: extract(module, env)
+        ES->>DFS: queryRecords(entityType)
+        DFS-->>ES: RawRecord[]
+        ES->>ES: canonicalize + normalize
+        ES->>DB: INSERT ON CONFLICT (batch 50 lignes)
+    end
+
+    ES->>ES: crossReference ShipMatrix\n+ generateChangelog
+
+    alt Succès
+        CLI->>DB: COMMIT
+        CLI->>DB: INSERT ExtractionLog {status: success}
+        CLI-->>Dev: Ships: 515 | Components: 6087 | OK
+    else Erreur
+        CLI->>DB: ROLLBACK
+        CLI->>DB: INSERT ExtractionLog {status: failed}
+        CLI-->>Dev: Extraction échouée (DB inchangée)
+    end

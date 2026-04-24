@@ -1,0 +1,125 @@
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'fontSize': '13px', 'fontFamily': 'Arial'}, 'er': {'diagramPadding': 20, 'entityPadding': 10, 'useMaxWidth': true}}}%%
+erDiagram
+    COMMODITY {
+        string uuid PK
+        string env PK
+        string name
+        string type
+        float occupancyScu
+    }
+
+    SHOP {
+        int id PK
+        string env
+        string name
+        string location
+        string system
+        string shopType
+    }
+
+    SHOP_INVENTORY {
+        int id PK
+        int shopId FK
+        string componentUuid FK
+        float basePrice
+        float rental1d
+        float rental7d
+    }
+
+    COMMODITY_PRICE {
+        int id PK
+        string commodityUuid FK
+        int shopId FK
+        float buyPrice
+        float sellPrice
+        datetime reportedAt
+    }
+
+    MISSION {
+        string uuid PK
+        string env PK
+        string title
+        string missionType
+        bool isLegal
+        float rewardMin
+        float rewardMax
+        string faction
+        string missionGiver
+    }
+
+    CRAFTING_RECIPE {
+        string uuid PK
+        string env PK
+        string name
+        string category
+        string outputItemUuid FK
+        int outputQuantity
+        int craftingTime
+        string stationType
+    }
+
+    CRAFTING_INGREDIENT {
+        int id PK
+        string recipeUuid FK
+        string itemUuid FK
+        string itemName
+        int quantity
+        bool isOptional
+    }
+
+    MINING_ELEMENT {
+        string uuid PK
+        string env PK
+        string name
+        string commodityUuid FK
+        float instability
+        float resistance
+    }
+
+    LOCATION {
+        string uuid PK
+        string env PK
+        string name
+        string type
+        string systemCode
+        string parentUuid FK
+    }
+
+    EXTRACTION_LOG {
+        int id PK
+        string gameVersion
+        string gameEnv
+        int shipsCount
+        int componentsCount
+        string status
+        int durationMs
+        datetime extractedAt
+    }
+
+    CHANGELOG {
+        int id PK
+        int extractionId FK
+        string entityType
+        string entityUuid
+        string changeType
+        string fieldName
+        string oldValue
+        string newValue
+    }
+
+    USER {
+        int id PK
+        string uuid
+        string email
+        string username
+        string passwordHash
+        string role
+    }
+
+    SHOP ||--o{ SHOP_INVENTORY : "vend composants"
+    SHOP ||--o{ COMMODITY_PRICE : "cote commodités"
+    COMMODITY ||--o{ COMMODITY_PRICE : "a des prix"
+    MINING_ELEMENT }o--|| COMMODITY : "est une commodité"
+    CRAFTING_RECIPE ||--o{ CRAFTING_INGREDIENT : "nécessite"
+    EXTRACTION_LOG ||--o{ CHANGELOG : "génère"
+    LOCATION }o--o| LOCATION : "parent de"
