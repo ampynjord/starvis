@@ -84,13 +84,12 @@ services:
       traefik.http.routers.starvis-api-docs.rule: "Host(`${DOMAIN}`) && PathPrefix(`/api-docs`)"
       traefik.http.routers.starvis-api-docs.entrypoints: "websecure"
       traefik.http.routers.starvis-api-docs.tls.certresolver: "${TRAEFIK_CERT_RESOLVER:-letsencrypt}"
-      traefik.http.routers.starvis-api-docs.priority: "100"
-      traefik.http.services.starvis-api-docs.loadbalancer.server.port: "${API_INTERNAL_PORT:-3000}"
-      traefik.http.routers.starvis-api.rule: "Host(`${DOMAIN}`) && PathPrefix(`/api`, `/health`, `/admin`)"
+      traefik.http.routers.starvis-api-docs.service: "starvis-api-svc"
+      traefik.http.routers.starvis-api.rule: "Host(`${DOMAIN}`) && (PathPrefix(`/health`) || PathPrefix(`/admin`) || (PathPrefix(`/api`) && !PathPrefix(`/api-docs`)))"
       traefik.http.routers.starvis-api.entrypoints: "websecure"
       traefik.http.routers.starvis-api.tls.certresolver: "${TRAEFIK_CERT_RESOLVER:-letsencrypt}"
-      traefik.http.routers.starvis-api.priority: "90"
-      traefik.http.services.starvis-api.loadbalancer.server.port: "${API_INTERNAL_PORT:-3000}"
+      traefik.http.routers.starvis-api.service: "starvis-api-svc"
+      traefik.http.services.starvis-api-svc.loadbalancer.server.port: "${API_INTERNAL_PORT:-3000}"
     depends_on:
       postgres:
         condition: service_healthy
