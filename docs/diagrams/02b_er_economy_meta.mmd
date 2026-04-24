@@ -119,7 +119,7 @@ erDiagram
     SHOP ||--o{ SHOP_INVENTORY : "vend composants"
     SHOP ||--o{ COMMODITY_PRICE : "cote commodités"
     COMMODITY ||--o{ COMMODITY_PRICE : "a des prix"
-    COMMODITY ||--o{ MINING_ELEMENT : "correspond à"
+    MINING_ELEMENT }o--|| COMMODITY : "est une commodité"
     CRAFTING_RECIPE ||--o{ CRAFTING_INGREDIENT : "nécessite"
     EXTRACTION_LOG ||--o{ CHANGELOG : "génère"
     LOCATION }o--o| LOCATION : "parent de"

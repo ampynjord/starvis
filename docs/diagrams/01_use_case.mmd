@@ -1,12 +1,11 @@
-%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'fontSize': '15px', 'fontFamily': 'Arial'}}}%%
-graph TD
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'fontSize': '12px', 'fontFamily': 'Arial'}, 'flowchart': {'nodeSpacing': 22, 'rankSpacing': 55, 'useMaxWidth': true}}}%%
+graph LR
     U["👤 Utilisateur"]
     A["🔑 Admin"]
     B["🤖 Bot Discord"]
     E["⚙️ Extracteur CLI"]
 
     subgraph PUB["Navigation publique"]
-        direction TB
         UC1["Rechercher un vaisseau"]
         UC2["Consulter les composants"]
         UC3["Parcourir les commodités"]
@@ -17,7 +16,6 @@ graph TD
     end
 
     subgraph ADV["Fonctionnalités avancées"]
-        direction TB
         UC8["Simuler un loadout"]
         UC9["Comparer des vaisseaux"]
         UC10["Routes commerciales"]
@@ -25,23 +23,20 @@ graph TD
     end
 
     subgraph AUTHZ["Compte utilisateur"]
-        direction TB
         UC12["S'inscrire"]
         UC13["Se connecter"]
-        UC14["Token API personnel"]
+        UC14["Token API"]
     end
 
     subgraph ADMIN["Administration"]
-        direction TB
         UC15["Gérer les utilisateurs"]
         UC16["Logs d'extraction"]
-        UC17["Changelog des données"]
+        UC17["Changelog"]
     end
 
     subgraph EXT["Extraction des données"]
-        direction TB
         UC18["Parser Data.p4k"]
-        UC19["Sync RSI Ship Matrix"]
+        UC19["Sync Ship Matrix RSI"]
         UC20["Scraping CTM / RSI"]
         UC21["Journaliser l'extraction"]
     end
@@ -52,6 +47,8 @@ graph TD
     A --> ADMIN
     A --> UC13
     B --> UC1
+    B --> UC2
+    B --> UC3
     B --> UC9
     B --> UC11
     E --> EXT
