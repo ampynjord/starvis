@@ -7,7 +7,8 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
-      { source: '/api-docs', destination: `${process.env.API_URL || 'http://api:3000'}/api-docs` },
+      // /api-docs destination with trailing slash to bypass Express's trust-proxy redirect loop
+      { source: '/api-docs', destination: `${process.env.API_URL || 'http://api:3000'}/api-docs/` },
       { source: '/api-docs/:path*', destination: `${process.env.API_URL || 'http://api:3000'}/api-docs/:path*` },
       { source: '/api/:path*', destination: `${process.env.API_URL || 'http://api:3000'}/api/:path*` },
       { source: '/health/:path*', destination: `${process.env.API_URL || 'http://api:3000'}/health/:path*` },
