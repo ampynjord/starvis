@@ -111,7 +111,11 @@ app.use((req, res, next) => {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const swaggerSpec = JSON.parse(readFileSync(path.join(__dirname, 'openapi.json'), 'utf-8'));
 swaggerSpec.servers = [{ url: '/', description: 'Current host' }];
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+const swaggerSetup = swaggerUi.setup(swaggerSpec);
+// Intercept GET /api-docs (no trailing slash) before Express's router generates an
+// absolute-URL redirect using the internal Docker hostname (starvis-api) as Host.
+app.get('/api-docs', (req, res, next) => { req.url = '/'; swaggerSetup(req, res, next); });
+app.use('/api-docs', swaggerUi.serve, swaggerSetup);
 
 // ===== ROOT =====
 app.get('/', (_, res) =>
