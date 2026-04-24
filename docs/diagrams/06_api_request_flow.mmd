@@ -1,0 +1,24 @@
+%%{init: {'theme': 'base', 'themeVariables': {'background': '#ffffff', 'mainBkg': '#ffffff', 'fontSize': '13px', 'fontFamily': 'Arial'}, 'flowchart': {'nodeSpacing': 18, 'rankSpacing': 38, 'useMaxWidth': true}}}%%
+flowchart TD
+    A([Requête HTTP]) --> B{"Rate limiters\nBurst 30/min · Standard 200/15min\nSpeed limiter après 20 req"}
+    B -- Dépassé --> ERR1["429 Too Many Requests"]
+    B -- OK --> C{"Route\nprotégée ?"}
+
+    C -- Non --> F
+    C -- Oui --> D{"JWT\nvalide ?"}
+    D -- Non/Expiré --> ERR2["401 Unauthorized"]
+    D -- Valide --> F
+
+    F["Service + Prisma Query\n(GameDataService)"] --> G{"ETag\nIf-None-Match ?"}
+    G -- Match --> OK1["304 Not Modified"]
+    G -- Absent/Expiré --> H[Requête PostgreSQL]
+
+    H --> I{"Format ?"}
+    I -- JSON --> OK2["200 OK — JSON + pagination"]
+    I -- CSV --> OK3["200 OK — CSV + Content-Disposition"]
+
+    style ERR1 fill:#e74c3c,color:#fff
+    style ERR2 fill:#e74c3c,color:#fff
+    style OK1 fill:#27ae60,color:#fff
+    style OK2 fill:#27ae60,color:#fff
+    style OK3 fill:#27ae60,color:#fff
