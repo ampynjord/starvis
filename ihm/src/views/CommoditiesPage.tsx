@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Search } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -10,7 +9,9 @@ import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { Pagination } from '@/components/ui/Pagination';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { FilterPanel } from '@/components/ui/FilterPanel';
 import { GlowBadge } from '@/components/ui/GlowBadge';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { useListQueryState } from '@/hooks/useListQueryState';
 
 const LIMIT = 30;
@@ -77,18 +78,26 @@ export default function CommoditiesPage() {
   const isIndustrial = pathname?.startsWith('/industrial');
   const title = isIndustrial ? 'Industrial' : 'Trade Goods';
 
+  const filterGroups = categories.length > 0 ? [
+    {
+      key: 'category',
+      label: 'Category',
+      options: categories.map(c => ({ label: c.label, value: c.label })),
+      value: activeCategory,
+      onChange: (v: string) => { setActiveCategory(v); setPage(1); },
+    },
+  ] : [];
+
   return (
     <div className="max-w-(--breakpoint-2xl) mx-auto">
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <div>
-          <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">{title}</h1>
-          {data && <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">{data.total.toLocaleString('en-US')} goods indexed</p>}
-        </div>
-        <div className="relative w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={13} />
-          <input type="text" value={search} onChange={e => updateSearch(e.target.value)} placeholder="Search…" className="sci-input w-full pl-8 text-xs" />
-        </div>
-      </div>
+      <PageHeader
+        title={title}
+        count={data?.total}
+        countLabel="goods"
+        search={search}
+        searchPlaceholder="Search…"
+        onSearch={updateSearch}
+      />
 
       {isIndustrial && (
         <div className="sci-panel p-3 mb-4 flex items-center justify-between gap-3">
@@ -97,25 +106,20 @@ export default function CommoditiesPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 mb-4">
-        {categories.map((chip) => (
-          <button
-            key={chip.label}
-            type="button"
-            onClick={() => { setActiveCategory(chip.label); setPage(1); }}
-            className={[
-              'px-3 py-1 rounded-sm text-xs font-rajdhani font-semibold tracking-wider transition-all border',
-              activeCategory === chip.label
-                ? 'bg-cyan-950/60 border-cyan-700 text-cyan-400'
-                : 'border-border text-slate-500 hover:text-slate-300 hover:border-slate-600',
-            ].join(' ')}
-          >
-            {chip.label}
-          </button>
-        ))}
-      </div>
+      <div className="flex gap-4">
+        <div className="w-44 shrink-0">
+          {filterGroups.length > 0 ? (
+            <FilterPanel
+              hasFilters={activeCategory !== 'All'}
+              onReset={() => { setActiveCategory('All'); setPage(1); }}
+              groups={filterGroups}
+            />
+          ) : (
+            <div className="sci-panel p-3 text-xs text-slate-600 animate-pulse">Loading…</div>
+          )}
+        </div>
 
-      <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0">
         {isLoading ? <LoadingGrid message="LOADING…" />
         : error ? <ErrorState error={error as Error} onRetry={() => void refetch()} />
         : !data?.data?.length ? <EmptyState icon="📦" title="No commodities found" />
@@ -146,6 +150,7 @@ export default function CommoditiesPage() {
             {data && <Pagination className="mt-6" page={data.page} totalPages={data.pages} onPageChange={updatePageWithScroll} />}
           </>
         )}
+        </div>
       </div>
     </div>
   );

@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Search } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
 import { api } from "@/services/api";
@@ -12,7 +11,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { GlowBadge } from "@/components/ui/GlowBadge";
 import { useListQueryState } from "@/hooks/useListQueryState";
-import { COMPONENT_TYPE_COLORS } from "@/utils/constants";
+import { COMPONENT_TYPE_COLORS, COMPONENT_TYPE_LABELS } from "@/utils/constants";
+import { PageHeader } from "@/components/ui/PageHeader";
 import type { ComponentListItem } from "@/types/api";
 
 const LIMIT = 30;
@@ -234,7 +234,7 @@ export default function ComponentsPage() {
 					key: "type",
 					label: "Type",
 					options: (filters["types"] ?? []).map((t: string) => ({
-						label: t,
+						label: COMPONENT_TYPE_LABELS[t] ?? t,
 						value: t,
 					})),
 					value: type,
@@ -286,31 +286,14 @@ export default function ComponentsPage() {
 
 	return (
 		<div className="max-w-(--breakpoint-2xl) mx-auto">
-			<div className="mb-6 flex items-center justify-between gap-4">
-				<div>
-					<h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">
-						Components
-					</h1>
-					{data && (
-						<p className="text-sm text-slate-500 mt-0.5 font-mono-sc">
-							{data.total.toLocaleString("en-US")} components
-						</p>
-					)}
-				</div>
-				<div className="relative w-72">
-					<Search
-						className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
-						size={13}
-					/>
-					<input
-						type="text"
-						value={search}
-						onChange={(e) => updateSearch(e.target.value)}
-						placeholder="Search a component…"
-						className="sci-input w-full pl-8 text-xs"
-					/>
-				</div>
-			</div>
+			<PageHeader
+				title="Components"
+				count={data?.total}
+				countLabel="components"
+				search={search}
+				searchPlaceholder="Search a component…"
+				onSearch={updateSearch}
+			/>
 
 			<div className="flex gap-4">
 				<div className="w-44 shrink-0">
@@ -378,7 +361,7 @@ export default function ComponentsPage() {
 													<span
 														className={`text-xs font-mono-sc ${COMPONENT_TYPE_COLORS[comp.type] ?? "text-slate-500"}`}
 													>
-														{comp.type}
+														{COMPONENT_TYPE_LABELS[comp.type] ?? comp.type}
 													</span>
 													{comp.sub_type && (
 														<span className="text-xs text-slate-600">

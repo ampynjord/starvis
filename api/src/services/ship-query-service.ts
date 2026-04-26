@@ -37,6 +37,9 @@ const SHIP_SELECT = [
   'COALESCE(s.cargo_capacity, sm.cargocapacity) as cargo_capacity',
   's.crew_size',
   's.shield_hp',
+  's.shield_regen',
+  's.shield_regen_delay',
+  's.shield_down_delay',
   // Combat
   's.missile_damage_total',
   's.weapon_damage_total',

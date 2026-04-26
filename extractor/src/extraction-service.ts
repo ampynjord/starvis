@@ -854,7 +854,7 @@ export class ExtractionService {
             pitch_max, yaw_max, roll_max,
             total_hp,
             hydrogen_fuel_capacity, quantum_fuel_capacity,
-            shield_hp,
+            shield_hp, shield_regen, shield_regen_delay, shield_down_delay,
             armor_physical, armor_energy, armor_distortion,
             armor_thermal,
             armor_signal_ir, armor_signal_em, armor_signal_cs,
@@ -866,7 +866,7 @@ export class ExtractionService {
             insurance_claim_time, insurance_expedite_cost,
             vehicle_category,
             game_data
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46)
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,$39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49)
           ON CONFLICT (uuid, env) DO UPDATE SET
             class_name=EXCLUDED.class_name, name=EXCLUDED.name,
             manufacturer_code=EXCLUDED.manufacturer_code,
@@ -880,7 +880,8 @@ export class ExtractionService {
             total_hp=EXCLUDED.total_hp,
             hydrogen_fuel_capacity=EXCLUDED.hydrogen_fuel_capacity,
             quantum_fuel_capacity=EXCLUDED.quantum_fuel_capacity,
-            shield_hp=EXCLUDED.shield_hp,
+            shield_hp=EXCLUDED.shield_hp, shield_regen=EXCLUDED.shield_regen,
+            shield_regen_delay=EXCLUDED.shield_regen_delay, shield_down_delay=EXCLUDED.shield_down_delay,
             armor_physical=EXCLUDED.armor_physical, armor_energy=EXCLUDED.armor_energy,
             armor_distortion=EXCLUDED.armor_distortion, armor_thermal=EXCLUDED.armor_thermal,
             armor_signal_ir=EXCLUDED.armor_signal_ir, armor_signal_em=EXCLUDED.armor_signal_em,
@@ -921,6 +922,9 @@ export class ExtractionService {
             fullData.fuelCapacity || null,
             fullData.qtFuelCapacity || null,
             (fullData.shield?.maxShieldHealth ?? fullData.shield?.maxHp) != null ? Math.round(fullData.shield!.maxShieldHealth ?? fullData.shield!.maxHp!) : null,
+            fullData.shield?.maxShieldRegen ?? null,
+            fullData.shield?.damagedRegenDelay ?? null,
+            fullData.shield?.downedRegenDelay ?? null,
             fullData.armor?.data?.armor?.damageMultiplier?.damagePhysical ?? null,
             fullData.armor?.data?.armor?.damageMultiplier?.damageEnergy ?? null,
             fullData.armor?.data?.armor?.damageMultiplier?.damageDistortion ?? null,

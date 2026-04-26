@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { ExternalLink, Search } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -13,6 +13,8 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { GlowBadge } from "@/components/ui/GlowBadge";
 import { useListQueryState } from "@/hooks/useListQueryState";
+import { ITEM_TYPE_LABELS } from "@/utils/constants";
+import { PageHeader } from "@/components/ui/PageHeader";
 import type { ItemListItem } from "@/types/api";
 
 const LIMIT = 30;
@@ -25,7 +27,7 @@ const FPS_CATEGORIES_STATIC: { slug: string; label: string }[] = [
 	{ slug: "core",         label: "Core" },
 	{ slug: "arms",         label: "Arms" },
 	{ slug: "legs",         label: "Legs" },
-	{ slug: "backpack",     label: "Backpack" },
+	{ slug: "backpack",     label: "Back" },
 	{ slug: "undersuit",    label: "Undersuit" },
 	{ slug: "tools-medics", label: "Tools & Medics" },
 	{ slug: "attachments",  label: "Attachments" },
@@ -75,7 +77,7 @@ const TYPE_LABEL: Record<string, string> = {
 	Armor_Arms:     "Arms",
 	Armor_Legs:     "Legs",
 	Armor_Helmet:   "Helmet",
-	Armor_Backpack: "Backpack",
+	Armor_Backpack: "Back",
 	Undersuit:      "Undersuit",
 	Clothing:       "Clothing",
 	Gadget:         "Other",
@@ -291,31 +293,14 @@ export default function ItemsPage() {
 
 	return (
 		<div className="max-w-(--breakpoint-2xl) mx-auto">
-			<div className="mb-4 flex items-center justify-between gap-4">
-				<div>
-					<h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">
-						{pageTitle}
-					</h1>
-					{data && (
-						<p className="text-sm text-slate-500 mt-0.5 font-mono-sc">
-							{data.total.toLocaleString("en-US")} items
-						</p>
-					)}
-				</div>
-				<div className="relative w-72">
-					<Search
-						className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
-						size={13}
-					/>
-					<input
-						type="text"
-						value={search}
-						onChange={(e) => updateSearch(e.target.value)}
-						placeholder="Search an item…"
-						className="sci-input w-full pl-8 text-xs"
-					/>
-				</div>
-			</div>
+			<PageHeader
+				title={pageTitle}
+				count={data?.total}
+				countLabel="items"
+				search={search}
+				searchPlaceholder="Search an item…"
+				onSearch={updateSearch}
+			/>
 
 			{/* Category chips (fps mode only) */}
 			{mode === "fps" && (
@@ -401,7 +386,7 @@ export default function ItemsPage() {
 												</div>
 												<div className="flex items-center gap-3 mt-0.5 flex-wrap">
 													<span className="text-xs font-mono-sc text-cyan-700">
-														{TYPE_LABEL[item.type] ?? item.type}
+														{ITEM_TYPE_LABELS[item.type] ?? item.type}
 													</span>
 													{item.sub_type && item.sub_type !== "UNDEFINED" && (
 														<span className="text-xs text-slate-600">

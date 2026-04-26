@@ -320,6 +320,30 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
           </div>
         )}
 
+        {/* Shield regen */}
+        {(ship.shield_regen != null || ship.shield_regen_delay != null) && (
+          <div className="flex items-center gap-1.5 mb-2">
+            {ship.shield_regen != null && (
+              <div className="flex-1 flex flex-col items-center rounded-md border border-cyan-900/30 bg-cyan-950/10 py-1.5 px-1">
+                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Regen</span>
+                <span className="text-sm font-orbitron font-bold text-cyan-400 tabular-nums">{Number(ship.shield_regen).toFixed(1)}/s</span>
+              </div>
+            )}
+            {ship.shield_regen_delay != null && (
+              <div className="flex-1 flex flex-col items-center rounded-md border border-cyan-900/30 bg-cyan-950/10 py-1.5 px-1">
+                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Delay</span>
+                <span className="text-sm font-orbitron font-bold text-cyan-400 tabular-nums">{Number(ship.shield_regen_delay).toFixed(1)}s</span>
+              </div>
+            )}
+            {ship.shield_down_delay != null && (
+              <div className="flex-1 flex flex-col items-center rounded-md border border-cyan-900/30 bg-cyan-950/10 py-1.5 px-1">
+                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Down</span>
+                <span className="text-sm font-orbitron font-bold text-cyan-400 tabular-nums">{Number(ship.shield_down_delay).toFixed(1)}s</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Armor HP + durabilité */}
         {(ship.armor_hp != null || ship.armor_phys_resist != null) && (
           <div className="flex items-center gap-1.5 mb-2">
