@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import { MapPin, Search, ShoppingBag } from 'lucide-react';
+import { MapPin, ShoppingBag } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { useMemo, useState } from 'react';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
@@ -64,27 +65,14 @@ export default function ShopsPage() {
 
   return (
     <div className="max-w-(--breakpoint-xl) mx-auto space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Shops</h1>
-          {data && (
-            <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">
-              {data.total.toLocaleString('en-US')} shops
-            </p>
-          )}
-        </div>
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={13} />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => updateSearch(e.target.value)}
-            placeholder="Search shops or locations…"
-            className="sci-input w-full pl-8 text-xs"
-          />
-        </div>
-      </div>
+      <PageHeader
+        title="Shops"
+        count={data?.total}
+        countLabel="shops"
+        search={search}
+        searchPlaceholder="Search shops or locations…"
+        onSearch={updateSearch}
+      />
 
       {/* Shop type chips */}
       {shopTypes.length > 0 && (
