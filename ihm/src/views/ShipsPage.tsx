@@ -1,7 +1,8 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { ArrowUpDown, Search } from 'lucide-react';
+import { ArrowUpDown } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/services/api';
@@ -104,10 +105,21 @@ export default function ShipsPage() {
 
   const availableSorts = SORT_OPTIONS.filter(o => o.categories.includes(category));
 
+  const categoryLabel = CATEGORIES.find(c => c.value === category)?.label ?? 'Ships';
+
   return (
     <div className="max-w-(--breakpoint-2xl) mx-auto">
+      <PageHeader
+        title={categoryLabel}
+        count={data?.total}
+        countLabel="results"
+        search={search}
+        searchPlaceholder="Search…"
+        onSearch={updateSearch}
+      />
+
       {/* Tabs */}
-      <div className="flex gap-1 mb-6 border-b border-slate-800">
+      <div className="flex gap-1 mb-4 border-b border-slate-800">
         {CATEGORIES.map(cat => {
           const count = categoryCount(cat.value);
           const active = category === cat.value;
@@ -132,43 +144,24 @@ export default function ShipsPage() {
         })}
       </div>
 
-      {/* Toolbar */}
-      <div className="mb-4 flex items-center justify-between gap-4 flex-wrap">
-        <p className="text-sm text-slate-500 font-mono-sc">
-          {data ? `${data.total.toLocaleString('en-US')} results` : <span className="invisible">–</span>}
-        </p>
-
-        <div className="flex items-center gap-2">
-          {/* Sort */}
-          <select
-            value={sort}
-            onChange={e => { setSort(e.target.value); setPage(1); }}
-            className="sci-input text-xs py-1.5"
-          >
-            {availableSorts.map(o => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
-          <button
-            onClick={toggleOrder}
-            title={order === 'asc' ? 'Ascending — click to reverse' : 'Descending — click to reverse'}
-            className="sci-panel px-2 py-1.5 text-slate-400 hover:text-cyan-400 transition-colors"
-          >
-            <ArrowUpDown size={13} className={order === 'desc' ? 'rotate-180 transition-transform' : 'transition-transform'} />
-          </button>
-
-          {/* Search */}
-          <div className="relative w-56">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={13} />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => updateSearch(e.target.value)}
-              placeholder="Search…"
-              className="sci-input w-full pl-8 text-xs"
-            />
-          </div>
-        </div>
+      {/* Sort toolbar */}
+      <div className="mb-4 flex items-center justify-end gap-2">
+        <select
+          value={sort}
+          onChange={e => { setSort(e.target.value); setPage(1); }}
+          className="sci-input text-xs py-1.5"
+        >
+          {availableSorts.map(o => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        <button
+          onClick={toggleOrder}
+          title={order === 'asc' ? 'Ascending — click to reverse' : 'Descending — click to reverse'}
+          className="sci-panel px-2 py-1.5 text-slate-400 hover:text-cyan-400 transition-colors"
+        >
+          <ArrowUpDown size={13} className={order === 'desc' ? 'rotate-180 transition-transform' : 'transition-transform'} />
+        </button>
       </div>
 
       <div className="flex gap-4">
