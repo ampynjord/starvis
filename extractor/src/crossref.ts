@@ -89,6 +89,12 @@ function normalizeForMatch(name: string): string {
     .replace(/-/g, ' ')
     .replace(/\./g, '')
     .replace(/\//g, '')
+    // Unify "Mk IV/III/II/I" and "Mk4/3/2/1" so Ship Matrix ↔ P4K always match
+    .replace(/\bmk\s*iv\b/g, 'mk 4')
+    .replace(/\bmk\s*iii\b/g, 'mk 3')
+    .replace(/\bmk\s*ii\b/g, 'mk 2')
+    .replace(/\bmk\s*i\b/g, 'mk 1')
+    .replace(/\bmk\s*(\d)\b/g, 'mk $1')
     .replace(/\s+/g, ' ');
 }
 
