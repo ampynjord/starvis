@@ -89,6 +89,9 @@ export interface Ship extends ShipListItem {
   armor_signal_ir: number | null;
   armor_signal_em: number | null;
   armor_signal_cs: number | null;
+  shield_regen: number | null;
+  shield_regen_delay: number | null;
+  shield_down_delay: number | null;
 }
 
 export interface LoadoutNode {
