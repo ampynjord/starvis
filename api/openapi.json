@@ -3,7 +3,7 @@
   "info": {
     "title": "Starvis API",
     "version": "1.0.0",
-    "description": "Star Citizen Ships, Components, Items & Game Data API.\n\nData sources:\n- **P4K game data** (ships, components, items, commodities, shops, missions, mining, crafting, locations)\n- **RSI Website** (ship matrix, galactapedia, comm-links, starmap)\n\n### Authentication\nMost endpoints are public. Admin endpoints require an `X-API-Key` header.\n\n### Pagination\nAll list endpoints support `page` and `limit` query parameters and return `{ data, total, page, limit, pages }`.\n\n### Filters\nEvery domain has a `/filters` endpoint returning `{ filters: { fieldName: [{ value, label, count? }] } }`."
+    "description": "Star Citizen Ships, Components, Items & Game Data API.\n\nData sources:\n- **P4K game data** (ships, components, items, commodities, shops, missions, mining, crafting, locations)\n- **RSI Website** (ship matrix, galactapedia, comm-links, starmap)\n\n### Authentication\nMost endpoints are public. Two authentication methods are supported:\n- **Bearer JWT** (`Authorization: Bearer <token>`): obtained via `POST /auth/login` or `POST /auth/api-token`. Required for `/api/v1/chat`, `/auth/me`, and admin routes.\n- **API Key** (`X-API-Key` header): for admin endpoints only.\n\n### Pagination\nAll list endpoints support `page` and `limit` query parameters and return `{ data, total, page, limit, pages }`.\n\n### Filters\nEvery domain has a `/filters` endpoint returning `{ filters: { fieldName: [{ value, label, count? }] } }`.\n\n### Game environments\nUse the `env` query parameter to select the game environment: `live` (default), `ptu`, `eptu`, `custom`."
   },
   "components": {
     "securitySchemes": {
@@ -11,6 +11,11 @@
         "type": "apiKey",
         "in": "header",
         "name": "X-API-Key"
+      },
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
       }
     },
     "parameters": {
@@ -43,7 +48,7 @@
       "env": {
         "name": "env",
         "in": "query",
-        "schema": { "type": "string", "enum": ["live", "ptu"], "default": "live" },
+        "schema": { "type": "string", "enum": ["live", "ptu", "eptu", "custom"], "default": "live" },
         "description": "Game environment"
       }
     },
@@ -499,7 +504,15 @@
         }
       },
       "Unauthorized": {
-        "description": "Missing or invalid API key",
+        "description": "Missing or invalid authentication token",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Error" }
+          }
+        }
+      },
+      "BadRequest": {
+        "description": "Invalid request parameters",
         "content": {
           "application/json": {
             "schema": { "$ref": "#/components/schemas/Error" }
@@ -531,7 +544,9 @@
     { "name": "Loadout", "description": "Ship loadout simulator (DPS, shield, power aggregation)" },
     { "name": "Search", "description": "Unified multi-entity cross-search" },
     { "name": "Calculators", "description": "FPS damage and mining yield calculators" },
-    { "name": "Admin", "description": "Administrative endpoints (require X-API-Key)" },
+    { "name": "Admin", "description": "Administrative endpoints (require Bearer JWT admin role or X-API-Key)" },
+    { "name": "Auth", "description": "Authentication — register, login, JWT tokens" },
+    { "name": "Chat", "description": "AI assistant powered by Mistral (requires Bearer JWT)" },
     { "name": "Health", "description": "Liveness, readiness probes and Prometheus metrics" }
   ],
   "paths": {
@@ -1376,24 +1391,29 @@
         }
       }
     },
-    "/api/v1/shops/{id}": {
+    "/api/v1/shops/{id}/inventory": {
       "get": {
         "tags": ["Shops"],
-        "summary": "Get shop details with inventory",
-        "operationId": "getShopById",
-        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "summary": "Get shop inventory",
+        "operationId": "getShopInventory",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "description": "Shop ID" },
+          { "$ref": "#/components/parameters/env" },
+          { "$ref": "#/components/parameters/format" }
+        ],
         "responses": {
           "200": {
-            "description": "Shop details with full inventory",
+            "description": "Shop inventory items",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/ShopDetail" } }
+                  "properties": { "success": { "type": "boolean" }, "count": { "type": "integer" }, "data": { "type": "array", "items": { "type": "object" } } }
                 }
               }
             }
           },
+          "400": { "$ref": "#/components/responses/BadRequest" },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
@@ -2363,12 +2383,469 @@
         }
       }
     },
-    "/metrics": {
+    "/health/metrics": {
       "get": {
         "tags": ["Health"],
         "summary": "Prometheus metrics",
         "operationId": "metrics",
-        "responses": { "200": { "description": "Prometheus text format metrics" } }
+        "responses": { "200": { "description": "Prometheus text format metrics (text/plain)" } }
+      }
+    },
+    "/health/cache/stats": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Cache statistics",
+        "operationId": "cacheStats",
+        "responses": {
+          "200": {
+            "description": "Redis cache statistics",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "object" } } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/locations/types": {
+      "get": {
+        "tags": ["Locations"],
+        "summary": "List available location types",
+        "operationId": "getLocationTypes",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": {
+          "200": {
+            "description": "Array of location type strings",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } } } } }
+          }
+        }
+      }
+    },
+    "/api/v1/locations/systems": {
+      "get": {
+        "tags": ["Locations"],
+        "summary": "List star systems that contain locations",
+        "operationId": "getLocationSystems",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": {
+          "200": {
+            "description": "Array of system name strings",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } } } } }
+          }
+        }
+      }
+    },
+    "/api/v1/locations/all": {
+      "get": {
+        "tags": ["Locations"],
+        "summary": "All locations (unpaginated)",
+        "operationId": "getAllLocations",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": {
+          "200": {
+            "description": "Full list of locations",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "count": { "type": "integer" }, "data": { "type": "array", "items": { "type": "object" } } } } } }
+          }
+        }
+      }
+    },
+    "/api/v1/missions/types": {
+      "get": {
+        "tags": ["Missions"],
+        "summary": "List mission types",
+        "operationId": "getMissionTypes",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Array of type strings", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } } } } } }
+        }
+      }
+    },
+    "/api/v1/missions/factions": {
+      "get": {
+        "tags": ["Missions"],
+        "summary": "List mission factions",
+        "operationId": "getMissionFactions",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Array of faction strings", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } } } } } }
+        }
+      }
+    },
+    "/api/v1/missions/systems": {
+      "get": {
+        "tags": ["Missions"],
+        "summary": "List star systems that have missions",
+        "operationId": "getMissionSystems",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Array of system name strings", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } } } } } }
+        }
+      }
+    },
+    "/api/v1/missions/categories": {
+      "get": {
+        "tags": ["Missions"],
+        "summary": "List mission categories",
+        "operationId": "getMissionCategories",
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": { "200": { "description": "Array of category strings", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } } } } } }
+        }
+      }
+    },
+    "/api/v1/ship-matrix/stats": {
+      "get": {
+        "tags": ["Ship Matrix"],
+        "summary": "Ship Matrix statistics (counts by status, size, etc.)",
+        "operationId": "getShipMatrixStats",
+        "responses": {
+          "200": {
+            "description": "Ship Matrix aggregate statistics",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "object" } } } } }
+          }
+        }
+      }
+    },
+    "/api/v1/ship-matrix/{id}": {
+      "get": {
+        "tags": ["Ship Matrix"],
+        "summary": "Get a single Ship Matrix entry by numeric ID or ship name",
+        "operationId": "getShipMatrixById",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Numeric ID or ship name" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ship Matrix entry",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "object" } } } } }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+    "/api/v1/loadout/calculate": {
+      "post": {
+        "tags": ["Ships"],
+        "summary": "Calculate loadout with component swaps",
+        "operationId": "calculateLoadout",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["shipUuid"],
+                "properties": {
+                  "shipUuid": { "type": "string", "format": "uuid" },
+                  "swaps": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "hardpointName": { "type": "string" },
+                        "newComponentUuid": { "type": "string", "format": "uuid" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Calculated loadout with stats",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "object" } } } } }
+          }
+        }
+      }
+    },
+    "/api/v1/chat": {
+      "post": {
+        "tags": ["Chat"],
+        "summary": "Chat with the Starvis AI assistant (SSE streaming)",
+        "operationId": "chat",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["messages"],
+                "properties": {
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["role", "content"],
+                      "properties": {
+                        "role": { "type": "string", "enum": ["user", "assistant"] },
+                        "content": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Server-Sent Events stream. Each event is JSON: `{type:\"chunk\",text}`, `{type:\"done\"}`, or `{type:\"error\",message}`",
+            "content": { "text/event-stream": { "schema": { "type": "string" } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/chat/ask": {
+      "post": {
+        "tags": ["Chat"],
+        "summary": "Ask the Starvis AI assistant (synchronous JSON response)",
+        "operationId": "chatAsk",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["messages"],
+                "properties": {
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["role", "content"],
+                      "properties": {
+                        "role": { "type": "string", "enum": ["user", "assistant"] },
+                        "content": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI reply",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "reply": { "type": "string" } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register a new user account",
+        "operationId": "register",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "username", "password"],
+                "properties": {
+                  "email": { "type": "string", "format": "email" },
+                  "username": { "type": "string", "minLength": 3, "maxLength": 50, "pattern": "^[a-zA-Z0-9_-]+$" },
+                  "password": { "type": "string", "minLength": 8, "description": "Must contain uppercase, lowercase, digit and special character" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "token": { "type": "string" }, "user": { "type": "object" } } } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "409": { "description": "Email or username already taken" }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Log in and receive a JWT",
+        "operationId": "login",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["emailOrUsername", "password"],
+                "properties": {
+                  "emailOrUsername": { "type": "string", "description": "Email address or username" },
+                  "password": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "token": { "type": "string" }, "user": { "type": "object" } } } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/auth/me": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Get current user profile",
+        "operationId": "getMe",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Current user",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "user": { "type": "object" } } } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "put": {
+        "tags": ["Auth"],
+        "summary": "Update current user profile",
+        "operationId": "updateMe",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": { "type": "string", "minLength": 3, "maxLength": 50 },
+                  "avatarUrl": { "type": "string", "format": "uri" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated user",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "user": { "type": "object" } } } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/auth/api-token": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Generate a long-lived API token (1 year)",
+        "operationId": "generateApiToken",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Generated token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "token": { "type": "string" },
+                    "expiresIn": { "type": "string", "example": "1y" },
+                    "note": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/admin/stats": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Admin statistics (ship matrix + game data counts)",
+        "operationId": "adminStats",
+        "security": [{ "bearerAuth": [] }, { "apiKey": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/env" }],
+        "responses": {
+          "200": {
+            "description": "Admin stats",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "object" } } } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/admin/extraction-log": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Latest extraction log",
+        "operationId": "adminExtractionLog",
+        "security": [{ "bearerAuth": [] }, { "apiKey": [] }],
+        "responses": {
+          "200": {
+            "description": "Extraction log",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "object" } } } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "List all users (admin only)",
+        "operationId": "adminListUsers",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "User list",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "object" } } } } } }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/admin/users/{id}/role": {
+      "put": {
+        "tags": ["Admin"],
+        "summary": "Update a user's role (admin only)",
+        "operationId": "adminSetUserRole",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "description": "User ID" }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["role"],
+                "properties": { "role": { "type": "string", "enum": ["user", "admin"] } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated user",
+            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "user": { "type": "object" } } } } }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
       }
     }
   }
