@@ -76,6 +76,7 @@ const ITEM_PATH_PATTERNS: Array<{ regex: RegExp; type: string; subType?: string 
   { regex: /scitem\/characters\/.*\/clothing\//i, type: 'Clothing' },
   // Tools & gadgets from carryables
   { regex: /scitem\/carryables\/1h\/(?:.*tool|.*multitool)/i, type: 'Tool' },
+  { regex: /scitem\/carryables\/1h\/.*module/i, type: 'Tool', subType: 'Module' },
   { regex: /scitem\/carryables\/1h\//i, type: 'Gadget', subType: 'Handheld' },
   { regex: /scitem\/carryables\/2h\//i, type: 'Gadget', subType: 'Two-handed' },
   // Consumables
@@ -96,6 +97,8 @@ function classifyItem(filePath: string): { type: string; subType: string | null 
 /** Commodity path patterns */
 const COMMODITY_PATHS: Array<{ regex: RegExp; type: string }> = [
   { regex: /commodities\/food\//i, type: 'Food' },
+  { regex: /commodities\/drink[s]?\//i, type: 'Drink' },
+  { regex: /commodities\/beverage[s]?\//i, type: 'Drink' },
   { regex: /commodities\/minerals?\//i, type: 'Mineral' },
   { regex: /commodities\/metals?\//i, type: 'Metal' },
   { regex: /commodities\/gas\//i, type: 'Gas' },
@@ -113,6 +116,8 @@ const COMMODITY_PATHS: Array<{ regex: RegExp; type: string }> = [
   { regex: /commodities\/mixedmining\//i, type: 'Mixed Mining' },
   { regex: /commodities\/non_metals?\//i, type: 'Nonmetal' },
   { regex: /commodities\/waste\//i, type: 'Waste' },
+  { regex: /commodities\/refined\//i, type: 'Refined' },
+  { regex: /commodities\/raw\//i, type: 'Raw' },
 ];
 
 /** Check if path is a commodity */
