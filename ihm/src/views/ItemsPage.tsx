@@ -71,21 +71,7 @@ const TYPE_COLOR: Record<string, string> = {
 	Magazine:       "bg-amber-500",
 };
 
-const TYPE_LABEL: Record<string, string> = {
-	FPS_Weapon:     "Weapon",
-	Armor_Torso:    "Core",
-	Armor_Arms:     "Arms",
-	Armor_Legs:     "Legs",
-	Armor_Helmet:   "Helmet",
-	Armor_Backpack: "Back",
-	Undersuit:      "Undersuit",
-	Clothing:       "Clothing",
-	Gadget:         "Other",
-	Tool:           "Tool",
-	Consumable:     "Consumable",
-	Attachment:     "Attachment",
-	Magazine:       "Magazine",
-};
+
 
 /** Sub-type filter options per slug */
 const SLUG_SUBTYPES: Record<string, { label: string; value: string }[]> = {
