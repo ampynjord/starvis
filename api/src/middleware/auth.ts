@@ -33,8 +33,14 @@ function extractBearer(req: Request): string | null {
 /**
  * requireJwt — vérifie le Bearer JWT, injecte req.jwtPayload.
  * Accepte n'importe quel rôle (user, admin).
+ * En mode inspection, permet l'accès sans authentification.
  */
 export function requireJwt(req: Request, res: Response, next: NextFunction) {
+  // Mode inspection: permet l'accès public pour les professeurs
+  if (process.env.INSPECTION_MODE === 'true') {
+    return next();
+  }
+
   if (!process.env.JWT_SECRET) return next(); // JWT désactivé → pas de blocage
 
   const token = extractBearer(req);
@@ -53,8 +59,14 @@ export function requireJwt(req: Request, res: Response, next: NextFunction) {
 /**
  * requireJwtAdmin — vérifie le Bearer JWT ET que role === 'admin'.
  * Accepte aussi l'ADMIN_API_KEY (X-Api-Key) pour la compatibilité serveur-to-serveur.
+ * En mode inspection, permet l'accès sans authentification.
  */
 export function requireJwtAdmin(req: Request, res: Response, next: NextFunction) {
+  // Mode inspection: permet l'accès public pour les professeurs
+  if (process.env.INSPECTION_MODE === 'true') {
+    return next();
+  }
+
   // 1. Toujours accepter la clé admin (backward compat, scripts serveur)
   const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
   if (ADMIN_API_KEY) {
