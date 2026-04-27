@@ -20,7 +20,11 @@ export async function POST() {
 
     const text = await upstream.text();
     let data: any = {};
-    try { data = JSON.parse(text); } catch { /* empty */ }
+    try {
+      data = JSON.parse(text);
+    } catch {
+      /* empty */
+    }
 
     if (!upstream.ok) {
       return NextResponse.json({ error: data.error ?? 'Failed' }, { status: upstream.status });

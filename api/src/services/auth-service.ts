@@ -1,6 +1,6 @@
+import type { PrismaLike } from '@starvis/db';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import type { PrismaLike } from '@starvis/db';
 
 export interface JwtPayload {
   sub: number;
@@ -30,7 +30,15 @@ function getSecret(): string {
   return s;
 }
 
-function toPublicUser(u: { id: number; uuid: string; email: string; username: string; role: string; avatarUrl: string | null; createdAt: Date }): PublicUser {
+function toPublicUser(u: {
+  id: number;
+  uuid: string;
+  email: string;
+  username: string;
+  role: string;
+  avatarUrl: string | null;
+  createdAt: Date;
+}): PublicUser {
   return { id: u.id, uuid: u.uuid, email: u.email, username: u.username, role: u.role, avatarUrl: u.avatarUrl, createdAt: u.createdAt };
 }
 

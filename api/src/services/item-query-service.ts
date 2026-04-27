@@ -131,7 +131,9 @@ export class ItemQueryService {
   async getItemByUuid(uuid: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT i.*, m.name as manufacturer_name FROM game.items i LEFT JOIN game.manufacturers m ON i.manufacturer_code = m.code WHERE i.uuid = ? AND i.env = ?`),
+      toPostgres(
+        `SELECT i.*, m.name as manufacturer_name FROM game.items i LEFT JOIN game.manufacturers m ON i.manufacturer_code = m.code WHERE i.uuid = ? AND i.env = ?`,
+      ),
       uuid,
       env,
     );
@@ -141,7 +143,9 @@ export class ItemQueryService {
   async getItemByClassName(className: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT i.*, m.name as manufacturer_name FROM game.items i LEFT JOIN game.manufacturers m ON i.manufacturer_code = m.code WHERE i.class_name = ? AND i.env = ?`),
+      toPostgres(
+        `SELECT i.*, m.name as manufacturer_name FROM game.items i LEFT JOIN game.manufacturers m ON i.manufacturer_code = m.code WHERE i.class_name = ? AND i.env = ?`,
+      ),
       className,
       env,
     );
@@ -156,11 +160,15 @@ export class ItemQueryService {
     const prisma = this.getClient(env);
     const [typeRows, subTypeRows, mfrRows] = await Promise.all([
       prisma.$queryRawUnsafe<Row[]>(
-        toPostgres(`SELECT type as value, COUNT(*) as count FROM game.items WHERE env = ? AND type IS NOT NULL GROUP BY type ORDER BY type`),
+        toPostgres(
+          `SELECT type as value, COUNT(*) as count FROM game.items WHERE env = ? AND type IS NOT NULL GROUP BY type ORDER BY type`,
+        ),
         env,
       ),
       prisma.$queryRawUnsafe<Row[]>(
-        toPostgres(`SELECT sub_type as value, COUNT(*) as count FROM game.items WHERE env = ? AND sub_type IS NOT NULL AND sub_type != '' GROUP BY sub_type ORDER BY sub_type`),
+        toPostgres(
+          `SELECT sub_type as value, COUNT(*) as count FROM game.items WHERE env = ? AND sub_type IS NOT NULL AND sub_type != '' GROUP BY sub_type ORDER BY sub_type`,
+        ),
         env,
       ),
       prisma.$queryRawUnsafe<Row[]>(

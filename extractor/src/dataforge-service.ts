@@ -1481,8 +1481,8 @@ export class DataForgeService implements DataForgeContext {
         cType.includes('Tank') ||
         cType.includes('Sprint') ||
         // Fallback: any controller-like component with a direct topSpeed/maxSpeed field
-        (lp.includes('wheel') || lp.includes('drive') || lp.includes('movement')) &&
-          (typeof comp.topSpeed === 'number' || typeof comp.maxSpeed === 'number' || typeof comp.maxLinearVelocity === 'number')
+        ((lp.includes('wheel') || lp.includes('drive') || lp.includes('movement')) &&
+          (typeof comp.topSpeed === 'number' || typeof comp.maxSpeed === 'number' || typeof comp.maxLinearVelocity === 'number'))
       ) {
         const topSpeed =
           comp.topSpeed ??

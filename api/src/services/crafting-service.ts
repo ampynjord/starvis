@@ -61,7 +61,9 @@ export class CraftingService {
   async getStationTypes(env = 'live'): Promise<string[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT DISTINCT station_type FROM game.crafting_recipes WHERE env = ? AND station_type IS NOT NULL AND station_type != '' ORDER BY station_type`),
+      toPostgres(
+        `SELECT DISTINCT station_type FROM game.crafting_recipes WHERE env = ? AND station_type IS NOT NULL AND station_type != '' ORDER BY station_type`,
+      ),
       env,
     );
     return rows.map((r) => String(r.station_type));
@@ -105,7 +107,9 @@ export class CraftingService {
     const whereClause = where.join(' AND ');
 
     const [countRow] = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT COUNT(*) as total FROM game.crafting_recipes r LEFT JOIN game.items oi ON oi.uuid = r.output_item_uuid AND oi.env = r.env WHERE ${whereClause}`),
+      toPostgres(
+        `SELECT COUNT(*) as total FROM game.crafting_recipes r LEFT JOIN game.items oi ON oi.uuid = r.output_item_uuid AND oi.env = r.env WHERE ${whereClause}`,
+      ),
       ...params,
     );
     const total = Number(countRow?.total ?? 0);

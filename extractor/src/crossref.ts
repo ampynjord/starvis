@@ -80,22 +80,24 @@ export const SM_TO_P4K_ALIASES: Record<string, string> = {
 };
 
 function normalizeForMatch(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/['\u2019\u2018]/g, "'")
-    .replace(/-/g, ' ')
-    .replace(/\./g, '')
-    .replace(/\//g, '')
-    // Unify "Mk IV/III/II/I" and "Mk4/3/2/1" so Ship Matrix ↔ P4K always match
-    .replace(/\bmk\s*iv\b/g, 'mk 4')
-    .replace(/\bmk\s*iii\b/g, 'mk 3')
-    .replace(/\bmk\s*ii\b/g, 'mk 2')
-    .replace(/\bmk\s*i\b/g, 'mk 1')
-    .replace(/\bmk\s*(\d)\b/g, 'mk $1')
-    .replace(/\s+/g, ' ');
+  return (
+    name
+      .toLowerCase()
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/['\u2019\u2018]/g, "'")
+      .replace(/-/g, ' ')
+      .replace(/\./g, '')
+      .replace(/\//g, '')
+      // Unify "Mk IV/III/II/I" and "Mk4/3/2/1" so Ship Matrix ↔ P4K always match
+      .replace(/\bmk\s*iv\b/g, 'mk 4')
+      .replace(/\bmk\s*iii\b/g, 'mk 3')
+      .replace(/\bmk\s*ii\b/g, 'mk 2')
+      .replace(/\bmk\s*i\b/g, 'mk 1')
+      .replace(/\bmk\s*(\d)\b/g, 'mk $1')
+      .replace(/\s+/g, ' ')
+  );
 }
 
 /**
@@ -260,7 +262,9 @@ export async function tagVariantTypes(conn: PoolClient, env: GameEnv): Promise<v
     );
   }
 
-  await conn.query("UPDATE game.ships SET variant_type = 'special' WHERE ship_matrix_id IS NULL AND variant_type IS NULL AND env = $1", [env]);
+  await conn.query("UPDATE game.ships SET variant_type = 'special' WHERE ship_matrix_id IS NULL AND variant_type IS NULL AND env = $1", [
+    env,
+  ]);
 }
 
 /**
@@ -283,10 +287,10 @@ export async function tagVariantTypes(conn: PoolClient, env: GameEnv): Promise<v
 export async function pruneExcludedVariants(conn: PoolClient, env: GameEnv): Promise<number> {
   const EXCLUDED = ['bis_edition', 'event', 'military', 'tutorial', 'special', 'arena_ai', 'npc'];
   const placeholders = EXCLUDED.map((_, i) => `$${i + 1}`).join(', ');
-  const result = await conn.query<any>(
-    `DELETE FROM game.ships WHERE variant_type IN (${placeholders}) AND env = $${EXCLUDED.length + 1}`,
-    [...EXCLUDED, env],
-  );
+  const result = await conn.query<any>(`DELETE FROM game.ships WHERE variant_type IN (${placeholders}) AND env = $${EXCLUDED.length + 1}`, [
+    ...EXCLUDED,
+    env,
+  ]);
   const count = result.rowCount ?? 0;
   if (count > 0) logger.info(`Pruned ${count} ships with excluded variant types (bis, event, military, tutorial, special, arena, npc)`);
   return count;

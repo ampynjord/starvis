@@ -5,13 +5,7 @@ import { NextResponse } from 'next/server';
 const PUBLIC_PATHS = ['/login', '/register'];
 
 // Préfixes toujours accessibles (assets Next.js, route handlers API interne)
-const PUBLIC_PREFIXES = [
-  '/api/',
-  '/_next/',
-  '/favicon',
-  '/robots',
-  '/sitemap',
-];
+const PUBLIC_PREFIXES = ['/api/', '/_next/', '/favicon', '/robots', '/sitemap'];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

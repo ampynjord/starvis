@@ -334,7 +334,9 @@ export class ShipQueryService {
     if (uuid.startsWith('concept-')) {
       const smId = uuid.replace('concept-', '');
       const rows = await prisma.$queryRawUnsafe<Row[]>(
-        toPostgres(`SELECT ${CONCEPT_SELECT}, TRUE as is_concept_only FROM rsi.ship_matrix sm2 WHERE sm2.id = ? AND sm2.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)`),
+        toPostgres(
+          `SELECT ${CONCEPT_SELECT}, TRUE as is_concept_only FROM rsi.ship_matrix sm2 WHERE sm2.id = ? AND sm2.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)`,
+        ),
         smId,
         env,
       );
@@ -383,19 +385,27 @@ export class ShipQueryService {
         env,
       ),
       prisma.$queryRawUnsafe<Row[]>(
-        toPostgres(`SELECT DISTINCT role as value FROM game.ships WHERE env = ? AND role IS NOT NULL AND role != '' ${catWhereNoAlias} ORDER BY role`),
+        toPostgres(
+          `SELECT DISTINCT role as value FROM game.ships WHERE env = ? AND role IS NOT NULL AND role != '' ${catWhereNoAlias} ORDER BY role`,
+        ),
         env,
       ),
       prisma.$queryRawUnsafe<Row[]>(
-        toPostgres(`SELECT DISTINCT career as value FROM game.ships WHERE env = ? AND career IS NOT NULL AND career != '' ${catWhereNoAlias} ORDER BY career`),
+        toPostgres(
+          `SELECT DISTINCT career as value FROM game.ships WHERE env = ? AND career IS NOT NULL AND career != '' ${catWhereNoAlias} ORDER BY career`,
+        ),
         env,
       ),
       prisma.$queryRawUnsafe<Row[]>(
-        toPostgres(`SELECT DISTINCT variant_type as value FROM game.ships WHERE env = ? AND variant_type IS NOT NULL AND variant_type != '' AND variant_type != 'npc' ${catWhereNoAlias} ORDER BY variant_type`),
+        toPostgres(
+          `SELECT DISTINCT variant_type as value FROM game.ships WHERE env = ? AND variant_type IS NOT NULL AND variant_type != '' AND variant_type != 'npc' ${catWhereNoAlias} ORDER BY variant_type`,
+        ),
         env,
       ),
       prisma.$queryRawUnsafe<Row[]>(
-        toPostgres("SELECT COALESCE(vehicle_category, 'ship') as value, COUNT(*) as count FROM game.ships WHERE env = ? GROUP BY vehicle_category ORDER BY value"),
+        toPostgres(
+          "SELECT COALESCE(vehicle_category, 'ship') as value, COUNT(*) as count FROM game.ships WHERE env = ? GROUP BY vehicle_category ORDER BY value",
+        ),
         env,
       ),
     ]);

@@ -160,7 +160,9 @@ export class GameDataService {
     const limit = Math.min(100, parseInt(params.limit || '50', 10));
     const offset = parseInt(params.offset || '0', 10);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT c.*, e.game_version, e.extracted_at as extraction_date FROM meta.changelog c LEFT JOIN meta.extraction_log e ON c.extraction_id = e.id${w} ORDER BY c.created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`),
+      toPostgres(
+        `SELECT c.*, e.game_version, e.extracted_at as extraction_date FROM meta.changelog c LEFT JOIN meta.extraction_log e ON c.extraction_id = e.id${w} ORDER BY c.created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
+      ),
       ...p,
     );
     return { data: rows, total };
@@ -185,7 +187,14 @@ export class GameDataService {
         (SELECT COUNT(*) FROM game.shops WHERE env = ?) as shops,
         (SELECT COUNT(*) FROM game.ships WHERE env = ? AND ship_matrix_id IS NOT NULL) as shipsLinkedToMatrix
     `),
-      env, env, env, env, env, env, env, env,
+      env,
+      env,
+      env,
+      env,
+      env,
+      env,
+      env,
+      env,
     );
     const latest = await this.getLatestExtraction(env);
     const raw = rows[0];
@@ -241,7 +250,16 @@ export class GameDataService {
         (SELECT COUNT(DISTINCT type) FROM game.components WHERE env = ?) as component_types,
         (SELECT COUNT(DISTINCT type) FROM game.items WHERE env = ?) as item_types
     `),
-      env, env, env, env, env, env, env, env, env, env,
+      env,
+      env,
+      env,
+      env,
+      env,
+      env,
+      env,
+      env,
+      env,
+      env,
     );
     const latest = await this.getLatestExtraction(env);
     const raw = rows[0];

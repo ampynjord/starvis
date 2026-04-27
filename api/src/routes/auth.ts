@@ -29,7 +29,9 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     }
     const strongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{8,}$/;
     if (typeof password !== 'string' || !strongPassword.test(password)) {
-      return void res.status(400).json({ success: false, error: 'Password must be 8+ chars with uppercase, lowercase, digit and special character' });
+      return void res
+        .status(400)
+        .json({ success: false, error: 'Password must be 8+ chars with uppercase, lowercase, digit and special character' });
     }
     if (typeof username !== 'string' || username.length < 3 || username.length > 50 || !/^[a-zA-Z0-9_-]+$/.test(username)) {
       return void res.status(400).json({ success: false, error: 'Username must be 3-50 chars, letters/numbers/_ only' });

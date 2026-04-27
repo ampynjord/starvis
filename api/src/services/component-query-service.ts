@@ -100,7 +100,9 @@ export class ComponentQueryService {
   async getComponentByUuid(uuid: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres('SELECT c.*, m.name as manufacturer_name FROM game.components c LEFT JOIN game.manufacturers m ON c.manufacturer_code = m.code WHERE c.uuid = ? AND c.env = ?'),
+      toPostgres(
+        'SELECT c.*, m.name as manufacturer_name FROM game.components c LEFT JOIN game.manufacturers m ON c.manufacturer_code = m.code WHERE c.uuid = ? AND c.env = ?',
+      ),
       uuid,
       env,
     );
@@ -110,7 +112,9 @@ export class ComponentQueryService {
   async getComponentByClassName(className: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres('SELECT c.*, m.name as manufacturer_name FROM game.components c LEFT JOIN game.manufacturers m ON c.manufacturer_code = m.code WHERE c.class_name = ? AND c.env = ?'),
+      toPostgres(
+        'SELECT c.*, m.name as manufacturer_name FROM game.components c LEFT JOIN game.manufacturers m ON c.manufacturer_code = m.code WHERE c.class_name = ? AND c.env = ?',
+      ),
       className,
       env,
     );
@@ -125,11 +129,15 @@ export class ComponentQueryService {
     const prisma = this.getClient(env);
     const [typeRows, subTypeRows, sizeRows, gradeRows, mfrRows] = await Promise.all([
       prisma.$queryRawUnsafe<Row[]>(
-        toPostgres("SELECT type as value, COUNT(*) as count FROM game.components WHERE env = ? AND type IS NOT NULL AND type != '' GROUP BY type ORDER BY type"),
+        toPostgres(
+          "SELECT type as value, COUNT(*) as count FROM game.components WHERE env = ? AND type IS NOT NULL AND type != '' GROUP BY type ORDER BY type",
+        ),
         env,
       ),
       prisma.$queryRawUnsafe<Row[]>(
-        toPostgres("SELECT sub_type as value, COUNT(*) as count FROM game.components WHERE env = ? AND sub_type IS NOT NULL AND sub_type != '' GROUP BY sub_type ORDER BY sub_type"),
+        toPostgres(
+          "SELECT sub_type as value, COUNT(*) as count FROM game.components WHERE env = ? AND sub_type IS NOT NULL AND sub_type != '' GROUP BY sub_type ORDER BY sub_type",
+        ),
         env,
       ),
       prisma.$queryRawUnsafe<Row[]>(
@@ -137,11 +145,15 @@ export class ComponentQueryService {
         env,
       ),
       prisma.$queryRawUnsafe<Row[]>(
-        toPostgres("SELECT DISTINCT grade as value FROM game.components WHERE env = ? AND grade IS NOT NULL AND grade != '' ORDER BY grade"),
+        toPostgres(
+          "SELECT DISTINCT grade as value FROM game.components WHERE env = ? AND grade IS NOT NULL AND grade != '' ORDER BY grade",
+        ),
         env,
       ),
       prisma.$queryRawUnsafe<Row[]>(
-        toPostgres("SELECT c.manufacturer_code as value, COALESCE(m.name, c.manufacturer_code) as label, COUNT(c.uuid) as count FROM game.components c LEFT JOIN game.manufacturers m ON m.code = c.manufacturer_code WHERE c.env = ? AND c.manufacturer_code IS NOT NULL AND c.manufacturer_code != '' GROUP BY c.manufacturer_code, m.name ORDER BY label"),
+        toPostgres(
+          "SELECT c.manufacturer_code as value, COALESCE(m.name, c.manufacturer_code) as label, COUNT(c.uuid) as count FROM game.components c LEFT JOIN game.manufacturers m ON m.code = c.manufacturer_code WHERE c.env = ? AND c.manufacturer_code IS NOT NULL AND c.manufacturer_code != '' GROUP BY c.manufacturer_code, m.name ORDER BY label",
+        ),
         env,
       ),
     ]);
