@@ -14,7 +14,8 @@ export function middleware(req: NextRequest) {
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
   // Mode inspection: permet l'accès public sans authentification pour les professeurs
-  const inspectionMode = process.env.NEXT_PUBLIC_INSPECTION_MODE === 'true';
+  const inspectionMode =
+    process.env.NEXT_PUBLIC_INSPECTION_MODE === 'true' || process.env.INSPECTION_MODE === 'true';
   if (inspectionMode) return NextResponse.next();
 
   // Vérification de présence du cookie uniquement (la signature JWT est validée
