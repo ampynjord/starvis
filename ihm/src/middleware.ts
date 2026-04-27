@@ -13,6 +13,10 @@ export function middleware(req: NextRequest) {
   if (PUBLIC_PATHS.includes(pathname)) return NextResponse.next();
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
+  // Mode inspection: permet l'accès public sans authentification pour les professeurs
+  const inspectionMode = process.env.NEXT_PUBLIC_INSPECTION_MODE === 'true';
+  if (inspectionMode) return NextResponse.next();
+
   // Vérification de présence du cookie uniquement (la signature JWT est validée
   // côté API sur chaque appel authentifié — le middleware gère uniquement la redirection UX)
   const token = req.cookies.get('starvis_token')?.value;
