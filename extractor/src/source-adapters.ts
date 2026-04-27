@@ -174,48 +174,6 @@ function count(data: ExternalCanonicalData): number {
 }
 
 export async function loadExternalCanonicalData(): Promise<ExternalCanonicalData> {
-  const communityPath = process.env.STARVIS_COMMUNITY_CANONICAL_JSON?.trim();
-  const communityUrl = process.env.STARVIS_COMMUNITY_CANONICAL_URL?.trim();
-
-  if (!communityPath && !communityUrl) return EMPTY_DATA;
-
-  const result: ExternalCanonicalData = {
-    items: new Map(),
-    commodities: new Map(),
-    components: new Map(),
-    shops: new Map(),
-  };
-
-  const sources = [{ name: 'community', path: communityPath, url: communityUrl }];
-
-  for (const source of sources) {
-    let payload: SourcePayload | null = null;
-
-    if (source.path) payload = readPayload(source.path);
-
-    if (!payload && source.url) {
-      payload = await fetchPayload(source.url, {});
-    }
-
-    if (!payload) continue;
-
-    const mapped = mapPayload(payload);
-
-    mergeMaps(result.items, mapped.items);
-    mergeMaps(result.commodities, mapped.commodities);
-    mergeMaps(result.components, mapped.components);
-    mergeMaps(result.shops, mapped.shops);
-
-    logger.info(
-      `Loaded external source ${source.name}: ${count(mapped)} overrides (items=${mapped.items.size}, commodities=${mapped.commodities.size}, components=${mapped.components.size}, shops=${mapped.shops.size})`,
-    );
-  }
-
-  if (count(result) > 0) {
-    logger.info(
-      `Merged external overrides: items=${result.items.size}, commodities=${result.commodities.size}, components=${result.components.size}, shops=${result.shops.size}`,
-    );
-  }
-
-  return result;
+  logger.info('External canonical overrides are disabled: only P4K and RSI sources are used.');
+  return EMPTY_DATA;
 }

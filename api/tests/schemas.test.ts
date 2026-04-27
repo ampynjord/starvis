@@ -50,8 +50,8 @@ describe('qEnv', () => {
     expect(qEnv.parse('ptu')).toBe('ptu');
   });
 
-  it('accepts eptu', () => {
-    expect(qEnv.parse('eptu')).toBe('eptu');
+  it('accepts custom', () => {
+    expect(qEnv.parse('custom')).toBe('custom');
   });
 
   it('accepts live', () => {

@@ -10,8 +10,8 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME:-starvis}-postgres
     environment:
       POSTGRES_DB: ${DB_NAME:-starvis}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USER:-starvis_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-starvis_pass}
     # Port exposé en loopback uniquement — pour extractions locales via tunnel SSH
     ports:
       - "127.0.0.1:${DB_EXTERNAL_PORT:-5432}:5432"
@@ -53,18 +53,18 @@ services:
     environment:
       NODE_ENV: production
       PORT: ${API_INTERNAL_PORT:-3000}
-      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-starvis}
+      DATABASE_URL: postgresql://${DB_USER:-starvis_user}:${DB_PASSWORD:-starvis_pass}@postgres:5432/${DB_NAME:-starvis}
       REDIS_HOST: redis
-      REDIS_PORT: 6379
+      REDIS_PORT: ${REDIS_INTERNAL_PORT:-6379}
       INSPECTION_MODE: ${INSPECTION_MODE:-false}
-      ADMIN_API_KEY: ${ADMIN_API_KEY}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       CORS_ORIGIN: ${CORS_ORIGIN:-https://${DOMAIN}}
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-200}
       RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-30}
       CTM_CACHE_DIR: /app/ctm-cache
-      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
-      JWT_SECRET: ${JWT_SECRET}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-}
     restart: unless-stopped
     deploy:
       resources:
@@ -103,8 +103,8 @@ services:
     image: ${IHM_IMAGE:-ghcr.io/ampynjord/starvis-ihm:latest}
     container_name: ${COMPOSE_PROJECT_NAME:-starvis}-ihm
     environment:
-      API_URL: http://${COMPOSE_PROJECT_NAME:-starvis}-api:${API_INTERNAL_PORT:-3000}
-      JWT_SECRET: ${JWT_SECRET}
+      API_URL: http://${API_HOST:-api}:${API_INTERNAL_PORT:-3000}
+      JWT_SECRET: ${JWT_SECRET:-}
       NEXT_PUBLIC_INSPECTION_MODE: ${INSPECTION_MODE:-false}
     restart: unless-stopped
     deploy:
@@ -134,11 +134,11 @@ services:
     image: ${BOT_IMAGE:-ghcr.io/ampynjord/starvis-bot:latest}
     container_name: ${COMPOSE_PROJECT_NAME:-starvis}-bot
     environment:
-      DISCORD_TOKEN: ${DISCORD_TOKEN}
-      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      DISCORD_TOKEN: ${DISCORD_TOKEN:-}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
       DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
-      API_URL: http://${COMPOSE_PROJECT_NAME:-starvis}-api:${API_INTERNAL_PORT:-3000}
-      SITE_URL: https://${DOMAIN}
+      API_URL: http://${API_HOST:-api}:${API_INTERNAL_PORT:-3000}
+      SITE_URL: ${SITE_URL:-https://${DOMAIN}}
       API_TOKEN: ${API_TOKEN:-}
     restart: unless-stopped
     deploy:
