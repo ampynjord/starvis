@@ -1,7 +1,7 @@
 ﻿import { useQuery } from '@tanstack/react-query';
 import {
   ChevronDown, ChevronRight, Clock, FlaskConical,
-  Minus, Package, Plus, Search, Settings2, Swords, Trophy,
+  Minus, Package, Plus, Search, Settings2, SlidersHorizontal, Swords, Trophy,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -227,6 +227,7 @@ export default function CraftingPage() {
   const [batchCount, setBatchCount] = useState(1);
   const [qualityMap, setQualityMap] = useState<Record<number, number>>({});
   const [missionPage, setMissionPage] = useState(1);
+  const [craftingSidebarOpen, setCraftingSidebarOpen] = useState(false);
 
   const debouncedSearch = useDebounce(search, 350);
   const setIngredientQuality = useCallback((id: number, v: number) => setQualityMap((p) => ({ ...p, [id]: v })), []);
@@ -426,7 +427,14 @@ export default function CraftingPage() {
     <div className="flex h-[calc(100vh-64px)]">
 
       {/* === LEFT SIDEBAR === */}
-      <div className="w-52 xl:w-60 shrink-0 border-r border-slate-800/60 flex flex-col bg-slate-950/50">
+      <div className={[
+        'shrink-0 border-r border-slate-800/60 flex flex-col bg-slate-950/50',
+        'w-52 xl:w-60',
+        // Mobile: fixed overlay drawer
+        'fixed inset-y-0 left-0 z-30 md:relative',
+        craftingSidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0',
+        'transition-transform duration-300 ease-in-out',
+      ].join(' ')}>
 
         {/* tabs */}
         <div className="flex border-b border-slate-800/60">
@@ -514,8 +522,24 @@ export default function CraftingPage() {
         </div>
       </div>
 
+      {/* Overlay mobile */}
+      {craftingSidebarOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-black/60 md:hidden"
+          onClick={() => setCraftingSidebarOpen(false)}
+        />
+      )}
+
       {/* === MAIN PANEL === */}
       <div className="flex-1 overflow-y-auto">
+        {/* Mobile toggle */}
+        <button
+          onClick={() => setCraftingSidebarOpen(true)}
+          className="md:hidden flex items-center gap-2 m-3 px-3 py-1.5 rounded-sm text-xs font-mono-sc uppercase tracking-wider border border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors"
+        >
+          <SlidersHorizontal size={13} />
+          {tab.charAt(0).toUpperCase() + tab.slice(1)}
+        </button>
 
         {/* --- BLUEPRINT detail --- */}
         {tab === 'blueprint' && selectedRecipe && (
