@@ -729,18 +729,19 @@
         "tags": ["Ships"],
         "summary": "Get ship by UUID or class_name",
         "operationId": "getShipByUuid",
+        "description": "Returns detailed ship information with optional related data. Use `include` parameter to fetch manufacturer details, paints, similar ships, and RSI Ship Matrix entry.",
         "parameters": [
           { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Ship UUID or class_name" },
           {
             "name": "include",
             "in": "query",
             "schema": { "type": "string" },
-            "description": "Comma-separated relations: manufacturer, paints, similar, matrix"
+            "description": "Comma-separated relations: manufacturer, paints, similar, matrix. Similar ships have same career/role; matrix includes official RSI specs."
           }
         ],
         "responses": {
           "200": {
-            "description": "Ship details",
+            "description": "Ship details with optional relations",
             "content": {
               "application/json": {
                 "schema": {
@@ -819,126 +820,6 @@
         }
       }
     },
-    "/api/v1/ships/{uuid}/stats": {
-      "get": {
-        "tags": ["Ships"],
-        "summary": "Get aggregated ship stats",
-        "operationId": "getShipStats",
-        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": {
-          "200": { "description": "Aggregated weapon DPS, shield HP, power draw, cooling" },
-          "404": { "$ref": "#/components/responses/NotFound" }
-        }
-      }
-    },
-    "/api/v1/ships/{uuid}/hardpoints": {
-      "get": {
-        "tags": ["Ships"],
-        "summary": "Get ship hardpoints",
-        "operationId": "getShipHardpoints",
-        "parameters": [{ "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } }],
-        "responses": {
-          "200": { "description": "Hardpoint/port list (type, size, equipped component)" },
-          "404": { "$ref": "#/components/responses/NotFound" }
-        }
-      }
-    },
-    "/api/v1/ships/{uuid}/similar": {
-      "get": {
-        "tags": ["Ships"],
-        "summary": "Get similar ships",
-        "operationId": "getSimilarShips",
-        "parameters": [
-          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
-          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 5, "maximum": 10 } }
-        ],
-        "responses": { "200": { "description": "Ships with same role/career" }, "404": { "$ref": "#/components/responses/NotFound" } }
-      }
-    },
-    "/api/v1/ships/{uuid}/compare/{uuid2}": {
-      "get": {
-        "tags": ["Ships"],
-        "summary": "Compare two ships",
-        "operationId": "compareShips",
-        "parameters": [
-          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
-          { "name": "uuid2", "in": "path", "required": true, "schema": { "type": "string" } }
-        ],
-        "responses": {
-          "200": { "description": "Side-by-side comparison of both ships" },
-          "404": { "$ref": "#/components/responses/NotFound" }
-        }
-      }
-    },
-    "/api/v1/ships/{uuid}/variants": {
-      "get": {
-        "tags": ["Ships"],
-        "summary": "Get ship variants",
-        "operationId": "getShipVariants",
-        "parameters": [
-          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
-          { "$ref": "#/components/parameters/env" }
-        ],
-        "responses": {
-          "200": { "description": "List of variants (bis, event, special…) sharing the same chassis" },
-          "404": { "$ref": "#/components/responses/NotFound" }
-        }
-      }
-    },
-    "/api/v1/ships/{uuid}/model": {
-      "get": {
-        "tags": ["Ships"],
-        "summary": "Get 3D model metadata",
-        "operationId": "getShipModel",
-        "description": "Returns metadata for the ship's 3D model (.ctm). Use `/model/file` to download the binary.",
-        "parameters": [
-          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" }, "description": "Ship UUID or slug" },
-          { "$ref": "#/components/parameters/env" }
-        ],
-        "responses": {
-          "200": {
-            "description": "3D model metadata",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": { "type": "boolean" },
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "uuid": { "type": "string" },
-                        "name": { "type": "string" },
-                        "format": { "type": "string", "example": "ctm" },
-                        "url": { "type": "string", "description": "Original RSI CDN URL" },
-                        "proxy_url": { "type": "string", "description": "Cached proxy URL via this API" }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": { "$ref": "#/components/responses/NotFound" }
-        }
-      }
-    },
-    "/api/v1/ships/{uuid}/model/file": {
-      "get": {
-        "tags": ["Ships"],
-        "summary": "Download 3D model file",
-        "operationId": "getShipModelFile",
-        "description": "Streams the .ctm binary. First request downloads from RSI and caches on disk; subsequent requests are served from cache.",
-        "parameters": [
-          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
-          { "$ref": "#/components/parameters/env" }
-        ],
-        "responses": {
-          "200": { "description": "CTM binary file", "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } } },
-          "404": { "$ref": "#/components/responses/NotFound" }
-        }
-      }
-    },
     "/api/v1/ships/ranking": {
       "get": {
         "tags": ["Ships"],
@@ -946,10 +827,10 @@
         "operationId": "getShipRanking",
         "parameters": [
           {
-            "name": "metric",
+            "name": "sort_by",
             "in": "query",
             "schema": { "type": "string" },
-            "description": "Ranking metric (scm_speed, cargo_capacity, shield_hp, …)"
+            "description": "Field to rank by (scm_speed, cargo_capacity, shield_hp, …)"
           },
           { "name": "career", "in": "query", "schema": { "type": "string" } },
           { "$ref": "#/components/parameters/limit" }
@@ -1228,18 +1109,6 @@
           },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
-      }
-    },
-    "/api/v1/items/{uuid}/buy-locations": {
-      "get": {
-        "tags": ["Items"],
-        "summary": "Where to buy an item",
-        "operationId": "getItemBuyLocations",
-        "parameters": [
-          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
-          { "$ref": "#/components/parameters/env" }
-        ],
-        "responses": { "200": { "description": "Buy locations list" }, "404": { "$ref": "#/components/responses/NotFound" } }
       }
     },
     "/api/v1/commodities": {
@@ -2008,7 +1877,7 @@
         "operationId": "search",
         "description": "Searches across ships, components, items, commodities, locations and missions simultaneously.",
         "parameters": [
-          { "name": "q", "in": "query", "required": true, "schema": { "type": "string", "minLength": 2 }, "description": "Search query" },
+          { "name": "search", "in": "query", "required": true, "schema": { "type": "string", "minLength": 2 }, "description": "Search query" },
           {
             "name": "types",
             "in": "query",
