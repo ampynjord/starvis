@@ -10,6 +10,7 @@
  *   DATABASE_URL (optional, overrides individual params)
  *   DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME
  *   P4K_PATH (alternative to --p4k flag)
+ *   P4K_LIVE_PATH, P4K_PTU_PATH (env-specific paths)
  *   LOG_LEVEL (debug|info|warn|error, default: info)
  */
 import { resolve } from 'node:path';
@@ -33,17 +34,10 @@ const AUTO_P4K: Record<GameEnv, string[]> = {
   live: [
     'C:/Program Files/Roberts Space Industries/StarCitizen/LIVE/Data.p4k',
     '/mnt/c/Program Files/Roberts Space Industries/StarCitizen/LIVE/Data.p4k',
-    `${process.env.HOME}/Library/Application Support/Roberts Space Industries/StarCitizen/LIVE/Data.p4k`,
   ],
   ptu: [
     'C:/Program Files/Roberts Space Industries/StarCitizen/PTU/Data.p4k',
     '/mnt/c/Program Files/Roberts Space Industries/StarCitizen/PTU/Data.p4k',
-    `${process.env.HOME}/Library/Application Support/Roberts Space Industries/StarCitizen/PTU/Data.p4k`,
-  ],
-  eptu: [
-    'C:/Program Files/Roberts Space Industries/StarCitizen/EPTU/Data.p4k',
-    '/mnt/c/Program Files/Roberts Space Industries/StarCitizen/EPTU/Data.p4k',
-    `${process.env.HOME}/Library/Application Support/Roberts Space Industries/StarCitizen/EPTU/Data.p4k`,
   ],
   custom: [],
 };
@@ -51,6 +45,17 @@ const AUTO_P4K: Record<GameEnv, string[]> = {
 function autoDetectP4K(env: GameEnv): string | null {
   if (env === 'custom') return null;
   return AUTO_P4K[env].find((p) => existsSync(p)) ?? null;
+}
+
+function getEnvSpecificP4KPath(env: GameEnv): string {
+  switch (env) {
+    case 'live':
+      return process.env.P4K_LIVE_PATH?.trim() || '';
+    case 'ptu':
+      return process.env.P4K_PTU_PATH?.trim() || '';
+    default:
+      return '';
+  }
 }
 
 const VALID_MODULES: ExtractionModule[] = [
@@ -85,7 +90,7 @@ const program = new Command()
   .description('Star Citizen P4K → PostgreSQL game data extractor')
   .version(pkg.version)
   .option('-p, --p4k <path>', 'path to Data.p4k (overrides auto-detection)')
-  .option('-e, --env <env>', 'game environment: live | ptu | eptu | custom', 'live')
+  .option('-e, --env <env>', 'game environment: live | ptu | custom', 'live')
   .option('-m, --modules <list>', 'comma-separated modules to extract (default: all)', 'all')
   .option('--dry-run', 'parse P4K and log stats without writing to database')
   .option('--prod-db', 'Use the production database configured via SSH tunnel')
@@ -99,7 +104,9 @@ Environment variables:
   DB_USER       PostgreSQL user
   DB_PASSWORD   PostgreSQL password
   DB_NAME       PostgreSQL database name (default: starvis)
-  P4K_PATH      Alternative to --p4k flag
+  P4K_PATH      Generic fallback path (alternative to --p4k flag)
+  P4K_LIVE_PATH Path used when --env live
+  P4K_PTU_PATH  Path used when --env ptu
   LOG_LEVEL     debug | info | warn | error (default: info)
 
 Available modules (P4K game data):
@@ -124,8 +131,8 @@ const opts = program.opts<{ p4k?: string; env: string; modules: string; dryRun?:
 
 function parseArgs(): { p4kPath: string; env: GameEnv; modules: Set<ExtractionModule | 'all'>; dryRun: boolean } {
   const envVal = opts.env as GameEnv;
-  if (!['live', 'ptu', 'eptu', 'custom'].includes(envVal)) {
-    console.error(`Error: --env must be live|ptu|eptu|custom, got "${envVal}"`);
+  if (!['live', 'ptu', 'custom'].includes(envVal)) {
+    console.error(`Error: --env must be live|ptu|custom, got "${envVal}"`);
     process.exit(1);
   }
 
@@ -139,7 +146,7 @@ function parseArgs(): { p4kPath: string; env: GameEnv; modules: Set<ExtractionMo
   const modules = new Set(modParts as (ExtractionModule | 'all')[]);
 
   // Resolve P4K path — not required when only P4K-free modules (e.g. ctm) are selected
-  let p4kPath = opts.p4k || process.env.P4K_PATH || '';
+  let p4kPath = opts.p4k || getEnvSpecificP4KPath(envVal) || process.env.P4K_PATH || '';
   if (!opts.p4k) {
     const detected = autoDetectP4K(envVal);
     if (detected) {
@@ -151,7 +158,7 @@ function parseArgs(): { p4kPath: string; env: GameEnv; modules: Set<ExtractionMo
   if (!p4kPath) {
     if (!isP4kFree(modules)) {
       console.error(
-        'Error: P4K path required. Use --p4k <path>, set P4K_PATH env var, or use --env live|ptu|eptu with RSI installed at default location.',
+        'Error: P4K path required. Use --p4k <path>, set P4K_PATH env var, or use --env live|ptu with RSI installed at default location.',
       );
       process.exit(1);
     }

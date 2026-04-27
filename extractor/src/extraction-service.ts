@@ -50,7 +50,7 @@ export type ExtractionModule =
   | 'starmap'
   | 'ship-matrix';
 
-export type GameEnv = 'live' | 'ptu' | 'eptu' | 'custom';
+export type GameEnv = 'live' | 'ptu' | 'custom';
 
 export interface ExtractionOptions {
   /** Which modules to run. Use `new Set(['all'])` for everything. */

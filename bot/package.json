@@ -4,8 +4,8 @@
   "description": "Discord bot for Starvis — Star Citizen database",
   "type": "module",
   "scripts": {
-    "start": "tsx --env-file=../../.env.dev src/index.ts",
-    "dev": "tsx --env-file=../../.env.dev watch src/index.ts",
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "deploy-commands": "tsx src/deploy-commands.ts",
     "lint": "biome check .",

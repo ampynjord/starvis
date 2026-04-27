@@ -7,7 +7,7 @@ import type { RouteDependencies } from './types.js';
 
 const FpsDamageBody = z.object({
   itemUuid: z.string().min(1, 'itemUuid is required'),
-  env: z.enum(['live', 'ptu', 'eptu', 'custom']).optional(),
+  env: z.enum(['live', 'ptu', 'custom']).optional(),
   fireMode: z.enum(['Single', 'Burst', 'Auto']).optional(),
   hitbox: z.enum(['head', 'torso', 'arm', 'leg']).optional(),
   armorClass: z.enum(['none', 'light', 'medium', 'heavy']).optional(),
@@ -19,7 +19,7 @@ const FpsDamageBody = z.object({
 
 const MiningYieldBody = z.object({
   compositionUuid: z.string().min(1, 'compositionUuid is required'),
-  env: z.enum(['live', 'ptu', 'eptu', 'custom']).optional(),
+  env: z.enum(['live', 'ptu', 'custom']).optional(),
   laserUuid: z.string().optional(),
   gadgetUuids: z.array(z.string()).max(3).optional(),
 });

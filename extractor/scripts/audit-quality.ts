@@ -5,15 +5,15 @@ import { Pool } from 'pg';
 
 config({ path: resolve(import.meta.dirname, '..', '..', '.env.extractor.dev') });
 
-type GameEnv = 'live' | 'ptu' | 'eptu';
+type GameEnv = 'live' | 'ptu';
 
 function parseEnvArg(): GameEnv {
   const args = process.argv.slice(2);
   for (let i = 0; i < args.length; i++) {
     if ((args[i] === '--env' || args[i] === '-e') && args[i + 1]) {
       const v = args[++i].toLowerCase() as GameEnv;
-      if (['live', 'ptu', 'eptu'].includes(v)) return v;
-      console.error(`Invalid --env value: ${v}. Expected live|ptu|eptu`);
+      if (['live', 'ptu'].includes(v)) return v;
+      console.error(`Invalid --env value: ${v}. Expected live|ptu`);
       process.exit(1);
     }
   }

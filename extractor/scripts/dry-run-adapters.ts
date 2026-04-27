@@ -21,25 +21,10 @@ function printEntitySummary(name: string, entries: Array<[string, ExternalSource
   console.log(`count: ${entries.length}`);
 
   if (!entries.length || sampleSize === 0) return;
-
-  const sourceTypeCounts = new Map<string, number>();
-  for (const [, row] of entries) {
-    const st = row.sourceType ?? 'unknown';
-    sourceTypeCounts.set(st, (sourceTypeCounts.get(st) ?? 0) + 1);
-  }
-
-  const sourceTypeText = [...sourceTypeCounts.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([k, v]) => `${k}:${v}`)
-    .join(' | ');
-
-  console.log(`source types: ${sourceTypeText || 'none'}`);
   console.log(`sample (max ${sampleSize}):`);
 
   for (const [className, row] of entries.slice(0, sampleSize)) {
-    console.log(
-      `- className=${className} name=${row.name ?? ''} source=${row.sourceType ?? ''}/${row.sourceName ?? ''} confidence=${row.confidenceScore ?? ''}`,
-    );
+    console.log(`- className=${className} name=${row.name ?? ''} confidence=${row.confidenceScore ?? ''}`);
   }
 }
 
@@ -59,9 +44,7 @@ async function main() {
   const total = items.length + commodities.length + components.length + shops.length;
 
   console.log(`total overrides: ${total}`);
-  console.log(`configured sources:`);
-  console.log(`- STARVIS_COMMUNITY_CANONICAL_JSON=${process.env.STARVIS_COMMUNITY_CANONICAL_JSON ? 'set' : 'unset'}`);
-  console.log(`- STARVIS_COMMUNITY_CANONICAL_URL=${process.env.STARVIS_COMMUNITY_CANONICAL_URL ? 'set' : 'unset'}`);
+  console.log('canonical external sources are disabled (P4K/RSI-only mode).');
 
   printEntitySummary('items', items, sampleSize);
   printEntitySummary('commodities', commodities, sampleSize);

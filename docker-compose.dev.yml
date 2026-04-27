@@ -10,8 +10,8 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME:-starvis}-postgres
     environment:
       POSTGRES_DB: ${DB_NAME:-starvis}
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_USER: ${DB_USER:-starvis_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-starvis_pass}
     ports:
       - "${DB_EXTERNAL_PORT:-5432}:5432"
     volumes:
@@ -50,24 +50,25 @@ services:
       - api_node_modules:/app/node_modules
       - ctm_cache:/app/ctm-cache
     ports:
-      - "${API_PORT:-3000}:3000"
+      - "${API_PORT:-3000}:${API_INTERNAL_PORT:-3000}"
     environment:
       NODE_ENV: development
-      PORT: 3000
-      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-starvis}
+      PORT: ${API_INTERNAL_PORT:-3000}
+      DATABASE_URL: postgresql://${DB_USER:-starvis_user}:${DB_PASSWORD:-starvis_pass}@postgres:5432/${DB_NAME:-starvis}
       REDIS_HOST: redis
-      REDIS_PORT: 6379
-      ADMIN_API_KEY: ${ADMIN_API_KEY}
+      REDIS_PORT: ${REDIS_INTERNAL_PORT:-6379}
+      INSPECTION_MODE: ${INSPECTION_MODE:-false}
+      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
       LOG_LEVEL: ${LOG_LEVEL:-debug}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-500}
       RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-200}
       CTM_CACHE_DIR: /app/ctm-cache
-      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
-      JWT_SECRET: ${JWT_SECRET}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      JWT_SECRET: ${JWT_SECRET:-}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health/live"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:${API_INTERNAL_PORT:-3000}/health/live"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -85,12 +86,13 @@ services:
     volumes:
       - ./:/app
       - ihm_node_modules:/app/node_modules
-    command: sh -c "npm install --prefer-offline && npm run dev --workspace=ihm -- -p 5173 -H 0.0.0.0"
+    command: sh -c "npm install --prefer-offline && npm run dev --workspace=ihm -- -p ${IHM_INTERNAL_PORT:-5173} -H 0.0.0.0"
     ports:
-      - "${IHM_DEV_PORT:-5173}:5173"
+      - "${IHM_DEV_PORT:-5173}:${IHM_INTERNAL_PORT:-5173}"
     environment:
-      API_URL: http://api:3000
-      JWT_SECRET: ${JWT_SECRET}
+      API_URL: http://${API_HOST:-api}:${API_INTERNAL_PORT:-3000}
+      JWT_SECRET: ${JWT_SECRET:-}
+      NEXT_PUBLIC_INSPECTION_MODE: ${INSPECTION_MODE:-false}
       # Nécessaire sur Windows : Docker Desktop ne propage pas inotify vers le conteneur
       CHOKIDAR_USEPOLLING: "true"
       CHOKIDAR_INTERVAL: "300"
@@ -111,8 +113,9 @@ services:
       DISCORD_TOKEN: ${DISCORD_TOKEN:-}
       DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
       DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
-      API_URL: http://api:3000
+      API_URL: http://${API_HOST:-api}:${API_INTERNAL_PORT:-3000}
       SITE_URL: ${SITE_URL:-http://localhost:5173}
+      API_TOKEN: ${API_TOKEN:-}
     depends_on:
       api:
         condition: service_healthy
