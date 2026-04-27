@@ -13,7 +13,11 @@ export async function POST(req: Request) {
 
     const text = await upstream.text();
     let data: any = {};
-    try { data = JSON.parse(text); } catch { /* empty body */ }
+    try {
+      data = JSON.parse(text);
+    } catch {
+      /* empty body */
+    }
 
     if (!upstream.ok) {
       return NextResponse.json({ error: data.error ?? 'Login failed' }, { status: upstream.status });

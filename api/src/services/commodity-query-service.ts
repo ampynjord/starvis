@@ -55,11 +55,7 @@ export class CommodityQueryService {
 
   async getCommodityByUuid(uuid: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
-    const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT * FROM game.commodities WHERE uuid = ? AND env = ?`),
-      uuid,
-      env,
-    );
+    const rows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(`SELECT * FROM game.commodities WHERE uuid = ? AND env = ?`), uuid, env);
     return rows[0] ? stripInternal(rows[0]) : null;
   }
 

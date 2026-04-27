@@ -19,8 +19,8 @@
  *   Starmap                 — systèmes stellaires
  */
 
-import OpenAI from 'openai';
 import type { PrismaLike } from '@starvis/db';
+import OpenAI from 'openai';
 import type { GameDataService } from './game-data-service.js';
 import type { RsiWebsiteService } from './rsi-website-service.js';
 import type { ShipMatrixService } from './ship-matrix-service.js';
@@ -189,7 +189,8 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_ship_details',
-      description: 'Stats complètes d\'un vaisseau spécifique (données brutes jeu + RSI). Inclut toutes les colonnes : vitesses, HP, cargo, armure, signaux, assurance.',
+      description:
+        "Stats complètes d'un vaisseau spécifique (données brutes jeu + RSI). Inclut toutes les colonnes : vitesses, HP, cargo, armure, signaux, assurance.",
       parameters: {
         type: 'object',
         properties: {
@@ -204,7 +205,8 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_ship_full_stats',
-      description: 'Stats agrégées du loadout d\'un vaisseau : DPS total, capacité de bouclier totale, puissance, refroidissement, portée QD, liste des hardpoints. UTILISER pour comparer les performances de combat ou de vol.',
+      description:
+        "Stats agrégées du loadout d'un vaisseau : DPS total, capacité de bouclier totale, puissance, refroidissement, portée QD, liste des hardpoints. UTILISER pour comparer les performances de combat ou de vol.",
       parameters: {
         type: 'object',
         properties: {
@@ -219,7 +221,8 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_ship_loadout',
-      description: 'Liste détaillée de tous les hardpoints d\'un vaisseau et les composants actuellement équipés (type, taille, nom, stats).',
+      description:
+        "Liste détaillée de tous les hardpoints d'un vaisseau et les composants actuellement équipés (type, taille, nom, stats).",
       parameters: {
         type: 'object',
         properties: {
@@ -234,7 +237,7 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_ship_variants',
-      description: 'Liste tous les variants d\'un vaisseau (même châssis, rôles différents). Ex: Cutlass Black/Blue/Red/Steel.',
+      description: "Liste tous les variants d'un vaisseau (même châssis, rôles différents). Ex: Cutlass Black/Blue/Red/Steel.",
       parameters: {
         type: 'object',
         properties: {
@@ -249,7 +252,8 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_ship_matrix',
-      description: 'Données officielles RSI d\'un vaisseau : dimensions officielles, prix ($USD et aUEC), lore, statut de production, description officielle.',
+      description:
+        "Données officielles RSI d'un vaisseau : dimensions officielles, prix ($USD et aUEC), lore, statut de production, description officielle.",
       parameters: {
         type: 'object',
         properties: {
@@ -263,7 +267,8 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'compare_ships',
-      description: 'Compare 2 à 4 vaisseaux côte-à-côte : stats brutes ET stats agrégées du loadout (DPS, boucliers, QD). UTILISER en priorité pour toute demande de comparaison — évite plusieurs appels séparés.',
+      description:
+        'Compare 2 à 4 vaisseaux côte-à-côte : stats brutes ET stats agrégées du loadout (DPS, boucliers, QD). UTILISER en priorité pour toute demande de comparaison — évite plusieurs appels séparés.',
       parameters: {
         type: 'object',
         properties: {
@@ -284,7 +289,11 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         type: 'object',
         properties: {
           query: { type: 'string', description: 'Nom du composant' },
-          type: { type: 'string', description: 'Type : WeaponGun | Shield | PowerPlant | Cooler | QuantumDrive | Countermeasure | Missile | Radar | MainThruster | ManoThrust | EMP | QuantumInterdictionGenerator' },
+          type: {
+            type: 'string',
+            description:
+              'Type : WeaponGun | Shield | PowerPlant | Cooler | QuantumDrive | Countermeasure | Missile | Radar | MainThruster | ManoThrust | EMP | QuantumInterdictionGenerator',
+          },
           size: { type: 'number', description: 'Taille 1-10' },
           grade: { type: 'number', description: 'Grade 1-4 (4=grade A, meilleur)' },
           manufacturer: { type: 'string', description: 'Code constructeur' },
@@ -306,8 +315,12 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Nom de l\'item' },
-          type: { type: 'string', description: 'Type : Char_Armor_Torso | Char_Armor_Legs | Char_Armor_Arms | Char_Helmet | Char_Armor_Backpack | WeaponPersonal | FoodProduct | MedicalDevice…' },
+          query: { type: 'string', description: "Nom de l'item" },
+          type: {
+            type: 'string',
+            description:
+              'Type : Char_Armor_Torso | Char_Armor_Legs | Char_Armor_Arms | Char_Helmet | Char_Armor_Backpack | WeaponPersonal | FoodProduct | MedicalDevice…',
+          },
           env: { type: 'string', description: '"live" | "ptu"' },
           limit: { type: 'number', description: 'Max résultats (défaut 15)' },
         },
@@ -324,7 +337,7 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Nom de la recette ou de l\'item craftable' },
+          query: { type: 'string', description: "Nom de la recette ou de l'item craftable" },
           category: { type: 'string', description: 'Catégorie de craft' },
           env: { type: 'string', description: '"live" | "ptu"' },
           limit: { type: 'number', description: 'Max résultats (défaut 10)' },
@@ -337,7 +350,8 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_recipe_details',
-      description: 'Détails complets d\'une recette de craft : ingrédients (quantités, optionnels), slot modifiers (qualité, modificateurs), station requise.',
+      description:
+        "Détails complets d'une recette de craft : ingrédients (quantités, optionnels), slot modifiers (qualité, modificateurs), station requise.",
       parameters: {
         type: 'object',
         properties: {
@@ -357,7 +371,7 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Nom de l\'élément (Quantanium, Laranite, Bexalite, Taranite…)' },
+          query: { type: 'string', description: "Nom de l'élément (Quantanium, Laranite, Bexalite, Taranite…)" },
           env: { type: 'string', description: '"live" | "ptu"' },
         },
         required: [],
@@ -388,7 +402,8 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'search_locations',
-      description: 'Recherche de lieux in-game : planètes, lunes, stations, avant-postes, villes. Indique si ravitaillement/réparations/atterrissage disponibles.',
+      description:
+        'Recherche de lieux in-game : planètes, lunes, stations, avant-postes, villes. Indique si ravitaillement/réparations/atterrissage disponibles.',
       parameters: {
         type: 'object',
         properties: {
@@ -424,7 +439,8 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_commodity_prices',
-      description: 'Prix d\'achat et de vente d\'une commodité dans tous les shops. Utile pour identifier où acheter au meilleur prix ou vendre le plus cher.',
+      description:
+        "Prix d'achat et de vente d'une commodité dans tous les shops. Utile pour identifier où acheter au meilleur prix ou vendre le plus cher.",
       parameters: {
         type: 'object',
         properties: {
@@ -444,9 +460,9 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
         type: 'object',
         properties: {
           scu: { type: 'number', description: 'Capacité cargo disponible en SCU' },
-          budget: { type: 'number', description: 'Budget d\'achat en aUEC (optionnel)' },
+          budget: { type: 'number', description: "Budget d'achat en aUEC (optionnel)" },
           commodity: { type: 'string', description: 'Filtrer sur une commodité spécifique (optionnel)' },
-          buy_system: { type: 'string', description: 'Système d\'achat (Stanton, Pyro…)' },
+          buy_system: { type: 'string', description: "Système d'achat (Stanton, Pyro…)" },
           sell_system: { type: 'string', description: 'Système de vente' },
           limit: { type: 'number', description: 'Nombre de routes retournées (défaut 10)' },
           env: { type: 'string', description: '"live" | "ptu"' },
@@ -477,7 +493,8 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'search_galactapedia',
-      description: 'Recherche dans la Galactapedia RSI : articles de lore sur les races, factions, lieux, vaisseaux, histoire de l\'univers Star Citizen.',
+      description:
+        "Recherche dans la Galactapedia RSI : articles de lore sur les races, factions, lieux, vaisseaux, histoire de l'univers Star Citizen.",
       parameters: {
         type: 'object',
         properties: {
@@ -585,7 +602,10 @@ function wrapTablesInCodeBlock(text: string): string {
   for (const line of lines) {
     // Suivi des blocs de code existants
     if (/^\s*```/.test(line)) {
-      if (inTable) { inTable = false; out.push('```'); }
+      if (inTable) {
+        inTable = false;
+        out.push('```');
+      }
       inCodeBlock = !inCodeBlock;
       out.push(line);
       continue;
@@ -657,7 +677,10 @@ export class ChatService {
       const out: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
         if (SKIP.has(k)) continue;
-        if (TRUNC_KEYS.has(k) && typeof v === 'string') { out[k] = v.slice(0, MAX_STR); continue; }
+        if (TRUNC_KEYS.has(k) && typeof v === 'string') {
+          out[k] = v.slice(0, MAX_STR);
+          continue;
+        }
         out[k] = this.trim(v);
       }
       return out;
@@ -698,13 +721,21 @@ export class ChatService {
           return {
             total: result.total,
             ships: result.data.map((s: Record<string, unknown>) => ({
-              name: s['name'], manufacturer: s['manufacturer_code'], role: s['role'], career: s['career'],
-              vehicle_category: s['vehicle_category'], size_y: s['size_y'],
-              scm_speed: s['scm_speed'], max_speed: s['max_speed'],
-              cargo_capacity: s['cargo_capacity'], crew_size: s['crew_size'],
-              shield_hp: s['shield_hp'], total_hp: s['total_hp'],
+              name: s['name'],
+              manufacturer: s['manufacturer_code'],
+              role: s['role'],
+              career: s['career'],
+              vehicle_category: s['vehicle_category'],
+              size_y: s['size_y'],
+              scm_speed: s['scm_speed'],
+              max_speed: s['max_speed'],
+              cargo_capacity: s['cargo_capacity'],
+              crew_size: s['crew_size'],
+              shield_hp: s['shield_hp'],
+              total_hp: s['total_hp'],
               weapon_damage_total: s['weapon_damage_total'],
-              production_status: s['production_status'], uuid: s['uuid'],
+              production_status: s['production_status'],
+              uuid: s['uuid'],
             })),
           };
         }
@@ -821,7 +852,11 @@ export class ChatService {
           const elements = await this.gameDataService.mining.getAllElements(env);
           const query = ((args.query as string | undefined) ?? '').toLowerCase();
           const filtered = query
-            ? elements.filter((e: Record<string, unknown>) => String(e['name'] ?? '').toLowerCase().includes(query))
+            ? elements.filter((e: Record<string, unknown>) =>
+                String(e['name'] ?? '')
+                  .toLowerCase()
+                  .includes(query),
+              )
             : elements;
           return { elements: filtered.slice(0, 25) };
         }
@@ -878,9 +913,13 @@ export class ChatService {
             commodity: comm['name'],
             occupancy_scu: comm['occupancy_scu'],
             prices: prices.map((p: Record<string, unknown>) => ({
-              shop: p['shop_name'], system: p['system'], city: p['city'],
-              buy_price: p['buy_price'], sell_price: p['sell_price'],
-              stock: p['stock'], demand: p['demand'],
+              shop: p['shop_name'],
+              system: p['system'],
+              city: p['city'],
+              buy_price: p['buy_price'],
+              sell_price: p['sell_price'],
+              stock: p['stock'],
+              demand: p['demand'],
             })),
           };
         }
@@ -1000,7 +1039,11 @@ export class ChatService {
           const results = await Promise.all(
             msg.tool_calls.map(async (tc) => {
               let args: Record<string, unknown> = {};
-              try { args = JSON.parse(tc.function.arguments); } catch { /* ignore */ }
+              try {
+                args = JSON.parse(tc.function.arguments);
+              } catch {
+                /* ignore */
+              }
               const result = await this.executeTool(tc.function.name, args);
               return { id: tc.id, result };
             }),
@@ -1072,7 +1115,11 @@ export class ChatService {
           const results = await Promise.all(
             msg.tool_calls.map(async (tc) => {
               let args: Record<string, unknown> = {};
-              try { args = JSON.parse(tc.function.arguments); } catch { /* ignore */ }
+              try {
+                args = JSON.parse(tc.function.arguments);
+              } catch {
+                /* ignore */
+              }
               const result = await this.executeTool(tc.function.name, args);
               return { id: tc.id, result };
             }),

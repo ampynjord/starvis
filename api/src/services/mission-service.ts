@@ -198,11 +198,15 @@ export class MissionService {
     const baseWhere = 'WHERE env = ? AND not_for_release = false AND work_in_progress = false';
     const [typeRows, factionRows] = await Promise.all([
       prisma.$queryRawUnsafe<Row[]>(
-        toPostgres(`SELECT mission_type as value, COUNT(*) as count FROM game.missions ${baseWhere} AND mission_type IS NOT NULL GROUP BY mission_type ORDER BY mission_type`),
+        toPostgres(
+          `SELECT mission_type as value, COUNT(*) as count FROM game.missions ${baseWhere} AND mission_type IS NOT NULL GROUP BY mission_type ORDER BY mission_type`,
+        ),
         env,
       ),
       prisma.$queryRawUnsafe<Row[]>(
-        toPostgres(`SELECT faction as value, COUNT(*) as count FROM game.missions ${baseWhere} AND faction IS NOT NULL AND faction != '' GROUP BY faction ORDER BY faction`),
+        toPostgres(
+          `SELECT faction as value, COUNT(*) as count FROM game.missions ${baseWhere} AND faction IS NOT NULL AND faction != '' GROUP BY faction ORDER BY faction`,
+        ),
         env,
       ),
     ]);

@@ -23,12 +23,7 @@ export function mountChatRoutes(router: Router, deps: RouteDependencies): void {
   if (!deps.rsiWebsiteService) return;
   if (!process.env.MISTRAL_API_KEY) return;
 
-  const chatService = new ChatService(
-    deps.gameDataService,
-    deps.shipMatrixService,
-    deps.rsiWebsiteService,
-    deps.prisma,
-  );
+  const chatService = new ChatService(deps.gameDataService, deps.shipMatrixService, deps.rsiWebsiteService, deps.prisma);
 
   // ── SSE streaming (web widget) ────────────────────────────────────────────
   router.post('/api/v1/chat', requireJwt, (req, res) => {
@@ -62,8 +57,14 @@ export function mountChatRoutes(router: Router, deps: RouteDependencies): void {
     chatService.streamChat(
       sanitized,
       (text) => send({ type: 'chunk', text }),
-      () => { send({ type: 'done' }); res.end(); },
-      (err) => { send({ type: 'error', message: err.message }); res.end(); },
+      () => {
+        send({ type: 'done' });
+        res.end();
+      },
+      (err) => {
+        send({ type: 'error', message: err.message });
+        res.end();
+      },
     );
   });
 
@@ -86,7 +87,9 @@ export function mountChatRoutes(router: Router, deps: RouteDependencies): void {
     } catch (e: any) {
       const msg: string = e.message ?? 'Chat error';
       const isRateLimit = msg.includes('429') || msg.includes('rate_limit') || msg.includes('Rate limit');
-      res.status(isRateLimit ? 429 : 500).json({ success: false, error: isRateLimit ? '⏳ Limite Mistral atteinte, réessaie dans quelques instants.' : msg });
+      res
+        .status(isRateLimit ? 429 : 500)
+        .json({ success: false, error: isRateLimit ? '⏳ Limite Mistral atteinte, réessaie dans quelques instants.' : msg });
     }
   });
 }

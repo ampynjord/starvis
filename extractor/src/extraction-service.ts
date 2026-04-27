@@ -6,7 +6,7 @@
  * and writes everything to the remote PostgreSQL database (schemas: game, rsi, meta).
  */
 import { createHash } from 'node:crypto';
-import { type Pool, type PoolClient } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { canonicalizeCommodityRecord, canonicalizeComponentRecord, canonicalizeItemRecord } from './canonical-source.js';
 import { extractCraftingRecipes } from './crafting-extractor.js';
 import {
@@ -273,8 +273,14 @@ export class ExtractionService {
       const oldShips = new Map(oldShipsRaw.map((s: any) => [s.class_name, s]));
       const oldComps = new Map(oldCompsRaw.map((c: any) => [c.class_name, c]));
 
-      const { rows: oldItemsRaw } = await conn.query<any>('SELECT uuid, class_name, name, type, sub_type, manufacturer_code FROM game.items WHERE env = $1', [env]);
-      const { rows: oldCommoditiesRaw } = await conn.query<any>('SELECT uuid, class_name, name, type FROM game.commodities WHERE env = $1', [env]);
+      const { rows: oldItemsRaw } = await conn.query<any>(
+        'SELECT uuid, class_name, name, type, sub_type, manufacturer_code FROM game.items WHERE env = $1',
+        [env],
+      );
+      const { rows: oldCommoditiesRaw } = await conn.query<any>(
+        'SELECT uuid, class_name, name, type FROM game.commodities WHERE env = $1',
+        [env],
+      );
       const oldItems = new Map(oldItemsRaw.map((i: any) => [i.class_name, i]));
       const oldCommodities = new Map(oldCommoditiesRaw.map((c: any) => [c.class_name, c]));
 
@@ -290,7 +296,10 @@ export class ExtractionService {
       }
       if (run('ships')) {
         // Preserve ctm_url values before wiping ships — they won't be re-scraped
-        const { rows: ctmRows } = await conn.query<any>('SELECT class_name, ctm_url FROM game.ships WHERE ctm_url IS NOT NULL AND env = $1', [env]);
+        const { rows: ctmRows } = await conn.query<any>(
+          'SELECT class_name, ctm_url FROM game.ships WHERE ctm_url IS NOT NULL AND env = $1',
+          [env],
+        );
         const savedCtmUrls: Array<{ className: string; ctmUrl: string }> = ctmRows.map((r: any) => ({
           className: r.class_name,
           ctmUrl: r.ctm_url,
@@ -760,7 +769,11 @@ export class ExtractionService {
   //  SHIPS → ships + ship_loadouts tables
   // ======================================================
 
-  private async saveShips(conn: PoolClient, env: GameEnv, onProgress?: (msg: string) => void): Promise<{ ships: number; loadoutPorts: number }> {
+  private async saveShips(
+    conn: PoolClient,
+    env: GameEnv,
+    onProgress?: (msg: string) => void,
+  ): Promise<{ ships: number; loadoutPorts: number }> {
     const vehicles = this.df.getVehicleDefinitions();
     let savedShips = 0;
     let totalPorts = 0;
@@ -921,7 +934,9 @@ export class ExtractionService {
             fullData.hull?.totalHp != null ? Math.round(fullData.hull.totalHp) : null,
             fullData.fuelCapacity || null,
             fullData.qtFuelCapacity || null,
-            (fullData.shield?.maxShieldHealth ?? fullData.shield?.maxHp) != null ? Math.round(fullData.shield!.maxShieldHealth ?? fullData.shield!.maxHp!) : null,
+            (fullData.shield?.maxShieldHealth ?? fullData.shield?.maxHp) != null
+              ? Math.round(fullData.shield!.maxShieldHealth ?? fullData.shield!.maxHp!)
+              : null,
             fullData.shield?.maxShieldRegen ?? null,
             fullData.shield?.damagedRegenDelay ?? null,
             fullData.shield?.downedRegenDelay ?? null,
@@ -1069,7 +1084,11 @@ export class ExtractionService {
         [shipUuid, env],
       );
       const total = parseFloat(rows[0]?.total) || 0;
-      await conn.query('UPDATE game.ships SET missile_damage_total = $1 WHERE uuid = $2 AND env = $3', [total > 0 ? total : null, shipUuid, env]);
+      await conn.query('UPDATE game.ships SET missile_damage_total = $1 WHERE uuid = $2 AND env = $3', [
+        total > 0 ? total : null,
+        shipUuid,
+        env,
+      ]);
     } catch {
       /* Non-critical */
     }
@@ -1084,7 +1103,11 @@ export class ExtractionService {
         [shipUuid, env],
       );
       const totalDps = parseFloat(rows[0]?.total_dps) || 0;
-      await conn.query('UPDATE game.ships SET weapon_damage_total = $1 WHERE uuid = $2 AND env = $3', [totalDps > 0 ? totalDps : null, shipUuid, env]);
+      await conn.query('UPDATE game.ships SET weapon_damage_total = $1 WHERE uuid = $2 AND env = $3', [
+        totalDps > 0 ? totalDps : null,
+        shipUuid,
+        env,
+      ]);
     } catch {
       /* Non-critical */
     }
@@ -1432,7 +1455,11 @@ export class ExtractionService {
   //  ITEMS + COMMODITIES → items + commodities tables
   // ======================================================
 
-  private async saveItems(conn: PoolClient, env: GameEnv, onProgress?: (msg: string) => void): Promise<{ items: number; commodities: number }> {
+  private async saveItems(
+    conn: PoolClient,
+    env: GameEnv,
+    onProgress?: (msg: string) => void,
+  ): Promise<{ items: number; commodities: number }> {
     const { items, commodities } = this.df.extractItems();
     let savedItems = 0;
     let savedCommodities = 0;
@@ -1619,7 +1646,11 @@ export class ExtractionService {
   //  SHOPS → shops + shop_inventory tables
   // ======================================================
 
-  private async saveShopsData(conn: PoolClient, env: GameEnv, onProgress?: (msg: string) => void): Promise<{ shops: number; inventory: number }> {
+  private async saveShopsData(
+    conn: PoolClient,
+    env: GameEnv,
+    onProgress?: (msg: string) => void,
+  ): Promise<{ shops: number; inventory: number }> {
     const provider = this.df.getProvider();
     if (!provider) {
       onProgress?.('Shops: P4K provider not available, skipping');
@@ -1831,7 +1862,10 @@ export class ExtractionService {
     }
 
     // ── Items changelog ──
-    const { rows: newItemsRaw } = await conn.query<any>('SELECT uuid, class_name, name, type, sub_type, manufacturer_code FROM game.items WHERE env = $1', [env]);
+    const { rows: newItemsRaw } = await conn.query<any>(
+      'SELECT uuid, class_name, name, type, sub_type, manufacturer_code FROM game.items WHERE env = $1',
+      [env],
+    );
     const newItems = new Map(newItemsRaw.map((i: any) => [i.class_name, i]));
     for (const [cn, item] of newItems) {
       if (!oldItems.has(cn)) inserts.push([extractionId, 'item', item.uuid, item.name || cn, 'added', null, null, null]);
@@ -1841,7 +1875,9 @@ export class ExtractionService {
     }
 
     // ── Commodities changelog ──
-    const { rows: newCommoditiesRaw } = await conn.query<any>('SELECT uuid, class_name, name, type FROM game.commodities WHERE env = $1', [env]);
+    const { rows: newCommoditiesRaw } = await conn.query<any>('SELECT uuid, class_name, name, type FROM game.commodities WHERE env = $1', [
+      env,
+    ]);
     const newCommodities = new Map(newCommoditiesRaw.map((c: any) => [c.class_name, c]));
     for (const [cn, commodity] of newCommodities) {
       if (!oldCommodities.has(cn))
@@ -1857,10 +1893,12 @@ export class ExtractionService {
       for (let i = 0; i < inserts.length; i += batchSize) {
         const batch = inserts.slice(i, i + batchSize);
         let paramIdx = 0;
-        const placeholders = batch.map(() => {
-          const cols = Array.from({ length: 8 }, () => `$${++paramIdx}`);
-          return `(${cols.join(',')})`;
-        }).join(', ');
+        const placeholders = batch
+          .map(() => {
+            const cols = Array.from({ length: 8 }, () => `$${++paramIdx}`);
+            return `(${cols.join(',')})`;
+          })
+          .join(', ');
         const values = batch.flat();
         await conn.query(
           `INSERT INTO meta.changelog (extraction_id, entity_type, entity_uuid, entity_name, change_type, field_name, old_value, new_value) VALUES ${placeholders}`,
@@ -1948,7 +1986,16 @@ export class ExtractionService {
     for (const comp of compositions) {
       for (const part of comp.parts) {
         if (elementUuidSet.has(part.elementUuid)) {
-          partRows.push([env, env, comp.uuid, part.elementUuid, part.minPercentage, part.maxPercentage, part.probability, part.curveExponent]);
+          partRows.push([
+            env,
+            env,
+            comp.uuid,
+            part.elementUuid,
+            part.minPercentage,
+            part.maxPercentage,
+            part.probability,
+            part.curveExponent,
+          ]);
         }
       }
     }
@@ -2063,7 +2110,12 @@ export class ExtractionService {
         let enriched = 0;
         for (const [uuid, d] of factionData.entries()) {
           if (!d.faction) continue;
-          await conn.query('UPDATE game.missions SET faction=$1, mission_giver=$2 WHERE uuid=$3 AND env=$4', [d.faction, d.missionGiver, uuid, env]);
+          await conn.query('UPDATE game.missions SET faction=$1, mission_giver=$2 WHERE uuid=$3 AND env=$4', [
+            d.faction,
+            d.missionGiver,
+            uuid,
+            env,
+          ]);
           enriched++;
         }
         if (enriched > 0) {
@@ -2143,7 +2195,11 @@ export class ExtractionService {
         }
         if (dangers.length >= 3) {
           const modeVal = mode(dangers);
-          await conn.query('UPDATE game.missions SET danger_level=$1 WHERE mission_type=$2 AND danger_level IS NULL AND env=$3', [modeVal, missionType, env]);
+          await conn.query('UPDATE game.missions SET danger_level=$1 WHERE mission_type=$2 AND danger_level IS NULL AND env=$3', [
+            modeVal,
+            missionType,
+            env,
+          ]);
         }
       }
       if (typeFallbackCount > 0) {

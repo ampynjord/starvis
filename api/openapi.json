@@ -635,7 +635,19 @@
           { "$ref": "#/components/parameters/env" }
         ],
         "responses": {
-          "200": { "description": "Paginated ground vehicle list", "content": { "application/json": { "schema": { "allOf": [{ "$ref": "#/components/schemas/Pagination" }, { "type": "object", "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/Ship" } } } }] } } } },
+          "200": {
+            "description": "Paginated ground vehicle list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/Pagination" },
+                    { "type": "object", "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/Ship" } } } }
+                  ]
+                }
+              }
+            }
+          },
           "503": { "$ref": "#/components/responses/ServiceUnavailable" }
         }
       }
@@ -665,7 +677,19 @@
           { "$ref": "#/components/parameters/env" }
         ],
         "responses": {
-          "200": { "description": "Paginated grav-lev vehicle list", "content": { "application/json": { "schema": { "allOf": [{ "$ref": "#/components/schemas/Pagination" }, { "type": "object", "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/Ship" } } } }] } } } },
+          "200": {
+            "description": "Paginated grav-lev vehicle list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/Pagination" },
+                    { "type": "object", "properties": { "data": { "type": "array", "items": { "$ref": "#/components/schemas/Ship" } } } }
+                  ]
+                }
+              }
+            }
+          },
           "503": { "$ref": "#/components/responses/ServiceUnavailable" }
         }
       }
@@ -1277,7 +1301,11 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": { "success": { "type": "boolean" }, "count": { "type": "integer" }, "data": { "type": "array", "items": { "type": "object" } } }
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "count": { "type": "integer" },
+                    "data": { "type": "array", "items": { "type": "object" } }
+                  }
                 }
               }
             }
@@ -1877,7 +1905,13 @@
         "operationId": "search",
         "description": "Searches across ships, components, items, commodities, locations and missions simultaneously.",
         "parameters": [
-          { "name": "search", "in": "query", "required": true, "schema": { "type": "string", "minLength": 2 }, "description": "Search query" },
+          {
+            "name": "search",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string", "minLength": 2 },
+            "description": "Search query"
+          },
           {
             "name": "types",
             "in": "query",
@@ -2215,8 +2249,18 @@
         "operationId": "getChangelog",
         "parameters": [
           { "name": "env", "in": "query", "schema": { "type": "string" } },
-          { "name": "entity_type", "in": "query", "schema": { "type": "string" }, "description": "Filter by entity type (ship, component, …)" },
-          { "name": "change_type", "in": "query", "schema": { "type": "string" }, "description": "Filter by change type (added, removed, modified)" },
+          {
+            "name": "entity_type",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Filter by entity type (ship, component, …)"
+          },
+          {
+            "name": "change_type",
+            "in": "query",
+            "schema": { "type": "string" },
+            "description": "Filter by change type (added, removed, modified)"
+          },
           { "$ref": "#/components/parameters/limit" }
         ],
         "responses": { "200": { "description": "Recent data changes (added/removed ships, components, etc.)" } }
@@ -2286,7 +2330,14 @@
         "responses": {
           "200": {
             "description": "Array of location type strings",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } } } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } }
+                }
+              }
+            }
           }
         }
       }
@@ -2300,7 +2351,14 @@
         "responses": {
           "200": {
             "description": "Array of system name strings",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } } } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } }
+                }
+              }
+            }
           }
         }
       }
@@ -2314,7 +2372,18 @@
         "responses": {
           "200": {
             "description": "Full list of locations",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "count": { "type": "integer" }, "data": { "type": "array", "items": { "type": "object" } } } } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "count": { "type": "integer" },
+                    "data": { "type": "array", "items": { "type": "object" } }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -2325,7 +2394,18 @@
         "summary": "List mission types",
         "operationId": "getMissionTypes",
         "parameters": [{ "$ref": "#/components/parameters/env" }],
-        "responses": { "200": { "description": "Array of type strings", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } } } } } }
+        "responses": {
+          "200": {
+            "description": "Array of type strings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -2335,7 +2415,18 @@
         "summary": "List mission factions",
         "operationId": "getMissionFactions",
         "parameters": [{ "$ref": "#/components/parameters/env" }],
-        "responses": { "200": { "description": "Array of faction strings", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } } } } } }
+        "responses": {
+          "200": {
+            "description": "Array of faction strings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -2345,7 +2436,18 @@
         "summary": "List star systems that have missions",
         "operationId": "getMissionSystems",
         "parameters": [{ "$ref": "#/components/parameters/env" }],
-        "responses": { "200": { "description": "Array of system name strings", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } } } } } }
+        "responses": {
+          "200": {
+            "description": "Array of system name strings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -2355,7 +2457,18 @@
         "summary": "List mission categories",
         "operationId": "getMissionCategories",
         "parameters": [{ "$ref": "#/components/parameters/env" }],
-        "responses": { "200": { "description": "Array of category strings", "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } } } } } }
+        "responses": {
+          "200": {
+            "description": "Array of category strings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "string" } } }
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -2367,7 +2480,11 @@
         "responses": {
           "200": {
             "description": "Ship Matrix aggregate statistics",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "object" } } } } }
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "object" } } }
+              }
+            }
           }
         }
       }
@@ -2383,7 +2500,11 @@
         "responses": {
           "200": {
             "description": "Ship Matrix entry",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "object" } } } } }
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "object" } } }
+              }
+            }
           },
           "404": { "$ref": "#/components/responses/NotFound" }
         }
@@ -2421,7 +2542,11 @@
         "responses": {
           "200": {
             "description": "Calculated loadout with stats",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "object" } } } } }
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "object" } } }
+              }
+            }
           }
         }
       }
@@ -2526,7 +2651,11 @@
                 "properties": {
                   "email": { "type": "string", "format": "email" },
                   "username": { "type": "string", "minLength": 3, "maxLength": 50, "pattern": "^[a-zA-Z0-9_-]+$" },
-                  "password": { "type": "string", "minLength": 8, "description": "Must contain uppercase, lowercase, digit and special character" }
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "description": "Must contain uppercase, lowercase, digit and special character"
+                  }
                 }
               }
             }
@@ -2535,7 +2664,14 @@
         "responses": {
           "201": {
             "description": "Account created",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "token": { "type": "string" }, "user": { "type": "object" } } } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "token": { "type": "string" }, "user": { "type": "object" } }
+                }
+              }
+            }
           },
           "400": { "$ref": "#/components/responses/BadRequest" },
           "409": { "description": "Email or username already taken" }
@@ -2565,7 +2701,14 @@
         "responses": {
           "200": {
             "description": "Authenticated",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "token": { "type": "string" }, "user": { "type": "object" } } } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "token": { "type": "string" }, "user": { "type": "object" } }
+                }
+              }
+            }
           },
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
@@ -2580,7 +2723,11 @@
         "responses": {
           "200": {
             "description": "Current user",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "user": { "type": "object" } } } } }
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "user": { "type": "object" } } }
+              }
+            }
           },
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
@@ -2607,7 +2754,11 @@
         "responses": {
           "200": {
             "description": "Updated user",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "user": { "type": "object" } } } } }
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "user": { "type": "object" } } }
+              }
+            }
           },
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
@@ -2650,7 +2801,11 @@
         "responses": {
           "200": {
             "description": "Admin stats",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "object" } } } } }
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "object" } } }
+              }
+            }
           },
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
@@ -2665,7 +2820,11 @@
         "responses": {
           "200": {
             "description": "Extraction log",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "object" } } } } }
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "object" } } }
+              }
+            }
           },
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
@@ -2680,7 +2839,14 @@
         "responses": {
           "200": {
             "description": "User list",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "object" } } } } } }
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "object" } } }
+                }
+              }
+            }
           },
           "401": { "$ref": "#/components/responses/Unauthorized" }
         }
@@ -2692,9 +2858,7 @@
         "summary": "Update a user's role (admin only)",
         "operationId": "adminSetUserRole",
         "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "description": "User ID" }
-        ],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" }, "description": "User ID" }],
         "requestBody": {
           "required": true,
           "content": {
@@ -2710,7 +2874,11 @@
         "responses": {
           "200": {
             "description": "Updated user",
-            "content": { "application/json": { "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "user": { "type": "object" } } } } }
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "user": { "type": "object" } } }
+              }
+            }
           },
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" }

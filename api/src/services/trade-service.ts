@@ -142,7 +142,12 @@ export class TradeService {
     const prisma = this.getClient(env);
     const safeLimit = Math.min(Math.max(1, limit), 100);
 
-    const where: string[] = ['buy_cp.env = ?', 'buy_cp.buy_price IS NOT NULL', 'buy_cp.buy_price > 0', 'sell_cp.sell_price > buy_cp.buy_price'];
+    const where: string[] = [
+      'buy_cp.env = ?',
+      'buy_cp.buy_price IS NOT NULL',
+      'buy_cp.buy_price > 0',
+      'sell_cp.sell_price > buy_cp.buy_price',
+    ];
     const params: (string | number)[] = [env];
 
     if (commodity) {
