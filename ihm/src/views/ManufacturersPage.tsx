@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, Cpu, Crosshair, Package, Pill, Rocket, Settings2, Shield, Shirt, ShoppingBag, SlidersHorizontal, Wrench, Zap } from 'lucide-react';
+import { Building2, ChevronRight, Cpu, Crosshair, Package, Pill, Rocket, Settings2, Shield, Shirt, ShoppingBag, SlidersHorizontal, Wrench, Zap } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
@@ -99,6 +99,7 @@ export default function ManufacturersPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<MfrTab>('ships');
   const [activeItemCat, setActiveItemCat] = useState<string>('All');
+  const [mfrListOpen, setMfrListOpen] = useState(false);
 
   const { data: manufacturers, isLoading, error, refetch } = useQuery({
     queryKey: ['manufacturers.list', env],
@@ -157,6 +158,20 @@ export default function ManufacturersPage() {
       <div className="flex gap-6">
         {/* Sidebar — manufacturer list */}
         <div className="w-64 shrink-0">
+          {/* Mobile toggle */}
+          <button
+            onClick={() => setMfrListOpen((o: boolean) => !o)}
+            className={[
+              'md:hidden flex items-center gap-2 mb-3 px-3 py-1.5 rounded-sm text-xs font-mono-sc uppercase tracking-wider border transition-colors w-full',
+              mfrListOpen || selected
+                ? 'border-cyan-700 text-cyan-400 bg-cyan-950/40'
+                : 'border-slate-700 text-slate-400 hover:text-slate-200',
+            ].join(' ')}
+          >
+            <Building2 size={13} />
+            {selected ? manufacturers?.find((m: Manufacturer) => m.code === selected)?.name ?? 'Manufacturer' : 'Manufacturer'}
+          </button>
+          <div className={mfrListOpen ? 'block md:block' : 'hidden md:block'}>
           <div className="sci-panel overflow-hidden">
             <div className="px-3 py-2 border-b border-border">
               <p className="text-xs font-mono-sc text-slate-600 uppercase">
@@ -210,9 +225,8 @@ export default function ManufacturersPage() {
               ))}
             </div>
           </div>
+          </div>
         </div>
-
-        {/* Main panel */}
         <div className="flex-1 min-w-0 space-y-4">
           {selectedMfr ? (
             <>
