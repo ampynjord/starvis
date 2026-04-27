@@ -56,6 +56,7 @@ services:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-starvis}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      INSPECTION_MODE: ${INSPECTION_MODE:-false}
       ADMIN_API_KEY: ${ADMIN_API_KEY}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       CORS_ORIGIN: ${CORS_ORIGIN:-https://${DOMAIN}}
@@ -104,6 +105,7 @@ services:
     environment:
       API_URL: http://${COMPOSE_PROJECT_NAME:-starvis}-api:${API_INTERNAL_PORT:-3000}
       JWT_SECRET: ${JWT_SECRET}
+      NEXT_PUBLIC_INSPECTION_MODE: ${INSPECTION_MODE:-false}
     restart: unless-stopped
     deploy:
       resources:
