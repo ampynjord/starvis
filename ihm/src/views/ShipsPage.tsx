@@ -8,7 +8,7 @@ import { useSearchParams } from 'next/navigation';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { ShipCard } from '@/components/ship/ShipCard';
-import { FilterPanel } from '@/components/ui/FilterPanel';
+import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { Pagination } from '@/components/ui/Pagination';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -167,8 +167,9 @@ export default function ShipsPage() {
       <div className="flex gap-4">
         {/* Filters */}
         <div className="w-44 shrink-0">
-          {filters ? (
-            <FilterPanel
+          <MobileFilterWrapper hasFilters={hasFilters}>
+            {filters ? (
+              <FilterPanel
               hasFilters={hasFilters}
               onReset={resetFilters}
               groups={[
@@ -203,6 +204,7 @@ export default function ShipsPage() {
           ) : (
             <div className="sci-panel p-3 text-xs text-slate-600 animate-pulse">Loading…</div>
           )}
+          </MobileFilterWrapper>
         </div>
 
         {/* Grid */}
