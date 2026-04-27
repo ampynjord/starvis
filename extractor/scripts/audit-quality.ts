@@ -55,7 +55,9 @@ async function main() {
   try {
     console.log('== STARVIS Data Quality Audit ==');
     console.log(`Target env: ${targetEnv}`);
-    console.log(`Database: ${process.env.DATABASE_URL ? '(DATABASE_URL)' : `${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || '5432'}/${process.env.DB_NAME || 'starvis'}`}`);
+    console.log(
+      `Database: ${process.env.DATABASE_URL ? '(DATABASE_URL)' : `${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || '5432'}/${process.env.DB_NAME || 'starvis'}`}`,
+    );
 
     // Presence checks
     const presenceQueries: Array<{ label: string; sql: string }> = [
@@ -83,14 +85,26 @@ async function main() {
 
     // Human-readable parsing checks
     const badQueries: Array<{ label: string; sql: string }> = [
-      { label: 'ships_bad_name', sql: "SELECT SUM(CASE WHEN name IS NULL OR TRIM(name)='' OR name='—' OR name LIKE '@%' THEN 1 ELSE 0 END) AS bad_rows FROM game.ships WHERE env = $1" },
+      {
+        label: 'ships_bad_name',
+        sql: "SELECT SUM(CASE WHEN name IS NULL OR TRIM(name)='' OR name='—' OR name LIKE '@%' THEN 1 ELSE 0 END) AS bad_rows FROM game.ships WHERE env = $1",
+      },
       {
         label: 'components_bad_name',
         sql: "SELECT SUM(CASE WHEN name IS NULL OR TRIM(name)='' OR name='—' OR name LIKE '@%' THEN 1 ELSE 0 END) AS bad_rows FROM game.components WHERE env = $1",
       },
-      { label: 'items_bad_name', sql: "SELECT SUM(CASE WHEN name IS NULL OR TRIM(name)='' OR name='—' OR name LIKE '@%' THEN 1 ELSE 0 END) AS bad_rows FROM game.items WHERE env = $1" },
-      { label: 'commodities_bad_name', sql: "SELECT SUM(CASE WHEN name IS NULL OR TRIM(name)='' OR name LIKE '@%' THEN 1 ELSE 0 END) AS bad_rows FROM game.commodities WHERE env = $1" },
-      { label: 'missions_bad_title', sql: "SELECT SUM(CASE WHEN title IS NULL OR TRIM(title)='' OR title LIKE '@%' THEN 1 ELSE 0 END) AS bad_rows FROM game.missions WHERE env = $1" },
+      {
+        label: 'items_bad_name',
+        sql: "SELECT SUM(CASE WHEN name IS NULL OR TRIM(name)='' OR name='—' OR name LIKE '@%' THEN 1 ELSE 0 END) AS bad_rows FROM game.items WHERE env = $1",
+      },
+      {
+        label: 'commodities_bad_name',
+        sql: "SELECT SUM(CASE WHEN name IS NULL OR TRIM(name)='' OR name LIKE '@%' THEN 1 ELSE 0 END) AS bad_rows FROM game.commodities WHERE env = $1",
+      },
+      {
+        label: 'missions_bad_title',
+        sql: "SELECT SUM(CASE WHEN title IS NULL OR TRIM(title)='' OR title LIKE '@%' THEN 1 ELSE 0 END) AS bad_rows FROM game.missions WHERE env = $1",
+      },
       {
         label: 'mining_elements_bad_name',
         sql: "SELECT SUM(CASE WHEN name IS NULL OR TRIM(name)='' OR name='—' OR name LIKE '@%' THEN 1 ELSE 0 END) AS bad_rows FROM game.mining_elements WHERE env = $1",
@@ -103,7 +117,10 @@ async function main() {
         label: 'ship_paints_bad_name',
         sql: "SELECT SUM(CASE WHEN paint_name IS NULL OR TRIM(paint_name)='' OR paint_uuid IS NULL OR TRIM(paint_uuid)='' OR paint_name LIKE '@%' THEN 1 ELSE 0 END) AS bad_rows FROM game.ship_paints WHERE env = $1",
       },
-      { label: 'shops_bad_name', sql: "SELECT SUM(CASE WHEN name IS NULL OR TRIM(name)='' OR name LIKE '@%' THEN 1 ELSE 0 END) AS bad_rows FROM game.shops WHERE env = $1" },
+      {
+        label: 'shops_bad_name',
+        sql: "SELECT SUM(CASE WHEN name IS NULL OR TRIM(name)='' OR name LIKE '@%' THEN 1 ELSE 0 END) AS bad_rows FROM game.shops WHERE env = $1",
+      },
     ];
 
     console.log('\n-- Human Parsing Quality --');

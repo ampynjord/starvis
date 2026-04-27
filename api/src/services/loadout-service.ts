@@ -712,7 +712,9 @@ export class LoadoutService {
   async getShipPaints(shipUuid: string, env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres('SELECT paint_class_name, paint_name, paint_uuid FROM game.ship_paints WHERE ship_uuid = ? AND env = ? ORDER BY paint_name'),
+      toPostgres(
+        'SELECT paint_class_name, paint_name, paint_uuid FROM game.ship_paints WHERE ship_uuid = ? AND env = ? ORDER BY paint_name',
+      ),
       shipUuid,
       env,
     );
@@ -856,7 +858,11 @@ export class LoadoutService {
 
   async getShipHardpoints(shipUuid: string, env = 'live'): Promise<Record<string, unknown>[] | null> {
     const prisma = this.getClient(env);
-    const shipRows = await prisma.$queryRawUnsafe<Row[]>(toPostgres('SELECT uuid FROM game.ships WHERE uuid = ? AND env = ?'), shipUuid, env);
+    const shipRows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres('SELECT uuid FROM game.ships WHERE uuid = ? AND env = ?'),
+      shipUuid,
+      env,
+    );
     if (!shipRows.length) return null;
 
     const loadoutRows = await this.getLoadoutRows(shipUuid, env);

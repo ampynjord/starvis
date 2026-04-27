@@ -35,7 +35,10 @@ export class RsiWebsiteService {
     const limit = Math.min(100, Math.max(1, opts.limit || 20));
     const offset = (page - 1) * limit;
 
-    const countRows = await this.prisma.$queryRawUnsafe<Row[]>(toPostgres(`SELECT COUNT(*) as total FROM rsi.galactapedia g${w}`), ...params);
+    const countRows = await this.prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT COUNT(*) as total FROM rsi.galactapedia g${w}`),
+      ...params,
+    );
     const total = Number(countRows[0]?.total) || 0;
 
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
@@ -76,7 +79,10 @@ export class RsiWebsiteService {
     const limit = Math.min(100, Math.max(1, opts.limit || 20));
     const offset = (page - 1) * limit;
 
-    const countRows = await this.prisma.$queryRawUnsafe<Row[]>(toPostgres(`SELECT COUNT(*) as total FROM rsi.comm_links cl${w}`), ...params);
+    const countRows = await this.prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT COUNT(*) as total FROM rsi.comm_links cl${w}`),
+      ...params,
+    );
     const total = Number(countRows[0]?.total) || 0;
 
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
@@ -122,7 +128,10 @@ export class RsiWebsiteService {
     const limit = Math.min(100, Math.max(1, opts.limit || 20));
     const offset = (page - 1) * limit;
 
-    const countRows = await this.prisma.$queryRawUnsafe<Row[]>(toPostgres(`SELECT COUNT(*) as total FROM rsi.starmap_locations sl${w}`), ...params);
+    const countRows = await this.prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT COUNT(*) as total FROM rsi.starmap_locations sl${w}`),
+      ...params,
+    );
     const total = Number(countRows[0]?.total) || 0;
 
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(

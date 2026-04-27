@@ -19,7 +19,11 @@ export async function GET() {
 
     const text = await upstream.text();
     let data: any = {};
-    try { data = JSON.parse(text); } catch { /* empty */ }
+    try {
+      data = JSON.parse(text);
+    } catch {
+      /* empty */
+    }
 
     if (!upstream.ok) {
       return NextResponse.json({ error: data.error ?? 'Forbidden' }, { status: upstream.status });

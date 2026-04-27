@@ -3,7 +3,15 @@
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
 import { annotateWithAffiliation } from '../data/location-affiliations.js';
-import { convertBigIntToNumber, type FiltersResult, type PaginatedResult, paginate, type Row, stripInternal, toPostgres } from './shared.js';
+import {
+  convertBigIntToNumber,
+  type FiltersResult,
+  type PaginatedResult,
+  paginate,
+  type Row,
+  stripInternal,
+  toPostgres,
+} from './shared.js';
 
 const LOCATION_SORT = new Set(['name', 'class_name', 'type', 'system_code', 'is_scannable']);
 
@@ -109,7 +117,9 @@ export class LocationQueryService {
   async getAll(env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres('SELECT uuid, class_name, name, type, system_code, parent_uuid, loc_key, is_scannable, hide_in_starmap FROM game.locations WHERE env = ? ORDER BY name ASC'),
+      toPostgres(
+        'SELECT uuid, class_name, name, type, system_code, parent_uuid, loc_key, is_scannable, hide_in_starmap FROM game.locations WHERE env = ? ORDER BY name ASC',
+      ),
       env,
     );
     return rows.map(convertBigIntToNumber).map(stripInternal).map(annotateWithAffiliation);
@@ -123,7 +133,9 @@ export class LocationQueryService {
         env,
       ),
       prisma.$queryRawUnsafe<Row[]>(
-        toPostgres(`SELECT DISTINCT system_code as value FROM game.locations WHERE env = ? AND system_code IS NOT NULL ORDER BY system_code`),
+        toPostgres(
+          `SELECT DISTINCT system_code as value FROM game.locations WHERE env = ? AND system_code IS NOT NULL ORDER BY system_code`,
+        ),
         env,
       ),
     ]);

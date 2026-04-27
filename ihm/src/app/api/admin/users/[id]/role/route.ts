@@ -23,7 +23,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const text = await upstream.text();
     let data: any = {};
-    try { data = JSON.parse(text); } catch { /* empty */ }
+    try {
+      data = JSON.parse(text);
+    } catch {
+      /* empty */
+    }
 
     if (!upstream.ok) {
       return NextResponse.json({ error: data.error ?? 'Update failed' }, { status: upstream.status });

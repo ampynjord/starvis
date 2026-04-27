@@ -13,7 +13,11 @@ export async function POST(req: Request) {
 
     const text = await upstream.text();
     let data: any = {};
-    try { data = JSON.parse(text); } catch { /* empty body */ }
+    try {
+      data = JSON.parse(text);
+    } catch {
+      /* empty body */
+    }
 
     if (!upstream.ok) {
       return NextResponse.json({ error: data.error ?? 'Registration failed' }, { status: upstream.status });
@@ -32,9 +36,6 @@ export async function POST(req: Request) {
     const msg = e?.cause?.code ?? e?.message ?? String(e);
     console.error('[auth/register]', API_BASE, msg);
     const isDev = process.env.NODE_ENV !== 'production';
-    return NextResponse.json(
-      { error: isDev ? `API unreachable (${API_BASE}): ${msg}` : 'Service unavailable' },
-      { status: 503 },
-    );
+    return NextResponse.json({ error: isDev ? `API unreachable (${API_BASE}): ${msg}` : 'Service unavailable' }, { status: 503 });
   }
 }
