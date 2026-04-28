@@ -7,6 +7,12 @@ import type { PrismaLike as PrismaClient } from '@starvis/db';
 import express, { type Express } from 'express';
 import request from 'supertest';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+
+vi.mock('../src/middleware/auth.js', () => ({
+  requireJwt: (_req: any, _res: any, next: any) => next(),
+  requireJwtAdmin: (_req: any, _res: any, next: any) => next(),
+  authMiddleware: (_req: any, _res: any, next: any) => next(),
+}));
 import { mountCommodityRoutes } from '../src/routes/commodities.js';
 import { healthRouter } from '../src/routes/health.js';
 import { createRoutes } from '../src/routes/index.js';
