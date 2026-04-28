@@ -36,12 +36,7 @@ function extractBearer(req: Request): string | null {
  * En mode inspection, permet l'accès sans authentification.
  */
 export function requireJwt(req: Request, res: Response, next: NextFunction) {
-  // Mode inspection: permet l'accès public pour les professeurs
-  if (process.env.INSPECTION_MODE === 'true') {
-    return next();
-  }
-
-  if (!process.env.JWT_SECRET) return next(); // JWT désactivé → pas de blocage
+  if (!process.env.JWT_SECRET) return res.status(500).json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' });
 
   const token = extractBearer(req);
   if (!token) {
@@ -62,11 +57,6 @@ export function requireJwt(req: Request, res: Response, next: NextFunction) {
  * En mode inspection, permet l'accès sans authentification.
  */
 export function requireJwtAdmin(req: Request, res: Response, next: NextFunction) {
-  // Mode inspection: permet l'accès public pour les professeurs
-  if (process.env.INSPECTION_MODE === 'true') {
-    return next();
-  }
-
   // 1. Toujours accepter la clé admin (backward compat, scripts serveur)
   const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
   if (ADMIN_API_KEY) {
