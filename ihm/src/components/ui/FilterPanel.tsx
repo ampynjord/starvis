@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, SlidersHorizontal, X } from 'lucide-react';
 import { useState } from 'react';
 
 interface FilterOption { label: string; value: string | number; }
@@ -69,5 +69,33 @@ export function FilterPanel({ groups, onReset, hasFilters, className = '' }: Pro
       </div>
       {groups.map(g => <FilterGroup key={g.key} label={g.label} options={g.options} value={g.value} onChange={g.onChange} />)}
     </div>
+  );
+}
+
+/**
+ * Wrapper mobile pour les panels de filtres.
+ * Sur mobile : affiche un bouton toggle. Sur desktop (md+) : rendu inline.
+ */
+export function MobileFilterWrapper({ children, hasFilters }: { children: React.ReactNode; hasFilters?: boolean }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className={[
+          'md:hidden flex items-center gap-2 mb-3 px-3 py-1.5 rounded-sm text-xs font-mono-sc uppercase tracking-wider border transition-colors',
+          open || hasFilters
+            ? 'border-cyan-700 text-cyan-400 bg-cyan-950/40'
+            : 'border-slate-700 text-slate-400 hover:text-slate-200 hover:border-slate-500',
+        ].join(' ')}
+      >
+        <SlidersHorizontal size={13} />
+        Filtres
+        {hasFilters && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 ml-0.5" />}
+      </button>
+      <div className={open ? 'block md:block' : 'hidden md:block'}>
+        {children}
+      </div>
+    </>
   );
 }

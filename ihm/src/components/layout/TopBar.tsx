@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, ChevronRight, LogIn, User, LogOut, Settings } from 'lucide-react';
+import { Search, X, ChevronRight, LogIn, User, LogOut, Settings, Menu } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -11,7 +11,7 @@ import { useDebounce } from '@/hooks/useDebounce';
 import { useEnv } from '@/contexts/EnvContext';
 import { useAuth } from '@/contexts/AuthContext';
 
-export function TopBar() {
+export function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) {
   const { env } = useEnv();
   const { user, logout } = useAuth();
   const [query, setQuery] = useState('');
@@ -51,7 +51,15 @@ export function TopBar() {
   );
 
   return (
-    <header className="h-14 flex items-center gap-4 px-4 border-b border-border bg-panel/60 backdrop-blur-sm z-10">
+    <header className="h-14 flex items-center gap-2 sm:gap-4 px-3 sm:px-4 border-b border-border bg-panel/60 backdrop-blur-sm z-10">
+      {/* Hamburger (mobile only) */}
+      <button
+        onClick={onMenuToggle}
+        className="md:hidden p-1.5 text-slate-500 hover:text-slate-200 transition-colors shrink-0"
+        aria-label="Ouvrir le menu"
+      >
+        <Menu size={20} />
+      </button>
       {/* Search */}
       <div className="relative flex-1 max-w-xl">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={14} />

@@ -1,12 +1,17 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { usePathname } from 'next/navigation';
+import { useState, useCallback } from 'react';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+  const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), []);
+
   return (
     <div className="flex h-screen overflow-hidden bg-void">
       {/* Scan line */}
@@ -17,10 +22,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         }}
       />
 
-      <Sidebar />
+      {/* Overlay mobile */}
+      <AnimatePresence>
+        {sidebarOpen && (
+          <motion.div
+            key="overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-30 bg-black/60 md:hidden"
+            onClick={closeSidebar}
+          />
+        )}
+      </AnimatePresence>
+
+      <Sidebar open={sidebarOpen} onClose={closeSidebar} />
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <TopBar />
+        <TopBar onMenuToggle={toggleSidebar} />
         <main className="flex-1 overflow-y-auto bg-void bg-grid">
           <motion.div
             key={pathname}
@@ -28,7 +48,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25 }}
-            className="p-6 min-h-full"
+            className="p-3 sm:p-6 min-h-full"
           >
             {children}
           </motion.div>
