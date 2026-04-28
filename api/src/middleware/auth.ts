@@ -30,6 +30,13 @@ function extractBearer(req: Request): string | null {
   return null;
 }
 
+function extractCookieToken(req: Request): string | null {
+  const cookie = req.headers.cookie;
+  if (!cookie) return null;
+  const match = cookie.split(';').find((c) => c.trim().startsWith('starvis_token='));
+  return match ? (match.split('=')[1]?.trim() ?? null) : null;
+}
+
 /**
  * requireJwt — vérifie le Bearer JWT, injecte req.jwtPayload.
  * Accepte n'importe quel rôle (user, admin).
@@ -38,7 +45,7 @@ function extractBearer(req: Request): string | null {
 export function requireJwt(req: Request, res: Response, next: NextFunction) {
   if (!process.env.JWT_SECRET) return res.status(500).json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' });
 
-  const token = extractBearer(req);
+  const token = extractBearer(req) ?? extractCookieToken(req);
   if (!token) {
     return res.status(401).json({ success: false, error: 'Authentication required' });
   }
