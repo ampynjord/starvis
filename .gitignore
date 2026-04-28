@@ -78,3 +78,6 @@ db-backup/
 # Prisma generated clients (rebuilt on npm install)
 db/generated/
 
+
+# Scripts locaux non versionnés
+sync-dawnstar.ps1
