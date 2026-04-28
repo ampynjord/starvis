@@ -13,7 +13,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { api } from '@/services/api';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { FilterPanel } from '@/components/ui/FilterPanel';
+import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { Pagination } from '@/components/ui/Pagination';
@@ -364,6 +364,7 @@ export default function ChangelogPage() {
 
           <div className="flex gap-4">
             <div className="w-44 shrink-0">
+              <MobileFilterWrapper hasFilters={hasFeedFilters}>
               <FilterPanel
                 hasFilters={hasFeedFilters}
                 onReset={() => { setEntityType(''); setChangeType(''); setPage(1); }}
@@ -382,6 +383,7 @@ export default function ChangelogPage() {
                   },
                 ]}
               />
+              </MobileFilterWrapper>
             </div>
 
             <div className="flex-1 min-w-0">

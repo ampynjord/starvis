@@ -9,7 +9,7 @@ import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { Pagination } from '@/components/ui/Pagination';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { FilterPanel } from '@/components/ui/FilterPanel';
+import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { useListQueryState } from '@/hooks/useListQueryState';
@@ -108,6 +108,7 @@ export default function CommoditiesPage() {
 
       <div className="flex gap-4">
         <div className="w-44 shrink-0">
+          <MobileFilterWrapper hasFilters={activeCategory !== 'All'}>
           {filterGroups.length > 0 ? (
             <FilterPanel
               hasFilters={activeCategory !== 'All'}
@@ -117,6 +118,7 @@ export default function CommoditiesPage() {
           ) : (
             <div className="sci-panel p-3 text-xs text-slate-600 animate-pulse">Loading…</div>
           )}
+          </MobileFilterWrapper>
         </div>
 
         <div className="flex-1 min-w-0">
