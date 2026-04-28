@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { api } from "@/services/api";
 import { useEnv } from "@/contexts/EnvContext";
-import { FilterPanel } from "@/components/ui/FilterPanel";
+import { FilterPanel, MobileFilterWrapper } from "@/components/ui/FilterPanel";
 import { LoadingGrid } from "@/components/ui/LoadingGrid";
 import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -314,6 +314,7 @@ export default function ItemsPage() {
 
 			<div className="flex gap-4">
 				<div className="w-44 shrink-0">
+					<MobileFilterWrapper hasFilters={hasFilters}>
 					{filterGroups.length > 0 ? (
 						<FilterPanel
 							hasFilters={hasFilters}
@@ -325,6 +326,7 @@ export default function ItemsPage() {
 							Loading…
 						</div>
 					)}
+					</MobileFilterWrapper>
 				</div>
 
 				<div className="flex-1 min-w-0">
