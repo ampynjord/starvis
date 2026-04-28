@@ -57,7 +57,6 @@ services:
       DATABASE_URL: postgresql://${DB_USER:-starvis_user}:${DB_PASSWORD:-starvis_pass}@postgres:5432/${DB_NAME:-starvis}
       REDIS_HOST: redis
       REDIS_PORT: ${REDIS_INTERNAL_PORT:-6379}
-      INSPECTION_MODE: ${INSPECTION_MODE:-false}
       ADMIN_API_KEY: ${ADMIN_API_KEY:-}
       LOG_LEVEL: ${LOG_LEVEL:-debug}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
@@ -92,7 +91,6 @@ services:
     environment:
       API_URL: http://${API_HOST:-api}:${API_INTERNAL_PORT:-3000}
       JWT_SECRET: ${JWT_SECRET:-}
-      NEXT_PUBLIC_INSPECTION_MODE: ${INSPECTION_MODE:-false}
       # Nécessaire sur Windows : Docker Desktop ne propage pas inotify vers le conteneur
       CHOKIDAR_USEPOLLING: "true"
       CHOKIDAR_INTERVAL: "300"
