@@ -80,3 +80,6 @@ db/generated/
 
 # AI
 .claude
+
+# Scripts locaux non versionnés
+sync-dawnstar.ps1
