@@ -535,8 +535,8 @@ interface MG2Header {
 }
 
 function lzmaDecompress(stream: CTMStream, interleavedOut: CTMInterleavedStream, outSize: number) {
-  // biome-ignore lint: the LZMA decoder uses duck-typing for the output stream
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // biome-ignore lint/suspicious/noExplicitAny: the LZMA decoder uses duck-typing for the output stream
   LZMA.decompress(stream, stream, interleavedOut as any, outSize);
 }
 
