@@ -14,32 +14,123 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/${{ github.repository }}
+  NODE_VERSION: '22'
 
-# ─────────────────────────────────────────────────────────────
-# LINT
-# ─────────────────────────────────────────────────────────────
 jobs:
-  lint:
-    name: Lint (Biome)
+# ─────────────────────────────────────────────────────────────
+# INSTALL — artifact partagé entre tous les jobs du même run
+# ─────────────────────────────────────────────────────────────
+  install:
+    name: Install & Generate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      - run: npm ci
+      # Cache node_modules par lockfile hash → npm ci skippé si cache hit
+      - name: Restore node_modules cache
+        id: nm-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      - name: Biome check (read-only, no auto-fix)
-        run: ./node_modules/.bin/biome ci .
+      - name: Install dependencies
+        if: steps.nm-cache.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Generate DB clients
+        run: npm run db:generate
+
+      # Upload node_modules + generated → téléchargé par tous les autres jobs
+      - name: Upload workspace artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: workspace
+          path: |
+            node_modules/
+            db/generated/
+          compression-level: 0
+          retention-days: 1
+
+# ─────────────────────────────────────────────────────────────
+# SECURITY — indépendant, ne nécessite pas node_modules
+# ─────────────────────────────────────────────────────────────
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - run: npm audit --omit=dev --audit-level=critical
+
+# ─────────────────────────────────────────────────────────────
+# DOCKERFILE LINT — indépendant
+# ─────────────────────────────────────────────────────────────
+  dockerfile-lint:
+    name: Dockerfile Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint api/Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: api/Dockerfile
+          failure-threshold: error
+      - name: Lint ihm/Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: ihm/Dockerfile
+          failure-threshold: error
+      - name: Lint bot/Dockerfile
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: bot/Dockerfile
+          failure-threshold: error
+
+# ─────────────────────────────────────────────────────────────
+# DEPENDENCY REVIEW — uniquement sur Pull Requests
+# ─────────────────────────────────────────────────────────────
+  dependency-review:
+    name: Dependency Review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: always
+
+# ─────────────────────────────────────────────────────────────
+# LINT (Biome)
+# ─────────────────────────────────────────────────────────────
+  lint:
+    name: Lint (Biome)
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: workspace
+      - run: ./node_modules/.bin/biome ci .
 
 # ─────────────────────────────────────────────────────────────
 # TYPECHECK — matrix par workspace
 # ─────────────────────────────────────────────────────────────
   typecheck:
     name: Typecheck (${{ matrix.name }})
+    needs: install
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -49,58 +140,28 @@ jobs:
             cmd: ./node_modules/.bin/tsc --noEmit --project api/tsconfig.json
           - name: extractor
             cmd: ./node_modules/.bin/tsc --noEmit --project extractor/tsconfig.json
-          - name: ihm
-            cmd: ./node_modules/.bin/tsc --noEmit --project ihm/tsconfig.json
           - name: bot
             cmd: ./node_modules/.bin/tsc --noEmit --project bot/tsconfig.json
+          - name: ihm
+            cmd: ./node_modules/.bin/tsc --noEmit --project ihm/tsconfig.json
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
-      - name: Generate DB clients
-        run: npm run db:generate
-
-      # IHM: next-env.d.ts et .next/types/routes.d.ts sont gitignorés, on les crée avant tsc
+          name: workspace
       - name: Setup IHM next types
         if: matrix.name == 'ihm'
         run: |
           printf '/// <reference types="next" />\n/// <reference types="next/image-types/global" />\n' > ihm/next-env.d.ts
-          mkdir -p ihm/.next/types
-          echo 'export {}' > ihm/.next/types/routes.d.ts
-
-      - name: Typecheck ${{ matrix.name }}
-        run: ${{ matrix.cmd }}
+          mkdir -p ihm/.next/types && echo 'export {}' > ihm/.next/types/routes.d.ts
+      - run: ${{ matrix.cmd }}
 
 # ─────────────────────────────────────────────────────────────
-# SECURITY
-# ─────────────────────────────────────────────────────────────
-  security:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
-      - name: npm audit (production deps only)
-        run: npm audit --omit=dev --audit-level=critical
-
-# ─────────────────────────────────────────────────────────────
-# TESTS — API (nécessite postgres + redis)
+# TESTS API (postgres + redis)
 # ─────────────────────────────────────────────────────────────
   test-api:
     name: Tests API
+    needs: install
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -109,8 +170,7 @@ jobs:
           POSTGRES_PASSWORD: ci_password
           POSTGRES_USER: ci_user
           POSTGRES_DB: starvis_test
-        ports:
-          - 5432:5432
+        ports: ['5432:5432']
         options: >-
           --health-cmd="pg_isready -U ci_user"
           --health-interval=10s
@@ -118,8 +178,7 @@ jobs:
           --health-retries=5
       redis:
         image: redis:7-alpine
-        ports:
-          - 6379:6379
+        ports: ['6379:6379']
         options: >-
           --health-cmd="redis-cli ping"
           --health-interval=10s
@@ -127,22 +186,13 @@ jobs:
           --health-retries=5
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
-      - name: Generate DB clients
-        run: npm run db:generate
-
-      - name: Apply DB schema (test DB)
+          name: workspace
+      - name: Apply DB schema
         run: npm run push --workspace=@starvis/db
         env:
           DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_test
-
       - name: Run API tests
         run: npm run test --workspace=@starvis/api -- --reporter=verbose
         env:
@@ -154,56 +204,43 @@ jobs:
           ADMIN_API_KEY: ci_admin_key
 
 # ─────────────────────────────────────────────────────────────
-# TESTS — Extractor (pas de services requis)
+# TESTS EXTRACTOR
 # ─────────────────────────────────────────────────────────────
   test-extractor:
     name: Tests Extractor
+    needs: install
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
-      - name: Generate DB clients
-        run: npm run db:generate
-
-      - name: Run Extractor tests
-        run: npm run test --workspace=@starvis/extractor -- --reporter=verbose
+          name: workspace
+      - run: npm run test --workspace=@starvis/extractor -- --reporter=verbose
         env:
           NODE_ENV: test
 
 # ─────────────────────────────────────────────────────────────
-# TESTS — IHM (jsdom)
+# TESTS IHM
 # ─────────────────────────────────────────────────────────────
   test-ihm:
     name: Tests IHM
+    needs: install
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: 22
-          cache: npm
-
-      - run: npm ci
-
-      - name: Run IHM tests
-        run: npm run test --workspace=starvis-ihm -- --reporter=verbose
+          name: workspace
+      - run: npm run test --workspace=starvis-ihm -- --reporter=verbose
 
 # ─────────────────────────────────────────────────────────────
-# BUILD — images Docker (uniquement main ou tags v*)
+# BUILD Docker images (main + tags v*)
 # ─────────────────────────────────────────────────────────────
   build:
-    name: Build & Push ${{ matrix.image.name }}
+    name: Build ${{ matrix.image.name }}
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
-    needs: [lint, typecheck, test-api, test-extractor, test-ihm, security]
+    needs: [lint, typecheck, test-api, test-extractor, test-ihm, security, dockerfile-lint]
     permissions:
       contents: read
       packages: write
@@ -220,7 +257,6 @@ jobs:
           - name: bot
             file: bot/Dockerfile
             target: ''
-
     steps:
       - uses: actions/checkout@v4
 
@@ -259,7 +295,7 @@ jobs:
           provenance: false
 
 # ─────────────────────────────────────────────────────────────
-# DEPLOY — production VPS (uniquement main)
+# DEPLOY VPS (main uniquement)
 # ─────────────────────────────────────────────────────────────
   deploy:
     name: Deploy to VPS
@@ -269,7 +305,6 @@ jobs:
     environment:
       name: production
       url: https://starvis.ampynjord.bzh
-
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.5
@@ -296,7 +331,7 @@ jobs:
             echo "==> Pull new images..."
             docker compose -f docker-compose.prod.yml --env-file .env.prod pull
 
-            echo "==> Rolling restart (zero-downtime)..."
+            echo "==> Rolling restart..."
             docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --remove-orphans
 
             echo "==> Prune old images..."
@@ -304,6 +339,7 @@ jobs:
 
             echo "==> Health check..."
             sleep 5
-            docker inspect --format='{{.State.Health.Status}}' starvis-api | grep -q "^healthy$" || (echo "Health check FAILED" && exit 1)
+            docker inspect --format='{{.State.Health.Status}}' starvis-api | grep -q "^healthy$" \
+              || (echo "Health check FAILED" && exit 1)
 
             echo "==> Deploy complete."
