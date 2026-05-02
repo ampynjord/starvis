@@ -3,9 +3,9 @@
 # Expose uniquement l'API REST + PostgreSQL + Redis
 #
 # Usage :
-#   cp .env.api.example .env.api
-#   # Remplir .env.api
-#   docker compose -f docker-compose.api-only.yml --env-file .env.api up -d
+#   cp .env.api-only.example .env.api-only
+#   # Remplir .env.api-only
+#   docker compose -f docker-compose.api-only.yml --env-file .env.api-only up -d
 # ============================================================
 
 services:
