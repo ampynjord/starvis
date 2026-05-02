@@ -35,7 +35,7 @@ jobs:
             target: production
           - name: bot
             file: bot/Dockerfile
-            target: ''
+            target: production
 
     steps:
       - uses: actions/checkout@v4
@@ -89,25 +89,36 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Generate CHANGELOG
+        uses: orhun/git-cliff-action@v3
+        env:
+          OUTPUT: RELEASE_BODY.md
+          GITHUB_REPO: ${{ github.repository }}
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+
+      - name: Append Docker pull instructions
+        run: |
+          TAG="${{ github.ref_name }}"
+          PREFIX="${{ env.IMAGE_PREFIX }}"
+          cat >> RELEASE_BODY.md << EOF
+
+          ## Docker Images
+
+          \`\`\`bash
+          docker pull ${PREFIX}-api:${TAG}
+          docker pull ${PREFIX}-ihm:${TAG}
+          docker pull ${PREFIX}-bot:${TAG}
+          \`\`\`
+
+          ## Self-hosting
+
+          Voir le [docker-compose.api-only.yml](docker-compose.api-only.yml) et [.env.api-only.example](.env.api-only.example).
+          EOF
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
           make_latest: true
-          body: |
-            ## Docker Images
-
-            ```bash
-            # API
-            docker pull ${{ env.IMAGE_PREFIX }}-api:${{ github.ref_name }}
-
-            # IHM
-            docker pull ${{ env.IMAGE_PREFIX }}-ihm:${{ github.ref_name }}
-
-            # Bot Discord
-            docker pull ${{ env.IMAGE_PREFIX }}-bot:${{ github.ref_name }}
-            ```
-
-            ## Self-hosting
-
-            Voir le [docker-compose.api-only.yml](docker-compose.api-only.yml) et [.env.api-only.example](.env.api-only.example).
+          body_path: RELEASE_BODY.md
