@@ -33,7 +33,7 @@ jobs:
       - run: npm ci
 
       - name: Biome check (read-only, no auto-fix)
-        run: npx biome ci .
+        run: ./node_modules/.bin/biome ci .
 
 # ─────────────────────────────────────────────────────────────
 # TYPECHECK — matrix par workspace
@@ -46,19 +46,13 @@ jobs:
       matrix:
         include:
           - name: api
-            cmd: npx tsc --noEmit --project api/tsconfig.json
+            cmd: ./node_modules/.bin/tsc --noEmit --project api/tsconfig.json
           - name: extractor
-            cmd: npx tsc --noEmit --project extractor/tsconfig.json
+            cmd: ./node_modules/.bin/tsc --noEmit --project extractor/tsconfig.json
           - name: ihm
-            # next-env.d.ts et .next/types/routes.d.ts sont gitignorés,
-            # on les génère manuellement avant tsc
-            cmd: |
-              printf '/// <reference types="next" />\n/// <reference types="next/image-types/global" />\n' > ihm/next-env.d.ts
-              mkdir -p ihm/.next/types
-              echo 'export {}' > ihm/.next/types/routes.d.ts
-              npx tsc --noEmit --project ihm/tsconfig.json
+            cmd: ./node_modules/.bin/tsc --noEmit --project ihm/tsconfig.json
           - name: bot
-            cmd: npx tsc --noEmit --project bot/tsconfig.json
+            cmd: ./node_modules/.bin/tsc --noEmit --project bot/tsconfig.json
     steps:
       - uses: actions/checkout@v4
 
@@ -71,6 +65,14 @@ jobs:
 
       - name: Generate DB clients
         run: npm run db:generate
+
+      # IHM: next-env.d.ts et .next/types/routes.d.ts sont gitignorés, on les crée avant tsc
+      - name: Setup IHM next types
+        if: matrix.name == 'ihm'
+        run: |
+          printf '/// <reference types="next" />\n/// <reference types="next/image-types/global" />\n' > ihm/next-env.d.ts
+          mkdir -p ihm/.next/types
+          echo 'export {}' > ihm/.next/types/routes.d.ts
 
       - name: Typecheck ${{ matrix.name }}
         run: ${{ matrix.cmd }}
