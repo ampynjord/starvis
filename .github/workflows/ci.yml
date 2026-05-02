@@ -123,6 +123,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: workspace
+      - name: Restore permissions
+        run: chmod -R +x node_modules/.bin
       - run: ./node_modules/.bin/biome ci .
 
 # ─────────────────────────────────────────────────────────────
@@ -149,6 +151,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: workspace
+      - name: Restore permissions
+        run: chmod -R +x node_modules/.bin
       - name: Setup IHM next types
         if: matrix.name == 'ihm'
         run: |
@@ -189,6 +193,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: workspace
+      - name: Restore permissions
+        run: chmod -R +x node_modules/.bin
       - name: Apply DB schema
         run: npm run push --workspace=@starvis/db
         env:
@@ -215,6 +221,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: workspace
+      - name: Restore permissions
+        run: chmod -R +x node_modules/.bin
       - run: npm run test --workspace=@starvis/extractor -- --reporter=verbose
         env:
           NODE_ENV: test
@@ -231,6 +239,8 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: workspace
+      - name: Restore permissions
+        run: chmod -R +x node_modules/.bin
       - run: npm run test --workspace=starvis-ihm -- --reporter=verbose
 
 # ─────────────────────────────────────────────────────────────
