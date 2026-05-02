@@ -8,7 +8,7 @@
  *
  * Source: https://api.star-citizen.wiki/api/
  */
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
 import logger from './logger.js';
 
 const SC_WIKI_BASE = 'https://api.star-citizen.wiki/api';
