@@ -285,7 +285,9 @@ jobs:
 
             echo "==> Pull latest code..."
             git remote set-url origin https://ampynjord:${{ secrets.GHCR_PAT }}@github.com/ampynjord/starvis.git
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
+            git clean -fd
             git remote set-url origin https://github.com/ampynjord/starvis.git
 
             echo "==> Login GHCR..."
