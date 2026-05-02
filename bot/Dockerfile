@@ -10,7 +10,7 @@ COPY bot/ ./bot/
 RUN npm run build --workspace=@starvis/bot
 
 # Production
-FROM node:22-alpine
+FROM node:22-alpine AS production
 WORKDIR /app
 
 COPY package*.json ./
