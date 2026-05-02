@@ -84,7 +84,6 @@ db/generated/
 .claude
 
 # Scripts locaux non versionnés
-sync-dawnstar.ps1
 sync-remotes.sh
 
 # Env API self-hosted
