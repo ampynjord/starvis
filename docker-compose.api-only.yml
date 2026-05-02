@@ -1,0 +1,81 @@
+# ============================================================
+# STARVIS — API self-hosted (sans IHM, sans bot)
+# Expose uniquement l'API REST + PostgreSQL + Redis
+#
+# Usage :
+#   cp .env.api.example .env.api
+#   # Remplir .env.api
+#   docker compose -f docker-compose.api-only.yml --env-file .env.api up -d
+# ============================================================
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-starvis}
+      POSTGRES_USER: ${DB_USER:-starvis_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Décommentez pour accéder à la BDD depuis l'hôte (ex: extractor local)
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-redis
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes --maxmemory ${REDIS_MAXMEMORY:-64mb} --maxmemory-policy allkeys-lru
+
+  api:
+    image: ${API_IMAGE:-ghcr.io/ampynjord/starvis-api:latest}
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-api
+    volumes:
+      - ctm_cache:/app/ctm-cache
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${DB_USER:-starvis_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-starvis}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      ADMIN_API_KEY: ${ADMIN_API_KEY:?ADMIN_API_KEY is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-500}
+      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-50}
+      CTM_CACHE_DIR: /app/ctm-cache
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+    ports:
+      - "${API_PORT:-127.0.0.1:3000}:3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  ctm_cache:

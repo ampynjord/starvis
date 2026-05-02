@@ -28,8 +28,6 @@ crafting_data.sql
 extractor/.env.dev
 extractor/.env.prod
 
-# Scripts locaux (non versionnés)
-sync-remotes.sh
 
 # IDE & Editor
 .vscode/
@@ -87,3 +85,7 @@ db/generated/
 
 # Scripts locaux non versionnés
 sync-dawnstar.ps1
+sync-remotes.sh
+
+# Env API self-hosted
+.env.api
