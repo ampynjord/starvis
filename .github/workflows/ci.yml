@@ -284,7 +284,9 @@ jobs:
             cd /home/debian/starvis
 
             echo "==> Pull latest code..."
+            git remote set-url origin https://ampynjord:${{ secrets.GHCR_PAT }}@github.com/ampynjord/starvis.git
             git pull origin main
+            git remote set-url origin https://github.com/ampynjord/starvis.git
 
             echo "==> Login GHCR..."
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ampynjord --password-stdin
