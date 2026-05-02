@@ -303,7 +303,7 @@ jobs:
             docker image prune -af --filter "until=24h"
 
             echo "==> Health check..."
-            sleep 10
-            curl -sf http://localhost:3000/health/live || (echo "Health check FAILED" && exit 1)
+            sleep 5
+            docker inspect --format='{{.State.Health.Status}}' starvis-api | grep -q "^healthy$" || (echo "Health check FAILED" && exit 1)
 
             echo "==> Deploy complete."
