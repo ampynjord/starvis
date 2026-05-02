@@ -88,4 +88,4 @@ sync-remotes.sh
 .gitlab-ci.yml
 
 # Env API self-hosted
-.env.api
+.env.api-only

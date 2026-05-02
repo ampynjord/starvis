@@ -110,4 +110,4 @@ jobs:
 
             ## Self-hosting
 
-            Voir le [docker-compose.api-only.yml](docker-compose.api-only.yml) et [.env.api.example](.env.api.example).
+            Voir le [docker-compose.api-only.yml](docker-compose.api-only.yml) et [.env.api-only.example](.env.api-only.example).
