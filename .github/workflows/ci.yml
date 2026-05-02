@@ -46,15 +46,12 @@ jobs:
       - name: Generate DB clients
         run: npm run db:generate
 
-      # Upload node_modules + generated → téléchargé par tous les autres jobs
-      - name: Upload workspace artifact
+      # Upload db/generated/ uniquement (node_modules partagé via cache)
+      - name: Upload generated artifact
         uses: actions/upload-artifact@v4
         with:
-          name: workspace
-          path: |
-            node_modules/
-            db/generated/
-          compression-level: 0
+          name: db-generated
+          path: db/generated/
           retention-days: 1
 
 # ─────────────────────────────────────────────────────────────
@@ -120,12 +117,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/setup-node@v4
         with:
-          name: workspace
-          path: .
-      - name: Restore permissions
-        run: chmod -R +x node_modules/.bin
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Restore node_modules cache
+        id: nm-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install (fallback)
+        if: steps.nm-cache.outputs.cache-hit != 'true'
+        run: npm ci
       - run: ./node_modules/.bin/biome ci .
 
 # ─────────────────────────────────────────────────────────────
@@ -149,12 +152,22 @@ jobs:
             cmd: ./node_modules/.bin/tsc --noEmit --project ihm/tsconfig.json
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Restore node_modules cache
+        id: nm-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install (fallback)
+        if: steps.nm-cache.outputs.cache-hit != 'true'
+        run: npm ci
       - uses: actions/download-artifact@v4
         with:
-          name: workspace
-          path: .
-      - name: Restore permissions
-        run: chmod -R +x node_modules/.bin
+          name: db-generated
+          path: db/generated/
       - name: Setup IHM next types
         if: matrix.name == 'ihm'
         run: |
@@ -192,12 +205,22 @@ jobs:
           --health-retries=5
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Restore node_modules cache
+        id: nm-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install (fallback)
+        if: steps.nm-cache.outputs.cache-hit != 'true'
+        run: npm ci
       - uses: actions/download-artifact@v4
         with:
-          name: workspace
-          path: .
-      - name: Restore permissions
-        run: chmod -R +x node_modules/.bin
+          name: db-generated
+          path: db/generated/
       - name: Apply DB schema
         run: npm run push --workspace=@starvis/db
         env:
@@ -221,12 +244,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/setup-node@v4
         with:
-          name: workspace
-          path: .
-      - name: Restore permissions
-        run: chmod -R +x node_modules/.bin
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Restore node_modules cache
+        id: nm-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install (fallback)
+        if: steps.nm-cache.outputs.cache-hit != 'true'
+        run: npm ci
       - run: npm run test --workspace=@starvis/extractor -- --reporter=verbose
         env:
           NODE_ENV: test
@@ -240,12 +269,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
+      - uses: actions/setup-node@v4
         with:
-          name: workspace
-          path: .
-      - name: Restore permissions
-        run: chmod -R +x node_modules/.bin
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Restore node_modules cache
+        id: nm-cache
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install (fallback)
+        if: steps.nm-cache.outputs.cache-hit != 'true'
+        run: npm ci
       - run: npm run test --workspace=starvis-ihm -- --reporter=verbose
 
 # ─────────────────────────────────────────────────────────────
