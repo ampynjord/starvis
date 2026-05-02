@@ -81,8 +81,9 @@ db-backup/
 db/generated/
 
 
-# Scripts locaux non versionnés
+# Scripts et configs locaux non versionnés
 sync-remotes.sh
+.gitlab-ci.yml
 
 # Env API self-hosted
 .env.api
