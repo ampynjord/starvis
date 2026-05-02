@@ -39,12 +39,26 @@ jobs:
 # TYPECHECK — matrix par workspace
 # ─────────────────────────────────────────────────────────────
   typecheck:
-    name: Typecheck (${{ matrix.workspace }})
+    name: Typecheck (${{ matrix.name }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        workspace: [api, extractor, ihm, bot]
+        include:
+          - name: api
+            cmd: npx tsc --noEmit --project api/tsconfig.json
+          - name: extractor
+            cmd: npx tsc --noEmit --project extractor/tsconfig.json
+          - name: ihm
+            # next-env.d.ts et .next/types/routes.d.ts sont gitignorés,
+            # on les génère manuellement avant tsc
+            cmd: |
+              printf '/// <reference types="next" />\n/// <reference types="next/image-types/global" />\n' > ihm/next-env.d.ts
+              mkdir -p ihm/.next/types
+              echo 'export {}' > ihm/.next/types/routes.d.ts
+              npx tsc --noEmit --project ihm/tsconfig.json
+          - name: bot
+            cmd: npx tsc --noEmit --project bot/tsconfig.json
     steps:
       - uses: actions/checkout@v4
 
@@ -58,8 +72,8 @@ jobs:
       - name: Generate DB clients
         run: npm run db:generate
 
-      - name: Typecheck ${{ matrix.workspace }}
-        run: npm run typecheck --workspace=${{ matrix.workspace }} --if-present
+      - name: Typecheck ${{ matrix.name }}
+        run: ${{ matrix.cmd }}
 
 # ─────────────────────────────────────────────────────────────
 # SECURITY
@@ -128,7 +142,7 @@ jobs:
           DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_test
 
       - name: Run API tests
-        run: npm run test --workspace=@starvis/api -- --coverage --reporter=verbose
+        run: npm run test --workspace=@starvis/api -- --reporter=verbose
         env:
           DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_test
           REDIS_HOST: 127.0.0.1
@@ -136,14 +150,6 @@ jobs:
           NODE_ENV: test
           JWT_SECRET: ci_test_secret_at_least_32_chars_long
           ADMIN_API_KEY: ci_admin_key
-
-      - name: Upload API coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-api
-          path: api/coverage/
-          retention-days: 14
 
 # ─────────────────────────────────────────────────────────────
 # TESTS — Extractor (pas de services requis)
@@ -165,17 +171,9 @@ jobs:
         run: npm run db:generate
 
       - name: Run Extractor tests
-        run: npm run test --workspace=@starvis/extractor -- --coverage --reporter=verbose
+        run: npm run test --workspace=@starvis/extractor -- --reporter=verbose
         env:
           NODE_ENV: test
-
-      - name: Upload Extractor coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-extractor
-          path: extractor/coverage/
-          retention-days: 14
 
 # ─────────────────────────────────────────────────────────────
 # TESTS — IHM (jsdom)
@@ -194,15 +192,7 @@ jobs:
       - run: npm ci
 
       - name: Run IHM tests
-        run: npm run test --workspace=starvis-ihm -- --coverage --reporter=verbose
-
-      - name: Upload IHM coverage
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: coverage-ihm
-          path: ihm/coverage/
-          retention-days: 14
+        run: npm run test --workspace=starvis-ihm -- --reporter=verbose
 
 # ─────────────────────────────────────────────────────────────
 # BUILD — images Docker (uniquement main ou tags v*)
