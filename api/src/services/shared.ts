@@ -160,7 +160,7 @@ export async function paginate(
 
   let orderExpr: string;
   const sortKey = opts.sort || '';
-  if (jsonSortMap && jsonSortMap[sortKey]) {
+  if (jsonSortMap?.[sortKey]) {
     orderExpr = `${jsonSortMap[sortKey]} ${order}`;
   } else {
     const sortCol = sortCols.has(sortKey) ? sortKey : 'name';

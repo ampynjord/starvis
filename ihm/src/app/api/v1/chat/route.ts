@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (token) headers.Authorization = `Bearer ${token}`;
 
   const upstream = await fetch(`${API_URL}/api/v1/chat`, {
     method: 'POST',

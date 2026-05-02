@@ -9,7 +9,7 @@
  * GET  /admin/users           — liste des utilisateurs
  * PUT  /admin/users/:id/role  — modifier le rôle d'un utilisateur
  */
-import type { NextFunction, Request, Response, Router } from 'express';
+import type { Router } from 'express';
 import { requireJwt, requireJwtAdmin } from '../middleware/index.js';
 import { AuthService } from '../services/auth-service.js';
 import type { RouteDependencies } from './types.js';

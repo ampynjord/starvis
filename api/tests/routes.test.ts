@@ -13,6 +13,7 @@ vi.mock('../src/middleware/auth.js', () => ({
   requireJwtAdmin: (_req: any, _res: any, next: any) => next(),
   authMiddleware: (_req: any, _res: any, next: any) => next(),
 }));
+
 import { mountCommodityRoutes } from '../src/routes/commodities.js';
 import { healthRouter } from '../src/routes/health.js';
 import { createRoutes } from '../src/routes/index.js';

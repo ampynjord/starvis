@@ -59,7 +59,7 @@ export function mountSystemRoutes(router: Router, deps: RouteDependencies): void
     asyncHandler(async (req, res) => {
       const env = getQueryString(req, 'env') ?? 'live';
       const latest = await gameDataService!.getLatestExtraction(env);
-      sendDataWithETag(req, res, latest || { message: 'No extraction for env: ' + env });
+      sendDataWithETag(req, res, latest || { message: `No extraction for env: ${env}` });
     }),
   );
 }

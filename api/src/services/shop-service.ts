@@ -3,7 +3,7 @@
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
 import { formatEnumLabel } from '../normalizers/labels.js';
-import { type FiltersResult, type PaginatedResult, type Row, stripInternal, toPostgres } from './shared.js';
+import { type FiltersResult, type PaginatedResult, type Row, toPostgres } from './shared.js';
 
 function normalizeShopRow(row: Row): Row {
   return {

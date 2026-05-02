@@ -1,0 +1,252 @@
+# ============================================================
+# STARVIS — GitLab CI/CD (api-only + extractor)
+# Scope : api/, extractor/, db/
+# Registry : GitLab Container Registry
+# ============================================================
+
+stages:
+  - lint
+  - test
+  - build
+  - deploy
+
+variables:
+  # Npm cache partagé entre jobs
+  npm_config_cache: "$CI_PROJECT_DIR/.npm"
+  # Image API dans la registry GitLab
+  API_IMAGE: $CI_REGISTRY_IMAGE/api
+
+# ─────────────────────────────────────────────────────────────
+# Cache npm partagé
+# ─────────────────────────────────────────────────────────────
+.npm_cache: &npm_cache
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - .npm/
+    policy: pull-push
+
+# ─────────────────────────────────────────────────────────────
+# Template Node.js de base
+# ─────────────────────────────────────────────────────────────
+.node_base: &node_base
+  image: node:22-alpine
+  before_script:
+    - npm ci --cache .npm --prefer-offline
+    - npm run db:generate
+  <<: *npm_cache
+
+# ─────────────────────────────────────────────────────────────
+# LINT
+# ─────────────────────────────────────────────────────────────
+lint:
+  stage: lint
+  <<: *node_base
+  script:
+    - npx biome ci api/ extractor/ db/
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+typecheck:api:
+  stage: lint
+  <<: *node_base
+  script:
+    - npm run typecheck --workspace=@starvis/api
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+typecheck:extractor:
+  stage: lint
+  <<: *node_base
+  script:
+    - npm run typecheck --workspace=@starvis/extractor --if-present
+    - npx tsc --noEmit --project extractor/tsconfig.json
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# ─────────────────────────────────────────────────────────────
+# TEST — API (PostgreSQL + Redis)
+# ─────────────────────────────────────────────────────────────
+test:api:
+  stage: test
+  <<: *node_base
+  services:
+    - name: postgres:16-alpine
+      alias: postgres
+      variables:
+        POSTGRES_DB: starvis_test
+        POSTGRES_USER: ci_user
+        POSTGRES_PASSWORD: ci_password
+    - name: redis:7-alpine
+      alias: redis
+  variables:
+    DATABASE_URL: postgresql://ci_user:ci_password@postgres:5432/starvis_test
+    REDIS_HOST: redis
+    REDIS_PORT: "6379"
+    NODE_ENV: test
+    JWT_SECRET: ci_test_secret_at_least_32_chars_long
+    ADMIN_API_KEY: ci_admin_key
+    POSTGRES_DB: starvis_test
+    POSTGRES_USER: ci_user
+    POSTGRES_PASSWORD: ci_password
+  before_script:
+    - npm ci --cache .npm --prefer-offline
+    - npm run db:generate
+    - npm run push --workspace=@starvis/db
+  script:
+    - npm run test --workspace=@starvis/api -- --reporter=verbose
+  artifacts:
+    when: always
+    paths:
+      - api/coverage/
+    expire_in: 14 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# ─────────────────────────────────────────────────────────────
+# TEST — Extractor
+# ─────────────────────────────────────────────────────────────
+test:extractor:
+  stage: test
+  <<: *node_base
+  variables:
+    NODE_ENV: test
+  script:
+    - npm run test --workspace=@starvis/extractor -- --reporter=verbose
+  artifacts:
+    when: always
+    paths:
+      - extractor/coverage/
+    expire_in: 14 days
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# ─────────────────────────────────────────────────────────────
+# SECURITY
+# ─────────────────────────────────────────────────────────────
+security:
+  stage: test
+  <<: *node_base
+  script:
+    - npm audit --omit=dev --audit-level=high
+  allow_failure: true
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# ─────────────────────────────────────────────────────────────
+# BUILD — image Docker API
+# ─────────────────────────────────────────────────────────────
+build:api:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  variables:
+    DOCKER_TLS_CERTDIR: "/certs"
+  before_script:
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+  script:
+    - |
+      TAG_SHA="$API_IMAGE:$CI_COMMIT_SHORT_SHA"
+      TAG_BRANCH="$API_IMAGE:$CI_COMMIT_REF_SLUG"
+
+      docker build \
+        --cache-from "$API_IMAGE:latest" \
+        --build-arg BUILDKIT_INLINE_CACHE=1 \
+        -t "$TAG_SHA" \
+        -t "$TAG_BRANCH" \
+        -f api/Dockerfile \
+        --target production \
+        .
+
+      # Tag latest uniquement sur la branche par défaut
+      if [ "$CI_COMMIT_BRANCH" = "$CI_DEFAULT_BRANCH" ]; then
+        docker tag "$TAG_SHA" "$API_IMAGE:latest"
+        docker push "$API_IMAGE:latest"
+      fi
+
+      # Tag semver sur les tags v*
+      if [ -n "$CI_COMMIT_TAG" ]; then
+        docker tag "$TAG_SHA" "$API_IMAGE:$CI_COMMIT_TAG"
+        docker push "$API_IMAGE:$CI_COMMIT_TAG"
+      fi
+
+      docker push "$TAG_SHA"
+      docker push "$TAG_BRANCH"
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+
+# ─────────────────────────────────────────────────────────────
+# DEPLOY — VPS (désactivé jusqu'à provisioning du serveur)
+#
+# Secrets à configurer dans GitLab avant activation :
+#   Settings > CI/CD > Variables
+#   - VPS_HOST       : IP ou hostname du serveur
+#   - VPS_SSH_KEY    : clé privée SSH (type: File, protected)
+#   - VPS_USER       : utilisateur SSH (défaut: debian)
+#
+# Structure attendue sur le serveur :
+#   ~/starvis-api/
+#     docker-compose.api-only.yml
+#     .env.api
+#
+# Pour activer : changer `when: manual` en `when: on_success`
+# ─────────────────────────────────────────────────────────────
+deploy:
+  stage: deploy
+  image: alpine:3.20
+  before_script:
+    - apk add --no-cache openssh-client curl
+    - eval $(ssh-agent -s)
+    - echo "$VPS_SSH_KEY" | tr -d '\r' | ssh-add -
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh
+    - ssh-keyscan -H "$VPS_HOST" >> ~/.ssh/known_hosts
+  script:
+    - |
+      VPS_USER="${VPS_USER:-debian}"
+      ssh "$VPS_USER@$VPS_HOST" "bash -s" << 'DEPLOY'
+        set -e
+        cd ~/starvis-api
+
+        echo "==> Login GitLab registry..."
+        echo "$CI_REGISTRY_PASSWORD" | docker login "$CI_REGISTRY" \
+          -u "$CI_REGISTRY_USER" --password-stdin
+
+        echo "==> Pull new API image..."
+        docker compose -f docker-compose.api-only.yml --env-file .env.api pull api
+
+        echo "==> Rolling restart..."
+        docker compose -f docker-compose.api-only.yml --env-file .env.api up -d --remove-orphans
+
+        echo "==> Prune old images..."
+        docker image prune -af --filter "until=24h"
+
+        echo "==> Health check..."
+        sleep 10
+        curl -sf http://localhost:3000/health/live \
+          || (echo "Health check FAILED" && exit 1)
+
+        echo "==> Deploy complete."
+      DEPLOY
+  environment:
+    name: production-api
+    url: https://api.dawnstar.fr
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG
+  when: manual
+  allow_failure: true

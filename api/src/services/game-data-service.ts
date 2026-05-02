@@ -58,8 +58,7 @@ export class GameDataService {
 
   constructor(
     private getClient: (env: string) => PrismaClient,
-    /** @deprecated same as getClient('live') — kept for backwards compat */
-    private _metaClient: PrismaClient,
+    _metaClient: PrismaClient,
   ) {
     this.ships = new ShipQueryService(getClient);
     this.components = new ComponentQueryService(getClient);

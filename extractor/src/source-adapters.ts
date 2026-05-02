@@ -105,7 +105,7 @@ function normalizeRows(rows: unknown): ExternalSourceOverride[] {
   return out;
 }
 
-function readPayload(filePath: string): SourcePayload | null {
+function _readPayload(filePath: string): SourcePayload | null {
   if (!existsSync(filePath)) {
     logger.warn(`External source file not found: ${filePath}`);
     return null;
@@ -121,7 +121,7 @@ function readPayload(filePath: string): SourcePayload | null {
   }
 }
 
-async function fetchPayload(url: string, headers: Record<string, string>): Promise<SourcePayload | null> {
+async function _fetchPayload(url: string, headers: Record<string, string>): Promise<SourcePayload | null> {
   try {
     const res = await fetch(url, { headers });
     if (!res.ok) {
@@ -142,7 +142,7 @@ async function fetchPayload(url: string, headers: Record<string, string>): Promi
   }
 }
 
-function mergeMaps(
+function _mergeMaps(
   target: Map<string, ExternalSourceOverride>,
   incoming: Map<string, ExternalSourceOverride>,
 ): Map<string, ExternalSourceOverride> {
@@ -160,7 +160,7 @@ function mergeMaps(
   return target;
 }
 
-function mapPayload(payload: SourcePayload): ExternalCanonicalData {
+function _mapPayload(payload: SourcePayload): ExternalCanonicalData {
   return {
     items: toMap(normalizeRows(payload.items)),
     commodities: toMap(normalizeRows(payload.commodities)),
@@ -169,7 +169,7 @@ function mapPayload(payload: SourcePayload): ExternalCanonicalData {
   };
 }
 
-function count(data: ExternalCanonicalData): number {
+function _count(data: ExternalCanonicalData): number {
   return data.items.size + data.commodities.size + data.components.size + data.shops.size;
 }
 

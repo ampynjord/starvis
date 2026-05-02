@@ -654,7 +654,7 @@ export class ChatService {
     const result = await this.gameDataService.ships.getAllShips({ env, search: name, limit: 1, page: 1 });
     if (result.data.length) {
       const ship = result.data[0] as Record<string, unknown>;
-      return { uuid: ship['uuid'] as string, data: ship };
+      return { uuid: ship.uuid as string, data: ship };
     }
     // Fallback: strip the first word to handle "Anvil Arrow" → "Arrow", "Drake Cutlass Black" → "Cutlass Black"
     if (!name.includes(' ')) return null;
@@ -662,7 +662,7 @@ export class ChatService {
     const r2 = await this.gameDataService.ships.getAllShips({ env, search: shorter, limit: 1, page: 1 });
     if (!r2.data.length) return null;
     const ship = r2.data[0] as Record<string, unknown>;
-    return { uuid: ship['uuid'] as string, data: ship };
+    return { uuid: ship.uuid as string, data: ship };
   }
 
   /** Supprime les champs lourds inutiles pour le LLM (blobs, URLs longues, JSON brut) */
@@ -685,7 +685,7 @@ export class ChatService {
       }
       return out;
     }
-    if (typeof obj === 'string' && obj.length > 600) return obj.slice(0, 600) + '…';
+    if (typeof obj === 'string' && obj.length > 600) return `${obj.slice(0, 600)}…`;
     return obj;
   }
 
@@ -721,21 +721,21 @@ export class ChatService {
           return {
             total: result.total,
             ships: result.data.map((s: Record<string, unknown>) => ({
-              name: s['name'],
-              manufacturer: s['manufacturer_code'],
-              role: s['role'],
-              career: s['career'],
-              vehicle_category: s['vehicle_category'],
-              size_y: s['size_y'],
-              scm_speed: s['scm_speed'],
-              max_speed: s['max_speed'],
-              cargo_capacity: s['cargo_capacity'],
-              crew_size: s['crew_size'],
-              shield_hp: s['shield_hp'],
-              total_hp: s['total_hp'],
-              weapon_damage_total: s['weapon_damage_total'],
-              production_status: s['production_status'],
-              uuid: s['uuid'],
+              name: s.name,
+              manufacturer: s.manufacturer_code,
+              role: s.role,
+              career: s.career,
+              vehicle_category: s.vehicle_category,
+              size_y: s.size_y,
+              scm_speed: s.scm_speed,
+              max_speed: s.max_speed,
+              cargo_capacity: s.cargo_capacity,
+              crew_size: s.crew_size,
+              shield_hp: s.shield_hp,
+              total_hp: s.total_hp,
+              weapon_damage_total: s.weapon_damage_total,
+              production_status: s.production_status,
+              uuid: s.uuid,
             })),
           };
         }
@@ -761,14 +761,14 @@ export class ChatService {
             this.gameDataService.loadouts.getShipLoadout(found.uuid, env),
             this.gameDataService.loadouts.getShipHardpoints(found.uuid, env),
           ]);
-          return { ship: found.data['name'], loadout, hardpoints };
+          return { ship: found.data.name, loadout, hardpoints };
         }
 
         case 'get_ship_variants': {
           const found = await this.resolveShipUuid(args.name as string, env);
           if (!found) return { error: `Vaisseau "${args.name}" introuvable` };
           const variants = await this.gameDataService.ships.getShipVariants(found.uuid, env);
-          return { base_ship: found.data['name'], variants };
+          return { base_ship: found.data.name, variants };
         }
 
         case 'compare_ships': {
@@ -843,7 +843,7 @@ export class ChatService {
           });
           if (!search.data.length) return { error: `Recette "${args.name}" introuvable` };
           const recipe = search.data[0] as Record<string, unknown>;
-          const full = await this.gameDataService.crafting.getRecipeByUuid(recipe['uuid'] as string, env);
+          const full = await this.gameDataService.crafting.getRecipeByUuid(recipe.uuid as string, env);
           return full ?? recipe;
         }
 
@@ -853,7 +853,7 @@ export class ChatService {
           const query = ((args.query as string | undefined) ?? '').toLowerCase();
           const filtered = query
             ? elements.filter((e: Record<string, unknown>) =>
-                String(e['name'] ?? '')
+                String(e.name ?? '')
                   .toLowerCase()
                   .includes(query),
               )
@@ -908,18 +908,18 @@ export class ChatService {
           });
           if (!comms.data.length) return { error: `Commodité "${args.name}" introuvable` };
           const comm = comms.data[0] as Record<string, unknown>;
-          const prices = await this.gameDataService.trade.getCommodityPrices(comm['uuid'] as string, env);
+          const prices = await this.gameDataService.trade.getCommodityPrices(comm.uuid as string, env);
           return {
-            commodity: comm['name'],
-            occupancy_scu: comm['occupancy_scu'],
+            commodity: comm.name,
+            occupancy_scu: comm.occupancy_scu,
             prices: prices.map((p: Record<string, unknown>) => ({
-              shop: p['shop_name'],
-              system: p['system'],
-              city: p['city'],
-              buy_price: p['buy_price'],
-              sell_price: p['sell_price'],
-              stock: p['stock'],
-              demand: p['demand'],
+              shop: p.shop_name,
+              system: p.system,
+              city: p.city,
+              buy_price: p.buy_price,
+              sell_price: p.sell_price,
+              stock: p.stock,
+              demand: p.demand,
             })),
           };
         }
@@ -1143,7 +1143,7 @@ export class ChatService {
       });
 
       const content = final.choices[0]?.message?.content;
-      const text = content && content.trim() ? content : 'Aucune réponse générée.';
+      const text = content?.trim() ? content : 'Aucune réponse générée.';
       return wrapTablesInCodeBlock(text);
     } catch (e) {
       throw e instanceof Error ? e : new Error(String(e));
