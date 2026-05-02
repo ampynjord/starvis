@@ -1,0 +1,121 @@
+# ============================================================
+# STARVIS — Self-hosted
+# Images pré-buildées depuis GHCR, exposition directe des ports
+# Sans Traefik — compatible avec n'importe quel reverse proxy
+# (Nginx, Caddy, HAProxy…) ou accès direct.
+#
+# Usage :
+#   cp .env.selfhost.example .env.selfhost
+#   # Remplir .env.selfhost
+#   docker compose -f docker-compose.selfhost.yml --env-file .env.selfhost up -d
+# ============================================================
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-starvis}
+      POSTGRES_USER: ${DB_USER:-starvis_user}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    # Décommentez pour accéder à la BDD depuis l'hôte (ex: extractor local)
+    # ports:
+    #   - "127.0.0.1:5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-redis
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes --maxmemory ${REDIS_MAXMEMORY:-64mb} --maxmemory-policy allkeys-lru
+
+  api:
+    image: ${API_IMAGE:-ghcr.io/ampynjord/starvis-api:latest}
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-api
+    volumes:
+      - ctm_cache:/app/ctm-cache
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${DB_USER:-starvis_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-starvis}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      ADMIN_API_KEY: ${ADMIN_API_KEY:?ADMIN_API_KEY is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-500}
+      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-50}
+      CTM_CACHE_DIR: /app/ctm-cache
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+    ports:
+      - "${API_PORT:-127.0.0.1:3000}:3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  ihm:
+    image: ${IHM_IMAGE:-ghcr.io/ampynjord/starvis-ihm:latest}
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-ihm
+    environment:
+      API_URL: http://api:3000
+      JWT_SECRET: ${JWT_SECRET}
+      # Mettre à true pour désactiver l'authentification (accès public)
+      INSPECTION_MODE: ${INSPECTION_MODE:-false}
+      NEXT_PUBLIC_INSPECTION_MODE: ${INSPECTION_MODE:-false}
+    ports:
+      - "${IHM_PORT:-8080}:8080"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    depends_on:
+      api:
+        condition: service_healthy
+
+  # Bot Discord — optionnel, commenter si non utilisé
+  bot:
+    image: ${BOT_IMAGE:-ghcr.io/ampynjord/starvis-bot:latest}
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-bot
+    environment:
+      DISCORD_TOKEN: ${DISCORD_TOKEN:-}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
+      API_URL: http://api:3000
+      SITE_URL: ${SITE_URL:-http://localhost:${IHM_PORT:-8080}}
+      API_TOKEN: ${API_TOKEN:-}
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  redis_data:
+  ctm_cache:
