@@ -170,7 +170,7 @@ jobs:
       - name: Install (fallback)
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: db-generated
           path: db/generated/
@@ -225,7 +225,7 @@ jobs:
       - name: Install (fallback)
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: db-generated
           path: db/generated/
