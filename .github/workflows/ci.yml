@@ -78,17 +78,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Lint api/Dockerfile
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.3.0
         with:
           dockerfile: api/Dockerfile
           failure-threshold: error
       - name: Lint ihm/Dockerfile
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.3.0
         with:
           dockerfile: ihm/Dockerfile
           failure-threshold: error
       - name: Lint bot/Dockerfile
-        uses: hadolint/hadolint-action@v3.1.0
+        uses: hadolint/hadolint-action@v3.3.0
         with:
           dockerfile: bot/Dockerfile
           failure-threshold: error
