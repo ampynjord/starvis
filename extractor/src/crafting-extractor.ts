@@ -171,7 +171,14 @@ interface CostSlot {
   count: number;
   isOptional: boolean;
   resourceOptions: { resourceRef: string; scu: number; minQuality: number }[];
-  modifiers: { propertyRef: string; startQuality: number; endQuality: number; modifierAtStart: number; modifierAtEnd: number; modifierType: string }[];
+  modifiers: {
+    propertyRef: string;
+    startQuality: number;
+    endQuality: number;
+    modifierAtStart: number;
+    modifierAtEnd: number;
+    modifierType: string;
+  }[];
 }
 
 /** Parse a CraftingCost_Select object into a CostSlot */
