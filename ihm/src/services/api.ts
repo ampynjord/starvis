@@ -373,9 +373,9 @@ export const api = {
 
   // ─── Changelog ─────────────────────────────────────────────────────
   changelog: {
-    list: (p: { limit?: number; offset?: number; entity_type?: string; change_type?: string }) =>
+    list: (p: { env?: string; limit?: number; offset?: number; entity_type?: string; change_type?: string }) =>
       get<{ data: ChangelogEntry[]; total: number }>('/changelog', p),
-    summary: () => get<ChangelogSummary>('/changelog/summary'),
+    summary: (env?: string) => get<ChangelogSummary>('/changelog/summary', { env }),
   },
 
   // ─── Loadout simulator ─────────────────────────────────────────────

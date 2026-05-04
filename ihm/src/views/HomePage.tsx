@@ -123,12 +123,12 @@ export default function HomePage() {
     queryFn: () => api.stats.version(env),
   });
   const { data: changelog } = useQuery({
-    queryKey: ['changelog.list', { limit: 10 }],
-    queryFn: () => api.changelog.list({ limit: 10 }),
+    queryKey: ['changelog.list', env, { limit: 10 }],
+    queryFn: () => api.changelog.list({ env, limit: 10 }),
   });
   const { data: changelogSummary } = useQuery({
-    queryKey: ['changelog.summary'],
-    queryFn: api.changelog.summary,
+    queryKey: ['changelog.summary', env],
+    queryFn: () => api.changelog.summary(env),
   });
   const { data: randomShip, refetch: refetchRandom } = useQuery({
     queryKey: ['ships.random', env],

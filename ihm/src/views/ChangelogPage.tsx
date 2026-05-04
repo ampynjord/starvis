@@ -1,57 +1,69 @@
-/**
- * ChangelogPage — two views:
- *  • "Feed"       : flat paginated list with sidebar filters
- *  • "By Version" : changes grouped by game version, then by entity
- */
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
-  BookOpen, ChevronDown, ChevronRight,
-  Dices, List, Minus, Package, Plus, RefreshCw, Settings2,
+  BookOpen,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Cpu,
+  Dices,
+  Layers,
+  List,
+  Minus,
+  Package,
+  Plus,
+  RefreshCw,
+  Settings2,
+  ShoppingBag,
 } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
+import { useEnv } from '@/contexts/EnvContext';
 import { api } from '@/services/api';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { Pagination } from '@/components/ui/Pagination';
-import { fDateTime } from '@/utils/formatters';
+import { fDate, fDateTime } from '@/utils/formatters';
 import type { ChangelogEntry } from '@/types/api';
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// ── Config ────────────────────────────────────────────────────────────────────
 
-const ENTITY_TYPES_FEED    = ['ship', 'component', 'item', 'commodity', 'paint', 'shop'];
-const ENTITY_TYPES_HISTORY = ['', 'ship', 'component', 'item', 'commodity', 'paint'];
-const CHANGE_TYPES         = ['added', 'removed', 'modified'];
-const CHANGE_TYPES_HISTORY = ['', 'added', 'removed', 'modified'];
-const LIMIT                = 40;
+const HISTORY_LIMIT = 1000;
+const FEED_LIMIT = 40;
+const AUTO_EXPAND_MAX = 4;
 
-const ENTITY_ICON: Record<string, React.ElementType> = {
-  ship: Package,
-  component: Settings2,
-  item: Dices,
+type ChangeType = 'added' | 'removed' | 'modified';
+
+const CHANGE_CFG: Record<ChangeType, { color: 'green' | 'red' | 'amber'; icon: typeof Plus; sign: string }> = {
+  added:    { color: 'green', icon: Plus,      sign: '+' },
+  removed:  { color: 'red',   icon: Minus,     sign: '-' },
+  modified: { color: 'amber', icon: RefreshCw, sign: '~' },
 };
 
-const CHANGE_COLOR: Record<string, string> = {
-  added: 'green',
-  removed: 'red',
-  modified: 'amber',
-};
+function EntityIcon({ type }: { type: string }) {
+  if (type === 'ship')      return <Package   size={12} className="text-cyan-600   shrink-0" />;
+  if (type === 'component') return <Cpu       size={12} className="text-blue-500   shrink-0" />;
+  if (type === 'item')      return <Dices     size={12} className="text-purple-500 shrink-0" />;
+  if (type === 'commodity') return <ShoppingBag size={12} className="text-yellow-600 shrink-0" />;
+  if (type === 'paint')     return <Layers    size={12} className="text-pink-500   shrink-0" />;
+  if (type === 'shop')      return <Settings2 size={12} className="text-slate-500  shrink-0" />;
+  return <Package size={12} className="text-slate-600 shrink-0" />;
+}
 
-const CHANGE_ICON: Record<string, React.ElementType> = {
-  added: Plus,
-  removed: Minus,
-  modified: RefreshCw,
-};
+function entityHref(type: string, uuid: string): string | null {
+  if (type === 'ship')      return `/ships/${uuid}`;
+  if (type === 'component') return `/components/${uuid}`;
+  if (type === 'item')      return `/items/${uuid}`;
+  return null;
+}
 
-// ── Grouping helpers ──────────────────────────────────────────────────────────
+// ── Grouping ──────────────────────────────────────────────────────────────────
 
 function groupByVersion(entries: ChangelogEntry[]): Map<string, ChangelogEntry[]> {
   const map = new Map<string, ChangelogEntry[]>();
   for (const e of entries) {
-    const v = e.game_version ?? 'Unknown version';
+    const v = e.game_version ?? 'Unknown';
     if (!map.has(v)) map.set(v, []);
     map.get(v)!.push(e);
   }
@@ -61,118 +73,165 @@ function groupByVersion(entries: ChangelogEntry[]): Map<string, ChangelogEntry[]
 function groupByEntity(entries: ChangelogEntry[]): Map<string, ChangelogEntry[]> {
   const map = new Map<string, ChangelogEntry[]>();
   for (const e of entries) {
-    const key = `${e.entity_type}:${e.entity_uuid}:${e.entity_name}`;
+    const key = `${e.entity_type}\0${e.entity_uuid}\0${e.entity_name}`;
     if (!map.has(key)) map.set(key, []);
     map.get(key)!.push(e);
   }
   return map;
 }
 
-// ── Sub-components (By Version view) ─────────────────────────────────────────
+// ── Diff row ──────────────────────────────────────────────────────────────────
 
-function EntityCard({ entityKey, entries }: { entityKey: string; entries: ChangelogEntry[] }) {
-  const [expanded, setExpanded] = useState(false);
-  const [type, , name] = entityKey.split(':');
-  const Icon = ENTITY_ICON[type] ?? Package;
-  const uuid = entries[0]?.entity_uuid;
-  const entityLink =
-    type === 'ship'      ? `/ships/${uuid}` :
-    type === 'component' ? `/components/${uuid}` :
-    type === 'item'      ? `/items/${uuid}` : null;
+function DiffRow({ entry, border }: { entry: ChangelogEntry; border: boolean }) {
+  const cfg = CHANGE_CFG[entry.change_type as ChangeType];
+  const Icon = cfg?.icon ?? RefreshCw;
+  const iconColor =
+    entry.change_type === 'added'   ? 'text-green-500' :
+    entry.change_type === 'removed' ? 'text-red-500'   : 'text-amber-500';
 
   return (
-    <div className="border border-slate-800 rounded-sm overflow-hidden">
+    <div className={`flex items-baseline gap-3 px-4 py-1.5 text-xs ${border ? 'border-t border-slate-900/70' : ''}`}>
+      <Icon size={10} className={`${iconColor} shrink-0 mt-0.5`} />
+
+      {entry.field_name ? (
+        <span className="font-mono-sc text-slate-500 shrink-0 w-36 truncate">{entry.field_name}</span>
+      ) : (
+        <span className="font-mono-sc italic text-slate-700 shrink-0 w-36">—</span>
+      )}
+
+      {entry.change_type === 'modified' && entry.old_value != null && entry.new_value != null ? (
+        <span className="flex items-baseline gap-1.5 flex-1 min-w-0">
+          <span className="text-red-400 line-through max-w-[120px] truncate">{entry.old_value}</span>
+          <span className="text-slate-600">→</span>
+          <span className="text-green-400 max-w-[120px] truncate">{entry.new_value}</span>
+        </span>
+      ) : entry.new_value != null ? (
+        <span className="text-green-400 flex-1 truncate">{entry.new_value}</span>
+      ) : entry.old_value != null ? (
+        <span className="text-red-400 line-through flex-1 truncate">{entry.old_value}</span>
+      ) : (
+        <GlowBadge color={cfg?.color ?? 'slate'} size="xs">{entry.change_type}</GlowBadge>
+      )}
+    </div>
+  );
+}
+
+// ── Entity card ───────────────────────────────────────────────────────────────
+
+function EntityCard({ entityKey, entries }: { entityKey: string; entries: ChangelogEntry[] }) {
+  const [type, uuid = '', name = ''] = entityKey.split('\0');
+  const href = entityHref(type, uuid);
+
+  const counts = { added: 0, removed: 0, modified: 0 };
+  for (const e of entries) {
+    if (e.change_type in counts) counts[e.change_type as ChangeType]++;
+  }
+
+  const [expanded, setExpanded] = useState(entries.length <= AUTO_EXPAND_MAX);
+
+  return (
+    <div className="border-t border-slate-800/50">
       <button
-        onClick={() => setExpanded(v => !v)}
-        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/2 transition-colors text-left"
+        onClick={() => setExpanded((v) => !v)}
+        className="w-full flex items-center gap-2.5 px-4 py-2 hover:bg-white/[0.02] transition-colors text-left"
       >
-        <Icon size={13} className="text-slate-600 shrink-0" />
+        <EntityIcon type={type} />
+
         <div className="flex-1 min-w-0">
-          {entityLink ? (
+          {href ? (
             <Link
-              href={entityLink}
+              href={href}
               className="text-xs font-rajdhani font-semibold text-cyan-400 hover:text-cyan-300 transition-colors truncate block"
-              onClick={e => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
               {name}
             </Link>
           ) : (
-            <span className="text-xs font-rajdhani font-semibold text-slate-200 truncate block">{name}</span>
+            <span className="text-xs font-rajdhani font-semibold text-slate-300 truncate block">{name}</span>
           )}
         </div>
+
         <div className="flex items-center gap-1 shrink-0">
-          {(['added', 'removed', 'modified'] as const).map(ct => {
-            const count = entries.filter(e => e.change_type === ct).length;
-            if (!count) return null;
-            return (
-              <GlowBadge key={ct} color={CHANGE_COLOR[ct] as 'green' | 'red' | 'amber'} size="xs">
-                {count}
-              </GlowBadge>
-            );
-          })}
+          {counts.added    > 0 && <GlowBadge color="green" size="xs">+{counts.added}</GlowBadge>}
+          {counts.removed  > 0 && <GlowBadge color="red"   size="xs">-{counts.removed}</GlowBadge>}
+          {counts.modified > 0 && <GlowBadge color="amber" size="xs">~{counts.modified}</GlowBadge>}
         </div>
-        {expanded ? <ChevronDown size={12} className="text-slate-600" /> : <ChevronRight size={12} className="text-slate-600" />}
+
+        {expanded
+          ? <ChevronDown  size={11} className="text-slate-700 shrink-0" />
+          : <ChevronRight size={11} className="text-slate-700 shrink-0" />}
       </button>
 
       {expanded && (
-        <div className="border-t border-slate-900 bg-slate-950/30">
-          {entries.map((entry, i) => {
-            const ChangeIcon = CHANGE_ICON[entry.change_type] ?? RefreshCw;
-            return (
-              <div key={entry.id} className={`flex items-start gap-3 px-3 py-2 text-xs ${i > 0 ? 'border-t border-slate-900/50' : ''}`}>
-                <ChangeIcon
-                  size={11}
-                  className={
-                    entry.change_type === 'added'   ? 'text-green-500 mt-0.5 shrink-0' :
-                    entry.change_type === 'removed' ? 'text-red-500 mt-0.5 shrink-0' :
-                                                      'text-amber-500 mt-0.5 shrink-0'
-                  }
-                />
-                <div className="flex-1 min-w-0">
-                  {entry.field_name && (
-                    <span className="font-mono-sc text-slate-500 mr-1">{entry.field_name}:</span>
-                  )}
-                  {entry.change_type === 'modified' && entry.old_value && entry.new_value ? (
-                    <span className="text-slate-400">
-                      <span className="text-red-400 line-through">{entry.old_value}</span>
-                      {' → '}
-                      <span className="text-green-400">{entry.new_value}</span>
-                    </span>
-                  ) : entry.new_value ? (
-                    <span className="text-slate-300">{entry.new_value}</span>
-                  ) : (
-                    <span className="italic text-slate-600">{entry.change_type}</span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+        <div className="bg-black/20 pb-1">
+          {entries.map((entry, i) => (
+            <DiffRow key={entry.id} entry={entry} border={i > 0} />
+          ))}
         </div>
       )}
     </div>
   );
 }
 
+// ── Version section ───────────────────────────────────────────────────────────
+
 function VersionSection({ version, entries }: { version: string; entries: ChangelogEntry[] }) {
   const [open, setOpen] = useState(true);
   const grouped = groupByEntity(entries);
 
+  const byChange = { added: 0, removed: 0, modified: 0 };
+  const byType: Record<string, number> = {};
+  for (const e of entries) {
+    if (e.change_type in byChange) byChange[e.change_type as ChangeType]++;
+    byType[e.entity_type] = (byType[e.entity_type] ?? 0) + 1;
+  }
+
+  const date = entries[0]?.created_at;
+
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
+    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="rounded border border-slate-800 overflow-hidden">
       <button
-        onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center gap-3 px-4 py-3 bg-slate-900/60 border border-slate-800 rounded-sm hover:border-slate-700 transition-all text-left"
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-start gap-3 px-4 py-3 bg-slate-900/80 hover:bg-slate-900/50 transition-colors text-left"
       >
-        <div className="flex-1">
-          <span className="font-orbitron text-sm text-cyan-400">{version}</span>
-          <span className="ml-3 font-mono-sc text-xs text-slate-600">
-            {entries.length} change{entries.length > 1 ? 's' : ''} · {grouped.size} entit{grouped.size > 1 ? 'ies' : 'y'}
-          </span>
+        <div className="flex-1 min-w-0 space-y-1.5">
+          {/* Version + date */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="font-orbitron text-sm font-bold text-cyan-400">SC {version}</span>
+            {date && (
+              <span className="font-mono-sc text-xs text-slate-500 flex items-center gap-1">
+                <Clock size={10} /> {fDate(date)}
+              </span>
+            )}
+            <span className="font-mono-sc text-xs text-slate-600">
+              {grouped.size} {grouped.size === 1 ? 'entity' : 'entities'}
+            </span>
+          </div>
+
+          {/* Entity type breakdown + change counts */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {Object.entries(byType)
+              .sort(([, a], [, b]) => b - a)
+              .map(([t, n]) => (
+                <span key={t} className="flex items-center gap-1 text-[10px] font-mono-sc text-slate-500">
+                  <EntityIcon type={t} />
+                  {n} {t}
+                </span>
+              ))}
+            <span className="text-slate-800 hidden sm:inline">·</span>
+            {byChange.added    > 0 && <GlowBadge color="green" size="xs">+{byChange.added} added</GlowBadge>}
+            {byChange.removed  > 0 && <GlowBadge color="red"   size="xs">-{byChange.removed} removed</GlowBadge>}
+            {byChange.modified > 0 && <GlowBadge color="amber" size="xs">~{byChange.modified} modified</GlowBadge>}
+          </div>
         </div>
-        {open ? <ChevronDown size={14} className="text-slate-600" /> : <ChevronRight size={14} className="text-slate-600" />}
+
+        {open
+          ? <ChevronDown  size={14} className="text-slate-600 mt-1 shrink-0" />
+          : <ChevronRight size={14} className="text-slate-600 mt-1 shrink-0" />}
       </button>
+
       {open && (
-        <div className="space-y-1.5 pl-4">
+        <div className="bg-slate-950/30">
           {[...grouped.entries()].map(([key, ents]) => (
             <EntityCard key={key} entityKey={key} entries={ents} />
           ))}
@@ -182,57 +241,129 @@ function VersionSection({ version, entries }: { version: string; entries: Change
   );
 }
 
+// ── Feed row ──────────────────────────────────────────────────────────────────
+
+function FeedRow({ entry }: { entry: ChangelogEntry }) {
+  const cfg = CHANGE_CFG[entry.change_type as ChangeType];
+  const href = entityHref(entry.entity_type, entry.entity_uuid);
+
+  return (
+    <div className="sci-panel px-4 py-2.5 flex items-start gap-3">
+      {/* Change badge */}
+      <GlowBadge color={cfg?.color ?? 'slate'} size="xs" className="shrink-0 mt-0.5 w-5 text-center">
+        {cfg?.sign ?? entry.change_type[0]}
+      </GlowBadge>
+
+      {/* Entity icon */}
+      <span className="mt-0.5 shrink-0">
+        <EntityIcon type={entry.entity_type} />
+      </span>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          {href ? (
+            <Link href={href} className="text-sm font-rajdhani font-semibold text-cyan-400 hover:text-cyan-300 transition-colors">
+              {entry.entity_name}
+            </Link>
+          ) : (
+            <span className="text-sm font-rajdhani font-semibold text-slate-300">{entry.entity_name}</span>
+          )}
+          <GlowBadge color="slate" size="xs">{entry.entity_type}</GlowBadge>
+        </div>
+
+        {/* Inline diff */}
+        {(entry.field_name || entry.old_value || entry.new_value) && (
+          <div className="flex items-baseline gap-1.5 mt-0.5 text-xs">
+            {entry.field_name && (
+              <span className="font-mono-sc text-slate-500">{entry.field_name}:</span>
+            )}
+            {entry.change_type === 'modified' && entry.old_value != null && entry.new_value != null ? (
+              <>
+                <span className="text-red-400 line-through">{entry.old_value}</span>
+                <span className="text-slate-600">→</span>
+                <span className="text-green-400">{entry.new_value}</span>
+              </>
+            ) : entry.new_value != null ? (
+              <span className="text-green-400">{entry.new_value}</span>
+            ) : entry.old_value != null ? (
+              <span className="text-red-400 line-through">{entry.old_value}</span>
+            ) : null}
+          </div>
+        )}
+      </div>
+
+      {/* Meta */}
+      <div className="shrink-0 text-right hidden md:block">
+        {entry.game_version && (
+          <div className="text-[10px] font-mono-sc text-slate-600">SC {entry.game_version}</div>
+        )}
+        <div className="text-[10px] font-mono-sc text-slate-700">{fDate(entry.created_at)}</div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
-type View = 'feed' | 'history';
+type View = 'history' | 'feed';
 
 export default function ChangelogPage() {
+  const { env } = useEnv();
   const [view, setView] = useState<View>('history');
-
-  // Feed state
-  const [page, setPage]             = useState(1);
   const [entityType, setEntityType] = useState('');
   const [changeType, setChangeType] = useState('');
+  const [page, setPage] = useState(1);
 
-  // History (by version) state
-  const [hEntityType, setHEntityType] = useState('ship');
-  const [hChangeType, setHChangeType] = useState('');
+  function toggleEntity(t: string) {
+    setEntityType((prev) => (prev === t ? '' : t));
+    setPage(1);
+  }
+  function toggleChange(t: string) {
+    setChangeType((prev) => (prev === t ? '' : t));
+    setPage(1);
+  }
 
   const { data: summary } = useQuery({
-    queryKey: ['changelog.summary'],
-    queryFn: api.changelog.summary,
+    queryKey: ['changelog.summary', env],
+    queryFn: () => api.changelog.summary(env),
     staleTime: 5 * 60_000,
   });
 
   const feedQuery = useQuery({
-    queryKey: ['changelog.feed', { page, entityType, changeType }],
-    queryFn: () => api.changelog.list({
-      limit: LIMIT, offset: (page - 1) * LIMIT,
-      entity_type: entityType || undefined,
-      change_type: changeType || undefined,
-    }),
+    queryKey: ['changelog.feed', env, page, entityType, changeType],
+    queryFn: () =>
+      api.changelog.list({
+        env,
+        limit: FEED_LIMIT,
+        offset: (page - 1) * FEED_LIMIT,
+        entity_type: entityType || undefined,
+        change_type: changeType || undefined,
+      }),
     enabled: view === 'feed',
   });
 
   const historyQuery = useQuery({
-    queryKey: ['changelog.history', hEntityType, hChangeType],
-    queryFn: () => api.changelog.list({
-      limit: 1000, offset: 0,
-      entity_type: hEntityType || undefined,
-      change_type: hChangeType || undefined,
-    }),
+    queryKey: ['changelog.history', env, entityType, changeType],
+    queryFn: () =>
+      api.changelog.list({
+        env,
+        limit: HISTORY_LIMIT,
+        offset: 0,
+        entity_type: entityType || undefined,
+        change_type: changeType || undefined,
+      }),
     staleTime: 5 * 60_000,
     enabled: view === 'history',
   });
 
-  const totalPages = feedQuery.data ? Math.ceil(feedQuery.data.total / LIMIT) : 0;
-  const hasFeedFilters = !!(entityType || changeType);
+  const totalPages = feedQuery.data ? Math.ceil(feedQuery.data.total / FEED_LIMIT) : 0;
   const grouped = historyQuery.data ? groupByVersion(historyQuery.data.data) : new Map<string, ChangelogEntry[]>();
+  const hasFilters = !!(entityType || changeType);
 
   return (
     <div className="max-w-(--breakpoint-xl) mx-auto space-y-5">
-
-      {/* Header */}
+      {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase flex items-center gap-2">
@@ -241,104 +372,117 @@ export default function ChangelogPage() {
           </h1>
           {summary && (
             <p className="text-xs text-slate-500 mt-0.5 font-mono-sc">
-              {summary.total.toLocaleString('en-US')} entries
+              {summary.total.toLocaleString('en-US')} total entries
               {summary.last_extraction && ` · Last extraction: ${fDateTime(summary.last_extraction)}`}
             </p>
           )}
         </div>
 
-        {/* View toggle */}
         <div className="flex items-center gap-1 bg-slate-900/60 border border-slate-800 rounded-sm p-1">
           <button
             onClick={() => setView('history')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono-sc uppercase transition-all ${
-              view === 'history'
-                ? 'bg-cyan-900/60 text-cyan-400 border border-cyan-800'
-                : 'text-slate-500 hover:text-slate-300'
+              view === 'history' ? 'bg-cyan-900/60 text-cyan-400 border border-cyan-800' : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            <ChevronRight size={12} />
-            By Version
+            <ChevronRight size={12} /> By Version
           </button>
           <button
             onClick={() => setView('feed')}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono-sc uppercase transition-all ${
-              view === 'feed'
-                ? 'bg-cyan-900/60 text-cyan-400 border border-cyan-800'
-                : 'text-slate-500 hover:text-slate-300'
+              view === 'feed' ? 'bg-cyan-900/60 text-cyan-400 border border-cyan-800' : 'text-slate-500 hover:text-slate-300'
             }`}
           >
-            <List size={12} />
-            Feed
+            <List size={12} /> Feed
           </button>
         </div>
       </div>
 
-      {/* ── By Version view ─────────────────────────────────────────────────── */}
+      {/* ── Stats / filter bar ───────────────────────────────────────────── */}
+      {summary && (
+        <div className="sci-panel px-4 py-3 space-y-2.5">
+          {/* By entity type */}
+          <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+            {Object.entries(summary.by_entity)
+              .sort(([, a], [, b]) => (b as number) - (a as number))
+              .map(([t, n]) => (
+                <button
+                  key={t}
+                  onClick={() => toggleEntity(t)}
+                  className={`flex items-center gap-1.5 text-xs font-mono-sc transition-colors ${
+                    entityType === t ? 'text-cyan-400' : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  <EntityIcon type={t} />
+                  <span className="capitalize">{t}</span>
+                  <span className={entityType === t ? 'text-cyan-300 font-semibold' : 'text-slate-600'}>
+                    {(n as number).toLocaleString('en-US')}
+                  </span>
+                </button>
+              ))}
+          </div>
+
+          <div className="border-t border-slate-800/60" />
+
+          {/* By change type */}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
+            {Object.entries(summary.by_change).map(([t, n]) => {
+              const cfg = CHANGE_CFG[t as ChangeType];
+              return (
+                <button
+                  key={t}
+                  onClick={() => toggleChange(t)}
+                  className={`flex items-center gap-2 text-xs font-mono-sc transition-colors ${
+                    changeType === t ? 'text-cyan-400' : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  <GlowBadge color={changeType === t ? 'cyan' : (cfg?.color ?? 'slate')} size="xs">
+                    {cfg?.sign ?? t[0]} {t}
+                  </GlowBadge>
+                  <span className={changeType === t ? 'text-cyan-300 font-semibold' : 'text-slate-600'}>
+                    {(n as number).toLocaleString('en-US')}
+                  </span>
+                </button>
+              );
+            })}
+
+            {hasFilters && (
+              <button
+                onClick={() => { setEntityType(''); setChangeType(''); setPage(1); }}
+                className="ml-auto text-xs font-mono-sc text-slate-600 hover:text-slate-400 transition-colors underline"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── History view ─────────────────────────────────────────────────── */}
       {view === 'history' && (
         <>
-          {/* Summary badges */}
-          {summary && (
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(summary.by_change).map(([type, count]) => (
-                <div key={type} className="sci-panel px-3 py-1.5 flex items-center gap-2">
-                  <GlowBadge color={type === 'added' ? 'green' : type === 'removed' ? 'red' : 'amber'}>{type}</GlowBadge>
-                  <span className="font-mono-sc text-sm text-slate-300">{(count as number).toLocaleString('en-US')}</span>
-                </div>
-              ))}
+          {historyQuery.data && (
+            <div className="flex items-center justify-between text-xs font-mono-sc text-slate-600">
+              <span>
+                {historyQuery.data.data.length.toLocaleString('en-US')} entries · {grouped.size}{' '}
+                {grouped.size === 1 ? 'version' : 'versions'}
+              </span>
+              {historyQuery.data.total > HISTORY_LIMIT && (
+                <span className="text-amber-600">
+                  Showing first {HISTORY_LIMIT.toLocaleString('en-US')} of {historyQuery.data.total.toLocaleString('en-US')} — apply a filter to narrow
+                </span>
+              )}
             </div>
           )}
 
-          {/* Inline filters */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1 bg-slate-900/60 border border-slate-800 rounded-sm p-1">
-              {ENTITY_TYPES_HISTORY.map(t => (
-                <button
-                  key={t || 'all'}
-                  onClick={() => setHEntityType(t)}
-                  className={`px-2.5 py-1 rounded text-[10px] font-mono-sc uppercase transition-all ${
-                    hEntityType === t
-                      ? 'bg-cyan-900/60 text-cyan-400 border border-cyan-800'
-                      : 'text-slate-600 hover:text-slate-400'
-                  }`}
-                >
-                  {t || 'All'}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-1 bg-slate-900/60 border border-slate-800 rounded-sm p-1">
-              {CHANGE_TYPES_HISTORY.map(t => (
-                <button
-                  key={t || 'all'}
-                  onClick={() => setHChangeType(t)}
-                  className={`px-2.5 py-1 rounded text-[10px] font-mono-sc uppercase transition-all ${
-                    hChangeType === t
-                      ? t === 'added'    ? 'bg-green-900/40 text-green-400 border border-green-800' :
-                        t === 'removed'  ? 'bg-red-900/40 text-red-400 border border-red-800' :
-                        t === 'modified' ? 'bg-amber-900/40 text-amber-400 border border-amber-800' :
-                                           'bg-cyan-900/60 text-cyan-400 border border-cyan-800'
-                      : 'text-slate-600 hover:text-slate-400'
-                  }`}
-                >
-                  {t || 'All changes'}
-                </button>
-              ))}
-            </div>
-            {historyQuery.data && (
-              <span className="text-xs text-slate-600 font-mono-sc ml-auto">
-                {historyQuery.data.data.length.toLocaleString('en-US')} results · {grouped.size} versions
-              </span>
-            )}
-          </div>
-
           {historyQuery.isLoading ? (
-            <LoadingGrid message="LOADING…" />
+            <LoadingGrid message="LOADING HISTORY…" />
+          ) : historyQuery.error ? (
+            <ErrorState error={historyQuery.error as Error} onRetry={() => void historyQuery.refetch()} />
           ) : grouped.size === 0 ? (
-            <div className="text-center py-16 text-slate-600 text-sm font-rajdhani">
-              No changes found for the selected filters
-            </div>
+            <div className="text-center py-16 text-slate-600 text-sm font-rajdhani">No changes found for the selected filters</div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {[...grouped.entries()].map(([version, entries]) => (
                 <VersionSection key={version} version={version} entries={entries} />
               ))}
@@ -347,85 +491,42 @@ export default function ChangelogPage() {
         </>
       )}
 
-      {/* ── Feed view ───────────────────────────────────────────────────────── */}
+      {/* ── Feed view ───────────────────────────────────────────────────── */}
       {view === 'feed' && (
         <>
-          {/* Summary badges */}
-          {summary && (
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(summary.by_change).map(([type, count]) => (
-                <div key={type} className="sci-panel px-3 py-1.5 flex items-center gap-2">
-                  <GlowBadge color={type === 'added' ? 'green' : type === 'removed' ? 'red' : 'amber'}>{type}</GlowBadge>
-                  <span className="font-mono-sc text-sm text-slate-300">{(count as number).toLocaleString('en-US')}</span>
+          {feedQuery.isLoading ? (
+            <LoadingGrid message="LOADING FEED…" />
+          ) : feedQuery.error ? (
+            <ErrorState error={feedQuery.error as Error} onRetry={() => void feedQuery.refetch()} />
+          ) : (
+            <>
+              {feedQuery.data && (
+                <div className="text-xs font-mono-sc text-slate-600">
+                  {feedQuery.data.total.toLocaleString('en-US')} entries
                 </div>
-              ))}
-            </div>
-          )}
-
-          <div className="flex gap-4">
-            <div className="w-44 shrink-0">
-              <MobileFilterWrapper hasFilters={hasFeedFilters}>
-              <FilterPanel
-                hasFilters={hasFeedFilters}
-                onReset={() => { setEntityType(''); setChangeType(''); setPage(1); }}
-                groups={[
-                  {
-                    key: 'entity_type', label: 'Entity',
-                    options: ENTITY_TYPES_FEED.map(t => ({ label: t, value: t })),
-                    value: entityType,
-                    onChange: v => { setEntityType(v); setPage(1); },
-                  },
-                  {
-                    key: 'change_type', label: 'Change',
-                    options: CHANGE_TYPES.map(t => ({ label: t, value: t })),
-                    value: changeType,
-                    onChange: v => { setChangeType(v); setPage(1); },
-                  },
-                ]}
-              />
-              </MobileFilterWrapper>
-            </div>
-
-            <div className="flex-1 min-w-0">
-              {feedQuery.isLoading ? <LoadingGrid message="LOADING…" />
-              : feedQuery.error ? <ErrorState error={feedQuery.error as Error} onRetry={() => void feedQuery.refetch()} />
-              : (
-                <>
-                  <div className="space-y-1.5">
-                    {feedQuery.data?.data.map((entry, i) => (
-                      <motion.div key={entry.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: Math.min(i * 0.02, 0.4) }}>
-                        <div className="sci-panel px-4 py-2.5 flex items-center gap-3">
-                          <GlowBadge
-                            color={entry.change_type === 'added' ? 'green' : entry.change_type === 'removed' ? 'red' : 'amber'}
-                            size="xs"
-                          >
-                            {entry.change_type}
-                          </GlowBadge>
-                          <GlowBadge color="slate" size="xs">{entry.entity_type}</GlowBadge>
-                          <span className="flex-1 text-sm text-slate-300 truncate">{entry.entity_name}</span>
-                          {entry.game_version && (
-                            <span className="text-xs font-mono-sc text-slate-600 hidden md:block">{entry.game_version}</span>
-                          )}
-                          <span className="text-xs font-mono-sc text-slate-700 shrink-0 hidden lg:block">
-                            {fDateTime(entry.created_at)}
-                          </span>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                  <Pagination
-                    className="mt-6"
-                    page={page}
-                    totalPages={totalPages}
-                    onPageChange={p => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                  />
-                </>
               )}
-            </div>
-          </div>
+              <div className="space-y-1.5">
+                {feedQuery.data?.data.map((entry, i) => (
+                  <motion.div
+                    key={entry.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: Math.min(i * 0.015, 0.3) }}
+                  >
+                    <FeedRow entry={entry} />
+                  </motion.div>
+                ))}
+              </div>
+              <Pagination
+                className="mt-6"
+                page={page}
+                totalPages={totalPages}
+                onPageChange={(p) => { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              />
+            </>
+          )}
         </>
       )}
-
     </div>
   );
 }

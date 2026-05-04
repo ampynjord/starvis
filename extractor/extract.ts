@@ -92,6 +92,7 @@ const program = new Command()
   .option('-p, --p4k <path>', 'path to Data.p4k (overrides auto-detection)')
   .option('-e, --env <env>', 'game environment: live | ptu | custom', 'live')
   .option('-m, --modules <list>', 'comma-separated modules to extract (default: all)', 'all')
+  .option('-V, --game-version <version>', 'override detected game version (e.g. 4.7.2)')
   .option('--dry-run', 'parse P4K and log stats without writing to database')
   .option('--prod-db', 'Use the production database configured via SSH tunnel')
   .addHelpText(
@@ -127,9 +128,9 @@ Examples:
   );
 
 program.parse();
-const opts = program.opts<{ p4k?: string; env: string; modules: string; dryRun?: boolean }>();
+const opts = program.opts<{ p4k?: string; env: string; modules: string; gameVersion?: string; dryRun?: boolean }>();
 
-function parseArgs(): { p4kPath: string; env: GameEnv; modules: Set<ExtractionModule | 'all'>; dryRun: boolean } {
+function parseArgs(): { p4kPath: string; env: GameEnv; modules: Set<ExtractionModule | 'all'>; dryRun: boolean; gameVersion?: string } {
   const envVal = opts.env as GameEnv;
   if (!['live', 'ptu', 'custom'].includes(envVal)) {
     console.error(`Error: --env must be live|ptu|custom, got "${envVal}"`);
@@ -165,7 +166,7 @@ function parseArgs(): { p4kPath: string; env: GameEnv; modules: Set<ExtractionMo
     // P4K-free modules (e.g. ctm) don't need the P4K file
   }
 
-  return { p4kPath, env: envVal, modules, dryRun: !!opts.dryRun };
+  return { p4kPath, env: envVal, modules, dryRun: !!opts.dryRun, gameVersion: opts.gameVersion };
 }
 
 /** True when all requested modules are network/DB-only (no P4K access required) */
@@ -188,7 +189,7 @@ function needsGameDb(modules: Set<ExtractionModule | 'all'>): boolean {
 
 // ── Main ────────────────────────────────────────────────────
 async function main() {
-  const { p4kPath, env, modules, dryRun } = parseArgs();
+  const { p4kPath, env, modules, dryRun, gameVersion } = parseArgs();
   const onlyAll = modules.has('all');
   const selectedModules = onlyAll ? new Set<ExtractionModule | 'all'>(['all']) : modules;
 
@@ -207,7 +208,7 @@ async function main() {
   let dfService: DataForgeService | null = null;
   if (!isP4kFree(selectedModules)) {
     logger.info('Initializing DataForge…');
-    dfService = new DataForgeService(p4kPath);
+    dfService = new DataForgeService(p4kPath, gameVersion);
     await dfService.init();
     logger.info('✅ DataForge initialized');
   }

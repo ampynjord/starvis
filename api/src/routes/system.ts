@@ -11,7 +11,8 @@ export function mountSystemRoutes(router: Router, deps: RouteDependencies): void
     '/api/v1/changelog/summary',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const data = await gameDataService!.getChangelogSummary();
+      const { env } = ChangelogQuery.parse(req.query);
+      const data = await gameDataService!.getChangelogSummary(env);
       sendWithETag(req, res, { success: true, data });
     }),
   );
@@ -22,6 +23,7 @@ export function mountSystemRoutes(router: Router, deps: RouteDependencies): void
     asyncHandler(async (req, res) => {
       const filters = ChangelogQuery.parse(req.query);
       const result = await gameDataService!.getChangelog({
+        env: filters.env,
         limit: filters.limit,
         offset: filters.offset,
         entityType: filters.entity_type,
