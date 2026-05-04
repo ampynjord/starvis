@@ -135,14 +135,16 @@ export class GameDataService {
   // ── Stats & system info ──────────────────────────────────────────────────
 
   async getChangelog(params: {
+    env?: string;
     limit?: string;
     offset?: string;
     entityType?: string;
     changeType?: string;
   }): Promise<{ data: Row[]; total: number }> {
-    const prisma = this.getClient('live');
-    const where: string[] = [];
-    const p: (string | number)[] = [];
+    const env = params.env ?? 'live';
+    const prisma = this.getClient(env);
+    const where: string[] = ['e.game_env = ?'];
+    const p: (string | number)[] = [env];
     if (params.entityType) {
       where.push('c.entity_type = ?');
       p.push(params.entityType);
@@ -152,15 +154,18 @@ export class GameDataService {
       p.push(params.changeType);
     }
 
-    const w = where.length ? ` WHERE ${where.join(' AND ')}` : '';
-    const countRows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(`SELECT COUNT(*) as total FROM meta.changelog c${w}`), ...p);
+    const w = ` WHERE ${where.join(' AND ')}`;
+    const countRows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT COUNT(*) as total FROM meta.changelog c INNER JOIN meta.extraction_log e ON c.extraction_id = e.id${w}`),
+      ...p,
+    );
     const total = Number(countRows[0]?.total) || 0;
 
     const limit = Math.min(100, parseInt(params.limit || '50', 10));
     const offset = parseInt(params.offset || '0', 10);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(
-        `SELECT c.*, e.game_version, e.extracted_at as extraction_date FROM meta.changelog c LEFT JOIN meta.extraction_log e ON c.extraction_id = e.id${w} ORDER BY c.created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
+        `SELECT c.*, e.game_version, e.game_env, e.extracted_at as extraction_date FROM meta.changelog c INNER JOIN meta.extraction_log e ON c.extraction_id = e.id${w} ORDER BY c.created_at DESC LIMIT ${Number(limit)} OFFSET ${Number(offset)}`,
       ),
       ...p,
     );
@@ -314,14 +319,26 @@ export class GameDataService {
     };
   }
 
-  async getChangelogSummary(): Promise<Record<string, unknown>> {
-    const prisma = this.getClient('live');
+  async getChangelogSummary(env = 'live'): Promise<Record<string, unknown>> {
+    const prisma = this.getClient(env);
     const byType = await prisma.$queryRawUnsafe<Row[]>(
-      `SELECT entity_type, change_type, COUNT(*) as count
-       FROM meta.changelog GROUP BY entity_type, change_type ORDER BY entity_type, change_type`,
+      toPostgres(
+        `SELECT c.entity_type, c.change_type, COUNT(*) as count
+         FROM meta.changelog c INNER JOIN meta.extraction_log e ON c.extraction_id = e.id
+         WHERE e.game_env = ? GROUP BY c.entity_type, c.change_type ORDER BY c.entity_type, c.change_type`,
+      ),
+      env,
     );
-    const latest = await prisma.$queryRawUnsafe<Row[]>('SELECT extracted_at FROM meta.extraction_log ORDER BY id DESC LIMIT 1');
-    const total = await prisma.$queryRawUnsafe<Row[]>('SELECT COUNT(*) as total FROM meta.changelog');
+    const latest = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT extracted_at FROM meta.extraction_log WHERE game_env = ? ORDER BY id DESC LIMIT 1`),
+      env,
+    );
+    const total = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(
+        `SELECT COUNT(*) as total FROM meta.changelog c INNER JOIN meta.extraction_log e ON c.extraction_id = e.id WHERE e.game_env = ?`,
+      ),
+      env,
+    );
 
     const by_entity: Record<string, number> = {};
     const by_change: Record<string, number> = {};
