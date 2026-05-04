@@ -83,6 +83,7 @@ export const ShopQuery = z
 
 export const ChangelogQuery = z
   .object({
+    env: qEnv,
     limit: qStr,
     offset: qStr,
     entity_type: qStr,

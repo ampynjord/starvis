@@ -37,8 +37,14 @@ export class DataForgeService implements DataForgeContext {
   private guidIndex = new Map<string, string>();
   private manufacturerCache: Map<string, ManufacturerInfo> | null = null;
   private scVersion: string | null = null;
+  private scVersionOverride: string | null = null;
 
-  constructor(private p4kPath: string) {}
+  constructor(
+    private p4kPath: string,
+    versionOverride?: string,
+  ) {
+    if (versionOverride) this.scVersionOverride = versionOverride;
+  }
 
   // ============ DataForgeContext implementation ============
 
@@ -152,6 +158,11 @@ export class DataForgeService implements DataForgeContext {
       } catch (_err) {
         logger.warn('Could not read SC game version from P4K', { module: 'dataforge' });
       }
+
+    if (this.scVersionOverride) {
+      this.scVersion = this.scVersionOverride;
+      logger.info(`SC game version: ${this.scVersion} (from --game-version override)`, { module: 'dataforge' });
+    }
 
     const dcbEntry = await this.provider.getEntry('Data\\Game2.dcb');
     if (!dcbEntry) throw new Error('Game2.dcb not found');
