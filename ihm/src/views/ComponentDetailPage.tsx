@@ -6,6 +6,7 @@ import {
 	ChevronUp,
 	MapPin,
 	Rocket,
+	Zap,
 } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
@@ -62,16 +63,16 @@ function HeroStat({
 	label,
 	value,
 	accent,
-}: { label: string; value: string; accent?: string }) {
+	icon,
+}: { label: string; value: string; accent?: string; icon?: React.ReactNode }) {
 	if (value === "—") return null;
 	return (
-		<div className="flex flex-col items-center justify-center rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-3 min-w-[80px]">
-			<span className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest mb-1">
-				{label}
-			</span>
-			<span
-				className={`text-lg font-orbitron font-bold tabular-nums leading-none ${accent ?? "text-cyan-400"}`}
-			>
+		<div className="flex flex-col items-center gap-1 rounded-md border border-slate-800 bg-slate-900/60 px-4 py-3 min-w-[72px]">
+			<div className="flex items-center gap-1 text-slate-600">
+				{icon ?? <Zap size={9} />}
+				<span className="text-[9px] font-mono-sc uppercase tracking-widest">{label}</span>
+			</div>
+			<span className={`text-sm font-orbitron font-bold tabular-nums ${accent ?? "text-cyan-400"}`}>
 				{value}
 			</span>
 		</div>
@@ -410,7 +411,7 @@ export default function ComponentDetailPage() {
 			Number(comp.weapon_damage_stun) > 0);
 
 	return (
-		<div className="max-w-(--breakpoint-lg) mx-auto space-y-6">
+		<div className="max-w-(--breakpoint-xl) mx-auto space-y-6">
 			{/* Breadcrumb */}
 			<div className="flex items-center gap-2 text-xs font-mono-sc text-slate-600">
 				<button
@@ -428,57 +429,63 @@ export default function ComponentDetailPage() {
 				<span className="text-slate-400">{comp.name}</span>
 			</div>
 
-			{/* Header card */}
-			<div className="sci-panel p-6">
-				<div className="flex flex-col gap-4">
-					<div>
-						<p className={`text-xs font-mono-sc ${typeColor} uppercase tracking-widest mb-1`}>
-							{comp.type}
-							{comp.sub_type ? ` · ${comp.sub_type}` : ""}
-						</p>
-						<h1 className="font-orbitron text-2xl font-black text-slate-100">
-							{comp.name}
-						</h1>
-						<div className="flex flex-wrap gap-2 mt-3">
-							{comp.grade && (
-								<GlowBadge color="amber">{comp.grade}</GlowBadge>
-							)}
-							{comp.size != null && (
-								<GlowBadge color="slate">S{comp.size}</GlowBadge>
-							)}
-							{comp.manufacturer_name && (
-								<GlowBadge color="cyan">{comp.manufacturer_name}</GlowBadge>
-							)}
-							{comp.class_name && (
-								<GlowBadge color="slate">{comp.class_name}</GlowBadge>
-							)}
+			{/* Hero */}
+			<div className="sci-panel overflow-hidden">
+				{/* Image placeholder */}
+				<div className="relative w-full h-48 bg-slate-900">
+					<div className="w-full h-full flex items-center justify-center">
+						<span className="font-orbitron text-6xl font-black text-slate-800 select-none tracking-widest">
+							{comp.type.slice(0, 3).toUpperCase()}
+						</span>
+					</div>
+					<div className="absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-[#0A1628] to-transparent" />
+				</div>
+
+				{/* Header info */}
+				<div className="px-6 pb-6 -mt-8 relative">
+					<div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+						<div>
+							<p className={`text-xs font-mono-sc ${typeColor} uppercase tracking-widest mb-1`}>
+								{comp.type}{comp.sub_type ? ` · ${comp.sub_type}` : ""}
+							</p>
+							<h1 className="font-orbitron text-3xl font-black text-slate-100 leading-tight">
+								{comp.name}
+							</h1>
+							<div className="flex flex-wrap gap-2 mt-3">
+								{comp.grade && <GlowBadge color="amber">{comp.grade}</GlowBadge>}
+								{comp.size != null && <GlowBadge color="slate">S{comp.size}</GlowBadge>}
+								{comp.manufacturer_name && <GlowBadge color="cyan">{comp.manufacturer_name}</GlowBadge>}
+								{comp.class_name && <GlowBadge color="slate">{comp.class_name}</GlowBadge>}
+							</div>
 						</div>
 					</div>
-
-					{/* Hero stats */}
-					{heroStats.length > 0 && (
-						<div className="flex flex-wrap gap-2 pt-2 border-t border-slate-800">
-							{heroStats.map((s) => (
-								<HeroStat key={s.label} label={s.label} value={s.value} accent={s.accent} />
-							))}
-						</div>
-					)}
-
-					{comp.description && (
-						<p className="text-sm text-slate-500 leading-relaxed">
-							{comp.description}
-						</p>
-					)}
-
-					<CanonicalMeta
-						sourceType={comp.source_type}
-						sourceName={comp.source_name}
-						confidenceScore={comp.confidence_score}
-						canonicalKey={comp.canonical_component_key}
-						normalizedName={comp.normalized_name}
-					/>
 				</div>
 			</div>
+
+			{/* Quick stats bar */}
+			{heroStats.length > 0 && (
+				<div className="flex flex-wrap gap-2">
+					{heroStats.map((s) => (
+						<HeroStat key={s.label} label={s.label} value={s.value} accent={s.accent} />
+					))}
+				</div>
+			)}
+
+			{/* Description */}
+			{comp.description && (
+				<p className="text-sm text-slate-400 leading-relaxed border-l-2 border-cyan-900/40 pl-4">
+					{comp.description}
+				</p>
+			)}
+
+			{/* Canonical meta */}
+			<CanonicalMeta
+				sourceType={comp.source_type}
+				sourceName={comp.source_name}
+				confidenceScore={comp.confidence_score}
+				canonicalKey={comp.canonical_component_key}
+				normalizedName={comp.normalized_name}
+			/>
 
 			{/* Stats grid */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
