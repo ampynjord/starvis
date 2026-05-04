@@ -1331,7 +1331,7 @@ export class ExtractionService {
       });
     }
 
-    let saved = 0;
+    let matched = 0;
     let debugSamples = 0;
     const paintRows: (string | number | null)[][] = [];
     await conn.query('DELETE FROM game.ship_paints WHERE env = $1', [env]);
@@ -1398,6 +1398,7 @@ export class ExtractionService {
         continue;
       }
 
+      matched++;
       for (const shipUuid of shipUuids) {
         paintRows.push([env, shipUuid, paint.paintClassName, paint.paintName, paint.paintUuid]);
       }
@@ -1412,8 +1413,10 @@ export class ExtractionService {
       paintRows,
       ExtractionService.BATCH_SIZE,
     );
-    saved = paintRows.length;
-    onProgress?.(`Paints: ${saved}/${paints.length} saved (${paints.length - saved} unmatched)`);
+    const unmatched = paints.length - matched;
+    onProgress?.(
+      `Paints: ${paintRows.length} rows saved (${matched}/${paints.length} matched${unmatched ? `, ${unmatched} unmatched` : ''})`,
+    );
   }
 
   // ======================================================
