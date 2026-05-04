@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ChevronRight, MapPin, TrendingDown, TrendingUp } from 'lucide-react';
+import { ArrowLeft, ChevronRight, MapPin, Package, TrendingDown, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/services/api';
@@ -18,6 +18,23 @@ function fmtNum(v: number | null | undefined, unit = '', digits = 2): string {
   if (Number.isNaN(n)) return '—';
   return `${n.toFixed(digits)}${unit ? ` ${unit}` : ''}`;
 }
+
+// ── Quick stat pill ───────────────────────────────────────────────────────────
+
+function QuickStat({ icon, label, value, accent }: { icon: React.ReactNode; label: string; value: string; accent?: string }) {
+  if (value === '—') return null;
+  return (
+    <div className="flex flex-col items-center gap-1 rounded-md border border-slate-800 bg-slate-900/60 px-4 py-3 min-w-[72px]">
+      <div className="flex items-center gap-1 text-slate-600">
+        {icon}
+        <span className="text-[9px] font-mono-sc uppercase tracking-widest">{label}</span>
+      </div>
+      <span className={`text-sm font-orbitron font-bold tabular-nums ${accent ?? 'text-slate-200'}`}>{value}</span>
+    </div>
+  );
+}
+
+// ── Price row ─────────────────────────────────────────────────────────────────
 
 function PriceRow({ price }: { price: CommodityPrice }) {
   const hasBuy = price.buy_price != null && price.buy_price > 0;
@@ -85,8 +102,11 @@ export default function CommodityDetailPage() {
     return best;
   }, null);
 
+  const typeInitials = (commodity.type ?? 'COM').slice(0, 3).toUpperCase();
+
   return (
-    <div className="max-w-(--breakpoint-lg) mx-auto space-y-5">
+    <div className="max-w-(--breakpoint-xl) mx-auto space-y-6">
+
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs font-mono-sc text-slate-600">
         <button type="button" onClick={() => router.back()} className="hover:text-slate-400 transition-colors flex items-center gap-1">
@@ -99,78 +119,121 @@ export default function CommodityDetailPage() {
       </div>
 
       {/* Hero */}
-      <div className="sci-panel p-6">
-        <p className="text-xs font-mono-sc text-cyan-700 uppercase tracking-widest mb-1">{commodity.type ?? 'Commodity'}</p>
-        <h1 className="font-orbitron text-2xl font-black text-slate-100">{commodity.name}</h1>
-        <div className="flex flex-wrap gap-2 mt-3">
-          {commodity.type && <GlowBadge color="slate">{commodity.type}</GlowBadge>}
-          {commodity.sub_type && <GlowBadge color="slate">{commodity.sub_type}</GlowBadge>}
-          {commodity.symbol && <GlowBadge color="cyan">{commodity.symbol}</GlowBadge>}
-          {commodity.occupancy_scu != null && (
-            <GlowBadge color="amber">{fmtNum(commodity.occupancy_scu, 'μSCU', 4)}</GlowBadge>
-          )}
+      <div className="sci-panel overflow-hidden">
+        {/* Image placeholder */}
+        <div className="relative w-full h-48 bg-slate-900">
+          <div className="w-full h-full flex items-center justify-center">
+            <span className="font-orbitron text-6xl font-black text-slate-800 select-none tracking-widest">
+              {typeInitials}
+            </span>
+          </div>
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-[#0A1628] to-transparent" />
         </div>
-        <CanonicalMeta
-          className="mt-4"
-          sourceType={commodity.source_type}
-          sourceName={commodity.source_name}
-          confidenceScore={commodity.confidence_score}
-          canonicalKey={commodity.canonical_commodity_key}
-          normalizedName={commodity.normalized_name}
-        />
+
+        {/* Header info */}
+        <div className="px-6 pb-6 -mt-8 relative">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+            <div>
+              <p className="text-xs font-mono-sc text-cyan-700 uppercase tracking-widest mb-1">{commodity.type ?? 'Commodity'}</p>
+              <h1 className="font-orbitron text-3xl font-black text-slate-100 leading-tight">{commodity.name}</h1>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {commodity.type && <GlowBadge color="slate">{commodity.type}</GlowBadge>}
+                {commodity.sub_type && <GlowBadge color="slate">{commodity.sub_type}</GlowBadge>}
+                {commodity.symbol && <GlowBadge color="cyan">{commodity.symbol}</GlowBadge>}
+                {commodity.occupancy_scu != null && (
+                  <GlowBadge color="amber">{fmtNum(commodity.occupancy_scu, 'μSCU', 4)}</GlowBadge>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Price summary */}
-      {(bestBuy || bestSell) && (
-        <div className="grid grid-cols-2 gap-3">
+      {/* Quick stats — best prices */}
+      {(bestBuy || bestSell || commodity.occupancy_scu != null) && (
+        <div className="flex gap-2 flex-wrap">
           {bestBuy && (
-            <div className="sci-panel p-4">
-              <p className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest mb-1">Best buy price</p>
-              <p className="text-xl font-orbitron font-bold text-green-400">{fCredits(bestBuy.buy_price!)}</p>
-              <p className="text-xs text-slate-500 mt-1 truncate">{bestBuy.shop_name}</p>
-              <p className="text-[10px] text-slate-700 truncate">{bestBuy.system ?? '—'}</p>
-            </div>
+            <QuickStat
+              icon={<TrendingUp size={9} />}
+              label="Best buy"
+              value={fCredits(bestBuy.buy_price!)}
+              accent="text-green-400"
+            />
           )}
           {bestSell && (
-            <div className="sci-panel p-4">
-              <p className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest mb-1">Best sell price</p>
-              <p className="text-xl font-orbitron font-bold text-amber-400">{fCredits(bestSell.sell_price!)}</p>
-              <p className="text-xs text-slate-500 mt-1 truncate">{bestSell.shop_name}</p>
-              <p className="text-[10px] text-slate-700 truncate">{bestSell.system ?? '—'}</p>
-            </div>
+            <QuickStat
+              icon={<TrendingDown size={9} />}
+              label="Best sell"
+              value={fCredits(bestSell.sell_price!)}
+              accent="text-amber-400"
+            />
+          )}
+          {buyLocations.length > 0 && (
+            <QuickStat
+              icon={<MapPin size={9} />}
+              label="Buy locs"
+              value={String(buyLocations.length)}
+            />
+          )}
+          {sellLocations.length > 0 && (
+            <QuickStat
+              icon={<MapPin size={9} />}
+              label="Sell locs"
+              value={String(sellLocations.length)}
+            />
+          )}
+          {commodity.occupancy_scu != null && (
+            <QuickStat
+              icon={<Package size={9} />}
+              label="Density"
+              value={fmtNum(commodity.occupancy_scu, 'μSCU', 4)}
+            />
           )}
         </div>
       )}
 
-      {/* Buy locations */}
-      {buyLocations.length > 0 && (
-        <ScifiPanel
-          title="Buy Locations"
-          subtitle={`${buyLocations.length} location${buyLocations.length !== 1 ? 's' : ''}`}
-          actions={<TrendingUp size={14} className="text-green-700" />}
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-72 overflow-y-auto">
-            {buyLocations.sort((a, b) => (b.buy_price ?? 0) - (a.buy_price ?? 0)).map((p) => (
-              <PriceRow key={`buy-${p.id}`} price={{ ...p, sell_price: null }} />
-            ))}
-          </div>
-        </ScifiPanel>
-      )}
+      {/* Canonical meta */}
+      <CanonicalMeta
+        sourceType={commodity.source_type}
+        sourceName={commodity.source_name}
+        confidenceScore={commodity.confidence_score}
+        canonicalKey={commodity.canonical_commodity_key}
+        normalizedName={commodity.normalized_name}
+      />
 
-      {/* Sell locations */}
-      {sellLocations.length > 0 && (
-        <ScifiPanel
-          title="Sell Locations"
-          subtitle={`${sellLocations.length} location${sellLocations.length !== 1 ? 's' : ''}`}
-          actions={<MapPin size={14} className="text-amber-700" />}
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-72 overflow-y-auto">
-            {sellLocations.sort((a, b) => (a.sell_price ?? 0) - (b.sell_price ?? 0)).map((p) => (
-              <PriceRow key={`sell-${p.id}`} price={{ ...p, buy_price: null }} />
-            ))}
-          </div>
-        </ScifiPanel>
-      )}
+      {/* Locations grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+
+        {/* Buy locations */}
+        {buyLocations.length > 0 && (
+          <ScifiPanel
+            title="Buy Locations"
+            subtitle={`${buyLocations.length} location${buyLocations.length !== 1 ? 's' : ''}`}
+            actions={<TrendingUp size={14} className="text-green-700" />}
+          >
+            <div className="space-y-1 max-h-96 overflow-y-auto">
+              {buyLocations.sort((a, b) => (b.buy_price ?? 0) - (a.buy_price ?? 0)).map((p) => (
+                <PriceRow key={`buy-${p.id}`} price={{ ...p, sell_price: null }} />
+              ))}
+            </div>
+          </ScifiPanel>
+        )}
+
+        {/* Sell locations */}
+        {sellLocations.length > 0 && (
+          <ScifiPanel
+            title="Sell Locations"
+            subtitle={`${sellLocations.length} location${sellLocations.length !== 1 ? 's' : ''}`}
+            actions={<MapPin size={14} className="text-amber-700" />}
+          >
+            <div className="space-y-1 max-h-96 overflow-y-auto">
+              {sellLocations.sort((a, b) => (a.sell_price ?? 0) - (b.sell_price ?? 0)).map((p) => (
+                <PriceRow key={`sell-${p.id}`} price={{ ...p, buy_price: null }} />
+              ))}
+            </div>
+          </ScifiPanel>
+        )}
+      </div>
 
       {!prices?.length && !isLoading && (
         <ScifiPanel title="Trade Prices">
