@@ -9,17 +9,35 @@ const P4K_PATH = 'C:/Program Files/Roberts Space Industries/StarCitizen/PTU/Data
 
 const KEYWORDS = [
   // Véhicules
-  'vehicle', 'entity', 'ship', 'aircraft', 'spacecraft',
+  'vehicle',
+  'entity',
+  'ship',
+  'aircraft',
+  'spacecraft',
   // Fabricants
-  'manufacturer', 'brand', 'maker',
+  'manufacturer',
+  'brand',
+  'maker',
   // Mining
-  'mineable', 'mine', 'rock', 'ore', 'composition', 'deposit',
+  'mineable',
+  'mine',
+  'rock',
+  'ore',
+  'composition',
+  'deposit',
   // Crafting
-  'craft', 'blueprint', 'recipe', 'fabricat',
+  'craft',
+  'blueprint',
+  'recipe',
+  'fabricat',
   // Contrats
-  'contract', 'mission', 'generator',
+  'contract',
+  'mission',
+  'generator',
   // Items
-  'scitem', 'item', 'component',
+  'scitem',
+  'item',
+  'component',
 ];
 
 async function main() {
@@ -41,7 +59,7 @@ async function main() {
 
   // 1. Tous les structs triés alphabétiquement
   const allStructs = df.structDefs.map((s) => s.name).sort();
-  console.log('\n=== ALL STRUCTS (' + allStructs.length + ') ===');
+  console.log(`\n=== ALL STRUCTS (${allStructs.length}) ===`);
   for (const s of allStructs) console.log(' ', s);
 
   // 2. Structs par keyword

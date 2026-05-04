@@ -43,6 +43,6 @@
     }
   },
   "files": {
-    "includes": ["**/*.ts", "**/*.js", "**/*.mjs", "**/*.json", "**/*.vue"]
+    "includes": ["**/*.ts", "**/*.js", "**/*.mjs", "**/*.json", "**/*.vue", "!ihm/src/lib/CTMLoader.ts"]
   }
 }
