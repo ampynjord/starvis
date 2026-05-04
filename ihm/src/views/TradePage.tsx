@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import type { Commodity, Shop, TradeRoute } from '@/types/api';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -116,10 +117,7 @@ export default function TradePage() {
 
   return (
     <div className="max-w-(--breakpoint-2xl) mx-auto">
-      <div className="mb-4">
-        <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Trade Routes</h1>
-        <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">Trade route calculator</p>
-      </div>
+      <PageHeader title="Trade Routes" subtitle="Trade route calculator" />
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4">
         {/* Main content */}

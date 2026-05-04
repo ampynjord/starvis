@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
-  BookOpen,
   ChevronDown,
   ChevronRight,
   Clock,
@@ -23,6 +22,7 @@ import { api } from '@/services/api';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Pagination } from '@/components/ui/Pagination';
 import { fDate, fDateTime } from '@/utils/formatters';
 import type { ChangelogEntry } from '@/types/api';
@@ -378,41 +378,31 @@ export default function ChangelogPage() {
   const hasFilters = !!(entityType || changeType);
 
   return (
-    <div className="max-w-(--breakpoint-xl) mx-auto space-y-5">
-      {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase flex items-center gap-2">
-            <BookOpen size={18} />
-            Changelog
-          </h1>
-          {summary && (
-            <p className="text-xs text-slate-500 mt-0.5 font-mono-sc">
-              {summary.total.toLocaleString('en-US')} total entries
-              {summary.last_extraction && ` · Last extraction: ${fDateTime(summary.last_extraction)}`}
-            </p>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1 bg-slate-900/60 border border-slate-800 rounded-sm p-1">
-          <button
-            onClick={() => setView('history')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono-sc uppercase transition-all ${
-              view === 'history' ? 'bg-cyan-900/60 text-cyan-400 border border-cyan-800' : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            <ChevronRight size={12} /> By Version
-          </button>
-          <button
-            onClick={() => setView('feed')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono-sc uppercase transition-all ${
-              view === 'feed' ? 'bg-cyan-900/60 text-cyan-400 border border-cyan-800' : 'text-slate-500 hover:text-slate-300'
-            }`}
-          >
-            <List size={12} /> Feed
-          </button>
-        </div>
-      </div>
+    <div className="max-w-(--breakpoint-2xl) mx-auto space-y-5">
+      <PageHeader
+        title="Changelog"
+        subtitle={summary ? `${summary.total.toLocaleString('en-US')} total entries${summary.last_extraction ? ` · Last extraction: ${fDateTime(summary.last_extraction)}` : ''}` : undefined}
+        actions={
+          <div className="flex items-center gap-1 bg-slate-900/60 border border-slate-800 rounded-sm p-1">
+            <button
+              onClick={() => setView('history')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono-sc uppercase transition-all ${
+                view === 'history' ? 'bg-cyan-900/60 text-cyan-400 border border-cyan-800' : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              <ChevronRight size={12} /> By Version
+            </button>
+            <button
+              onClick={() => setView('feed')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono-sc uppercase transition-all ${
+                view === 'feed' ? 'bg-cyan-900/60 text-cyan-400 border border-cyan-800' : 'text-slate-500 hover:text-slate-300'
+              }`}
+            >
+              <List size={12} /> Feed
+            </button>
+          </div>
+        }
+      />
 
       {/* ── Stats / filter bar ───────────────────────────────────────────── */}
       {summary && (

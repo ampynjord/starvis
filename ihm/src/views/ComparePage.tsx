@@ -14,9 +14,10 @@ import {
 } from 'recharts';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
-import { ScifiPanel } from '@/components/ui/ScifiPanel';
-import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { GlowBadge } from '@/components/ui/GlowBadge';
+import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { useDebounce } from '@/hooks/useDebounce';
 import { fDimension, fMass, fSpeed } from '@/utils/formatters';
 import type { Ship, ShipListItem } from '@/types/api';
@@ -155,13 +156,11 @@ export default function ComparePage() {
   };
 
   return (
-    <div className="max-w-(--breakpoint-xl) mx-auto space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest">COMPARE</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Compare up to 4 ships side by side</p>
-        </div>
-        {canShowComparison && (
+    <div className="max-w-(--breakpoint-2xl) mx-auto space-y-6">
+      <PageHeader
+        title="Compare"
+        subtitle="Compare up to 4 ships side by side"
+        actions={canShowComparison ? (
           <button
             type="button"
             onClick={handleShare}
@@ -170,8 +169,8 @@ export default function ComparePage() {
             {copied ? <Check size={12} className="text-green-400" /> : <Link size={12} />}
             {copied ? 'Copied!' : 'Share'}
           </button>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       {/* Ship selectors */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

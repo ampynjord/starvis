@@ -1,13 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Palette, Search } from 'lucide-react';
+import { Palette } from 'lucide-react';
 import Link from 'next/link';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
-import { LoadingGrid } from '@/components/ui/LoadingGrid';
-import { Pagination } from '@/components/ui/Pagination';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { Pagination } from '@/components/ui/Pagination';
 import { useListQueryState } from '@/hooks/useListQueryState';
 import type { PaintListItem } from '@/types/api';
 
@@ -24,28 +25,14 @@ export default function PaintsPage() {
 
   return (
     <div className="max-w-(--breakpoint-2xl) mx-auto">
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <div>
-          <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">
-            Paints
-          </h1>
-          {data && (
-            <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">
-              {data.total.toLocaleString('en-US')} paints
-            </p>
-          )}
-        </div>
-        <div className="relative w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={13} />
-          <input
-            type="text"
-            value={search}
-            onChange={e => updateSearch(e.target.value)}
-            placeholder="Search paint or ship…"
-            className="sci-input w-full pl-8 text-xs"
-          />
-        </div>
-      </div>
+      <PageHeader
+        title="Paints"
+        count={data?.total}
+        countLabel="paints"
+        search={search}
+        searchPlaceholder="Search paint or ship…"
+        onSearch={updateSearch}
+      />
 
       {isLoading ? (
         <LoadingGrid message="LOADING PAINTS…" />

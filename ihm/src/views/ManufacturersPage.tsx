@@ -3,10 +3,11 @@ import { Building2, ChevronRight, Cpu, Crosshair, Package, Pill, Rocket, Setting
 import { useState } from 'react';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
-import { ScifiPanel } from '@/components/ui/ScifiPanel';
-import { LoadingGrid } from '@/components/ui/LoadingGrid';
-import { ErrorState } from '@/components/ui/ErrorState';
 import { ShipCard } from '@/components/ship/ShipCard';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import type { ComponentListItem, ItemListItem, Manufacturer } from '@/types/api';
 import { COMPONENT_TYPE_COLORS } from '@/utils/constants';
 
@@ -152,8 +153,8 @@ export default function ManufacturersPage() {
   ];
 
   return (
-    <div className="max-w-(--breakpoint-xl) mx-auto space-y-6">
-      <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">Manufacturers</h1>
+    <div className="max-w-(--breakpoint-2xl) mx-auto space-y-6">
+      <PageHeader title="Manufacturers" count={manufacturers?.length} countLabel="manufacturers" />
 
       <div className="flex gap-6">
         {/* Sidebar — manufacturer list */}

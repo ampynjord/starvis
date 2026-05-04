@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { Search, ChevronRight } from 'lucide-react';
+import { ChevronRight, Search } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
-import { useSearchParams, useRouter, usePathname } from 'next/navigation';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
-import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { useDebounce } from '@/hooks/useDebounce';
 
 type Tab = 'all' | 'ships' | 'components' | 'items' | 'commodities' | 'missions' | 'recipes';
@@ -73,13 +74,8 @@ export default function SearchResultsPage() {
   const totalCount = sections.reduce((sum, s) => sum + s.items.length, 0);
 
   return (
-    <div className="max-w-(--breakpoint-lg) mx-auto space-y-4">
-      <div className="flex items-center gap-3 mb-2">
-        <Search size={18} className="text-cyan-400" />
-        <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">
-          Search
-        </h1>
-      </div>
+    <div className="max-w-(--breakpoint-2xl) mx-auto space-y-4">
+      <PageHeader title="Search" />
 
       {/* Search Input */}
       <div className="relative">

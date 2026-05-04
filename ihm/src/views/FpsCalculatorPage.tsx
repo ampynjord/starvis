@@ -1,13 +1,14 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { useMemo, useState } from 'react';
 import { Crosshair, Shield, SlidersHorizontal, Target } from 'lucide-react';
-import { useEnv } from '@/contexts/EnvContext';
-import { ScifiPanel } from '@/components/ui/ScifiPanel';
-import { LoadingGrid } from '@/components/ui/LoadingGrid';
-import { ErrorState } from '@/components/ui/ErrorState';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { useMemo, useState } from 'react';
 import { api } from '@/services/api';
+import { useEnv } from '@/contexts/EnvContext';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import type { ItemListItem } from '@/types/api';
 
 const FIRE_RATE_PROFILES = [
@@ -129,14 +130,7 @@ export default function FpsCalculatorPage() {
 
   return (
     <div className="max-w-(--breakpoint-2xl) mx-auto space-y-6">
-      <div>
-        <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">
-          FPS Calculator
-        </h1>
-        <p className="text-sm text-slate-500 mt-1 font-mono-sc">
-          Weapon damage and TTK analysis with attachments, mitigation and hitbox simulation.
-        </p>
-      </div>
+      <PageHeader title="FPS Calculator" subtitle="Weapon damage and TTK analysis with attachments, mitigation and hitbox simulation." />
 
       {loadingWeapons ? (
         <LoadingGrid message="Loading FPS weapons..." />

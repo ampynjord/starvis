@@ -9,7 +9,6 @@ import {
 	ChevronUp,
 	ChevronsUpDown,
 	Table2,
-	Trophy,
 } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
@@ -26,10 +25,11 @@ import {
 } from "recharts";
 import { api } from "@/services/api";
 import { useEnv } from "@/contexts/EnvContext";
-import { GlowBadge } from "@/components/ui/GlowBadge";
-import { LoadingGrid } from "@/components/ui/LoadingGrid";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { FilterPanel } from "@/components/ui/FilterPanel";
+import { GlowBadge } from "@/components/ui/GlowBadge";
+import { LoadingGrid } from "@/components/ui/LoadingGrid";
+import { PageHeader } from "@/components/ui/PageHeader";
 import { fDimension, fMass, fNumber, fSpeed } from "@/utils/formatters";
 import type { ShipListItem } from "@/types/api";
 
@@ -356,74 +356,59 @@ export default function RankingPage() {
 
 	return (
 		<div className="max-w-(--breakpoint-2xl) mx-auto space-y-4">
-			{/* Header */}
-			<div className="flex items-center justify-between flex-wrap gap-3">
-				<div>
-					<h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase flex items-center gap-2">
-						<Trophy size={18} className="text-amber-400" />
-						Ranking
-					</h1>
-					<p className="text-xs text-slate-500 mt-0.5 font-mono-sc">
-						{displayShips.length}
-						{topN > 0 && allShips.length > topN ? `/${allShips.length}` : ""} ships
-						· sorted by{" "}
-						<span className="text-cyan-500">{activeStatDef.label}</span>
-					</p>
-				</div>
-
-				<div className="flex items-center gap-2 flex-wrap">
-					{/* Top-N selector */}
-					<select
-						value={topN}
-						onChange={(e) => setTopN(Number(e.target.value))}
-						className="sci-input text-xs py-1.5"
-					>
-						{TOP_N_OPTIONS.map((o) => (
-							<option key={o.value} value={o.value}>
-								{o.label}
-							</option>
-						))}
-					</select>
-
-					{/* View mode toggle */}
-					<div className="flex gap-1 border border-slate-800 rounded-sm p-0.5">
-						<button
-							type="button"
-							onClick={() => setViewMode("table")}
-							title="Table view"
-							className={`p-1.5 rounded-sm transition-colors ${viewMode === "table" ? "bg-cyan-950/60 text-cyan-400" : "text-slate-600 hover:text-slate-300"}`}
+			<PageHeader
+				title="Ranking"
+				subtitle={`${displayShips.length}${topN > 0 && allShips.length > topN ? `/${allShips.length}` : ""} ships · sorted by ${activeStatDef.label}`}
+				actions={
+					<div className="flex items-center gap-2 flex-wrap">
+						<select
+							value={topN}
+							onChange={(e) => setTopN(Number(e.target.value))}
+							className="sci-input text-xs py-1.5"
 						>
-							<Table2 size={14} />
-						</button>
-						<button
-							type="button"
-							onClick={() => setViewMode("chart")}
-							title="Chart view"
-							className={`p-1.5 rounded-sm transition-colors ${viewMode === "chart" ? "bg-cyan-950/60 text-cyan-400" : "text-slate-600 hover:text-slate-300"}`}
-						>
-							<BarChart2 size={14} />
-						</button>
-					</div>
-
-					{/* Vehicle category */}
-					<div className="flex gap-1">
-						{VEHICLE_CATS.map(({ label, value }) => (
+							{TOP_N_OPTIONS.map((o) => (
+								<option key={o.value} value={o.value}>
+									{o.label}
+								</option>
+							))}
+						</select>
+						<div className="flex gap-1 border border-slate-800 rounded-sm p-0.5">
 							<button
-								key={value}
 								type="button"
-								onClick={() => switchVehicleCat(value)}
-								className={`px-3 py-1.5 text-xs font-rajdhani font-semibold uppercase tracking-wider rounded border transition-all ${
-									vehicleCat === value
-										? "bg-cyan-950/60 border-cyan-800 text-cyan-400"
-										: "border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-600"
-								}`}
+								onClick={() => setViewMode("table")}
+								title="Table view"
+								className={`p-1.5 rounded-sm transition-colors ${viewMode === "table" ? "bg-cyan-950/60 text-cyan-400" : "text-slate-600 hover:text-slate-300"}`}
 							>
-								{label}
+								<Table2 size={14} />
 							</button>
-						))}
+							<button
+								type="button"
+								onClick={() => setViewMode("chart")}
+								title="Chart view"
+								className={`p-1.5 rounded-sm transition-colors ${viewMode === "chart" ? "bg-cyan-950/60 text-cyan-400" : "text-slate-600 hover:text-slate-300"}`}
+							>
+								<BarChart2 size={14} />
+							</button>
+						</div>
+						<div className="flex gap-1">
+							{VEHICLE_CATS.map(({ label, value }) => (
+								<button
+									key={value}
+									type="button"
+									onClick={() => switchVehicleCat(value)}
+									className={`px-3 py-1.5 text-xs font-rajdhani font-semibold uppercase tracking-wider rounded border transition-all ${
+										vehicleCat === value
+											? "bg-cyan-950/60 border-cyan-800 text-cyan-400"
+											: "border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-600"
+									}`}
+								>
+									{label}
+								</button>
+							))}
+						</div>
 					</div>
-				</div>
-			</div>
+				}
+			/>
 
 			<div className="flex gap-4">
 				{/* Left panel: stat category + manufacturer */}

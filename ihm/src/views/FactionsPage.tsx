@@ -16,7 +16,6 @@ import {
   Link as LinkIcon,
   Package,
   Radio,
-  Search,
   Share2,
   Shield,
   Skull,
@@ -34,6 +33,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -369,32 +369,13 @@ export default function FactionsPage() {
 
   return (
     <div className="max-w-(--breakpoint-2xl) mx-auto">
-      {/* Header */}
-      <div className="mb-4 flex items-start gap-4 flex-wrap justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-sm border border-amber-800 bg-amber-950/40 flex items-center justify-center shrink-0">
-            <Shield size={18} className="text-amber-400" />
-          </div>
-          <div>
-            <h1 className="font-orbitron text-xl font-bold text-amber-400 tracking-widest uppercase leading-none">
-              Factions
-            </h1>
-            <p className="text-xs text-slate-500 mt-0.5 font-mono-sc">
-              {factions?.length ?? 0} factions · {(allMissions?.total ?? 0).toLocaleString('en-US')} missions
-            </p>
-          </div>
-        </div>
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={13} />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Filter factions…"
-            className="sci-input w-full pl-8 text-xs"
-          />
-        </div>
-      </div>
+      <PageHeader
+        title="Factions"
+        subtitle={`${factions?.length ?? 0} factions · ${(allMissions?.total ?? 0).toLocaleString('en-US')} missions`}
+        search={search}
+        searchPlaceholder="Filter factions…"
+        onSearch={setSearch}
+      />
 
       {/* Content: faction list + detail */}
       <div className="grid grid-cols-1 xl:grid-cols-[280px_1fr] gap-4 items-start">

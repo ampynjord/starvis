@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Pickaxe } from 'lucide-react';
 import { useCallback, useState } from 'react';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
-import { LoadingGrid } from '@/components/ui/LoadingGrid';
-import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import type { MiningCompositionView } from '@/types/mining';
 import { CompositionSelector } from '@/components/mining/CompositionSelector';
@@ -71,18 +71,7 @@ export default function MiningPage() {
 
   return (
     <div className="max-w-(--breakpoint-2xl) mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3">
-          <Pickaxe size={20} className="text-cyan-400" />
-          <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">
-            Mining Calculator
-          </h1>
-        </div>
-        <p className="text-sm text-slate-500 mt-1 font-mono-sc">
-          Regolith-style workflow: scan deposits, analyze composition, assess risk, optimize yield.
-        </p>
-      </div>
+      <PageHeader title="Mining Calculator" subtitle="Regolith-style workflow: scan deposits, analyze composition, assess risk, optimize yield." />
 
       {/* Workflow Progress */}
       <WorkflowProgress

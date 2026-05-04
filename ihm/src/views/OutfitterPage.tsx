@@ -4,15 +4,16 @@
  */
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, ChevronDown, Settings2, X, Zap, Shield, Wind, Cpu, Search, RefreshCw, Copy, ExternalLink, AlertTriangle } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, Copy, Cpu, ExternalLink, RefreshCw, Search, Shield, Wind, X, Zap } from 'lucide-react';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
-import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { useDebounce } from '@/hooks/useDebounce';
 import { fNumber } from '@/utils/formatters';
 import type { CompatibleComponent, HardpointEntry, HardpointComponent, LoadoutResult, ShipListItem } from '@/types/api';
@@ -624,16 +625,10 @@ export default function OutfitterPage() {
 
   return (
     <div className="max-w-(--breakpoint-xl) mx-auto space-y-4">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase flex items-center gap-2">
-            <Settings2 size={18} />
-            Ship Outfitter
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">Customize your loadout and calculate DPS in real time</p>
-        </div>
-        {selectedShip && (
+      <PageHeader
+        title="Ship Outfitter"
+        subtitle="Customize your loadout and calculate DPS in real time"
+        actions={selectedShip ? (
           <div className="flex items-center gap-2">
             {hasSwaps && (
               <button onClick={handleReset} className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-slate-500 hover:text-slate-300 border border-slate-800 hover:border-slate-600 rounded-sm transition-all">
@@ -644,8 +639,8 @@ export default function OutfitterPage() {
               <Copy size={12} /> Copy link
             </button>
           </div>
-        )}
-      </div>
+        ) : undefined}
+      />
 
       {/* Ship selector */}
       <ScifiPanel title="Select Ship">
