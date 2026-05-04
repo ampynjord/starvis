@@ -2564,9 +2564,10 @@ export class ExtractionService {
 
     let updated = 0;
     for (const [className, ctmUrl] of ctmMap) {
-      await conn.query('UPDATE game.ships SET ctm_url = $1 WHERE class_name = $2 AND env = $3', [ctmUrl, className, env]);
+      // Update across all envs — CTM URLs come from RSI website (env-agnostic)
+      await conn.query('UPDATE game.ships SET ctm_url = $1 WHERE class_name = $2', [ctmUrl, className]);
       updated++;
     }
-    onProgress?.(`CTM: ${updated} ships updated with CTM URL`);
+    onProgress?.(`CTM: ${updated} ships updated with CTM URL (all envs)`);
   }
 }
