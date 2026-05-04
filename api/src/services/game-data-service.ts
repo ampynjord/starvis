@@ -140,6 +140,7 @@ export class GameDataService {
     offset?: string;
     entityType?: string;
     changeType?: string;
+    markersOnly?: boolean;
   }): Promise<{ data: Row[]; total: number }> {
     const env = params.env ?? 'live';
     const prisma = this.getClient(env);
@@ -153,6 +154,9 @@ export class GameDataService {
       where.push('c.change_type = ?');
       p.push(params.changeType);
     }
+    if (params.markersOnly) {
+      where.push('c.field_name IS NULL');
+    }
 
     const w = ` WHERE ${where.join(' AND ')}`;
     const countRows = await prisma.$queryRawUnsafe<Row[]>(
@@ -161,7 +165,7 @@ export class GameDataService {
     );
     const total = Number(countRows[0]?.total) || 0;
 
-    const limit = Math.min(100, parseInt(params.limit || '50', 10));
+    const limit = Math.min(1000, parseInt(params.limit || '50', 10));
     const offset = parseInt(params.offset || '0', 10);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(
@@ -321,9 +325,10 @@ export class GameDataService {
 
   async getChangelogSummary(env = 'live'): Promise<Record<string, unknown>> {
     const prisma = this.getClient(env);
+    // Count distinct entities per type/change_type to avoid inflating counts with field-level detail rows
     const byType = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(
-        `SELECT c.entity_type, c.change_type, COUNT(*) as count
+        `SELECT c.entity_type, c.change_type, COUNT(DISTINCT c.entity_uuid) as count
          FROM meta.changelog c INNER JOIN meta.extraction_log e ON c.extraction_id = e.id
          WHERE e.game_env = ? GROUP BY c.entity_type, c.change_type ORDER BY c.entity_type, c.change_type`,
       ),
@@ -335,7 +340,7 @@ export class GameDataService {
     );
     const total = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(
-        `SELECT COUNT(*) as total FROM meta.changelog c INNER JOIN meta.extraction_log e ON c.extraction_id = e.id WHERE e.game_env = ?`,
+        `SELECT COUNT(*) as total FROM (SELECT DISTINCT c.entity_uuid, c.change_type FROM meta.changelog c INNER JOIN meta.extraction_log e ON c.extraction_id = e.id WHERE e.game_env = ?) sub`,
       ),
       env,
     );
