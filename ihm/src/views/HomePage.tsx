@@ -41,7 +41,7 @@ const DB_ENTRIES = [
   { key: 'items',         label: 'FPS Gear',         icon: Dices,     color: 'text-violet-400', bar: 'bg-violet-500',  to: '/fps-gear' },
   { key: 'commodities',   label: 'Industrial',       icon: Package,   color: 'text-amber-400',  bar: 'bg-amber-500',   to: '/industrial' },
   { key: 'manufacturers', label: 'Manufacturers',    icon: Wrench,    color: 'text-slate-400',  bar: 'bg-slate-500',   to: '/manufacturers' },
-  { key: 'paints',        label: 'Ship Paints',      icon: Palette,   color: 'text-pink-400',   bar: 'bg-pink-500',    to: '/ships' },
+  { key: 'paints',        label: 'Ship Paints',      icon: Palette,   color: 'text-pink-400',   bar: 'bg-pink-500',    to: '/paints' },
 ] as const;
 
 type ToolCategory = 'combat' | 'economy' | 'data';
@@ -137,10 +137,12 @@ export default function HomePage() {
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['stats.overview', env],
     queryFn: () => api.stats.overview(env),
+    staleTime: 0,
   });
   const { data: version } = useQuery({
     queryKey: ['version', env],
     queryFn: () => api.stats.version(env),
+    staleTime: 0,
   });
   const { data: changelog } = useQuery({
     queryKey: ['changelog.feed.home', env],
