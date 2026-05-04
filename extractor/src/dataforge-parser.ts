@@ -476,6 +476,7 @@ export function parseDataForge(buf: Buffer): DataForgeData {
   for (let i = 0; i < header.recordDefinitionCount; i++) {
     const nameOffset = i32();
     const fileNameOffset = i32();
+    if (version >= 8) u32(); // DevTeamNameOffset — added in DataForge v8
     const structIndex = i32();
     const id = readGuid();
     const instanceIndex = u16();
