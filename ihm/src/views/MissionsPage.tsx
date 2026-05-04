@@ -9,7 +9,6 @@ import {
   BookOpen,
   Calendar,
   Clock,
-  ClipboardList,
   Coins,
   Crosshair,
   Eye,
@@ -20,7 +19,6 @@ import {
   Package,
   Radio,
   Scale,
-  Search,
   Share2,
   Shield,
   Skull,
@@ -41,6 +39,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { Pagination } from '@/components/ui/Pagination';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -547,51 +546,17 @@ export default function MissionsPage() {
 
   return (
     <div className="max-w-(--breakpoint-2xl) mx-auto">
-      {/* Header */}
-      <div className="mb-4 flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-sm border border-cyan-800 bg-cyan-950/40 flex items-center justify-center shrink-0">
-              <ClipboardList size={18} className="text-cyan-400" />
-            </div>
-            <div>
-              <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase leading-none">
-                Mission Database
-              </h1>
-              {summary && (
-                <p className="text-xs text-slate-500 mt-0.5 font-mono-sc">
-                  {summary.showing.toLocaleString('en-US')} / {summary.total.toLocaleString('en-US')} missions
-                  {data && (
-                    <span className="ml-3 text-slate-600">
-                      ·{' '}
-                      <span className="text-green-600">{data.data.filter(m => m.is_legal).length} legal</span>
-                      {' '}·{' '}
-                      <span className="text-red-600">{data.data.filter(m => !m.is_legal).length} illegal</span>
-                      {data.data.some(m => m.has_blueprint_reward) && (
-                        <>
-                          {' '}·{' '}
-                          <span className="text-purple-500">{data.data.filter(m => m.has_blueprint_reward).length} blueprints</span>
-                        </>
-                      )}
-                    </span>
-                  )}
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="relative w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={13} />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              placeholder="Search mission, giver, class name…"
-              className="sci-input w-full pl-8 text-xs"
-            />
-          </div>
-        </div>
+      <PageHeader
+        title="Mission Database"
+        count={summary?.total}
+        countLabel="missions"
+        search={search}
+        searchPlaceholder="Search mission, giver, class name…"
+        onSearch={(v) => { setSearch(v); setPage(1); }}
+      />
 
-        {/* Filter bar */}
+      {/* Filter bar */}
+      <div className="mb-4">
         <div className="sci-panel p-3 space-y-3">
           {/* Mission type chips with icons */}
           {types && types.length > 0 && (
