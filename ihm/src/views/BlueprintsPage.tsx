@@ -357,11 +357,13 @@ function FilterChips({
   value,
   onChange,
   colorFn,
+  labelFn,
 }: {
   options: string[];
   value: string;
   onChange: (v: string) => void;
   colorFn?: (opt: string) => BadgeColor;
+  labelFn?: (opt: string) => string;
 }) {
   return (
     <div className="flex flex-wrap gap-1">
@@ -382,7 +384,7 @@ function FilterChips({
             onClick={() => onChange(active ? '' : opt)}
             className={`flex items-center gap-0.5 px-2 py-1 rounded-sm text-xs font-mono-sc transition-colors border ${active ? `bg-${c}-950/60 text-${c}-400 border-${c}-800` : 'text-slate-500 hover:text-slate-300 border-transparent hover:border-border'}`}
           >
-            {opt}
+            {labelFn ? labelFn(opt) : opt}
           </button>
         );
       })}
@@ -449,7 +451,7 @@ export default function BlueprintsPage() {
                 Blueprint Database
               </h1>
               <p className="text-xs text-slate-500 mt-0.5 font-mono-sc">
-                {recipes.length.toLocaleString('en-US')} blueprints
+                {(data?.total ?? recipes.length).toLocaleString('en-US')} blueprints
                 {categories && ` · ${categories.length} categories`}
               </p>
             </div>
@@ -476,6 +478,7 @@ export default function BlueprintsPage() {
                 value={category}
                 onChange={setCategory}
                 colorFn={getCatColor}
+                labelFn={(opt) => categories.find((c) => c.category === opt)?.displayCategory ?? categories.find((c) => c.category === opt)?.display_category ?? opt}
               />
             </div>
           )}

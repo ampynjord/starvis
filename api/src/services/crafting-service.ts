@@ -80,7 +80,7 @@ export class CraftingService {
   }): Promise<PaginatedResult> {
     const { env = 'live', category, search, page = 1, limit = 50, skillLevel, stationType } = opts;
     const prisma = this.getClient(env);
-    const safeLimit = Math.min(Math.max(1, limit), 200);
+    const safeLimit = Math.min(Math.max(1, limit), 1500);
     const offset = (page - 1) * safeLimit;
 
     const where: string[] = ['r.env = ?'];
