@@ -14,7 +14,7 @@ const useProd = process.argv.includes('--prod');
 config({ path: resolve(import.meta.dirname, '..', useProd ? '.env.prod' : '.env.dev') });
 
 import { Pool } from 'pg';
-import { scrapeShipCtmUrls, type ShipToScrape } from '../src/ctm-scraper.js';
+import { type ShipToScrape, scrapeShipCtmUrls } from '../src/ctm-scraper.js';
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -48,11 +48,13 @@ async function main() {
     const row = rows[0];
     console.log(`Found: ${row.name} (${row.class_name}) — env: ${row.env} — URL: ${row.rsi_url}`);
 
-    const ships: ShipToScrape[] = [{
-      className: row.class_name,
-      name: row.name,
-      rsiUrl: row.rsi_url,
-    }];
+    const ships: ShipToScrape[] = [
+      {
+        className: row.class_name,
+        name: row.name,
+        rsiUrl: row.rsi_url,
+      },
+    ];
 
     console.log('Launching Playwright CTM scrape (headful browser will open)…');
     const ctmMap = await scrapeShipCtmUrls(ships, (msg) => console.log(msg));
@@ -66,10 +68,7 @@ async function main() {
     console.log(`CTM URL: ${ctmUrl}`);
 
     // Update all envs (CTM URLs are env-agnostic)
-    const result = await conn.query(
-      'UPDATE game.ships SET ctm_url = $1 WHERE class_name = $2',
-      [ctmUrl, row.class_name],
-    );
+    const result = await conn.query('UPDATE game.ships SET ctm_url = $1 WHERE class_name = $2', [ctmUrl, row.class_name]);
     console.log(`Updated ${result.rowCount} row(s) in game.ships.`);
   } finally {
     conn.release();
