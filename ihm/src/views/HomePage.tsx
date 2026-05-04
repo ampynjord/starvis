@@ -5,115 +5,135 @@ import {
   BarChart3,
   BookOpen,
   ClipboardList,
+  Clock,
   Crosshair,
   Dices,
-  Scroll,
+  Layers,
+  Minus,
   Package,
   Palette,
   Pickaxe,
+  Plus,
+  RefreshCw,
   Rocket,
+  Scroll,
   Settings2,
   Shuffle,
   SlidersHorizontal,
   TrendingUp,
   Trophy,
   Wrench,
+  Zap,
 } from 'lucide-react';
 import Link from 'next/link';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
-import { ScifiPanel } from '@/components/ui/ScifiPanel';
-import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { GlowBadge } from '@/components/ui/GlowBadge';
-import { fDateTime, fNumber } from '@/utils/formatters';
+import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { fDate, fNumber } from '@/utils/formatters';
+import type { ChangelogEntry } from '@/types/api';
 
-// ── Stats cards ───────────────────────────────────────────────────────────────
+// ── Config ────────────────────────────────────────────────────────────────────
 
-const STAT_CARDS = [
-  { key: 'ships',         label: 'Ships / Vehicles', icon: Rocket,   color: 'text-cyan-400',   to: '/ships' },
-  { key: 'components',    label: 'Ship Components',  icon: Settings2, color: 'text-blue-400',  to: '/components' },
-  { key: 'items',         label: 'FPS Gear',         icon: Dices,    color: 'text-green-400',  to: '/fps-gear' },
-  { key: 'commodities',   label: 'Industrial',       icon: Package,  color: 'text-purple-400', to: '/industrial' },
-  { key: 'manufacturers', label: 'Manufacturers', icon: Wrench,   color: 'text-amber-400',  to: '/manufacturers' },
-  { key: 'paints',        label: 'Ship Paints',      icon: Palette,  color: 'text-pink-400',   to: '/ships' },
-];
+const DB_ENTRIES = [
+  { key: 'ships',         label: 'Ships & Vehicles', icon: Rocket,    color: 'text-cyan-400',   bar: 'bg-cyan-500',    to: '/ships' },
+  { key: 'components',    label: 'Components',       icon: Settings2, color: 'text-blue-400',   bar: 'bg-blue-500',    to: '/components' },
+  { key: 'items',         label: 'FPS Gear',         icon: Dices,     color: 'text-violet-400', bar: 'bg-violet-500',  to: '/fps-gear' },
+  { key: 'commodities',   label: 'Industrial',       icon: Package,   color: 'text-amber-400',  bar: 'bg-amber-500',   to: '/industrial' },
+  { key: 'manufacturers', label: 'Manufacturers',    icon: Wrench,    color: 'text-slate-400',  bar: 'bg-slate-500',   to: '/manufacturers' },
+  { key: 'paints',        label: 'Ship Paints',      icon: Palette,   color: 'text-pink-400',   bar: 'bg-pink-500',    to: '/ships' },
+] as const;
 
-// ── Tool cards ────────────────────────────────────────────────────────────────
+type ToolCategory = 'combat' | 'economy' | 'data';
 
-const TOOL_CARDS: {
+const TOOLS: {
   to: string;
   icon: React.ElementType;
   label: string;
-  description: string;
-  accent: string;
+  sub: string;
+  category: ToolCategory;
   badge?: string;
 }[] = [
-  {
-    to: '/outfitter',
-    icon: SlidersHorizontal,
-    label: 'Outfitter',
-    description: 'Build ship loadouts, calculate DPS, power draw and shield efficiency across every slot.',
-    accent: 'border-red-700 hover:border-red-500',
-    badge: 'DPS Calc',
-  },
-  {
-    to: '/mining',
-    icon: Pickaxe,
-    label: 'Mining',
-    description: 'Browse ore compositions by deposit type, compute profitability and optimal laser settings.',
-    accent: 'border-yellow-700 hover:border-yellow-500',
-    badge: 'Calculator',
-  },
-  {
-    to: '/compare',
-    icon: BarChart3,
-    label: 'Compare',
-    description: 'Side-by-side stat comparison for any ships or components in the fleet.',
-    accent: 'border-cyan-800 hover:border-cyan-600',
-  },
-  {
-    to: '/ranking',
-    icon: Trophy,
-    label: 'Ranking',
-    description: 'Top ships sorted by DPS, cargo, speed, shields and other key statistics.',
-    accent: 'border-amber-800 hover:border-amber-600',
-  },
-  {
-    to: '/trade',
-    icon: TrendingUp,
-    label: 'Trade Routes',
-    description: 'Find the most profitable trade routes, compare commodity prices across locations.',
-    accent: 'border-green-800 hover:border-green-600',
-    badge: 'Profit',
-  },
-  {
-    to: '/blueprints',
-    icon: Scroll,
-    label: 'Blueprints',
-    description: 'Browse crafting recipes, required materials and station types.',
-    accent: 'border-violet-800 hover:border-violet-600',
-  },
-  {
-    to: '/fps-calculator',
-    icon: Crosshair,
-    label: 'FPS Calculator',
-    description: 'Compute TTK, DPS and damage breakdowns for personal weapons.',
-    accent: 'border-orange-800 hover:border-orange-600',
-    badge: 'TTK',
-  },
-  {
-    to: '/missions',
-    icon: ClipboardList,
-    label: 'Missions',
-    description: 'Browse all contract templates, filter by type and legality.',
-    accent: 'border-slate-700 hover:border-slate-500',
-  },
+  { to: '/outfitter',     icon: SlidersHorizontal, label: 'Outfitter',    sub: 'DPS, power & shield calculator',       category: 'combat',  badge: 'DPS' },
+  { to: '/fps-calculator',icon: Crosshair,         label: 'FPS Calc',     sub: 'TTK & damage breakdown for weapons',   category: 'combat',  badge: 'TTK' },
+  { to: '/compare',       icon: BarChart3,         label: 'Compare',      sub: 'Side-by-side ship & component stats',  category: 'data' },
+  { to: '/ranking',       icon: Trophy,            label: 'Ranking',      sub: 'Top ships by DPS, cargo, speed…',      category: 'data' },
+  { to: '/trade',         icon: TrendingUp,        label: 'Trade Routes', sub: 'Profit & commodity prices',            category: 'economy', badge: 'aUEC' },
+  { to: '/mining',        icon: Pickaxe,           label: 'Mining',       sub: 'Ore yield & laser settings',           category: 'economy', badge: 'Yield' },
+  { to: '/blueprints',    icon: Scroll,            label: 'Blueprints',   sub: 'Crafting recipes & materials',         category: 'economy' },
+  { to: '/missions',      icon: ClipboardList,     label: 'Missions',     sub: 'Contracts by faction & legality',      category: 'data' },
 ];
 
-// ── Component ─────────────────────────────────────────────────────────────────
+const CATEGORY_LABEL: Record<ToolCategory, { label: string; color: string; border: string }> = {
+  combat:  { label: 'Combat',  color: 'text-red-400',    border: 'border-red-800/60 hover:border-red-500/70' },
+  economy: { label: 'Economy', color: 'text-green-400',  border: 'border-green-800/60 hover:border-green-500/70' },
+  data:    { label: 'Data',    color: 'text-blue-400',   border: 'border-blue-800/60 hover:border-blue-500/70' },
+};
+
+const CHANGE_ICON = {
+  added:    { Icon: Plus,      cls: 'text-green-400', bg: 'bg-green-950/50 border-green-900' },
+  removed:  { Icon: Minus,     cls: 'text-red-400',   bg: 'bg-red-950/50 border-red-900' },
+  modified: { Icon: RefreshCw, cls: 'text-amber-400', bg: 'bg-amber-950/50 border-amber-900' },
+};
+
+const ENTITY_COLOR: Record<string, string> = {
+  ship:      'text-cyan-400',
+  component: 'text-blue-400',
+  item:      'text-violet-400',
+  commodity: 'text-amber-400',
+};
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function StatCard({ entry, value, max, delay }: { entry: typeof DB_ENTRIES[number]; value: number; max: number; delay: number }) {
+  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+  return (
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}>
+      <Link href={entry.to} className="block h-full">
+        <div className="holo-card px-4 py-3 h-full group">
+          <div className="flex items-start justify-between mb-2">
+            <entry.icon size={16} className={`${entry.color} shrink-0 group-hover:scale-110 transition-transform`} />
+            <span className="text-[9px] font-mono-sc text-slate-700 uppercase tracking-widest">{pct}%</span>
+          </div>
+          <p className="font-orbitron text-2xl font-black text-slate-100 leading-none mb-1">
+            {value >= 1000 ? `${(value / 1000).toFixed(1)}K` : value.toLocaleString('en-US')}
+          </p>
+          <p className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-wider mb-2">{entry.label}</p>
+          <div className="h-0.5 w-full rounded-full bg-slate-800/80 overflow-hidden">
+            <motion.div
+              className={`h-full rounded-full ${entry.bar} opacity-60`}
+              initial={{ width: 0 }}
+              animate={{ width: `${pct}%` }}
+              transition={{ delay: delay + 0.2, duration: 0.8, ease: 'easeOut' }}
+            />
+          </div>
+        </div>
+      </Link>
+    </motion.div>
+  );
+}
+
+function ChangelogRow({ entry }: { entry: ChangelogEntry }) {
+  const ct = (entry.change_type ?? 'modified') as 'added' | 'removed' | 'modified';
+  const { Icon, cls, bg } = CHANGE_ICON[ct] ?? CHANGE_ICON.modified;
+  const entityColor = ENTITY_COLOR[entry.entity_type] ?? 'text-slate-400';
+
+  return (
+    <div className="flex items-center gap-2.5 px-3 py-2 hover:bg-white/[0.025] transition-colors rounded-sm">
+      <span className={`inline-flex items-center justify-center w-5 h-5 rounded-sm border shrink-0 ${bg}`}>
+        <Icon size={9} className={cls} />
+      </span>
+      <span className="flex-1 min-w-0 text-sm font-rajdhani text-slate-300 truncate">{entry.entity_name}</span>
+      <span className={`text-[10px] font-mono-sc shrink-0 ${entityColor}`}>{entry.entity_type}</span>
+    </div>
+  );
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
   const { env } = useEnv();
+
   const { data: stats, isLoading: statsLoading } = useQuery({
     queryKey: ['stats.overview', env],
     queryFn: () => api.stats.overview(env),
@@ -123,248 +143,331 @@ export default function HomePage() {
     queryFn: () => api.stats.version(env),
   });
   const { data: changelog } = useQuery({
-    queryKey: ['changelog.list', env, { limit: 10 }],
-    queryFn: () => api.changelog.list({ env, limit: 10 }),
+    queryKey: ['changelog.feed.home', env],
+    queryFn: () => api.changelog.list({ env, limit: 20, markers_only: true }),
   });
   const { data: changelogSummary } = useQuery({
     queryKey: ['changelog.summary', env],
     queryFn: () => api.changelog.summary(env),
   });
-  const { data: randomShip, refetch: refetchRandom } = useQuery({
+  const { data: randomShip, refetch: refetchRandom, isFetching: shipFetching } = useQuery({
     queryKey: ['ships.random', env],
     queryFn: () => api.ships.random(env),
     staleTime: Number.POSITIVE_INFINITY,
   });
 
-  const changeCounts = changelog?.data.reduce(
-    (acc, e: { change_type: string }) => {
-      if (e.change_type === 'added') acc.added++;
-      else if (e.change_type === 'removed') acc.removed++;
-      else acc.modified++;
-      return acc;
-    },
-    { added: 0, removed: 0, modified: 0 },
-  );
+  const maxStat = stats
+    ? Math.max(stats.ships, stats.components, stats.items, stats.commodities, stats.manufacturers, stats.paints)
+    : 1;
+
+  const byChange = changelog?.data.reduce<Record<string, number>>((acc, e) => {
+    acc[e.change_type] = (acc[e.change_type] ?? 0) + 1;
+    return acc;
+  }, {});
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-5 max-w-[1400px] mx-auto">
 
-      {/* ── Hero ─────────────────────────────────────────────────────── */}
-      <div className="sci-panel p-6 border-cyan-900 relative overflow-hidden">
-        <div className="absolute inset-0 bg-linear-to-r from-cyan-950/20 via-transparent to-transparent pointer-events-none" />
-        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="font-orbitron text-3xl font-black text-cyan-400 glow-text tracking-widest">
-              STARVIS
-            </h1>
-            <p className="text-slate-400 text-sm mt-1 font-rajdhani">
-              Star Citizen — ships · components · mining · outfitter · trade · blueprints
-            </p>
-          </div>
-          {version && (
-            <div className="sci-panel p-3 text-right shrink-0 border-cyan-900">
-              <p className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest">Game version</p>
-              <p className="font-orbitron text-cyan-400 text-sm mt-0.5">{version.game_version}</p>
-              <p className="text-xs text-slate-600 mt-0.5">{fDateTime(version.extracted_at)}</p>
+      {/* ── Command Header ────────────────────────────────────────────── */}
+      <div className="sci-panel relative overflow-hidden">
+        <div className="absolute inset-0 bg-linear-to-r from-cyan-950/25 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute top-0 left-0 right-0 h-px bg-linear-to-r from-cyan-500/40 via-cyan-400/20 to-transparent" />
+
+        <div className="relative px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-end gap-4">
+            <div>
+              <h1 className="font-orbitron text-4xl font-black text-cyan-400 glow-text tracking-widest leading-none">
+                STARVIS
+              </h1>
+              <p className="font-mono-sc text-[10px] text-slate-600 tracking-widest uppercase mt-1">
+                Star Citizen · Game Database & Toolset
+              </p>
             </div>
-          )}
+            <div className="hidden sm:block w-px h-10 bg-border self-center" />
+            <div className="hidden sm:block">
+              <p className="font-mono-sc text-[9px] text-slate-700 uppercase tracking-widest">Modules</p>
+              <p className="font-rajdhani text-xs text-slate-500 leading-snug">
+                Ships · Components · FPS · Mining · Trade · Crafting
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 flex-wrap">
+            {version ? (
+              <>
+                <div className="text-right">
+                  <p className="font-orbitron text-base font-bold text-cyan-400">SC {version.game_version}</p>
+                  <p className="font-mono-sc text-[10px] text-slate-600 flex items-center gap-1 justify-end">
+                    <Clock size={8} /> {fDate(version.extracted_at)}
+                  </p>
+                </div>
+                <GlowBadge color={env === 'ptu' ? 'amber' : 'cyan'} size="sm">
+                  {env.toUpperCase()}
+                </GlowBadge>
+              </>
+            ) : (
+              <div className="w-28 h-10 bg-slate-900/50 rounded animate-pulse" />
+            )}
+          </div>
         </div>
       </div>
 
-      {/* ── Stats counters ───────────────────────────────────────────── */}
+      {/* ── Stat grid ────────────────────────────────────────────────── */}
       {statsLoading ? (
-        <LoadingGrid rows={1} cols={6} message="LOADING STATS…" />
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          {STAT_CARDS.map(({ key, label, icon: Icon, color, to }, i) => (
-            <motion.div
-              key={key}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.07 }}
-            >
-              <Link href={to} className="block">
-                <div className="holo-card text-center py-4 group cursor-pointer">
-                  <Icon size={20} className={`${color} mx-auto mb-2 group-hover:scale-110 transition-transform`} />
-                  <p className="font-orbitron text-xl font-bold text-slate-200">
-                    {stats ? (stats[key as keyof typeof stats] ?? 0).toLocaleString('en-US') : '—'}
-                  </p>
-                  <p className="text-xs font-rajdhani text-slate-500 uppercase tracking-wide mt-0.5">
-                    {label}
-                  </p>
-                </div>
-              </Link>
-            </motion.div>
+        <LoadingGrid rows={1} cols={6} message="LOADING DATABASE…" />
+      ) : stats ? (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+          {DB_ENTRIES.map((entry, i) => (
+            <StatCard
+              key={entry.key}
+              entry={entry}
+              value={stats[entry.key as keyof typeof stats] as number ?? 0}
+              max={maxStat}
+              delay={i * 0.06}
+            />
           ))}
         </div>
-      )}
+      ) : null}
 
-      {/* ── Featured ship spotlight ──────────────────────────────────── */}
-      {randomShip && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-          <ScifiPanel
-            title="Ship spotlight"
-            actions={
+      {/* ── Spotlight + Changelog ─────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+
+        {/* Ship spotlight */}
+        <motion.div
+          className="lg:col-span-3"
+          initial={{ opacity: 0, x: -12 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.35 }}
+        >
+          <div className="sci-panel h-full flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-800/60">
+              <span className="font-orbitron text-[10px] font-bold text-slate-500 tracking-widest uppercase flex items-center gap-1.5">
+                <Rocket size={10} />
+                Ship Spotlight
+              </span>
               <button
                 type="button"
                 onClick={() => refetchRandom()}
-                className="sci-btn-ghost py-1 px-2 text-xs"
+                disabled={shipFetching}
+                className="sci-btn-ghost py-1 px-2 text-[10px] gap-1"
               >
-                <Shuffle size={11} /> Random
+                <Shuffle size={9} className={shipFetching ? 'animate-spin' : ''} />
+                Random
               </button>
-            }
-          >
-            <Link href={`/ships/${randomShip.uuid}`} className="flex flex-col sm:flex-row gap-4 group">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="font-orbitron text-lg font-bold text-slate-200 group-hover:text-cyan-400 transition-colors truncate">
-                    {randomShip.name}
-                  </h3>
-                  {randomShip.manufacturer_code && (
-                    <GlowBadge color="cyan" size="xs">{randomShip.manufacturer_code}</GlowBadge>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {randomShip.role && (
-                    <div>
-                      <p className="text-[10px] font-mono-sc text-slate-600 uppercase">Role</p>
-                      <p className="text-sm text-slate-400">{randomShip.role}</p>
-                    </div>
-                  )}
-                  {randomShip.crew_size != null && (
-                    <div>
-                      <p className="text-[10px] font-mono-sc text-slate-600 uppercase">Crew</p>
-                      <p className="text-sm text-slate-400">{randomShip.crew_size}</p>
-                    </div>
-                  )}
-                  {randomShip.cargo_capacity != null && (
-                    <div>
-                      <p className="text-[10px] font-mono-sc text-slate-600 uppercase">Cargo</p>
-                      <p className="text-sm text-slate-400">{fNumber(randomShip.cargo_capacity)} SCU</p>
-                    </div>
-                  )}
-                  {randomShip.scm_speed != null && (
-                    <div>
-                      <p className="text-[10px] font-mono-sc text-slate-600 uppercase">SCM Speed</p>
-                      <p className="text-sm text-slate-400">{fNumber(randomShip.scm_speed)} m/s</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center shrink-0">
-                <span className="sci-btn-primary py-1.5 px-3 text-xs group-hover:border-cyan-400 transition-colors">
-                  View details <ArrowRight size={12} />
-                </span>
-              </div>
-            </Link>
-          </ScifiPanel>
-        </motion.div>
-      )}
+            </div>
 
-      {/* ── Tool cards ───────────────────────────────────────────────── */}
-      <div>
-        <p className="text-[10px] font-orbitron tracking-widest text-slate-600 uppercase mb-3">Tools</p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {TOOL_CARDS.map(({ to, icon: Icon, label, description, accent, badge }, i) => (
-            <motion.div
-              key={to}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 + i * 0.05 }}
-            >
-              <Link href={to} className="block h-full">
-                <div className={`sci-panel p-4 h-full border transition-colors duration-150 ${accent} group`}>
-                  <div className="flex items-start justify-between mb-3">
-                    <Icon size={20} className="text-slate-400 group-hover:text-slate-200 transition-colors shrink-0" />
-                    {badge && (
-                      <span className="text-[9px] font-orbitron tracking-widest text-slate-600 border border-slate-700 rounded-sm px-1 py-0.5 uppercase">
-                        {badge}
-                      </span>
+            {randomShip ? (
+              <div className="flex-1 p-4 flex flex-col gap-4">
+                {/* Ship identity */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h2 className="font-orbitron text-xl font-black text-slate-100 leading-tight truncate">
+                      {randomShip.name}
+                    </h2>
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {randomShip.manufacturer_code && (
+                        <GlowBadge color="cyan" size="xs">{randomShip.manufacturer_code}</GlowBadge>
+                      )}
+                      {randomShip.role && (
+                        <GlowBadge color="slate" size="xs">{randomShip.role}</GlowBadge>
+                      )}
+                      {randomShip.career && (
+                        <span className="font-mono-sc text-[10px] text-slate-600">{randomShip.career}</span>
+                      )}
+                    </div>
+                  </div>
+                  {randomShip.variant_type && randomShip.variant_type !== 'Base' && (
+                    <GlowBadge color="amber" size="xs">{randomShip.variant_type}</GlowBadge>
+                  )}
+                </div>
+
+                {/* Key stats grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {[
+                    { label: 'Crew',      val: randomShip.crew_size != null ? String(randomShip.crew_size) : null, unit: '' },
+                    { label: 'Cargo',     val: randomShip.cargo_capacity != null ? fNumber(randomShip.cargo_capacity) : null, unit: 'SCU' },
+                    { label: 'SCM Speed', val: randomShip.scm_speed != null ? fNumber(randomShip.scm_speed) : null, unit: 'm/s' },
+                    { label: 'Max Speed', val: randomShip.max_speed != null ? fNumber(randomShip.max_speed) : null, unit: 'm/s' },
+                    { label: 'Shield HP', val: randomShip.shield_hp != null ? fNumber(randomShip.shield_hp) : null, unit: '' },
+                    { label: 'Total HP',  val: randomShip.total_hp != null ? fNumber(randomShip.total_hp) : null, unit: '' },
+                    { label: 'Mass',      val: randomShip.mass != null ? fNumber(randomShip.mass) : null, unit: 'kg' },
+                    { label: 'Min Crew',  val: randomShip.min_crew != null ? String(randomShip.min_crew) : null, unit: '' },
+                  ].filter(s => s.val != null).slice(0, 6).map(stat => (
+                    <div key={stat.label} className="sci-panel px-3 py-2">
+                      <p className="font-mono-sc text-[9px] text-slate-600 uppercase tracking-widest">{stat.label}</p>
+                      <p className="font-orbitron text-sm font-bold text-slate-200 mt-0.5">
+                        {stat.val}
+                        {stat.unit && <span className="text-[10px] text-slate-600 ml-1">{stat.unit}</span>}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Combat stats bar row */}
+                {(randomShip.weapon_damage_total || randomShip.missile_damage_total) && (
+                  <div className="flex gap-3 flex-wrap">
+                    {randomShip.weapon_damage_total != null && randomShip.weapon_damage_total > 0 && (
+                      <div className="flex items-center gap-2">
+                        <Zap size={10} className="text-red-400 shrink-0" />
+                        <span className="font-mono-sc text-[10px] text-slate-600">Weapon DPS</span>
+                        <span className="font-orbitron text-xs text-red-400">{fNumber(randomShip.weapon_damage_total)}</span>
+                      </div>
+                    )}
+                    {randomShip.missile_damage_total != null && randomShip.missile_damage_total > 0 && (
+                      <div className="flex items-center gap-2">
+                        <Layers size={10} className="text-orange-400 shrink-0" />
+                        <span className="font-mono-sc text-[10px] text-slate-600">Missile DMG</span>
+                        <span className="font-orbitron text-xs text-orange-400">{fNumber(randomShip.missile_damage_total)}</span>
+                      </div>
                     )}
                   </div>
-                  <p className="font-orbitron text-sm font-bold text-slate-300 group-hover:text-slate-100 transition-colors mb-1">
-                    {label}
-                  </p>
-                  <p className="text-xs font-rajdhani text-slate-600 group-hover:text-slate-500 leading-relaxed transition-colors">
-                    {description}
-                  </p>
+                )}
+
+                {/* CTA */}
+                <div className="mt-auto pt-1">
+                  <Link
+                    href={`/ships/${randomShip.uuid}`}
+                    className="sci-btn-primary text-xs py-2 px-4 inline-flex items-center gap-1.5"
+                  >
+                    Full data sheet <ArrowRight size={12} />
+                  </Link>
                 </div>
+              </div>
+            ) : (
+              <div className="flex-1 p-4"><LoadingGrid rows={3} cols={3} message="LOADING…" /></div>
+            )}
+          </div>
+        </motion.div>
+
+        {/* Changelog feed */}
+        <motion.div
+          className="lg:col-span-2"
+          initial={{ opacity: 0, x: 12 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <div className="sci-panel h-full flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-800/60">
+              <div>
+                <span className="font-orbitron text-[10px] font-bold text-slate-500 tracking-widest uppercase flex items-center gap-1.5">
+                  <BookOpen size={10} />
+                  Recent Changes
+                </span>
+                {changelogSummary && (
+                  <p className="font-mono-sc text-[9px] text-slate-700 mt-0.5">
+                    {changelogSummary.total.toLocaleString('en-US')} entities tracked
+                  </p>
+                )}
+              </div>
+              <Link href="/changelog" className="sci-btn-ghost py-1 px-2 text-[10px] gap-1">
+                All <ArrowRight size={9} />
               </Link>
-            </motion.div>
-          ))}
-        </div>
+            </div>
+
+            {/* Change summary badges */}
+            {byChange && Object.keys(byChange).length > 0 && (
+              <div className="flex items-center gap-3 px-4 py-2 border-b border-slate-800/40">
+                {byChange.added    > 0 && <span className="font-mono-sc text-[10px] text-green-400">+{byChange.added} added</span>}
+                {byChange.modified > 0 && <span className="font-mono-sc text-[10px] text-amber-400">~{byChange.modified} modified</span>}
+                {byChange.removed  > 0 && <span className="font-mono-sc text-[10px] text-red-400">-{byChange.removed} removed</span>}
+              </div>
+            )}
+
+            {/* Feed */}
+            <div className="flex-1 overflow-y-auto max-h-72 py-1">
+              {changelog?.data.map((entry) => (
+                <ChangelogRow key={entry.id} entry={entry} />
+              ))}
+              {!changelog && (
+                <div className="p-4"><LoadingGrid rows={4} cols={3} message="" /></div>
+              )}
+            </div>
+          </div>
+        </motion.div>
       </div>
 
-      {/* ── Bottom grid: database nav + changelog ────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* ── Tools ────────────────────────────────────────────────────── */}
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+        <div className="flex items-center gap-3 mb-3">
+          <span className="font-orbitron text-[10px] font-bold text-slate-600 tracking-widest uppercase">
+            Tools & Calculators
+          </span>
+          <div className="flex-1 h-px bg-slate-800" />
+          <div className="flex items-center gap-2">
+            {(['combat', 'economy', 'data'] as ToolCategory[]).map(cat => (
+              <span key={cat} className={`font-mono-sc text-[9px] uppercase tracking-widest ${CATEGORY_LABEL[cat].color}`}>
+                ■ {CATEGORY_LABEL[cat].label}
+              </span>
+            ))}
+          </div>
+        </div>
 
-        {/* Database navigation */}
-        <ScifiPanel title="Database" className="lg:col-span-1">
-          <div className="space-y-1">
-            {STAT_CARDS.map(({ key, to, icon: Icon, label, color }) => (
-              <Link
-                key={label}
-                href={to}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-sm border border-transparent hover:border-border hover:bg-white/5 transition-all group"
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          {TOOLS.map(({ to, icon: Icon, label, sub, category, badge }, i) => {
+            const cat = CATEGORY_LABEL[category];
+            return (
+              <motion.div
+                key={to}
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.52 + i * 0.04 }}
               >
-                <Icon size={14} className={color} />
-                <span className="font-rajdhani font-semibold text-sm text-slate-400 group-hover:text-slate-200 uppercase tracking-wide transition-colors">
+                <Link href={to} className="block h-full">
+                  <div className={`sci-panel p-4 h-full border transition-colors duration-150 ${cat.border} group cursor-pointer`}>
+                    <div className="flex items-start justify-between mb-3">
+                      <Icon size={18} className="text-slate-500 group-hover:text-slate-200 transition-colors shrink-0" />
+                      <div className="flex flex-col items-end gap-1">
+                        {badge && (
+                          <span className="font-orbitron text-[8px] tracking-widest text-slate-700 border border-slate-800 rounded-sm px-1 py-0.5 uppercase">
+                            {badge}
+                          </span>
+                        )}
+                        <span className={`font-mono-sc text-[8px] uppercase tracking-widest ${cat.color} opacity-60`}>
+                          {cat.label}
+                        </span>
+                      </div>
+                    </div>
+                    <p className="font-orbitron text-sm font-bold text-slate-300 group-hover:text-slate-100 transition-colors mb-1 leading-tight">
+                      {label}
+                    </p>
+                    <p className="font-rajdhani text-xs text-slate-600 group-hover:text-slate-500 leading-snug transition-colors">
+                      {sub}
+                    </p>
+                  </div>
+                </Link>
+              </motion.div>
+            );
+          })}
+        </div>
+      </motion.div>
+
+      {/* ── Database quick-access ────────────────────────────────────── */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.65 }}>
+        <div className="sci-panel px-2 py-1.5">
+          <div className="flex flex-wrap items-stretch divide-x divide-slate-800/60">
+            {DB_ENTRIES.map(({ key, label, icon: Icon, color, to }) => (
+              <Link
+                key={key}
+                href={to}
+                className="flex items-center gap-2 px-4 py-2 hover:bg-white/[0.03] transition-colors group flex-1 min-w-0"
+              >
+                <Icon size={12} className={`${color} shrink-0`} />
+                <span className="font-rajdhani font-semibold text-xs text-slate-500 group-hover:text-slate-300 uppercase tracking-wide transition-colors whitespace-nowrap">
                   {label}
                 </span>
                 {stats && (
-                  <span className="ml-auto font-mono-sc text-xs text-slate-700">
-                    {(stats[key as keyof typeof stats] ?? 0).toLocaleString('en-US')}
+                  <span className="ml-auto font-mono-sc text-[10px] text-slate-700 hidden sm:block">
+                    {(stats[key as keyof typeof stats] as number ?? 0).toLocaleString('en-US')}
                   </span>
                 )}
               </Link>
             ))}
           </div>
-        </ScifiPanel>
+        </div>
+      </motion.div>
 
-        {/* Changelog */}
-        <ScifiPanel
-          title="Latest changes"
-          subtitle={changelogSummary ? `${changelogSummary.total.toLocaleString('en-US')} entries total` : undefined}
-          className="lg:col-span-2"
-          actions={
-            <Link href="/changelog" className="sci-btn-ghost py-1 px-2 text-xs">
-              <BookOpen size={11} /> View all
-            </Link>
-          }
-        >
-          {changeCounts && (
-            <div className="flex gap-4 mb-3 text-xs font-mono-sc">
-              <span className="text-green-400">+{changeCounts.added} added</span>
-              <span className="text-amber-400">~{changeCounts.modified} modified</span>
-              <span className="text-red-400">-{changeCounts.removed} removed</span>
-            </div>
-          )}
-          <div className="space-y-1 max-h-72 overflow-y-auto">
-            {changelog?.data.map((entry: { id: string | number; change_type: string; entity_name: string; entity_type: string; created_at: string }) => (
-              <div key={entry.id} className="flex items-center gap-3 px-2 py-1.5 rounded-sm hover:bg-white/5 transition-colors">
-                <GlowBadge
-                  color={
-                    entry.change_type === 'added' ? 'green' :
-                    entry.change_type === 'removed' ? 'red' : 'amber'
-                  }
-                  size="xs"
-                >
-                  {entry.change_type}
-                </GlowBadge>
-                <span className="flex-1 text-sm text-slate-400 truncate">{entry.entity_name}</span>
-                <span className="text-xs font-mono-sc text-slate-600 shrink-0">
-                  {entry.entity_type}
-                </span>
-                <span className="text-xs font-mono-sc text-slate-700 shrink-0 hidden md:block">
-                  {fDateTime(entry.created_at)}
-                </span>
-              </div>
-            ))}
-            {!changelog && <LoadingGrid rows={3} cols={4} message="" />}
-          </div>
-        </ScifiPanel>
-      </div>
     </div>
   );
 }
-
