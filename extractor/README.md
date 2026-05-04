@@ -63,7 +63,7 @@ npx tsx extractor/extract.ts [options]
 | `-e, --env <env>` | Environnement : `live` \| `ptu` \| `custom` | `live` |
 | `-m, --modules <list>` | Modules à extraire, séparés par virgule | `all` |
 | `-p, --p4k <path>` | Chemin vers `Data.p4k` (prioritaire sur les variables d'env) | — |
-| `-V, --game-version <ver>` | Version du jeu à enregistrer en base (ex: `4.7.2`) | auto-détectée |
+| `--game-version <ver>` | Version du jeu à enregistrer en base (ex: `4.7.2`) | auto-détectée |
 | `--dry-run` | Parse le P4K et affiche les stats sans écrire en base | — |
 | `--prod-db` | Utilise `.env.prod` (base de prod, port 5433 via tunnel SSH) | — |
 
