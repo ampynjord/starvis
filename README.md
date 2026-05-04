@@ -60,11 +60,24 @@ L'application combine deux sources complémentaires :
 
 | Source | Contenu | Mise à jour |
 |---|---|---|
-| **P4K / DataForge** | Données in-game réelles (~515 vaisseaux, ~6 000 composants, ~10 000 items FPS…) | Via CLI `extractor/` |
+| **P4K / DataForge** | Données in-game réelles (~320 vaisseaux, ~3 200 composants, ~10 000 items FPS…) | Via CLI `extractor/` |
 | **RSI Ship Matrix** | Données marketing officielles (~246 vaisseaux) | Synchronisation automatique au démarrage de l'API |
 | **RSI Website** | Galactapedia, Comm-links, Starmap, CTM | Via CLI `extractor/` |
 
 L'extraction P4K se fait en local — voir [`extractor/README.md`](extractor/README.md).
+
+---
+
+## Environnements LIVE / PTU
+
+Les données LIVE et PTU coexistent dans la même base PostgreSQL, séparées par une colonne `env` (`'live'` ou `'ptu'`) sur chaque table du schéma `game`.
+
+| Env | Version actuelle | Description |
+|---|---|---|
+| `live` | 4.7.2 | Serveurs de production Star Citizen |
+| `ptu` | 4.8.0 | Public Test Universe |
+
+Tous les endpoints API acceptent un paramètre `?env=live` (défaut) ou `?env=ptu`. L'interface bascule entre les deux via un sélecteur persisté en `localStorage`.
 
 ---
 
@@ -75,6 +88,7 @@ L'extraction P4K se fait en local — voir [`extractor/README.md`](extractor/REA
 │  Local (développeur)                                  │
 │                                                      │
 │  Star Citizen → P4K → extractor CLI → PostgreSQL VPS │
+│  (LIVE & PTU, données séparées par colonne env)      │
 └──────────────────────────────────────────────────────┘
 
 ┌──────────────────────────────────────────────────────┐
@@ -91,13 +105,15 @@ L'extraction P4K se fait en local — voir [`extractor/README.md`](extractor/REA
 
 | Schéma | Contenu |
 |---|---|
-| `game` | Vaisseaux, composants, items, commodités, missions, crafting (LIVE et PTU) |
+| `game` | Vaisseaux, composants, items, commodités, missions, crafting — colonnes `env = 'live'` ou `'ptu'` |
 | `rsi` | Ship Matrix, Galactapedia, Comm-links, Starmap |
-| `meta` | Logs d'extraction, changelog automatique |
+| `meta` | Logs d'extraction (`extraction_log`), changelog automatique avec filtrage par env |
 
 ---
 
 ## API — Endpoints principaux
+
+Tous les endpoints de données acceptent `?env=live` (défaut) ou `?env=ptu`.
 
 | Ressource | Endpoints clés |
 |---|---|
@@ -106,12 +122,14 @@ L'extraction P4K se fait en local — voir [`extractor/README.md`](extractor/REA
 | Items FPS | `GET /items`, `/items/:id`, `/items/filters` |
 | Commodités | `GET /commodities`, `/commodities/:id/prices` |
 | Commerce | `GET /trade/prices`, `/trade/location/:key` |
-| Mining | `GET /mining/lasers` |
+| Mining | `GET /mining/elements`, `/mining/compositions`, `/mining/lasers` |
 | Missions | `GET /missions`, `/missions/:id` |
 | Crafting | `GET /crafting/recipes`, `/crafting/recipes/:id` |
+| Locations | `GET /locations`, `/locations/:id` |
 | Ship Matrix | `GET /ship-matrix`, `/ship-matrix/:id` |
 | Recherche | `GET /search` |
 | Calculs | `GET /calculate/fps-damage`, `/calculate/mining-yield` |
+| Changelog | `GET /changelog`, `/changelog/summary` — filtré par env |
 | Admin | `POST /admin/sync-ship-matrix`, `GET /admin/extraction-log` |
 | Santé | `GET /health`, `/health/live`, `/health/ready`, `/metrics` |
 
