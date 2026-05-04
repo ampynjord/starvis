@@ -2501,6 +2501,7 @@ export class ExtractionService {
           mod.endQuality,
           mod.modifierAtStart,
           mod.modifierAtEnd,
+          mod.modifierType ?? null,
         ]);
       }
     }
@@ -2511,9 +2512,9 @@ export class ExtractionService {
       savedModifiers = await ExtractionService.batchUpsert(
         conn,
         `INSERT INTO game.crafting_slot_modifiers
-           (recipe_env, recipe_uuid, slot_name, property_name, property_uuid, unit_format, start_quality, end_quality, modifier_at_start, modifier_at_end)`,
+           (recipe_env, recipe_uuid, slot_name, property_name, property_uuid, unit_format, start_quality, end_quality, modifier_at_start, modifier_at_end, modifier_type)`,
         '',
-        10,
+        11,
         modifierRowsWithEnv,
       );
     }

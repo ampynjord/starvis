@@ -25,6 +25,7 @@ export interface CraftingModifierRecord {
   endQuality: number;
   modifierAtStart: number;
   modifierAtEnd: number;
+  modifierType: string;
 }
 
 export interface CraftingIngredientRecord {
@@ -170,7 +171,7 @@ interface CostSlot {
   count: number;
   isOptional: boolean;
   resourceOptions: { resourceRef: string; scu: number; minQuality: number }[];
-  modifiers: { propertyRef: string; startQuality: number; endQuality: number; modifierAtStart: number; modifierAtEnd: number }[];
+  modifiers: { propertyRef: string; startQuality: number; endQuality: number; modifierAtStart: number; modifierAtEnd: number; modifierType: string }[];
 }
 
 /** Parse a CraftingCost_Select object into a CostSlot */
@@ -237,6 +238,7 @@ function parseCostSelect(obj: Record<string, unknown>, isOptional: boolean, locS
             endQuality: typeof range.endQuality === 'number' ? range.endQuality : 1000,
             modifierAtStart: typeof range.modifierAtStart === 'number' ? range.modifierAtStart : 1,
             modifierAtEnd: typeof range.modifierAtEnd === 'number' ? range.modifierAtEnd : 1,
+            modifierType: safeString(range.__type) ?? 'CraftingGameplayPropertyModifierValueRange_Linear',
           });
         }
       }
@@ -335,6 +337,7 @@ function extractBlueprintIngredientsAndModifiers(
         endQuality: mod.endQuality,
         modifierAtStart: mod.modifierAtStart,
         modifierAtEnd: mod.modifierAtEnd,
+        modifierType: mod.modifierType,
       });
     }
   }

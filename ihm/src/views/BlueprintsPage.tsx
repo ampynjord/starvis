@@ -60,13 +60,25 @@ function cleanUnitFormat(raw: string | null | undefined): string {
   return raw;
 }
 
-function fmtModifierValue(v: number): string {
+const ADDITIVE_TYPE = 'CraftingGameplayPropertyModifierValueRange_LinearIntegerAdditive';
+
+function isAdditive(modifierType: string | null | undefined): boolean {
+  return modifierType === ADDITIVE_TYPE;
+}
+
+function fmtModifierValue(v: number, additive: boolean): string {
+  if (additive) {
+    const sign = v >= 0 ? '+' : '';
+    return `${sign}${Math.round(v)}`;
+  }
   return `×${v.toFixed(2)}`;
 }
 
-function modifierColor(v: number): string {
-  if (v > 1) return 'text-green-400';
-  if (v < 1) return 'text-red-400';
+function modifierColor(v: number, additive: boolean): string {
+  const positive = additive ? v > 0 : v > 1;
+  const negative = additive ? v < 0 : v < 1;
+  if (positive) return 'text-green-400';
+  if (negative) return 'text-red-400';
   return 'text-slate-400';
 }
 
@@ -347,13 +359,20 @@ function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
                     </div>
                     <div className="flex flex-col items-end gap-0.5 shrink-0">
                       <div className="flex items-center gap-0.5 text-xs font-orbitron">
-                        <span className={modifierColor(mod.modifier_at_start)}>
-                          {fmtModifierValue(mod.modifier_at_start)}
-                        </span>
-                        <span className="text-slate-700">→</span>
-                        <span className={modifierColor(mod.modifier_at_end)}>
-                          {fmtModifierValue(mod.modifier_at_end)}
-                        </span>
+                        {(() => {
+                          const additive = isAdditive(mod.modifier_type);
+                          return (
+                            <>
+                              <span className={modifierColor(mod.modifier_at_start, additive)}>
+                                {fmtModifierValue(mod.modifier_at_start, additive)}
+                              </span>
+                              <span className="text-slate-700">→</span>
+                              <span className={modifierColor(mod.modifier_at_end, additive)}>
+                                {fmtModifierValue(mod.modifier_at_end, additive)}
+                              </span>
+                            </>
+                          );
+                        })()}
                       </div>
                       <span className="text-[10px] text-slate-600">
                         q{mod.start_quality}–q{mod.end_quality}

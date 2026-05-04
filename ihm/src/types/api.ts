@@ -609,6 +609,8 @@ export interface CraftingSlotModifier {
   modifierAtStart?: number;
   modifier_at_end: number;
   modifierAtEnd?: number;
+  modifier_type: string | null;
+  modifierType?: string | null;
 }
 
 export interface CraftingCategory {
