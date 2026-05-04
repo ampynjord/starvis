@@ -53,6 +53,23 @@ function fmtName(r: CraftingRecipe): string {
   return r.display_name ?? r.name ?? r.class_name;
 }
 
+function cleanUnitFormat(raw: string | null | undefined): string {
+  if (!raw || raw === '@LOC_EMPTY') return '';
+  if (raw.startsWith('@StatUnits_')) return raw.slice('@StatUnits_'.length).replace(/_/g, ' ');
+  if (raw.startsWith('@')) return '';
+  return raw;
+}
+
+function fmtModifierValue(v: number): string {
+  return `×${v.toFixed(2)}`;
+}
+
+function modifierColor(v: number): string {
+  if (v > 1) return 'text-green-400';
+  if (v < 1) return 'text-red-400';
+  return 'text-slate-400';
+}
+
 // ── Category color map ────────────────────────────────────────────────────────
 
 type BadgeColor = 'cyan' | 'amber' | 'green' | 'red' | 'purple' | 'slate';
@@ -219,9 +236,20 @@ function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
         </div>
         <h3 className="font-orbitron text-base text-slate-100 leading-snug">{fmtName(recipe)}</h3>
         {(recipe.display_output_item_name ?? recipe.output_item_name) && (
-          <p className="text-xs text-purple-400 font-mono-sc mt-0.5">
-            → {recipe.display_output_item_name ?? recipe.output_item_name}
-            {recipe.output_quantity > 1 && ` ×${recipe.output_quantity}`}
+          <p className="text-xs text-purple-400 font-mono-sc mt-0.5 flex items-center gap-1 flex-wrap">
+            <span>→</span>
+            {recipe.output_item_uuid ? (
+              <Link
+                href={`/items/${recipe.output_item_uuid}`}
+                className="hover:text-purple-200 underline underline-offset-2 decoration-purple-800 flex items-center gap-0.5"
+              >
+                {recipe.display_output_item_name ?? recipe.output_item_name}
+                <LinkIcon size={9} className="opacity-50" />
+              </Link>
+            ) : (
+              <span>{recipe.display_output_item_name ?? recipe.output_item_name}</span>
+            )}
+            {recipe.output_quantity > 1 && <span>×{recipe.output_quantity}</span>}
           </p>
         )}
       </div>
@@ -258,13 +286,31 @@ function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
                 <div key={ing.id} className="flex items-center justify-between gap-2 py-1.5 border-b border-slate-800/60 last:border-0">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-mono-sc text-slate-200 truncate">
-                      {ing.display_item_name ?? ing.item_name}
+                      {ing.item_uuid ? (
+                        <Link
+                          href={`/items/${ing.item_uuid}`}
+                          className="hover:text-cyan-300 underline underline-offset-2 decoration-slate-700 inline-flex items-center gap-0.5"
+                        >
+                          {ing.display_item_name ?? ing.item_name}
+                          <LinkIcon size={8} className="opacity-40 shrink-0" />
+                        </Link>
+                      ) : (
+                        ing.display_item_name ?? ing.item_name
+                      )}
                     </p>
-                    {ing.slot_name && (
-                      <p className="text-[10px] text-slate-600 truncate">
-                        {ing.display_slot_name ?? ing.slot_name}
-                      </p>
-                    )}
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      {ing.slot_name && (
+                        <p className="text-[10px] text-slate-600 truncate">
+                          {ing.display_slot_name ?? ing.slot_name}
+                        </p>
+                      )}
+                      {ing.scu != null && ing.scu > 0 && (
+                        <span className="text-[10px] text-slate-600 font-mono-sc">{ing.scu} SCU</span>
+                      )}
+                      {ing.min_quality > 0 && (
+                        <span className="text-[10px] text-slate-600 font-mono-sc">min q{ing.min_quality}</span>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {ing.is_optional && (
@@ -287,16 +333,35 @@ function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
               <Zap size={10} /> Quality Modifiers
             </p>
             <div className="space-y-1.5">
-              {recipe.modifiers.map((mod) => (
-                <div key={mod.id} className="flex items-center justify-between gap-2 text-xs">
-                  <span className="text-slate-400 font-mono-sc truncate flex-1">
-                    {mod.display_property_name ?? mod.property_name}
-                  </span>
-                  <span className="text-[10px] text-slate-600 shrink-0">
-                    q{mod.start_quality}→q{mod.end_quality}
-                  </span>
-                </div>
-              ))}
+              {recipe.modifiers.map((mod) => {
+                const unit = cleanUnitFormat(mod.unit_format);
+                return (
+                  <div key={mod.id} className="flex items-start justify-between gap-2 py-1 border-b border-slate-800/60 last:border-0">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-xs text-slate-300 font-mono-sc">
+                        {mod.display_property_name ?? mod.property_name}
+                      </span>
+                      {unit && (
+                        <span className="text-[10px] text-slate-600 ml-1">({unit})</span>
+                      )}
+                    </div>
+                    <div className="flex flex-col items-end gap-0.5 shrink-0">
+                      <div className="flex items-center gap-0.5 text-xs font-orbitron">
+                        <span className={modifierColor(mod.modifier_at_start)}>
+                          {fmtModifierValue(mod.modifier_at_start)}
+                        </span>
+                        <span className="text-slate-700">→</span>
+                        <span className={modifierColor(mod.modifier_at_end)}>
+                          {fmtModifierValue(mod.modifier_at_end)}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-600">
+                        q{mod.start_quality}–q{mod.end_quality}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
