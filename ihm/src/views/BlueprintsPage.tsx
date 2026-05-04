@@ -228,7 +228,7 @@ function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
   const recipe = full ?? r;
 
   return (
-    <ScifiPanel title="Blueprint Detail" subtitle={recipe.class_name}>
+    <ScifiPanel title="Blueprint Detail">
       {/* Header */}
       <div className="mb-4">
         <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -375,7 +375,7 @@ function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
                         })()}
                       </div>
                       <span className="text-[10px] text-slate-600">
-                        q{mod.start_quality}–q{mod.end_quality}
+                        q{Math.round(mod.start_quality / 100)}–q{Math.round(mod.end_quality / 100)}
                       </span>
                     </div>
                   </div>
@@ -385,12 +385,12 @@ function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
           </div>
         )}
 
-        {/* Associated missions */}
-        {recipe.unlock_missions && recipe.unlock_missions.length > 0 && (
-          <div className="sci-panel p-3 bg-cyan-950/10 border-cyan-900/30">
-            <p className="text-[10px] font-mono-sc text-cyan-500 uppercase flex items-center gap-1 mb-2">
-              <ClipboardList size={10} /> Unlock Blueprint ({recipe.unlock_missions.length})
-            </p>
+        {/* Acquisition */}
+        <div className="sci-panel p-3 bg-cyan-950/10 border-cyan-900/30">
+          <p className="text-[10px] font-mono-sc text-cyan-500 uppercase flex items-center gap-1 mb-2">
+            <ClipboardList size={10} /> Unlock Blueprint{recipe.unlock_missions && recipe.unlock_missions.length > 0 ? ` (${recipe.unlock_missions.length})` : ''}
+          </p>
+          {recipe.unlock_missions && recipe.unlock_missions.length > 0 ? (
             <div className="space-y-1.5">
               {recipe.unlock_missions.map((m) => (
                 <Link
@@ -422,12 +422,9 @@ function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
                 </Link>
               ))}
             </div>
-          </div>
-        )}
-
-        {/* Technical footer */}
-        <div className="sci-panel p-2 border-slate-800/40 bg-slate-900/30">
-          <p className="text-[10px] font-mono-sc text-slate-600 break-all">{recipe.class_name}</p>
+          ) : recipe.unlock_missions !== undefined ? (
+            <p className="text-[10px] text-slate-500 font-mono-sc italic">Aucune source d'obtention trouvée dans les données.</p>
+          ) : null}
         </div>
       </div>
     </ScifiPanel>
