@@ -137,30 +137,51 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           if (typeof c.Health === 'number' && c.Health > 0) comp.hp = Math.round(c.Health);
         }
 
-        // Weapon fire rate
+        // Weapon stats (fire rate for projectile weapons; DPS/range for beam weapons)
         if (cType === 'SCItemWeaponComponentParams') {
           const fireActions = c.fireActions;
           if (Array.isArray(fireActions) && fireActions.length > 0) {
             const pa = fireActions[0];
             if (pa && typeof pa === 'object') {
-              if (typeof pa.fireRate === 'number') comp.weaponFireRate = Math.round(pa.fireRate * 100) / 100;
-              const lp = pa.launchParams;
-              if (lp && typeof lp === 'object') {
-                if (typeof lp.pelletCount === 'number') comp.weaponPelletsPerShot = lp.pelletCount;
-              }
-              if (!comp.weaponFireRate && Array.isArray(pa.sequenceEntries)) {
-                let totalFR = 0;
-                for (const se of pa.sequenceEntries) {
-                  const wa = se?.weaponAction;
-                  if (wa && typeof wa.fireRate === 'number') totalFR += wa.fireRate;
-                  if (!comp.weaponPelletsPerShot && wa?.launchParams?.pelletCount) comp.weaponPelletsPerShot = wa.launchParams.pelletCount;
+              if (pa.damagePerSecond && typeof pa.damagePerSecond === 'object') {
+                // Beam weapon — continuous-fire, no projectile
+                const dps = pa.damagePerSecond as Record<string, unknown>;
+                const beamDps =
+                  (typeof dps.DamageEnergy === 'number' ? dps.DamageEnergy : 0) +
+                  (typeof dps.DamagePhysical === 'number' ? dps.DamagePhysical : 0) +
+                  (typeof dps.DamageDistortion === 'number' ? dps.DamageDistortion : 0) +
+                  (typeof dps.DamageThermal === 'number' ? dps.DamageThermal : 0);
+                if (beamDps > 0) comp.weaponBeamDps = Math.round(beamDps * 10000) / 10000;
+                if (typeof pa.fullDamageRange === 'number') comp.weaponFullDamageRange = Math.round(pa.fullDamageRange * 100) / 100;
+                if (typeof pa.zeroDamageRange === 'number') comp.weaponZeroDamageRange = Math.round(pa.zeroDamageRange * 100) / 100;
+                if (typeof pa.heatPerSecond === 'number') comp.weaponHeatPerSecond = Math.round(pa.heatPerSecond * 10000) / 10000;
+                if (typeof pa.maxAmmoLoad === 'number') comp.weaponBeamCapacity = Math.round(pa.maxAmmoLoad * 100) / 100;
+                if (typeof pa.regenerationCooldown === 'number')
+                  comp.weaponBeamRegenCooldown = Math.round(pa.regenerationCooldown * 100) / 100;
+              } else {
+                // Projectile weapon — fire rate + ammo path
+                if (typeof pa.fireRate === 'number') comp.weaponFireRate = Math.round(pa.fireRate * 100) / 100;
+                const lp = pa.launchParams;
+                if (lp && typeof lp === 'object') {
+                  if (typeof (lp as Record<string, unknown>).pelletCount === 'number')
+                    comp.weaponPelletsPerShot = (lp as Record<string, unknown>).pelletCount as number;
                 }
-                if (totalFR > 0) comp.weaponFireRate = Math.round(totalFR * 100) / 100;
+                if (!comp.weaponFireRate && Array.isArray(pa.sequenceEntries)) {
+                  let totalFR = 0;
+                  for (const se of pa.sequenceEntries) {
+                    const wa = (se as Record<string, unknown>)?.weaponAction as Record<string, unknown> | undefined;
+                    if (wa && typeof wa.fireRate === 'number') totalFR += wa.fireRate;
+                    if (!comp.weaponPelletsPerShot && (wa?.launchParams as Record<string, unknown>)?.pelletCount)
+                      comp.weaponPelletsPerShot = (wa?.launchParams as Record<string, unknown>)?.pelletCount as number;
+                  }
+                  if (totalFR > 0) comp.weaponFireRate = Math.round(totalFR * 100) / 100;
+                }
               }
             }
           }
-          if (c.weaponAction && typeof c.weaponAction === 'object' && !comp.weaponFireRate) {
-            if (typeof c.weaponAction.fireRate === 'number') comp.weaponFireRate = Math.round(c.weaponAction.fireRate * 100) / 100;
+          if (c.weaponAction && typeof c.weaponAction === 'object' && !comp.weaponFireRate && !comp.weaponBeamDps) {
+            if (typeof (c.weaponAction as Record<string, unknown>).fireRate === 'number')
+              comp.weaponFireRate = Math.round(((c.weaponAction as Record<string, unknown>).fireRate as number) * 100) / 100;
           }
         }
 
@@ -222,9 +243,12 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
                   const totalDmg = physical + energy + distortion + thermal + biochemical + stun;
                   if (totalDmg > 0) {
                     comp.weaponDamage = Math.round(totalDmg * 10000) / 10000;
-                    comp.weaponDamagePhysical = Math.round(physical * 10000) / 10000;
-                    comp.weaponDamageEnergy = Math.round(energy * 10000) / 10000;
-                    comp.weaponDamageDistortion = Math.round(distortion * 10000) / 10000;
+                    comp.weaponDamagePhysical = physical > 0 ? Math.round(physical * 10000) / 10000 : undefined;
+                    comp.weaponDamageEnergy = energy > 0 ? Math.round(energy * 10000) / 10000 : undefined;
+                    comp.weaponDamageDistortion = distortion > 0 ? Math.round(distortion * 10000) / 10000 : undefined;
+                    comp.weaponDamageThermal = thermal > 0 ? Math.round(thermal * 10000) / 10000 : undefined;
+                    comp.weaponDamageBiochemical = biochemical > 0 ? Math.round(biochemical * 10000) / 10000 : undefined;
+                    comp.weaponDamageStun = stun > 0 ? Math.round(stun * 10000) / 10000 : undefined;
                     const dtypes: [string, number][] = [
                       ['physical', physical],
                       ['energy', energy],
@@ -317,9 +341,12 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
               const total = physical + energy + distortion + thermal + biochemical + stun;
               if (total > 0) {
                 comp.missileDamage = Math.round(total * 100) / 100;
-                comp.missileDamagePhysical = Math.round(physical * 100) / 100;
-                comp.missileDamageEnergy = Math.round(energy * 100) / 100;
-                comp.missileDamageDistortion = Math.round(distortion * 100) / 100;
+                comp.missileDamagePhysical = physical > 0 ? Math.round(physical * 100) / 100 : undefined;
+                comp.missileDamageEnergy = energy > 0 ? Math.round(energy * 100) / 100 : undefined;
+                comp.missileDamageDistortion = distortion > 0 ? Math.round(distortion * 100) / 100 : undefined;
+                comp.missileDamageThermal = thermal > 0 ? Math.round(thermal * 100) / 100 : undefined;
+                comp.missileDamageBiochemical = biochemical > 0 ? Math.round(biochemical * 100) / 100 : undefined;
+                comp.missileDamageStun = stun > 0 ? Math.round(stun * 100) / 100 : undefined;
               }
             }
           }
