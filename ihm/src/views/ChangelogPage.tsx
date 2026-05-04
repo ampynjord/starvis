@@ -122,12 +122,18 @@ function EntityCard({ entityKey, entries }: { entityKey: string; entries: Change
   const [type, uuid = '', name = ''] = entityKey.split('\0');
   const href = entityHref(type, uuid);
 
-  const counts = { added: 0, removed: 0, modified: 0 };
-  for (const e of entries) {
-    if (e.change_type in counts) counts[e.change_type as ChangeType]++;
-  }
+  // Separate marker rows (entity-level) from detail rows (field-level)
+  const markerEntries = entries.filter((e) => e.field_name == null);
+  const detailEntries = entries.filter((e) => e.field_name != null);
 
-  const [expanded, setExpanded] = useState(entries.length <= AUTO_EXPAND_MAX);
+  // Badge counts: +/- from markers (1 per entity), ~ from detail rows
+  const isAdded   = markerEntries.some((e) => e.change_type === 'added');
+  const isRemoved = markerEntries.some((e) => e.change_type === 'removed');
+  const modifiedCount = detailEntries.filter((e) => e.change_type === 'modified').length;
+
+  // Show detail rows when available; fall back to marker rows for old data
+  const displayEntries = detailEntries.length > 0 ? detailEntries : markerEntries;
+  const [expanded, setExpanded] = useState(displayEntries.length <= AUTO_EXPAND_MAX);
 
   return (
     <div className="border-t border-slate-800/50">
@@ -152,9 +158,12 @@ function EntityCard({ entityKey, entries }: { entityKey: string; entries: Change
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          {counts.added    > 0 && <GlowBadge color="green" size="xs">+{counts.added}</GlowBadge>}
-          {counts.removed  > 0 && <GlowBadge color="red"   size="xs">-{counts.removed}</GlowBadge>}
-          {counts.modified > 0 && <GlowBadge color="amber" size="xs">~{counts.modified}</GlowBadge>}
+          {isAdded    && <GlowBadge color="green" size="xs">+1</GlowBadge>}
+          {isRemoved  && <GlowBadge color="red"   size="xs">-1</GlowBadge>}
+          {modifiedCount > 0 && <GlowBadge color="amber" size="xs">~{modifiedCount}</GlowBadge>}
+          {detailEntries.length > 0 && (
+            <span className="text-[10px] font-mono-sc text-slate-700 ml-0.5">{detailEntries.length} fields</span>
+          )}
         </div>
 
         {expanded
@@ -164,7 +173,7 @@ function EntityCard({ entityKey, entries }: { entityKey: string; entries: Change
 
       {expanded && (
         <div className="bg-black/20 pb-1">
-          {entries.map((entry, i) => (
+          {displayEntries.map((entry, i) => (
             <DiffRow key={entry.id} entry={entry} border={i > 0} />
           ))}
         </div>
@@ -179,11 +188,17 @@ function VersionSection({ version, entries }: { version: string; entries: Change
   const [open, setOpen] = useState(true);
   const grouped = groupByEntity(entries);
 
+  // Count entity-level stats (not row-level) so field-detail rows don't inflate counts
   const byChange = { added: 0, removed: 0, modified: 0 };
   const byType: Record<string, number> = {};
-  for (const e of entries) {
-    if (e.change_type in byChange) byChange[e.change_type as ChangeType]++;
-    byType[e.entity_type] = (byType[e.entity_type] ?? 0) + 1;
+  for (const [, ents] of grouped) {
+    const entityType = ents[0]?.entity_type ?? '';
+    byType[entityType] = (byType[entityType] ?? 0) + 1;
+    const marker = ents.find((e) => e.field_name == null);
+    const hasModified = ents.some((e) => e.change_type === 'modified');
+    if (marker?.change_type === 'added') byChange.added++;
+    else if (marker?.change_type === 'removed') byChange.removed++;
+    else if (hasModified) byChange.modified++;
   }
 
   const date = entries[0]?.created_at;
@@ -339,6 +354,7 @@ export default function ChangelogPage() {
         offset: (page - 1) * FEED_LIMIT,
         entity_type: entityType || undefined,
         change_type: changeType || undefined,
+        markers_only: true,
       }),
     enabled: view === 'feed',
   });

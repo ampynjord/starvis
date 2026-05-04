@@ -1804,16 +1804,39 @@ export class ExtractionService {
 
     const inserts: Array<[number, string, string, string, string, string | null, string | null, string | null]> = [];
 
-    // Added ships
-    for (const [cn, ship] of newShips) {
-      if (!oldShips.has(cn)) inserts.push([extractionId, 'ship', ship.uuid, ship.name || cn, 'added', null, null, null]);
+    type InsertRow = [number, string, string, string, string, string | null, string | null, string | null];
+
+    function pushDetails(
+      rows: InsertRow[],
+      extractId: number,
+      entityType: string,
+      uuid: string,
+      name: string,
+      changeType: 'added' | 'removed',
+      obj: Record<string, any>,
+      fields: string[],
+    ): void {
+      for (const field of fields) {
+        const val = obj[field];
+        if (val == null) continue;
+        rows.push([
+          extractId,
+          entityType,
+          uuid,
+          name,
+          changeType,
+          field,
+          changeType === 'removed' ? String(val) : null,
+          changeType === 'added' ? String(val) : null,
+        ]);
+      }
     }
-    // Removed ships
-    for (const [cn, ship] of oldShips) {
-      if (!newShips.has(cn)) inserts.push([extractionId, 'ship', ship.uuid, ship.name || cn, 'removed', null, null, null]);
-    }
-    // Modified ships
-    const shipFields = [
+
+    // Ship detail fields for added/removed (name omitted — already in entity_name)
+    const shipDetailFields = [
+      'manufacturer_code',
+      'role',
+      'career',
       'mass',
       'scm_speed',
       'max_speed',
@@ -1823,14 +1846,29 @@ export class ExtractionService {
       'missile_damage_total',
       'weapon_damage_total',
       'crew_size',
-      'role',
-      'career',
-      'name',
     ];
+    // Ship fields tracked for modifications (includes name for renames)
+    const shipModFields = [...shipDetailFields, 'name'];
+
+    // Added ships
+    for (const [cn, ship] of newShips) {
+      if (!oldShips.has(cn)) {
+        inserts.push([extractionId, 'ship', ship.uuid, ship.name || cn, 'added', null, null, null]);
+        pushDetails(inserts, extractionId, 'ship', ship.uuid, ship.name || cn, 'added', ship, shipDetailFields);
+      }
+    }
+    // Removed ships
+    for (const [cn, ship] of oldShips) {
+      if (!newShips.has(cn)) {
+        inserts.push([extractionId, 'ship', ship.uuid, ship.name || cn, 'removed', null, null, null]);
+        pushDetails(inserts, extractionId, 'ship', ship.uuid, ship.name || cn, 'removed', ship, shipDetailFields);
+      }
+    }
+    // Modified ships
     for (const [cn, newShip] of newShips) {
       const oldShip = oldShips.get(cn);
       if (!oldShip) continue;
-      for (const field of shipFields) {
+      for (const field of shipModFields) {
         const oldVal = oldShip[field];
         const newVal = newShip[field];
         if (oldVal == null && newVal == null) continue;
@@ -1852,14 +1890,45 @@ export class ExtractionService {
       }
     }
 
+    const compDetailFields = ['type', 'sub_type', 'size', 'grade', 'manufacturer_code'];
+
     // Added components
     for (const [cn, comp] of newComps) {
-      if (!oldComps.has(cn)) inserts.push([extractionId, 'component', comp.uuid, comp.name || cn, 'added', null, null, null]);
+      if (!oldComps.has(cn)) {
+        inserts.push([extractionId, 'component', comp.uuid, comp.name || cn, 'added', null, null, null]);
+        pushDetails(inserts, extractionId, 'component', comp.uuid, comp.name || cn, 'added', comp, compDetailFields);
+      }
     }
     // Removed components
     for (const [cn, comp] of oldComps) {
-      if (!newComps.has(cn)) inserts.push([extractionId, 'component', comp.uuid, comp.name || cn, 'removed', null, null, null]);
+      if (!newComps.has(cn)) {
+        inserts.push([extractionId, 'component', comp.uuid, comp.name || cn, 'removed', null, null, null]);
+        pushDetails(inserts, extractionId, 'component', comp.uuid, comp.name || cn, 'removed', comp, compDetailFields);
+      }
     }
+    // Modified components
+    for (const [cn, newComp] of newComps) {
+      const oldComp = oldComps.get(cn);
+      if (!oldComp) continue;
+      for (const field of compDetailFields) {
+        const oldVal = oldComp[field];
+        const newVal = newComp[field];
+        if (oldVal == null && newVal == null) continue;
+        if (String(oldVal) === String(newVal)) continue;
+        inserts.push([
+          extractionId,
+          'component',
+          newComp.uuid,
+          newComp.name || cn,
+          'modified',
+          field,
+          oldVal != null ? String(oldVal) : null,
+          newVal != null ? String(newVal) : null,
+        ]);
+      }
+    }
+
+    const itemDetailFields = ['type', 'sub_type', 'manufacturer_code'];
 
     // ── Items changelog ──
     const { rows: newItemsRaw } = await conn.query<any>(
@@ -1868,11 +1937,40 @@ export class ExtractionService {
     );
     const newItems = new Map(newItemsRaw.map((i: any) => [i.class_name, i]));
     for (const [cn, item] of newItems) {
-      if (!oldItems.has(cn)) inserts.push([extractionId, 'item', item.uuid, item.name || cn, 'added', null, null, null]);
+      if (!oldItems.has(cn)) {
+        inserts.push([extractionId, 'item', item.uuid, item.name || cn, 'added', null, null, null]);
+        pushDetails(inserts, extractionId, 'item', item.uuid, item.name || cn, 'added', item, itemDetailFields);
+      }
     }
     for (const [cn, item] of oldItems) {
-      if (!newItems.has(cn)) inserts.push([extractionId, 'item', item.uuid, item.name || cn, 'removed', null, null, null]);
+      if (!newItems.has(cn)) {
+        inserts.push([extractionId, 'item', item.uuid, item.name || cn, 'removed', null, null, null]);
+        pushDetails(inserts, extractionId, 'item', item.uuid, item.name || cn, 'removed', item, itemDetailFields);
+      }
     }
+    // Modified items
+    for (const [cn, newItem] of newItems) {
+      const oldItem = oldItems.get(cn);
+      if (!oldItem) continue;
+      for (const field of itemDetailFields) {
+        const oldVal = oldItem[field];
+        const newVal = newItem[field];
+        if (oldVal == null && newVal == null) continue;
+        if (String(oldVal) === String(newVal)) continue;
+        inserts.push([
+          extractionId,
+          'item',
+          newItem.uuid,
+          newItem.name || cn,
+          'modified',
+          field,
+          oldVal != null ? String(oldVal) : null,
+          newVal != null ? String(newVal) : null,
+        ]);
+      }
+    }
+
+    const commodityDetailFields = ['type'];
 
     // ── Commodities changelog ──
     const { rows: newCommoditiesRaw } = await conn.query<any>('SELECT uuid, class_name, name, type FROM game.commodities WHERE env = $1', [
@@ -1880,12 +1978,16 @@ export class ExtractionService {
     ]);
     const newCommodities = new Map(newCommoditiesRaw.map((c: any) => [c.class_name, c]));
     for (const [cn, commodity] of newCommodities) {
-      if (!oldCommodities.has(cn))
+      if (!oldCommodities.has(cn)) {
         inserts.push([extractionId, 'commodity', commodity.uuid, commodity.name || cn, 'added', null, null, null]);
+        pushDetails(inserts, extractionId, 'commodity', commodity.uuid, commodity.name || cn, 'added', commodity, commodityDetailFields);
+      }
     }
     for (const [cn, commodity] of oldCommodities) {
-      if (!newCommodities.has(cn))
+      if (!newCommodities.has(cn)) {
         inserts.push([extractionId, 'commodity', commodity.uuid, commodity.name || cn, 'removed', null, null, null]);
+        pushDetails(inserts, extractionId, 'commodity', commodity.uuid, commodity.name || cn, 'removed', commodity, commodityDetailFields);
+      }
     }
 
     if (inserts.length > 0) {
