@@ -797,8 +797,9 @@ model CraftingSlotModifier {
   unitFormat      String  @default("") @map("unit_format") @db.VarChar(100)
   startQuality    Int     @default(0) @map("start_quality")
   endQuality      Int     @default(1000) @map("end_quality")
-  modifierAtStart Decimal @map("modifier_at_start") @db.Decimal(10, 6)
-  modifierAtEnd   Decimal @map("modifier_at_end") @db.Decimal(10, 6)
+  modifierAtStart Decimal  @map("modifier_at_start") @db.Decimal(10, 6)
+  modifierAtEnd   Decimal  @map("modifier_at_end") @db.Decimal(10, 6)
+  modifierType    String?  @map("modifier_type") @db.VarChar(100)
 
   recipe CraftingRecipe @relation(fields: [recipeUuid, recipeEnv], references: [uuid, env], onDelete: Cascade)
 

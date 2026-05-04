@@ -212,7 +212,7 @@ export class CraftingService {
 
     const modifiers = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT id, slot_name, property_name, property_uuid, unit_format,
-              start_quality, end_quality, modifier_at_start, modifier_at_end
+              start_quality, end_quality, modifier_at_start, modifier_at_end, modifier_type
        FROM game.crafting_slot_modifiers
        WHERE recipe_env = ? AND recipe_uuid = ?
        ORDER BY slot_name, property_name`),
