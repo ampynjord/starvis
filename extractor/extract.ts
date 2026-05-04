@@ -92,7 +92,7 @@ const program = new Command()
   .option('-p, --p4k <path>', 'path to Data.p4k (overrides auto-detection)')
   .option('-e, --env <env>', 'game environment: live | ptu | custom', 'live')
   .option('-m, --modules <list>', 'comma-separated modules to extract (default: all)', 'all')
-  .option('-V, --game-version <version>', 'override detected game version (e.g. 4.7.2)')
+  .option('--game-version <version>', 'override detected game version (e.g. 4.7.2)')
   .option('--dry-run', 'parse P4K and log stats without writing to database')
   .option('--prod-db', 'Use the production database configured via SSH tunnel')
   .addHelpText(
