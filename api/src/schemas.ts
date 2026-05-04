@@ -88,6 +88,7 @@ export const ChangelogQuery = z
     offset: qStr,
     entity_type: qStr,
     change_type: qStr,
+    markers_only: qStr,
   })
   .passthrough();
 

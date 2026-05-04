@@ -28,6 +28,7 @@ export function mountSystemRoutes(router: Router, deps: RouteDependencies): void
         offset: filters.offset,
         entityType: filters.entity_type,
         changeType: filters.change_type,
+        markersOnly: filters.markers_only === 'true',
       });
       sendWithETag(req, res, { success: true, ...result });
     }),
