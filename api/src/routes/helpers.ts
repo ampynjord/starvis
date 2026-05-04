@@ -33,7 +33,7 @@ export function setETag(res: Response, jsonStr: string): string {
   const hash = createHash('md5').update(jsonStr).digest('hex').slice(0, 16);
   const etag = `"${hash}"`;
   res.setHeader('ETag', etag);
-  res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+  res.setHeader('Cache-Control', 'public, max-age=60, must-revalidate');
   return etag;
 }
 
