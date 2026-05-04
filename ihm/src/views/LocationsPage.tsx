@@ -29,6 +29,7 @@ import { useEnv } from '@/contexts/EnvContext';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { useDebounce } from '@/hooks/useDebounce';
 
 // ── Type meta ─────────────────────────────────────────────────────────────────
@@ -394,21 +395,11 @@ export default function LocationsPage() {
   const attachedShops = totalShops - orphanShops.length;
 
   return (
-    <div className="space-y-3">
-      <div>
-        <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">
-          Locations
-        </h1>
-        <p className="text-sm text-slate-500 mt-1 flex items-center gap-3">
-          <span>Systems, planets, stations and points of interest in the verse.</span>
-          {totalShops > 0 && (
-            <span className="text-xs font-mono-sc text-slate-700 flex items-center gap-1">
-              <ShoppingBag size={10} />
-              {attachedShops}/{totalShops} shops attached
-            </span>
-          )}
-        </p>
-      </div>
+    <div className="max-w-(--breakpoint-2xl) mx-auto space-y-3">
+      <PageHeader
+        title="Locations"
+        subtitle={`Systems, planets, stations and points of interest in the verse.${totalShops > 0 ? ` · ${attachedShops}/${totalShops} shops attached` : ''}`}
+      />
 
       {/* Search + tree controls */}
       <div className="flex items-center gap-2">

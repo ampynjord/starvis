@@ -10,7 +10,6 @@ import {
   Link as LinkIcon,
   Package,
   Scroll,
-  Search,
   Settings2,
   Skull,
   Swords,
@@ -28,6 +27,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { useDebounce } from '@/hooks/useDebounce';
 
@@ -520,36 +520,17 @@ export default function BlueprintsPage() {
 
   return (
     <div className="max-w-(--breakpoint-2xl) mx-auto">
-      {/* Header */}
-      <div className="mb-4 flex flex-col gap-4">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-sm border border-purple-800 bg-purple-950/40 flex items-center justify-center shrink-0">
-              <Scroll size={18} className="text-purple-400" />
-            </div>
-            <div>
-              <h1 className="font-orbitron text-xl font-bold text-purple-400 tracking-widest uppercase leading-none">
-                Blueprint Database
-              </h1>
-              <p className="text-xs text-slate-500 mt-0.5 font-mono-sc">
-                {(data?.total ?? recipes.length).toLocaleString('en-US')} blueprints
-                {categories && ` · ${categories.length} categories`}
-              </p>
-            </div>
-          </div>
-          <div className="relative w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" size={13} />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search blueprint, output item…"
-              className="sci-input w-full pl-8 text-xs"
-            />
-          </div>
-        </div>
+      <PageHeader
+        title="Blueprint Database"
+        count={data?.total ?? recipes.length}
+        countLabel="blueprints"
+        search={search}
+        searchPlaceholder="Search blueprint, output item…"
+        onSearch={setSearch}
+      />
 
-        {/* Filter bar */}
+      {/* Filter bar */}
+      <div className="mb-4">
         <div className="sci-panel p-3 space-y-3">
           {categories && categories.length > 0 && (
             <div>
