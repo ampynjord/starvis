@@ -20,15 +20,42 @@ vi.mock('@/services/api', () => ({
         extracted_at: '2024-06-01T12:00:00Z',
       }),
     },
+    ships: {
+      random: vi.fn().mockResolvedValue({
+        uuid: 'ship-1',
+        name: 'Aegis Hammerhead',
+        manufacturer_code: 'AEGS',
+        role: 'Combat',
+        career: 'Military',
+        crew_size: 9,
+        cargo_capacity: 0,
+        scm_speed: 1200,
+        max_speed: 1800,
+        shield_hp: 45000,
+        total_hp: 80000,
+        mass: 150000,
+        weapon_damage_total: 5000,
+        missile_damage_total: 0,
+        min_crew: 3,
+        variant_type: 'Base',
+        ship_matrix_id: null,
+        thumbnail: null,
+        production_status: 'flight-ready',
+        boost_speed_forward: null,
+        hydrogen_fuel_capacity: null,
+        quantum_fuel_capacity: null,
+      }),
+    },
     changelog: {
       list: vi.fn().mockResolvedValue({
         data: [],
-        pagination: { total: 1000, page: 1, limit: 8, pages: 125 },
+        total: 1000,
       }),
       summary: vi.fn().mockResolvedValue({
         total: 1000,
         last_extraction: '2024-06-01T12:00:00Z',
         by_change: { added: 10, modified: 5, removed: 2 },
+        by_entity: { ship: 8, component: 9 },
       }),
     },
   },
@@ -52,9 +79,9 @@ describe('HomePage', () => {
   it('renders stat card labels', async () => {
     renderWithProviders(<HomePage />);
     await waitFor(() => {
-      expect(screen.getByText('Ships / Vehicles')).toBeInTheDocument();
-      expect(screen.getByText('Ship Components')).toBeInTheDocument();
-      expect(screen.getByText('Manufacturers')).toBeInTheDocument();
+      expect(screen.getAllByText('Ships & Vehicles').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Components').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Manufacturers').length).toBeGreaterThan(0);
     });
   });
 
@@ -65,24 +92,24 @@ describe('HomePage', () => {
     });
   });
 
-  it('renders Database section', async () => {
+  it('renders ship spotlight section', async () => {
     renderWithProviders(<HomePage />);
     await waitFor(() => {
-      expect(screen.getByText('Database')).toBeInTheDocument();
+      expect(screen.getByText('Ship Spotlight')).toBeInTheDocument();
     });
   });
 
-  it('renders Latest changes section', async () => {
+  it('renders Recent Changes section', async () => {
     renderWithProviders(<HomePage />);
     await waitFor(() => {
-      expect(screen.getByText('Latest changes')).toBeInTheDocument();
+      expect(screen.getByText('Recent Changes')).toBeInTheDocument();
     });
   });
 
   it('renders game version when loaded', async () => {
     renderWithProviders(<HomePage />);
     await waitFor(() => {
-      expect(screen.getByText('3.23.1')).toBeInTheDocument();
+      expect(screen.getByText(/3\.23\.1/)).toBeInTheDocument();
     });
   });
 });
