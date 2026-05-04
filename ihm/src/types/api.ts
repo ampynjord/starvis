@@ -246,6 +246,16 @@ export interface Component extends ComponentListItem {
   weapon_damage_physical: number | null;
   weapon_damage_energy: number | null;
   weapon_damage_distortion: number | null;
+  weapon_damage_thermal: number | null;
+  weapon_damage_biochemical: number | null;
+  weapon_damage_stun: number | null;
+  // Beam weapon stats
+  weapon_full_damage_range: number | null;
+  weapon_zero_damage_range: number | null;
+  weapon_heat_per_second: number | null;
+  weapon_beam_capacity: number | null;
+  weapon_beam_regen_cooldown: number | null;
+  weapon_beam_dps: number | null;
   // Shield extended
   shield_regen_delay: number | null;
   shield_hardening: number | null;
@@ -266,6 +276,9 @@ export interface Component extends ComponentListItem {
   missile_damage_physical: number | null;
   missile_damage_energy: number | null;
   missile_damage_distortion: number | null;
+  missile_damage_thermal: number | null;
+  missile_damage_biochemical: number | null;
+  missile_damage_stun: number | null;
   // EMP
   emp_charge_time: number | null;
   emp_cooldown: number | null;

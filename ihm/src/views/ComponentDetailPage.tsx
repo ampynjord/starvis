@@ -99,63 +99,50 @@ function SpecRow({ label, value }: { label: string; value: string }) {
 function DamageBreakdown({
 	physical,
 	energy,
-	distortion: _distortion,
+	distortion,
+	thermal,
+	biochemical,
+	stun,
 	total,
 }: {
-	physical: number | null;
-	energy: number | null;
-	distortion: number | null;
+	physical?: number | null;
+	energy?: number | null;
+	distortion?: number | null;
+	thermal?: number | null;
+	biochemical?: number | null;
+	stun?: number | null;
 	total: number | null;
 }) {
 	const t = Number(total) || 0;
 	if (t === 0) return null;
 	const p = Math.round(((Number(physical) || 0) / t) * 100);
 	const e = Math.round(((Number(energy) || 0) / t) * 100);
-	const d = 100 - p - e;
+	const d = Math.round(((Number(distortion) || 0) / t) * 100);
+	const th = Math.round(((Number(thermal) || 0) / t) * 100);
+	const b = Math.round(((Number(biochemical) || 0) / t) * 100);
+	const s = Math.round(((Number(stun) || 0) / t) * 100);
+	const hasBreakdown = p > 0 || e > 0 || d > 0 || th > 0 || b > 0 || s > 0;
+	if (!hasBreakdown) return null;
 	return (
 		<div className="mt-2">
 			<p className="text-[10px] font-mono-sc text-slate-600 uppercase mb-1">
 				Damage breakdown
 			</p>
 			<div className="flex h-2 rounded-full overflow-hidden gap-px">
-				{p > 0 && (
-					<div
-						className="bg-orange-500/70 rounded-full"
-						style={{ width: `${p}%` }}
-						title={`Physical ${p}%`}
-					/>
-				)}
-				{e > 0 && (
-					<div
-						className="bg-blue-500/70 rounded-full"
-						style={{ width: `${e}%` }}
-						title={`Energy ${e}%`}
-					/>
-				)}
-				{d > 0 && (
-					<div
-						className="bg-purple-500/70 rounded-full"
-						style={{ width: `${d}%` }}
-						title={`Distortion ${d}%`}
-					/>
-				)}
+				{p > 0 && <div className="bg-orange-500/70 rounded-full" style={{ width: `${p}%` }} title={`Physical ${p}%`} />}
+				{e > 0 && <div className="bg-blue-500/70 rounded-full" style={{ width: `${e}%` }} title={`Energy ${e}%`} />}
+				{d > 0 && <div className="bg-purple-500/70 rounded-full" style={{ width: `${d}%` }} title={`Distortion ${d}%`} />}
+				{th > 0 && <div className="bg-red-500/70 rounded-full" style={{ width: `${th}%` }} title={`Thermal ${th}%`} />}
+				{b > 0 && <div className="bg-green-500/70 rounded-full" style={{ width: `${b}%` }} title={`Biochemical ${b}%`} />}
+				{s > 0 && <div className="bg-yellow-400/70 rounded-full" style={{ width: `${s}%` }} title={`Stun ${s}%`} />}
 			</div>
-			<div className="flex gap-3 mt-1">
-				{p > 0 && (
-					<span className="text-[10px] font-mono-sc text-orange-500">
-						Phys {p}%
-					</span>
-				)}
-				{e > 0 && (
-					<span className="text-[10px] font-mono-sc text-blue-400">
-						Energy {e}%
-					</span>
-				)}
-				{d > 0 && (
-					<span className="text-[10px] font-mono-sc text-purple-400">
-						Dist {d}%
-					</span>
-				)}
+			<div className="flex flex-wrap gap-3 mt-1">
+				{p > 0 && <span className="text-[10px] font-mono-sc text-orange-500">Phys {p}%</span>}
+				{e > 0 && <span className="text-[10px] font-mono-sc text-blue-400">Energy {e}%</span>}
+				{d > 0 && <span className="text-[10px] font-mono-sc text-purple-400">Dist {d}%</span>}
+				{th > 0 && <span className="text-[10px] font-mono-sc text-red-400">Thermal {th}%</span>}
+				{b > 0 && <span className="text-[10px] font-mono-sc text-green-400">Biochem {b}%</span>}
+				{s > 0 && <span className="text-[10px] font-mono-sc text-yellow-400">Stun {s}%</span>}
 			</div>
 		</div>
 	);
@@ -165,7 +152,17 @@ function DamageBreakdown({
 
 function getHeroStats(comp: Component) {
 	const t = comp.type;
-	if (t === "WeaponGun")
+	if (t === "WeaponGun") {
+		const isBeam = comp.weapon_beam_dps != null;
+		if (isBeam)
+			return [
+				{ label: "Beam DPS", value: fN(comp.weapon_beam_dps, "", 1), accent: "text-red-400" },
+				{ label: "Full Range", value: fN(comp.weapon_full_damage_range, "m", 0) },
+				{ label: "Zero Range", value: fN(comp.weapon_zero_damage_range, "m", 0) },
+				{ label: "Heat/s", value: fN(comp.weapon_heat_per_second, "", 0) },
+				{ label: "Capacity", value: fN(comp.weapon_beam_capacity, "", 0) },
+				{ label: "Regen CD", value: fN(comp.weapon_beam_regen_cooldown, "s", 1) },
+			];
 		return [
 			{ label: "DPS", value: fN(comp.weapon_dps, "", 1), accent: "text-red-400" },
 			{ label: "Burst DPS", value: fN(comp.weapon_burst_dps, "", 1) },
@@ -174,6 +171,7 @@ function getHeroStats(comp: Component) {
 			{ label: "Fire Rate", value: comp.weapon_fire_rate ? `${fN(comp.weapon_fire_rate, "", 0)} rpm` : "—" },
 			{ label: "Type", value: comp.weapon_damage_type ?? "—" },
 		];
+	}
 	if (t === "Shield")
 		return [
 			{ label: "HP", value: fN(comp.shield_hp), accent: "text-blue-400" },
@@ -301,13 +299,28 @@ function getSectionTitle(type: string): string {
 
 function getTypeSpecs(comp: Component): { label: string; value: string }[] {
 	const t = comp.type;
-	if (t === "WeaponGun")
+	if (t === "WeaponGun") {
+		const isBeam = comp.weapon_beam_dps != null;
+		if (isBeam)
+			return [
+				{ label: "Physical dmg/s", value: fN(comp.weapon_damage_physical, "", 1) },
+				{ label: "Energy dmg/s", value: fN(comp.weapon_damage_energy, "", 1) },
+				{ label: "Distortion dmg/s", value: fN(comp.weapon_damage_distortion, "", 1) },
+				{ label: "Thermal dmg/s", value: fN(comp.weapon_damage_thermal, "", 1) },
+			];
 		return [
 			{ label: "Alpha Damage", value: fN(comp.weapon_alpha_damage, "", 2) },
+			{ label: "Physical", value: fN(comp.weapon_damage_physical, "", 2) },
+			{ label: "Energy", value: fN(comp.weapon_damage_energy, "", 2) },
+			{ label: "Distortion", value: fN(comp.weapon_damage_distortion, "", 2) },
+			{ label: "Thermal", value: fN(comp.weapon_damage_thermal, "", 2) },
+			{ label: "Biochemical", value: fN(comp.weapon_damage_biochemical, "", 2) },
+			{ label: "Stun", value: fN(comp.weapon_damage_stun, "", 2) },
 			{ label: "Pellets / shot", value: fN(comp.weapon_pellets_per_shot) },
 			{ label: "Projectile speed", value: fN(comp.weapon_speed, "m/s", 0) },
 			{ label: "Ammo capacity", value: fN(comp.weapon_ammo_count) },
 		];
+	}
 	if (t === "Shield")
 		return [
 			{ label: "Faces", value: fN(comp.shield_faces) },
@@ -323,9 +336,12 @@ function getTypeSpecs(comp: Component): { label: string; value: string }[] {
 	if (t === "Missile")
 		return [
 			{ label: "Lock range", value: fN(comp.missile_lock_range, "m", 0) },
-			{ label: "Phys damage", value: fN(comp.missile_damage_physical, "", 0) },
-			{ label: "Energy damage", value: fN(comp.missile_damage_energy, "", 0) },
-			{ label: "Distortion dmg", value: fN(comp.missile_damage_distortion, "", 0) },
+			{ label: "Physical", value: fN(comp.missile_damage_physical, "", 0) },
+			{ label: "Energy", value: fN(comp.missile_damage_energy, "", 0) },
+			{ label: "Distortion", value: fN(comp.missile_damage_distortion, "", 0) },
+			{ label: "Thermal", value: fN(comp.missile_damage_thermal, "", 0) },
+			{ label: "Biochemical", value: fN(comp.missile_damage_biochemical, "", 0) },
+			{ label: "Stun", value: fN(comp.missile_damage_stun, "", 0) },
 		];
 	return [];
 }
@@ -382,12 +398,16 @@ export default function ComponentDetailPage() {
 		{ label: "IR signature", value: fN(comp.ir_signature) },
 	].filter((s) => s.value !== "—");
 
-	// Are there any combat/weapon-like stats beyond what hero shows?
+	const isBeamWeapon = comp.weapon_beam_dps != null;
 	const hasDamageBreakdown =
 		comp.type === "WeaponGun" &&
+		!isBeamWeapon &&
 		(Number(comp.weapon_damage_physical) > 0 ||
 			Number(comp.weapon_damage_energy) > 0 ||
-			Number(comp.weapon_damage_distortion) > 0);
+			Number(comp.weapon_damage_distortion) > 0 ||
+			Number(comp.weapon_damage_thermal) > 0 ||
+			Number(comp.weapon_damage_biochemical) > 0 ||
+			Number(comp.weapon_damage_stun) > 0);
 
 	return (
 		<div className="max-w-(--breakpoint-lg) mx-auto space-y-6">
@@ -478,19 +498,23 @@ export default function ComponentDetailPage() {
 								physical={comp.weapon_damage_physical}
 								energy={comp.weapon_damage_energy}
 								distortion={comp.weapon_damage_distortion}
+								thermal={comp.weapon_damage_thermal}
+								biochemical={comp.weapon_damage_biochemical}
+								stun={comp.weapon_damage_stun}
 								total={comp.weapon_damage}
 							/>
 						)}
-						{comp.type === "Missile" &&
-							(Number(comp.missile_damage_physical) > 0 ||
-								Number(comp.missile_damage_energy) > 0) && (
-								<DamageBreakdown
-									physical={comp.missile_damage_physical}
-									energy={comp.missile_damage_energy}
-									distortion={comp.missile_damage_distortion}
-									total={comp.missile_damage}
-								/>
-							)}
+						{comp.type === "Missile" && Number(comp.missile_damage) > 0 && (
+							<DamageBreakdown
+								physical={comp.missile_damage_physical}
+								energy={comp.missile_damage_energy}
+								distortion={comp.missile_damage_distortion}
+								thermal={comp.missile_damage_thermal}
+								biochemical={comp.missile_damage_biochemical}
+								stun={comp.missile_damage_stun}
+								total={comp.missile_damage}
+							/>
+						)}
 					</ScifiPanel>
 				)}
 
