@@ -61,6 +61,8 @@ function computeStats(nodes: LoadoutNode[]): LStats {
   const all = flattenNodes(nodes);
   let powerOutput = 0, powerDraw = 0, heat = 0, cooling = 0, shieldHp = 0, totalDps = 0;
   const hardpoints: { type: string; size: number }[] = [];
+
+  // Accumulate energy/combat stats across all nested components
   for (const nd of all) {
     if (!nd.component_uuid) continue;
     powerOutput += n(nd.power_output);
@@ -69,6 +71,10 @@ function computeStats(nodes: LoadoutNode[]): LStats {
     cooling     += n(nd.cooling_rate);
     shieldHp    += n(nd.shield_hp);
     totalDps    += n(nd.weapon_dps);
+  }
+
+  // Hardpoints: count ROOT-LEVEL slots only (not sub-ports of turrets/gimbals)
+  for (const nd of nodes) {
     const pn = nd.port_name.toLowerCase();
     if (NOISY.some(p => pn.includes(p))) continue;
     const type = nd.port_type || '';
@@ -626,37 +632,31 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
       {/* ════════════════════════════════════════
           RADAR
       ════════════════════════════════════════ */}
-      {!isGround && radarNode && (radarNode.radar_tracking_signal != null || radarNode.radar_detection_lifetime != null || radarNode.radar_range != null) && (
+      {!isGround && radarNode && (
         <div>
           <SectionLabel>Radar</SectionLabel>
           <div className="grid grid-cols-3 gap-1.5">
-            {radarNode.radar_range != null && (
-              <div className="flex flex-col items-center rounded-md border border-green-900/40 bg-green-950/10 py-2 px-1">
-                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Range</span>
-                <span className="text-sm font-orbitron font-bold text-green-400 tabular-nums">
-                  {Math.round(n(radarNode.radar_range) / 1000)}
-                </span>
-                <span className="text-[9px] font-mono-sc text-slate-700">km</span>
-              </div>
-            )}
-            {radarNode.radar_tracking_signal != null && (
-              <div className="flex flex-col items-center rounded-md border border-green-900/40 bg-green-950/10 py-2 px-1">
-                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Tracking</span>
-                <span className="text-sm font-orbitron font-bold text-green-400 tabular-nums">
-                  {(n(radarNode.radar_tracking_signal) * 100).toFixed(1)}
-                </span>
-                <span className="text-[9px] font-mono-sc text-slate-700">%</span>
-              </div>
-            )}
-            {radarNode.radar_detection_lifetime != null && (
-              <div className="flex flex-col items-center rounded-md border border-green-900/40 bg-green-950/10 py-2 px-1">
-                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Ping</span>
-                <span className="text-sm font-orbitron font-bold text-green-400 tabular-nums">
-                  {n(radarNode.radar_detection_lifetime).toFixed(1)}
-                </span>
-                <span className="text-[9px] font-mono-sc text-slate-700">s</span>
-              </div>
-            )}
+            <div className="flex flex-col items-center rounded-md border border-green-900/40 bg-green-950/10 py-2 px-1">
+              <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Range</span>
+              <span className="text-sm font-orbitron font-bold text-green-400 tabular-nums">
+                {radarNode.radar_range != null ? Math.round(n(radarNode.radar_range) / 1000) : '—'}
+              </span>
+              <span className="text-[9px] font-mono-sc text-slate-700">km</span>
+            </div>
+            <div className="flex flex-col items-center rounded-md border border-green-900/40 bg-green-950/10 py-2 px-1">
+              <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Tracking</span>
+              <span className="text-sm font-orbitron font-bold text-green-400 tabular-nums">
+                {radarNode.radar_tracking_signal != null ? (n(radarNode.radar_tracking_signal) * 100).toFixed(1) : '—'}
+              </span>
+              <span className="text-[9px] font-mono-sc text-slate-700">%</span>
+            </div>
+            <div className="flex flex-col items-center rounded-md border border-green-900/40 bg-green-950/10 py-2 px-1">
+              <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Ping</span>
+              <span className="text-sm font-orbitron font-bold text-green-400 tabular-nums">
+                {radarNode.radar_detection_lifetime != null ? n(radarNode.radar_detection_lifetime).toFixed(1) : '—'}
+              </span>
+              <span className="text-[9px] font-mono-sc text-slate-700">s</span>
+            </div>
           </div>
         </div>
       )}

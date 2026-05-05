@@ -32,7 +32,15 @@ import { usePathname } from 'next/navigation';
 import { useEnv } from '@/contexts/EnvContext';
 import { useAuth } from '@/contexts/AuthContext';
 
-const CORE_ITEMS = [
+type NavItemDef = {
+  to: string;
+  icon: React.ElementType;
+  label: string;
+  auth?: boolean;
+  comingSoon?: boolean;
+};
+
+const CORE_ITEMS: NavItemDef[] = [
   { to: '/',              icon: Home,          label: 'Dashboard' },
   { to: '/missions',      icon: ClipboardList, label: 'Missions' },
   { to: '/locations',     icon: MapPin,        label: 'Locations' },
@@ -41,38 +49,52 @@ const CORE_ITEMS = [
   { to: '/manufacturers', icon: Wrench,        label: 'Manufacturers' },
 ];
 
-const SHIP_ITEMS = [
-  { to: '/ships',         icon: Rocket,        label: 'Ships & Vehicles' },
-  { to: '/components',    icon: Settings2,     label: 'Ship Components' },
-  { to: '/outfitter',     icon: SlidersHorizontal, label: 'Outfitter', auth: true },
-  { to: '/compare',       icon: BarChart3,     label: 'Compare' },
-  { to: '/ranking',       icon: Trophy,        label: 'Ranking' },
-  { to: '/paints',        icon: Paintbrush,    label: 'Paints' },
+const SHIP_ITEMS: NavItemDef[] = [
+  { to: '/ships',         icon: Rocket,            label: 'Ships & Vehicles' },
+  { to: '/components',    icon: Settings2,         label: 'Ship Components' },
+  { to: '/paints',        icon: Paintbrush,        label: 'Paints' },
+  { to: '/compare',       icon: BarChart3,         label: 'Compare' },
+  { to: '/ranking',       icon: Trophy,            label: 'Ranking' },
+  { to: '/outfitter',     icon: SlidersHorizontal, label: 'Loadout Manager', comingSoon: true },
 ];
 
-const FPS_ITEMS = [
-  { to: '/fps-gear',      icon: Crosshair,     label: 'FPS Gear' },
-  { to: '/fps-calculator', icon: SlidersHorizontal, label: 'FPS Calculator' },
-  { to: '/other-items',   icon: Layers3,       label: 'Other Items' },
+const FPS_ITEMS: NavItemDef[] = [
+  { to: '/fps-gear',        icon: Crosshair,         label: 'FPS Gear' },
+  { to: '/other-items',     icon: Layers3,           label: 'Other Items' },
+  { to: '/fps-calculator',  icon: SlidersHorizontal, label: 'FPS Calculator', comingSoon: true },
 ];
 
-const INDUSTRIAL_ITEMS = [
-  { to: '/industrial',    icon: Factory,       label: 'Commodities' },
-  { to: '/trade',         icon: TrendingUp,    label: 'Trade Routes' },
-  { to: '/mining',        icon: Pickaxe,       label: 'Mining' },
+const INDUSTRIAL_ITEMS: NavItemDef[] = [
+  { to: '/industrial',  icon: Factory,    label: 'Commodities' },
+  { to: '/trade',       icon: TrendingUp, label: 'Trade Routes',     comingSoon: true },
+  { to: '/mining',      icon: Pickaxe,    label: 'Mining Calculator', comingSoon: true },
 ];
 
-const LORE_ITEMS = [
-  { to: '/comm-links',    icon: Newspaper,     label: 'Comm-Links' },
-  { to: '/galactapedia',  icon: Globe,         label: 'Galactapedia' },
+const LORE_ITEMS: NavItemDef[] = [
+  { to: '/comm-links',   icon: Newspaper, label: 'Comm-Links' },
+  { to: '/galactapedia', icon: Globe,     label: 'Galactapedia' },
 ];
 
 
-function NavItem({ to, icon: Icon, label, auth: requiresAuth, onNavigate }: { to: string; icon: React.ElementType; label: string; auth?: boolean; onNavigate?: () => void }) {
+function NavItem({ to, icon: Icon, label, auth: requiresAuth, comingSoon, onNavigate }: NavItemDef & { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user } = useAuth();
-  const isActive = to === '/' ? pathname === '/' : pathname?.startsWith(to);
+  const isActive = !comingSoon && (to === '/' ? pathname === '/' : pathname?.startsWith(to));
   const locked = requiresAuth && !user;
+
+  if (comingSoon) {
+    return (
+      <div className="flex items-center gap-3 px-2 py-2.5 rounded-sm border border-transparent cursor-default select-none opacity-40">
+        <Icon size={16} className="shrink-0 text-slate-600" strokeWidth={1.5} />
+        <span className="font-rajdhani font-semibold text-sm uppercase tracking-wider truncate flex-1 text-slate-600">
+          {label}
+        </span>
+        <span className="shrink-0 text-[9px] font-orbitron font-bold tracking-widest text-slate-500 bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded-sm">
+          SOON
+        </span>
+      </div>
+    );
+  }
 
   return (
     <Link
@@ -106,7 +128,7 @@ function NavItem({ to, icon: Icon, label, auth: requiresAuth, onNavigate }: { to
   );
 }
 
-function NavGroup({ label, items, onNavigate }: { label: string; items: typeof CORE_ITEMS; onNavigate?: () => void }) {
+function NavGroup({ label, items, onNavigate }: { label: string; items: NavItemDef[]; onNavigate?: () => void }) {
   return (
     <div>
       <p className="px-2 pt-3 pb-1 text-[10px] font-orbitron tracking-widest text-slate-600 uppercase select-none">
@@ -227,4 +249,3 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
     </aside>
   );
 }
-
