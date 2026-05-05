@@ -20,6 +20,8 @@ const nextConfig: NextConfig = {
       { source: '/equipment', destination: '/components', permanent: true },
       { source: '/items', destination: '/fps-gear', permanent: true },
       { source: '/commodities', destination: '/industrial', permanent: true },
+      { source: '/factions', destination: '/missions', permanent: true },
+      { source: '/other-items', destination: '/fps-gear', permanent: true },
     ];
   },
 };

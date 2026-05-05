@@ -69,17 +69,20 @@ const ITEM_PATH_PATTERNS: Array<{ regex: RegExp; type: string; subType?: string 
   { regex: /scitem\/weapons\/devices\//i, type: 'Gadget', subType: 'Device' },
   // Undersuit BEFORE the broad armor pattern (undersuits live under /armor/ in the P4K)
   { regex: /scitem\/characters\/.*undersuit/i, type: 'Undersuit' },
-  // Personal armor — ONE broad pattern; specific type is always refined via AttachDef.Type below
-  // Do NOT split by helmet/torso/arms/legs here: manufacturer folder names (e.g. "kastak_arms")
-  // would cause false matches on `.*arm`, `.*leg` etc.
-  { regex: /scitem\/characters\/.*\/armor\//i, type: 'Armor_Torso' },
+  // Personal armor — unified type 'Armor'; specific sub-type (Helmet/Torso/Arms/Legs)
+  // is refined via AttachDef.Type in DataForge (see classifyArmorSubType below).
+  { regex: /scitem\/characters\/.*\/armor\//i, type: 'Armor' },
   { regex: /scitem\/characters\/.*\/clothing\//i, type: 'Clothing' },
   // Tools & gadgets from carryables
-  { regex: /scitem\/carryables\/1h\/(?:.*tool|.*multitool)/i, type: 'Tool' },
+  { regex: /scitem\/carryables\/1h\/(?:.*tool|.*multitool)/i, type: 'Tool', subType: 'Multitool' },
   { regex: /scitem\/carryables\/1h\/.*module/i, type: 'Tool', subType: 'Module' },
   { regex: /scitem\/carryables\/1h\//i, type: 'Gadget', subType: 'Handheld' },
   { regex: /scitem\/carryables\/2h\//i, type: 'Gadget', subType: 'Two-handed' },
-  // Consumables
+  // Consumables — subType refined from path
+  { regex: /scitem\/consumables\/.*medic/i, type: 'Consumable', subType: 'Medical' },
+  { regex: /scitem\/consumables\/.*stim/i, type: 'Consumable', subType: 'Stim' },
+  { regex: /scitem\/consumables\/.*food/i, type: 'Consumable', subType: 'Food' },
+  { regex: /scitem\/consumables\/.*drink/i, type: 'Consumable', subType: 'Drink' },
   { regex: /scitem\/consumables\//i, type: 'Consumable' },
 ];
 

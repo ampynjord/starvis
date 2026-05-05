@@ -50,8 +50,9 @@ export class PaintQueryService {
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT s.uuid as value, COALESCE(sm.name, s.name) as label, COUNT(sp.id) as count
        FROM game.ship_paints sp
-       JOIN game.ships s ON sp.ship_uuid = s.uuid AND s.env = ?
+       JOIN game.ships s ON sp.ship_uuid = s.uuid AND s.env = sp.env
        LEFT JOIN rsi.ship_matrix sm ON s.ship_matrix_id = sm.id
+       WHERE sp.env = ?
        GROUP BY s.uuid, s.name, sm.name
        ORDER BY COALESCE(sm.name, s.name)`),
       env,

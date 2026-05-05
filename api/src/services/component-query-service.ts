@@ -49,6 +49,8 @@ export class ComponentQueryService {
   async getAllComponents(filters?: {
     env?: string;
     type?: string;
+    /** Multiple types (from category mapping) — overrides `type` when provided */
+    types?: string[];
     sub_type?: string;
     size?: string;
     grade?: string;
@@ -66,7 +68,12 @@ export class ComponentQueryService {
     const where: string[] = ['c.env = ?'];
     const params: (string | number)[] = [env];
 
-    if (filters?.type) {
+    if (filters?.types && filters.types.length > 0) {
+      // Multi-type filter for category-based queries
+      const placeholders = filters.types.map(() => '?').join(', ');
+      where.push(`c.type IN (${placeholders})`);
+      params.push(...filters.types);
+    } else if (filters?.type) {
       where.push('c.type = ?');
       params.push(filters.type);
     }

@@ -493,6 +493,7 @@ model Component {
   qdCalibrationRate       Decimal? @map("qd_calibration_rate") @db.Decimal(10, 4)
   qdCalibrationDelay      Decimal? @map("qd_calibration_delay") @db.Decimal(10, 2)
   qdCalibrationMaxAngle   Decimal? @map("qd_calibration_max_angle") @db.Decimal(8, 2)
+  p4kPath                 String?  @map("p4k_path") @db.VarChar(500)
   createdAt               DateTime @default(now()) @map("created_at")
   updatedAt               DateTime @default(now()) @updatedAt @map("updated_at")
 

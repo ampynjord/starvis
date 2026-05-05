@@ -1,8 +1,5 @@
-'use client';
-
-import { Suspense } from 'react';
-import FactionsPage from '@/views/FactionsPage';
+import { redirect } from 'next/navigation';
 
 export default function Page() {
-  return <Suspense><FactionsPage /></Suspense>;
+  redirect('/missions');
 }
