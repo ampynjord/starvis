@@ -709,6 +709,33 @@ export class LoadoutService {
     return rows;
   }
 
+  /** List all modular ship module slots across all ships, optionally filtered by ship UUID */
+  async getAllShipModules(params: { env?: string; ship_uuid?: string; search?: string } = {}): Promise<Row[]> {
+    const env = params.env ?? 'live';
+    const prisma = this.getClient(env);
+    const where: string[] = ['sm.env = ?'];
+    const qParams: (string | number)[] = [env];
+    if (params.ship_uuid) {
+      where.push('sm.ship_uuid = ?');
+      qParams.push(params.ship_uuid);
+    }
+    if (params.search) {
+      where.push('(sm.slot_display_name ILIKE ? OR s.name ILIKE ?)');
+      const t = `%${params.search}%`;
+      qParams.push(t, t);
+    }
+    const sql = `
+      SELECT sm.*, s.name as ship_name, s.class_name as ship_class_name,
+             m.name as manufacturer_name
+      FROM game.ship_modules sm
+      JOIN game.ships s ON sm.ship_uuid = s.uuid AND sm.env = s.env
+      LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code
+      WHERE ${where.join(' AND ')}
+      ORDER BY s.name, sm.slot_name
+    `;
+    return prisma.$queryRawUnsafe<Row[]>(toPostgres(sql), ...qParams);
+  }
+
   async getShipPaints(shipUuid: string, env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(

@@ -3,6 +3,29 @@ import { ComponentQuery } from '../schemas.js';
 import { asyncHandler, makeGameDataGuard, sendCsvOrJson, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
+/** P4K-faithful component category → type array mapping */
+const COMPONENT_CATEGORY_TYPES: Record<string, string[]> = {
+  weapons: ['WeaponGun', 'Turret', 'TurretUnmanned', 'MissileRack', 'Missile', 'Torpedo', 'Bomb'],
+  systems: [
+    'Shield',
+    'PowerPlant',
+    'Cooler',
+    'QuantumDrive',
+    'Thruster',
+    'FuelIntake',
+    'FuelTank',
+    'Radar',
+    'Countermeasure',
+    'LifeSupport',
+    'EMP',
+    'QuantumInterdictionGenerator',
+    'LandingSystem',
+    'SelfDestruct',
+  ],
+  mounts: ['Gimbal'],
+  utility: ['MiningLaser', 'SalvageHead', 'TractorBeam'],
+};
+
 export function mountComponentRoutes(router: Router, deps: RouteDependencies): void {
   const { gameDataService } = deps;
   const requireGameData = makeGameDataGuard(gameDataService);
@@ -48,7 +71,15 @@ export function mountComponentRoutes(router: Router, deps: RouteDependencies): v
     requireGameData,
     asyncHandler(async (req, res) => {
       const t = Date.now();
-      const filters = ComponentQuery.parse(req.query);
+      // ?category= maps to a predefined type list; overrides individual ?type= param
+      const categoryParam = req.query.category ? String(req.query.category) : undefined;
+      const categoryTypes = categoryParam ? COMPONENT_CATEGORY_TYPES[categoryParam] : undefined;
+      const queryWithCategory = categoryTypes ? { ...req.query, type: undefined } : req.query;
+      const filters = ComponentQuery.parse(queryWithCategory);
+      if (categoryTypes) {
+        // Inject the multi-type list directly into the service call
+        (filters as Record<string, unknown>).types = categoryTypes;
+      }
       const result = await gameDataService!.components.getAllComponents(filters);
       const payload = {
         success: true,

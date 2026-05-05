@@ -854,6 +854,82 @@
         }
       }
     },
+    "/api/v1/ships/{uuid}/compare/{uuid2}": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Compare two ships side by side",
+        "operationId": "compareShips",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" }, "description": "UUID of the first ship" },
+          { "name": "uuid2", "in": "path", "required": true, "schema": { "type": "string" }, "description": "UUID of the second ship" },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Comparison result with per-field diff and winner",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "ship1": { "$ref": "#/components/schemas/Ship" },
+                        "ship2": { "$ref": "#/components/schemas/Ship" },
+                        "diff": {
+                          "type": "object",
+                          "description": "Per-field comparison. Each key maps to { ship1, ship2, winner: 1|2|null }",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "ship1": {},
+                              "ship2": {},
+                              "winner": { "type": "integer", "nullable": true, "enum": [1, 2, null] }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "One or both ships not found" }
+        }
+      }
+    },
+    "/api/v1/ship-modules": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "List ship modules (optional equipment slots)",
+        "operationId": "getShipModules",
+        "parameters": [
+          { "name": "ship_uuid", "in": "query", "schema": { "type": "string" }, "description": "Filter by ship UUID" },
+          { "$ref": "#/components/parameters/search" },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Module list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "count": { "type": "integer" },
+                    "data": { "type": "array", "items": { "type": "object" } }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/ships/ranking": {
       "get": {
         "tags": ["Ships"],

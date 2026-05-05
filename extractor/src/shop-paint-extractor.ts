@@ -26,8 +26,10 @@ export function extractPaints(
   for (const r of dfData.records) {
     if (r.structIndex !== entityClassIdx) continue;
     const fn = (r.fileName || '').toLowerCase();
+    // Accept any path containing "paint" or "skin" in the filename — this covers both
+    // SC 3.x live paths (Data/Objects/Ships/.../ship_xyz_paint_default.xml) and
+    // SC 4.x PTU paths (Data/Entities/Items/Spaceships/Paint/Paint_XYZ.xml).
     if (!fn.includes('paint') && !fn.includes('skin')) continue;
-    if (!fn.includes('scitem') && !fn.includes('entities')) continue;
 
     const className = r.name?.replace('EntityClassDefinition.', '') || '';
     if (!className) continue;

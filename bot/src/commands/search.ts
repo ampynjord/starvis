@@ -3,6 +3,8 @@ import { SlashCommandBuilder } from 'discord.js';
 import { searchAll } from '../api.js';
 import { errorEmbed, searchEmbed } from '../embeds.js';
 
+const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
+
 export const data = new SlashCommandBuilder()
   .setName('search')
   .setDescription('Recherche unifiée (vaisseaux, composants, items, commodités)')
@@ -27,7 +29,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         const mfr = s.manufacturer ? ` (${s.manufacturer})` : '';
         const role = s.focus ?? s.role;
         const extra = role ? ` — ${role}` : '';
-        return `• **${s.name}**${mfr}${extra}`;
+        const id = s.id ?? s.ship_matrix_id;
+        const link = id ? `[${s.name}](${SITE_URL}/ships/${id})` : `**${s.name}**`;
+        return `• ${link}${mfr}${extra}`;
       });
       sections.push(`🚀 **Vaisseaux** (${res.data.ships.length})\n${items.join('\n')}`);
     }

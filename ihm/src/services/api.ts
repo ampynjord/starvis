@@ -293,6 +293,8 @@ export const api = {
       size?: number;
       grade?: string;
       manufacturer?: string;
+      /** P4K category filter: weapons | systems | mounts | utility */
+      category?: string;
     }) => get<PaginatedResponse<ComponentListItem>>('/components', p),
     filters: (env?: string) => get<Record<string, string[]>>('/components/filters', { env }),
     get: (uuid: string, env?: string) => get<Component>(`/components/${uuid}`, { env }),

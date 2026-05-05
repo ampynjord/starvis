@@ -39,34 +39,70 @@ const COOKIE_SELECTORS = [
 
 // ── Public API ─────────────────────────────────────────────────────────────
 
+export interface ScrapeOptions {
+  /** Number of ships to scrape in parallel (default: 1 = sequential). */
+  concurrency?: number;
+  onProgress?: (msg: string) => void;
+}
+
 /**
  * Scrape CTM model URLs for the given ships.
  *
- * @param ships     Array of ships to scrape (class_name + name + RSI URL)
- * @param onProgress Optional progress callback
+ * @param ships   Array of ships to scrape (class_name + name + RSI URL)
+ * @param opts    Options: concurrency (parallel browsers) and progress callback
  * @returns Map of className → ctmUrl (only ships for which a CTM was found)
  */
-export async function scrapeShipCtmUrls(ships: ShipToScrape[], onProgress?: (msg: string) => void): Promise<Map<string, string>> {
+export async function scrapeShipCtmUrls(
+  ships: ShipToScrape[],
+  opts: ScrapeOptions | ((msg: string) => void) = {},
+): Promise<Map<string, string>> {
+  // Back-compat: old callers pass a function as second arg
+  const options: ScrapeOptions = typeof opts === 'function' ? { onProgress: opts } : opts;
+  const { concurrency = 1, onProgress } = options;
+
   const results = new Map<string, string>();
+  const total = ships.length;
 
-  for (let i = 0; i < ships.length; i++) {
-    const ship = ships[i];
-    onProgress?.(`[${i + 1}/${ships.length}] Scraping CTM: ${ship.name} (${ship.className})…`);
-
-    try {
-      const ctmUrl = await scrapeOnePage(ship);
-      if (ctmUrl) {
-        results.set(ship.className, ctmUrl);
-        onProgress?.(`  ✅ CTM found: ${ctmUrl}`);
-      } else {
-        onProgress?.(`  ○ No CTM for ${ship.name}`);
+  if (concurrency <= 1) {
+    // Sequential mode (original behaviour)
+    for (let i = 0; i < total; i++) {
+      const ship = ships[i];
+      onProgress?.(`[${i + 1}/${total}] Scraping CTM: ${ship.name} (${ship.className})…`);
+      try {
+        const ctmUrl = await scrapeOnePage(ship);
+        if (ctmUrl) {
+          results.set(ship.className, ctmUrl);
+          onProgress?.(`  ✅ CTM found: ${ctmUrl}`);
+        } else {
+          onProgress?.(`  ○ No CTM for ${ship.name}`);
+        }
+      } catch (err) {
+        onProgress?.(`  ❌ Error scraping ${ship.name}: ${(err as Error).message}`);
       }
-    } catch (err) {
-      onProgress?.(`  ❌ Error scraping ${ship.name}: ${(err as Error).message}`);
+      if (i < total - 1) await sleep(INTER_SHIP_DELAY_MS);
     }
-
-    if (i < ships.length - 1) {
-      await sleep(INTER_SHIP_DELAY_MS);
+  } else {
+    // Concurrent mode — process ships in parallel batches of `concurrency`
+    let done = 0;
+    for (let i = 0; i < total; i += concurrency) {
+      const batch = ships.slice(i, i + concurrency);
+      const settled = await Promise.allSettled(batch.map((ship) => scrapeOnePage(ship)));
+      for (let j = 0; j < batch.length; j++) {
+        done++;
+        const ship = batch[j];
+        const result = settled[j];
+        onProgress?.(`[${done}/${total}] ${ship.name} (${ship.className})`);
+        if (result.status === 'fulfilled' && result.value) {
+          results.set(ship.className, result.value);
+          onProgress?.(`  ✅ CTM found: ${result.value}`);
+        } else if (result.status === 'rejected') {
+          onProgress?.(`  ❌ Error: ${(result.reason as Error).message}`);
+        } else {
+          onProgress?.(`  ○ No CTM found`);
+        }
+      }
+      // Brief pause between batches to avoid hammering the RSI CDN
+      if (i + concurrency < total) await sleep(INTER_SHIP_DELAY_MS);
     }
   }
 

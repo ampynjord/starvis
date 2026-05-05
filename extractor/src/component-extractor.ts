@@ -21,30 +21,42 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
 
   const components: any[] = [];
 
+  // P4K-faithful component type registry.
+  // Order matters: more specific patterns must come BEFORE broader ones.
+  // Key = DB `type` value; value = regex against the lowercase P4K file path.
   const componentPaths: Record<string, RegExp> = {
+    // ── Weapons ──────────────────────────────────────────────────────────────
     WeaponGun: /scitem.*weapons\/[^/\\]+$/i,
-    Shield: /shield_?generator[s]?[/\\]|shield[s]?[/\\]/i,
-    PowerPlant: /power_?plant[s]?[/\\]|powerplant/i,
-    Cooler: /cooler[s]?[/\\]/i,
-    QuantumDrive: /quantum_?drive[s]?[/\\]|quantumdrive/i,
-    Missile: /missile[s]?[/\\](?!rack|launcher|_rack)/i,
-    Bomb: /bomb[s]?[/\\]/i,
-    Torpedo: /torpedo(?:es)?[/\\]|torped[os][/\\]/i,
-    Thruster: /thruster[s]?[/\\]/i,
-    Radar: /radar[s]?[/\\]/i,
-    Countermeasure: /countermeasure[s]?[/\\]|flare[s]?[/\\]|noise[/\\]/i,
-    FuelIntake: /fuel_?intake[s]?[/\\]/i,
-    FuelTank: /fuel_?tank[s]?[/\\](?!quantum)/i,
-    LifeSupport: /life_?support[s]?[/\\]/i,
-    EMP: /emp[/\\]|distortion_?charge[/\\]|emp_?generator/i,
-    QuantumInterdictionGenerator: /quantum_?interdiction[/\\]|qig[/\\]|quantum_?enforcement/i,
-    Gimbal: /weapon_mounts\/gimbal[/\\]|mount_?fixed[/\\]/i,
     Turret: /ships\/turret[/\\](?!.*unmanned)/i,
     TurretUnmanned: /turret_?unmanned[/\\]/i,
     MissileRack: /missile_?racks?[/\\]/i,
+    Missile: /missile[s]?[/\\](?!rack|launcher|_rack)/i,
+    Torpedo: /torpedo(?:es)?[/\\]|torped[os][/\\]/i,
+    Bomb: /bomb[s]?[/\\]/i,
+    // ── Systems ──────────────────────────────────────────────────────────────
+    Shield: /shield_?generator[s]?[/\\]|shield[s]?[/\\]/i,
+    PowerPlant: /power_?plant[s]?[/\\]|powerplant/i,
+    Cooler: /cooler[s]?[/\\]/i,
+    // Jump drives BEFORE QuantumDrive (more specific path)
+    QuantumDrive: /quantum_?drive[s]?[/\\]|quantumdrive/i,
+    // VTOL / retro thrusters covered by subType derived from path in thruster handler below
+    Thruster: /thruster[s]?[/\\]/i,
+    FuelIntake: /fuel_?intake[s]?[/\\]/i,
+    // Quantum fuel tanks BEFORE hydrogen tanks (negative lookahead was not reliable)
+    FuelTank: /fuel_?tank[s]?[/\\]/i,
+    Radar: /radar[s]?[/\\]/i,
+    Countermeasure: /countermeasure[s]?[/\\]|flare[s]?[/\\]|noise[/\\]/i,
+    LifeSupport: /life_?support[s]?[/\\]/i,
+    EMP: /emp[/\\]|distortion_?charge[/\\]|emp_?generator/i,
+    // QIG = "jammer" — QuantumInterdictionGenerator
+    QuantumInterdictionGenerator: /quantum_?interdiction[/\\]|qig[/\\]|quantum_?enforcement/i,
+    LandingSystem: /landing_?system[s]?[/\\]|landing_?gear[/\\]/i,
+    SelfDestruct: /ships\/selfdestruct[/\\]/i,
+    // ── Weapon mounts ─────────────────────────────────────────────────────────
+    Gimbal: /weapon_mounts\/gimbal[/\\]|mount_?fixed[/\\]/i,
+    // ── Utility ───────────────────────────────────────────────────────────────
     MiningLaser: /utility\/mining\/miningarm[/\\]|mining_?laser[/\\]|miningsubitems[/\\]/i,
     SalvageHead: /utility\/salvage\/salvagehead[/\\]/i,
-    SelfDestruct: /ships\/selfdestruct[/\\]/i,
     TractorBeam: /utility\/tractorbeam[/\\]/i,
   };
 
@@ -647,6 +659,29 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           comp.weaponBurstDps = comp.weaponDps;
           comp.weaponSustainedDps = comp.weaponDps;
         }
+      }
+
+      // ── P4K-faithful subType derivation ─────────────────────────────────────
+      // Derives sub_type from the P4K file path so DB values mirror the game taxonomy.
+
+      // FuelTank: distinguish Quantum vs Hydrogen reservoirs
+      if (type === 'FuelTank' && !comp.subType) {
+        comp.subType = fn.includes('quantum') ? 'Quantum' : 'Hydrogen';
+      }
+
+      // QuantumDrive: detect jump drives (4.x uses a dedicated sub-path / class name)
+      if (type === 'QuantumDrive' && !comp.subType) {
+        comp.subType = fn.includes('jump') || lcName.includes('jump') ? 'Jump' : 'Standard';
+      }
+
+      // Thruster: promote thrusterType → subType for P4K consistency
+      if (type === 'Thruster' && !comp.subType && comp.thrusterType) {
+        comp.subType = comp.thrusterType; // 'Main' | 'Maneuvering' | 'Retro' | 'VTOL'
+      }
+
+      // Gimbal: separate Gimbal vs Fixed mount via path
+      if (type === 'Gimbal' && !comp.subType) {
+        comp.subType = fn.includes('mount_fixed') || fn.includes('fixed') ? 'Fixed' : 'Gimbal';
       }
 
       // Manufacturer fallback: try to match className prefix against DataForge manufacturer records.

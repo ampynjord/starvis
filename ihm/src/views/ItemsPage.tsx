@@ -56,19 +56,15 @@ const SLUG_COLOR: Record<FpsSlug | "all", string> = {
 };
 
 const TYPE_COLOR: Record<string, string> = {
-	FPS_Weapon:     "bg-red-500",
-	Armor_Torso:    "bg-blue-500",
-	Armor_Arms:     "bg-blue-500",
-	Armor_Legs:     "bg-blue-600",
-	Armor_Helmet:   "bg-blue-400",
-	Armor_Backpack: "bg-blue-700",
-	Undersuit:      "bg-teal-500",
-	Clothing:       "bg-slate-500",
-	Gadget:         "bg-yellow-500",
-	Tool:           "bg-green-500",
-	Consumable:     "bg-green-400",
-	Attachment:     "bg-purple-500",
-	Magazine:       "bg-amber-500",
+	FPS_Weapon:  "bg-red-500",
+	Armor:       "bg-blue-500",
+	Undersuit:   "bg-teal-500",
+	Clothing:    "bg-slate-500",
+	Gadget:      "bg-yellow-500",
+	Tool:        "bg-green-500",
+	Consumable:  "bg-green-400",
+	Attachment:  "bg-purple-500",
+	Magazine:    "bg-amber-500",
 };
 
 

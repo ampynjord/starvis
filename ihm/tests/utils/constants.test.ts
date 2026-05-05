@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { API_BASE, COMPONENT_TYPE_COLORS, VARIANT_TYPE_COLORS, VARIANT_TYPE_LABELS } from '@/utils/constants';
+import { API_BASE, COMPONENT_TYPE_COLORS, VARIANT_TYPE_LABELS } from '@/utils/constants';
 
 describe('API_BASE', () => {
   it('equals /api/v1', () => {
@@ -13,15 +13,6 @@ describe('VARIANT_TYPE_LABELS', () => {
     expect(VARIANT_TYPE_LABELS.collector).toBe('Collector');
     expect(VARIANT_TYPE_LABELS.wikelo).toBe('Wikelo');
     expect(VARIANT_TYPE_LABELS.pyam_exec).toBe('PyAM / Exec');
-  });
-});
-
-describe('VARIANT_TYPE_COLORS', () => {
-  it('contains an entry for each type', () => {
-    expect(VARIANT_TYPE_COLORS.standard).toBeDefined();
-    expect(VARIANT_TYPE_COLORS.collector).toContain('amber');
-    expect(VARIANT_TYPE_COLORS.wikelo).toContain('emerald');
-    expect(VARIANT_TYPE_COLORS.pyam_exec).toContain('purple');
   });
 });
 

@@ -4,15 +4,17 @@ import { parseIncludes } from '../services/shared.js';
 import { asyncHandler, makeGameDataGuard, sendCsvOrJson, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
-/** Semantic category definitions — each slug is a dedicated API route */
+/** Semantic category definitions — each slug is a dedicated API route.
+ *  Types use the P4K-faithful naming (Armor unified type; sub-types from AttachDef).
+ */
 const CATEGORY_DEFS: Record<string, { types: string[]; subTypes?: string[]; excludeSubTypes?: string[]; label: string }> = {
   weapons: { label: 'Weapons', types: ['FPS_Weapon'], excludeSubTypes: ['Throwable', 'Mine'] },
   throwable: { label: 'Throwable', types: ['FPS_Weapon'], subTypes: ['Throwable', 'Mine'] },
-  helmet: { label: 'Helmet', types: ['Armor_Helmet'] },
-  core: { label: 'Core', types: ['Armor_Torso'] },
-  arms: { label: 'Arms', types: ['Armor_Arms'] },
-  legs: { label: 'Legs', types: ['Armor_Legs'] },
-  backpack: { label: 'Backpack', types: ['Armor_Backpack'] },
+  helmet: { label: 'Helmet', types: ['Armor'], subTypes: ['Helmet'] },
+  core: { label: 'Core', types: ['Armor'], subTypes: ['Torso'] },
+  arms: { label: 'Arms', types: ['Armor'], subTypes: ['Arms'] },
+  legs: { label: 'Legs', types: ['Armor'], subTypes: ['Legs'] },
+  backpack: { label: 'Backpack', types: ['Armor'], subTypes: ['Backpack'] },
   undersuit: { label: 'Undersuit', types: ['Undersuit'] },
   'tools-medics': { label: 'Tools & Medics', types: ['Tool', 'Consumable'] },
   magazines: { label: 'Magazines', types: ['Magazine'] },

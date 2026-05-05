@@ -486,4 +486,18 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
       });
     }),
   );
+
+  // ── Ship modules listing ─────────────────────────────────────────────────────
+
+  router.get(
+    '/api/v1/ship-modules',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = String(req.query.env ?? 'live');
+      const ship_uuid = req.query.ship_uuid ? String(req.query.ship_uuid) : undefined;
+      const search = req.query.search ? String(req.query.search) : undefined;
+      const data = await gameDataService!.loadouts.getAllShipModules({ env, ship_uuid, search });
+      sendWithETag(req, res, { success: true, count: data.length, data });
+    }),
+  );
 }
