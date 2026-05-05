@@ -185,6 +185,7 @@ function getHeroStats(comp: Component) {
 		return [
 			{ label: "Speed", value: fMmps(comp.qd_speed), accent: "text-purple-400" },
 			{ label: "Spool", value: fN(comp.qd_spool_time, "s", 1) },
+			{ label: "Range", value: fKm(comp.qd_range) },
 			{ label: "Cooldown", value: fN(comp.qd_cooldown, "s", 1) },
 			{ label: "Fuel Rate", value: comp.qd_fuel_rate ? `${Number(comp.qd_fuel_rate).toFixed(4)}/s` : "—" },
 			{ label: "Cal. Rate", value: comp.qd_calibration_rate ? fN(comp.qd_calibration_rate, "", 2) : "—" },
@@ -334,14 +335,16 @@ function getTypeSpecs(comp: Component): { label: string; value: string }[] {
 			{ label: "Biochemical", value: fN(comp.weapon_damage_biochemical, "", 2) },
 			{ label: "Stun", value: fN(comp.weapon_damage_stun, "", 2) },
 			{ label: "Pellets / shot", value: fN(comp.weapon_pellets_per_shot) },
+			{ label: "Burst size", value: fN(comp.weapon_burst_size) },
 			{ label: "Projectile speed", value: fN(comp.weapon_speed, "m/s", 0) },
 			{ label: "Ammo capacity", value: fN(comp.weapon_ammo_count) },
+			{ label: "Heat / shot", value: fN(comp.weapon_heat_per_shot, "", 4) },
+			{ label: "Charge time", value: fN(comp.weapon_charge_time, "s", 2) },
 		];
 	}
 	if (t === "Shield")
 		return [
 			{ label: "Faces", value: fN(comp.shield_faces) },
-			{ label: "Downed Regen Delay", value: comp.shield_downed_regen_delay ? fN(comp.shield_downed_regen_delay, "s", 1) : "—" },
 		];
 	if (t === "QuantumDrive")
 		return [
@@ -350,14 +353,8 @@ function getTypeSpecs(comp: Component): { label: string; value: string }[] {
 			{ label: "Tuning rate", value: fN(comp.qd_tuning_rate, "", 4) },
 			{ label: "Alignment rate", value: fN(comp.qd_alignment_rate, "", 4) },
 			{ label: "Disconnect range", value: fN(comp.qd_disconnect_range, "m", 0) },
-			{ label: "Cal. delay", value: comp.qd_calibration_delay ? fN(comp.qd_calibration_delay, "s", 1) : "—" },
+			{ label: "Cal. delay", value: fN(comp.qd_calibration_delay, "s", 1) },
 		];
-	if (t === "WeaponGun") {
-		const specs = [];
-		if (comp.weapon_heat_per_shot != null) specs.push({ label: "Heat / shot", value: fN(comp.weapon_heat_per_shot, "", 4) });
-		if (comp.weapon_charge_time != null) specs.push({ label: "Charge time", value: fN(comp.weapon_charge_time, "s", 2) });
-		return specs;
-	}
 	if (t === "Missile" || t === "Bomb" || t === "Torpedo")
 		return [
 			{ label: "Lock range", value: fN(comp.missile_lock_range, "m", 0) },
@@ -367,10 +364,6 @@ function getTypeSpecs(comp: Component): { label: string; value: string }[] {
 			{ label: "Thermal", value: fN(comp.missile_damage_thermal, "", 0) },
 			{ label: "Biochemical", value: fN(comp.missile_damage_biochemical, "", 0) },
 			{ label: "Stun", value: fN(comp.missile_damage_stun, "", 0) },
-		];
-	if (t === "Radar")
-		return [
-			{ label: "Tracking signal", value: fPct(comp.radar_tracking_signal) },
 		];
 	return [];
 }

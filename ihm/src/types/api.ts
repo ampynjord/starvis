@@ -221,6 +221,15 @@ export interface ComponentListItem {
   mining_speed: number | null;
   rack_count: number | null;
   rack_missile_size: number | null;
+  // Extended list stats (all returned by c.* in API)
+  missile_signal_type: string | null;
+  missile_guidance_mode: string | null;
+  gimbal_max_angle: number | null;
+  turret_max_pitch: number | null;
+  turret_max_yaw: number | null;
+  tractor_max_force: number | null;
+  salvage_speed: number | null;
+  qig_jammer_range: number | null;
 }
 
 export interface Component extends ComponentListItem {
@@ -269,7 +278,6 @@ export interface Component extends ComponentListItem {
   qd_alignment_rate: number | null;
   qd_disconnect_range: number | null;
   // Missile extended
-  missile_signal_type: string | null;
   missile_speed: number | null;
   missile_lock_time: number | null;
   missile_lock_range: number | null;
@@ -279,11 +287,12 @@ export interface Component extends ComponentListItem {
   missile_damage_thermal: number | null;
   missile_damage_biochemical: number | null;
   missile_damage_stun: number | null;
+  missile_range: number | null;
+  missile_explosion_radius: number | null;
   // EMP
   emp_charge_time: number | null;
   emp_cooldown: number | null;
   // Quantum Interdiction Generator
-  qig_jammer_range: number | null;
   qig_snare_radius: number | null;
   qig_charge_time: number | null;
   qig_cooldown: number | null;
@@ -292,21 +301,16 @@ export interface Component extends ComponentListItem {
   mining_resistance: number | null;
   mining_instability: number | null;
   // Salvage
-  salvage_speed: number | null;
   salvage_radius: number | null;
   // Tractor
-  tractor_max_force: number | null;
   tractor_max_range: number | null;
   // Gimbal extended
   gimbal_type: string | null;
-  gimbal_max_angle: number | null;
   gimbal_pitch_speed: number | null;
   gimbal_yaw_speed: number | null;
   // Turret arcs
   turret_min_pitch: number | null;
-  turret_max_pitch: number | null;
   turret_min_yaw: number | null;
-  turret_max_yaw: number | null;
   // Radar extended
   radar_detection_lifetime: number | null;
   radar_tracking_signal: number | null;
@@ -314,10 +318,6 @@ export interface Component extends ComponentListItem {
   radar_ping_cooldown: number | null;
   // Thruster
   thruster_type: string | null;
-  // Missile extended
-  missile_range: number | null;
-  missile_explosion_radius: number | null;
-  missile_guidance_mode: string | null;
   // Shield extended
   shield_downed_regen_delay: number | null;
   // Weapon heat/charge
