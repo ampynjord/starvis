@@ -1080,6 +1080,34 @@ export interface MiningYieldResult {
   gadgets: MiningLaserInfo[];
 }
 
+// ─── CommLinks ────────────────────────────────────────────────────────────────
+export interface CommLink {
+  id: number;
+  rsi_id: string | null;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  content: string | null;
+  category: string | null;
+  thumbnail_url: string | null;
+  rsi_url: string | null;
+  published_at: string | null;
+}
+
+// ─── Galactapedia ─────────────────────────────────────────────────────────────
+export interface GalactapediaEntry {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  content: string | null;
+  categories: string[] | string | null;
+  tags: string[] | string | null;
+  thumbnail_url: string | null;
+  rsi_url: string | null;
+  updated_at: string | null;
+}
+
 // ─── Locations ────────────────────────────────────────────────────────────────
 export interface Location {
   uuid: string;

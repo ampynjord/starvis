@@ -7,10 +7,12 @@ import {
   Crosshair,
   ExternalLink,
   Factory,
+  Globe,
   Home,
   Layers3,
   Lock,
   MapPin,
+  Newspaper,
   Paintbrush,
   Pickaxe,
   Rocket,
@@ -58,6 +60,11 @@ const INDUSTRIAL_ITEMS = [
   { to: '/industrial',    icon: Factory,       label: 'Commodities' },
   { to: '/trade',         icon: TrendingUp,    label: 'Trade Routes' },
   { to: '/mining',        icon: Pickaxe,       label: 'Mining' },
+];
+
+const LORE_ITEMS = [
+  { to: '/comm-links',    icon: Newspaper,     label: 'Comm-Links' },
+  { to: '/galactapedia',  icon: Globe,         label: 'Galactapedia' },
 ];
 
 
@@ -183,6 +190,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         <NavGroup label="Ships" items={SHIP_ITEMS} onNavigate={onClose} />
         <NavGroup label="FPS" items={FPS_ITEMS} onNavigate={onClose} />
         <NavGroup label="Industrial" items={INDUSTRIAL_ITEMS} onNavigate={onClose} />
+        <NavGroup label="Lore" items={LORE_ITEMS} onNavigate={onClose} />
         {user?.role === 'admin' && (
           <NavGroup label="Admin" items={[{ to: '/admin', icon: Shield, label: 'Administration' }]} onNavigate={onClose} />
         )}
