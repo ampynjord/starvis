@@ -758,11 +758,14 @@ export class DataForgeService implements DataForgeContext {
                 }
               }
               // Ground vehicle drive controller — speed stored in movement params
-              // Try common port names: controller_drive (Cyclone/ROC), controller_wheel (Nova/Storm/Mule)
+              // Try common port names: controller_drive (Cyclone/ROC), controller_wheel, controller_tracked (Nova/Storm)
               if (
                 (portName === 'hardpoint_controller_drive' ||
                   portName === 'hardpoint_controller_wheel' ||
-                  portName.includes('controller_movement')) &&
+                  portName === 'hardpoint_controller_tracked' ||
+                  portName.includes('controller_movement') ||
+                  portName.includes('controller_drive') ||
+                  portName.includes('controller_track')) &&
                 entCN &&
                 this.dfData
               ) {
@@ -1092,18 +1095,35 @@ export class DataForgeService implements DataForgeContext {
       // Extract hull parts tree and sum damageMax
       const { totalHp, bodyHp, parts } = this.extractVehicleXmlParts(mainPart);
 
-      // Extract ground vehicle top speed from <MovementParams><PhysicalWheeled v0SteerMax="...">
-      // v0SteerMax is the top speed in m/s at low steering angle (straight line max speed)
+      // Extract ground vehicle top speed from <MovementParams>
       let groundTopSpeed: number | null = null;
       let groundBoostSpeed: number | null = null;
       const movementNode = rootNode.children?.find((c) => c.tag === 'MovementParams');
       if (movementNode) {
+        // Wheeled vehicles (Cyclone, ROC, Storm, Mule, etc.): v0SteerMax = top speed in m/s
         const wheeledNode = movementNode.children?.find((c) => c.tag === 'PhysicalWheeled');
         if (wheeledNode) {
           const v0 = parseFloat(wheeledNode.attributes?.v0SteerMax || '0');
           const boost = parseFloat(wheeledNode.attributes?.vMaxSteerMax || '0');
           if (v0 > 0) groundTopSpeed = Math.round(v0);
           if (boost > 0 && boost !== v0) groundBoostSpeed = Math.round(boost);
+        }
+        // Tracked vehicles (Nova, Storm AA, etc.): PhysicalTracked with topSpeed or v0SteerMax
+        if (!groundTopSpeed) {
+          const trackedNode = movementNode.children?.find((c) => c.tag === 'PhysicalTracked');
+          if (trackedNode) {
+            const v0 = parseFloat(trackedNode.attributes?.v0SteerMax || trackedNode.attributes?.topSpeed || '0');
+            const boost = parseFloat(trackedNode.attributes?.vMaxSteerMax || '0');
+            if (v0 > 0) groundTopSpeed = Math.round(v0);
+            if (boost > 0 && boost !== v0) groundBoostSpeed = Math.round(boost);
+          }
+        }
+        // Hover vehicles (Nox, X1, Dragonfly, etc.): topSpeed attribute directly on movement child
+        if (!groundTopSpeed) {
+          for (const child of movementNode.children || []) {
+            const ts = parseFloat(child.attributes?.topSpeed || child.attributes?.maxSpeed || '0');
+            if (ts > 0) { groundTopSpeed = Math.round(ts); break; }
+          }
         }
       }
 
