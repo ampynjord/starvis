@@ -204,6 +204,17 @@ export async function getManufacturers(): Promise<PaginatedResponse<Manufacturer
   return apiFetch<PaginatedResponse<ManufacturerResult>>('/api/v1/manufacturers?limit=50');
 }
 
+/** Lightweight autocomplete — returns up to 25 matching ship names for Discord autocomplete. */
+export async function getShipsAutocomplete(query: string): Promise<Array<{ name: string; value: string }>> {
+  if (!query.trim()) return [];
+  try {
+    const res = await apiFetch<PaginatedResponse<ShipResult>>(`/api/v1/ships?search=${encodeURIComponent(query)}&limit=25`);
+    return (res.data ?? []).map((s) => ({ name: s.name, value: s.name }));
+  } catch {
+    return [];
+  }
+}
+
 export async function chatAsk(messages: { role: 'user' | 'assistant'; content: string }[], apiToken: string): Promise<string> {
   const url = `${API_BASE_URL}/api/v1/chat/ask`;
   const res = await fetch(url, {

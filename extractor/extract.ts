@@ -95,6 +95,10 @@ const program = new Command()
   .option('--game-version <version>', 'override detected game version (e.g. 4.7.2)')
   .option('--dry-run', 'parse P4K and log stats without writing to database')
   .option('--prod-db', 'Use the production database configured via SSH tunnel')
+  .option('--ctm-force', 'CTM: re-scrape all ships, even those that already have a URL (default: incremental)')
+  .option('--ctm-concurrency <n>', 'CTM: number of ships to scrape in parallel (default: 1)', '1')
+  .option('--ctm-force', 'CTM: re-scrape all ships, even those that already have a URL (default: incremental)')
+  .option('--ctm-concurrency <n>', 'CTM: number of ships to scrape in parallel (default: 1)', '1')
   .addHelpText(
     'after',
     `
@@ -124,13 +128,32 @@ Examples:
   npx tsx extract.ts --env live
   npx tsx extract.ts --env ptu --modules missions,ships
   npx tsx extract.ts --p4k /path/to/Data.p4k --env custom
+  npx tsx extract.ts --modules ctm                          # incremental: only missing
+  npx tsx extract.ts --modules ctm --ctm-force              # force re-scrape all
+  npx tsx extract.ts --modules ctm --ctm-concurrency 4      # 4 browsers in parallel
   npx tsx extract.ts --dry-run`,
   );
 
 program.parse();
-const opts = program.opts<{ p4k?: string; env: string; modules: string; gameVersion?: string; dryRun?: boolean }>();
+const opts = program.opts<{
+  p4k?: string;
+  env: string;
+  modules: string;
+  gameVersion?: string;
+  dryRun?: boolean;
+  ctmForce?: boolean;
+  ctmConcurrency?: string;
+}>();
 
-function parseArgs(): { p4kPath: string; env: GameEnv; modules: Set<ExtractionModule | 'all'>; dryRun: boolean; gameVersion?: string } {
+function parseArgs(): {
+  p4kPath: string;
+  env: GameEnv;
+  modules: Set<ExtractionModule | 'all'>;
+  dryRun: boolean;
+  gameVersion?: string;
+  ctmForce: boolean;
+  ctmConcurrency: number;
+} {
   const envVal = opts.env as GameEnv;
   if (!['live', 'ptu', 'custom'].includes(envVal)) {
     console.error(`Error: --env must be live|ptu|custom, got "${envVal}"`);
@@ -166,7 +189,15 @@ function parseArgs(): { p4kPath: string; env: GameEnv; modules: Set<ExtractionMo
     // P4K-free modules (e.g. ctm) don't need the P4K file
   }
 
-  return { p4kPath, env: envVal, modules, dryRun: !!opts.dryRun, gameVersion: opts.gameVersion };
+  return {
+    p4kPath,
+    env: envVal,
+    modules,
+    dryRun: !!opts.dryRun,
+    gameVersion: opts.gameVersion,
+    ctmForce: !!opts.ctmForce,
+    ctmConcurrency: Math.max(1, parseInt(opts.ctmConcurrency ?? '1', 10)),
+  };
 }
 
 /** True when all requested modules are network/DB-only (no P4K access required) */
@@ -189,7 +220,7 @@ function needsGameDb(modules: Set<ExtractionModule | 'all'>): boolean {
 
 // ── Main ────────────────────────────────────────────────────
 async function main() {
-  const { p4kPath, env, modules, dryRun, gameVersion } = parseArgs();
+  const { p4kPath, env, modules, dryRun, gameVersion, ctmForce, ctmConcurrency } = parseArgs();
   const onlyAll = modules.has('all');
   const selectedModules = onlyAll ? new Set<ExtractionModule | 'all'>(['all']) : modules;
 
@@ -258,7 +289,13 @@ async function main() {
   const startTime = Date.now();
 
   try {
-    const stats = await extractor.extractAll((msg) => logger.info(msg), { modules: selectedModules, env, rsiPool: pool });
+    const stats = await extractor.extractAll((msg) => logger.info(msg), {
+      modules: selectedModules,
+      env,
+      rsiPool: pool,
+      ctmForce,
+      ctmConcurrency,
+    });
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     logger.info('═══════════════════════════════════════════');

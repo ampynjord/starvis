@@ -17,13 +17,19 @@ export const data = new SlashCommandBuilder()
       .setRequired(false)
       .addChoices(
         { name: 'Arme', value: 'WeaponGun' },
-        { name: 'Missile', value: 'MissileLauncher' },
+        { name: 'Missile', value: 'WeaponMissile' },
+        { name: 'Rack à missiles', value: 'MissileRack' },
         { name: 'Bouclier', value: 'Shield' },
         { name: 'Moteur QD', value: 'QuantumDrive' },
         { name: 'Refroidisseur', value: 'Cooler' },
         { name: 'Générateur', value: 'PowerPlant' },
         { name: 'Radar', value: 'Radar' },
         { name: 'Pousseur', value: 'Thruster' },
+        { name: 'Gimbal', value: 'Gimbal' },
+        { name: 'Tourelle', value: 'Turret' },
+        { name: 'Carburant', value: 'FuelTank' },
+        { name: 'Mining Laser', value: 'MiningLaser' },
+        { name: 'Tractor Beam', value: 'TractorBeam' },
       ),
   );
 

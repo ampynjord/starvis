@@ -7,13 +7,6 @@ export const VARIANT_TYPE_LABELS: Record<string, string> = {
   pyam_exec: 'PyAM / Exec',
 };
 
-export const VARIANT_TYPE_COLORS: Record<string, string> = {
-  standard: 'text-cyan-400 border-cyan-800 bg-cyan-950/40',
-  collector: 'text-amber-400 border-amber-800 bg-amber-950/40',
-  wikelo: 'text-emerald-400 border-emerald-800 bg-emerald-950/40',
-  pyam_exec: 'text-purple-400 border-purple-800 bg-purple-950/40',
-};
-
 /** Internal DB type → human-readable game label */
 export const COMPONENT_TYPE_LABELS: Record<string, string> = {
   WeaponGun: 'Gun',
@@ -34,11 +27,15 @@ export const COMPONENT_TYPE_LABELS: Record<string, string> = {
   SalvageHead: 'Salvage Head',
   LifeSupport: 'Life Support',
   QuantumInterdictionGenerator: 'Quantum Interdiction',
+  LandingSystem: 'Landing System',
   Gimbal: 'Gimbal',
   Turret: 'Turret',
   TurretUnmanned: 'Unmanned Turret',
   SelfDestruct: 'Self Destruct',
   Scanner: 'Scanner',
+  Missile: 'Missile',
+  Torpedo: 'Torpedo',
+  Bomb: 'Bomb',
 };
 
 export const COMPONENT_TYPE_COLORS: Record<string, string> = {
@@ -60,21 +57,21 @@ export const COMPONENT_TYPE_COLORS: Record<string, string> = {
   SalvageHead: 'text-lime-400',
   LifeSupport: 'text-rose-400',
   QuantumInterdictionGenerator: 'text-violet-400',
+  LandingSystem: 'text-slate-300',
   Gimbal: 'text-slate-400',
   Turret: 'text-red-300',
   TurretUnmanned: 'text-red-200',
   SelfDestruct: 'text-rose-600',
   Scanner: 'text-teal-400',
+  Missile: 'text-orange-400',
+  Torpedo: 'text-orange-500',
+  Bomb: 'text-rose-500',
 };
 
 /** FPS item type → human-readable game label (matches SC inventory names) */
 export const ITEM_TYPE_LABELS: Record<string, string> = {
   FPS_Weapon: 'Weapon',
-  Armor_Helmet: 'Helmet',
-  Armor_Torso: 'Core',
-  Armor_Arms: 'Arms',
-  Armor_Legs: 'Legs',
-  Armor_Backpack: 'Back',
+  Armor: 'Armor',
   Undersuit: 'Undersuit',
   Clothing: 'Clothing',
   Gadget: 'Gadget',
@@ -82,29 +79,4 @@ export const ITEM_TYPE_LABELS: Record<string, string> = {
   Consumable: 'Consumable',
   Attachment: 'Attachment',
   Magazine: 'Magazine',
-};
-
-/** Commodity type → display label */
-export const COMMODITY_TYPE_LABELS: Record<string, string> = {
-  Food: 'Food',
-  Drink: 'Drink',
-  Mineral: 'Mineral',
-  Metal: 'Metal',
-  Gas: 'Gas',
-  Vice: 'Vice',
-  Natural: 'Natural',
-  'Consumer Goods': 'Consumer Goods',
-  Manmade: 'Manmade',
-  'Processed Goods': 'Processed Goods',
-  Alloy: 'Alloy',
-  'Agricultural Supply': 'Agricultural Supply',
-  Halogen: 'Halogen',
-  Counterfeit: 'Contraband',
-  'Medical Supply': 'Medical',
-  Scrap: 'Scrap',
-  'Mixed Mining': 'Mixed Mining',
-  Nonmetal: 'Non-Metal',
-  Waste: 'Waste',
-  Refined: 'Refined',
-  Raw: 'Raw',
 };

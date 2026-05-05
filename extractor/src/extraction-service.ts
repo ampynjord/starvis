@@ -59,6 +59,17 @@ export interface ExtractionOptions {
   env: GameEnv;
   /** PostgreSQL pool — same pool used for game + rsi schemas (single DB). */
   rsiPool?: Pool;
+  /**
+   * CTM scraping mode:
+   * - `false` (default): incremental — only ships with `ctm_url IS NULL`
+   * - `true`: force — rescrape all ships regardless of existing URL
+   */
+  ctmForce?: boolean;
+  /**
+   * Number of ships to scrape concurrently in the CTM module (default: 1).
+   * Increase (e.g. 3–4) to parallelise browser sessions and reduce total scrape time.
+   */
+  ctmConcurrency?: number;
 }
 
 const DEFAULT_OPTIONS: ExtractionOptions = { modules: new Set(['all']), env: 'live' };
@@ -431,8 +442,10 @@ export class ExtractionService {
 
       // 6b. Scrape CTM (3D model) URLs — after cross-reference so ship_matrix_id is populated
       if (run('ctm')) {
-        onProgress?.('Scraping 3D model URLs (CTM) from RSI…');
-        await this.saveShipCtmModels(conn, env, onProgress);
+        const force = options.ctmForce ?? false;
+        const concurrency = options.ctmConcurrency ?? 1;
+        onProgress?.(`Scraping 3D model URLs (CTM) from RSI… [${force ? 'force-all' : 'incremental'}, concurrency=${concurrency}]`);
+        await this.saveShipCtmModels(conn, env, { force, concurrency }, onProgress);
       }
 
       // 6c. Log extraction to extraction_log
@@ -2642,21 +2655,29 @@ export class ExtractionService {
    * Only processes ships that have a ship_matrix URL (RSI page known).
    * Skip nothing in the DB: previously scraped URLs are kept unless overwritten.
    */
-  private async saveShipCtmModels(conn: PoolClient, env: GameEnv, onProgress?: (msg: string) => void): Promise<void> {
-    // Fetch ships that have a known RSI store page
+  private async saveShipCtmModels(
+    conn: PoolClient,
+    _env: GameEnv,
+    ctmOpts: { force?: boolean; concurrency?: number },
+    onProgress?: (msg: string) => void,
+  ): Promise<void> {
+    const { force = false, concurrency = 1 } = ctmOpts;
+
+    // Incremental mode: query ALL envs so PTU-only ships also get a CTM URL.
+    // The UPDATE below is already env-agnostic (WHERE class_name = ?) so a single
+    // scrape covers every env at once.
     const { rows } = await conn.query<any>(
-      `SELECT s.class_name, s.name, sm.url as rsi_url
+      `SELECT DISTINCT ON (s.class_name) s.class_name, s.name, sm.url as rsi_url
        FROM game.ships s
        INNER JOIN rsi.ship_matrix sm ON s.ship_matrix_id = sm.id
-       WHERE s.env = $1
-         AND s.vehicle_category = 'ship'
+       WHERE s.vehicle_category = 'ship'
          AND sm.url IS NOT NULL
-       ORDER BY s.name`,
-      [env],
+         ${force ? '' : 'AND s.ctm_url IS NULL'}
+       ORDER BY s.class_name, s.env`,
     );
 
     if (!rows.length) {
-      onProgress?.('CTM: no ships with RSI URL found, skipping');
+      onProgress?.(force ? 'CTM: no ships with RSI URL found, skipping' : 'CTM: all ships already have a CTM URL — nothing to scrape');
       return;
     }
 
@@ -2666,8 +2687,8 @@ export class ExtractionService {
       rsiUrl: r.rsi_url as string,
     }));
 
-    onProgress?.(`CTM: scraping ${ships.length} ships…`);
-    const ctmMap = await scrapeShipCtmUrls(ships, onProgress);
+    onProgress?.(`CTM: scraping ${ships.length} ship${ships.length !== 1 ? 's' : ''}…`);
+    const ctmMap = await scrapeShipCtmUrls(ships, { concurrency, onProgress });
     onProgress?.(`CTM: found ${ctmMap.size}/${ships.length} CTM URLs`);
 
     if (!ctmMap.size) return;

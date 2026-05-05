@@ -1,6 +1,6 @@
-import type { ChatInputCommandInteraction } from 'discord.js';
+import type { AutocompleteInteraction, ChatInputCommandInteraction } from 'discord.js';
 import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
-import { getShipLoadout, getShips } from '../api.js';
+import { getShipLoadout, getShips, getShipsAutocomplete } from '../api.js';
 import { errorEmbed } from '../embeds.js';
 
 const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
@@ -8,7 +8,15 @@ const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
 export const data = new SlashCommandBuilder()
   .setName('loadout')
   .setDescription("Afficher le loadout par défaut d'un vaisseau")
-  .addStringOption((opt) => opt.setName('vaisseau').setDescription('Nom du vaisseau (ex: Hornet F7C, Carrack)').setRequired(true));
+  .addStringOption((opt) =>
+    opt.setName('vaisseau').setDescription('Nom du vaisseau (ex: Hornet F7C, Carrack)').setRequired(true).setAutocomplete(true),
+  );
+
+export async function autocomplete(interaction: AutocompleteInteraction): Promise<void> {
+  const focused = interaction.options.getFocused();
+  const choices = await getShipsAutocomplete(focused);
+  await interaction.respond(choices.slice(0, 25));
+}
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const name = interaction.options.getString('vaisseau', true);
@@ -44,7 +52,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const embed = new EmbedBuilder()
       .setColor(0x2ecc71)
       .setTitle(`🔧 Loadout — ${ship.name}`)
-      .setURL(`${SITE_URL}/ships`)
+      .setURL(`${SITE_URL}/ships/${ship.uuid}`)
       .setFooter({ text: 'Starvis — Star Citizen Database' });
 
     const fields: { name: string; value: string; inline: boolean }[] = [];

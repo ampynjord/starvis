@@ -1,4 +1,4 @@
-import type { ChatInputCommandInteraction, Interaction } from 'discord.js';
+import type { AutocompleteInteraction, ChatInputCommandInteraction, Interaction } from 'discord.js';
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { commands } from './commands/index.js';
 import { errorEmbed } from './embeds.js';
@@ -20,6 +20,19 @@ client.once(Events.ClientReady, (c) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction: Interaction) => {
+  // Autocomplete
+  if (interaction.isAutocomplete()) {
+    const command = commandMap.get(interaction.commandName) as { autocomplete?: (i: AutocompleteInteraction) => Promise<void> } | undefined;
+    if (command?.autocomplete) {
+      try {
+        await command.autocomplete(interaction as AutocompleteInteraction);
+      } catch (err) {
+        console.error(`Autocomplete /${interaction.commandName} failed:`, err);
+      }
+    }
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) return;
 
   const command = commandMap.get(interaction.commandName);
