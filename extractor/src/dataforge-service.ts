@@ -1122,7 +1122,10 @@ export class DataForgeService implements DataForgeContext {
         if (!groundTopSpeed) {
           for (const child of movementNode.children || []) {
             const ts = parseFloat(child.attributes?.topSpeed || child.attributes?.maxSpeed || '0');
-            if (ts > 0) { groundTopSpeed = Math.round(ts); break; }
+            if (ts > 0) {
+              groundTopSpeed = Math.round(ts);
+              break;
+            }
           }
         }
       }
