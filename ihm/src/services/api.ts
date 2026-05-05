@@ -2,6 +2,7 @@ import type {
   BuyLocation,
   ChangelogEntry,
   ChangelogSummary,
+  CommLink,
   Commodity,
   CommodityPrice,
   CompatibleComponent,
@@ -11,6 +12,7 @@ import type {
   CraftingRecipe,
   CraftingResource,
   FpsDamageResult,
+  GalactapediaEntry,
   Item,
   ItemBuyLocation,
   ItemListItem,
@@ -490,5 +492,20 @@ export const api = {
     all: (env?: string) => get<Location[]>('/locations/all', { env }),
     get: (uuid: string, env?: string) => get<Location>(`/locations/${uuid}`, { env }),
     children: (uuid: string, env?: string) => get<Location[]>(`/locations/${uuid}/children`, { env }),
+  },
+
+  // ─── CommLinks ──────────────────────────────────────────────────────
+  commLinks: {
+    categories: () => get<string[]>('/comm-links/categories'),
+    list: (filters?: { search?: string; category?: string; page?: number; limit?: number }) =>
+      get<PaginatedResponse<CommLink>>('/comm-links', filters as Record<string, string | number | undefined>),
+    get: (id: string) => get<CommLink>(`/comm-links/${id}`),
+  },
+
+  // ─── Galactapedia ────────────────────────────────────────────────────
+  galactapedia: {
+    list: (filters?: { search?: string; category?: string; page?: number; limit?: number }) =>
+      get<PaginatedResponse<GalactapediaEntry>>('/galactapedia', filters as Record<string, string | number | undefined>),
+    get: (id: string) => get<GalactapediaEntry>(`/galactapedia/${id}`),
   },
 };
