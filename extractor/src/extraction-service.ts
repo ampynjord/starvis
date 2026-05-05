@@ -597,17 +597,23 @@ export class ExtractionService {
             missile_range, missile_lock_range,
             missile_damage_physical, missile_damage_energy, missile_damage_distortion,
             missile_damage_thermal, missile_damage_biochemical, missile_damage_stun,
+            missile_explosion_radius, missile_guidance_mode,
             thruster_max_thrust, thruster_type,
             radar_range, radar_detection_lifetime, radar_tracking_signal,
-            cm_ammo_count,
+            radar_ping_range, radar_ping_cooldown,
+            cm_ammo_count, cm_type,
             fuel_capacity, fuel_intake_rate,
             emp_damage, emp_radius, emp_charge_time, emp_cooldown,
             qig_jammer_range, qig_snare_radius, qig_charge_time, qig_cooldown,
             mining_speed, mining_range, mining_resistance, mining_instability,
             tractor_max_force, tractor_max_range,
             salvage_speed, salvage_radius,
-            gimbal_type,
-            rack_count, rack_missile_size`;
+            gimbal_type, gimbal_max_angle, gimbal_pitch_speed, gimbal_yaw_speed,
+            turret_min_pitch, turret_max_pitch, turret_min_yaw, turret_max_yaw,
+            rack_count, rack_missile_size,
+            shield_downed_regen_delay,
+            weapon_heat_per_shot, weapon_charge_time,
+            qd_calibration_rate, qd_calibration_delay, qd_calibration_max_angle`;
 
     const COMP_CONFLICT = `(uuid, env) DO UPDATE SET
             class_name=EXCLUDED.class_name, name=EXCLUDED.name,
@@ -649,11 +655,15 @@ export class ExtractionService {
             missile_damage_distortion=EXCLUDED.missile_damage_distortion,
             missile_damage_thermal=EXCLUDED.missile_damage_thermal, missile_damage_biochemical=EXCLUDED.missile_damage_biochemical,
             missile_damage_stun=EXCLUDED.missile_damage_stun,
+            missile_explosion_radius=EXCLUDED.missile_explosion_radius,
+            missile_guidance_mode=EXCLUDED.missile_guidance_mode,
             thruster_max_thrust=EXCLUDED.thruster_max_thrust, thruster_type=EXCLUDED.thruster_type,
             radar_range=EXCLUDED.radar_range,
             radar_detection_lifetime=EXCLUDED.radar_detection_lifetime,
             radar_tracking_signal=EXCLUDED.radar_tracking_signal,
-            cm_ammo_count=EXCLUDED.cm_ammo_count,
+            radar_ping_range=EXCLUDED.radar_ping_range,
+            radar_ping_cooldown=EXCLUDED.radar_ping_cooldown,
+            cm_ammo_count=EXCLUDED.cm_ammo_count, cm_type=EXCLUDED.cm_type,
             fuel_capacity=EXCLUDED.fuel_capacity, fuel_intake_rate=EXCLUDED.fuel_intake_rate,
             emp_damage=EXCLUDED.emp_damage, emp_radius=EXCLUDED.emp_radius,
             emp_charge_time=EXCLUDED.emp_charge_time, emp_cooldown=EXCLUDED.emp_cooldown,
@@ -664,10 +674,20 @@ export class ExtractionService {
             tractor_max_force=EXCLUDED.tractor_max_force, tractor_max_range=EXCLUDED.tractor_max_range,
             salvage_speed=EXCLUDED.salvage_speed, salvage_radius=EXCLUDED.salvage_radius,
             gimbal_type=EXCLUDED.gimbal_type,
+            gimbal_max_angle=EXCLUDED.gimbal_max_angle,
+            gimbal_pitch_speed=EXCLUDED.gimbal_pitch_speed, gimbal_yaw_speed=EXCLUDED.gimbal_yaw_speed,
+            turret_min_pitch=EXCLUDED.turret_min_pitch, turret_max_pitch=EXCLUDED.turret_max_pitch,
+            turret_min_yaw=EXCLUDED.turret_min_yaw, turret_max_yaw=EXCLUDED.turret_max_yaw,
             rack_count=EXCLUDED.rack_count, rack_missile_size=EXCLUDED.rack_missile_size,
+            shield_downed_regen_delay=EXCLUDED.shield_downed_regen_delay,
+            weapon_heat_per_shot=EXCLUDED.weapon_heat_per_shot,
+            weapon_charge_time=EXCLUDED.weapon_charge_time,
+            qd_calibration_rate=EXCLUDED.qd_calibration_rate,
+            qd_calibration_delay=EXCLUDED.qd_calibration_delay,
+            qd_calibration_max_angle=EXCLUDED.qd_calibration_max_angle,
             updated_at=CURRENT_TIMESTAMP`;
 
-    const COL_COUNT = 98; // number of columns above (97 + env)
+    const COL_COUNT = 116; // number of columns above (115 stats + env)
 
     /** Map a component object to a flat array of values */
     const toCanonicalRow = (c: any): (string | number | null)[] => {
@@ -752,12 +772,17 @@ export class ExtractionService {
         c.missileDamageThermal ?? null,
         c.missileDamageBiochemical ?? null,
         c.missileDamageStun ?? null,
+        c.missileExplosionRadius ?? null,
+        c.missileGuidanceMode || null,
         c.thrusterMaxThrust ?? null,
         c.thrusterType || null,
         c.radarRange ?? null,
         c.radarDetectionLifetime ?? null,
         c.radarTrackingSignal ?? null,
+        c.radarPingRange ?? null,
+        c.radarPingCooldown ?? null,
         c.cmAmmoCount ?? null,
+        c.cmType || null,
         c.fuelCapacity ?? null,
         c.fuelIntakeRate ?? null,
         c.empDamage ?? null,
@@ -777,8 +802,21 @@ export class ExtractionService {
         c.salvageSpeed ?? null,
         c.salvageRadius ?? null,
         c.gimbalType || null,
+        c.gimbalMaxAngle ?? null,
+        c.gimbalPitchSpeed ?? null,
+        c.gimbalYawSpeed ?? null,
+        c.turretMinPitch ?? null,
+        c.turretMaxPitch ?? null,
+        c.turretMinYaw ?? null,
+        c.turretMaxYaw ?? null,
         c.rackCount ?? null,
         c.rackMissileSize ?? null,
+        c.shieldDownedRegenDelay ?? null,
+        c.weaponHeatPerShot ?? null,
+        c.weaponChargeTime ?? null,
+        c.qdCalibrationRate ?? null,
+        c.qdCalibrationDelay ?? null,
+        c.qdCalibrationMaxAngle ?? null,
       ];
     };
 
@@ -1186,6 +1224,42 @@ export class ExtractionService {
         defaultContains: 'Tier_1',
         tierExtract: true,
       },
+    ],
+    // Caterpillar: front command module + 4 cargo/module bays
+    DRAK_Caterpillar: [
+      { slotName: 'hardpoint_module_command', slotType: 'command', modulePrefix: 'DRAK_Caterpillar_Module_Command_', defaultContains: 'Command' },
+      { slotName: 'hardpoint_module_01', slotType: 'cargo', modulePrefix: 'DRAK_Caterpillar_Module_', defaultContains: 'Cargo' },
+      { slotName: 'hardpoint_module_02', slotType: 'cargo', modulePrefix: 'DRAK_Caterpillar_Module_', defaultContains: 'Cargo' },
+      { slotName: 'hardpoint_module_03', slotType: 'cargo', modulePrefix: 'DRAK_Caterpillar_Module_', defaultContains: 'Cargo' },
+      { slotName: 'hardpoint_module_04', slotType: 'cargo', modulePrefix: 'DRAK_Caterpillar_Module_', defaultContains: 'Cargo' },
+    ],
+    // Galaxy: modular mission bay
+    RSI_Galaxy: [
+      { slotName: 'hardpoint_module_bay', slotType: 'bay', modulePrefix: 'RSI_Galaxy_Module_', defaultContains: 'Cargo' },
+    ],
+    // Ironclad: modular cargo bays
+    CNOU_Ironclad: [
+      { slotName: 'hardpoint_module_front', slotType: 'front', modulePrefix: 'CNOU_Ironclad_Module_', defaultContains: 'Cargo' },
+      { slotName: 'hardpoint_module_mid', slotType: 'mid', modulePrefix: 'CNOU_Ironclad_Module_', defaultContains: 'Cargo' },
+    ],
+    CNOU_Ironclad_Assault: [
+      { slotName: 'hardpoint_module_front', slotType: 'front', modulePrefix: 'CNOU_Ironclad_Module_', defaultContains: 'Cargo' },
+      { slotName: 'hardpoint_module_mid', slotType: 'mid', modulePrefix: 'CNOU_Ironclad_Module_', defaultContains: 'Cargo' },
+    ],
+    // Hull C: detachable cargo pods
+    MISC_Hull_C: [
+      { slotName: 'hardpoint_cargo_01', slotType: 'cargo', modulePrefix: 'MISC_HullC_Module_', defaultContains: 'Cargo' },
+    ],
+    // Pioneer: modular fabrication bays
+    MISC_Pioneer: [
+      { slotName: 'hardpoint_module_01', slotType: 'fabrication', modulePrefix: 'MISC_Pioneer_Module_', defaultContains: 'Fabrication' },
+    ],
+    // 600i: cabin/exploration/touring modules
+    ORIG_600i_Explorer: [
+      { slotName: 'hardpoint_module_cabin', slotType: 'cabin', modulePrefix: 'ORIG_600i_Module_', defaultContains: 'Cabin' },
+    ],
+    ORIG_600i_Touring: [
+      { slotName: 'hardpoint_module_cabin', slotType: 'cabin', modulePrefix: 'ORIG_600i_Module_', defaultContains: 'Cabin' },
     ],
   };
 

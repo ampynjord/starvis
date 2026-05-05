@@ -297,15 +297,38 @@ export interface Component extends ComponentListItem {
   // Tractor
   tractor_max_force: number | null;
   tractor_max_range: number | null;
-  // Gimbal
+  // Gimbal extended
   gimbal_type: string | null;
-  // Radar (extended from list)
+  gimbal_max_angle: number | null;
+  gimbal_pitch_speed: number | null;
+  gimbal_yaw_speed: number | null;
+  // Turret arcs
+  turret_min_pitch: number | null;
+  turret_max_pitch: number | null;
+  turret_min_yaw: number | null;
+  turret_max_yaw: number | null;
+  // Radar extended
   radar_detection_lifetime: number | null;
   radar_tracking_signal: number | null;
+  radar_ping_range: number | null;
+  radar_ping_cooldown: number | null;
   // Thruster
   thruster_type: string | null;
-  // Missile
+  // Missile extended
   missile_range: number | null;
+  missile_explosion_radius: number | null;
+  missile_guidance_mode: string | null;
+  // Shield extended
+  shield_downed_regen_delay: number | null;
+  // Weapon heat/charge
+  weapon_heat_per_shot: number | null;
+  weapon_charge_time: number | null;
+  // Countermeasure type
+  cm_type: string | null;
+  // QD calibration
+  qd_calibration_rate: number | null;
+  qd_calibration_delay: number | null;
+  qd_calibration_max_angle: number | null;
   data_json?: Record<string, unknown> | null;
   game_data: Record<string, unknown> | null;
 }

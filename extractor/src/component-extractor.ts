@@ -28,6 +28,8 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
     Cooler: /cooler[s]?[/\\]/i,
     QuantumDrive: /quantum_?drive[s]?[/\\]|quantumdrive/i,
     Missile: /missile[s]?[/\\](?!rack|launcher|_rack)/i,
+    Bomb: /bomb[s]?[/\\]/i,
+    Torpedo: /torpedo(?:es)?[/\\]|torped[os][/\\]/i,
     Thruster: /thruster[s]?[/\\]/i,
     Radar: /radar[s]?[/\\]/i,
     Countermeasure: /countermeasure[s]?[/\\]|flare[s]?[/\\]|noise[/\\]/i,
@@ -161,6 +163,8 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
               } else {
                 // Projectile weapon — fire rate + ammo path
                 if (typeof pa.fireRate === 'number') comp.weaponFireRate = Math.round(pa.fireRate * 100) / 100;
+                if (typeof pa.heatPerShot === 'number') comp.weaponHeatPerShot = Math.round(pa.heatPerShot * 10000) / 10000;
+                if (typeof pa.chargeTime === 'number') comp.weaponChargeTime = Math.round(pa.chargeTime * 100) / 100;
                 const lp = pa.launchParams;
                 if (lp && typeof lp === 'object') {
                   if (typeof (lp as Record<string, unknown>).pelletCount === 'number')
@@ -171,6 +175,8 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
                   for (const se of pa.sequenceEntries) {
                     const wa = (se as Record<string, unknown>)?.weaponAction as Record<string, unknown> | undefined;
                     if (wa && typeof wa.fireRate === 'number') totalFR += wa.fireRate;
+                    if (!comp.weaponHeatPerShot && typeof wa?.heatPerShot === 'number')
+                      comp.weaponHeatPerShot = Math.round((wa.heatPerShot as number) * 10000) / 10000;
                     if (!comp.weaponPelletsPerShot && (wa?.launchParams as Record<string, unknown>)?.pelletCount)
                       comp.weaponPelletsPerShot = (wa?.launchParams as Record<string, unknown>)?.pelletCount as number;
                   }
@@ -276,6 +282,8 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           if (typeof c.MaxShieldHealth === 'number') comp.shieldHp = Math.round(c.MaxShieldHealth * 100) / 100;
           if (typeof c.MaxShieldRegen === 'number') comp.shieldRegen = Math.round(c.MaxShieldRegen * 10000) / 10000;
           if (typeof c.DamagedRegenDelay === 'number') comp.shieldRegenDelay = Math.round(c.DamagedRegenDelay * 100) / 100;
+          if (typeof c.DownedRegenDelay === 'number') comp.shieldDownedRegenDelay = Math.round(c.DownedRegenDelay * 100) / 100;
+          else if (typeof c.downedRegenDelay === 'number') comp.shieldDownedRegenDelay = Math.round(c.downedRegenDelay * 100) / 100;
           if (typeof c.Hardening === 'number') comp.shieldHardening = Math.round(c.Hardening * 10000) / 10000;
           if (typeof c.MaxReallocation === 'number') comp.shieldFaces = c.MaxReallocation > 0 ? 6 : 2;
           if (typeof c.ShieldMaxHealth === 'number' && !comp.shieldHp) comp.shieldHp = Math.round(c.ShieldMaxHealth * 100) / 100;
@@ -324,9 +332,22 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
             if (typeof sjp.driveSpeed === 'number') comp.qdTuningRate = Math.round(sjp.driveSpeed * 100) / 100;
             if (typeof sjp.stageOneAccelRate === 'number') comp.qdAlignmentRate = Math.round(sjp.stageOneAccelRate * 100) / 100;
           }
+          // Calibration stats (4.x)
+          const calParams = c.calibrationParams || c.params;
+          if (calParams && typeof calParams === 'object') {
+            if (typeof calParams.calibrationRate === 'number') comp.qdCalibrationRate = Math.round(calParams.calibrationRate * 10000) / 10000;
+            if (typeof calParams.calibrationDelay === 'number') comp.qdCalibrationDelay = Math.round(calParams.calibrationDelay * 100) / 100;
+            if (typeof calParams.maxCalibrationAngle === 'number') comp.qdCalibrationMaxAngle = Math.round(calParams.maxCalibrationAngle * 100) / 100;
+          }
+          if (!comp.qdCalibrationRate && typeof c.calibrationRate === 'number')
+            comp.qdCalibrationRate = Math.round(c.calibrationRate * 10000) / 10000;
+          if (!comp.qdCalibrationDelay && typeof c.calibrationDelay === 'number')
+            comp.qdCalibrationDelay = Math.round(c.calibrationDelay * 100) / 100;
+          if (!comp.qdCalibrationMaxAngle && typeof c.maxCalibrationAngle === 'number')
+            comp.qdCalibrationMaxAngle = Math.round(c.maxCalibrationAngle * 100) / 100;
         }
 
-        // Missile
+        // Missile / Bomb / Torpedo — all share SCItemMissileParams
         if (cType === 'SCItemMissileParams') {
           const ep = c.explosionParams;
           if (ep && typeof ep === 'object') {
@@ -349,10 +370,16 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
                 comp.missileDamageStun = stun > 0 ? Math.round(stun * 100) / 100 : undefined;
               }
             }
+            if (typeof ep.maxRadius === 'number') comp.missileExplosionRadius = Math.round(ep.maxRadius * 100) / 100;
+            else if (typeof ep.radius === 'number') comp.missileExplosionRadius = Math.round(ep.radius * 100) / 100;
           }
-          const gcs = c.GCSParams;
+          const gcs = c.GCSParams || c.gcsParams;
           if (gcs && typeof gcs === 'object') {
             if (typeof gcs.linearSpeed === 'number') comp.missileSpeed = Math.round(gcs.linearSpeed * 100) / 100;
+            if (typeof gcs.maxAngularVelocity === 'number' || typeof gcs.maxAngularSpeed === 'number') {
+              const angVel = gcs.maxAngularVelocity ?? gcs.maxAngularSpeed;
+              if (typeof angVel === 'number') comp.missileMaxAngularVelocity = Math.round(angVel * 100) / 100;
+            }
           }
           const tp = c.targetingParams;
           if (tp && typeof tp === 'object') {
@@ -361,6 +388,13 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
             if (typeof tp.lockRangeMax === 'number') comp.missileLockRange = Math.round(tp.lockRangeMax * 100) / 100;
             if (typeof tp.lockRangeMin === 'number') comp.missileRange = Math.round(tp.lockRangeMin * 100) / 100;
           }
+          // Guidance mode from seeker/guidance params
+          const seekerParams = c.seekerParams || c.guidanceParams || c.seekertype;
+          if (seekerParams && typeof seekerParams === 'object') {
+            if (typeof seekerParams.seekerType === 'string') comp.missileGuidanceMode = seekerParams.seekerType;
+            else if (typeof seekerParams.guidanceType === 'string') comp.missileGuidanceMode = seekerParams.guidanceType;
+          }
+          if (!comp.missileGuidanceMode && comp.missileSignalType) comp.missileGuidanceMode = comp.missileSignalType;
         }
 
         // Projectile params
@@ -412,9 +446,21 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
               comp.radarDetectionLifetime = Math.round(Math.max(...piercingValues) * 10000) / 10000;
             }
           }
-          if (c.pingProperties && typeof c.pingProperties.cooldownTime === 'number') {
-            comp.radarRange = c.pingProperties.cooldownTime;
+          const pp = c.pingProperties;
+          if (pp && typeof pp === 'object') {
+            // pingRange = active scan range in meters; cooldownTime = seconds between pings
+            const pingRange = typeof pp.pingRange === 'number' ? pp.pingRange : typeof pp.scanRange === 'number' ? pp.scanRange : null;
+            if (pingRange !== null) {
+              comp.radarRange = Math.round(pingRange * 100) / 100;
+              comp.radarPingRange = comp.radarRange;
+            }
+            if (typeof pp.cooldownTime === 'number') comp.radarPingCooldown = Math.round(pp.cooldownTime * 100) / 100;
           }
+          // Fallback: top-level detectionRadius / maxRange fields
+          const detRange = typeof c.detectionRadius === 'number' ? c.detectionRadius
+            : typeof c.maxRange === 'number' ? c.maxRange
+            : typeof c.scanRange === 'number' ? c.scanRange : null;
+          if (detRange !== null && !comp.radarRange) comp.radarRange = Math.round(detRange * 100) / 100;
         }
 
         // Countermeasure
@@ -424,6 +470,13 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
         if (type === 'Countermeasure' && cType === 'SAmmoContainerComponentParams') {
           if (typeof c.maxAmmoCount === 'number') comp.cmAmmoCount = c.maxAmmoCount;
           if (typeof c.initialAmmoCount === 'number' && !comp.cmAmmoCount) comp.cmAmmoCount = c.initialAmmoCount;
+        }
+        // Countermeasure type from path/name
+        if (type === 'Countermeasure' && !comp.cmType) {
+          if (fn.includes('flare')) comp.cmType = 'Flare';
+          else if (fn.includes('noise') || fn.includes('chaff')) comp.cmType = 'Noise';
+          else if (lcName.includes('flare')) comp.cmType = 'Flare';
+          else if (lcName.includes('noise') || lcName.includes('chaff')) comp.cmType = 'Noise';
         }
 
         // Fuel Tank
@@ -505,11 +558,39 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           if (typeof c.Radius === 'number' && !comp.salvageRadius) comp.salvageRadius = Math.round(c.Radius * 100) / 100;
         }
 
-        // Gimbal / mount type detection
+        // Gimbal / mount type detection + stats
         if (type === 'Gimbal') {
           if (fn.includes('gimbal')) comp.gimbalType = 'Gimbal';
           else if (fn.includes('fixed')) comp.gimbalType = 'Fixed';
           else comp.gimbalType = 'Gimbal';
+        }
+        if (cType === 'SCItemGimbalComponentParams' || cType === 'SItemGimbalComponentParams') {
+          // Max deflection angle (take max of horizontal/vertical, prefer the larger one)
+          const maxH = typeof c.maxHorizontalAngle === 'number' ? c.maxHorizontalAngle : typeof c.maxYaw === 'number' ? c.maxYaw : null;
+          const maxV = typeof c.maxVerticalAngle === 'number' ? c.maxVerticalAngle : typeof c.maxPitch === 'number' ? c.maxPitch : null;
+          if (maxH !== null || maxV !== null) {
+            comp.gimbalMaxAngle = Math.round(Math.max(maxH ?? 0, maxV ?? 0) * 100) / 100;
+          }
+          const pitchSpd = typeof c.pitchSpeed === 'number' ? c.pitchSpeed : typeof c.angularSpeedPitch === 'number' ? c.angularSpeedPitch : null;
+          if (pitchSpd !== null) comp.gimbalPitchSpeed = Math.round(pitchSpd * 100) / 100;
+          const yawSpd = typeof c.yawSpeed === 'number' ? c.yawSpeed : typeof c.angularSpeedYaw === 'number' ? c.angularSpeedYaw : null;
+          if (yawSpd !== null) comp.gimbalYawSpeed = Math.round(yawSpd * 100) / 100;
+          if (!comp.gimbalMaxAngle && !pitchSpd && !yawSpd) {
+            // Fallback: coupling strength may indicate fixed vs powered
+            if (typeof c.couplingStrength === 'number') comp.gimbalMaxAngle = Math.round(c.couplingStrength * 100) / 100;
+          }
+        }
+        // Turret arc extraction
+        if ((type === 'Turret' || type === 'TurretUnmanned') &&
+            (cType === 'SCItemTurretBaseComponentParams' || cType === 'SItemTurretBaseComponentParams' || cType === 'SCItemTurretSocketComponentParams')) {
+          const minPitch = typeof c.minPitch === 'number' ? c.minPitch : typeof c.minArcVertical === 'number' ? c.minArcVertical : null;
+          const maxPitch = typeof c.maxPitch === 'number' ? c.maxPitch : typeof c.maxArcVertical === 'number' ? c.maxArcVertical : null;
+          const minYaw = typeof c.minYaw === 'number' ? c.minYaw : typeof c.minArcHorizontal === 'number' ? c.minArcHorizontal : null;
+          const maxYaw = typeof c.maxYaw === 'number' ? c.maxYaw : typeof c.maxArcHorizontal === 'number' ? c.maxArcHorizontal : null;
+          if (minPitch !== null) comp.turretMinPitch = Math.round(minPitch * 100) / 100;
+          if (maxPitch !== null) comp.turretMaxPitch = Math.round(maxPitch * 100) / 100;
+          if (minYaw !== null) comp.turretMinYaw = Math.round(minYaw * 100) / 100;
+          if (maxYaw !== null) comp.turretMaxYaw = Math.round(maxYaw * 100) / 100;
         }
 
         // Missile rack: count sub-ports
