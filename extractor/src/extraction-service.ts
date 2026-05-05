@@ -1227,16 +1227,19 @@ export class ExtractionService {
     ],
     // Caterpillar: front command module + 4 cargo/module bays
     DRAK_Caterpillar: [
-      { slotName: 'hardpoint_module_command', slotType: 'command', modulePrefix: 'DRAK_Caterpillar_Module_Command_', defaultContains: 'Command' },
+      {
+        slotName: 'hardpoint_module_command',
+        slotType: 'command',
+        modulePrefix: 'DRAK_Caterpillar_Module_Command_',
+        defaultContains: 'Command',
+      },
       { slotName: 'hardpoint_module_01', slotType: 'cargo', modulePrefix: 'DRAK_Caterpillar_Module_', defaultContains: 'Cargo' },
       { slotName: 'hardpoint_module_02', slotType: 'cargo', modulePrefix: 'DRAK_Caterpillar_Module_', defaultContains: 'Cargo' },
       { slotName: 'hardpoint_module_03', slotType: 'cargo', modulePrefix: 'DRAK_Caterpillar_Module_', defaultContains: 'Cargo' },
       { slotName: 'hardpoint_module_04', slotType: 'cargo', modulePrefix: 'DRAK_Caterpillar_Module_', defaultContains: 'Cargo' },
     ],
     // Galaxy: modular mission bay
-    RSI_Galaxy: [
-      { slotName: 'hardpoint_module_bay', slotType: 'bay', modulePrefix: 'RSI_Galaxy_Module_', defaultContains: 'Cargo' },
-    ],
+    RSI_Galaxy: [{ slotName: 'hardpoint_module_bay', slotType: 'bay', modulePrefix: 'RSI_Galaxy_Module_', defaultContains: 'Cargo' }],
     // Ironclad: modular cargo bays
     CNOU_Ironclad: [
       { slotName: 'hardpoint_module_front', slotType: 'front', modulePrefix: 'CNOU_Ironclad_Module_', defaultContains: 'Cargo' },
@@ -1247,9 +1250,7 @@ export class ExtractionService {
       { slotName: 'hardpoint_module_mid', slotType: 'mid', modulePrefix: 'CNOU_Ironclad_Module_', defaultContains: 'Cargo' },
     ],
     // Hull C: detachable cargo pods
-    MISC_Hull_C: [
-      { slotName: 'hardpoint_cargo_01', slotType: 'cargo', modulePrefix: 'MISC_HullC_Module_', defaultContains: 'Cargo' },
-    ],
+    MISC_Hull_C: [{ slotName: 'hardpoint_cargo_01', slotType: 'cargo', modulePrefix: 'MISC_HullC_Module_', defaultContains: 'Cargo' }],
     // Pioneer: modular fabrication bays
     MISC_Pioneer: [
       { slotName: 'hardpoint_module_01', slotType: 'fabrication', modulePrefix: 'MISC_Pioneer_Module_', defaultContains: 'Fabrication' },
