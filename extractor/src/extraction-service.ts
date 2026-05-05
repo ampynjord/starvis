@@ -1184,7 +1184,8 @@ export class ExtractionService {
     Array<{
       slotName: string;
       slotType: string;
-      modulePrefix: string;
+      modulePrefix?: string;
+      moduleNames?: string[];
       defaultContains: string;
       tierExtract?: boolean;
     }>
@@ -1192,6 +1193,14 @@ export class ExtractionService {
     AEGS_Retaliator: [
       { slotName: 'hardpoint_front_module', slotType: 'front', modulePrefix: 'AEGS_Retaliator_Module_Front_', defaultContains: 'Base' },
       { slotName: 'hardpoint_rear_module', slotType: 'rear', modulePrefix: 'AEGS_Retaliator_Module_Rear_', defaultContains: 'Base' },
+    ],
+    RSI_Aurora_Mk2: [
+      {
+        slotName: 'hardpoint_module',
+        slotType: 'module',
+        moduleNames: ['RSI_Aurora_Mk2_Module_Cargo', 'RSI_Aurora_Mk2_Module_Missile'],
+        defaultContains: 'Cargo',
+      },
     ],
     RSI_Apollo_Medivac: [
       {
@@ -1289,9 +1298,10 @@ export class ExtractionService {
       await conn.query('DELETE FROM game.ship_modules WHERE ship_uuid = $1 AND env = $2', [fullData.ref, env]);
 
       for (const slotDef of config) {
-        const allModuleNames = this.df.findEntityClassNamesByPrefix(slotDef.modulePrefix);
+        const allModuleNames =
+          slotDef.moduleNames ?? (slotDef.modulePrefix ? this.df.findEntityClassNamesByPrefix(slotDef.modulePrefix) : []);
         if (allModuleNames.length === 0) {
-          logger.warn(`No modules found for prefix "${slotDef.modulePrefix}" on ${shipClassName}`);
+          logger.warn(`No modules found for prefix "${slotDef.modulePrefix ?? '(explicit list)'}" on ${shipClassName}`);
           continue;
         }
 

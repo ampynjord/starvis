@@ -32,6 +32,24 @@ const HP_ORDER    = ['WeaponGun','Weapon','Gimbal','Turret','MissileRack','Shiel
 const VISUAL_TYPES = new Set(HP_ORDER);
 const NOISY       = ['controller','_door','radar_helper','fuel_tank','fuel_intake'];
 
+const HP_LABELS: Record<string, string> = {
+  WeaponGun: 'Guns', Weapon: 'Wpns', Gimbal: 'Gimbal', Turret: 'Turret',
+  MissileRack: 'Msls', Shield: 'Shield', PowerPlant: 'Power', Cooler: 'Cool',
+  QuantumDrive: 'QD', Radar: 'Radar',
+};
+const HP_STYLES: Record<string, string> = {
+  WeaponGun:    'text-red-400     border-red-900/50    bg-red-950/30',
+  Weapon:       'text-red-400     border-red-900/50    bg-red-950/30',
+  Gimbal:       'text-violet-400  border-violet-900/50 bg-violet-950/30',
+  Turret:       'text-amber-400   border-amber-900/50  bg-amber-950/30',
+  MissileRack:  'text-orange-400  border-orange-900/50 bg-orange-950/30',
+  Shield:       'text-blue-400    border-blue-900/50   bg-blue-950/30',
+  PowerPlant:   'text-yellow-400  border-yellow-900/50 bg-yellow-950/30',
+  Cooler:       'text-cyan-400    border-cyan-900/50   bg-cyan-950/30',
+  QuantumDrive: 'text-violet-400  border-violet-900/50 bg-violet-950/30',
+  Radar:        'text-green-400   border-green-900/50  bg-green-950/30',
+};
+
 interface LStats {
   powerOutput: number; powerDraw: number;
   heat: number; cooling: number;
@@ -274,6 +292,64 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
           </div>
         )}
       </div>
+
+      {/* ════════════════════════════════════════
+          FIREPOWER
+      ════════════════════════════════════════ */}
+      {(ls.totalDps > 0 || (ship.weapon_damage_total != null && Number(ship.weapon_damage_total) > 0) || (ship.missile_damage_total != null && Number(ship.missile_damage_total) > 0)) && (
+        <div>
+          <SectionLabel>Firepower</SectionLabel>
+          <div className="grid grid-cols-2 gap-1.5">
+            {(ls.totalDps > 0 || (ship.weapon_damage_total != null && Number(ship.weapon_damage_total) > 0)) && (
+              <div className="flex flex-col items-center rounded-md border border-red-900/40 bg-red-950/10 py-2 px-1">
+                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Weapons DPS</span>
+                <span className="text-sm font-orbitron font-bold text-red-400 tabular-nums">
+                  {fK(ls.totalDps > 0 ? ls.totalDps : n(ship.weapon_damage_total))}
+                </span>
+              </div>
+            )}
+            {ship.missile_damage_total != null && n(ship.missile_damage_total) > 0 && (
+              <div className="flex flex-col items-center rounded-md border border-orange-900/40 bg-orange-950/10 py-2 px-1">
+                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Missiles</span>
+                <span className="text-sm font-orbitron font-bold text-orange-400 tabular-nums">
+                  {fK(n(ship.missile_damage_total))}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════
+          HARDPOINTS
+      ════════════════════════════════════════ */}
+      {hpGroups.size > 0 && (
+        <div>
+          <SectionLabel>Hardpoints</SectionLabel>
+          <div className="flex flex-col gap-1.5">
+            {HP_ORDER.filter(t => hpGroups.has(t)).map(type => {
+              const sizes = hpGroups.get(type)!;
+              const label = HP_LABELS[type] ?? type;
+              const style = HP_STYLES[type] ?? 'text-slate-400 border-slate-700 bg-slate-900/40';
+              return (
+                <div key={type} className="flex items-center gap-1.5">
+                  <span className={`text-[8px] font-mono-sc border rounded-sm px-1.5 py-0.5 leading-none shrink-0 w-12 text-center ${style}`}>
+                    {label}
+                  </span>
+                  <div className="flex flex-wrap gap-1 flex-1">
+                    {sizes.map((s, i) => (
+                      <span key={i} className="text-[8px] font-mono-sc text-slate-500 border border-slate-800 bg-slate-900/40 rounded-sm px-1 py-0.5 leading-none tabular-nums">
+                        S{s}
+                      </span>
+                    ))}
+                  </div>
+                  <span className="text-[8px] font-mono-sc text-slate-700 shrink-0">×{sizes.length}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ════════════════════════════════════════
           SURVIVAL — HP + ARMOR
@@ -550,10 +626,19 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
       {/* ════════════════════════════════════════
           RADAR
       ════════════════════════════════════════ */}
-      {!isGround && radarNode && (radarNode.radar_tracking_signal || radarNode.radar_detection_lifetime) && (
+      {!isGround && radarNode && (radarNode.radar_tracking_signal || radarNode.radar_detection_lifetime || radarNode.radar_range) && (
         <div>
           <SectionLabel>Radar</SectionLabel>
-          <div className="grid grid-cols-2 gap-1.5">
+          <div className="grid grid-cols-3 gap-1.5">
+            {radarNode.radar_range != null && (
+              <div className="flex flex-col items-center rounded-md border border-green-900/40 bg-green-950/10 py-2 px-1">
+                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Range</span>
+                <span className="text-sm font-orbitron font-bold text-green-400 tabular-nums">
+                  {Math.round(n(radarNode.radar_range) / 1000)}
+                </span>
+                <span className="text-[9px] font-mono-sc text-slate-700">km</span>
+              </div>
+            )}
             {radarNode.radar_tracking_signal != null && (
               <div className="flex flex-col items-center rounded-md border border-green-900/40 bg-green-950/10 py-2 px-1">
                 <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Tracking</span>
@@ -602,6 +687,22 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
               </div>
             )}
           </div>
+          {/* QD speed + spool */}
+          {qdNode && (n(qdNode.qd_speed ?? 0) > 0 || qdNode.qd_spool_time != null) && (
+            <div className="flex items-center justify-between mt-1.5 rounded-md border border-violet-900/30 bg-violet-950/10 px-3 py-1.5">
+              <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest">QD Speed</span>
+              <div className="flex items-baseline gap-2">
+                {n(qdNode.qd_speed ?? 0) > 0 && (
+                  <span className="text-sm font-orbitron font-bold text-violet-400 tabular-nums">
+                    {(n(qdNode.qd_speed ?? 0) / 1_000_000).toFixed(0)} Mm/s
+                  </span>
+                )}
+                {qdNode.qd_spool_time != null && (
+                  <span className="text-xs font-mono-sc text-slate-500">spool {n(qdNode.qd_spool_time).toFixed(1)}s</span>
+                )}
+              </div>
+            </div>
+          )}
           {/* QD range */}
           {qdNode?.qd_range != null && n(qdNode.qd_range) > 0 && (
             <div className="flex items-center justify-between mt-1.5 rounded-md border border-violet-900/30 bg-violet-950/10 px-3 py-1.5">
