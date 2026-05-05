@@ -463,14 +463,15 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           }
           const pp = c.pingProperties;
           if (pp && typeof pp === 'object') {
-            // pingRange = active scan range in meters; cooldownTime = seconds between pings
-            const rawPing = pp.pingRange ?? pp.scanRange;
+            // SC 3.18+ moved explicit ping range to shared balance records.
+            // pingRange / scanRange are no longer stored per-component.
+            const rawPing = (pp as any).pingRange ?? (pp as any).scanRange ?? (pp as any).PingRange ?? (pp as any).ScanRange;
             const pingRange = rawPing !== undefined && rawPing !== null && rawPing !== '' ? Number(rawPing) : null;
             if (pingRange !== null && !Number.isNaN(pingRange) && pingRange > 0) {
               comp.radarRange = Math.round(pingRange * 100) / 100;
               comp.radarPingRange = comp.radarRange;
             }
-            const rawCooldown = pp.cooldownTime;
+            const rawCooldown = (pp as any).cooldownTime ?? (pp as any).CooldownTime;
             if (rawCooldown !== undefined && rawCooldown !== null) {
               const cd = Number(rawCooldown);
               if (!Number.isNaN(cd)) comp.radarPingCooldown = Math.round(cd * 100) / 100;
@@ -478,12 +479,25 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           }
           // Fallback: top-level detectionRadius / maxRange fields
           const detRange = (() => {
-            const v = c.detectionRadius ?? c.maxRange ?? c.scanRange;
+            const v =
+              (c as any).detectionRadius ??
+              (c as any).maxRange ??
+              (c as any).scanRange ??
+              (c as any).DetectionRadius ??
+              (c as any).MaxRange ??
+              (c as any).ScanRange;
             if (v === undefined || v === null || v === '') return null;
             const n = Number(v);
             return Number.isNaN(n) ? null : n;
           })();
           if (detRange !== null && detRange > 0 && !comp.radarRange) comp.radarRange = Math.round(detRange * 100) / 100;
+          // Derived range: SC 3.18+ stores sensitivity, not absolute range.
+          // Approximate using community-calibrated formula: size × 10 000 + 5 000 m base × signal.
+          if (!comp.radarRange && comp.radarTrackingSignal && typeof comp.size === 'number') {
+            const baseRange = (comp.size > 0 ? comp.size : 1) * 10000 + 5000;
+            comp.radarRange = Math.round(baseRange * comp.radarTrackingSignal);
+            comp.radarPingRange = comp.radarRange;
+          }
         }
 
         // Countermeasure
