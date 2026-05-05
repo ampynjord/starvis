@@ -306,7 +306,7 @@ export class ExtractionService {
         }));
         await conn.query('DELETE FROM game.ship_modules WHERE env = $1', [env]);
         await conn.query('DELETE FROM game.ship_loadouts WHERE env = $1', [env]);
-        await conn.query('DELETE FROM game.ship_paints WHERE env = $1', [env]);
+        // ship_paints FK has ON DELETE CASCADE — deleted automatically with ships
         await conn.query('DELETE FROM game.ships WHERE env = $1', [env]);
         // Immediately store for later restore (after re-insert)
         (this as any)._savedCtmUrls = savedCtmUrls;
@@ -372,8 +372,8 @@ export class ExtractionService {
         }
       }
 
-      // 5b. Extract & save paints/liveries
-      if (run('paints')) {
+      // 5b. Extract & save paints/liveries (always when ships are re-extracted, since CASCADE clears them)
+      if (run('paints') || run('ships')) {
         onProgress?.('Extracting paints…');
         await this.savePaints(conn, env, onProgress);
       }

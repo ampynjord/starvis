@@ -49,6 +49,7 @@ export interface ShipListItem {
   max_crew: number | null;
   ship_matrix_id: number | null; // non-null = has RSI SM link
   thumbnail: string | null;
+  thumbnail_large: string | null;
   production_status: string | null;
   variant_type: string | null;
   is_concept_only: boolean;

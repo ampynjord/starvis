@@ -54,15 +54,16 @@ const TOOLS: {
   sub: string;
   category: ToolCategory;
   badge?: string;
+  comingSoon?: boolean;
 }[] = [
-  { to: '/outfitter',     icon: SlidersHorizontal, label: 'Outfitter',    sub: 'DPS, power & shield calculator',       category: 'combat',  badge: 'DPS' },
-  { to: '/fps-calculator',icon: Crosshair,         label: 'FPS Calc',     sub: 'TTK & damage breakdown for weapons',   category: 'combat',  badge: 'TTK' },
-  { to: '/compare',       icon: BarChart3,         label: 'Compare',      sub: 'Side-by-side ship & component stats',  category: 'data' },
-  { to: '/ranking',       icon: Trophy,            label: 'Ranking',      sub: 'Top ships by DPS, cargo, speed…',      category: 'data' },
-  { to: '/trade',         icon: TrendingUp,        label: 'Trade Routes', sub: 'Profit & commodity prices',            category: 'economy', badge: 'aUEC' },
-  { to: '/mining',        icon: Pickaxe,           label: 'Mining',       sub: 'Ore yield & laser settings',           category: 'economy', badge: 'Yield' },
-  { to: '/blueprints',    icon: Scroll,            label: 'Blueprints',   sub: 'Crafting recipes & materials',         category: 'economy' },
-  { to: '/missions',      icon: ClipboardList,     label: 'Missions',     sub: 'Contracts by faction & legality',      category: 'data' },
+  { to: '/compare',       icon: BarChart3,         label: 'Compare',           sub: 'Side-by-side ship & component stats',  category: 'data' },
+  { to: '/ranking',       icon: Trophy,            label: 'Ranking',           sub: 'Top ships by DPS, cargo, speed…',      category: 'data' },
+  { to: '/blueprints',    icon: Scroll,            label: 'Blueprints',        sub: 'Crafting recipes & materials',         category: 'economy' },
+  { to: '/missions',      icon: ClipboardList,     label: 'Missions',          sub: 'Contracts by faction & legality',      category: 'data' },
+  { to: '/outfitter',     icon: SlidersHorizontal, label: 'Loadout Manager',   sub: 'DPS, power & shield calculator',       category: 'combat',  badge: 'DPS',   comingSoon: true },
+  { to: '/fps-calculator',icon: Crosshair,         label: 'FPS Calculator',    sub: 'TTK & damage breakdown for weapons',   category: 'combat',  badge: 'TTK',   comingSoon: true },
+  { to: '/trade',         icon: TrendingUp,        label: 'Trade Routes',      sub: 'Profit & commodity prices',            category: 'economy', badge: 'aUEC',  comingSoon: true },
+  { to: '/mining',        icon: Pickaxe,           label: 'Mining Calculator', sub: 'Ore yield & laser settings',           category: 'economy', badge: 'Yield', comingSoon: true },
 ];
 
 const CATEGORY_LABEL: Record<ToolCategory, { label: string; color: string; border: string }> = {
@@ -263,10 +264,10 @@ export default function HomePage() {
             {randomShip ? (
               <div className="flex-1 p-4 flex flex-col gap-4">
                 {/* Ship thumbnail */}
-                {randomShip.thumbnail && (
+                {(randomShip.thumbnail_large || randomShip.thumbnail) && (
                   <div className="relative h-44 rounded-sm overflow-hidden bg-slate-900">
                     <Image
-                      src={randomShip.thumbnail}
+                      src={randomShip.thumbnail_large || randomShip.thumbnail!}
                       alt={randomShip.name}
                       fill
                       className="object-cover object-center scale-110"
@@ -422,8 +423,40 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          {TOOLS.map(({ to, icon: Icon, label, sub, category, badge }, i) => {
+          {TOOLS.map(({ to, icon: Icon, label, sub, category, badge, comingSoon }, i) => {
             const cat = CATEGORY_LABEL[category];
+            const inner = (
+              <div className={[
+                'sci-panel p-4 h-full border transition-colors duration-150',
+                comingSoon
+                  ? 'opacity-40 cursor-default border-transparent'
+                  : `${cat.border} group cursor-pointer`,
+              ].join(' ')}>
+                <div className="flex items-start justify-between mb-3">
+                  <Icon size={18} className={comingSoon ? 'text-slate-700 shrink-0' : 'text-slate-500 group-hover:text-slate-200 transition-colors shrink-0'} />
+                  <div className="flex flex-col items-end gap-1">
+                    {comingSoon ? (
+                      <span className="font-orbitron text-[8px] tracking-widest text-slate-600 border border-slate-800 rounded-sm px-1.5 py-0.5 uppercase">
+                        SOON
+                      </span>
+                    ) : badge && (
+                      <span className="font-orbitron text-[8px] tracking-widest text-slate-700 border border-slate-800 rounded-sm px-1 py-0.5 uppercase">
+                        {badge}
+                      </span>
+                    )}
+                    <span className={`font-mono-sc text-[8px] uppercase tracking-widest ${comingSoon ? 'text-slate-700' : cat.color} opacity-60`}>
+                      {cat.label}
+                    </span>
+                  </div>
+                </div>
+                <p className={`font-orbitron text-sm font-bold mb-1 leading-tight ${comingSoon ? 'text-slate-700' : 'text-slate-300 group-hover:text-slate-100 transition-colors'}`}>
+                  {label}
+                </p>
+                <p className={`font-rajdhani text-xs leading-snug ${comingSoon ? 'text-slate-800' : 'text-slate-600 group-hover:text-slate-500 transition-colors'}`}>
+                  {sub}
+                </p>
+              </div>
+            );
             return (
               <motion.div
                 key={to}
@@ -431,29 +464,7 @@ export default function HomePage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.52 + i * 0.04 }}
               >
-                <Link href={to} className="block h-full">
-                  <div className={`sci-panel p-4 h-full border transition-colors duration-150 ${cat.border} group cursor-pointer`}>
-                    <div className="flex items-start justify-between mb-3">
-                      <Icon size={18} className="text-slate-500 group-hover:text-slate-200 transition-colors shrink-0" />
-                      <div className="flex flex-col items-end gap-1">
-                        {badge && (
-                          <span className="font-orbitron text-[8px] tracking-widest text-slate-700 border border-slate-800 rounded-sm px-1 py-0.5 uppercase">
-                            {badge}
-                          </span>
-                        )}
-                        <span className={`font-mono-sc text-[8px] uppercase tracking-widest ${cat.color} opacity-60`}>
-                          {cat.label}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="font-orbitron text-sm font-bold text-slate-300 group-hover:text-slate-100 transition-colors mb-1 leading-tight">
-                      {label}
-                    </p>
-                    <p className="font-rajdhani text-xs text-slate-600 group-hover:text-slate-500 leading-snug transition-colors">
-                      {sub}
-                    </p>
-                  </div>
-                </Link>
+                {comingSoon ? inner : <Link href={to} className="block h-full">{inner}</Link>}
               </motion.div>
             );
           })}
