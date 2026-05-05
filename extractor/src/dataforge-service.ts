@@ -765,7 +765,9 @@ export class DataForgeService implements DataForgeContext {
                   portName === 'hardpoint_controller_tracked' ||
                   portName.includes('controller_movement') ||
                   portName.includes('controller_drive') ||
-                  portName.includes('controller_track')) &&
+                  portName.includes('controller_track') ||
+                  portName.includes('controller_wheel') ||
+                  portName.includes('controller_ground')) &&
                 entCN &&
                 this.dfData
               ) {
@@ -1118,10 +1120,18 @@ export class DataForgeService implements DataForgeContext {
             if (boost > 0 && boost !== v0) groundBoostSpeed = Math.round(boost);
           }
         }
-        // Hover vehicles (Nox, X1, Dragonfly, etc.): topSpeed attribute directly on movement child
+        // Generic fallback: try all MovementParams children with any known speed attribute
+        // Catches VehicleDriveWheeled, PhysicsTank, SWheeledVehicleMovementParams, hover, etc.
         if (!groundTopSpeed) {
           for (const child of movementNode.children || []) {
+            const v0 = parseFloat(child.attributes?.v0SteerMax || '0');
+            const vMax = parseFloat(child.attributes?.vMaxSteerMax || '0');
             const ts = parseFloat(child.attributes?.topSpeed || child.attributes?.maxSpeed || '0');
+            if (v0 > 0) {
+              groundTopSpeed = Math.round(v0);
+              if (vMax > 0 && vMax !== v0) groundBoostSpeed = Math.round(vMax);
+              break;
+            }
             if (ts > 0) {
               groundTopSpeed = Math.round(ts);
               break;
