@@ -14,7 +14,6 @@ import {
   Skull,
   Swords,
   Trophy,
-  X,
   Zap,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -29,6 +28,7 @@ import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
+import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
 import { useDebounce } from '@/hooks/useDebounce';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -431,48 +431,6 @@ function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
   );
 }
 
-// ── Filters ───────────────────────────────────────────────────────────────────
-
-function FilterChips({
-  options,
-  value,
-  onChange,
-  colorFn,
-  labelFn,
-}: {
-  options: string[];
-  value: string;
-  onChange: (v: string) => void;
-  colorFn?: (opt: string) => BadgeColor;
-  labelFn?: (opt: string) => string;
-}) {
-  return (
-    <div className="flex flex-wrap gap-1">
-      <button
-        type="button"
-        onClick={() => onChange('')}
-        className={`px-2 py-1 rounded-sm text-xs font-mono-sc transition-colors border ${!value ? 'bg-cyan-950/60 text-cyan-400 border-cyan-800' : 'text-slate-500 hover:text-slate-300 border-transparent hover:border-border'}`}
-      >
-        All
-      </button>
-      {options.map((opt) => {
-        const c = colorFn?.(opt) ?? 'slate';
-        const active = value === opt;
-        return (
-          <button
-            key={opt}
-            type="button"
-            onClick={() => onChange(active ? '' : opt)}
-            className={`flex items-center gap-0.5 px-2 py-1 rounded-sm text-xs font-mono-sc transition-colors border ${active ? `bg-${c}-950/60 text-${c}-400 border-${c}-800` : 'text-slate-500 hover:text-slate-300 border-transparent hover:border-border'}`}
-          >
-            {labelFn ? labelFn(opt) : opt}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function BlueprintsPage() {
@@ -529,47 +487,37 @@ export default function BlueprintsPage() {
         onSearch={setSearch}
       />
 
-      {/* Filter bar */}
-      <div className="mb-4">
-        <div className="sci-panel p-3 space-y-3">
-          {categories && categories.length > 0 && (
-            <div>
-              <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">Category</p>
-              <FilterChips
-                options={categories.map((c) => c.category)}
-                value={category}
-                onChange={setCategory}
-                colorFn={getCatColor}
-                labelFn={(opt) => categories.find((c) => c.category === opt)?.displayCategory ?? categories.find((c) => c.category === opt)?.display_category ?? opt}
-              />
-            </div>
-          )}
-          {stationTypes && stationTypes.length > 0 && (
-            <div className="flex items-end gap-4 flex-wrap">
-              <div>
-                <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">Station Type</p>
-                <FilterChips
-                  options={stationTypes}
-                  value={stationType}
-                  onChange={setStationType}
-                />
-              </div>
-              {hasFilters && (
-                <button
-                  type="button"
-                  onClick={() => { setSearch(''); setCategory(''); setStationType(''); }}
-                  className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition-colors ml-auto"
-                >
-                  <X size={12} /> Reset filters
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Content */}
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-4 items-start">
+      <div className="flex gap-4">
+        <div className="w-44 shrink-0">
+          <MobileFilterWrapper hasFilters={hasFilters}>
+            <FilterPanel
+              hasFilters={hasFilters}
+              onReset={() => { setSearch(''); setCategory(''); setStationType(''); }}
+              groups={[
+                {
+                  key: 'category',
+                  label: 'Category',
+                  options: (categories ?? []).map((c) => ({
+                    label: c.displayCategory ?? c.display_category ?? c.category,
+                    value: c.category,
+                  })),
+                  value: category,
+                  onChange: setCategory,
+                },
+                {
+                  key: 'stationType',
+                  label: 'Station Type',
+                  options: (stationTypes ?? []).map((st) => ({ label: st, value: st })),
+                  value: stationType,
+                  onChange: setStationType,
+                },
+              ]}
+            />
+          </MobileFilterWrapper>
+        </div>
+        <div className="flex-1 min-w-0">
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-4 items-start">
         {/* Blueprint list */}
         <div>
           {isLoading ? (
@@ -607,6 +555,8 @@ export default function BlueprintsPage() {
               <p className="text-xs text-slate-500">Click a blueprint in the list to view its details, ingredients and associated missions.</p>
             </ScifiPanel>
           )}
+        </div>
+      </div>
         </div>
       </div>
     </div>

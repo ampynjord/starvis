@@ -20,13 +20,11 @@ import {
   Radio,
   Scale,
   Share2,
-  Shield,
   Skull,
   Truck,
   User,
   Users,
   Wrench,
-  X,
   Zap,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -42,6 +40,7 @@ import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { Pagination } from '@/components/ui/Pagination';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
+import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
 import { useDebounce } from '@/hooks/useDebounce';
 
 const LIMIT = 40;
@@ -116,104 +115,6 @@ function DangerPips({ level }: { level: number | null }) {
           key={i}
           className={`w-1.5 h-1.5 rounded-full transition-colors ${i < (level ?? 0) ? colors[Math.min(i, colors.length - 1)] : 'bg-slate-700'}`}
         />
-      ))}
-    </div>
-  );
-}
-
-// ── ChipGroup ─────────────────────────────────────────────────────────────────
-
-function ChipGroup({
-  options,
-  value,
-  onChange,
-}: { options: string[]; value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="flex flex-wrap gap-1">
-      <button
-        type="button"
-        onClick={() => onChange('')}
-        className={`px-2 py-1 rounded-sm text-xs font-mono-sc transition-colors ${!value ? 'bg-cyan-950/60 text-cyan-400 border border-cyan-800' : 'text-slate-500 hover:text-slate-300 border border-transparent hover:border-border'}`}
-      >
-        All
-      </button>
-      {options.map((opt) => (
-        <button
-          key={opt}
-          type="button"
-          onClick={() => onChange(value === opt ? '' : opt)}
-          className={`px-2 py-1 rounded-sm text-xs font-mono-sc transition-colors ${value === opt ? 'bg-cyan-950/60 text-cyan-400 border border-cyan-800' : 'text-slate-500 hover:text-slate-300 border border-transparent hover:border-border'}`}
-        >
-          {opt}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ── TypeChipGroup ─────────────────────────────────────────────────────────────
-
-function TypeChipGroup({
-  options,
-  value,
-  onChange,
-}: { options: string[]; value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="flex flex-wrap gap-1">
-      <button
-        type="button"
-        onClick={() => onChange('')}
-        className={`flex items-center gap-1 px-2 py-1 rounded-sm text-xs font-mono-sc transition-colors ${!value ? 'bg-cyan-950/60 text-cyan-400 border border-cyan-800' : 'text-slate-500 hover:text-slate-300 border border-transparent hover:border-border'}`}
-      >
-        All
-      </button>
-      {options.map((opt) => {
-        const meta = getTypeMeta(opt);
-        const active = value === opt;
-        const activeCls = active
-          ? `bg-${meta.color}-950/60 text-${meta.color}-400 border-${meta.color}-800`
-          : 'text-slate-500 hover:text-slate-300 border-transparent hover:border-border';
-        return (
-          <button
-            key={opt}
-            type="button"
-            onClick={() => onChange(active ? '' : opt)}
-            className={`flex items-center gap-1 px-2 py-1 rounded-sm text-xs font-mono-sc transition-colors border ${activeCls}`}
-          >
-            {meta.icon}
-            {meta.label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-// ── ToggleGroup ───────────────────────────────────────────────────────────────
-
-function ToggleGroup({
-  options,
-  value,
-  onChange,
-}: { options: { label: string; value: string }[]; value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="flex gap-0.5">
-      <button
-        type="button"
-        onClick={() => onChange('')}
-        className={`px-2.5 py-1.5 rounded-l text-xs font-mono-sc transition-colors border ${!value ? 'bg-cyan-950/60 text-cyan-400 border-cyan-800' : 'text-slate-500 border-border hover:text-slate-300'}`}
-      >
-        All
-      </button>
-      {options.map((opt, i) => (
-        <button
-          key={opt.value}
-          type="button"
-          onClick={() => onChange(value === opt.value ? '' : opt.value)}
-          className={`px-2.5 py-1.5 text-xs font-mono-sc transition-colors border ${i === options.length - 1 ? 'rounded-r' : ''} ${value === opt.value ? 'bg-cyan-950/60 text-cyan-400 border-cyan-800' : 'text-slate-500 border-border hover:text-slate-300'}`}
-        >
-          {opt.label}
-        </button>
       ))}
     </div>
   );
@@ -555,88 +456,62 @@ export default function MissionsPage() {
         onSearch={(v) => { setSearch(v); setPage(1); }}
       />
 
-      {/* Filter bar */}
-      <div className="mb-4">
-        <div className="sci-panel p-3 space-y-3">
-          {/* Mission type chips with icons */}
-          {types && types.length > 0 && (
-            <div>
-              <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">
-                Mission Type
-              </p>
-              <TypeChipGroup
-                options={types}
-                value={type}
-                onChange={(v) => { setType(v); setPage(1); }}
-              />
-            </div>
-          )}
-
-          {/* Faction chips */}
-          {factions && factions.length > 0 && (
-            <div>
-              <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">
-                <Shield size={9} className="inline mr-1" />Faction
-              </p>
-              <ChipGroup
-                options={factions}
-                value={faction}
-                onChange={(v) => { setFaction(v); setPage(1); }}
-              />
-            </div>
-          )}
-
-          {/* Category + toggles row */}
-          <div className="flex flex-wrap gap-4 items-end">
-            {categories && categories.length > 0 && (
-              <div>
-                <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">Category</p>
-                <ChipGroup
-                  options={categories}
-                  value={category}
-                  onChange={(v) => { setCategory(v); setPage(1); }}
-                />
-              </div>
-            )}
-            <div>
-              <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">Legality</p>
-              <ToggleGroup
-                options={[{ label: 'Legal', value: 'true' }, { label: 'Illegal', value: 'false' }]}
-                value={legal}
-                onChange={(v) => { setLegal(v); setPage(1); }}
-              />
-            </div>
-            <div>
-              <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">Group play</p>
-              <ToggleGroup
-                options={[{ label: 'Group', value: 'true' }, { label: 'Solo', value: 'false' }]}
-                value={sharing}
-                onChange={(v) => { setSharing(v); setPage(1); }}
-              />
-            </div>
-            <div>
-              <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase mb-1.5">Recurrence</p>
-              <ToggleGroup
-                options={[{ label: 'Unique', value: 'unique' }, { label: 'Repeatable', value: 'repeatable' }]}
-                value={availability}
-                onChange={(v) => { setAvailability(v); setPage(1); }}
-              />
-            </div>
-            {hasFilters && (
-              <button
-                type="button"
-                onClick={resetAll}
-                className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition-colors ml-auto"
-              >
-                <X size={12} /> Reset filters
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
       {/* Content */}
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 items-start">
+      <div className="flex gap-4">
+        <div className="w-44 shrink-0">
+          <MobileFilterWrapper hasFilters={hasFilters}>
+            <FilterPanel
+              hasFilters={hasFilters}
+              onReset={resetAll}
+              groups={[
+                {
+                  key: 'type',
+                  label: 'Mission Type',
+                  options: (types ?? []).map((t) => ({ label: getTypeMeta(t).label, value: t })),
+                  value: type,
+                  onChange: (v) => { setType(v); setPage(1); },
+                },
+                {
+                  key: 'faction',
+                  label: 'Faction',
+                  options: (factions ?? []).map((f) => ({ label: f, value: f })),
+                  value: faction,
+                  onChange: (v) => { setFaction(v); setPage(1); },
+                },
+                {
+                  key: 'category',
+                  label: 'Category',
+                  options: (categories ?? []).map((c) => ({ label: c, value: c })),
+                  value: category,
+                  onChange: (v) => { setCategory(v); setPage(1); },
+                },
+                {
+                  key: 'legal',
+                  label: 'Legality',
+                  options: [{ label: 'Legal', value: 'true' }, { label: 'Illegal', value: 'false' }],
+                  value: legal,
+                  onChange: (v) => { setLegal(v); setPage(1); },
+                },
+                {
+                  key: 'sharing',
+                  label: 'Group Play',
+                  options: [{ label: 'Group', value: 'true' }, { label: 'Solo', value: 'false' }],
+                  value: sharing,
+                  onChange: (v) => { setSharing(v); setPage(1); },
+                },
+                {
+                  key: 'availability',
+                  label: 'Recurrence',
+                  options: [{ label: 'Unique', value: 'unique' }, { label: 'Repeatable', value: 'repeatable' }],
+                  value: availability,
+                  onChange: (v) => { setAvailability(v); setPage(1); },
+                },
+              ]}
+            />
+          </MobileFilterWrapper>
+        </div>
+        <div className="flex-1 min-w-0">
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 items-start">
         {/* Mission list */}
         <div>
           {isLoading ? (
@@ -681,6 +556,8 @@ export default function MissionsPage() {
               <p className="text-xs text-slate-500">Click a mission in the list to view its details.</p>
             </ScifiPanel>
           )}
+        </div>
+      </div>
         </div>
       </div>
     </div>

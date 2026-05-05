@@ -441,7 +441,7 @@ function SystemCard({ node, jumpModule }: { node: LoadoutNode; jumpModule: Loado
   } else if (t === 'Radar') {
     stats = (
       <>
-        {node.radar_range && <StatPill label="range"    value={`${Math.round(parseFloat(String(node.radar_range))/1000)}km`} color={accent.text} />}
+        {node.radar_range && (() => { const r = Math.round(parseFloat(String(node.radar_range))); return <StatPill label="range" value={r >= 1000 ? `${Math.round(r / 1000)}km` : `${r}m`} color={accent.text} />; })()}
         {node.radar_tracking_signal && <StatPill label="track" value={parseFloat(String(node.radar_tracking_signal)).toFixed(2)} />}
         {node.radar_detection_lifetime && <StatPill label="ttl" value={`${parseFloat(String(node.radar_detection_lifetime)).toFixed(1)}s`} />}
       </>
