@@ -335,9 +335,12 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           // Calibration stats (4.x)
           const calParams = c.calibrationParams || c.params;
           if (calParams && typeof calParams === 'object') {
-            if (typeof calParams.calibrationRate === 'number') comp.qdCalibrationRate = Math.round(calParams.calibrationRate * 10000) / 10000;
-            if (typeof calParams.calibrationDelay === 'number') comp.qdCalibrationDelay = Math.round(calParams.calibrationDelay * 100) / 100;
-            if (typeof calParams.maxCalibrationAngle === 'number') comp.qdCalibrationMaxAngle = Math.round(calParams.maxCalibrationAngle * 100) / 100;
+            if (typeof calParams.calibrationRate === 'number')
+              comp.qdCalibrationRate = Math.round(calParams.calibrationRate * 10000) / 10000;
+            if (typeof calParams.calibrationDelay === 'number')
+              comp.qdCalibrationDelay = Math.round(calParams.calibrationDelay * 100) / 100;
+            if (typeof calParams.maxCalibrationAngle === 'number')
+              comp.qdCalibrationMaxAngle = Math.round(calParams.maxCalibrationAngle * 100) / 100;
           }
           if (!comp.qdCalibrationRate && typeof c.calibrationRate === 'number')
             comp.qdCalibrationRate = Math.round(c.calibrationRate * 10000) / 10000;
@@ -457,9 +460,14 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
             if (typeof pp.cooldownTime === 'number') comp.radarPingCooldown = Math.round(pp.cooldownTime * 100) / 100;
           }
           // Fallback: top-level detectionRadius / maxRange fields
-          const detRange = typeof c.detectionRadius === 'number' ? c.detectionRadius
-            : typeof c.maxRange === 'number' ? c.maxRange
-            : typeof c.scanRange === 'number' ? c.scanRange : null;
+          const detRange =
+            typeof c.detectionRadius === 'number'
+              ? c.detectionRadius
+              : typeof c.maxRange === 'number'
+                ? c.maxRange
+                : typeof c.scanRange === 'number'
+                  ? c.scanRange
+                  : null;
           if (detRange !== null && !comp.radarRange) comp.radarRange = Math.round(detRange * 100) / 100;
         }
 
@@ -571,7 +579,8 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           if (maxH !== null || maxV !== null) {
             comp.gimbalMaxAngle = Math.round(Math.max(maxH ?? 0, maxV ?? 0) * 100) / 100;
           }
-          const pitchSpd = typeof c.pitchSpeed === 'number' ? c.pitchSpeed : typeof c.angularSpeedPitch === 'number' ? c.angularSpeedPitch : null;
+          const pitchSpd =
+            typeof c.pitchSpeed === 'number' ? c.pitchSpeed : typeof c.angularSpeedPitch === 'number' ? c.angularSpeedPitch : null;
           if (pitchSpd !== null) comp.gimbalPitchSpeed = Math.round(pitchSpd * 100) / 100;
           const yawSpd = typeof c.yawSpeed === 'number' ? c.yawSpeed : typeof c.angularSpeedYaw === 'number' ? c.angularSpeedYaw : null;
           if (yawSpd !== null) comp.gimbalYawSpeed = Math.round(yawSpd * 100) / 100;
@@ -581,8 +590,12 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           }
         }
         // Turret arc extraction
-        if ((type === 'Turret' || type === 'TurretUnmanned') &&
-            (cType === 'SCItemTurretBaseComponentParams' || cType === 'SItemTurretBaseComponentParams' || cType === 'SCItemTurretSocketComponentParams')) {
+        if (
+          (type === 'Turret' || type === 'TurretUnmanned') &&
+          (cType === 'SCItemTurretBaseComponentParams' ||
+            cType === 'SItemTurretBaseComponentParams' ||
+            cType === 'SCItemTurretSocketComponentParams')
+        ) {
           const minPitch = typeof c.minPitch === 'number' ? c.minPitch : typeof c.minArcVertical === 'number' ? c.minArcVertical : null;
           const maxPitch = typeof c.maxPitch === 'number' ? c.maxPitch : typeof c.maxArcVertical === 'number' ? c.maxArcVertical : null;
           const minYaw = typeof c.minYaw === 'number' ? c.minYaw : typeof c.minArcHorizontal === 'number' ? c.minArcHorizontal : null;
