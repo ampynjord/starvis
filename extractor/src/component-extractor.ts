@@ -464,23 +464,26 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           const pp = c.pingProperties;
           if (pp && typeof pp === 'object') {
             // pingRange = active scan range in meters; cooldownTime = seconds between pings
-            const pingRange = typeof pp.pingRange === 'number' ? pp.pingRange : typeof pp.scanRange === 'number' ? pp.scanRange : null;
-            if (pingRange !== null) {
+            const rawPing = pp.pingRange ?? pp.scanRange;
+            const pingRange = rawPing !== undefined && rawPing !== null && rawPing !== '' ? Number(rawPing) : null;
+            if (pingRange !== null && !Number.isNaN(pingRange) && pingRange > 0) {
               comp.radarRange = Math.round(pingRange * 100) / 100;
               comp.radarPingRange = comp.radarRange;
             }
-            if (typeof pp.cooldownTime === 'number') comp.radarPingCooldown = Math.round(pp.cooldownTime * 100) / 100;
+            const rawCooldown = pp.cooldownTime;
+            if (rawCooldown !== undefined && rawCooldown !== null) {
+              const cd = Number(rawCooldown);
+              if (!Number.isNaN(cd)) comp.radarPingCooldown = Math.round(cd * 100) / 100;
+            }
           }
           // Fallback: top-level detectionRadius / maxRange fields
-          const detRange =
-            typeof c.detectionRadius === 'number'
-              ? c.detectionRadius
-              : typeof c.maxRange === 'number'
-                ? c.maxRange
-                : typeof c.scanRange === 'number'
-                  ? c.scanRange
-                  : null;
-          if (detRange !== null && !comp.radarRange) comp.radarRange = Math.round(detRange * 100) / 100;
+          const detRange = (() => {
+            const v = c.detectionRadius ?? c.maxRange ?? c.scanRange;
+            if (v === undefined || v === null || v === '') return null;
+            const n = Number(v);
+            return Number.isNaN(n) ? null : n;
+          })();
+          if (detRange !== null && detRange > 0 && !comp.radarRange) comp.radarRange = Math.round(detRange * 100) / 100;
         }
 
         // Countermeasure

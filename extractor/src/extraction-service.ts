@@ -1527,7 +1527,7 @@ export class ExtractionService {
     }
 
     // Batch insert paints (ignore duplicates / FK errors)
-    await ExtractionService.batchUpsert(
+    const inserted = await ExtractionService.batchUpsert(
       conn,
       'INSERT INTO game.ship_paints (env, ship_uuid, paint_class_name, paint_name, paint_uuid)',
       '',
@@ -1537,7 +1537,7 @@ export class ExtractionService {
     );
     const unmatched = paints.length - matched;
     onProgress?.(
-      `Paints: ${paintRows.length} rows saved (${matched}/${paints.length} matched${unmatched ? `, ${unmatched} unmatched` : ''})`,
+      `Paints: ${inserted} rows saved (${paintRows.length} prepared, ${matched}/${paints.length} matched${unmatched ? `, ${unmatched} unmatched` : ''})`,
     );
   }
 

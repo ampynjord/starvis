@@ -394,7 +394,7 @@ export default function HomePage() {
             )}
 
             {/* Feed */}
-            <div className="flex-1 overflow-y-auto max-h-72 py-1">
+            <div className="flex-1 overflow-y-auto py-1">
               {changelog?.data.map((entry) => (
                 <ChangelogRow key={entry.id} entry={entry} />
               ))}
