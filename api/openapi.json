@@ -1788,11 +1788,27 @@
         "parameters": [
           { "$ref": "#/components/parameters/env" },
           { "$ref": "#/components/parameters/search" },
-          { "name": "outputItemUuid", "in": "query", "schema": { "type": "string", "format": "uuid" }, "description": "Filter by output item UUID (find recipes that craft a specific item)" },
+          {
+            "name": "outputItemUuid",
+            "in": "query",
+            "schema": { "type": "string", "format": "uuid" },
+            "description": "Filter by output item UUID (find recipes that craft a specific item)"
+          },
           { "name": "stationType", "in": "query", "schema": { "type": "string" }, "description": "Filter by crafting station type" },
-          { "name": "skillLevel", "in": "query", "schema": { "type": "integer" }, "description": "Filter to recipes requiring at most this skill level" },
+          {
+            "name": "skillLevel",
+            "in": "query",
+            "schema": { "type": "integer" },
+            "description": "Filter to recipes requiring at most this skill level"
+          },
           { "name": "category", "in": "query", "schema": { "type": "string" }, "description": "Filter by recipe category" },
-          { "name": "station_type", "in": "query", "schema": { "type": "string" }, "deprecated": true, "description": "Alias for stationType (deprecated)" },
+          {
+            "name": "station_type",
+            "in": "query",
+            "schema": { "type": "string" },
+            "deprecated": true,
+            "description": "Alias for stationType (deprecated)"
+          },
           { "$ref": "#/components/parameters/page" },
           { "$ref": "#/components/parameters/limit" }
         ],
