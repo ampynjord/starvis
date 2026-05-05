@@ -318,10 +318,18 @@ export function extractLocations(df: DataForgeContext, loc: LocationLocAdapter, 
   // (the nearest extracted ancestor). We want them under the planet instead.
   // Mapping: class_name prefix → planet class_name
   const LAGRANGE_PREFIX_TO_PLANET: Record<string, string> = {
+    // Stanton
     rr_hur_: 'stanton1', // Hurston
     rr_cru_: 'stanton2', // Crusader
     rr_arc_: 'stanton3', // ArcCorp
     rr_mic_: 'stanton4', // microTech
+    // Pyro
+    rr_pyro1_: 'pyro1',
+    rr_pyro2_: 'pyro2',
+    rr_pyro3_: 'pyro3',
+    rr_pyro4_: 'pyro4',
+    rr_pyro5_: 'pyro5',
+    rr_pyro6_: 'pyro6',
   };
   const planetUuidByClassName = new Map<string, string>();
   for (const rec of records) {
@@ -377,7 +385,22 @@ export function extractLocations(df: DataForgeContext, loc: LocationLocAdapter, 
     const m = fp.match(/\/system\/[^/]+\/([^/]+)\//);
     if (!m) continue;
     const bodyFolder = m[1]; // e.g. "delamar", "stanton2c", "stanton1"
-    const bodyUuid = bodyUuidByFolder.get(bodyFolder);
+    let bodyUuid = bodyUuidByFolder.get(bodyFolder);
+
+    // Fallback: if bodyFolder is not a body (e.g. "station", "reststop"), try to infer
+    // the parent body from the record's class name (e.g. "rr_pyro1_l1" → "pyro1")
+    if (!bodyUuid) {
+      const cn = rec.className.toLowerCase();
+      for (const [bodyKey, uuid] of bodyUuidByFolder) {
+        // Match body name as a word-boundary segment in the class name
+        const escapedKey = bodyKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        if (new RegExp(`(?:^|[_-])${escapedKey}(?:[_-]|$)`).test(cn)) {
+          bodyUuid = uuid;
+          break;
+        }
+      }
+    }
+
     if (!bodyUuid || rec.parentUuid === bodyUuid) continue;
     // Only re-assign if current parent is NOT the correct body
     // (don't override correct moon/planet parenting already done)

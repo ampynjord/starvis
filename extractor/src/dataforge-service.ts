@@ -28,6 +28,54 @@ import { extractPaints as _extractPaints } from './shop-paint-extractor.js';
 export { classifyPort, MANUFACTURER_CODES } from './dataforge-utils.js';
 export type { LoadoutPortEntry } from './loadout-parser.js';
 
+/**
+ * Minimal plain-text XML parser that builds a shallow CryXmlNode tree.
+ * Only handles attribute extraction and 1-level nesting — sufficient for vehicle XMLs.
+ */
+function parsePlainXmlShallow(xml: string): CryXmlNode {
+  const attrRe = /(\w+)=['"]([^'"]*)['"]/g;
+
+  function parseAttrs(s: string): Record<string, string> {
+    const attrs: Record<string, string> = {};
+    attrRe.lastIndex = 0;
+    for (;;) {
+      const match = attrRe.exec(s);
+      if (match === null) break;
+      attrs[match[1]] = match[2];
+    }
+    return attrs;
+  }
+
+  // Parse all opening tags and build a tree (depth-limited to 3 levels)
+  const tagRe = /<(\/?)([\w:]+)([^>]*)\/?>|<!--[\s\S]*?-->/g;
+  const stack: CryXmlNode[] = [];
+  const root: CryXmlNode = { tag: 'root', attributes: {}, children: [] };
+  stack.push(root);
+
+  tagRe.lastIndex = 0;
+  for (;;) {
+    const m = tagRe.exec(xml);
+    if (m === null) break;
+    if (!m[2]) continue; // comment
+    const isClose = m[1] === '/';
+    const isSelfClose = m[0].endsWith('/>');
+    const tag = m[2];
+    const attrsStr = m[3] || '';
+
+    if (isClose) {
+      if (stack.length > 1) stack.pop();
+    } else {
+      const node: CryXmlNode = { tag, attributes: parseAttrs(attrsStr), children: [] };
+      const parent = stack[stack.length - 1];
+      parent.children.push(node);
+      if (!isSelfClose) stack.push(node);
+    }
+  }
+
+  // Return the actual root element (first child of our synthetic root)
+  return root.children?.[0] ?? root;
+}
+
 export class DataForgeService implements DataForgeContext {
   private provider: P4KProvider | null = null;
   private dcbBuffer: Buffer | null = null;
@@ -1083,24 +1131,30 @@ export class DataForgeService implements DataForgeContext {
       if (isCryXmlB(buf)) {
         rootNode = parseCryXml(buf);
       } else {
-        // Plain text XML - not expected but handle
-        return null;
+        // Plain text XML — parse attributes with a lightweight regex-based approach
+        const xmlStr = buf.toString('utf8');
+        rootNode = parsePlainXmlShallow(xmlStr);
       }
 
       // Navigate: <Vehicle> -> <Parts> -> <Part name="..." mass="..." ...>
       const partsNode = rootNode.children?.find((c) => c.tag === 'Parts');
-      if (!partsNode?.children?.length) return null;
+      const mainPart = partsNode?.children?.[0];
 
-      const mainPart = partsNode.children[0]; // Root Part element
-      const mass = parseFloat(mainPart.attributes?.mass || '0');
+      const mass = parseFloat(mainPart?.attributes?.mass || '0');
 
       // Extract hull parts tree and sum damageMax
-      const { totalHp, bodyHp, parts } = this.extractVehicleXmlParts(mainPart);
+      const { totalHp, bodyHp, parts } = mainPart ? this.extractVehicleXmlParts(mainPart) : { totalHp: 0, bodyHp: 0, parts: [] };
 
       // Extract ground vehicle top speed from <MovementParams>
+      // Structure can be either:
+      //   <Vehicle><MovementParams .../>  (flat)
+      //   <Vehicle><Movement ...><MovementParams .../>  (nested under Movement)
       let groundTopSpeed: number | null = null;
       let groundBoostSpeed: number | null = null;
-      const movementNode = rootNode.children?.find((c) => c.tag === 'MovementParams');
+      const movementNode =
+        rootNode.children?.find((c) => c.tag === 'MovementParams') ??
+        rootNode.children?.find((c) => c.tag === 'Movement')?.children?.find((c) => c.tag === 'MovementParams') ??
+        rootNode.children?.find((c) => c.tag === 'Movement');
       if (movementNode) {
         // Wheeled vehicles (Cyclone, ROC, Storm, Mule, etc.): v0SteerMax = top speed in m/s
         const wheeledNode = movementNode.children?.find((c) => c.tag === 'PhysicalWheeled');
