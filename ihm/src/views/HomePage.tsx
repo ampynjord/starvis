@@ -264,15 +264,15 @@ export default function HomePage() {
               <div className="flex-1 p-4 flex flex-col gap-4">
                 {/* Ship thumbnail */}
                 {randomShip.thumbnail && (
-                  <div className="relative h-36 rounded overflow-hidden bg-slate-900/60 border border-slate-800/60">
+                  <div className="relative h-44 rounded-sm overflow-hidden bg-slate-900">
                     <Image
                       src={randomShip.thumbnail}
                       alt={randomShip.name}
                       fill
-                      className="object-contain"
+                      className="object-cover object-center scale-110"
                       unoptimized
                     />
-                    <div className="absolute inset-0 bg-linear-to-t from-slate-950/70 via-transparent to-transparent" />
+                    <div className="absolute inset-0 bg-linear-to-t from-slate-950/80 via-slate-950/20 to-transparent" />
                   </div>
                 )}
 

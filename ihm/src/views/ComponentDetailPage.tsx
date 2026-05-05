@@ -4,10 +4,12 @@ import {
 	ChevronDown,
 	ChevronRight,
 	ChevronUp,
+	FlaskConical,
 	MapPin,
 	Rocket,
 	Zap,
 } from "lucide-react";
+import Image from "next/image";
 import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -397,6 +399,11 @@ export default function ComponentDetailPage() {
 		queryFn: () => api.components.buyLocations(uuid!, env),
 		enabled: !!uuid,
 	});
+	const { data: craftingData } = useQuery({
+		queryKey: ["crafting.byOutput", uuid, env],
+		queryFn: () => api.crafting.recipes({ outputItemUuid: uuid!, env, limit: 5 }),
+		enabled: !!uuid,
+	});
 
 	if (isLoading) return <LoadingGrid message="LOADING COMPONENT…" />;
 	if (error)
@@ -611,6 +618,58 @@ export default function ComponentDetailPage() {
 				</ScifiPanel>
 			)}
 
+			{/* Blueprint & Crafting */}
+			{craftingData && craftingData.data.length > 0 && (
+				<ScifiPanel
+					title="Crafting"
+					subtitle={`${craftingData.total} recipe${craftingData.total !== 1 ? 's' : ''}`}
+					actions={<FlaskConical size={14} className="text-purple-500" />}
+				>
+					<div className="space-y-3">
+						{craftingData.data.map((recipe) => (
+							<Link
+								key={recipe.uuid}
+								href={`/crafting?recipe=${recipe.uuid}`}
+								className="block sci-panel p-3 bg-purple-950/10 border-purple-900/30 hover:border-purple-500/40 transition-colors"
+							>
+								<div className="flex items-start justify-between gap-2 mb-2">
+									<p className="text-xs font-orbitron text-slate-200 leading-tight">
+										{recipe.display_name ?? recipe.class_name}
+									</p>
+									<div className="flex gap-1 shrink-0">
+										{recipe.station_type && (
+											<span className="text-[9px] font-mono-sc text-purple-400 border border-purple-900/40 bg-purple-950/20 rounded-sm px-1.5 py-0.5 leading-none">
+												{recipe.station_type}
+											</span>
+										)}
+										{recipe.skill_level != null && (
+											<span className="text-[9px] font-mono-sc text-amber-400 border border-amber-900/40 bg-amber-950/20 rounded-sm px-1.5 py-0.5 leading-none">
+												Lvl {recipe.skill_level}
+											</span>
+										)}
+									</div>
+								</div>
+								{recipe.crafting_time_s != null && (
+									<p className="text-[10px] font-mono-sc text-slate-500 mb-2">
+										⏱ {recipe.crafting_time_s < 60 ? `${recipe.crafting_time_s}s` : `${Math.round(recipe.crafting_time_s / 60)} min`}
+										{recipe.output_quantity != null && recipe.output_quantity > 1 && ` · ×${recipe.output_quantity}`}
+									</p>
+								)}
+								{recipe.ingredients && recipe.ingredients.length > 0 && (
+									<div className="flex flex-wrap gap-1">
+										{recipe.ingredients.map((ing, i) => (
+											<span key={i} className="text-[9px] font-mono-sc text-slate-500 border border-slate-800 bg-slate-900/40 rounded-sm px-1.5 py-0.5 leading-none">
+												{ing.quantity != null ? `×${ing.quantity} ` : ''}{ing.display_item_name ?? ing.displayItemName ?? ing.item_name}
+											</span>
+										))}
+									</div>
+								)}
+							</Link>
+						))}
+					</div>
+				</ScifiPanel>
+			)}
+
 			{/* Equipped Ships — lightweight list */}
 			{ships && ships.length > 0 && (
 				<ScifiPanel
@@ -623,8 +682,13 @@ export default function ComponentDetailPage() {
 							<Link
 								key={s.uuid}
 								href={`/ships/${s.uuid}`}
-								className="flex items-center gap-2 sci-panel px-3 py-2 hover:border-cyan-800/60 transition-colors group"
+								className="flex items-center gap-2 sci-panel px-2 py-1.5 hover:border-cyan-800/60 transition-colors group overflow-hidden"
 							>
+								{s.thumbnail && (
+									<div className="relative w-14 h-9 shrink-0 rounded-sm overflow-hidden bg-slate-900">
+										<Image src={s.thumbnail} alt={s.name ?? ''} fill className="object-cover" unoptimized />
+									</div>
+								)}
 								<div className="min-w-0 flex-1">
 									<p className="text-xs font-orbitron text-slate-200 group-hover:text-cyan-400 transition-colors truncate">
 										{s.name ?? s.class_name}

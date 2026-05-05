@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   Activity, ArrowLeft, ChevronDown, ChevronRight, ChevronUp,
-  Heart, MapPin, Ruler, Shield, Swords, Weight, Zap,
+  FlaskConical, Heart, MapPin, Ruler, Shield, Swords, Weight, Zap,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -220,6 +220,12 @@ export default function ItemDetailPage() {
     enabled: !!uuid,
   });
 
+  const { data: craftingData } = useQuery({
+    queryKey: ['crafting.byOutput', uuid, env],
+    queryFn: () => api.crafting.recipes({ outputItemUuid: uuid!, env, limit: 5 }),
+    enabled: !!uuid,
+  });
+
   if (isLoading) return <LoadingGrid message="LOADING ITEM…" />;
   if (error) return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
   if (!item) return null;
@@ -327,6 +333,59 @@ export default function ItemDetailPage() {
         <div className="lg:col-span-2 space-y-6">
           {isWeapon && <WeaponStats item={item} />}
           {isArmor && <ArmorStats item={item} />}
+
+          {/* Blueprint & Crafting */}
+          {craftingData && craftingData.data.length > 0 && (
+            <ScifiPanel
+              title="Crafting"
+              subtitle={`${craftingData.total} recipe${craftingData.total !== 1 ? 's' : ''}`}
+              actions={<FlaskConical size={14} className="text-purple-500" />}
+            >
+              <div className="space-y-3">
+                {craftingData.data.map((recipe) => (
+                  <Link
+                    key={recipe.uuid}
+                    href={`/crafting?recipe=${recipe.uuid}`}
+                    className="block sci-panel p-3 bg-purple-950/10 border-purple-900/30 hover:border-purple-500/40 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <p className="text-xs font-orbitron text-slate-200 leading-tight">
+                        {recipe.display_name ?? recipe.class_name}
+                      </p>
+                      <div className="flex gap-1 shrink-0">
+                        {recipe.station_type && (
+                          <span className="text-[9px] font-mono-sc text-purple-400 border border-purple-900/40 bg-purple-950/20 rounded-sm px-1.5 py-0.5 leading-none">
+                            {recipe.station_type}
+                          </span>
+                        )}
+                        {recipe.skill_level != null && (
+                          <span className="text-[9px] font-mono-sc text-amber-400 border border-amber-900/40 bg-amber-950/20 rounded-sm px-1.5 py-0.5 leading-none">
+                            Lvl {recipe.skill_level}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {recipe.crafting_time_s != null && (
+                      <p className="text-[10px] font-mono-sc text-slate-500 mb-2">
+                        ⏱ {recipe.crafting_time_s < 60 ? `${recipe.crafting_time_s}s` : `${Math.round(recipe.crafting_time_s / 60)} min`}
+                        {recipe.output_quantity != null && recipe.output_quantity > 1 && ` · ×${recipe.output_quantity}`}
+                      </p>
+                    )}
+                    {recipe.ingredients && recipe.ingredients.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {recipe.ingredients.map((ing, i) => (
+                          // biome-ignore lint/suspicious/noArrayIndexKey: stable ingredient list
+                          <span key={i} className="text-[9px] font-mono-sc text-slate-500 border border-slate-800 bg-slate-900/40 rounded-sm px-1.5 py-0.5 leading-none">
+                            {ing.quantity != null ? `×${ing.quantity} ` : ''}{ing.display_item_name ?? ing.displayItemName ?? ing.item_name}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            </ScifiPanel>
+          )}
 
           {/* Buy locations */}
           <ScifiPanel

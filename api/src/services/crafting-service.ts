@@ -77,8 +77,9 @@ export class CraftingService {
     limit?: number;
     skillLevel?: number;
     stationType?: string;
+    outputItemUuid?: string;
   }): Promise<PaginatedResult> {
-    const { env = 'live', category, search, page = 1, limit = 50, skillLevel, stationType } = opts;
+    const { env = 'live', category, search, page = 1, limit = 50, skillLevel, stationType, outputItemUuid } = opts;
     const prisma = this.getClient(env);
     const safeLimit = Math.min(Math.max(1, limit), 1500);
     const offset = (page - 1) * safeLimit;
@@ -89,6 +90,10 @@ export class CraftingService {
     if (category) {
       where.push('r.category = ?');
       params.push(category);
+    }
+    if (outputItemUuid) {
+      where.push('r.output_item_uuid = ?');
+      params.push(outputItemUuid);
     }
     if (search) {
       where.push('(r.name ILIKE ? OR r.class_name ILIKE ? OR COALESCE(oi.name, r.output_item_name) ILIKE ?)');

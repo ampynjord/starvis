@@ -450,6 +450,7 @@ export const api = {
       limit?: number;
       skillLevel?: number;
       stationType?: string;
+      outputItemUuid?: string;
     }) =>
       mapPaginated(
         await get<PaginatedResponse<CraftingRecipe>>('/crafting/recipes', filters as Record<string, string | number | undefined>),

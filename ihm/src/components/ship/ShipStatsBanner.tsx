@@ -71,8 +71,8 @@ function computeStats(nodes: LoadoutNode[]): LStats {
     totalDps    += n(nd.weapon_dps);
     const pn = nd.port_name.toLowerCase();
     if (NOISY.some(p => pn.includes(p))) continue;
-    const type = nd.port_type || nd.component_type || '';
-    if (VISUAL_TYPES.has(type)) {
+    const type = nd.port_type || '';
+    if (type && VISUAL_TYPES.has(type)) {
       hardpoints.push({ type, size: n(nd.component_size ?? nd.port_max_size) || 1 });
     }
   }
@@ -626,7 +626,7 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
       {/* ════════════════════════════════════════
           RADAR
       ════════════════════════════════════════ */}
-      {!isGround && radarNode && (radarNode.radar_tracking_signal || radarNode.radar_detection_lifetime || radarNode.radar_range) && (
+      {!isGround && radarNode && (radarNode.radar_tracking_signal != null || radarNode.radar_detection_lifetime != null || radarNode.radar_range != null) && (
         <div>
           <SectionLabel>Radar</SectionLabel>
           <div className="grid grid-cols-3 gap-1.5">
