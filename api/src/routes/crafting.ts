@@ -44,6 +44,7 @@ export function mountCraftingRoutes(router: Router, deps: RouteDependencies): vo
         limit: getQueryNumber(req, 'limit'),
         skillLevel: getQueryNumber(req, 'skillLevel'),
         stationType: getQueryString(req, 'stationType'),
+        outputItemUuid: getQueryString(req, 'outputItemUuid'),
       });
       sendPaginatedWithETag(req, res, result, t);
     }),
