@@ -30,7 +30,17 @@ const COMP_SORT = new Set([
   'mass',
   'thruster_max_thrust',
   'radar_range',
+  'radar_ping_range',
   'fuel_capacity',
+  'shield_downed_regen_delay',
+  'gimbal_max_angle',
+  'missile_damage',
+  'missile_explosion_radius',
+  'weapon_beam_dps',
+  'weapon_heat_per_shot',
+  'qd_calibration_rate',
+  'turret_max_pitch',
+  'turret_max_yaw',
 ]);
 
 export class ComponentQueryService {

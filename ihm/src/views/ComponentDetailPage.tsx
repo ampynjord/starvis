@@ -178,6 +178,7 @@ function getHeroStats(comp: Component) {
 			{ label: "HP", value: fN(comp.shield_hp), accent: "text-blue-400" },
 			{ label: "Regen", value: comp.shield_regen ? `${fN(comp.shield_regen, "", 1)}/s` : "—" },
 			{ label: "Regen Delay", value: fN(comp.shield_regen_delay, "s", 2) },
+			{ label: "Downed Delay", value: comp.shield_downed_regen_delay ? fN(comp.shield_downed_regen_delay, "s", 1) : "—" },
 			{ label: "Hardening", value: comp.shield_hardening ? fPct(comp.shield_hardening) : "—" },
 		];
 	if (t === "QuantumDrive")
@@ -186,6 +187,8 @@ function getHeroStats(comp: Component) {
 			{ label: "Spool", value: fN(comp.qd_spool_time, "s", 1) },
 			{ label: "Cooldown", value: fN(comp.qd_cooldown, "s", 1) },
 			{ label: "Fuel Rate", value: comp.qd_fuel_rate ? `${Number(comp.qd_fuel_rate).toFixed(4)}/s` : "—" },
+			{ label: "Cal. Rate", value: comp.qd_calibration_rate ? fN(comp.qd_calibration_rate, "", 2) : "—" },
+			{ label: "Max Cal. Angle", value: comp.qd_calibration_max_angle ? fN(comp.qd_calibration_max_angle, "°", 1) : "—" },
 		];
 	if (t === "PowerPlant")
 		return [
@@ -207,17 +210,19 @@ function getHeroStats(comp: Component) {
 		];
 	if (t === "Radar")
 		return [
-			{ label: "Ping Range", value: fKm(comp.radar_range ? Number(comp.radar_range) * 1000 : null), accent: "text-indigo-400" },
-			{ label: "Ping Duration", value: comp.radar_detection_lifetime ? `${fN(comp.radar_detection_lifetime, "", 1)} s` : "—" },
-			{ label: "Tracking", value: fPct(comp.radar_tracking_signal) },
+			{ label: "Ping Range", value: fKm(comp.radar_ping_range ?? comp.radar_range), accent: "text-indigo-400" },
+			{ label: "Ping Cooldown", value: comp.radar_ping_cooldown ? `${fN(comp.radar_ping_cooldown, "", 1)} s` : "—" },
+			{ label: "Track Signal", value: fPct(comp.radar_tracking_signal) },
+			{ label: "Det. Lifetime", value: comp.radar_detection_lifetime ? `${fN(comp.radar_detection_lifetime, "", 1)} s` : "—" },
 		];
-	if (t === "Missile")
+	if (t === "Missile" || t === "Bomb" || t === "Torpedo")
 		return [
 			{ label: "Damage", value: fN(comp.missile_damage), accent: "text-orange-400" },
-			{ label: "Signal", value: comp.missile_signal_type ?? "—" },
+			{ label: "Guidance", value: comp.missile_guidance_mode ?? comp.missile_signal_type ?? "—" },
 			{ label: "Speed", value: fN(comp.missile_speed, "m/s", 0) },
 			{ label: "Range", value: fN(comp.missile_range, "m", 0) },
 			{ label: "Lock Time", value: fN(comp.missile_lock_time, "s", 2) },
+			{ label: "Blast Radius", value: comp.missile_explosion_radius ? fN(comp.missile_explosion_radius, "m", 0) : "—" },
 		];
 	if (t === "MissileRack")
 		return [
@@ -262,11 +267,20 @@ function getHeroStats(comp: Component) {
 		];
 	if (t === "Countermeasure")
 		return [
-			{ label: "Ammo", value: fN(comp.cm_ammo_count), accent: "text-slate-300" },
+			{ label: "Type", value: comp.cm_type ?? "—", accent: "text-slate-300" },
+			{ label: "Ammo", value: fN(comp.cm_ammo_count) },
 		];
 	if (t === "Gimbal")
 		return [
 			{ label: "Type", value: comp.gimbal_type ?? "—", accent: "text-slate-300" },
+			{ label: "Max Angle", value: comp.gimbal_max_angle ? fN(comp.gimbal_max_angle, "°", 1) : "—" },
+			{ label: "Pitch Speed", value: comp.gimbal_pitch_speed ? fN(comp.gimbal_pitch_speed, "°/s", 0) : "—" },
+			{ label: "Yaw Speed", value: comp.gimbal_yaw_speed ? fN(comp.gimbal_yaw_speed, "°/s", 0) : "—" },
+		];
+	if (t === "Turret" || t === "TurretUnmanned")
+		return [
+			{ label: "Pitch", value: (comp.turret_min_pitch != null && comp.turret_max_pitch != null) ? `${fN(comp.turret_min_pitch, "°", 0)} / ${fN(comp.turret_max_pitch, "°", 0)}` : "—", accent: "text-cyan-400" },
+			{ label: "Yaw", value: (comp.turret_min_yaw != null && comp.turret_max_yaw != null) ? `${fN(comp.turret_min_yaw, "°", 0)} / ${fN(comp.turret_max_yaw, "°", 0)}` : "—" },
 		];
 	return [];
 }
@@ -282,6 +296,8 @@ function getSectionTitle(type: string): string {
 		FuelIntake: "Fuel Intake",
 		Radar: "Radar",
 		Missile: "Missile Stats",
+		Bomb: "Bomb Stats",
+		Torpedo: "Torpedo Stats",
 		MissileRack: "Missile Rack",
 		Thruster: "Thruster",
 		EMP: "EMP Stats",
@@ -325,6 +341,7 @@ function getTypeSpecs(comp: Component): { label: string; value: string }[] {
 	if (t === "Shield")
 		return [
 			{ label: "Faces", value: fN(comp.shield_faces) },
+			{ label: "Downed Regen Delay", value: comp.shield_downed_regen_delay ? fN(comp.shield_downed_regen_delay, "s", 1) : "—" },
 		];
 	if (t === "QuantumDrive")
 		return [
@@ -333,8 +350,15 @@ function getTypeSpecs(comp: Component): { label: string; value: string }[] {
 			{ label: "Tuning rate", value: fN(comp.qd_tuning_rate, "", 4) },
 			{ label: "Alignment rate", value: fN(comp.qd_alignment_rate, "", 4) },
 			{ label: "Disconnect range", value: fN(comp.qd_disconnect_range, "m", 0) },
+			{ label: "Cal. delay", value: comp.qd_calibration_delay ? fN(comp.qd_calibration_delay, "s", 1) : "—" },
 		];
-	if (t === "Missile")
+	if (t === "WeaponGun") {
+		const specs = [];
+		if (comp.weapon_heat_per_shot != null) specs.push({ label: "Heat / shot", value: fN(comp.weapon_heat_per_shot, "", 4) });
+		if (comp.weapon_charge_time != null) specs.push({ label: "Charge time", value: fN(comp.weapon_charge_time, "s", 2) });
+		return specs;
+	}
+	if (t === "Missile" || t === "Bomb" || t === "Torpedo")
 		return [
 			{ label: "Lock range", value: fN(comp.missile_lock_range, "m", 0) },
 			{ label: "Physical", value: fN(comp.missile_damage_physical, "", 0) },
@@ -343,6 +367,10 @@ function getTypeSpecs(comp: Component): { label: string; value: string }[] {
 			{ label: "Thermal", value: fN(comp.missile_damage_thermal, "", 0) },
 			{ label: "Biochemical", value: fN(comp.missile_damage_biochemical, "", 0) },
 			{ label: "Stun", value: fN(comp.missile_damage_stun, "", 0) },
+		];
+	if (t === "Radar")
+		return [
+			{ label: "Tracking signal", value: fPct(comp.radar_tracking_signal) },
 		];
 	return [];
 }
