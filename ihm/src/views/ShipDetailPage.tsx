@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, BarChart3, ChevronRight, Clock,
-  ExternalLink, Layers, Package, Palette, Ruler, Users, Zap,
+  Crosshair, ExternalLink, Layers, Package, Palette, Rocket, Ruler, Users, Zap,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -242,6 +242,9 @@ export default function ShipDetailPage() {
               <h1 className="font-orbitron text-3xl font-black text-slate-100 leading-tight">
                 {ship.name}
               </h1>
+              {ship.short_name && ship.short_name !== ship.name && (
+                <p className="text-[10px] font-mono-sc text-slate-600 mt-0.5 uppercase tracking-widest">{ship.short_name}</p>
+              )}
               <div className="flex flex-wrap gap-2 mt-3">
                 {ship.career && <GlowBadge color="cyan">{ship.career}</GlowBadge>}
                 {ship.role && ship.role !== ship.career && <GlowBadge color="slate">{ship.role}</GlowBadge>}
@@ -252,6 +255,12 @@ export default function ShipDetailPage() {
                   </GlowBadge>
                 )}
                 {ship.ship_matrix_id != null && <GlowBadge color="green">RSI</GlowBadge>}
+                {ship.is_concept_only && <GlowBadge color="amber">Concept</GlowBadge>}
+                {!ship.is_concept_only && ship.production_status && ship.production_status !== 'flight_ready' && (
+                  <GlowBadge color="amber">
+                    {ship.production_status.replace(/_/g, ' ')}
+                  </GlowBadge>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-3 shrink-0">
@@ -312,13 +321,19 @@ export default function ShipDetailPage() {
         {ship.mass != null && (
           <QuickStat icon={<span className="text-[8px]">kg</span>} label="Mass" value={fMass(ship.mass)} />
         )}
+        {ship.weapon_damage_total != null && Number(ship.weapon_damage_total) > 0 && (
+          <QuickStat icon={<Crosshair size={9} />} label="Weap DPS" value={String(Math.round(Number(ship.weapon_damage_total)))} />
+        )}
+        {ship.missile_damage_total != null && Number(ship.missile_damage_total) > 0 && (
+          <QuickStat icon={<Rocket size={9} />} label="Missiles" value={String(Math.round(Number(ship.missile_damage_total)))} />
+        )}
       </div>
 
       {/* ── Main layout ────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
 
         {/* ════ LEFT — 3D · Dimensions · Cargo · Loadout ════ */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-3 space-y-6">
 
           {/* HoloViewer — uniquement si modèle 3D disponible */}
           {ship.ctm_url && (
@@ -334,6 +349,21 @@ export default function ShipDetailPage() {
                 H={Number(ship.size_z) || 0}
                 mass={ship.mass}
               />
+              {(ship.cross_section_x || ship.cross_section_y || ship.cross_section_z) && (
+                <div className="mt-2 pt-2 border-t border-slate-800/60 flex flex-wrap gap-x-4 gap-y-1 items-end">
+                  {[
+                    { k: 'Length', v: ship.cross_section_z },
+                    { k: 'Width',  v: ship.cross_section_x },
+                    { k: 'Height', v: ship.cross_section_y },
+                  ].filter(d => d.v != null).map(({ k, v }) => (
+                    <div key={k} className="flex items-baseline gap-1">
+                      <span className="text-[9px] font-mono-sc text-slate-600 uppercase">{k}</span>
+                      <span className="text-[10px] font-orbitron text-slate-400 tabular-nums">{Number(v).toFixed(1)} m</span>
+                    </div>
+                  ))}
+                  <span className="text-[8px] font-mono-sc text-slate-700 ml-auto">Ship Matrix</span>
+                </div>
+              )}
             </ScifiPanel>
           )}
 
@@ -360,7 +390,7 @@ export default function ShipDetailPage() {
         </div>
 
         {/* ════ RIGHT sidebar ════ */}
-        <div className="lg:col-span-1 space-y-4">
+        <div className="lg:col-span-2 space-y-4">
 
           {/* Stats */}
           <ScifiPanel title={isGround ? 'Performance' : 'Combat & Speed'}>

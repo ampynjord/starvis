@@ -1818,11 +1818,15 @@ export class DataForgeService implements DataForgeContext {
     const entityClassIdx = this.dfData.structDefs.findIndex((s) => s.name === 'EntityClassDefinition');
     if (entityClassIdx === -1) return [];
     const lprefix = prefix.toLowerCase();
+    const seen = new Set<string>();
     const result: string[] = [];
     for (const r of this.dfData.records) {
       if (r.structIndex !== entityClassIdx) continue;
       const name = (r.name ?? '').replace('EntityClassDefinition.', '');
-      if (name.toLowerCase().startsWith(lprefix)) result.push(name);
+      if (name.toLowerCase().startsWith(lprefix) && !seen.has(name)) {
+        seen.add(name);
+        result.push(name);
+      }
     }
     return result;
   }

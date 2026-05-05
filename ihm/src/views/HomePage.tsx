@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 import {
   ArrowRight,
   BarChart3,
@@ -261,6 +262,20 @@ export default function HomePage() {
 
             {randomShip ? (
               <div className="flex-1 p-4 flex flex-col gap-4">
+                {/* Ship thumbnail */}
+                {randomShip.thumbnail && (
+                  <div className="relative h-36 rounded overflow-hidden bg-slate-900/60 border border-slate-800/60">
+                    <Image
+                      src={randomShip.thumbnail}
+                      alt={randomShip.name}
+                      fill
+                      className="object-contain"
+                      unoptimized
+                    />
+                    <div className="absolute inset-0 bg-linear-to-t from-slate-950/70 via-transparent to-transparent" />
+                  </div>
+                )}
+
                 {/* Ship identity */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
