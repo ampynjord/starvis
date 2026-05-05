@@ -97,8 +97,6 @@ const program = new Command()
   .option('--prod-db', 'Use the production database configured via SSH tunnel')
   .option('--ctm-force', 'CTM: re-scrape all ships, even those that already have a URL (default: incremental)')
   .option('--ctm-concurrency <n>', 'CTM: number of ships to scrape in parallel (default: 1)', '1')
-  .option('--ctm-force', 'CTM: re-scrape all ships, even those that already have a URL (default: incremental)')
-  .option('--ctm-concurrency <n>', 'CTM: number of ships to scrape in parallel (default: 1)', '1')
   .addHelpText(
     'after',
     `
