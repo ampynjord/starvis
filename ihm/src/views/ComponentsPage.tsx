@@ -51,24 +51,18 @@ const KEY_STATS: Partial<Record<string, KeyStat[]>> = {
 			format: (v) => `${fNum(v)}m`,
 		},
 	],
-	WeaponMissile: [
-		{
-			label: "Dmg",
-			value: (c) => c.missile_damage,
-			format: (v) => fNum(v),
-		},
+	Missile: [
+		{ label: "Dmg", value: (c) => c.missile_damage, format: (v) => fNum(v) },
+	],
+	Bomb: [
+		{ label: "Dmg", value: (c) => c.missile_damage, format: (v) => fNum(v) },
+	],
+	Torpedo: [
+		{ label: "Dmg", value: (c) => c.missile_damage, format: (v) => fNum(v) },
 	],
 	MissileRack: [
-		{
-			label: "Racks",
-			value: (c) => c.rack_count,
-			format: (v) => String(v),
-		},
-		{
-			label: "Size",
-			value: (c) => c.rack_missile_size,
-			format: (v) => `S${v}`,
-		},
+		{ label: "Racks", value: (c) => c.rack_count, format: (v) => String(v) },
+		{ label: "Size", value: (c) => c.rack_missile_size, format: (v) => `S${v}` },
 	],
 	QuantumDrive: [
 		{
@@ -76,11 +70,8 @@ const KEY_STATS: Partial<Record<string, KeyStat[]>> = {
 			value: (c) => c.qd_speed,
 			format: (v) => `${(v / 1e6).toFixed(0)} Mm/s`,
 		},
-		{
-			label: "Spool",
-			value: (c) => c.qd_spool_time,
-			format: (v) => `${v}s`,
-		},
+		{ label: "Spool", value: (c) => c.qd_spool_time, format: (v) => `${v}s` },
+		{ label: "Range", value: (c) => c.qd_range, format: (v) => v >= 1e9 ? `${(v / 1e9).toFixed(0)} Gm` : v >= 1e6 ? `${(v / 1e6).toFixed(0)} Mm` : `${fNum(v)}m` },
 	],
 	PowerPlant: [
 		{
@@ -132,23 +123,31 @@ const KEY_STATS: Partial<Record<string, KeyStat[]>> = {
 		},
 	],
 	EMP: [
-		{
-			label: "Dmg",
-			value: (c) => c.emp_damage,
-			format: (v) => fNum(v),
-		},
-		{
-			label: "Radius",
-			value: (c) => c.emp_radius,
-			format: (v) => `${fNum(v)}m`,
-		},
+		{ label: "Dmg", value: (c) => c.emp_damage, format: (v) => fNum(v) },
+		{ label: "Radius", value: (c) => c.emp_radius, format: (v) => `${fNum(v)}m` },
+	],
+	QuantumInterdictionGenerator: [
+		{ label: "Jammer", value: (c) => c.qig_jammer_range, format: (v) => `${fNum(v)}m` },
 	],
 	MiningLaser: [
-		{
-			label: "Speed",
-			value: (c) => c.mining_speed,
-			format: (v) => fNum(v, 1),
-		},
+		{ label: "Speed", value: (c) => c.mining_speed, format: (v) => fNum(v, 1) },
+	],
+	TractorBeam: [
+		{ label: "Force", value: (c) => c.tractor_max_force, format: (v) => `${(v / 1000).toFixed(0)}kN` },
+	],
+	SalvageHead: [
+		{ label: "Speed", value: (c) => c.salvage_speed, format: (v) => fNum(v, 1) },
+	],
+	Gimbal: [
+		{ label: "Max Angle", value: (c) => c.gimbal_max_angle, format: (v) => `${fNum(v, 1)}°` },
+	],
+	Turret: [
+		{ label: "Pitch", value: (c) => c.turret_max_pitch, format: (v) => `${fNum(v, 0)}°` },
+		{ label: "Yaw", value: (c) => c.turret_max_yaw, format: (v) => `${fNum(v, 0)}°` },
+	],
+	TurretUnmanned: [
+		{ label: "Pitch", value: (c) => c.turret_max_pitch, format: (v) => `${fNum(v, 0)}°` },
+		{ label: "Yaw", value: (c) => c.turret_max_yaw, format: (v) => `${fNum(v, 0)}°` },
 	],
 };
 
