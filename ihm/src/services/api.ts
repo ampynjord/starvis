@@ -338,8 +338,20 @@ export const api = {
     subTypes: (type?: string, env?: string) => get<{ sub_types: { value: string; count: number }[] }>('/items/sub-types', { type, env }),
     manufacturers: (type?: string, env?: string) =>
       get<{ manufacturers: { code: string; name: string; count: number }[] }>('/items/manufacturers', { type, env }),
-    filters: (env?: string) =>
-      get<{ types: string[]; sub_types: string[]; manufacturers: { code: string; name: string }[] }>('/items/filters', { env }),
+    filters: async (env?: string) => {
+      const res = await get<{
+        filters?: {
+          type?: { value: string }[];
+          sub_type?: { value: string }[];
+          manufacturer?: { value: string; label: string }[];
+        };
+      }>('/items/filters', { env });
+      return {
+        types: res.filters?.type?.map((t) => t.value) ?? [],
+        sub_types: res.filters?.sub_type?.map((t) => t.value) ?? [],
+        manufacturers: res.filters?.manufacturer ?? [],
+      };
+    },
     get: async (uuid: string, env?: string) => mapItem(await get<Item>(`/items/${uuid}`, { env })),
     buyLocations: (uuid: string, env?: string) => get<ItemBuyLocation[]>(`/items/${uuid}/buy-locations`, { env }),
   },
