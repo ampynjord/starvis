@@ -115,7 +115,7 @@ export const PaintQuery = z
     search: qStr,
     ship_uuid: qStr,
     page: qInt(1),
-    limit: qInt(50, 200),
+    limit: qInt(50, 5000),
     format: qStr,
   })
   .passthrough();
