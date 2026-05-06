@@ -21,10 +21,10 @@ vi.mock('@/services/api', () => ({
 describe('ItemsPage', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  it('renders the page heading (Other Items or FPS Gear)', async () => {
+  it('renders the page heading (Items or FPS Gear)', async () => {
     renderWithProviders(<ItemsPage />);
     await waitFor(() => {
-      const heading = screen.queryByRole('heading', { name: /other items|fps gear/i });
+      const heading = screen.queryByRole('heading', { name: /items|fps gear/i });
       expect(heading).toBeInTheDocument();
     });
   });
