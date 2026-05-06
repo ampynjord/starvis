@@ -7,6 +7,7 @@ import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { useListQueryState } from '@/hooks/useListQueryState';
@@ -170,13 +171,24 @@ const FETCH_LIMIT = 2000;
 export default function PaintsPage() {
   const { env } = useEnv();
   const { search, debouncedSearch, updateSearch } = useListQueryState();
+  const [selectedManufacturer, setSelectedManufacturer] = useState('');
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['paints.list.all', env, debouncedSearch],
     queryFn: () => api.paints.list({ env, page: 1, limit: FETCH_LIMIT, search: debouncedSearch || undefined }),
   });
 
-  const groups = data?.data ? groupPaints(data.data as PaintListItem[]) : [];
+  const allGroups = data?.data ? groupPaints(data.data as PaintListItem[]) : [];
+  const groups = selectedManufacturer
+    ? allGroups.filter((g) => g.manufacturerName === selectedManufacturer)
+    : allGroups;
+
+  const manufacturerOptions = allGroups.map((g) => ({
+    value: g.manufacturerName,
+    label: `${g.manufacturerName} (${g.ships.reduce((acc, s) => acc + s.paints.length, 0)})`,
+  }));
+
+  const hasFilters = !!selectedManufacturer;
 
   return (
     <div className="max-w-(--breakpoint-2xl) mx-auto">
@@ -193,13 +205,36 @@ export default function PaintsPage() {
         <LoadingGrid message="LOADING PAINTS…" />
       ) : error ? (
         <ErrorState error={error as Error} onRetry={() => void refetch()} />
-      ) : !groups.length ? (
+      ) : !allGroups.length ? (
         <EmptyState icon="🎨" title="No paints found" />
       ) : (
-        <div>
-          {groups.map((g) => (
-            <ManufacturerSection key={g.manufacturerName} group={g} />
-          ))}
+        <div className="flex gap-4">
+          {/* Sidebar filter */}
+          <div className="w-44 shrink-0">
+            <MobileFilterWrapper hasFilters={hasFilters}>
+              <FilterPanel
+                hasFilters={hasFilters}
+                onReset={() => setSelectedManufacturer('')}
+                groups={[
+                  {
+                    key: 'manufacturer',
+                    label: 'Manufacturer',
+                    options: manufacturerOptions,
+                    value: selectedManufacturer,
+                    onChange: (v) => setSelectedManufacturer(v),
+                    defaultOpen: true,
+                  },
+                ]}
+              />
+            </MobileFilterWrapper>
+          </div>
+
+          {/* Groups */}
+          <div className="flex-1 min-w-0">
+            {groups.map((g) => (
+              <ManufacturerSection key={g.manufacturerName} group={g} />
+            ))}
+          </div>
         </div>
       )}
     </div>
