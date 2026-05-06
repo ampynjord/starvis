@@ -18,7 +18,7 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       { source: '/equipment', destination: '/components', permanent: true },
-      { source: '/items', destination: '/fps-gear', permanent: true },
+      { source: '/other-items', destination: '/items', permanent: true },
       { source: '/commodities', destination: '/industrial', permanent: true },
       { source: '/factions', destination: '/missions', permanent: true },
     ];
