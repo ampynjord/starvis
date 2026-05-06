@@ -511,26 +511,17 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           if (typeof c.initialAmmoCount === 'number' && !comp.cmAmmoCount) comp.cmAmmoCount = c.initialAmmoCount;
         }
         // Countermeasure type from path/name
+        // Ship-specific hardware launchers (MFRCODE_Ship_CML_Chaff) vs generic ammo (CML_Noise_Small)
         if (type === 'Countermeasure' && !comp.cmType) {
-          const looksLikeLauncher = fn.includes('launcher') || lcName.includes('launcher');
-          if (looksLikeLauncher) {
-            if (fn.includes('noise') || fn.includes('chaff') || lcName.includes('noise') || lcName.includes('chaff')) {
-              comp.cmType = 'Noise Launcher';
-            } else if (
-              fn.includes('decoy') ||
-              fn.includes('cml_decoy') ||
-              fn.includes('flare') ||
-              lcName.includes('decoy') ||
-              lcName.includes('cml_decoy') ||
-              lcName.includes('flare')
-            ) {
-              comp.cmType = 'Decoy Launcher';
-            }
+          const isHardwareLauncher = !lcName.startsWith('cml_');
+          const isNoise = fn.includes('noise') || fn.includes('chaff') || lcName.includes('chaff');
+          const isDecoy = fn.includes('decoy') || fn.includes('cml_decoy') || fn.includes('flare') || lcName.includes('flare');
+          if (isHardwareLauncher) {
+            if (isNoise) comp.cmType = 'Noise Launcher';
+            else if (isDecoy) comp.cmType = 'Decoy Launcher';
           } else {
-            if (fn.includes('noise') || fn.includes('chaff')) comp.cmType = 'Noise';
-            else if (fn.includes('decoy') || fn.includes('cml_decoy') || fn.includes('flare')) comp.cmType = 'Decoy';
-            else if (lcName.includes('noise') || lcName.includes('chaff')) comp.cmType = 'Noise';
-            else if (lcName.includes('decoy') || lcName.includes('cml_decoy') || lcName.includes('flare')) comp.cmType = 'Decoy';
+            if (isNoise) comp.cmType = 'Noise';
+            else if (isDecoy) comp.cmType = 'Decoy';
           }
         }
         // Promote cmType → subType so the standard sub_type filter works
@@ -708,7 +699,6 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
         const isShipMissileClass = /^(?:g?misl_s\d+_|bomb_s\d+_)/i.test(className);
         const looksLikeBallisticAmmo =
           (lcName.includes('ballistic') && (lcName.includes('mag') || lcName.includes('ammo'))) ||
-          lcName.includes('rocket') ||
           lcName.includes('bullet');
         const looksLikeAmmoEntity =
           fn.includes('/fps/') ||
