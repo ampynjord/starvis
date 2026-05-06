@@ -26,6 +26,7 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
   // Key = DB `type` value; value = regex against the lowercase P4K file path.
   const componentPaths: Record<string, RegExp> = {
     // ── Weapons ──────────────────────────────────────────────────────────────
+    Ammunition: /weapons[/\\].*(ballistic|rocket|bullet).*(mag|ammo|munition|missile)[/\\]/i,
     WeaponGun: /scitem.*weapons\/[^/\\]+$/i,
     Turret: /ships\/turret[/\\](?!.*unmanned)/i,
     TurretUnmanned: /turret_?unmanned[/\\]/i,
@@ -52,7 +53,7 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
     // QIG = "jammer" — QuantumInterdictionGenerator
     QuantumInterdictionGenerator: /quantum_?interdiction[/\\]|qig[/\\]|quantum_?enforcement/i,
     // ── Weapon mounts ─────────────────────────────────────────────────────────
-    Gimbal: /weapon_mounts\/gimbal[/\\]|mount_?fixed[/\\]/i,
+    Gimbal: /weapon_mounts\/gimbal[/\\]/i,
     // ── Utility ───────────────────────────────────────────────────────────────
     MiningLaser: /utility\/mining\/miningarm[/\\]|mining_?laser[/\\]|miningsubitems[/\\]/i,
     SalvageHead: /utility\/salvage\/salvagehead[/\\]/i,
@@ -512,7 +513,20 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
         // Countermeasure type from path/name
         if (type === 'Countermeasure' && !comp.cmType) {
           const looksLikeLauncher = fn.includes('launcher') || lcName.includes('launcher');
-          if (!looksLikeLauncher) {
+          if (looksLikeLauncher) {
+            if (fn.includes('noise') || fn.includes('chaff') || lcName.includes('noise') || lcName.includes('chaff')) {
+              comp.cmType = 'Noise Launcher';
+            } else if (
+              fn.includes('decoy') ||
+              fn.includes('cml_decoy') ||
+              fn.includes('flare') ||
+              lcName.includes('decoy') ||
+              lcName.includes('cml_decoy') ||
+              lcName.includes('flare')
+            ) {
+              comp.cmType = 'Decoy Launcher';
+            }
+          } else {
             if (fn.includes('noise') || fn.includes('chaff')) comp.cmType = 'Noise';
             else if (fn.includes('decoy') || fn.includes('cml_decoy') || fn.includes('flare')) comp.cmType = 'Decoy';
             else if (lcName.includes('noise') || lcName.includes('chaff')) comp.cmType = 'Noise';
@@ -689,38 +703,65 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
       // ── P4K-faithful subType derivation ─────────────────────────────────────
       // Derives sub_type from the P4K file path so DB values mirror the game taxonomy.
 
+      // Reclassify FPS ammo/rocket entities as Ammunition (not ship missiles)
+      if (comp.type !== 'Ammunition') {
+        const isShipMissileClass = /^(?:g?misl_s\d+_|bomb_s\d+_)/i.test(className);
+        const looksLikeBallisticAmmo =
+          (lcName.includes('ballistic') && (lcName.includes('mag') || lcName.includes('ammo'))) ||
+          lcName.includes('rocket') ||
+          lcName.includes('bullet');
+        const looksLikeAmmoEntity =
+          fn.includes('/fps/') ||
+          fn.includes('\\fps\\') ||
+          (looksLikeBallisticAmmo && !lcName.includes('launcher'));
+        if ((comp.type === 'Missile' || comp.type === 'WeaponGun') && looksLikeAmmoEntity && !isShipMissileClass) {
+          comp.type = 'Ammunition';
+        }
+      }
+
+      // Keep Gimbal category clean: remove known non-gimbal mounts/turrets
+      if (
+        comp.type === 'Gimbal' &&
+        (/(?:^|_)(camera|turret)(?:_|$)/i.test(className) ||
+          className.toLowerCase().includes('salvage') ||
+          className.toLowerCase().includes('tractor'))
+      ) {
+        continue;
+      }
+
       // FuelTank: distinguish Quantum vs Hydrogen reservoirs
-      if (type === 'FuelTank' && !comp.subType) {
+      if (comp.type === 'FuelTank' && !comp.subType) {
         comp.subType = fn.includes('quantum') ? 'Quantum' : 'Hydrogen';
       }
 
       // QuantumDrive: detect jump drives (4.x uses a dedicated sub-path / class name)
-      if (type === 'QuantumDrive' && !comp.subType) {
+      if (comp.type === 'QuantumDrive' && !comp.subType) {
         comp.subType = fn.includes('jump') || lcName.includes('jump') ? 'Jump' : 'Standard';
       }
 
       // Thruster: promote thrusterType → subType for P4K consistency
-      if (type === 'Thruster' && !comp.subType && comp.thrusterType) {
+      if (comp.type === 'Thruster' && !comp.subType && comp.thrusterType) {
         comp.subType = comp.thrusterType; // 'Main' | 'Maneuvering' | 'Retro' | 'VTOL'
       }
 
-      // Gimbal: separate Gimbal vs Fixed mount via path
-      if (type === 'Gimbal' && !comp.subType) {
-        comp.subType = fn.includes('mount_fixed') || fn.includes('fixed') ? 'Fixed' : 'Gimbal';
+      // Gimbal: keep only real gimbals in this type
+      if (comp.type === 'Gimbal' && !comp.subType) {
+        comp.subType = 'Gimbal';
       }
 
       // WeaponGun: derive sub_type from weaponDamageType when ammoContainerRecord didn't resolve
-      if (type === 'WeaponGun' && !comp.subType && comp.weaponDamageType) {
+      if (comp.type === 'WeaponGun' && !comp.subType && comp.weaponDamageType) {
         if (comp.weaponDamageType === 'physical') comp.subType = 'Ballistic';
         else if (comp.weaponDamageType === 'energy') comp.subType = 'Energy';
         else if (comp.weaponDamageType === 'distortion') comp.subType = 'Distortion';
       }
 
       // Missile: tag torpedoes and bombs from class_name / resolved display name
-      if (type === 'Missile' && !comp.subType) {
+      if (comp.type === 'Missile' && !comp.subType) {
         const lcDispName = (comp.name || '').toLowerCase();
         if (lcName.startsWith('bomb_') || lcDispName.includes(' bomb')) comp.subType = 'Bomb';
         else if (lcDispName.includes('torpedo') || /^misl_s(?:09|10|11|12)_/i.test(className)) comp.subType = 'Torpedo';
+        else comp.subType = 'Missile';
       }
 
       // Manufacturer fallback: try to match className prefix against DataForge manufacturer records.
