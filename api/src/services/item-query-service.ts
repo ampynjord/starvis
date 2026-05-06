@@ -244,7 +244,13 @@ export class ItemQueryService {
       legs: byType.get('Armor_Legs') || 0,
       backpack: byType.get('Armor_Backpack') || 0,
       undersuit: byType.get('Undersuit') || 0,
-      'tools-medics': (byType.get('Tool') || 0) + (byType.get('Consumable') || 0) - consumableFoodDrink - consumableMission + (byType.get('Gadget') || 0) + fpsGadget,
+      'tools-medics':
+        (byType.get('Tool') || 0) +
+        (byType.get('Consumable') || 0) -
+        consumableFoodDrink -
+        consumableMission +
+        (byType.get('Gadget') || 0) +
+        fpsGadget,
       magazines: byType.get('Magazine') || 0,
       attachments: byType.get('Attachment') || 0,
       clothing: byType.get('Clothing') || 0,
