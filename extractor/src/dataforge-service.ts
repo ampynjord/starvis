@@ -1156,17 +1156,56 @@ export class DataForgeService implements DataForgeContext {
         rootNode.children?.find((c) => c.tag === 'Movement')?.children?.find((c) => c.tag === 'MovementParams') ??
         rootNode.children?.find((c) => c.tag === 'Movement');
       if (movementNode) {
-        // Wheeled vehicles (Cyclone, ROC, Storm, Mule, etc.): v0SteerMax = top speed in m/s
-        // NOTE: vMaxSteerMax is a CryEngine steering parameter (steer speed at max velocity),
-        // NOT a boost speed. Only use as boost if strictly greater than v0.
-        const wheeledNode = movementNode.children?.find((c) => c.tag === 'PhysicalWheeled');
-        if (wheeledNode) {
-          const v0 = parseFloat(wheeledNode.attributes?.v0SteerMax || '0');
-          const boost = parseFloat(wheeledNode.attributes?.vMaxSteerMax || '0');
-          if (v0 > 0) groundTopSpeed = Math.round(v0);
-          if (boost > v0) groundBoostSpeed = Math.round(boost);
+        // Helper: look for Handling > Power > topSpeed inside a movement system child node.
+        // Used by ArcadeWheeled (Mule) and PhysicalWheeled (ROC, Ursa).
+        // v0SteerMax on those nodes is a CryEngine steering parameter, NOT a speed cap.
+        const handlingPowerTopSpeed = (node: CryXmlNode): number | null => {
+          const handling = node.children?.find((c) => c.tag === 'Handling');
+          if (!handling) return null;
+          const power = handling.children?.find((c) => c.tag === 'Power');
+          if (!power) return null;
+          const ts = parseFloat(power.attributes?.topSpeed || '0');
+          return ts > 0 ? Math.round(ts) : null;
+        };
+
+        // Priority 1: ArcadeWheeled — Mule and similar (simplified arcade physics).
+        // Real top speed stored in ArcadeWheeled > Handling > Power > topSpeed.
+        const arcadeNode = movementNode.children?.find((c) => c.tag === 'ArcadeWheeled');
+        if (arcadeNode) {
+          const powerTs = handlingPowerTopSpeed(arcadeNode);
+          if (powerTs) groundTopSpeed = powerTs;
         }
-        // Tracked vehicles (Nova, Storm AA, etc.): PhysicalTracked with topSpeed or v0SteerMax
+
+        // Priority 2: PhysicalWheeled — ROC, Ursa (have Handling > Power), Cyclone (does not).
+        // When Handling/Power is absent, fall back to v0SteerMax as best approximation.
+        if (!groundTopSpeed) {
+          const wheeledNode = movementNode.children?.find((c) => c.tag === 'PhysicalWheeled');
+          if (wheeledNode) {
+            const powerTs = handlingPowerTopSpeed(wheeledNode);
+            const v0 = parseFloat(wheeledNode.attributes?.v0SteerMax || '0');
+            const boost = parseFloat(wheeledNode.attributes?.vMaxSteerMax || '0');
+            if (powerTs) {
+              groundTopSpeed = powerTs;
+            } else if (v0 > 0) {
+              groundTopSpeed = Math.round(v0);
+              if (boost > v0) groundBoostSpeed = Math.round(boost);
+            }
+          }
+        }
+
+        // Priority 3: TrackWheeled — Nova (maxSpeed=25), Storm (maxSpeed=30).
+        // maxSpeed attribute is the explicit physics cap set by designers.
+        if (!groundTopSpeed) {
+          const trackNode = movementNode.children?.find((c) => c.tag === 'TrackWheeled');
+          if (trackNode) {
+            const maxS = parseFloat(trackNode.attributes?.maxSpeed || '0');
+            const v0 = parseFloat(trackNode.attributes?.v0SteerMax || '0');
+            if (maxS > 0) groundTopSpeed = Math.round(maxS);
+            else if (v0 > 0) groundTopSpeed = Math.round(v0);
+          }
+        }
+
+        // Priority 4: PhysicalTracked — Storm AA and other tracked vehicles.
         if (!groundTopSpeed) {
           const trackedNode = movementNode.children?.find((c) => c.tag === 'PhysicalTracked');
           if (trackedNode) {
@@ -1176,20 +1215,20 @@ export class DataForgeService implements DataForgeContext {
             if (boost > v0) groundBoostSpeed = Math.round(boost);
           }
         }
-        // Generic fallback: try all MovementParams children with any known speed attribute
+
+        // Priority 5: Generic fallback — scan all children.
         // Catches VehicleDriveWheeled, PhysicsTank, SWheeledVehicleMovementParams, hover, etc.
         if (!groundTopSpeed) {
           for (const child of movementNode.children || []) {
+            const powerTs = handlingPowerTopSpeed(child);
+            const ts = parseFloat(child.attributes?.topSpeed || child.attributes?.maxSpeed || '0');
             const v0 = parseFloat(child.attributes?.v0SteerMax || '0');
             const vMax = parseFloat(child.attributes?.vMaxSteerMax || '0');
-            const ts = parseFloat(child.attributes?.topSpeed || child.attributes?.maxSpeed || '0');
+            if (powerTs) { groundTopSpeed = powerTs; break; }
+            if (ts > 0) { groundTopSpeed = Math.round(ts); break; }
             if (v0 > 0) {
               groundTopSpeed = Math.round(v0);
               if (vMax > v0) groundBoostSpeed = Math.round(vMax);
-              break;
-            }
-            if (ts > 0) {
-              groundTopSpeed = Math.round(ts);
               break;
             }
           }
