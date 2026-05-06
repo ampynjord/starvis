@@ -8,19 +8,26 @@ import type { RouteDependencies } from './types.js';
  *  Types use the P4K-faithful naming (Armor unified type; sub-types from AttachDef).
  */
 const CATEGORY_DEFS: Record<string, { types: string[]; subTypes?: string[]; excludeSubTypes?: string[]; label: string }> = {
-  weapons: { label: 'Weapons', types: ['FPS_Weapon'], excludeSubTypes: ['Throwable', 'Mine'] },
+  // Weapons = strictly FPS firearms/melee; tool-like FPS gadgets are excluded.
+  weapons: { label: 'Weapons', types: ['FPS_Weapon'], excludeSubTypes: ['Throwable', 'Mine', 'Gadget'] },
   throwable: { label: 'Throwable', types: ['FPS_Weapon'], subTypes: ['Throwable', 'Mine'] },
   helmet: { label: 'Helmet', types: ['Armor_Helmet'] },
-  core: { label: 'Core', types: ['Armor_Torso'] },
+  core: { label: 'Torso', types: ['Armor_Torso'] },
   arms: { label: 'Arms', types: ['Armor_Arms'] },
   legs: { label: 'Legs', types: ['Armor_Legs'] },
   backpack: { label: 'Backpack', types: ['Armor_Backpack'] },
   undersuit: { label: 'Undersuit', types: ['Undersuit'] },
-  'tools-medics': { label: 'Tools & Medics', types: ['Tool', 'Consumable'] },
+  // Include Gadget + FPS_Weapon, then exclude real weapon sub-types to keep only tool-like FPS gadgets.
+  'tools-medics': {
+    label: 'Tools & Medics',
+    types: ['Tool', 'Consumable', 'Gadget', 'FPS_Weapon'],
+    excludeSubTypes: ['Pistol', 'SMG', 'Shotgun', 'Sniper Rifle', 'LMG', 'Melee', 'Large', 'Medium', 'Small', 'Launcher', 'Throwable', 'Mine', 'Food', 'Drink', 'Hacking', 'SystemAccess'],
+  },
   magazines: { label: 'Magazines', types: ['Magazine'] },
-  attachments: { label: 'Attachments', types: ['Attachment'] },
+  attachments: { label: 'Attachment', types: ['Attachment'] },
   clothing: { label: 'Clothing', types: ['Clothing'] },
-  other: { label: 'Other', types: ['Gadget'] },
+  // Keep "Other" as a narrow fallback bucket.
+  other: { label: 'Other', types: ['Gadget'], excludeSubTypes: ['Handheld', 'Two-handed', 'Device'] },
 };
 
 export function mountItemRoutes(router: Router, deps: RouteDependencies): void {

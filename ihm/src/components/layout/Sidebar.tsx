@@ -51,7 +51,7 @@ const SHIPS_ITEMS: NavItemDef[] = [
 
 const FPS_ITEMS: NavItemDef[] = [
   { to: '/fps-gear',       icon: Crosshair,         label: 'FPS Gear' },
-  { to: '/other-items',    icon: Layers3,           label: 'Other Items' },
+  { to: '/items',          icon: Layers3,           label: 'Items' },
   { to: '/fps-calculator', icon: SlidersHorizontal, label: 'FPS Calculator', comingSoon: true },
 ];
 
