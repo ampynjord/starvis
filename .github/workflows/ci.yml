@@ -1,4 +1,4 @@
-name: CI
+name: CI / Release
 
 on:
   push:
@@ -339,9 +339,10 @@ jobs:
           images: ${{ env.IMAGE_PREFIX }}-${{ matrix.image.name }}
           tags: |
             type=sha,prefix=sha-
-            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+            type=raw,value=latest
             type=semver,pattern={{version}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
             type=semver,pattern={{major}}.{{minor}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=semver,pattern={{major}},enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
       - name: Build and push ${{ matrix.image.name }}
         uses: docker/build-push-action@v6
@@ -357,12 +358,62 @@ jobs:
           provenance: false
 
 # ─────────────────────────────────────────────────────────────
-# DEPLOY VPS (main uniquement)
+# GITHUB RELEASE — notes auto-générées (tags v* uniquement)
+# ─────────────────────────────────────────────────────────────
+  github-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate CHANGELOG
+        uses: orhun/git-cliff-action@v3
+        env:
+          OUTPUT: RELEASE_BODY.md
+          GITHUB_REPO: ${{ github.repository }}
+        with:
+          config: cliff.toml
+          args: --latest --strip header
+
+      - name: Append Docker pull instructions
+        run: |
+          TAG="${{ github.ref_name }}"
+          PREFIX="${{ env.IMAGE_PREFIX }}"
+          cat >> RELEASE_BODY.md << EOF
+
+          ## Docker Images
+
+          \`\`\`bash
+          docker pull ${PREFIX}-api:${TAG}
+          docker pull ${PREFIX}-ihm:${TAG}
+          docker pull ${PREFIX}-bot:${TAG}
+          \`\`\`
+
+          ## Self-hosting
+
+          Voir le [docker-compose.api-only.yml](docker-compose.api-only.yml) et [.env.api-only.example](.env.api-only.example).
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          make_latest: true
+          body_path: RELEASE_BODY.md
+
+# ─────────────────────────────────────────────────────────────
+# DEPLOY VPS — main push (latest) et tags v* (semver)
 # ─────────────────────────────────────────────────────────────
   deploy:
     name: Deploy to VPS
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     needs: build
     environment:
       name: production
