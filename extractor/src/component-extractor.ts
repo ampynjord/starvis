@@ -50,8 +50,6 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
     EMP: /emp[/\\]|distortion_?charge[/\\]|emp_?generator/i,
     // QIG = "jammer" — QuantumInterdictionGenerator
     QuantumInterdictionGenerator: /quantum_?interdiction[/\\]|qig[/\\]|quantum_?enforcement/i,
-    LandingSystem: /landing_?system[s]?[/\\]|landing_?gear[/\\]/i,
-    SelfDestruct: /ships\/selfdestruct[/\\]/i,
     // ── Weapon mounts ─────────────────────────────────────────────────────────
     Gimbal: /weapon_mounts\/gimbal[/\\]|mount_?fixed[/\\]/i,
     // ── Utility ───────────────────────────────────────────────────────────────
@@ -701,6 +699,20 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
         comp.subType = fn.includes('mount_fixed') || fn.includes('fixed') ? 'Fixed' : 'Gimbal';
       }
 
+      // WeaponGun: derive sub_type from weaponDamageType when ammoContainerRecord didn't resolve
+      if (type === 'WeaponGun' && !comp.subType && comp.weaponDamageType) {
+        if (comp.weaponDamageType === 'physical') comp.subType = 'Ballistic';
+        else if (comp.weaponDamageType === 'energy') comp.subType = 'Energy';
+        else if (comp.weaponDamageType === 'distortion') comp.subType = 'Distortion';
+      }
+
+      // Missile: tag torpedoes and bombs from class_name / resolved display name
+      if (type === 'Missile' && !comp.subType) {
+        const lcDispName = (comp.name || '').toLowerCase();
+        if (lcName.startsWith('bomb_') || lcDispName.includes(' bomb')) comp.subType = 'Bomb';
+        else if (lcDispName.includes('torpedo') || /^misl_s(?:09|10|11|12)_/i.test(className)) comp.subType = 'Torpedo';
+      }
+
       // Manufacturer fallback: try to match className prefix against DataForge manufacturer records.
       // Only assigns if the code is known to be a real manufacturer (in DataForge SCItemManufacturer),
       // to avoid false positives like DOOR_, SEAT_, RACK_, etc.
@@ -712,6 +724,13 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           if (mfgInfo) comp.manufacturerCode = code;
         }
       }
+
+      // Reclassify ship remote turrets as TurretUnmanned (remote-controlled, not physically manned)
+      if (comp.type === 'Turret' && lcName.includes('remote')) {
+        comp.type = 'TurretUnmanned';
+      }
+      // Skip world-object/NPC ground defense turrets (class names like "Turret_Automated_*", "Turret_AntiPersonnel_*")
+      if (comp.type === 'TurretUnmanned' && /^Turret_/i.test(className)) continue;
 
       components.push(comp);
     } catch (e) {

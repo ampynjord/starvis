@@ -23,30 +23,24 @@ interface CategoryDef {
   /** Maps to API ?category= param */
   apiSlug: string;
   types: string[];
-  /** Available sub-type chips within this category */
-  subTypes?: string[];
 }
 
 const CATEGORIES: CategoryDef[] = [
   {
     label: "Weapons",
     apiSlug: "weapons",
-    types: ["WeaponGun", "Turret", "TurretUnmanned", "MissileRack", "Missile", "Torpedo", "Bomb"],
-    subTypes: ["Ballistic", "Energy", "Distortion"],
+    types: ["WeaponGun", "Turret", "TurretUnmanned", "MissileRack", "Missile"],
   },
   {
     label: "Systems",
     apiSlug: "systems",
     types: ["Shield", "PowerPlant", "Cooler", "QuantumDrive", "Thruster", "FuelIntake", "FuelTank",
-            "Radar", "Countermeasure", "LifeSupport", "EMP", "QuantumInterdictionGenerator",
-            "LandingSystem", "SelfDestruct"],
-    subTypes: ["Standard", "Jump", "Hydrogen", "Quantum", "Main", "Maneuvering", "Retro", "VTOL"],
+            "Radar", "Countermeasure", "LifeSupport", "EMP", "QuantumInterdictionGenerator"],
   },
   {
     label: "Mounts",
     apiSlug: "mounts",
     types: ["Gimbal"],
-    subTypes: ["Gimbal", "Fixed"],
   },
   {
     label: "Utility",
@@ -54,6 +48,15 @@ const CATEGORIES: CategoryDef[] = [
     types: ["MiningLaser", "SalvageHead", "TractorBeam"],
   },
 ];
+
+/** Sub-type chips available per primary type chip */
+const TYPE_SUBTYPES: Partial<Record<string, string[]>> = {
+  WeaponGun:    ["Ballistic", "Energy", "Distortion"],
+  Missile:      ["Torpedo", "Bomb"],
+  Thruster:     ["Main", "Maneuvering", "Retro", "VTOL"],
+  QuantumDrive: ["Standard", "Jump"],
+  Gimbal:       ["Gimbal", "Fixed"],
+};
 
 // ── Key stats per type ─────────────────────────────────────────────────────────
 
@@ -311,10 +314,10 @@ export default function ComponentsPage() {
         onSelect={handleTypeSelect}
       />
 
-      {/* SubType chips — only when available for this category */}
-      {category.subTypes && category.subTypes.length > 0 && (
+      {/* SubType chips — only when a specific type is selected and has sub-types */}
+      {selectedType && (TYPE_SUBTYPES[selectedType]?.length ?? 0) > 0 && (
         <SubTypeChips
-          subTypes={category.subTypes}
+          subTypes={TYPE_SUBTYPES[selectedType]!}
           selected={selectedSubType}
           onSelect={handleSubTypeSelect}
         />
