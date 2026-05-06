@@ -37,8 +37,8 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
     Shield: /shield_?generator[s]?[/\\]|shield[s]?[/\\]/i,
     PowerPlant: /power_?plant[s]?[/\\]|powerplant/i,
     Cooler: /cooler[s]?[/\\]/i,
-    // Jump drives BEFORE QuantumDrive (more specific path)
-    JumpDrive: /jump_?drive[s]?[/\\]|jumpmodule[s]?[/\\]|jump_?module[s]?[/\\]/i,
+    // Jump modules BEFORE QuantumDrive (more specific path)
+    JumpModule: /jump_?drive[s]?[/\\]|jumpmodule[s]?[/\\]|jump_?module[s]?[/\\]|\/jdrv\//i,
     QuantumDrive: /quantum_?drive[s]?[/\\]|quantumdrive/i,
     // VTOL / retro thrusters covered by subType derived from path in thruster handler below
     Thruster: /thruster[s]?[/\\]/i,
@@ -511,12 +511,13 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
         }
         // Countermeasure type from path/name
         if (type === 'Countermeasure' && !comp.cmType) {
-          if (fn.includes('flare')) comp.cmType = 'Flare';
-          else if (fn.includes('noise') || fn.includes('chaff')) comp.cmType = 'Noise';
-          else if (fn.includes('decoy') || fn.includes('cml_decoy')) comp.cmType = 'Decoy';
-          else if (lcName.includes('flare')) comp.cmType = 'Flare';
-          else if (lcName.includes('noise') || lcName.includes('chaff')) comp.cmType = 'Noise';
-          else if (lcName.includes('decoy') || lcName.includes('cml_decoy')) comp.cmType = 'Decoy';
+          const looksLikeLauncher = fn.includes('launcher') || lcName.includes('launcher');
+          if (!looksLikeLauncher) {
+            if (fn.includes('noise') || fn.includes('chaff')) comp.cmType = 'Noise';
+            else if (fn.includes('decoy') || fn.includes('cml_decoy') || fn.includes('flare')) comp.cmType = 'Decoy';
+            else if (lcName.includes('noise') || lcName.includes('chaff')) comp.cmType = 'Noise';
+            else if (lcName.includes('decoy') || lcName.includes('cml_decoy') || lcName.includes('flare')) comp.cmType = 'Decoy';
+          }
         }
         // Promote cmType → subType so the standard sub_type filter works
         if (type === 'Countermeasure' && comp.cmType && !comp.subType) {
