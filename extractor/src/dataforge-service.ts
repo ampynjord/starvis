@@ -1157,12 +1157,14 @@ export class DataForgeService implements DataForgeContext {
         rootNode.children?.find((c) => c.tag === 'Movement');
       if (movementNode) {
         // Wheeled vehicles (Cyclone, ROC, Storm, Mule, etc.): v0SteerMax = top speed in m/s
+        // NOTE: vMaxSteerMax is a CryEngine steering parameter (steer speed at max velocity),
+        // NOT a boost speed. Only use as boost if strictly greater than v0.
         const wheeledNode = movementNode.children?.find((c) => c.tag === 'PhysicalWheeled');
         if (wheeledNode) {
           const v0 = parseFloat(wheeledNode.attributes?.v0SteerMax || '0');
           const boost = parseFloat(wheeledNode.attributes?.vMaxSteerMax || '0');
           if (v0 > 0) groundTopSpeed = Math.round(v0);
-          if (boost > 0 && boost !== v0) groundBoostSpeed = Math.round(boost);
+          if (boost > v0) groundBoostSpeed = Math.round(boost);
         }
         // Tracked vehicles (Nova, Storm AA, etc.): PhysicalTracked with topSpeed or v0SteerMax
         if (!groundTopSpeed) {
@@ -1171,7 +1173,7 @@ export class DataForgeService implements DataForgeContext {
             const v0 = parseFloat(trackedNode.attributes?.v0SteerMax || trackedNode.attributes?.topSpeed || '0');
             const boost = parseFloat(trackedNode.attributes?.vMaxSteerMax || '0');
             if (v0 > 0) groundTopSpeed = Math.round(v0);
-            if (boost > 0 && boost !== v0) groundBoostSpeed = Math.round(boost);
+            if (boost > v0) groundBoostSpeed = Math.round(boost);
           }
         }
         // Generic fallback: try all MovementParams children with any known speed attribute
@@ -1183,7 +1185,7 @@ export class DataForgeService implements DataForgeContext {
             const ts = parseFloat(child.attributes?.topSpeed || child.attributes?.maxSpeed || '0');
             if (v0 > 0) {
               groundTopSpeed = Math.round(v0);
-              if (vMax > 0 && vMax !== v0) groundBoostSpeed = Math.round(vMax);
+              if (vMax > v0) groundBoostSpeed = Math.round(vMax);
               break;
             }
             if (ts > 0) {
