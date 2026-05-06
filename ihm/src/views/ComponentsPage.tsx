@@ -34,7 +34,7 @@ const CATEGORIES: CategoryDef[] = [
   {
     label: "Systems",
     apiSlug: "systems",
-    types: ["Shield", "PowerPlant", "Cooler", "QuantumDrive", "JumpDrive", "Thruster", "FuelIntake", "FuelTank",
+    types: ["Shield", "PowerPlant", "Cooler", "QuantumDrive", "Thruster", "FuelIntake", "FuelTank",
             "Radar", "Countermeasure", "LifeSupport", "EMP", "QuantumInterdictionGenerator"],
   },
   {
@@ -48,9 +48,9 @@ const CATEGORIES: CategoryDef[] = [
     types: ["MiningLaser", "SalvageHead", "TractorBeam"],
   },
   {
-    label: "Modules",
+    label: "Ship Modules",
     apiSlug: "modules",
-    types: ["ShipModule"],
+    types: ["ShipModule", "JumpModule"],
   },
 ];
 
@@ -59,7 +59,7 @@ const TYPE_SUBTYPES: Partial<Record<string, string[]>> = {
   WeaponGun:      ["Ballistic", "Energy", "Distortion"],
   Missile:        ["Torpedo", "Bomb"],
   Thruster:       ["Main", "Maneuvering", "Retro", "VTOL"],
-  Countermeasure: ["Flare", "Noise", "Decoy"],
+  Countermeasure: ["Noise", "Decoy"],
 };
 
 // ── Key stats per type ─────────────────────────────────────────────────────────
