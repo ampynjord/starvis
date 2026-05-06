@@ -59,7 +59,7 @@ const TYPE_TO_SLUG: Record<string, string> = {
   Armor_Backpack: 'backpack',
   Undersuit:      'undersuit',
   Clothing:       'clothing',
-  Gadget:         'other',
+  Gadget:         'tools-medics',
   Tool:           'tools-medics',
   Consumable:     'tools-medics',
   Attachment:     'attachments',
@@ -232,8 +232,11 @@ export default function ItemDetailPage() {
 
   const displayName = item.displayName ?? item.display_name ?? item.name;
   const typeLabel = TYPE_LABEL[item.type] ?? item.type;
-  const slug = TYPE_TO_SLUG[item.type];
-  const breadcrumbHref = slug ? `/fps-gear?cat=${slug}` : '/fps-gear';
+  const consumableSubType = item.sub_type ?? '';
+  const isItemsConsumable = item.type === 'Consumable' && ['Food', 'Drink', 'Hacking', 'SystemAccess'].includes(consumableSubType);
+  const slug = isItemsConsumable ? '' : TYPE_TO_SLUG[item.type];
+  const breadcrumbHref = isItemsConsumable ? '/items' : slug ? `/fps-gear?cat=${slug}` : '/items';
+  const breadcrumbLabel = isItemsConsumable || !slug ? 'Items' : 'FPS Gear';
 
   const isWeapon = item.type === 'FPS_Weapon';
   const isArmor = item.type.startsWith('Armor_') || item.type === 'Undersuit';
@@ -269,7 +272,7 @@ export default function ItemDetailPage() {
           <ArrowLeft size={12} /> Back
         </button>
         <ChevronRight size={10} />
-        <Link href={breadcrumbHref} className="hover:text-slate-400">FPS Gear</Link>
+        <Link href={breadcrumbHref} className="hover:text-slate-400">{breadcrumbLabel}</Link>
         <ChevronRight size={10} />
         <span className="text-slate-400">{displayName}</span>
       </div>

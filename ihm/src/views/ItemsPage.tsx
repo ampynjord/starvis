@@ -24,19 +24,20 @@ const FPS_CATEGORIES_STATIC: { slug: string; label: string }[] = [
 	{ slug: "weapons",      label: "Weapons" },
 	{ slug: "throwable",    label: "Throwable" },
 	{ slug: "helmet",       label: "Helmet" },
-	{ slug: "core",         label: "Core" },
+	{ slug: "core",         label: "Torso" },
 	{ slug: "arms",         label: "Arms" },
 	{ slug: "legs",         label: "Legs" },
-	{ slug: "backpack",     label: "Back" },
+	{ slug: "backpack",     label: "Backpack" },
 	{ slug: "undersuit",    label: "Undersuit" },
 	{ slug: "tools-medics", label: "Tools & Medics" },
-	{ slug: "attachments",  label: "Attachments" },
+	{ slug: "attachments",  label: "Attachment" },
 	{ slug: "magazines",    label: "Magazines" },
 	{ slug: "clothing",     label: "Clothing" },
 	{ slug: "other",        label: "Other" },
 ];
 
 type FpsSlug = (typeof FPS_CATEGORIES_STATIC)[number]["slug"];
+type ItemFamily = "all" | "mission" | "food";
 
 const SLUG_COLOR: Record<FpsSlug | "all", string> = {
 	all:          "bg-cyan-500",
@@ -73,8 +74,12 @@ const TYPE_COLOR: Record<string, string> = {
 const SLUG_SUBTYPES: Record<string, { label: string; value: string }[]> = {
 	weapons: [
 		"Pistol", "SMG", "Shotgun", "Sniper Rifle", "Assault Rifle",
-		"LMG", "Launcher", "Melee", "Medium", "Large", "Small", "Gadget",
+		"LMG", "Launcher", "Melee", "Medium", "Large", "Small",
 	].map((s) => ({ label: s, value: s })),
+	throwable: [
+		{ label: "Grenades", value: "Throwable" },
+		{ label: "Mines", value: "Mine" },
+	],
 	helmet:  [{ label: "Light", value: "Light" }, { label: "Medium", value: "Medium" }, { label: "Heavy", value: "Heavy" }],
 	core:    [{ label: "Light", value: "Light" }, { label: "Medium", value: "Medium" }, { label: "Heavy", value: "Heavy" }],
 	arms:    [{ label: "Light", value: "Light" }, { label: "Medium", value: "Medium" }, { label: "Heavy", value: "Heavy" }],
@@ -158,8 +163,9 @@ export default function ItemsPage() {
 		updateSearch, updatePageWithScroll, resetListState, setPage,
 	} = useListQueryState();
 
-	const mode: "fps" | "other" = pathname?.startsWith("/other-items") ? "other" : "fps";
+	const mode: "fps" | "other" = pathname?.startsWith("/items") || pathname?.startsWith("/other-items") ? "other" : "fps";
 	const [activeSlug, setActiveSlug] = useState<FpsSlug | "all">("all");
+	const [itemFamily, setItemFamily] = useState<ItemFamily>("all");
 	const [subType, setSubType] = useState("");
 	const [manufacturer, setManufacturer] = useState("");
 
@@ -210,7 +216,7 @@ export default function ItemsPage() {
 
 	// Build query call
 	const isCategory = mode === "fps" && activeSlug !== "all";
-	const queryKey = ["items.list", env, activeSlug, page, debouncedSearch, subType, manufacturer];
+	const queryKey = ["items.list", mode, env, activeSlug, itemFamily, page, debouncedSearch, subType, manufacturer];
 
 	const { data, isLoading, error, refetch } = useQuery({
 		queryKey,
@@ -228,25 +234,54 @@ export default function ItemsPage() {
 			}
 			if (mode === "fps") {
 				// "All" in fps mode: exclude no types, use generic list with all fps types
-				return api.items.list({ ...base, types: "FPS_Weapon,Armor_Helmet,Armor_Torso,Armor_Arms,Armor_Legs,Armor_Backpack,Undersuit,Tool,Consumable,Magazine,Attachment,Gadget,Clothing" });
+				return api.items.list({
+					...base,
+					types: "FPS_Weapon,Armor_Helmet,Armor_Torso,Armor_Arms,Armor_Legs,Armor_Backpack,Undersuit,Tool,Consumable,Magazine,Attachment,Gadget,Clothing",
+					exclude_sub_types: "Food,Drink",
+				});
 			}
-			// other-items mode
-			const fpsCovered = "FPS_Weapon,Armor_Helmet,Armor_Torso,Armor_Arms,Armor_Legs,Armor_Backpack,Undersuit,Tool,Consumable,Magazine,Attachment,Gadget,Clothing";
+			// items mode (non-FPS buckets + consumable food/drink)
+			const fpsCovered = "FPS_Weapon,Armor_Helmet,Armor_Torso,Armor_Arms,Armor_Legs,Armor_Backpack,Undersuit,Tool,Magazine,Attachment,Gadget,Clothing";
 			const otherTypes = (filters?.types ?? []).filter((t) => !fpsCovered.includes(t));
-			return api.items.list({ ...base, types: otherTypes.join(",") || undefined });
+			const nonFpsNonConsumable = otherTypes.filter((t) => t !== "Consumable");
+
+			if (itemFamily === "mission") {
+				return api.items.list({ ...base, type: "Consumable", sub_types: "Hacking,SystemAccess" });
+			}
+
+			if (itemFamily === "food") {
+				return api.items.list({ ...base, type: "Consumable", sub_types: "Food,Drink" });
+			}
+
+			const mergedTypes = [...nonFpsNonConsumable, "Consumable"].join(",");
+			return api.items.list({ ...base, types: mergedTypes || undefined, exclude_sub_types: "Medical,MedPack,OxygenCap,Stim" });
 		},
 		enabled: mode === "other" ? !!filters : true,
 	});
 
-	const hasFilters = !!(manufacturer || debouncedSearch || subType || activeSlug !== "all");
+	const hasFilters = !!(manufacturer || debouncedSearch || subType || activeSlug !== "all" || (mode === "other" && itemFamily !== "all"));
 	const resetFilters = () => {
 		resetListState();
 		setManufacturer("");
 		setSubType("");
 		setActiveSlug("all");
+		setItemFamily("all");
 	};
 
 	const filterGroups = [
+		...(mode === "other"
+			? [{
+					key: "family",
+					label: "Family",
+					options: [
+						{ label: "All Items", value: "all" },
+						{ label: "Mission Objects", value: "mission" },
+						{ label: "Food & Drink", value: "food" },
+					],
+					value: itemFamily,
+					onChange: (v: string) => { setItemFamily(v as ItemFamily); setPage(1); },
+				}]
+			: []),
 		...(subTypeOptions.length > 0
 			? [{
 					key: "subtype",
@@ -271,7 +306,7 @@ export default function ItemsPage() {
 	const getItemName = (item: ItemListItem) =>
 		item.displayName ?? item.display_name ?? item.name;
 
-	const pageTitle = mode === "other" ? "Other Items" : "FPS Gear";
+	const pageTitle = mode === "other" ? "Items" : "FPS Gear";
 
 	return (
 		<div className="max-w-(--breakpoint-2xl) mx-auto">
@@ -342,10 +377,7 @@ export default function ItemsPage() {
 										animate={{ opacity: 1, x: 0 }}
 										transition={{ delay: Math.min(i * 0.02, 0.3) }}
 									>
-										<Link
-											href={`/items/${item.uuid}`}
-											className="flex items-center gap-3 sci-panel hover:border-cyan-800/60 transition-colors px-4 py-2.5 group"
-										>
+										<div className="flex items-center gap-3 sci-panel hover:border-cyan-800/60 transition-colors px-4 py-2.5 group">
 											{/* Color bar */}
 											<div
 												className={`w-0.5 self-stretch rounded-full shrink-0 opacity-50 ${
@@ -356,7 +388,7 @@ export default function ItemsPage() {
 											/>
 
 											{/* Info */}
-											<div className="flex-1 min-w-0">
+											<Link href={`/items/${item.uuid}`} className="flex-1 min-w-0">
 												<div className="flex items-center gap-2 flex-wrap">
 													<span className="font-orbitron text-sm text-slate-200 group-hover:text-cyan-400 transition-colors truncate">
 														{getItemName(item)}
@@ -383,7 +415,7 @@ export default function ItemsPage() {
 														</span>
 													)}
 												</div>
-											</div>
+											</Link>
 
 											{/* Stats */}
 											<div className="shrink-0 text-right">
@@ -393,13 +425,12 @@ export default function ItemsPage() {
 											{/* Mission leads icon */}
 											<Link
 												href={`/missions?search=${encodeURIComponent(getItemName(item))}`}
-												onClick={(e) => e.stopPropagation()}
 												className="shrink-0 text-slate-700 hover:text-amber-400 transition-colors"
 												title="Mission leads"
 											>
 												<ExternalLink size={12} />
 											</Link>
-										</Link>
+										</div>
 									</motion.div>
 								))}
 							</div>

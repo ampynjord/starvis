@@ -231,9 +231,12 @@ export class ItemQueryService {
       byTypeSub.set(key, Number(r.cnt));
     }
     const droppable = (byTypeSub.get('FPS_Weapon::Throwable') || 0) + (byTypeSub.get('FPS_Weapon::Mine') || 0);
+    const fpsGadget = byTypeSub.get('FPS_Weapon::Gadget') || 0;
+    const consumableFoodDrink = (byTypeSub.get('Consumable::Food') || 0) + (byTypeSub.get('Consumable::Drink') || 0);
+    const consumableMission = (byTypeSub.get('Consumable::Hacking') || 0) + (byTypeSub.get('Consumable::SystemAccess') || 0);
     const weaponTotal = byType.get('FPS_Weapon') || 0;
     return {
-      weapons: weaponTotal - droppable,
+      weapons: weaponTotal - droppable - fpsGadget,
       throwable: droppable,
       helmet: byType.get('Armor_Helmet') || 0,
       core: byType.get('Armor_Torso') || 0,
@@ -241,11 +244,11 @@ export class ItemQueryService {
       legs: byType.get('Armor_Legs') || 0,
       backpack: byType.get('Armor_Backpack') || 0,
       undersuit: byType.get('Undersuit') || 0,
-      'tools-medics': (byType.get('Tool') || 0) + (byType.get('Consumable') || 0),
+      'tools-medics': (byType.get('Tool') || 0) + (byType.get('Consumable') || 0) - consumableFoodDrink - consumableMission + (byType.get('Gadget') || 0) + fpsGadget,
       magazines: byType.get('Magazine') || 0,
       attachments: byType.get('Attachment') || 0,
       clothing: byType.get('Clothing') || 0,
-      other: byType.get('Gadget') || 0,
+      other: 0,
     };
   }
 
