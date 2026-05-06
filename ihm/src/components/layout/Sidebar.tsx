@@ -40,39 +40,35 @@ type NavItemDef = {
   comingSoon?: boolean;
 };
 
-const CORE_ITEMS: NavItemDef[] = [
-  { to: '/',              icon: Home,          label: 'Dashboard' },
-  { to: '/missions',      icon: ClipboardList, label: 'Missions' },
-  { to: '/locations',     icon: MapPin,        label: 'Locations' },
-  { to: '/blueprints',    icon: Scroll,        label: 'Blueprints' },
-  { to: '/factions',      icon: Shield,        label: 'Factions' },
-  { to: '/manufacturers', icon: Wrench,        label: 'Manufacturers' },
-];
-
-const SHIP_ITEMS: NavItemDef[] = [
-  { to: '/ships',         icon: Rocket,            label: 'Ships & Vehicles' },
-  { to: '/components',    icon: Settings2,         label: 'Ship Components' },
-  { to: '/paints',        icon: Paintbrush,        label: 'Paints' },
-  { to: '/compare',       icon: BarChart3,         label: 'Compare' },
-  { to: '/ranking',       icon: Trophy,            label: 'Ranking' },
-  { to: '/outfitter',     icon: SlidersHorizontal, label: 'Loadout Manager', comingSoon: true },
+const SHIPS_ITEMS: NavItemDef[] = [
+  { to: '/ships',      icon: Rocket,            label: 'Ships & Vehicles' },
+  { to: '/components', icon: Settings2,         label: 'Ship Components' },
+  { to: '/paints',     icon: Paintbrush,        label: 'Paints' },
+  { to: '/compare',    icon: BarChart3,         label: 'Compare' },
+  { to: '/ranking',    icon: Trophy,            label: 'Ranking' },
+  { to: '/outfitter',  icon: SlidersHorizontal, label: 'Loadout Manager', comingSoon: true },
 ];
 
 const FPS_ITEMS: NavItemDef[] = [
-  { to: '/fps-gear',        icon: Crosshair,         label: 'FPS Gear' },
-  { to: '/other-items',     icon: Layers3,           label: 'Other Items' },
-  { to: '/fps-calculator',  icon: SlidersHorizontal, label: 'FPS Calculator', comingSoon: true },
+  { to: '/fps-gear',       icon: Crosshair,         label: 'FPS Gear' },
+  { to: '/other-items',    icon: Layers3,           label: 'Other Items' },
+  { to: '/fps-calculator', icon: SlidersHorizontal, label: 'FPS Calculator', comingSoon: true },
 ];
 
-const INDUSTRIAL_ITEMS: NavItemDef[] = [
-  { to: '/industrial',  icon: Factory,    label: 'Commodities' },
-  { to: '/trade',       icon: TrendingUp, label: 'Trade Routes',     comingSoon: true },
-  { to: '/mining',      icon: Pickaxe,    label: 'Mining Calculator', comingSoon: true },
+const ECONOMY_ITEMS: NavItemDef[] = [
+  { to: '/industrial', icon: Factory,    label: 'Commodities' },
+  { to: '/blueprints', icon: Scroll,     label: 'Blueprints & Crafting' },
+  { to: '/trade',      icon: TrendingUp, label: 'Trade Routes',      comingSoon: true },
+  { to: '/mining',     icon: Pickaxe,    label: 'Mining Calculator', comingSoon: true },
 ];
 
-const LORE_ITEMS: NavItemDef[] = [
-  { to: '/comm-links',   icon: Newspaper, label: 'Comm-Links' },
-  { to: '/galactapedia', icon: Globe,     label: 'Galactapedia' },
+const UNIVERSE_ITEMS: NavItemDef[] = [
+  { to: '/missions',      icon: ClipboardList, label: 'Missions' },
+  { to: '/locations',     icon: MapPin,        label: 'Locations' },
+  { to: '/factions',      icon: Shield,        label: 'Factions' },
+  { to: '/manufacturers', icon: Wrench,        label: 'Manufacturers' },
+  { to: '/galactapedia',  icon: Globe,         label: 'Galactapedia' },
+  { to: '/comm-links',    icon: Newspaper,     label: 'Comm-Links' },
 ];
 
 
@@ -208,11 +204,11 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             </button>
           </div>
         </div>
-        <NavGroup label="Core" items={CORE_ITEMS} onNavigate={onClose} />
-        <NavGroup label="Ships" items={SHIP_ITEMS} onNavigate={onClose} />
-        <NavGroup label="FPS" items={FPS_ITEMS} onNavigate={onClose} />
-        <NavGroup label="Industrial" items={INDUSTRIAL_ITEMS} onNavigate={onClose} />
-        <NavGroup label="Lore" items={LORE_ITEMS} onNavigate={onClose} />
+        <NavItem to="/" icon={Home} label="Dashboard" onNavigate={onClose} />
+        <NavGroup label="Ships" items={SHIPS_ITEMS} onNavigate={onClose} />
+        <NavGroup label="FPS Combat" items={FPS_ITEMS} onNavigate={onClose} />
+        <NavGroup label="Economy & Industry" items={ECONOMY_ITEMS} onNavigate={onClose} />
+        <NavGroup label="Universe" items={UNIVERSE_ITEMS} onNavigate={onClose} />
         {user?.role === 'admin' && (
           <NavGroup label="Admin" items={[{ to: '/admin', icon: Shield, label: 'Administration' }]} onNavigate={onClose} />
         )}
