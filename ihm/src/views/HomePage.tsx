@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
@@ -5,45 +6,92 @@ import {
   ArrowRight,
   BarChart3,
   BookOpen,
+  ChevronRight,
   ClipboardList,
   Clock,
   Crosshair,
-  Dices,
+  Globe,
   Layers,
   Minus,
-  Package,
-  Palette,
   Pickaxe,
   Plus,
   RefreshCw,
   Rocket,
   Scroll,
-  Settings2,
+  Search,
   Shuffle,
   SlidersHorizontal,
   TrendingUp,
   Trophy,
-  Wrench,
   Zap,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { fDate, fNumber } from '@/utils/formatters';
-import type { ChangelogEntry } from '@/types/api';
+import type { ChangelogEntry, StatsOverview } from '@/types/api';
 
 // ── Config ────────────────────────────────────────────────────────────────────
 
-const DB_ENTRIES = [
-  { key: 'ships',         label: 'Ships & Vehicles', icon: Rocket,    color: 'text-cyan-400',   bar: 'bg-cyan-500',    to: '/ships' },
-  { key: 'components',    label: 'Components',       icon: Settings2, color: 'text-blue-400',   bar: 'bg-blue-500',    to: '/components' },
-  { key: 'items',         label: 'FPS Gear',         icon: Dices,     color: 'text-violet-400', bar: 'bg-violet-500',  to: '/fps-gear' },
-  { key: 'commodities',   label: 'Industrial',       icon: Package,   color: 'text-amber-400',  bar: 'bg-amber-500',   to: '/industrial' },
-  { key: 'manufacturers', label: 'Manufacturers',    icon: Wrench,    color: 'text-slate-400',  bar: 'bg-slate-500',   to: '/manufacturers' },
-  { key: 'paints',        label: 'Ship Paints',      icon: Palette,   color: 'text-pink-400',   bar: 'bg-pink-500',    to: '/paints' },
-] as const;
+type SectionDef = {
+  id: string;
+  label: string;
+  icon: React.ElementType;
+  color: string;
+  border: string;
+  glow: string;
+  statKey: keyof StatsOverview | null;
+  links: { label: string; to: string }[];
+};
+
+const SECTIONS: SectionDef[] = [
+  {
+    id: 'ships', label: 'Ships', icon: Rocket,
+    color: 'text-cyan-400', border: 'border-cyan-900/50 hover:border-cyan-700/60', glow: 'from-cyan-950/20',
+    statKey: 'ships',
+    links: [
+      { label: 'Ships & Vehicles', to: '/ships' },
+      { label: 'Ship Components',  to: '/components' },
+      { label: 'Paints',           to: '/paints' },
+      { label: 'Compare',          to: '/compare' },
+      { label: 'Ranking',          to: '/ranking' },
+    ],
+  },
+  {
+    id: 'fps', label: 'FPS Combat', icon: Crosshair,
+    color: 'text-violet-400', border: 'border-violet-900/50 hover:border-violet-700/60', glow: 'from-violet-950/20',
+    statKey: 'items',
+    links: [
+      { label: 'FPS Gear',     to: '/fps-gear' },
+      { label: 'Other Items',  to: '/other-items' },
+    ],
+  },
+  {
+    id: 'economy', label: 'Economy & Industry', icon: TrendingUp,
+    color: 'text-amber-400', border: 'border-amber-900/50 hover:border-amber-700/60', glow: 'from-amber-950/20',
+    statKey: 'commodities',
+    links: [
+      { label: 'Commodities',         to: '/industrial' },
+      { label: 'Blueprints & Crafting', to: '/blueprints' },
+    ],
+  },
+  {
+    id: 'universe', label: 'Universe', icon: Globe,
+    color: 'text-emerald-400', border: 'border-emerald-900/50 hover:border-emerald-700/60', glow: 'from-emerald-950/20',
+    statKey: null,
+    links: [
+      { label: 'Missions',      to: '/missions' },
+      { label: 'Locations',     to: '/locations' },
+      { label: 'Factions',      to: '/factions' },
+      { label: 'Manufacturers', to: '/manufacturers' },
+      { label: 'Galactapedia',  to: '/galactapedia' },
+      { label: 'Comm-Links',    to: '/comm-links' },
+    ],
+  },
+];
 
 type ToolCategory = 'combat' | 'economy' | 'data';
 
@@ -87,30 +135,39 @@ const ENTITY_COLOR: Record<string, string> = {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function StatCard({ entry, value, max, delay }: { entry: typeof DB_ENTRIES[number]; value: number; max: number; delay: number }) {
-  const pct = max > 0 ? Math.round((value / max) * 100) : 0;
+function SectionCard({ section, stats, delay }: { section: SectionDef; stats: StatsOverview | undefined; delay: number }) {
+  const count = section.statKey ? stats?.[section.statKey] : null;
   return (
-    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }}>
-      <Link href={entry.to} className="block h-full">
-        <div className="holo-card px-4 py-3 h-full group">
-          <div className="flex items-start justify-between mb-2">
-            <entry.icon size={16} className={`${entry.color} shrink-0 group-hover:scale-110 transition-transform`} />
-            <span className="text-[9px] font-mono-sc text-slate-700 uppercase tracking-widest">{pct}%</span>
+    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay }} className="h-full">
+      <div className={`sci-panel border ${section.border} bg-linear-to-b ${section.glow} to-transparent overflow-hidden h-full transition-colors`}>
+        <div className="px-4 py-2.5 border-b border-slate-800/60 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <section.icon size={14} className={section.color} strokeWidth={1.5} />
+            <span className="font-orbitron text-[10px] font-bold tracking-widest uppercase text-slate-400">
+              {section.label}
+            </span>
           </div>
-          <p className="font-orbitron text-2xl font-black text-slate-100 leading-none mb-1">
-            {value >= 1000 ? `${(value / 1000).toFixed(1)}K` : value.toLocaleString('en-US')}
-          </p>
-          <p className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-wider mb-2">{entry.label}</p>
-          <div className="h-0.5 w-full rounded-full bg-slate-800/80 overflow-hidden">
-            <motion.div
-              className={`h-full rounded-full ${entry.bar} opacity-60`}
-              initial={{ width: 0 }}
-              animate={{ width: `${pct}%` }}
-              transition={{ delay: delay + 0.2, duration: 0.8, ease: 'easeOut' }}
-            />
-          </div>
+          {count != null && (
+            <span className="font-orbitron text-[10px] font-black text-slate-600 tabular-nums">
+              {count.toLocaleString('en-US')}
+            </span>
+          )}
         </div>
-      </Link>
+        <div className="py-1">
+          {section.links.map(link => (
+            <Link
+              key={link.to}
+              href={link.to}
+              className="flex items-center gap-2 px-4 py-1.5 hover:bg-white/5 transition-colors group"
+            >
+              <ChevronRight size={10} className={`${section.color} opacity-40 group-hover:opacity-80 shrink-0`} />
+              <span className="font-rajdhani font-semibold text-sm text-slate-500 group-hover:text-slate-200 transition-colors">
+                {link.label}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </div>
     </motion.div>
   );
 }
@@ -135,8 +192,14 @@ function ChangelogRow({ entry }: { entry: ChangelogEntry }) {
 
 export default function HomePage() {
   const { env } = useEnv();
+  const router = useRouter();
+  const [heroSearch, setHeroSearch] = useState('');
+  const handleHeroSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (heroSearch.trim()) router.push(`/search?q=${encodeURIComponent(heroSearch.trim())}`);
+  };
 
-  const { data: stats, isLoading: statsLoading } = useQuery({
+  const { data: stats } = useQuery({
     queryKey: ['stats.overview', env],
     queryFn: () => api.stats.overview(env),
     staleTime: 0,
@@ -160,10 +223,6 @@ export default function HomePage() {
     staleTime: Number.POSITIVE_INFINITY,
   });
 
-  const maxStat = stats
-    ? Math.max(stats.ships, stats.components, stats.items, stats.commodities, stats.manufacturers, stats.paints)
-    : 1;
-
   const byChange = changelog?.data.reduce<Record<string, number>>((acc, e) => {
     acc[e.change_type] = (acc[e.change_type] ?? 0) + 1;
     return acc;
@@ -172,66 +231,55 @@ export default function HomePage() {
   return (
     <div className="space-y-5 max-w-[1400px] mx-auto">
 
-      {/* ── Command Header ────────────────────────────────────────────── */}
+      {/* ── Hero ─────────────────────────────────────────────────────── */}
       <div className="sci-panel relative overflow-hidden">
-        <div className="absolute inset-0 bg-linear-to-r from-cyan-950/25 via-transparent to-transparent pointer-events-none" />
-        <div className="absolute top-0 left-0 right-0 h-px bg-linear-to-r from-cyan-500/40 via-cyan-400/20 to-transparent" />
-
-        <div className="relative px-6 py-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-end gap-4">
-            <div>
-              <h1 className="font-orbitron text-4xl font-black text-cyan-400 glow-text tracking-widest leading-none">
-                STARVIS
-              </h1>
-              <p className="font-mono-sc text-[10px] text-slate-600 tracking-widest uppercase mt-1">
-                Star Citizen · Game Database & Toolset
-              </p>
-            </div>
-            <div className="hidden sm:block w-px h-10 bg-border self-center" />
-            <div className="hidden sm:block">
-              <p className="font-mono-sc text-[9px] text-slate-700 uppercase tracking-widest">Modules</p>
-              <p className="font-rajdhani text-xs text-slate-500 leading-snug">
-                Ships · Components · FPS · Mining · Trade · Crafting
-              </p>
-            </div>
+        <div className="absolute inset-0 bg-linear-to-br from-cyan-950/20 via-transparent to-violet-950/10 pointer-events-none" />
+        <div className="absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-cyan-500/40 to-transparent" />
+        <div className="relative px-6 py-8 flex flex-col items-center gap-5 text-center">
+          <div>
+            <h1 className="font-orbitron text-5xl sm:text-6xl font-black text-cyan-400 glow-text tracking-widest leading-none">
+              STARVIS
+            </h1>
+            <p className="font-mono-sc text-[10px] text-slate-600 tracking-widest uppercase mt-2">
+              Star Citizen · Game Database & Toolset
+            </p>
           </div>
-
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap justify-center">
             {version ? (
               <>
-                <div className="text-right">
-                  <p className="font-orbitron text-base font-bold text-cyan-400">SC {version.game_version}</p>
-                  <p className="font-mono-sc text-[10px] text-slate-600 flex items-center gap-1 justify-end">
-                    <Clock size={8} /> {fDate(version.extracted_at)}
-                  </p>
-                </div>
                 <GlowBadge color={env === 'ptu' ? 'amber' : 'cyan'} size="sm">
                   {env.toUpperCase()}
                 </GlowBadge>
+                <span className="font-orbitron text-sm font-bold text-slate-400">SC {version.game_version}</span>
+                <span className="font-mono-sc text-[10px] text-slate-600 flex items-center gap-1">
+                  <Clock size={8} /> {fDate(version.extracted_at)}
+                </span>
               </>
             ) : (
-              <div className="w-28 h-10 bg-slate-900/50 rounded animate-pulse" />
+              <div className="w-40 h-6 bg-slate-900/50 rounded animate-pulse" />
             )}
           </div>
+          <form onSubmit={handleHeroSearch} className="w-full max-w-xl">
+            <div className="relative">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-600" size={16} />
+              <input
+                type="text"
+                value={heroSearch}
+                onChange={(e) => setHeroSearch(e.target.value)}
+                placeholder="Search ships, components, items…"
+                className="w-full bg-slate-900/80 border border-slate-700 rounded-sm pl-10 pr-4 py-2.5 text-sm font-rajdhani text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-600 focus:bg-slate-900 transition-colors"
+              />
+            </div>
+          </form>
         </div>
       </div>
 
-      {/* ── Stat grid ────────────────────────────────────────────────── */}
-      {statsLoading ? (
-        <LoadingGrid rows={1} cols={6} message="LOADING DATABASE…" />
-      ) : stats ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-          {DB_ENTRIES.map((entry, i) => (
-            <StatCard
-              key={entry.key}
-              entry={entry}
-              value={stats[entry.key as keyof typeof stats] as number ?? 0}
-              max={maxStat}
-              delay={i * 0.06}
-            />
-          ))}
-        </div>
-      ) : null}
+      {/* ── Section cards ─────────────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {SECTIONS.map((section, i) => (
+          <SectionCard key={section.id} section={section} stats={stats} delay={i * 0.08} />
+        ))}
+      </div>
 
       {/* ── Spotlight + Changelog ─────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
@@ -354,7 +402,7 @@ export default function HomePage() {
                 )}
 
                 {/* CTA */}
-                <div className="mt-auto pt-1">
+                <div className="pt-1">
                   <Link
                     href={`/ships/${randomShip.uuid}`}
                     className="sci-btn-primary text-xs py-2 px-4 inline-flex items-center gap-1.5"
@@ -482,30 +530,6 @@ export default function HomePage() {
         </div>
       </motion.div>
 
-      {/* ── Database quick-access ────────────────────────────────────── */}
-      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.65 }}>
-        <div className="sci-panel px-2 py-1.5">
-          <div className="flex flex-wrap items-stretch divide-x divide-slate-800/60">
-            {DB_ENTRIES.map(({ key, label, icon: Icon, color, to }) => (
-              <Link
-                key={key}
-                href={to}
-                className="flex items-center gap-2 px-4 py-2 hover:bg-white/[0.03] transition-colors group flex-1 min-w-0"
-              >
-                <Icon size={12} className={`${color} shrink-0`} />
-                <span className="font-rajdhani font-semibold text-xs text-slate-500 group-hover:text-slate-300 uppercase tracking-wide transition-colors whitespace-nowrap">
-                  {label}
-                </span>
-                {stats && (
-                  <span className="ml-auto font-mono-sc text-[10px] text-slate-700 hidden sm:block">
-                    {(stats[key as keyof typeof stats] as number ?? 0).toLocaleString('en-US')}
-                  </span>
-                )}
-              </Link>
-            ))}
-          </div>
-        </div>
-      </motion.div>
 
     </div>
   );

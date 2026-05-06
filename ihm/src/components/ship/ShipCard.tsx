@@ -94,25 +94,17 @@ export function ShipCard({ ship, index = 0 }: Props) {
               )}
             </div>
 
-            {/* Badges + RSI indicator */}
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex gap-2 min-w-0 overflow-hidden">
-                {ship.career && (
-                  <GlowBadge color="cyan" size="xs">{ship.career}</GlowBadge>
-                )}
-                {ship.role && ship.role !== ship.career && (
-                  <GlowBadge color="slate" size="xs">{ship.role}</GlowBadge>
-                )}
-                {ship.vehicle_category && ship.vehicle_category !== 'ship' && (
-                  <GlowBadge color="slate" size="xs">{ship.vehicle_category}</GlowBadge>
-                )}
-              </div>
-              <span className="text-xs font-mono-sc shrink-0">
-                {ship.ship_matrix_id != null
-                  ? <span className="text-green-500">◆ RSI</span>
-                  : <span className="text-slate-700">◇</span>
-                }
-              </span>
+            {/* Badges */}
+            <div className="flex gap-2 min-w-0 overflow-hidden">
+              {ship.career && (
+                <GlowBadge color="cyan" size="xs">{ship.career}</GlowBadge>
+              )}
+              {ship.role && ship.role !== ship.career && (
+                <GlowBadge color="slate" size="xs">{ship.role}</GlowBadge>
+              )}
+              {ship.vehicle_category && ship.vehicle_category !== 'ship' && (
+                <GlowBadge color="slate" size="xs">{ship.vehicle_category}</GlowBadge>
+              )}
             </div>
           </div>
         </div>
