@@ -11,6 +11,7 @@ const COMPONENT_CATEGORY_TYPES: Record<string, string[]> = {
     'PowerPlant',
     'Cooler',
     'QuantumDrive',
+    'JumpDrive',
     'Thruster',
     'FuelIntake',
     'FuelTank',
@@ -22,6 +23,7 @@ const COMPONENT_CATEGORY_TYPES: Record<string, string[]> = {
   ],
   mounts: ['Gimbal'],
   utility: ['MiningLaser', 'SalvageHead', 'TractorBeam'],
+  modules: ['ShipModule'],
 };
 
 export function mountComponentRoutes(router: Router, deps: RouteDependencies): void {

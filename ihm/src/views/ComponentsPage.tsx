@@ -34,7 +34,7 @@ const CATEGORIES: CategoryDef[] = [
   {
     label: "Systems",
     apiSlug: "systems",
-    types: ["Shield", "PowerPlant", "Cooler", "QuantumDrive", "Thruster", "FuelIntake", "FuelTank",
+    types: ["Shield", "PowerPlant", "Cooler", "QuantumDrive", "JumpDrive", "Thruster", "FuelIntake", "FuelTank",
             "Radar", "Countermeasure", "LifeSupport", "EMP", "QuantumInterdictionGenerator"],
   },
   {
@@ -47,15 +47,19 @@ const CATEGORIES: CategoryDef[] = [
     apiSlug: "utility",
     types: ["MiningLaser", "SalvageHead", "TractorBeam"],
   },
+  {
+    label: "Modules",
+    apiSlug: "modules",
+    types: ["ShipModule"],
+  },
 ];
 
 /** Sub-type chips available per primary type chip */
 const TYPE_SUBTYPES: Partial<Record<string, string[]>> = {
-  WeaponGun:    ["Ballistic", "Energy", "Distortion"],
-  Missile:      ["Torpedo", "Bomb"],
-  Thruster:     ["Main", "Maneuvering", "Retro", "VTOL"],
-  QuantumDrive: ["Standard", "Jump"],
-  Gimbal:       ["Gimbal", "Fixed"],
+  WeaponGun:      ["Ballistic", "Energy", "Distortion"],
+  Missile:        ["Torpedo", "Bomb"],
+  Thruster:       ["Main", "Maneuvering", "Retro", "VTOL"],
+  Countermeasure: ["Flare", "Noise", "Decoy"],
 };
 
 // ── Key stats per type ─────────────────────────────────────────────────────────

@@ -38,6 +38,7 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
     PowerPlant: /power_?plant[s]?[/\\]|powerplant/i,
     Cooler: /cooler[s]?[/\\]/i,
     // Jump drives BEFORE QuantumDrive (more specific path)
+    JumpDrive: /jump_?drive[s]?[/\\]|jumpmodule[s]?[/\\]|jump_?module[s]?[/\\]/i,
     QuantumDrive: /quantum_?drive[s]?[/\\]|quantumdrive/i,
     // VTOL / retro thrusters covered by subType derived from path in thruster handler below
     Thruster: /thruster[s]?[/\\]/i,
@@ -56,6 +57,8 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
     MiningLaser: /utility\/mining\/miningarm[/\\]|mining_?laser[/\\]|miningsubitems[/\\]/i,
     SalvageHead: /utility\/salvage\/salvagehead[/\\]/i,
     TractorBeam: /utility\/tractorbeam[/\\]/i,
+    // ── Modular ship modules ──────────────────────────────────────────────────
+    ShipModule: /ship_?modules?[/\\]|modular_?modules?[/\\]|cargo_?modules?[/\\]/i,
   };
 
   let scanned = 0;
@@ -510,8 +513,14 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
         if (type === 'Countermeasure' && !comp.cmType) {
           if (fn.includes('flare')) comp.cmType = 'Flare';
           else if (fn.includes('noise') || fn.includes('chaff')) comp.cmType = 'Noise';
+          else if (fn.includes('decoy') || fn.includes('cml_decoy')) comp.cmType = 'Decoy';
           else if (lcName.includes('flare')) comp.cmType = 'Flare';
           else if (lcName.includes('noise') || lcName.includes('chaff')) comp.cmType = 'Noise';
+          else if (lcName.includes('decoy') || lcName.includes('cml_decoy')) comp.cmType = 'Decoy';
+        }
+        // Promote cmType → subType so the standard sub_type filter works
+        if (type === 'Countermeasure' && comp.cmType && !comp.subType) {
+          comp.subType = comp.cmType;
         }
 
         // Fuel Tank
