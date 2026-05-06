@@ -59,7 +59,7 @@ const TYPE_SUBTYPES: Partial<Record<string, string[]>> = {
   WeaponGun:      ["Ballistic", "Energy", "Distortion"],
   Missile:        ["Missile", "Torpedo", "Bomb"],
   Thruster:       ["Main", "Maneuvering", "Retro", "VTOL"],
-  Countermeasure: ["Noise", "Decoy", "Noise Launcher", "Decoy Launcher"],
+  Countermeasure: ["Noise Launcher", "Decoy Launcher"],
 };
 
 // ── Key stats per type ─────────────────────────────────────────────────────────
