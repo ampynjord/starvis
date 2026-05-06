@@ -37,7 +37,7 @@ export class PaintQueryService {
     const total = Number(countRows[0]?.total) || 0;
 
     const page = Math.max(1, opts.page || 1);
-    const limit = Math.min(200, Math.max(1, opts.limit || 50));
+    const limit = Math.min(5000, Math.max(1, opts.limit || 50));
     const offset = (page - 1) * limit;
 
     const sql = `${baseSql} ORDER BY s.name, sp.paint_name LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
