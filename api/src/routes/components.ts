@@ -11,7 +11,6 @@ const COMPONENT_CATEGORY_TYPES: Record<string, string[]> = {
     'PowerPlant',
     'Cooler',
     'QuantumDrive',
-    'JumpDrive',
     'Thruster',
     'FuelIntake',
     'FuelTank',
@@ -23,7 +22,7 @@ const COMPONENT_CATEGORY_TYPES: Record<string, string[]> = {
   ],
   mounts: ['Gimbal'],
   utility: ['MiningLaser', 'SalvageHead', 'TractorBeam'],
-  modules: ['ShipModule'],
+  modules: ['ShipModule', 'JumpModule'],
 };
 
 export function mountComponentRoutes(router: Router, deps: RouteDependencies): void {
@@ -74,6 +73,9 @@ export function mountComponentRoutes(router: Router, deps: RouteDependencies): v
       // ?category= maps to a predefined type list; overrides individual ?type= param
       const categoryParam = req.query.category ? String(req.query.category) : undefined;
       const categoryTypes = categoryParam ? COMPONENT_CATEGORY_TYPES[categoryParam] : undefined;
+      if (categoryParam && !categoryTypes) {
+        return void res.status(400).json({ success: false, error: `Invalid category: ${categoryParam}` });
+      }
       const queryWithCategory = categoryTypes ? { ...req.query, type: undefined } : req.query;
       const filters = ComponentQuery.parse(queryWithCategory);
       if (categoryTypes) {
