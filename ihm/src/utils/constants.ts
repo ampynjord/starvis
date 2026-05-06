@@ -10,6 +10,7 @@ export const VARIANT_TYPE_LABELS: Record<string, string> = {
 /** Internal DB type → human-readable game label */
 export const COMPONENT_TYPE_LABELS: Record<string, string> = {
   WeaponGun: 'Gun',
+  Ammunition: 'Ammunition',
   WeaponMissile: 'Missile',
   Shield: 'Shield',
   QuantumDrive: 'Quantum Drive',
@@ -37,6 +38,7 @@ export const COMPONENT_TYPE_LABELS: Record<string, string> = {
 
 export const COMPONENT_TYPE_COLORS: Record<string, string> = {
   WeaponGun: 'text-red-400',
+  Ammunition: 'text-orange-200',
   WeaponMissile: 'text-orange-400',
   Shield: 'text-blue-400',
   QuantumDrive: 'text-purple-400',
