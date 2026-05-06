@@ -1224,8 +1224,14 @@ export class DataForgeService implements DataForgeContext {
             const ts = parseFloat(child.attributes?.topSpeed || child.attributes?.maxSpeed || '0');
             const v0 = parseFloat(child.attributes?.v0SteerMax || '0');
             const vMax = parseFloat(child.attributes?.vMaxSteerMax || '0');
-            if (powerTs) { groundTopSpeed = powerTs; break; }
-            if (ts > 0) { groundTopSpeed = Math.round(ts); break; }
+            if (powerTs) {
+              groundTopSpeed = powerTs;
+              break;
+            }
+            if (ts > 0) {
+              groundTopSpeed = Math.round(ts);
+              break;
+            }
             if (v0 > 0) {
               groundTopSpeed = Math.round(v0);
               if (vMax > v0) groundBoostSpeed = Math.round(vMax);

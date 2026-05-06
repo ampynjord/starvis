@@ -271,7 +271,7 @@ export const api = {
       };
     },
     search: (search: string, limit = 8, env?: string) => get<ShipListItem[]>('/ships/search', { search, limit, env }),
-    random: (env?: string) => get<ShipListItem>('/ships/random', { env }),
+    random: (env?: string) => get<Ship>('/ships/random', { env }),
     get: (uuid: string, env?: string) => get<Ship>(`/ships/${uuid}`, { env }),
     loadout: (uuid: string, env?: string) => get<LoadoutNode[]>(`/ships/${uuid}/loadout`, { env }),
     paints: (uuid: string, env?: string) => get<ShipPaint[]>(`/ships/${uuid}/paints`, { env }),
