@@ -698,12 +698,9 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
       if (comp.type !== 'Ammunition') {
         const isShipMissileClass = /^(?:g?misl_s\d+_|bomb_s\d+_)/i.test(className);
         const looksLikeBallisticAmmo =
-          (lcName.includes('ballistic') && (lcName.includes('mag') || lcName.includes('ammo'))) ||
-          lcName.includes('bullet');
+          (lcName.includes('ballistic') && (lcName.includes('mag') || lcName.includes('ammo'))) || lcName.includes('bullet');
         const looksLikeAmmoEntity =
-          fn.includes('/fps/') ||
-          fn.includes('\\fps\\') ||
-          (looksLikeBallisticAmmo && !lcName.includes('launcher'));
+          fn.includes('/fps/') || fn.includes('\\fps\\') || (looksLikeBallisticAmmo && !lcName.includes('launcher'));
         if ((comp.type === 'Missile' || comp.type === 'WeaponGun') && looksLikeAmmoEntity && !isShipMissileClass) {
           comp.type = 'Ammunition';
         }
