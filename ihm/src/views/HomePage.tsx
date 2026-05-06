@@ -303,15 +303,19 @@ export default function HomePage() {
                 {/* Key stats grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                   {[
-                    { label: 'Crew',      val: randomShip.crew_size != null ? String(randomShip.crew_size) : null, unit: '' },
-                    { label: 'Cargo',     val: randomShip.cargo_capacity != null ? fNumber(randomShip.cargo_capacity) : null, unit: 'SCU' },
-                    { label: 'SCM Speed', val: randomShip.scm_speed != null ? fNumber(randomShip.scm_speed) : null, unit: 'm/s' },
-                    { label: 'Max Speed', val: randomShip.max_speed != null ? fNumber(randomShip.max_speed) : null, unit: 'm/s' },
-                    { label: 'Shield HP', val: randomShip.shield_hp != null ? fNumber(randomShip.shield_hp) : null, unit: '' },
-                    { label: 'Total HP',  val: randomShip.total_hp != null ? fNumber(randomShip.total_hp) : null, unit: '' },
-                    { label: 'Mass',      val: randomShip.mass != null ? fNumber(randomShip.mass) : null, unit: 'kg' },
-                    { label: 'Min Crew',  val: randomShip.min_crew != null ? String(randomShip.min_crew) : null, unit: '' },
-                  ].filter(s => s.val != null).slice(0, 6).map(stat => (
+                    { label: 'Crew',        val: randomShip.crew_size != null ? String(randomShip.crew_size) : null, unit: '' },
+                    { label: 'Cargo',       val: randomShip.cargo_capacity != null ? fNumber(randomShip.cargo_capacity) : null, unit: 'SCU' },
+                    { label: 'SCM Speed',   val: randomShip.scm_speed != null ? fNumber(randomShip.scm_speed) : null, unit: 'm/s' },
+                    { label: 'Max Speed',   val: randomShip.max_speed != null ? fNumber(randomShip.max_speed) : null, unit: 'm/s' },
+                    { label: 'Shield HP',   val: randomShip.shield_hp != null ? fNumber(randomShip.shield_hp) : null, unit: '' },
+                    { label: 'Total HP',    val: randomShip.total_hp != null ? fNumber(randomShip.total_hp) : null, unit: '' },
+                    { label: 'Mass',        val: randomShip.mass != null ? fNumber(randomShip.mass) : null, unit: 'kg' },
+                    { label: 'Min Crew',    val: randomShip.min_crew != null ? String(randomShip.min_crew) : null, unit: '' },
+                    { label: 'H₂ Fuel',    val: randomShip.hydrogen_fuel_capacity != null ? fNumber(randomShip.hydrogen_fuel_capacity) : null, unit: 'L' },
+                    { label: 'QT Fuel',     val: randomShip.quantum_fuel_capacity != null ? fNumber(randomShip.quantum_fuel_capacity) : null, unit: 'L' },
+                    { label: 'Boost Fwd',   val: randomShip.boost_speed_forward != null ? fNumber(randomShip.boost_speed_forward) : null, unit: 'm/s' },
+                    { label: 'Shield Regen',val: randomShip.shield_regen != null ? fNumber(randomShip.shield_regen) : null, unit: 'hp/s' },
+                  ].filter(s => s.val != null).map(stat => (
                     <div key={stat.label} className="sci-panel px-3 py-2">
                       <p className="font-mono-sc text-[9px] text-slate-600 uppercase tracking-widest">{stat.label}</p>
                       <p className="font-orbitron text-sm font-bold text-slate-200 mt-0.5">
@@ -340,6 +344,13 @@ export default function HomePage() {
                       </div>
                     )}
                   </div>
+                )}
+
+                {/* Ship description */}
+                {randomShip.sm_description && (
+                  <p className="text-[11px] text-slate-500 leading-relaxed line-clamp-4">
+                    {randomShip.sm_description}
+                  </p>
                 )}
 
                 {/* CTA */}
