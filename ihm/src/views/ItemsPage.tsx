@@ -37,7 +37,23 @@ const FPS_CATEGORIES_STATIC: { slug: string; label: string }[] = [
 ];
 
 type FpsSlug = (typeof FPS_CATEGORIES_STATIC)[number]["slug"];
-type ItemFamily = "all" | "clothing" | "mission" | "food";
+type ItemsSlug = "all" | "clothing" | "armor" | "chips" | "food";
+
+const ITEMS_CATEGORIES_STATIC: { slug: ItemsSlug; label: string }[] = [
+	{ slug: "all",      label: "All" },
+	{ slug: "clothing", label: "Clothing" },
+	{ slug: "armor",    label: "Armor" },
+	{ slug: "chips",    label: "Chips" },
+	{ slug: "food",     label: "Food & Drink" },
+];
+
+const ITEMS_SLUG_COLOR: Record<ItemsSlug, string> = {
+	all:      "bg-cyan-500",
+	clothing: "bg-slate-500",
+	armor:    "bg-blue-500",
+	chips:    "bg-green-500",
+	food:     "bg-orange-500",
+};
 
 /** FPS types covered by the FPS Gear page — excluded from Items page */
 const FPS_COVERED_TYPES = new Set([
@@ -172,7 +188,7 @@ export default function ItemsPage() {
 
 	const mode: "fps" | "other" = pathname?.startsWith("/items") || pathname?.startsWith("/other-items") ? "other" : "fps";
 	const [activeSlug, setActiveSlug] = useState<FpsSlug | "all">("all");
-	const [itemFamily, setItemFamily] = useState<ItemFamily>("all");
+	const [itemsSlug, setItemsSlug] = useState<ItemsSlug>("all");
 	const [subType, setSubType] = useState("");
 	const [manufacturer, setManufacturer] = useState("");
 
@@ -195,7 +211,7 @@ export default function ItemsPage() {
 	/** Manufacturer list for the current category */
 	const categoryTypes = mode === "fps"
 		? (activeSlug === "all" ? undefined : activeSlug)
-		: (itemFamily === "clothing" ? "Clothing" : itemFamily === "mission" || itemFamily === "food" ? "Consumable" : undefined);
+		: (itemsSlug === "clothing" ? "Clothing" : itemsSlug === "armor" ? "Armor" : itemsSlug === "chips" || itemsSlug === "food" ? "Consumable" : undefined);
 
 	const { data: mfrData } = useQuery({
 		queryKey: ["items.manufacturers", categoryTypes, env],
@@ -212,6 +228,15 @@ export default function ItemsPage() {
 				...FPS_CATEGORIES_STATIC.map((c) => ({ ...c, count: countMap.get(c.slug) ?? 0 })),
 			]
 		: [];
+	const tc = filters?.typeCounts ?? {};
+	const sc = filters?.subTypeCounts ?? {};
+	const itemsCountMap: Record<ItemsSlug, number> = {
+		all:      (tc.Clothing ?? 0) + (tc.Armor ?? 0) + (sc.Hacking ?? 0) + (sc.SystemAccess ?? 0) + (sc.Food ?? 0) + (sc.Drink ?? 0),
+		clothing: tc.Clothing ?? 0,
+		armor:    tc.Armor ?? 0,
+		chips:    (sc.Hacking ?? 0) + (sc.SystemAccess ?? 0),
+		food:     (sc.Food ?? 0) + (sc.Drink ?? 0),
+	};
 
 	const selectSlug = (slug: FpsSlug | "all") => {
 		setActiveSlug(slug);
@@ -219,11 +244,17 @@ export default function ItemsPage() {
 		setPage(1);
 	};
 
+	const selectItemsSlug = (slug: ItemsSlug) => {
+		setItemsSlug(slug);
+		setManufacturer("");
+		setPage(1);
+	};
+
 	const subTypeOptions = SLUG_SUBTYPES[activeSlug as FpsSlug] ?? [];
 
 	// Build query call
 	const isCategory = mode === "fps" && activeSlug !== "all";
-	const queryKey = ["items.list", mode, env, activeSlug, itemFamily, page, debouncedSearch, subType, manufacturer];
+	const queryKey = ["items.list", mode, env, activeSlug, itemsSlug, page, debouncedSearch, subType, manufacturer];
 
 	const { data, isLoading, error, refetch } = useQuery({
 		queryKey,
@@ -267,30 +298,16 @@ export default function ItemsPage() {
 		enabled: mode === "other" ? !!filters : true,
 	});
 
-	const hasFilters = !!(manufacturer || debouncedSearch || subType || activeSlug !== "all" || (mode === "other" && itemFamily !== "all"));
+	const hasFilters = !!(manufacturer || debouncedSearch || subType || activeSlug !== "all" || (mode === "other" && itemsSlug !== "all"));
 	const resetFilters = () => {
 		resetListState();
 		setManufacturer("");
 		setSubType("");
 		setActiveSlug("all");
-		setItemFamily("all");
+		setItemsSlug("all");
 	};
 
 	const filterGroups = [
-		...(mode === "other"
-			? [{
-					key: "family",
-					label: "Family",
-					options: [
-						{ label: "All Items", value: "all" },
-						{ label: "Clothing", value: "clothing" },
-						{ label: "Mission Objects", value: "mission" },
-						{ label: "Food & Drink", value: "food" },
-					],
-					value: itemFamily,
-					onChange: (v: string) => { setItemFamily(v as ItemFamily); setPage(1); },
-				}]
-			: []),
 		...(subTypeOptions.length > 0
 			? [{
 					key: "subtype",
@@ -328,7 +345,29 @@ export default function ItemsPage() {
 				onSearch={updateSearch}
 			/>
 
-			{/* Category chips (fps mode only) */}
+			{/* Category chips */}
+			{mode === "other" && (
+				<div className="flex flex-wrap gap-1.5 mb-4">
+					{ITEMS_CATEGORIES_STATIC.map((cat) => (
+						<button
+							key={cat.slug}
+							type="button"
+							onClick={() => selectItemsSlug(cat.slug)}
+							className={[
+								"px-3 py-1 rounded-sm text-xs font-rajdhani font-semibold tracking-wider transition-all border",
+								itemsSlug === cat.slug
+									? "bg-cyan-950/60 border-cyan-700 text-cyan-400"
+									: "border-border text-slate-500 hover:text-slate-300 hover:border-slate-600",
+							].join(" ")}
+						>
+							{cat.label}
+							{itemsCountMap[cat.slug] > 0 && (
+								<span className="ml-1 text-[10px] text-slate-600">{itemsCountMap[cat.slug].toLocaleString()}</span>
+							)}
+						</button>
+					))}
+				</div>
+			)}
 			{mode === "fps" && (
 				<div className="flex flex-wrap gap-1.5 mb-4">
 					{chips.map((chip) => (
@@ -390,12 +429,11 @@ export default function ItemsPage() {
 											{/* Color bar */}
 											<div
 												className={`w-0.5 self-stretch rounded-full shrink-0 opacity-50 ${
-													activeSlug !== "all"
-														? (SLUG_COLOR[activeSlug] ?? "bg-slate-700")
-														: (TYPE_COLOR[item.type] ?? "bg-slate-700")
+													mode === "fps"
+														? (activeSlug !== "all" ? (SLUG_COLOR[activeSlug] ?? "bg-slate-700") : (TYPE_COLOR[item.type] ?? "bg-slate-700"))
+														: (itemsSlug !== "all" ? (ITEMS_SLUG_COLOR[itemsSlug] ?? "bg-slate-700") : (TYPE_COLOR[item.type] ?? "bg-slate-700"))
 												}`}
 											/>
-
 											{/* Info */}
 											<Link href={`/items/${item.uuid}`} className="flex-1 min-w-0">
 												<div className="flex items-center gap-2 flex-wrap">
