@@ -207,7 +207,7 @@ export default function ItemsPage() {
 	/** Manufacturer list for the current category */
 	const categoryTypes = mode === "fps"
 		? (activeSlug === "all" ? undefined : activeSlug)
-		: (itemsSlug === "chips" || itemsSlug === "food" ? "Consumable" : undefined);
+		: "Consumable"; // Items page only shows Consumable types (chips, food & drink)
 
 	const { data: mfrData } = useQuery({
 		queryKey: ["items.manufacturers", categoryTypes, env],
