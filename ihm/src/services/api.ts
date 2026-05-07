@@ -341,14 +341,15 @@ export const api = {
     filters: async (env?: string) => {
       const res = await get<{
         filters?: {
-          type?: { value: string }[];
-          sub_type?: { value: string }[];
+          type?: { value: string; count: number }[];
+          sub_type?: { value: string; count: number }[];
           manufacturer?: { value: string; label: string }[];
         };
       }>('/items/filters', { env });
       return {
         types: res.filters?.type?.map((t) => t.value) ?? [],
-        sub_types: res.filters?.sub_type?.map((t) => t.value) ?? [],
+        typeCounts: Object.fromEntries(res.filters?.type?.map((t) => [t.value, Number(t.count)]) ?? []) as Record<string, number>,
+        subTypeCounts: Object.fromEntries(res.filters?.sub_type?.map((t) => [t.value, Number(t.count)]) ?? []) as Record<string, number>,
         manufacturers: res.filters?.manufacturer ?? [],
       };
     },
