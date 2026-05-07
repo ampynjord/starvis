@@ -78,11 +78,12 @@ const ITEM_PATH_PATTERNS: Array<{ regex: RegExp; type: string; subType?: string 
   { regex: /scitem\/carryables\/1h\/.*module/i, type: 'Tool', subType: 'Module' },
   { regex: /scitem\/carryables\/1h\//i, type: 'Gadget', subType: 'Handheld' },
   { regex: /scitem\/carryables\/2h\//i, type: 'Gadget', subType: 'Two-handed' },
-  // Consumables — subType refined from path
-  { regex: /scitem\/consumables\/.*medic/i, type: 'Consumable', subType: 'Medical' },
-  { regex: /scitem\/consumables\/.*stim/i, type: 'Consumable', subType: 'Stim' },
-  { regex: /scitem\/consumables\/.*food/i, type: 'Consumable', subType: 'Food' },
-  { regex: /scitem\/consumables\/.*drink/i, type: 'Consumable', subType: 'Drink' },
+  // Consumables — subType refined from path. Match by folder for better coverage.
+  { regex: /scitem\/consumables\/(medical|medpack|medic)/i, type: 'Consumable', subType: 'Medical' },
+  { regex: /scitem\/consumables\/(stim|stimulant)/i, type: 'Consumable', subType: 'Stim' },
+  { regex: /scitem\/consumables\/(food|meal|recipe)/i, type: 'Consumable', subType: 'Food' },
+  { regex: /scitem\/consumables\/(drink|beverage|water|juice|tea|coffee|beer|wine|soda)/i, type: 'Consumable', subType: 'Drink' },
+  { regex: /scitem\/consumables\/(oxygen|oxy|o2)/i, type: 'Consumable', subType: 'OxygenCap' },
   { regex: /scitem\/consumables\//i, type: 'Consumable' },
 ];
 
@@ -519,6 +520,17 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
           item.type = 'Consumable';
           item.subType = 'Drink';
         }
+      }
+
+      // Fallback: Consumable items with null subType should attempt to infer from path or attachType
+      // to ensure Food/Drink items are not accidentally included in Tools & Medics category
+      if (item.type === 'Consumable' && !item.subType && extData.attachType && typeof extData.attachType === 'string') {
+        const attachTypeStr = String(extData.attachType).toLowerCase();
+        if (attachTypeStr.includes('food')) item.subType = 'Food';
+        else if (attachTypeStr.includes('drink') || attachTypeStr.includes('beverage')) item.subType = 'Drink';
+        else if (attachTypeStr.includes('medical') || attachTypeStr.includes('medic')) item.subType = 'Medical';
+        else if (attachTypeStr.includes('stim')) item.subType = 'Stim';
+        else if (attachTypeStr.includes('oxygen') || attachTypeStr.includes('o2')) item.subType = 'OxygenCap';
       }
 
       // Manufacturer fallback: try to match className prefix against DataForge manufacturer records.
