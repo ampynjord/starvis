@@ -37,29 +37,25 @@ const FPS_CATEGORIES_STATIC: { slug: string; label: string }[] = [
 ];
 
 type FpsSlug = (typeof FPS_CATEGORIES_STATIC)[number]["slug"];
-type ItemsSlug = "all" | "clothing" | "armor" | "chips" | "food";
+type ItemsSlug = "all" | "chips" | "food";
 
 const ITEMS_CATEGORIES_STATIC: { slug: ItemsSlug; label: string }[] = [
-	{ slug: "all",      label: "All" },
-	{ slug: "clothing", label: "Clothing" },
-	{ slug: "armor",    label: "Armor" },
-	{ slug: "chips",    label: "Chips" },
-	{ slug: "food",     label: "Food & Drink" },
+	{ slug: "all",   label: "All" },
+	{ slug: "chips", label: "Chips" },
+	{ slug: "food",  label: "Food & Drink" },
 ];
 
 const ITEMS_SLUG_COLOR: Record<ItemsSlug, string> = {
-	all:      "bg-cyan-500",
-	clothing: "bg-slate-500",
-	armor:    "bg-blue-500",
-	chips:    "bg-green-500",
-	food:     "bg-orange-500",
+	all:   "bg-cyan-500",
+	chips: "bg-green-500",
+	food:  "bg-orange-500",
 };
 
 /** FPS types covered by the FPS Gear page — excluded from Items page */
 const FPS_COVERED_TYPES = new Set([
 	"FPS_Weapon", "Armor_Helmet", "Armor_Torso", "Armor_Arms",
 	"Armor_Legs", "Armor_Backpack", "Undersuit", "Tool",
-	"Magazine", "Attachment", "Gadget",
+	"Magazine", "Attachment", "Gadget", "Clothing", "Armor",
 ]);
 
 const SLUG_COLOR: Record<FpsSlug | "all", string> = {
@@ -211,7 +207,7 @@ export default function ItemsPage() {
 	/** Manufacturer list for the current category */
 	const categoryTypes = mode === "fps"
 		? (activeSlug === "all" ? undefined : activeSlug)
-		: (itemsSlug === "clothing" ? "Clothing" : itemsSlug === "armor" ? "Armor" : itemsSlug === "chips" || itemsSlug === "food" ? "Consumable" : undefined);
+		: (itemsSlug === "chips" || itemsSlug === "food" ? "Consumable" : undefined);
 
 	const { data: mfrData } = useQuery({
 		queryKey: ["items.manufacturers", categoryTypes, env],
@@ -231,11 +227,9 @@ export default function ItemsPage() {
 	const tc = filters?.typeCounts ?? {};
 	const sc = filters?.subTypeCounts ?? {};
 	const itemsCountMap: Record<ItemsSlug, number> = {
-		all:      (tc.Clothing ?? 0) + (tc.Armor ?? 0) + (sc.Hacking ?? 0) + (sc.SystemAccess ?? 0) + (sc.Food ?? 0) + (sc.Drink ?? 0),
-		clothing: tc.Clothing ?? 0,
-		armor:    tc.Armor ?? 0,
-		chips:    (sc.Hacking ?? 0) + (sc.SystemAccess ?? 0),
-		food:     (sc.Food ?? 0) + (sc.Drink ?? 0),
+		all:   (sc.Hacking ?? 0) + (sc.SystemAccess ?? 0) + (sc.Food ?? 0) + (sc.Drink ?? 0),
+		chips: (sc.Hacking ?? 0) + (sc.SystemAccess ?? 0),
+		food:  (sc.Food ?? 0) + (sc.Drink ?? 0),
 	};
 
 	const selectSlug = (slug: FpsSlug | "all") => {
@@ -281,13 +275,10 @@ export default function ItemsPage() {
 			// items mode — all types not covered by FPS Gear
 			const otherTypes = (filters?.types ?? []).filter((t) => !FPS_COVERED_TYPES.has(t));
 
-			if (itemFamily === "clothing") {
-				return api.items.list({ ...base, type: "Clothing" });
-			}
-			if (itemFamily === "mission") {
+			if (itemsSlug === "chips") {
 				return api.items.list({ ...base, type: "Consumable", sub_types: "Hacking,SystemAccess" });
 			}
-			if (itemFamily === "food") {
+			if (itemsSlug === "food") {
 				return api.items.list({ ...base, type: "Consumable", sub_types: "Food,Drink" });
 			}
 
