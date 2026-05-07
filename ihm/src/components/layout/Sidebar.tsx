@@ -51,15 +51,16 @@ const SHIPS_ITEMS: NavItemDef[] = [
 
 const FPS_ITEMS: NavItemDef[] = [
   { to: '/fps-gear',       icon: Crosshair,         label: 'FPS Gear' },
-  { to: '/items',          icon: Layers3,           label: 'Items' },
+  { to: '/consumables',    icon: Layers3,           label: 'Consumables' },
   { to: '/fps-calculator', icon: SlidersHorizontal, label: 'FPS Calculator', comingSoon: true },
 ];
 
 const ECONOMY_ITEMS: NavItemDef[] = [
   { to: '/industrial', icon: Factory,    label: 'Commodities' },
   { to: '/blueprints', icon: Scroll,     label: 'Blueprints & Crafting' },
+  { to: '/minerals',   icon: Pickaxe,    label: 'Minerals Library' },
+  { to: '/mining',     icon: BarChart3,  label: 'Mining Calculator', comingSoon: true },
   { to: '/trade',      icon: TrendingUp, label: 'Trade Routes',      comingSoon: true },
-  { to: '/mining',     icon: Pickaxe,    label: 'Mining Calculator', comingSoon: true },
 ];
 
 const UNIVERSE_ITEMS: NavItemDef[] = [
@@ -206,7 +207,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         </div>
         <NavItem to="/" icon={Home} label="Dashboard" onNavigate={onClose} />
         <NavGroup label="Ships" items={SHIPS_ITEMS} onNavigate={onClose} />
-        <NavGroup label="FPS Combat" items={FPS_ITEMS} onNavigate={onClose} />
+        <NavGroup label="FPS & Equipment" items={FPS_ITEMS} onNavigate={onClose} />
         <NavGroup label="Economy & Industry" items={ECONOMY_ITEMS} onNavigate={onClose} />
         <NavGroup label="Universe" items={UNIVERSE_ITEMS} onNavigate={onClose} />
         {user?.role === 'admin' && (

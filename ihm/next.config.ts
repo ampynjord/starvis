@@ -18,7 +18,9 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       { source: '/equipment', destination: '/components', permanent: true },
-      { source: '/other-items', destination: '/items', permanent: true },
+      { source: '/other-items', destination: '/consumables', permanent: true },
+      { source: '/items', destination: '/consumables', permanent: true },
+      { source: '/items/:uuid', destination: '/consumables/:uuid', permanent: true },
       { source: '/commodities', destination: '/industrial', permanent: true },
       { source: '/factions', destination: '/missions', permanent: true },
     ];

@@ -235,8 +235,8 @@ export default function ItemDetailPage() {
   const consumableSubType = item.sub_type ?? '';
   const isItemsConsumable = item.type === 'Consumable' && ['Food', 'Drink', 'Hacking', 'SystemAccess'].includes(consumableSubType);
   const slug = isItemsConsumable ? '' : TYPE_TO_SLUG[item.type];
-  const breadcrumbHref = isItemsConsumable ? '/items' : slug ? `/fps-gear?cat=${slug}` : '/items';
-  const breadcrumbLabel = isItemsConsumable || !slug ? 'Items' : 'FPS Gear';
+  const breadcrumbHref = isItemsConsumable ? '/consumables' : slug ? `/fps-gear?cat=${slug}` : '/consumables';
+  const breadcrumbLabel = isItemsConsumable || !slug ? 'Consumables' : 'FPS Gear';
 
   const isWeapon = item.type === 'FPS_Weapon';
   const isArmor = item.type.startsWith('Armor_') || item.type === 'Undersuit';
