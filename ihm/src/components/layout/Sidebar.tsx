@@ -2,75 +2,19 @@
 
 import { motion } from 'framer-motion';
 import {
-  BarChart3,
   BookOpen,
-  Crosshair,
   ExternalLink,
-  Factory,
-  Globe,
   Home,
-  Layers3,
   Lock,
-  MapPin,
-  Newspaper,
-  Paintbrush,
-  Pickaxe,
-  Rocket,
-  Scroll,
-  Settings2,
   Shield,
-  SlidersHorizontal,
-  TrendingUp,
-  Trophy,
   User,
-  Wrench,
-  ClipboardList,
   X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEnv } from '@/contexts/EnvContext';
 import { useAuth } from '@/contexts/AuthContext';
-
-type NavItemDef = {
-  to: string;
-  icon: React.ElementType;
-  label: string;
-  auth?: boolean;
-  comingSoon?: boolean;
-};
-
-const SHIPS_ITEMS: NavItemDef[] = [
-  { to: '/ships',      icon: Rocket,            label: 'Ships & Vehicles' },
-  { to: '/components', icon: Settings2,         label: 'Ship Components' },
-  { to: '/paints',     icon: Paintbrush,        label: 'Paints' },
-  { to: '/compare',    icon: BarChart3,         label: 'Compare' },
-  { to: '/ranking',    icon: Trophy,            label: 'Ranking' },
-  { to: '/outfitter',  icon: SlidersHorizontal, label: 'Loadout Manager', comingSoon: true },
-];
-
-const FPS_ITEMS: NavItemDef[] = [
-  { to: '/fps-gear',       icon: Crosshair,         label: 'FPS Gear' },
-  { to: '/consumables',    icon: Layers3,           label: 'Consumables' },
-  { to: '/fps-calculator', icon: SlidersHorizontal, label: 'FPS Calculator', comingSoon: true },
-];
-
-const ECONOMY_ITEMS: NavItemDef[] = [
-  { to: '/industrial', icon: Factory,    label: 'Commodities' },
-  { to: '/blueprints', icon: Scroll,     label: 'Blueprints & Crafting' },
-  { to: '/minerals',   icon: Pickaxe,    label: 'Minerals Library' },
-  { to: '/mining',     icon: BarChart3,  label: 'Mining Calculator', comingSoon: true },
-  { to: '/trade',      icon: TrendingUp, label: 'Trade Routes',      comingSoon: true },
-];
-
-const UNIVERSE_ITEMS: NavItemDef[] = [
-  { to: '/missions',      icon: ClipboardList, label: 'Missions' },
-  { to: '/locations',     icon: MapPin,        label: 'Locations' },
-  { to: '/factions',      icon: Shield,        label: 'Factions' },
-  { to: '/manufacturers', icon: Wrench,        label: 'Manufacturers' },
-  { to: '/galactapedia',  icon: Globe,         label: 'Galactapedia' },
-  { to: '/comm-links',    icon: Newspaper,     label: 'Comm-Links' },
-];
+import { NAV_GROUPS, type NavItemDef } from '@/components/layout/navigation';
 
 
 function NavItem({ to, icon: Icon, label, auth: requiresAuth, comingSoon, onNavigate }: NavItemDef & { onNavigate?: () => void }) {
@@ -206,10 +150,9 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           </div>
         </div>
         <NavItem to="/" icon={Home} label="Dashboard" onNavigate={onClose} />
-        <NavGroup label="Ships" items={SHIPS_ITEMS} onNavigate={onClose} />
-        <NavGroup label="FPS & Equipment" items={FPS_ITEMS} onNavigate={onClose} />
-        <NavGroup label="Economy & Industry" items={ECONOMY_ITEMS} onNavigate={onClose} />
-        <NavGroup label="Universe" items={UNIVERSE_ITEMS} onNavigate={onClose} />
+        {NAV_GROUPS.map((group) => (
+          <NavGroup key={group.id} label={group.label} items={group.items} onNavigate={onClose} />
+        ))}
         {user?.role === 'admin' && (
           <NavGroup label="Admin" items={[{ to: '/admin', icon: Shield, label: 'Administration' }]} onNavigate={onClose} />
         )}
