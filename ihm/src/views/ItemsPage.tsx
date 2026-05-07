@@ -37,18 +37,16 @@ const FPS_CATEGORIES_STATIC: { slug: string; label: string }[] = [
 ];
 
 type FpsSlug = (typeof FPS_CATEGORIES_STATIC)[number]["slug"];
-type ItemsSlug = "all" | "chips" | "food";
+type ItemsSlug = "all" | "chips";
 
 const ITEMS_CATEGORIES_STATIC: { slug: ItemsSlug; label: string }[] = [
 	{ slug: "all",   label: "All" },
 	{ slug: "chips", label: "Chips" },
-	{ slug: "food",  label: "Food & Drink" },
 ];
 
 const ITEMS_SLUG_COLOR: Record<ItemsSlug, string> = {
 	all:   "bg-cyan-500",
 	chips: "bg-green-500",
-	food:  "bg-orange-500",
 };
 
 /** FPS types covered by the FPS Gear page — excluded from Items page */
@@ -207,7 +205,7 @@ export default function ItemsPage() {
 	/** Manufacturer list for the current category */
 	const categoryTypes = mode === "fps"
 		? (activeSlug === "all" ? undefined : activeSlug)
-		: "Consumable"; // Items page only shows Consumable types (chips, food & drink)
+		: "Consumable"; // Items page only shows Consumable types (Hacking/SystemAccess)
 
 	const { data: mfrData } = useQuery({
 		queryKey: ["items.manufacturers", categoryTypes, env],
@@ -226,9 +224,8 @@ export default function ItemsPage() {
 		: [];
 	const sc = filters?.subTypeCounts ?? {};
 	const itemsCountMap: Record<ItemsSlug, number> = {
-		all:   (sc.Hacking ?? 0) + (sc.SystemAccess ?? 0) + (sc.Food ?? 0) + (sc.Drink ?? 0),
+		all:   (sc.Hacking ?? 0) + (sc.SystemAccess ?? 0),
 		chips: (sc.Hacking ?? 0) + (sc.SystemAccess ?? 0),
-		food:  (sc.Food ?? 0) + (sc.Drink ?? 0),
 	};
 
 	const selectSlug = (slug: FpsSlug | "all") => {
@@ -276,9 +273,6 @@ export default function ItemsPage() {
 
 			if (itemsSlug === "chips") {
 				return api.items.list({ ...base, type: "Consumable", sub_types: "Hacking,SystemAccess" });
-			}
-			if (itemsSlug === "food") {
-				return api.items.list({ ...base, type: "Consumable", sub_types: "Food,Drink" });
 			}
 
 			// "All": everything non-FPS, exclude medical consumables (covered by FPS Gear Tools & Medics)
