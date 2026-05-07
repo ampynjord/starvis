@@ -207,7 +207,7 @@ export default function ItemsPage() {
 	/** Manufacturer list for the current category */
 	const categoryTypes = mode === "fps"
 		? (activeSlug === "all" ? undefined : activeSlug)
-		: "Consumable"; // Items page only shows Consumable types (Hacking/SystemAccess/Medical/MedPack/OxygenCap)
+		: "Consumable"; // Items page only shows Consumable types (Hacking/SystemAccess/Food/Drink)
 
 	const { data: mfrData } = useQuery({
 		queryKey: ["items.manufacturers", categoryTypes, env],
@@ -226,9 +226,9 @@ export default function ItemsPage() {
 		: [];
 	const sc = filters?.subTypeCounts ?? {};
 	const itemsCountMap: Record<ItemsSlug, number> = {
-		all:        (sc.Hacking ?? 0) + (sc.SystemAccess ?? 0) + (sc.Medical ?? 0) + (sc.MedPack ?? 0) + (sc.OxygenCap ?? 0),
+		all:        (sc.Hacking ?? 0) + (sc.SystemAccess ?? 0) + (sc.Food ?? 0) + (sc.Drink ?? 0),
 		chips:      (sc.Hacking ?? 0) + (sc.SystemAccess ?? 0),
-		consumable: (sc.Medical ?? 0) + (sc.MedPack ?? 0) + (sc.OxygenCap ?? 0),
+		consumable: (sc.Food ?? 0) + (sc.Drink ?? 0),
 	};
 
 	const selectSlug = (slug: FpsSlug | "all") => {
@@ -278,7 +278,7 @@ export default function ItemsPage() {
 				return api.items.list({ ...base, type: "Consumable", sub_types: "Hacking,SystemAccess" });
 			}
 			if (itemsSlug === "consumable") {
-				return api.items.list({ ...base, type: "Consumable", sub_types: "Medical,MedPack,OxygenCap" });
+				return api.items.list({ ...base, type: "Consumable", sub_types: "Food,Drink" });
 			}
 
 			// "All": everything non-FPS, exclude medical consumables (covered by FPS Gear Tools & Medics)
