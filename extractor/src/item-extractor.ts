@@ -509,6 +509,18 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
         item.weaponDps = rawDps < 999999 ? Math.round(rawDps * 10000) / 10000 : null;
       }
 
+      // Refine Gadget/Handheld carryables that are actually Food or Drink
+      // using the AttachDef.Type from DataForge (already stored in extData.attachType)
+      if (item.type === 'Gadget' && item.subType === 'Handheld') {
+        if (extData.attachType === 'Food') {
+          item.type = 'Consumable';
+          item.subType = 'Food';
+        } else if (extData.attachType === 'Drink') {
+          item.type = 'Consumable';
+          item.subType = 'Drink';
+        }
+      }
+
       // Manufacturer fallback: try to match className prefix against DataForge manufacturer records.
       // Only assigns if the code is known to be a real manufacturer (in DataForge SCItemManufacturer),
       // to avoid false positives like DOOR_, SEAT_, RACK_, etc.
