@@ -37,18 +37,12 @@ const FPS_CATEGORIES_STATIC: { slug: string; label: string }[] = [
 ];
 
 type FpsSlug = (typeof FPS_CATEGORIES_STATIC)[number]["slug"];
-type ItemsSlug = "all" | "chips" | "consumable";
+type ItemsSlug = "all" | "chips" | "other" | `sub:${string}`;
 
-const ITEMS_CATEGORIES_STATIC: { slug: ItemsSlug; label: string }[] = [
-	{ slug: "all",        label: "All" },
-	{ slug: "chips",      label: "Chips" },
-	{ slug: "consumable", label: "Consumable" },
-];
-
-const ITEMS_SLUG_COLOR: Record<ItemsSlug, string> = {
-	all:        "bg-cyan-500",
-	chips:      "bg-green-500",
-	consumable: "bg-purple-500",
+const ITEMS_SLUG_COLOR: Record<string, string> = {
+	all: "bg-cyan-500",
+	chips: "bg-green-500",
+	other: "bg-yellow-500",
 };
 
 /** FPS types covered by the FPS Gear page — excluded from Items page */
@@ -86,6 +80,19 @@ const TYPE_COLOR: Record<string, string> = {
 	Attachment:  "bg-purple-500",
 	Magazine:    "bg-amber-500",
 };
+
+const CHIP_SUBTYPES = ["Hacking", "SystemAccess"] as const;
+const CONSUMABLE_SUBTYPE_ORDER = ["Food", "Drink", "Medical", "MedPack", "OxygenCap", "Stim"] as const;
+
+function formatConsumableLabel(subType: string): string {
+	const explicitLabels: Record<string, string> = {
+		SystemAccess: "System Access",
+		MedPack: "MedPack",
+		OxygenCap: "Oxygen Cap",
+	};
+	if (explicitLabels[subType]) return explicitLabels[subType];
+	return subType.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/_/g, " ");
+}
 
 
 
@@ -204,15 +211,23 @@ export default function ItemsPage() {
 		enabled: mode === "other",
 	});
 
+	const { data: consumableSubTypes } = useQuery({
+		queryKey: ["items.subTypes", "Consumable", env],
+		queryFn: async () => (await api.items.subTypes("Consumable", env)).sub_types,
+		staleTime: 5 * 60_000,
+		enabled: mode === "other",
+	});
+
 	/** Manufacturer list for the current category */
 	const categoryTypes = mode === "fps"
 		? (activeSlug === "all" ? undefined : activeSlug)
-		: "Consumable"; // Items page only shows Consumable types (Hacking/SystemAccess/Food/Drink)
+		: undefined;
 
 	const { data: mfrData } = useQuery({
 		queryKey: ["items.manufacturers", categoryTypes, env],
 		queryFn: () => api.items.manufacturers(categoryTypes, env),
 		staleTime: 5 * 60_000,
+		enabled: mode === "fps",
 	});
 
 	// Build chip list — static labels shown immediately, counts added when API responds
@@ -224,12 +239,40 @@ export default function ItemsPage() {
 				...FPS_CATEGORIES_STATIC.map((c) => ({ ...c, count: countMap.get(c.slug) ?? 0 })),
 			]
 		: [];
-	const sc = filters?.subTypeCounts ?? {};
-	const itemsCountMap: Record<ItemsSlug, number> = {
-		all:        (sc.Hacking ?? 0) + (sc.SystemAccess ?? 0) + (sc.Food ?? 0) + (sc.Drink ?? 0),
-		chips:      (sc.Hacking ?? 0) + (sc.SystemAccess ?? 0),
-		consumable: (sc.Food ?? 0) + (sc.Drink ?? 0),
-	};
+	const otherTypes = (filters?.types ?? []).filter((t) => !FPS_COVERED_TYPES.has(t));
+	const nonConsumableOtherTypes = otherTypes.filter((t) => t !== "Consumable");
+	const consumableEntries = (consumableSubTypes ?? []).filter((entry) => Number(entry.count) > 0);
+	const consumableCountMap = Object.fromEntries(
+		consumableEntries.map((entry) => [entry.value, Number(entry.count)]),
+	) as Record<string, number>;
+	const chipCount = CHIP_SUBTYPES.reduce((sum, value) => sum + (consumableCountMap[value] ?? 0), 0);
+	const otherCount = nonConsumableOtherTypes.reduce((sum, value) => sum + (filters?.typeCounts[value] ?? 0), 0);
+	const orderedConsumableEntries = consumableEntries
+		.filter((entry) => !CHIP_SUBTYPES.includes(entry.value as (typeof CHIP_SUBTYPES)[number]))
+		.sort((left, right) => {
+			const leftIndex = CONSUMABLE_SUBTYPE_ORDER.indexOf(left.value as (typeof CONSUMABLE_SUBTYPE_ORDER)[number]);
+			const rightIndex = CONSUMABLE_SUBTYPE_ORDER.indexOf(right.value as (typeof CONSUMABLE_SUBTYPE_ORDER)[number]);
+			const leftRank = leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex;
+			const rightRank = rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex;
+			if (leftRank !== rightRank) return leftRank - rightRank;
+			return formatConsumableLabel(left.value).localeCompare(formatConsumableLabel(right.value));
+		});
+	const itemCategories: { slug: ItemsSlug; label: string; count: number }[] = mode === "other"
+		? [
+				{
+					slug: "all",
+					label: "All",
+					count: consumableEntries.reduce((sum, entry) => sum + Number(entry.count), 0) + otherCount,
+				},
+				...(chipCount > 0 ? [{ slug: "chips" as const, label: "Chips", count: chipCount }] : []),
+				...orderedConsumableEntries.map((entry) => ({
+					slug: `sub:${entry.value}` as const,
+					label: formatConsumableLabel(entry.value),
+					count: Number(entry.count),
+				})),
+				{ slug: "other", label: "Other", count: otherCount },
+			]
+		: [];
 
 	const selectSlug = (slug: FpsSlug | "all") => {
 		setActiveSlug(slug);
@@ -239,11 +282,18 @@ export default function ItemsPage() {
 
 	const selectItemsSlug = (slug: ItemsSlug) => {
 		setItemsSlug(slug);
-		setManufacturer("");
+		setSubType("");
 		setPage(1);
 	};
 
-	const subTypeOptions = SLUG_SUBTYPES[activeSlug as FpsSlug] ?? [];
+	const fpsSubTypeOptions = SLUG_SUBTYPES[activeSlug as FpsSlug] ?? [];
+	const consumableFilterOptions = mode !== "other"
+		? []
+		: itemsSlug === "chips"
+			? CHIP_SUBTYPES.filter((value) => consumableCountMap[value] > 0).map((value) => ({ label: formatConsumableLabel(value), value }))
+			: itemsSlug === "all"
+				? consumableEntries.map((entry) => ({ label: formatConsumableLabel(entry.value), value: entry.value }))
+				: [];
 
 	// Build query call
 	const isCategory = mode === "fps" && activeSlug !== "all";
@@ -271,24 +321,30 @@ export default function ItemsPage() {
 					exclude_sub_types: "Food,Drink",
 				});
 			}
-			// items mode — all types not covered by FPS Gear
-			const otherTypes = (filters?.types ?? []).filter((t) => !FPS_COVERED_TYPES.has(t));
-
+			// consumables mode — all non-FPS item types, with consumable subtypes split into dedicated chips
 			if (itemsSlug === "chips") {
-				return api.items.list({ ...base, type: "Consumable", sub_types: "Hacking,SystemAccess" });
+				return api.items.list({ ...base, type: "Consumable", sub_types: CHIP_SUBTYPES.join(",") });
 			}
-			if (itemsSlug === "consumable") {
-				return api.items.list({ ...base, type: "Consumable", sub_types: "Food,Drink" });
+			if (itemsSlug.startsWith("sub:")) {
+				return api.items.list({ ...base, type: "Consumable", sub_types: itemsSlug.slice(4) });
+			}
+			if (itemsSlug === "other") {
+				return api.items.list({ ...base, types: nonConsumableOtherTypes.join(",") || undefined });
 			}
 
-			// "All": everything non-FPS, exclude medical consumables (covered by FPS Gear Tools & Medics)
-			const mergedTypes = otherTypes.join(",");
-			return api.items.list({ ...base, types: mergedTypes || undefined, exclude_sub_types: "Medical,MedPack,OxygenCap,Stim" });
+			// "All": everything outside FPS Gear, including every consumable subtype
+			return api.items.list({ ...base, types: otherTypes.join(",") || undefined });
 		},
 		enabled: mode === "other" ? !!filters : true,
 	});
 
-	const hasFilters = !!(manufacturer || debouncedSearch || subType || activeSlug !== "all" || (mode === "other" && itemsSlug !== "all"));
+	const hasFilters = !!(
+		(mode === "fps" && manufacturer)
+		|| debouncedSearch
+		|| subType
+		|| activeSlug !== "all"
+		|| (mode === "other" && itemsSlug !== "all")
+	);
 	const resetFilters = () => {
 		resetListState();
 		setManufacturer("");
@@ -297,32 +353,45 @@ export default function ItemsPage() {
 		setItemsSlug("all");
 	};
 
-	const filterGroups = [
-		...(subTypeOptions.length > 0
+	const filterGroups = mode === "fps"
+		? [
+				...(fpsSubTypeOptions.length > 0
+					? [{
+							key: "subtype",
+							label: activeSlug === "weapons" ? "Weapon type" : "Weight",
+							options: fpsSubTypeOptions,
+							value: subType,
+							onChange: (v: string) => { setSubType(v); setPage(1); },
+						}]
+					: []),
+				{
+					key: "mfr",
+					label: "Manufacturer",
+					options: (mfrData?.manufacturers ?? []).map((m) => ({
+						label: m.name,
+						value: m.code,
+					})),
+					value: manufacturer,
+					onChange: (v: string) => { setManufacturer(v); setPage(1); },
+				},
+			]
+		: consumableFilterOptions.length > 0
 			? [{
-					key: "subtype",
-					label: activeSlug === "weapons" ? "Weapon type" : "Weight",
-					options: subTypeOptions,
+					key: "consumable-subtype",
+					label: itemsSlug === "chips" ? "Chip type" : "Consumable type",
+					options: consumableFilterOptions,
 					value: subType,
 					onChange: (v: string) => { setSubType(v); setPage(1); },
 				}]
-			: []),
-		{
-			key: "mfr",
-			label: "Manufacturer",
-			options: (mfrData?.manufacturers ?? []).map((m) => ({
-				label: m.name,
-				value: m.code,
-			})),
-			value: manufacturer,
-			onChange: (v: string) => { setManufacturer(v); setPage(1); },
-		},
-	];
+			: [];
+	const isFiltersLoading = mode === "fps"
+		? !mfrData
+		: !filters || !consumableSubTypes;
 
 	const getItemName = (item: ItemListItem) =>
 		item.displayName ?? item.display_name ?? item.name;
 
-	const pageTitle = mode === "other" ? "Items" : "FPS Gear";
+	const pageTitle = mode === "other" ? "Consumables" : "FPS Gear";
 
 	return (
 		<div className="max-w-(--breakpoint-2xl) mx-auto">
@@ -338,7 +407,7 @@ export default function ItemsPage() {
 			{/* Category chips */}
 			{mode === "other" && (
 				<div className="flex flex-wrap gap-1.5 mb-4">
-					{ITEMS_CATEGORIES_STATIC.map((cat) => (
+					{itemCategories.map((cat) => (
 						<button
 							key={cat.slug}
 							type="button"
@@ -351,8 +420,8 @@ export default function ItemsPage() {
 							].join(" ")}
 						>
 							{cat.label}
-							{itemsCountMap[cat.slug] > 0 && (
-								<span className="ml-1 text-[10px] text-slate-600">{itemsCountMap[cat.slug].toLocaleString()}</span>
+							{cat.count > 0 && (
+								<span className="ml-1 text-[10px] text-slate-600">{cat.count.toLocaleString()}</span>
 							)}
 						</button>
 					))}
@@ -384,15 +453,19 @@ export default function ItemsPage() {
 			<div className="flex gap-4">
 				<div className="w-44 shrink-0">
 					<MobileFilterWrapper hasFilters={hasFilters}>
-					{filterGroups.length > 0 ? (
+					{isFiltersLoading ? (
+						<div className="sci-panel p-3 text-xs text-slate-600 animate-pulse">
+							Loading…
+						</div>
+					) : filterGroups.length > 0 ? (
 						<FilterPanel
 							hasFilters={hasFilters}
 							onReset={resetFilters}
 							groups={filterGroups}
 						/>
 					) : (
-						<div className="sci-panel p-3 text-xs text-slate-600 animate-pulse">
-							Loading…
+						<div className="sci-panel p-3 text-xs text-slate-600">
+							No extra filters for this category.
 						</div>
 					)}
 					</MobileFilterWrapper>

@@ -31,6 +31,7 @@ import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { NAV_GROUPS } from '@/components/layout/navigation';
 import { fDate, fNumber } from '@/utils/formatters';
 import type { ChangelogEntry, StatsOverview } from '@/types/api';
 
@@ -47,51 +48,49 @@ type SectionDef = {
   links: { label: string; to: string }[];
 };
 
-const SECTIONS: SectionDef[] = [
-  {
-    id: 'ships', label: 'Ships', icon: Rocket,
-    color: 'text-cyan-400', border: 'border-cyan-900/50 hover:border-cyan-700/60', glow: 'from-cyan-950/20',
+const HOME_SECTION_META: Record<string, Omit<SectionDef, 'label' | 'links'>> = {
+  ships: {
+    id: 'ships',
+    icon: Rocket,
+    color: 'text-cyan-400',
+    border: 'border-cyan-900/50 hover:border-cyan-700/60',
+    glow: 'from-cyan-950/20',
     statKey: 'ships',
-    links: [
-      { label: 'Ships & Vehicles', to: '/ships' },
-      { label: 'Ship Components',  to: '/components' },
-      { label: 'Paints',           to: '/paints' },
-      { label: 'Compare',          to: '/compare' },
-      { label: 'Ranking',          to: '/ranking' },
-    ],
   },
-  {
-    id: 'fps', label: 'FPS Combat', icon: Crosshair,
-    color: 'text-violet-400', border: 'border-violet-900/50 hover:border-violet-700/60', glow: 'from-violet-950/20',
+  fps: {
+    id: 'fps',
+    icon: Crosshair,
+    color: 'text-violet-400',
+    border: 'border-violet-900/50 hover:border-violet-700/60',
+    glow: 'from-violet-950/20',
     statKey: 'items',
-    links: [
-      { label: 'FPS Gear',     to: '/fps-gear' },
-      { label: 'Other Items',  to: '/other-items' },
-    ],
   },
-  {
-    id: 'economy', label: 'Economy & Industry', icon: TrendingUp,
-    color: 'text-amber-400', border: 'border-amber-900/50 hover:border-amber-700/60', glow: 'from-amber-950/20',
+  economy: {
+    id: 'economy',
+    icon: TrendingUp,
+    color: 'text-amber-400',
+    border: 'border-amber-900/50 hover:border-amber-700/60',
+    glow: 'from-amber-950/20',
     statKey: 'commodities',
-    links: [
-      { label: 'Commodities',         to: '/industrial' },
-      { label: 'Blueprints & Crafting', to: '/blueprints' },
-    ],
   },
-  {
-    id: 'universe', label: 'Universe', icon: Globe,
-    color: 'text-emerald-400', border: 'border-emerald-900/50 hover:border-emerald-700/60', glow: 'from-emerald-950/20',
+  universe: {
+    id: 'universe',
+    icon: Globe,
+    color: 'text-emerald-400',
+    border: 'border-emerald-900/50 hover:border-emerald-700/60',
+    glow: 'from-emerald-950/20',
     statKey: null,
-    links: [
-      { label: 'Missions',      to: '/missions' },
-      { label: 'Locations',     to: '/locations' },
-      { label: 'Factions',      to: '/factions' },
-      { label: 'Manufacturers', to: '/manufacturers' },
-      { label: 'Galactapedia',  to: '/galactapedia' },
-      { label: 'Comm-Links',    to: '/comm-links' },
-    ],
   },
-];
+};
+
+const SECTIONS: SectionDef[] = NAV_GROUPS.map((group) => ({
+  ...HOME_SECTION_META[group.id],
+  label: group.label,
+  links: group.items.filter((item) => !item.comingSoon && !item.auth).map((item) => ({
+    label: item.label,
+    to: item.to,
+  })),
+}));
 
 type ToolCategory = 'combat' | 'economy' | 'data';
 
@@ -132,6 +131,14 @@ const ENTITY_COLOR: Record<string, string> = {
   item:      'text-violet-400',
   commodity: 'text-amber-400',
 };
+
+function entityHref(type: string, uuid: string): string | null {
+  if (type === 'ship') return `/ships/${uuid}`;
+  if (type === 'component') return `/components/${uuid}`;
+  if (type === 'item') return `/items/${uuid}`;
+  if (type === 'commodity') return '/industrial';
+  return null;
+}
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -176,15 +183,32 @@ function ChangelogRow({ entry }: { entry: ChangelogEntry }) {
   const ct = (entry.change_type ?? 'modified') as 'added' | 'removed' | 'modified';
   const { Icon, cls, bg } = CHANGE_ICON[ct] ?? CHANGE_ICON.modified;
   const entityColor = ENTITY_COLOR[entry.entity_type] ?? 'text-slate-400';
-
-  return (
-    <div className="flex items-center gap-2.5 px-3 py-2 hover:bg-white/[0.025] transition-colors rounded-sm">
+  const href = entityHref(entry.entity_type, entry.entity_uuid);
+  const content = (
+    <>
       <span className={`inline-flex items-center justify-center w-5 h-5 rounded-sm border shrink-0 ${bg}`}>
         <Icon size={9} className={cls} />
       </span>
       <span className="flex-1 min-w-0 text-sm font-rajdhani text-slate-300 truncate">{entry.entity_name}</span>
       <span className={`text-[10px] font-mono-sc shrink-0 ${entityColor}`}>{entry.entity_type}</span>
-    </div>
+    </>
+  );
+
+  if (!href) {
+    return (
+      <div className="flex items-center gap-2.5 px-3 py-2 hover:bg-white/[0.025] transition-colors rounded-sm">
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-2.5 px-3 py-2 hover:bg-white/[0.025] hover:text-cyan-300 transition-colors rounded-sm"
+    >
+      {content}
+    </Link>
   );
 }
 
