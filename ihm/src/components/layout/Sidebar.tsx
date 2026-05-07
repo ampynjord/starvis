@@ -20,10 +20,11 @@ import { NAV_GROUPS, type NavItemDef } from '@/components/layout/navigation';
 function NavItem({ to, icon: Icon, label, auth: requiresAuth, comingSoon, onNavigate }: NavItemDef & { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const isActive = !comingSoon && (to === '/' ? pathname === '/' : pathname?.startsWith(to));
   const locked = requiresAuth && !user;
 
-  if (comingSoon) {
+  if (comingSoon && !isAdmin) {
     return (
       <div className="flex items-center gap-3 px-2 py-2.5 rounded-sm border border-transparent cursor-default select-none opacity-40">
         <Icon size={16} className="shrink-0 text-slate-600" strokeWidth={1.5} />
@@ -34,6 +35,29 @@ function NavItem({ to, icon: Icon, label, auth: requiresAuth, comingSoon, onNavi
           SOON
         </span>
       </div>
+    );
+  }
+
+  if (comingSoon && isAdmin) {
+    return (
+      <Link
+        href={to}
+        onClick={onNavigate}
+        className={[
+          'flex items-center gap-3 px-2 py-2.5 rounded-sm transition-all duration-150 group border',
+          pathname?.startsWith(to)
+            ? 'bg-amber-950/40 border-amber-800/60 text-amber-400'
+            : 'text-slate-400 hover:text-slate-200 hover:bg-amber-950/20 border-amber-900/30',
+        ].join(' ')}
+      >
+        <Icon size={16} className="shrink-0 text-slate-500 group-hover:text-slate-300" strokeWidth={1.5} />
+        <span className="font-rajdhani font-semibold text-sm uppercase tracking-wider truncate flex-1">
+          {label}
+        </span>
+        <span className="shrink-0 text-[9px] font-orbitron font-bold tracking-widest text-amber-600 bg-amber-950/60 border border-amber-800/50 px-1.5 py-0.5 rounded-sm">
+          SOON
+        </span>
+      </Link>
     );
   }
 

@@ -29,6 +29,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { NAV_GROUPS } from '@/components/layout/navigation';
@@ -216,6 +217,8 @@ function ChangelogRow({ entry }: { entry: ChangelogEntry }) {
 
 export default function HomePage() {
   const { env } = useEnv();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const router = useRouter();
   const [heroSearch, setHeroSearch] = useState('');
   const handleHeroSearch = (e: React.FormEvent) => {
@@ -508,18 +511,25 @@ export default function HomePage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {TOOLS.map(({ to, icon: Icon, label, sub, category, badge, comingSoon }, i) => {
             const cat = CATEGORY_LABEL[category];
+            const adminPreview = comingSoon && isAdmin;
             const inner = (
               <div className={[
                 'sci-panel p-4 h-full border transition-colors duration-150',
-                comingSoon
+                comingSoon && !isAdmin
                   ? 'opacity-40 cursor-default border-transparent'
-                  : `${cat.border} group cursor-pointer`,
+                  : adminPreview
+                    ? 'border-amber-900/40 group cursor-pointer hover:border-amber-700/50 hover:bg-amber-950/10'
+                    : `${cat.border} group cursor-pointer`,
               ].join(' ')}>
                 <div className="flex items-start justify-between mb-3">
-                  <Icon size={18} className={comingSoon ? 'text-slate-700 shrink-0' : 'text-slate-500 group-hover:text-slate-200 transition-colors shrink-0'} />
+                  <Icon size={18} className={comingSoon && !isAdmin ? 'text-slate-700 shrink-0' : 'text-slate-500 group-hover:text-slate-200 transition-colors shrink-0'} />
                   <div className="flex flex-col items-end gap-1">
                     {comingSoon ? (
-                      <span className="font-orbitron text-[8px] tracking-widest text-slate-600 border border-slate-800 rounded-sm px-1.5 py-0.5 uppercase">
+                      <span className={`font-orbitron text-[8px] tracking-widest border rounded-sm px-1.5 py-0.5 uppercase ${
+                        adminPreview
+                          ? 'text-amber-600 border-amber-800/60 bg-amber-950/40'
+                          : 'text-slate-600 border-slate-800'
+                      }`}>
                         SOON
                       </span>
                     ) : badge && (
@@ -527,15 +537,15 @@ export default function HomePage() {
                         {badge}
                       </span>
                     )}
-                    <span className={`font-mono-sc text-[8px] uppercase tracking-widest ${comingSoon ? 'text-slate-700' : cat.color} opacity-60`}>
+                    <span className={`font-mono-sc text-[8px] uppercase tracking-widest ${comingSoon && !isAdmin ? 'text-slate-700' : cat.color} opacity-60`}>
                       {cat.label}
                     </span>
                   </div>
                 </div>
-                <p className={`font-orbitron text-sm font-bold mb-1 leading-tight ${comingSoon ? 'text-slate-700' : 'text-slate-300 group-hover:text-slate-100 transition-colors'}`}>
+                <p className={`font-orbitron text-sm font-bold mb-1 leading-tight ${comingSoon && !isAdmin ? 'text-slate-700' : 'text-slate-300 group-hover:text-slate-100 transition-colors'}`}>
                   {label}
                 </p>
-                <p className={`font-rajdhani text-xs leading-snug ${comingSoon ? 'text-slate-800' : 'text-slate-600 group-hover:text-slate-500 transition-colors'}`}>
+                <p className={`font-rajdhani text-xs leading-snug ${comingSoon && !isAdmin ? 'text-slate-800' : 'text-slate-600 group-hover:text-slate-500 transition-colors'}`}>
                   {sub}
                 </p>
               </div>
@@ -547,7 +557,7 @@ export default function HomePage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.52 + i * 0.04 }}
               >
-                {comingSoon ? inner : <Link href={to} className="block h-full">{inner}</Link>}
+                {comingSoon && !isAdmin ? inner : <Link href={to} className="block h-full">{inner}</Link>}
               </motion.div>
             );
           })}
