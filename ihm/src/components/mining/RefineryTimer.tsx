@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, Plus, Trash2, CheckCircle2, Timer } from 'lucide-react';
+import { Plus, Trash2, CheckCircle2, Timer } from 'lucide-react';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { BASE_REFINERY_MINUTES_PER_SCU, REFINERY_LOCATIONS, REFINERY_METHODS } from '@/data/mining-static';
 
