@@ -37,7 +37,14 @@ const FPS_CATEGORIES_STATIC: { slug: string; label: string }[] = [
 ];
 
 type FpsSlug = (typeof FPS_CATEGORIES_STATIC)[number]["slug"];
-type ItemFamily = "all" | "mission" | "food";
+type ItemFamily = "all" | "clothing" | "mission" | "food";
+
+/** FPS types covered by the FPS Gear page — excluded from Items page */
+const FPS_COVERED_TYPES = new Set([
+	"FPS_Weapon", "Armor_Helmet", "Armor_Torso", "Armor_Arms",
+	"Armor_Legs", "Armor_Backpack", "Undersuit", "Tool",
+	"Magazine", "Attachment", "Gadget",
+]);
 
 const SLUG_COLOR: Record<FpsSlug | "all", string> = {
 	all:          "bg-cyan-500",
@@ -188,7 +195,7 @@ export default function ItemsPage() {
 	/** Manufacturer list for the current category */
 	const categoryTypes = mode === "fps"
 		? (activeSlug === "all" ? undefined : activeSlug)
-		: undefined;
+		: (itemFamily === "clothing" ? "Clothing" : itemFamily === "mission" || itemFamily === "food" ? "Consumable" : undefined);
 
 	const { data: mfrData } = useQuery({
 		queryKey: ["items.manufacturers", categoryTypes, env],
@@ -240,20 +247,21 @@ export default function ItemsPage() {
 					exclude_sub_types: "Food,Drink",
 				});
 			}
-			// items mode (non-FPS buckets + consumable food/drink)
-			const fpsCovered = "FPS_Weapon,Armor_Helmet,Armor_Torso,Armor_Arms,Armor_Legs,Armor_Backpack,Undersuit,Tool,Magazine,Attachment,Gadget,Clothing";
-			const otherTypes = (filters?.types ?? []).filter((t) => !fpsCovered.includes(t));
-			const nonFpsNonConsumable = otherTypes.filter((t) => t !== "Consumable");
+			// items mode — all types not covered by FPS Gear
+			const otherTypes = (filters?.types ?? []).filter((t) => !FPS_COVERED_TYPES.has(t));
 
+			if (itemFamily === "clothing") {
+				return api.items.list({ ...base, type: "Clothing" });
+			}
 			if (itemFamily === "mission") {
 				return api.items.list({ ...base, type: "Consumable", sub_types: "Hacking,SystemAccess" });
 			}
-
 			if (itemFamily === "food") {
 				return api.items.list({ ...base, type: "Consumable", sub_types: "Food,Drink" });
 			}
 
-			const mergedTypes = [...nonFpsNonConsumable, "Consumable"].join(",");
+			// "All": everything non-FPS, exclude medical consumables (covered by FPS Gear Tools & Medics)
+			const mergedTypes = otherTypes.join(",");
 			return api.items.list({ ...base, types: mergedTypes || undefined, exclude_sub_types: "Medical,MedPack,OxygenCap,Stim" });
 		},
 		enabled: mode === "other" ? !!filters : true,
@@ -275,6 +283,7 @@ export default function ItemsPage() {
 					label: "Family",
 					options: [
 						{ label: "All Items", value: "all" },
+						{ label: "Clothing", value: "clothing" },
 						{ label: "Mission Objects", value: "mission" },
 						{ label: "Food & Drink", value: "food" },
 					],
