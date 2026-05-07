@@ -224,7 +224,6 @@ export default function ItemsPage() {
 				...FPS_CATEGORIES_STATIC.map((c) => ({ ...c, count: countMap.get(c.slug) ?? 0 })),
 			]
 		: [];
-	const tc = filters?.typeCounts ?? {};
 	const sc = filters?.subTypeCounts ?? {};
 	const itemsCountMap: Record<ItemsSlug, number> = {
 		all:   (sc.Hacking ?? 0) + (sc.SystemAccess ?? 0) + (sc.Food ?? 0) + (sc.Drink ?? 0),
