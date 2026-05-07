@@ -182,7 +182,7 @@ export default function ItemsPage() {
 		updateSearch, updatePageWithScroll, resetListState, setPage,
 	} = useListQueryState();
 
-	const mode: "fps" | "other" = pathname?.startsWith("/items") || pathname?.startsWith("/other-items") ? "other" : "fps";
+	const mode: "fps" | "other" = pathname?.startsWith("/consumables") || pathname?.startsWith("/items") || pathname?.startsWith("/other-items") ? "other" : "fps";
 	const [activeSlug, setActiveSlug] = useState<FpsSlug | "all">("all");
 	const [itemsSlug, setItemsSlug] = useState<ItemsSlug>("all");
 	const [subType, setSubType] = useState("");
