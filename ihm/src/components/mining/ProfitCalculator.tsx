@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { DollarSign, Info, Plus, Trash2 } from 'lucide-react';
+import { Info, Plus, Trash2 } from 'lucide-react';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
-import { ORE_PRICES, REFINERY_METHODS, type OrePrice } from '@/data/mining-static';
+import { ORE_PRICES, REFINERY_METHODS } from '@/data/mining-static';
 
 interface OreEntry {
   id: number;
