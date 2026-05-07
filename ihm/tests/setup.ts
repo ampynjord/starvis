@@ -44,6 +44,12 @@ vi.mock('next/navigation', () => ({
   useParams: () => ({}),
 }));
 
+// Mock AuthContext — user non-admin par défaut (sans AuthProvider requis)
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: null, loading: false, login: vi.fn(), register: vi.fn(), logout: vi.fn(), refresh: vi.fn() }),
+  AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 // Mock next/link → simple <a>
 vi.mock('next/link', () => ({
   default: ({ children, href, ...rest }: Record<string, unknown>) =>
