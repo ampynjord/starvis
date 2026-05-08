@@ -39,7 +39,7 @@ const SHIPS_ITEMS: NavItemDef[] = [
   { to: '/paints', icon: Paintbrush, label: 'Paints' },
   { to: '/compare', icon: BarChart3, label: 'Compare' },
   { to: '/ranking', icon: Trophy, label: 'Ranking' },
-  { to: '/outfitter', icon: SlidersHorizontal, label: 'Loadout Manager', comingSoon: true },
+  { to: '/outfitter', icon: SlidersHorizontal, label: 'Loadout Manager' },
 ];
 
 const FPS_ITEMS: NavItemDef[] = [
@@ -50,9 +50,9 @@ const FPS_ITEMS: NavItemDef[] = [
 
 const ECONOMY_ITEMS: NavItemDef[] = [
   { to: '/industrial', icon: Factory, label: 'Commodities' },
-  { to: '/blueprints', icon: Scroll, label: 'Blueprints & Crafting' },
+  { to: '/blueprints', icon: Scroll, label: 'Crafting Calculator' },
   { to: '/minerals', icon: Pickaxe, label: 'Minerals Library' },
-  { to: '/mining', icon: BarChart3, label: 'Mining Calculator', comingSoon: true },
+  { to: '/mining', icon: BarChart3, label: 'Mining Calculator' },
   { to: '/trade', icon: TrendingUp, label: 'Trade Routes', comingSoon: true },
 ];
 

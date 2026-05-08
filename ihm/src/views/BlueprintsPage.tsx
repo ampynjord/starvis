@@ -213,6 +213,49 @@ function BlueprintCard({
   );
 }
 
+// ── BatchCalculator ───────────────────────────────────────────────────────────
+
+function BatchCalculator({ recipe }: { recipe: CraftingRecipe }) {
+  const [qty, setQty] = useState(1);
+  const n = Math.max(1, Math.round(qty));
+  if (!recipe.ingredients || recipe.ingredients.length === 0) return null;
+
+  return (
+    <div className="sci-panel p-3 bg-slate-900/30 border-slate-800/40">
+      <p className="text-[10px] font-mono-sc text-slate-500 uppercase flex items-center gap-1 mb-2">
+        <FlaskConical size={10} /> Batch Calculator
+      </p>
+      <div className="flex items-center gap-2 mb-3">
+        <label className="text-[10px] text-slate-500 font-mono-sc uppercase shrink-0">Quantity</label>
+        <input
+          type="number"
+          min={1}
+          max={9999}
+          value={qty}
+          onChange={(e) => setQty(Number(e.target.value))}
+          className="sci-input text-xs w-20"
+        />
+        {recipe.crafting_time_s != null && (
+          <span className="text-[10px] font-mono-sc text-slate-600 ml-auto">
+            Total time: <span className="text-cyan-400">{fmtTime(recipe.crafting_time_s * n)}</span>
+          </span>
+        )}
+      </div>
+      <div className="space-y-1">
+        {recipe.ingredients.map((ing) => (
+          <div key={ing.id} className="flex items-center justify-between gap-2 text-[10px] font-mono-sc py-0.5 border-b border-slate-800/40 last:border-0">
+            <span className="text-slate-400 truncate flex-1">{ing.display_item_name ?? ing.item_name}</span>
+            <span className="text-amber-400 font-bold shrink-0">×{ing.quantity * n}</span>
+            {ing.scu != null && ing.scu > 0 && (
+              <span className="text-slate-600 shrink-0">{(ing.scu * n).toFixed(2)} SCU</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── DetailPanel ───────────────────────────────────────────────────────────────
 
 function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
@@ -228,7 +271,7 @@ function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
   const recipe = full ?? r;
 
   return (
-    <ScifiPanel title="Blueprint Detail">
+    <ScifiPanel title="Recipe Detail">
       {/* Header */}
       <div className="mb-4">
         <div className="flex items-center gap-2 flex-wrap mb-2">
@@ -286,6 +329,9 @@ function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
             </div>
           )}
         </div>
+
+        {/* Batch calculator */}
+        <BatchCalculator recipe={recipe} />
 
         {/* Ingredients */}
         {recipe.ingredients && recipe.ingredients.length > 0 && (
@@ -479,11 +525,11 @@ export default function BlueprintsPage() {
   return (
     <div className="max-w-(--breakpoint-2xl) mx-auto">
       <PageHeader
-        title="Blueprint Database"
+        title="Crafting Calculator"
         count={data?.total ?? recipes.length}
-        countLabel="blueprints"
+        countLabel="recipes"
         search={search}
-        searchPlaceholder="Search blueprint, output item…"
+        searchPlaceholder="Search recipe, output item…"
         onSearch={setSearch}
       />
 
@@ -551,8 +597,8 @@ export default function BlueprintsPage() {
           {selectedRecipe ? (
             <DetailPanel r={selectedRecipe} env={env} />
           ) : (
-            <ScifiPanel title="Blueprint Detail" subtitle="Select a blueprint">
-              <p className="text-xs text-slate-500">Click a blueprint in the list to view its details, ingredients and associated missions.</p>
+            <ScifiPanel title="Recipe Detail" subtitle="Select a recipe">
+              <p className="text-xs text-slate-500">Click a recipe to view ingredients, quality modifiers, batch calculator, and unlock missions.</p>
             </ScifiPanel>
           )}
         </div>
