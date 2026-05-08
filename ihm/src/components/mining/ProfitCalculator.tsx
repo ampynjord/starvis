@@ -2,17 +2,15 @@ import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Info, Plus, Trash2 } from 'lucide-react';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
-import { ORE_PRICES, REFINERY_METHODS } from '@/data/mining-static';
+import { BASE_REFINERY_MINUTES_PER_SCU, ORE_PRICES, REFINERY_METHODS } from '@/data/mining-static';
 
 interface OreEntry {
   id: number;
   oreName: string;
-  massKg: number;
+  massScu: number;
   orePct: number;
   pricePerScu: number;
 }
-
-const SCU_KG = 100; // 1 SCU ≈ 100 kg (community standard)
 
 let _id = 0;
 function newId() {
@@ -28,14 +26,14 @@ function defaultPrice(name: string): number {
 export function ProfitCalculator() {
   const [methodId, setMethodId] = useState('cormack');
   const [ores, setOres] = useState<OreEntry[]>([
-    { id: newId(), oreName: 'Quantanium', massKg: 1000, orePct: 30, pricePerScu: 1450 },
+    { id: newId(), oreName: 'Quantanium', massScu: 2000, orePct: 25, pricePerScu: 1450 },
   ]);
   const [customPrices, setCustomPrices] = useState<Record<number, string>>({});
 
   const method = REFINERY_METHODS.find((m) => m.id === methodId) ?? REFINERY_METHODS[1];
 
   const addOre = () => {
-    setOres((prev) => [...prev, { id: newId(), oreName: 'Iron', massKg: 1000, orePct: 10, pricePerScu: 60 }]);
+    setOres((prev) => [...prev, { id: newId(), oreName: 'Iron', massScu: 2000, orePct: 10, pricePerScu: 60 }]);
   };
 
   const removeOre = (id: number) => {
@@ -46,7 +44,7 @@ export function ProfitCalculator() {
     setOres((prev) =>
       prev.map((o) => {
         if (o.id !== id) return o;
-        const updated = { ...o, [field]: value };
+        const updated = { ...o, [field]: field === 'massScu' || field === 'orePct' ? Number(value) : value };
         if (field === 'oreName') {
           const price = defaultPrice(String(value));
           updated.pricePerScu = price;
@@ -67,21 +65,21 @@ export function ProfitCalculator() {
 
   const results = useMemo(() => {
     return ores.map((ore) => {
-      const oreKg = ore.massKg * (ore.orePct / 100);
-      const rawScu = oreKg / SCU_KG;
+      const rawScu = ore.massScu * (ore.orePct / 100);
       const refinedScu = rawScu * method.yieldPct;
       const grossValue = refinedScu * ore.pricePerScu;
       const refineryFee = grossValue * method.feePct;
       const netProfit = grossValue - refineryFee;
+      const estimatedMinutes = rawScu * BASE_REFINERY_MINUTES_PER_SCU * method.timeMultiplier;
       return {
         id: ore.id,
         oreName: ore.oreName,
-        oreKg,
         rawScu,
         refinedScu,
         grossValue,
         refineryFee,
         netProfit,
+        estimatedMinutes,
       };
     });
   }, [ores, method]);
@@ -94,10 +92,18 @@ export function ProfitCalculator() {
         grossValue: acc.grossValue + r.grossValue,
         refineryFee: acc.refineryFee + r.refineryFee,
         netProfit: acc.netProfit + r.netProfit,
+        estimatedMinutes: acc.estimatedMinutes + r.estimatedMinutes,
       }),
-      { rawScu: 0, refinedScu: 0, grossValue: 0, refineryFee: 0, netProfit: 0 },
+      { rawScu: 0, refinedScu: 0, grossValue: 0, refineryFee: 0, netProfit: 0, estimatedMinutes: 0 },
     );
   }, [results]);
+
+  function fmtDuration(minutes: number): string {
+    if (minutes < 60) return `${Math.round(minutes)}m`;
+    const h = Math.floor(minutes / 60);
+    const m = Math.round(minutes % 60);
+    return `${h}h ${m.toString().padStart(2, '0')}m`;
+  }
 
   const fmt = (v: number) => Math.round(v).toLocaleString();
   const fmtScu = (v: number) => v.toFixed(2);
@@ -182,12 +188,12 @@ export function ProfitCalculator() {
 
                 {/* Rock mass */}
                 <div>
-                  <label className="text-[10px] uppercase tracking-widest text-slate-600 block mb-1">Rock Mass (kg)</label>
+                  <label className="text-[10px] uppercase tracking-widest text-slate-600 block mb-1">Rock Mass (SCU)</label>
                   <input
                     type="number"
                     min={1}
-                    value={ore.massKg}
-                    onChange={(e) => updateOre(ore.id, 'massKg', Number(e.target.value))}
+                    value={ore.massScu}
+                    onChange={(e) => updateOre(ore.id, 'massScu', e.target.value)}
                     className="sci-input w-full text-xs"
                   />
                 </div>
@@ -238,10 +244,6 @@ export function ProfitCalculator() {
                 return (
                   <div className="flex flex-wrap gap-3 mt-2 text-[10px] font-mono-sc border-t border-slate-800/50 pt-2">
                     <span>
-                      <span className="text-slate-600">Ore: </span>
-                      <span className="text-slate-300">{r.oreKg.toFixed(1)} kg</span>
-                    </span>
-                    <span>
                       <span className="text-slate-600">Raw: </span>
                       <span className="text-slate-300">{fmtScu(r.rawScu)} SCU</span>
                     </span>
@@ -263,6 +265,10 @@ export function ProfitCalculator() {
                         {fmt(r.netProfit)} aUEC
                       </span>
                     </span>
+                    <span>
+                      <span className="text-slate-600">Est. time: </span>
+                      <span className="text-blue-400">{fmtDuration(r.estimatedMinutes)}</span>
+                    </span>
                   </div>
                 );
               })()}
@@ -281,12 +287,13 @@ export function ProfitCalculator() {
       {ores.length > 0 && (
         <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
           <ScifiPanel title="Total Summary" subtitle={`Using ${method.name} · ${(method.yieldPct * 100).toFixed(0)}% yield · ${(method.feePct * 100).toFixed(1)}% fee`}>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               <StatCard label="Raw SCU" value={`${fmtScu(totals.rawScu)} SCU`} color="text-slate-300" />
               <StatCard label="Refined SCU" value={`${fmtScu(totals.refinedScu)} SCU`} color="text-cyan-400" />
               <StatCard label="Gross Value" value={`${fmt(totals.grossValue)} aUEC`} color="text-green-400" />
               <StatCard label="Refinery Fee" value={`-${fmt(totals.refineryFee)} aUEC`} color="text-amber-400" />
               <StatCard label="Net Profit" value={`${fmt(totals.netProfit)} aUEC`} color={totals.netProfit >= 0 ? 'text-green-400' : 'text-red-400'} large />
+              <StatCard label="Est. Duration" value={fmtDuration(totals.estimatedMinutes)} color="text-blue-400" />
             </div>
 
             {/* Efficiency bar */}
@@ -307,7 +314,10 @@ export function ProfitCalculator() {
 
             <div className="mt-3 flex items-start gap-2 text-[10px] text-slate-600 font-mono-sc">
               <Info size={11} className="shrink-0 mt-0.5" />
-              <span>Prices are community estimates. 1 SCU ≈ {SCU_KG} kg. Update "Price (aUEC/SCU)" for live data.</span>
+              <span>
+                Rock Mass (SCU) = the mass number shown on the rock in-game. Prices are community estimates — override the "Price" field for live values.
+                Duration is an approximation based on {BASE_REFINERY_MINUTES_PER_SCU} min/raw SCU.
+              </span>
             </div>
           </ScifiPanel>
         </motion.div>

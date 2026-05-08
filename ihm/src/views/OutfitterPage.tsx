@@ -626,8 +626,8 @@ export default function OutfitterPage() {
   return (
     <div className="max-w-(--breakpoint-xl) mx-auto space-y-4">
       <PageHeader
-        title="Ship Outfitter"
-        subtitle="Customize your loadout and calculate DPS in real time"
+        title="Loadout Manager"
+        subtitle="Customize your ship loadout — real-time DPS, power budget, thermal balance"
         actions={selectedShip ? (
           <div className="flex items-center gap-2">
             {hasSwaps && (
@@ -731,23 +731,47 @@ export default function OutfitterPage() {
                 )}
               </div>
 
-              {/* Power/Thermal budget warnings */}
-              {(powerOverload || thermalOverload) && (
-                <div className="flex flex-wrap gap-2">
-                  {powerOverload && (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-red-950/40 rounded-sm border border-red-800/60">
-                      <AlertTriangle size={12} className="text-red-400 shrink-0" />
-                      <span className="text-[10px] text-red-400 font-mono-sc">
-                        Power overload: {fNumber(powerDraw, 0)}W draw &gt; {fNumber(powerOutput, 0)}W output ({fNumber(Math.abs(powerBalance), 0)}W deficit)
-                      </span>
+              {/* Power & Thermal budget bars */}
+              {(powerOutput > 0 || thermalCool > 0) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {powerOutput > 0 && (
+                    <div className="sci-panel px-3 py-2">
+                      <div className="flex justify-between text-[10px] font-mono-sc mb-1">
+                        <span className={powerOverload ? 'text-red-400' : 'text-slate-500'}>
+                          {powerOverload && <AlertTriangle size={10} className="inline mr-0.5" />}
+                          Power Budget
+                        </span>
+                        <span className={powerOverload ? 'text-red-400' : 'text-slate-400'}>
+                          {fNumber(powerDraw, 0)} / {fNumber(powerOutput, 0)} W
+                          {powerOverload ? ` (${fNumber(Math.abs(powerBalance), 0)}W deficit)` : ''}
+                        </span>
+                      </div>
+                      <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${powerOverload ? 'bg-red-500' : 'bg-yellow-500'}`}
+                          style={{ width: `${Math.min(100, powerOutput > 0 ? (powerDraw / powerOutput) * 100 : 0).toFixed(1)}%` }}
+                        />
+                      </div>
                     </div>
                   )}
-                  {thermalOverload && (
-                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-950/40 rounded-sm border border-orange-800/60">
-                      <AlertTriangle size={12} className="text-orange-400 shrink-0" />
-                      <span className="text-[10px] text-orange-400 font-mono-sc">
-                        Thermal overload: {fNumber(thermalHeat, 0)} heat &gt; {fNumber(thermalCool, 0)} cooling ({fNumber(Math.abs(thermalBalance), 0)} deficit)
-                      </span>
+                  {thermalCool > 0 && (
+                    <div className="sci-panel px-3 py-2">
+                      <div className="flex justify-between text-[10px] font-mono-sc mb-1">
+                        <span className={thermalOverload ? 'text-orange-400' : 'text-slate-500'}>
+                          {thermalOverload && <AlertTriangle size={10} className="inline mr-0.5" />}
+                          Thermal Budget
+                        </span>
+                        <span className={thermalOverload ? 'text-orange-400' : 'text-slate-400'}>
+                          {fNumber(thermalHeat, 0)} / {fNumber(thermalCool, 0)} heat/s
+                          {thermalOverload ? ` (${fNumber(Math.abs(thermalBalance), 0)} deficit)` : ''}
+                        </span>
+                      </div>
+                      <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${thermalOverload ? 'bg-orange-500' : 'bg-cyan-500'}`}
+                          style={{ width: `${Math.min(100, thermalCool > 0 ? (thermalHeat / thermalCool) * 100 : 0).toFixed(1)}%` }}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
