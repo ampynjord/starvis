@@ -9,6 +9,7 @@ import {
   BookOpen,
   Calendar,
   Clock,
+  ClipboardList,
   Coins,
   Crosshair,
   Eye,
@@ -381,6 +382,8 @@ export default function MissionsPage() {
   const [category, setCategory] = useState('');
   const [sharing, setSharing] = useState('');
   const [availability, setAvailability] = useState('');
+  const [blueprintOnly, setBlueprintOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<'default' | 'reward_desc' | 'reward_asc' | 'danger_desc'>('default');
   const [selectedUuid, setSelectedUuid] = useState<string | null>(searchParams?.get('selected') ?? null);
   const debouncedSearch = useDebounce(search, 350);
 
@@ -421,7 +424,7 @@ export default function MissionsPage() {
       }),
   });
 
-  const hasFilters = !!(type || debouncedSearch || legal || sharing || faction || category || availability);
+  const hasFilters = !!(type || debouncedSearch || legal || sharing || faction || category || availability || blueprintOnly);
 
   const { data: selectedMissionFallback } = useQuery({
     queryKey: ['missions.single', selectedUuid, env],
@@ -431,18 +434,38 @@ export default function MissionsPage() {
 
   const sel: Mission | null = data?.data?.find((m) => m.uuid === selectedUuid) ?? selectedMissionFallback ?? null;
 
-  useEffect(() => {
-    if (data?.data?.length && !selectedUuid) setSelectedUuid(data.data[0].uuid);
-  }, [data?.data, selectedUuid]);
-
   const summary = useMemo(() => {
     if (!data) return null;
     return { total: data.total, showing: data.data.length };
   }, [data]);
 
+  const displayedMissions = useMemo(() => {
+    let list = data?.data ?? [];
+    if (blueprintOnly) list = list.filter((m) => m.has_blueprint_reward);
+    switch (sortBy) {
+      case 'reward_desc': return [...list].sort((a, b) => (b.reward_max ?? b.reward_min ?? 0) - (a.reward_max ?? a.reward_min ?? 0));
+      case 'reward_asc': return [...list].sort((a, b) => (a.reward_max ?? a.reward_min ?? 0) - (b.reward_max ?? b.reward_min ?? 0));
+      case 'danger_desc': return [...list].sort((a, b) => (b.danger_level ?? 0) - (a.danger_level ?? 0));
+      default: return list;
+    }
+  }, [data?.data, blueprintOnly, sortBy]);
+
+  const blueprintCount = useMemo(() => data?.data?.filter((m) => m.has_blueprint_reward).length ?? 0, [data?.data]);
+  const avgReward = useMemo(() => {
+    const missions = data?.data ?? [];
+    const withReward = missions.filter((m) => m.reward_max != null || m.reward_min != null);
+    if (!withReward.length) return null;
+    const total = withReward.reduce((s, m) => s + (m.reward_max ?? m.reward_min ?? 0), 0);
+    return Math.round(total / withReward.length);
+  }, [data?.data]);
+
+  useEffect(() => {
+    if (displayedMissions.length && !selectedUuid) setSelectedUuid(displayedMissions[0].uuid);
+  }, [displayedMissions, selectedUuid]);
+
   const resetAll = () => {
     setType(''); setSearch(''); setLegal(''); setFaction('');
-    setCategory(''); setAvailability(''); setSharing(''); setPage(1);
+    setCategory(''); setAvailability(''); setSharing(''); setBlueprintOnly(false); setSortBy('default'); setPage(1);
   };
 
   return (
@@ -455,6 +478,55 @@ export default function MissionsPage() {
         searchPlaceholder="Search mission, giver, class name…"
         onSearch={(v) => { setSearch(v); setPage(1); }}
       />
+
+      {/* Stats bar + quick actions */}
+      {data && (
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/60 rounded-sm border border-slate-800 text-[10px] font-mono-sc text-slate-500">
+            <ClipboardList size={10} /> {data?.total.toLocaleString()} missions
+          </div>
+          {avgReward != null && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/60 rounded-sm border border-slate-800 text-[10px] font-mono-sc text-slate-500">
+              <Coins size={10} /> avg {avgReward.toLocaleString()} aUEC
+            </div>
+          )}
+          {blueprintCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setBlueprintOnly((v) => !v)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-sm border text-[10px] font-mono-sc transition-colors ${
+                blueprintOnly
+                  ? 'bg-purple-950/40 border-purple-800/60 text-purple-400'
+                  : 'bg-slate-900/60 border-slate-800 text-slate-500 hover:border-slate-700 hover:text-slate-300'
+              }`}
+            >
+              <FlaskConical size={10} /> {blueprintCount} blueprint reward{blueprintCount > 1 ? 's' : ''}
+            </button>
+          )}
+          <div className="ml-auto flex items-center gap-1">
+            <span className="text-[10px] font-mono-sc text-slate-600 mr-1">Sort:</span>
+            {([
+              ['default', 'Default'] as const,
+              ['reward_desc', 'Reward ↓'] as const,
+              ['reward_asc', 'Reward ↑'] as const,
+              ['danger_desc', 'Danger ↓'] as const,
+            ] as const).map(([val, label]) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => setSortBy(val)}
+                className={`px-2 py-1 rounded-sm text-[10px] font-mono-sc border transition-colors ${
+                  sortBy === val
+                    ? 'bg-cyan-950/40 border-cyan-800/60 text-cyan-400'
+                    : 'border-slate-800 text-slate-600 hover:text-slate-400'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       <div className="flex gap-4">
@@ -518,12 +590,12 @@ export default function MissionsPage() {
             <LoadingGrid message="LOADING MISSIONS…" />
           ) : error ? (
             <ErrorState error={error as Error} onRetry={() => void refetch()} />
-          ) : !data?.data?.length ? (
+          ) : !displayedMissions.length ? (
             <EmptyState icon="📋" title="No missions found" />
           ) : (
             <>
               <div className="space-y-1.5">
-                {data.data.map((m, i) => (
+                {displayedMissions.map((m, i) => (
                   <motion.div
                     key={m.uuid}
                     initial={{ opacity: 0, x: -8 }}
@@ -538,9 +610,9 @@ export default function MissionsPage() {
                   </motion.div>
                 ))}
               </div>
-              {data.pages > 1 && (
+              {(data?.pages ?? 0) > 1 && (
                 <div className="mt-4">
-                  <Pagination page={page} totalPages={data.pages} onPageChange={setPage} />
+                  <Pagination page={page} totalPages={data!.pages} onPageChange={setPage} />
                 </div>
               )}
             </>
