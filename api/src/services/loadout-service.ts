@@ -115,10 +115,13 @@ function buildComponentInfo(row: Row, childMap: Map<number, Row[]>): Record<stri
   const mountSize = isMountItem ? (String(row.component_class_name).match(/[Ss](\d+)/) || [])[1] : null;
 
   const subChildren = childMap.get(Number(row.id)) || [];
+  const _seenSubNames = new Set<string>();
   const relevantSubChildren = subChildren.filter((c) => {
     const cn = String(c.port_name || '');
     if (cn.startsWith('Screen_') || cn.startsWith('Display_') || cn.startsWith('Annunciator')) return false;
     if (cn.includes('_MFD') || cn.includes('dashboard') || cn.includes('HUD')) return false;
+    if (_seenSubNames.has(cn)) return false;
+    _seenSubNames.add(cn);
     return c.component_uuid || c.type || c.component_class_name;
   });
   const subItems = relevantSubChildren.map((c) => {
@@ -222,13 +225,23 @@ function buildComponentInfo(row: Row, childMap: Map<number, Row[]>): Record<stri
 function buildHardpoints(loadout: Row[]): Record<string, unknown>[] {
   const childMap = new Map<number, Row[]>();
   const rootPorts: Row[] = [];
+  const seenRootPortNames = new Set<string>();
+  const seenChildPortNames = new Map<number, Set<string>>();
 
   for (const port of loadout) {
     if (port.parent_id != null && port.parent_id !== 0) {
       const pid = Number(port.parent_id);
+      const pname = String(port.port_name || '');
+      if (!seenChildPortNames.has(pid)) seenChildPortNames.set(pid, new Set());
+      const seen = seenChildPortNames.get(pid)!;
+      if (seen.has(pname)) continue;
+      seen.add(pname);
       if (!childMap.has(pid)) childMap.set(pid, []);
       childMap.get(pid)!.push(port);
     } else {
+      const pname = String(port.port_name || '');
+      if (seenRootPortNames.has(pname)) continue;
+      seenRootPortNames.add(pname);
       rootPorts.push(port);
     }
   }
