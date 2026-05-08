@@ -45,7 +45,7 @@ export function RefineryTimer() {
   const [newLabel, setNewLabel] = useState('');
   const [newLocation, setNewLocation] = useState(REFINERY_LOCATIONS[0].id);
   const [newMethod, setNewMethod] = useState('cormack');
-  const [newScu, setNewScu] = useState<string>('10');
+  const [newScu, setNewScu] = useState<string>('50');
   const [now, setNow] = useState(Date.now);
   const tickRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -301,7 +301,7 @@ export function RefineryTimer() {
       )}
 
       <div className="text-[10px] text-slate-700 font-mono-sc text-center">
-        Timer durations are estimates based on {BASE_REFINERY_MINUTES_PER_SCU} min/SCU base rate. Actual in-game times vary.
+        Timer durations are estimates (~{BASE_REFINERY_MINUTES_PER_SCU} min/raw SCU). Enter the raw SCU before refining. Actual in-game times vary.
       </div>
     </div>
   );

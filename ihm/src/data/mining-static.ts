@@ -80,6 +80,7 @@ export interface OrePrice {
 // Players can override these in the Profit Calculator.
 export const ORE_PRICES: OrePrice[] = [
   { name: 'Quantanium', classFragment: 'quantanium', pricePerScu: 1450, scuPerKg: 1 },
+  { name: 'Hadanite', classFragment: 'hadanite', pricePerScu: 975, scuPerKg: 1 },
   { name: 'Bexalite', classFragment: 'bexalite', pricePerScu: 640, scuPerKg: 1 },
   { name: 'Laranite', classFragment: 'laranite', pricePerScu: 512, scuPerKg: 1 },
   { name: 'Diamond', classFragment: 'diamond', pricePerScu: 600, scuPerKg: 1 },
@@ -99,9 +100,9 @@ export const ORE_PRICES: OrePrice[] = [
   { name: 'Inert Materials', classFragment: 'inert', pricePerScu: 0, scuPerKg: 1 },
 ];
 
-// Approximate base refinery time in minutes per 1 SCU for each ore category.
-// Used only for timer estimation when no exact data is available.
-export const BASE_REFINERY_MINUTES_PER_SCU = 10;
+// Approximate base refinery time in minutes per 1 raw SCU submitted.
+// Community estimate: ~1 min/SCU for average ore at standard method.
+export const BASE_REFINERY_MINUTES_PER_SCU = 1;
 
 export interface RefineryLocation {
   id: string;
@@ -110,15 +111,18 @@ export interface RefineryLocation {
 }
 
 export const REFINERY_LOCATIONS: RefineryLocation[] = [
-  { id: 'arc_corp', name: 'ArcCorp Mining Area 157', system: 'Stanton' },
-  { id: 'cl_lagrange', name: 'CL-Lagrange Station', system: 'Stanton' },
-  { id: 'cru_l5', name: 'CRU-L5 Station', system: 'Stanton' },
+  // Stanton
+  { id: 'arc_l1', name: 'ARC-L1 Wide Forest Station', system: 'Stanton' },
+  { id: 'arc_l2', name: 'ARC-L2 Lively Pathway Station', system: 'Stanton' },
+  { id: 'cru_l1', name: 'CRU-L1 Ambitious Dream Station', system: 'Stanton' },
+  { id: 'cru_l5', name: 'CRU-L5 Beautiful Glen Station', system: 'Stanton' },
   { id: 'grim_hex', name: 'Grim HEX', system: 'Stanton' },
-  { id: 'hdms', name: 'HDMS Outpost', system: 'Stanton' },
-  { id: 'mic_l1', name: 'MIC-L1 Station', system: 'Stanton' },
-  { id: 'mic_l2', name: 'MIC-L2 Station', system: 'Stanton' },
-  { id: 'port_olisar', name: 'Port Olisar', system: 'Stanton' },
-  { id: 'pyro_l1', name: 'Pyro Gateway Station', system: 'Pyro' },
+  { id: 'hur_l2', name: 'HUR-L2 Faithful Dream Station', system: 'Stanton' },
+  { id: 'hur_l3', name: 'HUR-L3 Thundering Express', system: 'Stanton' },
+  { id: 'mic_l1', name: 'MIC-L1 Shallow Frontier Station', system: 'Stanton' },
+  { id: 'mic_l2', name: 'MIC-L2 Long Forest Station', system: 'Stanton' },
+  // Pyro
+  { id: 'pyro_gateway', name: 'Pyro Gateway Station', system: 'Pyro' },
   { id: 'ruin_station', name: 'Ruin Station', system: 'Pyro' },
   { id: 'checkmate', name: 'Checkmate', system: 'Pyro' },
 ];
