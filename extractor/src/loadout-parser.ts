@@ -75,11 +75,14 @@ export class LoadoutParser {
         if (subRecord) {
           const subData = this.ctx.readInstance(subRecord.structIndex, subRecord.instanceIndex, 0, 5);
           if (subData && Array.isArray(subData.Components)) {
-            for (const subComp of subData.Components) {
+            const seenSubPorts = new Set<string>();
+          for (const subComp of subData.Components) {
               if (!subComp || subComp.__type !== 'SEntityComponentDefaultLoadoutParams') continue;
               const subEntries = subComp.loadout?.entries;
               if (!Array.isArray(subEntries)) continue;
               for (const se of subEntries) {
+                if (!se.itemPortName || seenSubPorts.has(se.itemPortName)) continue;
+                seenSubPorts.add(se.itemPortName);
                 let subEntClassName = se.entityClassName || '';
                 if (!subEntClassName && se.entityClassReference?.__ref)
                   subEntClassName = this.ctx.resolveGuid(se.entityClassReference.__ref) || '';
@@ -126,7 +129,7 @@ export class LoadoutParser {
     for (const entry of mainEntries) {
       const portName = entry.portName;
       let entClassName = entry.entityClassName || '';
-      if (!portName) continue;
+      if (!portName || processedPorts.has(portName)) continue;
       if (!entClassName && variantMap) entClassName = variantMap.get(portName) || '';
       loadoutItems.push(processEntry(portName, entClassName, entry.children, 0, ''));
       processedPorts.add(portName);
@@ -164,14 +167,18 @@ export class LoadoutParser {
       return result;
     };
 
-    const entries: any[] = [];
+    // Use a Map to dedup by portName — later component entries override earlier ones,
+    // matching DataForge inheritance semantics where child overrides parent.
+    const entryMap = new Map<string, any>();
     for (const comp of data.Components) {
       if (!comp || comp.__type !== 'SEntityComponentDefaultLoadoutParams') continue;
       const items = comp.loadout?.entries;
       if (!Array.isArray(items)) continue;
-      entries.push(...parseEntries(items));
+      for (const e of parseEntries(items)) {
+        if (e.portName) entryMap.set(e.portName, e);
+      }
     }
-    return entries;
+    return [...entryMap.values()];
   }
 
   private findVariantLoadoutMap(className: string): Map<string, string> | null {
