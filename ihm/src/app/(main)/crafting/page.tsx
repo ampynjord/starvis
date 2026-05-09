@@ -5,6 +5,6 @@ import { useRouter } from 'next/navigation';
 
 export default function Page() {
   const router = useRouter();
-  useEffect(() => { router.replace('/blueprints'); }, [router]);
+  useEffect(() => { router.replace('/crafting-calculator'); }, [router]);
   return null;
 }

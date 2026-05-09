@@ -89,13 +89,16 @@ export function mountMiningRoutes(router: Router, deps: RouteDependencies): void
     }),
   );
 
-  // GET /api/v1/mining/lasers — all mining lasers & gadgets
+  // GET /api/v1/mining/lasers — all mining lasers, heads & gadgets
   router.get(
     '/api/v1/mining/lasers',
     asyncHandler(async (req, res) => {
       const env = String(req.query.env ?? 'live');
       const components = await getGamePrisma(env).component.findMany({
-        where: { type: 'MiningLaser', miningSpeed: { not: null } },
+        where: {
+          type: 'MiningLaser',
+          OR: [{ miningSpeed: { not: null } }, { miningResistance: { not: null } }, { miningInstability: { not: null } }],
+        },
         select: {
           uuid: true,
           name: true,
@@ -116,10 +119,10 @@ export function mountMiningRoutes(router: Router, deps: RouteDependencies): void
         grade: c.grade,
         manufacturerCode: c.manufacturerCode ?? null,
         manufacturerName: null,
-        miningSpeed: Number(c.miningSpeed),
-        miningRange: Number(c.miningRange ?? 0),
-        miningResistance: Number(c.miningResistance ?? 0),
-        miningInstability: Number(c.miningInstability ?? 0),
+        miningSpeed: c.miningSpeed != null ? Number(c.miningSpeed) : null,
+        miningRange: c.miningRange != null ? Number(c.miningRange) : null,
+        miningResistance: c.miningResistance != null ? Number(c.miningResistance) : null,
+        miningInstability: c.miningInstability != null ? Number(c.miningInstability) : null,
       }));
       res.json({ success: true, count: data.length, data });
     }),
