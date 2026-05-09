@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
     return [
       { source: '/api-docs', destination: `${process.env.API_URL || 'http://api:3000'}/api-docs` },
       { source: '/api-docs/:path*', destination: `${process.env.API_URL || 'http://api:3000'}/api-docs/:path*` },
-      { source: '/api/:path*', destination: `${process.env.API_URL || 'http://api:3000'}/api/:path*` },
+      { source: '/api/v1/:path*', destination: `${process.env.API_URL || 'http://api:3000'}/api/v1/:path*` },
       { source: '/health/:path*', destination: `${process.env.API_URL || 'http://api:3000'}/health/:path*` },
       { source: '/health', destination: `${process.env.API_URL || 'http://api:3000'}/health/live` },
       { source: '/admin/:path*', destination: `${process.env.API_URL || 'http://api:3000'}/admin/:path*` },
