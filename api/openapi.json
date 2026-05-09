@@ -3,7 +3,7 @@
   "info": {
     "title": "Starvis API",
     "version": "1.0.0",
-    "description": "Star Citizen Ships, Components, Items & Game Data API.\n\nData sources:\n- **P4K game data** (ships, components, items, commodities, shops, missions, mining, crafting, locations)\n- **RSI Website** (ship matrix, galactapedia, comm-links, starmap)\n\n### Authentication\nMost endpoints are public. Two authentication methods are supported:\n- **Bearer JWT** (`Authorization: Bearer <token>`): obtained via `POST /auth/login` or `POST /auth/api-token`. Required for `/api/v1/chat`, `/auth/me`, and admin routes.\n- **API Key** (`X-API-Key` header): for admin endpoints only.\n\n### Pagination\nAll list endpoints support `page` and `limit` query parameters and return `{ data, total, page, limit, pages }`.\n\n### Filters\nEvery domain has a `/filters` endpoint returning `{ filters: { fieldName: [{ value, label, count? }] } }`.\n\n### Game environments\nUse the `env` query parameter to select the game environment: `live` (default), `ptu`, `eptu`, `custom`."
+    "description": "Star Citizen Ships, Components, Items & Game Data API.\n\nData sources:\n- **P4K game data** (ships, components, items, commodities, shops, missions, mining, crafting, locations)\n- **RSI Website** (ship matrix, galactapedia, comm-links, starmap)\n\n### Authentication\nMost endpoints are public. Two authentication methods are supported:\n- **Bearer JWT** (`Authorization: Bearer <token>`): obtained via `POST /auth/login` or `POST /auth/api-token`. Required for `/auth/me`, beta-only tools, and admin routes.\n- **API Key** (`X-API-Key` header): for admin endpoints only.\n\n### User Roles\n| Role | Description |\n|---|---|\n| `user` | Standard account — access to all public data |\n| `beta_tester` | Early access to tools in active development (Loadout Manager, FPS Calculator, Mining Calculator, Trade Calculator, Crafting Calculator) |\n| `admin` | Full access including user management and admin API |\n\nRoles are assigned by an admin via `PUT /admin/users/{id}/role`.\n\n### Pagination\nAll list endpoints support `page` and `limit` query parameters and return `{ data, total, page, limit, pages }`.\n\n### Filters\nEvery domain has a `/filters` endpoint returning `{ filters: { fieldName: [{ value, label, count? }] } }`.\n\n### Game environments\nUse the `env` query parameter to select the game environment: `live` (default), `ptu`, `eptu`, `custom`."
   },
   "components": {
     "securitySchemes": {
@@ -96,6 +96,22 @@
           "page": { "type": "integer" },
           "limit": { "type": "integer" },
           "pages": { "type": "integer", "description": "Total number of pages" }
+        }
+      },
+      "UserRole": {
+        "type": "string",
+        "enum": ["user", "beta_tester", "admin"],
+        "description": "User role. `beta_tester` grants access to features in active development. `admin` has full access including user management."
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "email": { "type": "string", "format": "email" },
+          "username": { "type": "string" },
+          "role": { "$ref": "#/components/schemas/UserRole" },
+          "avatarUrl": { "type": "string", "format": "uri", "nullable": true },
+          "createdAt": { "type": "string", "format": "date-time" }
         }
       },
       "Ship": {
@@ -2775,7 +2791,11 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": { "success": { "type": "boolean" }, "token": { "type": "string" }, "user": { "type": "object" } }
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "token": { "type": "string", "description": "JWT Bearer token (24h)" },
+                    "user": { "$ref": "#/components/schemas/User" }
+                  }
                 }
               }
             }
@@ -2812,7 +2832,11 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": { "success": { "type": "boolean" }, "token": { "type": "string" }, "user": { "type": "object" } }
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "token": { "type": "string", "description": "JWT Bearer token (24h)" },
+                    "user": { "$ref": "#/components/schemas/User" }
+                  }
                 }
               }
             }
@@ -2832,7 +2856,10 @@
             "description": "Current user",
             "content": {
               "application/json": {
-                "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "user": { "type": "object" } } }
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "user": { "$ref": "#/components/schemas/User" } }
+                }
               }
             }
           },
@@ -2863,7 +2890,10 @@
             "description": "Updated user",
             "content": {
               "application/json": {
-                "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "user": { "type": "object" } } }
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "user": { "$ref": "#/components/schemas/User" } }
+                }
               }
             }
           },
@@ -2950,7 +2980,10 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "properties": { "success": { "type": "boolean" }, "data": { "type": "array", "items": { "type": "object" } } }
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/User" } }
+                  }
                 }
               }
             }
@@ -2973,7 +3006,7 @@
               "schema": {
                 "type": "object",
                 "required": ["role"],
-                "properties": { "role": { "type": "string", "enum": ["user", "admin"] } }
+                "properties": { "role": { "$ref": "#/components/schemas/UserRole" } }
               }
             }
           }
@@ -2983,7 +3016,10 @@
             "description": "Updated user",
             "content": {
               "application/json": {
-                "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "user": { "type": "object" } } }
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "user": { "$ref": "#/components/schemas/User" } }
+                }
               }
             }
           },

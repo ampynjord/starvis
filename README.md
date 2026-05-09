@@ -111,6 +111,25 @@ Tous les endpoints API acceptent un paramètre `?env=live` (défaut) ou `?env=pt
 
 ---
 
+## Rôles utilisateur
+
+| Rôle | Accès |
+|---|---|
+| `user` | Toutes les données publiques |
+| `beta_tester` | Accès anticipé aux outils en développement actif |
+| `admin` | Accès complet + gestion des utilisateurs |
+
+Les outils **beta** (accessibles uniquement aux `beta_tester` et `admin`) :
+- Loadout Manager (`/loadout-manager`)
+- FPS Calculator (`/fps-calculator`)
+- Mining Calculator (`/mining-calculator`)
+- Trade Calculator (`/trade-calculator`)
+- Crafting Calculator (`/crafting-calculator`)
+
+Les rôles sont attribués par un admin via `PUT /admin/users/:id/role`.
+
+---
+
 ## API — Endpoints principaux
 
 Tous les endpoints de données acceptent `?env=live` (défaut) ou `?env=ptu`.
@@ -121,7 +140,7 @@ Tous les endpoints de données acceptent `?env=live` (défaut) ou `?env=ptu`.
 | Composants | `GET /components`, `/components/:id`, `/components/filters` |
 | Items FPS | `GET /items`, `/items/:id`, `/items/filters` |
 | Commodités | `GET /commodities`, `/commodities/:id/prices` |
-| Commerce | `GET /trade/prices`, `/trade/location/:key` |
+| Commerce | `GET /trade/prices`, `/trade/location/:key`, `/trade/routes`, `/trade/systems` |
 | Mining | `GET /mining/elements`, `/mining/compositions`, `/mining/lasers` |
 | Missions | `GET /missions`, `/missions/:id` |
 | Crafting | `GET /crafting/recipes`, `/crafting/recipes/:id` |
@@ -130,7 +149,8 @@ Tous les endpoints de données acceptent `?env=live` (défaut) ou `?env=ptu`.
 | Recherche | `GET /search` |
 | Calculs | `GET /calculate/fps-damage`, `/calculate/mining-yield` |
 | Changelog | `GET /changelog`, `/changelog/summary` — filtré par env |
-| Admin | `POST /admin/sync-ship-matrix`, `GET /admin/extraction-log` |
+| Auth | `POST /auth/register`, `POST /auth/login`, `GET /auth/me`, `PUT /auth/me`, `POST /auth/api-token` |
+| Admin | `GET /admin/users`, `PUT /admin/users/:id/role`, `POST /admin/sync-ship-matrix`, `GET /admin/extraction-log` |
 | Santé | `GET /health`, `/health/live`, `/health/ready`, `/metrics` |
 
 Toutes les listes supportent `page`, `limit`, `search`, `sort`, `order` et `format=csv`.
