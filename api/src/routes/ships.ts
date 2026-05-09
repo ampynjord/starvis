@@ -162,13 +162,25 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
       const loadout = await gameDataService!.loadouts.getShipLoadout(uuid, env);
       if (!loadout.length) return void res.status(404).json({ success: false, error: 'No loadout found' });
       // Build recursive hierarchical tree (supports turret→gimbal→weapon 3+ levels)
-      const rootPorts = loadout.filter((p: Record<string, unknown>) => !p.parent_id);
+      // Deduplicate by port_name per parent to handle duplicate DB rows from extractor.
+      const seenRootNames = new Set<string>();
+      const seenChildNames = new Map<number, Set<string>>();
+      const rootPorts: Record<string, unknown>[] = [];
       const childMap = new Map<number, Record<string, unknown>[]>();
       for (const p of loadout) {
         const parentId = p.parent_id != null ? Number(p.parent_id) : null;
+        const pname = String(p.port_name || '');
         if (parentId) {
+          if (!seenChildNames.has(parentId)) seenChildNames.set(parentId, new Set());
+          const seen = seenChildNames.get(parentId)!;
+          if (seen.has(pname)) continue;
+          seen.add(pname);
           if (!childMap.has(parentId)) childMap.set(parentId, []);
           childMap.get(parentId)!.push(p);
+        } else {
+          if (seenRootNames.has(pname)) continue;
+          seenRootNames.add(pname);
+          rootPorts.push(p);
         }
       }
       function buildTree(node: Record<string, unknown>): Record<string, unknown> {
