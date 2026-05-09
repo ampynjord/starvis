@@ -99,6 +99,9 @@ jobs:
     name: Dependency Review
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    # Non-blocking: requires GitHub Advanced Security (not available on this plan).
+    # npm audit is already enforced by the Security Audit job.
+    continue-on-error: true
     permissions:
       contents: read
       pull-requests: write
