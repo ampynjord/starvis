@@ -117,7 +117,7 @@ export default function TradePage() {
 
   return (
     <div className="max-w-(--breakpoint-2xl) mx-auto">
-      <PageHeader title="Trade Routes" subtitle="Trade route calculator" />
+      <PageHeader title="Trade Calculator" subtitle="Find the most profitable trade routes" />
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4">
         {/* Main content */}

@@ -336,7 +336,7 @@ function DetailPanel({ m }: { m: Mission }) {
         {/* Blueprint reward */}
         {!!m.has_blueprint_reward && (
           <Link
-            href={m.blueprint_reward_uuid ? `/blueprints?recipe=${m.blueprint_reward_uuid}` : '/blueprints'}
+            href={m.blueprint_reward_uuid ? `/crafting-calculator?recipe=${m.blueprint_reward_uuid}` : '/crafting-calculator'}
             className="block sci-panel p-2.5 bg-purple-950/20 border-purple-900/30 hover:border-purple-500/50 transition-colors"
           >
             <p className="text-[10px] text-purple-500 font-mono-sc uppercase flex items-center gap-1 mb-0.5">

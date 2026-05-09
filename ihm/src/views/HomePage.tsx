@@ -106,12 +106,12 @@ const TOOLS: {
 }[] = [
   { to: '/compare',       icon: BarChart3,         label: 'Compare',           sub: 'Side-by-side ship & component stats',  category: 'data' },
   { to: '/ranking',       icon: Trophy,            label: 'Ranking',           sub: 'Top ships by DPS, cargo, speed…',      category: 'data' },
-  { to: '/blueprints',    icon: Scroll,            label: 'Blueprints',        sub: 'Crafting recipes & materials',         category: 'economy' },
-  { to: '/missions',      icon: ClipboardList,     label: 'Missions',          sub: 'Contracts by faction & legality',      category: 'data' },
-  { to: '/outfitter',     icon: SlidersHorizontal, label: 'Loadout Manager',   sub: 'DPS, power & shield calculator',       category: 'combat',  badge: 'DPS',   comingSoon: true },
-  { to: '/fps-calculator',icon: Crosshair,         label: 'FPS Calculator',    sub: 'TTK & damage breakdown for weapons',   category: 'combat',  badge: 'TTK',   comingSoon: true },
-  { to: '/trade',         icon: TrendingUp,        label: 'Trade Routes',      sub: 'Profit & commodity prices',            category: 'economy', badge: 'aUEC',  comingSoon: true },
-  { to: '/mining',        icon: Pickaxe,           label: 'Mining Calculator', sub: 'Ore yield & laser settings',           category: 'economy', badge: 'Yield', comingSoon: true },
+  { to: '/crafting-calculator', icon: Scroll,            label: 'Crafting Calculator', sub: 'Recipes, ingredients & batch calc', category: 'economy' },
+  { to: '/missions',            icon: ClipboardList,     label: 'Missions',            sub: 'Contracts by faction & legality',  category: 'data' },
+  { to: '/loadout-manager',     icon: SlidersHorizontal, label: 'Loadout Manager',     sub: 'DPS, power & shield calculator',   category: 'combat',  badge: 'DPS' },
+  { to: '/fps-calculator',      icon: Crosshair,         label: 'FPS Calculator',      sub: 'TTK & damage breakdown for weapons', category: 'combat', badge: 'TTK', comingSoon: true },
+  { to: '/trade-calculator',    icon: TrendingUp,        label: 'Trade Calculator',    sub: 'Profit & commodity prices',        category: 'economy', badge: 'aUEC' },
+  { to: '/mining-calculator',   icon: Pickaxe,           label: 'Mining Calculator',   sub: 'Ore yield & laser settings',       category: 'economy', badge: 'Yield' },
 ];
 
 const CATEGORY_LABEL: Record<ToolCategory, { label: string; color: string; border: string }> = {
@@ -135,9 +135,9 @@ const ENTITY_COLOR: Record<string, string> = {
 
 function entityHref(type: string, uuid: string): string | null {
   if (type === 'ship') return `/ships/${uuid}`;
-  if (type === 'component') return `/components/${uuid}`;
+  if (type === 'component') return `/ships-components/${uuid}`;
   if (type === 'item') return `/items/${uuid}`;
-  if (type === 'commodity') return '/industrial';
+  if (type === 'commodity') return '/commodities';
   return null;
 }
 

@@ -1067,10 +1067,10 @@ export interface MiningLaserInfo {
   grade: string | null;
   manufacturerCode: string | null;
   manufacturerName?: string | null;
-  miningSpeed: number;
-  miningRange: number;
-  miningResistance: number;
-  miningInstability: number;
+  miningSpeed: number | null;
+  miningRange: number | null;
+  miningResistance: number | null;
+  miningInstability: number | null;
 }
 
 export interface MiningYieldResult {

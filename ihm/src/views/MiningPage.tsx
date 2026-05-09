@@ -287,10 +287,10 @@ export default function MiningPage() {
                                   <td className="p-2 text-slate-300">{laser.name}</td>
                                   <td className="p-2 text-center text-cyan-400">S{laser.size}</td>
                                   <td className="p-2 text-center text-slate-400">{laser.grade ?? '—'}</td>
-                                  <td className="p-2 text-right text-green-400">{laser.miningSpeed.toFixed(2)}</td>
-                                  <td className="p-2 text-right text-blue-400">{laser.miningRange.toFixed(0)}m</td>
-                                  <td className="p-2 text-right text-amber-400">{laser.miningResistance.toFixed(3)}</td>
-                                  <td className="p-2 text-right text-red-400">{laser.miningInstability.toFixed(3)}</td>
+                                  <td className="p-2 text-right text-green-400">{laser.miningSpeed != null ? laser.miningSpeed.toFixed(2) : '—'}</td>
+                                  <td className="p-2 text-right text-blue-400">{laser.miningRange != null ? `${laser.miningRange.toFixed(0)}m` : '—'}</td>
+                                  <td className="p-2 text-right text-amber-400">{laser.miningResistance != null ? laser.miningResistance.toFixed(3) : '—'}</td>
+                                  <td className="p-2 text-right text-red-400">{laser.miningInstability != null ? laser.miningInstability.toFixed(3) : '—'}</td>
                                   <td className="p-2 text-slate-500">{laser.manufacturerName ?? '—'}</td>
                                 </tr>
                               ))}
