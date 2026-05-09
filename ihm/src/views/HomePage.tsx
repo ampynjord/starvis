@@ -84,10 +84,16 @@ const HOME_SECTION_META: Record<string, Omit<SectionDef, 'label' | 'links'>> = {
   },
 };
 
+const BETA_ROLES = ['beta_tester', 'admin'] as const;
+
+function isBetaRole(role: string | undefined): boolean {
+  return BETA_ROLES.includes(role as (typeof BETA_ROLES)[number]);
+}
+
 const SECTIONS: SectionDef[] = NAV_GROUPS.map((group) => ({
   ...HOME_SECTION_META[group.id],
   label: group.label,
-  links: group.items.filter((item) => !item.comingSoon && !item.auth).map((item) => ({
+  links: group.items.filter((item) => !item.beta && !item.auth).map((item) => ({
     label: item.label,
     to: item.to,
   })),
@@ -102,16 +108,16 @@ const TOOLS: {
   sub: string;
   category: ToolCategory;
   badge?: string;
-  comingSoon?: boolean;
+  beta?: boolean;
 }[] = [
-  { to: '/compare',       icon: BarChart3,         label: 'Compare',           sub: 'Side-by-side ship & component stats',  category: 'data' },
-  { to: '/ranking',       icon: Trophy,            label: 'Ranking',           sub: 'Top ships by DPS, cargo, speed…',      category: 'data' },
-  { to: '/crafting-calculator', icon: Scroll,            label: 'Crafting Calculator', sub: 'Recipes, ingredients & batch calc', category: 'economy' },
-  { to: '/missions',            icon: ClipboardList,     label: 'Missions',            sub: 'Contracts by faction & legality',  category: 'data' },
-  { to: '/loadout-manager',     icon: SlidersHorizontal, label: 'Loadout Manager',     sub: 'DPS, power & shield calculator',   category: 'combat',  badge: 'DPS' },
-  { to: '/fps-calculator',      icon: Crosshair,         label: 'FPS Calculator',      sub: 'TTK & damage breakdown for weapons', category: 'combat', badge: 'TTK', comingSoon: true },
-  { to: '/trade-calculator',    icon: TrendingUp,        label: 'Trade Calculator',    sub: 'Profit & commodity prices',        category: 'economy', badge: 'aUEC' },
-  { to: '/mining-calculator',   icon: Pickaxe,           label: 'Mining Calculator',   sub: 'Ore yield & laser settings',       category: 'economy', badge: 'Yield' },
+  { to: '/compare',             icon: BarChart3,         label: 'Compare',             sub: 'Side-by-side ship & component stats',    category: 'data' },
+  { to: '/ranking',             icon: Trophy,            label: 'Ranking',             sub: 'Top ships by DPS, cargo, speed…',        category: 'data' },
+  { to: '/crafting-calculator', icon: Scroll,            label: 'Crafting Calculator', sub: 'Recipes, ingredients & batch calc',      category: 'economy', beta: true },
+  { to: '/missions',            icon: ClipboardList,     label: 'Missions',            sub: 'Contracts by faction & legality',        category: 'data' },
+  { to: '/loadout-manager',     icon: SlidersHorizontal, label: 'Loadout Manager',     sub: 'DPS, power & shield calculator',         category: 'combat',  badge: 'DPS', beta: true },
+  { to: '/fps-calculator',      icon: Crosshair,         label: 'FPS Calculator',      sub: 'TTK & damage breakdown for weapons',     category: 'combat',  badge: 'TTK', beta: true },
+  { to: '/trade-calculator',    icon: TrendingUp,        label: 'Trade Calculator',    sub: 'Profit & commodity prices',              category: 'economy', badge: 'aUEC', beta: true },
+  { to: '/mining-calculator',   icon: Pickaxe,           label: 'Mining Calculator',   sub: 'Ore yield & laser settings',             category: 'economy', badge: 'Yield', beta: true },
 ];
 
 const CATEGORY_LABEL: Record<ToolCategory, { label: string; color: string; border: string }> = {
@@ -218,7 +224,7 @@ function ChangelogRow({ entry }: { entry: ChangelogEntry }) {
 export default function HomePage() {
   const { env } = useEnv();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
+  const hasBetaAccess = isBetaRole(user?.role);
   const router = useRouter();
   const [heroSearch, setHeroSearch] = useState('');
   const handleHeroSearch = (e: React.FormEvent) => {
@@ -509,43 +515,38 @@ export default function HomePage() {
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          {TOOLS.map(({ to, icon: Icon, label, sub, category, badge, comingSoon }, i) => {
+          {TOOLS.map(({ to, icon: Icon, label, sub, category, badge, beta }, i) => {
             const cat = CATEGORY_LABEL[category];
-            const adminPreview = comingSoon && isAdmin;
+            const locked = beta && !hasBetaAccess;
             const inner = (
               <div className={[
                 'sci-panel p-4 h-full border transition-colors duration-150',
-                comingSoon && !isAdmin
+                locked
                   ? 'opacity-40 cursor-default border-transparent'
-                  : adminPreview
-                    ? 'border-amber-900/40 group cursor-pointer hover:border-amber-700/50 hover:bg-amber-950/10'
-                    : `${cat.border} group cursor-pointer`,
+                  : `${cat.border} group cursor-pointer`,
               ].join(' ')}>
                 <div className="flex items-start justify-between mb-3">
-                  <Icon size={18} className={comingSoon && !isAdmin ? 'text-slate-700 shrink-0' : 'text-slate-500 group-hover:text-slate-200 transition-colors shrink-0'} />
+                  <Icon size={18} className={locked ? 'text-slate-700 shrink-0' : 'text-slate-500 group-hover:text-slate-200 transition-colors shrink-0'} strokeWidth={locked ? 1 : 1.5} />
                   <div className="flex flex-col items-end gap-1">
-                    {comingSoon ? (
-                      <span className={`font-orbitron text-[8px] tracking-widest border rounded-sm px-1.5 py-0.5 uppercase ${
-                        adminPreview
-                          ? 'text-amber-600 border-amber-800/60 bg-amber-950/40'
-                          : 'text-slate-600 border-slate-800'
-                      }`}>
-                        SOON
+                    {beta && (
+                      <span className={`font-orbitron text-[8px] tracking-widest rounded-sm px-1.5 py-0.5 uppercase ${locked ? 'text-purple-700 border border-purple-900/40' : 'text-purple-400 bg-purple-950/40 border border-purple-700/50'}`}>
+                        BETA
                       </span>
-                    ) : badge && (
+                    )}
+                    {!beta && badge && (
                       <span className="font-orbitron text-[8px] tracking-widest text-slate-700 border border-slate-800 rounded-sm px-1 py-0.5 uppercase">
                         {badge}
                       </span>
                     )}
-                    <span className={`font-mono-sc text-[8px] uppercase tracking-widest ${comingSoon && !isAdmin ? 'text-slate-700' : cat.color} opacity-60`}>
+                    <span className={`font-mono-sc text-[8px] uppercase tracking-widest ${locked ? 'text-slate-700' : cat.color} opacity-60`}>
                       {cat.label}
                     </span>
                   </div>
                 </div>
-                <p className={`font-orbitron text-sm font-bold mb-1 leading-tight ${comingSoon && !isAdmin ? 'text-slate-700' : 'text-slate-300 group-hover:text-slate-100 transition-colors'}`}>
+                <p className={`font-orbitron text-sm font-bold mb-1 leading-tight ${locked ? 'text-slate-700' : 'text-slate-300 group-hover:text-slate-100 transition-colors'}`}>
                   {label}
                 </p>
-                <p className={`font-rajdhani text-xs leading-snug ${comingSoon && !isAdmin ? 'text-slate-800' : 'text-slate-600 group-hover:text-slate-500 transition-colors'}`}>
+                <p className={`font-rajdhani text-xs leading-snug ${locked ? 'text-slate-800' : 'text-slate-600 group-hover:text-slate-500 transition-colors'}`}>
                   {sub}
                 </p>
               </div>
@@ -557,7 +558,7 @@ export default function HomePage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.52 + i * 0.04 }}
               >
-                {comingSoon && !isAdmin ? inner : <Link href={to} className="block h-full">{inner}</Link>}
+                {locked ? inner : <Link href={to} className="block h-full">{inner}</Link>}
               </motion.div>
             );
           })}

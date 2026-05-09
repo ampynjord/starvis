@@ -16,48 +16,31 @@ import { useEnv } from '@/contexts/EnvContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { NAV_GROUPS, type NavItemDef } from '@/components/layout/navigation';
 
+/** Roles that can access beta features (mirrors API BETA_ROLES). */
+const BETA_ROLES = ['beta_tester', 'admin'] as const;
 
-function NavItem({ to, icon: Icon, label, auth: requiresAuth, comingSoon, onNavigate }: NavItemDef & { onNavigate?: () => void }) {
+function isBetaRole(role: string | undefined): boolean {
+  return BETA_ROLES.includes(role as (typeof BETA_ROLES)[number]);
+}
+
+function NavItem({ to, icon: Icon, label, auth: requiresAuth, beta, onNavigate }: NavItemDef & { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
-  const isActive = !comingSoon && (to === '/' ? pathname === '/' : pathname?.startsWith(to));
+  const hasBetaAccess = isBetaRole(user?.role);
+  const isActive = !beta || hasBetaAccess ? (to === '/' ? pathname === '/' : pathname?.startsWith(to)) : false;
   const locked = requiresAuth && !user;
 
-  if (comingSoon && !isAdmin) {
+  if (beta && !hasBetaAccess) {
     return (
-      <div className="flex items-center gap-3 px-2 py-2.5 rounded-sm border border-transparent cursor-default select-none opacity-40">
+      <div className="flex items-center gap-3 px-2 py-2.5 rounded-sm border border-transparent cursor-default select-none opacity-50">
         <Icon size={16} className="shrink-0 text-slate-600" strokeWidth={1.5} />
         <span className="font-rajdhani font-semibold text-sm uppercase tracking-wider truncate flex-1 text-slate-600">
           {label}
         </span>
-        <span className="shrink-0 text-[9px] font-orbitron font-bold tracking-widest text-slate-500 bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded-sm">
-          SOON
+        <span className="shrink-0 text-[9px] font-orbitron font-bold tracking-widest text-purple-500/70 bg-purple-950/30 border border-purple-800/40 px-1.5 py-0.5 rounded-sm">
+          BETA
         </span>
       </div>
-    );
-  }
-
-  if (comingSoon && isAdmin) {
-    return (
-      <Link
-        href={to}
-        onClick={onNavigate}
-        className={[
-          'flex items-center gap-3 px-2 py-2.5 rounded-sm transition-all duration-150 group border',
-          pathname?.startsWith(to)
-            ? 'bg-amber-950/40 border-amber-800/60 text-amber-400'
-            : 'text-slate-400 hover:text-slate-200 hover:bg-amber-950/20 border-amber-900/30',
-        ].join(' ')}
-      >
-        <Icon size={16} className="shrink-0 text-slate-500 group-hover:text-slate-300" strokeWidth={1.5} />
-        <span className="font-rajdhani font-semibold text-sm uppercase tracking-wider truncate flex-1">
-          {label}
-        </span>
-        <span className="shrink-0 text-[9px] font-orbitron font-bold tracking-widest text-amber-600 bg-amber-950/60 border border-amber-800/50 px-1.5 py-0.5 rounded-sm">
-          SOON
-        </span>
-      </Link>
     );
   }
 
@@ -80,10 +63,13 @@ function NavItem({ to, icon: Icon, label, auth: requiresAuth, comingSoon, onNavi
       <span className="font-rajdhani font-semibold text-sm uppercase tracking-wider truncate flex-1">
         {label}
       </span>
-      {locked && (
-        <Lock size={10} className="shrink-0 text-slate-600" />
+      {locked && <Lock size={10} className="shrink-0 text-slate-600" />}
+      {beta && (
+        <span className="shrink-0 text-[9px] font-orbitron font-bold tracking-widest text-purple-400 bg-purple-950/40 border border-purple-700/50 px-1.5 py-0.5 rounded-sm">
+          BETA
+        </span>
       )}
-      {isActive && !locked && (
+      {isActive && !locked && !beta && (
         <motion.div
           layoutId="nav-indicator"
           className="ml-auto w-1 h-1 rounded-full bg-cyan-400"
@@ -191,6 +177,11 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           >
             <User size={12} />
             <span className="font-mono-sc truncate">{user.username}</span>
+            {isBetaRole(user.role) && (
+              <span className="text-[8px] font-orbitron tracking-widest text-purple-400 bg-purple-950/40 border border-purple-700/50 px-1 py-0.5 rounded-sm uppercase ml-auto">
+                {user.role === 'admin' ? 'admin' : 'beta'}
+              </span>
+            )}
           </Link>
         )}
         <Link
