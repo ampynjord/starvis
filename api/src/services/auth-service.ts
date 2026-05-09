@@ -109,6 +109,41 @@ export class AuthService {
     return toPublicUser(user);
   }
 
+  async adminUpdateUser(userId: number, updates: { username?: string; email?: string; avatarUrl?: string }): Promise<PublicUser> {
+    const data: Record<string, string> = {};
+    if (updates.username !== undefined) data.username = updates.username.trim();
+    if (updates.email !== undefined) data.email = updates.email.toLowerCase().trim();
+    if (updates.avatarUrl !== undefined) data.avatarUrl = updates.avatarUrl;
+    const user = await (this.prisma as any).user.update({ where: { id: userId }, data });
+    return toPublicUser(user);
+  }
+
+  async adminResetPassword(userId: number, newPassword: string): Promise<void> {
+    const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    await (this.prisma as any).user.update({ where: { id: userId }, data: { passwordHash } });
+  }
+
+  async deleteUser(userId: number): Promise<void> {
+    await (this.prisma as any).user.delete({ where: { id: userId } });
+  }
+
+  async adminCreateUser(email: string, username: string, password: string, role = 'user'): Promise<PublicUser> {
+    const emailLower = email.toLowerCase().trim();
+    const usernameTrimmed = username.trim();
+    const existing = await (this.prisma as any).user.findFirst({
+      where: { OR: [{ email: emailLower }, { username: usernameTrimmed }] },
+    });
+    if (existing) {
+      if (existing.email === emailLower) throw new Error('EMAIL_TAKEN');
+      throw new Error('USERNAME_TAKEN');
+    }
+    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+    const user = await (this.prisma as any).user.create({
+      data: { email: emailLower, username: usernameTrimmed, passwordHash, role },
+    });
+    return toPublicUser(user);
+  }
+
   generateApiToken(user: PublicUser): string {
     const payload: JwtPayload = { sub: user.id, uuid: user.uuid, email: user.email, username: user.username, role: user.role };
     return jwt.sign(payload, getSecret(), { expiresIn: JWT_API_TOKEN_EXPIRES });
