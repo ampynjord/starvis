@@ -58,6 +58,34 @@ export function requireJwt(req: Request, res: Response, next: NextFunction) {
   }
 }
 
+/** Roles that can access beta features. */
+export const BETA_ROLES = ['beta_tester', 'admin'] as const;
+
+/**
+ * requireJwtBetaOrAdmin — vérifie le Bearer JWT ET que role est beta_tester ou admin.
+ * Donne accès aux outils en accès anticipé (beta).
+ */
+export function requireJwtBetaOrAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!process.env.JWT_SECRET) {
+    return res.status(401).json({ success: false, error: 'Unauthorized' });
+  }
+  const token = extractBearer(req) ?? extractCookieToken(req);
+  if (!token) {
+    return res.status(401).json({ success: false, error: 'Authentication required' });
+  }
+  try {
+    const authService = new AuthService(null as any);
+    const payload = authService.verifyToken(token);
+    if (!BETA_ROLES.includes(payload.role as (typeof BETA_ROLES)[number])) {
+      return res.status(403).json({ success: false, error: 'Beta tester or admin role required' });
+    }
+    (req as any).jwtPayload = payload;
+    next();
+  } catch {
+    res.status(401).json({ success: false, error: 'Invalid or expired token' });
+  }
+}
+
 /**
  * requireJwtAdmin — vérifie le Bearer JWT ET que role === 'admin'.
  * Accepte aussi l'ADMIN_API_KEY (X-Api-Key) pour la compatibilité serveur-to-serveur.
