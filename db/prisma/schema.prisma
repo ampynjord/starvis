@@ -102,6 +102,7 @@ model Changelog {
 
 enum UserRole {
   user
+  beta_tester
   admin
 
   @@schema("meta")
