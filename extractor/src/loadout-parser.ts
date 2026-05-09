@@ -76,7 +76,7 @@ export class LoadoutParser {
           const subData = this.ctx.readInstance(subRecord.structIndex, subRecord.instanceIndex, 0, 5);
           if (subData && Array.isArray(subData.Components)) {
             const seenSubPorts = new Set<string>();
-          for (const subComp of subData.Components) {
+            for (const subComp of subData.Components) {
               if (!subComp || subComp.__type !== 'SEntityComponentDefaultLoadoutParams') continue;
               const subEntries = subComp.loadout?.entries;
               if (!Array.isArray(subEntries)) continue;
