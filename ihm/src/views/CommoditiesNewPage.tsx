@@ -1,6 +1,7 @@
 /**
- * MineralsLibraryPage — Complete mineral/ore reference
- * Shows mining properties, sell prices, crafting usage, and rock finder links.
+ * CommoditiesNewPage — Merged commodities & minerals library
+ * Combines trade goods (paginated list with filters) and the full minerals
+ * reference (sortable table with detail drawer), using the Minerals Library style.
  */
 'use client';
 
@@ -13,6 +14,8 @@ import {
   Crosshair,
   FlaskConical,
   Link as LinkIcon,
+  Package,
+  Pickaxe,
   Search,
   X,
 } from 'lucide-react';
@@ -23,13 +26,154 @@ import { useEnv } from '@/contexts/EnvContext';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { Pagination } from '@/components/ui/Pagination';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { GlowBadge } from '@/components/ui/GlowBadge';
+import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
+import { useListQueryState } from '@/hooks/useListQueryState';
+import { useDebounce } from '@/hooks/useDebounce';
 import type { MiningElement } from '@/types/api';
 import { ORE_PRICES } from '@/data/mining-static';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+
+type Tab = 'trade' | 'minerals';
+
+// ── Trade Goods (from CommoditiesPage) ───────────────────────────────────────
+
+const TRADE_LIMIT = 30;
+
+interface CommodityCategoryDef {
+  label: string;
+  test: (type: string) => boolean;
+}
+
+const COMMODITY_CATEGORY_DEFS: CommodityCategoryDef[] = [
+  { label: 'Raw Ore / Minerals', test: (t) => /(raw|ore|mineral|gem)/i.test(t) },
+  { label: 'Refined Materials', test: (t) => /(refined|processed|alloy|ingot)/i.test(t) },
+  { label: 'Fuel / Gas / Fluids', test: (t) => /(fuel|gas|liquid|hydrogen|quantum)/i.test(t) },
+  { label: 'Agriculture / Food', test: (t) => /(agri|agriculture|food|bio|organic)/i.test(t) },
+  { label: 'Medical / Contraband', test: (t) => /(medical|drug|narcotic|contraband)/i.test(t) },
+];
+
+function buildCommodityCategories(rawTypes: string[]): { label: string; types: string[] }[] {
+  const normalized = rawTypes.filter(Boolean);
+  const used = new Set<string>();
+  const categories = COMMODITY_CATEGORY_DEFS.map((def) => {
+    const types = normalized.filter((t) => def.test(t));
+    types.forEach((t) => used.add(t));
+    return { label: def.label, types };
+  }).filter((c) => c.types.length > 0);
+  const misc = normalized.filter((t) => !used.has(t));
+  if (misc.length > 0) categories.push({ label: 'Other Trade Goods', types: misc });
+  return [{ label: 'All', types: [] }, ...categories];
+}
+
+function TradeGoodsTab() {
+  const { env } = useEnv();
+  const { page, search, debouncedSearch, updateSearch, updatePageWithScroll, setPage } = useListQueryState();
+  const [activeCategory, setActiveCategory] = useState('All');
+
+  const { data: types } = useQuery({
+    queryKey: ['commodities.types', env],
+    queryFn: () => api.commodities.types(env),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+
+  const categories = useMemo(() => buildCommodityCategories(types ?? []), [types]);
+  const selectedCategory = categories.find((c) => c.label === activeCategory) ?? categories[0];
+  const chipTypes = selectedCategory?.types ?? [];
+  const effectiveType = chipTypes.length === 1 ? chipTypes[0] : undefined;
+  const effectiveTypes = chipTypes.length > 1 ? chipTypes.join(',') : undefined;
+
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['commodities.list', env, { page, search: debouncedSearch, type: effectiveType, types: effectiveTypes }],
+    queryFn: () => api.commodities.list({ env, page, limit: TRADE_LIMIT, search: debouncedSearch || undefined, type: effectiveType, types: effectiveTypes }),
+  });
+
+  const filterGroups = categories.length > 0 ? [{
+    key: 'category',
+    label: 'Category',
+    options: categories.map((c) => ({ label: c.label, value: c.label })),
+    value: activeCategory,
+    onChange: (v: string) => { setActiveCategory(v); setPage(1); },
+  }] : [];
+
+  return (
+    <div className="flex gap-4">
+      <div className="w-44 shrink-0">
+        <MobileFilterWrapper hasFilters={activeCategory !== 'All'}>
+          {filterGroups.length > 0 ? (
+            <FilterPanel
+              hasFilters={activeCategory !== 'All'}
+              onReset={() => { setActiveCategory('All'); setPage(1); }}
+              groups={filterGroups}
+            />
+          ) : (
+            <div className="sci-panel p-3 text-xs text-slate-600 animate-pulse">Loading…</div>
+          )}
+        </MobileFilterWrapper>
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="sci-panel p-3 mb-4 flex items-center justify-between gap-3">
+          <p className="text-xs text-slate-400 font-mono-sc">Raw ores, refined materials, fuel/gas and trade goods. Use Mining Calculator for yield and profit tools.</p>
+          <Link href="/mining-calculator" className="text-xs text-cyan-400 hover:text-cyan-300 whitespace-nowrap">Open Mining Calculator</Link>
+        </div>
+
+        <div className="mb-4 relative">
+          <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-600" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => updateSearch(e.target.value)}
+            placeholder="Search commodities…"
+            className="sci-input pl-6 pr-7 py-1.5 text-xs w-full sm:w-64"
+          />
+          {search && (
+            <button type="button" onClick={() => updateSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400">
+              <X size={11} />
+            </button>
+          )}
+        </div>
+
+        {isLoading ? <LoadingGrid message="LOADING…" />
+          : error ? <ErrorState error={error as Error} onRetry={() => void refetch()} />
+          : !data?.data?.length ? <EmptyState icon="📦" title="No commodities found" />
+          : (
+            <>
+              <div className="space-y-1.5">
+                {(data.data ?? []).map((c, i) => (
+                  <motion.div key={c.uuid} initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: Math.min(i * 0.03, 0.3) }}>
+                    <div className="sci-panel px-4 py-3 hover:border-cyan-800 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <Link href={`/commodities/${c.uuid}`} className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-orbitron text-sm text-slate-200">{c.name}</span>
+                            {c.type && <GlowBadge color="slate">{c.type}</GlowBadge>}
+                            {c.sub_type && <GlowBadge color="slate" size="xs">{c.sub_type}</GlowBadge>}
+                          </div>
+                          {c.symbol && <p className="text-xs font-mono-sc text-slate-600 mt-0.5">{c.symbol}</p>}
+                        </Link>
+                        <div className="text-right shrink-0 space-y-1">
+                          {c.occupancy_scu != null && <p className="text-xs font-mono-sc text-slate-600">{c.occupancy_scu} μSCU</p>}
+                          <Link href={`/missions?search=${encodeURIComponent(c.name)}`} className="text-[10px] text-amber-500 hover:text-amber-300">Mission leads</Link>
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+              {data && <Pagination className="mt-6" page={data.page} totalPages={data.pages} onPageChange={updatePageWithScroll} />}
+            </>
+          )}
+      </div>
+    </div>
+  );
+}
+
+// ── Minerals Library (from MineralsLibraryPage) ───────────────────────────────
 
 function lookupPrice(element: MiningElement): number | null {
   const lower = (element.name ?? element.class_name ?? '').toLowerCase();
@@ -69,25 +213,12 @@ function fmtNum(v: number | null | undefined, d = 2): string {
   return v.toFixed(d);
 }
 
-// ── Sort ──────────────────────────────────────────────────────────────────────
-
 type SortKey = 'name' | 'price' | 'instability' | 'resistance' | 'optimalWindow' | 'avgProb' | 'rocks';
 type SortDir = 'asc' | 'desc';
 
-function SortTh({
-  label,
-  sk,
-  current,
-  dir,
-  onSort,
-  left,
-}: {
-  label: string;
-  sk: SortKey;
-  current: SortKey;
-  dir: SortDir;
-  onSort: (k: SortKey) => void;
-  left?: boolean;
+function SortTh({ label, sk, current, dir, onSort, left }: {
+  label: string; sk: SortKey; current: SortKey; dir: SortDir;
+  onSort: (k: SortKey) => void; left?: boolean;
 }) {
   const active = current === sk;
   const Icon = active ? (dir === 'asc' ? ChevronUp : ChevronDown) : ChevronsUpDown;
@@ -100,8 +231,6 @@ function SortTh({
     </th>
   );
 }
-
-// ── Detail Drawer ─────────────────────────────────────────────────────────────
 
 function MineralDetail({ element }: { element: MiningElement }) {
   const price = lookupPrice(element);
@@ -153,7 +282,6 @@ function MineralDetail({ element }: { element: MiningElement }) {
           </div>
         </div>
 
-        {/* Laser power window bar */}
         {windowStart != null && windowEnd != null && optWin != null && (
           <div className="mb-3">
             <div className="text-[10px] text-slate-600 font-mono-sc mb-1">
@@ -172,16 +300,15 @@ function MineralDetail({ element }: { element: MiningElement }) {
           </div>
         )}
 
-        {/* Actions */}
         <div className="flex flex-wrap gap-2">
           <Link
-            href={`/mining-calculator?tab=finder`}
+            href="/mining-calculator?tab=finder"
             className="flex items-center gap-1.5 text-[10px] font-mono-sc text-cyan-500 hover:text-cyan-300 border border-cyan-900/50 hover:border-cyan-700 px-2 py-1.5 rounded-sm transition-colors"
           >
             <Crosshair size={11} /> Find rocks with this mineral
           </Link>
           <Link
-            href={`/mining-calculator?tab=profit`}
+            href="/mining-calculator?tab=profit"
             className="flex items-center gap-1.5 text-[10px] font-mono-sc text-green-500 hover:text-green-300 border border-green-900/50 hover:border-green-700 px-2 py-1.5 rounded-sm transition-colors"
           >
             <FlaskConical size={11} /> Calculate profit
@@ -197,14 +324,13 @@ function MineralDetail({ element }: { element: MiningElement }) {
   );
 }
 
-// ── Main ──────────────────────────────────────────────────────────────────────
-
-export default function MineralsLibraryPage() {
+function MineralsTab() {
   const { env } = useEnv();
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('price');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [selectedUuid, setSelectedUuid] = useState<string | null>(null);
+  const debouncedSearch = useDebounce(search, 250);
 
   const { data: minerals = [], isLoading, error } = useQuery({
     queryKey: ['minerals-library', env],
@@ -218,9 +344,9 @@ export default function MineralsLibraryPage() {
   };
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = debouncedSearch.trim().toLowerCase();
     return minerals.filter((m) => !q || (m.name ?? m.class_name ?? '').toLowerCase().includes(q));
-  }, [minerals, search]);
+  }, [minerals, debouncedSearch]);
 
   const sorted = useMemo(() => {
     return [...filtered].sort((a, b) => {
@@ -244,7 +370,6 @@ export default function MineralsLibraryPage() {
   }, [filtered, sortKey, sortDir]);
 
   const selectedElement = useMemo(() => sorted.find((e) => e.uuid === selectedUuid) ?? null, [sorted, selectedUuid]);
-
   const priceableCount = useMemo(() => minerals.filter((m) => (lookupPrice(m) ?? 0) > 0).length, [minerals]);
 
   if (isLoading) return <LoadingGrid message="Loading minerals..." />;
@@ -252,15 +377,7 @@ export default function MineralsLibraryPage() {
   if (!minerals.length) return <EmptyState title="No minerals found" />;
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto">
-      <PageHeader
-        title="Minerals Library"
-        count={minerals.length}
-        countLabel="minerals"
-        subtitle="Complete reference of all mineable elements — properties, sell prices, and mining data"
-      />
-
-      {/* Quick stats */}
+    <div>
       <div className="flex flex-wrap gap-2 mb-4">
         <div className="sci-panel px-3 py-1.5 text-[10px] font-mono-sc text-slate-500 flex items-center gap-1.5">
           <FlaskConical size={10} /> {priceableCount} with known price
@@ -276,7 +393,6 @@ export default function MineralsLibraryPage() {
         </Link>
       </div>
 
-      {/* Table */}
       <ScifiPanel
         title="Mineral Reference"
         subtitle={`${sorted.length} of ${minerals.length} minerals`}
@@ -366,12 +482,61 @@ export default function MineralsLibraryPage() {
         </div>
       </ScifiPanel>
 
-      {/* Detail drawer */}
       {selectedElement && (
         <div className="mt-4">
           <MineralDetail element={selectedElement} />
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
+
+export default function CommoditiesNewPage() {
+  const [activeTab, setActiveTab] = useState<Tab>('trade');
+
+  const TABS: { id: Tab; label: string; icon: React.ReactNode; subtitle: string }[] = [
+    { id: 'trade', label: 'Trade Goods', icon: <Package size={14} />, subtitle: 'Commodities, ores and trade items' },
+    { id: 'minerals', label: 'Minerals Library', icon: <Pickaxe size={14} />, subtitle: 'Mining elements — properties, prices, rock data' },
+  ];
+
+  return (
+    <div className="max-w-(--breakpoint-2xl) mx-auto">
+      <PageHeader
+        title="Commodities"
+        subtitle="Trade goods catalogue and complete minerals reference"
+      />
+
+      <div className="mb-6 overflow-x-auto">
+        <div className="flex gap-1 min-w-max pb-1">
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-3 py-2 rounded-sm text-xs font-mono-sc transition-all whitespace-nowrap border ${
+                activeTab === tab.id
+                  ? 'border-cyan-500/70 bg-cyan-950/30 text-cyan-300'
+                  : 'border-slate-700/40 text-slate-500 hover:border-slate-600/60 hover:text-slate-300'
+              }`}
+            >
+              <span className={activeTab === tab.id ? 'text-cyan-400' : 'text-slate-600'}>
+                {tab.icon}
+              </span>
+              <span className="font-semibold">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+        {TABS.find((t) => t.id === activeTab) && (
+          <div className="mt-1.5 text-[10px] text-slate-600 font-mono-sc uppercase tracking-widest pl-0.5">
+            {TABS.find((t) => t.id === activeTab)!.subtitle}
+          </div>
+        )}
+      </div>
+
+      {activeTab === 'trade' && <TradeGoodsTab />}
+      {activeTab === 'minerals' && <MineralsTab />}
     </div>
   );
 }
