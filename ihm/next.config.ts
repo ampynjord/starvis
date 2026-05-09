@@ -17,11 +17,17 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
-      { source: '/equipment', destination: '/components', permanent: true },
+      { source: '/equipment', destination: '/ships-components', permanent: true },
+      { source: '/components', destination: '/ships-components', permanent: true },
+      { source: '/outfitter', destination: '/loadout-manager', permanent: true },
+      { source: '/blueprints', destination: '/crafting-calculator', permanent: true },
+      { source: '/mining', destination: '/mining-calculator', permanent: true },
+      { source: '/trade', destination: '/trade-calculator', permanent: true },
+      { source: '/industrial', destination: '/commodities', permanent: true },
+      { source: '/minerals', destination: '/commodities', permanent: true },
       { source: '/other-items', destination: '/consumables', permanent: true },
       { source: '/items', destination: '/consumables', permanent: true },
       { source: '/items/:uuid', destination: '/consumables/:uuid', permanent: true },
-      { source: '/commodities', destination: '/industrial', permanent: true },
       { source: '/factions', destination: '/missions', permanent: true },
     ];
   },

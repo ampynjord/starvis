@@ -8,7 +8,6 @@ import {
   MapPin,
   Newspaper,
   Paintbrush,
-  Pickaxe,
   Rocket,
   Scroll,
   Settings2,
@@ -35,11 +34,11 @@ export type NavGroupDef = {
 
 const SHIPS_ITEMS: NavItemDef[] = [
   { to: '/ships', icon: Rocket, label: 'Ships & Vehicles' },
-  { to: '/components', icon: Settings2, label: 'Ship Components' },
+  { to: '/ships-components', icon: Settings2, label: 'Ship Components' },
   { to: '/paints', icon: Paintbrush, label: 'Paints' },
   { to: '/compare', icon: BarChart3, label: 'Compare' },
   { to: '/ranking', icon: Trophy, label: 'Ranking' },
-  { to: '/outfitter', icon: SlidersHorizontal, label: 'Loadout Manager' },
+  { to: '/loadout-manager', icon: SlidersHorizontal, label: 'Loadout Manager' },
 ];
 
 const FPS_ITEMS: NavItemDef[] = [
@@ -49,11 +48,10 @@ const FPS_ITEMS: NavItemDef[] = [
 ];
 
 const ECONOMY_ITEMS: NavItemDef[] = [
-  { to: '/industrial', icon: Factory, label: 'Commodities' },
-  { to: '/blueprints', icon: Scroll, label: 'Crafting Calculator' },
-  { to: '/minerals', icon: Pickaxe, label: 'Minerals Library' },
-  { to: '/mining', icon: BarChart3, label: 'Mining Calculator' },
-  { to: '/trade', icon: TrendingUp, label: 'Trade Routes', comingSoon: true },
+  { to: '/commodities', icon: Factory, label: 'Commodities' },
+  { to: '/crafting-calculator', icon: Scroll, label: 'Crafting Calculator' },
+  { to: '/mining-calculator', icon: BarChart3, label: 'Mining Calculator' },
+  { to: '/trade-calculator', icon: TrendingUp, label: 'Trade Calculator' },
 ];
 
 const UNIVERSE_ITEMS: NavItemDef[] = [
