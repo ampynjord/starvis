@@ -175,13 +175,13 @@ function MineralDetail({ element }: { element: MiningElement }) {
         {/* Actions */}
         <div className="flex flex-wrap gap-2">
           <Link
-            href={`/mining?tab=finder`}
+            href={`/mining-calculator?tab=finder`}
             className="flex items-center gap-1.5 text-[10px] font-mono-sc text-cyan-500 hover:text-cyan-300 border border-cyan-900/50 hover:border-cyan-700 px-2 py-1.5 rounded-sm transition-colors"
           >
             <Crosshair size={11} /> Find rocks with this mineral
           </Link>
           <Link
-            href={`/mining?tab=profit`}
+            href={`/mining-calculator?tab=profit`}
             className="flex items-center gap-1.5 text-[10px] font-mono-sc text-green-500 hover:text-green-300 border border-green-900/50 hover:border-green-700 px-2 py-1.5 rounded-sm transition-colors"
           >
             <FlaskConical size={11} /> Calculate profit
@@ -269,7 +269,7 @@ export default function MineralsLibraryPage() {
           <Crosshair size={10} /> Click a row to inspect
         </div>
         <Link
-          href="/mining"
+          href="/mining-calculator"
           className="sci-panel px-3 py-1.5 text-[10px] font-mono-sc text-cyan-500 hover:text-cyan-300 flex items-center gap-1.5 transition-colors border-cyan-900/40 hover:border-cyan-700"
         >
           <LinkIcon size={10} /> Open Mining Calculator
