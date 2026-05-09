@@ -113,8 +113,8 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   router.put('/admin/users/:id/role', requireJwtAdmin, async (req, res) => {
     const id = Number(req.params.id);
     const { role } = req.body ?? {};
-    if (!['user', 'admin'].includes(role)) {
-      return void res.status(400).json({ success: false, error: 'role must be "user" or "admin"' });
+    if (!['user', 'beta_tester', 'admin'].includes(role)) {
+      return void res.status(400).json({ success: false, error: 'role must be "user", "beta_tester" or "admin"' });
     }
     try {
       const user = await authService.setRole(id, role);

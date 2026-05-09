@@ -23,7 +23,8 @@ export type NavItemDef = {
   icon: React.ElementType;
   label: string;
   auth?: boolean;
-  comingSoon?: boolean;
+  /** Feature under active development — accessible only to beta_tester and admin roles. */
+  beta?: boolean;
 };
 
 export type NavGroupDef = {
@@ -38,20 +39,20 @@ const SHIPS_ITEMS: NavItemDef[] = [
   { to: '/paints', icon: Paintbrush, label: 'Paints' },
   { to: '/compare', icon: BarChart3, label: 'Compare' },
   { to: '/ranking', icon: Trophy, label: 'Ranking' },
-  { to: '/loadout-manager', icon: SlidersHorizontal, label: 'Loadout Manager' },
+  { to: '/loadout-manager', icon: SlidersHorizontal, label: 'Loadout Manager', beta: true },
 ];
 
 const FPS_ITEMS: NavItemDef[] = [
   { to: '/fps-gear', icon: Crosshair, label: 'FPS Gear' },
   { to: '/consumables', icon: Layers3, label: 'Consumables' },
-  { to: '/fps-calculator', icon: SlidersHorizontal, label: 'FPS Calculator', comingSoon: true },
+  { to: '/fps-calculator', icon: SlidersHorizontal, label: 'FPS Calculator', beta: true },
 ];
 
 const ECONOMY_ITEMS: NavItemDef[] = [
   { to: '/commodities', icon: Factory, label: 'Commodities' },
-  { to: '/crafting-calculator', icon: Scroll, label: 'Crafting Calculator' },
-  { to: '/mining-calculator', icon: BarChart3, label: 'Mining Calculator' },
-  { to: '/trade-calculator', icon: TrendingUp, label: 'Trade Calculator' },
+  { to: '/crafting-calculator', icon: Scroll, label: 'Crafting Calculator', beta: true },
+  { to: '/mining-calculator', icon: BarChart3, label: 'Mining Calculator', beta: true },
+  { to: '/trade-calculator', icon: TrendingUp, label: 'Trade Calculator', beta: true },
 ];
 
 const UNIVERSE_ITEMS: NavItemDef[] = [
