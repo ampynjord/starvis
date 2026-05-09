@@ -112,6 +112,9 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   // PUT /admin/users/:id/role
   router.put('/admin/users/:id/role', requireJwtAdmin, async (req, res) => {
     const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return void res.status(400).json({ success: false, error: 'Invalid user id' });
+    }
     const { role } = req.body ?? {};
     if (!['user', 'beta_tester', 'admin'].includes(role)) {
       return void res.status(400).json({ success: false, error: 'role must be "user", "beta_tester" or "admin"' });
@@ -119,7 +122,8 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     try {
       const user = await authService.setRole(id, role);
       res.json({ success: true, user });
-    } catch {
+    } catch (e: any) {
+      if (e?.code === 'P2025') return void res.status(404).json({ success: false, error: 'User not found' });
       res.status(500).json({ success: false, error: 'Failed to update role' });
     }
   });
