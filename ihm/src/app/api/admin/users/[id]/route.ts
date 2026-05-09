@@ -24,25 +24,27 @@ async function proxy(method: string, path: string, token: string, body?: unknown
   return NextResponse.json(data, { status: upstream.status });
 }
 
-export async function GET() {
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const token = await getToken();
     if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-    return proxy('GET', '/admin/users', token);
+    const body = await req.json().catch(() => ({}));
+    return proxy('PUT', `/admin/users/${id}`, token, body);
   } catch (e: any) {
-    console.error('[admin/users GET]', e);
+    console.error('[admin/users/:id PUT]', e);
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
   }
 }
 
-export async function POST(req: Request) {
+export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params;
     const token = await getToken();
     if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-    const body = await req.json().catch(() => ({}));
-    return proxy('POST', '/admin/users', token, body);
+    return proxy('DELETE', `/admin/users/${id}`, token);
   } catch (e: any) {
-    console.error('[admin/users POST]', e);
+    console.error('[admin/users/:id DELETE]', e);
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
   }
 }
