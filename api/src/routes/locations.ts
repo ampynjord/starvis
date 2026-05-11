@@ -1,10 +1,10 @@
 import type { Router } from 'express';
+import { requireJwtBetaOrAdmin } from '../middleware/index.js';
 import {
   asyncHandler,
   getQueryNumber,
   getQueryString,
   makeGameDataGuard,
-  mountEnvDataRoute,
   sendDataWithETag,
   sendPaginatedWithETag,
   sendWithETag,
@@ -18,6 +18,7 @@ export function mountLocationRoutes(router: Router, deps: RouteDependencies): vo
   /** GET /api/v1/locations/filters */
   router.get(
     '/api/v1/locations/filters',
+    requireJwtBetaOrAdmin,
     requireGameData,
     asyncHandler(async (req, res) => {
       const env = getQueryString(req, 'env') ?? 'live';
@@ -27,14 +28,31 @@ export function mountLocationRoutes(router: Router, deps: RouteDependencies): vo
   );
 
   /** GET /api/v1/locations/types */
-  mountEnvDataRoute(router, '/api/v1/locations/types', requireGameData, (env) => gameDataService!.locations.getLocationTypes(env));
+  router.get(
+    '/api/v1/locations/types',
+    requireJwtBetaOrAdmin,
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = getQueryString(req, 'env') ?? 'live';
+      sendDataWithETag(req, res, await gameDataService!.locations.getLocationTypes(env));
+    }),
+  );
 
   /** GET /api/v1/locations/systems */
-  mountEnvDataRoute(router, '/api/v1/locations/systems', requireGameData, (env) => gameDataService!.locations.getLocationSystems(env));
+  router.get(
+    '/api/v1/locations/systems',
+    requireJwtBetaOrAdmin,
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = getQueryString(req, 'env') ?? 'live';
+      sendDataWithETag(req, res, await gameDataService!.locations.getLocationSystems(env));
+    }),
+  );
 
   /** GET /api/v1/locations/all — full unpaginated list for tree views */
   router.get(
     '/api/v1/locations/all',
+    requireJwtBetaOrAdmin,
     requireGameData,
     asyncHandler(async (req, res) => {
       const env = getQueryString(req, 'env') ?? 'live';
@@ -46,6 +64,7 @@ export function mountLocationRoutes(router: Router, deps: RouteDependencies): vo
   /** GET /api/v1/locations */
   router.get(
     '/api/v1/locations',
+    requireJwtBetaOrAdmin,
     requireGameData,
     asyncHandler(async (req, res) => {
       const t = Date.now();
@@ -68,6 +87,7 @@ export function mountLocationRoutes(router: Router, deps: RouteDependencies): vo
   /** GET /api/v1/locations/:uuid */
   router.get(
     '/api/v1/locations/:uuid',
+    requireJwtBetaOrAdmin,
     requireGameData,
     asyncHandler(async (req, res) => {
       const env = getQueryString(req, 'env') ?? 'live';
@@ -80,6 +100,7 @@ export function mountLocationRoutes(router: Router, deps: RouteDependencies): vo
   /** GET /api/v1/locations/:uuid/children */
   router.get(
     '/api/v1/locations/:uuid/children',
+    requireJwtBetaOrAdmin,
     requireGameData,
     asyncHandler(async (req, res) => {
       const env = getQueryString(req, 'env') ?? 'live';
