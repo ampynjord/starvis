@@ -600,8 +600,7 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
             if (instability && typeof instability.value === 'number')
               comp.miningInstability = Math.round(instability.value * 10000) / 10000;
             const resistance = mod.resistanceModifier;
-            if (resistance && typeof resistance.value === 'number')
-              comp.miningResistance = Math.round(resistance.value * 10000) / 10000;
+            if (resistance && typeof resistance.value === 'number') comp.miningResistance = Math.round(resistance.value * 10000) / 10000;
           }
         }
 
@@ -621,8 +620,7 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
 
             // Tractor beam fire action
             if (faType === 'SWeaponActionFireTractorBeamParams') {
-              if (typeof fa.maxForce === 'number' && !comp.tractorMaxForce)
-                comp.tractorMaxForce = Math.round(fa.maxForce * 100) / 100;
+              if (typeof fa.maxForce === 'number' && !comp.tractorMaxForce) comp.tractorMaxForce = Math.round(fa.maxForce * 100) / 100;
               if (typeof fa.maxDistance === 'number' && !comp.tractorMaxRange)
                 comp.tractorMaxRange = Math.round(fa.maxDistance * 100) / 100;
             }
