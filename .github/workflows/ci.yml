@@ -17,7 +17,8 @@ env:
 
 jobs:
 # ─────────────────────────────────────────────────────────────
-# INSTALL — artifact partagé entre tous les jobs du même run
+# INSTALL — node_modules + db/generated/ en cache
+# db:generate ne tourne que si les schémas Prisma ont changé
 # ─────────────────────────────────────────────────────────────
   install:
     name: Install & Generate
@@ -30,7 +31,6 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
 
-      # Cache node_modules par lockfile hash → npm ci skippé si cache hit
       - name: Restore node_modules cache
         id: nm-cache
         uses: actions/cache@v4
@@ -38,28 +38,29 @@ jobs:
           path: |
             node_modules
             api/node_modules
+            ihm/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
 
+      - name: Restore db/generated cache
+        id: db-gen-cache
+        uses: actions/cache@v4
+        with:
+          path: db/generated/
+          key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma') }}
+
       - name: Generate DB clients
+        if: steps.db-gen-cache.outputs.cache-hit != 'true'
         run: npm run db:generate
 
-      # Upload db/generated/ uniquement (node_modules partagé via cache)
-      - name: Upload generated artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: db-generated
-          path: db/generated/
-          retention-days: 1
-
 # ─────────────────────────────────────────────────────────────
-# SECURITY — indépendant, ne nécessite pas node_modules
+# CHECKS — security audit + hadolint (1 seul runner)
 # ─────────────────────────────────────────────────────────────
-  security:
-    name: Security Audit
+  checks:
+    name: Security & Dockerfile
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -67,31 +68,18 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
       - run: npm audit --omit=dev --audit-level=critical
-
-# ─────────────────────────────────────────────────────────────
-# DOCKERFILE LINT — indépendant
-# ─────────────────────────────────────────────────────────────
-  dockerfile-lint:
-    name: Dockerfile Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Lint api/Dockerfile
-        uses: hadolint/hadolint-action@v3.1.0
+      - uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: api/Dockerfile
           failure-threshold: error
-      - name: Lint ihm/Dockerfile
-        uses: hadolint/hadolint-action@v3.1.0
+      - uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: ihm/Dockerfile
           failure-threshold: error
-      - name: Lint bot/Dockerfile
-        uses: hadolint/hadolint-action@v3.1.0
+      - uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: bot/Dockerfile
           failure-threshold: error
-
 
 # ─────────────────────────────────────────────────────────────
 # LINT (Biome)
@@ -112,6 +100,7 @@ jobs:
           path: |
             node_modules
             api/node_modules
+            ihm/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install (fallback)
         if: steps.nm-cache.outputs.cache-hit != 'true'
@@ -149,14 +138,16 @@ jobs:
           path: |
             node_modules
             api/node_modules
+            ihm/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install (fallback)
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
-      - uses: actions/download-artifact@v4
+      - name: Restore db/generated cache
+        uses: actions/cache@v4
         with:
-          name: db-generated
           path: db/generated/
+          key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma') }}
       - name: Setup IHM next types
         if: matrix.name == 'ihm'
         run: |
@@ -181,17 +172,17 @@ jobs:
         ports: ['5432:5432']
         options: >-
           --health-cmd="pg_isready -U ci_user"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=10
       redis:
         image: redis:7-alpine
         ports: ['6379:6379']
         options: >-
           --health-cmd="redis-cli ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=5
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -204,14 +195,16 @@ jobs:
           path: |
             node_modules
             api/node_modules
+            ihm/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install (fallback)
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
-      - uses: actions/download-artifact@v4
+      - name: Restore db/generated cache
+        uses: actions/cache@v4
         with:
-          name: db-generated
           path: db/generated/
+          key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma') }}
       - name: Apply DB schema
         run: npm run push --workspace=@starvis/db
         env:
@@ -245,6 +238,7 @@ jobs:
           path: |
             node_modules
             api/node_modules
+            ihm/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install (fallback)
         if: steps.nm-cache.outputs.cache-hit != 'true'
@@ -272,6 +266,7 @@ jobs:
           path: |
             node_modules
             api/node_modules
+            ihm/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install (fallback)
         if: steps.nm-cache.outputs.cache-hit != 'true'
@@ -285,8 +280,7 @@ jobs:
     name: Build ${{ matrix.image.name }}
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [lint, typecheck, test-api, test-extractor, test-ihm, security, dockerfile-lint]
-
+    needs: [lint, typecheck, test-api, test-extractor, test-ihm, checks]
     permissions:
       contents: read
       packages: write

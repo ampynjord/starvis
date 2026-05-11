@@ -67,7 +67,7 @@ export function FilterPanel({ groups, onReset, hasFilters, className = '' }: Pro
           </button>
         )}
       </div>
-      {groups.map(g => <FilterGroup key={g.key} label={g.label} options={g.options} value={g.value} onChange={g.onChange} />)}
+      {groups.map(g => <FilterGroup key={g.key} label={g.label} options={g.options} value={g.value} onChange={g.onChange} defaultOpen={g.defaultOpen} />)}
     </div>
   );
 }

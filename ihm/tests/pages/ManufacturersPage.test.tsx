@@ -28,8 +28,8 @@ describe('ManufacturersPage', () => {
   it('renders manufacturer names from API', async () => {
     renderWithProviders(<ManufacturersPage />);
     await waitFor(() => {
-      expect(screen.getByText('Anvil Aerospace')).toBeInTheDocument();
-      expect(screen.getByText('Roberts Space Industries')).toBeInTheDocument();
+      expect(screen.getByText(/Anvil Aerospace/)).toBeInTheDocument();
+      expect(screen.getByText(/Roberts Space Industries/)).toBeInTheDocument();
     });
   });
 });
