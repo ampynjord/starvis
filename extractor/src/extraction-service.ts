@@ -1158,7 +1158,35 @@ export class ExtractionService {
          WHERE sl.ship_uuid = $1 AND sl.env = $2 AND c.type IN ('Missile','WeaponMissile')`,
         [shipUuid, env],
       );
-      const total = parseFloat(rows[0]?.total) || 0;
+      let total = parseFloat(rows[0]?.total) || 0;
+
+      // Fallback for DataForge v8: some racks (e.g. MRCK_S09_AEGS_Eclipse) lost their
+      // SEntityComponentDefaultLoadoutParams, so missiles don't appear in ship_loadouts.
+      // Use rack_count × max(missile_damage for that size) as an approximation.
+      if (total === 0) {
+        const { rows: rackRows } = await conn.query<any>(
+          `SELECT COALESCE(SUM(
+             rack.rack_count * COALESCE((
+               SELECT MAX(m.missile_damage)
+               FROM game.components m
+               WHERE m.env = rack.env
+                 AND m.type IN ('Missile','WeaponMissile')
+                 AND m.size = rack.rack_missile_size
+                 AND m.missile_damage > 0
+                 AND m.class_name NOT LIKE 'G%'
+             ), 0)
+           ), 0) AS total
+           FROM game.ship_loadouts sl
+           JOIN game.components rack ON sl.component_uuid = rack.uuid AND sl.env = rack.env
+           WHERE sl.ship_uuid = $1 AND sl.env = $2
+             AND rack.type = 'MissileRack'
+             AND rack.rack_count > 0
+             AND rack.rack_missile_size > 0`,
+          [shipUuid, env],
+        );
+        total = parseFloat(rackRows[0]?.total) || 0;
+      }
+
       await conn.query('UPDATE game.ships SET missile_damage_total = $1 WHERE uuid = $2 AND env = $3', [
         total > 0 ? total : null,
         shipUuid,
