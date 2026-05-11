@@ -4,7 +4,7 @@
 [![Node v22](https://img.shields.io/badge/node-v22-green)](https://nodejs.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Base de données Star Citizen — vaisseaux, composants, objets FPS, commerce, crafting, mining.
+Plateforme de données Star Citizen
 
 - **Production** : [starvis.ampynjord.bzh](https://starvis.ampynjord.bzh)
 - **API Docs** : [starvis.ampynjord.bzh/api-docs](https://starvis.ampynjord.bzh/api-docs)
