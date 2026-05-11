@@ -1,50 +1,56 @@
+'use client';
+
 import { useQuery } from '@tanstack/react-query';
-import { Building2, ChevronRight, Cpu, Crosshair, Package, Pill, Rocket, Settings2, Shield, Shirt, ShoppingBag, SlidersHorizontal, Wrench, Zap } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowUpDown, Cpu, Crosshair, Package, Pill, Rocket, Settings2, Shield, Shirt, ShoppingBag, SlidersHorizontal, Wrench, Zap } from 'lucide-react';
+import Link from 'next/link';
+import { useMemo, useState } from 'react';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { ShipCard } from '@/components/ship/ShipCard';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { Pagination } from '@/components/ui/Pagination';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
-import type { ComponentListItem, ItemListItem, Manufacturer } from '@/types/api';
-import { COMPONENT_TYPE_COLORS } from '@/utils/constants';
+import type { ComponentListItem, ItemListItem, Manufacturer, ShipListItem } from '@/types/api';
+import { COMPONENT_TYPE_COLORS, COMPONENT_TYPE_LABELS } from '@/utils/constants';
 
 type MfrTab = 'ships' | 'components' | 'items';
 
-/** Maps raw DB type to a friendly display category */
+const PAGE_SIZE = 24;
+
 const ITEM_CATEGORY_DISPLAY: Record<string, string> = {
-  FPS_Weapon:    'Weapons',
-  Armor_Helmet:  'Helmet',
-  Armor_Torso:   'Core',
-  Armor_Arms:    'Arms',
-  Armor_Legs:    'Legs',
-  Undersuit:     'Undersuit',
-  Clothing:      'Clothing',
-  Gadget:        'Gadgets',
-  Tool:          'Tools',
-  Consumable:    'Consumables',
-  Attachment:    'Attachments',
-  Magazine:      'Magazines',
+  FPS_Weapon:   'Weapons',
+  Armor_Helmet: 'Helmet',
+  Armor_Torso:  'Core',
+  Armor_Arms:   'Arms',
+  Armor_Legs:   'Legs',
+  Undersuit:    'Undersuit',
+  Clothing:     'Clothing',
+  Gadget:       'Gadgets',
+  Tool:         'Tools',
+  Consumable:   'Consumables',
+  Attachment:   'Attachments',
+  Magazine:     'Magazines',
 };
 
 const ITEM_CATEGORY_COLORS: Record<string, string> = {
-  Weapons:      'text-red-400',
-  Helmet:       'text-blue-300',
-  Core:         'text-blue-400',
-  Arms:         'text-blue-500',
-  Legs:         'text-blue-600',
-  Undersuit:    'text-indigo-400',
-  Clothing:     'text-purple-400',
-  Gadgets:      'text-yellow-400',
-  Tools:        'text-green-400',
-  Consumables:  'text-orange-400',
-  Attachments:  'text-teal-400',
-  Magazines:    'text-slate-500',
+  Weapons:     'text-red-400',
+  Helmet:      'text-blue-300',
+  Core:        'text-blue-400',
+  Arms:        'text-blue-500',
+  Legs:        'text-blue-600',
+  Undersuit:   'text-indigo-400',
+  Clothing:    'text-purple-400',
+  Gadgets:     'text-yellow-400',
+  Tools:       'text-green-400',
+  Consumables: 'text-orange-400',
+  Attachments: 'text-teal-400',
+  Magazines:   'text-slate-500',
 };
 
-/** Icon per category (lucide) */
 const ITEM_CATEGORY_ICONS: Record<string, React.ReactNode> = {
   Weapons:     <Crosshair size={12} />,
   Helmet:      <Shield size={12} />,
@@ -60,19 +66,57 @@ const ITEM_CATEGORY_ICONS: Record<string, React.ReactNode> = {
   Magazines:   <Package size={12} />,
 };
 
+const SHIP_SORTS = [
+  { value: 'name',           label: 'Name' },
+  { value: 'cargo_capacity', label: 'Cargo' },
+  { value: 'crew_size',      label: 'Crew' },
+  { value: 'scm_speed',      label: 'SCM Speed' },
+] as const;
+
+const COMP_SORTS = [
+  { value: 'type', label: 'Type' },
+  { value: 'name', label: 'Name' },
+  { value: 'size', label: 'Size' },
+] as const;
+
+function getKeyStat(c: ComponentListItem): string | null {
+  const fN = (n: number | null | undefined, unit = '', dec = 0) =>
+    n != null ? `${Number(n).toLocaleString('en-US', { maximumFractionDigits: dec, minimumFractionDigits: dec })}${unit}` : null;
+  switch (c.type) {
+    case 'WeaponGun': return fN(c.weapon_dps, ' DPS', 1);
+    case 'Shield': return fN(c.shield_hp, ' HP');
+    case 'QuantumDrive': return c.qd_speed != null ? `${(Number(c.qd_speed) / 1e6).toFixed(0)} Mm/s` : null;
+    case 'PowerPlant': return fN(c.power_output);
+    case 'Cooler': return fN(c.cooling_rate);
+    case 'Radar': return fN(c.radar_range, 'm');
+    case 'TractorBeam': return c.tractor_max_force != null ? `${(Number(c.tractor_max_force) / 1000).toFixed(0)} kN` : null;
+    case 'MiningLaser': return fN(c.mining_speed, '', 1);
+    case 'SalvageHead': return fN(c.salvage_speed, '', 2);
+    case 'EMP': return fN(c.emp_damage, ' Dmg');
+    case 'QuantumInterdictionGenerator': return fN(c.qig_jammer_range, 'm');
+    case 'Thruster': return c.thruster_max_thrust != null ? `${(Number(c.thruster_max_thrust) / 1000).toFixed(0)} kN` : null;
+    case 'Missile': case 'Torpedo': case 'Bomb': return fN(c.missile_damage, ' Dmg');
+    case 'FuelTank': return fN(c.fuel_capacity);
+    default: return null;
+  }
+}
+
 function ComponentRow({ c }: { c: ComponentListItem }) {
   const color = COMPONENT_TYPE_COLORS[c.type] ?? 'text-slate-400';
+  const keyStat = getKeyStat(c);
   return (
-    <div className="flex items-center gap-3 px-3 py-2 rounded hover:bg-white/5 transition-colors border border-transparent hover:border-slate-800">
-      <span className={`text-xs font-mono-sc w-28 shrink-0 truncate ${color}`}>{c.type}</span>
+    <Link
+      href={`/components/${c.uuid}`}
+      className="flex items-center gap-3 px-3 py-2 rounded hover:bg-white/5 transition-colors border border-transparent hover:border-slate-800"
+    >
+      <span className={`text-xs font-mono-sc w-28 shrink-0 truncate ${color}`}>
+        {COMPONENT_TYPE_LABELS[c.type] ?? c.type}
+      </span>
       <span className="flex-1 text-sm text-slate-300 truncate">{c.name}</span>
-      {c.size != null && (
-        <span className="text-xs font-mono-sc text-slate-600 shrink-0">S{c.size}</span>
-      )}
-      {c.grade && (
-        <span className="text-xs font-mono-sc text-slate-600 shrink-0">{c.grade}</span>
-      )}
-    </div>
+      {keyStat && <span className={`text-xs font-mono-sc shrink-0 ${color}`}>{keyStat}</span>}
+      {c.size != null && <span className="text-xs font-mono-sc text-slate-600 shrink-0">S{c.size}</span>}
+      {c.grade && <span className="text-xs font-mono-sc text-slate-600 shrink-0">{c.grade}</span>}
+    </Link>
   );
 }
 
@@ -85,12 +129,8 @@ function ItemRow({ item, category }: { item: ItemListItem; category: string }) {
         <span className={`text-xs font-mono-sc w-28 shrink-0 truncate ${color}`}>{item.sub_type}</span>
       )}
       <span className="flex-1 text-sm text-slate-300 truncate">{label}</span>
-      {item.size != null && (
-        <span className="text-xs font-mono-sc text-slate-600 shrink-0">S{item.size}</span>
-      )}
-      {item.grade && (
-        <span className="text-xs font-mono-sc text-slate-600 shrink-0">{item.grade}</span>
-      )}
+      {item.size != null && <span className="text-xs font-mono-sc text-slate-600 shrink-0">S{item.size}</span>}
+      {item.grade && <span className="text-xs font-mono-sc text-slate-600 shrink-0">{item.grade}</span>}
     </div>
   );
 }
@@ -99,8 +139,21 @@ export default function ManufacturersPage() {
   const { env } = useEnv();
   const [selected, setSelected] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<MfrTab>('ships');
-  const [activeItemCat, setActiveItemCat] = useState<string>('All');
-  const [mfrListOpen, setMfrListOpen] = useState(false);
+  const [mfrSearch, setMfrSearch] = useState('');
+
+  // Ships tab state
+  const [shipSort, setShipSort] = useState<string>('name');
+  const [shipOrder, setShipOrder] = useState<'asc' | 'desc'>('asc');
+  const [shipPage, setShipPage] = useState(1);
+
+  // Components tab state
+  const [compTypeFilter, setCompTypeFilter] = useState('');
+  const [compSort, setCompSort] = useState<string>('type');
+  const [compOrder, setCompOrder] = useState<'asc' | 'desc'>('asc');
+  const [compPage, setCompPage] = useState(1);
+
+  // Items tab state
+  const [activeItemCat, setActiveItemCat] = useState('All');
 
   const { data: manufacturers, isLoading, error, refetch } = useQuery({
     queryKey: ['manufacturers.list', env],
@@ -125,26 +178,79 @@ export default function ManufacturersPage() {
     enabled: !!selected && activeTab === 'items',
   });
 
-  const selectedMfr = manufacturers?.find((m: Manufacturer) => m.code === selected);
+  // Filter manufacturers by search
+  const filteredMfrs = useMemo(
+    () =>
+      (manufacturers ?? []).filter(
+        (m: Manufacturer) =>
+          !mfrSearch ||
+          m.name.toLowerCase().includes(mfrSearch.toLowerCase()) ||
+          m.code.toLowerCase().includes(mfrSearch.toLowerCase()),
+      ),
+    [manufacturers, mfrSearch],
+  );
 
-  // Group items by display category (e.g. Armor_Arms + Armor_Torso + … → "Armor")
-  const itemsByCategory = itemsByMfr?.reduce<Record<string, ItemListItem[]>>((acc, item) => {
-    const cat = ITEM_CATEGORY_DISPLAY[item.type ?? ''] ?? (item.type ?? 'Other');
-    if (!acc[cat]) acc[cat] = [];
-    acc[cat].push(item);
-    return acc;
-  }, {});
+  // Sort + paginate ships
+  const sortedShips = useMemo(() => {
+    if (!shipsByMfr) return [];
+    return [...shipsByMfr].sort((a, b) => {
+      const av = a[shipSort as keyof ShipListItem] as number | string | null | undefined;
+      const bv = b[shipSort as keyof ShipListItem] as number | string | null | undefined;
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      const cmp = typeof av === 'string' ? av.localeCompare(bv as string) : (av as number) - (bv as number);
+      return shipOrder === 'asc' ? cmp : -cmp;
+    });
+  }, [shipsByMfr, shipSort, shipOrder]);
 
-  // Group components by type
-  const componentsByType = componentsByMfr?.reduce<Record<string, ComponentListItem[]>>((acc, c) => {
-    const key = c.type ?? 'Unknown';
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(c);
-    return acc;
-  }, {});
+  const shipPages = Math.ceil(sortedShips.length / PAGE_SIZE);
+  const pagedShips = sortedShips.slice((shipPage - 1) * PAGE_SIZE, shipPage * PAGE_SIZE);
 
-  if (isLoading) return <LoadingGrid message="LOADING…" />;
-  if (error)     return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
+  // Filter + sort + paginate components
+  const filteredComps = useMemo(() => {
+    if (!componentsByMfr) return [];
+    const items = compTypeFilter
+      ? componentsByMfr.filter((c) => c.type === compTypeFilter)
+      : componentsByMfr;
+    return [...items].sort((a, b) => {
+      let cmp = 0;
+      if (compSort === 'type') cmp = (a.type ?? '').localeCompare(b.type ?? '');
+      else if (compSort === 'name') cmp = a.name.localeCompare(b.name);
+      else if (compSort === 'size') cmp = (a.size ?? 0) - (b.size ?? 0);
+      return compOrder === 'asc' ? cmp : -cmp;
+    });
+  }, [componentsByMfr, compTypeFilter, compSort, compOrder]);
+
+  const compPages = Math.ceil(filteredComps.length / PAGE_SIZE);
+  const pagedComps = filteredComps.slice((compPage - 1) * PAGE_SIZE, compPage * PAGE_SIZE);
+
+  const compTypes = useMemo(
+    () => [...new Set((componentsByMfr ?? []).map((c) => c.type))].sort(),
+    [componentsByMfr],
+  );
+
+  const itemsByCategory = useMemo(
+    () =>
+      (itemsByMfr ?? []).reduce<Record<string, ItemListItem[]>>((acc, item) => {
+        const cat = ITEM_CATEGORY_DISPLAY[item.type ?? ''] ?? (item.type ?? 'Other');
+        if (!acc[cat]) acc[cat] = [];
+        acc[cat].push(item);
+        return acc;
+      }, {}),
+    [itemsByMfr],
+  );
+
+  const selectedMfr = (manufacturers ?? []).find((m: Manufacturer) => m.code === selected);
+
+  const selectMfr = (code: string) => {
+    setSelected(code || null);
+    setActiveTab('ships');
+    setActiveItemCat('All');
+    setCompTypeFilter('');
+    setShipPage(1);
+    setCompPage(1);
+  };
 
   const tabs: { key: MfrTab; label: string; count: number; icon: React.ReactNode }[] = [
     { key: 'ships',      label: 'Ships',      count: selectedMfr?.ship_count ?? 0,      icon: <Rocket size={12} /> },
@@ -152,89 +258,52 @@ export default function ManufacturersPage() {
     { key: 'items',      label: 'Items',      count: selectedMfr?.item_count ?? 0,      icon: <ShoppingBag size={12} /> },
   ];
 
-  return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto space-y-6">
-      <PageHeader title="Manufacturers" count={manufacturers?.length} countLabel="manufacturers" />
+  if (isLoading) return <LoadingGrid message="LOADING…" />;
+  if (error) return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
 
-      <div className="flex gap-6">
-        {/* Sidebar — manufacturer list */}
-        <div className="w-64 shrink-0">
-          {/* Mobile toggle */}
-          <button
-            onClick={() => setMfrListOpen((o: boolean) => !o)}
-            className={[
-              'md:hidden flex items-center gap-2 mb-3 px-3 py-1.5 rounded-sm text-xs font-mono-sc uppercase tracking-wider border transition-colors w-full',
-              mfrListOpen || selected
-                ? 'border-cyan-700 text-cyan-400 bg-cyan-950/40'
-                : 'border-slate-700 text-slate-400 hover:text-slate-200',
-            ].join(' ')}
-          >
-            <Building2 size={13} />
-            {selected ? manufacturers?.find((m: Manufacturer) => m.code === selected)?.name ?? 'Manufacturer' : 'Manufacturer'}
-          </button>
-          <div className={mfrListOpen ? 'block md:block' : 'hidden md:block'}>
-          <div className="sci-panel overflow-hidden">
-            <div className="px-3 py-2 border-b border-border">
-              <p className="text-xs font-mono-sc text-slate-600 uppercase">
-                {manufacturers?.length ?? 0} manufacturers
-              </p>
-            </div>
-            <div className="space-y-0.5 p-1.5 max-h-[calc(100vh-200px)] overflow-y-auto">
-              {manufacturers?.map((m: Manufacturer) => (
-                <button
-                  key={m.code}
-                  onClick={() => {
-                    if (m.code === selected) {
-                      setSelected(null);
-                    } else {
-                      setSelected(m.code);
-                      setActiveTab('ships');
-                      setActiveItemCat('All');
-                    }
-                  }}
-                  className={`w-full flex items-center justify-between px-3 py-2.5 rounded text-left transition-all ${
-                    m.code === selected
-                      ? 'bg-cyan-950/60 border border-cyan-800 text-cyan-400'
-                      : 'hover:bg-white/5 text-slate-400 hover:text-slate-200 border border-transparent'
-                  }`}
-                >
-                  <div className="min-w-0">
-                    <p className="font-orbitron text-xs font-bold truncate">{m.code}</p>
-                    <p className="text-xs text-slate-600 truncate">{m.name}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0 ml-2">
-                    <div className="flex flex-col items-end gap-0.5">
-                      {m.ship_count > 0 && (
-                        <span className="text-[10px] font-mono-sc text-slate-600 flex items-center gap-0.5">
-                          <Rocket size={8} />{m.ship_count}
-                        </span>
-                      )}
-                      {m.component_count > 0 && (
-                        <span className="text-[10px] font-mono-sc text-slate-600 flex items-center gap-0.5">
-                          <Settings2 size={8} />{m.component_count}
-                        </span>
-                      )}
-                      {m.item_count > 0 && (
-                        <span className="text-[10px] font-mono-sc text-slate-600 flex items-center gap-0.5">
-                          <ShoppingBag size={8} />{m.item_count}
-                        </span>
-                      )}
-                    </div>
-                    <ChevronRight size={10} className="text-slate-700" />
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-          </div>
+  return (
+    <div className="max-w-(--breakpoint-2xl) mx-auto">
+      <PageHeader
+        title="Manufacturers"
+        count={manufacturers?.length}
+        countLabel="manufacturers"
+        search={mfrSearch}
+        searchPlaceholder="Search manufacturer…"
+        onSearch={(v) => { setMfrSearch(v); setSelected(null); }}
+      />
+
+      <div className="flex gap-4">
+        {/* Filter sidebar */}
+        <div className="w-52 shrink-0">
+          <MobileFilterWrapper hasFilters={!!selected}>
+            <FilterPanel
+              hasFilters={!!selected}
+              onReset={() => selectMfr('')}
+              groups={[
+                {
+                  key: 'manufacturer',
+                  label: `Manufacturer (${filteredMfrs.length})`,
+                  options: filteredMfrs.map((m: Manufacturer) => ({
+                    label: `${m.code} — ${m.name}`,
+                    value: m.code,
+                  })),
+                  value: selected ?? '',
+                  onChange: selectMfr,
+                  defaultOpen: true,
+                },
+              ]}
+            />
+          </MobileFilterWrapper>
         </div>
+
+        {/* Content */}
         <div className="flex-1 min-w-0 space-y-4">
           {selectedMfr ? (
             <>
-              {/* Header */}
+              {/* Manufacturer header */}
               <ScifiPanel>
                 <div className="flex items-start gap-4">
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <p className="text-xs font-mono-sc text-cyan-700 uppercase tracking-widest">{selectedMfr.code}</p>
                     <h2 className="font-orbitron text-xl text-slate-100 mt-0.5">{selectedMfr.name}</h2>
                     {selectedMfr.known_for && (
@@ -265,95 +334,159 @@ export default function ManufacturersPage() {
               </ScifiPanel>
 
               {/* Tabs */}
-              <div className="flex gap-1">
+              <div className="flex gap-1 border-b border-slate-800">
                 {tabs.map((tab) => (
                   <button
                     key={tab.key}
                     onClick={() => setActiveTab(tab.key)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono-sc rounded border transition-colors ${
+                    className={`flex items-center gap-1.5 px-4 py-2 text-xs font-mono-sc uppercase tracking-wider border-b-2 -mb-px transition-colors ${
                       activeTab === tab.key
-                        ? 'border-cyan-700 bg-cyan-950/40 text-cyan-400'
-                        : 'border-slate-800 text-slate-500 hover:border-slate-600 hover:text-slate-300'
+                        ? 'border-cyan-500 text-cyan-400'
+                        : 'border-transparent text-slate-500 hover:text-slate-300'
                     }`}
                   >
                     {tab.icon}
                     {tab.label}
                     {tab.count > 0 && (
-                      <span className="text-[10px] text-slate-600">({tab.count})</span>
+                      <span className={`ml-1 ${activeTab === tab.key ? 'text-cyan-600' : 'text-slate-700'}`}>
+                        ({tab.count})
+                      </span>
                     )}
                   </button>
                 ))}
               </div>
 
-              {/* Tab content — Ships */}
+              {/* Ships tab */}
               {activeTab === 'ships' && (
                 <>
+                  {/* Sort toolbar */}
+                  <div className="flex items-center justify-end gap-2">
+                    <select
+                      value={shipSort}
+                      onChange={(e) => { setShipSort(e.target.value); setShipPage(1); }}
+                      className="sci-input text-xs py-1.5"
+                    >
+                      {SHIP_SORTS.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => setShipOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
+                      title={shipOrder === 'asc' ? 'Ascending' : 'Descending'}
+                      className="sci-panel px-2 py-1.5 text-slate-400 hover:text-cyan-400 transition-colors"
+                    >
+                      <ArrowUpDown size={13} className={shipOrder === 'desc' ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                    </button>
+                  </div>
+
                   {loadingShips ? (
                     <LoadingGrid message="Loading ships…" />
-                  ) : shipsByMfr && shipsByMfr.length > 0 ? (
-                    <ScifiPanel title="Ships" subtitle={`${shipsByMfr.length} ships`}>
+                  ) : pagedShips.length > 0 ? (
+                    <>
                       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-                        {shipsByMfr.map((s, i) => <ShipCard key={s.uuid} ship={s} index={i} />)}
+                        {pagedShips.map((s, i) => <ShipCard key={s.uuid} ship={s} index={i} />)}
                       </div>
-                    </ScifiPanel>
+                      {shipPages > 1 && (
+                        <Pagination className="mt-4" page={shipPage} totalPages={shipPages} onPageChange={setShipPage} />
+                      )}
+                    </>
                   ) : (
-                    <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-700">
-                      <Rocket size={24} />
-                      <p className="font-rajdhani text-sm">No ships found</p>
-                    </div>
+                    <EmptyState icon="🚀" title="No ships" message="This manufacturer has no ships." />
                   )}
                 </>
               )}
 
-              {/* Tab content — Components */}
+              {/* Components tab */}
               {activeTab === 'components' && (
                 <>
                   {loadingComponents ? (
                     <LoadingGrid message="Loading components…" />
-                  ) : componentsByType && Object.keys(componentsByType).length > 0 ? (
-                    <div className="space-y-3">
-                      {Object.entries(componentsByType)
-                        .sort(([a], [b]) => a.localeCompare(b))
-                        .map(([type, comps]) => (
-                          <ScifiPanel
-                            key={type}
-                            title={type}
-                            subtitle={`${comps.length} components`}
+                  ) : (
+                    <>
+                      {/* Type filter chips */}
+                      {compTypes.length > 1 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {['', ...compTypes].map((t) => {
+                            const color = COMPONENT_TYPE_COLORS[t] ?? 'text-slate-400';
+                            const active = compTypeFilter === t;
+                            return (
+                              <button
+                                key={t || '__all__'}
+                                onClick={() => { setCompTypeFilter(t); setCompPage(1); }}
+                                className={[
+                                  'px-2.5 py-1 rounded-sm text-xs font-mono-sc tracking-wide border transition-all',
+                                  active
+                                    ? 'bg-cyan-950/60 border-cyan-700 text-cyan-400'
+                                    : `border-slate-800 ${t ? color : 'text-slate-500'} hover:border-slate-600`,
+                                ].join(' ')}
+                              >
+                                {t ? (COMPONENT_TYPE_LABELS[t] ?? t) : 'All'}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Sort toolbar */}
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs text-slate-600 font-mono-sc">
+                          {filteredComps.length} component{filteredComps.length !== 1 ? 's' : ''}
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={compSort}
+                            onChange={(e) => { setCompSort(e.target.value); setCompPage(1); }}
+                            className="sci-input text-xs py-1.5"
                           >
+                            {COMP_SORTS.map((o) => (
+                              <option key={o.value} value={o.value}>{o.label}</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => setCompOrder((o) => (o === 'asc' ? 'desc' : 'asc'))}
+                            className="sci-panel px-2 py-1.5 text-slate-400 hover:text-cyan-400 transition-colors"
+                          >
+                            <ArrowUpDown size={13} className={compOrder === 'desc' ? 'rotate-180 transition-transform' : 'transition-transform'} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {pagedComps.length > 0 ? (
+                        <>
+                          <ScifiPanel>
                             <div className="divide-y divide-slate-900">
-                              {comps.map((c) => <ComponentRow key={c.uuid} c={c} />)}
+                              {pagedComps.map((c) => <ComponentRow key={c.uuid} c={c} />)}
                             </div>
                           </ScifiPanel>
-                        ))}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-700">
-                      <Settings2 size={24} />
-                      <p className="font-rajdhani text-sm">No ship components found</p>
-                    </div>
+                          {compPages > 1 && (
+                            <Pagination className="mt-4" page={compPage} totalPages={compPages} onPageChange={setCompPage} />
+                          )}
+                        </>
+                      ) : (
+                        <EmptyState icon="⚙️" title="No components" message="No components match the current filter." />
+                      )}
+                    </>
                   )}
                 </>
               )}
 
-              {/* Tab content — Items (FPS) */}
+              {/* Items tab */}
               {activeTab === 'items' && (
                 <>
                   {loadingItems ? (
                     <LoadingGrid message="Loading items…" />
-                  ) : itemsByCategory && Object.keys(itemsByCategory).length > 0 ? (
+                  ) : Object.keys(itemsByCategory).length > 0 ? (
                     <div className="space-y-3">
-                      {/* Category chips */}
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-1.5">
                         {['All', ...Object.keys(itemsByCategory).sort()].map((cat) => (
                           <button
                             key={cat}
-                            type="button"
                             onClick={() => setActiveItemCat(cat)}
                             className={[
-                              'px-3 py-1 rounded-sm text-xs font-rajdhani font-semibold tracking-wider transition-all border',
+                              'px-2.5 py-1 rounded-sm text-xs font-mono-sc tracking-wide border transition-all',
                               activeItemCat === cat
                                 ? 'bg-cyan-950/60 border-cyan-700 text-cyan-400'
-                                : 'border-border text-slate-500 hover:text-slate-300 hover:border-slate-600',
+                                : 'border-slate-800 text-slate-500 hover:border-slate-600 hover:text-slate-300',
                             ].join(' ')}
                           >
                             {cat === 'All' ? 'All' : (
@@ -388,10 +521,7 @@ export default function ManufacturersPage() {
                         ))}
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-700">
-                      <Package size={24} />
-                      <p className="font-rajdhani text-sm">No FPS items found</p>
-                    </div>
+                    <EmptyState icon="🛍️" title="No items" message="This manufacturer has no FPS items." />
                   )}
                 </>
               )}
@@ -407,4 +537,3 @@ export default function ManufacturersPage() {
     </div>
   );
 }
-

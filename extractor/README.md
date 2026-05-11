@@ -76,7 +76,7 @@ npx tsx extractor/extract.ts [options]
 | Module | Contenu |
 |---|---|
 | `ships` | Vaisseaux et véhicules avec attributs et ports de chargement |
-| `components` | Composants vaisseaux (22 types : armes, boucliers, moteurs…) |
+| `components` | Composants vaisseaux : armes, boucliers, moteurs QD, thrusters, radars, EMP, QIG, mining lasers (stats de minage), tractor beams (force/portée), salvage heads (vitesse/portée), missiles, tourelles… |
 | `items` | Objets FPS (15 types : armes, armures, gadgets, consommables…) |
 | `commodities` | Commodités échangeables (métaux, gaz, nourriture…) |
 | `mining` | Éléments minéraux, compositions de dépôts, lasers |
