@@ -173,7 +173,8 @@ model Component {
   tractorMaxForce         Decimal? @map("tractor_max_force") @db.Decimal(15, 2)
   tractorMaxRange         Decimal? @map("tractor_max_range") @db.Decimal(10, 2)
   salvageSpeed            Decimal? @map("salvage_speed") @db.Decimal(10, 4)
-  salvageRadius           Decimal? @map("salvage_radius") @db.Decimal(10, 2)
+  salvageRadius           Decimal? @map("salvage_radius") @db.Decimal(10, 4)
+  salvageRange            Decimal? @map("salvage_range") @db.Decimal(10, 2)
   gimbalType              String?  @map("gimbal_type") @db.VarChar(20)
   rackCount               Int?     @map("rack_count") @db.UnsignedTinyInt
   rackMissileSize         Int?     @map("rack_missile_size") @db.UnsignedTinyInt

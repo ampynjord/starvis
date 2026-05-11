@@ -579,7 +579,7 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           if (typeof c.cooldownTime === 'number' && !comp.qigCooldown) comp.qigCooldown = Math.round(c.cooldownTime * 100) / 100;
         }
 
-        // Mining laser
+        // Mining laser — legacy absolute-value params (pre-4.x)
         if (cType === 'SCItemMiningLaserParams' || cType === 'SMiningLaserParams') {
           if (typeof c.miningExtractionLaserPower === 'number') comp.miningSpeed = Math.round(c.miningExtractionLaserPower * 10000) / 10000;
           if (typeof c.MiningExtractionLaserPower === 'number' && !comp.miningSpeed)
@@ -592,7 +592,20 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           if (typeof c.OptimalRange === 'number' && !comp.miningRange) comp.miningRange = Math.round(c.OptimalRange * 100) / 100;
         }
 
-        // Tractor beam
+        // Mining laser — 4.x modifier-based params (SEntityComponentMiningLaserParams)
+        if (cType === 'SEntityComponentMiningLaserParams') {
+          const mod = c.miningLaserModifiers;
+          if (mod && typeof mod === 'object') {
+            const instability = mod.laserInstability;
+            if (instability && typeof instability.value === 'number')
+              comp.miningInstability = Math.round(instability.value * 10000) / 10000;
+            const resistance = mod.resistanceModifier;
+            if (resistance && typeof resistance.value === 'number')
+              comp.miningResistance = Math.round(resistance.value * 10000) / 10000;
+          }
+        }
+
+        // Tractor beam — legacy dedicated params (pre-4.x)
         if (cType === 'SCItemTractorBeamParams' || cType === 'STractorBeamParams') {
           if (typeof c.maxForce === 'number') comp.tractorMaxForce = Math.round(c.maxForce * 100) / 100;
           if (typeof c.MaxForce === 'number' && !comp.tractorMaxForce) comp.tractorMaxForce = Math.round(c.MaxForce * 100) / 100;
@@ -600,11 +613,40 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           if (typeof c.MaxRange === 'number' && !comp.tractorMaxRange) comp.tractorMaxRange = Math.round(c.MaxRange * 100) / 100;
         }
 
-        // Salvage
+        // Tractor beam + Salvage — 4.x stats live inside SCItemWeaponComponentParams.fireActions
+        if (cType === 'SCItemWeaponComponentParams' && Array.isArray(c.fireActions)) {
+          for (const fa of c.fireActions as Record<string, unknown>[]) {
+            if (!fa || typeof fa !== 'object') continue;
+            const faType = fa.__type as string | undefined;
+
+            // Tractor beam fire action
+            if (faType === 'SWeaponActionFireTractorBeamParams') {
+              if (typeof fa.maxForce === 'number' && !comp.tractorMaxForce)
+                comp.tractorMaxForce = Math.round(fa.maxForce * 100) / 100;
+              if (typeof fa.maxDistance === 'number' && !comp.tractorMaxRange)
+                comp.tractorMaxRange = Math.round(fa.maxDistance * 100) / 100;
+            }
+
+            // Salvage beam fire action
+            if (faType === 'SWeaponActionFireSalvageRepairParams') {
+              if (typeof fa.materialEfficiency === 'number' && !comp.salvageSpeed)
+                comp.salvageSpeed = Math.round((fa.materialEfficiency as number) * 10000) / 10000;
+              const rp = fa.rangeParams as Record<string, unknown> | null | undefined;
+              if (rp && typeof rp === 'object') {
+                if (typeof rp.maxBeamDistance === 'number' && !comp.salvageRange)
+                  comp.salvageRange = Math.round((rp.maxBeamDistance as number) * 100) / 100;
+                if (typeof rp.aimPointSensorRadius === 'number' && !comp.salvageRadius)
+                  comp.salvageRadius = Math.round((rp.aimPointSensorRadius as number) * 10000) / 10000;
+              }
+            }
+          }
+        }
+
+        // Salvage — legacy dedicated params (pre-4.x)
         if (cType === 'SCItemSalvageParams' || cType === 'SSalvageParams' || cType === 'SCItemSalvageModifierParams') {
-          if (typeof c.salvageSpeed === 'number') comp.salvageSpeed = Math.round(c.salvageSpeed * 10000) / 10000;
+          if (typeof c.salvageSpeed === 'number' && !comp.salvageSpeed) comp.salvageSpeed = Math.round(c.salvageSpeed * 10000) / 10000;
           if (typeof c.SalvageSpeed === 'number' && !comp.salvageSpeed) comp.salvageSpeed = Math.round(c.SalvageSpeed * 10000) / 10000;
-          if (typeof c.radius === 'number') comp.salvageRadius = Math.round(c.radius * 100) / 100;
+          if (typeof c.radius === 'number' && !comp.salvageRadius) comp.salvageRadius = Math.round(c.radius * 100) / 100;
           if (typeof c.Radius === 'number' && !comp.salvageRadius) comp.salvageRadius = Math.round(c.Radius * 100) / 100;
         }
 
@@ -705,6 +747,30 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           comp.type = 'Ammunition';
         }
       }
+
+      // Reclassify mining lasers — in 4.x they live under /ships/weapons/ so they match WeaponGun
+      if (comp.type === 'WeaponGun' && /^Mining_Laser_/i.test(className)) {
+        comp.type = 'MiningLaser';
+        // Derive mining stats from already-extracted beam weapon fields
+        if (comp.weaponBeamDps && !comp.miningSpeed) comp.miningSpeed = comp.weaponBeamDps;
+        if (comp.weaponFullDamageRange && !comp.miningRange) comp.miningRange = comp.weaponFullDamageRange;
+      }
+
+      // Reclassify tractor beams — in 4.x they live under /weapons/ so they match WeaponGun
+      if (comp.type === 'WeaponGun' && /TractorBeam/i.test(className) && !lcName.startsWith('aegs')) {
+        comp.type = 'TractorBeam';
+      }
+
+      // Mining arms (miningarm/ path) are physical mounts with no stats — skip
+      if (comp.type === 'MiningLaser' && fn.includes('miningarm')) continue;
+
+      // Mining modules (miningsubitems/ path) are consumable modifiers, not lasers
+      if (comp.type === 'MiningLaser' && fn.includes('miningsubitems')) {
+        comp.type = 'MiningModifier';
+      }
+
+      // Tractor beam arms are physical mounts — real beam stats are on the sub-item — skip
+      if (comp.type === 'TractorBeam' && /(?:tractor_?beam_?arm|_?arm$)/i.test(className)) continue;
 
       // Keep Gimbal category clean: remove known non-gimbal mounts/turrets
       if (

@@ -620,7 +620,7 @@ export class ExtractionService {
             qig_jammer_range, qig_snare_radius, qig_charge_time, qig_cooldown,
             mining_speed, mining_range, mining_resistance, mining_instability,
             tractor_max_force, tractor_max_range,
-            salvage_speed, salvage_radius,
+            salvage_speed, salvage_radius, salvage_range,
             gimbal_type, gimbal_max_angle, gimbal_pitch_speed, gimbal_yaw_speed,
             turret_min_pitch, turret_max_pitch, turret_min_yaw, turret_max_yaw,
             rack_count, rack_missile_size,
@@ -685,7 +685,7 @@ export class ExtractionService {
             mining_speed=EXCLUDED.mining_speed, mining_range=EXCLUDED.mining_range,
             mining_resistance=EXCLUDED.mining_resistance, mining_instability=EXCLUDED.mining_instability,
             tractor_max_force=EXCLUDED.tractor_max_force, tractor_max_range=EXCLUDED.tractor_max_range,
-            salvage_speed=EXCLUDED.salvage_speed, salvage_radius=EXCLUDED.salvage_radius,
+            salvage_speed=EXCLUDED.salvage_speed, salvage_radius=EXCLUDED.salvage_radius, salvage_range=EXCLUDED.salvage_range,
             gimbal_type=EXCLUDED.gimbal_type,
             gimbal_max_angle=EXCLUDED.gimbal_max_angle,
             gimbal_pitch_speed=EXCLUDED.gimbal_pitch_speed, gimbal_yaw_speed=EXCLUDED.gimbal_yaw_speed,
@@ -700,7 +700,7 @@ export class ExtractionService {
             qd_calibration_max_angle=EXCLUDED.qd_calibration_max_angle,
             updated_at=CURRENT_TIMESTAMP`;
 
-    const COL_COUNT = 116; // number of columns above (115 stats + env)
+    const COL_COUNT = 117; // number of columns above (116 stats + env)
 
     /** Map a component object to a flat array of values */
     const toCanonicalRow = (c: any): (string | number | null)[] => {
@@ -814,6 +814,7 @@ export class ExtractionService {
         c.tractorMaxRange ?? null,
         c.salvageSpeed ?? null,
         c.salvageRadius ?? null,
+        c.salvageRange ?? null,
         c.gimbalType || null,
         c.gimbalMaxAngle ?? null,
         c.gimbalPitchSpeed ?? null,
