@@ -31,7 +31,7 @@ export function ChatWidget() {
       setMessages([
         {
           role: 'assistant',
-          content: 'Bonjour, je suis **Starvis** — votre assistant Star Citizen. Posez-moi vos questions sur les vaisseaux, composants, armes, missions, recettes de craft ou ressources minières.',
+          content: 'Hello, I am **Starvis** — your Star Citizen AI assistant. Ask me anything about ships, components, weapons, missions, crafting recipes or mining resources.',
         },
       ]);
     }
@@ -97,8 +97,8 @@ export function ChatWidget() {
               });
             } else if (evt.type === 'error') {
               const errMsg = evt.message?.includes('Rate limit') || evt.message?.includes('rate_limit')
-                ? '⚠️ Limite de tokens Groq atteinte pour aujourd\'hui. Réessayez dans ~1h (quota gratuit : 100k tokens/jour).'
-                : `⚠️ ${evt.message ?? 'Erreur inconnue'}`;
+                ? '⚠️ Groq daily token limit reached. Try again in ~1h (free quota: 100k tokens/day).'
+                : `⚠️ ${evt.message ?? 'Unknown error'}`;
               setMessages((prev) => {
                 const next = [...prev];
                 next[assistantIdx] = { role: 'assistant', content: errMsg, streaming: false };
@@ -114,7 +114,7 @@ export function ChatWidget() {
       if ((e as Error).name !== 'AbortError') {
         setMessages((prev) => {
           const next = [...prev];
-          next[assistantIdx] = { role: 'assistant', content: 'Erreur de connexion. Veuillez réessayer.' };
+          next[assistantIdx] = { role: 'assistant', content: 'Connection error. Please try again.' };
           return next;
         });
       }
@@ -132,6 +132,8 @@ export function ChatWidget() {
       send();
     }
   };
+
+  const isBeta = user?.role === 'beta_tester' || user?.role === 'admin';
 
   if (authLoading) return null;
 
@@ -156,7 +158,7 @@ export function ChatWidget() {
             <Bot size={28} style={{ color: '#00d4ff' }} />
             <div>
               <p className="font-orbitron text-xs tracking-widest text-cyan-400 uppercase mb-1">STARVIS AI</p>
-              <p className="text-sm text-slate-400">Connectez-vous pour accéder à l'assistant Star Citizen.</p>
+              <p className="text-sm text-slate-400">Sign in to access the Star Citizen AI assistant.</p>
             </div>
             <Link
               href="/login"
@@ -164,11 +166,34 @@ export function ChatWidget() {
               className="flex items-center gap-2 px-4 py-2 border border-cyan-700/50 hover:border-cyan-500/70 bg-cyan-900/20 hover:bg-cyan-900/40 text-cyan-400 hover:text-cyan-300 font-mono-sc text-xs rounded transition-colors"
             >
               <LogIn size={13} />
-              SE CONNECTER
+              SIGN IN
             </Link>
           </motion.div>
         )}
-        {open && user && (
+        {open && user && !isBeta && (
+          <motion.div
+            key="beta-only"
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            transition={{ duration: 0.2 }}
+            className="w-72 flex flex-col items-center gap-4 p-6 text-center"
+            style={{
+              background: 'rgba(8,12,20,0.97)',
+              border: '1px solid rgba(0,212,255,0.3)',
+              borderRadius: '8px',
+              boxShadow: '0 0 40px rgba(0,0,0,0.8), 0 0 20px rgba(0,212,255,0.1)',
+            }}
+          >
+            <Bot size={28} style={{ color: '#00d4ff' }} />
+            <div>
+              <p className="font-orbitron text-xs tracking-widest text-cyan-400 uppercase mb-1">STARVIS AI</p>
+              <p className="text-sm text-slate-400 mb-1">This feature is in early access.</p>
+              <p className="text-xs text-slate-600">Available to beta testers only.</p>
+            </div>
+          </motion.div>
+        )}
+        {open && user && isBeta && (
           <motion.div
             key="chat-panel"
             initial={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -202,7 +227,7 @@ export function ChatWidget() {
               <button
                 onClick={() => setOpen(false)}
                 className="text-slate-500 hover:text-slate-300 transition-colors p-1"
-                aria-label="Fermer"
+                aria-label="Close"
               >
                 <ChevronDown size={16} />
               </button>
@@ -259,7 +284,7 @@ export function ChatWidget() {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={onKeyDown}
-                  placeholder="Posez votre question…"
+                  placeholder="Ask your question…"
                   disabled={loading}
                   rows={1}
                   className="flex-1 bg-transparent text-sm text-slate-200 placeholder-slate-600 resize-none focus:outline-none leading-5"
@@ -270,13 +295,13 @@ export function ChatWidget() {
                   disabled={loading || !input.trim()}
                   className="flex-shrink-0 p-1 transition-colors disabled:opacity-40"
                   style={{ color: '#00d4ff' }}
-                  aria-label="Envoyer"
+                  aria-label="Send"
                 >
                   <Send size={16} />
                 </button>
               </div>
               <p className="text-center text-slate-700 text-[10px] mt-1.5 font-mono">
-                Starvis AI · données live Star Citizen
+                Starvis AI · live Star Citizen data
               </p>
             </div>
           </motion.div>
@@ -288,7 +313,7 @@ export function ChatWidget() {
         onClick={() => setOpen((v) => !v)}
         whileHover={{ scale: 1.08 }}
         whileTap={{ scale: 0.95 }}
-        aria-label={open ? 'Fermer le chat' : 'Ouvrir le chat Starvis'}
+        aria-label={open ? 'Close chat' : 'Open Starvis chat'}
         className="relative w-14 h-14 rounded-full flex items-center justify-center transition-all"
         style={{
           background: open ? 'rgba(0,212,255,0.15)' : 'rgba(0,212,255,0.1)',

@@ -7,8 +7,8 @@ import logger from '../utils/logger.js';
 export const healthRouter = express.Router();
 
 /**
- * Health check - Liveness probe (est-ce que le service répond ?)
- * Utilisé par Kubernetes/Docker pour redémarrer le container si nécessaire
+ * Health check - Liveness probe (is the service responding?)
+ * Used by Kubernetes/Docker to restart the container if necessary
  */
 healthRouter.get('/live', (_req: Request, res: Response) => {
   res.status(200).json({
@@ -18,8 +18,8 @@ healthRouter.get('/live', (_req: Request, res: Response) => {
 });
 
 /**
- * Health check - Readiness probe (est-ce que le service est prêt ?)
- * Vérifie que la DB et Redis sont accessibles
+ * Health check - Readiness probe (is the service ready?)
+ * Checks that DB and Redis are accessible
  */
 healthRouter.get('/ready', async (_req: Request, res: Response) => {
   const checks = {
@@ -28,7 +28,7 @@ healthRouter.get('/ready', async (_req: Request, res: Response) => {
   };
 
   try {
-    // Vérifier la connexion DB
+    // Check DB connection
     const prisma = getPrisma();
     await prisma.$queryRaw`SELECT 1`;
     checks.database = true;
@@ -37,7 +37,7 @@ healthRouter.get('/ready', async (_req: Request, res: Response) => {
   }
 
   try {
-    // Vérifier la connexion Redis
+    // Check Redis connection
     await redis.ping();
     checks.redis = true;
   } catch (error) {
@@ -55,7 +55,7 @@ healthRouter.get('/ready', async (_req: Request, res: Response) => {
 });
 
 /**
- * Endpoint pour les métriques Prometheus
+ * Endpoint for Prometheus metrics
  */
 healthRouter.get('/metrics', async (_req: Request, res: Response) => {
   try {
@@ -69,7 +69,7 @@ healthRouter.get('/metrics', async (_req: Request, res: Response) => {
 });
 
 /**
- * Endpoint pour les stats du cache (debug)
+ * Endpoint for cache stats (debug)
  */
 healthRouter.get('/cache/stats', (_req: Request, res: Response) => {
   const stats = getCacheStats();

@@ -8,40 +8,40 @@ const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
 
 export const data = new SlashCommandBuilder()
   .setName('component')
-  .setDescription('Rechercher un composant vaisseau (arme, bouclier, moteur…)')
-  .addStringOption((opt) => opt.setName('nom').setDescription('Nom du composant (ex: CF-557, 9-Series Longsword)').setRequired(true))
+  .setDescription('Search a ship component (weapon, shield, engine…)')
+  .addStringOption((opt) => opt.setName('name').setDescription('Component name (e.g. CF-557, 9-Series Longsword)').setRequired(true))
   .addStringOption((opt) =>
     opt
       .setName('type')
-      .setDescription('Type de composant')
+      .setDescription('Component type')
       .setRequired(false)
       .addChoices(
-        { name: 'Arme', value: 'WeaponGun' },
+        { name: 'Weapon', value: 'WeaponGun' },
         { name: 'Missile', value: 'WeaponMissile' },
-        { name: 'Rack à missiles', value: 'MissileRack' },
-        { name: 'Bouclier', value: 'Shield' },
-        { name: 'Moteur QD', value: 'QuantumDrive' },
-        { name: 'Refroidisseur', value: 'Cooler' },
-        { name: 'Générateur', value: 'PowerPlant' },
+        { name: 'Missile Rack', value: 'MissileRack' },
+        { name: 'Shield', value: 'Shield' },
+        { name: 'Quantum Drive', value: 'QuantumDrive' },
+        { name: 'Cooler', value: 'Cooler' },
+        { name: 'Power Plant', value: 'PowerPlant' },
         { name: 'Radar', value: 'Radar' },
-        { name: 'Pousseur', value: 'Thruster' },
+        { name: 'Thruster', value: 'Thruster' },
         { name: 'Gimbal', value: 'Gimbal' },
-        { name: 'Tourelle', value: 'Turret' },
-        { name: 'Carburant', value: 'FuelTank' },
+        { name: 'Turret', value: 'Turret' },
+        { name: 'Fuel Tank', value: 'FuelTank' },
         { name: 'Mining Laser', value: 'MiningLaser' },
         { name: 'Tractor Beam', value: 'TractorBeam' },
       ),
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  const name = interaction.options.getString('nom', true);
+  const name = interaction.options.getString('name', true);
   await interaction.deferReply();
 
   try {
     const res = await getComponents(name);
 
     if (!res.data || res.data.length === 0) {
-      await interaction.editReply({ embeds: [errorEmbed(`Aucun composant trouvé pour « ${name} ».`)] });
+      await interaction.editReply({ embeds: [errorEmbed(`No component found for "${name}".`)] });
       return;
     }
 
@@ -55,9 +55,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const fields: { name: string; value: string; inline: boolean }[] = [];
 
     if (comp.type) fields.push({ name: '🔧 Type', value: comp.type, inline: true });
-    if (comp.size != null) fields.push({ name: '📐 Taille', value: `S${comp.size}`, inline: true });
+    if (comp.size != null) fields.push({ name: '📐 Size', value: `S${comp.size}`, inline: true });
     if (comp.grade) fields.push({ name: '⭐ Grade', value: comp.grade, inline: true });
-    if (comp.manufacturer) fields.push({ name: '🏭 Constructeur', value: comp.manufacturer, inline: true });
+    if (comp.manufacturer) fields.push({ name: '🏭 Manufacturer', value: comp.manufacturer, inline: true });
 
     embed.addFields(fields);
 
@@ -66,12 +66,12 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         .slice(1)
         .map((c) => `• ${c.name}${c.type ? ` (${c.type})` : ''}`)
         .join('\n');
-      embed.addFields([{ name: `Autres résultats (${res.data.length - 1})`, value: others, inline: false }]);
+      embed.addFields([{ name: `Other results (${res.data.length - 1})`, value: others, inline: false }]);
     }
 
     await interaction.editReply({ embeds: [embed] });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+    const msg = err instanceof Error ? err.message : 'Unknown error';
     await interaction.editReply({ embeds: [errorEmbed(msg)] });
   }
 }

@@ -6,12 +6,11 @@ import { errorEmbed, shipEmbed } from '../embeds.js';
 
 export const data = new SlashCommandBuilder()
   .setName('ship')
-  .setDescription('Rechercher un vaisseau Star Citizen')
+  .setDescription('Search for a Star Citizen ship')
   .addStringOption((opt) =>
-    opt.setName('nom').setDescription('Nom du vaisseau (ex: Aurora, Carrack)').setRequired(true).setAutocomplete(true),
+    opt.setName('name').setDescription('Ship name (e.g. Aurora, Carrack)').setRequired(true).setAutocomplete(true),
   );
 
-/** Merge ship-matrix data and game-data into a single rich object */
 function mergeShipData(matrix: ShipResult | null, gameData: ShipResult | null): ShipResult {
   if (!matrix) return gameData!;
   if (!gameData) return matrix;
@@ -25,11 +24,10 @@ export async function autocomplete(interaction: AutocompleteInteraction): Promis
 }
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  const name = interaction.options.getString('nom', true);
+  const name = interaction.options.getString('name', true);
   await interaction.deferReply();
 
   try {
-    // Fetch matrix and game data in parallel
     const [matrixResult, gameResult] = await Promise.allSettled([getShipByName(name), getShips(name)]);
 
     const matrixShip = matrixResult.status === 'fulfilled' && matrixResult.value.success ? matrixResult.value.data : null;
@@ -37,7 +35,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const allGameShips = gameResult.status === 'fulfilled' ? (gameResult.value.data ?? []) : [];
 
     if (!matrixShip && !gameShip) {
-      await interaction.editReply({ embeds: [errorEmbed(`Aucun vaisseau trouvé pour « ${name} ».`)] });
+      await interaction.editReply({ embeds: [errorEmbed(`No ship found for "${name}".`)] });
       return;
     }
 
@@ -50,12 +48,12 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         .map((s) => `• ${s.name}`)
         .join('\n');
       const currentDesc = embed.data.description ?? '';
-      embed.setDescription(`${currentDesc}\n\n**Autres résultats :**\n${others}`.trim());
+      embed.setDescription(`${currentDesc}\n\n**Other results:**\n${others}`.trim());
     }
 
     await interaction.editReply({ embeds: [embed] });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+    const msg = err instanceof Error ? err.message : 'Unknown error';
     await interaction.editReply({ embeds: [errorEmbed(msg)] });
   }
 }

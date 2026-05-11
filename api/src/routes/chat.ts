@@ -7,7 +7,7 @@
  */
 
 import type { Router } from 'express';
-import { requireJwt } from '../middleware/index.js';
+import { requireJwt, requireJwtBetaOrAdmin } from '../middleware/index.js';
 import { ChatService } from '../services/chat-service.js';
 import type { RouteDependencies } from './types.js';
 
@@ -25,8 +25,8 @@ export function mountChatRoutes(router: Router, deps: RouteDependencies): void {
 
   const chatService = new ChatService(deps.gameDataService, deps.shipMatrixService, deps.rsiWebsiteService, deps.prisma);
 
-  // ── SSE streaming (web widget) ────────────────────────────────────────────
-  router.post('/api/v1/chat', requireJwt, (req, res) => {
+  // ── SSE streaming (web widget — beta testers & admins only) ─────────────
+  router.post('/api/v1/chat', requireJwtBetaOrAdmin, (req, res) => {
     const { messages } = req.body as { messages?: { role: string; content: string }[] };
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -68,8 +68,8 @@ export function mountChatRoutes(router: Router, deps: RouteDependencies): void {
     );
   });
 
-  // ── JSON sync (Discord bot / external) ───────────────────────────────────
-  router.post('/api/v1/chat/ask', requireJwt, async (req, res) => {
+  // ── JSON sync (Discord bot / external — beta testers & admins only) ─────
+  router.post('/api/v1/chat/ask', requireJwtBetaOrAdmin, async (req, res) => {
     const { messages } = req.body as { messages?: { role: string; content: string }[] };
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -89,7 +89,7 @@ export function mountChatRoutes(router: Router, deps: RouteDependencies): void {
       const isRateLimit = msg.includes('429') || msg.includes('rate_limit') || msg.includes('Rate limit');
       res
         .status(isRateLimit ? 429 : 500)
-        .json({ success: false, error: isRateLimit ? '⏳ Limite Mistral atteinte, réessaie dans quelques instants.' : msg });
+        .json({ success: false, error: isRateLimit ? '⏳ Mistral rate limit reached, please try again in a moment.' : msg });
     }
   });
 }

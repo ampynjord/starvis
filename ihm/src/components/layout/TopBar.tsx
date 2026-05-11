@@ -56,7 +56,7 @@ export function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) {
       <button
         onClick={onMenuToggle}
         className="md:hidden p-1.5 text-slate-500 hover:text-slate-200 transition-colors shrink-0"
-        aria-label="Ouvrir le menu"
+        aria-label="Open menu"
       >
         <Menu size={20} />
       </button>
@@ -244,14 +244,14 @@ export function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) {
                     className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-slate-300 hover:bg-cyan-950/40 hover:text-cyan-300 transition-colors"
                   >
                     <Settings size={13} />
-                    Mon profil
+                    My profile
                   </Link>
                   <button
                     onMouseDown={async () => { setUserMenuOpen(false); await logout(); }}
                     className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-red-500 hover:bg-red-950/30 hover:text-red-400 transition-colors border-t border-border/50"
                   >
                     <LogOut size={13} />
-                    Déconnexion
+                    Sign out
                   </button>
                 </motion.div>
               )}
@@ -263,7 +263,7 @@ export function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) {
             className="flex items-center gap-1.5 px-3 py-1.5 border border-cyan-700/50 hover:border-cyan-500/70 bg-cyan-900/20 hover:bg-cyan-900/40 text-cyan-400 hover:text-cyan-300 font-mono-sc text-xs rounded transition-colors"
           >
             <LogIn size={13} />
-            CONNEXION
+            SIGN IN
           </Link>
         )}
       </div>

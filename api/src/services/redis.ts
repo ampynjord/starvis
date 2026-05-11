@@ -2,12 +2,12 @@ import { Redis } from 'ioredis';
 import logger from '../utils/logger.js';
 import { cacheCounter, cacheHitRateGauge } from './prometheus.js';
 
-// Stats globales pour le cache
+// Global cache stats
 let cacheHits = 0;
 let cacheMisses = 0;
 
 /**
- * Configuration de la connexion Redis
+ * Redis connection configuration
  */
 const redisConfig = {
   host: process.env.REDIS_HOST || 'localhost',
@@ -25,15 +25,15 @@ const redisConfig = {
   maxRetriesPerRequest: 3,
   enableReadyCheck: true,
   enableOfflineQueue: false,
-  lazyConnect: true, // Ne pas se connecter immédiatement
+  lazyConnect: true, // Do not connect immediately
 };
 
 /**
- * Client Redis singleton
+ * Redis singleton client
  */
 export const redis = new Redis(redisConfig);
 
-// Flag pour savoir si Redis est disponible
+// Flag to track Redis availability
 let redisAvailable = false;
 
 redis.on('connect', () => {
@@ -57,7 +57,7 @@ redis.on('close', () => {
 });
 
 /**
- * Initialiser la connexion Redis (lazy connect)
+ * Initialize the Redis connection (lazy connect)
  */
 export async function initRedis(): Promise<boolean> {
   try {
@@ -73,35 +73,35 @@ export async function initRedis(): Promise<boolean> {
 }
 
 /**
- * Vérifie si Redis est disponible
+ * Check if Redis is available
  */
 export function isRedisAvailable(): boolean {
   return redisAvailable;
 }
 
 /**
- * Cache TTL par défaut (1 heure)
+ * Default cache TTL (1 hour)
  */
 export const DEFAULT_TTL = 3600;
 
 /**
- * TTL spécifiques par type de données
+ * Per-data-type specific TTLs
  */
 export const CACHE_TTL = {
-  SHIPS_LIST: 3600, // 1 heure
-  SHIP_DETAIL: 3600, // 1 heure
-  COMPONENTS_LIST: 3600, // 1 heure
-  COMPONENT_DETAIL: 3600, // 1 heure
-  FILTERS: 3600, // 1 heure
-  MANUFACTURERS: 7200, // 2 heures (changent rarement)
-  SHIP_MATRIX: 7200, // 2 heures
-  LOADOUTS: 3600, // 1 heure
-  SHOPS: 3600, // 1 heure
+  SHIPS_LIST: 3600, // 1 hour
+  SHIP_DETAIL: 3600, // 1 hour
+  COMPONENTS_LIST: 3600, // 1 hour
+  COMPONENT_DETAIL: 3600, // 1 hour
+  FILTERS: 3600, // 1 hour
+  MANUFACTURERS: 7200, // 2 hours (rarely changes)
+  SHIP_MATRIX: 7200, // 2 hours
+  LOADOUTS: 3600, // 1 hour
+  SHOPS: 3600, // 1 hour
   CHANGELOG: 1800, // 30 minutes
 };
 
 /**
- * Wrapper générique pour get avec métriques
+ * Generic get wrapper with metrics
  */
 export async function cacheGet<T>(key: string): Promise<T | null> {
   if (!isRedisAvailable()) {
@@ -130,7 +130,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
 }
 
 /**
- * Wrapper générique pour set avec métriques
+ * Generic set wrapper with metrics
  */
 export async function cacheSet<T>(key: string, value: T, ttl: number = DEFAULT_TTL): Promise<boolean> {
   if (!isRedisAvailable()) {
@@ -150,7 +150,7 @@ export async function cacheSet<T>(key: string, value: T, ttl: number = DEFAULT_T
 }
 
 /**
- * Invalider le cache par pattern
+ * Invalidate cache by pattern
  */
 export async function cacheInvalidatePattern(pattern: string): Promise<number> {
   try {
@@ -170,7 +170,7 @@ export async function cacheInvalidatePattern(pattern: string): Promise<number> {
 }
 
 /**
- * Invalider tout le cache
+ * Flush all cache
  */
 export async function cacheFlush(): Promise<void> {
   try {
@@ -184,7 +184,7 @@ export async function cacheFlush(): Promise<void> {
 }
 
 /**
- * Mise à jour du taux de hit du cache
+ * Update cache hit rate metric
  */
 function updateCacheHitRate(): void {
   const total = cacheHits + cacheMisses;
@@ -195,7 +195,7 @@ function updateCacheHitRate(): void {
 }
 
 /**
- * Obtenir les stats du cache
+ * Get cache stats
  */
 export function getCacheStats() {
   const total = cacheHits + cacheMisses;
@@ -210,7 +210,7 @@ export function getCacheStats() {
 }
 
 /**
- * Générer une clé de cache standardisée
+ * Build a standardized cache key
  */
 export function buildCacheKey(prefix: string, ...parts: (string | number | undefined)[]): string {
   const validParts = parts.filter((p) => p !== undefined && p !== null);

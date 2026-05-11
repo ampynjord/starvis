@@ -31,16 +31,16 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x08111e);
 
-    // ── Éclairage (calqué sur le Holoviewer RSI) ───────────────────────
-    // Ambiance très sombre — les creux du vaisseau restent quasi-noirs
+    // ── Lighting (modeled after RSI Holoviewer) ────────────────────────
+    // Very dark ambient — ship hollows remain nearly black
     scene.add(new THREE.AmbientLight(0x0a2535, 2.5));
 
-    // Lumière principale : dessus-avant, blanc-cyan fort → surfaces planes lumineuses
+    // Key light: top-front, strong white-cyan → bright flat surfaces
     const key = new THREE.DirectionalLight(0x60d8ef, 4.5);
     key.position.set(0.4, 1.0, 0.6);
     scene.add(key);
 
-    // Fill très doux sur le côté opposé (évite le noir total sur les flancs)
+    // Very soft fill on the opposite side (avoids total black on flanks)
     const fill = new THREE.DirectionalLight(0x1060a0, 0.6);
     fill.position.set(-1, 0.2, -0.8);
     scene.add(fill);
@@ -65,10 +65,10 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
     controls.autoRotateSpeed = 0.5;
     controls.enablePan = false;
 
-    // ── Matériau hologramme RSI (MeshPhong — ombre douce, specular léger) ─
+    // ── RSI hologram material (MeshPhong — soft shadow, light specular) ─
     const holoMaterial = new THREE.MeshPhongMaterial({
       color: 0x1aa8c0,      // cyan-turquoise hologramme
-      emissive: 0x041828,   // légère auto-luminescence pour éviter le noir total
+      emissive: 0x041828,   // slight self-glow to avoid total black
       specular: 0x66ddff,   // reflets brillants blanc-bleu
       shininess: 55,
       side: THREE.DoubleSide,

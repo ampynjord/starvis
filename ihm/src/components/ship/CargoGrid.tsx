@@ -1,7 +1,7 @@
 /**
- * CargoGrid — SCU count + iframe sc-cargo.space pré-sélectionné sur le vaisseau
- * Format URL sc-cargo : nom lowercase + "-official"
- * ex: "Avenger Titan" → "#/v1/viewer/avenger%20titan-official"
+ * CargoGrid — SCU count + sc-cargo.space iframe pre-selected on the ship
+ * sc-cargo URL format: lowercase name + "-official"
+ * e.g. "Avenger Titan" → "#/v1/viewer/avenger%20titan-official"
  */
 import { useState } from 'react';
 import { Maximize2, X } from 'lucide-react';
@@ -16,7 +16,7 @@ export function CargoGrid({ scu, shipName }: { scu: number; shipName: string }) 
   return (
     <>
       <div className="space-y-2">
-        {/* En-tête SCU */}
+        {/* SCU header */}
         <div className="flex items-baseline justify-between">
           <span className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest">Cargo hold</span>
           <div className="flex items-center gap-2">
@@ -26,7 +26,7 @@ export function CargoGrid({ scu, shipName }: { scu: number; shipName: string }) 
             </span>
             <button
               onClick={() => setFullscreen(true)}
-              title="Plein écran"
+              title="Fullscreen"
               className="flex items-center justify-center w-5 h-5 rounded-sm border border-slate-700 bg-slate-900 text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-colors"
             >
               <Maximize2 size={10} />
@@ -46,7 +46,7 @@ export function CargoGrid({ scu, shipName }: { scu: number; shipName: string }) 
           />
         </div>
 
-        {/* Crédits */}
+        {/* Credits */}
         <div className="flex items-center justify-between">
           <span className="text-[9px] font-mono-sc text-slate-800">
             Made by the community · © sc-cargo.space
@@ -57,18 +57,18 @@ export function CargoGrid({ scu, shipName }: { scu: number; shipName: string }) 
             rel="noopener noreferrer"
             className="text-[9px] font-mono-sc text-slate-700 hover:text-slate-500 underline underline-offset-2"
           >
-            ouvrir ↗
+            open ↗
           </a>
         </div>
       </div>
 
-      {/* Overlay plein écran */}
+      {/* Fullscreen overlay */}
       {fullscreen && (
         <div
           className="fixed inset-0 z-50 bg-black/90 flex flex-col"
           onClick={(e) => { if (e.target === e.currentTarget) setFullscreen(false); }}
         >
-          {/* Barre de titre */}
+          {/* Title bar */}
           <div className="flex items-center justify-between px-4 py-2 border-b border-slate-800 bg-slate-950 shrink-0">
             <div className="flex items-center gap-3">
               <span className="text-[10px] font-mono-sc text-slate-500 uppercase tracking-widest">Cargo hold</span>
@@ -99,7 +99,7 @@ export function CargoGrid({ scu, shipName }: { scu: number; shipName: string }) 
             </div>
           </div>
 
-          {/* iframe pleine hauteur */}
+          {/* Full-height iframe */}
           <iframe
             key={iframeSrc + '-fs'}
             src={iframeSrc}

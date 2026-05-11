@@ -7,18 +7,18 @@ const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
 
 export const data = new SlashCommandBuilder()
   .setName('search')
-  .setDescription('Recherche unifiée (vaisseaux, composants, items, commodités)')
-  .addStringOption((opt) => opt.setName('terme').setDescription('Terme de recherche').setRequired(true));
+  .setDescription('Unified search (ships, components, items, commodities)')
+  .addStringOption((opt) => opt.setName('term').setDescription('Search term').setRequired(true));
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  const term = interaction.options.getString('terme', true);
+  const term = interaction.options.getString('term', true);
   await interaction.deferReply();
 
   try {
     const res = await searchAll(term);
 
     if (res.total === 0) {
-      await interaction.editReply({ embeds: [errorEmbed(`Aucun résultat pour « ${term} ».`)] });
+      await interaction.editReply({ embeds: [errorEmbed(`No results for "${term}".`)] });
       return;
     }
 
@@ -33,7 +33,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         const link = id ? `[${s.name}](${SITE_URL}/ships/${id})` : `**${s.name}**`;
         return `• ${link}${mfr}${extra}`;
       });
-      sections.push(`🚀 **Vaisseaux** (${res.data.ships.length})\n${items.join('\n')}`);
+      sections.push(`🚀 **Ships** (${res.data.ships.length})\n${items.join('\n')}`);
     }
 
     if (res.data.components?.length > 0) {
@@ -45,7 +45,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         if (c.manufacturer) parts.push(c.manufacturer);
         return parts.join(' — ');
       });
-      sections.push(`⚙️ **Composants** (${res.data.components.length})\n${items.join('\n')}`);
+      sections.push(`⚙️ **Components** (${res.data.components.length})\n${items.join('\n')}`);
     }
 
     if (res.data.items?.length > 0) {
@@ -64,16 +64,16 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         if (c.type) parts.push(c.type);
         return parts.join(' — ');
       });
-      sections.push(`🛢️ **Commodités** (${res.data.commodities.length})\n${items.join('\n')}`);
+      sections.push(`🛢️ **Commodities** (${res.data.commodities.length})\n${items.join('\n')}`);
     }
 
-    const description = sections.join('\n\n') || 'Aucun résultat.';
+    const description = sections.join('\n\n') || 'No results.';
 
     await interaction.editReply({
-      embeds: [searchEmbed(`🔍 Résultats pour « ${term} »`, description)],
+      embeds: [searchEmbed(`🔍 Results for "${term}"`, description)],
     });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+    const msg = err instanceof Error ? err.message : 'Unknown error';
     await interaction.editReply({ embeds: [errorEmbed(msg)] });
   }
 }

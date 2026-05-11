@@ -6,8 +6,8 @@ const API_TOKEN = process.env.API_TOKEN ?? '';
 
 export const data = new SlashCommandBuilder()
   .setName('starvis')
-  .setDescription("Pose une question à Starvis, l'IA Star Citizen (vaisseaux, missions, trade, lore…)")
-  .addStringOption((opt) => opt.setName('question').setDescription('Ta question en langage naturel').setRequired(true));
+  .setDescription('Ask Starvis, the Star Citizen AI (ships, missions, trade, lore…)')
+  .addStringOption((opt) => opt.setName('question').setDescription('Your question in natural language').setRequired(true));
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const question = interaction.options.getString('question', true);
@@ -16,7 +16,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   if (!API_TOKEN) {
     await interaction.editReply({
-      embeds: [new EmbedBuilder().setColor(0xed4245).setDescription('❌ API_TOKEN non configuré sur le bot.')],
+      embeds: [new EmbedBuilder().setColor(0xed4245).setDescription('❌ API_TOKEN not configured on the bot.')],
     });
     return;
   }
@@ -28,9 +28,9 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     const embed = new EmbedBuilder()
       .setColor(0x00d4ff)
-      .setAuthor({ name: 'Starvis — IA Star Citizen' })
+      .setAuthor({ name: 'Starvis — Star Citizen AI' })
       .setDescription(chunks[0])
-      .setFooter({ text: `Question : ${question.slice(0, 100)}` });
+      .setFooter({ text: `Question: ${question.slice(0, 100)}` });
 
     await interaction.editReply({ embeds: [embed] });
 
@@ -44,8 +44,8 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       embeds: [
         new EmbedBuilder()
           .setColor(0xed4245)
-          .setTitle('Erreur Starvis')
-          .setDescription(e.message?.slice(0, 300) ?? 'Erreur inconnue'),
+          .setTitle('Starvis Error')
+          .setDescription(e.message?.slice(0, 300) ?? 'Unknown error'),
       ],
     });
   }

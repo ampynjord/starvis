@@ -38,9 +38,8 @@ function extractCookieToken(req: Request): string | null {
 }
 
 /**
- * requireJwt — vérifie le Bearer JWT, injecte req.jwtPayload.
- * Accepte n'importe quel rôle (user, admin).
- * En mode inspection, permet l'accès sans authentification.
+ * requireJwt — verifies Bearer JWT, injects req.jwtPayload.
+ * Accepts any role (user, admin).
  */
 export function requireJwt(req: Request, res: Response, next: NextFunction) {
   if (!process.env.JWT_SECRET) return res.status(500).json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' });
@@ -50,7 +49,7 @@ export function requireJwt(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ success: false, error: 'Authentication required' });
   }
   try {
-    const authService = new AuthService(null as any); // verifyToken n'utilise pas prisma
+    const authService = new AuthService(null as any); // verifyToken does not use prisma
     (req as any).jwtPayload = authService.verifyToken(token);
     next();
   } catch {
@@ -62,8 +61,8 @@ export function requireJwt(req: Request, res: Response, next: NextFunction) {
 export const BETA_ROLES = ['beta_tester', 'admin'] as const;
 
 /**
- * requireJwtBetaOrAdmin — vérifie le Bearer JWT ET que role est beta_tester ou admin.
- * Donne accès aux outils en accès anticipé (beta).
+ * requireJwtBetaOrAdmin — verifies Bearer JWT AND that role is beta_tester or admin.
+ * Grants access to early-access (beta) features.
  */
 export function requireJwtBetaOrAdmin(req: Request, res: Response, next: NextFunction) {
   if (!process.env.JWT_SECRET) {
@@ -87,12 +86,11 @@ export function requireJwtBetaOrAdmin(req: Request, res: Response, next: NextFun
 }
 
 /**
- * requireJwtAdmin — vérifie le Bearer JWT ET que role === 'admin'.
- * Accepte aussi l'ADMIN_API_KEY (X-Api-Key) pour la compatibilité serveur-to-serveur.
- * En mode inspection, permet l'accès sans authentification.
+ * requireJwtAdmin — verifies Bearer JWT AND that role === 'admin'.
+ * Also accepts ADMIN_API_KEY (X-Api-Key) for server-to-server compatibility.
  */
 export function requireJwtAdmin(req: Request, res: Response, next: NextFunction) {
-  // 1. Toujours accepter la clé admin (backward compat, scripts serveur)
+  // 1. Always accept admin key (backward compat, server scripts)
   const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
   if (ADMIN_API_KEY) {
     const apiKey = String(req.headers['x-api-key'] || '');
@@ -103,7 +101,7 @@ export function requireJwtAdmin(req: Request, res: Response, next: NextFunction)
     }
   }
 
-  // 2. Sinon valider le JWT avec role admin
+  // 2. Otherwise validate JWT with admin role
   if (!process.env.JWT_SECRET) {
     return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
