@@ -1,10 +1,10 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-// Chemins publics (pas de connexion requise)
+// Public paths (no login required)
 const PUBLIC_PATHS = ['/login', '/register'];
 
-// Préfixes toujours accessibles (assets Next.js, route handlers API interne)
+// Always-accessible prefixes (Next.js assets, internal API route handlers)
 const PUBLIC_PREFIXES = ['/api/', '/_next/', '/favicon', '/robots', '/sitemap'];
 
 export function middleware(req: NextRequest) {
@@ -13,8 +13,8 @@ export function middleware(req: NextRequest) {
   if (PUBLIC_PATHS.includes(pathname)) return NextResponse.next();
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
-  // Vérification de présence du cookie uniquement (la signature JWT est validée
-  // côté API sur chaque appel authentifié — le middleware gère uniquement la redirection UX)
+  // Only check cookie presence (JWT signature is validated by the API on each
+  // authenticated call — this middleware only handles UX redirection)
   const token = req.cookies.get('starvis_token')?.value;
   if (!token) {
     const loginUrl = new URL('/login', req.url);

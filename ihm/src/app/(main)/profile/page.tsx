@@ -41,7 +41,7 @@ export default function ProfilePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Update failed');
       await refresh();
-      setMessage({ type: 'success', text: 'Profil mis à jour' });
+      setMessage({ type: 'success', text: 'Profile updated' });
     } catch (err: any) {
       setMessage({ type: 'error', text: err.message });
     } finally {
@@ -60,14 +60,14 @@ export default function ProfilePage() {
       const res = await fetch('/api/auth/me', { method: 'DELETE' });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setMessage({ type: 'error', text: (data as any).error ?? 'Échec de la suppression' });
+        setMessage({ type: 'error', text: (data as any).error ?? 'Deletion failed' });
         setShowDeleteModal(false);
         return;
       }
       await logout();
       router.push('/login');
     } catch {
-      setMessage({ type: 'error', text: 'Erreur réseau' });
+      setMessage({ type: 'error', text: 'Network error' });
       setShowDeleteModal(false);
     } finally {
       setDeleting(false);
@@ -102,7 +102,7 @@ export default function ProfilePage() {
     <div className="p-6 max-w-lg mx-auto space-y-6">
       <div className="flex items-center gap-3">
         <User size={20} className="text-cyan-400" />
-        <h1 className="text-lg font-orbitron font-bold text-white tracking-wider">MON PROFIL</h1>
+        <h1 className="text-lg font-orbitron font-bold text-white tracking-wider">MY PROFILE</h1>
       </div>
 
       {/* Info card */}
@@ -137,11 +137,11 @@ export default function ProfilePage() {
         transition={{ delay: 0.05 }}
         className="sci-panel p-5 space-y-5"
       >
-        <h2 className="text-sm font-mono-sc text-cyan-700 uppercase tracking-wider">Modifier le profil</h2>
+        <h2 className="text-sm font-mono-sc text-cyan-700 uppercase tracking-wider">Edit profile</h2>
 
         <form onSubmit={handleSave} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider">Pseudonyme</label>
+            <label className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider">Username</label>
             <input
               type="text"
               value={username}
@@ -154,7 +154,7 @@ export default function ProfilePage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider">URL Avatar</label>
+            <label className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider">Avatar URL</label>
             <input
               type="url"
               value={avatarUrl}
@@ -180,7 +180,7 @@ export default function ProfilePage() {
             className="flex items-center gap-2 py-2 px-4 bg-cyan-900/40 border border-cyan-700/50 hover:border-cyan-500/70 hover:bg-cyan-900/60 text-cyan-300 font-mono-sc text-sm rounded transition-colors disabled:opacity-50"
           >
             <Save size={14} />
-            {saving ? 'SAUVEGARDE...' : 'SAUVEGARDER'}
+            {saving ? 'SAVING...' : 'SAVE'}
           </button>
         </form>
       </motion.div>
@@ -193,13 +193,13 @@ export default function ProfilePage() {
         className="sci-panel p-5 space-y-4"
       >
         <div className="space-y-1">
-          <h2 className="text-sm font-mono-sc text-cyan-700 uppercase tracking-wider">Token API externe</h2>
-          <p className="text-xs text-slate-600">Génère un token longue durée (1 an) pour accéder à l'API depuis des projets externes.</p>
+          <h2 className="text-sm font-mono-sc text-cyan-700 uppercase tracking-wider">External API token</h2>
+          <p className="text-xs text-slate-600">Generate a long-lived token (1 year) to access the API from external projects.</p>
         </div>
 
         {apiToken ? (
           <div className="space-y-2">
-            <p className="text-xs text-amber-400 font-mono-sc">Copiez ce token maintenant — il ne sera plus affiché.</p>
+            <p className="text-xs text-amber-400 font-mono-sc">Copy this token now — it will not be shown again.</p>
             <div className="flex items-center gap-2">
               <code className="flex-1 text-[10px] font-mono text-slate-300 bg-slate-900 border border-slate-700 rounded px-3 py-2 truncate">
                 {apiToken}
@@ -220,7 +220,7 @@ export default function ProfilePage() {
             className="flex items-center gap-2 py-2 px-4 bg-cyan-900/40 border border-cyan-700/50 hover:border-cyan-500/70 hover:bg-cyan-900/60 text-cyan-300 font-mono-sc text-sm rounded transition-colors disabled:opacity-50"
           >
             <Key size={14} />
-            {generatingToken ? 'GÉNÉRATION...' : 'GÉNÉRER UN TOKEN API'}
+            {generatingToken ? 'GENERATING...' : 'GENERATE API TOKEN'}
           </button>
         )}
       </motion.div>
@@ -231,10 +231,10 @@ export default function ProfilePage() {
         className="flex items-center gap-2 py-2 px-4 border border-red-800/40 hover:border-red-600/60 text-red-500 hover:text-red-400 font-mono-sc text-sm rounded transition-colors"
       >
         <LogOut size={14} />
-        SE DÉCONNECTER
+        SIGN OUT
       </button>
 
-      {/* Danger zone — RGPD droit à l'effacement */}
+      {/* Danger zone — GDPR right to erasure */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -243,18 +243,18 @@ export default function ProfilePage() {
       >
         <div className="flex items-center gap-2">
           <AlertTriangle size={14} className="text-red-500 shrink-0" />
-          <h2 className="text-sm font-mono-sc text-red-500 uppercase tracking-wider">Zone de danger</h2>
+          <h2 className="text-sm font-mono-sc text-red-500 uppercase tracking-wider">Danger zone</h2>
         </div>
         <p className="text-xs text-slate-500 leading-relaxed">
-          La suppression de votre compte est irréversible. Toutes vos données personnelles (e-mail, pseudonyme, avatar)
-          seront définitivement effacées, conformément à votre droit à l'effacement (RGPD art. 17).
+          Account deletion is irreversible. All your personal data (email, username, avatar)
+          will be permanently erased, in accordance with your right to erasure (GDPR art. 17).
         </p>
         <button
           onClick={() => { setDeleteConfirm(''); setShowDeleteModal(true); }}
           className="flex items-center gap-2 py-2 px-4 border border-red-800/50 hover:border-red-600/70 bg-red-950/20 hover:bg-red-950/40 text-red-500 hover:text-red-400 font-mono-sc text-sm rounded transition-colors"
         >
           <Trash2 size={14} />
-          SUPPRIMER MON COMPTE
+          DELETE MY ACCOUNT
         </button>
       </motion.div>
 
@@ -269,16 +269,16 @@ export default function ProfilePage() {
             <div className="flex items-center gap-2">
               <AlertTriangle size={18} className="text-red-400 shrink-0" />
               <h3 className="font-orbitron text-sm font-bold text-red-400 uppercase tracking-wider">
-                Confirmer la suppression
+                Confirm deletion
               </h3>
             </div>
             <p className="text-xs text-slate-400 leading-relaxed">
-              Cette action est <span className="text-red-400 font-semibold">irréversible</span>. Votre compte et toutes
-              vos données seront définitivement supprimés.
+              This action is <span className="text-red-400 font-semibold">irreversible</span>. Your account and all
+              your data will be permanently deleted.
             </p>
             <div className="space-y-1.5">
               <label className="text-xs font-mono-sc text-slate-500 uppercase tracking-wider">
-                Tapez <span className="text-red-400">{user.username}</span> pour confirmer
+                Type <span className="text-red-400">{user.username}</span> to confirm
               </label>
               <input
                 type="text"
@@ -294,7 +294,7 @@ export default function ProfilePage() {
                 onClick={() => setShowDeleteModal(false)}
                 className="flex-1 py-2 px-4 border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-200 font-mono-sc text-sm rounded transition-colors"
               >
-                ANNULER
+                CANCEL
               </button>
               <button
                 onClick={handleDeleteAccount}
@@ -302,7 +302,7 @@ export default function ProfilePage() {
                 className="flex-1 flex items-center justify-center gap-2 py-2 px-4 bg-red-900/40 border border-red-700/50 hover:border-red-500/70 hover:bg-red-900/60 text-red-400 font-mono-sc text-sm rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 <Trash2 size={13} />
-                {deleting ? 'SUPPRESSION...' : 'SUPPRIMER'}
+                {deleting ? 'DELETING...' : 'DELETE'}
               </button>
             </div>
           </motion.div>

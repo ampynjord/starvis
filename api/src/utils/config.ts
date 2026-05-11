@@ -1,5 +1,5 @@
 /**
- * Configuration centralisée — toutes les valeurs viennent du .env
+ * Centralized configuration — all values come from .env
  */
 
 function requireEnv(key: string): string {

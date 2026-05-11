@@ -370,7 +370,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
 
   /**
    * GET /api/v1/ships/:uuid/model
-   * Retourne les métadonnées du modèle 3D (url, format, taille estimée).
+   * Returns 3D model metadata (url, format, estimated size).
    */
   router.get(
     '/api/v1/ships/:uuid/model',
@@ -401,11 +401,11 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
 
   /**
    * GET /api/v1/ships/:uuid/model/file
-   * Sert le fichier .ctm binaire avec cache disque (lazy).
-   * - 1ère requête : télécharge depuis RSI, sauvegarde dans CTM_CACHE_DIR/{uuid}.ctm
-   * - Requêtes suivantes : sert le fichier local directement
-   * - Si ctm_url change en DB (nouvelle extraction) : le sidecar {uuid}.url détecte
-   *   le changement et re-télécharge automatiquement
+   * Serves the binary .ctm file with disk cache (lazy).
+   * - First request: downloads from RSI, saves to CTM_CACHE_DIR/{uuid}.ctm
+   * - Subsequent requests: serves the local file directly
+   * - If ctm_url changes in DB (new extraction): sidecar {uuid}.url detects
+   *   the change and re-downloads automatically
    */
   router.get(
     '/api/v1/ships/:uuid/model/file',
@@ -421,12 +421,12 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
       const ctmUrl = ship.ctm_url as string | null;
       if (!ctmUrl) return void res.status(404).json({ success: false, error: 'No 3D model available for this ship' });
 
-      // ── Cache disque ──────────────────────────────────────────────────────
+      // ── Disk cache ───────────────────────────────────────────────────────
       mkdirSync(CTM_CACHE_DIR, { recursive: true });
       const cacheFile = join(CTM_CACHE_DIR, `${uuid}.ctm`);
       const sidecar = join(CTM_CACHE_DIR, `${uuid}.url`);
 
-      // Invalide le cache si l'URL a changé depuis le dernier téléchargement
+      // Invalidate cache if the URL changed since last download
       const cachedUrl = existsSync(sidecar) ? readFileSync(sidecar, 'utf-8').trim() : null;
       if (cachedUrl && cachedUrl !== ctmUrl && existsSync(cacheFile)) {
         unlinkSync(cacheFile);
@@ -441,7 +441,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
         ETag: etag,
       };
 
-      // ── Servir depuis le cache ────────────────────────────────────────────
+      // ── Serve from cache ─────────────────────────────────────────────────
       if (existsSync(cacheFile)) {
         if (req.headers['if-none-match'] === etag) {
           res.status(304).end();
@@ -453,7 +453,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
         return;
       }
 
-      // ── Téléchargement depuis RSI + sauvegarde ────────────────────────────
+      // ── Download from RSI + save ─────────────────────────────────────────
       if (req.headers['if-none-match'] === etag) {
         res.status(304).end();
         return;
@@ -474,7 +474,7 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
             res.setHeader('X-CTM-Cache', 'MISS');
             if (upstream.headers['content-length']) res.setHeader('Content-Length', upstream.headers['content-length']);
 
-            // Écriture simultanée vers le client ET le cache disque
+            // Pipe simultaneously to the client AND disk cache
             const writer = createWriteStream(cacheFile);
             upstream.pipe(res);
             upstream.pipe(writer);

@@ -91,7 +91,7 @@ function computeStats(nodes: LoadoutNode[]): LStats {
 
 // ── Primitives ───────────────────────────────────────────
 
-/** Séparateur section */
+/** Section separator */
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-2 mb-2.5">
@@ -140,7 +140,7 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
   const boostedRoll  = (abAngMult && n(ship.roll_max)  > 0) ? n(ship.roll_max)  * abAngMult.y : null;
   const rampUp   = ship.boost_ramp_up   ?? (typeof ab?.afterburnerRampUpTime   === 'number' ? ab.afterburnerRampUpTime   : null);
   const rampDown = ship.boost_ramp_down ?? (typeof ab?.afterburnerRampDownTime === 'number' ? ab.afterburnerRampDownTime : null);
-  // Accélération boosté (G)
+  // Boosted acceleration (G)
   const gForceBoost = (abAccelMult && gForce != null) ? gForce * abAccelMult.x : null;
 
   // ── Velocity ruler ─────────────────────────────────────
@@ -148,7 +148,7 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
   const pctOf = (v: number | null | undefined) =>
     maxSpeed > 0 ? (Math.min(n(v), maxSpeed) / maxSpeed) * 100 : 0;
 
-  // ── Hardpoints groupés ──────────────────────────────────
+  // ── Grouped hardpoints ───────────────────────────────────
   const hpGroups = new Map<string, number[]>();
   for (const hp of ls.hardpoints) {
     if (!hpGroups.has(hp.type)) hpGroups.set(hp.type, []);
@@ -221,7 +221,7 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
           )}
         </div>
 
-        {/* Légende sous la ruler */}
+        {/* Legend below the ruler */}
         <div className="flex gap-3 mb-3">
           {(isGround ? [
             { label: 'Max Speed', color: 'bg-cyan-500', value: fV(ship.max_speed) + ' m/s' },
@@ -239,7 +239,7 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
           ))}
         </div>
 
-        {/* Agilité — ships uniquement */}
+        {/* Agility — ships only */}
         {!isGroundOrGravlev && (
           <div className="grid grid-cols-3 gap-1.5">
             {[
@@ -274,7 +274,7 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
           </div>
         )}
 
-        {/* Angles boostés + ramp — ships uniquement */}
+        {/* Boosted angles + ramp — ships only */}
         {!isGroundOrGravlev && (boostedPitch != null || rampUp != null) && (
           <div className="grid grid-cols-2 gap-1.5 mt-2">
             {boostedPitch != null && (
@@ -426,7 +426,7 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
           </div>
         )}
 
-        {/* Armor HP + durabilité */}
+        {/* Armor HP + durability */}
         {(ship.armor_hp != null || ship.armor_phys_resist != null) && (
           <div className="flex items-center gap-1.5 mb-2">
             {ship.armor_hp != null && (
@@ -459,7 +459,7 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
           </div>
         )}
 
-        {/* Armor resistance — 3 blocs côte à côte */}
+        {/* Armor resistance — 3 blocks side by side */}
         {armBars.length > 0 && (
           <div className="grid grid-cols-3 gap-1.5">
             {armBars.map(({ k, v, color, text }) => {
@@ -469,7 +469,7 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
                   key={k}
                   className="relative flex flex-col items-center rounded-md border border-slate-800 bg-slate-900/40 overflow-hidden py-2.5 px-1"
                 >
-                  {/* fill de fond proportionnel */}
+                  {/* proportional background fill */}
                   <div
                     className={`absolute bottom-0 left-0 right-0 opacity-10 ${color}`}
                     style={{ height: `${pct}%` }}
@@ -485,7 +485,7 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
           </div>
         )}
 
-        {/* Pénétration de dommages */}
+        {/* Damage penetration */}
         {(ship.fuse_penetration != null || ship.component_penetration != null) && (
           <div className="flex items-center justify-between mt-2 rounded-md border border-orange-900/30 bg-orange-950/10 px-3 py-1.5">
             <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest">Penetration</span>
@@ -526,8 +526,8 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
           { key: 'CS',    label: 'Cross-sec',val: ship.armor_signal_cs, color: '#06b6d4', dimColor: 'text-cyan-400',   trackColor: 'rgba(6,182,212,0.15)'  },
         ].filter(s => s.val != null) as { key: string; label: string; val: number; color: string; dimColor: string; trackColor: string }[];
 
-        // Référence : 1.0 = baseline. Valeurs normalement entre 0 et 1+
-        // (on ignore maxVal car les valeurs sont déjà en fraction de la référence)
+        // Reference: 1.0 = baseline. Values normally between 0 and 1+
+        // (maxVal is ignored as values are already fractions of the reference)
 
         return (
           <div>
@@ -535,9 +535,9 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
             <div className="grid grid-cols-3 gap-1.5">
               {sigs.map(({ key, label, val, color, dimColor, trackColor }) => {
                 const v = parseFloat(String(val));
-                const pct = Math.min(v * 100, 150); // peut dépasser 1.0
+                const pct = Math.min(v * 100, 150); // can exceed 1.0
                 const pctCapped = Math.min(pct, 100);
-                // Couleur : bas = vert (discret), haut = rouge (visible)
+                // Color: low = green (discrete), high = red (visible)
                 const barColor = pct < 30 ? '#22c55e' : pct < 70 ? '#f59e0b' : '#ef4444';
                 const r = 18, cx = 24, cy = 24;
                 const startA = -210 * (Math.PI / 180);
@@ -566,7 +566,7 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
                       )}
                       {/* Dot central */}
                       <circle cx={cx} cy={cy - 4} r="1.5" fill={color} opacity="0.6" />
-                      {/* Label clé */}
+                      {/* Key label */}
                       <text x={cx} y={cy + 6} textAnchor="middle" fontSize="7"
                         fontWeight="bold" fontFamily="monospace" fill={color} opacity="0.85">
                         {key}

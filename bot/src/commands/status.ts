@@ -3,7 +3,7 @@ import { SlashCommandBuilder } from 'discord.js';
 import { getHealth, getStats } from '../api.js';
 import { errorEmbed, statusEmbed } from '../embeds.js';
 
-export const data = new SlashCommandBuilder().setName('status').setDescription('État de Starvis (API, base de données)');
+export const data = new SlashCommandBuilder().setName('status').setDescription('Starvis status (API, database)');
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   await interaction.deferReply();
@@ -16,7 +16,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     await interaction.editReply({ embeds: [statusEmbed(healthy, statsData)] });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+    const msg = err instanceof Error ? err.message : 'Unknown error';
     await interaction.editReply({ embeds: [errorEmbed(msg)] });
   }
 }

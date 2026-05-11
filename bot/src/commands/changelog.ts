@@ -23,36 +23,36 @@ const ENTITY_ICONS: Record<string, string> = {
 
 export const data = new SlashCommandBuilder()
   .setName('changelog')
-  .setDescription('Dernières modifications de la base Starvis (vaisseaux, composants…)')
+  .setDescription('Latest changes to the Starvis database (ships, components…)')
   .addIntegerOption((opt) =>
     opt
-      .setName('limite')
-      .setDescription("Nombre d'entrées à afficher (défaut: 8, max: 20)")
+      .setName('limit')
+      .setDescription('Number of entries to display (default: 8, max: 20)')
       .setRequired(false)
       .setMinValue(1)
       .setMaxValue(20),
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  const limit = interaction.options.getInteger('limite') ?? 8;
+  const limit = interaction.options.getInteger('limit') ?? 8;
   await interaction.deferReply();
 
   try {
     const res = await getChangelog(limit);
 
     if (!res.success || !res.data?.length) {
-      await interaction.editReply({ embeds: [errorEmbed('Aucun changement récent trouvé.')] });
+      await interaction.editReply({ embeds: [errorEmbed('No recent changes found.')] });
       return;
     }
 
     const lines = res.data.map((entry) => {
       const changeIcon = CHANGE_ICONS[entry.change_type] ?? '⚪';
       const entityIcon = ENTITY_ICONS[entry.entity_type] ?? '📄';
-      const name = entry.entity_name ?? 'Inconnu';
+      const name = entry.entity_name ?? 'Unknown';
 
       if (entry.change_type === 'modified' && entry.field_name) {
-        const from = entry.old_value ? `~~${entry.old_value}~~` : '_vide_';
-        const to = entry.new_value ?? '_vide_';
+        const from = entry.old_value ? `~~${entry.old_value}~~` : '_empty_';
+        const to = entry.new_value ?? '_empty_';
         return `${changeIcon}${entityIcon} **${name}** — \`${entry.field_name}\`: ${from} → ${to}`;
       }
       return `${changeIcon}${entityIcon} **${name}** ${entry.change_type}`;
@@ -62,14 +62,14 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     const embed = new EmbedBuilder()
       .setColor(0xfee75c)
-      .setTitle(`📝 Changelog Starvis (${res.total} entrées)`)
+      .setTitle(`📝 Changelog Starvis (${res.total} entries)`)
       .setDescription(description.length > 4000 ? `${description.slice(0, 3997)}…` : description)
       .setURL(`${SITE_URL}/changelog`)
       .setFooter({ text: 'Starvis — Star Citizen Database' });
 
     await interaction.editReply({ embeds: [embed] });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+    const msg = err instanceof Error ? err.message : 'Unknown error';
     await interaction.editReply({ embeds: [errorEmbed(msg)] });
   }
 }

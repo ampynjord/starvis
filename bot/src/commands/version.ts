@@ -7,13 +7,13 @@ const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
 
 export const data = new SlashCommandBuilder()
   .setName('version')
-  .setDescription('Version actuelle des données Star Citizen extraites')
+  .setDescription('Current version of the extracted Star Citizen data')
   .addStringOption((opt) =>
     opt
       .setName('env')
-      .setDescription('Environnement de jeu')
+      .setDescription('Game environment')
       .setRequired(false)
-      .addChoices({ name: 'LIVE (défaut)', value: 'live' }, { name: 'PTU', value: 'ptu' }),
+      .addChoices({ name: 'LIVE (default)', value: 'live' }, { name: 'PTU', value: 'ptu' }),
   );
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -23,12 +23,12 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const res = await getGameVersion();
 
     if (!res.success || !res.data) {
-      await interaction.editReply({ embeds: [errorEmbed('Impossible de récupérer la version du jeu.')] });
+      await interaction.editReply({ embeds: [errorEmbed('Unable to fetch the game version.')] });
       return;
     }
 
     const v = res.data;
-    const extractedDate = new Date(v.extracted_at).toLocaleDateString('fr-FR', {
+    const extractedDate = new Date(v.extracted_at).toLocaleDateString('en-US', {
       day: '2-digit',
       month: 'long',
       year: 'numeric',
@@ -41,17 +41,17 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       .setTitle(`🎮 Star Citizen ${v.game_version}`)
       .setURL(SITE_URL)
       .addFields([
-        { name: '🌍 Environnement', value: (v.env ?? 'live').toUpperCase(), inline: true },
-        { name: '🚀 Vaisseaux', value: v.ships_count?.toLocaleString('fr-FR') ?? '—', inline: true },
-        { name: '⚙️ Composants', value: v.components_count?.toLocaleString('fr-FR') ?? '—', inline: true },
-        { name: '📦 Items', value: v.items_count?.toLocaleString('fr-FR') ?? '—', inline: true },
-        { name: '🕐 Dernière extraction', value: extractedDate, inline: false },
+        { name: '🌍 Environment', value: (v.env ?? 'live').toUpperCase(), inline: true },
+        { name: '🚀 Ships', value: v.ships_count?.toLocaleString() ?? '—', inline: true },
+        { name: '⚙️ Components', value: v.components_count?.toLocaleString() ?? '—', inline: true },
+        { name: '📦 Items', value: v.items_count?.toLocaleString() ?? '—', inline: true },
+        { name: '🕐 Last extraction', value: extractedDate, inline: false },
       ])
       .setFooter({ text: 'Starvis — Star Citizen Database' });
 
     await interaction.editReply({ embeds: [embed] });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+    const msg = err instanceof Error ? err.message : 'Unknown error';
     await interaction.editReply({ embeds: [errorEmbed(msg)] });
   }
 }

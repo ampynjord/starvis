@@ -143,7 +143,7 @@ function getAncestors(uuids: Set<string>, byId: Map<string, Location>): Set<stri
   return result;
 }
 
-// ── ShopList (affiché sous un nœud quand il a des shops) ─────────────────────
+// ── ShopList (shown under a node when it has shops) ──────────────────────────
 
 function ShopList({ shops }: { shops: Shop[] }) {
   if (!shops.length) return null;
@@ -265,7 +265,7 @@ function TreeNode({ loc, childrenOf, shopsByLocKey, depth, expandedIds, onToggle
 
       {isExpanded && (
         <>
-          {/* Shops de ce nœud */}
+          {/* Shops for this node */}
           {shops.length > 0 && (
             <ShopList shops={shops} />
           )}
@@ -340,20 +340,20 @@ export default function LocationsPage() {
     return map;
   }, [shopsData]);
 
-  // Shops sans loc_key — non rattachés
+  // Shops without loc_key — not linked to any location
   const orphanShops = useMemo(
     () => (shopsData?.data ?? []).filter((s) => !s.loc_key),
     [shopsData],
   );
 
-  // Auto-expand systems au premier chargement
+  // Auto-expand systems on first load
   useEffect(() => {
     if (!allLocs.length || initialized) return;
     setExpandedIds(new Set(allLocs.filter((l) => l.type === 'system').map((l) => l.uuid)));
     setInitialized(true);
   }, [allLocs, initialized]);
 
-  // Filtre de recherche : matchs + ancêtres
+  // Search filter: matches + ancestors
   const { visibleIds, matchIds } = useMemo<{
     visibleIds: Set<string> | null;
     matchIds: Set<string> | null;
@@ -463,7 +463,7 @@ export default function LocationsPage() {
       {orphanShops.length > 0 && (
         <details className="sci-panel">
           <summary className="px-4 py-3 text-xs font-mono-sc text-slate-600 cursor-pointer hover:text-slate-400 uppercase tracking-widest">
-            {orphanShops.length} shops non rattachés à une location
+            {orphanShops.length} shops not linked to any location
           </summary>
           <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 mt-2">
             {orphanShops.map((shop) => (
