@@ -26,7 +26,7 @@ const shareTechMono = Share_Tech_Mono({
   weight: '400',
 });
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://starvis.gg';
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://starvis.ampynjord.bzh';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

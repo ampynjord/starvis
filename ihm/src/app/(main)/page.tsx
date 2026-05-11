@@ -15,11 +15,11 @@ const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebSite',
   name: 'STARVIS',
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://starvis.gg',
+  url: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://starvis.ampynjord.bzh',
   description: 'The most complete Star Citizen database — ships, components, FPS gear and more.',
   potentialAction: {
     '@type': 'SearchAction',
-    target: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://starvis.gg'}/search?q={search_term_string}`,
+    target: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://starvis.ampynjord.bzh'}/search?q={search_term_string}`,
     'query-input': 'required name=search_term_string',
   },
 };
