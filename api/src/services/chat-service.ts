@@ -221,8 +221,7 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_ship_loadout',
-      description:
-        'Detailed list of all hardpoints on a ship and the currently equipped components (type, size, name, stats).',
+      description: 'Detailed list of all hardpoints on a ship and the currently equipped components (type, size, name, stats).',
       parameters: {
         type: 'object',
         properties: {
@@ -402,8 +401,7 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'search_locations',
-      description:
-        'Search in-game locations: planets, moons, stations, outposts, cities. Indicates if refuel/repair/landing available.',
+      description: 'Search in-game locations: planets, moons, stations, outposts, cities. Indicates if refuel/repair/landing available.',
       parameters: {
         type: 'object',
         properties: {
@@ -493,8 +491,7 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'search_galactapedia',
-      description:
-        'Search RSI Galactapedia: lore articles on races, factions, locations, ships, Star Citizen universe history.',
+      description: 'Search RSI Galactapedia: lore articles on races, factions, locations, ships, Star Citizen universe history.',
       parameters: {
         type: 'object',
         properties: {

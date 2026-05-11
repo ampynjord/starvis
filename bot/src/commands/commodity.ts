@@ -28,8 +28,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       return parts.join(' — ');
     });
 
-    const description =
-      lines.join('\n') + (res.total > res.data.length ? `\n\n_… and ${res.total - res.data.length} more results_` : '');
+    const description = lines.join('\n') + (res.total > res.data.length ? `\n\n_… and ${res.total - res.data.length} more results_` : '');
 
     await interaction.editReply({
       embeds: [searchEmbed(`🛢️ Commodities — "${name}"`, description)],
