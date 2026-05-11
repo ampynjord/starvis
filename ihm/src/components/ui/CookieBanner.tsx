@@ -1,6 +1,6 @@
 'use client';
 
-import { Cookie, X } from 'lucide-react';
+import { Cookie } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
@@ -17,9 +17,9 @@ export function CookieBanner() {
     }
   }, []);
 
-  const dismiss = () => {
+  const respond = (choice: 'accepted' | 'declined') => {
     try {
-      localStorage.setItem(STORAGE_KEY, 'accepted');
+      localStorage.setItem(STORAGE_KEY, choice);
     } catch {
       // ignore
     }
@@ -30,9 +30,9 @@ export function CookieBanner() {
 
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50 max-w-xl mx-auto">
-      <div className="sci-panel border border-slate-700 bg-slate-950/95 backdrop-blur-sm p-4 flex items-start gap-3 shadow-xl">
-        <Cookie size={16} className="text-cyan-500 shrink-0 mt-0.5" />
-        <div className="flex-1 min-w-0">
+      <div className="sci-panel border border-slate-700 bg-slate-950/95 backdrop-blur-sm p-4 shadow-xl">
+        <div className="flex items-start gap-3 mb-3">
+          <Cookie size={16} className="text-cyan-500 shrink-0 mt-0.5" />
           <p className="font-rajdhani text-sm text-slate-300 leading-snug">
             Starvis uses a single session cookie (<code className="font-mono-sc text-xs text-cyan-400">starvis_token</code>)
             strictly necessary for authentication. No advertising or tracking cookies are used.{' '}
@@ -41,13 +41,20 @@ export function CookieBanner() {
             </Link>
           </p>
         </div>
-        <button
-          onClick={dismiss}
-          className="shrink-0 p-1 rounded hover:bg-white/10 transition-colors text-slate-400 hover:text-slate-200"
-          aria-label="Dismiss"
-        >
-          <X size={14} />
-        </button>
+        <div className="flex items-center gap-2 justify-end">
+          <button
+            onClick={() => respond('declined')}
+            className="py-1 px-3 text-xs font-mono-sc text-slate-500 hover:text-slate-300 border border-slate-700 hover:border-slate-500 rounded-sm transition-colors"
+          >
+            DECLINE
+          </button>
+          <button
+            onClick={() => respond('accepted')}
+            className="py-1 px-3 text-xs font-mono-sc text-cyan-300 bg-cyan-900/40 border border-cyan-700/50 hover:border-cyan-500/70 hover:bg-cyan-900/60 rounded-sm transition-colors"
+          >
+            ACCEPT
+          </button>
+        </div>
       </div>
     </div>
   );
