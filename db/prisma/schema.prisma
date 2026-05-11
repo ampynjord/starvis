@@ -119,8 +119,29 @@ model User {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
+  bugReports BugReport[]
+
   @@index([email])
   @@map("users")
+  @@schema("meta")
+}
+
+model BugReport {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  title       String   @db.VarChar(200)
+  description String   @db.Text
+  attachments Json     @default("[]")
+  status      String   @default("open") @db.VarChar(20)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("bug_reports")
   @@schema("meta")
 }
 

@@ -23,6 +23,7 @@ const PUBLIC_PATHS = new Set([
   '/search',
   '/items',
   '/legal',
+  '/developer',
 ]);
 
 // Public path prefixes — detail pages and sub-routes

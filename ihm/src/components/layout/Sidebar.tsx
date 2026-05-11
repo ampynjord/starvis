@@ -3,6 +3,8 @@
 import { motion } from 'framer-motion';
 import {
   BookOpen,
+  Bug,
+  Code2,
   ExternalLink,
   Home,
   Lock,
@@ -164,8 +166,18 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         {NAV_GROUPS.map((group) => (
           <NavGroup key={group.id} label={group.label} items={group.items} onNavigate={onClose} />
         ))}
+        {isBetaRole(user?.role) && (
+          <NavGroup label="Developer" items={[{ to: '/developer', icon: Code2, label: 'API Access' }]} onNavigate={onClose} />
+        )}
         {user?.role === 'admin' && (
-          <NavGroup label="Admin" items={[{ to: '/admin', icon: Shield, label: 'Administration' }]} onNavigate={onClose} />
+          <NavGroup
+            label="Admin"
+            items={[
+              { to: '/admin', icon: Shield, label: 'Administration' },
+              { to: '/admin/bug-reports', icon: Bug, label: 'Bug Reports' },
+            ]}
+            onNavigate={onClose}
+          />
         )}
       </nav>
 
@@ -192,6 +204,15 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           <BookOpen size={12} />
           <span className="font-mono-sc">Changelog</span>
         </Link>
+        {user && (
+          <Link
+            href="/report-bug"
+            className="flex items-center gap-2 text-xs text-slate-600 hover:text-slate-400 transition-colors"
+          >
+            <Bug size={12} />
+            <span className="font-mono-sc">Report a bug</span>
+          </Link>
+        )}
         <a
           href="https://robertsspaceindustries.com"
           target="_blank"
