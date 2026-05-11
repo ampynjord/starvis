@@ -426,6 +426,7 @@ export default function ComponentDetailPage() {
 		{ label: "Heat generation", value: fN(comp.heat_generation) },
 		{ label: "EM signature", value: fN(comp.em_signature) },
 		{ label: "IR signature", value: fN(comp.ir_signature) },
+		{ label: "Cross-section sig.", value: fN(comp.cross_section_signature) },
 	].filter((s) => s.value !== "—");
 
 	const isBeamWeapon = comp.weapon_beam_dps != null;

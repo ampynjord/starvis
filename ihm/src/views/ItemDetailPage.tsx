@@ -241,7 +241,7 @@ export default function ItemDetailPage() {
   const isWeapon = item.type === 'FPS_Weapon';
   const isArmor = item.type.startsWith('Armor_') || item.type === 'Undersuit';
 
-  const rawPayload = item.data_json ?? null;
+  const rawPayload = item.game_data ?? item.data_json ?? null;
 
   // Build QuickStat pills
   const quickStats: { icon: React.ReactNode; label: string; value: string }[] = [];
@@ -336,6 +336,27 @@ export default function ItemDetailPage() {
         <div className="lg:col-span-2 space-y-6">
           {isWeapon && <WeaponStats item={item} />}
           {isArmor && <ArmorStats item={item} />}
+
+          {/* Generic properties for other item types */}
+          {!isWeapon && !isArmor && rawPayload && Object.keys(rawPayload).length > 0 && (
+            <ScifiPanel title="Properties">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {Object.entries(rawPayload).map(([key, val]) => {
+                  if (val == null) return null;
+                  const display = typeof val === 'number'
+                    ? Number.isInteger(val) ? val.toLocaleString('en-US') : val.toFixed(4).replace(/\.?0+$/, '')
+                    : String(val);
+                  const label = key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
+                  return (
+                    <div key={key} className="sci-panel px-3 py-2 flex flex-col gap-0.5">
+                      <span className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest truncate">{label}</span>
+                      <span className="text-xs font-mono-sc text-slate-300 font-semibold break-all">{display}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </ScifiPanel>
+          )}
 
           {/* Blueprint & Crafting */}
           {craftingData && craftingData.data.length > 0 && (
