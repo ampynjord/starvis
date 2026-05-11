@@ -364,8 +364,8 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
             comp.qdCalibrationMaxAngle = Math.round(c.maxCalibrationAngle * 100) / 100;
         }
 
-        // Missile / Bomb / Torpedo — all share SCItemMissileParams
-        if (cType === 'SCItemMissileParams') {
+        // Missile / Bomb / Torpedo — SCItemMissileParams or SCItemBombParams
+        if (cType === 'SCItemMissileParams' || cType === 'SCItemBombParams') {
           const ep = c.explosionParams;
           if (ep && typeof ep === 'object') {
             const dmg = ep.damage;
