@@ -35,6 +35,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showRules, setShowRules] = useState(false);
+  const [consented, setConsented] = useState(false);
 
   const passwordsMatch = confirm === '' || password === confirm;
   const strongEnough = isStrongPassword(password);
@@ -49,6 +50,10 @@ export default function RegisterPage() {
     }
     if (password !== confirm) {
       setError('Les mots de passe ne correspondent pas.');
+      return;
+    }
+    if (!consented) {
+      setError("Vous devez accepter la politique de confidentialité pour créer un compte.");
       return;
     }
 
@@ -176,6 +181,28 @@ export default function RegisterPage() {
             )}
           </div>
 
+          {/* RGPD — consentement */}
+          <label className="flex items-start gap-2.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={consented}
+              onChange={(e) => setConsented(e.target.checked)}
+              className="mt-0.5 accent-cyan-500 shrink-0"
+            />
+            <span className="text-xs text-slate-400 leading-relaxed">
+              J'ai lu et j'accepte la{' '}
+              <Link
+                href="/legal"
+                target="_blank"
+                rel="noreferrer"
+                className="text-cyan-500 hover:text-cyan-300 underline underline-offset-2"
+              >
+                politique de confidentialité
+              </Link>{' '}
+              et consens au traitement de mes données personnelles (e-mail, pseudonyme) aux fins d'accès au service.
+            </span>
+          </label>
+
           {error && (
             <p className="text-xs text-red-400 font-mono-sc bg-red-950/30 border border-red-800/30 rounded px-3 py-2">
               {error}
@@ -184,7 +211,7 @@ export default function RegisterPage() {
 
           <button
             type="submit"
-            disabled={loading || !strongEnough || !passwordsMatch || confirm.length === 0}
+            disabled={loading || !strongEnough || !passwordsMatch || confirm.length === 0 || !consented}
             className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-cyan-900/40 border border-cyan-700/50 hover:border-cyan-500/70 hover:bg-cyan-900/60 text-cyan-300 font-mono-sc text-sm rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <UserPlus size={15} />

@@ -6,6 +6,7 @@ import {
   ExternalLink,
   Home,
   Lock,
+  Scale,
   Shield,
   User,
   X,
@@ -200,6 +201,17 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           <ExternalLink size={12} />
           <span className="font-mono-sc">RSI Website</span>
         </a>
+        <Link
+          href="/legal"
+          className="flex items-center gap-2 text-xs text-slate-600 hover:text-slate-400 transition-colors"
+        >
+          <Scale size={12} />
+          <span className="font-mono-sc">Mentions légales</span>
+        </Link>
+        <p className="text-[9px] text-slate-700 leading-tight pt-1">
+          Star Citizen® © Cloud Imperium Games.
+          Projet communautaire non lucratif.
+        </p>
       </div>
     </aside>
   );

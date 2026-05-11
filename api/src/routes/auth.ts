@@ -87,6 +87,18 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     }
   });
 
+  // DELETE /auth/me — supprimer son propre compte
+  router.delete('/auth/me', requireJwt, async (req, res) => {
+    const payload = (req as any).jwtPayload;
+    try {
+      await authService.deleteUser(payload.sub);
+      res.json({ success: true });
+    } catch (e: any) {
+      if (e?.code === 'P2025') return void res.status(404).json({ success: false, error: 'User not found' });
+      res.status(500).json({ success: false, error: 'Account deletion failed' });
+    }
+  });
+
   // ── API Token (accès projets externes) ────────────────────────────────────
   // POST /auth/api-token — génère un JWT longue durée (1 an)
   router.post('/auth/api-token', requireJwt, async (req, res) => {
