@@ -1,3 +1,5 @@
+﻿'use client';
+
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, Search } from 'lucide-react';
 import { useState } from 'react';

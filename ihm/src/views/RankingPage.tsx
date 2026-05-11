@@ -1,3 +1,5 @@
+﻿'use client';
+
 /**
  * RankingPage — ship ranking table + bar chart
  */
