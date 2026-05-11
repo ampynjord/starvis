@@ -1,3 +1,5 @@
+﻿'use client';
+
 /**
  * MineralsLibraryPage — Complete mineral/ore reference
  * Shows mining properties, sell prices, crafting usage, and rock finder links.

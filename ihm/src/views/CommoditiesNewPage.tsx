@@ -1,3 +1,5 @@
+﻿'use client';
+
 /**
  * CommoditiesNewPage — Merged commodities & minerals library
  * Combines trade goods (paginated list with filters) and the full minerals

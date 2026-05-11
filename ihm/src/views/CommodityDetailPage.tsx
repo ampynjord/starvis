@@ -1,3 +1,5 @@
+﻿'use client';
+
 import { useQuery } from '@tanstack/react-query';
 import { ArrowLeft, ChevronDown, ChevronRight, ChevronUp, MapPin, Package, TrendingDown, TrendingUp } from 'lucide-react';
 import Link from 'next/link';

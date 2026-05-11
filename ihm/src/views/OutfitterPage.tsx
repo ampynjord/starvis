@@ -1,3 +1,5 @@
+﻿'use client';
+
 /**
  * OutfitterPage — Ship loadout customizer + DPS calculator
  * Inspired by erkul.games DPS Calculator
