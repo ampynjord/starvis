@@ -1,16 +1,51 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-// Public paths (no login required)
-const PUBLIC_PATHS = ['/login', '/register'];
+// Exact public paths (no login required)
+const PUBLIC_PATHS = new Set([
+  '/',
+  '/login',
+  '/register',
+  '/ships',
+  '/ships-components',
+  '/paints',
+  '/compare',
+  '/ranking',
+  '/fps-gear',
+  '/consumables',
+  '/commodities',
+  '/missions',
+  '/factions',
+  '/manufacturers',
+  '/galactapedia',
+  '/comm-links',
+  '/changelog',
+  '/search',
+  '/items',
+  '/legal',
+]);
 
-// Always-accessible prefixes (Next.js assets, internal API route handlers)
-const PUBLIC_PREFIXES = ['/api/', '/_next/', '/favicon', '/robots', '/sitemap'];
+// Public path prefixes — detail pages and sub-routes
+const PUBLIC_PREFIXES = [
+  '/ships/',
+  '/ships-components/',
+  '/items/',
+  '/consumables/',
+  '/commodities/',
+  '/galactapedia/',
+  '/comm-links/',
+  // Next.js internals & static assets
+  '/api/',
+  '/_next/',
+  '/favicon',
+  '/robots',
+  '/sitemap',
+];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if (PUBLIC_PATHS.includes(pathname)) return NextResponse.next();
+  if (PUBLIC_PATHS.has(pathname)) return NextResponse.next();
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
   // Only check cookie presence (JWT signature is validated by the API on each

@@ -22,6 +22,7 @@ import {
   Shuffle,
   SlidersHorizontal,
   TrendingUp,
+  TriangleAlert,
   Trophy,
   Zap,
 } from 'lucide-react';
@@ -263,6 +264,20 @@ export default function HomePage() {
 
   return (
     <div className="space-y-5 max-w-[1400px] mx-auto">
+
+      {/* ── Early access banner ───────────────────────────────────────── */}
+      <div className="flex items-start gap-3 rounded-sm border border-amber-800/50 bg-amber-950/20 px-4 py-3">
+        <TriangleAlert size={15} className="text-amber-500 mt-0.5 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="font-orbitron text-[10px] font-bold text-amber-400 tracking-widest uppercase mb-0.5">
+            Early Access
+          </p>
+          <p className="font-rajdhani text-sm text-slate-400 leading-snug">
+            Starvis is in early access. Game data may be incomplete or inaccurate — extraction is ongoing and updated regularly.
+            Your bug reports are invaluable to improve the platform.
+          </p>
+        </div>
+      </div>
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <div className="sci-panel relative overflow-hidden">
