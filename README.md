@@ -190,3 +190,36 @@ npm run typecheck --workspace=api                      # Type-check API
 npx tsc --noEmit --project extractor/tsconfig.json    # Type-check extractor
 npm run lint                                           # Lint Biome (tous les workspaces)
 ```
+
+---
+
+## Mentions légales & Conformité
+
+### Projet communautaire non lucratif
+
+STARVIS est un projet **indépendant, communautaire et non lucratif**. Il n'est pas affilié à, soutenu par,
+ni officiellement connecté à **Cloud Imperium Games Corporation** ou **Roberts Space Industries Corp.**
+
+### Crédits — Propriété intellectuelle
+
+**Star Citizen®** ainsi que l'ensemble des données du jeu (noms de vaisseaux, composants, items, lore, etc.)
+sont la propriété de **Cloud Imperium Games Corporation** et/ou **Roberts Space Industries Corp.**
+
+> © 2012–2025 Cloud Imperium Rights LLC. All rights reserved.
+
+Les données affichées (extraites du P4K via DataForge, de la RSI Ship Matrix et du site RSI) sont utilisées
+dans un cadre strictement non commercial, à des fins communautaires, conformément à la politique de licence
+communautaire de CIG. STARVIS ne revendique aucun droit de propriété sur ces contenus.
+
+### Licence du code source
+
+Le code est distribué sous **licence MIT** (voir [LICENSE](LICENSE)).
+La licence MIT couvre le code uniquement — elle ne s'applique pas aux données ou contenus appartenant à CIG.
+
+### RGPD / Protection des données
+
+Données collectées lors de l'inscription : e-mail, nom d'utilisateur, hash de mot de passe, rôle, avatar.
+Aucune donnée de paiement, aucun cookie publicitaire, aucune transmission à des tiers à des fins commerciales.
+
+Contact RGPD : gwenvaelcaouissin@gmail.com  
+Politique complète disponible sur [/legal](https://starvis.ampynjord.bzh/legal).
