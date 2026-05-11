@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   },
   description:
     'Starvis is the most complete Star Citizen database: ships, components, FPS gear, commodities, missions, manufacturers, galactapedia and more. Data extracted directly from the game files.',
-  keywords: ['star citizen', 'ships', 'database', 'components', 'starvis', 'sc', 'game data'],
+  keywords: ['star citizen', 'star citizen ships', 'star citizen database', 'sc ships', 'star citizen components', 'star citizen wiki', 'starvis', 'star citizen data', 'ship stats', 'galactapedia'],
   authors: [{ name: 'ampynjord' }],
   openGraph: {
     type: 'website',
@@ -56,7 +56,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="fr" className={`dark ${orbitron.variable} ${rajdhani.variable} ${shareTechMono.variable}`} suppressHydrationWarning>
+    <html lang="en" className={`dark ${orbitron.variable} ${rajdhani.variable} ${shareTechMono.variable}`} suppressHydrationWarning>
       <body className="bg-void text-slate-200">
         <Providers>
           {children}
