@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { mountAdminRoutes } from './admin.js';
-import { mountBugReportRoutes } from './bug-reports.js';
 import { mountAuthRoutes } from './auth.js';
+import { mountBugReportRoutes } from './bug-reports.js';
 import { mountCalculateRoutes } from './calculate.js';
 import { mountChatRoutes } from './chat.js';
 import { mountCommodityRoutes } from './commodities.js';
