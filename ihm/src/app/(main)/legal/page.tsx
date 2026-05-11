@@ -90,12 +90,9 @@ export default function LegalPage() {
         <h3 className="text-slate-300 font-semibold text-xs uppercase tracking-wider">Data controller</h3>
         <P>
           STARVIS is operated by <span className="text-slate-200">ampynjord</span>. For any questions
-          regarding your personal data, contact:{' '}
-          <a
-            href="mailto:gwenvaelcaouissin@gmail.com"
-            className="text-cyan-500 hover:text-cyan-300 underline underline-offset-2"
-          >
-            gwenvaelcaouissin@gmail.com
+          regarding your personal data, use the{' '}
+          <a href="/report-bug" className="text-cyan-500 hover:text-cyan-300 underline underline-offset-2">
+            contact form
           </a>
         </P>
 
@@ -164,12 +161,9 @@ export default function LegalPage() {
           <a href="/profile" className="text-cyan-500 hover:text-cyan-300 underline underline-offset-2">
             profile
           </a>{' '}
-          (Danger zone section). For other rights, contact{' '}
-          <a
-            href="mailto:gwenvaelcaouissin@gmail.com"
-            className="text-cyan-500 hover:text-cyan-300 underline underline-offset-2"
-          >
-            gwenvaelcaouissin@gmail.com
+          (Danger zone section). For other rights, use the{' '}
+          <a href="/report-bug" className="text-cyan-500 hover:text-cyan-300 underline underline-offset-2">
+            contact form
           </a>
           . You also have the right to lodge a complaint with the relevant supervisory authority (CNIL in
           France:{' '}
