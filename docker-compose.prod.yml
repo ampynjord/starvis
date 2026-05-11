@@ -64,6 +64,12 @@ services:
       CTM_CACHE_DIR: /app/ctm-cache
       MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
       JWT_SECRET: ${JWT_SECRET:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-}
     restart: unless-stopped
     deploy:
       resources:
