@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Copy, Key, LogOut, Save, Shield, User } from 'lucide-react';
+import { AlertTriangle, Copy, Key, LogOut, Save, Shield, Trash2, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,6 +17,9 @@ export default function ProfilePage() {
   const [apiToken, setApiToken] = useState<string | null>(null);
   const [generatingToken, setGeneratingToken] = useState(false);
   const [tokenCopied, setTokenCopied] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -49,6 +52,26 @@ export default function ProfilePage() {
   const handleLogout = async () => {
     await logout();
     router.push('/');
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/auth/me', { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setMessage({ type: 'error', text: (data as any).error ?? 'Échec de la suppression' });
+        setShowDeleteModal(false);
+        return;
+      }
+      await logout();
+      router.push('/login');
+    } catch {
+      setMessage({ type: 'error', text: 'Erreur réseau' });
+      setShowDeleteModal(false);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const handleGenerateApiToken = async () => {
@@ -210,6 +233,81 @@ export default function ProfilePage() {
         <LogOut size={14} />
         SE DÉCONNECTER
       </button>
+
+      {/* Danger zone — RGPD droit à l'effacement */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.15 }}
+        className="sci-panel p-5 space-y-4 border-red-900/40"
+      >
+        <div className="flex items-center gap-2">
+          <AlertTriangle size={14} className="text-red-500 shrink-0" />
+          <h2 className="text-sm font-mono-sc text-red-500 uppercase tracking-wider">Zone de danger</h2>
+        </div>
+        <p className="text-xs text-slate-500 leading-relaxed">
+          La suppression de votre compte est irréversible. Toutes vos données personnelles (e-mail, pseudonyme, avatar)
+          seront définitivement effacées, conformément à votre droit à l'effacement (RGPD art. 17).
+        </p>
+        <button
+          onClick={() => { setDeleteConfirm(''); setShowDeleteModal(true); }}
+          className="flex items-center gap-2 py-2 px-4 border border-red-800/50 hover:border-red-600/70 bg-red-950/20 hover:bg-red-950/40 text-red-500 hover:text-red-400 font-mono-sc text-sm rounded transition-colors"
+        >
+          <Trash2 size={14} />
+          SUPPRIMER MON COMPTE
+        </button>
+      </motion.div>
+
+      {/* Modal de confirmation de suppression */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="sci-panel p-6 max-w-sm w-full space-y-4"
+          >
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={18} className="text-red-400 shrink-0" />
+              <h3 className="font-orbitron text-sm font-bold text-red-400 uppercase tracking-wider">
+                Confirmer la suppression
+              </h3>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Cette action est <span className="text-red-400 font-semibold">irréversible</span>. Votre compte et toutes
+              vos données seront définitivement supprimés.
+            </p>
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono-sc text-slate-500 uppercase tracking-wider">
+                Tapez <span className="text-red-400">{user.username}</span> pour confirmer
+              </label>
+              <input
+                type="text"
+                value={deleteConfirm}
+                onChange={(e) => setDeleteConfirm(e.target.value)}
+                placeholder={user.username}
+                className="sci-input w-full"
+                autoComplete="off"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 py-2 px-4 border border-slate-700 hover:border-slate-500 text-slate-400 hover:text-slate-200 font-mono-sc text-sm rounded transition-colors"
+              >
+                ANNULER
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirm !== user.username || deleting}
+                className="flex-1 flex items-center justify-center gap-2 py-2 px-4 bg-red-900/40 border border-red-700/50 hover:border-red-500/70 hover:bg-red-900/60 text-red-400 font-mono-sc text-sm rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <Trash2 size={13} />
+                {deleting ? 'SUPPRESSION...' : 'SUPPRIMER'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }

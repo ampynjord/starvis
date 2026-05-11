@@ -31,6 +31,30 @@ export async function GET() {
   }
 }
 
+export async function DELETE() {
+  try {
+    const token = await getToken();
+    if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+
+    const upstream = await fetch(`${API_BASE}/auth/me`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!upstream.ok) {
+      const data = await upstream.json().catch(() => ({}));
+      return NextResponse.json({ error: (data as any).error ?? 'Deletion failed' }, { status: upstream.status });
+    }
+
+    const res = NextResponse.json({ success: true });
+    res.cookies.delete('starvis_token');
+    return res;
+  } catch (e: any) {
+    console.error('[auth/me DELETE]', e);
+    return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
+  }
+}
+
 export async function PUT(req: Request) {
   try {
     const token = await getToken();
