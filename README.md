@@ -60,7 +60,7 @@ L'application combine deux sources complémentaires :
 
 | Source | Contenu | Mise à jour |
 |---|---|---|
-| **P4K / DataForge** | Données in-game réelles (~320 vaisseaux, ~3 200 composants, ~10 000 items FPS…) | Via CLI `extractor/` |
+| **P4K / DataForge** | Données in-game réelles (~350 vaisseaux, ~3 000 composants sur 22 types, ~10 000 items FPS…) | Via CLI `extractor/` |
 | **RSI Ship Matrix** | Données marketing officielles (~246 vaisseaux) | Synchronisation automatique au démarrage de l'API |
 | **RSI Website** | Galactapedia, Comm-links, Starmap, CTM | Via CLI `extractor/` |
 
@@ -137,7 +137,7 @@ Tous les endpoints de données acceptent `?env=live` (défaut) ou `?env=ptu`.
 | Ressource | Endpoints clés |
 |---|---|
 | Vaisseaux | `GET /ships`, `/ships/:id`, `/ships/:id/loadout`, `/ships/:id/compare/:otherId`, `/ships/ranking` |
-| Composants | `GET /components`, `/components/:id`, `/components/filters` |
+| Composants | `GET /components`, `/components/:id`, `/components/filters`, `/components/types`, `/components/compatible` |
 | Items FPS | `GET /items`, `/items/:id`, `/items/filters` |
 | Commodités | `GET /commodities`, `/commodities/:id/prices` |
 | Commerce | `GET /trade/prices`, `/trade/location/:key`, `/trade/routes`, `/trade/systems` |

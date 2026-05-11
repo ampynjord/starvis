@@ -266,6 +266,7 @@ function getHeroStats(comp: Component) {
 	if (t === "SalvageHead")
 		return [
 			{ label: "Speed", value: fN(comp.salvage_speed, "", 2), accent: "text-amber-400" },
+			{ label: "Range", value: fN(comp.salvage_range, "m", 0) },
 			{ label: "Radius", value: fN(comp.salvage_radius, "m", 0) },
 		];
 	if (t === "Countermeasure")
