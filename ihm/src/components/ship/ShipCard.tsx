@@ -74,7 +74,7 @@ export function ShipCard({ ship, index = 0 }: Props) {
               </h3>
             </div>
 
-            {/* Stats — adaptées selon la catégorie */}
+            {/* Stats — adapted by category */}
             <div className="flex gap-3">
               <StatCell icon={<Users size={9} />} label="Crew" value={crewLabel(ship)} />
               {isGround ? (

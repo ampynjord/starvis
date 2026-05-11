@@ -161,24 +161,24 @@ function EditModal({ target, onClose, onSaved }: { target: AuthUser; onClose: ()
   };
 
   return (
-    <Modal title={`Modifier — ${target.username}`} onClose={onClose}>
+    <Modal title={`Edit — ${target.username}`} onClose={onClose}>
       <div className="space-y-3.5">
-        <Field label="Nom d'utilisateur" error={error && error.toLowerCase().includes('username') ? error : undefined}>
+        <Field label="Username" error={error && error.toLowerCase().includes('username') ? error : undefined}>
           <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
         </Field>
         <Field label="Email" error={error && error.toLowerCase().includes('email') ? error : undefined}>
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" />
         </Field>
-        <Field label="Avatar URL (optionnel)">
+        <Field label="Avatar URL (optional)">
           <Input value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://…" />
         </Field>
         {error && !error.toLowerCase().includes('email') && !error.toLowerCase().includes('username') && (
           <p className="text-[11px] text-red-400 font-mono-sc">{error}</p>
         )}
         <div className="flex gap-2 pt-1">
-          <button type="button" onClick={onClose} className="flex-1 sci-btn-ghost py-2 text-xs">Annuler</button>
+          <button type="button" onClick={onClose} className="flex-1 sci-btn-ghost py-2 text-xs">Cancel</button>
           <button type="button" onClick={save} disabled={saving} className="flex-1 sci-btn-primary py-2 text-xs">
-            {saving ? 'Sauvegarde…' : 'Sauvegarder'}
+            {saving ? 'Saving…' : 'Save'}
           </button>
         </div>
       </div>
@@ -211,14 +211,14 @@ function RoleModal({ target, onClose, onSaved }: { target: AuthUser; onClose: ()
   };
 
   return (
-    <Modal title={`Rôle — ${target.username}`} onClose={onClose}>
+    <Modal title={`Role — ${target.username}`} onClose={onClose}>
       <div className="space-y-4">
         <RoleSelect value={role} onChange={setRole} />
         {error && <p className="text-[11px] text-red-400 font-mono-sc">{error}</p>}
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className="flex-1 sci-btn-ghost py-2 text-xs">Annuler</button>
+          <button type="button" onClick={onClose} className="flex-1 sci-btn-ghost py-2 text-xs">Cancel</button>
           <button type="button" onClick={save} disabled={saving || role === target.role} className="flex-1 sci-btn-primary py-2 text-xs disabled:opacity-40">
-            {saving ? 'Sauvegarde…' : 'Appliquer'}
+            {saving ? 'Saving…' : 'Apply'}
           </button>
         </div>
       </div>
@@ -242,7 +242,7 @@ function ResetPasswordModal({ target, onClose }: { target: AuthUser; onClose: ()
       await apiFetch(`/api/admin/users/${target.id}/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+body: JSON.stringify({ password }),
       });
       setDone(true);
     } catch (e: any) {
@@ -253,21 +253,21 @@ function ResetPasswordModal({ target, onClose }: { target: AuthUser; onClose: ()
   };
 
   return (
-    <Modal title={`Mot de passe — ${target.username}`} onClose={onClose}>
+    <Modal title={`Password — ${target.username}`} onClose={onClose}>
       {done ? (
         <div className="space-y-4 text-center py-2">
-          <p className="text-green-400 font-mono-sc text-sm">Mot de passe réinitialisé.</p>
-          <button type="button" onClick={onClose} className="sci-btn-primary py-2 px-6 text-xs">Fermer</button>
+          <p className="text-green-400 font-mono-sc text-sm">Password reset.</p>
+          <button type="button" onClick={onClose} className="sci-btn-primary py-2 px-6 text-xs">Close</button>
         </div>
       ) : (
         <div className="space-y-3.5">
-          <Field label="Nouveau mot de passe" error={error}>
+          <Field label="New password" error={error}>
             <div className="relative">
               <Input
                 type={show ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Min. 8 chars, maj, chiffre, spécial"
+                placeholder="Min. 8 chars, uppercase, digit, special"
                 className="pr-10"
               />
               <button
@@ -280,9 +280,9 @@ function ResetPasswordModal({ target, onClose }: { target: AuthUser; onClose: ()
             </div>
           </Field>
           <div className="flex gap-2 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 sci-btn-ghost py-2 text-xs">Annuler</button>
+            <button type="button" onClick={onClose} className="flex-1 sci-btn-ghost py-2 text-xs">Cancel</button>
             <button type="button" onClick={save} disabled={saving || password.length < 8} className="flex-1 sci-btn-primary py-2 text-xs disabled:opacity-40">
-              {saving ? 'Sauvegarde…' : 'Réinitialiser'}
+              {saving ? 'Saving…' : 'Reset'}
             </button>
           </div>
         </div>
@@ -310,24 +310,24 @@ function DeleteModal({ target, onClose, onDeleted }: { target: AuthUser; onClose
   };
 
   return (
-    <Modal title="Confirmer la suppression" onClose={onClose}>
+    <Modal title="Confirm deletion" onClose={onClose}>
       <div className="space-y-4">
         <p className="text-sm text-slate-400 font-rajdhani">
-          Supprimer définitivement{' '}
+          Permanently delete{' '}
           <span className="text-slate-200 font-semibold">{target.username}</span>{' '}
-          <span className="text-slate-600">({target.email})</span> ?
-          Cette action est irréversible.
+          <span className="text-slate-600">({target.email})</span>?
+          This action is irreversible.
         </p>
         {error && <p className="text-[11px] text-red-400 font-mono-sc">{error}</p>}
         <div className="flex gap-2">
-          <button type="button" onClick={onClose} className="flex-1 sci-btn-ghost py-2 text-xs">Annuler</button>
+          <button type="button" onClick={onClose} className="flex-1 sci-btn-ghost py-2 text-xs">Cancel</button>
           <button
             type="button"
             onClick={confirm}
             disabled={deleting}
             className="flex-1 py-2 text-xs font-orbitron font-bold tracking-widest uppercase rounded-sm border border-red-700/60 bg-red-950/30 text-red-400 hover:bg-red-950/60 transition-colors disabled:opacity-40"
           >
-            {deleting ? 'Suppression…' : 'Supprimer'}
+            {deleting ? 'Deleting…' : 'Delete'}
           </button>
         </div>
       </div>
@@ -364,21 +364,21 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   };
 
   return (
-    <Modal title="Créer un utilisateur" onClose={onClose}>
+    <Modal title="Create user" onClose={onClose}>
       <div className="space-y-3.5">
         <Field label="Email">
           <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@example.com" />
         </Field>
-        <Field label="Nom d'utilisateur">
+        <Field label="Username">
           <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
         </Field>
-        <Field label="Mot de passe">
+        <Field label="Password">
           <div className="relative">
             <Input
               type={show ? 'text' : 'password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Min. 8 chars, maj, chiffre, spécial"
+              placeholder="Min. 8 chars, uppercase, digit, special"
               className="pr-10"
             />
             <button type="button" onClick={() => setShow((v) => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-400">
@@ -386,14 +386,14 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
             </button>
           </div>
         </Field>
-        <Field label="Rôle">
+        <Field label="Role">
           <RoleSelect value={role} onChange={setRole} />
         </Field>
         {error && <p className="text-[11px] text-red-400 font-mono-sc">{error}</p>}
         <div className="flex gap-2 pt-1">
-          <button type="button" onClick={onClose} className="flex-1 sci-btn-ghost py-2 text-xs">Annuler</button>
+          <button type="button" onClick={onClose} className="flex-1 sci-btn-ghost py-2 text-xs">Cancel</button>
           <button type="button" onClick={save} disabled={saving} className="flex-1 sci-btn-primary py-2 text-xs">
-            {saving ? 'Création…' : 'Créer'}
+            {saving ? 'Creating…' : 'Create'}
           </button>
         </div>
       </div>
@@ -436,25 +436,25 @@ export default function AdminPage() {
   const updateUser = useCallback((updated: AuthUser) => {
     setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
     setModal(null);
-    showToast(`${updated.username} mis à jour.`);
+    showToast(`${updated.username} updated.`);
   }, [showToast]);
 
   const removeUser = useCallback((id: number) => {
     setUsers((prev) => prev.filter((u) => u.id !== id));
     setModal(null);
-    showToast('Utilisateur supprimé.');
+    showToast('User deleted.');
   }, [showToast]);
 
   const addUser = useCallback((created: AuthUser) => {
     setUsers((prev) => [created, ...prev]);
     setModal(null);
-    showToast(`${created.username} créé.`);
+    showToast(`${created.username} created.`);
   }, [showToast]);
 
   if (me?.role !== 'admin') {
     return (
       <div className="p-6 text-center text-slate-500 font-mono-sc text-sm">
-        ACCÈS REFUSÉ — Rôle admin requis
+        ACCESS DENIED — Admin role required
       </div>
     );
   }
@@ -487,7 +487,7 @@ export default function AdminPage() {
             className="sci-btn-primary py-1.5 px-3 text-xs gap-1.5 flex items-center"
           >
             <Plus size={12} />
-            Créer un compte
+            Create account
           </button>
         </div>
 
@@ -518,7 +518,7 @@ export default function AdminPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Rechercher par nom ou email…"
+              placeholder="Search by name or email…"
               className="w-full bg-slate-900/60 border border-slate-700/60 rounded-sm pl-9 pr-3 py-2 text-sm font-rajdhani text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-600 transition-colors"
             />
           </div>
@@ -537,7 +537,7 @@ export default function AdminPage() {
                     : 'border-transparent text-slate-600 hover:text-slate-400 hover:border-slate-700'
                 }`}
               >
-                {r === 'all' ? 'Tous' : ROLE_STYLE[r].label}
+                {r === 'all' ? 'All' : ROLE_STYLE[r].label}
               </button>
             ))}
           </div>
@@ -546,16 +546,16 @@ export default function AdminPage() {
         {/* Table */}
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="sci-panel overflow-hidden">
           <div className="px-4 py-2.5 border-b border-border/50 flex items-center justify-between">
-            <span className="text-[10px] font-mono-sc text-cyan-700 uppercase tracking-wider">Utilisateurs</span>
+            <span className="text-[10px] font-mono-sc text-cyan-700 uppercase tracking-wider">Users</span>
             <span className="text-[10px] text-slate-600">
-              {filtered.length !== users.length ? `${filtered.length} / ${users.length}` : `${users.length} comptes`}
+              {filtered.length !== users.length ? `${filtered.length} / ${users.length}` : `${users.length} accounts`}
             </span>
           </div>
 
           {loading ? (
-            <div className="p-8 text-center text-slate-600 text-sm font-mono-sc">Chargement…</div>
+            <div className="p-8 text-center text-slate-600 text-sm font-mono-sc">Loading…</div>
           ) : filtered.length === 0 ? (
-            <div className="p-8 text-center text-slate-700 text-sm font-mono-sc">Aucun résultat</div>
+            <div className="p-8 text-center text-slate-700 text-sm font-mono-sc">No results</div>
           ) : (
             <div className="divide-y divide-border/30">
               {filtered.map((u) => (
@@ -568,7 +568,7 @@ export default function AdminPage() {
                       <span className="text-sm text-slate-200 font-rajdhani font-semibold truncate">{u.username}</span>
                       <RoleBadge role={u.role} />
                       {u.id === me?.id && (
-                        <span className="text-[9px] font-orbitron text-slate-600 border border-slate-800 px-1 py-0.5 rounded-sm">VOUS</span>
+                        <span className="text-[9px] font-orbitron text-slate-600 border border-slate-800 px-1 py-0.5 rounded-sm">YOU</span>
                       )}
                     </div>
                     <p className="text-[11px] text-slate-600 truncate font-mono-sc mt-0.5">{u.email}</p>
@@ -576,7 +576,7 @@ export default function AdminPage() {
 
                   {/* Date */}
                   <span className="hidden lg:block text-[10px] text-slate-700 font-mono-sc shrink-0 tabular-nums">
-                    {new Date(u.createdAt).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                    {new Date(u.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: '2-digit' })}
                   </span>
 
                   {/* Actions */}
@@ -584,7 +584,7 @@ export default function AdminPage() {
                     <button
                       type="button"
                       onClick={() => setModal({ type: 'edit', user: u })}
-                      title="Modifier"
+                      title="Edit"
                       className="p-1.5 rounded border border-transparent hover:border-slate-700/50 hover:bg-white/5 text-slate-600 hover:text-slate-300 transition-colors"
                     >
                       <Pencil size={13} />
@@ -592,7 +592,7 @@ export default function AdminPage() {
                     <button
                       type="button"
                       onClick={() => setModal({ type: 'role', user: u })}
-                      title="Changer le rôle"
+                      title="Change role"
                       className="p-1.5 rounded border border-transparent hover:border-slate-700/50 hover:bg-white/5 text-slate-600 hover:text-slate-300 transition-colors"
                     >
                       <UserCheck size={13} />
@@ -600,7 +600,7 @@ export default function AdminPage() {
                     <button
                       type="button"
                       onClick={() => setModal({ type: 'password', user: u })}
-                      title="Réinitialiser le mot de passe"
+                      title="Reset password"
                       className="p-1.5 rounded border border-transparent hover:border-slate-700/50 hover:bg-white/5 text-slate-600 hover:text-slate-300 transition-colors"
                     >
                       <KeyRound size={13} />
@@ -609,7 +609,7 @@ export default function AdminPage() {
                       <button
                         type="button"
                         onClick={() => setModal({ type: 'delete', user: u })}
-                        title="Supprimer"
+                        title="Delete"
                         className="p-1.5 rounded border border-transparent hover:border-red-800/50 hover:bg-red-950/20 text-slate-700 hover:text-red-500 transition-colors"
                       >
                         <Trash2 size={13} />

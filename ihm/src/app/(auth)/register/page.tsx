@@ -13,11 +13,11 @@ interface PasswordRule {
 }
 
 const PASSWORD_RULES: PasswordRule[] = [
-  { label: 'Au moins 8 caractères',        test: (p) => p.length >= 8 },
-  { label: 'Une lettre majuscule',          test: (p) => /[A-Z]/.test(p) },
-  { label: 'Une lettre minuscule',          test: (p) => /[a-z]/.test(p) },
-  { label: 'Un chiffre',                    test: (p) => /[0-9]/.test(p) },
-  { label: 'Un caractère spécial (!@#…)',   test: (p) => /[^a-zA-Z0-9]/.test(p) },
+  { label: 'At least 8 characters',        test: (p) => p.length >= 8 },
+  { label: 'One uppercase letter',          test: (p) => /[A-Z]/.test(p) },
+  { label: 'One lowercase letter',          test: (p) => /[a-z]/.test(p) },
+  { label: 'One digit',                     test: (p) => /[0-9]/.test(p) },
+  { label: 'One special character (!@#…)',  test: (p) => /[^a-zA-Z0-9]/.test(p) },
 ];
 
 function isStrongPassword(p: string): boolean {
@@ -45,15 +45,15 @@ export default function RegisterPage() {
     setError('');
 
     if (!strongEnough) {
-      setError('Le mot de passe ne respecte pas les règles de sécurité.');
+      setError('The password does not meet the security requirements.');
       return;
     }
     if (password !== confirm) {
-      setError('Les mots de passe ne correspondent pas.');
+      setError('Passwords do not match.');
       return;
     }
     if (!consented) {
-      setError("Vous devez accepter la politique de confidentialité pour créer un compte.");
+      setError('You must accept the privacy policy to create an account.');
       return;
     }
 
@@ -62,7 +62,7 @@ export default function RegisterPage() {
       await register(email, username, password);
       router.push('/');
     } catch (err: any) {
-      setError(err.message ?? 'Erreur lors de la création du compte');
+      setError(err.message ?? 'Account creation failed');
     } finally {
       setLoading(false);
     }
@@ -81,14 +81,15 @@ export default function RegisterPage() {
           <div className="w-12 h-12 rounded-full bg-cyan-950 border border-cyan-700/40 flex items-center justify-center mx-auto mb-4">
             <UserPlus size={20} className="text-cyan-400" />
           </div>
-          <h1 className="text-xl font-orbitron font-bold text-white tracking-wider">INSCRIPTION</h1>
-          <p className="text-xs text-slate-500 font-mono-sc">CRÉER UN COMPTE STARVIS</p>
+          <h1 className="text-xl font-orbitron font-bold text-white tracking-wider">REGISTER</h1>
+          <p className="text-xs text-slate-500 font-mono-sc">CREATE A STARVIS ACCOUNT</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Email */}
           <div className="space-y-1.5">
             <label className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider">Email</label>
+
             <div className="relative">
               <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
               <input
@@ -105,7 +106,7 @@ export default function RegisterPage() {
 
           {/* Pseudo */}
           <div className="space-y-1.5">
-            <label className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider">Pseudonyme</label>
+            <label className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider">Username</label>
             <div className="relative">
               <User size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
               <input
@@ -121,12 +122,12 @@ export default function RegisterPage() {
                 pattern="[a-zA-Z0-9_-]+"
               />
             </div>
-            <p className="text-xs text-slate-600">3-50 caractères, lettres/chiffres/_ uniquement</p>
+            <p className="text-xs text-slate-600">3-50 characters, letters/digits/_ only</p>
           </div>
 
           {/* Mot de passe */}
           <div className="space-y-1.5">
-            <label className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider">Mot de passe</label>
+            <label className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider">Password</label>
             <div className="relative">
               <Lock size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
               <input
@@ -141,7 +142,7 @@ export default function RegisterPage() {
               />
             </div>
 
-            {/* Indicateur de règles */}
+            {/* Rules indicator */}
             {showRules && password.length > 0 && (
               <ul className="space-y-1 mt-1">
                 {PASSWORD_RULES.map((rule) => {
@@ -161,7 +162,7 @@ export default function RegisterPage() {
 
           {/* Confirmation */}
           <div className="space-y-1.5">
-            <label className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider">Confirmer le mot de passe</label>
+            <label className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider">Confirm password</label>
             <div className="relative">
               <Lock size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
               <input
@@ -177,7 +178,7 @@ export default function RegisterPage() {
               />
             </div>
             {confirm.length > 0 && !passwordsMatch && (
-              <p className="text-xs text-red-400">Les mots de passe ne correspondent pas</p>
+              <p className="text-xs text-red-400">Passwords do not match</p>
             )}
           </div>
 
@@ -190,16 +191,16 @@ export default function RegisterPage() {
               className="mt-0.5 accent-cyan-500 shrink-0"
             />
             <span className="text-xs text-slate-400 leading-relaxed">
-              J'ai lu et j'accepte la{' '}
+              I have read and accept the{' '}
               <Link
                 href="/legal"
                 target="_blank"
                 rel="noreferrer"
                 className="text-cyan-500 hover:text-cyan-300 underline underline-offset-2"
               >
-                politique de confidentialité
+                privacy policy
               </Link>{' '}
-              et consens au traitement de mes données personnelles (e-mail, pseudonyme) aux fins d'accès au service.
+              and consent to the processing of my personal data (email, username) for access to the service.
             </span>
           </label>
 
@@ -215,14 +216,14 @@ export default function RegisterPage() {
             className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-cyan-900/40 border border-cyan-700/50 hover:border-cyan-500/70 hover:bg-cyan-900/60 text-cyan-300 font-mono-sc text-sm rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <UserPlus size={15} />
-            {loading ? 'CRÉATION...' : 'CRÉER LE COMPTE'}
+            {loading ? 'CREATING...' : 'CREATE ACCOUNT'}
           </button>
         </form>
 
         <p className="text-center text-xs text-slate-600">
-          Déjà un compte ?{' '}
+          Already have an account?{' '}
           <Link href="/login" className="text-cyan-500 hover:text-cyan-300 transition-colors">
-            Se connecter
+            Sign in
           </Link>
         </p>
       </div>

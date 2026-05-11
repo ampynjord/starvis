@@ -335,7 +335,7 @@ export default function ShipDetailPage() {
         {/* ════ LEFT — 3D · Dimensions · Cargo · Loadout ════ */}
         <div className="lg:col-span-3 space-y-6">
 
-          {/* HoloViewer — uniquement si modèle 3D disponible */}
+          {/* HoloViewer — only if 3D model available */}
           {ship.ctm_url && (
             <HoloViewer shipUuid={ship.uuid} shipName={ship.name} />
           )}

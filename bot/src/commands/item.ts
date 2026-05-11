@@ -8,18 +8,18 @@ const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
 
 export const data = new SlashCommandBuilder()
   .setName('item')
-  .setDescription('Rechercher un item FPS (armure, arme, gadget…)')
-  .addStringOption((opt) => opt.setName('nom').setDescription("Nom de l'item (ex: Pyro RYT, Hurston Dynamics)").setRequired(true));
+  .setDescription('Search an FPS item (armor, weapon, gadget…)')
+  .addStringOption((opt) => opt.setName('name').setDescription('Item name (e.g. Pyro RYT, Hurston Dynamics)').setRequired(true));
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  const name = interaction.options.getString('nom', true);
+  const name = interaction.options.getString('name', true);
   await interaction.deferReply();
 
   try {
     const res = await getItems(name);
 
     if (!res.data || res.data.length === 0) {
-      await interaction.editReply({ embeds: [errorEmbed(`Aucun item trouvé pour « ${name} ».`)] });
+      await interaction.editReply({ embeds: [errorEmbed(`No item found for "${name}".`)] });
       return;
     }
 
@@ -30,19 +30,19 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       return parts.join(' — ');
     });
 
-    const more = res.total > res.data.length ? `\n\n_… et ${res.total - res.data.length} autres résultats_` : '';
+    const more = res.total > res.data.length ? `\n\n_… and ${res.total - res.data.length} more results_` : '';
     const description = lines.join('\n') + more;
 
     const embed = new EmbedBuilder()
       .setColor(COLORS.item)
-      .setTitle(`📦 Items — « ${name} »`)
+      .setTitle(`📦 Items — "${name}"`)
       .setDescription(description)
       .setURL(`${SITE_URL}/equipment`)
       .setFooter({ text: 'Starvis — Star Citizen Database' });
 
     await interaction.editReply({ embeds: [embed] });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+    const msg = err instanceof Error ? err.message : 'Unknown error';
     await interaction.editReply({ embeds: [errorEmbed(msg)] });
   }
 }

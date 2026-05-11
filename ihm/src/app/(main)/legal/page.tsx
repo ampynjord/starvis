@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Mentions légales — STARVIS',
-  description: 'Mentions légales, crédits, politique de confidentialité RGPD et licence du projet STARVIS.',
+  title: 'Legal notice — STARVIS',
+  description: 'Legal notice, credits, GDPR privacy policy and license for the STARVIS project.',
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -33,64 +33,64 @@ export default function LegalPage() {
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
         <h1 className="font-orbitron text-xl font-bold tracking-widest text-slate-100 uppercase mb-1">
-          Mentions légales
+          Legal notice
         </h1>
-        <p className="text-xs text-slate-600 font-mono-sc">Dernière mise à jour : mai 2025</p>
+        <p className="text-xs text-slate-600 font-mono-sc">Last updated: May 2025</p>
       </div>
 
-      <Section title="Présentation du projet">
+      <Section title="About the project">
         <P>
-          <span className="text-slate-200 font-semibold">STARVIS</span> est un projet communautaire indépendant et{' '}
-          <span className="text-slate-200">non lucratif</span>, développé par des passionnés de Star Citizen.
-          Il n'est pas affilié à, soutenu par, ni officiellement connecté à{' '}
-          <span className="text-slate-200">Cloud Imperium Games Corporation</span> ou{' '}
+          <span className="text-slate-200 font-semibold">STARVIS</span> is an independent,{' '}
+          <span className="text-slate-200">non-profit community project</span> developed by Star Citizen
+          enthusiasts. It is not affiliated with, endorsed by, or officially connected to{' '}
+          <span className="text-slate-200">Cloud Imperium Games Corporation</span> or{' '}
           <span className="text-slate-200">Roberts Space Industries Corp.</span>
         </P>
         <P>
-          Le code source est publié sous licence{' '}
+          The source code is published under the{' '}
           <a
             href="https://github.com/ampynjord/starvis/blob/main/LICENSE"
             target="_blank"
             rel="noreferrer"
             className="text-cyan-500 hover:text-cyan-300 underline underline-offset-2"
           >
-            MIT
+            MIT license
           </a>
           .
         </P>
       </Section>
 
-      <Section title="Crédits — Propriété intellectuelle de Cloud Imperium Games">
+      <Section title="Credits — Cloud Imperium Games intellectual property">
         <P>
-          Star Citizen® ainsi que l'ensemble des données du jeu, noms de vaisseaux, noms d'items, lore, visuels
-          et contenus associés sont la propriété intellectuelle de{' '}
-          <span className="text-slate-200">Cloud Imperium Games Corporation</span> et/ou{' '}
+          Star Citizen® and all associated game data, ship names, item names, lore, imagery and related
+          content are the intellectual property of{' '}
+          <span className="text-slate-200">Cloud Imperium Games Corporation</span> and/or{' '}
           <span className="text-slate-200">Roberts Space Industries Corp.</span>
         </P>
-        <P>© 2012–2025 Cloud Imperium Rights LLC. Tous droits réservés.</P>
-        <P>Les données affichées sur STARVIS proviennent des sources suivantes :</P>
+        <P>© 2012–2025 Cloud Imperium Rights LLC. All rights reserved.</P>
+        <P>Data displayed on STARVIS is sourced from:</P>
         <Ul
           items={[
-            'Données in-game extraites du fichier P4K de Star Citizen via DataForge (composants, vaisseaux, items FPS, missions, crafting…)',
-            'RSI Ship Matrix — API officielle de Roberts Space Industries',
-            'Site RSI — robertsspaceindustries.com (Galactapedia, Comm-links, Starmap, CTM)',
+            "In-game data extracted from Star Citizen's P4K file via DataForge (components, ships, FPS items, missions, crafting…)",
+            "RSI Ship Matrix — official Roberts Space Industries API",
+            "RSI website — robertsspaceindustries.com (Galactapedia, Comm-links, Starmap, CTM)",
           ]}
         />
         <P>
-          Ces données sont utilisées dans un cadre strictement non commercial, à des fins communautaires
-          et éducatives, conformément à la politique de licence communautaire de Cloud Imperium Games.
+          This data is used for strictly non-commercial, community and educational purposes, in accordance
+          with Cloud Imperium Games' community license policy.
         </P>
         <P>
-          STARVIS ne revendique aucun droit de propriété sur ces contenus. Si Cloud Imperium Games souhaite
-          que certaines données soient retirées, nous nous y conformerons sans délai.
+          STARVIS makes no claim of ownership over this content. If Cloud Imperium Games requests the
+          removal of specific data, we will comply without delay.
         </P>
       </Section>
 
-      <Section title="Politique de confidentialité — RGPD">
-        <h3 className="text-slate-300 font-semibold text-xs uppercase tracking-wider">Responsable du traitement</h3>
+      <Section title="Privacy policy — GDPR">
+        <h3 className="text-slate-300 font-semibold text-xs uppercase tracking-wider">Data controller</h3>
         <P>
-          STARVIS est exploité par <span className="text-slate-200">ampynjord</span>. Pour toute question
-          relative à vos données personnelles, contactez :{' '}
+          STARVIS is operated by <span className="text-slate-200">ampynjord</span>. For any questions
+          regarding your personal data, contact:{' '}
           <a
             href="mailto:gwenvaelcaouissin@gmail.com"
             className="text-cyan-500 hover:text-cyan-300 underline underline-offset-2"
@@ -100,121 +100,121 @@ export default function LegalPage() {
         </P>
 
         <h3 className="text-slate-300 font-semibold text-xs uppercase tracking-wider pt-2">
-          Données collectées
+          Data collected
         </h3>
         <P>
-          Lors de l'inscription et de l'utilisation du service, les données suivantes peuvent être collectées :
+          The following data may be collected when you register and use the service:
         </P>
         <Ul
           items={[
-            "Adresse e-mail (identifiant de connexion)",
-            "Nom d’utilisateur (pseudo)",
-            "Mot de passe (stocké sous forme de hash bcrypt — jamais en clair)",
-            "Rôle utilisateur (user / beta_tester / admin)",
-            "URL d’avatar (optionnel)",
+            "Email address (login identifier)",
+            "Username (display name)",
+            "Password (stored as a bcrypt hash — never in plain text)",
+            "User role (user / beta_tester / admin)",
+            "Avatar URL (optional)",
           ]}
         />
-        <P>Aucune donnée de paiement n'est collectée. Le service est entièrement gratuit.</P>
+        <P>No payment data is collected. The service is entirely free.</P>
 
         <h3 className="text-slate-300 font-semibold text-xs uppercase tracking-wider pt-2">
-          Finalité du traitement
+          Purpose of processing
         </h3>
         <Ul
           items={[
-            'Authentification et gestion du compte utilisateur',
-            'Différenciation des accès (fonctionnalités beta)',
-            'Sécurité et prévention des abus',
+            "Authentication and user account management",
+            "Access differentiation (beta features)",
+            "Security and abuse prevention",
           ]}
         />
 
         <h3 className="text-slate-300 font-semibold text-xs uppercase tracking-wider pt-2">
-          Base légale
+          Legal basis
         </h3>
         <P>
-          Le traitement repose sur le consentement explicite recueilli lors de l'inscription (article 6(1)(a) du RGPD)
-          et sur l'exécution du contrat d'accès au service (article 6(1)(b) du RGPD).
+          Processing is based on the explicit consent collected at registration (GDPR article 6(1)(a))
+          and on the performance of the service access contract (GDPR article 6(1)(b)).
         </P>
 
         <h3 className="text-slate-300 font-semibold text-xs uppercase tracking-wider pt-2">
-          Durée de conservation
+          Retention period
         </h3>
         <P>
-          Les données sont conservées pendant toute la durée d'activité du compte. Un compte inactif depuis
-          plus de 2 ans peut être supprimé après notification par e-mail.
+          Data is retained for the duration of account activity. Accounts inactive for more than 2 years
+          may be deleted after email notification.
         </P>
 
         <h3 className="text-slate-300 font-semibold text-xs uppercase tracking-wider pt-2">
-          Vos droits
+          Your rights
         </h3>
         <P>
-          Conformément au RGPD, vous disposez des droits suivants sur vos données personnelles :
+          Under the GDPR, you have the following rights over your personal data:
         </P>
         <Ul
           items={[
-            "Droit d'accès — obtenir une copie de vos données",
-            "Droit de rectification — corriger des données inexactes",
-            "Droit à l'effacement — demander la suppression de votre compte et de vos données",
-            "Droit à la portabilité — recevoir vos données dans un format structuré",
-            "Droit d'opposition — vous opposer à certains traitements",
+            "Right of access — obtain a copy of your data",
+            "Right of rectification — correct inaccurate data",
+            "Right to erasure — request deletion of your account and data",
+            "Right to data portability — receive your data in a structured format",
+            "Right to object — object to certain processing activities",
           ]}
         />
         <P>
-          Le <span className="text-slate-300">droit à l'effacement</span> (suppression de compte) est directement
-          accessible depuis votre{' '}
+          The <span className="text-slate-300">right to erasure</span> (account deletion) is directly
+          available from your{' '}
           <a href="/profile" className="text-cyan-500 hover:text-cyan-300 underline underline-offset-2">
-            profil
+            profile
           </a>{' '}
-          (section "Zone de danger"). Pour les autres droits, contactez{' '}
+          (Danger zone section). For other rights, contact{' '}
           <a
             href="mailto:gwenvaelcaouissin@gmail.com"
             className="text-cyan-500 hover:text-cyan-300 underline underline-offset-2"
           >
             gwenvaelcaouissin@gmail.com
           </a>
-          . Vous disposez également du droit de saisir la{' '}
+          . You also have the right to lodge a complaint with the relevant supervisory authority (CNIL in
+          France:{' '}
           <a
             href="https://www.cnil.fr"
             target="_blank"
             rel="noreferrer"
             className="text-cyan-500 hover:text-cyan-300 underline underline-offset-2"
           >
-            CNIL
+            www.cnil.fr
           </a>
-          .
+          ).
         </P>
 
         <h3 className="text-slate-300 font-semibold text-xs uppercase tracking-wider pt-2">
-          Hébergement &amp; sous-traitants
+          Hosting &amp; sub-processors
         </h3>
         <P>
-          Les données sont hébergées sur un VPS situé dans l'Union Européenne. Aucune donnée personnelle
-          n'est transmise à des tiers à des fins commerciales.
+          Data is hosted on a VPS located within the European Union. No personal data is transferred to
+          third parties for commercial purposes.
         </P>
       </Section>
 
-      <Section title="Cookies &amp; Stockage local">
+      <Section title="Cookies &amp; Local storage">
         <P>
-          STARVIS utilise un cookie de session <span className="font-mono-sc text-slate-300">token</span>{' '}
-          (HttpOnly, Secure) pour maintenir votre connexion. Aucun cookie publicitaire ou de tracking
-          tiers n'est utilisé.
+          STARVIS uses a session cookie <span className="font-mono-sc text-slate-300">starvis_token</span>{' '}
+          (HttpOnly, Secure) to maintain your session. No advertising or third-party tracking cookies
+          are used.
         </P>
         <P>
-          Le choix d'environnement (LIVE/PTU) est mémorisé via{' '}
-          <span className="font-mono-sc text-slate-300">localStorage</span> sur votre appareil
-          uniquement.
+          Your environment choice (LIVE/PTU) is stored via{' '}
+          <span className="font-mono-sc text-slate-300">localStorage</span> on your device only.
         </P>
       </Section>
 
-      <Section title="Licence du code source">
+      <Section title="Source code license">
         <P>
-          Le code source de STARVIS est distribué sous licence{' '}
-          <span className="text-slate-200">MIT</span>. Vous êtes libre de l'utiliser, le modifier et le
-          redistribuer à condition de conserver les mentions de copyright et l'avis de propriété
-          intellectuelle de Cloud Imperium Games inclus dans le fichier LICENSE.
+          The STARVIS source code is distributed under the{' '}
+          <span className="text-slate-200">MIT license</span>. You are free to use, modify and
+          redistribute it provided you retain the copyright notices and the Cloud Imperium Games
+          intellectual property notice included in the LICENSE file.
         </P>
         <P>
-          La licence MIT s'applique au code uniquement — elle ne couvre pas les données ou contenus
-          appartenant à Cloud Imperium Games.
+          The MIT license applies to the code only — it does not cover data or content owned by
+          Cloud Imperium Games.
         </P>
       </Section>
     </div>

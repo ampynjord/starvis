@@ -1,22 +1,22 @@
 /**
- * ChatService — IA Starvis, Mistral AI avec tool use exhaustif.
+ * ChatService — Starvis AI, Mistral AI with exhaustive tool use.
  *
- * Couverture DB complète (schémas game + rsi + meta) :
- *   Ships / Ground / Gravlev — stats complètes, loadout, hardpoints, variants
- *   Components              — armes, boucliers, thrusters, QD, coolers…
- *   Items                   — armures, casques, armes FPS, gadgets
- *   Crafting                — recettes, ingrédients, slot modifiers
- *   Mining                  — éléments, compositions rocheuses
- *   Missions                — types, factions, récompenses
- *   Locations               — planètes, lunes, stations, avant-postes
- *   Commodities             — matières premières, prix d'achat/vente
- *   Trade routes            — meilleurs itinéraires de commerce
- *   Shops                   — inventaires
- *   Manufacturers           — constructeurs
- *   Ship Matrix (RSI)       — données officielles RSI (dimensions, prix, lore)
- *   Galactapedia            — lore RSI
- *   Comm-links              — communications CIG
- *   Starmap                 — systèmes stellaires
+ * Full DB coverage (game + rsi + meta schemas):
+ *   Ships / Ground / Gravlev — full stats, loadout, hardpoints, variants
+ *   Components              — weapons, shields, thrusters, QD, coolers…
+ *   Items                   — armor, helmets, FPS weapons, gadgets
+ *   Crafting                — recipes, ingredients, slot modifiers
+ *   Mining                  — elements, rock compositions
+ *   Missions                — types, factions, rewards
+ *   Locations               — planets, moons, stations, outposts
+ *   Commodities             — raw materials, buy/sell prices
+ *   Trade routes            — best trade itineraries
+ *   Shops                   — inventories
+ *   Manufacturers           — ship manufacturers
+ *   Ship Matrix (RSI)       — official RSI data (dimensions, prices, lore)
+ *   Galactapedia            — RSI lore
+ *   Comm-links              — CIG communications
+ *   Starmap                 — star systems
  */
 
 import type { PrismaLike } from '@starvis/db';
@@ -35,55 +35,55 @@ export interface ChatMessage {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// System Prompt — expert Star Citizen + guide d'utilisation des outils
+// System Prompt — Star Citizen expert + tool usage guide
 // ─────────────────────────────────────────────────────────────────────────────
 
-const SYSTEM_PROMPT = `Tu es Starvis, l'IA officielle de la base de données Starvis — données extraites directement du jeu Star Citizen (version LIVE).
+const SYSTEM_PROMPT = `You are Starvis, the official AI of the Starvis database — data extracted directly from Star Citizen (LIVE version).
 
-## Langue
-Réponds en **français** par défaut. Adapte-toi à la langue de l'utilisateur.
+## Language
+Respond in **English** by default. Adapt to the user's language if they write in another language.
 
-## Règle absolue
-Pour toute question sur Star Citizen, **utilise toujours un outil** pour interroger la base avant de répondre. Ne jamais inventer de statistiques.
+## Absolute rule
+For any Star Citizen question, **always use a tool** to query the database before answering. Never invent statistics.
 
 ---
 
-## Données disponibles & champs importants
+## Available data & important fields
 
-### Vaisseaux (schema game, table ships)
-Identité : uuid, class_name, name, manufacturer_code, manufacturer_name, career, role, vehicle_category (ship/ground/gravlev), variant_type, production_status, short_name
-Physique : mass (kg), total_hp, size_x (largeur m), size_y (longueur m), size_z (hauteur m)
-Vol : scm_speed (m/s), max_speed (m/s), boost_speed_forward, boost_speed_backward, pitch_max, yaw_max, roll_max (degrés/s), boost_ramp_up/down (s)
-Ressources : hydrogen_fuel_capacity (L), quantum_fuel_capacity (L), cargo_capacity (SCU), crew_size
-Combat : shield_hp (HP total boucliers), weapon_damage_total (DPS armes), missile_damage_total (dégâts missiles)
-Armure : armor_physical, armor_energy, armor_distortion, armor_hp, armor_phys_resist, armor_energy_resist
-Signatures : armor_signal_ir (chaleur), armor_signal_em (électromagnétique), armor_signal_cs (cross-section)
-Assurance : insurance_claim_time (min), insurance_expedite_cost (aUEC)
-RSI : ship_matrix_id, thumbnail, production_status (Flight Ready / In Production / In Concept), store_url, min_crew, max_crew, sm_description
+### Ships (schema game, table ships)
+Identity: uuid, class_name, name, manufacturer_code, manufacturer_name, career, role, vehicle_category (ship/ground/gravlev), variant_type, production_status, short_name
+Physical: mass (kg), total_hp, size_x (width m), size_y (length m), size_z (height m)
+Flight: scm_speed (m/s), max_speed (m/s), boost_speed_forward, boost_speed_backward, pitch_max, yaw_max, roll_max (deg/s), boost_ramp_up/down (s)
+Resources: hydrogen_fuel_capacity (L), quantum_fuel_capacity (L), cargo_capacity (SCU), crew_size
+Combat: shield_hp (total shield HP), weapon_damage_total (weapons DPS), missile_damage_total (missile damage)
+Armor: armor_physical, armor_energy, armor_distortion, armor_hp, armor_phys_resist, armor_energy_resist
+Signatures: armor_signal_ir (heat), armor_signal_em (electromagnetic), armor_signal_cs (cross-section)
+Insurance: insurance_claim_time (min), insurance_expedite_cost (aUEC)
+RSI: ship_matrix_id, thumbnail, production_status (Flight Ready / In Production / In Concept), store_url, min_crew, max_crew, sm_description
 
-### Stats agrégées du loadout (via get_ship_full_stats)
-weapons_dps_total, weapons_alpha_total, shield_capacity_total, shield_regen_total, shield_faces, power_output_total, heat_dissipation_total, qd_range (AU), qd_speed (m/s), qd_cooldown (s), countermeasure_count, missile_damage_total, hardpoints (liste des emplacements)
+### Aggregated loadout stats (via get_ship_full_stats)
+weapons_dps_total, weapons_alpha_total, shield_capacity_total, shield_regen_total, shield_faces, power_output_total, heat_dissipation_total, qd_range (AU), qd_speed (m/s), qd_cooldown (s), countermeasure_count, missile_damage_total, hardpoints (slot list)
 
-### Composants (schema game, table components)
-uuid, name, class_name, type (WeaponGun/Shield/PowerPlant/Cooler/QuantumDrive/Countermeasure/Missile/Radar/MainThruster/ManoThrust…), sub_type, size (1-10), grade (1-4, A=meilleur), manufacturer_code, mass
-Armes : fire_rate (coups/min), ammo_speed (m/s), ammo_lifetime (s), range (m), dmg_physical, dmg_energy, dmg_distortion, dmg_thermal, dmg_biochemical, burst_dps, sustained_dps, alpha_damage
-Boucliers : shield_capacity, shield_regen, face_coverage (faces protégées)
-QD : qd_range (AU), qd_speed (m/s), qd_cooldown (s), qd_fuel_rate
-Power plants : power_output
-Coolers : cooling_rate
+### Components (schema game, table components)
+uuid, name, class_name, type (WeaponGun/Shield/PowerPlant/Cooler/QuantumDrive/Countermeasure/Missile/Radar/MainThruster/ManoThrust…), sub_type, size (1-10), grade (1-4, A=best), manufacturer_code, mass
+Weapons: fire_rate (shots/min), ammo_speed (m/s), ammo_lifetime (s), range (m), dmg_physical, dmg_energy, dmg_distortion, dmg_thermal, dmg_biochemical, burst_dps, sustained_dps, alpha_damage
+Shields: shield_capacity, shield_regen, face_coverage (protected faces)
+QD: qd_range (AU), qd_speed (m/s), qd_cooldown (s), qd_fuel_rate
+Power plants: power_output
+Coolers: cooling_rate
 
 ### Items (schema game, table items)
 uuid, name, class_name, type (Char_Armor_Torso/Char_Helmet/WeaponPersonal/FoodProduct…), sub_type, manufacturer_code, mass
-Armures FPS : armor_physical, armor_energy, armor_distortion, armor_signal_ir, armor_signal_em
+FPS armor: armor_physical, armor_energy, armor_distortion, armor_signal_ir, armor_signal_em
 
 ### Crafting (schema game, table crafting_recipes)
 uuid, name, output_item_name, output_item_uuid, category, station_type, craft_time (s), quantity_produced, schematic_uuid
-Ingrédients : item_name, quantity, is_optional, scu
-Slot modifiers : slot_name, property_name, start_quality, end_quality, modifier_at_start, modifier_at_end
+Ingredients: item_name, quantity, is_optional, scu
+Slot modifiers: slot_name, property_name, start_quality, end_quality, modifier_at_start, modifier_at_end
 
 ### Mining (schema game)
-Éléments : uuid, name, description, instability, resistance, mass, inert_material
-Compositions rocheuses : liste d'éléments avec pourcentages
+Elements: uuid, name, description, instability, resistance, mass, inert_material
+Rock compositions: list of elements with percentages
 
 ### Missions (schema game, table missions)
 uuid, name, type, faction, system_name, category, danger_level (1-5), completion_time_secs, reward_min, reward_max, required_reputation, reputation_reward, base_xp
@@ -92,19 +92,19 @@ uuid, name, type, faction, system_name, category, danger_level (1-5), completion
 uuid, name, type (Planet/Moon/Station/Outpost/City/LagrangePoint…), system, parent_name, has_shops, has_landing_zone, has_refuel, has_restock, has_repair
 
 ### Commodities (schema game, table commodities)
-uuid, name, type, description, occupancy_scu (SCU par unité), is_illegal, is_volatile
+uuid, name, type, description, occupancy_scu (SCU per unit), is_illegal, is_volatile
 
-### Prix de commodités (schema game, table commodity_prices)
-buy_price (aUEC/unité), sell_price, stock, demand, shop_name, system, city
+### Commodity prices (schema game, table commodity_prices)
+buy_price (aUEC/unit), sell_price, stock, demand, shop_name, system, city
 
-### Trade routes (calculées à la volée)
-commodity_name, buy_price, buy_shop, buy_system, sell_price, sell_shop, sell_system, profit_per_unit, profit_per_scu, total_profit (pour N SCU)
+### Trade routes (calculated on the fly)
+commodity_name, buy_price, buy_shop, buy_system, sell_price, sell_shop, sell_system, profit_per_unit, profit_per_scu, total_profit (for N SCU)
 
-### Ship Matrix RSI (schema rsi, table ship_matrix)
-name, manufacturer_code, manufacturer_name, length, beam, height, mass, cargo_capacity, min_crew, max_crew, scm_speed, afterburner_speed, pitch_max, yaw_max, roll_max, price_usd, price_uec (prix ingame), production_status, description, url
+### RSI Ship Matrix (schema rsi, table ship_matrix)
+name, manufacturer_code, manufacturer_name, length, beam, height, mass, cargo_capacity, min_crew, max_crew, scm_speed, afterburner_speed, pitch_max, yaw_max, roll_max, price_usd, price_uec (in-game price), production_status, description, url
 
 ### Galactapedia (schema rsi)
-id, title, content (texte lore), category, tags
+id, title, content (lore text), category, tags
 
 ### Comm-links (schema rsi)
 id, title, content, url, published_at, category
@@ -114,48 +114,48 @@ id, code, name, type, description, affiliation
 
 ---
 
-## Calculs courants
+## Common calculations
 
-**DPS d'une arme** = burst_dps (rafale) ou sustained_dps (soutenu) — déjà calculés en DB
-**DPS total vaisseau** = weapon_damage_total (déjà calculé via loadout)
-**Portée effective d'une arme** = ammo_speed × ammo_lifetime (en mètres)
-**Profit trade** = (sell_price - buy_price) × scu_quantity / occupancy_scu
-**Ratio SCU/budget** = budget / buy_price = SCU max achetables
-**Autonomie QD** = quantum_fuel_capacity / qd_fuel_rate (en AU)
+**Weapon DPS** = burst_dps (burst fire) or sustained_dps (sustained) — already computed in DB
+**Total ship DPS** = weapon_damage_total (already computed via loadout)
+**Effective weapon range** = ammo_speed × ammo_lifetime (in meters)
+**Trade profit** = (sell_price - buy_price) × scu_quantity / occupancy_scu
+**SCU/budget ratio** = budget / buy_price = max purchasable SCU
+**QD range** = quantum_fuel_capacity / qd_fuel_rate (in AU)
 
 ---
 
-## Noms de vaisseaux avec fabricant
+## Ship names with manufacturer
 
-Quand l'utilisateur mentionne un vaisseau avec son fabricant, passe le code constructeur dans le paramètre manufacturer et le modèle seul dans query :
+When the user mentions a ship with its manufacturer, pass the manufacturer code in the manufacturer parameter and only the model in query:
 - "Anvil Arrow" → manufacturer: "ANVL", query: "Arrow"
 - "Origin 300i" → manufacturer: "ORIG", query: "300i"
 - "Drake Cutlass Black" → manufacturer: "DRAK", query: "Cutlass Black"
 - "RSI Constellation Andromeda" → manufacturer: "RSI", query: "Constellation Andromeda"
 
-Si tu ne connais pas le code constructeur, passe juste le modèle dans query sans le nom du fabricant.
+If you don't know the manufacturer code, just pass the model in query without the manufacturer name.
 
-## Stratégie d'utilisation des outils
+## Tool usage strategy
 
-1. Question vaisseau → search_ships (liste) puis get_ship_details (stats brutes) et/ou get_ship_full_stats (loadout agrégé)
-2. Comparer des vaisseaux → search_ships pour chacun puis get_ship_full_stats
-3. Meilleure arme d'un calibre → search_components avec type+size, trier par sustained_dps
-4. Route commerciale → find_trade_routes
-5. Prix d'une commodité → get_commodity_prices
-6. Recette de craft → search_crafting puis get_recipe_details
-7. Lore / histoire → search_galactapedia ou search_comm_links
-8. Où acheter un item → search_shops
-9. Variants d'un vaisseau → get_ship_variants
+1. Ship question → search_ships (list) then get_ship_details (raw stats) and/or get_ship_full_stats (aggregated loadout)
+2. Compare ships → search_ships for each then get_ship_full_stats
+3. Best weapon of a given size → search_components with type+size, sort by sustained_dps
+4. Trade route → find_trade_routes
+5. Commodity price → get_commodity_prices
+6. Crafting recipe → search_crafting then get_recipe_details
+7. Lore / history → search_galactapedia or search_comm_links
+8. Where to buy an item → search_shops
+9. Ship variants → get_ship_variants
 
-## Formatage des réponses
+## Response formatting
 
-- **Gras** pour les chiffres clés et noms importants.
-- **Listes à puces** pour énumérer.
-- **Tableaux** : utilise TOUJOURS des blocs de code (triple backtick) pour les tableaux — jamais la syntaxe pipe/markdown qui ne s'affiche pas correctement sur Discord et l'interface web. Exemple de rendu attendu dans un bloc code :
-  Vaisseau      | SCM   | Cargo
+- **Bold** for key figures and important names.
+- **Bullet lists** for enumerations.
+- **Tables**: ALWAYS use code blocks (triple backtick) for tables — never pipe/markdown syntax which doesn't render correctly on Discord and the web UI. Expected rendering in a code block:
+  Ship          | SCM   | Cargo
   Carrack       | 120   | 456 SCU
   Constellation | 185   | 96 SCU
-- Réponds de façon **concise** : pas de section inutile si l'info tient en quelques lignes.`;
+- Respond **concisely**: no unnecessary section if the info fits in a few lines.`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tool definitions
@@ -167,18 +167,18 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'search_ships',
-      description: 'Recherche des vaisseaux, véhicules terrestres ou gravlev. Retourne les stats de base de plusieurs résultats.',
+      description: 'Search ships, ground vehicles or gravlev. Returns basic stats for multiple results.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Nom partiel du vaisseau' },
-          manufacturer: { type: 'string', description: 'Code constructeur (ORIG, ANVL, RSI, CRUS, DRAK, MISC, BANU, XI-AN, VANDUL…)' },
+          query: { type: 'string', description: 'Partial ship name' },
+          manufacturer: { type: 'string', description: 'Manufacturer code (ORIG, ANVL, RSI, CRUS, DRAK, MISC, BANU, XI-AN, VANDUL…)' },
           category: { type: 'string', description: '"ship" | "ground" | "gravlev"' },
-          role: { type: 'string', description: 'Rôle (fighter, bomber, mining, cargo, exploration, stealth, support…)' },
-          career: { type: 'string', description: 'Carrière (Combat, Transport, Exploration, Industrial, Support…)' },
-          env: { type: 'string', description: '"live" (défaut) | "ptu"' },
-          limit: { type: 'number', description: 'Max résultats (défaut 10, max 20)' },
-          sort: { type: 'string', description: 'Champ de tri (scm_speed, cargo_capacity, shield_hp, mass…)' },
+          role: { type: 'string', description: 'Role (fighter, bomber, mining, cargo, exploration, stealth, support…)' },
+          career: { type: 'string', description: 'Career (Combat, Transport, Exploration, Industrial, Support…)' },
+          env: { type: 'string', description: '"live" (default) | "ptu"' },
+          limit: { type: 'number', description: 'Max results (default 10, max 20)' },
+          sort: { type: 'string', description: 'Sort field (scm_speed, cargo_capacity, shield_hp, mass…)' },
           order: { type: 'string', description: '"asc" | "desc"' },
         },
         required: [],
@@ -190,11 +190,11 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: 'get_ship_details',
       description:
-        "Stats complètes d'un vaisseau spécifique (données brutes jeu + RSI). Inclut toutes les colonnes : vitesses, HP, cargo, armure, signaux, assurance.",
+        'Full stats of a specific ship (raw game data + RSI). Includes all columns: speeds, HP, cargo, armor, signals, insurance.',
       parameters: {
         type: 'object',
         properties: {
-          name: { type: 'string', description: 'Nom exact ou partiel du vaisseau (ex: "Carrack", "Constellation Andromeda")' },
+          name: { type: 'string', description: 'Exact or partial ship name (e.g. "Carrack", "Constellation Andromeda")' },
           env: { type: 'string', description: '"live" | "ptu"' },
         },
         required: ['name'],
@@ -206,11 +206,11 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: 'get_ship_full_stats',
       description:
-        "Stats agrégées du loadout d'un vaisseau : DPS total, capacité de bouclier totale, puissance, refroidissement, portée QD, liste des hardpoints. UTILISER pour comparer les performances de combat ou de vol.",
+        'Aggregated loadout stats for a ship: total DPS, total shield capacity, power, cooling, QD range, hardpoint list. USE to compare combat or flight performance.',
       parameters: {
         type: 'object',
         properties: {
-          name: { type: 'string', description: 'Nom du vaisseau' },
+          name: { type: 'string', description: 'Ship name' },
           env: { type: 'string', description: '"live" | "ptu"' },
         },
         required: ['name'],
@@ -222,11 +222,11 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: 'get_ship_loadout',
       description:
-        "Liste détaillée de tous les hardpoints d'un vaisseau et les composants actuellement équipés (type, taille, nom, stats).",
+        'Detailed list of all hardpoints on a ship and the currently equipped components (type, size, name, stats).',
       parameters: {
         type: 'object',
         properties: {
-          name: { type: 'string', description: 'Nom du vaisseau' },
+          name: { type: 'string', description: 'Ship name' },
           env: { type: 'string', description: '"live" | "ptu"' },
         },
         required: ['name'],
@@ -237,11 +237,11 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_ship_variants',
-      description: "Liste tous les variants d'un vaisseau (même châssis, rôles différents). Ex: Cutlass Black/Blue/Red/Steel.",
+      description: 'Lists all variants of a ship (same chassis, different roles). E.g. Cutlass Black/Blue/Red/Steel.',
       parameters: {
         type: 'object',
         properties: {
-          name: { type: 'string', description: 'Nom du vaisseau de base' },
+          name: { type: 'string', description: 'Base ship name' },
           env: { type: 'string', description: '"live" | "ptu"' },
         },
         required: ['name'],
@@ -253,11 +253,11 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: 'get_ship_matrix',
       description:
-        "Données officielles RSI d'un vaisseau : dimensions officielles, prix ($USD et aUEC), lore, statut de production, description officielle.",
+        'Official RSI data for a ship: official dimensions, prices ($USD and aUEC), lore, production status, official description.',
       parameters: {
         type: 'object',
         properties: {
-          name: { type: 'string', description: 'Nom du vaisseau' },
+          name: { type: 'string', description: 'Ship name' },
         },
         required: ['name'],
       },
@@ -268,11 +268,11 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: 'compare_ships',
       description:
-        'Compare 2 à 4 vaisseaux côte-à-côte : stats brutes ET stats agrégées du loadout (DPS, boucliers, QD). UTILISER en priorité pour toute demande de comparaison — évite plusieurs appels séparés.',
+        'Compare 2 to 4 ships side-by-side: raw stats AND aggregated loadout stats (DPS, shields, QD). USE as first choice for any comparison request — avoids multiple separate calls.',
       parameters: {
         type: 'object',
         properties: {
-          names: { type: 'array', items: { type: 'string' }, description: 'Liste des noms de vaisseaux à comparer (2-4)' },
+          names: { type: 'array', items: { type: 'string' }, description: 'List of ship names to compare (2-4)' },
           env: { type: 'string', description: '"live" | "ptu"' },
         },
         required: ['names'],
@@ -284,23 +284,23 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'search_components',
-      description: 'Recherche des composants vaisseau. Retourne stats détaillées (DPS, portée, capacité bouclier, output power…).',
+      description: 'Search ship components. Returns detailed stats (DPS, range, shield capacity, power output…).',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Nom du composant' },
+          query: { type: 'string', description: 'Component name' },
           type: {
             type: 'string',
             description:
-              'Type : WeaponGun | Shield | PowerPlant | Cooler | QuantumDrive | Countermeasure | Missile | Radar | MainThruster | ManoThrust | EMP | QuantumInterdictionGenerator',
+              'Type: WeaponGun | Shield | PowerPlant | Cooler | QuantumDrive | Countermeasure | Missile | Radar | MainThruster | ManoThrust | EMP | QuantumInterdictionGenerator',
           },
-          size: { type: 'number', description: 'Taille 1-10' },
-          grade: { type: 'number', description: 'Grade 1-4 (4=grade A, meilleur)' },
-          manufacturer: { type: 'string', description: 'Code constructeur' },
+          size: { type: 'number', description: 'Size 1-10' },
+          grade: { type: 'number', description: 'Grade 1-4 (4=grade A, best)' },
+          manufacturer: { type: 'string', description: 'Manufacturer code' },
           env: { type: 'string', description: '"live" | "ptu"' },
-          sort: { type: 'string', description: 'Tri : sustained_dps, burst_dps, shield_capacity, qd_range, power_output…' },
-          order: { type: 'string', description: '"asc" | "desc" (défaut desc)' },
-          limit: { type: 'number', description: 'Max résultats (défaut 15)' },
+          sort: { type: 'string', description: 'Sort: sustained_dps, burst_dps, shield_capacity, qd_range, power_output…' },
+          order: { type: 'string', description: '"asc" | "desc" (default desc)' },
+          limit: { type: 'number', description: 'Max results (default 15)' },
         },
         required: [],
       },
@@ -311,18 +311,18 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'search_items',
-      description: 'Recherche items FPS : armures, casques, armes, gadgets, nourriture, équipements médicaux…',
+      description: 'Search FPS items: armor, helmets, weapons, gadgets, food, medical equipment…',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: "Nom de l'item" },
+          query: { type: 'string', description: 'Item name' },
           type: {
             type: 'string',
             description:
-              'Type : Char_Armor_Torso | Char_Armor_Legs | Char_Armor_Arms | Char_Helmet | Char_Armor_Backpack | WeaponPersonal | FoodProduct | MedicalDevice…',
+              'Type: Char_Armor_Torso | Char_Armor_Legs | Char_Armor_Arms | Char_Helmet | Char_Armor_Backpack | WeaponPersonal | FoodProduct | MedicalDevice…',
           },
           env: { type: 'string', description: '"live" | "ptu"' },
-          limit: { type: 'number', description: 'Max résultats (défaut 15)' },
+          limit: { type: 'number', description: 'Max results (default 15)' },
         },
         required: [],
       },
@@ -333,14 +333,14 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'search_crafting',
-      description: 'Recherche de recettes de craft. Retourne nom, catégorie, station, temps de craft, quantité produite.',
+      description: 'Search crafting recipes. Returns name, category, station, craft time, quantity produced.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: "Nom de la recette ou de l'item craftable" },
-          category: { type: 'string', description: 'Catégorie de craft' },
+          query: { type: 'string', description: 'Recipe name or craftable item name' },
+          category: { type: 'string', description: 'Craft category' },
           env: { type: 'string', description: '"live" | "ptu"' },
-          limit: { type: 'number', description: 'Max résultats (défaut 10)' },
+          limit: { type: 'number', description: 'Max results (default 10)' },
         },
         required: [],
       },
@@ -351,11 +351,11 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: 'get_recipe_details',
       description:
-        "Détails complets d'une recette de craft : ingrédients (quantités, optionnels), slot modifiers (qualité, modificateurs), station requise.",
+        'Full details of a crafting recipe: ingredients (quantities, optional), slot modifiers (quality, modifiers), required station.',
       parameters: {
         type: 'object',
         properties: {
-          name: { type: 'string', description: 'Nom exact de la recette' },
+          name: { type: 'string', description: 'Exact recipe name' },
           env: { type: 'string', description: '"live" | "ptu"' },
         },
         required: ['name'],
@@ -367,11 +367,11 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'search_mining',
-      description: 'Recherche des éléments minables : instabilité, résistance, masse, matière inerte.',
+      description: 'Search minable elements: instability, resistance, mass, inert material.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: "Nom de l'élément (Quantanium, Laranite, Bexalite, Taranite…)" },
+          query: { type: 'string', description: 'Element name (Quantanium, Laranite, Bexalite, Taranite…)' },
           env: { type: 'string', description: '"live" | "ptu"' },
         },
         required: [],
@@ -383,15 +383,15 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'search_missions',
-      description: 'Recherche de missions : type, faction, danger, récompenses aUEC et XP, réputation requise.',
+      description: 'Search missions: type, faction, danger, aUEC and XP rewards, required reputation.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Nom ou type de mission' },
+          query: { type: 'string', description: 'Mission name or type' },
           faction: { type: 'string', description: 'Faction (Crusader Security, Advocacy, Nine Tails, Violent Nomad…)' },
-          type: { type: 'string', description: 'Type de mission' },
+          type: { type: 'string', description: 'Mission type' },
           env: { type: 'string', description: '"live" | "ptu"' },
-          limit: { type: 'number', description: 'Max résultats (défaut 10)' },
+          limit: { type: 'number', description: 'Max results (default 10)' },
         },
         required: [],
       },
@@ -403,15 +403,15 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: 'search_locations',
       description:
-        'Recherche de lieux in-game : planètes, lunes, stations, avant-postes, villes. Indique si ravitaillement/réparations/atterrissage disponibles.',
+        'Search in-game locations: planets, moons, stations, outposts, cities. Indicates if refuel/repair/landing available.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Nom du lieu' },
-          type: { type: 'string', description: 'Type : Planet | Moon | Station | Outpost | City | LagrangePoint | JumpPoint' },
-          system: { type: 'string', description: 'Système stellaire (Stanton, Pyro, Nyx…)' },
+          query: { type: 'string', description: 'Location name' },
+          type: { type: 'string', description: 'Type: Planet | Moon | Station | Outpost | City | LagrangePoint | JumpPoint' },
+          system: { type: 'string', description: 'Star system (Stanton, Pyro, Nyx…)' },
           env: { type: 'string', description: '"live" | "ptu"' },
-          limit: { type: 'number', description: 'Max résultats (défaut 15)' },
+          limit: { type: 'number', description: 'Max results (default 15)' },
         },
         required: [],
       },
@@ -422,14 +422,14 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'search_commodities',
-      description: 'Recherche de commodités échangeables : type, SCU/unité, légalité.',
+      description: 'Search tradeable commodities: type, SCU/unit, legality.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Nom de la commodité' },
-          type: { type: 'string', description: 'Type de commodité' },
+          query: { type: 'string', description: 'Commodity name' },
+          type: { type: 'string', description: 'Commodity type' },
           env: { type: 'string', description: '"live" | "ptu"' },
-          limit: { type: 'number', description: 'Max résultats (défaut 15)' },
+          limit: { type: 'number', description: 'Max results (default 15)' },
         },
         required: [],
       },
@@ -440,11 +440,11 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: 'get_commodity_prices',
       description:
-        "Prix d'achat et de vente d'une commodité dans tous les shops. Utile pour identifier où acheter au meilleur prix ou vendre le plus cher.",
+        'Buy and sell prices for a commodity across all shops. Useful to find where to buy at the best price or sell for the most.',
       parameters: {
         type: 'object',
         properties: {
-          name: { type: 'string', description: 'Nom de la commodité (ex: "Quantanium", "Medical Supplies")' },
+          name: { type: 'string', description: 'Commodity name (e.g. "Quantanium", "Medical Supplies")' },
           env: { type: 'string', description: '"live" | "ptu"' },
         },
         required: ['name'],
@@ -455,16 +455,16 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'find_trade_routes',
-      description: 'Calcule les meilleures routes commerciales selon ton SCU et budget. Retourne profit/unité, profit/SCU et profit total.',
+      description: 'Calculates the best trade routes based on SCU and budget. Returns profit/unit, profit/SCU and total profit.',
       parameters: {
         type: 'object',
         properties: {
-          scu: { type: 'number', description: 'Capacité cargo disponible en SCU' },
-          budget: { type: 'number', description: "Budget d'achat en aUEC (optionnel)" },
-          commodity: { type: 'string', description: 'Filtrer sur une commodité spécifique (optionnel)' },
-          buy_system: { type: 'string', description: "Système d'achat (Stanton, Pyro…)" },
-          sell_system: { type: 'string', description: 'Système de vente' },
-          limit: { type: 'number', description: 'Nombre de routes retournées (défaut 10)' },
+          scu: { type: 'number', description: 'Available cargo capacity in SCU' },
+          budget: { type: 'number', description: 'Purchase budget in aUEC (optional)' },
+          commodity: { type: 'string', description: 'Filter on a specific commodity (optional)' },
+          buy_system: { type: 'string', description: 'Purchase system (Stanton, Pyro…)' },
+          sell_system: { type: 'string', description: 'Sell system' },
+          limit: { type: 'number', description: 'Number of routes returned (default 10)' },
           env: { type: 'string', description: '"live" | "ptu"' },
         },
         required: ['scu'],
@@ -475,14 +475,14 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'search_shops',
-      description: 'Recherche des magasins (shops) et leur inventaire. Utile pour savoir où acheter un item ou composant.',
+      description: 'Search shops and their inventory. Useful to find where to buy an item or component.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Nom du shop ou de la location' },
-          system: { type: 'string', description: 'Système stellaire' },
+          query: { type: 'string', description: 'Shop name or location name' },
+          system: { type: 'string', description: 'Star system' },
           env: { type: 'string', description: '"live" | "ptu"' },
-          limit: { type: 'number', description: 'Max résultats (défaut 10)' },
+          limit: { type: 'number', description: 'Max results (default 10)' },
         },
         required: [],
       },
@@ -494,13 +494,13 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     function: {
       name: 'search_galactapedia',
       description:
-        "Recherche dans la Galactapedia RSI : articles de lore sur les races, factions, lieux, vaisseaux, histoire de l'univers Star Citizen.",
+        'Search RSI Galactapedia: lore articles on races, factions, locations, ships, Star Citizen universe history.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Sujet à rechercher' },
-          category: { type: 'string', description: 'Catégorie Galactapedia' },
-          limit: { type: 'number', description: 'Max résultats (défaut 5)' },
+          query: { type: 'string', description: 'Subject to search' },
+          category: { type: 'string', description: 'Galactapedia category' },
+          limit: { type: 'number', description: 'Max results (default 5)' },
         },
         required: ['query'],
       },
@@ -510,12 +510,12 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'search_comm_links',
-      description: 'Recherche dans les Comm-links CIG : annonces officielles, lettres des fondateurs, notes de patch, lore.',
+      description: 'Search CIG Comm-links: official announcements, letters from the chairman, patch notes, lore.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Sujet à rechercher' },
-          limit: { type: 'number', description: 'Max résultats (défaut 5)' },
+          query: { type: 'string', description: 'Subject to search' },
+          limit: { type: 'number', description: 'Max results (default 5)' },
         },
         required: ['query'],
       },
@@ -525,12 +525,12 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'search_starmap',
-      description: 'Recherche des systèmes stellaires dans la Starmap RSI : description, affiliation, type.',
+      description: 'Search star systems in RSI Starmap: description, affiliation, type.',
       parameters: {
         type: 'object',
         properties: {
-          query: { type: 'string', description: 'Nom du système (Stanton, Pyro, Terra, Magnus…)' },
-          limit: { type: 'number', description: 'Max résultats (défaut 5)' },
+          query: { type: 'string', description: 'System name (Stanton, Pyro, Terra, Magnus…)' },
+          limit: { type: 'number', description: 'Max results (default 5)' },
         },
         required: [],
       },
@@ -541,7 +541,7 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_manufacturers',
-      description: 'Liste tous les constructeurs avec leur code, nom et nombre de vaisseaux.',
+      description: 'Lists all manufacturers with their code, name and ship count.',
       parameters: {
         type: 'object',
         properties: {
@@ -551,31 +551,31 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
       },
     },
   },
-  // ── DB brute ─────────────────────────────────────────────────────────────
+  // ── Raw DB ───────────────────────────────────────────────────────────────
   {
     type: 'function',
     function: {
       name: 'query_database',
-      description: `Exécute une requête SQL SELECT libre sur la base de données du jeu.
-Utilise cet outil pour des agrégations complexes, classements, statistiques croisées ou toute requête non couverte par les autres outils.
-Schémas disponibles : game, rsi.
-Tables principales :
+      description: `Executes a free SELECT SQL query on the game database.
+Use this tool for complex aggregations, rankings, cross-statistics or any query not covered by other tools.
+Available schemas: game, rsi.
+Main tables:
   game.ships, game.components, game.items, game.missions, game.locations,
   game.commodities, game.commodity_prices, game.crafting_recipes, game.crafting_ingredients,
   game.ship_loadouts, game.ship_paints, game.shops, game.shop_inventory, game.manufacturers,
   rsi.ship_matrix, rsi.galactapedia, rsi.comm_links, rsi.starmap
-Uniquement SELECT. Utilise $1, $2… pour les paramètres.`,
+SELECT only. Use $1, $2… for parameters.`,
       parameters: {
         type: 'object',
         properties: {
           sql: {
             type: 'string',
-            description: 'Requête SELECT SQL paramétrée (pas de INSERT/UPDATE/DELETE)',
+            description: 'Parameterized SELECT SQL query (no INSERT/UPDATE/DELETE)',
           },
           params: {
             type: 'array',
             items: { type: ['string', 'number', 'boolean'] },
-            description: 'Paramètres de la requête ($1, $2…)',
+            description: 'Query parameters ($1, $2…)',
           },
         },
         required: ['sql'],
@@ -589,9 +589,9 @@ Uniquement SELECT. Utilise $1, $2… pour les paramètres.`,
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Convertit les tableaux markdown pipe (| col | col |) en blocs de code,
- * qui s'affichent correctement sur Discord et dans les embeds web.
- * Les tableaux déjà dans un bloc de code existant sont ignorés.
+ * Converts pipe markdown tables (| col | col |) to code blocks,
+ * which render correctly on Discord and web embeds.
+ * Tables already inside an existing code block are ignored.
  */
 function wrapTablesInCodeBlock(text: string): string {
   const lines = text.split('\n');
@@ -600,7 +600,7 @@ function wrapTablesInCodeBlock(text: string): string {
   let inTable = false;
 
   for (const line of lines) {
-    // Suivi des blocs de code existants
+    // Track existing code blocks
     if (/^\s*```/.test(line)) {
       if (inTable) {
         inTable = false;
@@ -624,7 +624,7 @@ function wrapTablesInCodeBlock(text: string): string {
       inTable = false;
       out.push('```');
     }
-    // Nettoie le gras (**text**) à l'intérieur des cellules de tableau
+    // Strip bold (**text**) inside table cells
     out.push(inTable ? line.replace(/\*\*(.*?)\*\*/g, '$1') : line);
   }
   if (inTable) out.push('```');
@@ -665,7 +665,7 @@ export class ChatService {
     return { uuid: ship.uuid as string, data: ship };
   }
 
-  /** Supprime les champs lourds inutiles pour le LLM (blobs, URLs longues, JSON brut) */
+  /** Strips heavy fields unused by the LLM (blobs, long URLs, raw JSON) */
   private trim(obj: unknown): unknown {
     const SKIP = new Set(['game_data', 'thumbnail_large', 'ctm_url', 'loadout', 'hardpoints_raw']);
     const TRUNC_KEYS = new Set(['sm_description', 'description', 'content', 'lore']);
@@ -742,21 +742,21 @@ export class ChatService {
 
         case 'get_ship_details': {
           const found = await this.resolveShipUuid(args.name as string, env);
-          if (!found) return { error: `Vaisseau "${args.name}" introuvable` };
+          if (!found) return { error: `Ship "${args.name}" not found` };
           const details = await this.gameDataService.ships.getShipByUuid(found.uuid, env);
           return details ?? found.data;
         }
 
         case 'get_ship_full_stats': {
           const found = await this.resolveShipUuid(args.name as string, env);
-          if (!found) return { error: `Vaisseau "${args.name}" introuvable` };
+          if (!found) return { error: `Ship "${args.name}" not found` };
           const stats = await this.gameDataService.loadouts.getShipStats(found.uuid, env);
-          return stats ?? { error: 'Stats de loadout non disponibles' };
+          return stats ?? { error: 'Loadout stats not available' };
         }
 
         case 'get_ship_loadout': {
           const found = await this.resolveShipUuid(args.name as string, env);
-          if (!found) return { error: `Vaisseau "${args.name}" introuvable` };
+          if (!found) return { error: `Ship "${args.name}" not found` };
           const [loadout, hardpoints] = await Promise.all([
             this.gameDataService.loadouts.getShipLoadout(found.uuid, env),
             this.gameDataService.loadouts.getShipHardpoints(found.uuid, env),
@@ -766,7 +766,7 @@ export class ChatService {
 
         case 'get_ship_variants': {
           const found = await this.resolveShipUuid(args.name as string, env);
-          if (!found) return { error: `Vaisseau "${args.name}" introuvable` };
+          if (!found) return { error: `Ship "${args.name}" not found` };
           const variants = await this.gameDataService.ships.getShipVariants(found.uuid, env);
           return { base_ship: found.data.name, variants };
         }
@@ -776,7 +776,7 @@ export class ChatService {
           const results = await Promise.all(
             names.map(async (n) => {
               const found = await this.resolveShipUuid(n, env);
-              if (!found) return { name: n, error: 'introuvable' };
+              if (!found) return { name: n, error: 'not found' };
               const [details, stats] = await Promise.all([
                 this.gameDataService.ships.getShipByUuid(found.uuid, env),
                 this.gameDataService.loadouts.getShipStats(found.uuid, env),
@@ -789,7 +789,7 @@ export class ChatService {
 
         case 'get_ship_matrix': {
           const entry = await this.shipMatrixService.getByName(args.name as string);
-          if (!entry) return { error: `"${args.name}" non trouvé dans la Ship Matrix RSI` };
+          if (!entry) return { error: `"${args.name}" not found in RSI Ship Matrix` };
           return entry;
         }
 
@@ -841,7 +841,7 @@ export class ChatService {
             limit: 1,
             page: 1,
           });
-          if (!search.data.length) return { error: `Recette "${args.name}" introuvable` };
+          if (!search.data.length) return { error: `Recipe "${args.name}" not found` };
           const recipe = search.data[0] as Record<string, unknown>;
           const full = await this.gameDataService.crafting.getRecipeByUuid(recipe.uuid as string, env);
           return full ?? recipe;
@@ -906,7 +906,7 @@ export class ChatService {
             limit: 1,
             page: 1,
           });
-          if (!comms.data.length) return { error: `Commodité "${args.name}" introuvable` };
+          if (!comms.data.length) return { error: `Commodity "${args.name}" not found` };
           const comm = comms.data[0] as Record<string, unknown>;
           const prices = await this.gameDataService.trade.getCommodityPrices(comm.uuid as string, env);
           return {
@@ -985,7 +985,7 @@ export class ChatService {
         // ── DB brute ──────────────────────────────────────────────────────
         case 'query_database': {
           const sql = (args.sql as string).trim();
-          if (!/^\s*SELECT\b/i.test(sql)) return { error: 'Seules les requêtes SELECT sont autorisées' };
+          if (!/^\s*SELECT\b/i.test(sql)) return { error: 'Only SELECT queries are allowed' };
           const params = Array.isArray(args.params) ? args.params : [];
           const rows = await (this.prisma as any).$queryRawUnsafe(sql, ...params);
           const data = Array.isArray(rows) ? rows.slice(0, 50) : rows;
@@ -993,7 +993,7 @@ export class ChatService {
         }
 
         default:
-          return { error: `Outil inconnu : ${name}` };
+          return { error: `Unknown tool: ${name}` };
       }
     } catch (e) {
       return { error: String(e) };
@@ -1014,8 +1014,8 @@ export class ChatService {
     ];
 
     try {
-      // Phase 1 — boucle agentique : résolution des tool calls (non-streaming)
-      // Les tool calls d'une même réponse sont exécutés EN PARALLÈLE.
+      // Phase 1 — agentic loop: resolve tool calls (non-streaming)
+      // Tool calls from the same response are executed IN PARALLEL.
       let iterations = 0;
       while (iterations < MAX_ITER) {
         const response = await this.openai.chat.completions.create({
@@ -1035,7 +1035,7 @@ export class ChatService {
           iterations++;
           groqMessages.push(msg);
 
-          // Exécution PARALLÈLE de tous les tool calls de la réponse
+          // PARALLEL execution of all tool calls in the response
           const results = await Promise.all(
             msg.tool_calls.map(async (tc) => {
               let args: Record<string, unknown> = {};
@@ -1049,7 +1049,7 @@ export class ChatService {
             }),
           );
 
-          // Injecter les résultats dans l'ordre (requis par l'API)
+          // Inject results in order (required by the API)
           for (const { id, result } of results) {
             groqMessages.push({
               role: 'tool',
@@ -1062,7 +1062,7 @@ export class ChatService {
         break;
       }
 
-      // Phase 2 — stream la réponse finale (tool_choice: none pour forcer une réponse textuelle)
+      // Phase 2 — stream the final response (tool_choice: none to force a text response)
       const stream = await this.openai.chat.completions.create({
         model: RESPONSE_MODEL,
         messages: groqMessages,
@@ -1078,7 +1078,7 @@ export class ChatService {
         const delta = chunk.choices[0]?.delta?.content;
         if (delta) fullText += delta;
       }
-      onChunk(wrapTablesInCodeBlock(fullText || 'Aucune réponse générée.'));
+      onChunk(wrapTablesInCodeBlock(fullText || 'No response generated.'));
       onDone();
     } catch (e) {
       onError(e instanceof Error ? e : new Error(String(e)));
@@ -1143,7 +1143,7 @@ export class ChatService {
       });
 
       const content = final.choices[0]?.message?.content;
-      const text = content?.trim() ? content : 'Aucune réponse générée.';
+      const text = content?.trim() ? content : 'No response generated.';
       return wrapTablesInCodeBlock(text);
     } catch (e) {
       throw e instanceof Error ? e : new Error(String(e));

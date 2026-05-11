@@ -206,11 +206,11 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           className="flex items-center gap-2 text-xs text-slate-600 hover:text-slate-400 transition-colors"
         >
           <Scale size={12} />
-          <span className="font-mono-sc">Mentions légales</span>
+          <span className="font-mono-sc">Legal notice</span>
         </Link>
         <p className="text-[9px] text-slate-700 leading-tight pt-1">
           Star Citizen® © Cloud Imperium Games.
-          Projet communautaire non lucratif.
+          Non-profit community project.
         </p>
       </div>
     </aside>

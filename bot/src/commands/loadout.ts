@@ -7,9 +7,9 @@ const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
 
 export const data = new SlashCommandBuilder()
   .setName('loadout')
-  .setDescription("Afficher le loadout par défaut d'un vaisseau")
+  .setDescription("Display a ship's default loadout")
   .addStringOption((opt) =>
-    opt.setName('vaisseau').setDescription('Nom du vaisseau (ex: Hornet F7C, Carrack)').setRequired(true).setAutocomplete(true),
+    opt.setName('ship').setDescription('Ship name (e.g. Hornet F7C, Carrack)').setRequired(true).setAutocomplete(true),
   );
 
 export async function autocomplete(interaction: AutocompleteInteraction): Promise<void> {
@@ -19,7 +19,7 @@ export async function autocomplete(interaction: AutocompleteInteraction): Promis
 }
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  const name = interaction.options.getString('vaisseau', true);
+  const name = interaction.options.getString('ship', true);
   await interaction.deferReply();
 
   try {
@@ -28,14 +28,14 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const ship = res.data?.[0];
 
     if (!ship?.uuid) {
-      await interaction.editReply({ embeds: [errorEmbed(`Vaisseau introuvable : « ${name} »`)] });
+      await interaction.editReply({ embeds: [errorEmbed(`Ship not found: "${name}"`)] });
       return;
     }
 
     const loadoutRes = await getShipLoadout(ship.uuid);
 
     if (!loadoutRes.success || !loadoutRes.data?.ports?.length) {
-      await interaction.editReply({ embeds: [errorEmbed(`Aucun loadout disponible pour ${ship.name}.`)] });
+      await interaction.editReply({ embeds: [errorEmbed(`No loadout available for ${ship.name}.`)] });
       return;
     }
 
@@ -44,7 +44,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     // Group by port type
     const byType: Record<string, typeof ports> = {};
     for (const port of ports) {
-      const t = port.port_type ?? 'Autre';
+      const t = port.port_type ?? 'Other';
       if (!byType[t]) byType[t] = [];
       byType[t].push(port);
     }
@@ -61,7 +61,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       const lines = typePorts
         .slice(0, 8)
         .map((p) => {
-          const comp = p.component_name ? `**${p.component_name}**` : '_vide_';
+          const comp = p.component_name ? `**${p.component_name}**` : '_empty_';
           const size = p.min_size != null ? ` S${p.min_size}${p.max_size !== p.min_size ? `–${p.max_size}` : ''}` : '';
           return `• ${p.port_name}${size}: ${comp}`;
         })
@@ -71,14 +71,14 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     }
 
     if (fields.length === 0) {
-      embed.setDescription('Aucun port de loadout trouvé.');
+      embed.setDescription('No loadout port found.');
     } else {
       embed.addFields(fields);
     }
 
     await interaction.editReply({ embeds: [embed] });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+    const msg = err instanceof Error ? err.message : 'Unknown error';
     await interaction.editReply({ embeds: [errorEmbed(msg)] });
   }
 }

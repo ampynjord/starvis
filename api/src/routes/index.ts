@@ -50,8 +50,8 @@ const routeMounts = [
 export function createRoutes(deps: RouteDependencies): Router {
   const router = Router();
 
-  // Toutes les routes /api/* requièrent un JWT utilisateur
-  // Exceptions publiques : /auth/*, /health/* (montés hors de ce router)
+  // All /api/* routes require a user JWT
+  // Public exceptions: /auth/*, /health/* (mounted outside this router)
   router.use('/api', requireJwt);
 
   for (const mount of routeMounts) {

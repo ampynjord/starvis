@@ -469,7 +469,7 @@ function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
               ))}
             </div>
           ) : recipe.unlock_missions !== undefined ? (
-            <p className="text-[10px] text-slate-500 font-mono-sc italic">Aucune source d'obtention trouvée dans les données.</p>
+            <p className="text-[10px] text-slate-500 font-mono-sc italic">No acquisition source found in the data.</p>
           ) : null}
         </div>
       </div>

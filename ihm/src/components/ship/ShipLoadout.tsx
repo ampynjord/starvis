@@ -1,6 +1,6 @@
 /**
- * ShipLoadout — Layout carte inspiré erkul.games
- * Chaque port est une carte individuelle, stats inline par type.
+ * ShipLoadout — Card layout inspired by erkul.games
+ * Each port is an individual card with inline stats per type.
  */
 
 import { useState } from 'react';
@@ -575,8 +575,8 @@ interface ModuleEntry {
 
 interface ProcessedLoadout {
   weapons:      WeaponSlot[];
-  weapTurrets:  LoadoutNode[];  // tourelles classées « armes »
-  utilities:    LoadoutNode[];  // tourelles/montages classés « utilitaires »
+  weapTurrets:  LoadoutNode[];  // turrets classified as "weapons"
+  utilities:    LoadoutNode[];  // turrets/mounts classified as "utilities"
   racks:        RackSlot[];
   shields:      LoadoutNode[];
   systems:      SystemSlot[];
@@ -587,9 +587,9 @@ interface ProcessedLoadout {
   moduleEntries: ModuleEntry[];
 }
 
-/** Détermine si un nœud (tourelle ou child) est une arme de combat */
+/** Determines whether a node (turret or child) is a combat weapon */
 function classifyTurretNode(turret: LoadoutNode): 'weapon' | 'utility' {
-  // Parcourir les enfants (gimbals) et leurs enfants (armes)
+  // Traverse children (gimbals) and their children (weapons)
   for (const child of turret.children ?? []) {
     const ct = child.component_type;
     if (ct) {
@@ -604,7 +604,7 @@ function classifyTurretNode(turret: LoadoutNode): 'weapon' | 'utility' {
       }
     }
   }
-  return 'weapon'; // par défaut: arme
+  return 'weapon'; // default: weapon
 }
 
 const THRUSTER_ORDER = ['Main','Maneuvering','Retro'];

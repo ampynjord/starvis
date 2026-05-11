@@ -1,13 +1,13 @@
 /**
- * POST /auth/register         — créer un compte
- * POST /auth/login            — se connecter
- * GET  /auth/me               — profil courant (Bearer)
- * PUT  /auth/me               — modifier son profil (Bearer)
- * POST /auth/api-token        — générer un token longue durée (Bearer, pour projets externes)
+ * POST /auth/register         — create an account
+ * POST /auth/login            — sign in
+ * GET  /auth/me               — current profile (Bearer)
+ * PUT  /auth/me               — update own profile (Bearer)
+ * POST /auth/api-token        — generate a long-lived token (Bearer, for external projects)
  *
- * Admin (Bearer role=admin ou X-Api-Key) :
- * GET  /admin/users           — liste des utilisateurs
- * PUT  /admin/users/:id/role  — modifier le rôle d'un utilisateur
+ * Admin (Bearer role=admin or X-Api-Key):
+ * GET  /admin/users           — list users
+ * PUT  /admin/users/:id/role  — update a user's role
  */
 import type { Router } from 'express';
 import { requireJwt, requireJwtAdmin } from '../middleware/index.js';
@@ -19,7 +19,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
 
   const authService = new AuthService(deps.prisma);
 
-  // ── Authentification ───────────────────────────────────────────────────────
+  // ── Authentication ────────────────────────────────────────────────────────
 
   // POST /auth/register
   router.post('/auth/register', async (req, res) => {
@@ -87,7 +87,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     }
   });
 
-  // DELETE /auth/me — supprimer son propre compte
+  // DELETE /auth/me — delete own account
   router.delete('/auth/me', requireJwt, async (req, res) => {
     const payload = (req as any).jwtPayload;
     try {
@@ -99,8 +99,8 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     }
   });
 
-  // ── API Token (accès projets externes) ────────────────────────────────────
-  // POST /auth/api-token — génère un JWT longue durée (1 an)
+  // ── API Token (external project access) ──────────────────────────────────
+  // POST /auth/api-token — generates a long-lived JWT (1 year)
   router.post('/auth/api-token', requireJwt, async (req, res) => {
     const payload = (req as any).jwtPayload;
     const user = await authService.me(payload.sub);
@@ -109,7 +109,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     res.json({ success: true, token, expiresIn: '1y', note: 'Store this token securely — it will not be shown again.' });
   });
 
-  // ── Admin : gestion des utilisateurs ─────────────────────────────────────
+  // ── Admin: user management ───────────────────────────────────────────────
 
   // GET /admin/users
   router.get('/admin/users', requireJwtAdmin, async (_req, res) => {
@@ -200,7 +200,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     }
   });
 
-  // POST /admin/users — créer un utilisateur (admin bypass)
+  // POST /admin/users — create a user (admin bypass)
   router.post('/admin/users', requireJwtAdmin, async (req, res) => {
     const { email, username, password, role } = req.body ?? {};
     if (!email || !username || !password) {

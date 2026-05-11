@@ -45,14 +45,14 @@ function LoginForm() {
           <div className="w-12 h-12 rounded-full bg-cyan-950 border border-cyan-700/40 flex items-center justify-center mx-auto mb-4">
             <Lock size={20} className="text-cyan-400" />
           </div>
-          <h1 className="text-xl font-orbitron font-bold text-white tracking-wider">CONNEXION</h1>
+          <h1 className="text-xl font-orbitron font-bold text-white tracking-wider">SIGN IN</h1>
           <p className="text-xs text-slate-500 font-mono-sc">STARVIS SECURE ACCESS</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
             <label className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider">
-              Email ou pseudonyme
+              Email or username
             </label>
             <div className="relative">
               <User size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
@@ -60,7 +60,7 @@ function LoginForm() {
                 type="text"
                 value={field}
                 onChange={(e) => setField(e.target.value)}
-                placeholder="email@exemple.com ou pseudo"
+                placeholder="email@example.com or username"
                 className="sci-input w-full pl-8"
                 autoComplete="username"
                 required
@@ -70,7 +70,7 @@ function LoginForm() {
 
           <div className="space-y-1.5">
             <label className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider">
-              Mot de passe
+              Password
             </label>
             <div className="relative">
               <Lock size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
@@ -98,14 +98,14 @@ function LoginForm() {
             className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-cyan-900/40 border border-cyan-700/50 hover:border-cyan-500/70 hover:bg-cyan-900/60 text-cyan-300 font-mono-sc text-sm rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <LogIn size={15} />
-            {loading ? 'CONNEXION...' : 'SE CONNECTER'}
+            {loading ? 'SIGNING IN...' : 'SIGN IN'}
           </button>
         </form>
 
         <p className="text-center text-xs text-slate-600">
-          Pas encore de compte ?{' '}
+          No account yet?{' '}
           <Link href="/register" className="text-cyan-500 hover:text-cyan-300 transition-colors">
-            Créer un compte
+            Create an account
           </Link>
         </p>
       </div>
