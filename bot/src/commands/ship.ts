@@ -7,9 +7,7 @@ import { errorEmbed, shipEmbed } from '../embeds.js';
 export const data = new SlashCommandBuilder()
   .setName('ship')
   .setDescription('Search for a Star Citizen ship')
-  .addStringOption((opt) =>
-    opt.setName('name').setDescription('Ship name (e.g. Aurora, Carrack)').setRequired(true).setAutocomplete(true),
-  );
+  .addStringOption((opt) => opt.setName('name').setDescription('Ship name (e.g. Aurora, Carrack)').setRequired(true).setAutocomplete(true));
 
 function mergeShipData(matrix: ShipResult | null, gameData: ShipResult | null): ShipResult {
   if (!matrix) return gameData!;

@@ -7,7 +7,7 @@
  */
 
 import type { Router } from 'express';
-import { requireJwt, requireJwtBetaOrAdmin } from '../middleware/index.js';
+import { requireJwtBetaOrAdmin } from '../middleware/index.js';
 import { ChatService } from '../services/chat-service.js';
 import type { RouteDependencies } from './types.js';
 
