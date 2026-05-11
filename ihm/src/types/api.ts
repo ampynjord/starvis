@@ -303,6 +303,7 @@ export interface Component extends ComponentListItem {
   mining_instability: number | null;
   // Salvage
   salvage_radius: number | null;
+  salvage_range: number | null;
   // Tractor
   tractor_max_range: number | null;
   // Gimbal extended
