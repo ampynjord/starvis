@@ -10,7 +10,7 @@
  * PUT  /admin/users/:id/role  — update a user's role
  */
 import type { Router } from 'express';
-import { requireJwt, requireJwtAdmin } from '../middleware/index.js';
+import { requireJwt, requireJwtAdmin, requireJwtBetaOrAdmin } from '../middleware/index.js';
 import { AuthService } from '../services/auth-service.js';
 import type { RouteDependencies } from './types.js';
 
@@ -100,8 +100,8 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   });
 
   // ── API Token (external project access) ──────────────────────────────────
-  // POST /auth/api-token — generates a long-lived JWT (1 year)
-  router.post('/auth/api-token', requireJwt, async (req, res) => {
+  // POST /auth/api-token — generates a long-lived JWT (1 year); beta_tester+ only
+  router.post('/auth/api-token', requireJwtBetaOrAdmin, async (req, res) => {
     const payload = (req as any).jwtPayload;
     const user = await authService.me(payload.sub);
     if (!user) return void res.status(404).json({ success: false, error: 'User not found' });

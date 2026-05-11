@@ -11,6 +11,7 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 vi.mock('../src/middleware/auth.js', () => ({
   requireJwt: (_req: any, _res: any, next: any) => next(),
   requireJwtAdmin: (_req: any, _res: any, next: any) => next(),
+  requireJwtBetaOrAdmin: (_req: any, _res: any, next: any) => next(),
   authMiddleware: (_req: any, _res: any, next: any) => next(),
 }));
 
@@ -120,6 +121,7 @@ function makeGameDataService() {
       getRecipeByUuid: fn(null),
     },
     locations: {
+      getLocationFilters: fn({}),
       getLocationTypes: fn([]),
       getLocationSystems: fn([]),
       getAll: fn([]),

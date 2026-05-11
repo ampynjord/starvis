@@ -6,6 +6,7 @@ import {
   ArrowRight,
   BarChart3,
   BookOpen,
+  Bug,
   ChevronRight,
   ClipboardList,
   Clock,
@@ -277,6 +278,15 @@ export default function HomePage() {
             Your bug reports are invaluable to improve the platform.
           </p>
         </div>
+        {user && (
+          <Link
+            href="/report-bug"
+            className="sci-btn-ghost py-1.5 px-3 text-[10px] gap-1.5 whitespace-nowrap shrink-0"
+          >
+            <Bug size={11} />
+            Report a bug
+          </Link>
+        )}
       </div>
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
