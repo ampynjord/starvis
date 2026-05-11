@@ -8,6 +8,24 @@ async function getToken() {
   return cookieStore.get('starvis_token')?.value ?? null;
 }
 
+export async function GET(req: Request) {
+  try {
+    const token = await getToken();
+    if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+
+    const url = new URL(req.url);
+    const qs = url.searchParams.toString();
+    const upstream = await fetch(`${API_BASE}/api/v1/bug-reports${qs ? `?${qs}` : ''}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    const data = await upstream.json().catch(() => ({}));
+    return NextResponse.json(data, { status: upstream.status });
+  } catch {
+    return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
+  }
+}
+
 export async function POST(req: Request) {
   try {
     const token = await getToken();

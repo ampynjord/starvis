@@ -83,6 +83,32 @@ export function mountBugReportRoutes(router: Router, deps: RouteDependencies): v
     }),
   );
 
+  // ── User: list own reports ───────────────────────────────────────────────────
+  router.get(
+    '/api/v1/bug-reports',
+    requireJwt,
+    asyncHandler(async (req, res) => {
+      const payload = (req as any).jwtPayload;
+      const page = Math.max(1, Number(req.query.page ?? 1));
+      const limit = Math.min(20, Math.max(1, Number(req.query.limit ?? 10)));
+      const offset = (page - 1) * limit;
+
+      const where = { userId: payload.sub };
+      const [total, data] = await Promise.all([
+        (prisma as any).bugReport.count({ where }),
+        (prisma as any).bugReport.findMany({
+          where,
+          orderBy: { createdAt: 'desc' },
+          skip: offset,
+          take: limit,
+          select: { id: true, title: true, status: true, createdAt: true, updatedAt: true },
+        }),
+      ]);
+
+      res.json({ success: true, total, page, limit, pages: Math.ceil(total / limit), data });
+    }),
+  );
+
   // ── Admin: list reports ──────────────────────────────────────────────────────
   router.get(
     '/admin/bug-reports',

@@ -206,6 +206,15 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         </Link>
         {user && (
           <Link
+            href="/my-reports"
+            className="flex items-center gap-2 text-xs text-slate-600 hover:text-slate-400 transition-colors"
+          >
+            <Bug size={12} />
+            <span className="font-mono-sc">My reports</span>
+          </Link>
+        )}
+        {user && (
+          <Link
             href="/report-bug"
             className="flex items-center gap-2 text-xs text-slate-600 hover:text-slate-400 transition-colors"
           >
