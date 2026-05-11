@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import { requireJwt } from '../middleware/index.js';
 import { mountAdminRoutes } from './admin.js';
 import { mountAuthRoutes } from './auth.js';
 import { mountCalculateRoutes } from './calculate.js';
@@ -49,10 +48,6 @@ const routeMounts = [
 
 export function createRoutes(deps: RouteDependencies): Router {
   const router = Router();
-
-  // All /api/* routes require a user JWT
-  // Public exceptions: /auth/*, /health/* (mounted outside this router)
-  router.use('/api', requireJwt);
 
   for (const mount of routeMounts) {
     mount(router, deps);
