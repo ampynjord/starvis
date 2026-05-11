@@ -1,3 +1,5 @@
+﻿'use client';
+
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { ArrowRight, DollarSign, Filter, MapPin, Package, Plus, Search, SortDesc, TrendingUp, Truck } from 'lucide-react';
