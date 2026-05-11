@@ -1,6 +1,6 @@
 import type { MetadataRoute } from 'next';
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://starvis.gg';
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://starvis.ampynjord.bzh';
 
 const STATIC_ROUTES: { path: string; priority: number; changefreq: MetadataRoute.Sitemap[number]['changeFrequency'] }[] = [
   { path: '/', priority: 1.0, changefreq: 'daily' },
