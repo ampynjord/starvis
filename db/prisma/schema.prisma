@@ -500,6 +500,7 @@ model Component {
   tractorMaxRange         Decimal? @map("tractor_max_range") @db.Decimal(10, 2)
   salvageSpeed            Decimal? @map("salvage_speed") @db.Decimal(10, 4)
   salvageRadius           Decimal? @map("salvage_radius") @db.Decimal(10, 2)
+  salvageRange            Decimal? @map("salvage_range") @db.Decimal(10, 2)
   gimbalType              String?  @map("gimbal_type") @db.VarChar(20)
   gimbalMaxAngle          Decimal? @map("gimbal_max_angle") @db.Decimal(8, 2)
   gimbalPitchSpeed        Decimal? @map("gimbal_pitch_speed") @db.Decimal(8, 2)
