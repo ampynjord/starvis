@@ -74,10 +74,7 @@ export async function sendBugReportNotification(report: {
   }
 }
 
-export async function sendBugReportAcknowledgment(
-  to: string,
-  report: { id: number; title: string },
-): Promise<void> {
+export async function sendBugReportAcknowledgment(to: string, report: { id: number; title: string }): Promise<void> {
   const transporter = await createTransporter();
   if (!transporter) {
     logger.warn('SMTP not configured — skipping bug report acknowledgment', { module: 'Email' });

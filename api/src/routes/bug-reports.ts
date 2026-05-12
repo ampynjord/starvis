@@ -6,7 +6,7 @@
  */
 import type { Router } from 'express';
 import { requireJwt, requireJwtAdmin } from '../middleware/index.js';
-import { sendBugReportNotification, sendBugReportAcknowledgment } from '../services/email-service.js';
+import { sendBugReportAcknowledgment, sendBugReportNotification } from '../services/email-service.js';
 import { asyncHandler } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
