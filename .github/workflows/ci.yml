@@ -370,7 +370,8 @@ jobs:
             npm install --silent
 
             echo "==> DB schema push..."
-            set -a; . .env.prod; set +a
+            DATABASE_URL=$(awk '/^DATABASE_URL=/{sub(/^DATABASE_URL=/,"");gsub(/["\x27]/,"");print;exit}' .env.prod)
+            export DATABASE_URL
             npm run push --workspace=@starvis/db
 
             echo "==> Pull new images..."
