@@ -5,7 +5,7 @@ import type { RouteDependencies } from './types.js';
 
 /** P4K-faithful component category → type array mapping */
 const COMPONENT_CATEGORY_TYPES: Record<string, string[]> = {
-  weapons: ['WeaponGun', 'Turret', 'TurretUnmanned', 'MissileRack', 'Missile', 'Ammunition'],
+  weapons: ['WeaponGun', 'Turret', 'TurretUnmanned', 'MissileRack', 'Missile', 'Ammunition', 'EMP', 'QuantumInterdictionGenerator'],
   systems: [
     'Shield',
     'PowerPlant',
@@ -18,8 +18,6 @@ const COMPONENT_CATEGORY_TYPES: Record<string, string[]> = {
     'Radar',
     'Countermeasure',
     'LifeSupport',
-    'EMP',
-    'QuantumInterdictionGenerator',
   ],
   mounts: ['Gimbal'],
   utility: ['MiningLaser', 'SalvageHead', 'TractorBeam'],
