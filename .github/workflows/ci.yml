@@ -366,6 +366,10 @@ jobs:
             echo "==> Login GHCR..."
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ampynjord --password-stdin
 
+            echo "==> DB schema push..."
+            export $(grep -E "^DATABASE_URL=" .env.prod | head -1)
+            npm run push --workspace=@starvis/db
+
             echo "==> Pull new images..."
             docker compose -f docker-compose.prod.yml --env-file .env.prod pull
 
