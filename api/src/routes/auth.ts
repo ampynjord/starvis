@@ -19,10 +19,7 @@
 import type { Router } from 'express';
 import { requireJwt, requireJwtAdmin, requireJwtBetaOrAdmin } from '../middleware/index.js';
 import { AuthService } from '../services/auth-service.js';
-import {
-  sendVerificationEmail,
-  sendPasswordResetEmail,
-} from '../services/email-service.js';
+import { sendPasswordResetEmail, sendVerificationEmail } from '../services/email-service.js';
 import type { RouteDependencies } from './types.js';
 
 const STRONG_PASSWORD = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{8,}$/;
@@ -97,7 +94,8 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
       const result = await authService.verifyEmail(token);
       res.json({ success: true, token: result.token, user: result.user });
     } catch (e: any) {
-      if (e.message === 'INVALID_TOKEN') return void res.status(400).json({ success: false, error: 'Invalid or expired verification token' });
+      if (e.message === 'INVALID_TOKEN')
+        return void res.status(400).json({ success: false, error: 'Invalid or expired verification token' });
       res.status(500).json({ success: false, error: 'Email verification failed' });
     }
   });
@@ -210,7 +208,8 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
       res.json({ success: true });
     } catch (e: any) {
       if (e.message === 'INVALID_2FA_CODE') return void res.status(400).json({ success: false, error: 'Invalid authentication code' });
-      if (e.message === '2FA_NOT_SETUP') return void res.status(400).json({ success: false, error: '2FA not configured — call /auth/2fa/setup first' });
+      if (e.message === '2FA_NOT_SETUP')
+        return void res.status(400).json({ success: false, error: '2FA not configured — call /auth/2fa/setup first' });
       res.status(500).json({ success: false, error: '2FA activation failed' });
     }
   });
@@ -246,7 +245,8 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
       res.json({ success: true, token: result.token, user: result.user });
     } catch (e: any) {
       if (e.message === 'INVALID_2FA_CODE') return void res.status(400).json({ success: false, error: 'Invalid authentication code' });
-      if (e.message === 'INVALID_TOKEN') return void res.status(400).json({ success: false, error: 'Session expired — please log in again' });
+      if (e.message === 'INVALID_TOKEN')
+        return void res.status(400).json({ success: false, error: 'Session expired — please log in again' });
       res.status(500).json({ success: false, error: '2FA verification failed' });
     }
   });

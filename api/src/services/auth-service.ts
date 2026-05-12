@@ -1,5 +1,5 @@
-import { createRequire } from 'node:module';
 import { randomBytes } from 'node:crypto';
+import { createRequire } from 'node:module';
 import type { PrismaLike } from '@starvis/db';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -31,7 +31,6 @@ const SALT_ROUNDS = 12;
 const JWT_EXPIRES = '7d';
 const JWT_API_TOKEN_EXPIRES = '1y';
 const JWT_2FA_PENDING_EXPIRES = '5m';
-const VERIFICATION_TOKEN_TTL_MS = 48 * 60 * 60 * 1000;
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
 function getSecret(): string {
@@ -71,11 +70,7 @@ function toPublicUser(u: {
 export class AuthService {
   constructor(private prisma: PrismaLike) {}
 
-  async register(
-    email: string,
-    username: string,
-    password: string,
-  ): Promise<{ requiresVerification: true; email: string }> {
+  async register(email: string, username: string, password: string): Promise<{ requiresVerification: true; email: string }> {
     const emailLower = email.toLowerCase().trim();
     const usernameTrimmed = username.trim();
 
@@ -126,10 +121,7 @@ export class AuthService {
   async login(
     emailOrUsername: string,
     password: string,
-  ): Promise<
-    | { token: string; user: PublicUser }
-    | { requires2FA: true; pendingToken: string }
-  > {
+  ): Promise<{ token: string; user: PublicUser } | { requires2FA: true; pendingToken: string }> {
     const lower = emailOrUsername.toLowerCase().trim();
     const user = await (this.prisma as any).user.findFirst({
       where: { OR: [{ email: lower }, { username: lower }] },
@@ -142,11 +134,7 @@ export class AuthService {
     if (!user.emailVerified) throw new Error('EMAIL_NOT_VERIFIED');
 
     if (user.twoFactorEnabled) {
-      const pendingToken = jwt.sign(
-        { sub: user.id, type: '2fa_pending' },
-        getSecret(),
-        { expiresIn: JWT_2FA_PENDING_EXPIRES },
-      );
+      const pendingToken = jwt.sign({ sub: user.id, type: '2fa_pending' }, getSecret(), { expiresIn: JWT_2FA_PENDING_EXPIRES });
       return { requires2FA: true, pendingToken };
     }
 
@@ -164,7 +152,7 @@ export class AuthService {
     if (payload.type !== '2fa_pending') throw new Error('INVALID_TOKEN');
 
     const user = await (this.prisma as any).user.findUnique({ where: { id: payload.sub } });
-    if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) throw new Error('INVALID_TOKEN');
+    if (!user?.twoFactorEnabled || !user?.twoFactorSecret) throw new Error('INVALID_TOKEN');
 
     const { authenticator } = _require('otplib');
     const valid = authenticator.verify({ token: code, secret: user.twoFactorSecret });
@@ -226,7 +214,7 @@ export class AuthService {
 
   async enable2FA(userId: number, code: string): Promise<void> {
     const user = await (this.prisma as any).user.findUnique({ where: { id: userId } });
-    if (!user || !user.twoFactorSecret) throw new Error('2FA_NOT_SETUP');
+    if (!user?.twoFactorSecret) throw new Error('2FA_NOT_SETUP');
 
     const { authenticator } = _require('otplib');
     const valid = authenticator.verify({ token: code, secret: user.twoFactorSecret });
@@ -240,7 +228,7 @@ export class AuthService {
 
   async disable2FA(userId: number, code: string): Promise<void> {
     const user = await (this.prisma as any).user.findUnique({ where: { id: userId } });
-    if (!user || !user.twoFactorEnabled || !user.twoFactorSecret) throw new Error('2FA_NOT_ENABLED');
+    if (!user?.twoFactorEnabled || !user?.twoFactorSecret) throw new Error('2FA_NOT_ENABLED');
 
     const { authenticator } = _require('otplib');
     const valid = authenticator.verify({ token: code, secret: user.twoFactorSecret });
@@ -280,10 +268,7 @@ export class AuthService {
     return toPublicUser(user);
   }
 
-  async adminUpdateUser(
-    userId: number,
-    updates: { username?: string; email?: string; avatarUrl?: string },
-  ): Promise<PublicUser> {
+  async adminUpdateUser(userId: number, updates: { username?: string; email?: string; avatarUrl?: string }): Promise<PublicUser> {
     const data: Record<string, string> = {};
     if (updates.username !== undefined) data.username = updates.username.trim();
     if (updates.email !== undefined) data.email = updates.email.toLowerCase().trim();
@@ -333,13 +318,7 @@ export class AuthService {
     return jwt.verify(token, getSecret()) as unknown as JwtPayload;
   }
 
-  private signToken(user: {
-    id: number;
-    uuid: string;
-    email: string;
-    username: string;
-    role: string;
-  }): string {
+  private signToken(user: { id: number; uuid: string; email: string; username: string; role: string }): string {
     const payload: JwtPayload = {
       sub: user.id,
       uuid: user.uuid,
