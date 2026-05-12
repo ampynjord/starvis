@@ -1,0 +1,40 @@
+name: DB Dump (prod → artifact)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  dump:
+    name: Dump production DB
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create dump on VPS
+        uses: appleboy/ssh-action@v1.2.5
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: debian
+          port: 2222
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            PGUSER=$(docker exec starvis-postgres printenv POSTGRES_USER)
+            PGDB=$(docker exec starvis-postgres printenv POSTGRES_DB)
+            docker exec starvis-postgres pg_dump -U "$PGUSER" "$PGDB" | gzip > /tmp/starvis_dump.sql.gz
+            echo "Dump ready at /tmp/starvis_dump.sql.gz"
+
+      - name: Download dump via SCP
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$VPS_SSH_KEY" > ~/.ssh/vps_key
+          chmod 600 ~/.ssh/vps_key
+          scp -i ~/.ssh/vps_key -o StrictHostKeyChecking=no -P 2222 \
+            debian@${{ secrets.VPS_HOST }}:/tmp/starvis_dump.sql.gz \
+            ./starvis_dump.sql.gz
+
+      - name: Upload as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: starvis-db-dump
+          path: starvis_dump.sql.gz
+          retention-days: 1
