@@ -961,16 +961,14 @@ export function ShipLoadout({
   const data = processLoadout(nodes, activeModules, moduleSlots);
 
   // ── Tabs ─────────────────────────────────────────────────
-  type TabKey = 'weapons' | 'ordnance' | 'shields' | 'systems' | 'countermeasures' | 'modules' | 'paint';
+  type TabKey = 'weapons' | 'systems' | 'utility' | 'modules' | 'paint';
   interface TabDef { key: TabKey; label: string; count: number }
   const allTabs: TabDef[] = ([
-    { key: 'weapons' as TabKey,         label: 'Weapons & Utility', count: data.weapons.length + data.weapTurrets.length + data.utilities.length },
-    { key: 'ordnance' as TabKey,        label: 'Ordnance',          count: data.racks.length },
-    { key: 'shields' as TabKey,         label: 'Shields',           count: data.shields.length },
-    { key: 'systems' as TabKey,         label: 'Systems',           count: data.systems.length + data.thrusters.length },
-    { key: 'countermeasures' as TabKey, label: 'Countermeasures',   count: data.cmDecoys.length + data.cmNoises.length },
-    { key: 'modules' as TabKey,         label: 'Modules',           count: data.moduleEntries.length },
-    { key: 'paint' as TabKey,           label: 'Paint',             count: data.defaultPaint ? 1 : 0 },
+    { key: 'weapons' as TabKey, label: 'Weapons',     count: data.weapons.length + data.weapTurrets.length + data.racks.length },
+    { key: 'systems' as TabKey, label: 'Systems',     count: data.shields.length + data.systems.length + data.thrusters.length + data.cmDecoys.length + data.cmNoises.length },
+    { key: 'utility' as TabKey, label: 'Utility',     count: data.utilities.length },
+    { key: 'modules' as TabKey, label: 'Ship Modules',count: data.moduleEntries.length },
+    { key: 'paint'   as TabKey, label: 'Paint',       count: data.defaultPaint ? 1 : 0 },
   ] as TabDef[]).filter(t => t.count > 0);
 
   const [activeTab, setActiveTab] = useState<TabKey>(() => (allTabs[0]?.key ?? 'weapons') as TabKey);
@@ -1006,7 +1004,7 @@ export function ShipLoadout({
 
       {/* ── Tab content ── */}
 
-      {/* Weapons & Utility */}
+      {/* Weapons — combat guns, turrets, ordnance */}
       {validTab === 'weapons' && (
         <div className="space-y-5">
           {(data.weapons.length > 0 || data.weapTurrets.length > 0) && (
@@ -1022,42 +1020,32 @@ export function ShipLoadout({
               </div>
             </div>
           )}
-          {data.utilities.length > 0 && (
+          {data.racks.length > 0 && (
             <div>
-              <p className="text-[9px] font-mono-sc text-teal-400/70 uppercase tracking-wider mb-3">Utility</p>
+              <p className="text-[9px] font-mono-sc text-orange-400/70 uppercase tracking-wider mb-3">Ordnance</p>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                {data.utilities.map((node, i) => {
-                  if (node.port_type === 'Turret') return <TurretCard key={i} node={node} />;
-                  const weapon = node.children?.find(c => c.component_type && ALL_WEAPON_TYPES.has(c.component_type)) ?? null;
-                  return <WeaponCard key={i} portName={node.port_name} mount={node} weapon={weapon} />;
-                })}
+                {data.racks.map((slot, i) => (
+                  <RackCard key={i} rack={slot.rack} missiles={slot.missiles} />
+                ))}
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* Ordnance */}
-      {validTab === 'ordnance' && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-          {data.racks.map((slot, i) => (
-            <RackCard key={i} rack={slot.rack} missiles={slot.missiles} />
-          ))}
-        </div>
-      )}
-
-      {/* Shields */}
-      {validTab === 'shields' && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-          {data.shields.map((node, i) => (
-            <ShieldCard key={i} node={node} />
-          ))}
-        </div>
-      )}
-
-      {/* Systems + Thrusters */}
+      {/* Systems — shields, power/thermal/nav, thrusters, countermeasures */}
       {validTab === 'systems' && (
         <div className="space-y-5">
+          {data.shields.length > 0 && (
+            <div>
+              <p className="text-[9px] font-mono-sc text-blue-400/70 uppercase tracking-wider mb-3">Shields</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                {data.shields.map((node, i) => (
+                  <ShieldCard key={i} node={node} />
+                ))}
+              </div>
+            </div>
+          )}
           {data.systems.length > 0 && (
             <div>
               <p className="text-[9px] font-mono-sc text-violet-400/70 uppercase tracking-wider mb-3">Systems</p>
@@ -1083,25 +1071,37 @@ export function ShipLoadout({
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {/* Countermeasures */}
-      {validTab === 'countermeasures' && (
-        <div className="flex flex-wrap gap-2">
-          {[...data.cmDecoys, ...data.cmNoises].map((cm, i) => (
-            <div key={i} className="flex items-center gap-2 rounded-md border border-teal-900/30 bg-teal-950/10 px-3 py-1.5">
-              <span className="text-xs text-slate-300">{cm.name}</span>
-              <span className="text-xs font-mono-sc text-teal-600">x{cm.count}</span>
-              {cm.ammoPerUnit != null && (
-                <span className="text-[9px] font-mono-sc text-slate-500 tabular-nums">{cm.ammoPerUnit * cm.count} shots</span>
-              )}
+          {(data.cmDecoys.length > 0 || data.cmNoises.length > 0) && (
+            <div>
+              <p className="text-[9px] font-mono-sc text-teal-400/70 uppercase tracking-wider mb-3">Countermeasures</p>
+              <div className="flex flex-wrap gap-2">
+                {[...data.cmDecoys, ...data.cmNoises].map((cm, i) => (
+                  <div key={i} className="flex items-center gap-2 rounded-md border border-teal-900/30 bg-teal-950/10 px-3 py-1.5">
+                    <span className="text-xs text-slate-300">{cm.name}</span>
+                    <span className="text-xs font-mono-sc text-teal-600">x{cm.count}</span>
+                    {cm.ammoPerUnit != null && (
+                      <span className="text-[9px] font-mono-sc text-slate-500 tabular-nums">{cm.ammoPerUnit * cm.count} shots</span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-          ))}
+          )}
         </div>
       )}
 
-      {/* Modules */}
+      {/* Utility */}
+      {validTab === 'utility' && (
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+          {data.utilities.map((node, i) => {
+            if (node.port_type === 'Turret') return <TurretCard key={i} node={node} />;
+            const weapon = node.children?.find(c => c.component_type && ALL_WEAPON_TYPES.has(c.component_type)) ?? null;
+            return <WeaponCard key={i} portName={node.port_name} mount={node} weapon={weapon} />;
+          })}
+        </div>
+      )}
+
+      {/* Ship Modules */}
       {validTab === 'modules' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {data.moduleEntries.map((entry, i) => (
