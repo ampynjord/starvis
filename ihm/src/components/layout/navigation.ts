@@ -25,6 +25,8 @@ export type NavItemDef = {
   auth?: boolean;
   /** Feature under active development — accessible only to beta_tester and admin roles. */
   beta?: boolean;
+  /** Use exact pathname match for active state (avoids prefix collision between sibling routes). */
+  exact?: boolean;
 };
 
 export type NavGroupDef = {

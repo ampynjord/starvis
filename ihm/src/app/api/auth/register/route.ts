@@ -23,15 +23,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: data.error ?? 'Registration failed' }, { status: upstream.status });
     }
 
-    const res = NextResponse.json({ user: data.user });
-    res.cookies.set('starvis_token', data.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60,
-      path: '/',
-    });
-    return res;
+    // Email verification required — no token, no cookie
+    return NextResponse.json({ requiresVerification: true });
   } catch (e: any) {
     const msg = e?.cause?.code ?? e?.message ?? String(e);
     console.error('[auth/register]', API_BASE, msg);

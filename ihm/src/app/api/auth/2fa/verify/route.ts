@@ -5,27 +5,15 @@ const API_BASE = process.env.API_URL ?? 'http://localhost:3000';
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const upstream = await fetch(`${API_BASE}/auth/login`, {
+    const upstream = await fetch(`${API_BASE}/auth/2fa/verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
 
-    const text = await upstream.text();
-    let data: any = {};
-    try {
-      data = JSON.parse(text);
-    } catch {
-      /* empty body */
-    }
-
+    const data = await upstream.json().catch(() => ({}));
     if (!upstream.ok) {
-      return NextResponse.json({ error: data.error ?? 'Login failed' }, { status: upstream.status });
-    }
-
-    // 2FA step — return pending token to client, no cookie yet
-    if (data.requires2FA) {
-      return NextResponse.json({ requires2FA: true, pendingToken: data.pendingToken });
+      return NextResponse.json({ error: data.error ?? 'Verification failed' }, { status: upstream.status });
     }
 
     const res = NextResponse.json({ user: data.user });
@@ -38,7 +26,7 @@ export async function POST(req: Request) {
     });
     return res;
   } catch (e: any) {
-    console.error('[auth/login]', e);
+    console.error('[auth/2fa/verify]', e);
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
   }
 }
