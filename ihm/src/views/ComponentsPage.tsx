@@ -31,13 +31,13 @@ const CATEGORIES: CategoryDef[] = [
   {
     label: "Weapons",
     apiSlug: "weapons",
-    types: ["WeaponGun", "Turret", "TurretUnmanned", "MissileRack", "Missile", "Ammunition"],
+    types: ["WeaponGun", "Turret", "TurretUnmanned", "MissileRack", "Missile", "Ammunition", "EMP", "QuantumInterdictionGenerator"],
   },
   {
     label: "Systems",
     apiSlug: "systems",
     types: ["Shield", "PowerPlant", "Cooler", "QuantumDrive", "JumpModule", "Thruster", "FuelIntake", "FuelTank",
-            "Radar", "Countermeasure", "LifeSupport", "EMP", "QuantumInterdictionGenerator"],
+            "Radar", "Countermeasure", "LifeSupport"],
   },
   {
     label: "Mounts",

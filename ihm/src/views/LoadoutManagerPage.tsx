@@ -1,7 +1,7 @@
 ﻿'use client';
 
 /**
- * OutfitterPage — Ship loadout customizer + DPS calculator
+ * LoadoutManagerPage — Ship loadout customizer + DPS calculator
  * Inspired by erkul.games DPS Calculator
  */
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -489,7 +489,7 @@ function HardpointRow({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function OutfitterPage() {
+export default function LoadoutManagerPage() {
   const { env } = useEnv();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -517,13 +517,15 @@ export default function OutfitterPage() {
   });
 
   // Restore state from URL params on mount (?ship=UUID&swaps=portId:compUuid,...)
+  // Falls back to Aurora Mk2 when no ?ship= param is present
   useEffect(() => {
     if (restoredRef.current) return;
-    const shipUuid = searchParams?.get('ship');
-    if (!shipUuid) return;
     restoredRef.current = true;
 
-    const swapsParam = searchParams?.get('swaps');
+    const shipUuid = searchParams?.get('ship');
+    const targetUuid = shipUuid ?? '8e3a460d-6be2-ec95-782b-b14cdf97a8b3';
+
+    const swapsParam = shipUuid ? searchParams?.get('swaps') : null;
     const parsedSwaps: Record<number, string> = {};
     if (swapsParam) {
       for (const entry of swapsParam.split(',')) {
@@ -532,14 +534,13 @@ export default function OutfitterPage() {
       }
     }
 
-    // Load ship info and fire calculation
-    api.ships.search(shipUuid, 1, env).then((results) => {
-      const ship = results?.find((s) => s.uuid === shipUuid);
+    api.ships.search(targetUuid, 1, env).then((results) => {
+      const ship = results?.find((s) => s.uuid === targetUuid);
       if (!ship) return;
       setSelectedShip(ship);
       setSwaps(parsedSwaps);
       calculate({
-        uuid: shipUuid,
+        uuid: targetUuid,
         swaps: Object.entries(parsedSwaps).map(([portId, componentUuid]) => ({
           portId: Number(portId),
           componentUuid,
@@ -582,7 +583,7 @@ export default function OutfitterPage() {
     const swapEntries = Object.entries(swaps).map(([id, uuid]) => `${id}:${uuid}`).join(',');
     const params = new URLSearchParams({ ship: selectedShip.uuid });
     if (swapEntries) params.set('swaps', swapEntries);
-    const url = `${window.location.origin}/outfitter?${params}`;
+    const url = `${window.location.origin}/loadout-manager?${params}`;
     router.replace(`${pathname}?${params.toString()}`);
     navigator.clipboard.writeText(url);
   };

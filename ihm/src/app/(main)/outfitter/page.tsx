@@ -1,8 +1,8 @@
 'use client';
 
 import { Suspense } from 'react';
-import OutfitterPage from '@/views/OutfitterPage';
+import LoadoutManagerPage from '@/views/LoadoutManagerPage';
 
 export default function Page() {
-  return <Suspense><OutfitterPage /></Suspense>;
+  return <Suspense><LoadoutManagerPage /></Suspense>;
 }
