@@ -36,6 +36,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [showRules, setShowRules] = useState(false);
   const [consented, setConsented] = useState(false);
+  const [verificationPending, setVerificationPending] = useState(false);
 
   const passwordsMatch = confirm === '' || password === confirm;
   const strongEnough = isStrongPassword(password);
@@ -59,8 +60,12 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      await register(email, username, password);
-      router.push('/');
+      const result = await register(email, username, password);
+      if (result?.requiresVerification) {
+        setVerificationPending(true);
+      } else {
+        router.push('/');
+      }
     } catch (err: any) {
       setError(err.message ?? 'Account creation failed');
     } finally {
@@ -75,6 +80,22 @@ export default function RegisterPage() {
       transition={{ duration: 0.3 }}
       className="w-full max-w-sm"
     >
+      {verificationPending ? (
+        <div className="sci-panel p-8 space-y-4 text-center">
+          <div className="w-12 h-12 rounded-full bg-green-950 border border-green-700/40 flex items-center justify-center mx-auto">
+            <CheckCircle size={20} className="text-green-400" />
+          </div>
+          <h1 className="text-lg font-orbitron font-bold text-white tracking-wider">CHECK YOUR EMAIL</h1>
+          <p className="text-sm text-slate-400 font-rajdhani leading-relaxed">
+            We sent a verification link to <span className="text-cyan-400">{email}</span>.
+            Click the link in the email to activate your account.
+          </p>
+          <p className="text-xs text-slate-600">The link is valid for 48 hours.</p>
+          <Link href="/login" className="block text-xs text-cyan-500 hover:text-cyan-300 transition-colors mt-2">
+            Already verified? Sign in &rarr;
+          </Link>
+        </div>
+      ) : (
       <div className="sci-panel p-8 space-y-6">
         {/* Header */}
         <div className="text-center space-y-1">
@@ -227,6 +248,7 @@ export default function RegisterPage() {
           </Link>
         </p>
       </div>
+      )}
     </motion.div>
   );
 }

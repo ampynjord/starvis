@@ -6,7 +6,7 @@
  */
 import type { Router } from 'express';
 import { requireJwt, requireJwtAdmin } from '../middleware/index.js';
-import { sendBugReportNotification } from '../services/email-service.js';
+import { sendBugReportNotification, sendBugReportAcknowledgment } from '../services/email-service.js';
 import { asyncHandler } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
@@ -67,16 +67,20 @@ export function mountBugReportRoutes(router: Router, deps: RouteDependencies): v
           description: description.trim(),
           attachments: validAttachments,
         },
-        include: { user: { select: { username: true } } },
+        include: { user: { select: { username: true, email: true } } },
       });
 
-      // Fire-and-forget email notification
+      // Fire-and-forget emails
       sendBugReportNotification({
         id: report.id,
         title: report.title,
         description: report.description,
         username: report.user.username,
         createdAt: report.createdAt,
+      }).catch(() => {});
+      sendBugReportAcknowledgment(report.user.email, {
+        id: report.id,
+        title: report.title,
       }).catch(() => {});
 
       res.status(201).json({ success: true, data: { id: report.id } });

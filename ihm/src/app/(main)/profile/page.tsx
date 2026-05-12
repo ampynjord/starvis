@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { AlertTriangle, Copy, Key, LogOut, Save, Shield, Trash2, User } from 'lucide-react';
+import { AlertTriangle, Copy, Key, Lock, LogOut, QrCode, Save, Shield, ShieldCheck, ShieldOff, Trash2, User } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -20,6 +20,12 @@ export default function ProfilePage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
+
+  // 2FA state
+  const [twoFaSetup, setTwoFaSetup] = useState<{ secret: string; qrCodeUrl: string } | null>(null);
+  const [twoFaCode, setTwoFaCode] = useState('');
+  const [twoFaLoading, setTwoFaLoading] = useState(false);
+  const [twoFaMessage, setTwoFaMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -94,6 +100,69 @@ export default function ProfilePage() {
     navigator.clipboard.writeText(apiToken);
     setTokenCopied(true);
     setTimeout(() => setTokenCopied(false), 2000);
+  };
+
+  const isBetaOrAdmin = user?.role === 'beta_tester' || user?.role === 'admin';
+
+  const handleSetup2FA = async () => {
+    setTwoFaLoading(true);
+    setTwoFaMessage(null);
+    try {
+      const res = await fetch('/api/auth/2fa/setup', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Setup failed');
+      setTwoFaSetup({ secret: data.secret, qrCodeUrl: data.qrCodeUrl });
+      setTwoFaCode('');
+    } catch (err: any) {
+      setTwoFaMessage({ type: 'error', text: err.message });
+    } finally {
+      setTwoFaLoading(false);
+    }
+  };
+
+  const handleEnable2FA = async () => {
+    if (!twoFaCode) return;
+    setTwoFaLoading(true);
+    setTwoFaMessage(null);
+    try {
+      const res = await fetch('/api/auth/2fa/enable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: twoFaCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Activation failed');
+      setTwoFaSetup(null);
+      setTwoFaCode('');
+      setTwoFaMessage({ type: 'success', text: '2FA activated successfully.' });
+      await refresh();
+    } catch (err: any) {
+      setTwoFaMessage({ type: 'error', text: err.message });
+    } finally {
+      setTwoFaLoading(false);
+    }
+  };
+
+  const handleDisable2FA = async () => {
+    if (!twoFaCode) return;
+    setTwoFaLoading(true);
+    setTwoFaMessage(null);
+    try {
+      const res = await fetch('/api/auth/2fa/disable', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: twoFaCode }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Deactivation failed');
+      setTwoFaCode('');
+      setTwoFaMessage({ type: 'success', text: '2FA deactivated.' });
+      await refresh();
+    } catch (err: any) {
+      setTwoFaMessage({ type: 'error', text: err.message });
+    } finally {
+      setTwoFaLoading(false);
+    }
   };
 
   if (!user) return null;
@@ -193,34 +262,133 @@ export default function ProfilePage() {
         className="sci-panel p-5 space-y-4"
       >
         <div className="space-y-1">
-          <h2 className="text-sm font-mono-sc text-cyan-700 uppercase tracking-wider">External API token</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-sm font-mono-sc text-cyan-700 uppercase tracking-wider">External API token</h2>
+            {!isBetaOrAdmin && (
+              <span className="text-[9px] font-orbitron font-bold tracking-widest text-purple-400 bg-purple-950/40 border border-purple-700/50 px-1.5 py-0.5 rounded-sm">
+                BETA
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-600">Generate a long-lived token (1 year) to access the API from external projects.</p>
         </div>
 
-        {apiToken ? (
-          <div className="space-y-2">
-            <p className="text-xs text-amber-400 font-mono-sc">Copy this token now — it will not be shown again.</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 text-[10px] font-mono text-slate-300 bg-slate-900 border border-slate-700 rounded px-3 py-2 truncate">
-                {apiToken}
-              </code>
-              <button
-                onClick={handleCopyToken}
-                className="shrink-0 p-2 rounded border border-slate-700 hover:border-cyan-700/50 hover:bg-white/5 transition-colors"
-                title="Copier"
-              >
-                <Copy size={14} className={tokenCopied ? 'text-green-400' : 'text-slate-400'} />
-              </button>
+        {isBetaOrAdmin ? (
+          apiToken ? (
+            <div className="space-y-2">
+              <p className="text-xs text-amber-400 font-mono-sc">Copy this token now — it will not be shown again.</p>
+              <div className="flex items-center gap-2">
+                <code className="flex-1 text-[10px] font-mono text-slate-300 bg-slate-900 border border-slate-700 rounded px-3 py-2 truncate">
+                  {apiToken}
+                </code>
+                <button
+                  onClick={handleCopyToken}
+                  className="shrink-0 p-2 rounded border border-slate-700 hover:border-cyan-700/50 hover:bg-white/5 transition-colors"
+                  title="Copier"
+                >
+                  <Copy size={14} className={tokenCopied ? 'text-green-400' : 'text-slate-400'} />
+                </button>
+              </div>
             </div>
+          ) : (
+            <button
+              onClick={handleGenerateApiToken}
+              disabled={generatingToken}
+              className="flex items-center gap-2 py-2 px-4 bg-cyan-900/40 border border-cyan-700/50 hover:border-cyan-500/70 hover:bg-cyan-900/60 text-cyan-300 font-mono-sc text-sm rounded transition-colors disabled:opacity-50"
+            >
+              <Key size={14} />
+              {generatingToken ? 'GENERATING...' : 'GENERATE API TOKEN'}
+            </button>
+          )
+        ) : (
+          <div className="flex items-center gap-3 opacity-40 cursor-not-allowed select-none">
+            <Lock size={14} className="text-slate-500 shrink-0" />
+            <span className="text-xs text-slate-500 font-mono-sc">Available for beta_tester and admin accounts only.</span>
+          </div>
+        )}
+      </motion.div>
+
+      {/* 2FA */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.12 }}
+        className="sci-panel p-5 space-y-4"
+      >
+        <div className="space-y-1">
+          <h2 className="text-sm font-mono-sc text-cyan-700 uppercase tracking-wider">Two-factor authentication</h2>
+          <p className="text-xs text-slate-600">Add an extra layer of security with a TOTP authenticator app.</p>
+        </div>
+
+        {twoFaMessage && (
+          <p className={`text-xs font-mono-sc px-3 py-2 rounded border ${
+            twoFaMessage.type === 'success'
+              ? 'text-green-400 bg-green-950/30 border-green-800/30'
+              : 'text-red-400 bg-red-950/30 border-red-800/30'
+          }`}>
+            {twoFaMessage.text}
+          </p>
+        )}
+
+        {(user as any).twoFactorEnabled ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-green-400 text-xs font-mono-sc">
+              <ShieldCheck size={14} />
+              2FA is active
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-mono-sc text-slate-500 uppercase tracking-wider">TOTP code to disable</label>
+              <input
+                type="text"
+                value={twoFaCode}
+                onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                maxLength={6}
+                className="sci-input w-32 text-center font-mono tracking-widest"
+              />
+            </div>
+            <button
+              onClick={handleDisable2FA}
+              disabled={twoFaLoading || twoFaCode.length !== 6}
+              className="flex items-center gap-2 py-2 px-4 border border-red-800/50 hover:border-red-600/70 bg-red-950/20 hover:bg-red-950/40 text-red-400 font-mono-sc text-sm rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ShieldOff size={14} />
+              {twoFaLoading ? 'DISABLING...' : 'DISABLE 2FA'}
+            </button>
+          </div>
+        ) : twoFaSetup ? (
+          <div className="space-y-4">
+            <p className="text-xs text-slate-400">Scan this QR code with your authenticator app (Google Authenticator, Authy, etc.).</p>
+            <img src={twoFaSetup.qrCodeUrl} alt="2FA QR Code" className="w-40 h-40 bg-white p-2 rounded" />
+            <p className="text-xs text-slate-500">Or enter this secret manually: <code className="text-cyan-400 font-mono">{twoFaSetup.secret}</code></p>
+            <div className="space-y-2">
+              <label className="text-xs font-mono-sc text-slate-500 uppercase tracking-wider">Enter the 6-digit code to confirm</label>
+              <input
+                type="text"
+                value={twoFaCode}
+                onChange={(e) => setTwoFaCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="000000"
+                maxLength={6}
+                className="sci-input w-32 text-center font-mono tracking-widest"
+              />
+            </div>
+            <button
+              onClick={handleEnable2FA}
+              disabled={twoFaLoading || twoFaCode.length !== 6}
+              className="flex items-center gap-2 py-2 px-4 bg-cyan-900/40 border border-cyan-700/50 hover:border-cyan-500/70 hover:bg-cyan-900/60 text-cyan-300 font-mono-sc text-sm rounded transition-colors disabled:opacity-50"
+            >
+              <ShieldCheck size={14} />
+              {twoFaLoading ? 'VERIFYING...' : 'ACTIVATE 2FA'}
+            </button>
           </div>
         ) : (
           <button
-            onClick={handleGenerateApiToken}
-            disabled={generatingToken}
+            onClick={handleSetup2FA}
+            disabled={twoFaLoading}
             className="flex items-center gap-2 py-2 px-4 bg-cyan-900/40 border border-cyan-700/50 hover:border-cyan-500/70 hover:bg-cyan-900/60 text-cyan-300 font-mono-sc text-sm rounded transition-colors disabled:opacity-50"
           >
-            <Key size={14} />
-            {generatingToken ? 'GENERATING...' : 'GENERATE API TOKEN'}
+            <QrCode size={14} />
+            {twoFaLoading ? 'LOADING...' : 'SET UP 2FA'}
           </button>
         )}
       </motion.div>

@@ -10,6 +10,8 @@ export interface AuthUser {
   role: string;
   avatarUrl: string | null;
   createdAt: string;
+  emailVerified: boolean;
+  twoFactorEnabled: boolean;
 }
 
 interface AuthState {
@@ -18,8 +20,9 @@ interface AuthState {
 }
 
 interface AuthContextValue extends AuthState {
-  login: (emailOrUsername: string, password: string) => Promise<void>;
-  register: (email: string, username: string, password: string) => Promise<void>;
+  login: (emailOrUsername: string, password: string) => Promise<{ requires2FA: true; pendingToken: string } | void>;
+  register: (email: string, username: string, password: string) => Promise<{ requiresVerification: true } | void>;
+  verify2FA: (pendingToken: string, code: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -55,6 +58,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? 'Login failed');
+    if (data.requires2FA) {
+      return { requires2FA: true as const, pendingToken: data.pendingToken as string };
+    }
+    setState({ user: data.user, loading: false });
+  }, []);
+
+  const verify2FA = useCallback(async (pendingToken: string, code: string) => {
+    const res = await fetch('/api/auth/2fa/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pendingToken, code }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? '2FA verification failed');
     setState({ user: data.user, loading: false });
   }, []);
 
@@ -66,7 +83,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? 'Registration failed');
-    setState({ user: data.user, loading: false });
+    if (data.requiresVerification) {
+      return { requiresVerification: true as const };
+    }
   }, []);
 
   const logout = useCallback(async () => {
@@ -75,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ ...state, login, register, logout, refresh }}>
+    <AuthContext.Provider value={{ ...state, login, register, verify2FA, logout, refresh }}>
       {children}
     </AuthContext.Provider>
   );

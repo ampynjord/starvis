@@ -109,15 +109,21 @@ enum UserRole {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  uuid         String   @unique @default(cuid()) @db.VarChar(36)
-  email        String   @unique @db.VarChar(255)
-  username     String   @unique @db.VarChar(50)
-  passwordHash String   @map("password_hash") @db.VarChar(255)
-  role         UserRole @default(user)
-  avatarUrl    String?  @map("avatar_url") @db.VarChar(500)
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
+  id                Int       @id @default(autoincrement())
+  uuid              String    @unique @default(cuid()) @db.VarChar(36)
+  email             String    @unique @db.VarChar(255)
+  username          String    @unique @db.VarChar(50)
+  passwordHash      String    @map("password_hash") @db.VarChar(255)
+  role              UserRole  @default(user)
+  avatarUrl         String?   @map("avatar_url") @db.VarChar(500)
+  emailVerified     Boolean   @default(true) @map("email_verified")
+  verificationToken String?   @unique @map("verification_token") @db.VarChar(255)
+  resetToken        String?   @unique @map("reset_token") @db.VarChar(255)
+  resetTokenExpiry  DateTime? @map("reset_token_expiry")
+  twoFactorSecret   String?   @map("two_factor_secret") @db.VarChar(255)
+  twoFactorEnabled  Boolean   @default(false) @map("two_factor_enabled")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
 
   bugReports BugReport[]
 

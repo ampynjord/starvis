@@ -26,11 +26,13 @@ function isBetaRole(role: string | undefined): boolean {
   return BETA_ROLES.includes(role as (typeof BETA_ROLES)[number]);
 }
 
-function NavItem({ to, icon: Icon, label, auth: requiresAuth, beta, onNavigate }: NavItemDef & { onNavigate?: () => void }) {
+function NavItem({ to, icon: Icon, label, auth: requiresAuth, beta, exact, onNavigate }: NavItemDef & { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user } = useAuth();
   const hasBetaAccess = isBetaRole(user?.role);
-  const isActive = !beta || hasBetaAccess ? (to === '/' ? pathname === '/' : pathname?.startsWith(to)) : false;
+  const isActive = !beta || hasBetaAccess
+    ? (to === '/' ? pathname === '/' : exact ? pathname === to : pathname?.startsWith(to))
+    : false;
   const locked = requiresAuth && !user;
 
   if (beta && !hasBetaAccess) {
@@ -173,7 +175,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           <NavGroup
             label="Admin"
             items={[
-              { to: '/admin', icon: Shield, label: 'Administration' },
+              { to: '/admin', icon: Shield, label: 'Administration', exact: true },
               { to: '/admin/bug-reports', icon: Bug, label: 'Bug Reports' },
             ]}
             onNavigate={onClose}

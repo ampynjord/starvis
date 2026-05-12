@@ -23,6 +23,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: data.error ?? 'Login failed' }, { status: upstream.status });
     }
 
+    // 2FA step — return pending token to client, no cookie yet
+    if (data.requires2FA) {
+      return NextResponse.json({ requires2FA: true, pendingToken: data.pendingToken });
+    }
+
     const res = NextResponse.json({ user: data.user });
     res.cookies.set('starvis_token', data.token, {
       httpOnly: true,

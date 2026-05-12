@@ -1,9 +1,16 @@
 /**
- * POST /auth/register         — create an account
+ * POST /auth/register         — create an account (sends verification email)
  * POST /auth/login            — sign in
+ * POST /auth/verify-email     — verify email with token
+ * POST /auth/forgot-password  — request password reset email
+ * POST /auth/reset-password   — reset password with token
  * GET  /auth/me               — current profile (Bearer)
  * PUT  /auth/me               — update own profile (Bearer)
- * POST /auth/api-token        — generate a long-lived token (Bearer, for external projects)
+ * POST /auth/api-token        — generate a long-lived token (Bearer, beta_tester+ only)
+ * POST /auth/2fa/setup        — generate TOTP secret + QR code (Bearer)
+ * POST /auth/2fa/enable       — enable 2FA with TOTP code (Bearer)
+ * POST /auth/2fa/disable      — disable 2FA with TOTP code (Bearer)
+ * POST /auth/2fa/verify       — verify TOTP during login (pendingToken + code)
  *
  * Admin (Bearer role=admin or X-Api-Key):
  * GET  /admin/users           — list users
@@ -12,7 +19,13 @@
 import type { Router } from 'express';
 import { requireJwt, requireJwtAdmin, requireJwtBetaOrAdmin } from '../middleware/index.js';
 import { AuthService } from '../services/auth-service.js';
+import {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+} from '../services/email-service.js';
 import type { RouteDependencies } from './types.js';
+
+const STRONG_PASSWORD = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{8,}$/;
 
 export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   if (!process.env.JWT_SECRET) return;
@@ -27,8 +40,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     if (!email || !username || !password) {
       return void res.status(400).json({ success: false, error: 'email, username and password are required' });
     }
-    const strongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{8,}$/;
-    if (typeof password !== 'string' || !strongPassword.test(password)) {
+    if (typeof password !== 'string' || !STRONG_PASSWORD.test(password)) {
       return void res
         .status(400)
         .json({ success: false, error: 'Password must be 8+ chars with uppercase, lowercase, digit and special character' });
@@ -41,7 +53,12 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     }
     try {
       const result = await authService.register(email, username, password);
-      res.status(201).json({ success: true, ...result });
+      // Fire-and-forget verification email
+      const vtInfo = await authService.getVerificationToken(result.email);
+      if (vtInfo) {
+        sendVerificationEmail(result.email, vtInfo.username, vtInfo.token).catch(() => {});
+      }
+      res.status(201).json({ success: true, requiresVerification: true });
     } catch (e: any) {
       if (e.message === 'EMAIL_TAKEN') return void res.status(409).json({ success: false, error: 'Email already in use' });
       if (e.message === 'USERNAME_TAKEN') return void res.status(409).json({ success: false, error: 'Username already taken' });
@@ -57,10 +74,70 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     }
     try {
       const result = await authService.login(emailOrUsername, password);
-      res.json({ success: true, ...result });
+      if ('requires2FA' in result) {
+        return void res.json({ success: true, requires2FA: true, pendingToken: result.pendingToken });
+      }
+      res.json({ success: true, token: result.token, user: result.user });
     } catch (e: any) {
       if (e.message === 'INVALID_CREDENTIALS') return void res.status(401).json({ success: false, error: 'Invalid credentials' });
+      if (e.message === 'EMAIL_NOT_VERIFIED') {
+        return void res.status(403).json({ success: false, error: 'EMAIL_NOT_VERIFIED', emailNotVerified: true });
+      }
       res.status(500).json({ success: false, error: 'Login failed' });
+    }
+  });
+
+  // POST /auth/verify-email
+  router.post('/auth/verify-email', async (req, res) => {
+    const { token } = req.body ?? {};
+    if (!token || typeof token !== 'string') {
+      return void res.status(400).json({ success: false, error: 'token is required' });
+    }
+    try {
+      const result = await authService.verifyEmail(token);
+      res.json({ success: true, token: result.token, user: result.user });
+    } catch (e: any) {
+      if (e.message === 'INVALID_TOKEN') return void res.status(400).json({ success: false, error: 'Invalid or expired verification token' });
+      res.status(500).json({ success: false, error: 'Email verification failed' });
+    }
+  });
+
+  // POST /auth/forgot-password
+  router.post('/auth/forgot-password', async (req, res) => {
+    const { email } = req.body ?? {};
+    if (!email || typeof email !== 'string') {
+      return void res.status(400).json({ success: false, error: 'email is required' });
+    }
+    try {
+      const info = await authService.requestPasswordReset(email);
+      // Always return success to avoid email enumeration
+      if (info) {
+        sendPasswordResetEmail(email.toLowerCase().trim(), info.username, info.token).catch(() => {});
+      }
+      res.json({ success: true, message: 'If your email exists, a reset link has been sent.' });
+    } catch {
+      res.json({ success: true, message: 'If your email exists, a reset link has been sent.' });
+    }
+  });
+
+  // POST /auth/reset-password
+  router.post('/auth/reset-password', async (req, res) => {
+    const { token, password } = req.body ?? {};
+    if (!token || typeof token !== 'string') {
+      return void res.status(400).json({ success: false, error: 'token is required' });
+    }
+    if (typeof password !== 'string' || !STRONG_PASSWORD.test(password)) {
+      return void res
+        .status(400)
+        .json({ success: false, error: 'Password must be 8+ chars with uppercase, lowercase, digit and special character' });
+    }
+    try {
+      await authService.resetPassword(token, password);
+      res.json({ success: true });
+    } catch (e: any) {
+      if (e.message === 'INVALID_TOKEN') return void res.status(400).json({ success: false, error: 'Invalid or expired reset token' });
+      if (e.message === 'TOKEN_EXPIRED') return void res.status(400).json({ success: false, error: 'Reset token has expired' });
+      res.status(500).json({ success: false, error: 'Password reset failed' });
     }
   });
 
@@ -100,7 +177,6 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   });
 
   // ── API Token (external project access) ──────────────────────────────────
-  // POST /auth/api-token — generates a long-lived JWT (1 year); beta_tester+ only
   router.post('/auth/api-token', requireJwtBetaOrAdmin, async (req, res) => {
     const payload = (req as any).jwtPayload;
     const user = await authService.me(payload.sub);
@@ -109,9 +185,74 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     res.json({ success: true, token, expiresIn: '1y', note: 'Store this token securely — it will not be shown again.' });
   });
 
+  // ── 2FA endpoints ─────────────────────────────────────────────────────────
+
+  // POST /auth/2fa/setup
+  router.post('/auth/2fa/setup', requireJwt, async (req, res) => {
+    const payload = (req as any).jwtPayload;
+    try {
+      const result = await authService.setup2FA(payload.sub);
+      res.json({ success: true, ...result });
+    } catch {
+      res.status(500).json({ success: false, error: '2FA setup failed' });
+    }
+  });
+
+  // POST /auth/2fa/enable
+  router.post('/auth/2fa/enable', requireJwt, async (req, res) => {
+    const payload = (req as any).jwtPayload;
+    const { code } = req.body ?? {};
+    if (typeof code !== 'string' || code.length !== 6) {
+      return void res.status(400).json({ success: false, error: '6-digit code required' });
+    }
+    try {
+      await authService.enable2FA(payload.sub, code);
+      res.json({ success: true });
+    } catch (e: any) {
+      if (e.message === 'INVALID_2FA_CODE') return void res.status(400).json({ success: false, error: 'Invalid authentication code' });
+      if (e.message === '2FA_NOT_SETUP') return void res.status(400).json({ success: false, error: '2FA not configured — call /auth/2fa/setup first' });
+      res.status(500).json({ success: false, error: '2FA activation failed' });
+    }
+  });
+
+  // POST /auth/2fa/disable
+  router.post('/auth/2fa/disable', requireJwt, async (req, res) => {
+    const payload = (req as any).jwtPayload;
+    const { code } = req.body ?? {};
+    if (typeof code !== 'string' || code.length !== 6) {
+      return void res.status(400).json({ success: false, error: '6-digit code required' });
+    }
+    try {
+      await authService.disable2FA(payload.sub, code);
+      res.json({ success: true });
+    } catch (e: any) {
+      if (e.message === 'INVALID_2FA_CODE') return void res.status(400).json({ success: false, error: 'Invalid authentication code' });
+      if (e.message === '2FA_NOT_ENABLED') return void res.status(400).json({ success: false, error: '2FA is not currently enabled' });
+      res.status(500).json({ success: false, error: '2FA deactivation failed' });
+    }
+  });
+
+  // POST /auth/2fa/verify
+  router.post('/auth/2fa/verify', async (req, res) => {
+    const { pendingToken, code } = req.body ?? {};
+    if (!pendingToken || typeof pendingToken !== 'string') {
+      return void res.status(400).json({ success: false, error: 'pendingToken is required' });
+    }
+    if (typeof code !== 'string' || code.length !== 6) {
+      return void res.status(400).json({ success: false, error: '6-digit code required' });
+    }
+    try {
+      const result = await authService.verify2FA(pendingToken, code);
+      res.json({ success: true, token: result.token, user: result.user });
+    } catch (e: any) {
+      if (e.message === 'INVALID_2FA_CODE') return void res.status(400).json({ success: false, error: 'Invalid authentication code' });
+      if (e.message === 'INVALID_TOKEN') return void res.status(400).json({ success: false, error: 'Session expired — please log in again' });
+      res.status(500).json({ success: false, error: '2FA verification failed' });
+    }
+  });
+
   // ── Admin: user management ───────────────────────────────────────────────
 
-  // GET /admin/users
   router.get('/admin/users', requireJwtAdmin, async (_req, res) => {
     try {
       const users = await authService.listUsers();
@@ -121,7 +262,6 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     }
   });
 
-  // PUT /admin/users/:id/role
   router.put('/admin/users/:id/role', requireJwtAdmin, async (req, res) => {
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {
@@ -140,7 +280,6 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     }
   });
 
-  // PUT /admin/users/:id — modifier email / username / avatarUrl
   router.put('/admin/users/:id', requireJwtAdmin, async (req, res) => {
     const id = Number(req.params.id);
     const { username, email, avatarUrl } = req.body ?? {};
@@ -166,12 +305,10 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     }
   });
 
-  // POST /admin/users/:id/reset-password
   router.post('/admin/users/:id/reset-password', requireJwtAdmin, async (req, res) => {
     const id = Number(req.params.id);
     const { password } = req.body ?? {};
-    const strongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{8,}$/;
-    if (typeof password !== 'string' || !strongPassword.test(password)) {
+    if (typeof password !== 'string' || !STRONG_PASSWORD.test(password)) {
       return void res
         .status(400)
         .json({ success: false, error: 'Password must be 8+ chars with uppercase, lowercase, digit and special character' });
@@ -184,7 +321,6 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     }
   });
 
-  // DELETE /admin/users/:id
   router.delete('/admin/users/:id', requireJwtAdmin, async (req, res) => {
     const id = Number(req.params.id);
     const requesterId = (req as any).jwtPayload?.sub;
@@ -200,14 +336,12 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     }
   });
 
-  // POST /admin/users — create a user (admin bypass)
   router.post('/admin/users', requireJwtAdmin, async (req, res) => {
     const { email, username, password, role } = req.body ?? {};
     if (!email || !username || !password) {
       return void res.status(400).json({ success: false, error: 'email, username and password are required' });
     }
-    const strongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{8,}$/;
-    if (typeof password !== 'string' || !strongPassword.test(password)) {
+    if (typeof password !== 'string' || !STRONG_PASSWORD.test(password)) {
       return void res
         .status(400)
         .json({ success: false, error: 'Password must be 8+ chars with uppercase, lowercase, digit and special character' });
