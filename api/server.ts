@@ -111,11 +111,14 @@ app.use((req, res, next) => {
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const swaggerSpec = JSON.parse(readFileSync(path.join(__dirname, 'openapi.json'), 'utf-8'));
 swaggerSpec.servers = [{ url: '/', description: 'Current host' }];
-const swaggerSetup = swaggerUi.setup(swaggerSpec);
-// Redirect /api-docs → /api-docs/ so relative asset paths (./swagger-ui.css etc.) resolve correctly.
-// Traefik forwards X-Forwarded-Host + X-Forwarded-Proto so the redirect lands on the right domain.
-app.get(/^\/api-docs$/, (_, res) => res.redirect(301, '/api-docs/'));
-app.use('/api-docs', swaggerUi.serve, swaggerSetup);
+// Generate HTML with absolute asset paths so it works at /api-docs (no trailing slash).
+// swagger-ui-express uses relative paths (./swagger-ui.css) by default, which break when
+// the browser URL has no trailing slash (./foo resolves to /foo instead of /api-docs/foo).
+const swaggerHtml = swaggerUi.generateHTML(swaggerSpec)
+  .replace(/href="\.\//g, 'href="/api-docs/')
+  .replace(/src="\.\//g, 'src="/api-docs/');
+app.get('/api-docs', (_, res) => res.type('html').send(swaggerHtml));
+app.use('/api-docs', swaggerUi.serve);
 
 // ===== ROOT =====
 app.get('/', (_, res) =>
