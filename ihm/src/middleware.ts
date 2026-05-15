@@ -42,6 +42,8 @@ const PUBLIC_PREFIXES = [
   '/favicon',
   '/robots',
   '/sitemap',
+  // API documentation (Swagger UI proxied from backend)
+  '/api-docs',
 ];
 
 export function middleware(req: NextRequest) {
