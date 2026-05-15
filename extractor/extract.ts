@@ -17,7 +17,7 @@ import { resolve } from 'node:path';
 import { config } from 'dotenv';
 
 // .env files live inside extractor/ (self-contained local tool)
-const envFile = process.argv.includes('--prod-db') ? '.env.prod' : '.env.dev';
+const envFile = process.argv.includes('--prod-db') ? '.env.extractor.prod' : '.env.extractor.dev';
 config({ path: resolve(import.meta.dirname, envFile) });
 
 import { existsSync, readFileSync } from 'node:fs';
