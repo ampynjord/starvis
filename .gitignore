@@ -84,7 +84,7 @@ db/generated/
 .claude
 
 # Scripts et configs locaux non versionnés
-sync-remotes.sh
+sync-remotes.ps1
 .gitlab-ci.yml
 
 # Env API self-hosted
