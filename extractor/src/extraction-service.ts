@@ -906,7 +906,7 @@ export class ExtractionService {
         // Classify vehicle category
         let vehicleCategory = 'ship';
         const GROUND_PATTERNS =
-          /(?:^|\b|_)(cyclone|ursa|rover|spartan|ballista|tonk|nova|centurion|storm|lynx|roc|mule|ptv|greycat|buggy|tumbril|cart)(?:_|\b|$)/i;
+          /(?:^|\b|_)(cyclone|ursa|rover|spartan|ballista|tonk|nova|centurion|storm|lynx|roc|mule|ptv|greycat|buggy|tumbril|cart|utv)(?:_|\b|$)/i;
         const GRAVLEV_PATTERNS = /(?:^|\b|_)(dragonfly|nox|x1|ranger|hex|pulse|hoverquad)(?:_|\b|$)/i;
         if (GROUND_PATTERNS.test(veh.className)) vehicleCategory = 'ground';
         else if (GRAVLEV_PATTERNS.test(veh.className)) vehicleCategory = 'gravlev';

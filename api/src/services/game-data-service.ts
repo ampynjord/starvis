@@ -231,7 +231,7 @@ export class GameDataService {
 
   async getLatestExtraction(env = 'live'): Promise<Row | null> {
     const rows = await this.getClient('live').$queryRawUnsafe<Row[]>(
-      toPostgres('SELECT * FROM meta.extraction_log WHERE game_env = ? ORDER BY extracted_at DESC LIMIT 1'),
+      toPostgres('SELECT * FROM meta.extraction_log WHERE game_env = ? AND ships_count > 0 ORDER BY extracted_at DESC LIMIT 1'),
       env,
     );
     return rows[0] || null;
