@@ -89,3 +89,8 @@ sync-remotes.ps1
 
 # Env API self-hosted
 .env.api-only
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
