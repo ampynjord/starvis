@@ -7,6 +7,8 @@ const PUBLIC_PATHS = new Set([
   '/login',
   '/register',
   '/verify-email',
+  '/forgot-password',
+  '/reset-password',
   '/ships',
   '/ships-components',
   '/paints',
