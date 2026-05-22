@@ -612,6 +612,29 @@
             "items": { "$ref": "#/components/schemas/LoadoutPort" }
           }
         }
+      },
+      "BugReport": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer" },
+          "title": { "type": "string", "maxLength": 200 },
+          "description": { "type": "string", "maxLength": 20000 },
+          "status": { "type": "string", "enum": ["open", "in_progress", "resolved", "closed"] },
+          "attachments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": { "type": "string" },
+                "type": { "type": "string" },
+                "data": { "type": "string", "description": "base64-encoded content" }
+              }
+            }
+          },
+          "userId": { "type": "integer" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
       }
     },
     "responses": {
@@ -675,6 +698,7 @@
     { "name": "Admin", "description": "Administrative endpoints (require Bearer JWT admin role or X-API-Key)" },
     { "name": "Auth", "description": "Authentication — register, login, JWT tokens" },
     { "name": "Chat", "description": "AI assistant powered by Mistral (requires Bearer JWT)" },
+    { "name": "Bug Reports", "description": "User bug reports and admin management" },
     { "name": "Health", "description": "Liveness, readiness probes and Prometheus metrics" }
   ],
   "paths": {
@@ -2083,22 +2107,33 @@
         "tags": ["Calculators"],
         "summary": "Calculate FPS weapon damage",
         "operationId": "calcFpsDamage",
+        "description": "Calculates damage output for a FPS weapon with optional armor mitigation, fire mode and attachment bonuses.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": ["itemUuid"],
                 "properties": {
-                  "weapon_uuid": { "type": "string" },
-                  "target_armor": { "type": "string" },
-                  "shots": { "type": "integer", "default": 1 }
+                  "itemUuid": { "type": "string", "description": "UUID of the FPS weapon item" },
+                  "env": { "type": "string", "enum": ["live", "ptu", "custom"], "default": "live" },
+                  "fireMode": { "type": "string", "enum": ["Single", "Burst", "Auto"] },
+                  "hitbox": { "type": "string", "enum": ["head", "torso", "arm", "leg"], "default": "torso" },
+                  "armorClass": { "type": "string", "enum": ["none", "light", "medium", "heavy"], "default": "none" },
+                  "health": { "type": "number", "minimum": 1, "maximum": 10000, "default": 100 },
+                  "barrelRateBonus": { "type": "number", "minimum": 0, "maximum": 100, "description": "Barrel attachment RPM bonus (%)" },
+                  "underbarrelDamageBonus": { "type": "number", "minimum": 0, "maximum": 100, "description": "Underbarrel damage bonus (%)" },
+                  "craftedMitigationBonus": { "type": "number", "minimum": 0, "maximum": 100, "description": "Crafted armor mitigation bonus (%)" }
                 }
               }
             }
           }
         },
-        "responses": { "200": { "description": "Damage calculation result" } }
+        "responses": {
+          "200": { "description": "Damage calculation result" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
       }
     },
     "/api/v1/calculate/mining-yield": {
@@ -2106,21 +2141,28 @@
         "tags": ["Calculators"],
         "summary": "Calculate mining yield",
         "operationId": "calcMiningYield",
+        "description": "Calculates the expected mineral yield for a given rock composition with optional laser and gadgets.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
+                "required": ["compositionUuid"],
                 "properties": {
-                  "composition_id": { "type": "integer" },
-                  "rock_mass": { "type": "number" }
+                  "compositionUuid": { "type": "string", "description": "UUID of the rock composition" },
+                  "env": { "type": "string", "enum": ["live", "ptu", "custom"], "default": "live" },
+                  "laserUuid": { "type": "string", "description": "Optional mining laser component UUID" },
+                  "gadgetUuids": { "type": "array", "items": { "type": "string" }, "maxItems": 3, "description": "Optional mining gadget component UUIDs (max 3)" }
                 }
               }
             }
           }
         },
-        "responses": { "200": { "description": "Yield breakdown by element" } }
+        "responses": {
+          "200": { "description": "Yield breakdown by element" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
       }
     },
     "/api/v1/search": {
@@ -2888,15 +2930,14 @@
         },
         "responses": {
           "201": {
-            "description": "Account created",
+            "description": "Account created — verification email sent",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": { "type": "boolean" },
-                    "token": { "type": "string", "description": "JWT Bearer token (24h)" },
-                    "user": { "$ref": "#/components/schemas/User" }
+                    "success": { "type": "boolean", "example": true },
+                    "requiresVerification": { "type": "boolean", "example": true, "description": "Always true — user must verify their email before logging in" }
                   }
                 }
               }
@@ -3000,6 +3041,17 @@
             }
           },
           "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "delete": {
+        "tags": ["Auth"],
+        "summary": "Delete own account",
+        "operationId": "deleteMe",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Account deleted" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
     },
@@ -3127,6 +3179,639 @@
           },
           "400": { "$ref": "#/components/responses/BadRequest" },
           "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+
+    "/admin/users/{id}": {
+      "put": {
+        "tags": ["Admin"],
+        "summary": "Update any user's profile (admin only)",
+        "operationId": "adminUpdateUser",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": { "type": "string", "minLength": 3, "maxLength": 50, "pattern": "^[a-zA-Z0-9_-]+$" },
+                  "email": { "type": "string", "format": "email" },
+                  "avatarUrl": { "type": "string", "format": "uri" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated user" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "409": { "description": "Email or username already taken" }
+        }
+      },
+      "delete": {
+        "tags": ["Admin"],
+        "summary": "Delete a user (admin only)",
+        "operationId": "adminDeleteUser",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": {
+          "200": { "description": "User deleted" },
+          "400": { "description": "Cannot delete your own account" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/admin/users/{id}/reset-password": {
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Force-reset a user's password (admin only)",
+        "operationId": "adminResetUserPassword",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["password"],
+                "properties": { "password": { "type": "string", "minLength": 8, "description": "Must contain uppercase, lowercase, digit and special character" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Password reset" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+
+    "/admin/bug-reports": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "List all bug reports (admin only)",
+        "operationId": "adminListBugReports",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "status", "in": "query", "schema": { "type": "string", "enum": ["open", "in_progress", "resolved", "closed"] } },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated bug report list with user info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "total": { "type": "integer" },
+                    "page": { "type": "integer" },
+                    "limit": { "type": "integer" },
+                    "data": { "type": "array", "items": { "$ref": "#/components/schemas/BugReport" } }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+
+    "/admin/bug-reports/{id}": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "Get one bug report (admin only)",
+        "operationId": "adminGetBugReport",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "responses": {
+          "200": {
+            "description": "Bug report detail with attachments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "success": { "type": "boolean" }, "data": { "$ref": "#/components/schemas/BugReport" } }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      },
+      "patch": {
+        "tags": ["Admin"],
+        "summary": "Update bug report status (admin only)",
+        "operationId": "adminUpdateBugReport",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [{ "name": "id", "in": "path", "required": true, "schema": { "type": "integer" } }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "type": "string", "enum": ["open", "in_progress", "resolved", "closed"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Updated bug report" },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/api/v1/bug-reports": {
+      "get": {
+        "tags": ["Bug Reports"],
+        "summary": "List own bug reports",
+        "operationId": "listMyBugReports",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of the authenticated user's reports",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "total": { "type": "integer" },
+                    "page": { "type": "integer" },
+                    "limit": { "type": "integer" },
+                    "pages": { "type": "integer" },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": { "type": "integer" },
+                          "title": { "type": "string" },
+                          "status": { "type": "string" },
+                          "createdAt": { "type": "string", "format": "date-time" },
+                          "updatedAt": { "type": "string", "format": "date-time" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      },
+      "post": {
+        "tags": ["Bug Reports"],
+        "summary": "Submit a bug report",
+        "operationId": "createBugReport",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "description"],
+                "properties": {
+                  "title": { "type": "string", "maxLength": 200 },
+                  "description": { "type": "string", "maxLength": 20000 },
+                  "attachments": {
+                    "type": "array",
+                    "maxItems": 5,
+                    "description": "Optional attachments (max 5, 4 MB each)",
+                    "items": {
+                      "type": "object",
+                      "required": ["name", "type", "data"],
+                      "properties": {
+                        "name": { "type": "string" },
+                        "type": { "type": "string", "description": "MIME type" },
+                        "data": { "type": "string", "description": "base64-encoded file content" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Report created — confirmation email sent to user and notification to admin",
+            "content": {
+              "application/json": {
+                "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "object", "properties": { "id": { "type": "integer" } } } } }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/BadRequest" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+
+    "/auth/verify-email": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Verify email address",
+        "operationId": "verifyEmail",
+        "description": "Validates the email verification token sent after registration. Returns a JWT on success — the user is now logged in.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["token"],
+                "properties": { "token": { "type": "string", "description": "Token received in the verification email" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email verified — JWT issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "token": { "type": "string" },
+                    "user": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid or expired verification token" }
+        }
+      }
+    },
+
+    "/auth/forgot-password": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Request a password reset email",
+        "operationId": "forgotPassword",
+        "description": "Always returns success to prevent email enumeration. If the account exists a reset link is emailed.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email"],
+                "properties": { "email": { "type": "string", "format": "email" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Success (regardless of whether the email exists)" }
+        }
+      }
+    },
+
+    "/auth/reset-password": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Reset password with token",
+        "operationId": "resetPassword",
+        "description": "Validates the reset token (valid 1 hour) and sets a new password.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["token", "password"],
+                "properties": {
+                  "token": { "type": "string" },
+                  "password": { "type": "string", "minLength": 8, "description": "Must contain uppercase, lowercase, digit and special character" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Password reset successfully" },
+          "400": { "description": "Invalid or expired reset token" }
+        }
+      }
+    },
+
+    "/auth/2fa/setup": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Set up 2FA — generate TOTP secret",
+        "operationId": "setup2FA",
+        "security": [{ "bearerAuth": [] }],
+        "description": "Generates a TOTP secret and returns the QR code URL. Call `/auth/2fa/enable` with a valid code to activate.",
+        "responses": {
+          "200": {
+            "description": "TOTP secret and QR code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "secret": { "type": "string" },
+                    "qrCodeUrl": { "type": "string", "description": "otpauth:// URL to encode as QR code" }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+
+    "/auth/2fa/enable": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Enable 2FA — confirm with TOTP code",
+        "operationId": "enable2FA",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["code"],
+                "properties": { "code": { "type": "string", "minLength": 6, "maxLength": 6, "description": "6-digit TOTP code" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "2FA enabled" },
+          "400": { "description": "Invalid TOTP code or 2FA not set up" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+
+    "/auth/2fa/disable": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Disable 2FA",
+        "operationId": "disable2FA",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["code"],
+                "properties": { "code": { "type": "string", "minLength": 6, "maxLength": 6, "description": "6-digit TOTP code to confirm" } }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "2FA disabled" },
+          "400": { "description": "Invalid TOTP code or 2FA not enabled" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+
+    "/auth/2fa/verify": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Complete 2FA login",
+        "operationId": "verify2FA",
+        "description": "Called after a login that returned `requires2FA: true`. Supply the pending token and the TOTP code to receive a full JWT.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["pendingToken", "code"],
+                "properties": {
+                  "pendingToken": { "type": "string", "description": "Short-lived token returned by POST /auth/login when 2FA is required" },
+                  "code": { "type": "string", "minLength": 6, "maxLength": 6 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated — full JWT issued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "token": { "type": "string" },
+                    "user": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Invalid TOTP code or session expired" }
+        }
+      }
+    },
+
+    "/api/v1/ships/{uuid}/stats": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get ship hardpoint summary stats",
+        "operationId": "getShipStats",
+        "description": "Returns aggregated counts of weapons, shields, quantum drives, coolers, power plants and countermeasures.",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hardpoint aggregate stats",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "total_hardpoints": { "type": "integer" },
+                        "weapons": { "type": "integer" },
+                        "shields": { "type": "integer" },
+                        "quantum_drives": { "type": "integer" },
+                        "coolers": { "type": "integer" },
+                        "power_plants": { "type": "integer" },
+                        "by_type": { "type": "object", "additionalProperties": { "type": "integer" } }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/api/v1/ships/{uuid}/hardpoints": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get ship hardpoints list",
+        "operationId": "getShipHardpoints",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": {
+          "200": { "description": "Flat list of all hardpoints with size/type info" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/api/v1/ships/{uuid}/similar": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get similar ships",
+        "operationId": "getSimilarShips",
+        "description": "Returns ships with the same career and role, ordered by similarity.",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "schema": { "type": "integer", "default": 5, "maximum": 10 } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": {
+          "200": { "description": "Similar ships" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/api/v1/ships/{uuid}/variants": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get ship variants (same chassis)",
+        "operationId": "getShipVariants",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": {
+          "200": { "description": "All variants of the same chassis family" },
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
+      }
+    },
+
+    "/api/v1/ships/{uuid}/model": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Get 3D model metadata",
+        "operationId": "getShipModel",
+        "description": "Returns the CTM URL and proxy URL for the ship's 3D model. Use `/model/file` to download the binary.",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": {
+          "200": {
+            "description": "3D model metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "uuid": { "type": "string" },
+                        "name": { "type": "string" },
+                        "format": { "type": "string", "example": "ctm" },
+                        "url": { "type": "string", "description": "Original RSI CDN URL" },
+                        "proxy_url": { "type": "string", "description": "Starvis proxy URL (cached)" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": { "description": "Ship not found or no 3D model available" }
+        }
+      }
+    },
+
+    "/api/v1/ships/{uuid}/model/file": {
+      "get": {
+        "tags": ["Ships"],
+        "summary": "Download 3D model binary (.ctm)",
+        "operationId": "getShipModelFile",
+        "description": "Serves the binary `.ctm` file. First request downloads from RSI and caches to disk; subsequent requests are served from cache. Supports `If-None-Match` / ETag for browser caching.",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Binary CTM file",
+            "headers": {
+              "X-CTM-Cache": { "schema": { "type": "string", "enum": ["HIT", "MISS"] } }
+            },
+            "content": { "application/octet-stream": { "schema": { "type": "string", "format": "binary" } } }
+          },
+          "304": { "description": "Not modified (ETag match)" },
+          "404": { "description": "Ship not found or no 3D model available" }
+        }
+      }
+    },
+
+    "/api/v1/items/{uuid}/buy-locations": {
+      "get": {
+        "tags": ["Items"],
+        "summary": "Where to buy an item",
+        "operationId": "getItemBuyLocations",
+        "parameters": [
+          { "name": "uuid", "in": "path", "required": true, "schema": { "type": "string" } },
+          { "$ref": "#/components/parameters/env" }
+        ],
+        "responses": {
+          "200": { "description": "Shop locations where the item can be purchased" },
+          "404": { "$ref": "#/components/responses/NotFound" }
         }
       }
     }
