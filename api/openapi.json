@@ -2123,8 +2123,18 @@
                   "armorClass": { "type": "string", "enum": ["none", "light", "medium", "heavy"], "default": "none" },
                   "health": { "type": "number", "minimum": 1, "maximum": 10000, "default": 100 },
                   "barrelRateBonus": { "type": "number", "minimum": 0, "maximum": 100, "description": "Barrel attachment RPM bonus (%)" },
-                  "underbarrelDamageBonus": { "type": "number", "minimum": 0, "maximum": 100, "description": "Underbarrel damage bonus (%)" },
-                  "craftedMitigationBonus": { "type": "number", "minimum": 0, "maximum": 100, "description": "Crafted armor mitigation bonus (%)" }
+                  "underbarrelDamageBonus": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Underbarrel damage bonus (%)"
+                  },
+                  "craftedMitigationBonus": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Crafted armor mitigation bonus (%)"
+                  }
                 }
               }
             }
@@ -2153,7 +2163,12 @@
                   "compositionUuid": { "type": "string", "description": "UUID of the rock composition" },
                   "env": { "type": "string", "enum": ["live", "ptu", "custom"], "default": "live" },
                   "laserUuid": { "type": "string", "description": "Optional mining laser component UUID" },
-                  "gadgetUuids": { "type": "array", "items": { "type": "string" }, "maxItems": 3, "description": "Optional mining gadget component UUIDs (max 3)" }
+                  "gadgetUuids": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "maxItems": 3,
+                    "description": "Optional mining gadget component UUIDs (max 3)"
+                  }
                 }
               }
             }
@@ -2937,7 +2952,11 @@
                   "type": "object",
                   "properties": {
                     "success": { "type": "boolean", "example": true },
-                    "requiresVerification": { "type": "boolean", "example": true, "description": "Always true — user must verify their email before logging in" }
+                    "requiresVerification": {
+                      "type": "boolean",
+                      "example": true,
+                      "description": "Always true — user must verify their email before logging in"
+                    }
                   }
                 }
               }
@@ -3241,7 +3260,13 @@
               "schema": {
                 "type": "object",
                 "required": ["password"],
-                "properties": { "password": { "type": "string", "minLength": 8, "description": "Must contain uppercase, lowercase, digit and special character" } }
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "description": "Must contain uppercase, lowercase, digit and special character"
+                  }
+                }
               }
             }
           }
@@ -3346,10 +3371,7 @@
         "summary": "List own bug reports",
         "operationId": "listMyBugReports",
         "security": [{ "bearerAuth": [] }],
-        "parameters": [
-          { "$ref": "#/components/parameters/page" },
-          { "$ref": "#/components/parameters/limit" }
-        ],
+        "parameters": [{ "$ref": "#/components/parameters/page" }, { "$ref": "#/components/parameters/limit" }],
         "responses": {
           "200": {
             "description": "Paginated list of the authenticated user's reports",
@@ -3423,7 +3445,13 @@
             "description": "Report created — confirmation email sent to user and notification to admin",
             "content": {
               "application/json": {
-                "schema": { "type": "object", "properties": { "success": { "type": "boolean" }, "data": { "type": "object", "properties": { "id": { "type": "integer" } } } } }
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "type": "object", "properties": { "id": { "type": "integer" } } }
+                  }
+                }
               }
             }
           },
@@ -3511,7 +3539,11 @@
                 "required": ["token", "password"],
                 "properties": {
                   "token": { "type": "string" },
-                  "password": { "type": "string", "minLength": 8, "description": "Must contain uppercase, lowercase, digit and special character" }
+                  "password": {
+                    "type": "string",
+                    "minLength": 8,
+                    "description": "Must contain uppercase, lowercase, digit and special character"
+                  }
                 }
               }
             }
@@ -3591,7 +3623,9 @@
               "schema": {
                 "type": "object",
                 "required": ["code"],
-                "properties": { "code": { "type": "string", "minLength": 6, "maxLength": 6, "description": "6-digit TOTP code to confirm" } }
+                "properties": {
+                  "code": { "type": "string", "minLength": 6, "maxLength": 6, "description": "6-digit TOTP code to confirm" }
+                }
               }
             }
           }
@@ -3618,7 +3652,10 @@
                 "type": "object",
                 "required": ["pendingToken", "code"],
                 "properties": {
-                  "pendingToken": { "type": "string", "description": "Short-lived token returned by POST /auth/login when 2FA is required" },
+                  "pendingToken": {
+                    "type": "string",
+                    "description": "Short-lived token returned by POST /auth/login when 2FA is required"
+                  },
                   "code": { "type": "string", "minLength": 6, "maxLength": 6 }
                 }
               }
