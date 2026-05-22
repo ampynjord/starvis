@@ -258,18 +258,24 @@ export class ExtractionService {
     }
 
     const conn = await this.pool.connect();
-    // Keepalive: send a harmless SELECT every 30 s to prevent the MySQL server
-    // (or the SSH tunnel in front of it) from closing the connection during the
+    // Attach an error listener so that unexpected connection drops (e.g.
+    // server-side idle_in_transaction timeout, OOM kill) are logged instead of
+    // crashing the process as an unhandled 'error' event.  The error will still
+    // surface on the next awaited conn.query() and be caught by the try/catch.
+    conn.on('error', (err) => {
+      logger.error('PostgreSQL connection terminated unexpectedly during extraction', { error: err.message });
+    });
+    // Keepalive: send a harmless SELECT every 30 s to prevent the server
+    // (or an SSH tunnel in front of it) from closing the connection during the
     // CPU-intensive ship-extraction phase (which can run for 15+ minutes without
     // sending any SQL).
     const keepaliveTimer = setInterval(async () => {
       try {
         await conn.query('SELECT 1');
       } catch {
-        /* ignore — if the connection is
-      broken we'll find out on the next real query */
+        /* ignore — if the connection is broken we'll find out on the next real query */
       }
-    }, 30_000);
+    }, 10_000);
     try {
       // 1b. Snapshot current data BEFORE cleaning — for changelog comparison
       onProgress?.('Snapshotting current data for changelog…');
