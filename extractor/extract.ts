@@ -260,6 +260,9 @@ async function main() {
         password: process.env.DB_PASSWORD || '',
         database: process.env.DB_NAME || 'starvis',
         max: 5,
+        // Disable server-side timeouts — extraction can run for 15+ min in a
+        // single transaction across an SSH tunnel.
+        options: '--idle_in_transaction_session_timeout=0 --statement_timeout=0',
       };
 
   if (!process.env.DATABASE_URL && (!process.env.DB_USER || !process.env.DB_PASSWORD)) {
