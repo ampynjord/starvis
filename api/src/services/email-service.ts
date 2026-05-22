@@ -4,8 +4,8 @@ import logger from '../utils/logger.js';
 const _require = createRequire(import.meta.url);
 
 function getSiteUrl(): string {
-  const origin = process.env.CORS_ORIGIN ?? '';
-  return origin.split(',')[0].trim().replace(/\/$/, '') || 'http://localhost:8080';
+  const url = process.env.SITE_URL || process.env.CORS_ORIGIN?.split(',')[0].trim() || 'http://localhost:8080';
+  return url.replace(/\/$/, '');
 }
 
 async function createTransporter() {
