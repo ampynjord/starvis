@@ -1035,6 +1035,7 @@ export class ChatService {
           // PARALLEL execution of all tool calls in the response
           const results = await Promise.all(
             msg.tool_calls.map(async (tc) => {
+              if (tc.type !== 'function') return { id: tc.id, result: null };
               let args: Record<string, unknown> = {};
               try {
                 args = JSON.parse(tc.function.arguments);
@@ -1111,6 +1112,7 @@ export class ChatService {
           groqMessages.push(msg);
           const results = await Promise.all(
             msg.tool_calls.map(async (tc) => {
+              if (tc.type !== 'function') return { id: tc.id, result: null };
               let args: Record<string, unknown> = {};
               try {
                 args = JSON.parse(tc.function.arguments);
