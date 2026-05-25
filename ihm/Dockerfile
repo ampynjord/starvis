@@ -9,6 +9,7 @@ RUN npm ci --workspace=starvis-ihm
 FROM node:22-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/ihm/node_modules ./ihm/node_modules
 COPY ihm/ ./ihm/
 COPY package*.json ./
 RUN npm run build --workspace=starvis-ihm
