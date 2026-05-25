@@ -23,34 +23,88 @@ Star Citizen data platform
 
 ---
 
-## Quick start
+## Local install
 
 ### Prerequisites
 
-- Node.js 22+
-- Docker & Docker Compose
+- [Node.js 22+](https://nodejs.org)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine + Compose v2)
+- Git
 
-### Development
+### 1 — Clone and install dependencies
+
+```bash
+git clone https://github.com/ampynjord/starvis.git
+cd starvis
+npm install        # installs all workspaces (api, ihm, bot, extractor, db)
+```
+
+### 2 — Configure the environment
 
 ```bash
 cp .env.dev.example .env.dev
-# Fill in .env.dev: DB_PASSWORD, JWT_SECRET, ADMIN_API_KEY
-# Discord optional: DISCORD_TOKEN, DISCORD_CLIENT_ID, DISCORD_GUILD_ID
+```
 
+Open `.env.dev` and set at minimum:
+
+| Variable | Required | Description |
+|---|---|---|
+| `DB_PASSWORD` | yes | PostgreSQL password (any string in dev) |
+| `JWT_SECRET` | yes | Random secret for JWT signing (≥ 32 chars) |
+| `ADMIN_API_KEY` | yes | API key for admin endpoints |
+| `MISTRAL_API_KEY` | optional | Enables the AI chat assistant |
+| `DISCORD_TOKEN` | optional | Discord bot (can skip for UI-only dev) |
+| `SMTP_HOST` | optional | Outgoing email for password reset / verification |
+
+All variables and their defaults are documented in `.env.dev.example`.
+
+### 3 — Start the stack
+
+```bash
 docker compose -f docker-compose.dev.yml --env-file .env.dev up
 ```
 
-Services started:
+On first start Docker creates the PostgreSQL database and the three schemas (`game`, `rsi`, `meta`).
+The API then runs `prisma db push` automatically to create all tables before serving requests.
 
-| Service | Default port |
+| Service | URL / Port |
 |---|---|
-| API (hot reload) | 3000 |
-| IHM (Next.js HMR) | 5173 |
-| PostgreSQL | 5432 |
-| Redis | 6379 |
-| Discord Bot | — |
+| **IHM** (Next.js, hot reload) | http://localhost:5173 |
+| **API** (Express, hot reload) | http://localhost:3000 |
+| **Swagger UI** | http://localhost:3000/api-docs |
+| PostgreSQL | localhost:5432 |
+| Redis | localhost:6379 |
 
-Available environment variables with their default values are documented in `.env.dev.example` and `.env.prod.example`.
+> The Discord bot starts automatically but does nothing if `DISCORD_TOKEN` is empty.
+
+### 4 — Load game data (optional)
+
+The database is empty on first start — the UI will show no ships or items.
+To populate it, run the extractor with your local Star Citizen installation:
+
+```bash
+cp extractor/.env.extractor.example extractor/.env.dev
+# Set DB_PASSWORD to match .env.dev
+
+# Populate LIVE data (requires Data.p4k)
+npx tsx extractor/extract.ts --env live --game-version 4.7.2
+
+# Network-only modules (no Data.p4k needed)
+npx tsx extractor/extract.ts --modules ship-matrix,galactapedia,starmap
+```
+
+See [`extractor/README.md`](extractor/README.md) for the full list of modules and options.
+
+### 5 — Create an admin account
+
+Register via the UI at http://localhost:5173/register, then promote your account:
+
+```bash
+curl -X PUT http://localhost:3000/admin/users/1/role \
+  -H "X-Api-Key: <ADMIN_API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"role":"admin"}'
+```
 
 ---
 
@@ -107,7 +161,7 @@ All API endpoints accept a `?env=live` (default) or `?env=ptu` parameter. The in
 |---|---|
 | `game` | Ships, components, items, commodities, missions, crafting — `env = 'live'` or `'ptu'` columns |
 | `rsi` | Ship Matrix, Galactapedia, Comm-links, Starmap |
-| `meta` | Extraction logs (`extraction_log`), auto-changelog with env filtering |
+| `meta` | User accounts & roles, extraction logs, auto-changelog |
 
 ---
 
