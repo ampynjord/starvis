@@ -246,6 +246,7 @@ export const api = {
       manufacturer?: string;
       role?: string;
       career?: string;
+      status?: string;
       size?: number;
       variant_type?: string;
       /** Routes to /ships, /ground-vehicles, or /gravlev automatically */
@@ -266,6 +267,7 @@ export const api = {
         manufacturers: (f.manufacturer ?? []).map((m: any) => ({ code: m.value, name: m.label ?? m.value })),
         roles: (f.role ?? []).map((r: any) => r.value),
         careers: (f.career ?? []).map((c: any) => c.value),
+        statuses: (f.status ?? []).map((s: any) => ({ value: s.value, label: s.label ?? s.value, count: s.count ?? 0 })),
         variant_types: (f.variant_type ?? []).map((v: any) => v.value),
         vehicle_categories: (f.vehicle_category ?? []).map((c: any) => ({ value: c.value, count: c.count ?? 0 })),
       };

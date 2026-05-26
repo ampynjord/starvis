@@ -45,6 +45,7 @@ describe('ShipQueryService', () => {
         [row({ value: 'Military' })],
         [row({ value: 'collector' })],
         [row({ value: 'ship', count: 10 })],
+        [row({ value: 'flight-ready', count: 8 }), row({ value: 'in-concept', count: 2 })],
       ]);
       const svc = new ShipQueryService(createGetClient(prisma));
       const result = await svc.getShipFilters();
@@ -52,6 +53,10 @@ describe('ShipQueryService', () => {
       expect(result.filters.role?.map((r) => r.value)).toEqual(['Combat', 'Exploration']);
       expect(result.filters.career?.map((r) => r.value)).toEqual(['Military']);
       expect(result.filters.variant_type?.map((r) => r.value)).toEqual(['collector']);
+      expect(result.filters.status).toEqual([
+        { value: 'flight-ready', label: 'flight-ready', count: 8 },
+        { value: 'in-concept', label: 'in-concept', count: 2 },
+      ]);
     });
   });
 

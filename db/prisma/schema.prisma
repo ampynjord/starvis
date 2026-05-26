@@ -186,6 +186,7 @@ model ShipMatrix {
   mediaSourceUrl    String?  @map("media_source_url")
   mediaStoreSmall   String?  @map("media_store_small")
   mediaStoreLarge   String?  @map("media_store_large")
+  ctmUrl            String?  @map("ctm_url") @db.VarChar(500)
   compiled          Json?
   syncedAt          DateTime @default(now()) @map("synced_at")
 

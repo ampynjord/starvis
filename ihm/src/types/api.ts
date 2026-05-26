@@ -179,6 +179,7 @@ export interface ShipFilters {
   manufacturers: { code: string; name: string }[];
   roles: string[];
   careers: string[];
+  statuses: { value: string; label: string; count: number }[];
   variant_types: string[];
   vehicle_categories: { value: string; count: number }[];
 }

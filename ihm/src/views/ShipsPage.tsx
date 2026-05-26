@@ -32,6 +32,18 @@ const SORT_OPTIONS: { value: string; label: string; categories: string[] }[] = [
   { value: 'total_hp',       label: 'Hull HP',    categories: ['ship'] },
 ];
 
+const STATUS_LABELS: Record<string, string> = {
+  'flight-ready': 'Flight Ready',
+  'in-production': 'In Production',
+  'in-development': 'In Development',
+  'in-concept': 'In Concept',
+  'in-game-only': 'In Game Only',
+};
+
+function formatStatusLabel(value: string): string {
+  return STATUS_LABELS[value] ?? value.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 export default function ShipsPage() {
   const { env } = useEnv();
   const searchParams = useSearchParams();
@@ -48,6 +60,7 @@ export default function ShipsPage() {
 
   const [category, setCategory] = useState<string>(initialCat);
   const [manufacturer, setManufacturer] = useState('');
+  const [status, setStatus] = useState('');
   const [role, setRole] = useState('');
   const [career, setCareer] = useState('');
   const [variantType, setVariantType] = useState('');
@@ -61,13 +74,14 @@ export default function ShipsPage() {
   });
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['ships.list', env, { page, search: debouncedSearch, manufacturer, role, career, variantType, category, sort, order }],
+    queryKey: ['ships.list', env, { page, search: debouncedSearch, manufacturer, status, role, career, variantType, category, sort, order }],
     queryFn: () => api.ships.list({
       env,
       page,
       limit: LIMIT,
       search: debouncedSearch || undefined,
       manufacturer: manufacturer || undefined,
+      status: status || undefined,
       role: role || undefined,
       career: career || undefined,
       variant_type: variantType || undefined,
@@ -77,11 +91,12 @@ export default function ShipsPage() {
     }),
   });
 
-  const hasFilters = !!(manufacturer || role || career || variantType || debouncedSearch);
+  const hasFilters = !!(manufacturer || status || role || career || variantType || debouncedSearch);
 
   const switchCategory = (val: string) => {
     setCategory(val);
     setManufacturer('');
+    setStatus('');
     setRole('');
     setCareer('');
     setVariantType('');
@@ -92,6 +107,7 @@ export default function ShipsPage() {
 
   const resetFilters = () => {
     setManufacturer('');
+    setStatus('');
     setRole('');
     setCareer('');
     setVariantType('');
@@ -180,6 +196,13 @@ export default function ShipsPage() {
                   onChange: v => { setManufacturer(v); setPage(1); },
                 },
                 ...(category === 'ship' ? [
+                  {
+                    key: 'status', label: 'Status',
+                    options: (filters.statuses ?? []).map(s => ({ label: s.label ? formatStatusLabel(s.value) : formatStatusLabel(s.value), value: s.value, count: s.count })),
+                    value: status,
+                    onChange: (v: string) => { setStatus(v); setPage(1); },
+                    defaultOpen: true,
+                  },
                   {
                     key: 'career', label: 'Career',
                     options: filters.careers.map(c => ({ label: c, value: c })),

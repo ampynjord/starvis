@@ -1,7 +1,7 @@
 import { ChevronDown, ChevronUp, SlidersHorizontal, X } from 'lucide-react';
 import { useState } from 'react';
 
-interface FilterOption { label: string; value: string | number; }
+interface FilterOption { label: string; value: string | number; count?: number; }
 
 interface FilterGroup {
   key: string;
@@ -42,9 +42,10 @@ function FilterGroup({ label, options, value, onChange, defaultOpen = false }: F
             <button
               key={`${String(opt.value)}-${idx}`}
               onClick={() => onChange(String(opt.value))}
-              className={`w-full text-left px-2 py-1.5 rounded-sm text-xs truncate transition-colors ${String(value) === String(opt.value) ? 'text-cyan-400 bg-cyan-950/40' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}
+              className={`w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-sm text-xs transition-colors ${String(value) === String(opt.value) ? 'text-cyan-400 bg-cyan-950/40' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}
             >
-              {opt.label}
+              <span className="truncate">{opt.label}</span>
+              {typeof opt.count === 'number' && <span className="shrink-0 text-[10px] text-slate-600">{opt.count.toLocaleString('en-US')}</span>}
             </button>
           ))}
         </div>
