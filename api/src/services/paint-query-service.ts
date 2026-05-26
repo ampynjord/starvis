@@ -63,4 +63,96 @@ export class PaintQueryService {
       },
     };
   }
+
+  async getPaintGroups(opts: { env?: string; search?: string; manufacturer?: string }): Promise<{
+    groups: Row[];
+    total: number;
+    manufacturerOptions: Row[];
+  }> {
+    const env = opts.env ?? 'live';
+    const prisma = this.getClient(env);
+    const where: string[] = ['sp.env = ?'];
+    const params: (string | number)[] = [env];
+
+    if (opts.search) {
+      where.push('(sp.paint_name ILIKE ? OR sp.paint_class_name ILIKE ? OR s.name ILIKE ?)');
+      const t = `%${opts.search}%`;
+      params.push(t, t, t);
+    }
+    if (opts.manufacturer) {
+      where.push('COALESCE(m.name, ?) = ?');
+      params.push('-', opts.manufacturer);
+    }
+
+    const whereClause = where.join(' AND ');
+    const baseFrom = `FROM game.ship_paints sp
+      LEFT JOIN game.ships s ON sp.ship_uuid = s.uuid AND s.env = sp.env
+      LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code
+      WHERE ${whereClause}`;
+
+    const [groups, totalRows, manufacturerRows] = await Promise.all([
+      prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT
+          manufacturer_name,
+          jsonb_agg(
+            jsonb_build_object(
+              'shipName', ship_name,
+              'shipUuid', ship_uuid,
+              'paintCount', paint_count,
+              'paints', paints
+            )
+            ORDER BY ship_name
+          ) as ships,
+          SUM(paint_count)::int as paint_count,
+          COUNT(*)::int as ship_count
+         FROM (
+          SELECT
+            COALESCE(m.name, '-') as manufacturer_name,
+            COALESCE(s.name, '-') as ship_name,
+            COALESCE(sp.ship_uuid, '') as ship_uuid,
+            COUNT(sp.id)::int as paint_count,
+            jsonb_agg(
+              jsonb_build_object(
+                'id', sp.id,
+                'ship_uuid', sp.ship_uuid,
+                'paint_class_name', sp.paint_class_name,
+                'paint_name', sp.paint_name,
+                'paint_uuid', sp.paint_uuid,
+                'ship_name', s.name,
+                'ship_class_name', s.class_name,
+                'manufacturer_name', m.name,
+                'manufacturer_code', m.code
+              )
+              ORDER BY sp.paint_name
+            ) as paints
+           ${baseFrom}
+           GROUP BY COALESCE(m.name, '-'), COALESCE(s.name, '-'), COALESCE(sp.ship_uuid, '')
+         ) grouped_ships
+         GROUP BY manufacturer_name
+         ORDER BY manufacturer_name`),
+        ...params,
+      ),
+      prisma.$queryRawUnsafe<Row[]>(toPostgres(`SELECT COUNT(*) as total ${baseFrom}`), ...params),
+      prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT COALESCE(m.name, '-') as value, COALESCE(m.name, '-') as label, COUNT(sp.id)::int as count
+         FROM game.ship_paints sp
+         LEFT JOIN game.ships s ON sp.ship_uuid = s.uuid AND s.env = sp.env
+         LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code
+         WHERE sp.env = ?
+         GROUP BY COALESCE(m.name, '-')
+         ORDER BY COALESCE(m.name, '-')`),
+        env,
+      ),
+    ]);
+
+    return {
+      groups,
+      total: Number(totalRows[0]?.total ?? 0),
+      manufacturerOptions: manufacturerRows.map((row) => ({
+        value: String(row.value),
+        label: String(row.label),
+        count: Number(row.count),
+      })),
+    };
+  }
 }

@@ -13,7 +13,7 @@ import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { useListQueryState } from '@/hooks/useListQueryState';
-import type { PaintListItem } from '@/types/api';
+import type { PaintListItem, PaintManufacturerGroup } from '@/types/api';
 
 // ── Event badge detection ──────────────────────────────────────────────────────
 
@@ -37,37 +37,6 @@ function detectEvent(className: string | null): EventBadge | null {
     if (regex.test(className)) return badge;
   }
   return null;
-}
-
-// ── Grouping ───────────────────────────────────────────────────────────────────
-
-interface PaintGroup {
-  manufacturerName: string;
-  ships: Array<{
-    shipName: string;
-    shipUuid: string;
-    paints: PaintListItem[];
-  }>;
-}
-
-function groupPaints(items: PaintListItem[]): PaintGroup[] {
-  const mfrMap = new Map<string, Map<string, { uuid: string; paints: PaintListItem[] }>>();
-  for (const p of items) {
-    const mfr = p.manufacturer_name ?? '—';
-    const ship = p.ship_name ?? '—';
-    if (!mfrMap.has(mfr)) mfrMap.set(mfr, new Map());
-    const shipMap = mfrMap.get(mfr)!;
-    if (!shipMap.has(ship)) shipMap.set(ship, { uuid: p.ship_uuid ?? '', paints: [] });
-    shipMap.get(ship)!.paints.push(p);
-  }
-  return [...mfrMap.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([manufacturerName, ships]) => ({
-      manufacturerName,
-      ships: [...ships.entries()]
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([shipName, { uuid, paints }]) => ({ shipName, shipUuid: uuid, paints })),
-    }));
 }
 
 // ── PaintCard ────────────────────────────────────────────────────────────────
@@ -143,9 +112,8 @@ function ShipGroup({ shipName, shipUuid, paints }: { shipName: string; shipUuid:
 
 // ── Manufacturer section ──────────────────────────────────────────────────────
 
-function ManufacturerSection({ group }: { group: PaintGroup }) {
+function ManufacturerSection({ group }: { group: PaintManufacturerGroup }) {
   const [open, setOpen] = useState(true);
-  const total = group.ships.reduce((acc, s) => acc + s.paints.length, 0);
   return (
     <div className="mb-6">
       <button
@@ -156,7 +124,7 @@ function ManufacturerSection({ group }: { group: PaintGroup }) {
         {open ? <ChevronDown size={14} className="text-slate-500" /> : <ChevronRight size={14} className="text-slate-500" />}
         <span className="font-orbitron text-sm text-slate-300 uppercase tracking-wide">{group.manufacturerName}</span>
         <span className="text-xs font-mono-sc text-slate-600 ml-1">
-          {total} paint{total !== 1 ? 's' : ''} · {group.ships.length} ship{group.ships.length !== 1 ? 's' : ''}
+          {group.paintCount} paint{group.paintCount !== 1 ? 's' : ''} · {group.shipCount} ship{group.shipCount !== 1 ? 's' : ''}
         </span>
       </button>
       {open && group.ships.map((s) => (
@@ -166,9 +134,7 @@ function ManufacturerSection({ group }: { group: PaintGroup }) {
   );
 }
 
-// ── Main page — loads ALL paints (no pagination needed once grouped) ───────────
-
-const FETCH_LIMIT = 2000;
+// ── Main page ────────────────────────────────────────────────────────────────
 
 export default function PaintsPage() {
   const { env } = useEnv();
@@ -176,19 +142,9 @@ export default function PaintsPage() {
   const [selectedManufacturer, setSelectedManufacturer] = useState('');
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['paints.list.all', env, debouncedSearch],
-    queryFn: () => api.paints.list({ env, page: 1, limit: FETCH_LIMIT, search: debouncedSearch || undefined }),
+    queryKey: ['paints.groups', env, debouncedSearch, selectedManufacturer],
+    queryFn: () => api.paints.groups({ env, search: debouncedSearch || undefined, manufacturer: selectedManufacturer || undefined }),
   });
-
-  const allGroups = data?.data ? groupPaints(data.data as PaintListItem[]) : [];
-  const groups = selectedManufacturer
-    ? allGroups.filter((g) => g.manufacturerName === selectedManufacturer)
-    : allGroups;
-
-  const manufacturerOptions = allGroups.map((g) => ({
-    value: g.manufacturerName,
-    label: `${g.manufacturerName} (${g.ships.reduce((acc, s) => acc + s.paints.length, 0)})`,
-  }));
 
   const hasFilters = !!selectedManufacturer;
 
@@ -207,7 +163,7 @@ export default function PaintsPage() {
         <LoadingGrid message="LOADING PAINTS…" />
       ) : error ? (
         <ErrorState error={error as Error} onRetry={() => void refetch()} />
-      ) : !allGroups.length ? (
+      ) : !data?.groups.length ? (
         <EmptyState icon="🎨" title="No paints found" />
       ) : (
         <div className="flex gap-4">
@@ -221,7 +177,7 @@ export default function PaintsPage() {
                   {
                     key: 'manufacturer',
                     label: 'Manufacturer',
-                    options: manufacturerOptions,
+                    options: data.manufacturerOptions.map((option) => ({ value: option.value, label: `${option.label} (${option.count})` })),
                     value: selectedManufacturer,
                     onChange: (v) => setSelectedManufacturer(v),
                     defaultOpen: true,
@@ -233,7 +189,7 @@ export default function PaintsPage() {
 
           {/* Groups */}
           <div className="flex-1 min-w-0">
-            {groups.map((g) => (
+            {data.groups.map((g) => (
               <ManufacturerSection key={g.manufacturerName} group={g} />
             ))}
           </div>
@@ -242,4 +198,3 @@ export default function PaintsPage() {
     </div>
   );
 }
-

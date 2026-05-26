@@ -6,7 +6,7 @@ import CommoditiesPage from '@/views/CommoditiesPage';
 vi.mock('@/services/api', () => ({
   api: {
     commodities: {
-      types: vi.fn().mockResolvedValue(['RawMaterial', 'Gas', 'Food']),
+      categories: vi.fn().mockResolvedValue([{ label: 'All', types: [], count: 1 }, { label: 'Raw Ore / Minerals', types: ['RawMaterial'], count: 1 }]),
       list: vi.fn().mockResolvedValue({
         data: [{ uuid: 'comm1', name: 'Laranite', type: 'RawMaterial' }],
         total: 1,

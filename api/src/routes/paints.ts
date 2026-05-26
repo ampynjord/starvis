@@ -38,4 +38,18 @@ export function mountPaintRoutes(router: Router, deps: RouteDependencies): void 
       sendWithETag(req, res, payload);
     }),
   );
+
+  router.get(
+    '/api/v1/paints/groups',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = getQueryString(req, 'env') ?? 'live';
+      const result = await gameDataService!.paints.getPaintGroups({
+        env,
+        search: getQueryString(req, 'search'),
+        manufacturer: getQueryString(req, 'manufacturer'),
+      });
+      sendWithETag(req, res, { success: true, data: result });
+    }),
+  );
 }

@@ -32,6 +32,82 @@ const ITEM_SORT = new Set([
   'armor_temp_max',
 ]);
 
+const FPS_ALL_TYPES = [
+  'FPS_Weapon',
+  'Armor_Helmet',
+  'Armor_Torso',
+  'Armor_Arms',
+  'Armor_Legs',
+  'Armor_Backpack',
+  'Undersuit',
+  'Tool',
+  'Consumable',
+  'Magazine',
+  'Attachment',
+  'Gadget',
+  'Clothing',
+];
+const FPS_COVERED_TYPES = new Set([...FPS_ALL_TYPES, 'Armor']);
+const CHIP_SUBTYPES = ['Hacking', 'SystemAccess'];
+const CONSUMABLE_SUBTYPE_ORDER = ['Food', 'Drink', 'Medical', 'MedPack', 'OxygenCap', 'Stim'];
+const FPS_SUBTYPE_OPTIONS: Record<string, { label: string; value: string }[]> = {
+  weapons: ['Pistol', 'SMG', 'Shotgun', 'Sniper Rifle', 'Assault Rifle', 'LMG', 'Launcher', 'Melee', 'Medium', 'Large', 'Small'].map(
+    (s) => ({
+      label: s,
+      value: s,
+    }),
+  ),
+  throwable: [
+    { label: 'Grenades', value: 'Throwable' },
+    { label: 'Mines', value: 'Mine' },
+  ],
+  helmet: [
+    { label: 'Light', value: 'Light' },
+    { label: 'Medium', value: 'Medium' },
+    { label: 'Heavy', value: 'Heavy' },
+  ],
+  core: [
+    { label: 'Light', value: 'Light' },
+    { label: 'Medium', value: 'Medium' },
+    { label: 'Heavy', value: 'Heavy' },
+  ],
+  arms: [
+    { label: 'Light', value: 'Light' },
+    { label: 'Medium', value: 'Medium' },
+    { label: 'Heavy', value: 'Heavy' },
+  ],
+  legs: [
+    { label: 'Light', value: 'Light' },
+    { label: 'Medium', value: 'Medium' },
+    { label: 'Heavy', value: 'Heavy' },
+  ],
+  backpack: [
+    { label: 'Light', value: 'Light' },
+    { label: 'Medium', value: 'Medium' },
+    { label: 'Heavy', value: 'Heavy' },
+  ],
+};
+
+function formatConsumableLabel(subType: string): string {
+  const explicitLabels: Record<string, string> = {
+    SystemAccess: 'System Access',
+    MedPack: 'MedPack',
+    OxygenCap: 'Oxygen Cap',
+  };
+  return explicitLabels[subType] ?? subType.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ');
+}
+
+function orderConsumableEntries(entries: { value: string; count: number }[]) {
+  return [...entries].sort((left, right) => {
+    const leftIndex = CONSUMABLE_SUBTYPE_ORDER.indexOf(left.value);
+    const rightIndex = CONSUMABLE_SUBTYPE_ORDER.indexOf(right.value);
+    const leftRank = leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex;
+    const rightRank = rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex;
+    if (leftRank !== rightRank) return leftRank - rightRank;
+    return formatConsumableLabel(left.value).localeCompare(formatConsumableLabel(right.value));
+  });
+}
+
 export class ItemQueryService {
   constructor(private getClient: (env: string) => PrismaClient) {}
 
@@ -50,6 +126,7 @@ export class ItemQueryService {
     sub_type?: string;
     sub_types?: string;
     exclude_sub_types?: string;
+    item_group?: string;
     manufacturer?: string;
     search?: string;
     sort?: string;
@@ -61,9 +138,24 @@ export class ItemQueryService {
     const prisma = this.getClient(env);
     const where: string[] = ['i.env = ?'];
     const params: (string | number)[] = [env];
+    let resolvedTypes = filters?.types;
+    let resolvedType = filters?.type;
+    let resolvedSubTypes = filters?.sub_types;
+    let resolvedExcludeSubTypes = filters?.exclude_sub_types;
 
-    if (filters?.types) {
-      const typeList = filters.types
+    if (filters?.item_group) {
+      const navigation = await this.getItemNavigation(env);
+      const group = navigation.groups[filters.item_group];
+      if (group) {
+        resolvedTypes = group.types?.join(',');
+        resolvedType = group.type;
+        resolvedSubTypes = group.subTypes?.join(',');
+        resolvedExcludeSubTypes = group.excludeSubTypes?.join(',');
+      }
+    }
+
+    if (resolvedTypes) {
+      const typeList = resolvedTypes
         .split(',')
         .map((t) => t.trim())
         .filter(Boolean);
@@ -74,12 +166,12 @@ export class ItemQueryService {
         where.push(`i.type IN (${typeList.map(() => '?').join(', ')})`);
         params.push(...typeList);
       }
-    } else if (filters?.type) {
+    } else if (resolvedType) {
       where.push('i.type = ?');
-      params.push(filters.type);
+      params.push(resolvedType);
     }
-    if (filters?.sub_types) {
-      const stList = filters.sub_types
+    if (resolvedSubTypes) {
+      const stList = resolvedSubTypes
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
@@ -94,8 +186,8 @@ export class ItemQueryService {
       where.push('i.sub_type = ?');
       params.push(filters.sub_type);
     }
-    if (filters?.exclude_sub_types) {
-      const exList = filters.exclude_sub_types
+    if (resolvedExcludeSubTypes) {
+      const exList = resolvedExcludeSubTypes
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
@@ -303,5 +395,77 @@ export class ItemQueryService {
       uuid,
     );
     return rows;
+  }
+
+  async getItemNavigation(env = 'live'): Promise<{
+    fpsCategories: { slug: string; label: string; count: number }[];
+    otherCategories: { slug: string; label: string; count: number }[];
+    fpsSubTypeOptions: Record<string, { label: string; value: string }[]>;
+    consumableFilterOptions: Record<string, { label: string; value: string }[]>;
+    groups: Record<string, { type?: string; types?: string[]; subTypes?: string[]; excludeSubTypes?: string[] }>;
+  }> {
+    const [categoryCounts, filters, consumableSubTypes] = await Promise.all([
+      this.getCategoryCounts(env),
+      this.getItemFilters(env),
+      this.getItemSubTypes('Consumable', env),
+    ]);
+    const typeCounts = Object.fromEntries((filters.filters.type ?? []).map((entry) => [entry.value, Number(entry.count ?? 0)]));
+    const consumableEntries = consumableSubTypes.sub_types
+      .map((entry) => ({ value: entry.value, count: Number(entry.count) }))
+      .filter((entry) => entry.count > 0);
+    const consumableCountMap = Object.fromEntries(consumableEntries.map((entry) => [entry.value, entry.count]));
+    const otherTypes = (filters.filters.type ?? []).map((entry) => entry.value).filter((type) => !FPS_COVERED_TYPES.has(type));
+    const nonConsumableOtherTypes = otherTypes.filter((type) => type !== 'Consumable');
+    const chipCount = CHIP_SUBTYPES.reduce((sum, value) => sum + (consumableCountMap[value] ?? 0), 0);
+    const otherCount = nonConsumableOtherTypes.reduce((sum, value) => sum + (typeCounts[value] ?? 0), 0);
+    const orderedConsumableEntries = orderConsumableEntries(consumableEntries.filter((entry) => !CHIP_SUBTYPES.includes(entry.value)));
+    const fpsCategories = [
+      { slug: 'all', label: 'All', count: Object.values(categoryCounts).reduce((sum, count) => sum + count, 0) },
+      ...[
+        { slug: 'weapons', label: 'Weapons' },
+        { slug: 'throwable', label: 'Throwable' },
+        { slug: 'helmet', label: 'Helmet' },
+        { slug: 'core', label: 'Torso' },
+        { slug: 'arms', label: 'Arms' },
+        { slug: 'legs', label: 'Legs' },
+        { slug: 'backpack', label: 'Backpack' },
+        { slug: 'undersuit', label: 'Undersuit' },
+        { slug: 'tools-medics', label: 'Tools & Medics' },
+        { slug: 'attachments', label: 'Attachment' },
+        { slug: 'magazines', label: 'Magazines' },
+        { slug: 'clothing', label: 'Clothing' },
+        { slug: 'other', label: 'Other' },
+      ].map((category) => ({ ...category, count: categoryCounts[category.slug] ?? 0 })),
+    ];
+    const otherCategories = [
+      {
+        slug: 'all',
+        label: 'All',
+        count: consumableEntries.reduce((sum, entry) => sum + entry.count, 0) + otherCount,
+      },
+      ...(chipCount > 0 ? [{ slug: 'chips', label: 'Chips', count: chipCount }] : []),
+      ...orderedConsumableEntries.map((entry) => ({
+        slug: `sub:${entry.value}`,
+        label: formatConsumableLabel(entry.value),
+        count: entry.count,
+      })),
+      { slug: 'other', label: 'Other', count: otherCount },
+    ];
+    const consumableFilterOptions: Record<string, { label: string; value: string }[]> = {
+      chips: CHIP_SUBTYPES.filter((value) => (consumableCountMap[value] ?? 0) > 0).map((value) => ({
+        label: formatConsumableLabel(value),
+        value,
+      })),
+      all: consumableEntries.map((entry) => ({ label: formatConsumableLabel(entry.value), value: entry.value })),
+    };
+    const groups: Record<string, { type?: string; types?: string[]; subTypes?: string[]; excludeSubTypes?: string[] }> = {
+      fps_all: { types: FPS_ALL_TYPES, excludeSubTypes: ['Food', 'Drink'] },
+      other_all: { types: otherTypes },
+      other_chips: { type: 'Consumable', subTypes: CHIP_SUBTYPES },
+      other_other: { types: nonConsumableOtherTypes },
+    };
+    for (const entry of orderedConsumableEntries) groups[`other_sub:${entry.value}`] = { type: 'Consumable', subTypes: [entry.value] };
+
+    return { fpsCategories, otherCategories, fpsSubTypeOptions: FPS_SUBTYPE_OPTIONS, consumableFilterOptions, groups };
   }
 }
