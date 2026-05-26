@@ -102,6 +102,42 @@ describe('ShipQueryService', () => {
       expect((prisma as any).$queryRawUnsafe).toHaveBeenCalled();
     });
   });
+
+  describe('getAllShips concept-only Ship Matrix rows', () => {
+    it('includes upcoming Ship Matrix ships in the ships category', async () => {
+      const conceptShip = row({
+        uuid: 'concept-317',
+        class_name: 'odin',
+        name: 'Odin',
+        manufacturer_code: 'ANVL',
+        production_status: 'in-concept',
+        vehicle_category: 'ship',
+        is_concept_only: true,
+      });
+      const prisma = createMockPrisma([[row({ total: 0 })], [row({ total: 1 })], [conceptShip]]);
+      const svc = new ShipQueryService(createGetClient(prisma));
+
+      const result = await svc.getAllShips({ vehicle_category: 'ship' });
+
+      expect(result.total).toBe(1);
+      expect(result.data).toEqual([conceptShip]);
+      const calls = ((prisma as any).$queryRawUnsafe as any).mock.calls;
+      expect(calls[1][0]).toContain("sm2.production_status IN ('in-concept', 'in-production', 'in-development')");
+      expect(calls[2][0]).toContain('UNION ALL');
+      expect(calls[2][0]).toContain("'ship' as vehicle_category");
+    });
+
+    it('does not include upcoming Ship Matrix ships for ground routes', async () => {
+      const prisma = createMockPrisma([[row({ total: 0 })], []]);
+      const svc = new ShipQueryService(createGetClient(prisma));
+
+      await svc.getAllShips({ vehicle_category: 'ground' });
+
+      const calls = ((prisma as any).$queryRawUnsafe as any).mock.calls;
+      expect(calls).toHaveLength(2);
+      expect(calls.some((call: any[]) => String(call[0]).includes('rsi.ship_matrix sm2'))).toBe(false);
+    });
+  });
 });
 
 // ── ComponentQueryService ────────────────────────────────
