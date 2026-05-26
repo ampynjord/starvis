@@ -111,6 +111,9 @@ const CONCEPT_SELECT = [
   'sm2.cargocapacity as cargo_capacity',
   'sm2.min_crew as crew_size',
   'NULL as shield_hp',
+  'NULL as shield_regen',
+  'NULL as shield_regen_delay',
+  'NULL as shield_down_delay',
   // Combat
   'NULL as missile_damage_total',
   'NULL as weapon_damage_total',
@@ -327,7 +330,8 @@ export class ShipQueryService {
       sql = `SELECT ${CONCEPT_SELECT}, TRUE as is_concept_only FROM rsi.ship_matrix sm2${cw} ORDER BY ${nullSafeOrder} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
       allParams = [...conceptParams];
     } else if (includeConceptShips) {
-      sql = `(SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS}${w}) UNION ALL (SELECT ${CONCEPT_SELECT}, TRUE as is_concept_only FROM rsi.ship_matrix sm2${cw}) ORDER BY ${nullSafeOrder} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
+      const unionOrder = jsonExpr ? `name IS NULL, name ${order}` : `${sortCol} IS NULL, ${sortCol} ${order}`;
+      sql = `SELECT * FROM ((SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS}${w}) UNION ALL (SELECT ${CONCEPT_SELECT}, TRUE as is_concept_only FROM rsi.ship_matrix sm2${cw})) ship_rows ORDER BY ${unionOrder} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
       allParams = [...params, ...conceptParams];
     } else {
       sql = `SELECT ${SHIP_SELECT}, FALSE as is_concept_only ${SHIP_JOINS}${w} ORDER BY ${qualifiedOrder} LIMIT ${Number(limit)} OFFSET ${Number(offset)}`;
@@ -342,7 +346,8 @@ export class ShipQueryService {
   async getShipByUuid(uuid: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
     if (uuid.startsWith('concept-')) {
-      const smId = uuid.replace('concept-', '');
+      const smId = Number(uuid.replace('concept-', ''));
+      if (!Number.isInteger(smId)) return null;
       const rows = await prisma.$queryRawUnsafe<Row[]>(
         toPostgres(
           `SELECT ${CONCEPT_SELECT}, TRUE as is_concept_only FROM rsi.ship_matrix sm2 WHERE sm2.id = ? AND ${SHIP_MATRIX_UPCOMING_SQL} AND sm2.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)`,
