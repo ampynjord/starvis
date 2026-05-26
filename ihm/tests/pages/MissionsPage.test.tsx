@@ -15,7 +15,9 @@ vi.mock('@/services/api', () => ({
         page: 1,
         limit: 20,
         pages: 1,
+        summary: { blueprintRewards: 0, averageReward: null },
       }),
+      single: vi.fn(),
     },
   },
 }));

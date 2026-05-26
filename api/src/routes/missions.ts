@@ -6,7 +6,6 @@ import {
   makeGameDataGuard,
   mountEnvDataRoute,
   sendDataWithETag,
-  sendPaginatedWithETag,
   sendWithETag,
 } from './helpers.js';
 import type { RouteDependencies } from './types.js';
@@ -55,7 +54,7 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
   /**
    * GET /api/v1/missions
    * Paginated mission list with optional filters:
-   *   env, type, legal, shared, faction, system, category, unique, minReward, maxReward, search, page, limit
+   *   env, type, legal, shared, faction, system, category, unique, blueprintReward, minReward, maxReward, search, sort, page, limit
    */
   router.get(
     '/api/v1/missions',
@@ -71,13 +70,25 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
         system: getQueryString(req, 'system'),
         category: getQueryString(req, 'category'),
         unique: getQueryString(req, 'unique'),
+        blueprintReward: getQueryString(req, 'blueprintReward'),
         minReward: getQueryNumber(req, 'minReward'),
         maxReward: getQueryNumber(req, 'maxReward'),
         search: getQueryString(req, 'search'),
+        sort: getQueryString(req, 'sort'),
         page: getQueryNumber(req, 'page'),
         limit: getQueryNumber(req, 'limit'),
       });
-      sendPaginatedWithETag(req, res, result, t);
+      sendWithETag(req, res, {
+        success: true,
+        count: result.data.length,
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        pages: result.pages,
+        summary: result.summary,
+        data: result.data,
+        meta: { responseTime: `${Date.now() - t}ms` },
+      });
     }),
   );
 
