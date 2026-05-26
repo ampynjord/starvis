@@ -28,6 +28,16 @@ export function mountCommodityRoutes(router: Router, deps: RouteDependencies): v
   );
 
   router.get(
+    '/api/v1/commodities/categories',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = String(req.query.env ?? 'live');
+      const data = await gameDataService!.commodities.getCommodityCategories(env);
+      sendWithETag(req, res, { success: true, data: data.categories });
+    }),
+  );
+
+  router.get(
     '/api/v1/commodities',
     requireGameData,
     asyncHandler(async (req, res) => {

@@ -4,6 +4,7 @@ import type {
   ChangelogSummary,
   CommLink,
   Commodity,
+  CommodityCategory,
   CommodityPrice,
   CompatibleComponent,
   Component,
@@ -16,6 +17,7 @@ import type {
   Item,
   ItemBuyLocation,
   ItemListItem,
+  ItemNavigation,
   LoadoutNode,
   LoadoutResult,
   Location,
@@ -27,6 +29,7 @@ import type {
   Mission,
   MissionListResponse,
   PaginatedResponse,
+  PaintGroupsResponse,
   PaintListItem,
   SearchResult,
   Ship,
@@ -34,6 +37,7 @@ import type {
   ShipListItem,
   ShipModule,
   ShipPaint,
+  ShipRankingResponse,
   Shop,
   StatsOverview,
   TradeRoute,
@@ -280,8 +284,15 @@ export const api = {
     paints: (uuid: string, env?: string) => get<ShipPaint[]>(`/ships/${uuid}/paints`, { env }),
     similar: (uuid: string, limit = 6, env?: string) => get<ShipListItem[]>(`/ships/${uuid}/similar`, { limit, env }),
     modules: (uuid: string, env?: string) => get<ShipModule[]>(`/ships/${uuid}/modules`, { env }),
-    ranking: (sort_by: string, order: 'asc' | 'desc', category?: string, env?: string) =>
-      get<ShipListItem[]>('/ships/ranking', { sort_by, order, category, env }),
+    ranking: (opts: {
+      sort_by: string;
+      order: 'asc' | 'desc';
+      category?: string;
+      stat_category?: string;
+      manufacturer?: string;
+      top?: number;
+      env?: string;
+    }) => get<ShipRankingResponse>('/ships/ranking', opts),
   },
 
   // ─── Components ────────────────────────────────────────────────────
@@ -328,10 +339,12 @@ export const api = {
       sub_type?: string;
       sub_types?: string;
       exclude_sub_types?: string;
+      item_group?: string;
       size?: number;
       grade?: string;
       manufacturer?: string;
     }) => mapPaginated(await get<PaginatedResponse<ItemListItem>>('/items', p), mapItem),
+    navigation: (env?: string) => get<ItemNavigation>('/items/navigation', { env }),
     /** Semantic category route — /items/category/:slug */
     category: async (
       slug: string,
@@ -372,6 +385,7 @@ export const api = {
   paints: {
     list: (p?: { env?: string; page?: number; limit?: number; ship_uuid?: string; search?: string }) =>
       get<PaginatedResponse<PaintListItem>>('/paints', p),
+    groups: (p?: { env?: string; search?: string; manufacturer?: string }) => get<PaintGroupsResponse>('/paints/groups', p),
   },
 
   // ─── Shops ─────────────────────────────────────────────────────────
@@ -382,9 +396,10 @@ export const api = {
 
   // ─── Commodities ───────────────────────────────────────────────────
   commodities: {
-    list: (p: { env?: string; page?: number; limit?: number; search?: string; type?: string; types?: string }) =>
+    list: (p: { env?: string; page?: number; limit?: number; search?: string; type?: string; types?: string; category?: string }) =>
       get<PaginatedResponse<Commodity>>('/commodities', p),
     types: (env?: string) => get<string[]>('/commodities/types', { env }),
+    categories: (env?: string) => get<CommodityCategory[]>('/commodities/categories', { env }),
     get: (uuid: string, env?: string) => get<Commodity>(`/commodities/${uuid}`, { env }),
   },
 

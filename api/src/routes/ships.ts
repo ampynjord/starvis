@@ -9,6 +9,86 @@ import { CTM_CACHE_DIR } from '../utils/config.js';
 import { asyncHandler, makeGameDataGuard, makeShipResolver, sendCsvOrJson, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
+const RANKING_STATS = [
+  { key: 'scm_speed', label: 'SCM Speed', unit: 'm/s', higher_is_better: true, category: 'Flight', vehicleCategories: ['ship', 'gravlev'] },
+  { key: 'max_speed', label: 'Max Speed', unit: 'm/s', higher_is_better: true, category: 'Flight' },
+  {
+    key: 'boost_speed_forward',
+    label: 'AB Forward',
+    unit: 'm/s',
+    higher_is_better: true,
+    category: 'Flight',
+    vehicleCategories: ['ship', 'gravlev'],
+  },
+  { key: 'pitch_max', label: 'Pitch', unit: 'deg/s', higher_is_better: true, category: 'Flight', vehicleCategories: ['ship', 'gravlev'] },
+  { key: 'yaw_max', label: 'Yaw', unit: 'deg/s', higher_is_better: true, category: 'Flight', vehicleCategories: ['ship', 'gravlev'] },
+  { key: 'roll_max', label: 'Roll', unit: 'deg/s', higher_is_better: true, category: 'Flight', vehicleCategories: ['ship', 'gravlev'] },
+  { key: 'total_hp', label: 'Hull HP', unit: 'HP', higher_is_better: true, category: 'Combat' },
+  { key: 'shield_hp', label: 'Shield HP', unit: 'HP', higher_is_better: true, category: 'Combat', vehicleCategories: ['ship', 'gravlev'] },
+  {
+    key: 'weapon_damage_total',
+    label: 'Weapon DPS',
+    unit: 'DPS',
+    higher_is_better: true,
+    category: 'Combat',
+    vehicleCategories: ['ship', 'gravlev'],
+  },
+  {
+    key: 'missile_damage_total',
+    label: 'Missile Dmg',
+    unit: '',
+    higher_is_better: true,
+    category: 'Combat',
+    vehicleCategories: ['ship', 'gravlev'],
+  },
+  { key: 'cargo_capacity', label: 'Cargo', unit: 'SCU', higher_is_better: true, category: 'Transport' },
+  { key: 'crew_size', label: 'Crew', unit: '', higher_is_better: true, category: 'Transport' },
+  {
+    key: 'hydrogen_fuel_capacity',
+    label: 'H2 Fuel',
+    unit: 'L',
+    higher_is_better: true,
+    category: 'Fuel',
+    vehicleCategories: ['ship', 'gravlev'],
+  },
+  { key: 'quantum_fuel_capacity', label: 'QT Fuel', unit: 'L', higher_is_better: true, category: 'Fuel', vehicleCategories: ['ship'] },
+  { key: 'mass', label: 'Mass', unit: '', higher_is_better: false, category: 'Dimensions' },
+  { key: 'cross_section_z', label: 'Length', unit: 'm', higher_is_better: false, category: 'Dimensions' },
+  { key: 'cross_section_x', label: 'Width', unit: 'm', higher_is_better: false, category: 'Dimensions' },
+  { key: 'cross_section_y', label: 'Height', unit: 'm', higher_is_better: false, category: 'Dimensions' },
+] as const;
+
+const RANKING_STAT_CATEGORIES = ['All', 'Flight', 'Combat', 'Transport', 'Fuel', 'Dimensions'];
+const RANKING_VEHICLE_CATEGORIES = [
+  { label: 'Ships', value: 'ship' },
+  { label: 'Ground', value: 'ground' },
+  { label: 'Grav-lev', value: 'gravlev' },
+];
+const RANKING_TOP_OPTIONS = [
+  { label: 'Top 25', value: 25 },
+  { label: 'Top 50', value: 50 },
+  { label: 'Top 100', value: 100 },
+  { label: 'All', value: 0 },
+];
+const DEFAULT_RANKING_SORT: Record<string, string> = {
+  ship: 'scm_speed',
+  ground: 'max_speed',
+  gravlev: 'scm_speed',
+};
+
+function numericStat(row: Record<string, unknown>, key: string): number {
+  const value = Number(row[key] ?? 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function getRankingStats(vehicleCategory: string, statCategory: string) {
+  return RANKING_STATS.filter(
+    (stat) =>
+      (!('vehicleCategories' in stat) || stat.vehicleCategories.includes(vehicleCategory as never)) &&
+      (statCategory === 'All' || stat.category === statCategory),
+  );
+}
+
 export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
   const { gameDataService } = deps;
   const requireGameData = makeGameDataGuard(gameDataService);
@@ -50,19 +130,55 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
     requireGameData,
     asyncHandler(async (req, res) => {
       const env = String(req.query.env ?? 'live');
-      const sort = String(req.query.sort_by ?? req.query.sort ?? 'scm_speed');
+      const category = String(req.query.category ?? 'ship') || 'ship';
+      const requestedSort = String(req.query.sort_by ?? req.query.sort ?? DEFAULT_RANKING_SORT[category] ?? 'scm_speed');
+      const stats = getRankingStats(category, String(req.query.stat_category ?? 'All'));
+      const sort = stats.some((stat) => stat.key === requestedSort) ? requestedSort : (DEFAULT_RANKING_SORT[category] ?? 'max_speed');
       const order = String(req.query.order ?? 'desc').toUpperCase() === 'ASC' ? 'asc' : 'desc';
-      const category = String(req.query.category ?? '');
+      const top = Math.min(500, Math.max(0, Number(req.query.top ?? 50) || 0));
       const result = await gameDataService!.ships.getAllShips({
         env,
         sort,
         order,
         vehicle_category: category || undefined,
+        manufacturer: req.query.manufacturer ? String(req.query.manufacturer) : undefined,
         variant_type: 'none', // exclude non-playable variants
         limit: 500,
         page: 1,
       });
-      sendWithETag(req, res, { success: true, count: result.data.length, data: result.data });
+      const ships = top > 0 ? result.data.slice(0, top) : result.data;
+      const maxByKey = Object.fromEntries(
+        stats.map((stat) => {
+          const values = result.data.map((ship) => numericStat(ship, stat.key)).filter((value) => value > 0);
+          return [stat.key, values.length ? Math.max(...values) : 1];
+        }),
+      );
+      const activeStat = stats.find((stat) => stat.key === sort) ?? stats[0] ?? RANKING_STATS[0];
+      const chartData = ships
+        .map((ship) => ({
+          name: String(ship.name ?? ship.class_name ?? '').slice(0, 22),
+          value: numericStat(ship, activeStat.key),
+          uuid: String(ship.uuid),
+        }))
+        .filter((item) => item.value > 0);
+      sendWithETag(req, res, {
+        success: true,
+        data: {
+          ships,
+          total: result.data.length,
+          sort,
+          order,
+          category,
+          statCategory: String(req.query.stat_category ?? 'All'),
+          top,
+          stats,
+          statCategories: RANKING_STAT_CATEGORIES,
+          vehicleCategories: RANKING_VEHICLE_CATEGORIES,
+          topOptions: RANKING_TOP_OPTIONS,
+          maxByKey,
+          chartData,
+        },
+      });
     }),
   );
 

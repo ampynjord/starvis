@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { api } from '@/services/api';
@@ -18,73 +18,37 @@ import { useListQueryState } from '@/hooks/useListQueryState';
 
 const LIMIT = 30;
 
-interface CommodityCategoryDef {
-  label: string;
-  test: (type: string) => boolean;
-}
-
-const COMMODITY_CATEGORY_DEFS: CommodityCategoryDef[] = [
-  { label: 'Raw Ore / Minerals', test: (t) => /(raw|ore|mineral|gem)/i.test(t) },
-  { label: 'Refined Materials', test: (t) => /(refined|processed|alloy|ingot)/i.test(t) },
-  { label: 'Fuel / Gas / Fluids', test: (t) => /(fuel|gas|liquid|hydrogen|quantum)/i.test(t) },
-  { label: 'Agriculture / Food', test: (t) => /(agri|agriculture|food|bio|organic)/i.test(t) },
-  { label: 'Medical / Contraband', test: (t) => /(medical|drug|narcotic|contraband)/i.test(t) },
-];
-
-function buildCommodityCategories(rawTypes: string[]): { label: string; types: string[] }[] {
-  const normalized = rawTypes.filter(Boolean);
-  const used = new Set<string>();
-
-  const categories = COMMODITY_CATEGORY_DEFS.map((def) => {
-    const types = normalized.filter((t) => def.test(t));
-    types.forEach((t) => used.add(t));
-    return { label: def.label, types };
-  }).filter((c) => c.types.length > 0);
-
-  const misc = normalized.filter((t) => !used.has(t));
-  if (misc.length > 0) categories.push({ label: 'Other Trade Goods', types: misc });
-
-  return [{ label: 'All', types: [] }, ...categories];
-}
-
 export default function CommoditiesPage() {
   const pathname = usePathname();
   const { env } = useEnv();
   const { page, search, debouncedSearch, updateSearch, updatePageWithScroll, setPage } = useListQueryState();
   const [activeCategory, setActiveCategory] = useState('All');
 
-  const { data: types } = useQuery({ queryKey: ['commodities.types', env], queryFn: () => api.commodities.types(env), staleTime: Infinity });
-
-  const categories = useMemo(
-    () => buildCommodityCategories(types ?? []),
-    [types],
-  );
-
-  const selectedCategory = categories.find((c) => c.label === activeCategory) ?? categories[0];
-  const chipTypes = selectedCategory?.types ?? [];
-  const effectiveType = chipTypes.length === 1 ? chipTypes[0] : undefined;
-  const effectiveTypes = chipTypes.length > 1 ? chipTypes.join(',') : undefined;
+  const { data: categories } = useQuery({
+    queryKey: ['commodities.categories', env],
+    queryFn: () => api.commodities.categories(env),
+    staleTime: Infinity,
+  });
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['commodities.list', env, { page, search: debouncedSearch, type: effectiveType, types: effectiveTypes }],
+    queryKey: ['commodities.list', env, { page, search: debouncedSearch, category: activeCategory }],
     queryFn: () => api.commodities.list({
       env,
       page,
       limit: LIMIT,
       search: debouncedSearch || undefined,
-      type: effectiveType,
-      types: effectiveTypes,
+      category: activeCategory === 'All' ? undefined : activeCategory,
     }),
   });
 
   const isIndustrial = pathname?.startsWith('/industrial');
   const title = isIndustrial ? 'Industrial' : 'Trade Goods';
 
-  const filterGroups = categories.length > 0 ? [
+  const filterGroups = categories && categories.length > 0 ? [
     {
       key: 'category',
       label: 'Category',
-      options: categories.map(c => ({ label: c.label, value: c.label })),
+      options: categories.map(c => ({ label: c.count ? `${c.label} (${c.count})` : c.label, value: c.label })),
       value: activeCategory,
       onChange: (v: string) => { setActiveCategory(v); setPage(1); },
     },

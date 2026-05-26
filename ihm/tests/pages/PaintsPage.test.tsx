@@ -6,12 +6,24 @@ import PaintsPage from '@/views/PaintsPage';
 vi.mock('@/services/api', () => ({
   api: {
     paints: {
-      list: vi.fn().mockResolvedValue({
-        data: [{ paint_uuid: 'p1', paint_name: 'Sunrise', ship_name: 'Aurora MR', ship_uuid: 's1' }],
+      groups: vi.fn().mockResolvedValue({
+        groups: [
+          {
+            manufacturerName: 'RSI',
+            paintCount: 1,
+            shipCount: 1,
+            ships: [
+              {
+                shipName: 'Aurora MR',
+                shipUuid: 's1',
+                paintCount: 1,
+                paints: [{ paint_uuid: 'p1', paint_name: 'Sunrise', paint_class_name: 'Paint_Sunrise', ship_name: 'Aurora MR', ship_uuid: 's1' }],
+              },
+            ],
+          },
+        ],
         total: 1,
-        page: 1,
-        limit: 40,
-        pages: 1,
+        manufacturerOptions: [{ value: 'RSI', label: 'RSI', count: 1 }],
       }),
     },
   },

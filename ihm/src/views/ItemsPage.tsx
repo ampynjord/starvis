@@ -21,24 +21,7 @@ import type { ItemListItem } from "@/types/api";
 
 const LIMIT = 30;
 
-/** Ordered FPS category slugs + static labels (match API CATEGORY_DEFS) */
-const FPS_CATEGORIES_STATIC: { slug: string; label: string }[] = [
-	{ slug: "weapons",      label: "Weapons" },
-	{ slug: "throwable",    label: "Throwable" },
-	{ slug: "helmet",       label: "Helmet" },
-	{ slug: "core",         label: "Torso" },
-	{ slug: "arms",         label: "Arms" },
-	{ slug: "legs",         label: "Legs" },
-	{ slug: "backpack",     label: "Backpack" },
-	{ slug: "undersuit",    label: "Undersuit" },
-	{ slug: "tools-medics", label: "Tools & Medics" },
-	{ slug: "attachments",  label: "Attachment" },
-	{ slug: "magazines",    label: "Magazines" },
-	{ slug: "clothing",     label: "Clothing" },
-	{ slug: "other",        label: "Other" },
-];
-
-type FpsSlug = (typeof FPS_CATEGORIES_STATIC)[number]["slug"];
+type FpsSlug = string;
 type ItemsSlug = "all" | "chips" | "other" | `sub:${string}`;
 
 const ITEMS_SLUG_COLOR: Record<string, string> = {
@@ -46,13 +29,6 @@ const ITEMS_SLUG_COLOR: Record<string, string> = {
 	chips: "bg-green-500",
 	other: "bg-yellow-500",
 };
-
-/** FPS types covered by the FPS Gear page — excluded from Items page */
-const FPS_COVERED_TYPES = new Set([
-	"FPS_Weapon", "Armor_Helmet", "Armor_Torso", "Armor_Arms",
-	"Armor_Legs", "Armor_Backpack", "Undersuit", "Tool",
-	"Magazine", "Attachment", "Gadget", "Clothing", "Armor",
-]);
 
 const SLUG_COLOR: Record<FpsSlug | "all", string> = {
 	all:          "bg-cyan-500",
@@ -81,38 +57,6 @@ const TYPE_COLOR: Record<string, string> = {
 	Consumable:  "bg-green-400",
 	Attachment:  "bg-purple-500",
 	Magazine:    "bg-amber-500",
-};
-
-const CHIP_SUBTYPES = ["Hacking", "SystemAccess"] as const;
-const CONSUMABLE_SUBTYPE_ORDER = ["Food", "Drink", "Medical", "MedPack", "OxygenCap", "Stim"] as const;
-
-function formatConsumableLabel(subType: string): string {
-	const explicitLabels: Record<string, string> = {
-		SystemAccess: "System Access",
-		MedPack: "MedPack",
-		OxygenCap: "Oxygen Cap",
-	};
-	if (explicitLabels[subType]) return explicitLabels[subType];
-	return subType.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/_/g, " ");
-}
-
-
-
-/** Sub-type filter options per slug */
-const SLUG_SUBTYPES: Record<string, { label: string; value: string }[]> = {
-	weapons: [
-		"Pistol", "SMG", "Shotgun", "Sniper Rifle", "Assault Rifle",
-		"LMG", "Launcher", "Melee", "Medium", "Large", "Small",
-	].map((s) => ({ label: s, value: s })),
-	throwable: [
-		{ label: "Grenades", value: "Throwable" },
-		{ label: "Mines", value: "Mine" },
-	],
-	helmet:  [{ label: "Light", value: "Light" }, { label: "Medium", value: "Medium" }, { label: "Heavy", value: "Heavy" }],
-	core:    [{ label: "Light", value: "Light" }, { label: "Medium", value: "Medium" }, { label: "Heavy", value: "Heavy" }],
-	arms:    [{ label: "Light", value: "Light" }, { label: "Medium", value: "Medium" }, { label: "Heavy", value: "Heavy" }],
-	legs:    [{ label: "Light", value: "Light" }, { label: "Medium", value: "Medium" }, { label: "Heavy", value: "Heavy" }],
-	backpack:[{ label: "Light", value: "Light" }, { label: "Medium", value: "Medium" }, { label: "Heavy", value: "Heavy" }],
 };
 
 function fNum(v: number | string | null | undefined, dec = 0): string {
@@ -197,27 +141,10 @@ export default function ItemsPage() {
 	const [subType, setSubType] = useState("");
 	const [manufacturer, setManufacturer] = useState("");
 
-	/** Load categories with counts (fps mode only) */
-	const { data: categoriesData } = useQuery({
-		queryKey: ["items.categories", env],
-		queryFn: () => api.items.categories(env),
+	const { data: navigation } = useQuery({
+		queryKey: ["items.navigation", env],
+		queryFn: () => api.items.navigation(env),
 		staleTime: 5 * 60_000,
-		enabled: mode === "fps",
-	});
-
-	/** For other-items mode: load raw filters to know which types exist */
-	const { data: filters } = useQuery({
-		queryKey: ["items.filters", env],
-		queryFn: () => api.items.filters(env),
-		staleTime: 5 * 60_000,
-		enabled: mode === "other",
-	});
-
-	const { data: consumableSubTypes } = useQuery({
-		queryKey: ["items.subTypes", "Consumable", env],
-		queryFn: async () => (await api.items.subTypes("Consumable", env)).sub_types,
-		staleTime: 5 * 60_000,
-		enabled: mode === "other",
 	});
 
 	/** Manufacturer list for the current category */
@@ -232,49 +159,8 @@ export default function ItemsPage() {
 		enabled: mode === "fps",
 	});
 
-	// Build chip list — static labels shown immediately, counts added when API responds
-	// categoriesData is already unwrapped to the array by the api.get helper
-	const countMap = new Map((categoriesData ?? []).map((c) => [c.slug, c.count]));
-	const chips: { slug: string; label: string; count: number }[] = mode === "fps"
-		? [
-				{ slug: "all", label: "All", count: (categoriesData ?? []).reduce((s, c) => s + c.count, 0) },
-				...FPS_CATEGORIES_STATIC.map((c) => ({ ...c, count: countMap.get(c.slug) ?? 0 })),
-			]
-		: [];
-	const otherTypes = (filters?.types ?? []).filter((t) => !FPS_COVERED_TYPES.has(t));
-	const nonConsumableOtherTypes = otherTypes.filter((t) => t !== "Consumable");
-	const consumableEntries = (consumableSubTypes ?? []).filter((entry) => Number(entry.count) > 0);
-	const consumableCountMap = Object.fromEntries(
-		consumableEntries.map((entry) => [entry.value, Number(entry.count)]),
-	) as Record<string, number>;
-	const chipCount = CHIP_SUBTYPES.reduce((sum, value) => sum + (consumableCountMap[value] ?? 0), 0);
-	const otherCount = nonConsumableOtherTypes.reduce((sum, value) => sum + (filters?.typeCounts[value] ?? 0), 0);
-	const orderedConsumableEntries = consumableEntries
-		.filter((entry) => !CHIP_SUBTYPES.includes(entry.value as (typeof CHIP_SUBTYPES)[number]))
-		.sort((left, right) => {
-			const leftIndex = CONSUMABLE_SUBTYPE_ORDER.indexOf(left.value as (typeof CONSUMABLE_SUBTYPE_ORDER)[number]);
-			const rightIndex = CONSUMABLE_SUBTYPE_ORDER.indexOf(right.value as (typeof CONSUMABLE_SUBTYPE_ORDER)[number]);
-			const leftRank = leftIndex === -1 ? Number.MAX_SAFE_INTEGER : leftIndex;
-			const rightRank = rightIndex === -1 ? Number.MAX_SAFE_INTEGER : rightIndex;
-			if (leftRank !== rightRank) return leftRank - rightRank;
-			return formatConsumableLabel(left.value).localeCompare(formatConsumableLabel(right.value));
-		});
-	const itemCategories: { slug: ItemsSlug; label: string; count: number }[] = mode === "other"
-		? [
-				{
-					slug: "all",
-					label: "All",
-					count: consumableEntries.reduce((sum, entry) => sum + Number(entry.count), 0) + otherCount,
-				},
-				...(chipCount > 0 ? [{ slug: "chips" as const, label: "Chips", count: chipCount }] : []),
-				...orderedConsumableEntries.map((entry) => ({
-					slug: `sub:${entry.value}` as const,
-					label: formatConsumableLabel(entry.value),
-					count: Number(entry.count),
-				})),
-				{ slug: "other", label: "Other", count: otherCount },
-			]
-		: [];
+	const chips = mode === "fps" ? (navigation?.fpsCategories ?? []) : [];
+	const itemCategories = mode === "other" ? (navigation?.otherCategories ?? []) : [];
 
 	const selectSlug = (slug: FpsSlug | "all") => {
 		setActiveSlug(slug);
@@ -288,14 +174,8 @@ export default function ItemsPage() {
 		setPage(1);
 	};
 
-	const fpsSubTypeOptions = SLUG_SUBTYPES[activeSlug as FpsSlug] ?? [];
-	const consumableFilterOptions = mode !== "other"
-		? []
-		: itemsSlug === "chips"
-			? CHIP_SUBTYPES.filter((value) => consumableCountMap[value] > 0).map((value) => ({ label: formatConsumableLabel(value), value }))
-			: itemsSlug === "all"
-				? consumableEntries.map((entry) => ({ label: formatConsumableLabel(entry.value), value: entry.value }))
-				: [];
+	const fpsSubTypeOptions = navigation?.fpsSubTypeOptions[activeSlug as FpsSlug] ?? [];
+	const consumableFilterOptions = mode === "other" ? (navigation?.consumableFilterOptions[itemsSlug] ?? []) : [];
 
 	// Build query call
 	const isCategory = mode === "fps" && activeSlug !== "all";
@@ -316,28 +196,11 @@ export default function ItemsPage() {
 				return api.items.category(activeSlug, base);
 			}
 			if (mode === "fps") {
-				// "All" in fps mode: exclude no types, use generic list with all fps types
-				return api.items.list({
-					...base,
-					types: "FPS_Weapon,Armor_Helmet,Armor_Torso,Armor_Arms,Armor_Legs,Armor_Backpack,Undersuit,Tool,Consumable,Magazine,Attachment,Gadget,Clothing",
-					exclude_sub_types: "Food,Drink",
-				});
+				return api.items.list({ ...base, item_group: "fps_all" });
 			}
-			// consumables mode — all non-FPS item types, with consumable subtypes split into dedicated chips
-			if (itemsSlug === "chips") {
-				return api.items.list({ ...base, type: "Consumable", sub_types: CHIP_SUBTYPES.join(",") });
-			}
-			if (itemsSlug.startsWith("sub:")) {
-				return api.items.list({ ...base, type: "Consumable", sub_types: itemsSlug.slice(4) });
-			}
-			if (itemsSlug === "other") {
-				return api.items.list({ ...base, types: nonConsumableOtherTypes.join(",") || undefined });
-			}
-
-			// "All": everything outside FPS Gear, including every consumable subtype
-			return api.items.list({ ...base, types: otherTypes.join(",") || undefined });
+			return api.items.list({ ...base, item_group: `other_${itemsSlug}` });
 		},
-		enabled: mode === "other" ? !!filters : true,
+		enabled: !!navigation,
 	});
 
 	const hasFilters = !!(
@@ -386,9 +249,7 @@ export default function ItemsPage() {
 					onChange: (v: string) => { setSubType(v); setPage(1); },
 				}]
 			: [];
-	const isFiltersLoading = mode === "fps"
-		? !mfrData
-		: !filters || !consumableSubTypes;
+	const isFiltersLoading = mode === "fps" ? !mfrData || !navigation : !navigation;
 
 	const getItemName = (item: ItemListItem) =>
 		item.displayName ?? item.display_name ?? item.name;
@@ -413,7 +274,7 @@ export default function ItemsPage() {
 						<button
 							key={cat.slug}
 							type="button"
-							onClick={() => selectItemsSlug(cat.slug)}
+							onClick={() => selectItemsSlug(cat.slug as ItemsSlug)}
 							className={[
 								"px-3 py-1 rounded-sm text-xs font-rajdhani font-semibold tracking-wider transition-all border",
 								itemsSlug === cat.slug

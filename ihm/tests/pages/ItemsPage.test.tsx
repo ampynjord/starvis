@@ -6,7 +6,13 @@ import ItemsPage from '@/views/ItemsPage';
 vi.mock('@/services/api', () => ({
   api: {
     items: {
-      filters: vi.fn().mockResolvedValue({ types: ['FPS Weapon', 'Armor'], sub_types: [], manufacturers: [] }),
+      navigation: vi.fn().mockResolvedValue({
+        fpsCategories: [{ slug: 'all', label: 'All', count: 1 }],
+        otherCategories: [{ slug: 'all', label: 'All', count: 1 }],
+        fpsSubTypeOptions: {},
+        consumableFilterOptions: {},
+      }),
+      manufacturers: vi.fn().mockResolvedValue({ manufacturers: [] }),
       list: vi.fn().mockResolvedValue({
         data: [{ uuid: 'i1', name: 'P4-AR', type: 'FPS Weapon', sub_type: 'Rifle' }],
         total: 1,

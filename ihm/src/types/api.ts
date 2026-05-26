@@ -164,6 +164,51 @@ export interface PaintListItem extends ShipPaint {
   manufacturer_code: string | null;
 }
 
+export interface PaintShipGroup {
+  shipName: string;
+  shipUuid: string;
+  paintCount: number;
+  paints: PaintListItem[];
+}
+
+export interface PaintManufacturerGroup {
+  manufacturerName: string;
+  paintCount: number;
+  shipCount: number;
+  ships: PaintShipGroup[];
+}
+
+export interface PaintGroupsResponse {
+  groups: PaintManufacturerGroup[];
+  total: number;
+  manufacturerOptions: { value: string; label: string; count: number }[];
+}
+
+export interface RankingStat {
+  key: keyof ShipListItem;
+  label: string;
+  unit: string;
+  higher_is_better: boolean;
+  category: string;
+  vehicleCategories?: string[];
+}
+
+export interface ShipRankingResponse {
+  ships: ShipListItem[];
+  total: number;
+  sort: keyof ShipListItem;
+  order: 'asc' | 'desc';
+  category: string;
+  statCategory: string;
+  top: number;
+  stats: RankingStat[];
+  statCategories: string[];
+  vehicleCategories: { label: string; value: string }[];
+  topOptions: { label: string; value: number }[];
+  maxByKey: Partial<Record<keyof ShipListItem, number>>;
+  chartData: { name: string; value: number; uuid: string }[];
+}
+
 export interface ShipStats {
   total_hardpoints: number;
   weapons: number;
@@ -401,6 +446,13 @@ export interface Item extends ItemListItem {
   game_data: Record<string, unknown> | null;
 }
 
+export interface ItemNavigation {
+  fpsCategories: { slug: string; label: string; count: number }[];
+  otherCategories: { slug: string; label: string; count: number }[];
+  fpsSubTypeOptions: Record<string, { label: string; value: string }[]>;
+  consumableFilterOptions: Record<string, { label: string; value: string }[]>;
+}
+
 // ─── Manufacturers ────────────────────────────────────────────────────────────
 export interface Manufacturer {
   code: string;
@@ -428,6 +480,12 @@ export interface Commodity {
   symbol: string | null;
   occupancy_scu: number | null;
   data_json?: Record<string, unknown> | null;
+}
+
+export interface CommodityCategory {
+  label: string;
+  types: string[];
+  count: number;
 }
 
 // ─── Shops ────────────────────────────────────────────────────────────────────

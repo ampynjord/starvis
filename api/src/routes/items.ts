@@ -74,6 +74,16 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
   );
 
   router.get(
+    '/api/v1/items/navigation',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = String(req.query.env ?? 'live');
+      const data = await gameDataService!.items.getItemNavigation(env);
+      sendWithETag(req, res, { success: true, data });
+    }),
+  );
+
+  router.get(
     '/api/v1/items/sub-types',
     requireGameData,
     asyncHandler(async (req, res) => {
