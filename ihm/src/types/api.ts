@@ -810,6 +810,13 @@ export interface Mission {
   buyInAmount?: number | null;
 }
 
+export interface MissionListResponse extends PaginatedResponse<Mission> {
+  summary?: {
+    blueprintRewards: number;
+    averageReward: number | null;
+  };
+}
+
 export interface ChangelogEntry {
   id: number;
   entity_type: string;

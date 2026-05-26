@@ -394,16 +394,17 @@ describe('MissionService', () => {
         can_be_shared: 1,
         game_env: 'live',
       });
-      const prisma = createMockPrisma([[countRow], [m1, m2]]);
+      const prisma = createMockPrisma([[countRow], [row({ blueprint_rewards: 1, average_reward: 12000 })], [m1, m2]]);
       const svc = new MissionService(createGetClient(prisma));
       const result = await svc.getMissions({ env: 'live', page: 1, limit: 50 });
       expect(result.total).toBe(2);
       expect(result.data).toHaveLength(2);
       expect(result.page).toBe(1);
+      expect(result.summary).toEqual({ blueprintRewards: 1, averageReward: 12000 });
     });
 
     it('applies type filter', async () => {
-      const prisma = createMockPrisma([[row({ total: 0 })], []]);
+      const prisma = createMockPrisma([[row({ total: 0 })], [row({ blueprint_rewards: 0, average_reward: null })], []]);
       const svc = new MissionService(createGetClient(prisma));
       await svc.getMissions({ type: 'Bounty' });
       const sql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
@@ -411,7 +412,7 @@ describe('MissionService', () => {
     });
 
     it('applies is_legal = true filter', async () => {
-      const prisma = createMockPrisma([[row({ total: 0 })], []]);
+      const prisma = createMockPrisma([[row({ total: 0 })], [row({ blueprint_rewards: 0, average_reward: null })], []]);
       const svc = new MissionService(createGetClient(prisma));
       await svc.getMissions({ legal: 'true' });
       const sql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
@@ -419,18 +420,36 @@ describe('MissionService', () => {
     });
 
     it('applies is_legal = false filter', async () => {
-      const prisma = createMockPrisma([[row({ total: 0 })], []]);
+      const prisma = createMockPrisma([[row({ total: 0 })], [row({ blueprint_rewards: 0, average_reward: null })], []]);
       const svc = new MissionService(createGetClient(prisma));
       await svc.getMissions({ legal: 'false' });
       const sql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
       expect(sql).toContain('is_legal = false');
     });
 
+    it('applies can_be_shared = false filter', async () => {
+      const prisma = createMockPrisma([[row({ total: 0 })], [row({ blueprint_rewards: 0, average_reward: null })], []]);
+      const svc = new MissionService(createGetClient(prisma));
+      await svc.getMissions({ shared: 'false' });
+      const sql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
+      expect(sql).toContain('can_be_shared = false');
+    });
+
     it('clamps limit to 200', async () => {
-      const prisma = createMockPrisma([[row({ total: 0 })], []]);
+      const prisma = createMockPrisma([[row({ total: 0 })], [row({ blueprint_rewards: 0, average_reward: null })], []]);
       const svc = new MissionService(createGetClient(prisma));
       const result = await svc.getMissions({ limit: 9999 });
       expect(result.limit).toBe(200);
+    });
+
+    it('applies blueprint reward filtering and reward sorting in SQL', async () => {
+      const prisma = createMockPrisma([[row({ total: 0 })], [row({ blueprint_rewards: 0, average_reward: null })], []]);
+      const svc = new MissionService(createGetClient(prisma));
+      await svc.getMissions({ blueprintReward: 'true', sort: 'reward_desc' });
+      const countSql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
+      const dataSql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[2][0];
+      expect(countSql).toContain('has_blueprint_reward = true');
+      expect(dataSql).toContain('COALESCE(m.reward_max, m.reward_min, 0) DESC');
     });
   });
 

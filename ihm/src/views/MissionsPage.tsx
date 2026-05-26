@@ -29,7 +29,7 @@ import {
   Zap,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import type { Mission } from '@/types/api';
 import { api } from '@/services/api';
@@ -407,7 +407,7 @@ export default function MissionsPage() {
     queryKey: [
       'missions.list',
       env,
-      { page, search: debouncedSearch, type, legal, sharing, faction, category, availability },
+      { page, search: debouncedSearch, type, legal, sharing, faction, category, availability, blueprintOnly, sortBy },
     ],
     queryFn: () =>
       api.missions.list({
@@ -421,6 +421,8 @@ export default function MissionsPage() {
         faction: faction || undefined,
         category: category || undefined,
         unique: availability === 'unique' ? 'true' : availability === 'repeatable' ? 'false' : undefined,
+        blueprintReward: blueprintOnly ? 'true' : undefined,
+        sort: sortBy === 'default' ? undefined : sortBy,
       }),
   });
 
@@ -434,30 +436,9 @@ export default function MissionsPage() {
 
   const sel: Mission | null = data?.data?.find((m) => m.uuid === selectedUuid) ?? selectedMissionFallback ?? null;
 
-  const summary = useMemo(() => {
-    if (!data) return null;
-    return { total: data.total, showing: data.data.length };
-  }, [data]);
-
-  const displayedMissions = useMemo(() => {
-    let list = data?.data ?? [];
-    if (blueprintOnly) list = list.filter((m) => m.has_blueprint_reward);
-    switch (sortBy) {
-      case 'reward_desc': return [...list].sort((a, b) => (b.reward_max ?? b.reward_min ?? 0) - (a.reward_max ?? a.reward_min ?? 0));
-      case 'reward_asc': return [...list].sort((a, b) => (a.reward_max ?? a.reward_min ?? 0) - (b.reward_max ?? b.reward_min ?? 0));
-      case 'danger_desc': return [...list].sort((a, b) => (b.danger_level ?? 0) - (a.danger_level ?? 0));
-      default: return list;
-    }
-  }, [data?.data, blueprintOnly, sortBy]);
-
-  const blueprintCount = useMemo(() => data?.data?.filter((m) => m.has_blueprint_reward).length ?? 0, [data?.data]);
-  const avgReward = useMemo(() => {
-    const missions = data?.data ?? [];
-    const withReward = missions.filter((m) => m.reward_max != null || m.reward_min != null);
-    if (!withReward.length) return null;
-    const total = withReward.reduce((s, m) => s + (m.reward_max ?? m.reward_min ?? 0), 0);
-    return Math.round(total / withReward.length);
-  }, [data?.data]);
+  const displayedMissions = data?.data ?? [];
+  const blueprintCount = data?.summary?.blueprintRewards ?? 0;
+  const avgReward = data?.summary?.averageReward ?? null;
 
   useEffect(() => {
     if (displayedMissions.length && !selectedUuid) setSelectedUuid(displayedMissions[0].uuid);
@@ -472,7 +453,7 @@ export default function MissionsPage() {
     <div className="max-w-(--breakpoint-2xl) mx-auto">
       <PageHeader
         title="Mission Database"
-        count={summary?.total}
+        count={data?.total}
         countLabel="missions"
         search={search}
         searchPlaceholder="Search mission, giver, class name…"
@@ -493,7 +474,10 @@ export default function MissionsPage() {
           {blueprintCount > 0 && (
             <button
               type="button"
-              onClick={() => setBlueprintOnly((v) => !v)}
+              onClick={() => {
+                setBlueprintOnly((v) => !v);
+                setPage(1);
+              }}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-sm border text-[10px] font-mono-sc transition-colors ${
                 blueprintOnly
                   ? 'bg-purple-950/40 border-purple-800/60 text-purple-400'
@@ -514,7 +498,10 @@ export default function MissionsPage() {
               <button
                 key={val}
                 type="button"
-                onClick={() => setSortBy(val)}
+                onClick={() => {
+                  setSortBy(val);
+                  setPage(1);
+                }}
                 className={`px-2 py-1 rounded-sm text-[10px] font-mono-sc border transition-colors ${
                   sortBy === val
                     ? 'bg-cyan-950/40 border-cyan-800/60 text-cyan-400'
@@ -635,4 +622,3 @@ export default function MissionsPage() {
     </div>
   );
 }
-

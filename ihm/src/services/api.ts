@@ -25,6 +25,7 @@ import type {
   MiningLaserInfo,
   MiningYieldResult,
   Mission,
+  MissionListResponse,
   PaginatedResponse,
   PaintListItem,
   SearchResult,
@@ -446,13 +447,17 @@ export const api = {
       system?: string;
       category?: string;
       unique?: string;
+      blueprintReward?: string;
       minReward?: number;
       maxReward?: number;
       search?: string;
+      sort?: string;
       page?: number;
       limit?: number;
-    }) =>
-      mapPaginated(await get<PaginatedResponse<Mission>>('/missions', filters as Record<string, string | number | undefined>), mapMission),
+    }): Promise<MissionListResponse> => {
+      const result = await get<MissionListResponse>('/missions', filters as Record<string, string | number | undefined>);
+      return { ...mapPaginated(result, mapMission), summary: result.summary };
+    },
   },
 
   // ─── Crafting ────────────────────────────────────────────────────────

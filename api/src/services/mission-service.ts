@@ -5,6 +5,8 @@ import type { PrismaLike as PrismaClient } from '@starvis/db';
 import { formatEnumLabel } from '../normalizers/labels.js';
 import { convertBigIntToNumber, type FiltersResult, type PaginatedResult, type Row, toPostgres } from './shared.js';
 
+type MissionSort = 'default' | 'reward_desc' | 'reward_asc' | 'danger_desc';
+
 const MISSION_COLS = `m.uuid, m.class_name, m.title, m.description, m.mission_type,
   m.can_be_shared, m.only_owner_complete, m.is_legal,
   m.completion_time_s,
@@ -20,6 +22,26 @@ function normalizeMissionRow(row: Row): Row {
     ...row,
     display_mission_type: formatEnumLabel(String(row.mission_type ?? '')),
     display_category: formatEnumLabel(String(row.category ?? '')),
+  };
+}
+
+function getMissionOrderBy(sort?: string): string {
+  switch (sort as MissionSort | undefined) {
+    case 'reward_desc':
+      return 'COALESCE(m.reward_max, m.reward_min, 0) DESC, m.title ASC';
+    case 'reward_asc':
+      return 'COALESCE(m.reward_max, m.reward_min, 0) ASC, m.title ASC';
+    case 'danger_desc':
+      return 'COALESCE(m.danger_level, 0) DESC, m.title ASC';
+    default:
+      return 'm.mission_type ASC, m.title ASC';
+  }
+}
+
+export interface MissionListResult extends PaginatedResult {
+  summary: {
+    blueprintRewards: number;
+    averageReward: number | null;
   };
 }
 
@@ -87,12 +109,14 @@ export class MissionService {
     system?: string;
     category?: string;
     unique?: string;
+    blueprintReward?: string;
     minReward?: number;
     maxReward?: number;
     search?: string;
+    sort?: MissionSort | string;
     page?: number;
     limit?: number;
-  }): Promise<PaginatedResult> {
+  }): Promise<MissionListResult> {
     const {
       env = 'live',
       type,
@@ -102,9 +126,11 @@ export class MissionService {
       system,
       category,
       unique,
+      blueprintReward,
       minReward,
       maxReward,
       search,
+      sort,
       page = 1,
       limit = 50,
     } = opts;
@@ -122,6 +148,7 @@ export class MissionService {
     if (legal === 'true') where.push('m.is_legal = true');
     if (legal === 'false') where.push('m.is_legal = false');
     if (shared === 'true') where.push('m.can_be_shared = true');
+    if (shared === 'false') where.push('m.can_be_shared = false');
     if (faction) {
       where.push('m.faction = ?');
       params.push(faction);
@@ -136,6 +163,8 @@ export class MissionService {
     }
     if (unique === 'true') where.push('m.is_unique = true');
     if (unique === 'false') where.push('m.is_unique = false');
+    if (blueprintReward === 'true') where.push('m.has_blueprint_reward = true');
+    if (blueprintReward === 'false') where.push('m.has_blueprint_reward = false');
     if (minReward != null && minReward > 0) {
       where.push('m.reward_max >= ?');
       params.push(minReward);
@@ -145,24 +174,31 @@ export class MissionService {
       params.push(maxReward, maxReward);
     }
     if (search) {
-      where.push('(m.title ILIKE ? OR m.class_name ILIKE ? OR m.description ILIKE ?)');
+      where.push('(m.title ILIKE ? OR m.class_name ILIKE ? OR m.description ILIKE ? OR m.faction ILIKE ? OR m.mission_giver ILIKE ?)');
       const q = `%${search.replace(/[%_]/g, '\\$&')}%`;
-      params.push(q, q, q);
+      params.push(q, q, q, q, q);
     }
 
     const whereClause = where.join(' AND ');
 
-    const [countRow] = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT COUNT(*) as total FROM game.missions m WHERE ${whereClause}`),
-      ...params,
-    );
-    const total = Number(countRow?.total ?? 0);
+    const [countRows, summaryRows] = await Promise.all([
+      prisma.$queryRawUnsafe<Row[]>(toPostgres(`SELECT COUNT(*) as total FROM game.missions m WHERE ${whereClause}`), ...params),
+      prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT
+          COUNT(*) FILTER (WHERE m.has_blueprint_reward = true) as blueprint_rewards,
+          ROUND(AVG(COALESCE(m.reward_max, m.reward_min)) FILTER (WHERE COALESCE(m.reward_max, m.reward_min) IS NOT NULL)) as average_reward
+         FROM game.missions m
+         WHERE ${whereClause}`),
+        ...params,
+      ),
+    ]);
+    const total = Number(countRows[0]?.total ?? 0);
 
     const data = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT ${MISSION_COLS}
        FROM game.missions m
        WHERE ${whereClause}
-       ORDER BY m.mission_type ASC, m.title ASC
+       ORDER BY ${getMissionOrderBy(sort)}
        LIMIT ? OFFSET ?`),
       ...params,
       safeLimit,
@@ -175,6 +211,10 @@ export class MissionService {
       page,
       limit: safeLimit,
       pages: Math.ceil(total / safeLimit),
+      summary: {
+        blueprintRewards: Number(summaryRows[0]?.blueprint_rewards ?? 0),
+        averageReward: summaryRows[0]?.average_reward == null ? null : Number(summaryRows[0].average_reward),
+      },
     };
   }
 
