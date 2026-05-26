@@ -78,6 +78,17 @@ const SHIP_SELECT = [
   's.variant_type',
 ].join(', ');
 
+const SHIP_MATRIX_CATEGORY_SQL = `CASE
+  WHEN LOWER(COALESCE(sm2.type, '')) = 'gravlev'
+    OR LOWER(COALESCE(sm2.url, '')) ~ '(x1|nox|dragonfly|hoverquad|pulse)'
+    THEN 'gravlev'
+  WHEN LOWER(COALESCE(sm2.type, '')) = 'ground'
+    OR (LOWER(COALESCE(sm2.type, '')) = 'competition' AND LOWER(COALESCE(sm2.size, '')) = 'vehicle')
+    OR LOWER(COALESCE(sm2.url, '')) ~ '(g12|ranger|cyclone|ursa|rover|lynx|roc|mule|storm|nova|ballista|centurion|spartan|ptv|utv)'
+    THEN 'ground'
+  ELSE 'ship'
+END`;
+
 // prettier-ignore
 const CONCEPT_SELECT = [
   // Identity (derived from ship_matrix alias sm2)
@@ -145,7 +156,7 @@ const CONCEPT_SELECT = [
   // 3D model
   'sm2.ctm_url',
   // Meta
-  "'ship' as vehicle_category",
+  `${SHIP_MATRIX_CATEGORY_SQL} as vehicle_category`,
   'NULL as insurance_claim_time',
   'NULL as insurance_expedite_cost',
   'NULL as short_name',
@@ -273,7 +284,8 @@ export class ShipQueryService {
     }
 
     const w = ` WHERE ${where.join(' AND ')}`;
-    const includeConceptShips = !excludeConcept && (!filters?.vehicle_category || filters.vehicle_category === 'ship');
+    const includeConceptShips =
+      !excludeConcept && (!filters?.vehicle_category || ['ship', 'ground', 'gravlev'].includes(filters.vehicle_category));
 
     const conceptWhere: string[] = [
       'sm2.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)',
@@ -283,6 +295,10 @@ export class ShipQueryService {
     if (filters?.status && SHIP_MATRIX_UPCOMING_STATUSES.has(filters.status)) {
       conceptWhere.push('sm2.production_status = ?');
       conceptParams.push(filters.status);
+    }
+    if (filters?.vehicle_category) {
+      conceptWhere.push(`${SHIP_MATRIX_CATEGORY_SQL} = ?`);
+      conceptParams.push(filters.vehicle_category);
     }
     if (filters?.manufacturer) {
       conceptWhere.push('sm2.manufacturer_code = ?');
@@ -391,7 +407,7 @@ export class ShipQueryService {
     const prisma = this.getClient(env);
     const catWhere = category ? `AND s.vehicle_category = '${category.replace(/'/g, '')}'` : '';
     const catWhereNoAlias = category ? `AND vehicle_category = '${category.replace(/'/g, '')}'` : '';
-    const includeShipMatrixOnly = !category || category === 'ship';
+    const includeShipMatrixOnly = !category || ['ship', 'ground', 'gravlev'].includes(category);
     const manufacturerSql = includeShipMatrixOnly
       ? `WITH manufacturer_counts AS (
            SELECT s.manufacturer_code as value, COALESCE(m.name, s.manufacturer_code) as label, COUNT(s.uuid) as count
@@ -404,6 +420,7 @@ export class ShipQueryService {
            WHERE ${SHIP_MATRIX_UPCOMING_SQL}
              AND sm2.manufacturer_code IS NOT NULL
              AND sm2.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)
+             ${category ? `AND ${SHIP_MATRIX_CATEGORY_SQL} = '${category.replace(/'/g, '')}'` : ''}
            GROUP BY sm2.manufacturer_code, sm2.manufacturer_name
          )
          SELECT value, MAX(label) as label, SUM(count) as count
@@ -423,10 +440,11 @@ export class ShipQueryService {
            WHERE env = ?
            GROUP BY vehicle_category
            UNION ALL
-           SELECT 'ship' as value, COUNT(*) as count
+           SELECT ${SHIP_MATRIX_CATEGORY_SQL} as value, COUNT(*) as count
            FROM rsi.ship_matrix sm2
            WHERE ${SHIP_MATRIX_UPCOMING_SQL}
              AND sm2.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)
+           GROUP BY ${SHIP_MATRIX_CATEGORY_SQL}
          )
          SELECT value, SUM(count) as count
          FROM category_counts
@@ -434,18 +452,20 @@ export class ShipQueryService {
          ORDER BY value`
       : "SELECT COALESCE(vehicle_category, 'ship') as value, COUNT(*) as count FROM game.ships WHERE env = ? GROUP BY vehicle_category ORDER BY value";
     const categoryParams = includeShipMatrixOnly ? [env, env] : [env];
+    const statusGameCategoryWhere = category ? `s.vehicle_category = '${category.replace(/'/g, '')}'` : "s.vehicle_category = 'ship'";
 
     const statusSql = includeShipMatrixOnly
       ? `WITH status_counts AS (
            SELECT COALESCE(sm.production_status, 'in-game-only') as value, COUNT(*) as count
            FROM game.ships s LEFT JOIN rsi.ship_matrix sm ON s.ship_matrix_id = sm.id
-           WHERE s.env = ? AND s.vehicle_category = 'ship'
+           WHERE s.env = ? AND ${statusGameCategoryWhere}
            GROUP BY COALESCE(sm.production_status, 'in-game-only')
            UNION ALL
            SELECT sm2.production_status as value, COUNT(*) as count
            FROM rsi.ship_matrix sm2
            WHERE ${SHIP_MATRIX_UPCOMING_SQL}
              AND sm2.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)
+             ${category ? `AND ${SHIP_MATRIX_CATEGORY_SQL} = '${category.replace(/'/g, '')}'` : ''}
            GROUP BY sm2.production_status
          )
          SELECT value, SUM(count) as count
