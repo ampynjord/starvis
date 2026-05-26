@@ -103,6 +103,7 @@ export function makeGameDataGuard(gameDataService: GameDataService | undefined) 
 export function makeShipResolver(ships: ShipQueryService) {
   return {
     async resolveShipUuid(id: string, env = 'live'): Promise<string | null> {
+      if (id.startsWith('concept-')) return id;
       if (id.length === 36) return id;
       const ship = await ships.getShipByClassName(id, env);
       return (ship?.uuid as string) || null;

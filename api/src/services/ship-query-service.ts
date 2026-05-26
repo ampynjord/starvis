@@ -143,7 +143,7 @@ const CONCEPT_SELECT = [
   'sm2.min_crew',
   'sm2.max_crew',
   // 3D model
-  'NULL as ctm_url',
+  'sm2.ctm_url',
   // Meta
   "'ship' as vehicle_category",
   'NULL as insurance_claim_time',
@@ -391,14 +391,84 @@ export class ShipQueryService {
     const prisma = this.getClient(env);
     const catWhere = category ? `AND s.vehicle_category = '${category.replace(/'/g, '')}'` : '';
     const catWhereNoAlias = category ? `AND vehicle_category = '${category.replace(/'/g, '')}'` : '';
-    const [mfgRows, roleRows, careerRows, variantRows, categoryRows] = await Promise.all([
-      prisma.$queryRawUnsafe<Row[]>(
-        toPostgres(`SELECT s.manufacturer_code as value, COALESCE(m.name, s.manufacturer_code) as label, COUNT(s.uuid) as count
+    const includeShipMatrixOnly = !category || category === 'ship';
+    const manufacturerSql = includeShipMatrixOnly
+      ? `WITH manufacturer_counts AS (
+           SELECT s.manufacturer_code as value, COALESCE(m.name, s.manufacturer_code) as label, COUNT(s.uuid) as count
+           FROM game.ships s LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code
+           WHERE s.env = ? AND s.manufacturer_code IS NOT NULL AND s.manufacturer_code != '' ${catWhere}
+           GROUP BY s.manufacturer_code, m.name
+           UNION ALL
+           SELECT sm2.manufacturer_code as value, COALESCE(sm2.manufacturer_name, sm2.manufacturer_code) as label, COUNT(*) as count
+           FROM rsi.ship_matrix sm2
+           WHERE ${SHIP_MATRIX_UPCOMING_SQL}
+             AND sm2.manufacturer_code IS NOT NULL
+             AND sm2.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)
+           GROUP BY sm2.manufacturer_code, sm2.manufacturer_name
+         )
+         SELECT value, MAX(label) as label, SUM(count) as count
+         FROM manufacturer_counts
+         GROUP BY value
+         ORDER BY label`
+      : `SELECT s.manufacturer_code as value, COALESCE(m.name, s.manufacturer_code) as label, COUNT(s.uuid) as count
          FROM game.ships s LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code
          WHERE s.env = ? AND s.manufacturer_code IS NOT NULL AND s.manufacturer_code != '' ${catWhere}
-         GROUP BY s.manufacturer_code, m.name ORDER BY label`),
-        env,
-      ),
+         GROUP BY s.manufacturer_code, m.name ORDER BY label`;
+    const manufacturerParams = includeShipMatrixOnly ? [env, env] : [env];
+
+    const categorySql = includeShipMatrixOnly
+      ? `WITH category_counts AS (
+           SELECT COALESCE(vehicle_category, 'ship') as value, COUNT(*) as count
+           FROM game.ships
+           WHERE env = ?
+           GROUP BY vehicle_category
+           UNION ALL
+           SELECT 'ship' as value, COUNT(*) as count
+           FROM rsi.ship_matrix sm2
+           WHERE ${SHIP_MATRIX_UPCOMING_SQL}
+             AND sm2.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)
+         )
+         SELECT value, SUM(count) as count
+         FROM category_counts
+         GROUP BY value
+         ORDER BY value`
+      : "SELECT COALESCE(vehicle_category, 'ship') as value, COUNT(*) as count FROM game.ships WHERE env = ? GROUP BY vehicle_category ORDER BY value";
+    const categoryParams = includeShipMatrixOnly ? [env, env] : [env];
+
+    const statusSql = includeShipMatrixOnly
+      ? `WITH status_counts AS (
+           SELECT COALESCE(sm.production_status, 'in-game-only') as value, COUNT(*) as count
+           FROM game.ships s LEFT JOIN rsi.ship_matrix sm ON s.ship_matrix_id = sm.id
+           WHERE s.env = ? AND s.vehicle_category = 'ship'
+           GROUP BY COALESCE(sm.production_status, 'in-game-only')
+           UNION ALL
+           SELECT sm2.production_status as value, COUNT(*) as count
+           FROM rsi.ship_matrix sm2
+           WHERE ${SHIP_MATRIX_UPCOMING_SQL}
+             AND sm2.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)
+           GROUP BY sm2.production_status
+         )
+         SELECT value, SUM(count) as count
+         FROM status_counts
+         WHERE value IS NOT NULL AND value != ''
+         GROUP BY value
+         ORDER BY CASE value
+           WHEN 'flight-ready' THEN 1
+           WHEN 'in-production' THEN 2
+           WHEN 'in-development' THEN 3
+           WHEN 'in-concept' THEN 4
+           WHEN 'in-game-only' THEN 5
+           ELSE 9
+         END, value`
+      : `SELECT COALESCE(sm.production_status, 'in-game-only') as value, COUNT(*) as count
+         FROM game.ships s LEFT JOIN rsi.ship_matrix sm ON s.ship_matrix_id = sm.id
+         WHERE s.env = ? ${catWhere}
+         GROUP BY COALESCE(sm.production_status, 'in-game-only')
+         ORDER BY value`;
+    const statusParams = includeShipMatrixOnly ? [env, env] : [env];
+
+    const [mfgRows, roleRows, careerRows, variantRows, categoryRows, statusRows] = await Promise.all([
+      prisma.$queryRawUnsafe<Row[]>(toPostgres(manufacturerSql), ...manufacturerParams),
       prisma.$queryRawUnsafe<Row[]>(
         toPostgres(
           `SELECT DISTINCT role as value FROM game.ships WHERE env = ? AND role IS NOT NULL AND role != '' ${catWhereNoAlias} ORDER BY role`,
@@ -417,12 +487,8 @@ export class ShipQueryService {
         ),
         env,
       ),
-      prisma.$queryRawUnsafe<Row[]>(
-        toPostgres(
-          "SELECT COALESCE(vehicle_category, 'ship') as value, COUNT(*) as count FROM game.ships WHERE env = ? GROUP BY vehicle_category ORDER BY value",
-        ),
-        env,
-      ),
+      prisma.$queryRawUnsafe<Row[]>(toPostgres(categorySql), ...categoryParams),
+      prisma.$queryRawUnsafe<Row[]>(toPostgres(statusSql), ...statusParams),
     ]);
     return {
       filters: {
@@ -431,6 +497,7 @@ export class ShipQueryService {
         career: careerRows.map((r) => ({ value: String(r.value), label: String(r.value) })),
         variant_type: variantRows.map((r) => ({ value: String(r.value), label: String(r.value) })),
         vehicle_category: categoryRows.map((r) => ({ value: String(r.value), label: String(r.value), count: Number(r.count) })),
+        status: statusRows.map((r) => ({ value: String(r.value), label: String(r.value), count: Number(r.count) })),
       },
     };
   }

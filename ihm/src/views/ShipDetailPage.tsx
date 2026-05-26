@@ -36,6 +36,17 @@ function crewLabel(min: number | null | undefined, max: number | null | undefine
   return lo !== hi && hi != null ? `${lo}–${hi}` : String(lo);
 }
 
+const STATUS_LABELS: Record<string, string> = {
+  'in-concept': 'In Concept',
+  'in-production': 'In Production',
+  'in-development': 'In Development',
+  'in-game-only': 'In Game Only',
+};
+
+function statusLabel(status: string): string {
+  return STATUS_LABELS[status] ?? status.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 // ── Quick stat pill ───────────────────────────────────────────────────────────
 function QuickStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
@@ -256,11 +267,10 @@ export default function ShipDetailPage() {
                     {VARIANT_TYPE_LABELS[ship.variant_type] ?? ship.variant_type}
                   </GlowBadge>
                 )}
-                {ship.ship_matrix_id != null && <GlowBadge color="green">RSI</GlowBadge>}
-                {ship.is_concept_only && <GlowBadge color="amber">Concept</GlowBadge>}
-                {!ship.is_concept_only && ship.production_status && ship.production_status !== 'flight_ready' && (
+                {ship.is_concept_only && <GlowBadge color="amber">In Concept</GlowBadge>}
+                {!ship.is_concept_only && ship.production_status && !['flight-ready', 'flight_ready'].includes(ship.production_status) && (
                   <GlowBadge color="amber">
-                    {ship.production_status.replace(/_/g, ' ')}
+                    {statusLabel(ship.production_status)}
                   </GlowBadge>
                 )}
               </div>
