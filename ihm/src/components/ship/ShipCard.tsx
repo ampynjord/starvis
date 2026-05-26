@@ -21,6 +21,7 @@ function crewLabel(ship: ShipListItem): string {
 
 export function ShipCard({ ship, index = 0 }: Props) {
   const isGround = ship.vehicle_category === 'ground' || ship.vehicle_category === 'gravlev';
+  const isInConcept = ship.production_status === 'in-concept';
 
   return (
     <motion.div
@@ -46,17 +47,24 @@ export function ShipCard({ ship, index = 0 }: Props) {
                 </span>
               </div>
             )}
-            {ship.variant_type && ship.variant_type !== 'standard' && (
-              <div className="absolute top-1.5 right-1.5">
-                <GlowBadge
-                  color={
-                    ship.variant_type === 'collector' ? 'amber' :
-                    ship.variant_type === 'wikelo' ? 'green' :
-                    ship.variant_type === 'pyam_exec' ? 'purple' : 'slate'
-                  }
-                >
-                  {VARIANT_TYPE_LABELS[ship.variant_type] ?? ship.variant_type}
-                </GlowBadge>
+            {(isInConcept || (ship.variant_type && ship.variant_type !== 'standard')) && (
+              <div className="absolute top-1.5 right-1.5 flex flex-col items-end gap-1">
+                {isInConcept && <GlowBadge color="amber">In Concept</GlowBadge>}
+                {ship.variant_type && ship.variant_type !== 'standard' && (
+                  <GlowBadge
+                    color={
+                      ship.variant_type === 'collector'
+                        ? 'amber'
+                        : ship.variant_type === 'wikelo'
+                          ? 'green'
+                          : ship.variant_type === 'pyam_exec'
+                            ? 'purple'
+                            : 'slate'
+                    }
+                  >
+                    {VARIANT_TYPE_LABELS[ship.variant_type] ?? ship.variant_type}
+                  </GlowBadge>
+                )}
               </div>
             )}
             <div className="absolute inset-x-0 bottom-0 h-10 bg-linear-to-t from-[#0A1628] to-transparent pointer-events-none" />
