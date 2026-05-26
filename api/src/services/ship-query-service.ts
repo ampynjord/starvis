@@ -264,7 +264,7 @@ export class ShipQueryService {
       where.push("(s.variant_type IS NULL OR s.variant_type NOT IN ('npc', 'tutorial', 'enemy_ai', 'arena_ai', 'competition'))");
     }
 
-    const wantConceptOnly = filters?.status ? SHIP_MATRIX_UPCOMING_STATUSES.has(filters.status) : false;
+    const wantConceptOnly = false;
     const wantInGameOnly = filters?.status === 'in-game-only';
     const wantFlightReady = filters?.status === 'flight-ready';
     const excludeConcept = wantInGameOnly || wantFlightReady;
@@ -272,6 +272,10 @@ export class ShipQueryService {
     if (wantFlightReady) {
       where.push('sm.production_status = ?');
       params.push('flight-ready');
+    }
+    if (filters?.status && SHIP_MATRIX_UPCOMING_STATUSES.has(filters.status)) {
+      where.push('sm.production_status = ?');
+      params.push(filters.status);
     }
     if (wantInGameOnly) {
       where.push('s.ship_matrix_id IS NULL');
