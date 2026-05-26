@@ -97,9 +97,9 @@ const CONCEPT_SELECT = [
   'sm2.name',
   'sm2.manufacturer_code',
   'sm2.manufacturer_name as manufacturer_name',
-  // Role & career (no game data)
-  'NULL as career',
-  'NULL as role',
+  // Role & career from RSI marketing data
+  "CASE WHEN sm2.type IS NULL OR sm2.type = '' THEN NULL ELSE INITCAP(REPLACE(sm2.type, '-', ' ')) END as career",
+  'sm2.focus as role',
   // Physical
   'sm2.mass',
   'NULL as total_hp',
