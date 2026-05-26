@@ -142,12 +142,15 @@ const CONCEPT_SELECT = [
   // 3D model
   'NULL as ctm_url',
   // Meta
-  'NULL as vehicle_category',
+  "'ship' as vehicle_category",
   'NULL as insurance_claim_time',
   'NULL as insurance_expedite_cost',
   'NULL as short_name',
   'NULL as variant_type',
 ].join(', ');
+
+const SHIP_MATRIX_UPCOMING_STATUSES = new Set(['in-concept', 'in-production', 'in-development']);
+const SHIP_MATRIX_UPCOMING_SQL = "sm2.production_status IN ('in-concept', 'in-production', 'in-development')";
 
 const SHIP_JOINS = `FROM game.ships s
   LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code
@@ -247,7 +250,7 @@ export class ShipQueryService {
       where.push("(s.variant_type IS NULL OR s.variant_type NOT IN ('npc', 'tutorial', 'enemy_ai', 'arena_ai', 'competition'))");
     }
 
-    const wantConceptOnly = filters?.status === 'in-concept';
+    const wantConceptOnly = filters?.status ? SHIP_MATRIX_UPCOMING_STATUSES.has(filters.status) : false;
     const wantInGameOnly = filters?.status === 'in-game-only';
     const wantFlightReady = filters?.status === 'flight-ready';
     const excludeConcept = wantInGameOnly || wantFlightReady;
@@ -267,10 +270,17 @@ export class ShipQueryService {
     }
 
     const w = ` WHERE ${where.join(' AND ')}`;
-    const includeConceptShips = !excludeConcept && !filters?.vehicle_category;
+    const includeConceptShips = !excludeConcept && (!filters?.vehicle_category || filters.vehicle_category === 'ship');
 
-    const conceptWhere: string[] = ['sm2.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)'];
+    const conceptWhere: string[] = [
+      'sm2.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)',
+      SHIP_MATRIX_UPCOMING_SQL,
+    ];
     const conceptParams: (string | number)[] = [env];
+    if (filters?.status && SHIP_MATRIX_UPCOMING_STATUSES.has(filters.status)) {
+      conceptWhere.push('sm2.production_status = ?');
+      conceptParams.push(filters.status);
+    }
     if (filters?.manufacturer) {
       conceptWhere.push('sm2.manufacturer_code = ?');
       conceptParams.push(filters.manufacturer.toUpperCase());
@@ -335,7 +345,7 @@ export class ShipQueryService {
       const smId = uuid.replace('concept-', '');
       const rows = await prisma.$queryRawUnsafe<Row[]>(
         toPostgres(
-          `SELECT ${CONCEPT_SELECT}, TRUE as is_concept_only FROM rsi.ship_matrix sm2 WHERE sm2.id = ? AND sm2.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)`,
+          `SELECT ${CONCEPT_SELECT}, TRUE as is_concept_only FROM rsi.ship_matrix sm2 WHERE sm2.id = ? AND ${SHIP_MATRIX_UPCOMING_SQL} AND sm2.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)`,
         ),
         smId,
         env,
