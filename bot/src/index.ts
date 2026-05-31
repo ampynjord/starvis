@@ -5,8 +5,8 @@ import { errorEmbed } from './embeds.js';
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
-  console.error('Missing DISCORD_TOKEN environment variable');
-  process.exit(1);
+  console.log('DISCORD_TOKEN not set — bot disabled (set it in .env.dev to enable)');
+  process.exit(0);
 }
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
