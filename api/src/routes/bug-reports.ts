@@ -2,7 +2,7 @@
  * POST /api/v1/bug-reports       — submit a bug report (any logged-in user)
  * GET  /admin/bug-reports         — list all reports (admin)
  * GET  /admin/bug-reports/:id     — get one report (admin)
- * PATCH /admin/bug-reports/:id    — update status (admin)
+ * PATCH /admin/bug-reports/:id    — update status or mark duplicate (admin)
  */
 import type { Router } from 'express';
 import { requireJwt, requireJwtAdmin } from '../middleware/index.js';
@@ -12,6 +12,7 @@ import type { RouteDependencies } from './types.js';
 
 const MAX_ATTACHMENT_SIZE = 4 * 1024 * 1024; // 4 MB per attachment
 const MAX_ATTACHMENTS = 5;
+const BUG_REPORT_STATUSES = ['open', 'in_progress', 'resolved', 'closed'] as const;
 
 interface Attachment {
   name: string;
@@ -39,6 +40,14 @@ function validateAttachments(raw: unknown): Attachment[] {
 
 export function mountBugReportRoutes(router: Router, deps: RouteDependencies): void {
   const { prisma } = deps;
+  const adminReportInclude = {
+    user: { select: { id: true, username: true, email: true } },
+    duplicateOf: { select: { id: true, title: true, status: true } },
+    duplicateOfMe: {
+      orderBy: { createdAt: 'desc' },
+      include: { user: { select: { id: true, username: true, email: true } } },
+    },
+  };
 
   // ── User: submit report ──────────────────────────────────────────────────────
   router.post(
@@ -123,7 +132,21 @@ export function mountBugReportRoutes(router: Router, deps: RouteDependencies): v
       const limit = Math.min(50, Math.max(1, Number(req.query.limit ?? 20)));
       const offset = (page - 1) * limit;
 
-      const where = status ? { status } : {};
+      const search = typeof req.query.search === 'string' ? req.query.search.trim() : '';
+      const searchId = Number(search.replace(/^#/, ''));
+      const where: any = {
+        AND: [
+          status ? { status } : { duplicateOfId: null },
+          search
+            ? {
+                OR: [
+                  Number.isInteger(searchId) && searchId > 0 ? { id: searchId } : undefined,
+                  { title: { contains: search, mode: 'insensitive' } },
+                ].filter(Boolean),
+              }
+            : {},
+        ],
+      };
 
       const [total, data] = await Promise.all([
         (prisma as any).bugReport.count({ where }),
@@ -132,7 +155,7 @@ export function mountBugReportRoutes(router: Router, deps: RouteDependencies): v
           orderBy: { createdAt: 'desc' },
           skip: offset,
           take: limit,
-          include: { user: { select: { id: true, username: true, email: true } } },
+          include: adminReportInclude,
         }),
       ]);
 
@@ -151,14 +174,14 @@ export function mountBugReportRoutes(router: Router, deps: RouteDependencies): v
       }
       const report = await (prisma as any).bugReport.findUnique({
         where: { id },
-        include: { user: { select: { id: true, username: true, email: true } } },
+        include: adminReportInclude,
       });
       if (!report) return void res.status(404).json({ success: false, error: 'Report not found' });
       res.json({ success: true, data: report });
     }),
   );
 
-  // ── Admin: update status ─────────────────────────────────────────────────────
+  // ── Admin: update status / duplicate link ────────────────────────────────────
   router.patch(
     '/admin/bug-reports/:id',
     requireJwtAdmin,
@@ -167,11 +190,51 @@ export function mountBugReportRoutes(router: Router, deps: RouteDependencies): v
       if (!Number.isInteger(id) || id <= 0) {
         return void res.status(400).json({ success: false, error: 'Invalid id' });
       }
-      const { status } = req.body ?? {};
-      if (!['open', 'in_progress', 'resolved', 'closed'].includes(status)) {
+      const { status, duplicateOfId, duplicateComment } = req.body ?? {};
+      if (duplicateOfId !== undefined) {
+        const referenceId = Number(duplicateOfId);
+        if (!Number.isInteger(referenceId) || referenceId <= 0) {
+          return void res.status(400).json({ success: false, error: 'duplicateOfId must be a positive integer' });
+        }
+        if (referenceId === id) {
+          return void res.status(400).json({ success: false, error: 'A report cannot be a duplicate of itself' });
+        }
+
+        const [source, reference, sourceDuplicateCount] = await Promise.all([
+          (prisma as any).bugReport.findUnique({ where: { id }, select: { id: true } }),
+          (prisma as any).bugReport.findUnique({ where: { id: referenceId }, select: { id: true, status: true, duplicateOfId: true } }),
+          (prisma as any).bugReport.count({ where: { duplicateOfId: id } }),
+        ]);
+        if (!source) return void res.status(404).json({ success: false, error: 'Report not found' });
+        if (!reference) return void res.status(404).json({ success: false, error: 'Reference report not found' });
+        if (reference.duplicateOfId !== null) {
+          return void res.status(400).json({ success: false, error: 'Reference report must be a primary report' });
+        }
+        if (sourceDuplicateCount > 0) {
+          return void res.status(400).json({ success: false, error: 'A report with duplicate children cannot become a duplicate' });
+        }
+
+        const report = await (prisma as any).bugReport.update({
+          where: { id },
+          data: {
+            status: reference.status,
+            duplicateOfId: referenceId,
+            duplicateComment: typeof duplicateComment === 'string' && duplicateComment.trim().length > 0 ? duplicateComment.trim() : null,
+          },
+          include: adminReportInclude,
+        });
+        return void res.json({ success: true, data: report });
+      }
+
+      if (!BUG_REPORT_STATUSES.includes(status)) {
         return void res.status(400).json({ success: false, error: 'status must be open|in_progress|resolved|closed' });
       }
-      const report = await (prisma as any).bugReport.update({ where: { id }, data: { status } });
+      await (prisma as any).bugReport.updateMany({ where: { duplicateOfId: id }, data: { status } });
+      const report = await (prisma as any).bugReport.update({
+        where: { id },
+        data: { status, duplicateOfId: null, duplicateComment: null },
+        include: adminReportInclude,
+      });
       res.json({ success: true, data: report });
     }),
   );
