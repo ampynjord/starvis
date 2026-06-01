@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
+import { clearSessionCookie } from '../../_utils/proxy';
 
 export async function POST() {
   const res = NextResponse.json({ success: true });
-  res.cookies.delete('starvis_token');
+  clearSessionCookie(res);
   return res;
 }

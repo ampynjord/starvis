@@ -3,15 +3,14 @@
 import { Cookie } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-
-const STORAGE_KEY = 'starvis_cookie_consent';
+import { COOKIE_CONSENT_STORAGE_KEY, DEFAULT_AUTH_COOKIE_NAME } from '@/lib/app-constants';
 
 export function CookieBanner() {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     try {
-      if (!localStorage.getItem(STORAGE_KEY)) setVisible(true);
+      if (!localStorage.getItem(COOKIE_CONSENT_STORAGE_KEY)) setVisible(true);
     } catch {
       // localStorage unavailable
     }
@@ -19,7 +18,7 @@ export function CookieBanner() {
 
   const respond = (choice: 'accepted' | 'declined') => {
     try {
-      localStorage.setItem(STORAGE_KEY, choice);
+      localStorage.setItem(COOKIE_CONSENT_STORAGE_KEY, choice);
     } catch {
       // ignore
     }
@@ -34,7 +33,7 @@ export function CookieBanner() {
         <div className="flex items-start gap-3 mb-3">
           <Cookie size={16} className="text-cyan-500 shrink-0 mt-0.5" />
           <p className="font-rajdhani text-sm text-slate-300 leading-snug">
-            Starvis uses a single session cookie (<code className="font-mono-sc text-xs text-cyan-400">starvis_token</code>)
+            Starvis uses a single session cookie (<code className="font-mono-sc text-xs text-cyan-400">{DEFAULT_AUTH_COOKIE_NAME}</code>)
             strictly necessary for authentication. No advertising or tracking cookies are used.{' '}
             <Link href="/legal#cookies" className="text-cyan-500 hover:text-cyan-300 underline underline-offset-2">
               Learn more

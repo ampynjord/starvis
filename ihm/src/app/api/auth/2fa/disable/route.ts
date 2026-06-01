@@ -1,26 +1,19 @@
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-
-const API_BASE = process.env.API_URL ?? 'http://localhost:3000';
-
-async function getToken() {
-  const cookieStore = await cookies();
-  return cookieStore.get('starvis_token')?.value ?? null;
-}
+import { getAuthToken, readUpstreamJson, upstreamUrl } from '../../../_utils/proxy';
 
 export async function POST(req: Request) {
   try {
-    const token = await getToken();
+    const token = await getAuthToken();
     if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    const upstream = await fetch(`${API_BASE}/auth/2fa/disable`, {
+    const upstream = await fetch(upstreamUrl('/auth/2fa/disable'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(body),
     });
 
-    const data = await upstream.json().catch(() => ({}));
+    const data = await readUpstreamJson(upstream);
     if (!upstream.ok) {
       return NextResponse.json({ error: data.error ?? 'Deactivation failed' }, { status: upstream.status });
     }

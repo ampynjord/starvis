@@ -1,10 +1,9 @@
-const API_BASE_URL = process.env.API_URL || 'http://api:3000';
-const TIMEOUT_MS = 10_000;
+import { API_BASE_URL, API_TIMEOUT_MS } from './config.js';
 
 async function apiFetch<T>(path: string): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
   const res = await fetch(url, {
-    signal: AbortSignal.timeout(TIMEOUT_MS),
+    signal: AbortSignal.timeout(API_TIMEOUT_MS),
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) {

@@ -1,10 +1,10 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
 import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 import { getItems } from '../api.js';
+import { SITE_URL } from '../config.js';
 import { errorEmbed } from '../embeds.js';
 
 const COLORS = { item: 0xe67e22 } as const;
-const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
 
 export const data = new SlashCommandBuilder()
   .setName('item')

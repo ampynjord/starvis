@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { DEFAULT_AUTH_COOKIE_NAME } from '@/lib/app-constants';
 
 export const metadata: Metadata = {
   title: 'Legal notice — STARVIS',
@@ -189,7 +190,7 @@ export default function LegalPage() {
 
       <Section title="Cookies &amp; Local storage">
         <P>
-          STARVIS uses a session cookie <span className="font-mono-sc text-slate-300">starvis_token</span>{' '}
+          STARVIS uses a session cookie <span className="font-mono-sc text-slate-300">{DEFAULT_AUTH_COOKIE_NAME}</span>{' '}
           (HttpOnly, Secure) to maintain your session. No advertising or third-party tracking cookies
           are used.
         </P>

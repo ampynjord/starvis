@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { PUBLIC_SITE_URL } from '@/lib/server-config';
 import HomePage from '@/views/HomePage';
 
 export const metadata: Metadata = {
@@ -15,11 +16,11 @@ const jsonLd = {
   '@context': 'https://schema.org',
   '@type': 'WebSite',
   name: 'STARVIS',
-  url: process.env.NEXT_PUBLIC_SITE_URL ?? 'https://starvis.ampynjord.bzh',
+  url: PUBLIC_SITE_URL,
   description: 'The most complete Star Citizen database — ships, components, FPS gear and more.',
   potentialAction: {
     '@type': 'SearchAction',
-    target: `${process.env.NEXT_PUBLIC_SITE_URL ?? 'https://starvis.ampynjord.bzh'}/search?q={search_term_string}`,
+    target: `${PUBLIC_SITE_URL}/search?q={search_term_string}`,
     'query-input': 'required name=search_term_string',
   },
 };

@@ -1,9 +1,8 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
 import { SlashCommandBuilder } from 'discord.js';
 import { searchAll } from '../api.js';
+import { SITE_URL } from '../config.js';
 import { errorEmbed, searchEmbed } from '../embeds.js';
-
-const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
 
 export const data = new SlashCommandBuilder()
   .setName('search')

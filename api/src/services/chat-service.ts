@@ -21,13 +21,14 @@
 
 import type { PrismaLike } from '@starvis/db';
 import OpenAI from 'openai';
+import { CHAT_MAX_ITER, CHAT_PROVIDER_BASE_URL, CHAT_RESPONSE_MODEL, CHAT_TOOL_MODEL } from '../utils/config.js';
 import type { GameDataService } from './game-data-service.js';
 import type { RsiWebsiteService } from './rsi-website-service.js';
 import type { ShipMatrixService } from './ship-matrix-service.js';
 
-const TOOL_MODEL = 'mistral-small-latest';
-const RESPONSE_MODEL = 'mistral-small-latest';
-const MAX_ITER = 2;
+const TOOL_MODEL = CHAT_TOOL_MODEL;
+const RESPONSE_MODEL = CHAT_RESPONSE_MODEL;
+const MAX_ITER = CHAT_MAX_ITER;
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -642,7 +643,7 @@ export class ChatService {
     private rsiWebsiteService: RsiWebsiteService,
     private prisma: PrismaLike,
   ) {
-    this.openai = new OpenAI({ apiKey: process.env.MISTRAL_API_KEY, baseURL: 'https://api.mistral.ai/v1' });
+    this.openai = new OpenAI({ apiKey: process.env.MISTRAL_API_KEY, baseURL: CHAT_PROVIDER_BASE_URL });
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────

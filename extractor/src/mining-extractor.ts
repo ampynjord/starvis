@@ -48,12 +48,6 @@ function n(v: unknown): number | null {
   return Number.isFinite(f) ? f : null;
 }
 
-function _locKey(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  // Remove @-prefix locale keys → keep raw localization key
-  return raw.startsWith('@') ? raw : null;
-}
-
 function titleCaseWords(input: string): string {
   return input
     .split(/[_\s]+/)
@@ -174,7 +168,6 @@ export function extractMiningCompositions(
 
   // Build element UUID index for fast lookup
   const elementByUuid = new Map(elements.map((e) => [e.uuid, e]));
-  const _elementByClassName = new Map(elements.map((e) => [e.className.toLowerCase(), e]));
 
   const records = dfData.records.filter((r) => r.structIndex === structIdx);
   const results: MiningComposition[] = [];

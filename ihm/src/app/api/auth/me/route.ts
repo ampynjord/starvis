@@ -1,25 +1,18 @@
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-
-const API_BASE = process.env.API_URL ?? 'http://localhost:3000';
-
-async function getToken() {
-  const cookieStore = await cookies();
-  return cookieStore.get('starvis_token')?.value ?? null;
-}
+import { clearSessionCookie, getAuthToken, readUpstreamJson, upstreamUrl } from '../../_utils/proxy';
 
 export async function GET() {
   try {
-    const token = await getToken();
+    const token = await getAuthToken();
     if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
-    const upstream = await fetch(`${API_BASE}/auth/me`, {
+    const upstream = await fetch(upstreamUrl('/auth/me'), {
       headers: { Authorization: `Bearer ${token}` },
     });
 
     if (!upstream.ok) {
       const res = NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-      res.cookies.delete('starvis_token');
+      clearSessionCookie(res);
       return res;
     }
 
@@ -33,21 +26,21 @@ export async function GET() {
 
 export async function DELETE() {
   try {
-    const token = await getToken();
+    const token = await getAuthToken();
     if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
-    const upstream = await fetch(`${API_BASE}/auth/me`, {
+    const upstream = await fetch(upstreamUrl('/auth/me'), {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     });
 
     if (!upstream.ok) {
-      const data = await upstream.json().catch(() => ({}));
+      const data = await readUpstreamJson(upstream);
       return NextResponse.json({ error: (data as any).error ?? 'Deletion failed' }, { status: upstream.status });
     }
 
     const res = NextResponse.json({ success: true });
-    res.cookies.delete('starvis_token');
+    clearSessionCookie(res);
     return res;
   } catch (e: any) {
     console.error('[auth/me DELETE]', e);
@@ -57,23 +50,17 @@ export async function DELETE() {
 
 export async function PUT(req: Request) {
   try {
-    const token = await getToken();
+    const token = await getAuthToken();
     if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    const upstream = await fetch(`${API_BASE}/auth/me`, {
+    const upstream = await fetch(upstreamUrl('/auth/me'), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(body),
     });
 
-    const text = await upstream.text();
-    let data: any = {};
-    try {
-      data = JSON.parse(text);
-    } catch {
-      /* empty body */
-    }
+    const data = await readUpstreamJson(upstream);
 
     if (!upstream.ok) {
       return NextResponse.json({ error: data.error ?? 'Update failed' }, { status: upstream.status });

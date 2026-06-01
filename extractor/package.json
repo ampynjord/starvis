@@ -17,7 +17,6 @@
   "author": "ampynjord - Dawnstar",
   "license": "MIT",
   "dependencies": {
-    "@starvis/db": "*",
     "commander": "^13.1.0",
     "dotenv": "^16.3.1",
     "fzstd": "^0.1.1",

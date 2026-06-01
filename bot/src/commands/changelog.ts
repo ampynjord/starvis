@@ -1,9 +1,8 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
 import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 import { getChangelog } from '../api.js';
+import { SITE_URL } from '../config.js';
 import { errorEmbed } from '../embeds.js';
-
-const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
 
 const CHANGE_ICONS: Record<string, string> = {
   added: '🟢',

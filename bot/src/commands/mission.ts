@@ -1,9 +1,8 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
 import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 import { getMissions } from '../api.js';
+import { SITE_URL } from '../config.js';
 import { errorEmbed } from '../embeds.js';
-
-const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
 
 export const data = new SlashCommandBuilder()
   .setName('mission')
