@@ -39,6 +39,9 @@ jobs:
             node_modules
             api/node_modules
             ihm/node_modules
+            extractor/node_modules
+            bot/node_modules
+            db/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies
@@ -101,6 +104,9 @@ jobs:
             node_modules
             api/node_modules
             ihm/node_modules
+            extractor/node_modules
+            bot/node_modules
+            db/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install (fallback)
         if: steps.nm-cache.outputs.cache-hit != 'true'
@@ -139,6 +145,9 @@ jobs:
             node_modules
             api/node_modules
             ihm/node_modules
+            extractor/node_modules
+            bot/node_modules
+            db/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install (fallback)
         if: steps.nm-cache.outputs.cache-hit != 'true'
@@ -196,6 +205,9 @@ jobs:
             node_modules
             api/node_modules
             ihm/node_modules
+            extractor/node_modules
+            bot/node_modules
+            db/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install (fallback)
         if: steps.nm-cache.outputs.cache-hit != 'true'
@@ -239,6 +251,9 @@ jobs:
             node_modules
             api/node_modules
             ihm/node_modules
+            extractor/node_modules
+            bot/node_modules
+            db/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install (fallback)
         if: steps.nm-cache.outputs.cache-hit != 'true'
@@ -267,6 +282,9 @@ jobs:
             node_modules
             api/node_modules
             ihm/node_modules
+            extractor/node_modules
+            bot/node_modules
+            db/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - name: Install (fallback)
         if: steps.nm-cache.outputs.cache-hit != 'true'
