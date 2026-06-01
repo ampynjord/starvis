@@ -53,7 +53,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: db/generated/
-          key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma') }}
+          key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma', 'db/prisma.config.ts') }}
 
       - name: Generate DB clients
         if: steps.db-gen-cache.outputs.cache-hit != 'true'
@@ -156,7 +156,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: db/generated/
-          key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma') }}
+          key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma', 'db/prisma.config.ts') }}
       - name: Setup IHM next types
         if: matrix.name == 'ihm'
         run: |
@@ -216,7 +216,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: db/generated/
-          key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma') }}
+          key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma', 'db/prisma.config.ts') }}
       - name: Apply DB schema
         run: npm run push --workspace=@starvis/db
         env:
@@ -387,12 +387,14 @@ jobs:
             echo "==> Pull new images..."
             docker compose -f docker-compose.prod.yml --env-file .env.prod pull
 
-            echo "==> Rolling restart..."
-            docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --remove-orphans
+            echo "==> Ensure database services..."
+            docker compose -f docker-compose.prod.yml --env-file .env.prod up -d postgres redis
 
             echo "==> DB schema push..."
-            sleep 5
-            docker exec starvis-api sh -c "node_modules/.bin/prisma db push --schema=db/prisma/schema.prisma"
+            docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm --no-deps api npm run push --workspace=@starvis/db
+
+            echo "==> Rolling restart..."
+            docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --remove-orphans
 
             echo "==> Prune old images..."
             docker image prune -af --filter "until=24h"

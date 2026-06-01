@@ -10,6 +10,7 @@ FROM base AS deps
 COPY package*.json ./
 COPY db/package.json ./db/
 COPY api/package*.json ./api/
+COPY db/prisma.config.ts ./db/
 COPY db/prisma/ ./db/prisma/
 
 RUN npm ci --workspace=api --workspace=@starvis/db
@@ -31,6 +32,7 @@ FROM base AS production
 COPY package*.json ./
 COPY db/package.json ./db/
 COPY api/package*.json ./api/
+COPY db/prisma.config.ts ./db/
 COPY db/prisma/ ./db/prisma/
 
 RUN npm ci --omit=dev --workspace=api --workspace=@starvis/db --ignore-scripts
