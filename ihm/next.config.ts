@@ -12,6 +12,8 @@ const SECURITY_HEADERS = [
   },
 ];
 
+const BACKEND_API_URL = (process.env.API_URL ?? 'http://api:3000').replace(/\/$/, '');
+
 const nextConfig: NextConfig = {
   output: 'standalone',
   images: {
@@ -22,12 +24,12 @@ const nextConfig: NextConfig = {
   },
   async rewrites() {
     return [
-      { source: '/api-docs', destination: `${process.env.API_URL || 'http://api:3000'}/api-docs/` },
-      { source: '/api-docs/:path*', destination: `${process.env.API_URL || 'http://api:3000'}/api-docs/:path*` },
-      { source: '/api/v1/:path*', destination: `${process.env.API_URL || 'http://api:3000'}/api/v1/:path*` },
-      { source: '/health/:path*', destination: `${process.env.API_URL || 'http://api:3000'}/health/:path*` },
-      { source: '/health', destination: `${process.env.API_URL || 'http://api:3000'}/health/live` },
-      { source: '/admin/:path*', destination: `${process.env.API_URL || 'http://api:3000'}/admin/:path*` },
+      { source: '/api-docs', destination: `${BACKEND_API_URL}/api-docs/` },
+      { source: '/api-docs/:path*', destination: `${BACKEND_API_URL}/api-docs/:path*` },
+      { source: '/api/v1/:path*', destination: `${BACKEND_API_URL}/api/v1/:path*` },
+      { source: '/health/:path*', destination: `${BACKEND_API_URL}/health/:path*` },
+      { source: '/health', destination: `${BACKEND_API_URL}/health/live` },
+      { source: '/admin/:path*', destination: `${BACKEND_API_URL}/admin/:path*` },
     ];
   },
   async redirects() {

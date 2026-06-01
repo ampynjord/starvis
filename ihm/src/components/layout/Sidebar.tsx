@@ -18,24 +18,18 @@ import { usePathname } from 'next/navigation';
 import { useEnv } from '@/contexts/EnvContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { NAV_GROUPS, type NavItemDef } from '@/components/layout/navigation';
-
-/** Roles that can access beta features (mirrors API BETA_ROLES). */
-const BETA_ROLES = ['beta_tester', 'admin'] as const;
-
-function isBetaRole(role: string | undefined): boolean {
-  return BETA_ROLES.includes(role as (typeof BETA_ROLES)[number]);
-}
+import { ADMIN_ROLE, hasBetaAccess, PUBLIC_RSI_URL } from '@/lib/app-constants';
 
 function NavItem({ to, icon: Icon, label, auth: requiresAuth, beta, exact, onNavigate }: NavItemDef & { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user } = useAuth();
-  const hasBetaAccess = isBetaRole(user?.role);
-  const isActive = !beta || hasBetaAccess
+  const canAccessBeta = hasBetaAccess(user?.role);
+  const isActive = !beta || canAccessBeta
     ? (to === '/' ? pathname === '/' : exact ? pathname === to : pathname?.startsWith(to))
     : false;
   const locked = requiresAuth && !user;
 
-  if (beta && !hasBetaAccess) {
+  if (beta && !canAccessBeta) {
     return (
       <div className="flex items-center gap-3 px-2 py-2.5 rounded-sm border border-transparent cursor-default select-none opacity-50">
         <Icon size={16} className="shrink-0 text-slate-600" strokeWidth={1.5} />
@@ -168,10 +162,10 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         {NAV_GROUPS.map((group) => (
           <NavGroup key={group.id} label={group.label} items={group.items} onNavigate={onClose} />
         ))}
-        {isBetaRole(user?.role) && (
+        {hasBetaAccess(user?.role) && (
           <NavGroup label="Developer" items={[{ to: '/developer', icon: Code2, label: 'API Access' }]} onNavigate={onClose} />
         )}
-        {user?.role === 'admin' && (
+        {user?.role === ADMIN_ROLE && (
           <NavGroup
             label="Admin"
             items={[
@@ -192,9 +186,9 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           >
             <User size={12} />
             <span className="font-mono-sc truncate">{user.username}</span>
-            {isBetaRole(user.role) && (
+            {hasBetaAccess(user.role) && (
               <span className="text-[8px] font-orbitron tracking-widest text-purple-400 bg-purple-950/40 border border-purple-700/50 px-1 py-0.5 rounded-sm uppercase ml-auto">
-                {user.role === 'admin' ? 'admin' : 'beta'}
+                {user.role === ADMIN_ROLE ? 'admin' : 'beta'}
               </span>
             )}
           </Link>
@@ -225,7 +219,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           </Link>
         )}
         <a
-          href="https://robertsspaceindustries.com"
+          href={PUBLIC_RSI_URL}
           target="_blank"
           rel="noreferrer"
           className="flex items-center gap-2 text-xs text-slate-600 hover:text-slate-400 transition-colors"

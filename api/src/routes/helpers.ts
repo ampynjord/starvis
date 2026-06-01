@@ -29,7 +29,7 @@ export function asyncHandler(fn: (req: Request, res: Response) => Promise<void>)
   };
 }
 
-export function setETag(res: Response, jsonStr: string): string {
+function setETag(res: Response, jsonStr: string): string {
   const hash = createHash('md5').update(jsonStr).digest('hex').slice(0, 16);
   const etag = `"${hash}"`;
   res.setHeader('ETag', etag);

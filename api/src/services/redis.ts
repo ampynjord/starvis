@@ -59,30 +59,14 @@ redis.on('close', () => {
 /**
  * Initialize the Redis connection (lazy connect)
  */
-export async function initRedis(): Promise<boolean> {
-  try {
-    await redis.connect();
-    redisAvailable = true;
-    logger.info('Redis initialized successfully');
-    return true;
-  } catch (error) {
-    logger.warn('Redis not available, cache disabled', { error });
-    redisAvailable = false;
-    return false;
-  }
-}
-
-/**
- * Check if Redis is available
- */
-export function isRedisAvailable(): boolean {
+function isRedisAvailable(): boolean {
   return redisAvailable;
 }
 
 /**
  * Default cache TTL (1 hour)
  */
-export const DEFAULT_TTL = 3600;
+const DEFAULT_TTL = 3600;
 
 /**
  * Per-data-type specific TTLs
@@ -152,37 +136,6 @@ export async function cacheSet<T>(key: string, value: T, ttl: number = DEFAULT_T
 /**
  * Invalidate cache by pattern
  */
-export async function cacheInvalidatePattern(pattern: string): Promise<number> {
-  try {
-    const keys = await redis.keys(pattern);
-    if (keys.length > 0) {
-      const result = await redis.del(...keys);
-      cacheCounter.inc({ operation: 'invalidate', result: 'success' }, keys.length);
-      logger.info(`Invalidated ${result} cache keys`, { pattern });
-      return result;
-    }
-    return 0;
-  } catch (error) {
-    logger.error('Cache invalidate error', { pattern, error });
-    cacheCounter.inc({ operation: 'invalidate', result: 'error' });
-    return 0;
-  }
-}
-
-/**
- * Flush all cache
- */
-export async function cacheFlush(): Promise<void> {
-  try {
-    await redis.flushdb();
-    cacheCounter.inc({ operation: 'flush', result: 'success' });
-    logger.info('Cache flushed');
-  } catch (error) {
-    logger.error('Cache flush error', { error });
-    cacheCounter.inc({ operation: 'flush', result: 'error' });
-  }
-}
-
 /**
  * Update cache hit rate metric
  */

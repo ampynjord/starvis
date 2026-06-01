@@ -1,23 +1,16 @@
 import { NextResponse } from 'next/server';
-
-const API_BASE = process.env.API_URL ?? 'http://localhost:3000';
+import { readUpstreamJson, upstreamUrl } from '../../_utils/proxy';
 
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const upstream = await fetch(`${API_BASE}/auth/register`, {
+    const upstream = await fetch(upstreamUrl('/auth/register'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
 
-    const text = await upstream.text();
-    let data: any = {};
-    try {
-      data = JSON.parse(text);
-    } catch {
-      /* empty body */
-    }
+    const data = await readUpstreamJson(upstream);
 
     if (!upstream.ok) {
       return NextResponse.json({ error: data.error ?? 'Registration failed' }, { status: upstream.status });
@@ -27,8 +20,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ requiresVerification: true });
   } catch (e: any) {
     const msg = e?.cause?.code ?? e?.message ?? String(e);
-    console.error('[auth/register]', API_BASE, msg);
+    console.error('[auth/register]', upstreamUrl(''), msg);
     const isDev = process.env.NODE_ENV !== 'production';
-    return NextResponse.json({ error: isDev ? `API unreachable (${API_BASE}): ${msg}` : 'Service unavailable' }, { status: 503 });
+    return NextResponse.json({ error: isDev ? `API unreachable (${upstreamUrl('')}): ${msg}` : 'Service unavailable' }, { status: 503 });
   }
 }

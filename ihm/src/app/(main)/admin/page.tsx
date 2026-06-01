@@ -17,17 +17,18 @@ import {
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth, type AuthUser } from '@/contexts/AuthContext';
+import { ADMIN_ROLE, BETA_TESTER_ROLE, USER_ROLE, USER_ROLES } from '@/lib/app-constants';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-type Role = 'user' | 'beta_tester' | 'admin';
+type Role = (typeof USER_ROLES)[number];
 
-const ROLES: Role[] = ['user', 'beta_tester', 'admin'];
+const ROLES = [...USER_ROLES];
 
 const ROLE_STYLE: Record<Role, { label: string; badge: string }> = {
-  user:        { label: 'User',        badge: 'text-slate-400 border-slate-700/50 bg-slate-900/60' },
-  beta_tester: { label: 'Beta',        badge: 'text-purple-400 border-purple-700/50 bg-purple-950/40' },
-  admin:       { label: 'Admin',       badge: 'text-cyan-400 border-cyan-700/50 bg-cyan-950/40' },
+  [USER_ROLE]:        { label: 'User',        badge: 'text-slate-400 border-slate-700/50 bg-slate-900/60' },
+  [BETA_TESTER_ROLE]: { label: 'Beta',        badge: 'text-purple-400 border-purple-700/50 bg-purple-950/40' },
+  [ADMIN_ROLE]:       { label: 'Admin',       badge: 'text-cyan-400 border-cyan-700/50 bg-cyan-950/40' },
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -342,7 +343,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
-  const [role, setRole] = useState<Role>('user');
+  const [role, setRole] = useState<Role>(USER_ROLE);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -426,7 +427,7 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    if (me?.role !== 'admin') return;
+    if (me?.role !== ADMIN_ROLE) return;
     fetch('/api/admin/users')
       .then((r) => r.json())
       .then((d) => setUsers(d.data ?? []))
@@ -451,7 +452,7 @@ export default function AdminPage() {
     showToast(`${created.username} created.`);
   }, [showToast]);
 
-  if (me?.role !== 'admin') {
+  if (me?.role !== ADMIN_ROLE) {
     return (
       <div className="p-6 text-center text-slate-500 font-mono-sc text-sm">
         ACCESS DENIED — Admin role required
@@ -502,7 +503,7 @@ export default function AdminPage() {
             return (
               <div key={r} className="sci-panel px-3 py-2.5 border border-slate-800/60">
                 <p className="font-mono-sc text-[9px] text-slate-600 uppercase tracking-widest">{s.label}</p>
-                <p className={`font-orbitron text-lg font-black mt-0.5 ${r === 'admin' ? 'text-cyan-400' : r === 'beta_tester' ? 'text-purple-400' : 'text-slate-400'}`}>
+                <p className={`font-orbitron text-lg font-black mt-0.5 ${r === ADMIN_ROLE ? 'text-cyan-400' : r === BETA_TESTER_ROLE ? 'text-purple-400' : 'text-slate-400'}`}>
                   {countByRole[r] ?? 0}
                 </p>
               </div>
@@ -531,8 +532,8 @@ export default function AdminPage() {
                 className={`px-3 py-2 rounded-sm text-[10px] font-orbitron font-bold tracking-widest uppercase border transition-all ${
                   roleFilter === r
                     ? r === 'all' ? 'bg-slate-800 border-slate-600 text-slate-200'
-                      : r === 'admin' ? 'bg-cyan-950/60 border-cyan-700 text-cyan-400'
-                      : r === 'beta_tester' ? 'bg-purple-950/60 border-purple-700 text-purple-400'
+                      : r === ADMIN_ROLE ? 'bg-cyan-950/60 border-cyan-700 text-cyan-400'
+                      : r === BETA_TESTER_ROLE ? 'bg-purple-950/60 border-purple-700 text-purple-400'
                       : 'bg-slate-800 border-slate-600 text-slate-300'
                     : 'border-transparent text-slate-600 hover:text-slate-400 hover:border-slate-700'
                 }`}

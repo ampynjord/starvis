@@ -37,6 +37,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { NAV_GROUPS } from '@/components/layout/navigation';
+import { hasBetaAccess } from '@/lib/app-constants';
 import { fDate, fNumber } from '@/utils/formatters';
 import type { ChangelogEntry, StatsOverview } from '@/types/api';
 
@@ -87,12 +88,6 @@ const HOME_SECTION_META: Record<string, Omit<SectionDef, 'label' | 'links'>> = {
     statKey: null,
   },
 };
-
-const BETA_ROLES = ['beta_tester', 'admin'] as const;
-
-function isBetaRole(role: string | undefined): boolean {
-  return BETA_ROLES.includes(role as (typeof BETA_ROLES)[number]);
-}
 
 const SECTIONS: SectionDef[] = NAV_GROUPS.map((group) => ({
   ...HOME_SECTION_META[group.id],
@@ -228,7 +223,7 @@ function ChangelogRow({ entry }: { entry: ChangelogEntry }) {
 export default function HomePage() {
   const { env } = useEnv();
   const { user } = useAuth();
-  const hasBetaAccess = isBetaRole(user?.role);
+  const canAccessBeta = hasBetaAccess(user?.role);
   const router = useRouter();
   const [heroSearch, setHeroSearch] = useState('');
   const handleHeroSearch = (e: React.FormEvent) => {
@@ -544,7 +539,7 @@ export default function HomePage() {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {TOOLS.map(({ to, icon: Icon, label, sub, category, badge, beta }, i) => {
             const cat = CATEGORY_LABEL[category];
-            const locked = beta && !hasBetaAccess;
+            const locked = beta && !canAccessBeta;
             const inner = (
               <div className={[
                 'sci-panel p-4 h-full border transition-colors duration-150',

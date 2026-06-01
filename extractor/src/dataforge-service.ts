@@ -990,7 +990,6 @@ export class DataForgeService implements DataForgeContext {
       if (variantRecord) {
         const variantData = this.readInstance(variantRecord.structIndex, variantRecord.instanceIndex, 0, 6);
         if (variantData?.Components) {
-          const _variantLoadoutCount = 0;
           for (const comp of variantData.Components) {
             if (!comp || typeof comp !== 'object' || !comp.__type) continue;
             const cType = comp.__type as string;

@@ -10,6 +10,7 @@
  */
 
 import { chromium } from 'playwright';
+import { CTM_INTER_SHIP_DELAY_MS, CTM_WAIT_MS, RSI_BASE_URL } from './config.js';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -23,11 +24,6 @@ export interface ShipToScrape {
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
-
-const RSI_BASE = 'https://robertsspaceindustries.com';
-/** Time to wait for the 3D model to fully load after canvas interaction */
-const CTM_WAIT_MS = 15_000;
-const INTER_SHIP_DELAY_MS = 1_500;
 
 const COOKIE_SELECTORS = [
   'button:text("Accept")',
@@ -79,7 +75,7 @@ export async function scrapeShipCtmUrls(
       } catch (err) {
         onProgress?.(`  ❌ Error scraping ${ship.name}: ${(err as Error).message}`);
       }
-      if (i < total - 1) await sleep(INTER_SHIP_DELAY_MS);
+      if (i < total - 1) await sleep(CTM_INTER_SHIP_DELAY_MS);
     }
   } else {
     // Concurrent mode — process ships in parallel batches of `concurrency`
@@ -102,7 +98,7 @@ export async function scrapeShipCtmUrls(
         }
       }
       // Brief pause between batches to avoid hammering the RSI CDN
-      if (i + concurrency < total) await sleep(INTER_SHIP_DELAY_MS);
+      if (i + concurrency < total) await sleep(CTM_INTER_SHIP_DELAY_MS);
     }
   }
 
@@ -112,7 +108,7 @@ export async function scrapeShipCtmUrls(
 // ── Private helpers ────────────────────────────────────────────────────────
 
 async function scrapeOnePage(ship: ShipToScrape): Promise<string | null> {
-  const fullUrl = `${RSI_BASE}${ship.rsiUrl}`;
+  const fullUrl = `${RSI_BASE_URL}${ship.rsiUrl}`;
   const foundCtm: string[] = [];
 
   // headful=true is required: WebGL/3D viewer is often disabled in headless mode

@@ -1,26 +1,9 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import { AuthService } from '../services/auth-service.js';
+import { ADMIN_ROLE, AUTH_COOKIE_NAME, BETA_ACCESS_ROLES } from '../utils/config.js';
 
 // ── Admin API Key ─────────────────────────────────────────────────────────────
-
-export function authMiddleware(req: Request, res: Response, next: NextFunction) {
-  const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
-  if (!ADMIN_API_KEY) return res.status(500).json({ error: 'Server misconfiguration' });
-
-  const apiKey = String(req.headers['x-api-key'] || '');
-  const keyBuf = Buffer.from(apiKey);
-  const expectedBuf = Buffer.from(ADMIN_API_KEY);
-
-  if (!apiKey || keyBuf.length !== expectedBuf.length || !timingSafeEqual(keyBuf, expectedBuf)) {
-    return res.status(401).json({
-      error: 'Unauthorized',
-      message: 'Valid API key required. Use X-API-Key header.',
-    });
-  }
-
-  next();
-}
 
 // ── JWT Auth ──────────────────────────────────────────────────────────────────
 
@@ -33,7 +16,7 @@ function extractBearer(req: Request): string | null {
 function extractCookieToken(req: Request): string | null {
   const cookie = req.headers.cookie;
   if (!cookie) return null;
-  const match = cookie.split(';').find((c) => c.trim().startsWith('starvis_token='));
+  const match = cookie.split(';').find((c) => c.trim().startsWith(`${AUTH_COOKIE_NAME}=`));
   return match ? (match.split('=')[1]?.trim() ?? null) : null;
 }
 
@@ -57,9 +40,6 @@ export function requireJwt(req: Request, res: Response, next: NextFunction) {
   }
 }
 
-/** Roles that can access beta features. */
-export const BETA_ROLES = ['beta_tester', 'admin'] as const;
-
 /**
  * requireJwtBetaOrAdmin — verifies Bearer JWT AND that role is beta_tester or admin.
  * Grants access to early-access (beta) features.
@@ -75,7 +55,7 @@ export function requireJwtBetaOrAdmin(req: Request, res: Response, next: NextFun
   try {
     const authService = new AuthService(null as any);
     const payload = authService.verifyToken(token);
-    if (!BETA_ROLES.includes(payload.role as (typeof BETA_ROLES)[number])) {
+    if (!BETA_ACCESS_ROLES.includes(payload.role as (typeof BETA_ACCESS_ROLES)[number])) {
       return res.status(403).json({ success: false, error: 'Beta tester or admin role required' });
     }
     (req as any).jwtPayload = payload;
@@ -112,7 +92,7 @@ export function requireJwtAdmin(req: Request, res: Response, next: NextFunction)
   try {
     const authService = new AuthService(null as any);
     const payload = authService.verifyToken(token);
-    if (payload.role !== 'admin') {
+    if (payload.role !== ADMIN_ROLE) {
       return res.status(403).json({ success: false, error: 'Admin role required' });
     }
     (req as any).jwtPayload = payload;

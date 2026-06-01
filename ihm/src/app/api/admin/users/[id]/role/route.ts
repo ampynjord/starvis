@@ -1,33 +1,20 @@
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-
-const API_BASE = process.env.API_URL ?? 'http://localhost:3000';
-
-async function getToken() {
-  const cookieStore = await cookies();
-  return cookieStore.get('starvis_token')?.value ?? null;
-}
+import { getAuthToken, readUpstreamJson, upstreamUrl } from '../../../../_utils/proxy';
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const token = await getToken();
+    const token = await getAuthToken();
     if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
 
     const body = await req.json().catch(() => ({}));
-    const upstream = await fetch(`${API_BASE}/admin/users/${id}/role`, {
+    const upstream = await fetch(upstreamUrl(`/admin/users/${id}/role`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(body),
     });
 
-    const text = await upstream.text();
-    let data: any = {};
-    try {
-      data = JSON.parse(text);
-    } catch {
-      /* empty */
-    }
+    const data = await readUpstreamJson(upstream);
 
     if (!upstream.ok) {
       return NextResponse.json({ error: data.error ?? 'Update failed' }, { status: upstream.status });

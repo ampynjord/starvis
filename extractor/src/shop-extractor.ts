@@ -11,6 +11,7 @@
  * only yielded ~18 generic franchise templates with no location data.
  */
 
+import shopExtractorConfig from './data/shop-extractor-config.json' with { type: 'json' };
 import type { DataForgeContext } from './dataforge-utils.js';
 import type { LocalizationService } from './localization-service.js';
 import logger from './logger.js';
@@ -18,103 +19,22 @@ import type { P4KProvider } from './p4k-provider.js';
 
 // ── Category folder → shop_type mapping ─────────────────────────────────────
 
-const CATEGORY_TO_SHOP_TYPE: Record<string, string> = {
-  personalweapon: 'weapons',
-  armor: 'armor',
-  clothing: 'clothing',
-  dealership: 'vehicles',
-  bar: 'food_drink',
-  commex: 'commodities',
-  medical: 'medical',
-  service: 'service',
-  bounty: 'bounty',
-  vendor: 'general',
-  components: 'components',
-  utility: 'utility',
-  shippart: 'ship_parts',
-  customs: 'general',
-};
+const CATEGORY_TO_SHOP_TYPE: Record<string, string> = shopExtractorConfig.categoryToShopType;
 
 // ── Franchise slug fallback names (when DataForge / localization fails) ──────
 
-const FRANCHISE_SLUG_FALLBACK: Record<string, string> = {
-  // Well-known shops
-  casabaoutlet: 'Casaba Outlet',
-  centermass: 'CenterMass',
-  cubbyblast: 'Cubby Blast',
-  skutters: 'Skutters',
-  cordrys: "Cordry's",
-  conscientiousobjects: 'Conscientious Objects',
-  astroarmada: 'Astro Armada',
-  newdeal: 'New Deal',
-  dumperdepot: "Dumper's Depot",
-  dumpersdepot: "Dumper's Depot",
-  regal: 'Regal Luxury Rentals',
-  vantage: 'Vantage Rentals',
-  ftl: 'FTL Transports',
-  shubin: 'Shubin Interstellar',
-  tdd: 'Trade & Development Division',
-  kctrading: 'KC Trading',
-  kctrending: 'KC Trending', // actual filename slug
-  platinumbay: 'Platinum Bay',
-  cousincrows: "Cousin Crow's Custom Crafts",
-  cousincrow: "Cousin Crow's Custom Crafts",
-  livefire: 'Live Fire Weapons',
-  livefireweapons: 'Live Fire Weapons', // actual filename slug
-  livefirewepons: 'Live Fire Weapons', // typo in game files
-  hurstonshowroom: 'Hurston Dynamics Showroom',
-  hurston: 'Hurston Dynamics Showroom',
-  omegapro: 'Omega Pro',
-  garrity: 'Garrity Defense',
-  garritydefense: 'Garrity Defense',
-  factoryline: 'Factory Line',
-  tammany: 'Tammany and Sons',
-  tammanysonandsons: 'Tammany and Sons',
-  aparelli: 'Aparelli',
-  procyon: 'Procyon CDF',
-  procyoncdf: 'Procyon CDF',
-  makau: 'Makau Defense',
-  makaudefense: 'Makau Defense',
-  kelto: 'Kel-To',
-  crusaderprovidence: 'Crusader Providence Surplus',
-  crusaderindustries: 'Crusader Industries',
-  microtech: 'mTech',
-  reclamation: 'Reclamation & Disposal',
-  kgb: 'KGB Armory',
-  torchbearer: 'Torchbearer',
-  fta: 'Federal Trade Alliance',
-  // Shops found in current P4K Prefabs
-  cafemusain: 'Café Musain',
-  gloc: 'Glo-C',
-  old38: 'Old 38',
-  technotic: 'Technotic',
-  libertymaintenance: 'Liberty Maintenance',
-  medicalunit: 'Medical Unit',
-  independent: 'Independent',
-  customs: 'Customs',
-  admin: 'Admin Center',
-  street: 'Street Vendor',
-};
+const FRANCHISE_SLUG_FALLBACK: Record<string, string> = shopExtractorConfig.franchiseSlugFallback;
 
 // ── Location slug direct overrides (filename slug → exact game loc_key) ──────
 // Used when the filename slug doesn't match the location display name slug.
 // loc_keys are stable game constants (localization keys in global.ini).
 
-const LOCATION_SLUG_OVERRIDES: Record<string, string> = {
-  // Shops on ArcCorp use "arccorp" in filenames, but the landing zone is "Area 18"
-  arccorp: '@ui_pregame_port_Area18_name',
-};
+const LOCATION_SLUG_OVERRIDES: Record<string, string> = shopExtractorConfig.locationSlugOverrides;
 
 // ── Template / non-physical location slugs to skip ───────────────────────────
 // These appear as "location" slugs in filenames but indicate templates or props.
 
-const SKIP_LOCATION_SLUGS = new Set([
-  'franchise', // generic franchise template (e.g. casabaoutlet_franchise_sizeb.xml)
-  'prop', // prop placeholder
-  'intcomponent', // internal component
-  'component',
-  'vendor', // street_vendor.xml
-]);
+const SKIP_LOCATION_SLUGS = new Set(shopExtractorConfig.skipLocationSlugs);
 
 // ── Size/variant suffixes to strip from filename stem ────────────────────────
 
@@ -304,7 +224,7 @@ export async function extractShopsFromPrefabs(
  * Indexes by:
  *   1. Normalized full class_name (unique, highest confidence)
  *   2. Normalized full display name (e.g. "area18" from "Area 18")
- *   3. Direct overrides from LOCATION_SLUG_OVERRIDES (hardcoded game-slug → loc_key)
+ *   3. Direct overrides from LOCATION_SLUG_OVERRIDES (configured game-slug → loc_key)
  *
  * Intentionally NO word-level indexing to avoid ambiguity when multiple locations
  * share common words (e.g. "ArcCorp Mining Area 045" and "Area 18" both contain "area").

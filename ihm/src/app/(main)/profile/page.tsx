@@ -5,6 +5,7 @@ import { AlertTriangle, Copy, Key, Lock, LogOut, QrCode, Save, Shield, ShieldChe
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { hasBetaAccess } from '@/lib/app-constants';
 
 export default function ProfilePage() {
   const { user, logout, refresh } = useAuth();
@@ -102,7 +103,7 @@ export default function ProfilePage() {
     setTimeout(() => setTokenCopied(false), 2000);
   };
 
-  const isBetaOrAdmin = user?.role === 'beta_tester' || user?.role === 'admin';
+  const isBetaOrAdmin = hasBetaAccess(user?.role);
 
   const handleSetup2FA = async () => {
     setTwoFaLoading(true);

@@ -8,6 +8,8 @@
  * Classification uses the DataForge record file path (fileName field).
  * Names are resolved via the localization service (global.ini LOC keys).
  */
+
+import locationExtractorConfig from './data/location-extractor-config.json' with { type: 'json' };
 import type { DataForgeContext } from './dataforge-utils.js';
 import logger from './logger.js';
 
@@ -317,20 +319,7 @@ export function extractLocations(df: DataForgeContext, loc: LocationLocAdapter, 
   // After pass 3 the chain walk re-parents e.g. RR_ARC_L1 to StantonStar
   // (the nearest extracted ancestor). We want them under the planet instead.
   // Mapping: class_name prefix → planet class_name
-  const LAGRANGE_PREFIX_TO_PLANET: Record<string, string> = {
-    // Stanton
-    rr_hur_: 'stanton1', // Hurston
-    rr_cru_: 'stanton2', // Crusader
-    rr_arc_: 'stanton3', // ArcCorp
-    rr_mic_: 'stanton4', // microTech
-    // Pyro
-    rr_pyro1_: 'pyro1',
-    rr_pyro2_: 'pyro2',
-    rr_pyro3_: 'pyro3',
-    rr_pyro4_: 'pyro4',
-    rr_pyro5_: 'pyro5',
-    rr_pyro6_: 'pyro6',
-  };
+  const LAGRANGE_PREFIX_TO_PLANET: Record<string, string> = locationExtractorConfig.lagrangePrefixToPlanet;
   const planetUuidByClassName = new Map<string, string>();
   for (const rec of records) {
     if (rec.type === 'planet') planetUuidByClassName.set(rec.className.toLowerCase(), rec.uuid);

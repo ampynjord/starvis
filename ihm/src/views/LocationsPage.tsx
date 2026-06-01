@@ -32,11 +32,7 @@ import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { useDebounce } from '@/hooks/useDebounce';
-
-const BETA_ROLES = ['beta_tester', 'admin'] as const;
-function hasBetaRole(role: string | undefined): boolean {
-  return BETA_ROLES.includes(role as (typeof BETA_ROLES)[number]);
-}
+import { hasBetaAccess } from '@/lib/app-constants';
 
 // ── Type meta ─────────────────────────────────────────────────────────────────
 
@@ -336,7 +332,7 @@ export default function LocationsPage() {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [initialized, setInitialized] = useState(false);
 
-  if (!hasBetaRole(user?.role)) return <BetaGate />;
+  if (!hasBetaAccess(user?.role)) return <BetaGate />;
 
   const debouncedSearch = useDebounce(search, 250);
 

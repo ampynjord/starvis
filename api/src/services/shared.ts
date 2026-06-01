@@ -113,19 +113,6 @@ export interface FilterOption {
 export type FiltersResult = { filters: Record<string, FilterOption[]> };
 
 /** Convert a plain string array to FilterOption[] (value === label, no count) */
-export function toFilterOptions(values: string[]): FilterOption[] {
-  return values.map((v) => ({ value: v, label: v }));
-}
-
-/** Convert rows with { value, label?, count? } shape to FilterOption[] */
-export function rowsToFilterOptions(rows: Row[], valueKey: string, labelKey?: string, countKey?: string): FilterOption[] {
-  return rows.map((r) => ({
-    value: String(r[valueKey] ?? ''),
-    label: String(r[labelKey ?? valueKey] ?? r[valueKey] ?? ''),
-    ...(countKey ? { count: Number(r[countKey]) } : {}),
-  }));
-}
-
 // ── PostgreSQL helper ─────────────────────────────────────
 
 /**

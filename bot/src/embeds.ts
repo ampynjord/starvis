@@ -1,5 +1,6 @@
 import { type ColorResolvable, EmbedBuilder } from 'discord.js';
 import type { ShipResult, TradeRoute } from './api.js';
+import { SITE_URL } from './config.js';
 
 const COLORS = {
   primary: 0x5865f2,
@@ -10,8 +11,6 @@ const COLORS = {
   trade: 0x2ecc71,
   commodity: 0xe67e22,
 } as const satisfies Record<string, ColorResolvable>;
-
-export const SITE_URL = process.env.SITE_URL || 'https://starvis.ampynjord.bzh';
 
 export function shipEmbed(ship: ShipResult): EmbedBuilder {
   const shipId = ship.id ?? ship.ship_matrix_id;

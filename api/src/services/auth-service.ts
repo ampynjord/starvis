@@ -3,6 +3,7 @@ import { createRequire } from 'node:module';
 import type { PrismaLike } from '@starvis/db';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { JWT_2FA_PENDING_EXPIRES, JWT_API_TOKEN_EXPIRES, JWT_EXPIRES, RESET_TOKEN_TTL_MS } from '../utils/config.js';
 
 const _require = createRequire(import.meta.url);
 
@@ -28,10 +29,6 @@ export interface PublicUser {
 }
 
 const SALT_ROUNDS = 12;
-const JWT_EXPIRES = '7d';
-const JWT_API_TOKEN_EXPIRES = '1y';
-const JWT_2FA_PENDING_EXPIRES = '5m';
-const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
 function getSecret(): string {
   const s = process.env.JWT_SECRET;

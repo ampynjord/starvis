@@ -20,6 +20,7 @@ import type { Router } from 'express';
 import { requireJwt, requireJwtAdmin, requireJwtBetaOrAdmin } from '../middleware/index.js';
 import { AuthService } from '../services/auth-service.js';
 import { sendPasswordResetEmail, sendVerificationEmail } from '../services/email-service.js';
+import { USER_ROLE, USER_ROLES } from '../utils/config.js';
 import type { RouteDependencies } from './types.js';
 
 const STRONG_PASSWORD = /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^a-zA-Z0-9]).{8,}$/;
@@ -268,7 +269,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
       return void res.status(400).json({ success: false, error: 'Invalid user id' });
     }
     const { role } = req.body ?? {};
-    if (!['user', 'beta_tester', 'admin'].includes(role)) {
+    if (!USER_ROLES.includes(role)) {
       return void res.status(400).json({ success: false, error: 'role must be "user", "beta_tester" or "admin"' });
     }
     try {
@@ -352,7 +353,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return void res.status(400).json({ success: false, error: 'Invalid email address' });
     }
-    const assignedRole = ['user', 'beta_tester', 'admin'].includes(role) ? role : 'user';
+    const assignedRole = USER_ROLES.includes(role) ? role : USER_ROLE;
     try {
       const user = await authService.adminCreateUser(email, username, password, assignedRole);
       res.status(201).json({ success: true, user });

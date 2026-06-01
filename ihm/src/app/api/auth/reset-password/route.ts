@@ -1,17 +1,16 @@
 import { NextResponse } from 'next/server';
-
-const API_BASE = process.env.API_URL ?? 'http://localhost:3000';
+import { readUpstreamJson, upstreamUrl } from '../../_utils/proxy';
 
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const upstream = await fetch(`${API_BASE}/auth/reset-password`, {
+    const upstream = await fetch(upstreamUrl('/auth/reset-password'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
 
-    const data = await upstream.json().catch(() => ({}));
+    const data = await readUpstreamJson(upstream);
     if (!upstream.ok) {
       return NextResponse.json({ error: data.error ?? 'Reset failed' }, { status: upstream.status });
     }

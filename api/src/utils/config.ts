@@ -1,6 +1,7 @@
 /**
  * Centralized configuration — all values come from .env
  */
+import type { SignOptions } from 'jsonwebtoken';
 
 function requireEnv(key: string): string {
   const val = process.env[key];
@@ -41,3 +42,21 @@ export const RATE_LIMITS = {
  * When ctm_url changes in DB, the sidecar mismatch triggers a re-fetch.
  */
 export const CTM_CACHE_DIR = process.env.CTM_CACHE_DIR ?? '/tmp/ctm-cache';
+
+export const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? 'starvis_token';
+
+export const USER_ROLE = 'user';
+export const BETA_TESTER_ROLE = 'beta_tester';
+export const ADMIN_ROLE = 'admin';
+export const USER_ROLES = [USER_ROLE, BETA_TESTER_ROLE, ADMIN_ROLE] as const;
+export const BETA_ACCESS_ROLES = [BETA_TESTER_ROLE, ADMIN_ROLE] as const;
+
+export const JWT_EXPIRES = (process.env.JWT_EXPIRES ?? '7d') as SignOptions['expiresIn'];
+export const JWT_API_TOKEN_EXPIRES = (process.env.JWT_API_TOKEN_EXPIRES ?? '1y') as SignOptions['expiresIn'];
+export const JWT_2FA_PENDING_EXPIRES = (process.env.JWT_2FA_PENDING_EXPIRES ?? '5m') as SignOptions['expiresIn'];
+export const RESET_TOKEN_TTL_MS = parseInt(process.env.RESET_TOKEN_TTL_MS ?? String(60 * 60 * 1000), 10);
+
+export const CHAT_TOOL_MODEL = process.env.CHAT_TOOL_MODEL ?? 'mistral-small-latest';
+export const CHAT_RESPONSE_MODEL = process.env.CHAT_RESPONSE_MODEL ?? 'mistral-small-latest';
+export const CHAT_MAX_ITER = parseInt(process.env.CHAT_MAX_ITER ?? '2', 10);
+export const CHAT_PROVIDER_BASE_URL = process.env.CHAT_PROVIDER_BASE_URL ?? 'https://api.mistral.ai/v1';

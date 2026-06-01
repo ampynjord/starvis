@@ -1,13 +1,12 @@
 import type { Metadata } from 'next';
 import { Suspense } from 'react';
+import { SERVER_API_URL } from '@/lib/server-config';
 import CommLinkDetailPage from '@/views/CommLinkDetailPage';
-
-const API_BASE = process.env.API_URL ?? 'http://localhost:3000';
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   try {
     const { id } = await params;
-    const res = await fetch(`${API_BASE}/api/v1/comm-links/${id}`, { next: { revalidate: 3600 } });
+    const res = await fetch(`${SERVER_API_URL}/api/v1/comm-links/${id}`, { next: { revalidate: 3600 } });
     if (!res.ok) throw new Error();
     const { data } = await res.json();
     return {

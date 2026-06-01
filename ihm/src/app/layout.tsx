@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Orbitron, Rajdhani, Share_Tech_Mono } from 'next/font/google';
 import { ChatWidget } from '@/components/ui/ChatWidget';
 import { CookieBanner } from '@/components/ui/CookieBanner';
+import { PUBLIC_SITE_URL } from '@/lib/server-config';
 import { Providers } from './providers';
 import '@/index.css';
 
@@ -26,10 +27,8 @@ const shareTechMono = Share_Tech_Mono({
   weight: '400',
 });
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://starvis.ampynjord.bzh';
-
 export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
+  metadataBase: new URL(PUBLIC_SITE_URL),
   title: {
     default: 'STARVIS — Star Citizen Database',
     template: '%s — STARVIS',
@@ -41,7 +40,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: SITE_URL,
+    url: PUBLIC_SITE_URL,
     siteName: 'STARVIS',
     title: 'STARVIS — Star Citizen Database',
     description: 'Ships, components, FPS gear, commodities and more — extracted from game files.',

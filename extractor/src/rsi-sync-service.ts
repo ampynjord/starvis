@@ -9,14 +9,12 @@
  * Source: https://api.star-citizen.wiki/api/
  */
 import type { Pool } from 'pg';
+import { RSI_BASE_URL, RSI_SHIP_MATRIX_URL, SC_WIKI_API_URL, SCRAPER_USER_AGENT } from './config.js';
 import logger from './logger.js';
-
-const SC_WIKI_BASE = 'https://api.star-citizen.wiki/api';
-const RSI_SHIP_MATRIX_URL = 'https://robertsspaceindustries.com/ship-matrix/index';
 
 async function fetchJson(url: string): Promise<any> {
   const res = await fetch(url, {
-    headers: { Accept: 'application/json', 'User-Agent': 'Starvis-Scraper/1.0' },
+    headers: { Accept: 'application/json', 'User-Agent': SCRAPER_USER_AGENT },
   });
   if (!res.ok) throw new Error(`HTTP ${res.status} — ${url}`);
   return res.json();
@@ -39,7 +37,7 @@ export class RsiSyncService {
     try {
       let page = 1;
       while (true) {
-        const url = `${SC_WIKI_BASE}/galactapedia?page[number]=${page}&limit=100&with=translations`;
+        const url = `${SC_WIKI_API_URL}/galactapedia?page[number]=${page}&limit=100&with=translations`;
         onProgress?.(`  [galactapedia] page ${page}…`);
 
         let data: any;
@@ -65,7 +63,7 @@ export class RsiSyncService {
           const categories = item.categories ? JSON.stringify(item.categories.map((c: any) => c.name ?? c)) : null;
           const tags = item.tags ? JSON.stringify(item.tags.map((t: any) => t.name ?? t)) : null;
           const thumbnailUrl = item.thumbnail?.url ?? item.thumbnail ?? null;
-          const rsiUrl = `https://robertsspaceindustries.com/galactapedia/article/${id}-${slug}`;
+          const rsiUrl = `${RSI_BASE_URL}/galactapedia/article/${id}-${slug}`;
 
           try {
             const result = await conn.query<any>(
@@ -103,7 +101,7 @@ export class RsiSyncService {
     try {
       let page = 1;
       while (true) {
-        const url = `${SC_WIKI_BASE}/comm-links?page[number]=${page}&limit=100`;
+        const url = `${SC_WIKI_API_URL}/comm-links?page[number]=${page}&limit=100`;
         onProgress?.(`  [comm-links] page ${page}…`);
 
         let data: any;
@@ -153,7 +151,7 @@ export class RsiSyncService {
                 excerpt,
                 category,
                 item.thumbnail?.url ?? item.image ?? null,
-                item.rsi_url ?? `https://robertsspaceindustries.com/comm-link/${rsiId}`,
+                item.rsi_url ?? `${RSI_BASE_URL}/comm-link/${rsiId}`,
                 publishedAtSql,
               ],
             );
@@ -208,12 +206,12 @@ export class RsiSyncService {
           const storeSmall = images.store_small
             ? images.store_small.startsWith('http')
               ? images.store_small
-              : `https://robertsspaceindustries.com${images.store_small}`
+              : `${RSI_BASE_URL}${images.store_small}`
             : null;
           const storeLarge = images.store_large
             ? images.store_large.startsWith('http')
               ? images.store_large
-              : `https://robertsspaceindustries.com${images.store_large}`
+              : `${RSI_BASE_URL}${images.store_large}`
             : null;
 
           await conn.query(
@@ -341,7 +339,7 @@ export class RsiSyncService {
     try {
       let page = 1;
       while (true) {
-        const url = `${SC_WIKI_BASE}/starsystems?page[number]=${page}&limit=100`;
+        const url = `${SC_WIKI_API_URL}/starsystems?page[number]=${page}&limit=100`;
         onProgress?.(`  [starmap] systems page ${page}…`);
 
         let data: any;

@@ -24,9 +24,10 @@ import swaggerUi from 'swagger-ui-express';
 import { prometheusMiddleware } from './src/middleware/prometheus.js';
 import { healthRouter } from './src/routes/health.js';
 import { createRoutes } from './src/routes/index.js';
-import { GameDataService, ShipMatrixService } from './src/services/index.js';
+import { GameDataService } from './src/services/game-data-service.js';
 import { redis } from './src/services/redis.js';
 import { RsiWebsiteService } from './src/services/rsi-website-service.js';
+import { ShipMatrixService } from './src/services/ship-matrix-service.js';
 import { buildDatabaseUrl, logger, RATE_LIMITS } from './src/utils/index.js';
 
 const PORT = process.env.PORT || 3000;

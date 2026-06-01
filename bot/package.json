@@ -12,8 +12,7 @@
     "lint:fix": "biome check --write ."
   },
   "dependencies": {
-    "discord.js": "^14.18.0",
-    "@starvis/db": "*"
+    "discord.js": "^14.18.0"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.4",

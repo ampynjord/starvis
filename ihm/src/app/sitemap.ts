@@ -1,6 +1,5 @@
 import type { MetadataRoute } from 'next';
-
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://starvis.ampynjord.bzh';
+import { PUBLIC_SITE_URL } from '@/lib/server-config';
 
 const STATIC_ROUTES: { path: string; priority: number; changefreq: MetadataRoute.Sitemap[number]['changeFrequency'] }[] = [
   { path: '/', priority: 1.0, changefreq: 'daily' },
@@ -26,7 +25,7 @@ const STATIC_ROUTES: { path: string; priority: number; changefreq: MetadataRoute
 export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
   return STATIC_ROUTES.map(({ path, priority, changefreq }) => ({
-    url: `${BASE_URL}${path}`,
+    url: `${PUBLIC_SITE_URL}${path}`,
     lastModified: now,
     changeFrequency: changefreq,
     priority,

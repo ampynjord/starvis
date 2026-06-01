@@ -106,11 +106,6 @@ function cleanRuntimePlaceholderTokens(s: string | null | undefined): string | n
   return result || null;
 }
 
-function _hasRuntimePlaceholderTokens(s: string | null | undefined): boolean {
-  if (!s) return false;
-  return /~[a-z0-9_]+\(/i.test(s);
-}
-
 function humanizeMissionClassName(className: string): string {
   const withSpaces = className
     .replace(/_/g, ' ')

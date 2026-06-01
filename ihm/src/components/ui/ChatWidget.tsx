@@ -5,6 +5,7 @@ import { Bot, ChevronDown, LogIn, Send, X } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { hasBetaAccess } from '@/lib/app-constants';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -133,7 +134,7 @@ export function ChatWidget() {
     }
   };
 
-  const isBeta = user?.role === 'beta_tester' || user?.role === 'admin';
+  const isBeta = hasBetaAccess(user?.role);
 
   if (authLoading) return null;
 

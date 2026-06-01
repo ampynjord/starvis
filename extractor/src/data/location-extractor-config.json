@@ -1,0 +1,14 @@
+{
+  "lagrangePrefixToPlanet": {
+    "rr_hur_": "stanton1",
+    "rr_cru_": "stanton2",
+    "rr_arc_": "stanton3",
+    "rr_mic_": "stanton4",
+    "rr_pyro1_": "pyro1",
+    "rr_pyro2_": "pyro2",
+    "rr_pyro3_": "pyro3",
+    "rr_pyro4_": "pyro4",
+    "rr_pyro5_": "pyro5",
+    "rr_pyro6_": "pyro6"
+  }
+}

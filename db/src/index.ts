@@ -6,6 +6,7 @@
  *   rsi   — RSI website scraped data
  *   meta  — extraction logs, changelogs, manufacturers
  */
+import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/client/index.js';
 
 export { PrismaClient };
@@ -24,9 +25,8 @@ let prismaClient: PrismaClient | null = null;
  * Must be called once at startup before any other helper.
  */
 export function initPrisma(databaseUrl: string): PrismaClient {
-  prismaClient = new PrismaClient({
-    datasources: { db: { url: databaseUrl } },
-  });
+  const adapter = new PrismaPg({ connectionString: databaseUrl });
+  prismaClient = new PrismaClient({ adapter });
   return prismaClient;
 }
 
