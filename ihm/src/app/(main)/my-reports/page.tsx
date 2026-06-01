@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { AlertCircle, Bug, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { AlertCircle, Bug, CheckCircle, Clock, GitMerge, XCircle } from 'lucide-react';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -19,6 +19,7 @@ const STATUS_STYLES: Record<string, { label: string; icon: React.ReactNode; cls:
   in_progress: { label: 'In progress', icon: <Clock size={11} />, cls: 'text-cyan-400 bg-cyan-950/30 border-cyan-700/40' },
   resolved: { label: 'Resolved', icon: <CheckCircle size={11} />, cls: 'text-green-400 bg-green-950/30 border-green-700/40' },
   closed: { label: 'Closed', icon: <XCircle size={11} />, cls: 'text-slate-400 bg-slate-800/30 border-slate-600/40' },
+  duplicate: { label: 'Duplicate', icon: <GitMerge size={11} />, cls: 'text-violet-300 bg-violet-950/30 border-violet-700/40' },
 };
 
 function StatusBadge({ status }: { status: string }) {

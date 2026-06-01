@@ -27,7 +27,7 @@ export const RATE_LIMITS = {
   // Hard limit: requests per window per IP (then 429)
   max: parseInt(process.env.RATE_LIMIT_MAX || '200', 10),
   // Strict limit for admin endpoints
-  adminMax: 20,
+  adminMax: parseInt(process.env.RATE_LIMIT_ADMIN_MAX || '20', 10),
   // Burst: max requests per minute per IP
   burstWindowMs: 60 * 1000,
   burst: parseInt(process.env.RATE_LIMIT_BURST || '60', 10),

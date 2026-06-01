@@ -133,19 +133,24 @@ model User {
 }
 
 model BugReport {
-  id          Int      @id @default(autoincrement())
-  userId      Int      @map("user_id")
-  title       String   @db.VarChar(200)
-  description String   @db.Text
-  attachments Json     @default("[]")
-  status      String   @default("open") @db.VarChar(20)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id               Int      @id @default(autoincrement())
+  userId           Int      @map("user_id")
+  title            String   @db.VarChar(200)
+  description      String   @db.Text
+  attachments      Json     @default("[]")
+  status           String   @default("open") @db.VarChar(20)
+  duplicateOfId    Int?     @map("duplicate_of_id")
+  duplicateComment String?  @map("duplicate_comment") @db.Text
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  duplicateOf   BugReport?  @relation("BugReportDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicateOfMe BugReport[] @relation("BugReportDuplicates")
 
   @@index([userId])
   @@index([status])
+  @@index([duplicateOfId])
   @@index([createdAt])
   @@map("bug_reports")
   @@schema("meta")
