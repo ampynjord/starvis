@@ -181,18 +181,24 @@ async function start() {
     process.exit(1);
   }
 
-  // 2. Push schema to PostgreSQL
-  try {
-    const { execSync } = await import('node:child_process');
-    const schemaPath = path.resolve(__dirname, '..', 'db', 'prisma', 'schema.prisma');
-    execSync(`npx prisma db push --schema=${schemaPath} --skip-generate --accept-data-loss`, {
-      stdio: 'pipe',
-      env: { ...process.env, DATABASE_URL: buildDatabaseUrl() },
-    });
-    logger.info('✅ Schema synced → PostgreSQL', { module: 'DB' });
-  } catch (e: any) {
-    logger.error(`Schema sync failed: ${e.stderr?.toString() || e.message}`, { module: 'DB' });
-    process.exit(1);
+  // 2. Optionally push schema to PostgreSQL outside production deploys.
+  const shouldPushSchema =
+    process.env.DB_PUSH_ON_STARTUP === 'true' || (process.env.NODE_ENV !== 'production' && process.env.DB_PUSH_ON_STARTUP !== 'false');
+  if (shouldPushSchema) {
+    try {
+      const { execFileSync } = await import('node:child_process');
+      execFileSync('npm', ['run', 'push', '--workspace=@starvis/db', '--', '--skip-generate', '--accept-data-loss'], {
+        cwd: path.resolve(__dirname, '..'),
+        stdio: 'pipe',
+        env: { ...process.env, DATABASE_URL: buildDatabaseUrl() },
+      });
+      logger.info('✅ Schema synced → PostgreSQL', { module: 'DB' });
+    } catch (e: any) {
+      logger.error(`Schema sync failed: ${e.stderr?.toString() || e.message}`, { module: 'DB' });
+      process.exit(1);
+    }
+  } else {
+    logger.info('Schema sync skipped at startup', { module: 'DB' });
   }
 
   // 3. Initialize Redis (non-blocking)
