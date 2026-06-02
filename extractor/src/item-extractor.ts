@@ -196,7 +196,7 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
           subType: null,
           symbol: null,
           occupancyScu: null,
-          dataJson: null,
+          dataJson: { p4kPath: r.fileName || null, rawJson: { record: r, data } },
         };
 
         if (Array.isArray(data.Components)) {
@@ -269,7 +269,7 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
         dataJson: null,
       };
 
-      const extData: Record<string, unknown> = {};
+      const extData: Record<string, unknown> = { p4kPath: r.fileName || null, rawJson: { record: r, data } };
 
       for (const c of comps) {
         if (!c || typeof c !== 'object' || !c.__type) continue;

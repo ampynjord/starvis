@@ -123,7 +123,7 @@ export class CraftingService {
       toPostgres(`SELECT r.uuid, r.class_name, r.name, r.category,
               COALESCE(oi.name, r.output_item_name) AS output_item_name,
               r.output_item_uuid, r.output_quantity,
-              r.crafting_time_s, r.station_type, r.skill_level,
+              r.crafting_time_s, r.station_type, r.skill_level, r.p4k_path,
               (SELECT COUNT(DISTINCT sub_m.uuid) FROM (
                 SELECT uuid FROM game.missions WHERE blueprint_reward_uuid = r.uuid AND env = r.env
                 UNION ALL
@@ -171,7 +171,7 @@ export class CraftingService {
       toPostgres(`SELECT r.uuid, r.class_name, r.name, r.category,
               COALESCE(oi.name, r.output_item_name) AS output_item_name,
               r.output_item_uuid, r.output_quantity,
-              r.crafting_time_s, r.station_type, r.skill_level,
+              r.crafting_time_s, r.station_type, r.skill_level, r.p4k_path,
               ci.quantity, ci.scu, ci.slot_name
        FROM game.crafting_recipes r
        JOIN game.crafting_ingredients ci ON ci.recipe_uuid = r.uuid AND ci.recipe_env = r.env
@@ -192,7 +192,7 @@ export class CraftingService {
       toPostgres(`SELECT r.uuid, r.class_name, r.name, r.category,
               COALESCE(oi.name, r.output_item_name) AS output_item_name,
               r.output_item_uuid, r.output_quantity,
-              r.crafting_time_s, r.station_type, r.skill_level
+              r.crafting_time_s, r.station_type, r.skill_level, r.p4k_path, r.raw_json
        FROM game.crafting_recipes r
        LEFT JOIN game.items oi ON oi.uuid = r.output_item_uuid AND oi.env = r.env
        WHERE r.env = ? AND r.uuid = ?`),

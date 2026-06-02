@@ -15,7 +15,7 @@ const MISSION_COLS = `m.uuid, m.class_name, m.title, m.description, m.mission_ty
   m.location_system, m.location_planet, m.location_name,
   m.danger_level, m.required_reputation, m.reputation_reward,
   m.base_xp, m.category, m.is_unique, m.has_blueprint_reward, m.blueprint_reward_uuid,
-  m.buy_in_amount, m.not_for_release, m.work_in_progress`;
+  m.buy_in_amount, m.not_for_release, m.work_in_progress, m.p4k_path, m.raw_json`;
 
 function normalizeMissionRow(row: Row): Row {
   return {

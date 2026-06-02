@@ -108,7 +108,14 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
         if (isFpsWeapon) continue;
       }
 
-      const comp: any = { uuid: r.id, className, name: className.replace(/_/g, ' '), type };
+      const comp: any = {
+        uuid: r.id,
+        className,
+        name: className.replace(/_/g, ' '),
+        type,
+        p4kPath: r.fileName || null,
+        rawJson: { record: r, data },
+      };
       const comps = data.Components;
       if (!Array.isArray(comps)) continue;
 

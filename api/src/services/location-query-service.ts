@@ -92,7 +92,9 @@ export class LocationQueryService {
 
     const w = ` WHERE ${where.join(' AND ')}`;
 
-    const baseSql = `SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid, l.loc_key, l.is_scannable, l.hide_in_starmap FROM game.locations l${w}`;
+    const baseSql = `SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid, l.loc_key,
+      l.coordinates, l.p4k_path, l.is_scannable, l.hide_in_starmap
+      FROM game.locations l${w}`;
     const countSql = `SELECT COUNT(*) as total FROM game.locations l${w}`;
 
     const result = await paginate(prisma, baseSql, countSql, params, filters || {}, LOCATION_SORT, 'l');
@@ -103,7 +105,8 @@ export class LocationQueryService {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid,
-              l.loc_key, l.description, l.is_scannable, l.hide_in_starmap, l.extracted_at
+              l.loc_key, l.description, l.coordinates, l.p4k_path, l.raw_json,
+              l.is_scannable, l.hide_in_starmap, l.extracted_at
        FROM game.locations l
        WHERE l.env = ? AND l.uuid = ?
        LIMIT 1`),
@@ -118,7 +121,7 @@ export class LocationQueryService {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(
-        'SELECT uuid, class_name, name, type, system_code, parent_uuid, loc_key, is_scannable, hide_in_starmap FROM game.locations WHERE env = ? ORDER BY name ASC',
+        'SELECT uuid, class_name, name, type, system_code, parent_uuid, loc_key, coordinates, p4k_path, is_scannable, hide_in_starmap FROM game.locations WHERE env = ? ORDER BY name ASC',
       ),
       env,
     );
@@ -150,7 +153,8 @@ export class LocationQueryService {
   async getLocationChildren(uuid: string, env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid, l.is_scannable, l.hide_in_starmap
+      toPostgres(`SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid,
+              l.coordinates, l.p4k_path, l.is_scannable, l.hide_in_starmap
        FROM game.locations l
        WHERE l.env = ? AND l.parent_uuid = ?
          AND l.type NOT IN ('mining_claim')

@@ -22,6 +22,8 @@ export interface MiningElement {
   optimalWindowThinness: number | null;
   explosionMultiplier: number | null;
   clusterFactor: number | null;
+  p4kPath: string | null;
+  rawJson: Record<string, unknown> | null;
 }
 
 export interface MiningCompositionPart {
@@ -37,6 +39,8 @@ export interface MiningComposition {
   className: string;
   depositName: string | null;
   minDistinctElements: number | null;
+  p4kPath: string | null;
+  rawJson: Record<string, unknown> | null;
   parts: MiningCompositionPart[];
 }
 
@@ -140,6 +144,8 @@ export function extractMiningElements(ctx: DataForgeContext, _locService?: { res
         optimalWindowThinness: n(data.elementOptimalWindowThinness),
         explosionMultiplier: n(data.elementExplosionMultiplier),
         clusterFactor: n(data.elementClusterFactor),
+        p4kPath: r.fileName || null,
+        rawJson: { record: r, data },
       });
     } catch (e) {
       logger.debug(`MineableElement parse error [${r.name}]: ${(e as Error).message}`);
@@ -226,6 +232,8 @@ export function extractMiningCompositions(
         className,
         depositName,
         minDistinctElements: typeof data.minimumDistinctElements === 'number' ? data.minimumDistinctElements : null,
+        p4kPath: r.fileName || null,
+        rawJson: { record: r, data },
         parts,
       });
     } catch (e) {

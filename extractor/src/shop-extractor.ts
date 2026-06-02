@@ -55,6 +55,10 @@ export interface ShopExtractRecord {
   name: string;
   /** Localization key from ShopFranchise, e.g. "@item_NameShop_CasabaOutlet" */
   franchiseLocKey: string | null;
+  /** P4K prefab path that produced this physical shop instance. */
+  p4kPath: string | null;
+  /** Source metadata preserved for future enrichment. */
+  rawJson: Record<string, unknown> | null;
 }
 
 // ── Franchise resolution from DataForge ──────────────────────────────────────
@@ -198,6 +202,8 @@ export async function extractShopsFromPrefabs(
       shopType,
       name,
       franchiseLocKey,
+      p4kPath: filePath,
+      rawJson: { filePath, rawStem, stem, franchiseSlug, locationSlug, category, shopType, franchiseLocKey },
     });
   }
 

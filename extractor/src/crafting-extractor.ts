@@ -49,6 +49,8 @@ export interface CraftingRecipeRecord {
   craftingTime: number | null;
   stationType: string | null;
   skillLevel: number | null;
+  p4kPath: string | null;
+  rawJson: Record<string, unknown> | null;
   ingredients: CraftingIngredientRecord[];
   modifiers: CraftingModifierRecord[];
 }
@@ -421,6 +423,8 @@ function extractBlueprints(ctx: DataForgeService, locService?: CraftingLocalizat
         craftingTime,
         stationType: 'FPSCraftingBench',
         skillLevel: null,
+        p4kPath: r.fileName || null,
+        rawJson: { record: r, data },
         ingredients,
         modifiers,
       });
@@ -502,6 +506,8 @@ function extractLegacyRecipes(ctx: DataForgeService, locService?: CraftingLocali
           craftingTime,
           stationType,
           skillLevel,
+          p4kPath: r.fileName || null,
+          rawJson: { record: r, data },
           ingredients,
           modifiers: [],
         });

@@ -52,7 +52,8 @@ export class ShopService {
     const total = Number(countRows[0].count);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT id, name, class_name, shop_type, location, planet_moon, city, system,
-              canonical_location_key AS loc_key
+              canonical_shop_key, canonical_location_key AS loc_key,
+              franchise_slug, location_slug, franchise_loc_key, p4k_path
        FROM game.shops${w} ORDER BY name LIMIT ${Number(limit)} OFFSET ${Number(offset)}`),
       ...params,
     );
