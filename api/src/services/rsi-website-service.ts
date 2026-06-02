@@ -42,7 +42,9 @@ export class RsiWebsiteService {
     const total = Number(countRows[0]?.total) || 0;
 
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT g.id, g.slug, g.title, g.excerpt, g.categories, g.tags, g.thumbnail_url, g.rsi_url, g.updated_at
+      toPostgres(`SELECT g.id, g.slug, g.title, g.excerpt, g.type, g.template,
+              g.categories, g.tags, g.categories_count, g.tags_count, g.related_articles_count,
+              g.thumbnail_url, g.rsi_url, g.api_url, g.web_url, g.source_created_at, g.updated_at
        FROM rsi.galactapedia g${w} ORDER BY g.title LIMIT ${limit} OFFSET ${offset}`),
       ...params,
     );
@@ -86,7 +88,10 @@ export class RsiWebsiteService {
     const total = Number(countRows[0]?.total) || 0;
 
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT cl.id, cl.rsi_id, cl.slug, cl.title, cl.excerpt, cl.category, cl.thumbnail_url, cl.rsi_url, cl.published_at
+      toPostgres(`SELECT cl.id, cl.rsi_id, cl.slug, cl.title, cl.excerpt, cl.category,
+              cl.source_category, cl.channel, cl.series, cl.thumbnail_url, cl.rsi_url,
+              cl.api_url, cl.api_public_url, cl.images_count, cl.links_count, cl.comment_count,
+              cl.published_at
        FROM rsi.comm_links cl${w} ORDER BY cl.published_at DESC LIMIT ${limit} OFFSET ${offset}`),
       ...params,
     );
@@ -135,8 +140,12 @@ export class RsiWebsiteService {
     const total = Number(countRows[0]?.total) || 0;
 
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT sl.id, sl.rsi_id, sl.name, sl.system_code, sl.faction_name, sl.affiliations,
-              sl.thumbnail, sl.description, sl.coordinates, sl.jump_points
+      toPostgres(`SELECT sl.id, sl.rsi_id, sl.name, sl.type, sl.status, sl.star_type,
+              sl.system_code, sl.system_name, sl.faction_name, sl.affiliations,
+              sl.thumbnail, sl.description, sl.web_url, sl.coordinates, sl.aggregated,
+              sl.size, sl.population, sl.economy, sl.danger,
+              sl.frost_line, sl.habitable_zone_inner, sl.habitable_zone_outer,
+              sl.jump_points, sl.source_updated_at, sl.synced_at
        FROM rsi.starmap_locations sl${w} ORDER BY sl.name LIMIT ${limit} OFFSET ${offset}`),
       ...params,
     );

@@ -198,16 +198,25 @@ model ShipMatrix {
 }
 
 model Galactapedia {
-  id           String   @id @db.VarChar(50)
-  slug         String   @db.VarChar(255)
-  title        String   @db.VarChar(500)
-  content      String?
-  excerpt      String?  @db.VarChar(500)
-  categories   Json?
-  tags         Json?
-  thumbnailUrl String?  @map("thumbnail_url") @db.VarChar(500)
-  rsiUrl       String?  @map("rsi_url") @db.VarChar(500)
-  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  id                   String    @id @db.VarChar(50)
+  slug                 String    @db.VarChar(255)
+  title                String    @db.VarChar(500)
+  content              String?
+  excerpt              String?   @db.VarChar(500)
+  type                 String?   @db.VarChar(100)
+  template             String?   @db.VarChar(100)
+  categories           Json?
+  tags                 Json?
+  categoriesCount      Int?      @map("categories_count")
+  tagsCount            Int?      @map("tags_count")
+  relatedArticlesCount Int?      @map("related_articles_count")
+  thumbnailUrl         String?   @map("thumbnail_url") @db.VarChar(500)
+  rsiUrl               String?   @map("rsi_url") @db.VarChar(500)
+  apiUrl               String?   @map("api_url") @db.VarChar(500)
+  webUrl               String?   @map("web_url") @db.VarChar(500)
+  sourceCreatedAt      DateTime? @map("source_created_at")
+  rawJson              Json?     @map("raw_json")
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at")
 
   @@index([slug])
   @@map("galactapedia")
@@ -222,8 +231,17 @@ model CommLink {
   content      String?
   excerpt      String?   @db.VarChar(500)
   category     String?   @db.VarChar(100)
+  sourceCategory String? @map("source_category") @db.VarChar(100)
+  channel      String?   @db.VarChar(100)
+  series       String?   @db.VarChar(100)
   thumbnailUrl String?   @map("thumbnail_url") @db.VarChar(500)
   rsiUrl       String?   @map("rsi_url") @db.VarChar(500)
+  apiUrl       String?   @map("api_url") @db.VarChar(500)
+  apiPublicUrl String?   @map("api_public_url") @db.VarChar(500)
+  imagesCount  Int?      @map("images_count")
+  linksCount   Int?      @map("links_count")
+  commentCount Int?      @map("comment_count")
+  rawJson      Json?     @map("raw_json")
   publishedAt  DateTime? @map("published_at")
 
   @@index([category])
@@ -233,20 +251,33 @@ model CommLink {
 }
 
 model StarmapLocation {
-  id           Int      @id @default(autoincrement())
-  rsiId        String   @unique @map("rsi_id") @db.VarChar(50)
-  name         String   @db.VarChar(255)
-  type         String   @db.VarChar(50)
-  systemCode   String?  @map("system_code") @db.VarChar(20)
-  systemName   String?  @map("system_name") @db.VarChar(255)
-  parentId     String?  @map("parent_id") @db.VarChar(50)
-  factionName  String?  @map("faction_name") @db.VarChar(100)
-  affiliations Json?
-  thumbnail    String?  @db.VarChar(500)
-  description  String?
-  coordinates  Json?
-  jumpPoints   Json?    @map("jump_points")
-  syncedAt     DateTime @default(now()) @map("synced_at")
+  id                 Int       @id @default(autoincrement())
+  rsiId              String    @unique @map("rsi_id") @db.VarChar(50)
+  name               String    @db.VarChar(255)
+  type               String    @db.VarChar(50)
+  status             String?   @db.VarChar(20)
+  starType           String?   @map("star_type") @db.VarChar(50)
+  systemCode         String?   @map("system_code") @db.VarChar(20)
+  systemName         String?   @map("system_name") @db.VarChar(255)
+  parentId           String?   @map("parent_id") @db.VarChar(50)
+  factionName        String?   @map("faction_name") @db.VarChar(100)
+  affiliations       Json?
+  thumbnail          String?   @db.VarChar(500)
+  description        String?
+  webUrl             String?   @map("web_url") @db.VarChar(500)
+  coordinates        Json?
+  aggregated         Json?
+  size               Decimal?  @db.Decimal(12, 2)
+  population         Decimal?  @db.Decimal(12, 2)
+  economy            Decimal?  @db.Decimal(12, 2)
+  danger             Decimal?  @db.Decimal(12, 2)
+  frostLine          Decimal?  @map("frost_line") @db.Decimal(12, 2)
+  habitableZoneInner Decimal?  @map("habitable_zone_inner") @db.Decimal(12, 2)
+  habitableZoneOuter Decimal?  @map("habitable_zone_outer") @db.Decimal(12, 2)
+  jumpPoints         Json?     @map("jump_points")
+  rawJson            Json?     @map("raw_json")
+  sourceUpdatedAt    DateTime? @map("source_updated_at")
+  syncedAt           DateTime  @default(now()) @map("synced_at")
 
   @@index([systemCode])
   @@index([type])

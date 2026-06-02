@@ -20,6 +20,30 @@ async function fetchJson(url: string): Promise<any> {
   return res.json();
 }
 
+function json(value: unknown): string | null {
+  return value == null ? null : JSON.stringify(value);
+}
+
+function sqlDate(value: unknown): string | null {
+  if (!value) return null;
+  const date = new Date(String(value));
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
+function sourceList(value: unknown): string[] | null {
+  if (Array.isArray(value))
+    return value
+      .map((item: any) => item.name ?? item.code ?? item)
+      .filter(Boolean)
+      .map(String);
+  if (typeof value === 'string' && value.trim())
+    return value
+      .split(',')
+      .map((part) => part.trim())
+      .filter(Boolean);
+  return null;
+}
+
 export interface SyncStats {
   inserted: number;
   updated: number;
@@ -60,21 +84,48 @@ export class RsiSyncService {
 
           const content = item.translations?.en_EN ?? item.content ?? item.body ?? null;
           const excerpt = content ? (content as string).slice(0, 400).replace(/\n/g, ' ') : null;
-          const categories = item.categories ? JSON.stringify(item.categories.map((c: any) => c.name ?? c)) : null;
-          const tags = item.tags ? JSON.stringify(item.tags.map((t: any) => t.name ?? t)) : null;
+          const categories = json(sourceList(item.categories ?? item.category));
+          const tags = json(sourceList(item.tags ?? item.tag));
           const thumbnailUrl = item.thumbnail?.url ?? item.thumbnail ?? null;
           const rsiUrl = `${RSI_BASE_URL}/galactapedia/article/${id}-${slug}`;
 
           try {
             const result = await conn.query<any>(
-              `INSERT INTO rsi.galactapedia (id, slug, title, content, excerpt, categories, tags, thumbnail_url, rsi_url)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+              `INSERT INTO rsi.galactapedia (
+                 id, slug, title, content, excerpt, type, template, categories, tags,
+                 categories_count, tags_count, related_articles_count,
+                 thumbnail_url, rsi_url, api_url, web_url, source_created_at, raw_json
+               )
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
                ON CONFLICT (id) DO UPDATE SET
-                 slug=EXCLUDED.slug, title=EXCLUDED.title, content=EXCLUDED.content,
-                 excerpt=EXCLUDED.excerpt, categories=EXCLUDED.categories, tags=EXCLUDED.tags,
+                 slug=EXCLUDED.slug, title=EXCLUDED.title, content=EXCLUDED.content, excerpt=EXCLUDED.excerpt,
+                 type=EXCLUDED.type, template=EXCLUDED.template, categories=EXCLUDED.categories, tags=EXCLUDED.tags,
+                 categories_count=EXCLUDED.categories_count, tags_count=EXCLUDED.tags_count,
+                 related_articles_count=EXCLUDED.related_articles_count,
                  thumbnail_url=EXCLUDED.thumbnail_url, rsi_url=EXCLUDED.rsi_url,
+                 api_url=EXCLUDED.api_url, web_url=EXCLUDED.web_url,
+                 source_created_at=EXCLUDED.source_created_at, raw_json=EXCLUDED.raw_json,
                  updated_at=NOW()`,
-              [String(id), String(slug), String(item.title ?? item.name ?? slug), content, excerpt, categories, tags, thumbnailUrl, rsiUrl],
+              [
+                String(id),
+                String(slug),
+                String(item.title ?? item.name ?? slug),
+                content,
+                excerpt,
+                item.type ?? null,
+                item.template ?? null,
+                categories,
+                tags,
+                item.categories_count ?? null,
+                item.tags_count ?? null,
+                item.related_articles_count ?? null,
+                thumbnailUrl,
+                item.rsi_url ? `${RSI_BASE_URL}${item.rsi_url}` : rsiUrl,
+                item.api_url ?? null,
+                item.web_url ?? null,
+                sqlDate(item.created_at),
+                json(item),
+              ],
             );
             if (result.rowCount === 1) stats.inserted++;
             else stats.updated++;
@@ -124,24 +175,29 @@ export class RsiSyncService {
           const rsiUrlPath: string = item.rsi_url ?? '';
           const slug = rsiUrlPath.split('/').pop() ?? null;
           const content = item.translations?.en_EN ?? item.content ?? null;
-          const category =
-            item.channel && item.channel !== 'Undefined'
-              ? item.channel
-              : item.category && item.category !== 'Undefined'
-                ? item.category
-                : null;
+          const channel = item.channel && item.channel !== 'Undefined' ? item.channel : null;
+          const sourceCategory = item.category && item.category !== 'Undefined' ? item.category : null;
+          const category = channel ?? sourceCategory;
           const excerpt = content ? (content as string).slice(0, 400).replace(/\n/g, ' ') : null;
           const publishedAt = item.published_at ?? item.created_at ?? item.time ?? null;
-          const publishedAtSql = publishedAt ? new Date(publishedAt).toISOString().slice(0, 19).replace('T', ' ') : null;
+          const publishedAtSql = sqlDate(publishedAt);
 
           try {
             const result = await conn.query<any>(
-              `INSERT INTO rsi.comm_links (rsi_id, slug, title, content, excerpt, category, thumbnail_url, rsi_url, published_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+              `INSERT INTO rsi.comm_links (
+                 rsi_id, slug, title, content, excerpt, category, source_category, channel, series,
+                 thumbnail_url, rsi_url, api_url, api_public_url,
+                 images_count, links_count, comment_count, raw_json, published_at
+               )
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
                ON CONFLICT (rsi_id) DO UPDATE SET
                  slug=EXCLUDED.slug, title=EXCLUDED.title, content=EXCLUDED.content,
-                 excerpt=EXCLUDED.excerpt, category=EXCLUDED.category,
+                 excerpt=EXCLUDED.excerpt, category=EXCLUDED.category, source_category=EXCLUDED.source_category,
+                 channel=EXCLUDED.channel, series=EXCLUDED.series,
                  thumbnail_url=EXCLUDED.thumbnail_url, rsi_url=EXCLUDED.rsi_url,
+                 api_url=EXCLUDED.api_url, api_public_url=EXCLUDED.api_public_url,
+                 images_count=EXCLUDED.images_count, links_count=EXCLUDED.links_count,
+                 comment_count=EXCLUDED.comment_count, raw_json=EXCLUDED.raw_json,
                  published_at=EXCLUDED.published_at`,
               [
                 rsiId,
@@ -150,8 +206,17 @@ export class RsiSyncService {
                 content,
                 excerpt,
                 category,
+                sourceCategory,
+                channel,
+                item.series && item.series !== 'None' ? item.series : null,
                 item.thumbnail?.url ?? item.image ?? null,
                 item.rsi_url ?? `${RSI_BASE_URL}/comm-link/${rsiId}`,
+                item.api_url ?? null,
+                item.api_public_url ?? null,
+                item.images_count ?? null,
+                item.links_count ?? null,
+                item.comment_count ?? null,
+                json(item),
                 publishedAtSql,
               ],
             );
@@ -299,6 +364,8 @@ export class RsiSyncService {
       rsi_id: string;
       name: string;
       type: string;
+      status: string | null;
+      star_type: string | null;
       system_code: string | null;
       system_name: string | null;
       parent_id: string | null;
@@ -306,23 +373,47 @@ export class RsiSyncService {
       affiliations: string | null;
       thumbnail: string | null;
       description: string | null;
+      web_url: string | null;
       coordinates: string | null;
+      aggregated: string | null;
+      size: number | null;
+      population: number | null;
+      economy: number | null;
+      danger: number | null;
+      frost_line: number | null;
+      habitable_zone_inner: number | null;
+      habitable_zone_outer: number | null;
       jump_points: string | null;
+      raw_json: string | null;
+      source_updated_at: string | null;
     }) => {
       await conn.query(
-        `INSERT INTO rsi.starmap_locations (rsi_id, name, type, system_code, system_name, parent_id, faction_name, affiliations, thumbnail, description, coordinates, jump_points)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        `INSERT INTO rsi.starmap_locations (
+           rsi_id, name, type, status, star_type, system_code, system_name, parent_id,
+           faction_name, affiliations, thumbnail, description, web_url, coordinates, aggregated,
+           size, population, economy, danger, frost_line, habitable_zone_inner, habitable_zone_outer,
+           jump_points, raw_json, source_updated_at
+         )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
          ON CONFLICT (rsi_id) DO UPDATE SET
-           name=EXCLUDED.name, type=EXCLUDED.type, system_code=EXCLUDED.system_code,
+           name=EXCLUDED.name, type=EXCLUDED.type, status=EXCLUDED.status, star_type=EXCLUDED.star_type,
+           system_code=EXCLUDED.system_code,
            system_name=EXCLUDED.system_name, parent_id=EXCLUDED.parent_id,
            faction_name=EXCLUDED.faction_name, affiliations=EXCLUDED.affiliations,
-           thumbnail=EXCLUDED.thumbnail, description=EXCLUDED.description,
-           coordinates=EXCLUDED.coordinates, jump_points=EXCLUDED.jump_points,
+           thumbnail=EXCLUDED.thumbnail, description=EXCLUDED.description, web_url=EXCLUDED.web_url,
+           coordinates=EXCLUDED.coordinates, aggregated=EXCLUDED.aggregated,
+           size=EXCLUDED.size, population=EXCLUDED.population, economy=EXCLUDED.economy, danger=EXCLUDED.danger,
+           frost_line=EXCLUDED.frost_line, habitable_zone_inner=EXCLUDED.habitable_zone_inner,
+           habitable_zone_outer=EXCLUDED.habitable_zone_outer,
+           jump_points=EXCLUDED.jump_points, raw_json=EXCLUDED.raw_json,
+           source_updated_at=EXCLUDED.source_updated_at,
            synced_at=NOW()`,
         [
           row.rsi_id,
           row.name,
           row.type,
+          row.status,
+          row.star_type,
           row.system_code,
           row.system_name,
           row.parent_id,
@@ -330,8 +421,19 @@ export class RsiSyncService {
           row.affiliations,
           row.thumbnail,
           row.description,
+          row.web_url,
           row.coordinates,
+          row.aggregated,
+          row.size,
+          row.population,
+          row.economy,
+          row.danger,
+          row.frost_line,
+          row.habitable_zone_inner,
+          row.habitable_zone_outer,
           row.jump_points,
+          row.raw_json,
+          row.source_updated_at,
         ],
       );
     };
@@ -364,15 +466,28 @@ export class RsiSyncService {
               rsi_id: rsiId,
               name: String(sys.name ?? rsiId),
               type: 'star',
+              status: sys.status ?? null,
+              star_type: sys.type ?? null,
               system_code: systemCode,
               system_name: sys.name ?? null,
               parent_id: null,
               faction_name: sys.affiliation?.[0]?.name ?? null,
-              affiliations: sys.affiliation ? JSON.stringify(sys.affiliation.map((a: any) => a.name ?? a.code ?? a)) : null,
+              affiliations: json(sourceList(sys.affiliation)),
               thumbnail: sys.thumbnail?.url ?? null,
               description: sys.description ?? null,
-              coordinates: sys.position ? JSON.stringify({ x: sys.position.x, y: sys.position.y, z: sys.position.z }) : null,
-              jump_points: sys.jumppoints ? JSON.stringify(sys.jumppoints.map((j: any) => j.code ?? j)) : null,
+              web_url: sys.web_url ?? null,
+              coordinates: json(sys.position ? { x: sys.position.x, y: sys.position.y, z: sys.position.z } : null),
+              aggregated: json(sys.aggregated),
+              size: sys.aggregated?.size ?? null,
+              population: sys.aggregated?.population ?? null,
+              economy: sys.aggregated?.economy ?? null,
+              danger: sys.aggregated?.danger ?? null,
+              frost_line: sys.frost_line ?? null,
+              habitable_zone_inner: sys.habitable_zone_inner ?? null,
+              habitable_zone_outer: sys.habitable_zone_outer ?? null,
+              jump_points: json(sourceList(sys.jumppoints)),
+              raw_json: json(sys),
+              source_updated_at: sqlDate(sys.updated_at),
             });
             upserted++;
           } catch (err) {
@@ -394,15 +509,28 @@ export class RsiSyncService {
                     rsi_id: bodyRsiId,
                     name: String(body.name ?? bodyRsiId),
                     type: (body.type ?? 'unknown').toLowerCase(),
+                    status: body.status ?? null,
+                    star_type: null,
                     system_code: systemCode,
                     system_name: sys.name ?? null,
                     parent_id: body.parent_id ? String(body.parent_id) : rsiId,
                     faction_name: body.affiliation?.[0]?.name ?? null,
-                    affiliations: body.affiliation ? JSON.stringify(body.affiliation.map((a: any) => a.name ?? a)) : null,
+                    affiliations: json(sourceList(body.affiliation)),
                     thumbnail: body.thumbnail?.url ?? null,
                     description: body.description ?? null,
+                    web_url: body.web_url ?? null,
                     coordinates: null,
+                    aggregated: null,
+                    size: null,
+                    population: null,
+                    economy: null,
+                    danger: null,
+                    frost_line: null,
+                    habitable_zone_inner: null,
+                    habitable_zone_outer: null,
                     jump_points: null,
+                    raw_json: json(body),
+                    source_updated_at: sqlDate(body.updated_at),
                   });
                   upserted++;
                 } catch (err) {
