@@ -84,6 +84,124 @@ jobs:
           dockerfile: bot/Dockerfile
           failure-threshold: error
 
+# ---------------------------------------------------------------------------
+# CONFIG & SCHEMA
+# Validate deploy-critical config that unit tests do not exercise directly.
+# ---------------------------------------------------------------------------
+  config:
+    name: Config & Schema
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Restore node_modules cache
+        id: nm-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            node_modules
+            api/node_modules
+            ihm/node_modules
+            extractor/node_modules
+            bot/node_modules
+            db/node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install (fallback)
+        if: steps.nm-cache.outputs.cache-hit != 'true'
+        run: npm ci
+
+      - name: Validate Prisma schema
+        run: npm exec --workspace=@starvis/db -- prisma validate --schema=prisma/schema.prisma
+        env:
+          DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_test
+
+      - name: Guard Prisma 7 datasource config
+        run: |
+          if grep -R 'url *= *env(' db/prisma/*.prisma; then
+            echo "Prisma 7 requires datasource URLs in db/prisma.config.ts, not schema.prisma"
+            exit 1
+          fi
+          test -f db/prisma.config.ts
+
+      - name: Validate shell scripts
+        run: |
+          bash -n db/init.sh
+          bash -n db/backup.sh
+
+      - name: Validate compose files with example envs
+        run: |
+          docker compose -f docker-compose.dev.yml --env-file .env.dev.example config --quiet
+          docker compose -f docker-compose.prod.yml --env-file .env.prod.example config --quiet
+
+      - name: Check env examples cover compose variables
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+
+          function envKeys(file) {
+            return new Set(
+              readFileSync(file, 'utf8')
+                .split(/\r?\n/)
+                .map((line) => line.trim())
+                .filter((line) => line && !line.startsWith('#') && /^[A-Za-z_][A-Za-z0-9_]*=/.test(line))
+                .map((line) => line.split('=', 1)[0]),
+            );
+          }
+
+          function composeVars(file) {
+            const text = readFileSync(file, 'utf8');
+            return new Set([...text.matchAll(/\$\{([A-Z0-9_]+)/g)].map((match) => match[1]));
+          }
+
+          const checks = [
+            ['docker-compose.dev.yml', '.env.dev.example'],
+            ['docker-compose.prod.yml', '.env.prod.example'],
+          ];
+
+          let failed = false;
+          for (const [composeFile, envFile] of checks) {
+            const keys = envKeys(envFile);
+            const missing = [...composeVars(composeFile)].filter((key) => !keys.has(key)).sort();
+            if (missing.length) {
+              failed = true;
+              console.error(`${envFile} is missing variables used by ${composeFile}: ${missing.join(', ')}`);
+            }
+          }
+
+          const prodKeys = envKeys('.env.prod.example');
+          const requiredProd = [
+            'ADMIN_API_KEY',
+            'API_IMAGE',
+            'BOT_IMAGE',
+            'CORS_ORIGIN',
+            'DB_NAME',
+            'DB_PASSWORD',
+            'DB_USER',
+            'DISCORD_CLIENT_ID',
+            'DISCORD_TOKEN',
+            'DOMAIN',
+            'IHM_IMAGE',
+            'JWT_SECRET',
+            'MISTRAL_API_KEY',
+            'NEXT_PUBLIC_SITE_URL',
+            'SITE_URL',
+            'TRAEFIK_NETWORK',
+          ];
+          const missingProd = requiredProd.filter((key) => !prodKeys.has(key));
+          if (missingProd.length) {
+            failed = true;
+            console.error(`.env.prod.example is missing production contract keys: ${missingProd.join(', ')}`);
+          }
+
+          if (failed) process.exit(1);
+          NODE
+
 # ─────────────────────────────────────────────────────────────
 # LINT (Biome)
 # ─────────────────────────────────────────────────────────────
@@ -298,7 +416,7 @@ jobs:
     name: Build ${{ matrix.image.name }}
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [lint, typecheck, test-api, test-extractor, test-ihm, checks]
+    needs: [lint, typecheck, test-api, test-extractor, test-ihm, checks, config]
     permissions:
       contents: read
       packages: write
@@ -406,8 +524,24 @@ jobs:
             docker image prune -af --filter "until=24h"
 
             echo "==> Health check..."
-            sleep 5
+            for i in $(seq 1 12); do
+              API_HEALTH="$(docker inspect --format='{{.State.Health.Status}}' starvis-api 2>/dev/null || echo missing)"
+              IHM_HEALTH="$(docker inspect --format='{{.State.Health.Status}}' starvis-ihm 2>/dev/null || echo missing)"
+              if [ "$API_HEALTH" = "healthy" ] && [ "$IHM_HEALTH" = "healthy" ]; then
+                break
+              fi
+              echo "Waiting for healthy containers... api=${API_HEALTH} ihm=${IHM_HEALTH}"
+              sleep 5
+            done
+
             docker inspect --format='{{.State.Health.Status}}' starvis-api | grep -q "^healthy$" \
-              || (echo "Health check FAILED" && docker logs --tail=200 starvis-api && exit 1)
+              || (echo "API health check FAILED" && docker logs --tail=200 starvis-api && exit 1)
+            docker inspect --format='{{.State.Health.Status}}' starvis-ihm | grep -q "^healthy$" \
+              || (echo "IHM health check FAILED" && docker logs --tail=200 starvis-ihm && exit 1)
+
+            echo "==> Runtime smoke tests..."
+            docker exec starvis-api sh -c 'wget -qO- "http://127.0.0.1:${PORT:-3000}/health/live" >/dev/null'
+            docker exec starvis-api sh -c 'wget -qO- "http://127.0.0.1:${PORT:-3000}/health/ready" >/dev/null'
+            docker exec starvis-ihm wget -qO- http://127.0.0.1:8080/ >/dev/null
 
             echo "==> Deploy complete."
