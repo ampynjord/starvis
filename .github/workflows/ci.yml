@@ -394,7 +394,13 @@ jobs:
             docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm --no-deps api npm run push --workspace=@starvis/db
 
             echo "==> Rolling restart..."
-            docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --remove-orphans
+            if ! docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --remove-orphans; then
+              echo "==> API logs..."
+              docker logs --tail=200 starvis-api || true
+              echo "==> API health inspect..."
+              docker inspect --format='{{json .State.Health}}' starvis-api || true
+              exit 1
+            fi
 
             echo "==> Prune old images..."
             docker image prune -af --filter "until=24h"
@@ -402,6 +408,6 @@ jobs:
             echo "==> Health check..."
             sleep 5
             docker inspect --format='{{.State.Health.Status}}' starvis-api | grep -q "^healthy$" \
-              || (echo "Health check FAILED" && exit 1)
+              || (echo "Health check FAILED" && docker logs --tail=200 starvis-api && exit 1)
 
             echo "==> Deploy complete."
