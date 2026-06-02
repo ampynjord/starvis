@@ -138,6 +138,7 @@ jobs:
         run: |
           docker compose -f docker-compose.dev.yml --env-file .env.dev.example config --quiet
           docker compose -f docker-compose.prod.yml --env-file .env.prod.example config --quiet
+          docker compose -f docker-compose.api-only.yml --env-file .env.api-only.example config --quiet
 
       - name: Check env examples cover compose variables
         run: |
@@ -162,6 +163,7 @@ jobs:
           const checks = [
             ['docker-compose.dev.yml', '.env.dev.example'],
             ['docker-compose.prod.yml', '.env.prod.example'],
+            ['docker-compose.api-only.yml', '.env.api-only.example'],
           ];
 
           let failed = false;
@@ -201,6 +203,68 @@ jobs:
 
           if (failed) process.exit(1);
           NODE
+
+  api-only-smoke:
+    name: API-only Smoke
+    needs: config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build API image
+        run: docker build --target production -f api/Dockerfile -t starvis-api-only-ci:latest .
+
+      - name: Write API-only env
+        run: |
+          cat > .env.api-only.ci <<'EOF'
+          COMPOSE_PROJECT_NAME=starvis-api-only-ci
+          POSTGRES_IMAGE=postgres:16-alpine
+          REDIS_IMAGE=redis:7-alpine
+          API_IMAGE=starvis-api-only-ci:latest
+          API_PORT=127.0.0.1:18080
+          DB_EXTERNAL_PORT=15432
+          DB_NAME=starvis_api_only_ci
+          DB_USER=starvis_ci
+          DB_PASSWORD=ci_password
+          JWT_SECRET=ci_jwt_secret_at_least_32_chars_long
+          ADMIN_API_KEY=ci_admin_key
+          AUTH_COOKIE_NAME=starvis_token
+          CORS_ORIGIN=*
+          REDIS_MAXMEMORY=64mb
+          RATE_LIMIT_MAX=500
+          RATE_LIMIT_BURST=50
+          RATE_LIMIT_ADMIN_MAX=100
+          LOG_LEVEL=info
+          MISTRAL_API_KEY=
+          CHAT_PROVIDER_BASE_URL=https://api.mistral.ai/v1
+          CHAT_TOOL_MODEL=mistral-small-latest
+          CHAT_RESPONSE_MODEL=mistral-small-latest
+          SMTP_HOST=
+          SMTP_PORT=587
+          SMTP_USER=
+          SMTP_PASS=
+          SMTP_FROM=
+          CONTACT_EMAIL=
+          EOF
+
+      - name: Start API-only stack
+        run: docker compose -f docker-compose.api-only.yml --env-file .env.api-only.ci up -d --wait
+
+      - name: Smoke test API-only stack
+        run: |
+          curl -fsS http://127.0.0.1:18080/health/live
+          curl -fsS http://127.0.0.1:18080/health/ready
+          docker compose -f docker-compose.api-only.yml --env-file .env.api-only.ci ps
+
+      - name: Dump logs on failure
+        if: failure()
+        run: |
+          docker compose -f docker-compose.api-only.yml --env-file .env.api-only.ci ps || true
+          docker compose -f docker-compose.api-only.yml --env-file .env.api-only.ci logs --no-color --tail=200 || true
+
+      - name: Stop API-only stack
+        if: always()
+        run: docker compose -f docker-compose.api-only.yml --env-file .env.api-only.ci down -v --remove-orphans
 
 # ─────────────────────────────────────────────────────────────
 # LINT (Biome)
@@ -416,7 +480,7 @@ jobs:
     name: Build ${{ matrix.image.name }}
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [lint, typecheck, test-api, test-extractor, test-ihm, checks, config]
+    needs: [lint, typecheck, test-api, test-extractor, test-ihm, checks, config, api-only-smoke]
     permissions:
       contents: read
       packages: write

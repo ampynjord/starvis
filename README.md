@@ -95,6 +95,36 @@ npx tsx extractor/extract.ts --modules ship-matrix,galactapedia,starmap
 
 See [`extractor/README.md`](extractor/README.md) for the full list of modules and options.
 
+---
+
+## API-only self-host
+
+Use this mode when you only want the REST API, PostgreSQL, Redis and the local extractor workflow, without the Next.js UI or Discord bot.
+
+```bash
+cp .env.api-only.example .env.api-only
+# Fill DB_PASSWORD, JWT_SECRET, ADMIN_API_KEY and CORS_ORIGIN
+
+docker compose -f docker-compose.api-only.yml --env-file .env.api-only up -d
+```
+
+The stack starts PostgreSQL and Redis, runs a one-shot Prisma `db push`, then starts the API. Check it with:
+
+```bash
+curl http://127.0.0.1:3000/health/live
+curl http://127.0.0.1:3000/health/ready
+```
+
+To populate data from the extractor running on the host, use the DB values from `.env.api-only`:
+
+```bash
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_USER=starvis_user
+DB_PASSWORD=<same as .env.api-only>
+DB_NAME=starvis
+```
+
 ### 5 — Create an admin account
 
 Register via the UI at http://localhost:5173/register, then promote your account:
