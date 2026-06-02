@@ -22,6 +22,9 @@ export interface LocationRecord {
   parentUuid: string | null;
   locKey: string | null;
   description: string | null;
+  coordinates: Record<string, number> | null;
+  p4kPath: string | null;
+  rawJson: Record<string, unknown> | null;
   isScannable: boolean;
   hideInStarmap: boolean;
 }
@@ -205,6 +208,19 @@ function fallbackName(className: string): string {
   return name.trim() || className;
 }
 
+function extractCoordinates(data: Record<string, unknown>): Record<string, number> | null {
+  const candidates = [data.position, data.Position, data.coordinates, data.Coordinates, data.location, data.Location];
+  for (const candidate of candidates) {
+    if (!candidate || typeof candidate !== 'object') continue;
+    const obj = candidate as Record<string, unknown>;
+    const x = Number(obj.x ?? obj.X);
+    const y = Number(obj.y ?? obj.Y);
+    const z = Number(obj.z ?? obj.Z);
+    if ([x, y, z].every(Number.isFinite)) return { x, y, z };
+  }
+  return null;
+}
+
 export function extractLocations(df: DataForgeContext, loc: LocationLocAdapter, onProgress?: (msg: string) => void): LocationRecord[] {
   const dfData = df.getDfData();
   if (!dfData) return [];
@@ -273,6 +289,7 @@ export function extractLocations(df: DataForgeContext, loc: LocationLocAdapter, 
     const systemCode = extractSystemCode(filePath, className);
     const isScannable = Boolean(data.isScannable ?? data.IsScannable ?? false);
     const hideInStarmap = Boolean(data.hideInStarmap ?? data.HideInStarmap ?? false);
+    const coordinates = extractCoordinates(data);
 
     records.push({
       uuid: record.id,
@@ -283,6 +300,9 @@ export function extractLocations(df: DataForgeContext, loc: LocationLocAdapter, 
       parentUuid: rawParentUuid,
       locKey: rawLocKey && rawLocKey !== '@LOC_UNINITIALIZED' ? rawLocKey.substring(0, 255) : null,
       description: description ? description.substring(0, 4000) : null,
+      coordinates,
+      p4kPath: filePath || null,
+      rawJson: { record, data },
       isScannable,
       hideInStarmap,
     });

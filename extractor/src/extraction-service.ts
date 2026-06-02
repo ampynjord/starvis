@@ -307,10 +307,8 @@ export class ExtractionService {
 
       // 1c. Clean stale data before fresh extraction (order matters for FK constraints)
       onProgress?.('Cleaning stale data…');
-      if (run('shops')) {
-        await conn.query('DELETE FROM game.shops WHERE env = $1', [env]);
-        // shop_inventory rows are community-sourced; preserve them (FK ON DELETE CASCADE handles orphans)
-      }
+      // Shops are upserted below so community-sourced shop_inventory / commodity_prices keep their shop_id links.
+      // Deleting shops here would cascade those external records.
       if (run('ships')) {
         // Preserve ctm_url values before wiping ships — they won't be re-scraped
         const { rows: ctmRows } = await conn.query<any>(
@@ -632,7 +630,8 @@ export class ExtractionService {
             rack_count, rack_missile_size,
             shield_downed_regen_delay,
             weapon_heat_per_shot, weapon_charge_time,
-            qd_calibration_rate, qd_calibration_delay, qd_calibration_max_angle`;
+            qd_calibration_rate, qd_calibration_delay, qd_calibration_max_angle,
+            p4k_path, raw_json`;
 
     const COMP_CONFLICT = `(uuid, env) DO UPDATE SET
             class_name=EXCLUDED.class_name, name=EXCLUDED.name,
@@ -704,9 +703,11 @@ export class ExtractionService {
             qd_calibration_rate=EXCLUDED.qd_calibration_rate,
             qd_calibration_delay=EXCLUDED.qd_calibration_delay,
             qd_calibration_max_angle=EXCLUDED.qd_calibration_max_angle,
+            p4k_path=EXCLUDED.p4k_path,
+            raw_json=EXCLUDED.raw_json,
             updated_at=CURRENT_TIMESTAMP`;
 
-    const COL_COUNT = 117; // number of columns above (116 stats + env)
+    const COL_COUNT = 119; // number of columns above (stats + source metadata + env)
 
     /** Map a component object to a flat array of values */
     const toCanonicalRow = (c: any): (string | number | null)[] => {
@@ -837,6 +838,8 @@ export class ExtractionService {
         c.qdCalibrationRate ?? null,
         c.qdCalibrationDelay ?? null,
         c.qdCalibrationMaxAngle ?? null,
+        c.p4kPath ?? null,
+        c.rawJson ? JSON.stringify(c.rawJson) : null,
       ];
     };
 
@@ -1917,6 +1920,11 @@ export class ExtractionService {
         meta?.city ?? null,
         shop.shopType,
         shop.className,
+        shop.franchiseSlug,
+        shop.locationSlug,
+        shop.franchiseLocKey,
+        shop.p4kPath,
+        shop.rawJson ? JSON.stringify(shop.rawJson) : null,
       ]);
     }
 
@@ -1924,9 +1932,9 @@ export class ExtractionService {
     if (shopRows.length > 0) {
       savedShops = await ExtractionService.batchUpsert(
         conn,
-        `INSERT INTO game.shops (env, name, normalized_name, canonical_shop_key, canonical_location_key, location, system, planet_moon, city, shop_type, class_name)`,
+        `INSERT INTO game.shops (env, name, normalized_name, canonical_shop_key, canonical_location_key, location, system, planet_moon, city, shop_type, class_name, franchise_slug, location_slug, franchise_loc_key, p4k_path, raw_json)`,
         '',
-        11,
+        16,
         shopRows,
       );
     }
@@ -2213,6 +2221,8 @@ export class ExtractionService {
       e.optimalWindowThinness,
       e.explosionMultiplier,
       e.clusterFactor,
+      e.p4kPath,
+      e.rawJson ? JSON.stringify(e.rawJson) : null,
     ]);
     const savedElements = await ExtractionService.batchUpsert(
       conn,
@@ -2220,25 +2230,35 @@ export class ExtractionService {
          (env, uuid, class_name, name, commodity_uuid,
           instability, resistance,
           optimal_window_midpoint, optimal_window_midpoint_rand,
-          optimal_window_thinness, explosion_multiplier, cluster_factor)`,
+          optimal_window_thinness, explosion_multiplier, cluster_factor,
+          p4k_path, raw_json)`,
       `(uuid, env) DO UPDATE SET
          class_name=EXCLUDED.class_name, name=EXCLUDED.name, commodity_uuid=EXCLUDED.commodity_uuid,
          instability=EXCLUDED.instability, resistance=EXCLUDED.resistance,
          optimal_window_midpoint=EXCLUDED.optimal_window_midpoint,
          optimal_window_midpoint_rand=EXCLUDED.optimal_window_midpoint_rand,
          optimal_window_thinness=EXCLUDED.optimal_window_thinness,
-         explosion_multiplier=EXCLUDED.explosion_multiplier, cluster_factor=EXCLUDED.cluster_factor`,
-      12,
+         explosion_multiplier=EXCLUDED.explosion_multiplier, cluster_factor=EXCLUDED.cluster_factor,
+         p4k_path=EXCLUDED.p4k_path, raw_json=EXCLUDED.raw_json`,
+      14,
       elemRows,
     );
 
     // ── Save compositions (parent rows first) ──
-    const compRows = compositions.map((c) => [env, c.uuid, c.className, c.depositName, c.minDistinctElements]);
+    const compRows = compositions.map((c) => [
+      env,
+      c.uuid,
+      c.className,
+      c.depositName,
+      c.minDistinctElements,
+      c.p4kPath,
+      c.rawJson ? JSON.stringify(c.rawJson) : null,
+    ]);
     await ExtractionService.batchUpsert(
       conn,
-      `INSERT INTO game.mining_compositions (env, uuid, class_name, deposit_name, min_distinct_elements)`,
-      `(uuid, env) DO UPDATE SET class_name=EXCLUDED.class_name, deposit_name=EXCLUDED.deposit_name, min_distinct_elements=EXCLUDED.min_distinct_elements`,
-      5,
+      `INSERT INTO game.mining_compositions (env, uuid, class_name, deposit_name, min_distinct_elements, p4k_path, raw_json)`,
+      `(uuid, env) DO UPDATE SET class_name=EXCLUDED.class_name, deposit_name=EXCLUDED.deposit_name, min_distinct_elements=EXCLUDED.min_distinct_elements, p4k_path=EXCLUDED.p4k_path, raw_json=EXCLUDED.raw_json`,
+      7,
       compRows,
     );
 
@@ -2328,6 +2348,8 @@ export class ExtractionService {
       m.hasBlueprintReward ? 1 : 0,
       m.blueprintRewardUuid,
       m.buyInAmount != null ? Math.round(m.buyInAmount) : null,
+      m.p4kPath,
+      m.rawJson ? JSON.stringify(m.rawJson) : null,
     ]);
 
     const saved = await ExtractionService.batchUpsert(
@@ -2341,7 +2363,7 @@ export class ExtractionService {
           location_system, location_planet, location_name,
           danger_level, required_reputation, reputation_reward,
           base_xp, category, is_unique, has_blueprint_reward, blueprint_reward_uuid,
-          buy_in_amount)`,
+          buy_in_amount, p4k_path, raw_json)`,
       `(uuid, env) DO UPDATE SET
          class_name=EXCLUDED.class_name, title=EXCLUDED.title, description=EXCLUDED.description,
          mission_type=EXCLUDED.mission_type, can_be_shared=EXCLUDED.can_be_shared,
@@ -2357,8 +2379,10 @@ export class ExtractionService {
          base_xp=EXCLUDED.base_xp, category=EXCLUDED.category,
          is_unique=EXCLUDED.is_unique, has_blueprint_reward=EXCLUDED.has_blueprint_reward,
          blueprint_reward_uuid=EXCLUDED.blueprint_reward_uuid,
-         buy_in_amount=EXCLUDED.buy_in_amount`,
-      29,
+         buy_in_amount=EXCLUDED.buy_in_amount,
+         p4k_path=EXCLUDED.p4k_path,
+         raw_json=EXCLUDED.raw_json`,
+      31,
       rows,
     );
 
@@ -2551,15 +2575,18 @@ export class ExtractionService {
       r.parentUuid,
       r.locKey,
       r.description,
+      r.coordinates ? JSON.stringify(r.coordinates) : null,
+      r.p4kPath,
+      r.rawJson ? JSON.stringify(r.rawJson) : null,
       r.isScannable ? 1 : 0,
       r.hideInStarmap ? 1 : 0,
     ]);
 
     const affected = await ExtractionService.batchUpsert(
       conn,
-      'INSERT INTO game.locations (env, uuid, class_name, name, type, system_code, parent_uuid, loc_key, description, is_scannable, hide_in_starmap)',
-      '(uuid, env) DO UPDATE SET class_name=EXCLUDED.class_name, name=EXCLUDED.name, type=EXCLUDED.type, system_code=EXCLUDED.system_code, parent_uuid=EXCLUDED.parent_uuid, loc_key=EXCLUDED.loc_key, description=EXCLUDED.description, is_scannable=EXCLUDED.is_scannable, hide_in_starmap=EXCLUDED.hide_in_starmap',
-      11,
+      'INSERT INTO game.locations (env, uuid, class_name, name, type, system_code, parent_uuid, loc_key, description, coordinates, p4k_path, raw_json, is_scannable, hide_in_starmap)',
+      '(uuid, env) DO UPDATE SET class_name=EXCLUDED.class_name, name=EXCLUDED.name, type=EXCLUDED.type, system_code=EXCLUDED.system_code, parent_uuid=EXCLUDED.parent_uuid, loc_key=EXCLUDED.loc_key, description=EXCLUDED.description, coordinates=EXCLUDED.coordinates, p4k_path=EXCLUDED.p4k_path, raw_json=EXCLUDED.raw_json, is_scannable=EXCLUDED.is_scannable, hide_in_starmap=EXCLUDED.hide_in_starmap',
+      14,
       rows,
     );
 
@@ -2596,19 +2623,22 @@ export class ExtractionService {
       r.craftingTime,
       r.stationType,
       r.skillLevel,
+      r.p4kPath,
+      r.rawJson ? JSON.stringify(r.rawJson) : null,
     ]);
 
     const savedRecipes = await ExtractionService.batchUpsert(
       conn,
       `INSERT INTO game.crafting_recipes
          (env, uuid, class_name, name, category, output_item_name, output_item_uuid,
-          output_quantity, crafting_time_s, station_type, skill_level)`,
+          output_quantity, crafting_time_s, station_type, skill_level, p4k_path, raw_json)`,
       `(uuid, env) DO UPDATE SET
          class_name=EXCLUDED.class_name, name=EXCLUDED.name, category=EXCLUDED.category,
          output_item_name=EXCLUDED.output_item_name, output_item_uuid=EXCLUDED.output_item_uuid,
          output_quantity=EXCLUDED.output_quantity, crafting_time_s=EXCLUDED.crafting_time_s,
-         station_type=EXCLUDED.station_type, skill_level=EXCLUDED.skill_level`,
-      11,
+         station_type=EXCLUDED.station_type, skill_level=EXCLUDED.skill_level,
+         p4k_path=EXCLUDED.p4k_path, raw_json=EXCLUDED.raw_json`,
+      13,
       recipeRows,
     );
 

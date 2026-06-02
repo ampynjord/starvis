@@ -15,7 +15,7 @@ export class MiningQueryService {
       toPostgres(`SELECT e.uuid, e.class_name, e.name, e.commodity_uuid,
               e.instability, e.resistance,
               e.optimal_window_midpoint, e.optimal_window_thinness, e.optimal_window_midpoint_rand,
-              e.explosion_multiplier, e.cluster_factor,
+              e.explosion_multiplier, e.cluster_factor, e.p4k_path,
               COUNT(DISTINCT mcp.composition_uuid) AS rocks_containing,
               ROUND(AVG(mcp.probability) * 100, 1) AS avg_probability_pct,
               ROUND(AVG(mcp.min_percentage) * 100, 1) AS avg_min_pct,
@@ -25,7 +25,7 @@ export class MiningQueryService {
        WHERE e.env = ?
        GROUP BY e.uuid, e.class_name, e.name, e.commodity_uuid, e.instability, e.resistance,
                 e.optimal_window_midpoint, e.optimal_window_thinness, e.optimal_window_midpoint_rand,
-                e.explosion_multiplier, e.cluster_factor
+                e.explosion_multiplier, e.cluster_factor, e.p4k_path
        ORDER BY e.name ASC`),
       env,
     );
@@ -66,12 +66,12 @@ export class MiningQueryService {
     const prisma = this.getClient(env);
     const havingClause = includeEmpty ? '' : 'HAVING COUNT(mcp.id) > 0';
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT mc.uuid, mc.class_name, mc.deposit_name, mc.min_distinct_elements,
+      toPostgres(`SELECT mc.uuid, mc.class_name, mc.deposit_name, mc.min_distinct_elements, mc.p4k_path,
               COUNT(mcp.id) AS element_count
        FROM game.mining_compositions mc
        LEFT JOIN game.mining_composition_parts mcp ON mcp.composition_uuid = mc.uuid AND mcp.composition_env = mc.env
        WHERE mc.env = ?
-       GROUP BY mc.uuid, mc.class_name, mc.deposit_name, mc.min_distinct_elements
+       GROUP BY mc.uuid, mc.class_name, mc.deposit_name, mc.min_distinct_elements, mc.p4k_path
        ${havingClause}
        ORDER BY mc.deposit_name ASC`),
       env,

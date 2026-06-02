@@ -558,6 +558,7 @@ model Component {
   qdCalibrationDelay       Decimal? @map("qd_calibration_delay") @db.Decimal(10, 2)
   qdCalibrationMaxAngle    Decimal? @map("qd_calibration_max_angle") @db.Decimal(8, 2)
   p4kPath                  String?  @map("p4k_path") @db.VarChar(500)
+  rawJson                  Json?    @map("raw_json")
   createdAt                DateTime @default(now()) @map("created_at")
   updatedAt                DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -653,6 +654,11 @@ model Shop {
   planetMoon           String?  @map("planet_moon") @db.VarChar(100)
   city                 String?  @db.VarChar(100)
   shopType             String?  @map("shop_type") @db.VarChar(50)
+  franchiseSlug        String?  @map("franchise_slug") @db.VarChar(100)
+  locationSlug         String?  @map("location_slug") @db.VarChar(100)
+  franchiseLocKey      String?  @map("franchise_loc_key") @db.VarChar(255)
+  p4kPath              String?  @map("p4k_path") @db.VarChar(500)
+  rawJson              Json?    @map("raw_json")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -723,6 +729,8 @@ model MiningElement {
   optimalWindowThinness     Decimal? @map("optimal_window_thinness") @db.Decimal(6, 4)
   explosionMultiplier       Decimal? @map("explosion_multiplier") @db.Decimal(8, 2)
   clusterFactor             Decimal? @map("cluster_factor") @db.Decimal(6, 4)
+  p4kPath                   String?  @map("p4k_path") @db.VarChar(500)
+  rawJson                   Json?    @map("raw_json")
 
   compositionParts MiningCompositionPart[]
 
@@ -739,6 +747,8 @@ model MiningComposition {
   className           String  @map("class_name") @db.VarChar(255)
   depositName         String? @map("deposit_name") @db.VarChar(255)
   minDistinctElements Int?    @map("min_distinct_elements")
+  p4kPath             String? @map("p4k_path") @db.VarChar(500)
+  rawJson             Json?   @map("raw_json")
 
   parts MiningCompositionPart[]
 
@@ -802,6 +812,8 @@ model Mission {
   hasBlueprintReward  Boolean @default(false) @map("has_blueprint_reward")
   blueprintRewardUuid String? @map("blueprint_reward_uuid") @db.Char(36)
   blueprintRewardEnv  String? @default("live") @map("blueprint_reward_env") @db.VarChar(10)
+  p4kPath             String? @map("p4k_path") @db.VarChar(500)
+  rawJson             Json?   @map("raw_json")
 
   blueprint        CraftingRecipe?          @relation("MissionLegacyBlueprint", fields: [blueprintRewardUuid, blueprintRewardEnv], references: [uuid, env])
   blueprintRewards MissionBlueprintReward[]
@@ -831,6 +843,8 @@ model CraftingRecipe {
   craftingTime   Int?     @map("crafting_time_s")
   stationType    String?  @map("station_type") @db.VarChar(100)
   skillLevel     Int?     @map("skill_level")
+  p4kPath        String?  @map("p4k_path") @db.VarChar(500)
+  rawJson        Json?    @map("raw_json")
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -915,6 +929,9 @@ model Location {
   parentUuid    String?  @map("parent_uuid") @db.Char(36)
   locKey        String?  @map("loc_key") @db.VarChar(255)
   description   String?
+  coordinates   Json?
+  p4kPath       String?  @map("p4k_path") @db.VarChar(500)
+  rawJson       Json?    @map("raw_json")
   isScannable   Boolean  @default(false) @map("is_scannable")
   hideInStarmap Boolean  @default(false) @map("hide_in_starmap")
   extractedAt   DateTime @default(now()) @map("extracted_at")

@@ -46,6 +46,8 @@ export interface MissionRecord {
   hasBlueprintReward: boolean;
   blueprintRewardUuid: string | null;
   buyInAmount: number | null;
+  p4kPath: string | null;
+  rawJson: Record<string, unknown> | null;
 }
 
 const TYPE_PATTERNS: [RegExp, string][] = [
@@ -398,6 +400,8 @@ export function extractMissions(ctx: DataForgeService, locService?: MissionLocal
         hasBlueprintReward,
         blueprintRewardUuid,
         buyInAmount: null,
+        p4kPath: r.fileName || null,
+        rawJson: { record: r, data },
       });
     } catch (e) {
       logger.debug(`Mission extract error [${r.name}]: ${(e as Error).message}`);
