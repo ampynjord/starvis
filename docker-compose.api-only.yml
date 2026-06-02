@@ -1,11 +1,14 @@
 # ============================================================
-# STARVIS — API self-hosted (sans IHM, sans bot)
-# Expose uniquement l'API REST + PostgreSQL + Redis
+# STARVIS - API self-hosted (without IHM or bot)
+# Runs only the REST API, PostgreSQL and Redis.
 #
-# Usage :
+# Usage:
 #   cp .env.api-only.example .env.api-only
-#   # Remplir .env.api-only
+#   # Fill .env.api-only
 #   docker compose -f docker-compose.api-only.yml --env-file .env.api-only up -d
+#
+# The extractor runs outside Docker on the host machine. Point it to
+# DB_HOST=127.0.0.1 and DB_PORT=${DB_EXTERNAL_PORT:-5432}.
 # ============================================================
 
 services:
@@ -16,11 +19,11 @@ services:
       POSTGRES_DB: ${DB_NAME:-starvis}
       POSTGRES_USER: ${DB_USER:-starvis_user}
       POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    ports:
+      - "127.0.0.1:${DB_EXTERNAL_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    # Décommentez pour accéder à la BDD depuis l'hôte (ex: extractor local)
-    # ports:
-    #   - "127.0.0.1:5432:5432"
+      - ./db/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
@@ -41,6 +44,17 @@ services:
       retries: 5
     command: redis-server --appendonly yes --maxmemory ${REDIS_MAXMEMORY:-64mb} --maxmemory-policy allkeys-lru
 
+  db-push:
+    image: ${API_IMAGE:-ghcr.io/ampynjord/starvis-api:latest}
+    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-db-push
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-starvis_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-starvis}
+    command: npm run push --workspace=@starvis/db
+    restart: "no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     image: ${API_IMAGE:-ghcr.io/ampynjord/starvis-api:latest}
     container_name: ${COMPOSE_PROJECT_NAME:-starvis}-api
@@ -52,14 +66,26 @@ services:
       DATABASE_URL: postgresql://${DB_USER:-starvis_user}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-starvis}
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
       ADMIN_API_KEY: ${ADMIN_API_KEY:?ADMIN_API_KEY is required}
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME:-starvis_token}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-500}
       RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-50}
+      RATE_LIMIT_ADMIN_MAX: ${RATE_LIMIT_ADMIN_MAX:-100}
       CTM_CACHE_DIR: /app/ctm-cache
       MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      CHAT_PROVIDER_BASE_URL: ${CHAT_PROVIDER_BASE_URL:-https://api.mistral.ai/v1}
+      CHAT_TOOL_MODEL: ${CHAT_TOOL_MODEL:-mistral-small-latest}
+      CHAT_RESPONSE_MODEL: ${CHAT_RESPONSE_MODEL:-mistral-small-latest}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      CONTACT_EMAIL: ${CONTACT_EMAIL:-}
     ports:
       - "${API_PORT:-127.0.0.1:3000}:3000"
     restart: unless-stopped
@@ -70,8 +96,8 @@ services:
       retries: 5
       start_period: 15s
     depends_on:
-      postgres:
-        condition: service_healthy
+      db-push:
+        condition: service_completed_successfully
       redis:
         condition: service_healthy
 
