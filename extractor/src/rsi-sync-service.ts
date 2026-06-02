@@ -371,7 +371,7 @@ export class RsiSyncService {
               affiliations: sys.affiliation ? JSON.stringify(sys.affiliation.map((a: any) => a.name ?? a.code ?? a)) : null,
               thumbnail: sys.thumbnail?.url ?? null,
               description: sys.description ?? null,
-              coordinates: sys.position ? JSON.stringify({ x: sys.position.x, y: sys.position.y }) : null,
+              coordinates: sys.position ? JSON.stringify({ x: sys.position.x, y: sys.position.y, z: sys.position.z }) : null,
               jump_points: sys.jumppoints ? JSON.stringify(sys.jumppoints.map((j: any) => j.code ?? j)) : null,
             });
             upserted++;

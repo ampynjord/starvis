@@ -61,3 +61,33 @@ describe('RsiSyncService stats shape', () => {
     expect(result).toMatchObject({ upserted: expect.any(Number), errors: expect.any(Number) });
   });
 });
+
+describe('RsiSyncService.syncStarmap', () => {
+  it('stores 3D system coordinates', async () => {
+    vi.stubGlobal('fetch', async () => ({
+      ok: true,
+      json: async () => ({
+        data: [
+          {
+            id: 1,
+            code: 'TEST',
+            name: 'Test',
+            position: { x: 1.25, y: -2.5, z: 3.75 },
+            affiliation: [{ name: 'UEE' }],
+            jumppoints: [],
+          },
+        ],
+        meta: { total: 1, last_page: 1 },
+      }),
+    }));
+
+    const { RsiSyncService } = await import('../src/rsi-sync-service.js');
+    const { pool, query } = makePoolMock();
+    const svc = new RsiSyncService(pool);
+
+    await svc.syncStarmap();
+
+    const params = query.mock.calls[0][1] as unknown[];
+    expect(JSON.parse(params[10] as string)).toEqual({ x: 1.25, y: -2.5, z: 3.75 });
+  });
+});
