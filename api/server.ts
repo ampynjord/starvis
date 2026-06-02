@@ -187,7 +187,7 @@ async function start() {
   if (shouldPushSchema) {
     try {
       const { execFileSync } = await import('node:child_process');
-      execFileSync('npm', ['run', 'push', '--workspace=@starvis/db', '--', '--skip-generate', '--accept-data-loss'], {
+      execFileSync('npm', ['run', 'push', '--workspace=@starvis/db', '--', '--accept-data-loss'], {
         cwd: path.resolve(__dirname, '..'),
         stdio: 'pipe',
         env: { ...process.env, DATABASE_URL: buildDatabaseUrl() },
