@@ -43,7 +43,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     if (allGameShips.length > 1) {
       const others = allGameShips
         .slice(1)
-        .map((s) => `• ${s.name}`)
+        .map((s) => `- ${s.name}`)
         .join('\n');
       const currentDesc = embed.data.description ?? '';
       embed.setDescription(`${currentDesc}\n\n**Other results:**\n${others}`.trim());

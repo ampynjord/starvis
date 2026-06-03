@@ -6,7 +6,7 @@ import { errorEmbed, searchEmbed } from '../embeds.js';
 
 export const data = new SlashCommandBuilder()
   .setName('search')
-  .setDescription('Unified search (ships, components, items, commodities)')
+  .setDescription('Unified search across ships, components, items and commodities')
   .addStringOption((opt) => opt.setName('term').setDescription('Search term').setRequired(true));
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
@@ -15,64 +15,36 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
   try {
     const res = await searchAll(term);
-
     if (res.total === 0) {
       await interaction.editReply({ embeds: [errorEmbed(`No results for "${term}".`)] });
       return;
     }
 
-    const sections: string[] = [];
-
-    if (res.data.ships?.length > 0) {
-      const items = res.data.ships.map((s) => {
-        const mfr = s.manufacturer ? ` (${s.manufacturer})` : '';
-        const role = s.focus ?? s.role;
-        const extra = role ? ` — ${role}` : '';
+    const sections = [
+      section('Ships', res.data.ships, (s) => {
         const id = s.id ?? s.ship_matrix_id;
-        const link = id ? `[${s.name}](${SITE_URL}/ships/${id})` : `**${s.name}**`;
-        return `• ${link}${mfr}${extra}`;
-      });
-      sections.push(`🚀 **Ships** (${res.data.ships.length})\n${items.join('\n')}`);
-    }
-
-    if (res.data.components?.length > 0) {
-      const items = res.data.components.map((c) => {
-        const parts = [`• **${c.name}**`];
-        if (c.type) parts.push(c.type);
-        if (c.size != null) parts.push(`T${c.size}`);
-        if (c.grade) parts.push(`Grade ${c.grade}`);
-        if (c.manufacturer) parts.push(c.manufacturer);
-        return parts.join(' — ');
-      });
-      sections.push(`⚙️ **Components** (${res.data.components.length})\n${items.join('\n')}`);
-    }
-
-    if (res.data.items?.length > 0) {
-      const items = res.data.items.map((i) => {
-        const parts = [`• **${i.name}**`];
-        if (i.type) parts.push(i.type);
-        if (i.subType) parts.push(i.subType);
-        return parts.join(' — ');
-      });
-      sections.push(`📦 **Items** (${res.data.items.length})\n${items.join('\n')}`);
-    }
-
-    if (res.data.commodities?.length > 0) {
-      const items = res.data.commodities.map((c) => {
-        const parts = [`• **${c.name}**`];
-        if (c.type) parts.push(c.type);
-        return parts.join(' — ');
-      });
-      sections.push(`🛢️ **Commodities** (${res.data.commodities.length})\n${items.join('\n')}`);
-    }
-
-    const description = sections.join('\n\n') || 'No results.';
+        const name = id ? `[${s.name}](${SITE_URL}/ships/${id})` : `**${s.name}**`;
+        const role = s.focus ?? s.role;
+        return [name, s.manufacturer_name ?? s.manufacturer, role].filter(Boolean).join(' - ');
+      }),
+      section('Components', res.data.components, (c) =>
+        [`**${c.name}**`, c.type, c.size != null ? `S${c.size}` : null, c.grade ? `Grade ${c.grade}` : null].filter(Boolean).join(' - '),
+      ),
+      section('Items', res.data.items, (i) => [`**${i.name}**`, i.type, i.subType].filter(Boolean).join(' - ')),
+      section('Commodities', res.data.commodities, (c) => [`**${c.name}**`, c.type, c.sub_type].filter(Boolean).join(' - ')),
+    ].filter(Boolean);
 
     await interaction.editReply({
-      embeds: [searchEmbed(`🔍 Results for "${term}"`, description)],
+      embeds: [searchEmbed(`Results for "${term}"`, sections.join('\n\n') || 'No results.')],
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     await interaction.editReply({ embeds: [errorEmbed(msg)] });
   }
+}
+
+function section<T>(title: string, rows: T[] | undefined, render: (row: T) => string): string | null {
+  if (!rows?.length) return null;
+  const lines = rows.slice(0, 5).map((row, index) => `${index + 1}. ${render(row)}`);
+  return `**${title}** (${rows.length})\n${lines.join('\n')}`;
 }

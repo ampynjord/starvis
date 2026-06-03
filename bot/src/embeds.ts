@@ -5,121 +5,115 @@ import { SITE_URL } from './config.js';
 const COLORS = {
   primary: 0x5865f2,
   success: 0x57f287,
-  warning: 0xfee75c,
   error: 0xed4245,
   ship: 0x3498db,
   trade: 0x2ecc71,
   commodity: 0xe67e22,
 } as const satisfies Record<string, ColorResolvable>;
 
+function fmt(value: unknown, unit = ''): string {
+  if (value == null || value === '') return 'n/a';
+  if (typeof value === 'number') return `${value.toLocaleString('en-US')}${unit ? ` ${unit}` : ''}`;
+  return `${value}${unit ? ` ${unit}` : ''}`;
+}
+
+function truncate(text: string, max = 280): string {
+  return text.length > max ? `${text.slice(0, max - 3)}...` : text;
+}
+
 export function shipEmbed(ship: ShipResult): EmbedBuilder {
   const shipId = ship.id ?? ship.ship_matrix_id;
   const shipUrl = shipId ? `${SITE_URL}/ships/${shipId}` : SITE_URL;
-
   const embed = new EmbedBuilder()
     .setColor(COLORS.ship)
-    .setTitle(`${ship.name}`)
+    .setTitle(ship.name)
     .setURL(shipUrl)
-    .setFooter({ text: 'Starvis — Star Citizen Database' });
+    .setFooter({ text: 'Starvis - Star Citizen Database' });
 
   const thumb = ship.thumbnail ?? ship.thumbnail_large ?? ship.mediaStoreSmall ?? ship.mediaStoreLarge;
   if (thumb) embed.setThumbnail(thumb);
 
   const desc = ship.description ?? ship.sm_description;
-  if (desc) {
-    const truncated = desc.length > 200 ? `${desc.slice(0, 197)}…` : desc;
-    embed.setDescription(truncated);
-  }
-
-  const fields: { name: string; value: string; inline: boolean }[] = [];
+  if (desc) embed.setDescription(truncate(desc));
 
   const mfr = ship.manufacturer ?? ship.manufacturer_name;
-  const mfrCode = ship.manufacturer_code;
-  if (mfr) fields.push({ name: '🏭 Manufacturer', value: mfrCode ? `${mfr} (${mfrCode})` : mfr, inline: true });
-
   const role = ship.focus ?? ship.role;
-  if (role) fields.push({ name: '🎯 Role', value: role, inline: true });
-  if (ship.career && ship.career !== role) fields.push({ name: '💼 Career', value: ship.career, inline: true });
-
-  if (ship.size) fields.push({ name: '📐 Size', value: ship.size, inline: true });
-
-  if (ship.production_status) {
-    const statusIcon = ship.production_status === 'flight-ready' ? '✅' : '🔧';
-    fields.push({ name: 'Status', value: `${statusIcon} ${ship.production_status}`, inline: true });
-  }
-
   const crewMin = ship.crew_min ?? ship.min_crew;
   const crewMax = ship.crew_max ?? ship.max_crew;
-  if (crewMin != null && crewMax != null) {
-    fields.push({
-      name: '👥 Crew',
-      value: crewMin === crewMax ? `${crewMin}` : `${crewMin}–${crewMax}`,
-      inline: true,
-    });
-  }
-
   const cargo = ship.cargo_capacity ?? ship.sm_cargo;
-  if (cargo) fields.push({ name: '📦 Cargo', value: `${cargo} SCU`, inline: true });
 
-  if (ship.scm_speed) fields.push({ name: '🚀 SCM', value: `${ship.scm_speed} m/s`, inline: true });
-  if (ship.max_speed) fields.push({ name: '💨 Max', value: `${ship.max_speed} m/s`, inline: true });
+  const identity = [
+    mfr ? `Manufacturer: ${ship.manufacturer_code ? `${mfr} (${ship.manufacturer_code})` : mfr}` : null,
+    role ? `Role: ${role}` : null,
+    ship.career && ship.career !== role ? `Career: ${ship.career}` : null,
+    ship.production_status ? `Status: ${ship.production_status}` : null,
+  ].filter(Boolean);
 
-  if (ship.shield_hp) fields.push({ name: '🛡️ Shield', value: `${ship.shield_hp.toLocaleString()} HP`, inline: true });
-  if (ship.weapon_damage_total) {
-    fields.push({ name: '🔫 Weapons DPS', value: `${ship.weapon_damage_total.toLocaleString()}`, inline: true });
+  if (identity.length) {
+    embed.addFields({ name: 'Identity', value: identity.join('\n'), inline: false });
   }
-  if (ship.missile_damage_total) {
-    fields.push({ name: '🚀 Missile DMG', value: `${ship.missile_damage_total.toLocaleString()}`, inline: true });
+
+  const performance = [
+    ship.scm_speed ? `SCM: **${fmt(ship.scm_speed, 'm/s')}**` : null,
+    ship.max_speed ? `Max: **${fmt(ship.max_speed, 'm/s')}**` : null,
+    cargo ? `Cargo: **${fmt(cargo, 'SCU')}**` : null,
+    crewMin != null && crewMax != null ? `Crew: **${crewMin === crewMax ? crewMin : `${crewMin}-${crewMax}`}**` : null,
+  ].filter(Boolean);
+
+  if (performance.length) {
+    embed.addFields({ name: 'Performance', value: performance.join('\n'), inline: true });
   }
 
-  if (ship.total_hp) fields.push({ name: '❤️ HP Total', value: `${ship.total_hp.toLocaleString()}`, inline: true });
-  if (ship.mass) fields.push({ name: '⚖️ Mass', value: `${ship.mass.toLocaleString()} kg`, inline: true });
+  const combat = [
+    ship.weapon_damage_total ? `Weapons: **${fmt(ship.weapon_damage_total, 'DPS')}**` : null,
+    ship.missile_damage_total ? `Missiles: **${fmt(ship.missile_damage_total)}**` : null,
+    ship.shield_hp ? `Shield: **${fmt(ship.shield_hp, 'HP')}**` : null,
+    ship.total_hp ? `Hull: **${fmt(ship.total_hp, 'HP')}**` : null,
+  ].filter(Boolean);
 
-  if (ship.hydrogen_fuel_capacity) {
-    fields.push({ name: '⛽ Hydrogen', value: `${ship.hydrogen_fuel_capacity} SCU`, inline: true });
+  if (combat.length) {
+    embed.addFields({ name: 'Combat', value: combat.join('\n'), inline: true });
   }
-  if (ship.quantum_fuel_capacity) {
-    fields.push({ name: '🌀 Quantum', value: `${ship.quantum_fuel_capacity} SCU`, inline: true });
+
+  const logistics = [
+    ship.mass ? `Mass: **${fmt(ship.mass, 'kg')}**` : null,
+    ship.hydrogen_fuel_capacity ? `Hydrogen: **${fmt(ship.hydrogen_fuel_capacity, 'L')}**` : null,
+    ship.quantum_fuel_capacity ? `Quantum: **${fmt(ship.quantum_fuel_capacity, 'L')}**` : null,
+    ship.insurance_claim_time ? `Claim: **${fmt(Math.round(ship.insurance_claim_time), 'min')}**` : null,
+    ship.insurance_expedite_cost ? `Expedite: **${fmt(ship.insurance_expedite_cost, 'aUEC')}**` : null,
+    ship.price ? `Price: **${fmt(ship.price, 'aUEC')}**` : null,
+  ].filter(Boolean);
+
+  if (logistics.length) {
+    embed.addFields({ name: 'Logistics', value: logistics.join('\n'), inline: false });
   }
 
   if (ship.length && ship.beam && ship.height) {
-    fields.push({ name: '📏 Dimensions', value: `${ship.length} × ${ship.beam} × ${ship.height} m`, inline: true });
+    embed.addFields({ name: 'Dimensions', value: `${ship.length} x ${ship.beam} x ${ship.height} m`, inline: true });
   }
 
-  if (ship.insurance_claim_time) {
-    const mins = Math.floor(ship.insurance_claim_time);
-    const secs = Math.round((ship.insurance_claim_time - mins) * 60);
-    fields.push({ name: '🔄 Claim', value: `${mins}m${secs > 0 ? `${secs}s` : ''}`, inline: true });
-  }
-  if (ship.insurance_expedite_cost) {
-    fields.push({ name: '⚡ Expedite', value: `${ship.insurance_expedite_cost.toLocaleString()} aUEC`, inline: true });
-  }
-
-  if (ship.price) fields.push({ name: '💰 Price', value: `${ship.price.toLocaleString()} aUEC`, inline: true });
-
-  embed.addFields(fields);
   return embed;
 }
 
 export function tradeRoutesEmbed(routes: TradeRoute[], scu: number): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setColor(COLORS.trade)
-    .setTitle(`🚀 Top ${routes.length} trade routes (${scu} SCU)`)
+    .setTitle(`Top ${routes.length} trade routes (${scu} SCU)`)
     .setURL(`${SITE_URL}/trade`)
-    .setFooter({ text: 'Starvis — Star Citizen Database' });
+    .setFooter({ text: 'Starvis - Star Citizen Database' });
 
-  if (routes.length === 0) {
-    embed.setDescription('No routes found.');
-    return embed;
-  }
+  if (!routes.length) return embed.setDescription('No profitable routes found.');
 
   const lines = routes.map((r, i) => {
-    const profit = r.totalProfit.toLocaleString();
-    return `**${i + 1}.** ${r.commodity}\n` + `  📦 ${r.buyLocation} → ${r.sellLocation}\n` + `  💰 **${profit} aUEC** profit`;
+    return [
+      `**${i + 1}. ${r.commodity}**`,
+      `Buy: ${r.buyLocation} (${fmt(r.buyPrice, 'aUEC')})`,
+      `Sell: ${r.sellLocation} (${fmt(r.sellPrice, 'aUEC')})`,
+      `Profit: **${fmt(r.totalProfit, 'aUEC')}**`,
+    ].join('\n');
   });
 
-  embed.setDescription(lines.join('\n\n'));
-  return embed;
+  return embed.setDescription(lines.join('\n\n'));
 }
 
 export function searchEmbed(title: string, description: string): EmbedBuilder {
@@ -128,27 +122,29 @@ export function searchEmbed(title: string, description: string): EmbedBuilder {
     .setTitle(title)
     .setDescription(description)
     .setURL(SITE_URL)
-    .setFooter({ text: 'Starvis — Star Citizen Database' });
+    .setFooter({ text: 'Starvis - Star Citizen Database' });
 }
 
 export function statusEmbed(healthy: boolean, stats?: Record<string, number>): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setColor(healthy ? COLORS.success : COLORS.error)
-    .setTitle(healthy ? '✅ Starvis — Online' : '❌ Starvis — Offline')
+    .setTitle(healthy ? 'Starvis - Online' : 'Starvis - Offline')
     .setURL(SITE_URL)
-    .setFooter({ text: 'Starvis — Star Citizen Database' });
+    .setFooter({ text: 'Starvis - Star Citizen Database' });
 
   if (stats) {
-    const fields: { name: string; value: string; inline: boolean }[] = [];
-    for (const [key, value] of Object.entries(stats)) {
-      fields.push({ name: key, value: value.toLocaleString(), inline: true });
-    }
-    embed.addFields(fields);
+    embed.addFields(
+      Object.entries(stats).map(([key, value]) => ({
+        name: key,
+        value: value.toLocaleString('en-US'),
+        inline: true,
+      })),
+    );
   }
 
   return embed;
 }
 
 export function errorEmbed(message: string): EmbedBuilder {
-  return new EmbedBuilder().setColor(COLORS.error).setTitle('❌ Error').setDescription(message);
+  return new EmbedBuilder().setColor(COLORS.error).setTitle('Error').setDescription(message);
 }
