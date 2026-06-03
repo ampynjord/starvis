@@ -67,7 +67,7 @@ function fNum(v: number | string | null | undefined, dec = 0): string {
 
 function ItemStats({ item }: { item: ItemListItem }) {
 	const isWeapon = item.type === "FPS_Weapon";
-	const isArmor = item.type.startsWith("Armor_") || item.type === "Undersuit";
+	const isArmor = item.type === "Armor" || item.type.startsWith("Armor_") || item.type === "Undersuit";
 
 	if (isWeapon) {
 		const hasStat = item.weapon_dps != null || item.weapon_range != null || item.weapon_fire_rate != null;

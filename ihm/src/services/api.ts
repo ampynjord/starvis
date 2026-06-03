@@ -98,7 +98,10 @@ function mapMission(item: Mission): Mission {
     displayCategory: item.display_category,
     isUnique: item.is_unique,
     hasBlueprintReward: item.has_blueprint_reward,
+    blueprintRewardUuid: item.blueprint_reward_uuid,
+    blueprintRewardCount: item.blueprint_reward_count,
     buyInAmount: item.buy_in_amount,
+    blueprint_rewards: item.blueprint_rewards?.map(mapCraftingRecipe),
   };
 }
 
@@ -145,6 +148,11 @@ function mapCraftingRecipe(item: CraftingRecipe): CraftingRecipe {
     displayStationType: item.display_station_type,
     skillLevel: item.skill_level,
     gameEnv: item.game_env,
+    ingredientCount: item.ingredient_count,
+    optionalIngredientCount: item.optional_ingredient_count,
+    modifierCount: item.modifier_count,
+    totalScu: item.total_scu,
+    minQualityRequired: item.min_quality_required,
     ingredients: item.ingredients?.map(mapCraftingIngredient),
     modifiers: item.modifiers?.map(mapCraftingModifier),
   };

@@ -42,6 +42,11 @@ export interface MissionListResult extends PaginatedResult {
   summary: {
     blueprintRewards: number;
     averageReward: number | null;
+    legalMissions: number;
+    illegalMissions: number;
+    shareableMissions: number;
+    uniqueMissions: number;
+    averageDanger: number | null;
   };
 }
 
@@ -186,7 +191,12 @@ export class MissionService {
       prisma.$queryRawUnsafe<Row[]>(
         toPostgres(`SELECT
           COUNT(*) FILTER (WHERE m.has_blueprint_reward = true) as blueprint_rewards,
-          ROUND(AVG(COALESCE(m.reward_max, m.reward_min)) FILTER (WHERE COALESCE(m.reward_max, m.reward_min) IS NOT NULL)) as average_reward
+          ROUND(AVG(COALESCE(m.reward_max, m.reward_min)) FILTER (WHERE COALESCE(m.reward_max, m.reward_min) IS NOT NULL)) as average_reward,
+          COUNT(*) FILTER (WHERE m.is_legal = true) as legal_missions,
+          COUNT(*) FILTER (WHERE m.is_legal = false) as illegal_missions,
+          COUNT(*) FILTER (WHERE m.can_be_shared = true) as shareable_missions,
+          COUNT(*) FILTER (WHERE m.is_unique = true) as unique_missions,
+          ROUND(AVG(m.danger_level) FILTER (WHERE m.danger_level IS NOT NULL), 1) as average_danger
          FROM game.missions m
          WHERE ${whereClause}`),
         ...params,
@@ -195,8 +205,14 @@ export class MissionService {
     const total = Number(countRows[0]?.total ?? 0);
 
     const data = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT ${MISSION_COLS}
+      toPostgres(`SELECT ${MISSION_COLS},
+              COALESCE(blueprints.blueprint_reward_count, 0) AS blueprint_reward_count
        FROM game.missions m
+       LEFT JOIN (
+         SELECT mission_uuid, mission_env, COUNT(DISTINCT blueprint_uuid) AS blueprint_reward_count
+         FROM game.mission_blueprint_rewards
+         GROUP BY mission_uuid, mission_env
+       ) blueprints ON blueprints.mission_uuid = m.uuid AND blueprints.mission_env = m.env
        WHERE ${whereClause}
        ORDER BY ${getMissionOrderBy(sort)}
        LIMIT ? OFFSET ?`),
@@ -214,6 +230,11 @@ export class MissionService {
       summary: {
         blueprintRewards: Number(summaryRows[0]?.blueprint_rewards ?? 0),
         averageReward: summaryRows[0]?.average_reward == null ? null : Number(summaryRows[0].average_reward),
+        legalMissions: Number(summaryRows[0]?.legal_missions ?? 0),
+        illegalMissions: Number(summaryRows[0]?.illegal_missions ?? 0),
+        shareableMissions: Number(summaryRows[0]?.shareable_missions ?? 0),
+        uniqueMissions: Number(summaryRows[0]?.unique_missions ?? 0),
+        averageDanger: summaryRows[0]?.average_danger == null ? null : Number(summaryRows[0].average_danger),
       },
     };
   }
@@ -223,14 +244,47 @@ export class MissionService {
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT ${MISSION_COLS},
               r.name as blueprint_name,
-              r.output_item_name as blueprint_output
+              r.output_item_name as blueprint_output,
+              COALESCE(blueprints.blueprint_reward_count, 0) AS blueprint_reward_count
        FROM game.missions m
        LEFT JOIN game.crafting_recipes r ON m.blueprint_reward_uuid = r.uuid AND r.env = m.env
+       LEFT JOIN (
+         SELECT mission_uuid, mission_env, COUNT(DISTINCT blueprint_uuid) AS blueprint_reward_count
+         FROM game.mission_blueprint_rewards
+         GROUP BY mission_uuid, mission_env
+       ) blueprints ON blueprints.mission_uuid = m.uuid AND blueprints.mission_env = m.env
        WHERE m.env = ? AND m.uuid = ?`),
       env,
       uuid,
     );
-    return rows.length ? normalizeMissionRow(convertBigIntToNumber(rows[0])) : null;
+    if (!rows.length) return null;
+
+    const mission = normalizeMissionRow(convertBigIntToNumber(rows[0]));
+    const blueprintRewards = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT DISTINCT r.uuid, r.env AS game_env, r.class_name, r.name, r.category,
+              COALESCE(i.name, r.output_item_name) AS output_item_name,
+              r.output_item_uuid, r.output_quantity, r.crafting_time_s, r.station_type, r.skill_level
+       FROM game.crafting_recipes r
+       LEFT JOIN game.items i ON i.uuid = r.output_item_uuid AND i.env = r.env
+       WHERE r.env = ? AND r.uuid = ?
+       UNION
+       SELECT DISTINCT r.uuid, r.env AS game_env, r.class_name, r.name, r.category,
+              COALESCE(i.name, r.output_item_name) AS output_item_name,
+              r.output_item_uuid, r.output_quantity, r.crafting_time_s, r.station_type, r.skill_level
+       FROM game.mission_blueprint_rewards mbr
+       JOIN game.crafting_recipes r ON r.uuid = mbr.blueprint_uuid AND r.env = mbr.blueprint_env
+       LEFT JOIN game.items i ON i.uuid = r.output_item_uuid AND i.env = r.env
+       WHERE mbr.mission_env = ? AND mbr.mission_uuid = ?
+       ORDER BY name ASC`),
+      env,
+      String(mission.blueprint_reward_uuid ?? '00000000-0000-0000-0000-000000000000'),
+      env,
+      uuid,
+    );
+    mission.blueprint_rewards = convertBigIntToNumber(blueprintRewards);
+    mission.blueprint_reward_count = mission.blueprint_rewards.length;
+    mission.has_blueprint_reward = Boolean(mission.has_blueprint_reward || mission.blueprint_rewards.length > 0);
+    return mission;
   }
 
   async getMissionFilters(env = 'live'): Promise<FiltersResult> {

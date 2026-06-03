@@ -36,7 +36,8 @@ const COLOR_SELECTED = 0x20e4ff;
 const EMISS_DEFAULT  = 0x020c12;
 const COLOR_OUTLINE  = 0x00d4ff;
 const COLOR_RING     = 0x00c8f0;
-const SHIP_GAP       = 1.3;
+const MIN_SHIP_GAP   = 8;
+const SHIP_GAP_RATIO = 0.18;
 
 export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
   const containerRef  = useRef<HTMLDivElement>(null);
@@ -83,7 +84,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.autoRotate = true;
+    controls.autoRotate = false;
     controls.autoRotateSpeed = 0.3;
     controls.enablePan = true;
 
@@ -96,12 +97,13 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
       outlineMeshes: THREE.Mesh[];
       ring: THREE.Mesh | null;
       radius: number;
+      halfWidth: number;
       loaded: boolean;
     };
     const entries: ShipEntry[] = ships.map((ship) => ({
       ship, root: new THREE.Group(), inner: null,
       meshes: [], outlineMeshes: [], ring: null,
-      radius: 10, loaded: false,
+      radius: 10, halfWidth: 10, loaded: false,
     }));
 
     entries.forEach((e) => {
@@ -148,21 +150,26 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
     };
 
     // ── Position all ships in a row without overlap ───────────────────────────
+    const getGap = () => Math.max(MIN_SHIP_GAP, Math.max(...entries.map((e) => e.halfWidth)) * SHIP_GAP_RATIO);
+
     const getTotalSpan = () => {
       let span = 0;
+      const gap = getGap();
       entries.forEach((e, i) => {
-        span += e.radius * 2;
-        if (i < entries.length - 1) span += e.radius * SHIP_GAP * 0.5;
+        span += e.halfWidth * 2;
+        if (i < entries.length - 1) span += gap;
       });
       return span;
     };
 
     const repositionShips = () => {
       const totalSpan = getTotalSpan();
+      const gap = getGap();
       let x = -totalSpan / 2;
       entries.forEach((e) => {
-        e.root.position.x = x + e.radius;
-        x += e.radius * 2 + e.radius * SHIP_GAP * 0.5;
+        e.root.position.x = x + e.halfWidth;
+        e.root.position.z = 0;
+        x += e.halfWidth * 2 + gap;
       });
       // Move rings to ship positions
       entries.forEach((e) => { if (e.ring) e.ring.position.x = 0; });
@@ -222,7 +229,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
           const card = new THREE.Group();
           card.add(front, back, border);
           card.userData.fleetItemId = entry.ship.id;
-          card.rotation.y = Math.PI / 2; // face camera (same as CTM ships)
+          card.rotation.y = 0;
           return { card, meshes: [front] as THREE.Mesh[] };
         };
 
@@ -235,6 +242,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
               entry.root.add(card);
               entry.meshes.push(...meshes);
               entry.radius = CARD_W / 2;
+              entry.halfWidth = CARD_W / 2;
               entry.loaded = true;
               loadedSoFar++;
               setLoadedCount(loadedSoFar);
@@ -246,6 +254,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
               entry.root.add(card);
               entry.meshes.push(...meshes);
               entry.radius = CARD_W / 2;
+              entry.halfWidth = CARD_W / 2;
               entry.loaded = true;
               loadedSoFar++;
               setLoadedCount(loadedSoFar);
@@ -257,6 +266,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
           entry.root.add(card);
           entry.meshes.push(...meshes);
           entry.radius = CARD_W / 2;
+          entry.halfWidth = CARD_W / 2;
           entry.loaded = true;
           loadedSoFar++;
           setLoadedCount(loadedSoFar);
@@ -296,11 +306,13 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
           const sphere = new THREE.Sphere();
           box2.getBoundingSphere(sphere);
           const r = sphere.radius;
+          const width = box2.max.x - box2.min.x;
 
           entry.inner = inner;
           entry.meshes.push(mesh);
           entry.outlineMeshes.push(outlineMesh);
           entry.radius = r;
+          entry.halfWidth = Math.max(width / 2, r * 0.35);
           entry.root.add(inner);
 
           // Selection ring (torus)
@@ -495,9 +507,9 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
       className="w-full h-full relative"
       style={{ cursor: 'grab' }}
     >
-      {loadedCount < ships.filter((s) => s.ctmUrl).length && (
+      {loadedCount < ships.length && (
         <div className="absolute top-2 left-1/2 -translate-x-1/2 z-10 bg-slate-900/80 border border-cyan-800/40 rounded-sm px-3 py-1 text-[10px] font-mono-sc text-cyan-600 animate-pulse pointer-events-none">
-          Loading {loadedCount}/{ships.filter((s) => s.ctmUrl).length}…
+          Loading {loadedCount}/{ships.length}…
         </div>
       )}
       <div className="absolute bottom-2 right-3 text-[9px] text-slate-700 font-mono-sc pointer-events-none select-none">

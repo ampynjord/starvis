@@ -239,6 +239,9 @@ type ViewMode = 'mine' | 'member' | 'all';
 
 interface Member { id: number; username: string; avatarUrl: string | null }
 
+const getAddedById = (item: FleetItem) => item.addedBy?.id != null ? Number(item.addedBy.id) : null;
+const getShipUuid = (item: FleetItem) => item.shipUuid?.trim() || null;
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function FleetManagerPage() {
@@ -273,7 +276,7 @@ export default function FleetManagerPage() {
       if (membersRes.ok) {
         const membersData = await membersRes.json();
         const memberList: Member[] = (membersData.data ?? []).map((m: any) => ({
-          id: m.user.id,
+          id: Number(m.user.id),
           username: m.user.username,
           avatarUrl: m.user.avatarUrl,
         }));
@@ -281,7 +284,7 @@ export default function FleetManagerPage() {
       }
 
       // Enrich with ship data
-      const uuids = [...new Set(items.map((i: FleetItem) => i.shipUuid).filter(Boolean))] as string[];
+      const uuids = [...new Set(items.map((i: FleetItem) => getShipUuid(i)).filter(Boolean))] as string[];
       const shipMap = new Map<string, ShipListItem>();
       await Promise.all(
         uuids.map(async (uuid) => {
@@ -298,6 +301,13 @@ export default function FleetManagerPage() {
   }, []);
 
   useEffect(() => { if (user) loadFleet(); }, [user, loadFleet]);
+
+  useEffect(() => {
+    if (viewMode !== 'member') return;
+    if (selectedMemberId != null && members.some((m) => m.id === selectedMemberId)) return;
+    const firstWithShips = members.find((m) => fleetItems.some((item) => getAddedById(item) === m.id));
+    setSelectedMemberId(firstWithShips?.id ?? members[0]?.id ?? null);
+  }, [fleetItems, members, selectedMemberId, viewMode]);
 
   // Close member dropdown on outside click
   useEffect(() => {
@@ -331,24 +341,30 @@ export default function FleetManagerPage() {
 
   // Filter items by view mode
   const visibleItems = fleetItems.filter((i) => {
-    if (viewMode === 'mine')   return i.addedBy?.id === user?.id;
-    if (viewMode === 'member') return i.addedBy?.id === selectedMemberId;
+    const addedById = getAddedById(i);
+    if (viewMode === 'mine')   return addedById === Number(user?.id);
+    if (viewMode === 'member') return addedById === selectedMemberId;
     return true; // 'all'
   });
   const visibleItemIds = visibleItems.map((i) => i.id).join(',');
 
   // Memoize fleetShips — prevents scene rebuild on selection change
   const fleetShips: FleetShip[] = useMemo(() => visibleItems
-    .filter((i) => i.shipUuid && shipData.has(i.shipUuid))
+    .filter((i) => {
+      const uuid = getShipUuid(i);
+      return uuid && shipData.has(uuid);
+    })
     .map((i) => {
-      const s = shipData.get(i.shipUuid!)!;
+      const uuid = getShipUuid(i)!;
+      const s = shipData.get(uuid)!;
       return {
-        id: i.id, shipUuid: i.shipUuid!, name: s.name, className: s.class_name,
+        id: i.id, shipUuid: uuid, name: s.name, className: s.class_name,
         manufacturerCode: s.manufacturer_code, role: s.role, career: s.career,
         crewSize: s.crew_size, scmSpeed: s.scm_speed,
+        sizeX: (s as any).size_x ?? null, sizeY: (s as any).size_y ?? null, sizeZ: (s as any).size_z ?? null,
         isConceptOnly: (s as any).is_concept_only ?? false,
         thumbnailUrl: (s as any).thumbnail_large ?? (s as any).thumbnail ?? null,
-        ctmUrl: (s as any).is_concept_only ? null : `/api/v1/ships/${i.shipUuid}/model/file`,
+        ctmUrl: (s as any).is_concept_only ? null : `/api/v1/ships/${uuid}/model/file`,
         declaredBy: i.addedBy?.username ?? null,
       } satisfies FleetShip;
     }),
@@ -356,7 +372,8 @@ export default function FleetManagerPage() {
   [visibleItemIds, shipData.size]);
 
   const selectedItem = visibleItems.find((i) => i.id === selectedItemId) ?? null;
-  const selectedShip = selectedItem?.shipUuid ? shipData.get(selectedItem.shipUuid) ?? null : null;
+  const selectedShipUuid = selectedItem ? getShipUuid(selectedItem) : null;
+  const selectedShip = selectedShipUuid ? shipData.get(selectedShipUuid) ?? null : null;
   const selectedMember = members.find((m) => m.id === selectedMemberId);
 
   if (!user) return (
@@ -406,9 +423,16 @@ export default function FleetManagerPage() {
 
               {/* Member picker */}
               <div className="relative">
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); setViewMode('member'); setMemberDropdownOpen((v) => !v); setSelectedItemId(null); }}
+              <button
+                type="button"
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setViewMode('member');
+                  setSelectedMemberId((current) => current ?? members.find((m) => fleetItems.some((item) => getAddedById(item) === m.id))?.id ?? members[0]?.id ?? null);
+                  setMemberDropdownOpen((v) => !v);
+                  setSelectedItemId(null);
+                }}
                   className={`flex items-center gap-1 px-2.5 py-1 rounded-sm text-[10px] font-orbitron font-bold uppercase tracking-wider transition-all ${
                     viewMode === 'member' ? 'bg-cyan-950/80 text-cyan-400 border border-cyan-800/60' : 'text-slate-600 hover:text-slate-400'
                   }`}
@@ -436,7 +460,7 @@ export default function FleetManagerPage() {
                         <Users size={10} className="text-slate-600 shrink-0" />
                         <span className="text-xs font-rajdhani font-semibold truncate">{m.username}</span>
                         <span className="text-[9px] text-slate-600 font-mono-sc ml-auto shrink-0">
-                          {fleetItems.filter((i) => i.addedBy?.id === m.id).length}
+                          {fleetItems.filter((i) => getAddedById(i) === m.id).length}
                         </span>
                       </button>
                     ))}
@@ -502,7 +526,8 @@ export default function FleetManagerPage() {
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-950/95 to-transparent pt-6 pb-2 px-3">
                 <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
                   {visibleItems.map((item) => {
-                    const s = item.shipUuid ? shipData.get(item.shipUuid) : null;
+                    const uuid = getShipUuid(item);
+                    const s = uuid ? shipData.get(uuid) : null;
                     const isSelected = item.id === selectedItemId;
                     return (
                       <button
@@ -559,7 +584,7 @@ export default function FleetManagerPage() {
                     ship={selectedShip}
                     item={selectedItem}
                     onRemove={() => handleRemove(selectedItem.id)}
-                    canRemove={selectedItem.addedBy?.id === user?.id}
+                    canRemove={getAddedById(selectedItem) === Number(user?.id)}
                   />
                 </div>
               </motion.aside>

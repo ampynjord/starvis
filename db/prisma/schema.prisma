@@ -234,7 +234,7 @@ model CorporationFleetItem {
   corporationId Int           @map("corporation_id")
   itemType      FleetItemType @map("item_type")
   itemClassName String        @map("item_class_name") @db.VarChar(255)
-  shipUuid      String?       @map("ship_uuid") @db.Char(36)
+  shipUuid      String?       @map("ship_uuid") @db.VarChar(64)
   quantity      Int           @default(1)
   notes         String?       @db.Text
   addedById     Int?          @map("added_by_id")
