@@ -395,6 +395,9 @@ function MarkdownText({ text }: { text: string }) {
     <div className="starvis-markdown">
       {blocks.map((block, index) => {
         if (block.type === 'code') {
+          const table = parseMarkdownTable(block.content);
+          if (table) return <MarkdownTable key={index} table={table} />;
+
           return (
             <pre key={index}>
               <code>{block.content}</code>
@@ -421,6 +424,10 @@ function MarkdownText({ text }: { text: string }) {
           return <blockquote key={index}>{renderInline(block.content)}</blockquote>;
         }
 
+        if (block.type === 'table') {
+          return <MarkdownTable key={index} table={block} />;
+        }
+
         return <p key={index}>{renderInline(block.content)}</p>;
       })}
     </div>
@@ -432,13 +439,15 @@ type MarkdownBlock =
   | { type: 'heading'; level: number; content: string }
   | { type: 'list'; items: string[] }
   | { type: 'quote'; content: string }
-  | { type: 'code'; content: string };
+  | { type: 'code'; content: string }
+  | { type: 'table'; headers: string[]; rows: string[][] };
 
 function parseMarkdownBlocks(text: string): MarkdownBlock[] {
   const lines = text.replace(/\r\n/g, '\n').split('\n');
   const blocks: MarkdownBlock[] = [];
   let paragraph: string[] = [];
   let list: string[] = [];
+  let table: string[] = [];
   let code: string[] | null = null;
 
   const flushParagraph = () => {
@@ -453,6 +462,16 @@ function parseMarkdownBlocks(text: string): MarkdownBlock[] {
       list = [];
     }
   };
+  const flushTable = () => {
+    if (!table.length) return;
+    const parsed = parseMarkdownTable(table.join('\n'));
+    if (parsed) {
+      blocks.push(parsed);
+    } else {
+      blocks.push({ type: 'paragraph', content: table.join(' ') });
+    }
+    table = [];
+  };
 
   for (const line of lines) {
     if (line.trim().startsWith('```')) {
@@ -462,6 +481,7 @@ function parseMarkdownBlocks(text: string): MarkdownBlock[] {
       } else {
         flushParagraph();
         flushList();
+        flushTable();
         code = [];
       }
       continue;
@@ -476,6 +496,14 @@ function parseMarkdownBlocks(text: string): MarkdownBlock[] {
     if (!trimmed) {
       flushParagraph();
       flushList();
+      flushTable();
+      continue;
+    }
+
+    if (looksLikeTableLine(trimmed)) {
+      flushParagraph();
+      flushList();
+      table.push(trimmed);
       continue;
     }
 
@@ -483,6 +511,7 @@ function parseMarkdownBlocks(text: string): MarkdownBlock[] {
     if (heading) {
       flushParagraph();
       flushList();
+      flushTable();
       blocks.push({ type: 'heading', level: heading[1].length, content: heading[2] });
       continue;
     }
@@ -490,6 +519,7 @@ function parseMarkdownBlocks(text: string): MarkdownBlock[] {
     const bullet = /^[-*]\s+(.+)$/.exec(trimmed);
     if (bullet) {
       flushParagraph();
+      flushTable();
       list.push(bullet[1]);
       continue;
     }
@@ -497,19 +527,89 @@ function parseMarkdownBlocks(text: string): MarkdownBlock[] {
     if (trimmed.startsWith('> ')) {
       flushParagraph();
       flushList();
+      flushTable();
       blocks.push({ type: 'quote', content: trimmed.slice(2) });
       continue;
     }
 
     flushList();
+    flushTable();
     paragraph.push(trimmed);
   }
 
   if (code) blocks.push({ type: 'code', content: code.join('\n').trimEnd() });
   flushParagraph();
   flushList();
+  flushTable();
 
   return blocks;
+}
+
+interface ParsedTable {
+  type: 'table';
+  headers: string[];
+  rows: string[][];
+}
+
+function MarkdownTable({ table }: { table: ParsedTable }) {
+  return (
+    <div className="starvis-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            {table.headers.map((header, index) => (
+              <th key={index}>{renderInline(header)}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {table.rows.map((row, rowIndex) => (
+            <tr key={rowIndex}>
+              {table.headers.map((_, cellIndex) => (
+                <td key={cellIndex}>{renderInline(row[cellIndex] ?? '')}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function parseMarkdownTable(rawTable: string): ParsedTable | null {
+  const lines = rawTable
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.includes('|'));
+
+  if (lines.length < 2) return null;
+
+  const separatorIndex = lines.findIndex((line) => isTableSeparator(splitTableRow(line)));
+  if (separatorIndex <= 0) return null;
+
+  const headers = splitTableRow(lines[separatorIndex - 1]);
+  const rows = lines
+    .slice(separatorIndex + 1)
+    .map(splitTableRow)
+    .filter((row) => row.length > 0);
+
+  if (headers.length < 2 || rows.length === 0) return null;
+
+  return { type: 'table', headers, rows };
+}
+
+function looksLikeTableLine(line: string): boolean {
+  return line.includes('|') && splitTableRow(line).length >= 2;
+}
+
+function isTableSeparator(cells: string[]): boolean {
+  return cells.length >= 2 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
+function splitTableRow(line: string): string[] {
+  const trimmed = line.trim();
+  const withoutOuterPipes = trimmed.startsWith('|') && trimmed.endsWith('|') ? trimmed.slice(1, -1) : trimmed;
+  return withoutOuterPipes.split('|').map((cell) => cell.trim());
 }
 
 function renderInline(text: string): ReactNode[] {

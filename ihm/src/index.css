@@ -395,6 +395,27 @@
     @apply border-l border-cyan-700/60 pl-3 text-slate-400;
   }
 
+  .starvis-table-wrap {
+    @apply my-3 max-w-full overflow-x-auto rounded-sm border border-cyan-900/60 bg-black/25;
+  }
+
+  .starvis-markdown table {
+    @apply w-full min-w-max border-collapse text-left text-xs;
+  }
+
+  .starvis-markdown th {
+    @apply border-b border-cyan-900/70 bg-cyan-950/30 px-3 py-2 font-orbitron text-[10px] uppercase text-cyan-300;
+    letter-spacing: 0;
+  }
+
+  .starvis-markdown td {
+    @apply border-b border-cyan-950/50 px-3 py-2 align-top text-slate-300;
+  }
+
+  .starvis-markdown tr:last-child td {
+    @apply border-b-0;
+  }
+
   .starvis-markdown pre {
     @apply my-2 overflow-x-auto rounded-sm border border-cyan-900/60 bg-black/35 p-3 text-xs text-slate-200;
   }

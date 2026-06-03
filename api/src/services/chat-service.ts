@@ -173,14 +173,11 @@ If you don't know the manufacturer code, just pass the model in query without th
 
 - **Bold** for key figures and important names.
 - **Bullet lists** for enumerations.
-- **Tables**: ALWAYS use code blocks (triple backtick) for tables — never pipe/markdown syntax which doesn't render correctly on Discord and the web UI. Expected rendering in a code block:
-  Ship          | SCM   | Cargo
-  Carrack       | 120   | 456 SCU
-  Constellation | 185   | 96 SCU
+- **Tables**: On the web, use normal markdown pipe tables for compact comparisons. Keep them narrow: 3-5 columns max. For wide comparisons, split into multiple small tables or use bullets.
 - Respond **concisely**: no unnecessary section if the info fits in a few lines.
 - Use short section titles only when helpful: **Verdict**, **Why**, **Data**, **Caveats**.
 - When the user asks "best", give a role-specific recommendation, not only the highest stat.
-- When using multiple records, prefer compact code-block tables over long prose.
+- When the user explicitly asks through Discord, never use markdown tables or code-block tables; use compact bullets instead.
 - If data is missing, say what is missing and answer with the available fields.`;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -606,54 +603,6 @@ SELECT only. Use $1, $2… for parameters.`,
     },
   },
 ];
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Post-processing
-// ─────────────────────────────────────────────────────────────────────────────
-
-/**
- * Converts pipe markdown tables (| col | col |) to code blocks,
- * which render correctly on Discord and web embeds.
- * Tables already inside an existing code block are ignored.
- */
-function wrapTablesInCodeBlock(text: string): string {
-  const lines = text.split('\n');
-  const out: string[] = [];
-  let inCodeBlock = false;
-  let inTable = false;
-
-  for (const line of lines) {
-    // Track existing code blocks
-    if (/^\s*```/.test(line)) {
-      if (inTable) {
-        inTable = false;
-        out.push('```');
-      }
-      inCodeBlock = !inCodeBlock;
-      out.push(line);
-      continue;
-    }
-
-    if (inCodeBlock) {
-      out.push(line);
-      continue;
-    }
-
-    const isTableLine = /^\s*\|/.test(line);
-    if (isTableLine && !inTable) {
-      inTable = true;
-      out.push('```');
-    } else if (!isTableLine && inTable) {
-      inTable = false;
-      out.push('```');
-    }
-    // Strip bold (**text**) inside table cells
-    out.push(inTable ? line.replace(/\*\*(.*?)\*\*/g, '$1') : line);
-  }
-  if (inTable) out.push('```');
-
-  return out.join('\n');
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ChatService
@@ -1102,7 +1051,7 @@ export class ChatService {
         const delta = chunk.choices[0]?.delta?.content;
         if (delta) fullText += delta;
       }
-      onChunk(wrapTablesInCodeBlock(fullText || 'No response generated.'));
+      onChunk(fullText || 'No response generated.');
       onDone();
     } catch (e) {
       onError(e instanceof Error ? e : new Error(String(e)));
@@ -1169,7 +1118,7 @@ export class ChatService {
 
       const content = final.choices[0]?.message?.content;
       const text = content?.trim() ? content : 'No response generated.';
-      return wrapTablesInCodeBlock(text);
+      return text;
     } catch (e) {
       throw e instanceof Error ? e : new Error(String(e));
     }
