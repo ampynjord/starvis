@@ -62,8 +62,8 @@ const HOME_SECTION_META: Record<string, Omit<SectionDef, 'label' | 'links'>> = {
     glow: 'from-cyan-950/20',
     statKey: 'ships',
   },
-  fps: {
-    id: 'fps',
+  equipment: {
+    id: 'equipment',
     icon: Crosshair,
     color: 'text-violet-400',
     border: 'border-violet-900/50 hover:border-violet-700/60',

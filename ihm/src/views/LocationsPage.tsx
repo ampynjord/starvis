@@ -25,7 +25,6 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import type { Location, Shop } from '@/types/api';
 import { api } from '@/services/api';
-import { useAuth } from '@/contexts/AuthContext';
 import { useEnv } from '@/contexts/EnvContext';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
@@ -306,7 +305,6 @@ function TreeNode({ loc, childrenOf, shopsByLocKey, depth, expandedIds, onToggle
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function LocationsPage() {
-  const { user } = useAuth();
   const { env } = useEnv();
   const [search, setSearch] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
