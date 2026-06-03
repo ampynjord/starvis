@@ -80,8 +80,8 @@ describe('HomePage', () => {
     renderWithProviders(<HomePage />);
     await waitFor(() => {
       expect(screen.getAllByText('Ships & Vehicles').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Ship Components').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Manufacturers').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('FPS & Equipment').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Universe').length).toBeGreaterThan(0);
     });
   });
 
