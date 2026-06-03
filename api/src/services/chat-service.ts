@@ -141,8 +141,9 @@ Some older labels above are aliases. Prefer these current Starvis fields when in
 - Items: weapon_damage, weapon_fire_rate, weapon_range, weapon_speed, weapon_ammo_count, weapon_dps, armor_damage_reduction, armor_temp_min, armor_temp_max.
 - Crafting: crafting_time_s and output_quantity.
 - Missions: title, mission_type, mission_giver, completion_time_s, location_system, location_planet, location_name, reward_currency.
-- Locations: class_name, system_code, parent_uuid, loc_key, coordinates, description.
+- Locations: class_name, system_code, parent_uuid, rsi_starmap_location_id, loc_key, coordinates, description.
 - Starmap: system_code, system_name, status, star_type, faction_name, affiliations, coordinates {x,y,z}, aggregated, size, population, economy, danger, jump_points.
+- P4K locations are correlated with RSI starmap through game.locations.rsi_starmap_location_id -> rsi.starmap_locations.id. Prefer the joined/correlated view when explaining planets, moons, systems or coordinates.
 - RSI website data may include source metadata and raw_json in detail endpoints; summarize it, do not dump it.
 
 ---

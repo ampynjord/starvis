@@ -13,6 +13,7 @@ import {
   applyDimensionsFallback,
   applyHullSeriesCargoFallback,
   crossReferenceShipMatrix,
+  crossReferenceStarmapLocations,
   populateChassisId,
   pruneExcludedVariants,
   tagVariantTypes,
@@ -88,6 +89,7 @@ export interface ExtractionStats {
   missions: number;
   craftingRecipes: number;
   locations: number;
+  starmapLocationsLinked: number;
   errors: string[];
   extractionHash?: string;
   durationMs?: number;
@@ -214,6 +216,7 @@ export class ExtractionService {
       missions: 0,
       craftingRecipes: 0,
       locations: 0,
+      starmapLocationsLinked: 0,
       errors: [],
     };
 
@@ -242,6 +245,7 @@ export class ExtractionService {
       .update(`${this.dfService?.getVersion?.() || 'unknown'}-${Date.now()}`)
       .digest('hex');
     stats.extractionHash = extractionHash;
+    let starmapPreSynced = false;
 
     // ── Ship Matrix pre-sync (before main transaction so crossReferenceShipMatrix has data) ──
     // ship_matrix lives in rsi_website (separate DB/pool) — safe to populate before the P4K tx.
@@ -254,6 +258,21 @@ export class ExtractionService {
         if (s.errors) stats.errors.push(`Ship Matrix pre-sync: ${s.errors} errors`);
       } catch (e) {
         stats.errors.push(`Ship Matrix pre-sync failed: ${(e as Error).message}`);
+      }
+    }
+
+    // Starmap pre-sync mirrors Ship Matrix: when locations are extracted in the same run,
+    // correlation needs fresh RSI/SC Wiki rows before the P4K transaction links them.
+    if (run('starmap') && run('locations') && options.rsiPool) {
+      onProgress?.('Pre-syncing RSI Starmap (needed for location cross-reference)…');
+      try {
+        const rsiSync = new RsiSyncService(options.rsiPool);
+        const s = await rsiSync.syncStarmap(onProgress);
+        starmapPreSynced = true;
+        onProgress?.(`✅ Starmap pre-sync: upserted=${s.upserted}, errors=${s.errors}`);
+        if (s.errors) stats.errors.push(`Starmap pre-sync: ${s.errors} errors`);
+      } catch (e) {
+        stats.errors.push(`Starmap pre-sync failed: ${(e as Error).message}`);
       }
     }
 
@@ -423,6 +442,8 @@ export class ExtractionService {
       if (run('locations')) {
         onProgress?.('Extracting locations (StarMapObject)…');
         stats.locations = await this.saveLocations(conn, env, onProgress);
+        onProgress?.('Cross-referencing locations with RSI Starmap…');
+        stats.starmapLocationsLinked = await crossReferenceStarmapLocations(conn, env);
       }
 
       // 5g2. Extract & save shops/vendors (AFTER locations — needs loc_key from locations table)
@@ -491,7 +512,7 @@ export class ExtractionService {
       }
 
       onProgress?.(
-        `✅ Extraction complete: ${stats.ships} ships, ${stats.components} components, ${stats.items} items, ${stats.commodities} commodities, ${stats.manufacturers} manufacturers, ${stats.loadoutPorts} loadout ports, ${stats.shops} shops, ${stats.shipMatrixLinked} linked to Ship Matrix, ${stats.miningElements} mining elements, ${stats.miningCompositions} compositions`,
+        `✅ Extraction complete: ${stats.ships} ships, ${stats.components} components, ${stats.items} items, ${stats.commodities} commodities, ${stats.manufacturers} manufacturers, ${stats.loadoutPorts} loadout ports, ${stats.shops} shops, ${stats.shipMatrixLinked} linked to Ship Matrix, ${stats.starmapLocationsLinked} linked to RSI Starmap, ${stats.miningElements} mining elements, ${stats.miningCompositions} compositions`,
       );
 
       // ── Sanity check — abort if data dropped by >50% (only for extracted modules) ──
@@ -560,7 +581,7 @@ export class ExtractionService {
           }
         }
 
-        if (run('starmap')) {
+        if (run('starmap') && !starmapPreSynced) {
           onProgress?.('Syncing starmap from SC Wiki…');
           try {
             const s = await rsiSync.syncStarmap(onProgress);
@@ -569,6 +590,8 @@ export class ExtractionService {
           } catch (e) {
             stats.errors.push(`Starmap sync failed: ${(e as Error).message}`);
           }
+        } else if (run('starmap')) {
+          onProgress?.('Starmap sync skipped after extraction (already pre-synced for location cross-reference)');
         }
       }
     }

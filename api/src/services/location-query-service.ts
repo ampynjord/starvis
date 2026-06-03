@@ -92,9 +92,23 @@ export class LocationQueryService {
 
     const w = ` WHERE ${where.join(' AND ')}`;
 
-    const baseSql = `SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid, l.loc_key,
-      l.coordinates, l.p4k_path, l.is_scannable, l.hide_in_starmap
-      FROM game.locations l${w}`;
+    const baseSql = `SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid, l.rsi_starmap_location_id, l.loc_key,
+      l.coordinates, l.p4k_path, l.is_scannable, l.hide_in_starmap,
+      CASE WHEN sl.id IS NULL THEN NULL ELSE json_build_object(
+        'id', sl.id,
+        'rsi_id', sl.rsi_id,
+        'name', sl.name,
+        'type', sl.type,
+        'system_code', sl.system_code,
+        'system_name', sl.system_name,
+        'status', sl.status,
+        'faction_name', sl.faction_name,
+        'description', sl.description,
+        'web_url', sl.web_url,
+        'coordinates', sl.coordinates
+      ) END as rsi_starmap
+      FROM game.locations l
+      LEFT JOIN rsi.starmap_locations sl ON sl.id = l.rsi_starmap_location_id${w}`;
     const countSql = `SELECT COUNT(*) as total FROM game.locations l${w}`;
 
     const result = await paginate(prisma, baseSql, countSql, params, filters || {}, LOCATION_SORT, 'l');
@@ -105,9 +119,33 @@ export class LocationQueryService {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid,
-              l.loc_key, l.description, l.coordinates, l.p4k_path, l.raw_json,
-              l.is_scannable, l.hide_in_starmap, l.extracted_at
+              l.rsi_starmap_location_id, l.loc_key, l.description, l.coordinates, l.p4k_path, l.raw_json,
+              l.is_scannable, l.hide_in_starmap, l.extracted_at,
+              CASE WHEN sl.id IS NULL THEN NULL ELSE json_build_object(
+                'id', sl.id,
+                'rsi_id', sl.rsi_id,
+                'name', sl.name,
+                'type', sl.type,
+                'system_code', sl.system_code,
+                'system_name', sl.system_name,
+                'status', sl.status,
+                'star_type', sl.star_type,
+                'faction_name', sl.faction_name,
+                'affiliations', sl.affiliations,
+                'thumbnail', sl.thumbnail,
+                'description', sl.description,
+                'web_url', sl.web_url,
+                'coordinates', sl.coordinates,
+                'aggregated', sl.aggregated,
+                'size', sl.size,
+                'population', sl.population,
+                'economy', sl.economy,
+                'danger', sl.danger,
+                'jump_points', sl.jump_points,
+                'source_updated_at', sl.source_updated_at
+              ) END as rsi_starmap
        FROM game.locations l
+       LEFT JOIN rsi.starmap_locations sl ON sl.id = l.rsi_starmap_location_id
        WHERE l.env = ? AND l.uuid = ?
        LIMIT 1`),
       env,
@@ -121,7 +159,23 @@ export class LocationQueryService {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(
-        'SELECT uuid, class_name, name, type, system_code, parent_uuid, loc_key, coordinates, p4k_path, is_scannable, hide_in_starmap FROM game.locations WHERE env = ? ORDER BY name ASC',
+        `SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid, l.rsi_starmap_location_id,
+          l.loc_key, l.coordinates, l.p4k_path, l.is_scannable, l.hide_in_starmap,
+          CASE WHEN sl.id IS NULL THEN NULL ELSE json_build_object(
+            'id', sl.id,
+            'rsi_id', sl.rsi_id,
+            'name', sl.name,
+            'type', sl.type,
+            'system_code', sl.system_code,
+            'system_name', sl.system_name,
+            'status', sl.status,
+            'faction_name', sl.faction_name,
+            'web_url', sl.web_url,
+            'coordinates', sl.coordinates
+          ) END as rsi_starmap
+         FROM game.locations l
+         LEFT JOIN rsi.starmap_locations sl ON sl.id = l.rsi_starmap_location_id
+         WHERE l.env = ? ORDER BY l.name ASC`,
       ),
       env,
     );
@@ -154,8 +208,21 @@ export class LocationQueryService {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid,
-              l.coordinates, l.p4k_path, l.is_scannable, l.hide_in_starmap
+              l.rsi_starmap_location_id, l.coordinates, l.p4k_path, l.is_scannable, l.hide_in_starmap,
+              CASE WHEN sl.id IS NULL THEN NULL ELSE json_build_object(
+                'id', sl.id,
+                'rsi_id', sl.rsi_id,
+                'name', sl.name,
+                'type', sl.type,
+                'system_code', sl.system_code,
+                'system_name', sl.system_name,
+                'status', sl.status,
+                'faction_name', sl.faction_name,
+                'web_url', sl.web_url,
+                'coordinates', sl.coordinates
+              ) END as rsi_starmap
        FROM game.locations l
+       LEFT JOIN rsi.starmap_locations sl ON sl.id = l.rsi_starmap_location_id
        WHERE l.env = ? AND l.parent_uuid = ?
          AND l.type NOT IN ('mining_claim')
        ORDER BY l.type ASC, l.name ASC`),
