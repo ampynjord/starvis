@@ -18,11 +18,17 @@ import {
   X,
   Zap,
 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { FleetHoloViewer, type FleetShip } from '@/components/ship/FleetHoloViewer';
+import type { FleetShip } from '@/components/ship/FleetHoloViewer';
 import { api } from '@/services/api';
+
+const FleetHoloViewer = dynamic(
+  () => import('@/components/ship/FleetHoloViewer').then((m) => m.FleetHoloViewer),
+  { ssr: false },
+);
 import type { ShipListItem } from '@/types/api';
 
 interface FleetItem {
