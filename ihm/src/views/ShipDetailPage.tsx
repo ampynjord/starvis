@@ -487,11 +487,12 @@ export default function ShipDetailPage() {
 
           {/* Paints */}
           {paints && paints.length > 0 && (
-            <ScifiPanel title="Paints" subtitle={`${paints.length} available`} actions={<Palette size={14} className="text-slate-600" />}>
-              <div className="space-y-0.5 max-h-56 overflow-y-auto">
+            <ScifiPanel title="Liveries" subtitle={`${paints.length} available`} actions={<Palette size={14} className="text-slate-600" />}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-1.5 max-h-72 overflow-y-auto pr-1">
                 {paints.map(p => (
-                  <div key={p.paint_uuid} className="px-2 py-1.5 rounded-sm hover:bg-white/5">
-                    <span className="text-xs font-mono-sc text-slate-400">{p.paint_name}</span>
+                  <div key={p.paint_uuid ?? p.paint_class_name} className="px-2.5 py-2 rounded-sm border border-slate-800/50 bg-slate-900/30 hover:bg-white/5">
+                    <p className="text-xs font-rajdhani font-semibold text-slate-300 truncate">{p.paint_name ?? 'Unnamed livery'}</p>
+                    <p className="text-[9px] font-mono-sc text-slate-700 truncate mt-0.5">{p.paint_class_name}</p>
                   </div>
                 ))}
               </div>

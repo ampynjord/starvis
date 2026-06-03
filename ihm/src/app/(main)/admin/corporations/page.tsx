@@ -31,7 +31,7 @@ interface Corporation {
   description: string | null;
   logoUrl: string | null;
   createdAt: string;
-  _count: { memberships: number; fleetItems: number };
+  _count: { memberships: number; fleetItems: number; bankItems?: number; pendingMemberships?: number };
 }
 
 interface Membership {
@@ -39,6 +39,8 @@ interface Membership {
   userId: number;
   corporationId: number;
   rank: string | null;
+  role: 'member' | 'leader';
+  status: 'pending' | 'active' | 'rejected';
   declaredAt: string;
   user: { id: number; username: string; email: string; avatarUrl: string | null };
   corporation?: { id: number; name: string; tag: string };
@@ -585,7 +587,7 @@ export default function CorporationsPage() {
         </div>
 
         {/* Stats bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="sci-panel px-3 py-2.5 border border-slate-800/60">
             <p className="font-mono-sc text-[9px] text-slate-600 uppercase tracking-widest">Corporations</p>
             <p className="font-orbitron text-lg font-black text-slate-200 mt-0.5">{corps.length}</p>
@@ -600,6 +602,12 @@ export default function CorporationsPage() {
             <p className="font-mono-sc text-[9px] text-slate-600 uppercase tracking-widest">Fleet Items</p>
             <p className="font-orbitron text-lg font-black text-violet-400 mt-0.5">
               {corps.reduce((s, c) => s + c._count.fleetItems, 0)}
+            </p>
+          </div>
+          <div className="sci-panel px-3 py-2.5 border border-slate-800/60">
+            <p className="font-mono-sc text-[9px] text-slate-600 uppercase tracking-widest">Bank Items</p>
+            <p className="font-orbitron text-lg font-black text-amber-400 mt-0.5">
+              {corps.reduce((s, c) => s + (c._count.bankItems ?? 0), 0)}
             </p>
           </div>
         </div>
@@ -628,17 +636,22 @@ export default function CorporationsPage() {
                   </div>
 
                   {/* Identity */}
-                  <div className="flex-1 min-w-0">
+                  <Link href={`/admin/corporations/${c.id}`} className="flex-1 min-w-0 group">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-sm text-slate-200 font-rajdhani font-semibold truncate">{c.name}</span>
+                      <span className="text-sm text-slate-200 group-hover:text-cyan-300 font-rajdhani font-semibold truncate">{c.name}</span>
                       {c.tag && (
                         <span className="text-[9px] font-orbitron font-bold text-slate-500 border border-slate-700/50 px-1.5 py-0.5 rounded-sm">
                           [{c.tag}]
                         </span>
                       )}
+                      {(c._count.pendingMemberships ?? 0) > 0 && (
+                        <span className="text-[9px] font-orbitron font-bold text-amber-400 border border-amber-800/50 bg-amber-950/20 px-1.5 py-0.5 rounded-sm">
+                          {c._count.pendingMemberships} pending
+                        </span>
+                      )}
                     </div>
                     {c.description && <p className="text-[11px] text-slate-600 truncate mt-0.5">{c.description}</p>}
-                  </div>
+                  </Link>
 
                   {/* Counts */}
                   <div className="hidden sm:flex items-center gap-3 shrink-0">
@@ -658,6 +671,9 @@ export default function CorporationsPage() {
                     >
                       <Ship size={11} /> {c._count.fleetItems}
                     </button>
+                    <span className="flex items-center gap-1 text-[10px] text-slate-500 font-mono-sc" title="Bank items">
+                      <Package size={11} /> {c._count.bankItems ?? 0}
+                    </span>
                   </div>
 
                   {/* Actions */}

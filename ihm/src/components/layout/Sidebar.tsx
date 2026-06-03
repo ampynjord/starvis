@@ -146,6 +146,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
           <NavGroup
             label="Corporation"
             items={[
+              { to: '/corp',       icon: Building2, label: 'Corporation HQ', exact: true },
               { to: '/corp/fleet', icon: Ship,    label: 'Fleet Manager' },
               { to: '/corp/bank',  icon: Package, label: 'Corp Bank' },
             ]}

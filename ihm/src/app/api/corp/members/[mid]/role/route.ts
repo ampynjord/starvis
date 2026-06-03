@@ -1,15 +1,15 @@
 import { NextResponse } from 'next/server';
-import { getAuthToken, proxyJson } from '../../../../../_utils/proxy';
+import { getAuthToken, proxyJson } from '@/app/api/_utils/proxy';
 
 export async function PUT(req: Request, { params }: { params: Promise<{ mid: string }> }) {
+  const { mid } = await params;
   try {
-    const { mid } = await params;
     const token = await getAuthToken();
     if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     const body = await req.json().catch(() => ({}));
-    return proxyJson('PUT', `/admin/corporations/memberships/${mid}/approve`, token, body);
-  } catch (e: any) {
-    console.error('[admin/corporations/memberships/:mid/approve PUT]', e);
+    return proxyJson('PUT', `/corp/members/${mid}/role`, token, body);
+  } catch (e) {
+    console.error('[corp/members/:mid/role PUT]', e);
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
   }
 }

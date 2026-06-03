@@ -5,7 +5,6 @@ const STATIC_ROUTES: { path: string; priority: number; changefreq: MetadataRoute
   { path: '/', priority: 1.0, changefreq: 'daily' },
   { path: '/ships', priority: 0.9, changefreq: 'weekly' },
   { path: '/ships-components', priority: 0.8, changefreq: 'weekly' },
-  { path: '/paints', priority: 0.7, changefreq: 'weekly' },
   { path: '/compare', priority: 0.7, changefreq: 'monthly' },
   { path: '/ranking', priority: 0.7, changefreq: 'weekly' },
   { path: '/fps-gear', priority: 0.7, changefreq: 'weekly' },
