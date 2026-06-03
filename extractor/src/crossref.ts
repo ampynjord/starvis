@@ -198,6 +198,132 @@ export async function crossReferenceShipMatrix(conn: PoolClient, env: GameEnv): 
   return results.length;
 }
 
+function normalizeStarmapType(type: string | null | undefined): string {
+  const normalized = normalizeForMatch(type ?? '').replace(/\s+/g, '_');
+  if (normalized === 'system') return 'star';
+  if (normalized === 'jump_point' || normalized === 'jumppoint') return 'jump point';
+  if (normalized === 'asteroid_field') return 'asteroid';
+  return normalized;
+}
+
+function stripLocationNoise(name: string): string {
+  return normalizeForMatch(name)
+    .replace(/\b(star|sun|system|planet|moon)\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function locationMatchScore(p4kName: string, rsiName: string, rsiSystemName?: string | null): number {
+  const p4k = normalizeForMatch(p4kName);
+  const rsi = normalizeForMatch(rsiName);
+  const rsiSystem = normalizeForMatch(rsiSystemName ?? '');
+  if (!p4k || !rsi) return 0;
+  if (p4k === rsi || (rsiSystem && p4k === rsiSystem)) return 100;
+
+  const p4kStripped = stripLocationNoise(p4k);
+  const rsiStripped = stripLocationNoise(rsi);
+  const systemStripped = stripLocationNoise(rsiSystem);
+  if (p4kStripped && (p4kStripped === rsiStripped || p4kStripped === systemStripped)) return 95;
+
+  const p4kTokens = new Set(p4kStripped.split(' ').filter((token) => token.length > 1));
+  const rsiTokens = new Set(`${rsiStripped} ${systemStripped}`.split(' ').filter((token) => token.length > 1));
+  if (!p4kTokens.size || !rsiTokens.size) return 0;
+
+  let hits = 0;
+  for (const token of p4kTokens) if (rsiTokens.has(token)) hits++;
+  return Math.round((hits / p4kTokens.size) * 80);
+}
+
+function areStarmapTypesCompatible(p4kType: string, rsiType: string): boolean {
+  const p4k = normalizeStarmapType(p4kType);
+  const rsi = normalizeStarmapType(rsiType);
+  if (p4k === rsi) return true;
+  if (p4k === 'star' && rsi === 'star') return true;
+  if (p4k === 'planet' && ['planet', 'dwarf planet'].includes(rsi)) return true;
+  if (p4k === 'moon' && ['moon', 'satellite'].includes(rsi)) return true;
+  return false;
+}
+
+function inferSystemCode(location: { name: string; type: string; system_code: string | null; class_name?: string | null }): string {
+  if (location.system_code) return location.system_code.toUpperCase();
+
+  const type = normalizeStarmapType(location.type);
+  if (type !== 'star') return '';
+
+  const fromName = normalizeForMatch(location.name)
+    .replace(/\b(system|star|sun)\b/g, '')
+    .replace(/\s+/g, '')
+    .trim();
+  if (fromName) return fromName.toUpperCase();
+
+  const fromClass = normalizeForMatch(location.class_name ?? '')
+    .replace(/\b(solar|system|star|sun)\b/g, '')
+    .replace(/\s+/g, '')
+    .trim();
+  return fromClass.toUpperCase();
+}
+
+/**
+ * Cross-reference P4K StarMapObject locations with RSI/SC Wiki starmap records.
+ *
+ * The sources overlap but are not equivalent:
+ * - game.locations is the in-game/DataForge view (coordinates, hierarchy, loc keys).
+ * - rsi.starmap_locations is the official web/lore view (status, affiliations, descriptions, web URLs).
+ */
+export async function crossReferenceStarmapLocations(conn: PoolClient, env: GameEnv): Promise<number> {
+  await conn.query('UPDATE game.locations SET rsi_starmap_location_id = NULL WHERE env = $1', [env]);
+
+  const { rows: locations } = await conn.query<{
+    uuid: string;
+    name: string;
+    type: string;
+    system_code: string | null;
+    class_name: string | null;
+  }>('SELECT uuid, class_name, name, type, system_code FROM game.locations WHERE env = $1', [env]);
+
+  const { rows: rsiLocations } = await conn.query<{
+    id: number;
+    name: string;
+    type: string;
+    system_code: string | null;
+    system_name: string | null;
+  }>('SELECT id, name, type, system_code, system_name FROM rsi.starmap_locations');
+
+  const rsiBySystem = new Map<string, typeof rsiLocations>();
+  for (const rsi of rsiLocations) {
+    const key = (rsi.system_code ?? '').toUpperCase();
+    if (!key) continue;
+    const list = rsiBySystem.get(key) ?? [];
+    list.push(rsi);
+    rsiBySystem.set(key, list);
+  }
+
+  const links: Array<{ uuid: string; rsiId: number }> = [];
+
+  for (const location of locations) {
+    const systemCode = inferSystemCode(location);
+    if (!systemCode) continue;
+
+    const candidates = (rsiBySystem.get(systemCode) ?? []).filter((rsi) => areStarmapTypesCompatible(location.type, rsi.type));
+    if (!candidates.length) continue;
+
+    let best: { id: number; score: number } | null = null;
+    for (const candidate of candidates) {
+      const score = locationMatchScore(location.name, candidate.name, candidate.system_name);
+      if (!best || score > best.score) best = { id: candidate.id, score };
+    }
+
+    if (best && best.score >= 70) links.push({ uuid: location.uuid, rsiId: best.id });
+  }
+
+  for (const link of links) {
+    await conn.query('UPDATE game.locations SET rsi_starmap_location_id = $1 WHERE uuid = $2 AND env = $3', [link.rsiId, link.uuid, env]);
+  }
+
+  if (links.length > 0) logger.info(`Linked ${links.length} P4K locations to RSI starmap entries`);
+  return links.length;
+}
+
 /** Copy chassis_id from ship_matrix to ships for fast variant grouping */
 export async function populateChassisId(conn: PoolClient, env: GameEnv): Promise<number> {
   const result = await conn.query<any>(

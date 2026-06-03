@@ -279,6 +279,8 @@ model StarmapLocation {
   sourceUpdatedAt    DateTime? @map("source_updated_at")
   syncedAt           DateTime  @default(now()) @map("synced_at")
 
+  gameLocations Location[]
+
   @@index([systemCode])
   @@index([type])
   @@map("starmap_locations")
@@ -920,27 +922,31 @@ model CraftingSlotModifier {
 // ─── Locations ────────────────────────────────────────────────────────────────
 
 model Location {
-  uuid          String   @db.Char(36)
-  env           String   @default("live") @db.VarChar(10)
-  className     String   @map("class_name") @db.VarChar(255)
-  name          String   @db.VarChar(255)
-  type          String   @db.VarChar(50)
-  systemCode    String?  @map("system_code") @db.VarChar(20)
-  parentUuid    String?  @map("parent_uuid") @db.Char(36)
-  locKey        String?  @map("loc_key") @db.VarChar(255)
-  description   String?
-  coordinates   Json?
-  p4kPath       String?  @map("p4k_path") @db.VarChar(500)
-  rawJson       Json?    @map("raw_json")
-  isScannable   Boolean  @default(false) @map("is_scannable")
-  hideInStarmap Boolean  @default(false) @map("hide_in_starmap")
-  extractedAt   DateTime @default(now()) @map("extracted_at")
+  uuid                 String   @db.Char(36)
+  env                  String   @default("live") @db.VarChar(10)
+  className            String   @map("class_name") @db.VarChar(255)
+  name                 String   @db.VarChar(255)
+  type                 String   @db.VarChar(50)
+  systemCode           String?  @map("system_code") @db.VarChar(20)
+  parentUuid           String?  @map("parent_uuid") @db.Char(36)
+  rsiStarmapLocationId Int?     @map("rsi_starmap_location_id")
+  locKey               String?  @map("loc_key") @db.VarChar(255)
+  description          String?
+  coordinates          Json?
+  p4kPath              String?  @map("p4k_path") @db.VarChar(500)
+  rawJson              Json?    @map("raw_json")
+  isScannable          Boolean  @default(false) @map("is_scannable")
+  hideInStarmap        Boolean  @default(false) @map("hide_in_starmap")
+  extractedAt          DateTime @default(now()) @map("extracted_at")
+
+  rsiStarmapLocation StarmapLocation? @relation(fields: [rsiStarmapLocationId], references: [id], onDelete: SetNull)
 
   @@id([uuid, env])
   @@unique([className, env])
   @@index([type])
   @@index([systemCode])
   @@index([parentUuid])
+  @@index([rsiStarmapLocationId])
   @@index([env])
   @@map("locations")
   @@schema("game")

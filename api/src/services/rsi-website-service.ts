@@ -145,7 +145,22 @@ export class RsiWebsiteService {
               sl.thumbnail, sl.description, sl.web_url, sl.coordinates, sl.aggregated,
               sl.size, sl.population, sl.economy, sl.danger,
               sl.frost_line, sl.habitable_zone_inner, sl.habitable_zone_outer,
-              sl.jump_points, sl.source_updated_at, sl.synced_at
+              sl.jump_points, sl.source_updated_at, sl.synced_at,
+              (
+                SELECT json_build_object(
+                  'uuid', gl.uuid,
+                  'env', gl.env,
+                  'name', gl.name,
+                  'type', gl.type,
+                  'system_code', gl.system_code,
+                  'coordinates', gl.coordinates,
+                  'p4k_path', gl.p4k_path
+                )
+                FROM game.locations gl
+                WHERE gl.rsi_starmap_location_id = sl.id
+                ORDER BY CASE WHEN gl.type = 'system' THEN 0 ELSE 1 END, gl.name
+                LIMIT 1
+              ) as p4k_location
        FROM rsi.starmap_locations sl${w} ORDER BY sl.name LIMIT ${limit} OFFSET ${offset}`),
       ...params,
     );
@@ -155,7 +170,42 @@ export class RsiWebsiteService {
   async getStarmapSystem(codeOrId: string): Promise<Row | null> {
     const rows = await this.prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT sl.*,
-        (SELECT json_agg(json_build_object('id', c.id, 'name', c.name, 'type', c.type, 'rsi_id', c.rsi_id))
+        (
+          SELECT json_build_object(
+            'uuid', gl.uuid,
+            'env', gl.env,
+            'name', gl.name,
+            'type', gl.type,
+            'system_code', gl.system_code,
+            'coordinates', gl.coordinates,
+            'p4k_path', gl.p4k_path
+          )
+          FROM game.locations gl
+          WHERE gl.rsi_starmap_location_id = sl.id
+          ORDER BY CASE WHEN gl.type = 'system' THEN 0 ELSE 1 END, gl.name
+          LIMIT 1
+        ) as p4k_location,
+        (SELECT json_agg(json_build_object(
+          'id', c.id,
+          'name', c.name,
+          'type', c.type,
+          'rsi_id', c.rsi_id,
+          'p4k_location', (
+            SELECT json_build_object(
+              'uuid', gl.uuid,
+              'env', gl.env,
+              'name', gl.name,
+              'type', gl.type,
+              'system_code', gl.system_code,
+              'coordinates', gl.coordinates,
+              'p4k_path', gl.p4k_path
+            )
+            FROM game.locations gl
+            WHERE gl.rsi_starmap_location_id = c.id
+            ORDER BY gl.name
+            LIMIT 1
+          )
+        ))
          FROM rsi.starmap_locations c WHERE c.system_code = sl.system_code AND c.type != 'star'
         ) as children
        FROM rsi.starmap_locations sl
