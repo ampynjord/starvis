@@ -8,7 +8,7 @@ const COLORS = { item: 0xe67e22 } as const;
 
 export const data = new SlashCommandBuilder()
   .setName('item')
-  .setDescription('Search an FPS item (armor, weapon, gadget…)')
+  .setDescription('Search an FPS item (armor, weapon, gadget, etc.)')
   .addStringOption((opt) => opt.setName('name').setDescription('Item name (e.g. Pyro RYT, Hurston Dynamics)').setRequired(true));
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {

@@ -22,7 +22,7 @@ const ENTITY_ICONS: Record<string, string> = {
 
 export const data = new SlashCommandBuilder()
   .setName('changelog')
-  .setDescription('Latest changes to the Starvis database (ships, components…)')
+  .setDescription('Latest changes to the Starvis database (ships, components, etc.)')
   .addIntegerOption((opt) =>
     opt
       .setName('limit')
