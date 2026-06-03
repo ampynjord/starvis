@@ -329,26 +329,13 @@ export default function FleetManagerPage() {
     } catch {}
   };
 
-  if (!user) return (
-    <div className="p-8 text-center text-slate-500 font-mono-sc text-sm">Sign in to access the fleet manager.</div>
-  );
-
-  if (!loading && !corp) return (
-    <div className="p-8 text-center space-y-3">
-      <Building2 size={32} className="text-slate-700 mx-auto" />
-      <p className="text-slate-500 font-mono-sc text-sm">You are not part of any corporation.</p>
-      <Link href="/profile" className="text-cyan-500 hover:text-cyan-300 text-xs font-mono-sc transition-colors">
-        Join a corporation →
-      </Link>
-    </div>
-  );
-
   // Filter items by view mode
   const visibleItems = fleetItems.filter((i) => {
     if (viewMode === 'mine')   return i.addedBy?.id === user?.id;
     if (viewMode === 'member') return i.addedBy?.id === selectedMemberId;
     return true; // 'all'
   });
+  const visibleItemIds = visibleItems.map((i) => i.id).join(',');
 
   // Memoize fleetShips — prevents scene rebuild on selection change
   const fleetShips: FleetShip[] = useMemo(() => visibleItems
@@ -366,11 +353,25 @@ export default function FleetManagerPage() {
       } satisfies FleetShip;
     }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [visibleItems.map(i => i.id).join(','), shipData.size]);
+  [visibleItemIds, shipData.size]);
 
   const selectedItem = visibleItems.find((i) => i.id === selectedItemId) ?? null;
   const selectedShip = selectedItem?.shipUuid ? shipData.get(selectedItem.shipUuid) ?? null : null;
   const selectedMember = members.find((m) => m.id === selectedMemberId);
+
+  if (!user) return (
+    <div className="p-8 text-center text-slate-500 font-mono-sc text-sm">Sign in to access the fleet manager.</div>
+  );
+
+  if (!loading && !corp) return (
+    <div className="p-8 text-center space-y-3">
+      <Building2 size={32} className="text-slate-700 mx-auto" />
+      <p className="text-slate-500 font-mono-sc text-sm">You are not part of any corporation.</p>
+      <Link href="/profile" className="text-cyan-500 hover:text-cyan-300 text-xs font-mono-sc transition-colors">
+        Join a corporation →
+      </Link>
+    </div>
+  );
 
   return (
     <>
