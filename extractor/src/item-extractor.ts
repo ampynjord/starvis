@@ -133,11 +133,58 @@ function classifyCommodity(filePath: string): string | null {
   return null;
 }
 
+function normalizeFpsItemClassification(item: ItemRecord, filePath: string): void {
+  if (item.type !== 'FPS_Weapon') return;
+
+  const text = `${item.className} ${item.name} ${filePath}`.toLowerCase();
+  const isGenericSubType = !item.subType || ['small', 'medium', 'large', 'gadget', 'undefined'].includes(item.subType.toLowerCase());
+
+  if (text.includes('medgun') || text.includes('medical device')) {
+    item.type = 'Tool';
+    item.subType = 'Medical';
+    return;
+  }
+  if (text.includes('multitool') || text.includes('multi-tool')) {
+    item.type = 'Tool';
+    item.subType = 'Multitool';
+    return;
+  }
+  if (
+    text.includes('tractor') ||
+    text.includes('cutter') ||
+    text.includes('salvage') ||
+    text.includes('repair') ||
+    text.includes('fire_extinguisher') ||
+    text.includes('fire extinguisher')
+  ) {
+    item.type = 'Tool';
+    item.subType = 'Device';
+    return;
+  }
+  if (text.includes('binocular') || text.includes('monocular') || text.includes('rangefinder')) {
+    item.type = 'Gadget';
+    item.subType = 'Device';
+    return;
+  }
+
+  if (!isGenericSubType) return;
+
+  if (text.includes('shotgun')) item.subType = 'Shotgun';
+  else if (text.includes('sniper')) item.subType = 'Sniper Rifle';
+  else if (text.includes('smg')) item.subType = 'SMG';
+  else if (text.includes('lmg')) item.subType = 'LMG';
+  else if (text.includes('pistol')) item.subType = 'Pistol';
+  else if (text.includes('railgun') || text.includes('launcher') || text.includes('rocket')) item.subType = 'Launcher';
+  else if (text.includes('rifle') || text.includes('crossbow')) item.subType = 'Assault Rifle';
+}
+
 // ── Skip filters ──
 
-function shouldSkipItem(className: string): boolean {
+function shouldSkipItem(className: string, filePath = ''): boolean {
   const lc = className.toLowerCase();
+  const fp = filePath.replace(/\\/g, '/').toLowerCase();
   return (
+    fp.includes('/dev/') ||
     lc.includes('_test') ||
     lc.startsWith('test_') ||
     lc.includes('_debug') ||
@@ -184,7 +231,7 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
     if (commType) {
       scannedCommodities++;
       try {
-        if (shouldSkipItem(className)) continue;
+        if (shouldSkipItem(className, fn)) continue;
         const data = ctx.readInstance(r.structIndex, r.instanceIndex, 0, 4);
         if (!data) continue;
 
@@ -239,7 +286,7 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
     scannedItems++;
 
     try {
-      if (shouldSkipItem(className)) continue;
+      if (shouldSkipItem(className, fn)) continue;
       const data = ctx.readInstance(r.structIndex, r.instanceIndex, 0, 4);
       if (!data) continue;
       const comps = data.Components;
@@ -532,6 +579,8 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
         else if (attachTypeStr.includes('stim')) item.subType = 'Stim';
         else if (attachTypeStr.includes('oxygen') || attachTypeStr.includes('o2')) item.subType = 'OxygenCap';
       }
+
+      normalizeFpsItemClassification(item, fn);
 
       // Manufacturer fallback: try to match className prefix against DataForge manufacturer records.
       // Only assigns if the code is known to be a real manufacturer (in DataForge SCItemManufacturer),

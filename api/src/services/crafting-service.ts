@@ -9,6 +9,11 @@ import { convertBigIntToNumber, type PaginatedResult, type Row, toPostgres } fro
 function normalizeRecipeRow(row: Row): Row {
   return {
     ...row,
+    ingredient_count: Number(row.ingredient_count ?? 0),
+    optional_ingredient_count: Number(row.optional_ingredient_count ?? 0),
+    modifier_count: Number(row.modifier_count ?? 0),
+    total_scu: row.total_scu == null ? null : Number(row.total_scu),
+    min_quality_required: row.min_quality_required == null ? null : Number(row.min_quality_required),
     display_name: cleanRecipeName(String(row.name ?? row.class_name ?? '')),
     display_output_item_name: cleanItemName(String(row.output_item_name ?? row.name ?? row.class_name ?? '')),
     display_category: formatEnumLabel(String(row.category ?? '')),
@@ -124,6 +129,11 @@ export class CraftingService {
               COALESCE(oi.name, r.output_item_name) AS output_item_name,
               r.output_item_uuid, r.output_quantity,
               r.crafting_time_s, r.station_type, r.skill_level, r.p4k_path,
+              COALESCE(ing.ingredient_count, 0) AS ingredient_count,
+              COALESCE(ing.optional_ingredient_count, 0) AS optional_ingredient_count,
+              COALESCE(mod.modifier_count, 0) AS modifier_count,
+              ing.total_scu,
+              ing.min_quality_required,
               (SELECT COUNT(DISTINCT sub_m.uuid) FROM (
                 SELECT uuid FROM game.missions WHERE blueprint_reward_uuid = r.uuid AND env = r.env
                 UNION ALL
@@ -131,6 +141,20 @@ export class CraftingService {
               ) sub_m) AS missions_count
        FROM game.crafting_recipes r
        LEFT JOIN game.items oi ON oi.uuid = r.output_item_uuid AND oi.env = r.env
+       LEFT JOIN (
+         SELECT recipe_uuid, recipe_env,
+                COUNT(*) AS ingredient_count,
+                COUNT(*) FILTER (WHERE is_optional = true) AS optional_ingredient_count,
+                SUM(NULLIF(scu, 0)) AS total_scu,
+                MAX(NULLIF(min_quality, 0)) AS min_quality_required
+         FROM game.crafting_ingredients
+         GROUP BY recipe_uuid, recipe_env
+       ) ing ON ing.recipe_uuid = r.uuid AND ing.recipe_env = r.env
+       LEFT JOIN (
+         SELECT recipe_uuid, recipe_env, COUNT(*) AS modifier_count
+         FROM game.crafting_slot_modifiers
+         GROUP BY recipe_uuid, recipe_env
+       ) mod ON mod.recipe_uuid = r.uuid AND mod.recipe_env = r.env
        WHERE ${whereClause}
        ORDER BY r.category ASC, r.name ASC
        LIMIT ? OFFSET ?`),
@@ -192,9 +216,28 @@ export class CraftingService {
       toPostgres(`SELECT r.uuid, r.class_name, r.name, r.category,
               COALESCE(oi.name, r.output_item_name) AS output_item_name,
               r.output_item_uuid, r.output_quantity,
-              r.crafting_time_s, r.station_type, r.skill_level, r.p4k_path, r.raw_json
+              r.crafting_time_s, r.station_type, r.skill_level, r.p4k_path, r.raw_json,
+              COALESCE(ing.ingredient_count, 0) AS ingredient_count,
+              COALESCE(ing.optional_ingredient_count, 0) AS optional_ingredient_count,
+              COALESCE(mod.modifier_count, 0) AS modifier_count,
+              ing.total_scu,
+              ing.min_quality_required
        FROM game.crafting_recipes r
        LEFT JOIN game.items oi ON oi.uuid = r.output_item_uuid AND oi.env = r.env
+       LEFT JOIN (
+         SELECT recipe_uuid, recipe_env,
+                COUNT(*) AS ingredient_count,
+                COUNT(*) FILTER (WHERE is_optional = true) AS optional_ingredient_count,
+                SUM(NULLIF(scu, 0)) AS total_scu,
+                MAX(NULLIF(min_quality, 0)) AS min_quality_required
+         FROM game.crafting_ingredients
+         GROUP BY recipe_uuid, recipe_env
+       ) ing ON ing.recipe_uuid = r.uuid AND ing.recipe_env = r.env
+       LEFT JOIN (
+         SELECT recipe_uuid, recipe_env, COUNT(*) AS modifier_count
+         FROM game.crafting_slot_modifiers
+         GROUP BY recipe_uuid, recipe_env
+       ) mod ON mod.recipe_uuid = r.uuid AND mod.recipe_env = r.env
        WHERE r.env = ? AND r.uuid = ?`),
       env,
       uuid,

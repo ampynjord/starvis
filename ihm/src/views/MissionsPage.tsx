@@ -22,6 +22,7 @@ import {
   Scale,
   Share2,
   Skull,
+  Trophy,
   Truck,
   User,
   Users,
@@ -221,33 +222,43 @@ function MissionCard({
 
 // ── DetailPanel ───────────────────────────────────────────────────────────────
 
-function DetailPanel({ m }: { m: Mission }) {
-  const meta = getTypeMeta(m.mission_type);
-  const reward = formatReward(m.reward_min, m.reward_max, m.reward_currency);
+function DetailPanel({ m, env }: { m: Mission; env: string }) {
+  const { data: full } = useQuery({
+    queryKey: ['missions.detail', m.uuid, env],
+    queryFn: () => api.missions.single(m.uuid, env),
+    staleTime: 5 * 60_000,
+    initialData: m.blueprint_rewards ? m : undefined,
+  });
+  const mission = full ?? m;
+  const meta = getTypeMeta(mission.mission_type);
+  const reward = formatReward(mission.reward_min, mission.reward_max, mission.reward_currency);
+  const blueprintRewards = mission.blueprint_rewards ?? [];
+  const blueprintCount = mission.blueprint_reward_count ?? mission.blueprintRewardCount ?? blueprintRewards.length;
 
   return (
     <ScifiPanel
       title="Mission Detail"
-      subtitle={m.class_name}
+      subtitle={mission.class_name}
     >
       {/* Mission title + type */}
       <div className="mb-4">
         <div className="flex items-center gap-2 flex-wrap mb-2">
           <GlowBadge color={meta.color}>{meta.icon} {meta.label}</GlowBadge>
-          {m.category && <GlowBadge color="slate">{m.display_category ?? m.category}</GlowBadge>}
-          <GlowBadge color={m.is_legal ? 'green' : 'red'}>
-            <Scale size={10} /> {m.is_legal ? 'Legal' : 'Illegal'}
+          {mission.category && <GlowBadge color="slate">{mission.display_category ?? mission.category}</GlowBadge>}
+          <GlowBadge color={mission.is_legal ? 'green' : 'red'}>
+            <Scale size={10} /> {mission.is_legal ? 'Legal' : 'Illegal'}
           </GlowBadge>
-          <GlowBadge color={m.can_be_shared ? 'cyan' : 'slate'}>
-            <Share2 size={10} /> {m.can_be_shared ? 'Group' : 'Solo'}
+          <GlowBadge color={mission.can_be_shared ? 'cyan' : 'slate'}>
+            <Share2 size={10} /> {mission.can_be_shared ? 'Group' : 'Solo'}
           </GlowBadge>
-          {!!m.is_unique && <GlowBadge color="amber">Unique</GlowBadge>}
-          {!!m.has_blueprint_reward && (
-            <GlowBadge color="purple"><FlaskConical size={10} /> Blueprint</GlowBadge>
+          {!!mission.only_owner_complete && <GlowBadge color="slate">Owner Complete</GlowBadge>}
+          {!!mission.is_unique && <GlowBadge color="amber">Unique</GlowBadge>}
+          {!!mission.has_blueprint_reward && (
+            <GlowBadge color="purple"><FlaskConical size={10} /> {blueprintCount > 1 ? `${blueprintCount} Blueprints` : 'Blueprint'}</GlowBadge>
           )}
         </div>
-        {m.title && (
-          <h3 className="font-orbitron text-base text-slate-100 leading-snug">{m.title}</h3>
+        {mission.title && (
+          <h3 className="font-orbitron text-base text-slate-100 leading-snug">{mission.title}</h3>
         )}
       </div>
 
@@ -263,105 +274,148 @@ function DetailPanel({ m }: { m: Mission }) {
         )}
 
         {/* Buy-in */}
-        {m.buy_in_amount != null && m.buy_in_amount > 0 && (
+        {mission.buy_in_amount != null && mission.buy_in_amount > 0 && (
           <div className="sci-panel p-3 bg-orange-950/20 border-orange-900/30">
             <p className="text-[10px] font-mono-sc text-orange-500 uppercase flex items-center gap-1 mb-1">
               <Coins size={10} /> Buy-In Required
             </p>
             <p className="text-lg font-orbitron text-orange-400">
-              {m.buy_in_amount.toLocaleString('en-US')} {m.reward_currency ?? 'aUEC'}
+              {mission.buy_in_amount.toLocaleString('en-US')} {mission.reward_currency ?? 'aUEC'}
             </p>
           </div>
         )}
 
         {/* Faction / Giver */}
-        {(m.faction || m.mission_giver) && (
+        {(mission.faction || mission.mission_giver) && (
           <div className="grid grid-cols-2 gap-2">
-            {m.faction && (
+            {mission.faction && (
               <div className="sci-panel p-2.5">
                 <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
                   <Users size={9} /> Faction
                 </p>
-                <p className="text-sm font-mono-sc text-purple-400">{m.faction}</p>
+                <p className="text-sm font-mono-sc text-purple-400">{mission.faction}</p>
               </div>
             )}
-            {m.mission_giver && m.mission_giver !== m.faction && (
+            {mission.mission_giver && mission.mission_giver !== mission.faction && (
               <div className="sci-panel p-2.5">
                 <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
                   <User size={9} /> Mission Giver
                 </p>
-                <p className="text-sm font-mono-sc text-slate-300">{m.mission_giver}</p>
+                <p className="text-sm font-mono-sc text-slate-300">{mission.mission_giver}</p>
               </div>
             )}
           </div>
         )}
 
         {/* Danger + Duration */}
-        {(m.danger_level != null || m.completion_time_s != null) && (
+        {(mission.danger_level != null ||
+          mission.completion_time_s != null ||
+          mission.required_reputation != null ||
+          mission.reputation_reward != null ||
+          mission.base_xp != null) && (
           <div className="grid grid-cols-2 gap-2">
-            {m.danger_level != null && (
+            {mission.danger_level != null && (
               <div className="sci-panel p-2.5">
                 <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-1.5">
                   <Skull size={9} /> Danger Level
                 </p>
                 <div className="flex items-center gap-2">
-                  <DangerPips level={m.danger_level} />
-                  <span className="text-sm font-orbitron text-red-400">{m.danger_level}/5</span>
+                  <DangerPips level={mission.danger_level} />
+                  <span className="text-sm font-orbitron text-red-400">{mission.danger_level}/5</span>
                 </div>
               </div>
             )}
-            {m.completion_time_s != null && (
+            {mission.completion_time_s != null && (
               <div className="sci-panel p-2.5">
                 <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
                   <Clock size={9} /> Time Limit
                 </p>
-                <p className="text-sm font-orbitron text-slate-300">{formatDuration(m.completion_time_s)}</p>
+                <p className="text-sm font-orbitron text-slate-300">{formatDuration(mission.completion_time_s)}</p>
+              </div>
+            )}
+            {mission.required_reputation != null && (
+              <div className="sci-panel p-2.5">
+                <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
+                  <Users size={9} /> Required Reputation
+                </p>
+                <p className="text-sm font-orbitron text-purple-300">{mission.required_reputation}</p>
+              </div>
+            )}
+            {mission.reputation_reward != null && (
+              <div className="sci-panel p-2.5">
+                <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
+                  <Trophy size={9} /> Reputation Reward
+                </p>
+                <p className="text-sm font-orbitron text-green-300">+{mission.reputation_reward}</p>
+              </div>
+            )}
+            {mission.base_xp != null && (
+              <div className="sci-panel p-2.5">
+                <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
+                  <Zap size={9} /> Base XP
+                </p>
+                <p className="text-sm font-orbitron text-cyan-300">{mission.base_xp.toLocaleString('en-US')}</p>
               </div>
             )}
           </div>
         )}
 
         {/* Location: shown only when non-null (currently always null — runtime data) */}
-        {(m.location_system || m.location_planet || m.location_name) && (
+        {(mission.location_system || mission.location_planet || mission.location_name) && (
           <div className="sci-panel p-2.5">
             <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
               <MapPin size={9} /> Location
             </p>
             <p className="text-sm font-mono-sc text-slate-300">
-              {[m.location_system, m.location_planet, m.location_name].filter(Boolean).join(' › ')}
+              {[mission.location_system, mission.location_planet, mission.location_name].filter(Boolean).join(' > ')}
             </p>
           </div>
         )}
 
         {/* Blueprint reward */}
-        {!!m.has_blueprint_reward && (
-          <Link
-            href={m.blueprint_reward_uuid ? `/crafting-calculator?recipe=${m.blueprint_reward_uuid}` : '/crafting-calculator'}
-            className="block sci-panel p-2.5 bg-purple-950/20 border-purple-900/30 hover:border-purple-500/50 transition-colors"
-          >
+        {!!mission.has_blueprint_reward && (
+          <div className="sci-panel p-2.5 bg-purple-950/20 border-purple-900/30">
             <p className="text-[10px] text-purple-500 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
               <FlaskConical size={9} /> Blueprint Reward
-              <LinkIcon size={9} className="ml-auto text-purple-600" />
             </p>
-            <p className="text-sm font-mono-sc text-purple-200">
-              {m.blueprint_name ?? m.blueprint_output ?? 'Unknown Blueprint'}
-            </p>
-          </Link>
+            {blueprintRewards.length > 0 ? (
+              <div className="space-y-1.5 mt-2">
+                {blueprintRewards.map((bp) => (
+                  <Link
+                    key={bp.uuid}
+                    href={`/crafting-calculator?recipe=${bp.uuid}`}
+                    className="flex items-center justify-between gap-2 rounded-sm border border-purple-900/40 bg-slate-950/30 px-2 py-1.5 text-xs font-mono-sc text-purple-200 transition-colors hover:border-purple-500/60 hover:text-purple-100"
+                  >
+                    <span className="truncate">{bp.output_item_name ?? bp.name ?? bp.class_name}</span>
+                    <LinkIcon size={9} className="shrink-0 text-purple-500" />
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <Link
+                href={mission.blueprint_reward_uuid ? `/crafting-calculator?recipe=${mission.blueprint_reward_uuid}` : '/crafting-calculator'}
+                className="mt-1 inline-flex items-center gap-1 text-sm font-mono-sc text-purple-200 hover:text-purple-100"
+              >
+                {mission.blueprint_name ?? mission.blueprint_output ?? 'Unknown Blueprint'}
+                <LinkIcon size={9} />
+              </Link>
+            )}
+          </div>
         )}
 
         {/* Description */}
-        {m.description && (
+        {mission.description && (
           <div className="sci-panel p-2.5">
             <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-1">
               <BookOpen size={9} /> Description
             </p>
-            <p className="text-sm text-slate-400 leading-relaxed whitespace-pre-wrap">{m.description}</p>
+            <p className="text-sm text-slate-400 leading-relaxed whitespace-pre-wrap">{mission.description}</p>
           </div>
         )}
 
         {/* Technical footer */}
         <div className="sci-panel p-2 border-slate-800/40 bg-slate-900/30">
-          <p className="text-[10px] font-mono-sc text-slate-600 break-all">{m.class_name}</p>
+          <p className="text-[10px] font-mono-sc text-slate-600 break-all">{mission.class_name}</p>
         </div>
       </div>
     </ScifiPanel>
@@ -439,6 +493,11 @@ export default function MissionsPage() {
   const displayedMissions = data?.data ?? [];
   const blueprintCount = data?.summary?.blueprintRewards ?? 0;
   const avgReward = data?.summary?.averageReward ?? null;
+  const legalCount = data?.summary?.legalMissions ?? 0;
+  const illegalCount = data?.summary?.illegalMissions ?? 0;
+  const shareableCount = data?.summary?.shareableMissions ?? 0;
+  const uniqueCount = data?.summary?.uniqueMissions ?? 0;
+  const avgDanger = data?.summary?.averageDanger ?? null;
 
   useEffect(() => {
     if (displayedMissions.length && !selectedUuid) setSelectedUuid(displayedMissions[0].uuid);
@@ -463,12 +522,42 @@ export default function MissionsPage() {
       {/* Stats bar + quick actions */}
       {data && (
         <div className="flex flex-wrap items-center gap-2 mb-4">
+          {faction && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-950/30 rounded-sm border border-purple-900/50 text-[10px] font-mono-sc text-purple-300">
+              <Users size={10} /> faction {faction}
+            </div>
+          )}
           <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/60 rounded-sm border border-slate-800 text-[10px] font-mono-sc text-slate-500">
             <ClipboardList size={10} /> {data?.total.toLocaleString()} missions
           </div>
           {avgReward != null && (
             <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/60 rounded-sm border border-slate-800 text-[10px] font-mono-sc text-slate-500">
               <Coins size={10} /> avg {avgReward.toLocaleString()} aUEC
+            </div>
+          )}
+          {legalCount > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/60 rounded-sm border border-slate-800 text-[10px] font-mono-sc text-green-500">
+              <Scale size={10} /> {legalCount.toLocaleString()} legal
+            </div>
+          )}
+          {illegalCount > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/60 rounded-sm border border-slate-800 text-[10px] font-mono-sc text-red-500">
+              <Skull size={10} /> {illegalCount.toLocaleString()} illegal
+            </div>
+          )}
+          {shareableCount > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/60 rounded-sm border border-slate-800 text-[10px] font-mono-sc text-cyan-500">
+              <Share2 size={10} /> {shareableCount.toLocaleString()} group
+            </div>
+          )}
+          {uniqueCount > 0 && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/60 rounded-sm border border-slate-800 text-[10px] font-mono-sc text-amber-500">
+              <Trophy size={10} /> {uniqueCount.toLocaleString()} unique
+            </div>
+          )}
+          {avgDanger != null && (
+            <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/60 rounded-sm border border-slate-800 text-[10px] font-mono-sc text-slate-500">
+              <Skull size={10} /> danger avg {avgDanger}
             </div>
           )}
           {blueprintCount > 0 && (
@@ -609,7 +698,7 @@ export default function MissionsPage() {
         {/* Detail panel */}
         <div className="xl:sticky xl:top-6">
           {sel ? (
-            <DetailPanel m={sel} />
+            <DetailPanel m={sel} env={env} />
           ) : (
             <ScifiPanel title="Mission Detail" subtitle="Select a mission">
               <p className="text-xs text-slate-500">Click a mission in the list to view its details.</p>

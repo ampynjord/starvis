@@ -650,6 +650,16 @@ export interface CraftingRecipe {
   game_env: string;
   gameEnv?: string;
   missions_count?: number;
+  ingredient_count?: number;
+  ingredientCount?: number;
+  optional_ingredient_count?: number;
+  optionalIngredientCount?: number;
+  modifier_count?: number;
+  modifierCount?: number;
+  total_scu?: number | null;
+  totalScu?: number | null;
+  min_quality_required?: number | null;
+  minQualityRequired?: number | null;
   ingredients?: CraftingIngredient[];
   modifiers?: CraftingSlotModifier[];
   unlock_missions?: Pick<
@@ -865,6 +875,9 @@ export interface Mission {
   blueprintRewardUuid?: string | null;
   blueprint_name?: string | null;
   blueprint_output?: string | null;
+  blueprint_reward_count?: number;
+  blueprintRewardCount?: number;
+  blueprint_rewards?: CraftingRecipe[];
   buy_in_amount?: number | null;
   buyInAmount?: number | null;
 }
@@ -873,6 +886,11 @@ export interface MissionListResponse extends PaginatedResponse<Mission> {
   summary?: {
     blueprintRewards: number;
     averageReward: number | null;
+    legalMissions?: number;
+    illegalMissions?: number;
+    shareableMissions?: number;
+    uniqueMissions?: number;
+    averageDanger?: number | null;
   };
 }
 

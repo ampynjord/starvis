@@ -268,7 +268,7 @@ export default function HomePage() {
             Early Access
           </p>
           <p className="font-rajdhani text-sm text-slate-400 leading-snug">
-            Starvis is in early access. Game data may be incomplete or inaccurate — extraction is ongoing and updated regularly.
+            Starvis is still in active development. Some game data may be incomplete, outdated, or inaccurate while extraction and validation keep improving.
             Your bug reports are invaluable to improve the platform.
           </p>
         </div>

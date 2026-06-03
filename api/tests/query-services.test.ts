@@ -394,13 +394,35 @@ describe('MissionService', () => {
         can_be_shared: 1,
         game_env: 'live',
       });
-      const prisma = createMockPrisma([[countRow], [row({ blueprint_rewards: 1, average_reward: 12000 })], [m1, m2]]);
+      const prisma = createMockPrisma([
+        [countRow],
+        [
+          row({
+            blueprint_rewards: 1,
+            average_reward: 12000,
+            legal_missions: 2,
+            illegal_missions: 0,
+            shareable_missions: 1,
+            unique_missions: 0,
+            average_danger: 2.5,
+          }),
+        ],
+        [m1, m2],
+      ]);
       const svc = new MissionService(createGetClient(prisma));
       const result = await svc.getMissions({ env: 'live', page: 1, limit: 50 });
       expect(result.total).toBe(2);
       expect(result.data).toHaveLength(2);
       expect(result.page).toBe(1);
-      expect(result.summary).toEqual({ blueprintRewards: 1, averageReward: 12000 });
+      expect(result.summary).toEqual({
+        blueprintRewards: 1,
+        averageReward: 12000,
+        legalMissions: 2,
+        illegalMissions: 0,
+        shareableMissions: 1,
+        uniqueMissions: 0,
+        averageDanger: 2.5,
+      });
     });
 
     it('applies type filter', async () => {

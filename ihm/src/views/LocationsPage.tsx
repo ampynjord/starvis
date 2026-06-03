@@ -1,481 +1,633 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import {
-  Anchor,
-  Asterisk,
-  Building2,
-  ChevronDown,
-  ChevronRight,
-  Coffee,
-  Globe,
-  Globe2,
-  MapPin,
-  Package,
-  Pickaxe,
-  Radio,
-  Search,
-  Shield,
-  ShoppingBag,
-  TriangleAlert,
-  Wifi,
-  X,
-  Zap,
-} from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-import type { Location, Shop } from '@/types/api';
-import { api } from '@/services/api';
-import { useEnv } from '@/contexts/EnvContext';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Building2, Crosshair, Eye, Globe2, Loader2, MapPin, Radio, Search, Sparkles, X, Zap } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
-import { LoadingGrid } from '@/components/ui/LoadingGrid';
-import { PageHeader } from '@/components/ui/PageHeader';
-import { useDebounce } from '@/hooks/useDebounce';
+import { useEnv } from '@/contexts/EnvContext';
+import { api } from '@/services/api';
+import type { Location, Shop } from '@/types/api';
 
-// ── Type meta ─────────────────────────────────────────────────────────────────
-
-type BadgeColor = 'cyan' | 'amber' | 'green' | 'red' | 'purple' | 'slate';
-interface TypeMeta { color: BadgeColor; icon: React.ReactNode; label: string }
-
-const TYPE_META: Record<string, TypeMeta> = {
-  system:         { color: 'cyan',   icon: <Globe2 size={14} />,        label: 'System' },
-  star:           { color: 'amber',  icon: <Asterisk size={13} />,      label: 'Star' },
-  planet:         { color: 'green',  icon: <Globe size={13} />,         label: 'Planet' },
-  moon:           { color: 'slate',  icon: <Globe size={12} />,         label: 'Moon' },
-  landing_zone:   { color: 'cyan',   icon: <Building2 size={12} />,     label: 'City / LZ' },
-  station:        { color: 'purple', icon: <Anchor size={12} />,        label: 'Station' },
-  rest_stop:      { color: 'amber',  icon: <Coffee size={12} />,        label: 'Rest Stop' },
-  outpost:        { color: 'slate',  icon: <MapPin size={11} />,        label: 'Outpost' },
-  comm_array:     { color: 'cyan',   icon: <Radio size={11} />,         label: 'Comm Array' },
-  asteroid_field: { color: 'amber',  icon: <Wifi size={11} />,          label: 'Asteroid Field' },
-  jump_point:     { color: 'purple', icon: <Zap size={11} />,           label: 'Jump Point' },
-  mining_claim:   { color: 'slate',  icon: <Pickaxe size={11} />,       label: 'Mining Claim' },
-  junk_site:      { color: 'red',    icon: <TriangleAlert size={11} />, label: 'Junk Site' },
-  warehouse:      { color: 'amber',  icon: <Package size={11} />,       label: 'Warehouse' },
-  cave:           { color: 'slate',  icon: <MapPin size={11} />,        label: 'Cave' },
-  ruins:          { color: 'red',    icon: <Building2 size={11} />,     label: 'Ruins' },
-  bunker:         { color: 'red',    icon: <Shield size={11} />,        label: 'Bunker / UGF' },
+type Coordinates = { x?: number | string | null; y?: number | string | null; z?: number | string | null };
+type LocationWithMap = Location & {
+  coordinates?: Coordinates | null;
+  rsi_starmap?: {
+    name?: string | null;
+    type?: string | null;
+    status?: string | null;
+    system_code?: string | null;
+    faction_name?: string | null;
+    coordinates?: Coordinates | null;
+  } | null;
 };
 
-const TYPE_ORDER = [
-  'system', 'star', 'planet', 'moon',
-  'landing_zone', 'station', 'rest_stop',
-  'outpost', 'comm_array', 'asteroid_field', 'jump_point',
-  'cave', 'junk_site', 'warehouse', 'ruins', 'mining_claim', 'bunker',
-];
-
-const COLOR_ICON: Record<BadgeColor, string> = {
-  cyan: 'text-cyan-400', amber: 'text-amber-400', green: 'text-green-400',
-  red: 'text-red-400', purple: 'text-purple-400', slate: 'text-slate-400',
-};
-const COLOR_DIM: Record<BadgeColor, string> = {
-  cyan: 'text-cyan-700', amber: 'text-amber-700', green: 'text-green-700',
-  red: 'text-red-700', purple: 'text-purple-700', slate: 'text-slate-600',
+type StarmapNode = {
+  id: string;
+  loc: LocationWithMap;
+  parentId: string | null;
+  systemCode: string;
+  position: THREE.Vector3;
+  radius: number;
+  color: number;
+  glow: number;
+  label: string;
+  shopCount: number;
 };
 
-function getTypeMeta(type: string): TypeMeta {
-  return TYPE_META[type] ?? { color: 'slate', icon: <MapPin size={11} />, label: type };
+const TYPE_ORDER = ['system', 'star', 'planet', 'moon', 'landing_zone', 'station', 'rest_stop', 'outpost', 'comm_array', 'jump_point'];
+const IMPORTANT_TYPES = new Set(['system', 'star', 'planet', 'moon', 'landing_zone', 'station', 'rest_stop', 'outpost', 'comm_array', 'jump_point']);
+
+const TYPE_META: Record<string, { label: string; color: number; glow: number; radius: number; icon: React.ReactNode }> = {
+  system: { label: 'System', color: 0x20e4ff, glow: 0x083044, radius: 3.8, icon: <Sparkles size={12} /> },
+  star: { label: 'Star', color: 0xffc857, glow: 0x332006, radius: 3.4, icon: <Sparkles size={12} /> },
+  planet: { label: 'Planet', color: 0x2dd4bf, glow: 0x06352f, radius: 2.1, icon: <Globe2 size={12} /> },
+  moon: { label: 'Moon', color: 0x94a3b8, glow: 0x111827, radius: 1.15, icon: <Globe2 size={11} /> },
+  landing_zone: { label: 'Landing Zone', color: 0x38bdf8, glow: 0x082f49, radius: 0.95, icon: <Building2 size={11} /> },
+  station: { label: 'Station', color: 0xa78bfa, glow: 0x24124d, radius: 0.95, icon: <Radio size={11} /> },
+  rest_stop: { label: 'Rest Stop', color: 0xf59e0b, glow: 0x3b2206, radius: 0.85, icon: <MapPin size={11} /> },
+  outpost: { label: 'Outpost', color: 0x64748b, glow: 0x111827, radius: 0.62, icon: <MapPin size={10} /> },
+  comm_array: { label: 'Comm Array', color: 0x22d3ee, glow: 0x083344, radius: 0.7, icon: <Radio size={10} /> },
+  jump_point: { label: 'Jump Point', color: 0xc084fc, glow: 0x2e1065, radius: 1.05, icon: <Zap size={11} /> },
+};
+
+function normalizeType(type: string) {
+  const normalized = type.replace(/([a-z])([A-Z])/g, '$1_$2').replace(/-/g, '_').toLowerCase();
+  return normalized === 'star_system' ? 'system' : normalized;
 }
 
-// ── Tree building ─────────────────────────────────────────────────────────────
-
-interface TreeData {
-  byId: Map<string, Location>;
-  childrenOf: Map<string | null, Location[]>;
-  roots: Location[];
+function metaFor(type: string) {
+  const normalized = normalizeType(type);
+  return TYPE_META[normalized] ?? { label: normalized.replace(/_/g, ' '), color: 0x64748b, glow: 0x111827, radius: 0.45, icon: <MapPin size={10} /> };
 }
 
-function buildTree(locs: Location[]): TreeData {
-  const byId = new Map(locs.map((l) => [l.uuid, l]));
-  const childrenOf = new Map<string | null, Location[]>();
+function coordNumber(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
 
-  const systemUuidByCode = new Map<string, string>();
-  for (const loc of locs) {
-    if (loc.type === 'system') {
-      const m = loc.class_name.match(/^([A-Za-z]+)SolarSystem$/i);
-      if (m) systemUuidByCode.set(m[1].toUpperCase(), loc.uuid);
-    }
+function getCoordinates(loc: LocationWithMap): THREE.Vector3 | null {
+  const c = loc.coordinates ?? loc.rsi_starmap?.coordinates;
+  if (!c) return null;
+  const x = coordNumber(c.x);
+  const y = coordNumber(c.y);
+  const z = coordNumber(c.z);
+  if (x == null || z == null) return null;
+  return new THREE.Vector3(x, y ?? 0, z);
+}
+
+function systemCodeFor(loc: LocationWithMap) {
+  const byCode = loc.system_code ?? loc.rsi_starmap?.system_code;
+  if (byCode) return byCode.toUpperCase();
+  const m = loc.class_name?.match(/^([A-Za-z]+)SolarSystem$/);
+  return m?.[1]?.toUpperCase() ?? loc.uuid.slice(0, 8).toUpperCase();
+}
+
+function makeLabel(text: string, color: string) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 96;
+  const ctx = canvas.getContext('2d')!;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.font = '700 34px Rajdhani, Arial, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = color;
+  ctx.fillText(text.toUpperCase(), 256, 52);
+  ctx.font = '600 18px monospace';
+  ctx.shadowBlur = 6;
+  ctx.fillStyle = 'rgba(148, 163, 184, 0.8)';
+  ctx.fillText('STARVIS STARMAP', 256, 76);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(18, 3.4, 1);
+  return sprite;
+}
+
+function hashFloat(input: string) {
+  let h = 2166136261;
+  for (let i = 0; i < input.length; i++) h = Math.imul(h ^ input.charCodeAt(i), 16777619);
+  return (h >>> 0) / 4294967295;
+}
+
+function buildStarmap(locs: LocationWithMap[], shops: Shop[]): StarmapNode[] {
+  const visible = locs
+    .map((loc) => ({ ...loc, type: normalizeType(loc.type) }))
+    .filter((loc) => !loc.hide_in_starmap && IMPORTANT_TYPES.has(loc.type));
+  const byId = new Map(visible.map((loc) => [loc.uuid, loc]));
+  const systems = visible.filter((loc) => loc.type === 'system');
+  const systemByCode = new Map(systems.map((loc) => [systemCodeFor(loc), loc]));
+  const shopsByLocKey = new Map<string, number>();
+  for (const shop of shops) {
+    if (!shop.loc_key) continue;
+    shopsByLocKey.set(shop.loc_key, (shopsByLocKey.get(shop.loc_key) ?? 0) + 1);
   }
 
-  const starRemap = new Map<string, string | null>();
-  for (const loc of locs) {
-    if (loc.type === 'star') {
-      const sysId = (loc.parent_uuid && byId.has(loc.parent_uuid))
-        ? loc.parent_uuid
-        : (loc.system_code ? (systemUuidByCode.get(loc.system_code) ?? null) : null);
-      starRemap.set(loc.uuid, sysId);
-    }
-  }
+  const rawSystemCoords = systems.map((loc) => getCoordinates(loc)).filter(Boolean) as THREE.Vector3[];
+  const box = rawSystemCoords.length > 1 ? new THREE.Box3().setFromPoints(rawSystemCoords) : null;
+  const size = box?.getSize(new THREE.Vector3()) ?? new THREE.Vector3(1, 1, 1);
+  const center = box?.getCenter(new THREE.Vector3()) ?? new THREE.Vector3();
+  const maxAxis = Math.max(size.x, size.y, size.z, 1);
+  const normalizeSystemPos = (loc: LocationWithMap, index: number) => {
+    const c = getCoordinates(loc);
+    if (c && box) return c.clone().sub(center).multiplyScalar(150 / maxAxis);
+    const angle = (index / Math.max(systems.length, 1)) * Math.PI * 2;
+    const ring = 42 + (index % 3) * 18;
+    return new THREE.Vector3(Math.cos(angle) * ring, (hashFloat(loc.uuid) - 0.5) * 18, Math.sin(angle) * ring);
+  };
 
-  for (const loc of locs) {
-    if (loc.type === 'star') continue;
-    let pid = loc.parent_uuid && byId.has(loc.parent_uuid) ? loc.parent_uuid : null;
-    if (pid && starRemap.has(pid)) pid = starRemap.get(pid) ?? null;
-    if (pid === null && loc.type !== 'system' && loc.system_code) {
-      pid = systemUuidByCode.get(loc.system_code) ?? null;
-    }
-    if (!childrenOf.has(pid)) childrenOf.set(pid, []);
-    childrenOf.get(pid)!.push(loc);
-  }
+  const nodes = new Map<string, StarmapNode>();
+  systems.forEach((loc, index) => {
+    const m = metaFor('system');
+    nodes.set(loc.uuid, {
+      id: loc.uuid,
+      loc,
+      parentId: null,
+      systemCode: systemCodeFor(loc),
+      position: normalizeSystemPos(loc, index),
+      radius: m.radius,
+      color: m.color,
+      glow: m.glow,
+      label: loc.name,
+      shopCount: loc.loc_key ? shopsByLocKey.get(loc.loc_key) ?? 0 : 0,
+    });
+  });
 
-  for (const arr of childrenOf.values()) {
-    arr.sort((a, b) => {
+  const childrenByParent = new Map<string, LocationWithMap[]>();
+  const getParentId = (loc: LocationWithMap) => {
+    if (loc.parent_uuid && byId.has(loc.parent_uuid)) return loc.parent_uuid;
+    const system = systemByCode.get(systemCodeFor(loc));
+    return loc.type === 'system' ? null : system?.uuid ?? null;
+  };
+  for (const loc of visible) {
+    const parentId = getParentId(loc);
+    if (!parentId || loc.type === 'system') continue;
+    if (!childrenByParent.has(parentId)) childrenByParent.set(parentId, []);
+    childrenByParent.get(parentId)!.push(loc);
+  }
+  for (const children of childrenByParent.values()) {
+    children.sort((a, b) => {
       const ao = TYPE_ORDER.indexOf(a.type);
       const bo = TYPE_ORDER.indexOf(b.type);
-      const diff = (ao === -1 ? 99 : ao) - (bo === -1 ? 99 : bo);
-      return diff !== 0 ? diff : a.name.localeCompare(b.name);
+      return (ao === -1 ? 99 : ao) - (bo === -1 ? 99 : bo) || a.name.localeCompare(b.name);
     });
   }
 
-  return { byId, childrenOf, roots: childrenOf.get(null) ?? [] };
-}
-
-function getAncestors(uuids: Set<string>, byId: Map<string, Location>): Set<string> {
-  const result = new Set<string>();
-  for (const uuid of uuids) {
-    let loc = byId.get(uuid);
-    while (loc?.parent_uuid) {
-      if (result.has(loc.parent_uuid)) break;
-      result.add(loc.parent_uuid);
-      loc = byId.get(loc.parent_uuid);
-    }
+  const queue = [...nodes.values()];
+  while (queue.length) {
+    const parent = queue.shift()!;
+    const children = childrenByParent.get(parent.id) ?? [];
+    children.forEach((loc, index) => {
+      const m = metaFor(loc.type);
+      const count = children.length;
+      const angle = (index / Math.max(count, 1)) * Math.PI * 2 + hashFloat(loc.uuid) * 0.8;
+      const tier = loc.type === 'star' ? 0 : loc.type === 'planet' ? 1 : loc.type === 'moon' ? 0.55 : 0.85;
+      const baseDistance =
+        loc.type === 'star' ? 0 : loc.type === 'planet' ? 9 + index * 2.6 : loc.type === 'moon' ? 3.8 + index * 0.8 : 5.2 + index * 0.45;
+      const vertical = (hashFloat(`${loc.uuid}:y`) - 0.5) * (loc.type === 'planet' ? 4 : 2.2);
+      const position = parent.position
+        .clone()
+        .add(new THREE.Vector3(Math.cos(angle) * baseDistance * tier, vertical, Math.sin(angle) * baseDistance * tier));
+      const node: StarmapNode = {
+        id: loc.uuid,
+        loc,
+        parentId: parent.id,
+        systemCode: systemCodeFor(loc),
+        position,
+        radius: m.radius,
+        color: m.color,
+        glow: m.glow,
+        label: loc.name,
+        shopCount: loc.loc_key ? shopsByLocKey.get(loc.loc_key) ?? 0 : 0,
+      };
+      nodes.set(node.id, node);
+      queue.push(node);
+    });
   }
-  return result;
+
+  return [...nodes.values()];
 }
 
-// ── ShopList (shown under a node when it has shops) ──────────────────────────
+function StarmapScene({
+  nodes,
+  selectedId,
+  highlightedIds,
+  onSelect,
+}: {
+  nodes: StarmapNode[];
+  selectedId: string | null;
+  highlightedIds: Set<string>;
+  onSelect: (id: string) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const selectedRef = useRef(selectedId);
+  const highlightedRef = useRef(highlightedIds);
+  const onSelectRef = useRef(onSelect);
 
-function ShopList({ shops }: { shops: Shop[] }) {
-  if (!shops.length) return null;
-  return (
-    <div className="ml-6 my-1 border-l border-slate-800/60 pl-3 space-y-0.5">
-      {shops.map((shop) => (
-        <div key={shop.id} className="flex items-center gap-2 py-0.5 group">
-          <ShoppingBag size={10} className="text-cyan-800 shrink-0" />
-          <span className="text-[11px] font-rajdhani text-slate-500 group-hover:text-slate-300 transition-colors truncate">
-            {shop.name}
-          </span>
-          {shop.shop_type && (
-            <span className="text-[9px] font-mono-sc text-slate-700 shrink-0">
-              {shop.display_shop_type ?? shop.shop_type}
-            </span>
-          )}
-        </div>
-      ))}
-    </div>
-  );
+  useEffect(() => {
+    selectedRef.current = selectedId;
+    highlightedRef.current = highlightedIds;
+    onSelectRef.current = onSelect;
+  }, [selectedId, highlightedIds, onSelect]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || !nodes.length) return;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x020812);
+    scene.fog = new THREE.FogExp2(0x020812, 0.0028);
+
+    let renderer: THREE.WebGLRenderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+    } catch {
+      return;
+    }
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    container.appendChild(renderer.domElement);
+    rendererRef.current = renderer;
+
+    const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 2000);
+    camera.position.set(0, 80, 155);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.07;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.15;
+    controls.minDistance = 18;
+    controls.maxDistance = 360;
+
+    scene.add(new THREE.AmbientLight(0x14324a, 1.3));
+    const key = new THREE.DirectionalLight(0x8defff, 2.4);
+    key.position.set(1, 2, 1);
+    scene.add(key);
+
+    const starGeo = new THREE.BufferGeometry();
+    const starPositions = new Float32Array(1800 * 3);
+    for (let i = 0; i < starPositions.length; i += 3) {
+      const r = 280 + hashFloat(`r${i}`) * 520;
+      const a = hashFloat(`a${i}`) * Math.PI * 2;
+      const y = (hashFloat(`y${i}`) - 0.5) * 420;
+      starPositions[i] = Math.cos(a) * r;
+      starPositions[i + 1] = y;
+      starPositions[i + 2] = Math.sin(a) * r;
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    const starMat = new THREE.PointsMaterial({ color: 0x7dd3fc, size: 0.75, transparent: true, opacity: 0.55, depthWrite: false });
+    scene.add(new THREE.Points(starGeo, starMat));
+
+    const objects = new Map<string, THREE.Mesh>();
+    const labels: THREE.Sprite[] = [];
+    const nodeGroup = new THREE.Group();
+    scene.add(nodeGroup);
+
+    const linePositions: number[] = [];
+    const byId = new Map(nodes.map((node) => [node.id, node]));
+    for (const node of nodes) {
+      if (!node.parentId) continue;
+      const parent = byId.get(node.parentId);
+      if (!parent) continue;
+      linePositions.push(parent.position.x, parent.position.y, parent.position.z, node.position.x, node.position.y, node.position.z);
+    }
+    const lineGeo = new THREE.BufferGeometry();
+    lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
+    const lineMat = new THREE.LineBasicMaterial({ color: 0x164e63, transparent: true, opacity: 0.34 });
+    nodeGroup.add(new THREE.LineSegments(lineGeo, lineMat));
+
+    for (const node of nodes) {
+      const geo = new THREE.SphereGeometry(node.radius, node.loc.type === 'system' ? 32 : 20, node.loc.type === 'system' ? 16 : 10);
+      const mat = new THREE.MeshPhongMaterial({
+        color: node.color,
+        emissive: node.glow,
+        shininess: 75,
+        transparent: true,
+        opacity: node.loc.type === 'outpost' ? 0.72 : 0.92,
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.copy(node.position);
+      mesh.userData.nodeId = node.id;
+      nodeGroup.add(mesh);
+      objects.set(node.id, mesh);
+
+      if (node.loc.type === 'system' || node.loc.type === 'planet') {
+        const label = makeLabel(node.label, node.loc.type === 'system' ? '#22d3ee' : '#7dd3fc');
+        label.position.copy(node.position).add(new THREE.Vector3(0, node.radius + 4, 0));
+        label.userData.label = true;
+        labels.push(label);
+        nodeGroup.add(label);
+      }
+
+      if (node.loc.type === 'planet' || node.loc.type === 'system') {
+        const ring = new THREE.Mesh(
+          new THREE.TorusGeometry(node.radius * 2.4, 0.025, 6, 96),
+          new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: 0.16 }),
+        );
+        ring.position.copy(node.position);
+        ring.rotation.x = Math.PI / 2;
+        nodeGroup.add(ring);
+      }
+    }
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    const getHit = (event: PointerEvent) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      return raycaster.intersectObjects([...objects.values()], false)[0]?.object.userData.nodeId as string | undefined;
+    };
+    const onPointerUp = (event: PointerEvent) => {
+      const id = getHit(event);
+      if (id) onSelectRef.current(id);
+    };
+    renderer.domElement.addEventListener('pointerup', onPointerUp);
+
+    const clock = new THREE.Clock();
+    let frame = 0;
+    const focus = new THREE.Vector3();
+    const animate = () => {
+      frame = requestAnimationFrame(animate);
+      const t = clock.getElapsedTime();
+      for (const [id, mesh] of objects) {
+        const isSelected = selectedRef.current === id;
+        const isHighlighted = highlightedRef.current.has(id);
+        const mat = mesh.material as THREE.MeshPhongMaterial;
+        const scale = isSelected ? 1.45 + Math.sin(t * 5) * 0.08 : isHighlighted ? 1.22 : 1;
+        mesh.scale.setScalar(scale);
+        mat.opacity = isSelected || isHighlighted ? 1 : 0.72;
+        mat.emissiveIntensity = isSelected ? 2.2 : isHighlighted ? 1.35 : 0.8;
+      }
+      const selected = selectedRef.current ? byId.get(selectedRef.current) : null;
+      if (selected) {
+        focus.copy(selected.position);
+        controls.target.lerp(focus, 0.045);
+      }
+      for (const label of labels) label.quaternion.copy(camera.quaternion);
+      controls.update();
+      renderer.render(scene, camera);
+    };
+    animate();
+
+    const resize = new ResizeObserver(() => {
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    });
+    resize.observe(container);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      resize.disconnect();
+      renderer.domElement.removeEventListener('pointerup', onPointerUp);
+      controls.dispose();
+      scene.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (mesh.geometry) mesh.geometry.dispose();
+        const material = mesh.material as THREE.Material | THREE.Material[] | undefined;
+        if (Array.isArray(material)) material.forEach((m) => m.dispose());
+        else material?.dispose();
+      });
+      renderer.dispose();
+      if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
+      rendererRef.current = null;
+    };
+  }, [nodes]);
+
+  return <div ref={containerRef} className="absolute inset-0" />;
 }
-
-// ── TreeNode ──────────────────────────────────────────────────────────────────
-
-interface TreeNodeProps {
-  loc: Location;
-  childrenOf: Map<string | null, Location[]>;
-  shopsByLocKey: Map<string, Shop[]>;
-  depth: number;
-  expandedIds: Set<string>;
-  onToggle: (uuid: string) => void;
-  matchIds: Set<string> | null;
-  visibleIds: Set<string> | null;
-}
-
-function TreeNode({ loc, childrenOf, shopsByLocKey, depth, expandedIds, onToggle, matchIds, visibleIds }: TreeNodeProps) {
-  const allChildren = childrenOf.get(loc.uuid) ?? [];
-  const visibleChildren = visibleIds ? allChildren.filter((c) => visibleIds.has(c.uuid)) : allChildren;
-  const shops = loc.loc_key ? (shopsByLocKey.get(loc.loc_key) ?? []) : [];
-  const isExpanded = expandedIds.has(loc.uuid);
-  const hasChildren = visibleChildren.length > 0 || shops.length > 0;
-  const isMatch = matchIds?.has(loc.uuid) ?? false;
-  const meta = getTypeMeta(loc.type);
-
-  const isSystem = loc.type === 'system';
-  const isStar = loc.type === 'star';
-  const isPlanet = loc.type === 'planet';
-  const isMoon = loc.type === 'moon';
-  const indentPx = depth * 16 + 8;
-
-  return (
-    <div>
-      <div
-        className={[
-          'flex items-center gap-1.5 transition-colors select-none group',
-          hasChildren ? 'cursor-pointer' : 'cursor-default',
-          isSystem
-            ? 'py-2.5 pr-3 border-b border-slate-700/60 bg-slate-800/40 hover:bg-slate-700/40'
-            : isPlanet
-            ? 'py-1.5 pr-2 border-b border-slate-800/30 hover:bg-slate-800/30'
-            : isMoon
-            ? 'py-1 pr-2 hover:bg-slate-800/20'
-            : isStar
-            ? 'py-0.5 pr-2 opacity-50 hover:opacity-80'
-            : 'py-0.5 pr-2 hover:bg-slate-800/20',
-          isMatch ? 'bg-cyan-950/40 !opacity-100' : '',
-        ].join(' ')}
-        style={{ paddingLeft: `${indentPx}px` }}
-        onClick={() => hasChildren && onToggle(loc.uuid)}
-      >
-        <span className="w-3 shrink-0 text-slate-600">
-          {hasChildren
-            ? isExpanded
-              ? <ChevronDown size={11} />
-              : <ChevronRight size={11} />
-            : null}
-        </span>
-
-        <span className={isSystem || isPlanet ? COLOR_ICON[meta.color] : COLOR_DIM[meta.color]}>
-          {meta.icon}
-        </span>
-
-        <span
-          className={[
-            'flex-1 leading-tight truncate',
-            isSystem
-              ? 'font-orbitron text-sm font-bold text-cyan-300 tracking-widest uppercase'
-              : isPlanet
-              ? 'font-rajdhani font-semibold text-sm text-slate-100'
-              : isMoon
-              ? 'font-rajdhani font-semibold text-xs text-slate-300'
-              : isStar
-              ? 'font-mono text-[11px] text-slate-600 italic'
-              : 'font-rajdhani text-xs text-slate-400',
-          ].join(' ')}
-        >
-          {loc.name}
-        </span>
-
-        {!isStar && !isSystem && (
-          <span className={`text-[10px] shrink-0 transition-opacity ${isMatch ? 'opacity-100' : 'opacity-0 group-hover:opacity-60'}`}>
-            <GlowBadge color={meta.color}>{meta.label}</GlowBadge>
-          </span>
-        )}
-
-        {/* Indicateur shops */}
-        {shops.length > 0 && !isExpanded && (
-          <span className="flex items-center gap-0.5 text-[9px] text-cyan-800 shrink-0 ml-1">
-            <ShoppingBag size={8} /> {shops.length}
-          </span>
-        )}
-
-        {hasChildren && !isExpanded && visibleChildren.length > 0 && (
-          <span className="text-[10px] text-slate-700 font-mono shrink-0 tabular-nums ml-1">
-            {visibleChildren.length}
-          </span>
-        )}
-      </div>
-
-      {isExpanded && (
-        <>
-          {/* Shops for this node */}
-          {shops.length > 0 && (
-            <ShopList shops={shops} />
-          )}
-
-          {/* Enfants */}
-          {hasChildren && visibleChildren.length > 0 && (
-            <div
-              className={
-                isSystem
-                  ? 'border-l-2 border-slate-700/50 ml-5'
-                  : isPlanet
-                  ? 'border-l border-slate-700/40 ml-5'
-                  : 'border-l border-slate-800/30 ml-5'
-              }
-            >
-              {visibleChildren.map((child) => (
-                <TreeNode
-                  key={child.uuid}
-                  loc={child}
-                  childrenOf={childrenOf}
-                  shopsByLocKey={shopsByLocKey}
-                  depth={depth + 1}
-                  expandedIds={expandedIds}
-                  onToggle={onToggle}
-                  matchIds={matchIds}
-                  visibleIds={visibleIds}
-                />
-              ))}
-            </div>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-// ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function LocationsPage() {
   const { env } = useEnv();
   const [search, setSearch] = useState('');
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [initialized, setInitialized] = useState(false);
-
-  const debouncedSearch = useDebounce(search, 250);
+  const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set(['system', 'star', 'planet', 'moon', 'landing_zone', 'station', 'rest_stop', 'jump_point']));
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const { data: rawLocs, isLoading, error } = useQuery({
     queryKey: ['locations-all', env],
-    queryFn: () => api.locations.all(env),
+    queryFn: () => api.locations.all(env) as Promise<LocationWithMap[]>,
     staleTime: 5 * 60_000,
   });
 
   const { data: shopsData } = useQuery({
     queryKey: ['shops-all', env],
-    queryFn: () => api.shops.list({ env, limit: 500 }),
+    queryFn: () => api.shops?.list?.({ env, limit: 500 }) ?? Promise.resolve({ data: [], total: 0, page: 1, limit: 0, pages: 0 }),
     staleTime: 5 * 60_000,
   });
 
-  const allLocs: Location[] = rawLocs ?? [];
-  const { byId, childrenOf, roots } = useMemo(() => buildTree(allLocs), [allLocs]);
-
-  // Index shops par loc_key
-  const shopsByLocKey = useMemo(() => {
-    const map = new Map<string, Shop[]>();
-    for (const shop of shopsData?.data ?? []) {
-      if (!shop.loc_key) continue;
-      if (!map.has(shop.loc_key)) map.set(shop.loc_key, []);
-      map.get(shop.loc_key)!.push(shop);
-    }
-    // Trier par nom dans chaque groupe
-    for (const shops of map.values()) shops.sort((a, b) => a.name.localeCompare(b.name));
-    return map;
-  }, [shopsData]);
-
-  // Shops without loc_key — not linked to any location
-  const orphanShops = useMemo(
-    () => (shopsData?.data ?? []).filter((s) => !s.loc_key),
-    [shopsData],
+  const nodes = useMemo(() => buildStarmap(rawLocs ?? [], shopsData?.data ?? []), [rawLocs, shopsData]);
+  const query = search.trim().toLowerCase();
+  const filteredNodes = useMemo(
+    () =>
+      nodes.filter((node) => {
+        const typeMatch = activeTypes.has(node.loc.type);
+        const searchMatch =
+          !query ||
+          node.loc.name.toLowerCase().includes(query) ||
+          (node.loc.class_name ?? '').toLowerCase().includes(query) ||
+          node.systemCode.toLowerCase().includes(query);
+        return typeMatch && searchMatch;
+      }),
+    [activeTypes, nodes, query],
   );
+  const highlightedIds = useMemo(() => new Set(filteredNodes.map((node) => node.id)), [filteredNodes]);
+  const selectedNode = useMemo(() => nodes.find((node) => node.id === selectedId) ?? filteredNodes[0] ?? nodes[0] ?? null, [filteredNodes, nodes, selectedId]);
+  const countsByType = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const node of nodes) counts.set(node.loc.type, (counts.get(node.loc.type) ?? 0) + 1);
+    return counts;
+  }, [nodes]);
 
-  // Auto-expand systems on first load
   useEffect(() => {
-    if (!allLocs.length || initialized) return;
-    setExpandedIds(new Set(allLocs.filter((l) => l.type === 'system').map((l) => l.uuid)));
-    setInitialized(true);
-  }, [allLocs, initialized]);
+    if (!selectedId && filteredNodes[0]) setSelectedId(filteredNodes[0].id);
+  }, [filteredNodes, selectedId]);
 
-  // Search filter: matches + ancestors
-  const { visibleIds, matchIds } = useMemo<{
-    visibleIds: Set<string> | null;
-    matchIds: Set<string> | null;
-  }>(() => {
-    if (!debouncedSearch) return { visibleIds: null, matchIds: null };
-    const q = debouncedSearch.toLowerCase();
-    const matched = new Set(
-      allLocs
-        .filter((l) => l.name.toLowerCase().includes(q) || l.class_name.toLowerCase().includes(q))
-        .map((l) => l.uuid),
-    );
-    const ancestors = getAncestors(matched, byId);
-    return { visibleIds: new Set([...matched, ...ancestors]), matchIds: matched };
-  }, [debouncedSearch, allLocs, byId]);
-
-  const effectiveExpandedIds = useMemo(() => {
-    if (!debouncedSearch || !matchIds) return expandedIds;
-    return new Set([...expandedIds, ...getAncestors(matchIds, byId)]);
-  }, [debouncedSearch, matchIds, byId, expandedIds]);
-
-  const toggle = (uuid: string) =>
-    setExpandedIds((prev) => {
+  const toggleType = (type: string) => {
+    setActiveTypes((prev) => {
       const next = new Set(prev);
-      next.has(uuid) ? next.delete(uuid) : next.add(uuid);
+      next.has(type) ? next.delete(type) : next.add(type);
+      if (next.size === 0) next.add(type);
       return next;
     });
+  };
 
-  const expandAll = () =>
-    setExpandedIds(new Set(Array.from(childrenOf.keys()).filter((k): k is string => k !== null)));
-
-  const collapseAll = () => setExpandedIds(new Set());
-
-  const filteredRoots = useMemo(
-    () => (visibleIds ? roots.filter((l) => visibleIds.has(l.uuid)) : roots),
-    [roots, visibleIds],
-  );
-
-  const totalShops = shopsData?.total ?? 0;
-  const attachedShops = totalShops - orphanShops.length;
+  if (error) return <ErrorState error={error as Error} />;
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto space-y-3">
-      <PageHeader
-        title="Locations"
-        subtitle={`Systems, planets, stations and points of interest in the verse.${totalShops > 0 ? ` · ${attachedShops}/${totalShops} shops attached` : ''}`}
-      />
+    <div className="relative h-[calc(100dvh-3.5rem)] -m-4 md:-m-6 overflow-hidden bg-[#020812]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(8,145,178,0.18),transparent_34%),linear-gradient(180deg,rgba(2,8,18,0.25),rgba(2,8,18,0.92))] pointer-events-none z-10" />
 
-      {/* Search + tree controls */}
-      <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-          <input
-            type="search"
-            placeholder="Search locations…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-8 pr-8 py-2 bg-slate-900/60 border border-border rounded-sm text-sm text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-700"
-          />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
-            >
-              <X size={13} />
-            </button>
-          )}
+      {isLoading ? (
+        <div className="absolute inset-0 z-20 flex items-center justify-center">
+          <Loader2 className="text-cyan-500 animate-spin" size={34} />
         </div>
-        <div className="flex gap-2 text-[11px] font-mono-sc shrink-0">
-          <button type="button" onClick={expandAll} className="text-slate-500 hover:text-slate-300 transition-colors">
-            expand all
-          </button>
-          <span className="text-slate-700">·</span>
-          <button type="button" onClick={collapseAll} className="text-slate-500 hover:text-slate-300 transition-colors">
-            collapse
-          </button>
+      ) : (
+        <StarmapScene nodes={filteredNodes.length ? filteredNodes : nodes} selectedId={selectedNode?.id ?? null} highlightedIds={highlightedIds} onSelect={setSelectedId} />
+      )}
+
+      <header className="absolute left-4 right-4 top-4 z-20 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between pointer-events-none">
+        <div className="pointer-events-auto">
+          <div className="flex items-center gap-2 text-cyan-300">
+            <Sparkles size={18} />
+            <h1 className="font-orbitron text-lg md:text-2xl font-bold tracking-widest uppercase">Starmap</h1>
+            <h2 className="sr-only">Locations</h2>
+          </div>
+          <p className="font-mono-sc text-[10px] text-slate-500 uppercase tracking-widest mt-1">
+            {filteredNodes.length.toLocaleString('en-US')} visible objects · {nodes.length.toLocaleString('en-US')} mapped
+          </p>
+        </div>
+
+        <div className="pointer-events-auto flex flex-col gap-2 w-full lg:w-[520px]">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search system, planet, station..."
+              className="sci-input w-full pl-9 pr-9 bg-slate-950/80 backdrop-blur-md"
+            />
+            {search && (
+              <button type="button" onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            {TYPE_ORDER.filter((type) => countsByType.has(type)).map((type) => {
+              const meta = metaFor(type);
+              const active = activeTypes.has(type);
+              return (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => toggleType(type)}
+                  className={`shrink-0 flex items-center gap-1.5 rounded-sm border px-2.5 py-1 text-[10px] font-orbitron uppercase tracking-wider transition-colors ${
+                    active ? 'border-cyan-700 bg-cyan-950/60 text-cyan-300' : 'border-slate-800 bg-slate-950/60 text-slate-600 hover:text-slate-300'
+                  }`}
+                >
+                  {meta.icon}
+                  {meta.label}
+                  <span className="font-mono-sc text-slate-600">{countsByType.get(type)}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      </header>
+
+      {!isLoading && filteredNodes.length > 0 && (
+        <div className="absolute left-4 top-[9.25rem] z-20 w-[min(340px,calc(100vw-2rem))] pointer-events-auto">
+          <div className="max-h-[38vh] overflow-y-auto rounded-sm border border-cyan-900/30 bg-slate-950/62 backdrop-blur-xl p-2">
+            {filteredNodes.filter((node) => node.id !== selectedNode?.id).slice(0, 10).map((node) => {
+              const selected = selectedNode?.id === node.id;
+              return (
+                <button
+                  key={node.id}
+                  type="button"
+                  onClick={() => setSelectedId(node.id)}
+                  className={`w-full flex items-center gap-2 rounded-sm px-2 py-1.5 text-left transition-colors ${
+                    selected ? 'bg-cyan-950/60 text-cyan-300' : 'text-slate-400 hover:bg-slate-900/80 hover:text-slate-200'
+                  }`}
+                >
+                  <span className="shrink-0 text-cyan-500">{metaFor(node.loc.type).icon}</span>
+                  <span className="min-w-0 flex-1 truncate font-rajdhani text-sm font-semibold">{node.loc.name}</span>
+                  <span className="shrink-0 font-mono-sc text-[9px] text-slate-600">{node.systemCode}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <AnimatePresence>
+        {selectedNode && (
+          <motion.aside
+            key={selectedNode.id}
+            initial={{ opacity: 0, x: 28 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 28 }}
+            className="absolute right-4 top-[9.25rem] bottom-4 z-20 w-[min(380px,calc(100vw-2rem))] pointer-events-auto"
+          >
+            <div className="h-full sci-panel bg-slate-950/78 backdrop-blur-xl border-cyan-900/50 overflow-y-auto p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-cyan-400">
+                    {metaFor(selectedNode.loc.type).icon}
+                    <span className="font-mono-sc text-[10px] uppercase tracking-widest">{selectedNode.systemCode}</span>
+                  </div>
+                  <h2 className="font-orbitron text-xl text-white font-bold tracking-wider mt-1 leading-tight">{selectedNode.loc.name}</h2>
+                </div>
+                <GlowBadge color="cyan">{metaFor(selectedNode.loc.type).label}</GlowBadge>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 mt-4">
+                <Metric label="X" value={selectedNode.position.x.toFixed(1)} />
+                <Metric label="Y" value={selectedNode.position.y.toFixed(1)} />
+                <Metric label="Z" value={selectedNode.position.z.toFixed(1)} />
+              </div>
+
+              <div className="mt-4 space-y-2 text-sm font-rajdhani text-slate-400">
+                {selectedNode.loc.rsi_starmap?.status && <Info label="Status" value={selectedNode.loc.rsi_starmap.status} />}
+                {selectedNode.loc.rsi_starmap?.faction_name && <Info label="Faction" value={selectedNode.loc.rsi_starmap.faction_name} />}
+                <Info label="Class" value={selectedNode.loc.class_name} />
+                {selectedNode.shopCount > 0 && <Info label="Shops" value={`${selectedNode.shopCount}`} />}
+              </div>
+
+              {selectedNode.loc.description && (
+                <p className="mt-4 text-sm text-slate-500 leading-relaxed">{selectedNode.loc.description}</p>
+              )}
+
+              <div className="mt-5 flex gap-2">
+                <button type="button" onClick={() => setSelectedId(selectedNode.id)} className="sci-btn-primary py-2 px-3 text-xs gap-2">
+                  <Crosshair size={13} /> Focus
+                </button>
+                <button type="button" onClick={() => setActiveTypes(new Set(TYPE_ORDER))} className="sci-btn-ghost py-2 px-3 text-xs gap-2">
+                  <Eye size={13} /> Show all
+                </button>
+              </div>
+            </div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
+
+      <div className="absolute left-4 bottom-4 z-20 pointer-events-none max-w-md">
+        <div className="rounded-sm border border-cyan-900/40 bg-slate-950/70 backdrop-blur-md px-3 py-2">
+          <p className="font-mono-sc text-[10px] text-slate-500 uppercase tracking-widest">
+            Drag to orbit · Scroll to zoom · Click an object to inspect
+          </p>
         </div>
       </div>
+    </div>
+  );
+}
 
-      {/* Tree */}
-      {isLoading && <LoadingGrid rows={8} cols={1} />}
-      {error && <ErrorState error={error as Error} />}
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-sm border border-slate-800/70 bg-slate-900/50 px-2 py-2">
+      <p className="font-mono-sc text-[9px] text-slate-600 uppercase">{label}</p>
+      <p className="font-orbitron text-sm text-cyan-300 truncate">{value}</p>
+    </div>
+  );
+}
 
-      {!isLoading && !error && (
-        <div className="sci-panel overflow-hidden divide-y-0">
-          {filteredRoots.length === 0 ? (
-            <p className="text-sm text-slate-600 text-center py-10">No locations found.</p>
-          ) : (
-            filteredRoots.map((root) => (
-              <TreeNode
-                key={root.uuid}
-                loc={root}
-                childrenOf={childrenOf}
-                shopsByLocKey={shopsByLocKey}
-                depth={0}
-                expandedIds={effectiveExpandedIds}
-                onToggle={toggle}
-                matchIds={matchIds}
-                visibleIds={visibleIds}
-              />
-            ))
-          )}
-        </div>
-      )}
-
-      {/* Shops sans loc_key */}
-      {orphanShops.length > 0 && (
-        <details className="sci-panel">
-          <summary className="px-4 py-3 text-xs font-mono-sc text-slate-600 cursor-pointer hover:text-slate-400 uppercase tracking-widest">
-            {orphanShops.length} shops not linked to any location
-          </summary>
-          <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5 mt-2">
-            {orphanShops.map((shop) => (
-              <div key={shop.id} className="flex items-center gap-2 py-1">
-                <ShoppingBag size={10} className="text-slate-700 shrink-0" />
-                <span className="text-xs text-slate-600 truncate">{shop.name}</span>
-                {shop.location && <span className="text-[10px] text-slate-700 truncate">· {shop.location}</span>}
-              </div>
-            ))}
-          </div>
-        </details>
-      )}
+function Info({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-3 border-b border-slate-800/50 pb-2">
+      <span className="w-20 shrink-0 font-mono-sc text-[10px] text-slate-600 uppercase tracking-widest">{label}</span>
+      <span className="min-w-0 break-words text-slate-300">{value}</span>
     </div>
   );
 }

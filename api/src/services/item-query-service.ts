@@ -34,6 +34,7 @@ const ITEM_SORT = new Set([
 
 const FPS_ALL_TYPES = [
   'FPS_Weapon',
+  'Armor',
   'Armor_Helmet',
   'Armor_Torso',
   'Armor_Arms',
@@ -54,7 +55,7 @@ const CONSUMABLE_SUBTYPE_ORDER = ['Food', 'Drink', 'Medical', 'MedPack', 'Oxygen
 
 // ── New taxonomy groups — used for item_group queries ─────────────────────────
 const TAXONOMY_GROUPS: Record<string, { types: string[]; subTypes?: string[]; excludeSubTypes?: string[] }> = {
-  armor_all: { types: ['Armor_Helmet', 'Armor_Torso', 'Armor_Arms', 'Armor_Legs', 'Armor_Backpack', 'Undersuit'] },
+  armor_all: { types: ['Armor', 'Armor_Helmet', 'Armor_Torso', 'Armor_Arms', 'Armor_Legs', 'Armor_Backpack', 'Undersuit'] },
   clothing_all: { types: ['Clothing'] },
   weapons_all: { types: ['FPS_Weapon'], excludeSubTypes: ['Throwable', 'Mine'] },
   weapons_primary: { types: ['FPS_Weapon'], subTypes: ['Assault Rifle', 'SMG', 'Shotgun', 'Sniper Rifle', 'LMG'] },
@@ -64,7 +65,6 @@ const TAXONOMY_GROUPS: Record<string, { types: string[]; subTypes?: string[]; ex
       'Food',
       'Drink',
       'OxygenCap',
-      'Stim',
       'Assault Rifle',
       'SMG',
       'Shotgun',
@@ -82,6 +82,42 @@ const TAXONOMY_GROUPS: Record<string, { types: string[]; subTypes?: string[]; ex
   other_all: { types: ['Gadget'], excludeSubTypes: ['Handheld', 'Two-handed', 'Device'] },
   // Legacy
   fps_all: { types: FPS_ALL_TYPES, excludeSubTypes: ['Food', 'Drink'] },
+};
+
+const ITEM_CATEGORY_FILTERS: Record<string, { types: string[]; subTypes?: string[]; excludeSubTypes?: string[] }> = {
+  armor: TAXONOMY_GROUPS.armor_all,
+  'armor-suits': { types: ['Armor'] },
+  'armor-undersuits': { types: ['Undersuit'] },
+  'armor-helmets': { types: ['Armor_Helmet'] },
+  'armor-core': { types: ['Armor_Torso'] },
+  'armor-arms': { types: ['Armor_Arms'] },
+  'armor-legs': { types: ['Armor_Legs'] },
+  'armor-backpacks': { types: ['Armor_Backpack'] },
+  'armor-flair': { types: ['Attachment'], subTypes: ['Appearance'] },
+  clothing: TAXONOMY_GROUPS.clothing_all,
+  weapons: TAXONOMY_GROUPS.weapons_all,
+  'weapons-sidearms': { types: ['FPS_Weapon'], subTypes: ['Pistol'] },
+  'weapons-primary': TAXONOMY_GROUPS.weapons_primary,
+  'weapons-primary-ar': { types: ['FPS_Weapon'], subTypes: ['Assault Rifle'] },
+  'weapons-primary-smg': { types: ['FPS_Weapon'], subTypes: ['SMG'] },
+  'weapons-primary-shotgun': { types: ['FPS_Weapon'], subTypes: ['Shotgun'] },
+  'weapons-primary-sniper': { types: ['FPS_Weapon'], subTypes: ['Sniper Rifle'] },
+  'weapons-primary-lmg': { types: ['FPS_Weapon'], subTypes: ['LMG'] },
+  'weapons-special': { types: ['FPS_Weapon'], subTypes: ['Launcher'] },
+  'weapons-melee': { types: ['FPS_Weapon'], subTypes: ['Melee'] },
+  'weapons-attachments': { types: ['Attachment'], subTypes: ['Weapon Modifier'] },
+  'weapons-throwables': { types: ['FPS_Weapon'], subTypes: ['Throwable', 'Mine'] },
+  utility: TAXONOMY_GROUPS.utility_all,
+  'utility-gadgets': { types: ['Gadget'], subTypes: ['Handheld', 'Two-handed', 'Device'] },
+  'utility-medical': { types: ['Consumable', 'Tool'], subTypes: ['Medical', 'MedPack', 'Stim'] },
+  'utility-cryptokeys': { types: ['Consumable'], subTypes: ['Hacking', 'SystemAccess'] },
+  'utility-technology': { types: ['Tool', 'Gadget'], subTypes: ['Multitool', 'Module'] },
+  ammo: TAXONOMY_GROUPS.ammo_all,
+  sustenance: TAXONOMY_GROUPS.sustenance_all,
+  'sustenance-food': { types: ['Consumable'], subTypes: ['Food'] },
+  'sustenance-drink': { types: ['Consumable'], subTypes: ['Drink'] },
+  'sustenance-oxygen': { types: ['Consumable'], subTypes: ['OxygenCap'] },
+  other: TAXONOMY_GROUPS.other_all,
 };
 
 // ── Subtype filter options per category slug ─────────────────────────────────
@@ -360,7 +396,14 @@ export class ItemQueryService {
     return {
       // Armor
       armor:
-        type('Armor_Helmet') + type('Armor_Torso') + type('Armor_Arms') + type('Armor_Legs') + type('Armor_Backpack') + type('Undersuit'),
+        type('Armor') +
+        type('Armor_Helmet') +
+        type('Armor_Torso') +
+        type('Armor_Arms') +
+        type('Armor_Legs') +
+        type('Armor_Backpack') +
+        type('Undersuit'),
+      'armor-suits': type('Armor'),
       'armor-helmets': type('Armor_Helmet'),
       'armor-core': type('Armor_Torso'),
       'armor-arms': type('Armor_Arms'),
@@ -389,7 +432,7 @@ export class ItemQueryService {
       'weapons-attachments': sub('Attachment', 'Weapon Modifier'),
       'weapons-throwables': throwables,
       // Utility
-      utility: type('Tool') + type('Gadget') + type('Consumable') - foodDrinkOxy - cryptokeys - throwables - weaponsAll + throwables,
+      utility: type('Tool') + type('Gadget') + type('Consumable') - foodDrinkOxy,
       'utility-gadgets': gadgetHand,
       'utility-medical': medicalSubs,
       'utility-cryptokeys': cryptokeys,
@@ -419,20 +462,37 @@ export class ItemQueryService {
 
   async getItemManufacturers(type?: string, env = 'live'): Promise<{ manufacturers: { code: string; name: string; count: number }[] }> {
     const prisma = this.getClient(env);
-    const sql = type
-      ? `SELECT i.manufacturer_code as code, COALESCE(m.name, i.manufacturer_code) as name, COUNT(*) as count
-         FROM game.items i LEFT JOIN game.manufacturers m ON m.code = i.manufacturer_code
-         WHERE i.env = ? AND i.type = ? AND i.manufacturer_code IS NOT NULL
-         GROUP BY i.manufacturer_code, m.name
-         ORDER BY COALESCE(m.name, i.manufacturer_code)`
-      : `SELECT i.manufacturer_code as code, COALESCE(m.name, i.manufacturer_code) as name, COUNT(*) as count
-         FROM game.items i LEFT JOIN game.manufacturers m ON m.code = i.manufacturer_code
-         WHERE i.env = ? AND i.manufacturer_code IS NOT NULL
-         GROUP BY i.manufacturer_code, m.name
-         ORDER BY COALESCE(m.name, i.manufacturer_code)`;
-    const rows = type
-      ? await prisma.$queryRawUnsafe<Row[]>(toPostgres(sql), env, type)
-      : await prisma.$queryRawUnsafe<Row[]>(toPostgres(sql), env);
+    const where: string[] = ['i.env = ?', 'i.manufacturer_code IS NOT NULL'];
+    const params: string[] = [env];
+    const categoryFilter = type ? ITEM_CATEGORY_FILTERS[type] : undefined;
+
+    if (categoryFilter) {
+      if (categoryFilter.types.length === 1) {
+        where.push('i.type = ?');
+        params.push(categoryFilter.types[0]);
+      } else {
+        where.push(`i.type IN (${categoryFilter.types.map(() => '?').join(', ')})`);
+        params.push(...categoryFilter.types);
+      }
+      if (categoryFilter.subTypes?.length) {
+        where.push(`i.sub_type IN (${categoryFilter.subTypes.map(() => '?').join(', ')})`);
+        params.push(...categoryFilter.subTypes);
+      }
+      if (categoryFilter.excludeSubTypes?.length) {
+        where.push(`(i.sub_type NOT IN (${categoryFilter.excludeSubTypes.map(() => '?').join(', ')}) OR i.sub_type IS NULL)`);
+        params.push(...categoryFilter.excludeSubTypes);
+      }
+    } else if (type) {
+      where.push('i.type = ?');
+      params.push(type);
+    }
+
+    const sql = `SELECT i.manufacturer_code as code, COALESCE(m.name, i.manufacturer_code) as name, COUNT(*) as count
+       FROM game.items i LEFT JOIN game.manufacturers m ON m.code = i.manufacturer_code
+       WHERE ${where.join(' AND ')}
+       GROUP BY i.manufacturer_code, m.name
+       ORDER BY COALESCE(m.name, i.manufacturer_code)`;
+    const rows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(sql), ...params);
     return { manufacturers: rows.map((r) => ({ code: String(r.code), name: String(r.name), count: Number(r.count) })) };
   }
 
@@ -482,6 +542,7 @@ export class ItemQueryService {
     const fpsCategories: NavCategory[] = [
       // ── Armor ────────────────────────────────────────────────────────────────
       { slug: 'armor', label: 'All Armor', group: 'armor', count: c('armor') },
+      { slug: 'armor-suits', label: 'Suits', group: 'armor', count: c('armor-suits') },
       { slug: 'armor-undersuits', label: 'Undersuits', group: 'armor', count: c('armor-undersuits') },
       { slug: 'armor-helmets', label: 'Helmets', group: 'armor', count: c('armor-helmets') },
       { slug: 'armor-core', label: 'Core', group: 'armor', count: c('armor-core') },

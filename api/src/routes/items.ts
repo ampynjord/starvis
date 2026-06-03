@@ -14,8 +14,9 @@ const CATEGORY_DEFS: Record<string, CategoryDef> = {
   armor: {
     group: 'armor',
     label: 'All Armor',
-    types: ['Armor_Helmet', 'Armor_Torso', 'Armor_Arms', 'Armor_Legs', 'Armor_Backpack', 'Undersuit'],
+    types: ['Armor', 'Armor_Helmet', 'Armor_Torso', 'Armor_Arms', 'Armor_Legs', 'Armor_Backpack', 'Undersuit'],
   },
+  'armor-suits': { group: 'armor', label: 'Suits', types: ['Armor'] },
   'armor-undersuits': { group: 'armor', label: 'Undersuits', types: ['Undersuit'] },
   'armor-helmets': { group: 'armor', label: 'Helmets', types: ['Armor_Helmet'] },
   'armor-core': { group: 'armor', label: 'Core', types: ['Armor_Torso'] },
@@ -55,7 +56,6 @@ const CATEGORY_DEFS: Record<string, CategoryDef> = {
       'Food',
       'Drink',
       'OxygenCap',
-      'Stim',
       'Assault Rifle',
       'SMG',
       'Shotgun',

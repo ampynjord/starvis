@@ -615,16 +615,34 @@ export class ShipQueryService {
   async searchShipsAutocomplete(q: string, limit = 10, env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
     const t = `%${q}%`;
+    const cappedLimit = Number(Math.min(limit, 20));
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT s.uuid, COALESCE(sm.name, s.name) as name, s.class_name, s.manufacturer_code,
-              m.name as manufacturer_name, sm.media_store_small as thumbnail,
-              s.vehicle_category
-       ${SHIP_JOINS}
-       WHERE s.env = ? AND (s.name ILIKE ? OR s.class_name ILIKE ? OR s.short_name ILIKE ? OR sm.name ILIKE ?)
-         AND (s.variant_type IS NULL OR s.variant_type NOT IN ('tutorial','enemy_ai','arena_ai','competition'))
-       ORDER BY s.name LIMIT ${Number(Math.min(limit, 20))}`),
+      toPostgres(`SELECT * FROM (
+        SELECT s.uuid, COALESCE(sm.name, s.name) as name, s.class_name, s.manufacturer_code,
+                m.name as manufacturer_name, sm.media_store_small as thumbnail, sm.media_store_large as thumbnail_large,
+                s.vehicle_category, sm.production_status, FALSE as is_concept_only
+         ${SHIP_JOINS}
+         WHERE s.env = ? AND (s.name ILIKE ? OR s.class_name ILIKE ? OR s.short_name ILIKE ? OR sm.name ILIKE ?)
+           AND (s.variant_type IS NULL OR s.variant_type NOT IN ('tutorial','enemy_ai','arena_ai','competition'))
+        UNION ALL
+        SELECT 'concept-' || sm2.id::text as uuid, sm2.name,
+                LOWER(REPLACE(REPLACE(sm2.name, ' ', '_'), '''', '')) as class_name,
+                sm2.manufacturer_code, sm2.manufacturer_name,
+                sm2.media_store_small as thumbnail, sm2.media_store_large as thumbnail_large,
+                ${SHIP_MATRIX_CATEGORY_SQL} as vehicle_category, sm2.production_status, TRUE as is_concept_only
+         FROM rsi.ship_matrix sm2
+         WHERE sm2.production_status IN ('in-concept', 'in-production', 'in-development')
+           AND sm2.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)
+           AND (sm2.name ILIKE ? OR sm2.manufacturer_name ILIKE ? OR sm2.focus ILIKE ?)
+      ) rows
+       ORDER BY is_concept_only, name
+       LIMIT ${cappedLimit}`),
       env,
       t,
+      t,
+      t,
+      t,
+      env,
       t,
       t,
       t,

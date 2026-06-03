@@ -189,6 +189,11 @@ function BlueprintCard({
                 <ClipboardList size={8} /> {r.missions_count ?? r.unlock_missions!.length} mission{(r.missions_count ?? r.unlock_missions!.length) > 1 ? 's' : ''}
               </span>
             )}
+            {(r.modifier_count ?? r.modifierCount ?? 0) > 0 && (
+              <span className="inline-flex items-center gap-0.5 text-[10px] font-mono-sc px-1.5 py-0.5 rounded-sm border bg-green-950/40 border-green-900/60 text-green-400">
+                <Zap size={8} /> {r.modifier_count ?? r.modifierCount} modifier{(r.modifier_count ?? r.modifierCount ?? 0) > 1 ? 's' : ''}
+              </span>
+            )}
           </div>
         </div>
 
@@ -202,9 +207,14 @@ function BlueprintCard({
               <Clock size={9} />{fmtTime(r.crafting_time_s)}
             </span>
           )}
-          {r.ingredients && (
+          {((r.ingredient_count ?? r.ingredientCount ?? r.ingredients?.length ?? 0) > 0) && (
             <span className="text-[10px] font-mono-sc text-slate-600">
-              {r.ingredients.length} ing.
+              {r.ingredient_count ?? r.ingredientCount ?? r.ingredients!.length} ing.
+            </span>
+          )}
+          {(r.total_scu ?? r.totalScu ?? 0) > 0 && (
+            <span className="text-[10px] font-mono-sc text-slate-600">
+              {(r.total_scu ?? r.totalScu)?.toFixed(2)} SCU
             </span>
           )}
         </div>
@@ -269,6 +279,13 @@ function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
     initialData: r.ingredients ? r : undefined,
   });
   const recipe = full ?? r;
+  const ingredientCount = recipe.ingredient_count ?? recipe.ingredientCount ?? recipe.ingredients?.length ?? 0;
+  const optionalIngredientCount =
+    recipe.optional_ingredient_count ?? recipe.optionalIngredientCount ?? recipe.ingredients?.filter((ing) => ing.is_optional).length ?? 0;
+  const modifierCount = recipe.modifier_count ?? recipe.modifierCount ?? recipe.modifiers?.length ?? 0;
+  const totalScu = recipe.total_scu ?? recipe.totalScu ?? recipe.ingredients?.reduce((sum, ing) => sum + (ing.scu ?? 0), 0) ?? null;
+  const minQualityRequired =
+    recipe.min_quality_required ?? recipe.minQualityRequired ?? recipe.ingredients?.reduce((max, ing) => Math.max(max, ing.min_quality ?? 0), 0) ?? null;
 
   return (
     <ScifiPanel title="Recipe Detail">
@@ -311,7 +328,7 @@ function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
 
       <div className="space-y-2">
         {/* Info row */}
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
           {recipe.crafting_time_s != null && (
             <div className="sci-panel p-2.5">
               <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
@@ -326,6 +343,46 @@ function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
                 <Settings2 size={9} /> Station
               </p>
               <p className="text-sm font-mono-sc text-slate-200">{recipe.display_station_type ?? recipe.station_type}</p>
+            </div>
+          )}
+          {ingredientCount > 0 && (
+            <div className="sci-panel p-2.5">
+              <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
+                <Package size={9} /> Inputs
+              </p>
+              <p className="text-sm font-orbitron text-slate-200">{ingredientCount}</p>
+            </div>
+          )}
+          {optionalIngredientCount > 0 && (
+            <div className="sci-panel p-2.5">
+              <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
+                <Layers size={9} /> Optional
+              </p>
+              <p className="text-sm font-orbitron text-cyan-300">{optionalIngredientCount}</p>
+            </div>
+          )}
+          {modifierCount > 0 && (
+            <div className="sci-panel p-2.5">
+              <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
+                <Zap size={9} /> Modifiers
+              </p>
+              <p className="text-sm font-orbitron text-green-300">{modifierCount}</p>
+            </div>
+          )}
+          {totalScu != null && totalScu > 0 && (
+            <div className="sci-panel p-2.5">
+              <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
+                <Package size={9} /> Material Volume
+              </p>
+              <p className="text-sm font-orbitron text-amber-300">{totalScu.toFixed(2)} SCU</p>
+            </div>
+          )}
+          {minQualityRequired != null && minQualityRequired > 0 && (
+            <div className="sci-panel p-2.5">
+              <p className="text-[10px] text-slate-600 font-mono-sc uppercase flex items-center gap-1 mb-0.5">
+                <Trophy size={9} /> Required Quality
+              </p>
+              <p className="text-sm font-orbitron text-purple-300">q{Math.round(minQualityRequired / 100)}</p>
             </div>
           )}
         </div>
