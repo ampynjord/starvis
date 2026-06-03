@@ -18,14 +18,14 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import dynamic from 'next/dynamic';
+import createDynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { FleetShip } from '@/components/ship/FleetHoloViewer';
 import { api } from '@/services/api';
 
-const FleetHoloViewer = dynamic(
+const FleetHoloViewer = createDynamic(
   () => import('@/components/ship/FleetHoloViewer').then((m) => m.FleetHoloViewer),
   { ssr: false },
 );
