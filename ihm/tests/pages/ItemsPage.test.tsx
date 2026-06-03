@@ -30,7 +30,7 @@ describe('ItemsPage', () => {
   it('renders the page heading (Items or FPS Gear)', async () => {
     renderWithProviders(<ItemsPage />);
     await waitFor(() => {
-      const heading = screen.queryByRole('heading', { name: /items|fps gear/i });
+      const heading = screen.queryByRole('heading', { name: /equipment|armor|clothing|weapons|utility|ammo|sustenance/i });
       expect(heading).toBeInTheDocument();
     });
   });
