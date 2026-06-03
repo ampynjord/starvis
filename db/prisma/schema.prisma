@@ -168,6 +168,21 @@ enum FleetItemType {
   @@schema("meta")
 }
 
+enum CorporationMembershipRole {
+  member
+  leader
+
+  @@schema("meta")
+}
+
+enum CorporationMembershipStatus {
+  pending
+  active
+  rejected
+
+  @@schema("meta")
+}
+
 model Corporation {
   id                   Int      @id @default(autoincrement())
   name                 String   @unique @db.VarChar(100)
@@ -197,6 +212,10 @@ model CorporationMembership {
   userId        Int      @map("user_id")
   corporationId Int      @map("corporation_id")
   rank          String?  @db.VarChar(50)
+  role          CorporationMembershipRole   @default(member)
+  status        CorporationMembershipStatus @default(active)
+  reviewedById  Int?     @map("reviewed_by_id")
+  reviewedAt    DateTime? @map("reviewed_at")
   declaredAt    DateTime @default(now()) @map("declared_at")
 
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -204,6 +223,8 @@ model CorporationMembership {
 
   @@unique([userId, corporationId])
   @@index([corporationId])
+  @@index([corporationId, status])
+  @@index([userId, status])
   @@map("corporation_memberships")
   @@schema("meta")
 }

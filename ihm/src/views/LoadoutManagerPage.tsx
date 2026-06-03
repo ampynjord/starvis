@@ -78,6 +78,8 @@ const CATEGORY_ORDER = [
   'Countermeasures', 'Mining', 'Salvage', 'Tractor', 'Repair', 'Other',
 ];
 
+const DEFAULT_LOADOUT_SHIP_UUID = '8e3a460d-6be2-ec95-782b-b14cdf97a8b3'; // Aurora Mk II
+
 const CAT_ICON: Record<string, string> = {
   Weapons: '🔫', Turrets: '🗼', Missiles: '🚀', Shields: '🛡',
   'Power Plants': '⚡', Coolers: '❄', 'Quantum Drive': '🌀',
@@ -523,7 +525,7 @@ export default function LoadoutManagerPage() {
     restoredRef.current = true;
 
     const shipUuid = searchParams?.get('ship');
-    const targetUuid = shipUuid ?? '8e3a460d-6be2-ec95-782b-b14cdf97a8b3';
+    const targetUuid = shipUuid ?? DEFAULT_LOADOUT_SHIP_UUID;
 
     const swapsParam = shipUuid ? searchParams?.get('swaps') : null;
     const parsedSwaps: Record<number, string> = {};

@@ -10,6 +10,8 @@ import { RsiOrgPicker, type RsiOrg } from '@/components/ui/RsiOrgPicker';
 
 interface Membership {
   id: number;
+  role: 'member' | 'leader';
+  status: 'pending' | 'active' | 'rejected';
   declaredAt: string;
   corporation: { id: number; name: string; tag: string; rsiArchetype: string | null; logoUrl: string | null };
 }
@@ -70,7 +72,7 @@ export default function ProfilePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? 'Failed');
       setMembership(data.data);
-      setCorpMessage({ type: 'success', text: `Joined ${org.name}!` });
+      setCorpMessage({ type: 'success', text: `Request sent to ${org.name}. A corporation leader or admin must approve it.` });
     } catch (err: any) {
       setCorpMessage({ type: 'error', text: err.message });
     } finally {
@@ -347,9 +349,24 @@ export default function ProfilePage() {
                   {membership.corporation.rsiArchetype && (
                     <span className="text-[9px] text-slate-600 font-mono-sc">{membership.corporation.rsiArchetype}</span>
                   )}
+                  {membership.status !== 'active' && (
+                    <span className="text-[9px] font-orbitron text-amber-400 border border-amber-800/50 bg-amber-950/20 px-1 py-0.5 rounded-sm">
+                      {membership.status}
+                    </span>
+                  )}
+                  {membership.status === 'active' && membership.role === 'leader' && (
+                    <span className="text-[9px] font-orbitron text-emerald-400 border border-emerald-800/50 bg-emerald-950/20 px-1 py-0.5 rounded-sm">
+                      leader
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
+            {membership.status === 'pending' && (
+              <p className="text-xs text-amber-400 bg-amber-950/20 border border-amber-800/30 rounded-sm px-3 py-2">
+                Your membership request is waiting for approval by a corporation leader or admin.
+              </p>
+            )}
             <p className="text-[11px] text-slate-600">Change organization:</p>
             <RsiOrgPicker selected={null} onSelect={(org) => org && handleDeclareOrg(org)} disabled={corpLoading} placeholder="Search another org to switch…" />
             <button

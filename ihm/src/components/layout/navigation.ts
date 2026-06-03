@@ -7,7 +7,6 @@ import {
   MapPin,
   Newspaper,
   Package,
-  Paintbrush,
   Rocket,
   Scroll,
   Shield,
@@ -37,7 +36,6 @@ export type NavGroupDef = {
 const SHIPS_ITEMS: NavItemDef[] = [
   { to: '/ships', icon: Rocket, label: 'Ships & Vehicles' },
   { to: '/vehicles', icon: Zap, label: 'Vehicle Equipment' },
-  { to: '/paints', icon: Paintbrush, label: 'Liveries' },
   { to: '/compare', icon: BarChart3, label: 'Compare' },
   { to: '/ranking', icon: Trophy, label: 'Ranking' },
   { to: '/loadout-manager', icon: SlidersHorizontal, label: 'Loadout Manager' },

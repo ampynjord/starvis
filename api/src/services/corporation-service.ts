@@ -16,7 +16,7 @@ export interface CorporationData {
   rsiSyncedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
-  _count?: { memberships: number; fleetItems: number };
+  _count?: { memberships: number; fleetItems: number; bankItems?: number; pendingMemberships?: number };
 }
 
 export interface MembershipData {
@@ -24,6 +24,10 @@ export interface MembershipData {
   userId: number;
   corporationId: number;
   rank: string | null;
+  role: 'member' | 'leader';
+  status: 'pending' | 'active' | 'rejected';
+  reviewedById: number | null;
+  reviewedAt: Date | null;
   declaredAt: Date;
   user: { id: number; username: string; email: string; avatarUrl: string | null };
   corporation?: { id: number; name: string; tag: string };
@@ -66,6 +70,10 @@ const MEMBERSHIP_SELECT = {
   userId: true,
   corporationId: true,
   rank: true,
+  role: true,
+  status: true,
+  reviewedById: true,
+  reviewedAt: true,
   declaredAt: true,
   user: { select: { id: true, username: true, email: true, avatarUrl: true } },
   corporation: { select: { id: true, name: true, tag: true } },
@@ -94,14 +102,17 @@ export class CorporationService {
   // ── Corporations ────────────────────────────────────────────────────────────
 
   async listCorporations(): Promise<CorporationData[]> {
-    return this.db.corporation.findMany({
+    const corps = await this.db.corporation.findMany({
       select: CORP_SELECT,
       orderBy: { rsiMemberCount: 'desc' },
     });
+    return this.withCorporationCounts(corps);
   }
 
   async getCorporation(id: number): Promise<CorporationData | null> {
-    return this.db.corporation.findUnique({ where: { id }, select: CORP_SELECT });
+    const corp = await this.db.corporation.findUnique({ where: { id }, select: CORP_SELECT });
+    if (!corp) return null;
+    return (await this.withCorporationCounts([corp]))[0] ?? null;
   }
 
   async getCorporationByTag(tag: string): Promise<CorporationData | null> {
@@ -147,11 +158,82 @@ export class CorporationService {
     await this.db.corporation.delete({ where: { id } });
   }
 
+  async createCorporation(data: {
+    name: string;
+    tag?: string | null;
+    description?: string | null;
+    logoUrl?: string | null;
+  }): Promise<CorporationData> {
+    const corp = await this.db.corporation.create({
+      data: {
+        name: data.name.trim(),
+        tag: (data.tag?.trim() || data.name.trim().slice(0, 10)).toUpperCase(),
+        description: data.description?.trim() || null,
+        logoUrl: data.logoUrl?.trim() || null,
+      },
+      select: CORP_SELECT,
+    });
+    return (await this.withCorporationCounts([corp]))[0];
+  }
+
+  async updateCorporation(
+    id: number,
+    data: { name?: string; tag?: string | null; description?: string | null; logoUrl?: string | null },
+  ): Promise<CorporationData> {
+    const corp = await this.db.corporation.update({
+      where: { id },
+      data: {
+        ...(data.name !== undefined ? { name: data.name.trim() } : {}),
+        ...(data.tag !== undefined ? { tag: (data.tag?.trim() || '').toUpperCase() || undefined } : {}),
+        ...(data.description !== undefined ? { description: data.description?.trim() || null } : {}),
+        ...(data.logoUrl !== undefined ? { logoUrl: data.logoUrl?.trim() || null } : {}),
+      },
+      select: CORP_SELECT,
+    });
+    return (await this.withCorporationCounts([corp]))[0];
+  }
+
+  private async withCorporationCounts(corps: CorporationData[]): Promise<CorporationData[]> {
+    if (!corps.length) return corps;
+    const ids = corps.map((c) => c.id);
+    const [bankCounts, pendingCounts] = await Promise.all([
+      this.db.corporationFleetItem.groupBy({
+        by: ['corporationId'],
+        where: { corporationId: { in: ids }, itemType: { not: 'ship' } },
+        _count: { _all: true },
+      }),
+      this.db.corporationMembership.groupBy({
+        by: ['corporationId'],
+        where: { corporationId: { in: ids }, status: 'pending' },
+        _count: { _all: true },
+      }),
+    ]);
+    const bankByCorp = new Map<number, number>(bankCounts.map((row: any) => [Number(row.corporationId), Number(row._count._all)]));
+    const pendingByCorp = new Map<number, number>(pendingCounts.map((row: any) => [Number(row.corporationId), Number(row._count._all)]));
+    return corps.map((corp) => ({
+      ...corp,
+      _count: {
+        memberships: corp._count?.memberships ?? 0,
+        fleetItems: corp._count?.fleetItems ?? 0,
+        bankItems: bankByCorp.get(corp.id) ?? 0,
+        pendingMemberships: pendingByCorp.get(corp.id) ?? 0,
+      },
+    }));
+  }
+
   // ── Membership — instant declaration, no pending ─────────────────────────────
 
   async getMyMembership(userId: number): Promise<MembershipData | null> {
     return this.db.corporationMembership.findFirst({
       where: { userId },
+      orderBy: { declaredAt: 'desc' },
+      select: MEMBERSHIP_SELECT,
+    });
+  }
+
+  async getMyActiveMembership(userId: number): Promise<MembershipData | null> {
+    return this.db.corporationMembership.findFirst({
+      where: { userId, status: 'active' },
       select: MEMBERSHIP_SELECT,
     });
   }
@@ -163,15 +245,18 @@ export class CorporationService {
     });
   }
 
-  // Declare RSI org membership (instant, no approval needed)
-  async declareOrgMembership(userId: number, org: RsiOrg): Promise<MembershipData> {
+  async requestOrgMembership(userId: number, org: RsiOrg): Promise<MembershipData> {
     const corp = await this.upsertFromRsi(org);
-    // Remove any existing membership first
     await this.db.corporationMembership.deleteMany({ where: { userId } });
     return this.db.corporationMembership.create({
-      data: { userId, corporationId: corp.id },
+      data: { userId, corporationId: corp.id, status: 'pending', role: 'member' },
       select: MEMBERSHIP_SELECT,
     });
+  }
+
+  // Backward-compatible name: user declarations are now approval requests.
+  async declareOrgMembership(userId: number, org: RsiOrg): Promise<MembershipData> {
+    return this.requestOrgMembership(userId, org);
   }
 
   async leaveOrg(userId: number): Promise<void> {
@@ -182,9 +267,62 @@ export class CorporationService {
 
   async listMembers(corporationId: number): Promise<MembershipData[]> {
     return this.db.corporationMembership.findMany({
-      where: { corporationId },
+      where: { corporationId, status: 'active' },
       select: MEMBERSHIP_SELECT,
-      orderBy: { declaredAt: 'desc' },
+      orderBy: [{ role: 'desc' }, { declaredAt: 'desc' }],
+    });
+  }
+
+  async listPendingMemberships(corporationId?: number): Promise<MembershipData[]> {
+    return this.db.corporationMembership.findMany({
+      where: { status: 'pending', ...(corporationId ? { corporationId } : {}) },
+      select: MEMBERSHIP_SELECT,
+      orderBy: { declaredAt: 'asc' },
+    });
+  }
+
+  async isCorporationLeader(userId: number, corporationId: number): Promise<boolean> {
+    const membership = await this.db.corporationMembership.findFirst({
+      where: { userId, corporationId, status: 'active', role: 'leader' },
+      select: { id: true },
+    });
+    return !!membership;
+  }
+
+  async getMembership(membershipId: number): Promise<MembershipData | null> {
+    return this.db.corporationMembership.findUnique({
+      where: { id: membershipId },
+      select: MEMBERSHIP_SELECT,
+    });
+  }
+
+  async approveMembership(membershipId: number, reviewerId: number, role: 'member' | 'leader' = 'member'): Promise<MembershipData> {
+    const membership = await this.db.corporationMembership.findUnique({
+      where: { id: membershipId },
+      select: { id: true, userId: true },
+    });
+    if (!membership) throw new Error('NOT_FOUND');
+    await this.db.corporationMembership.deleteMany({ where: { userId: membership.userId, id: { not: membershipId } } });
+    return this.db.corporationMembership.update({
+      where: { id: membershipId },
+      data: { status: 'active', role, reviewedById: reviewerId, reviewedAt: new Date() },
+      select: MEMBERSHIP_SELECT,
+    });
+  }
+
+  async rejectMembership(membershipId: number, reviewerId: number): Promise<MembershipData> {
+    return this.db.corporationMembership.update({
+      where: { id: membershipId },
+      data: { status: 'rejected', reviewedById: reviewerId, reviewedAt: new Date() },
+      select: MEMBERSHIP_SELECT,
+    });
+  }
+
+  async updateMembershipRole(membershipId: number, role: 'member' | 'leader'): Promise<MembershipData> {
+    return this.db.corporationMembership.update({
+      where: { id: membershipId },
+      data: { role },
+      select: MEMBERSHIP_SELECT,
     });
   }
 
@@ -200,7 +338,7 @@ export class CorporationService {
     if (!user) throw new Error('USER_NOT_FOUND');
     await this.db.corporationMembership.deleteMany({ where: { userId } });
     return this.db.corporationMembership.create({
-      data: { userId, corporationId },
+      data: { userId, corporationId, status: 'active', role: 'member', reviewedAt: new Date() },
       select: MEMBERSHIP_SELECT,
     });
   }
