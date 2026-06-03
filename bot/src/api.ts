@@ -96,9 +96,20 @@ interface ComponentResult {
   uuid: string;
   name: string;
   type?: string;
+  sub_type?: string;
   size?: number;
   grade?: string;
   manufacturer?: string;
+  manufacturer_name?: string;
+  weapon_dps?: number;
+  weapon_burst_dps?: number;
+  weapon_sustained_dps?: number;
+  shield_hp?: number;
+  shield_regen?: number;
+  qd_speed?: number;
+  qd_range?: number;
+  cooling_rate?: number;
+  power_output?: number;
 }
 
 interface ItemResult {
@@ -145,6 +156,20 @@ export async function getShips(query: string): Promise<PaginatedResponse<ShipRes
   return apiFetch<PaginatedResponse<ShipResult>>(`/api/v1/ships?search=${encodeURIComponent(query)}&limit=5`);
 }
 
+export async function getTopShips(opts: {
+  sort: string;
+  order?: 'asc' | 'desc';
+  category?: 'ship' | 'ground' | 'gravlev';
+  limit?: number;
+}): Promise<PaginatedResponse<ShipResult>> {
+  const params = new URLSearchParams();
+  params.set('sort', opts.sort);
+  params.set('order', opts.order ?? 'desc');
+  params.set('limit', String(opts.limit ?? 10));
+  if (opts.category) params.set('vehicle_category', opts.category);
+  return apiFetch<PaginatedResponse<ShipResult>>(`/api/v1/ships?${params}`);
+}
+
 export async function getShipByName(name: string): Promise<{ success: boolean; data: ShipResult }> {
   return apiFetch(`/api/v1/ship-matrix/${encodeURIComponent(name)}`);
 }
@@ -165,8 +190,26 @@ export async function getStats(): Promise<StatsResponse> {
   return apiFetch<StatsResponse>('/api/v1/stats/overview');
 }
 
-export async function getComponents(query: string): Promise<PaginatedResponse<ComponentResult>> {
-  return apiFetch<PaginatedResponse<ComponentResult>>(`/api/v1/components?search=${encodeURIComponent(query)}&limit=5`);
+export async function getComponents(query: string, type?: string): Promise<PaginatedResponse<ComponentResult>> {
+  const params = new URLSearchParams();
+  params.set('search', query);
+  params.set('limit', '5');
+  if (type) params.set('type', type);
+  return apiFetch<PaginatedResponse<ComponentResult>>(`/api/v1/components?${params}`);
+}
+
+export async function getTopComponents(opts: {
+  type?: string;
+  sort: string;
+  order?: 'asc' | 'desc';
+  limit?: number;
+}): Promise<PaginatedResponse<ComponentResult>> {
+  const params = new URLSearchParams();
+  params.set('sort', opts.sort);
+  params.set('order', opts.order ?? 'desc');
+  params.set('limit', String(opts.limit ?? 10));
+  if (opts.type) params.set('type', opts.type);
+  return apiFetch<PaginatedResponse<ComponentResult>>(`/api/v1/components?${params}`);
 }
 
 export async function getItems(query: string): Promise<PaginatedResponse<ItemResult>> {

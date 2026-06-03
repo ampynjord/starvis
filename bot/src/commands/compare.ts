@@ -5,107 +5,108 @@ import { SITE_URL } from '../config.js';
 import { errorEmbed } from '../embeds.js';
 
 const COMPARE_FIELDS: Array<{ key: string; label: string; unit?: string; higherIsBetter?: boolean }> = [
-  { key: 'scm_speed', label: '?? SCM', unit: 'm/s', higherIsBetter: true },
-  { key: 'max_speed', label: '?? Vitesse max', unit: 'm/s', higherIsBetter: true },
-  { key: 'shield_hp', label: '??? Bouclier', unit: 'HP', higherIsBetter: true },
-  { key: 'total_hp', label: '?? HP', unit: '', higherIsBetter: true },
-  { key: 'cargo_capacity', label: '?? Cargo', unit: 'SCU', higherIsBetter: true },
-  { key: 'weapon_damage_total', label: '?? DPS Armes', unit: '', higherIsBetter: true },
-  { key: 'missile_damage_total', label: '?? DMG Missiles', unit: '', higherIsBetter: true },
-  { key: 'mass', label: '?? Masse', unit: 'kg', higherIsBetter: false },
-  { key: 'crew_size', label: '?? �quipage', unit: '', higherIsBetter: false },
+  { key: 'scm_speed', label: 'SCM speed', unit: 'm/s', higherIsBetter: true },
+  { key: 'max_speed', label: 'Max speed', unit: 'm/s', higherIsBetter: true },
+  { key: 'shield_hp', label: 'Shield HP', unit: 'HP', higherIsBetter: true },
+  { key: 'total_hp', label: 'Hull HP', unit: 'HP', higherIsBetter: true },
+  { key: 'cargo_capacity', label: 'Cargo', unit: 'SCU', higherIsBetter: true },
+  { key: 'weapon_damage_total', label: 'Weapon DPS', unit: 'DPS', higherIsBetter: true },
+  { key: 'missile_damage_total', label: 'Missile damage', unit: '', higherIsBetter: true },
+  { key: 'mass', label: 'Mass', unit: 'kg', higherIsBetter: false },
+  { key: 'crew_size', label: 'Crew', unit: '', higherIsBetter: false },
 ];
 
 export const data = new SlashCommandBuilder()
   .setName('compare')
-  .setDescription('Comparer deux vaisseaux c�te � c�te')
-  .addStringOption((opt) =>
-    opt.setName('vaisseau1').setDescription('Premier vaisseau (ex: Hornet F7C)').setRequired(true).setAutocomplete(true),
-  )
-  .addStringOption((opt) =>
-    opt.setName('vaisseau2').setDescription('Deuxi�me vaisseau (ex: Arrow)').setRequired(true).setAutocomplete(true),
-  );
+  .setDescription('Compare two ships side by side')
+  .addStringOption((opt) => opt.setName('ship1').setDescription('First ship, e.g. Hornet F7C').setRequired(true).setAutocomplete(true))
+  .addStringOption((opt) => opt.setName('ship2').setDescription('Second ship, e.g. Arrow').setRequired(true).setAutocomplete(true));
 
 export async function autocomplete(interaction: AutocompleteInteraction): Promise<void> {
   const focused = interaction.options.getFocused(true);
-  if (focused.name === 'vaisseau1' || focused.name === 'vaisseau2') {
+  if (focused.name === 'ship1' || focused.name === 'ship2') {
     const choices = await getShipsAutocomplete(focused.value);
     await interaction.respond(choices.slice(0, 25));
   }
 }
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
-  const name1 = interaction.options.getString('vaisseau1', true);
-  const name2 = interaction.options.getString('vaisseau2', true);
+  const name1 = interaction.options.getString('ship1', true);
+  const name2 = interaction.options.getString('ship2', true);
   await interaction.deferReply();
 
   try {
     const [res1, res2] = await Promise.all([getShips(name1), getShips(name2)]);
-
     const ship1 = res1.data?.[0];
     const ship2 = res2.data?.[0];
 
-    if (!ship1) {
-      await interaction.editReply({ embeds: [errorEmbed(`Vaisseau introuvable : � ${name1} �`)] });
-      return;
-    }
-    if (!ship2) {
-      await interaction.editReply({ embeds: [errorEmbed(`Vaisseau introuvable : � ${name2} �`)] });
-      return;
-    }
+    if (!ship1) return void interaction.editReply({ embeds: [errorEmbed(`Ship not found: ${name1}`)] });
+    if (!ship2) return void interaction.editReply({ embeds: [errorEmbed(`Ship not found: ${name2}`)] });
 
-    // Try dedicated compare endpoint (richer diff); fall back to client-side diff
     let diff: Record<string, { ship1: unknown; ship2: unknown; winner: 1 | 2 | null }> | null = null;
     if (ship1.uuid && ship2.uuid) {
       try {
         const cmp = await compareShips(ship1.uuid, ship2.uuid);
         if (cmp.success) diff = cmp.data.diff;
       } catch {
-        // Fall through to client-side comparison
+        diff = null;
       }
     }
+
+    const lines = COMPARE_FIELDS.map((field) =>
+      formatComparison(field, ship1 as unknown as Record<string, unknown>, ship2 as unknown as Record<string, unknown>, diff),
+    ).filter((line): line is string => Boolean(line));
+    const summary = summarize(lines, ship1.name, ship2.name);
 
     const embed = new EmbedBuilder()
       .setColor(0x3498db)
-      .setTitle(`?? ${ship1.name} vs ${ship2.name}`)
-      .setURL(`${SITE_URL}/ships`)
-      .setFooter({ text: 'Starvis � Star Citizen Database' });
+      .setTitle(`${ship1.name} vs ${ship2.name}`)
+      .setURL(`${SITE_URL}/compare`)
+      .setDescription(summary)
+      .addFields({ name: 'Scorecard', value: lines.join('\n') || 'No comparable stats available.', inline: false })
+      .setFooter({ text: 'Starvis - Game data comparison' });
 
-    const fields: { name: string; value: string; inline: boolean }[] = [
-      { name: '?? Vaisseau 1', value: `**${ship1.name}**`, inline: true },
-      { name: '\u200b', value: '**VS**', inline: true },
-      { name: '?? Vaisseau 2', value: `**${ship2.name}**`, inline: true },
-    ];
-
-    for (const { key, label, unit, higherIsBetter } of COMPARE_FIELDS) {
-      let v1: number | undefined;
-      let v2: number | undefined;
-
-      if (diff?.[key]) {
-        v1 = diff[key].ship1 as number | undefined;
-        v2 = diff[key].ship2 as number | undefined;
-      } else {
-        v1 = (ship1 as unknown as Record<string, unknown>)[key] as number | undefined;
-        v2 = (ship2 as unknown as Record<string, unknown>)[key] as number | undefined;
-      }
-
-      if (v1 == null && v2 == null) continue;
-
-      const fmt = (v: number | undefined) => (v == null ? '�' : `${v.toLocaleString('fr-FR')}${unit ? ` ${unit}` : ''}`);
-
-      let winner = '';
-      if (v1 != null && v2 != null && v1 !== v2) {
-        const v1Wins = higherIsBetter !== false ? v1 > v2 : v1 < v2;
-        winner = v1Wins ? '? ??' : '?? ?';
-      }
-
-      fields.push({ name: label, value: `${fmt(v1)} ${winner} ${fmt(v2)}`, inline: false });
-    }
-
-    embed.addFields(fields);
     await interaction.editReply({ embeds: [embed] });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+    const msg = err instanceof Error ? err.message : 'Unknown error';
     await interaction.editReply({ embeds: [errorEmbed(msg)] });
   }
+}
+
+function formatComparison(
+  field: (typeof COMPARE_FIELDS)[number],
+  ship1: Record<string, unknown>,
+  ship2: Record<string, unknown>,
+  diff: Record<string, { ship1: unknown; ship2: unknown; winner: 1 | 2 | null }> | null,
+): string | null {
+  const raw1 = diff?.[field.key]?.ship1 ?? ship1[field.key];
+  const raw2 = diff?.[field.key]?.ship2 ?? ship2[field.key];
+  const v1 = Number(raw1);
+  const v2 = Number(raw2);
+  if (!Number.isFinite(v1) && !Number.isFinite(v2)) return null;
+
+  let winner = 'even';
+  if (Number.isFinite(v1) && Number.isFinite(v2) && v1 !== v2) {
+    const firstWins = field.higherIsBetter !== false ? v1 > v2 : v1 < v2;
+    winner = firstWins ? 'ship1' : 'ship2';
+  }
+
+  return `${field.label}: ${fmt(v1, field.unit)} | ${fmt(v2, field.unit)} (${winner})`;
+}
+
+function summarize(lines: string[], ship1: string, ship2: string): string {
+  let wins1 = 0;
+  let wins2 = 0;
+  for (const line of lines) {
+    if (line.endsWith('(ship1)')) wins1++;
+    if (line.endsWith('(ship2)')) wins2++;
+  }
+  if (wins1 === wins2) return `Close match: **${ship1}** and **${ship2}** trade advantages depending on the role.`;
+  const winner = wins1 > wins2 ? ship1 : ship2;
+  return `Stat advantage: **${winner}** wins more compared categories (${Math.max(wins1, wins2)} vs ${Math.min(wins1, wins2)}).`;
+}
+
+function fmt(value: number, unit = ''): string {
+  if (!Number.isFinite(value)) return 'n/a';
+  return `${value.toLocaleString('en-US', { maximumFractionDigits: 2 })}${unit ? ` ${unit}` : ''}`;
 }
