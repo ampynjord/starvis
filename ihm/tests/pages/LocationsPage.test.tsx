@@ -4,7 +4,7 @@ import { renderWithProviders } from '../utils';
 import LocationsPage from '@/views/LocationsPage';
 
 vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({ user: { id: 1, username: 'tester', role: 'beta_tester' }, loading: false, login: vi.fn(), register: vi.fn(), logout: vi.fn(), refresh: vi.fn() }),
+  useAuth: () => ({ user: { id: 1, username: 'tester', role: 'user' }, loading: false, login: vi.fn(), register: vi.fn(), logout: vi.fn(), refresh: vi.fn() }),
   AuthProvider: ({ children }: { children: any }) => children,
 }));
 

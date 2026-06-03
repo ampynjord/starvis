@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+  Building2,
   Eye,
   EyeOff,
   KeyRound,
@@ -15,9 +16,11 @@ import {
   UserCheck,
   X,
 } from 'lucide-react';
+import Link from 'next/link';
+import { RsiOrgPicker, type RsiOrg } from '@/components/ui/RsiOrgPicker';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth, type AuthUser } from '@/contexts/AuthContext';
-import { ADMIN_ROLE, BETA_TESTER_ROLE, USER_ROLE, USER_ROLES } from '@/lib/app-constants';
+import { ADMIN_ROLE, DEVELOPER_ROLE, USER_ROLE, USER_ROLES } from '@/lib/app-constants';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -26,9 +29,9 @@ type Role = (typeof USER_ROLES)[number];
 const ROLES = [...USER_ROLES];
 
 const ROLE_STYLE: Record<Role, { label: string; badge: string }> = {
-  [USER_ROLE]:        { label: 'User',        badge: 'text-slate-400 border-slate-700/50 bg-slate-900/60' },
-  [BETA_TESTER_ROLE]: { label: 'Beta',        badge: 'text-purple-400 border-purple-700/50 bg-purple-950/40' },
-  [ADMIN_ROLE]:       { label: 'Admin',       badge: 'text-cyan-400 border-cyan-700/50 bg-cyan-950/40' },
+  [USER_ROLE]:      { label: 'User',      badge: 'text-slate-400 border-slate-700/50 bg-slate-900/60' },
+  [DEVELOPER_ROLE]: { label: 'Developer', badge: 'text-violet-400 border-violet-700/50 bg-violet-950/40' },
+  [ADMIN_ROLE]:     { label: 'Admin',     badge: 'text-cyan-400 border-cyan-700/50 bg-cyan-950/40' },
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -402,6 +405,86 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   );
 }
 
+// ── Modal: Corp assignment ─────────────────────────────────────────────────────
+
+function CorpModal({ target, onClose }: { target: AuthUser; onClose: () => void }) {
+  const [currentOrg, setCurrentOrg] = useState<{ name: string; tag: string } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    fetch(`/api/admin/users/${target.id}/corporation`)
+      .then((r) => r.json())
+      .then((d) => setCurrentOrg(d.data?.corporation ?? null))
+      .finally(() => setLoading(false));
+  }, [target.id]);
+
+  const handleAssign = async (org: RsiOrg) => {
+    setSaving(true);
+    setError('');
+    try {
+      await apiFetch(`/api/admin/users/${target.id}/corporation`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: org.symbol, name: org.name, logoUrl: org.logoUrl,
+          archetype: org.archetype, language: org.language, commitment: org.commitment,
+          recruiting: org.recruiting, roleplay: org.roleplay, memberCount: org.memberCount,
+        }),
+      });
+      setCurrentOrg({ name: org.name, tag: org.symbol });
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    setSaving(true);
+    setError('');
+    try {
+      await apiFetch(`/api/admin/users/${target.id}/corporation`, { method: 'DELETE' });
+      setCurrentOrg(null);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal title={`Organization — ${target.username}`} onClose={onClose}>
+      <div className="space-y-3">
+        {loading ? (
+          <p className="text-xs text-slate-600 font-mono-sc">Loading…</p>
+        ) : (
+          <>
+            <p className="text-xs text-slate-500">
+              {currentOrg
+                ? <>Current: <span className="text-cyan-400 font-orbitron">[{currentOrg.tag}] {currentOrg.name}</span></>
+                : 'No organization assigned.'}
+            </p>
+            <RsiOrgPicker selected={null} onSelect={(org) => org && handleAssign(org)} disabled={saving} placeholder="Search RSI org to assign…" />
+            {currentOrg && (
+              <button
+                type="button"
+                onClick={handleRemove}
+                disabled={saving}
+                className="text-[11px] text-red-500 hover:text-red-400 font-mono-sc transition-colors disabled:opacity-40"
+              >
+                Remove from organization
+              </button>
+            )}
+            {error && <p className="text-[10px] text-red-400 font-mono-sc">{error}</p>}
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 type ModalState =
@@ -410,6 +493,7 @@ type ModalState =
   | { type: 'password'; user: AuthUser }
   | { type: 'delete'; user: AuthUser }
   | { type: 'create' }
+  | { type: 'corp'; user: AuthUser }
   | null;
 
 export default function AdminPage() {
@@ -492,6 +576,15 @@ export default function AdminPage() {
           </button>
         </div>
 
+        {/* Nav links */}
+        <Link
+          href="/admin/corporations"
+          className="flex items-center gap-2 sci-panel px-3 py-2.5 border border-slate-800/60 hover:border-cyan-800/50 text-slate-500 hover:text-cyan-400 transition-colors w-fit"
+        >
+          <Building2 size={13} />
+          <span className="text-[10px] font-orbitron uppercase tracking-widest">Corporations</span>
+        </Link>
+
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           <div className="sci-panel px-3 py-2.5 border border-slate-800/60">
@@ -503,7 +596,7 @@ export default function AdminPage() {
             return (
               <div key={r} className="sci-panel px-3 py-2.5 border border-slate-800/60">
                 <p className="font-mono-sc text-[9px] text-slate-600 uppercase tracking-widest">{s.label}</p>
-                <p className={`font-orbitron text-lg font-black mt-0.5 ${r === ADMIN_ROLE ? 'text-cyan-400' : r === BETA_TESTER_ROLE ? 'text-purple-400' : 'text-slate-400'}`}>
+                <p className={`font-orbitron text-lg font-black mt-0.5 ${r === ADMIN_ROLE ? 'text-cyan-400' : r === DEVELOPER_ROLE ? 'text-purple-400' : 'text-slate-400'}`}>
                   {countByRole[r] ?? 0}
                 </p>
               </div>
@@ -533,7 +626,7 @@ export default function AdminPage() {
                   roleFilter === r
                     ? r === 'all' ? 'bg-slate-800 border-slate-600 text-slate-200'
                       : r === ADMIN_ROLE ? 'bg-cyan-950/60 border-cyan-700 text-cyan-400'
-                      : r === BETA_TESTER_ROLE ? 'bg-purple-950/60 border-purple-700 text-purple-400'
+                      : r === DEVELOPER_ROLE ? 'bg-purple-950/60 border-purple-700 text-purple-400'
                       : 'bg-slate-800 border-slate-600 text-slate-300'
                     : 'border-transparent text-slate-600 hover:text-slate-400 hover:border-slate-700'
                 }`}
@@ -582,6 +675,14 @@ export default function AdminPage() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setModal({ type: 'corp', user: u })}
+                      title="Corporation"
+                      className="p-1.5 rounded border border-transparent hover:border-slate-700/50 hover:bg-white/5 text-slate-600 hover:text-cyan-400 transition-colors"
+                    >
+                      <Building2 size={13} />
+                    </button>
                     <button
                       type="button"
                       onClick={() => setModal({ type: 'edit', user: u })}
@@ -645,6 +746,7 @@ export default function AdminPage() {
         {modal?.type === 'password' && <ResetPasswordModal key="password" target={modal.user} onClose={() => setModal(null)} />}
         {modal?.type === 'delete'   && <DeleteModal        key="delete"   target={modal.user} onClose={() => setModal(null)} onDeleted={removeUser} />}
         {modal?.type === 'create'   && <CreateModal        key="create"                       onClose={() => setModal(null)} onCreated={addUser} />}
+        {modal?.type === 'corp'     && <CorpModal          key="corp"     target={modal.user} onClose={() => setModal(null)} />}
       </AnimatePresence>
     </>
   );

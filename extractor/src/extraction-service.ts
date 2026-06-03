@@ -1951,12 +1951,20 @@ export class ExtractionService {
       ]);
     }
 
+    const SHOP_CONFLICT = `(class_name, env) DO UPDATE SET
+      name=EXCLUDED.name, normalized_name=EXCLUDED.normalized_name,
+      canonical_shop_key=EXCLUDED.canonical_shop_key, canonical_location_key=EXCLUDED.canonical_location_key,
+      location=EXCLUDED.location, system=EXCLUDED.system, planet_moon=EXCLUDED.planet_moon, city=EXCLUDED.city,
+      shop_type=EXCLUDED.shop_type, franchise_slug=EXCLUDED.franchise_slug, location_slug=EXCLUDED.location_slug,
+      franchise_loc_key=EXCLUDED.franchise_loc_key, p4k_path=EXCLUDED.p4k_path, raw_json=EXCLUDED.raw_json,
+      updated_at=CURRENT_TIMESTAMP`;
+
     let savedShops = 0;
     if (shopRows.length > 0) {
       savedShops = await ExtractionService.batchUpsert(
         conn,
         `INSERT INTO game.shops (env, name, normalized_name, canonical_shop_key, canonical_location_key, location, system, planet_moon, city, shop_type, class_name, franchise_slug, location_slug, franchise_loc_key, p4k_path, raw_json)`,
-        '',
+        SHOP_CONFLICT,
         16,
         shopRows,
       );

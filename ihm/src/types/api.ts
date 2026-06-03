@@ -447,10 +447,11 @@ export interface Item extends ItemListItem {
 }
 
 export interface ItemNavigation {
-  fpsCategories: { slug: string; label: string; count: number }[];
-  otherCategories: { slug: string; label: string; count: number }[];
+  fpsCategories: { slug: string; label: string; count: number; group: string; parentSlug?: string }[];
+  otherCategories: { slug: string; label: string; count: number; group: string }[];
   fpsSubTypeOptions: Record<string, { label: string; value: string }[]>;
   consumableFilterOptions: Record<string, { label: string; value: string }[]>;
+  groups?: Record<string, { type?: string; types?: string[]; subTypes?: string[]; excludeSubTypes?: string[] }>;
 }
 
 // ─── Manufacturers ────────────────────────────────────────────────────────────

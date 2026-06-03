@@ -14,7 +14,6 @@ import {
   useState,
 } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { hasBetaAccess } from '@/lib/app-constants';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -216,8 +215,6 @@ export function ChatWidget() {
     }
   };
 
-  const isBeta = hasBetaAccess(user?.role);
-
   if (authLoading) return null;
 
   return (
@@ -249,26 +246,7 @@ export function ChatWidget() {
           </motion.div>
         )}
 
-        {open && user && !isBeta && (
-          <motion.div
-            key="beta-only"
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            className="w-full max-w-72 flex flex-col items-center gap-4 p-6 text-center"
-            style={panelStyle}
-          >
-            <Bot size={28} style={{ color: '#00d4ff' }} />
-            <div>
-              <p className="font-orbitron text-xs tracking-widest text-cyan-400 uppercase mb-1">STARVIS</p>
-              <p className="text-sm text-slate-400 mb-1">This feature is in early access.</p>
-              <p className="text-xs text-slate-600">Available to beta testers only.</p>
-            </div>
-          </motion.div>
-        )}
-
-        {open && user && isBeta && (
+        {open && user && (
           <motion.div
             key="chat-panel"
             initial={{ opacity: 0, y: 20, scale: 0.95 }}

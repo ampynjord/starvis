@@ -4,47 +4,86 @@ import { parseIncludes } from '../services/shared.js';
 import { asyncHandler, makeGameDataGuard, sendCsvOrJson, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
-/** Semantic category definitions — each slug is a dedicated API route.
- *  Types use the P4K-faithful naming (Armor unified type; sub-types from AttachDef).
+type CategoryDef = { types: string[]; subTypes?: string[]; excludeSubTypes?: string[]; label: string; group: string };
+
+/** Semantic category definitions — new in-game taxonomy.
+ *  DB types are P4K-faithful; this layer maps them to the player-facing classification.
  */
-const CATEGORY_DEFS: Record<string, { types: string[]; subTypes?: string[]; excludeSubTypes?: string[]; label: string }> = {
-  // Weapons = strictly FPS firearms/melee; tool-like FPS gadgets are excluded.
-  weapons: { label: 'Weapons', types: ['FPS_Weapon'], excludeSubTypes: ['Throwable', 'Mine', 'Gadget'] },
-  throwable: { label: 'Throwable', types: ['FPS_Weapon'], subTypes: ['Throwable', 'Mine'] },
-  helmet: { label: 'Helmet', types: ['Armor_Helmet'] },
-  core: { label: 'Torso', types: ['Armor_Torso'] },
-  arms: { label: 'Arms', types: ['Armor_Arms'] },
-  legs: { label: 'Legs', types: ['Armor_Legs'] },
-  backpack: { label: 'Backpack', types: ['Armor_Backpack'] },
-  undersuit: { label: 'Undersuit', types: ['Undersuit'] },
-  // Include Gadget + FPS_Weapon, then exclude real weapon sub-types to keep only tool-like FPS gadgets.
-  'tools-medics': {
-    label: 'Tools & Medics',
-    types: ['Tool', 'Consumable', 'Gadget', 'FPS_Weapon'],
+const CATEGORY_DEFS: Record<string, CategoryDef> = {
+  // ── Armor ─────────────────────────────────────────────────────────────────────
+  armor: {
+    group: 'armor',
+    label: 'All Armor',
+    types: ['Armor_Helmet', 'Armor_Torso', 'Armor_Arms', 'Armor_Legs', 'Armor_Backpack', 'Undersuit'],
+  },
+  'armor-undersuits': { group: 'armor', label: 'Undersuits', types: ['Undersuit'] },
+  'armor-helmets': { group: 'armor', label: 'Helmets', types: ['Armor_Helmet'] },
+  'armor-core': { group: 'armor', label: 'Core', types: ['Armor_Torso'] },
+  'armor-arms': { group: 'armor', label: 'Arms', types: ['Armor_Arms'] },
+  'armor-legs': { group: 'armor', label: 'Legs', types: ['Armor_Legs'] },
+  'armor-backpacks': { group: 'armor', label: 'Backpacks', types: ['Armor_Backpack'] },
+  'armor-flair': { group: 'armor', label: 'Flair', types: ['Attachment'], subTypes: ['Appearance'] },
+
+  // ── Clothing ──────────────────────────────────────────────────────────────────
+  clothing: { group: 'clothing', label: 'All Clothing', types: ['Clothing'] },
+
+  // ── Weapons ───────────────────────────────────────────────────────────────────
+  weapons: { group: 'weapons', label: 'All Weapons', types: ['FPS_Weapon'], excludeSubTypes: ['Throwable', 'Mine'] },
+  'weapons-sidearms': { group: 'weapons', label: 'Sidearms', types: ['FPS_Weapon'], subTypes: ['Pistol'] },
+  'weapons-primary': {
+    group: 'weapons',
+    label: 'Primary',
+    types: ['FPS_Weapon'],
+    subTypes: ['Assault Rifle', 'SMG', 'Shotgun', 'Sniper Rifle', 'LMG'],
+  },
+  'weapons-primary-ar': { group: 'weapons-primary', label: 'Assault Rifles', types: ['FPS_Weapon'], subTypes: ['Assault Rifle'] },
+  'weapons-primary-smg': { group: 'weapons-primary', label: 'SMGs', types: ['FPS_Weapon'], subTypes: ['SMG'] },
+  'weapons-primary-shotgun': { group: 'weapons-primary', label: 'Shotguns', types: ['FPS_Weapon'], subTypes: ['Shotgun'] },
+  'weapons-primary-sniper': { group: 'weapons-primary', label: 'Sniper Rifles', types: ['FPS_Weapon'], subTypes: ['Sniper Rifle'] },
+  'weapons-primary-lmg': { group: 'weapons-primary', label: 'LMGs', types: ['FPS_Weapon'], subTypes: ['LMG'] },
+  'weapons-special': { group: 'weapons', label: 'Special', types: ['FPS_Weapon'], subTypes: ['Launcher'] },
+  'weapons-melee': { group: 'weapons', label: 'Melee', types: ['FPS_Weapon'], subTypes: ['Melee'] },
+  'weapons-attachments': { group: 'weapons', label: 'Attachments', types: ['Attachment'], subTypes: ['Weapon Modifier'] },
+  'weapons-throwables': { group: 'weapons', label: 'Throwables', types: ['FPS_Weapon'], subTypes: ['Throwable', 'Mine'] },
+
+  // ── Utility ───────────────────────────────────────────────────────────────────
+  utility: {
+    group: 'utility',
+    label: 'All Utility',
+    types: ['Tool', 'Gadget', 'Consumable'],
     excludeSubTypes: [
-      'Pistol',
+      'Food',
+      'Drink',
+      'OxygenCap',
+      'Stim',
+      'Assault Rifle',
       'SMG',
       'Shotgun',
       'Sniper Rifle',
       'LMG',
-      'Melee',
-      'Large',
-      'Medium',
-      'Small',
+      'Pistol',
       'Launcher',
+      'Melee',
       'Throwable',
       'Mine',
-      'Food',
-      'Drink',
-      'Hacking',
-      'SystemAccess',
     ],
   },
-  magazines: { label: 'Magazines', types: ['Magazine'] },
-  attachments: { label: 'Attachment', types: ['Attachment'] },
-  clothing: { label: 'Clothing', types: ['Clothing'] },
-  // Keep "Other" as a narrow fallback bucket.
-  other: { label: 'Other', types: ['Gadget'], excludeSubTypes: ['Handheld', 'Two-handed', 'Device'] },
+  'utility-gadgets': { group: 'utility', label: 'Gadgets', types: ['Gadget'], subTypes: ['Handheld', 'Two-handed', 'Device'] },
+  'utility-medical': { group: 'utility', label: 'Medical', types: ['Consumable', 'Tool'], subTypes: ['Medical', 'MedPack', 'Stim'] },
+  'utility-cryptokeys': { group: 'utility', label: 'Cryptokeys', types: ['Consumable'], subTypes: ['Hacking', 'SystemAccess'] },
+  'utility-technology': { group: 'utility', label: 'Technology', types: ['Tool', 'Gadget'], subTypes: ['Multitool', 'Module'] },
+
+  // ── Ammo ──────────────────────────────────────────────────────────────────────
+  ammo: { group: 'ammo', label: 'Ammo', types: ['Magazine'] },
+
+  // ── Sustenance ────────────────────────────────────────────────────────────────
+  sustenance: { group: 'sustenance', label: 'All Sustenance', types: ['Consumable'], subTypes: ['Food', 'Drink', 'OxygenCap'] },
+  'sustenance-food': { group: 'sustenance', label: 'Food', types: ['Consumable'], subTypes: ['Food'] },
+  'sustenance-drink': { group: 'sustenance', label: 'Drinks', types: ['Consumable'], subTypes: ['Drink'] },
+  'sustenance-oxygen': { group: 'sustenance', label: 'Oxygen', types: ['Consumable'], subTypes: ['OxygenCap'] },
+
+  // ── Other (catch-all) ─────────────────────────────────────────────────────────
+  other: { group: 'other', label: 'Other', types: ['Gadget'], excludeSubTypes: ['Handheld', 'Two-handed', 'Device'] },
 };
 
 export function mountItemRoutes(router: Router, deps: RouteDependencies): void {

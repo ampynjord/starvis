@@ -6,7 +6,7 @@
  * POST /auth/reset-password   — reset password with token
  * GET  /auth/me               — current profile (Bearer)
  * PUT  /auth/me               — update own profile (Bearer)
- * POST /auth/api-token        — generate a long-lived token (Bearer, beta_tester+ only)
+ * POST /auth/api-token        — generate a long-lived token (Bearer, developer+ only)
  * POST /auth/2fa/setup        — generate TOTP secret + QR code (Bearer)
  * POST /auth/2fa/enable       — enable 2FA with TOTP code (Bearer)
  * POST /auth/2fa/disable      — disable 2FA with TOTP code (Bearer)
@@ -270,7 +270,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     }
     const { role } = req.body ?? {};
     if (!USER_ROLES.includes(role)) {
-      return void res.status(400).json({ success: false, error: 'role must be "user", "beta_tester" or "admin"' });
+      return void res.status(400).json({ success: false, error: 'role must be "user", "developer" or "admin"' });
     }
     try {
       const user = await authService.setRole(id, role);

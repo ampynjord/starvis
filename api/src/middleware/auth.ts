@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import { AuthService } from '../services/auth-service.js';
-import { ADMIN_ROLE, AUTH_COOKIE_NAME, BETA_ACCESS_ROLES } from '../utils/config.js';
+import { ADMIN_ROLE, AUTH_COOKIE_NAME, DEVELOPER_ACCESS_ROLES } from '../utils/config.js';
 
 // ── Admin API Key ─────────────────────────────────────────────────────────────
 
@@ -41,10 +41,10 @@ export function requireJwt(req: Request, res: Response, next: NextFunction) {
 }
 
 /**
- * requireJwtBetaOrAdmin — verifies Bearer JWT AND that role is beta_tester or admin.
- * Grants access to early-access (beta) features.
+ * requireJwtDeveloperOrAdmin — verifies Bearer JWT AND that role is developer or admin.
+ * Grants access to API token generation and other developer features.
  */
-export function requireJwtBetaOrAdmin(req: Request, res: Response, next: NextFunction) {
+export function requireJwtDeveloperOrAdmin(req: Request, res: Response, next: NextFunction) {
   if (!process.env.JWT_SECRET) {
     return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
@@ -55,8 +55,8 @@ export function requireJwtBetaOrAdmin(req: Request, res: Response, next: NextFun
   try {
     const authService = new AuthService(null as any);
     const payload = authService.verifyToken(token);
-    if (!BETA_ACCESS_ROLES.includes(payload.role as (typeof BETA_ACCESS_ROLES)[number])) {
-      return res.status(403).json({ success: false, error: 'Beta tester or admin role required' });
+    if (!DEVELOPER_ACCESS_ROLES.includes(payload.role as (typeof DEVELOPER_ACCESS_ROLES)[number])) {
+      return res.status(403).json({ success: false, error: 'Developer or admin role required' });
     }
     (req as any).jwtPayload = payload;
     next();
@@ -64,6 +64,9 @@ export function requireJwtBetaOrAdmin(req: Request, res: Response, next: NextFun
     res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
 }
+
+/** @deprecated use requireJwtDeveloperOrAdmin */
+export const requireJwtBetaOrAdmin = requireJwtDeveloperOrAdmin;
 
 /**
  * requireJwtAdmin — verifies Bearer JWT AND that role === 'admin'.

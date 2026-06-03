@@ -46,10 +46,15 @@ export const CTM_CACHE_DIR = process.env.CTM_CACHE_DIR ?? '/tmp/ctm-cache';
 export const AUTH_COOKIE_NAME = process.env.AUTH_COOKIE_NAME ?? 'starvis_token';
 
 export const USER_ROLE = 'user';
-export const BETA_TESTER_ROLE = 'beta_tester';
+export const DEVELOPER_ROLE = 'developer';
 export const ADMIN_ROLE = 'admin';
-export const USER_ROLES = [USER_ROLE, BETA_TESTER_ROLE, ADMIN_ROLE] as const;
-export const BETA_ACCESS_ROLES = [BETA_TESTER_ROLE, ADMIN_ROLE] as const;
+export const USER_ROLES = [USER_ROLE, DEVELOPER_ROLE, ADMIN_ROLE] as const;
+export const DEVELOPER_ACCESS_ROLES = [DEVELOPER_ROLE, ADMIN_ROLE] as const;
+
+/** @deprecated use DEVELOPER_ROLE */
+export const BETA_TESTER_ROLE = DEVELOPER_ROLE;
+/** @deprecated use DEVELOPER_ACCESS_ROLES */
+export const BETA_ACCESS_ROLES = DEVELOPER_ACCESS_ROLES;
 
 export const JWT_EXPIRES = (process.env.JWT_EXPIRES ?? '7d') as SignOptions['expiresIn'];
 export const JWT_API_TOKEN_EXPIRES = (process.env.JWT_API_TOKEN_EXPIRES ?? '1y') as SignOptions['expiresIn'];

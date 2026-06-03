@@ -1,11 +1,18 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { AlertTriangle, Copy, Key, Lock, LogOut, QrCode, Save, Shield, ShieldCheck, ShieldOff, Trash2, User } from 'lucide-react';
+import { AlertTriangle, Building2, Copy, Key, Lock, LogOut, QrCode, Save, Shield, ShieldCheck, ShieldOff, Trash2, User, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { hasBetaAccess } from '@/lib/app-constants';
+import { hasDeveloperAccess } from '@/lib/app-constants';
+import { RsiOrgPicker, type RsiOrg } from '@/components/ui/RsiOrgPicker';
+
+interface Membership {
+  id: number;
+  declaredAt: string;
+  corporation: { id: number; name: string; tag: string; rsiArchetype: string | null; logoUrl: string | null };
+}
 
 export default function ProfilePage() {
   const { user, logout, refresh } = useAuth();
@@ -27,6 +34,64 @@ export default function ProfilePage() {
   const [twoFaCode, setTwoFaCode] = useState('');
   const [twoFaLoading, setTwoFaLoading] = useState(false);
   const [twoFaMessage, setTwoFaMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Corporation state
+  const [membership, setMembership] = useState<Membership | null | undefined>(undefined);
+  const [corpLoading, setCorpLoading] = useState(false);
+  const [corpMessage, setCorpMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const loadMembership = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/me/corporation');
+      const data = await res.json();
+      setMembership(data.data ?? null);
+    } catch {
+      setMembership(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (user) loadMembership();
+  }, [user, loadMembership]);
+
+  const handleDeclareOrg = async (org: RsiOrg) => {
+    setCorpLoading(true);
+    setCorpMessage(null);
+    try {
+      const res = await fetch('/api/auth/me/corporation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: org.symbol, name: org.name, logoUrl: org.logoUrl,
+          archetype: org.archetype, language: org.language, commitment: org.commitment,
+          recruiting: org.recruiting, roleplay: org.roleplay, memberCount: org.memberCount,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Failed');
+      setMembership(data.data);
+      setCorpMessage({ type: 'success', text: `Joined ${org.name}!` });
+    } catch (err: any) {
+      setCorpMessage({ type: 'error', text: err.message });
+    } finally {
+      setCorpLoading(false);
+    }
+  };
+
+  const handleLeave = async () => {
+    setCorpLoading(true);
+    setCorpMessage(null);
+    try {
+      const res = await fetch('/api/auth/me/corporation', { method: 'DELETE' });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error ?? 'Failed'); }
+      setMembership(null);
+      setCorpMessage({ type: 'success', text: 'Left the organization.' });
+    } catch (err: any) {
+      setCorpMessage({ type: 'error', text: err.message });
+    } finally {
+      setCorpLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -103,7 +168,7 @@ export default function ProfilePage() {
     setTimeout(() => setTokenCopied(false), 2000);
   };
 
-  const isBetaOrAdmin = hasBetaAccess(user?.role);
+  const isDeveloperOrAdmin = hasDeveloperAccess(user?.role);
 
   const handleSetup2FA = async () => {
     setTwoFaLoading(true);
@@ -255,6 +320,61 @@ export default function ProfilePage() {
         </form>
       </motion.div>
 
+      {/* Corporation */}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.08 }}
+        className="sci-panel p-5 space-y-4"
+      >
+        <div className="flex items-center gap-2">
+          <Building2 size={14} className="text-cyan-600" />
+          <h2 className="text-sm font-mono-sc text-cyan-700 uppercase tracking-wider">Corporation</h2>
+        </div>
+
+        {membership === undefined ? (
+          <p className="text-xs text-slate-600 font-mono-sc">Loading…</p>
+        ) : membership ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 py-2 px-3 border border-slate-800/60 rounded-sm bg-slate-900/40">
+              {membership.corporation.logoUrl && (
+                <img src={membership.corporation.logoUrl} alt={membership.corporation.tag} className="w-9 h-9 rounded-sm object-cover shrink-0" />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-rajdhani font-semibold text-white truncate">{membership.corporation.name}</p>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[9px] font-orbitron text-slate-500 border border-slate-700 px-1 py-0.5 rounded-sm">[{membership.corporation.tag}]</span>
+                  {membership.corporation.rsiArchetype && (
+                    <span className="text-[9px] text-slate-600 font-mono-sc">{membership.corporation.rsiArchetype}</span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-600">Change organization:</p>
+            <RsiOrgPicker selected={null} onSelect={(org) => org && handleDeclareOrg(org)} disabled={corpLoading} placeholder="Search another org to switch…" />
+            <button
+              type="button"
+              onClick={handleLeave}
+              disabled={corpLoading}
+              className="flex items-center gap-1.5 text-[11px] text-red-500 hover:text-red-400 font-mono-sc transition-colors disabled:opacity-40"
+            >
+              <X size={11} /> Leave organization
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs text-slate-500">You are not in any organization. Search your RSI org below.</p>
+            <RsiOrgPicker selected={null} onSelect={(org) => org && handleDeclareOrg(org)} disabled={corpLoading} />
+          </div>
+        )}
+
+        {corpMessage && (
+          <p className={`text-xs font-mono-sc px-3 py-2 rounded border ${
+            corpMessage.type === 'success' ? 'text-green-400 bg-green-950/30 border-green-800/30' : 'text-red-400 bg-red-950/30 border-red-800/30'
+          }`}>{corpMessage.text}</p>
+        )}
+      </motion.div>
+
       {/* API Token */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
@@ -265,16 +385,16 @@ export default function ProfilePage() {
         <div className="space-y-1">
           <div className="flex items-center gap-2">
             <h2 className="text-sm font-mono-sc text-cyan-700 uppercase tracking-wider">External API token</h2>
-            {!isBetaOrAdmin && (
-              <span className="text-[9px] font-orbitron font-bold tracking-widest text-purple-400 bg-purple-950/40 border border-purple-700/50 px-1.5 py-0.5 rounded-sm">
-                BETA
+            {!isDeveloperOrAdmin && (
+              <span className="text-[9px] font-orbitron font-bold tracking-widest text-violet-400 bg-violet-950/40 border border-violet-700/50 px-1.5 py-0.5 rounded-sm">
+                DEV
               </span>
             )}
           </div>
           <p className="text-xs text-slate-600">Generate a long-lived token (1 year) to access the API from external projects.</p>
         </div>
 
-        {isBetaOrAdmin ? (
+        {isDeveloperOrAdmin ? (
           apiToken ? (
             <div className="space-y-2">
               <p className="text-xs text-amber-400 font-mono-sc">Copy this token now — it will not be shown again.</p>
@@ -304,7 +424,7 @@ export default function ProfilePage() {
         ) : (
           <div className="flex items-center gap-3 opacity-40 cursor-not-allowed select-none">
             <Lock size={14} className="text-slate-500 shrink-0" />
-            <span className="text-xs text-slate-500 font-mono-sc">Available for beta_tester and admin accounts only.</span>
+            <span className="text-xs text-slate-500 font-mono-sc">Available for developer and admin accounts only.</span>
           </div>
         )}
       </motion.div>

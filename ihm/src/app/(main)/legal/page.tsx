@@ -108,7 +108,7 @@ export default function LegalPage() {
             "Email address (login identifier)",
             "Username (display name)",
             "Password (stored as a bcrypt hash — never in plain text)",
-            "User role (user / beta_tester / admin)",
+            "User role (user / developer / admin)",
             "Avatar URL (optional)",
           ]}
         />
