@@ -13,7 +13,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const toggleSidebar = useCallback(() => setSidebarOpen((v) => !v), []);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-void">
+    <div className="flex h-dvh min-w-0 overflow-hidden bg-void">
       {/* Scan line */}
       <div
         className="animate-scanline pointer-events-none fixed left-0 right-0 h-20 z-50"
@@ -41,14 +41,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <TopBar onMenuToggle={toggleSidebar} />
-        <main className="flex-1 overflow-y-auto bg-void bg-grid">
+        <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-void bg-grid">
           <motion.div
             key={pathname}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.25 }}
-            className="p-3 sm:p-6 min-h-full"
+            className="min-h-full min-w-0 p-3 sm:p-6"
           >
             {children}
           </motion.div>

@@ -266,6 +266,21 @@
 
   * { box-sizing: border-box; }
 
+  html,
+  body {
+    max-width: 100%;
+  }
+
+  img,
+  video,
+  canvas,
+  svg,
+  table,
+  pre,
+  code {
+    max-width: 100%;
+  }
+
   html {
     background-color: var(--void);
   }
@@ -334,4 +349,57 @@
   }
 
   /* ─── Utilities ─────────────────────────────────────────────────────────────── */
+}
+
+@layer components {
+  .starvis-markdown {
+    @apply min-w-0 space-y-2 break-words text-sm leading-relaxed text-slate-300;
+    overflow-wrap: anywhere;
+  }
+
+  .starvis-markdown h1,
+  .starvis-markdown h2,
+  .starvis-markdown h3,
+  .starvis-markdown h4 {
+    @apply mt-3 first:mt-0 font-orbitron text-cyan-300;
+    letter-spacing: 0;
+  }
+
+  .starvis-markdown h1 {
+    @apply text-base;
+  }
+
+  .starvis-markdown h2 {
+    @apply text-sm;
+  }
+
+  .starvis-markdown h3,
+  .starvis-markdown h4 {
+    @apply text-xs uppercase;
+  }
+
+  .starvis-markdown p {
+    @apply m-0;
+  }
+
+  .starvis-markdown ul {
+    @apply my-2 space-y-1 pl-4;
+    list-style: disc;
+  }
+
+  .starvis-markdown li {
+    @apply pl-1;
+  }
+
+  .starvis-markdown blockquote {
+    @apply border-l border-cyan-700/60 pl-3 text-slate-400;
+  }
+
+  .starvis-markdown pre {
+    @apply my-2 overflow-x-auto rounded-sm border border-cyan-900/60 bg-black/35 p-3 text-xs text-slate-200;
+  }
+
+  .starvis-markdown pre code {
+    @apply block min-w-max bg-transparent p-0 text-inherit;
+  }
 }
