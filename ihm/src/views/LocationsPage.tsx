@@ -32,7 +32,6 @@ import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { useDebounce } from '@/hooks/useDebounce';
-import { hasBetaAccess } from '@/lib/app-constants';
 
 // ── Type meta ─────────────────────────────────────────────────────────────────
 
@@ -306,33 +305,12 @@ function TreeNode({ loc, childrenOf, shopsByLocKey, depth, expandedIds, onToggle
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-function BetaGate() {
-  return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto space-y-3">
-      <PageHeader title="Locations" subtitle="Systems, planets, stations and points of interest in the verse." />
-      <div className="sci-panel flex flex-col items-center gap-4 py-16 text-center">
-        <Shield size={36} className="text-purple-500 opacity-60" />
-        <div>
-          <p className="font-orbitron text-sm font-bold text-purple-400 tracking-widest uppercase mb-1">
-            Beta Access Required
-          </p>
-          <p className="font-rajdhani text-sm text-slate-500 max-w-xs">
-            The Locations module is currently in beta. You need the beta tester role to access this feature.
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function LocationsPage() {
   const { user } = useAuth();
   const { env } = useEnv();
   const [search, setSearch] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [initialized, setInitialized] = useState(false);
-
-  if (!hasBetaAccess(user?.role)) return <BetaGate />;
 
   const debouncedSearch = useDebounce(search, 250);
 

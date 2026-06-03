@@ -127,7 +127,21 @@ function ItemStats({ item }: { item: ItemListItem }) {
 	return null;
 }
 
-export default function ItemsPage() {
+type TaxonomyGroup = 'armor' | 'clothing' | 'weapons' | 'utility' | 'ammo' | 'sustenance' | undefined;
+
+interface ItemsPageProps { group?: TaxonomyGroup }
+
+const GROUP_LABELS: Record<string, string> = {
+  armor: 'Armor', clothing: 'Clothing', weapons: 'Weapons',
+  utility: 'Utility', ammo: 'Ammo', sustenance: 'Sustenance',
+};
+
+const GROUP_ALL_KEY: Record<string, string> = {
+  armor: 'armor_all', clothing: 'clothing_all', weapons: 'weapons_all',
+  utility: 'utility_all', ammo: 'ammo_all', sustenance: 'sustenance_all',
+};
+
+export default function ItemsPage({ group }: ItemsPageProps = {}) {
 	const pathname = usePathname();
 	const { env } = useEnv();
 	const {
@@ -135,8 +149,21 @@ export default function ItemsPage() {
 		updateSearch, updatePageWithScroll, resetListState, setPage,
 	} = useListQueryState();
 
-	const mode: "fps" | "other" = pathname?.startsWith("/consumables") || pathname?.startsWith("/items") || pathname?.startsWith("/other-items") ? "other" : "fps";
-	const [activeSlug, setActiveSlug] = useState<FpsSlug | "all">("all");
+	// Derive taxonomy group from URL if not passed as prop
+	const resolvedGroup: TaxonomyGroup = group
+		?? (pathname?.startsWith('/armor')      ? 'armor'
+		  : pathname?.startsWith('/clothing')   ? 'clothing'
+		  : pathname?.startsWith('/weapons')    ? 'weapons'
+		  : pathname?.startsWith('/utility')    ? 'utility'
+		  : pathname?.startsWith('/ammo')       ? 'ammo'
+		  : pathname?.startsWith('/sustenance') ? 'sustenance'
+		  : undefined);
+
+	// All taxonomy pages use the "fps" (category slug) mode
+	const mode: "fps" | "other" = "fps";
+
+	const initSlug: FpsSlug | "all" = resolvedGroup ?? "all";
+	const [activeSlug, setActiveSlug] = useState<FpsSlug | "all">(initSlug);
 	const [itemsSlug, setItemsSlug] = useState<ItemsSlug>("all");
 	const [subType, setSubType] = useState("");
 	const [manufacturer, setManufacturer] = useState("");
@@ -159,8 +186,11 @@ export default function ItemsPage() {
 		enabled: mode === "fps",
 	});
 
-	const chips = mode === "fps" ? (navigation?.fpsCategories ?? []) : [];
-	const itemCategories = mode === "other" ? (navigation?.otherCategories ?? []) : [];
+	// Filter categories to only show subcategories for the current taxonomy group
+	const allFpsCategories = navigation?.fpsCategories ?? [];
+	const chips = resolvedGroup
+		? allFpsCategories.filter((c) => c.group === resolvedGroup || c.group?.startsWith(resolvedGroup + '-'))
+		: allFpsCategories;
 
 	const selectSlug = (slug: FpsSlug | "all") => {
 		setActiveSlug(slug);
@@ -168,18 +198,11 @@ export default function ItemsPage() {
 		setPage(1);
 	};
 
-	const selectItemsSlug = (slug: ItemsSlug) => {
-		setItemsSlug(slug);
-		setSubType("");
-		setPage(1);
-	};
-
 	const fpsSubTypeOptions = navigation?.fpsSubTypeOptions[activeSlug as FpsSlug] ?? [];
-	const consumableFilterOptions = mode === "other" ? (navigation?.consumableFilterOptions[itemsSlug] ?? []) : [];
 
 	// Build query call
-	const isCategory = mode === "fps" && activeSlug !== "all";
-	const queryKey = ["items.list", mode, env, activeSlug, itemsSlug, page, debouncedSearch, subType, manufacturer];
+	const groupAllKey = resolvedGroup ? (GROUP_ALL_KEY[resolvedGroup] ?? 'fps_all') : 'fps_all';
+	const queryKey = ["items.list", resolvedGroup, env, activeSlug, page, debouncedSearch, subType, manufacturer];
 
 	const { data, isLoading, error, refetch } = useQuery({
 		queryKey,
@@ -192,69 +215,51 @@ export default function ItemsPage() {
 				sub_type: subType || undefined,
 				manufacturer: manufacturer || undefined,
 			};
-			if (isCategory) {
-				return api.items.category(activeSlug, base);
+			// "all" on a grouped page → use the group's aggregate query
+			if (activeSlug === "all" || activeSlug === resolvedGroup) {
+				return api.items.list({ ...base, item_group: groupAllKey });
 			}
-			if (mode === "fps") {
-				return api.items.list({ ...base, item_group: "fps_all" });
-			}
-			return api.items.list({ ...base, item_group: `other_${itemsSlug}` });
+			return api.items.category(activeSlug, base);
 		},
 		enabled: !!navigation,
 	});
 
-	const hasFilters = !!(
-		(mode === "fps" && manufacturer)
-		|| debouncedSearch
-		|| subType
-		|| activeSlug !== "all"
-		|| (mode === "other" && itemsSlug !== "all")
-	);
+	const hasFilters = !!(manufacturer || debouncedSearch || subType || (activeSlug !== "all" && activeSlug !== resolvedGroup));
 	const resetFilters = () => {
 		resetListState();
 		setManufacturer("");
 		setSubType("");
-		setActiveSlug("all");
+		setActiveSlug(initSlug);
 		setItemsSlug("all");
 	};
 
-	const filterGroups = mode === "fps"
-		? [
-				...(fpsSubTypeOptions.length > 0
-					? [{
-							key: "subtype",
-							label: activeSlug === "weapons" ? "Weapon type" : "Weight",
-							options: fpsSubTypeOptions,
-							value: subType,
-							onChange: (v: string) => { setSubType(v); setPage(1); },
-						}]
-					: []),
-				{
-					key: "mfr",
-					label: "Manufacturer",
-					options: (mfrData?.manufacturers ?? []).map((m) => ({
-						label: m.name,
-						value: m.code,
-					})),
-					value: manufacturer,
-					onChange: (v: string) => { setManufacturer(v); setPage(1); },
-				},
-			]
-		: consumableFilterOptions.length > 0
+	const filterGroups = [
+		...(fpsSubTypeOptions.length > 0
 			? [{
-					key: "consumable-subtype",
-					label: itemsSlug === "chips" ? "Chip type" : "Consumable type",
-					options: consumableFilterOptions,
+					key: "subtype",
+					label: resolvedGroup === "weapons" ? "Weapon type" : resolvedGroup === "armor" ? "Weight" : "Type",
+					options: fpsSubTypeOptions,
 					value: subType,
 					onChange: (v: string) => { setSubType(v); setPage(1); },
 				}]
-			: [];
-	const isFiltersLoading = mode === "fps" ? !mfrData || !navigation : !navigation;
+			: []),
+		{
+			key: "mfr",
+			label: "Manufacturer",
+			options: (mfrData?.manufacturers ?? []).map((m) => ({
+				label: m.name,
+				value: m.code,
+			})),
+			value: manufacturer,
+			onChange: (v: string) => { setManufacturer(v); setPage(1); },
+		},
+	];
+	const isFiltersLoading = !mfrData || !navigation;
 
 	const getItemName = (item: ItemListItem) =>
 		item.displayName ?? item.display_name ?? item.name;
 
-	const pageTitle = mode === "other" ? "Consumables" : "FPS Gear";
+	const pageTitle = resolvedGroup ? GROUP_LABELS[resolvedGroup] ?? 'Equipment' : 'Equipment';
 
 	return (
 		<div className="max-w-(--breakpoint-2xl) mx-auto">
@@ -267,30 +272,8 @@ export default function ItemsPage() {
 				onSearch={updateSearch}
 			/>
 
-			{/* Category chips */}
-			{mode === "other" && (
-				<div className="flex flex-wrap gap-1.5 mb-4">
-					{itemCategories.map((cat) => (
-						<button
-							key={cat.slug}
-							type="button"
-							onClick={() => selectItemsSlug(cat.slug as ItemsSlug)}
-							className={[
-								"px-3 py-1 rounded-sm text-xs font-rajdhani font-semibold tracking-wider transition-all border",
-								itemsSlug === cat.slug
-									? "bg-cyan-950/60 border-cyan-700 text-cyan-400"
-									: "border-border text-slate-500 hover:text-slate-300 hover:border-slate-600",
-							].join(" ")}
-						>
-							{cat.label}
-							{cat.count > 0 && (
-								<span className="ml-1 text-[10px] text-slate-600">{cat.count.toLocaleString()}</span>
-							)}
-						</button>
-					))}
-				</div>
-			)}
-			{mode === "fps" && (
+			{/* Category chips — filtered to the current taxonomy group */}
+			{chips.length > 0 && (
 				<div className="flex flex-wrap gap-1.5 mb-4">
 					{chips.map((chip) => (
 						<button
@@ -302,8 +285,10 @@ export default function ItemsPage() {
 								activeSlug === chip.slug
 									? "bg-cyan-950/60 border-cyan-700 text-cyan-400"
 									: "border-border text-slate-500 hover:text-slate-300 hover:border-slate-600",
+								chip.parentSlug ? "ml-3 text-[11px]" : "",
 							].join(" ")}
 						>
+							{chip.parentSlug && <span className="mr-1 opacity-40">└</span>}
 							{chip.label}
 							{chip.count > 0 && (
 								<span className="ml-1 text-[10px] text-slate-600">{chip.count.toLocaleString()}</span>

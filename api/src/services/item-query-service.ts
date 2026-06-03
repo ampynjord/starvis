@@ -48,43 +48,64 @@ const FPS_ALL_TYPES = [
   'Clothing',
 ];
 const FPS_COVERED_TYPES = new Set([...FPS_ALL_TYPES, 'Armor']);
+
 const CHIP_SUBTYPES = ['Hacking', 'SystemAccess'];
 const CONSUMABLE_SUBTYPE_ORDER = ['Food', 'Drink', 'Medical', 'MedPack', 'OxygenCap', 'Stim'];
+
+// ── New taxonomy groups — used for item_group queries ─────────────────────────
+const TAXONOMY_GROUPS: Record<string, { types: string[]; subTypes?: string[]; excludeSubTypes?: string[] }> = {
+  armor_all: { types: ['Armor_Helmet', 'Armor_Torso', 'Armor_Arms', 'Armor_Legs', 'Armor_Backpack', 'Undersuit'] },
+  clothing_all: { types: ['Clothing'] },
+  weapons_all: { types: ['FPS_Weapon'], excludeSubTypes: ['Throwable', 'Mine'] },
+  weapons_primary: { types: ['FPS_Weapon'], subTypes: ['Assault Rifle', 'SMG', 'Shotgun', 'Sniper Rifle', 'LMG'] },
+  utility_all: {
+    types: ['Tool', 'Gadget', 'Consumable'],
+    excludeSubTypes: [
+      'Food',
+      'Drink',
+      'OxygenCap',
+      'Stim',
+      'Assault Rifle',
+      'SMG',
+      'Shotgun',
+      'Sniper Rifle',
+      'LMG',
+      'Pistol',
+      'Launcher',
+      'Melee',
+      'Throwable',
+      'Mine',
+    ],
+  },
+  ammo_all: { types: ['Magazine'] },
+  sustenance_all: { types: ['Consumable'], subTypes: ['Food', 'Drink', 'OxygenCap'] },
+  other_all: { types: ['Gadget'], excludeSubTypes: ['Handheld', 'Two-handed', 'Device'] },
+  // Legacy
+  fps_all: { types: FPS_ALL_TYPES, excludeSubTypes: ['Food', 'Drink'] },
+};
+
+// ── Subtype filter options per category slug ─────────────────────────────────
+const ARMOR_WEIGHT = [
+  { label: 'Light', value: 'Light' },
+  { label: 'Medium', value: 'Medium' },
+  { label: 'Heavy', value: 'Heavy' },
+];
+
 const FPS_SUBTYPE_OPTIONS: Record<string, { label: string; value: string }[]> = {
-  weapons: ['Pistol', 'SMG', 'Shotgun', 'Sniper Rifle', 'Assault Rifle', 'LMG', 'Launcher', 'Melee', 'Medium', 'Large', 'Small'].map(
-    (s) => ({
-      label: s,
-      value: s,
-    }),
-  ),
-  throwable: [
+  // Armor
+  armor: ARMOR_WEIGHT,
+  'armor-helmets': ARMOR_WEIGHT,
+  'armor-core': ARMOR_WEIGHT,
+  'armor-arms': ARMOR_WEIGHT,
+  'armor-legs': ARMOR_WEIGHT,
+  'armor-backpacks': ARMOR_WEIGHT,
+  // Weapons
+  weapons: ['Pistol', 'SMG', 'Shotgun', 'Sniper Rifle', 'Assault Rifle', 'LMG', 'Launcher', 'Melee'].map((s) => ({ label: s, value: s })),
+  'weapons-sidearms': [],
+  'weapons-primary': ['Assault Rifle', 'SMG', 'Shotgun', 'Sniper Rifle', 'LMG'].map((s) => ({ label: s, value: s })),
+  'weapons-throwables': [
     { label: 'Grenades', value: 'Throwable' },
     { label: 'Mines', value: 'Mine' },
-  ],
-  helmet: [
-    { label: 'Light', value: 'Light' },
-    { label: 'Medium', value: 'Medium' },
-    { label: 'Heavy', value: 'Heavy' },
-  ],
-  core: [
-    { label: 'Light', value: 'Light' },
-    { label: 'Medium', value: 'Medium' },
-    { label: 'Heavy', value: 'Heavy' },
-  ],
-  arms: [
-    { label: 'Light', value: 'Light' },
-    { label: 'Medium', value: 'Medium' },
-    { label: 'Heavy', value: 'Heavy' },
-  ],
-  legs: [
-    { label: 'Light', value: 'Light' },
-    { label: 'Medium', value: 'Medium' },
-    { label: 'Heavy', value: 'Heavy' },
-  ],
-  backpack: [
-    { label: 'Light', value: 'Light' },
-    { label: 'Medium', value: 'Medium' },
-    { label: 'Heavy', value: 'Heavy' },
   ],
 };
 
@@ -322,31 +343,66 @@ export class ItemQueryService {
       const key = `${r.type}::${r.sub_type ?? ''}`;
       byTypeSub.set(key, Number(r.cnt));
     }
-    const droppable = (byTypeSub.get('FPS_Weapon::Throwable') || 0) + (byTypeSub.get('FPS_Weapon::Mine') || 0);
-    const fpsGadget = byTypeSub.get('FPS_Weapon::Gadget') || 0;
-    const consumableFoodDrink = (byTypeSub.get('Consumable::Food') || 0) + (byTypeSub.get('Consumable::Drink') || 0);
-    const consumableMission = (byTypeSub.get('Consumable::Hacking') || 0) + (byTypeSub.get('Consumable::SystemAccess') || 0);
-    const weaponTotal = byType.get('FPS_Weapon') || 0;
+    const sub = (type: string, subType: string) => byTypeSub.get(`${type}::${subType}`) || 0;
+    const type = (t: string) => byType.get(t) || 0;
+
+    const throwables = sub('FPS_Weapon', 'Throwable') + sub('FPS_Weapon', 'Mine');
+    const fpsWeaponTotal = type('FPS_Weapon');
+    const weaponsAll = fpsWeaponTotal - throwables;
+    const _fpsGadget = sub('FPS_Weapon', 'Gadget');
+    const gadgetHand = sub('Gadget', 'Handheld') + sub('Gadget', 'Two-handed') + sub('Gadget', 'Device');
+    const medicalSubs = sub('Consumable', 'Medical') + sub('Consumable', 'MedPack') + sub('Consumable', 'Stim') + sub('Tool', 'Medical');
+    const cryptokeys = sub('Consumable', 'Hacking') + sub('Consumable', 'SystemAccess');
+    const techSubs = sub('Tool', 'Multitool') + sub('Tool', 'Module') + sub('Gadget', 'Device');
+    const foodDrinkOxy = sub('Consumable', 'Food') + sub('Consumable', 'Drink') + sub('Consumable', 'OxygenCap');
+    const appearanceFlair = sub('Attachment', 'Appearance');
+
     return {
-      weapons: weaponTotal - droppable - fpsGadget,
-      throwable: droppable,
-      helmet: byType.get('Armor_Helmet') || 0,
-      core: byType.get('Armor_Torso') || 0,
-      arms: byType.get('Armor_Arms') || 0,
-      legs: byType.get('Armor_Legs') || 0,
-      backpack: byType.get('Armor_Backpack') || 0,
-      undersuit: byType.get('Undersuit') || 0,
-      'tools-medics':
-        (byType.get('Tool') || 0) +
-        (byType.get('Consumable') || 0) -
-        consumableFoodDrink -
-        consumableMission +
-        (byType.get('Gadget') || 0) +
-        fpsGadget,
-      magazines: byType.get('Magazine') || 0,
-      attachments: byType.get('Attachment') || 0,
-      clothing: byType.get('Clothing') || 0,
-      other: 0,
+      // Armor
+      armor:
+        type('Armor_Helmet') + type('Armor_Torso') + type('Armor_Arms') + type('Armor_Legs') + type('Armor_Backpack') + type('Undersuit'),
+      'armor-helmets': type('Armor_Helmet'),
+      'armor-core': type('Armor_Torso'),
+      'armor-arms': type('Armor_Arms'),
+      'armor-legs': type('Armor_Legs'),
+      'armor-backpacks': type('Armor_Backpack'),
+      'armor-undersuits': type('Undersuit'),
+      'armor-flair': appearanceFlair,
+      // Clothing
+      clothing: type('Clothing'),
+      // Weapons
+      weapons: weaponsAll,
+      'weapons-sidearms': sub('FPS_Weapon', 'Pistol'),
+      'weapons-primary':
+        sub('FPS_Weapon', 'Assault Rifle') +
+        sub('FPS_Weapon', 'SMG') +
+        sub('FPS_Weapon', 'Shotgun') +
+        sub('FPS_Weapon', 'Sniper Rifle') +
+        sub('FPS_Weapon', 'LMG'),
+      'weapons-primary-ar': sub('FPS_Weapon', 'Assault Rifle'),
+      'weapons-primary-smg': sub('FPS_Weapon', 'SMG'),
+      'weapons-primary-shotgun': sub('FPS_Weapon', 'Shotgun'),
+      'weapons-primary-sniper': sub('FPS_Weapon', 'Sniper Rifle'),
+      'weapons-primary-lmg': sub('FPS_Weapon', 'LMG'),
+      'weapons-special': sub('FPS_Weapon', 'Launcher'),
+      'weapons-melee': sub('FPS_Weapon', 'Melee'),
+      'weapons-attachments': sub('Attachment', 'Weapon Modifier'),
+      'weapons-throwables': throwables,
+      // Utility
+      utility: type('Tool') + type('Gadget') + type('Consumable') - foodDrinkOxy - cryptokeys - throwables - weaponsAll + throwables,
+      'utility-gadgets': gadgetHand,
+      'utility-medical': medicalSubs,
+      'utility-cryptokeys': cryptokeys,
+      'utility-technology': techSubs,
+      // Ammo
+      ammo: type('Magazine'),
+      // Sustenance
+      sustenance: foodDrinkOxy,
+      'sustenance-food': sub('Consumable', 'Food'),
+      'sustenance-drink': sub('Consumable', 'Drink'),
+      'sustenance-oxygen': sub('Consumable', 'OxygenCap'),
+      // Other
+      other: type('Gadget') - gadgetHand - (sub('Gadget', 'Device') - 0), // residual gadgets
     };
   }
 
@@ -416,53 +472,98 @@ export class ItemQueryService {
     const consumableCountMap = Object.fromEntries(consumableEntries.map((entry) => [entry.value, entry.count]));
     const otherTypes = (filters.filters.type ?? []).map((entry) => entry.value).filter((type) => !FPS_COVERED_TYPES.has(type));
     const nonConsumableOtherTypes = otherTypes.filter((type) => type !== 'Consumable');
-    const chipCount = CHIP_SUBTYPES.reduce((sum, value) => sum + (consumableCountMap[value] ?? 0), 0);
+    const _chipCount = CHIP_SUBTYPES.reduce((sum, value) => sum + (consumableCountMap[value] ?? 0), 0);
     const otherCount = nonConsumableOtherTypes.reduce((sum, value) => sum + (typeCounts[value] ?? 0), 0);
     const orderedConsumableEntries = orderConsumableEntries(consumableEntries.filter((entry) => !CHIP_SUBTYPES.includes(entry.value)));
-    const fpsCategories = [
-      { slug: 'all', label: 'All', count: Object.values(categoryCounts).reduce((sum, count) => sum + count, 0) },
-      ...[
-        { slug: 'weapons', label: 'Weapons' },
-        { slug: 'throwable', label: 'Throwable' },
-        { slug: 'helmet', label: 'Helmet' },
-        { slug: 'core', label: 'Torso' },
-        { slug: 'arms', label: 'Arms' },
-        { slug: 'legs', label: 'Legs' },
-        { slug: 'backpack', label: 'Backpack' },
-        { slug: 'undersuit', label: 'Undersuit' },
-        { slug: 'tools-medics', label: 'Tools & Medics' },
-        { slug: 'attachments', label: 'Attachment' },
-        { slug: 'magazines', label: 'Magazines' },
-        { slug: 'clothing', label: 'Clothing' },
-        { slug: 'other', label: 'Other' },
-      ].map((category) => ({ ...category, count: categoryCounts[category.slug] ?? 0 })),
-    ];
-    const otherCategories = [
+    type NavCategory = { slug: string; label: string; count: number; group: string; parentSlug?: string };
+
+    const c = (slug: string) => categoryCounts[slug] ?? 0;
+
+    const fpsCategories: NavCategory[] = [
+      // ── Armor ────────────────────────────────────────────────────────────────
+      { slug: 'armor', label: 'All Armor', group: 'armor', count: c('armor') },
+      { slug: 'armor-undersuits', label: 'Undersuits', group: 'armor', count: c('armor-undersuits') },
+      { slug: 'armor-helmets', label: 'Helmets', group: 'armor', count: c('armor-helmets') },
+      { slug: 'armor-core', label: 'Core', group: 'armor', count: c('armor-core') },
+      { slug: 'armor-arms', label: 'Arms', group: 'armor', count: c('armor-arms') },
+      { slug: 'armor-legs', label: 'Legs', group: 'armor', count: c('armor-legs') },
+      { slug: 'armor-backpacks', label: 'Backpacks', group: 'armor', count: c('armor-backpacks') },
+      { slug: 'armor-flair', label: 'Flair', group: 'armor', count: c('armor-flair') },
+      // ── Clothing ─────────────────────────────────────────────────────────────
+      { slug: 'clothing', label: 'All Clothing', group: 'clothing', count: c('clothing') },
+      // ── Weapons ──────────────────────────────────────────────────────────────
+      { slug: 'weapons', label: 'All Weapons', group: 'weapons', count: c('weapons') },
+      { slug: 'weapons-sidearms', label: 'Sidearms', group: 'weapons', count: c('weapons-sidearms') },
+      { slug: 'weapons-primary', label: 'Primary', group: 'weapons', count: c('weapons-primary') },
       {
-        slug: 'all',
-        label: 'All',
-        count: consumableEntries.reduce((sum, entry) => sum + entry.count, 0) + otherCount,
+        slug: 'weapons-primary-ar',
+        label: 'Assault Rifles',
+        group: 'weapons-primary',
+        count: c('weapons-primary-ar'),
+        parentSlug: 'weapons-primary',
       },
-      ...(chipCount > 0 ? [{ slug: 'chips', label: 'Chips', count: chipCount }] : []),
-      ...orderedConsumableEntries.map((entry) => ({
-        slug: `sub:${entry.value}`,
-        label: formatConsumableLabel(entry.value),
-        count: entry.count,
-      })),
-      { slug: 'other', label: 'Other', count: otherCount },
+      {
+        slug: 'weapons-primary-smg',
+        label: 'SMGs',
+        group: 'weapons-primary',
+        count: c('weapons-primary-smg'),
+        parentSlug: 'weapons-primary',
+      },
+      {
+        slug: 'weapons-primary-shotgun',
+        label: 'Shotguns',
+        group: 'weapons-primary',
+        count: c('weapons-primary-shotgun'),
+        parentSlug: 'weapons-primary',
+      },
+      {
+        slug: 'weapons-primary-sniper',
+        label: 'Sniper Rifles',
+        group: 'weapons-primary',
+        count: c('weapons-primary-sniper'),
+        parentSlug: 'weapons-primary',
+      },
+      {
+        slug: 'weapons-primary-lmg',
+        label: 'LMGs',
+        group: 'weapons-primary',
+        count: c('weapons-primary-lmg'),
+        parentSlug: 'weapons-primary',
+      },
+      { slug: 'weapons-special', label: 'Special', group: 'weapons', count: c('weapons-special') },
+      { slug: 'weapons-melee', label: 'Melee', group: 'weapons', count: c('weapons-melee') },
+      { slug: 'weapons-attachments', label: 'Attachments', group: 'weapons', count: c('weapons-attachments') },
+      { slug: 'weapons-throwables', label: 'Throwables', group: 'weapons', count: c('weapons-throwables') },
+      // ── Utility ──────────────────────────────────────────────────────────────
+      { slug: 'utility', label: 'All Utility', group: 'utility', count: c('utility') },
+      { slug: 'utility-gadgets', label: 'Gadgets', group: 'utility', count: c('utility-gadgets') },
+      { slug: 'utility-medical', label: 'Medical', group: 'utility', count: c('utility-medical') },
+      { slug: 'utility-cryptokeys', label: 'Cryptokeys', group: 'utility', count: c('utility-cryptokeys') },
+      { slug: 'utility-technology', label: 'Technology', group: 'utility', count: c('utility-technology') },
+      // ── Ammo ─────────────────────────────────────────────────────────────────
+      { slug: 'ammo', label: 'Ammo', group: 'ammo', count: c('ammo') },
+      // ── Sustenance ───────────────────────────────────────────────────────────
+      { slug: 'sustenance', label: 'All Sustenance', group: 'sustenance', count: c('sustenance') },
+      { slug: 'sustenance-food', label: 'Food', group: 'sustenance', count: c('sustenance-food') },
+      { slug: 'sustenance-drink', label: 'Drinks', group: 'sustenance', count: c('sustenance-drink') },
+      { slug: 'sustenance-oxygen', label: 'Oxygen', group: 'sustenance', count: c('sustenance-oxygen') },
+      // ── Other ─────────────────────────────────────────────────────────────────
+      { slug: 'other', label: 'Other', group: 'other', count: c('other') },
     ];
+
+    // Keep otherCategories for backward compat (currently unused by new pages)
+    const otherCategories = [
+      { slug: 'all', label: 'All', count: consumableEntries.reduce((sum, entry) => sum + entry.count, 0) + otherCount, group: 'other' },
+    ];
+
     const consumableFilterOptions: Record<string, { label: string; value: string }[]> = {
-      chips: CHIP_SUBTYPES.filter((value) => (consumableCountMap[value] ?? 0) > 0).map((value) => ({
-        label: formatConsumableLabel(value),
-        value,
-      })),
       all: consumableEntries.map((entry) => ({ label: formatConsumableLabel(entry.value), value: entry.value })),
     };
+
     const groups: Record<string, { type?: string; types?: string[]; subTypes?: string[]; excludeSubTypes?: string[] }> = {
-      fps_all: { types: FPS_ALL_TYPES, excludeSubTypes: ['Food', 'Drink'] },
+      ...TAXONOMY_GROUPS,
+      // Legacy
       other_all: { types: otherTypes },
-      other_chips: { type: 'Consumable', subTypes: CHIP_SUBTYPES },
-      other_other: { types: nonConsumableOtherTypes },
     };
     for (const entry of orderedConsumableEntries) groups[`other_sub:${entry.value}`] = { type: 'Consumable', subTypes: [entry.value] };
 

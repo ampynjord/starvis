@@ -6,6 +6,7 @@ import { mountCalculateRoutes } from './calculate.js';
 import { mountChatRoutes } from './chat.js';
 import { mountCommodityRoutes } from './commodities.js';
 import { mountComponentRoutes } from './components.js';
+import { mountCorporationRoutes } from './corporations.js';
 import { mountCraftingRoutes } from './crafting.js';
 import { mountItemRoutes } from './items.js';
 import { mountLocationRoutes } from './locations.js';
@@ -43,6 +44,7 @@ const routeMounts = [
   mountTradeRoutes,
   mountSystemRoutes,
   mountAdminRoutes,
+  mountCorporationRoutes,
   mountRsiWebsiteRoutes,
   mountChatRoutes,
   mountAuthRoutes,

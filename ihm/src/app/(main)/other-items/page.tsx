@@ -1,7 +1,5 @@
-'use client';
-
-import ItemsPage from '@/views/ItemsPage';
+import { redirect } from 'next/navigation';
 
 export default function Page() {
-  return <ItemsPage />;
+  redirect('/utility');
 }
