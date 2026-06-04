@@ -2,29 +2,20 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Banknote, ClipboardList, Filter, Loader2, Scale, Search, Shield, Skull, Users, X } from 'lucide-react';
+import { Banknote, ClipboardList, Filter, Loader2, Scale, Search, Skull, Users, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
+import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { useEnv } from '@/contexts/EnvContext';
 import { api } from '@/services/api';
 import type { FactionSummary } from '@/types/api';
 
 function formatUec(value: number | null) {
   return value == null ? 'N/A' : `${Math.round(value).toLocaleString('en-US')} aUEC`;
-}
-
-function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
-  return (
-    <div className="sci-panel border border-slate-800/60 px-3 py-2">
-      <div className="flex items-center gap-1.5 text-slate-600">
-        {icon}
-        <span className="font-mono-sc text-[9px] uppercase tracking-widest">{label}</span>
-      </div>
-      <div className="mt-1 font-orbitron text-lg font-bold text-slate-100">{value}</div>
-    </div>
-  );
 }
 
 function FactionCard({ faction }: { faction: FactionSummary }) {
@@ -50,9 +41,9 @@ function FactionCard({ faction }: { faction: FactionSummary }) {
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-2">
-        <Stat icon={<Scale size={11} />} label="Legal" value={faction.legal_missions} />
-        <Stat icon={<Skull size={11} />} label="Illegal" value={faction.illegal_missions} />
-        <Stat icon={<Banknote size={11} />} label="Avg" value={<span className="text-sm">{formatUec(faction.reward_average)}</span>} />
+        <StatCard icon={Scale} label="Legal" value={faction.legal_missions} />
+        <StatCard icon={Skull} label="Illegal" value={faction.illegal_missions} accent={faction.illegal_missions ? 'rose' : 'slate'} />
+        <StatCard icon={Banknote} label="Avg" value={<span className="text-sm">{formatUec(faction.reward_average)}</span>} />
       </div>
 
       <div className="mt-4 space-y-2">
@@ -124,18 +115,15 @@ export default function FactionsPage() {
   if (error) return <ErrorState error={error as Error} />;
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="flex items-center gap-2 text-cyan-400">
-            <Shield size={20} />
-            <h1 className="font-orbitron text-2xl font-bold uppercase tracking-widest text-white">Factions</h1>
-          </div>
-          <p className="mt-1 font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">
-            Mission organizations, legality profile and reward bands
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
+    <PageShell>
+      <PageHeader
+        eyebrow="Universe"
+        title="Factions"
+        subtitle="Mission organizations, legality profile and reward bands."
+        count={filtered.length}
+        countLabel="visible factions"
+        actions={(
+          <>
           <div className="relative min-w-[260px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
             <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search faction, giver or type..." className="sci-input w-full pl-9 pr-9" />
@@ -151,15 +139,16 @@ export default function FactionsPage() {
             <option value="mixed">Mixed</option>
             <option value="hostile">Hostile</option>
           </select>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat icon={<Users size={12} />} label="Factions" value={factions.length} />
-        <Stat icon={<ClipboardList size={12} />} label="Missions" value={totals.missions} />
-        <Stat icon={<Scale size={12} />} label="Legal" value={totals.legal} />
-        <Stat icon={<Skull size={12} />} label="Illegal" value={totals.illegal} />
-      </div>
+      <StatGrid>
+        <StatCard icon={Users} label="Factions" value={factions.length} />
+        <StatCard icon={ClipboardList} label="Missions" value={totals.missions} accent="cyan" />
+        <StatCard icon={Scale} label="Legal" value={totals.legal} accent="emerald" />
+        <StatCard icon={Skull} label="Illegal" value={totals.illegal} accent={totals.illegal ? 'rose' : 'slate'} />
+      </StatGrid>
 
       <ScifiPanel
         title="Faction Index"
@@ -181,6 +170,6 @@ export default function FactionsPage() {
           </div>
         )}
       </ScifiPanel>
-    </div>
+    </PageShell>
   );
 }

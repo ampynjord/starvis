@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import { BookOpen, Code2, ExternalLink, Key, Lock, Terminal, Zap } from 'lucide-react';
 import Link from 'next/link';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 
 export const metadata: Metadata = {
   title: 'Developer API - STARVIS',
@@ -29,11 +31,12 @@ function Code({ children }: { children: string }) {
 
 export default function DeveloperPage() {
   return (
-    <div className="max-w-3xl mx-auto space-y-5">
-      <div>
-        <h1 className="font-orbitron text-xl font-bold tracking-widest text-slate-100 uppercase mb-1">Developer API</h1>
-        <p className="text-xs text-slate-600 font-mono-sc">External REST API - Developer access required</p>
-      </div>
+    <PageShell size="lg" className="p-4 md:p-6">
+      <PageHeader
+        eyebrow="Developer"
+        title="Developer API"
+        subtitle="External REST API - Developer access required."
+      />
 
       <div className="flex items-start gap-3 rounded-sm border border-amber-800/40 bg-amber-950/10 px-4 py-3">
         <Lock size={14} className="text-amber-500 mt-0.5 shrink-0" />
@@ -112,6 +115,6 @@ https://starvis.ampynjord.bzh/api/v1/search?q=aurora`}</Code>
           <code className="font-mono text-slate-300">X-RateLimit-Remaining</code> indicate the current state.
         </p>
       </Section>
-    </div>
+    </PageShell>
   );
 }

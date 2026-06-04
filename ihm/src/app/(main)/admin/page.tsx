@@ -11,13 +11,15 @@ import {
   Pencil,
   Plus,
   Search,
-  Shield,
   Trash2,
   UserCheck,
   X,
 } from 'lucide-react';
 import Link from 'next/link';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { RsiOrgPicker, type RsiOrg } from '@/components/ui/RsiOrgPicker';
+import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth, type AuthUser } from '@/contexts/AuthContext';
 import { ADMIN_ROLE, DEVELOPER_ROLE, USER_ROLE, USER_ROLES } from '@/lib/app-constants';
@@ -558,23 +560,22 @@ export default function AdminPage() {
 
   return (
     <>
-      <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
-
-        {/* Header */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            <Shield size={18} className="text-cyan-400 shrink-0" />
-            <h1 className="text-base font-orbitron font-bold text-white tracking-wider">ADMINISTRATION</h1>
-          </div>
-          <button
-            type="button"
-            onClick={() => setModal({ type: 'create' })}
-            className="sci-btn-primary py-1.5 px-3 text-xs gap-1.5 flex items-center"
-          >
-            <Plus size={12} />
-            Create account
-          </button>
-        </div>
+      <PageShell size="lg" className="p-4 md:p-6">
+        <PageHeader
+          eyebrow="Administration"
+          title="Users"
+          subtitle="Manage accounts, roles, passwords and corporation links."
+          actions={(
+            <button
+              type="button"
+              onClick={() => setModal({ type: 'create' })}
+              className="sci-btn-primary py-1.5 px-3 text-xs gap-1.5 flex items-center"
+            >
+              <Plus size={12} />
+              Create account
+            </button>
+          )}
+        />
 
         {/* Nav links */}
         <Link
@@ -586,23 +587,20 @@ export default function AdminPage() {
         </Link>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <div className="sci-panel px-3 py-2.5 border border-slate-800/60">
-            <p className="font-mono-sc text-[9px] text-slate-600 uppercase tracking-widest">Total</p>
-            <p className="font-orbitron text-lg font-black text-slate-200 mt-0.5">{users.length}</p>
-          </div>
+        <StatGrid>
+          <StatCard label="Total" value={users.length} />
           {ROLES.map((r) => {
             const s = ROLE_STYLE[r];
             return (
-              <div key={r} className="sci-panel px-3 py-2.5 border border-slate-800/60">
-                <p className="font-mono-sc text-[9px] text-slate-600 uppercase tracking-widest">{s.label}</p>
-                <p className={`font-orbitron text-lg font-black mt-0.5 ${r === ADMIN_ROLE ? 'text-cyan-400' : r === DEVELOPER_ROLE ? 'text-purple-400' : 'text-slate-400'}`}>
-                  {countByRole[r] ?? 0}
-                </p>
-              </div>
+              <StatCard
+                key={r}
+                label={s.label}
+                value={countByRole[r] ?? 0}
+                accent={r === ADMIN_ROLE ? 'cyan' : r === DEVELOPER_ROLE ? 'purple' : 'slate'}
+              />
             );
           })}
-        </div>
+        </StatGrid>
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-2">
@@ -723,7 +721,7 @@ export default function AdminPage() {
             </div>
           )}
         </motion.div>
-      </div>
+      </PageShell>
 
       {/* Toast */}
       <AnimatePresence>

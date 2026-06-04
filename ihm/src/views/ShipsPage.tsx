@@ -3,6 +3,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { ArrowUpDown } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
+import { PageTabs } from '@/components/ui/PageTabs';
 import { useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { api } from '@/services/api';
@@ -124,7 +126,7 @@ export default function ShipsPage() {
   const categoryLabel = CATEGORIES.find(c => c.value === category)?.label ?? 'Ships';
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto">
+    <PageShell>
       <PageHeader
         title={categoryLabel}
         count={data?.total}
@@ -135,30 +137,12 @@ export default function ShipsPage() {
       />
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 border-b border-slate-800">
-        {CATEGORIES.map(cat => {
-          const count = categoryCount(cat.value);
-          const active = category === cat.value;
-          return (
-            <button
-              key={cat.value}
-              onClick={() => switchCategory(cat.value)}
-              className={`px-4 py-2 text-xs font-mono-sc uppercase tracking-wider transition-colors border-b-2 -mb-px ${
-                active
-                  ? 'border-cyan-500 text-cyan-400'
-                  : 'border-transparent text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              {cat.label}
-              {count !== null && (
-                <span className={`ml-2 ${active ? 'text-cyan-600' : 'text-slate-700'}`}>
-                  {count.toLocaleString('en-US')}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
+      <PageTabs
+        className="mb-4"
+        items={CATEGORIES.map((cat) => ({ ...cat, count: categoryCount(cat.value) }))}
+        value={category}
+        onChange={switchCategory}
+      />
 
       {/* Sort toolbar */}
       <div className="mb-4 flex items-center justify-end gap-2">
@@ -261,6 +245,6 @@ export default function ShipsPage() {
           )}
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

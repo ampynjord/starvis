@@ -4,9 +4,11 @@ import { motion } from 'framer-motion';
 import { AlertTriangle, Building2, Copy, Key, Lock, LogOut, QrCode, Save, Shield, ShieldCheck, ShieldOff, Trash2, User, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
+import { RsiOrgPicker, type RsiOrg } from '@/components/ui/RsiOrgPicker';
 import { useAuth } from '@/contexts/AuthContext';
 import { hasDeveloperAccess } from '@/lib/app-constants';
-import { RsiOrgPicker, type RsiOrg } from '@/components/ui/RsiOrgPicker';
 
 interface Membership {
   id: number;
@@ -236,11 +238,18 @@ export default function ProfilePage() {
   if (!user) return null;
 
   return (
-    <div className="p-6 max-w-lg mx-auto space-y-6">
-      <div className="flex items-center gap-3">
-        <User size={20} className="text-cyan-400" />
-        <h1 className="text-lg font-orbitron font-bold text-white tracking-wider">MY PROFILE</h1>
-      </div>
+    <PageShell size="lg" className="p-4 md:p-6">
+      <PageHeader
+        eyebrow="Account"
+        title="My Profile"
+        subtitle="Manage identity, corporation membership, API token and security."
+        actions={(
+          <div className="flex items-center gap-2 rounded-sm border border-cyan-900/50 bg-cyan-950/20 px-2.5 py-1.5">
+            <User size={13} className="text-cyan-400" />
+            <span className="font-mono-sc text-[10px] uppercase tracking-wider text-cyan-500">{user.role}</span>
+          </div>
+        )}
+      />
 
       {/* Info card */}
       <motion.div
@@ -614,6 +623,6 @@ export default function ProfilePage() {
           </motion.div>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

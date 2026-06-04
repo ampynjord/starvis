@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Building2, Check, Crown, Package, ShieldCheck, Ship, UserCheck, UserMinus, Users, XCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
+import { StatCard, StatGrid } from '@/components/ui/StatCard';
 
 type MemberRole = 'member' | 'leader';
 
@@ -35,17 +38,6 @@ async function apiFetch(path: string, opts?: RequestInit) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error ?? 'Request failed');
   return data;
-}
-
-function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: number | string }) {
-  return (
-    <div className="sci-panel px-3 py-2.5 border border-slate-800/60">
-      <p className="font-mono-sc text-[9px] text-slate-600 uppercase tracking-widest flex items-center gap-1.5">
-        <Icon size={10} /> {label}
-      </p>
-      <p className="font-orbitron text-lg font-black text-slate-200 mt-0.5">{value}</p>
-    </div>
-  );
 }
 
 export default function CorpPage() {
@@ -140,30 +132,31 @@ export default function CorpPage() {
   const corp = workspace.corporation;
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-11 h-11 rounded-sm bg-cyan-950 border border-cyan-800/40 flex items-center justify-center overflow-hidden shrink-0">
-            {corp.logoUrl ? <img src={corp.logoUrl} alt={corp.tag} className="w-full h-full object-cover" /> : <Building2 size={18} className="text-cyan-400" />}
+    <PageShell size="xl" className="p-4 md:p-6">
+      <PageHeader
+        eyebrow="Corporation"
+        title={corp.name}
+        subtitle={`[${corp.tag}] corporation console`}
+        actions={(
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-sm bg-cyan-950 border border-cyan-800/40 flex items-center justify-center overflow-hidden shrink-0">
+              {corp.logoUrl ? <img src={corp.logoUrl} alt={corp.tag} className="w-full h-full object-cover" /> : <Building2 size={18} className="text-cyan-400" />}
+            </div>
+            {isLeader && (
+              <span className="inline-flex items-center gap-1.5 text-[10px] font-orbitron uppercase tracking-widest text-emerald-400 border border-emerald-800/50 bg-emerald-950/20 px-2 py-1 rounded-sm">
+                <ShieldCheck size={11} /> Leader
+              </span>
+            )}
           </div>
-          <div className="min-w-0">
-            <h1 className="font-orbitron text-lg font-bold text-white tracking-wider truncate">{corp.name}</h1>
-            <p className="text-[10px] text-slate-600 font-mono-sc uppercase tracking-widest">[{corp.tag}] corporation console</p>
-          </div>
-        </div>
-        {isLeader && (
-          <span className="inline-flex items-center gap-1.5 text-[10px] font-orbitron uppercase tracking-widest text-emerald-400 border border-emerald-800/50 bg-emerald-950/20 px-2 py-1 rounded-sm">
-            <ShieldCheck size={11} /> Leader
-          </span>
         )}
-      </div>
+      />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <Stat icon={Users} label="Members" value={workspace.members.length} />
-        <Stat icon={Ship} label="Fleet" value={fleetCount} />
-        <Stat icon={Package} label="Bank Items" value={bankCount} />
-        <Stat icon={Check} label="Pending" value={workspace.pendingMemberships.length} />
-      </div>
+      <StatGrid>
+        <StatCard icon={Users} label="Members" value={workspace.members.length} />
+        <StatCard icon={Ship} label="Fleet" value={fleetCount} accent="cyan" />
+        <StatCard icon={Package} label="Bank Items" value={bankCount} accent="purple" />
+        <StatCard icon={Check} label="Pending" value={workspace.pendingMemberships.length} accent={workspace.pendingMemberships.length ? 'amber' : 'slate'} />
+      </StatGrid>
 
       {isLeader && (
         <section className="grid gap-2 md:grid-cols-3">
@@ -293,6 +286,6 @@ export default function CorpPage() {
           })}
         </div>
       </section>
-    </div>
+    </PageShell>
   );
 }
