@@ -63,21 +63,30 @@ describe('RsiSyncService stats shape', () => {
 });
 
 describe('RsiSyncService.syncStarmap', () => {
-  it('stores 3D system coordinates', async () => {
+  it('stores 3D system coordinates from RSI official bootup API', async () => {
     vi.stubGlobal('fetch', async () => ({
       ok: true,
       json: async () => ({
-        data: [
-          {
-            id: 1,
-            code: 'TEST',
-            name: 'Test',
-            position: { x: 1.25, y: -2.5, z: 3.75 },
-            affiliation: [{ name: 'UEE' }],
-            jumppoints: [],
+        data: {
+          systems: {
+            resultset: [
+              {
+                id: 1,
+                code: 'TEST',
+                name: 'Test',
+                type: 'SingleStar',
+                status: 'P',
+                position: { x: 1.25, y: -2.5, z: 3.75 },
+                affiliation: [{ name: 'UEE' }],
+                jumppoints: [],
+                aggregated_size: 4,
+                aggregated_population: 5,
+                aggregated_economy: 6,
+                aggregated_danger: 1,
+              },
+            ],
           },
-        ],
-        meta: { total: 1, last_page: 1 },
+        },
       }),
     }));
 
@@ -89,6 +98,7 @@ describe('RsiSyncService.syncStarmap', () => {
 
     const params = query.mock.calls[0][1] as unknown[];
     expect(JSON.parse(params[13] as string)).toEqual({ x: 1.25, y: -2.5, z: 3.75 });
-    expect(JSON.parse(params[23] as string)).toMatchObject({ code: 'TEST' });
+    expect(params[1]).toBe('Test');
+    expect(params[2]).toBe('StarSystem');
   });
 });
