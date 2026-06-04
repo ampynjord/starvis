@@ -353,10 +353,26 @@ export class RsiWebsiteService {
   async getStarmapPositions(): Promise<Row[]> {
     return this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT sl.id, sl.rsi_id, sl.name, sl.type, sl.system_code, sl.system_name,
-              sl.parent_id, parent.id as parent_db_id, sl.coordinates, sl.aggregated
+              sl.status, sl.faction_name, sl.parent_id, parent.id as parent_db_id,
+              sl.coordinates, sl.aggregated,
+              (
+                SELECT json_build_object(
+                  'uuid', gl.uuid,
+                  'name', gl.name,
+                  'type', gl.type,
+                  'system_code', gl.system_code,
+                  'parent_uuid', gl.parent_uuid,
+                  'coordinates', gl.coordinates,
+                  'p4k_path', gl.p4k_path,
+                  'is_scannable', gl.is_scannable
+                )
+                FROM game.locations gl
+                WHERE gl.rsi_starmap_location_id = sl.id AND gl.env = 'live'
+                ORDER BY CASE WHEN lower(gl.type) = lower(sl.type) THEN 0 ELSE 1 END, gl.name
+                LIMIT 1
+              ) as p4k_location
        FROM rsi.starmap_locations sl
        LEFT JOIN rsi.starmap_locations parent ON parent.rsi_id = sl.parent_id
-       WHERE sl.coordinates IS NOT NULL OR sl.aggregated IS NOT NULL
        ORDER BY COALESCE(sl.system_name, sl.name), sl.type, sl.name`,
     );
   }
