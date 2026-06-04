@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CTMLoader } from '@/lib/CTMLoader';
+import { createVisibilityTracker, disposeObject3D, getThreePixelRatio } from '@/lib/three-performance';
 
 export interface FleetShip {
   id: number;
@@ -71,8 +72,8 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
     scene.add(fill);
 
     // ── Renderer ───────────────────────────────────────────────────────────────
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(getThreePixelRatio());
     renderer.setSize(W, H);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
@@ -88,6 +89,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
     controls.autoRotate = false;
     controls.autoRotateSpeed = 0.3;
     controls.enablePan = true;
+    const visibility = createVisibilityTracker(container);
 
     // ── Per-ship state ─────────────────────────────────────────────────────────
     type ShipEntry = {
@@ -136,7 +138,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
       const maxR = Math.max(...entries.map((e) => e.radius));
       const totalSpan = getTotalSpan();
       const size = Math.max(totalSpan * 1.6, maxR * 8);
-      const divs = Math.max(10, Math.round(size / (maxR / 2)));
+      const divs = Math.min(48, Math.max(10, Math.round(size / (maxR / 2))));
 
       // Find floor Y from all loaded ships
       let minY = 0;
@@ -403,7 +405,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
       mouse.y = -((clientY - rect.top)  / rect.height) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
       const meshes: THREE.Object3D[] = [];
-      entries.forEach((e) => e.meshes.forEach((m) => meshes.push(m)));
+      entries.forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
       const hits = raycaster.intersectObjects(meshes, true);
       if (!hits.length) return null;
       let obj: THREE.Object3D | null = hits[0].object;
@@ -472,6 +474,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
     // ── Render loop ────────────────────────────────────────────────────────────
     const animate = () => {
       frameRef.current = requestAnimationFrame(animate);
+      if (!visibility.isVisible()) return;
       const t = clockRef.current.getElapsedTime();
 
       // Animate selected ship
@@ -524,6 +527,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
       const h = container.clientHeight;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      renderer.setPixelRatio(getThreePixelRatio());
       renderer.setSize(w, h);
     });
     ro.observe(container);
@@ -531,12 +535,14 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
     return () => {
       cancelAnimationFrame(frameRef.current);
       ro.disconnect();
+      visibility.dispose();
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       renderer.domElement.removeEventListener('pointerup',   onPointerUp);
       renderer.domElement.removeEventListener('wheel', preventPageWheel);
       controls.dispose();
       holoMat.dispose();
+      disposeObject3D(scene);
       renderer.dispose();
       if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
       rendererRef.current = null;

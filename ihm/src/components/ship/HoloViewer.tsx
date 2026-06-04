@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CTMLoader } from '@/lib/CTMLoader';
+import { createVisibilityTracker, disposeObject3D, getThreePixelRatio } from '@/lib/three-performance';
 
 interface Props {
   shipUuid: string;
@@ -47,7 +48,7 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
 
     // ── Renderer ───────────────────────────────────────────────────────
     const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setPixelRatio(getThreePixelRatio());
     renderer.setSize(width, height);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
@@ -64,6 +65,7 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
     controls.autoRotate = true;
     controls.autoRotateSpeed = 0.5;
     controls.enablePan = false;
+    const visibility = createVisibilityTracker(container);
 
     // ── RSI hologram material (MeshPhong — soft shadow, light specular) ─
     const holoMaterial = new THREE.MeshPhongMaterial({
@@ -128,6 +130,7 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
     // ── Render loop ────────────────────────────────────────────────────
     const animate = () => {
       frameRef.current = requestAnimationFrame(animate);
+      if (!visibility.isVisible()) return;
       controls.update();
       renderer.render(scene, camera);
     };
@@ -139,6 +142,7 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
       const h = container.clientHeight;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      renderer.setPixelRatio(getThreePixelRatio());
       renderer.setSize(w, h);
     };
     const ro = new ResizeObserver(onResize);
@@ -147,8 +151,9 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
     return () => {
       cancelAnimationFrame(frameRef.current);
       ro.disconnect();
+      visibility.dispose();
       controls.dispose();
-      holoMaterial.dispose();
+      disposeObject3D(scene);
       renderer.dispose();
       container.removeChild(renderer.domElement);
       rendererRef.current = null;
@@ -201,4 +206,3 @@ export function HoloViewer({ shipUuid, shipName }: Props) {
     </div>
   );
 }
-
