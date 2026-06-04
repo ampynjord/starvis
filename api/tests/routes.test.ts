@@ -35,6 +35,7 @@ function makeGameDataService() {
     ships: {
       getAllShips: fn(paginated),
       getShipFilters: fn({}),
+      getShipCoverageAudit: fn({ env: 'live', summary: {} }),
       searchShipsAutocomplete: fn([]),
       getRandomShip: fn(null),
       getShipManufacturers: fn([]),
@@ -274,6 +275,14 @@ describe('GET /api/v1/ships/random', () => {
 describe('GET /api/v1/ships/manufacturers', () => {
   it('returns 200', async () => {
     const res = await request(app).get('/api/v1/ships/manufacturers');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+});
+
+describe('GET /api/v1/ships/audit', () => {
+  it('returns 200', async () => {
+    const res = await request(app).get('/api/v1/ships/audit');
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
   });

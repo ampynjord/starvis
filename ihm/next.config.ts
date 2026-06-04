@@ -29,7 +29,6 @@ const nextConfig: NextConfig = {
       { source: '/api/v1/:path*', destination: `${BACKEND_API_URL}/api/v1/:path*` },
       { source: '/health/:path*', destination: `${BACKEND_API_URL}/health/:path*` },
       { source: '/health', destination: `${BACKEND_API_URL}/health/live` },
-      { source: '/admin/:path*', destination: `${BACKEND_API_URL}/admin/:path*` },
     ];
   },
   async redirects() {

@@ -236,6 +236,16 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
   );
 
   router.get(
+    '/api/v1/ships/audit',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = String(req.query.env ?? 'live');
+      const data = await gameDataService!.ships.getShipCoverageAudit(env);
+      sendWithETag(req, res, { success: true, data });
+    }),
+  );
+
+  router.get(
     '/api/v1/ships/:uuid',
     requireGameData,
     asyncHandler(async (req, res) => {

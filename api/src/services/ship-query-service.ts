@@ -562,6 +562,72 @@ export class ShipQueryService {
     return rows.map((r) => ({ ...r, ship_count: Number(r.ship_count) }));
   }
 
+  async getShipCoverageAudit(env = 'live'): Promise<Row> {
+    const prisma = this.getClient(env);
+    const [summaryRows, unlinkedGameShips, matrixOnlyShips, duplicateClassNames] = await Promise.all([
+      prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT
+          (SELECT COUNT(*) FROM game.ships WHERE env = ?) AS game_ships,
+          (SELECT COUNT(*) FROM game.ships WHERE env = ? AND ship_matrix_id IS NOT NULL) AS linked_game_ships,
+          (SELECT COUNT(*) FROM game.ships WHERE env = ? AND ship_matrix_id IS NULL) AS unlinked_game_ships,
+          (SELECT COUNT(*) FROM rsi.ship_matrix) AS ship_matrix_entries,
+          (SELECT COUNT(*) FROM rsi.ship_matrix sm
+             WHERE sm.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)
+          ) AS matrix_only_entries,
+          (SELECT COUNT(*) FROM rsi.ship_matrix sm
+             WHERE sm.production_status IN ('in-concept', 'in-production', 'in-development')
+               AND sm.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)
+          ) AS concept_only_entries`),
+        env,
+        env,
+        env,
+        env,
+        env,
+      ),
+      prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT s.uuid, s.class_name, s.name, s.manufacturer_code, s.vehicle_category, s.variant_type
+          FROM game.ships s
+          WHERE s.env = ? AND s.ship_matrix_id IS NULL
+          ORDER BY s.manufacturer_code NULLS LAST, s.name
+          LIMIT 200`),
+        env,
+      ),
+      prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT sm.id, sm.name, sm.manufacturer_code, sm.manufacturer_name, sm.production_status, sm.type, sm.url
+          FROM rsi.ship_matrix sm
+          WHERE sm.id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)
+          ORDER BY sm.production_status, sm.manufacturer_name, sm.name
+          LIMIT 300`),
+        env,
+      ),
+      prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT class_name, COUNT(*) AS count, ARRAY_AGG(env ORDER BY env) AS envs
+          FROM game.ships
+          WHERE env = ?
+          GROUP BY class_name
+          HAVING COUNT(*) > 1
+          ORDER BY count DESC, class_name
+          LIMIT 100`),
+        env,
+      ),
+    ]);
+    const summary = convertBigIntToNumber(summaryRows[0] ?? {});
+    return {
+      env,
+      summary: {
+        game_ships: Number(summary.game_ships ?? 0),
+        linked_game_ships: Number(summary.linked_game_ships ?? 0),
+        unlinked_game_ships: Number(summary.unlinked_game_ships ?? 0),
+        ship_matrix_entries: Number(summary.ship_matrix_entries ?? 0),
+        matrix_only_entries: Number(summary.matrix_only_entries ?? 0),
+        concept_only_entries: Number(summary.concept_only_entries ?? 0),
+      },
+      unlinked_game_ships: unlinkedGameShips.map(convertBigIntToNumber),
+      matrix_only_entries: matrixOnlyShips.map(convertBigIntToNumber),
+      duplicate_class_names: duplicateClassNames.map(convertBigIntToNumber),
+    };
+  }
+
   async getManufacturerByCode(code: string, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
