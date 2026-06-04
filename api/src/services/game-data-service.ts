@@ -136,6 +136,7 @@ export class GameDataService {
 
   async getChangelog(params: {
     env?: string;
+    gameVersion?: string;
     limit?: string;
     offset?: string;
     entityType?: string;
@@ -149,6 +150,10 @@ export class GameDataService {
     if (params.entityType) {
       where.push('c.entity_type = ?');
       p.push(params.entityType);
+    }
+    if (params.gameVersion) {
+      where.push('e.game_version = ?');
+      p.push(params.gameVersion);
     }
     if (params.changeType) {
       where.push('c.change_type = ?');
@@ -290,6 +295,31 @@ export class GameDataService {
     return result;
   }
 
+  async getLatestStats(env = 'live'): Promise<Record<string, unknown>> {
+    const [overview, latest, extractionRows] = await Promise.all([
+      this.getPublicStats(env),
+      this.getLatestExtraction(env),
+      this.getClient('live').$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT id, game_version, game_env, extracted_at, status, duration_ms,
+               ships_count, components_count, items_count, commodities_count, manufacturers_count,
+               loadout_ports_count, shops_count, recipes_count
+          FROM meta.extraction_log
+          WHERE game_env = ?
+          ORDER BY extracted_at DESC
+          LIMIT 1`),
+        env,
+      ),
+    ]);
+    const extraction = extractionRows[0] ?? latest;
+    return {
+      env,
+      game_version: latest?.game_version ?? extraction?.game_version ?? null,
+      extracted_at: latest?.extracted_at ?? extraction?.extracted_at ?? null,
+      overview,
+      extraction,
+    };
+  }
+
   async getGameVersions(opts: { env?: string; limit?: number; offset?: number } = {}): Promise<{ data: Row[]; total: number }> {
     const prisma = this.getClient('live');
     const limit = Math.min(100, opts.limit || 20);
@@ -321,6 +351,26 @@ export class GameDataService {
       })),
       total,
     };
+  }
+
+  async getVersionChangelog(
+    version: string,
+    opts: { env?: string; limit?: string; offset?: string; changesOnly?: boolean } = {},
+  ): Promise<{
+    data: Row[];
+    total: number;
+    version: string;
+    env: string;
+  }> {
+    const env = opts.env ?? 'live';
+    const result = await this.getChangelog({
+      env,
+      gameVersion: version,
+      limit: opts.limit,
+      offset: opts.offset,
+      markersOnly: opts.changesOnly ? false : undefined,
+    });
+    return { ...result, version, env };
   }
 
   async getChangelogSummary(env = 'live'): Promise<Record<string, unknown>> {

@@ -21,6 +21,7 @@ import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
+import { requireJwtAdmin } from './src/middleware/auth.js';
 import { prometheusMiddleware } from './src/middleware/prometheus.js';
 import { healthRouter } from './src/routes/health.js';
 import { createRoutes } from './src/routes/index.js';
@@ -110,17 +111,44 @@ app.use((req, res, next) => {
 
 // ===== SWAGGER / OPENAPI =====
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const swaggerSpec = JSON.parse(readFileSync(path.join(__dirname, 'openapi.json'), 'utf-8'));
-swaggerSpec.servers = [{ url: '/', description: 'Current host' }];
+type OpenApiSpec = {
+  servers?: Array<Record<string, unknown>>;
+  paths?: Record<string, unknown>;
+  tags?: Array<{ name?: string; [key: string]: unknown }>;
+  [key: string]: unknown;
+};
+
+function cloneSpec(spec: OpenApiSpec): OpenApiSpec {
+  return JSON.parse(JSON.stringify(spec)) as OpenApiSpec;
+}
+
+function withoutAdminRoutes(spec: OpenApiSpec): OpenApiSpec {
+  const publicSpec = cloneSpec(spec);
+  publicSpec.paths = Object.fromEntries(Object.entries(publicSpec.paths ?? {}).filter(([route]) => !route.startsWith('/admin')));
+  publicSpec.tags = (publicSpec.tags ?? []).filter((tag) => tag.name !== 'Admin');
+  return publicSpec;
+}
+
+function makeSwaggerHtml(spec: OpenApiSpec, assetBasePath: string): string {
+  return swaggerUi
+    .generateHTML(spec)
+    .replace(/href="\.\//g, `href="${assetBasePath}/`)
+    .replace(/src="\.\//g, `src="${assetBasePath}/`);
+}
+
+const fullSwaggerSpec = JSON.parse(readFileSync(path.join(__dirname, 'openapi.json'), 'utf-8')) as OpenApiSpec;
+fullSwaggerSpec.servers = [{ url: '/', description: 'Current host' }];
+const publicSwaggerSpec = withoutAdminRoutes(fullSwaggerSpec);
 // Generate HTML with absolute asset paths so it works at /api-docs (no trailing slash).
 // swagger-ui-express uses relative paths (./swagger-ui.css) by default, which break when
 // the browser URL has no trailing slash (./foo resolves to /foo instead of /api-docs/foo).
-const swaggerHtml = swaggerUi
-  .generateHTML(swaggerSpec)
-  .replace(/href="\.\//g, 'href="/api-docs/')
-  .replace(/src="\.\//g, 'src="/api-docs/');
+const swaggerHtml = makeSwaggerHtml(publicSwaggerSpec, '/api-docs');
+const adminSwaggerHtml = makeSwaggerHtml(fullSwaggerSpec, '/api-docs');
 app.get('/api-docs', (_, res) => res.type('html').send(swaggerHtml));
+app.get('/api-docs/openapi.json', (_, res) => res.json(publicSwaggerSpec));
 app.use('/api-docs', swaggerUi.serve);
+app.get('/admin/api-docs', requireJwtAdmin, (_, res) => res.type('html').send(adminSwaggerHtml));
+app.get('/admin/api-docs/openapi.json', requireJwtAdmin, (_, res) => res.json(fullSwaggerSpec));
 
 // ===== ROOT =====
 app.get('/', (_, res) =>

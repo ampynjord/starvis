@@ -100,6 +100,8 @@ function makeGameDataService() {
     missions: {
       getMissionTypes: fn([]),
       getFactions: fn([]),
+      getFactionDetails: fn([]),
+      getFactionDetail: fn(null),
       getSystems: fn([]),
       getCategories: fn([]),
       getMissions: fn(paginated),
@@ -134,7 +136,9 @@ function makeGameDataService() {
     getChangelogSummary: fn([]),
     getChangelog: fn({ data: [], total: 0, page: 1, limit: 20, pages: 0 }),
     getPublicStats: fn({}),
+    getLatestStats: fn({}),
     getLatestExtraction: fn(null),
+    getVersionChangelog: fn({ data: [], total: 0, version: '4.8.1', env: 'live' }),
     getStats: fn({}),
     getExtractionLog: fn([]),
   };
@@ -545,6 +549,22 @@ describe('GET /api/v1/missions/types', () => {
   });
 });
 
+describe('GET /api/v1/factions', () => {
+  it('returns 200', async () => {
+    const res = await request(app).get('/api/v1/factions');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+});
+
+describe('GET /api/v1/factions/:faction (not found)', () => {
+  it('returns 404', async () => {
+    const res = await request(app).get('/api/v1/factions/unknown');
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+  });
+});
+
 describe('GET /api/v1/missions', () => {
   it('returns 200', async () => {
     const res = await request(app).get('/api/v1/missions');
@@ -678,6 +698,14 @@ describe('GET /api/v1/search', () => {
   });
 });
 
+describe('GET /api/v1/search/:query', () => {
+  it('returns 200 with all categories when query path param is provided', async () => {
+    const res = await request(app).get('/api/v1/search/aurora');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+});
+
 // ── System ────────────────────────────────────────────────
 
 describe('GET /api/v1/version', () => {
@@ -707,6 +735,22 @@ describe('GET /api/v1/changelog/summary', () => {
 describe('GET /api/v1/stats/overview', () => {
   it('returns 200', async () => {
     const res = await request(app).get('/api/v1/stats/overview');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+});
+
+describe('GET /api/v1/stats/latest', () => {
+  it('returns 200', async () => {
+    const res = await request(app).get('/api/v1/stats/latest');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+});
+
+describe('GET /api/v1/game-versions/:version/changelog', () => {
+  it('returns 200', async () => {
+    const res = await request(app).get('/api/v1/game-versions/4.8.1/changelog');
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
   });
@@ -779,8 +823,16 @@ function makeRsiWebsiteService() {
     getCommLinks: fn({ data: [], total: 0, page: 1, limit: 20, pages: 0 }),
     getCommLink: fn(null),
     getCommLinkCategories: fn([]),
+    getCommLinkImages: fn({ data: [], total: 0, page: 1, limit: 20, pages: 0 }),
+    getRandomCommLinkImage: fn(null),
+    getCommLinkImage: fn(null),
     getStarmapSystems: fn({ data: [], total: 0, page: 1, limit: 20, pages: 0 }),
     getStarmapSystem: fn(null),
+    getStarmapLocations: fn({ data: [], total: 0, page: 1, limit: 20, pages: 0 }),
+    getStarmapLocation: fn(null),
+    getStarmapFilters: fn({ filters: {} }),
+    getStarmapPositions: fn([]),
+    getJumpPoints: fn([]),
   };
 }
 
@@ -831,11 +883,53 @@ describe('RSI website routes', () => {
     expect(res.body.success).toBe(false);
   });
 
+  it('GET /api/v1/comm-link-images returns 200', async () => {
+    const res = await request(rsiApp).get('/api/v1/comm-link-images');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('GET /api/v1/comm-link-images/search returns 200', async () => {
+    const res = await request(rsiApp).get('/api/v1/comm-link-images/search?search=ship');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('GET /api/v1/comm-link-images/random returns 404 when no image exists', async () => {
+    const res = await request(rsiApp).get('/api/v1/comm-link-images/random');
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+  });
+
   it('GET /api/v1/starmap/systems returns 200', async () => {
     const res = await request(rsiApp).get('/api/v1/starmap/systems');
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
     expect(Array.isArray(res.body.data)).toBe(true);
+  });
+
+  it('GET /api/v1/starmap/locations returns 200', async () => {
+    const res = await request(rsiApp).get('/api/v1/starmap/locations');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('GET /api/v1/starmap/filters returns 200', async () => {
+    const res = await request(rsiApp).get('/api/v1/starmap/filters');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('GET /api/v1/starmap/positions returns 200', async () => {
+    const res = await request(rsiApp).get('/api/v1/starmap/positions');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('GET /api/v1/starmap/jump-points returns 200', async () => {
+    const res = await request(rsiApp).get('/api/v1/starmap/jump-points');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
   });
 
   it('GET /api/v1/starmap/systems/:code returns 404 when not found', async () => {

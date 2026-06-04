@@ -1,6 +1,7 @@
 import type { Router } from 'express';
 import {
   asyncHandler,
+  getQueryEnv,
   getQueryNumber,
   getQueryString,
   makeGameDataGuard,
@@ -38,6 +39,27 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
    * Lists all distinct factions
    */
   mountEnvDataRoute(router, '/api/v1/missions/factions', requireGameData, (env) => gameDataService!.missions.getFactions(env));
+
+  router.get(
+    '/api/v1/factions',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = getQueryEnv(req);
+      const data = await gameDataService!.missions.getFactionDetails(env);
+      sendDataWithETag(req, res, data, data.length);
+    }),
+  );
+
+  router.get(
+    '/api/v1/factions/:faction',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = getQueryEnv(req);
+      const data = await gameDataService!.missions.getFactionDetail(req.params.faction, env);
+      if (!data) return void res.status(404).json({ success: false, error: 'Faction not found' });
+      sendDataWithETag(req, res, data);
+    }),
+  );
 
   /**
    * GET /api/v1/missions/systems

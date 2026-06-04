@@ -88,7 +88,7 @@ export function requireJwtAdmin(req: Request, res: Response, next: NextFunction)
   if (!process.env.JWT_SECRET) {
     return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
-  const token = extractBearer(req);
+  const token = extractBearer(req) ?? extractCookieToken(req);
   if (!token) {
     return res.status(401).json({ success: false, error: 'Authentication required' });
   }

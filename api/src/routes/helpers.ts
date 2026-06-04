@@ -129,6 +129,24 @@ export function getQueryString(req: Request, key: string): string | undefined {
   return raw && raw.trim() !== '' ? raw : undefined;
 }
 
+/** Read `filter[field]` style query params, with optional fallback keys. */
+export function getFilterString(req: Request, key: string, ...fallbackKeys: string[]): string | undefined {
+  return (
+    getQueryString(req, `filter[${key}]`) ??
+    getQueryString(req, key) ??
+    fallbackKeys.map((fallback) => getQueryString(req, fallback)).find(Boolean)
+  );
+}
+
+/** Starvis stores current patch data by environment; accept common aliases. */
+export function getQueryEnv(req: Request): string {
+  const raw = getQueryString(req, 'env') ?? getQueryString(req, 'channel') ?? getQueryString(req, 'version') ?? 'live';
+  const normalized = raw.toLowerCase();
+  if (normalized === 'pu') return 'live';
+  if (['live', 'ptu', 'eptu', 'tech-preview', 'custom'].includes(normalized)) return normalized;
+  return 'live';
+}
+
 /** Read an optional number query parameter (undefined when missing/invalid). */
 export function getQueryNumber(req: Request, key: string): number | undefined {
   const raw = firstQueryValue(req.query[key]);
