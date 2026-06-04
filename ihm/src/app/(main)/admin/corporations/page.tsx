@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
+import { RsiOrgPicker, type RsiOrg } from '@/components/ui/RsiOrgPicker';
 import { useAuth } from '@/contexts/AuthContext';
 import { ADMIN_ROLE } from '@/lib/app-constants';
 
@@ -132,12 +133,69 @@ function SciBtnPrimary({ onClick, disabled, children }: { onClick?: () => void; 
 
 // ── Corp form modal ───────────────────────────────────────────────────────────
 
+function ImportCorpModal({ onClose, onSaved }: { onClose: () => void; onSaved: (c: Corporation) => void }) {
+  const [selectedOrg, setSelectedOrg] = useState<RsiOrg | null>(null);
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedOrg) return;
+    setError('');
+    setLoading(true);
+    try {
+      const data = await apiFetch('/api/admin/corporations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: selectedOrg.symbol,
+          name: selectedOrg.name,
+          logoUrl: selectedOrg.logoUrl,
+          archetype: selectedOrg.archetype,
+          language: selectedOrg.language,
+          commitment: selectedOrg.commitment,
+          recruiting: selectedOrg.recruiting,
+          roleplay: selectedOrg.roleplay,
+          memberCount: selectedOrg.memberCount,
+        }),
+      });
+      onSaved(data.data);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal title="Import Corporation" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <Field label="RSI organization *">
+          <RsiOrgPicker
+            selected={selectedOrg}
+            onSelect={setSelectedOrg}
+            disabled={loading}
+            placeholder="Search RSI organization by name or tag..."
+          />
+        </Field>
+        {selectedOrg && (
+          <div className="border border-slate-800/70 bg-slate-950/40 rounded-sm px-3 py-2 text-xs text-slate-500 font-mono-sc">
+            Import [{selectedOrg.symbol}] {selectedOrg.name} from live RSI data.
+          </div>
+        )}
+        {error && <p className="text-xs text-red-400 font-mono-sc bg-red-950/30 border border-red-800/30 rounded px-3 py-2">{error}</p>}
+        <SciBtnPrimary disabled={loading || !selectedOrg}>{loading ? 'Importing...' : 'Import Corporation'}</SciBtnPrimary>
+      </form>
+    </Modal>
+  );
+}
+
 function CorpFormModal({
   corp,
   onClose,
   onSaved,
 }: {
-  corp?: Corporation;
+  corp: Corporation;
   onClose: () => void;
   onSaved: (c: Corporation) => void;
 }) {
@@ -154,9 +212,7 @@ function CorpFormModal({
     setLoading(true);
     try {
       const body = { name, tag: tag || null, description: description || null, logoUrl: logoUrl || null };
-      const data = corp
-        ? await apiFetch(`/api/admin/corporations/${corp.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-        : await apiFetch('/api/admin/corporations', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await apiFetch(`/api/admin/corporations/${corp.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       onSaved(data.data);
     } catch (err: any) {
       setError(err.message);
@@ -166,7 +222,7 @@ function CorpFormModal({
   };
 
   return (
-    <Modal title={corp ? 'Edit Corporation' : 'Create Corporation'} onClose={onClose}>
+    <Modal title="Edit Corporation" onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-3">
         <Field label="Name *">
           <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Stellar Dynamics" required minLength={2} className="sci-input w-full" />
@@ -181,7 +237,7 @@ function CorpFormModal({
           <input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://…" className="sci-input w-full text-sm" />
         </Field>
         {error && <p className="text-xs text-red-400 font-mono-sc bg-red-950/30 border border-red-800/30 rounded px-3 py-2">{error}</p>}
-        <SciBtnPrimary disabled={loading || !name.trim()}>{loading ? 'Saving…' : corp ? 'Save Changes' : 'Create'}</SciBtnPrimary>
+        <SciBtnPrimary disabled={loading || !name.trim()}>{loading ? 'Saving...' : 'Save Changes'}</SciBtnPrimary>
       </form>
     </Modal>
   );
@@ -510,7 +566,7 @@ function FleetModal({ corp, onClose }: { corp: Corporation; onClose: () => void 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 type ModalState =
-  | { type: 'create' }
+  | { type: 'import' }
   | { type: 'edit'; corp: Corporation }
   | { type: 'reset'; corp: Corporation }
   | { type: 'members'; corp: Corporation }
@@ -583,10 +639,10 @@ export default function CorporationsPage() {
           </div>
           <button
             type="button"
-            onClick={() => setModal({ type: 'create' })}
+            onClick={() => setModal({ type: 'import' })}
             className="sci-btn-primary py-1.5 px-3 text-xs gap-1.5 flex items-center"
           >
-            <Plus size={12} /> New Corporation
+            <Plus size={12} /> Import Corporation
           </button>
         </div>
 
@@ -718,7 +774,7 @@ export default function CorporationsPage() {
 
       {/* Modals */}
       <AnimatePresence>
-        {modal?.type === 'create'  && <CorpFormModal key="create"  onClose={() => setModal(null)} onSaved={onSaved} />}
+        {modal?.type === 'import'  && <ImportCorpModal key="import"  onClose={() => setModal(null)} onSaved={onSaved} />}
         {modal?.type === 'edit'    && <CorpFormModal key="edit"    corp={modal.corp} onClose={() => setModal(null)} onSaved={onSaved} />}
         {modal?.type === 'reset'   && <ResetCorpModal key="reset" corp={modal.corp} onClose={() => setModal(null)} onReset={onReset} />}
         {modal?.type === 'members' && <MembersModal key="members" corp={modal.corp} onClose={() => setModal(null)} />}

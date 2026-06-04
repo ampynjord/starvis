@@ -12,6 +12,7 @@ import type {
   CraftingCategory,
   CraftingRecipe,
   CraftingResource,
+  FactionSummary,
   FpsDamageResult,
   GalactapediaEntry,
   Item,
@@ -483,6 +484,11 @@ export const api = {
     },
   },
 
+  factions: {
+    list: (env?: string) => get<FactionSummary[]>('/factions', { env }),
+    get: (name: string, env?: string) => get<FactionSummary>(`/factions/${encodeURIComponent(name)}`, { env }),
+  },
+
   // ─── Crafting ────────────────────────────────────────────────────────
   crafting: {
     categories: async (env?: string) => (await get<CraftingCategory[]>('/crafting/categories', { env })).map(mapCraftingCategory),
@@ -538,6 +544,10 @@ export const api = {
     all: (env?: string) => get<Location[]>('/locations/all', { env }),
     get: (uuid: string, env?: string) => get<Location>(`/locations/${uuid}`, { env }),
     children: (uuid: string, env?: string) => get<Location[]>(`/locations/${uuid}/children`, { env }),
+  },
+
+  starmap: {
+    positions: () => get<any[]>('/starmap/positions'),
   },
 
   // ─── CommLinks ──────────────────────────────────────────────────────

@@ -411,6 +411,7 @@ export default function FleetManagerPage() {
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
             {/* View mode selector */}
+            {corp ? (
             <div className="flex gap-1 rounded-sm border border-slate-800 p-0.5 bg-slate-900/60">
               {/* My Fleet */}
               <button
@@ -424,7 +425,6 @@ export default function FleetManagerPage() {
               </button>
 
               {/* Member picker */}
-              {corp && (
               <div className="relative">
               <button
                 type="button"
@@ -470,10 +470,8 @@ export default function FleetManagerPage() {
                   </div>
                 )}
               </div>
-              )}
 
               {/* All Corp */}
-              {corp && (
               <button
                 type="button"
                 onClick={() => { setViewMode('all'); setSelectedItemId(null); }}
@@ -483,8 +481,12 @@ export default function FleetManagerPage() {
               >
                 <Building2 size={10} /> Corp
               </button>
-              )}
             </div>
+            ) : (
+              <div className="flex items-center gap-1.5 rounded-sm border border-cyan-900/50 bg-cyan-950/30 px-2.5 py-1 font-orbitron text-[10px] font-bold uppercase tracking-wider text-cyan-400">
+                <Ship size={10} /> My Fleet
+              </div>
+            )}
 
             <span className="text-[10px] text-slate-600 font-mono-sc">
               {visibleItems.length}/{fleetItems.length}

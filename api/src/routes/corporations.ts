@@ -270,14 +270,29 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
   });
 
   router.post('/admin/corporations', requireJwtAdmin, async (req, res) => {
-    const { name, tag, description, logoUrl } = req.body ?? {};
-    if (!name || typeof name !== 'string') return void res.status(400).json({ success: false, error: 'name required' });
+    const { symbol, name, logoUrl, archetype, language, commitment, recruiting, roleplay, memberCount } = req.body ?? {};
+    if (!symbol || typeof symbol !== 'string') return void res.status(400).json({ success: false, error: 'symbol required' });
     try {
-      const corp = await svc.createCorporation({ name, tag, description, logoUrl });
+      const org =
+        typeof name === 'string' && name.trim()
+          ? {
+              symbol: symbol.toUpperCase(),
+              name,
+              logoUrl: logoUrl ?? null,
+              archetype: archetype ?? null,
+              language: language ?? null,
+              commitment: commitment ?? null,
+              recruiting: !!recruiting,
+              roleplay: !!roleplay,
+              memberCount: memberCount ?? null,
+            }
+          : await getRsiOrgBySymbol(symbol);
+      if (!org) return void res.status(404).json({ success: false, error: 'RSI org not found' });
+      const corp = await svc.upsertFromRsi(org);
       res.status(201).json({ success: true, data: corp });
     } catch (e: any) {
       if (e?.code === 'P2002') return void res.status(409).json({ success: false, error: 'Corporation name or tag already exists' });
-      res.status(500).json({ success: false, error: 'Failed to create corporation' });
+      res.status(500).json({ success: false, error: 'Failed to import corporation' });
     }
   });
 
@@ -422,11 +437,23 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
     const mid = Number(req.params.mid);
     const reviewerId = (req as any).jwtPayload.sub;
     if (!Number.isInteger(mid) || mid <= 0) return void res.status(400).json({ success: false, error: 'Invalid membership id' });
+    const role = VALID_MEMBER_ROLES.includes(req.body?.role) ? req.body.role : 'member';
     const membership = await svc.getMembership(mid);
     if (!membership) return void res.status(404).json({ success: false, error: 'Membership not found' });
     if (!(await requireLeaderOrAdmin(req, res, membership.corporationId))) return;
-    const approved = await svc.approveMembership(mid, reviewerId, 'member');
+    const approved = await svc.approveMembership(mid, reviewerId, role);
     res.json({ success: true, data: approved });
+  });
+
+  router.put('/corp/memberships/:mid/reject', requireJwt, async (req, res) => {
+    const mid = Number(req.params.mid);
+    const reviewerId = (req as any).jwtPayload.sub;
+    if (!Number.isInteger(mid) || mid <= 0) return void res.status(400).json({ success: false, error: 'Invalid membership id' });
+    const membership = await svc.getMembership(mid);
+    if (!membership) return void res.status(404).json({ success: false, error: 'Membership not found' });
+    if (!(await requireLeaderOrAdmin(req, res, membership.corporationId))) return;
+    const rejected = await svc.rejectMembership(mid, reviewerId);
+    res.json({ success: true, data: rejected });
   });
 
   router.put('/corp/members/:mid/role', requireJwt, async (req, res) => {
@@ -439,6 +466,20 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
     if (!(await requireLeaderOrAdmin(req, res, membership.corporationId))) return;
     const updated = await svc.updateMembershipRole(mid, role);
     res.json({ success: true, data: updated });
+  });
+
+  router.delete('/corp/members/:mid', requireJwt, async (req, res) => {
+    const mid = Number(req.params.mid);
+    const requesterId = (req as any).jwtPayload.sub;
+    if (!Number.isInteger(mid) || mid <= 0) return void res.status(400).json({ success: false, error: 'Invalid membership id' });
+    const membership = await svc.getMembership(mid);
+    if (!membership) return void res.status(404).json({ success: false, error: 'Membership not found' });
+    if (membership.userId === requesterId) {
+      return void res.status(400).json({ success: false, error: 'Use leave corporation from your profile to remove yourself' });
+    }
+    if (!(await requireLeaderOrAdmin(req, res, membership.corporationId))) return;
+    await svc.removeMembership(mid);
+    res.json({ success: true });
   });
 
   // ── Admin: users ↔ corp ──────────────────────────────────────────────────────

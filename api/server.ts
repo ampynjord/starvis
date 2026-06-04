@@ -176,17 +176,22 @@ function apiDocsAccessDenied(req: Request, res: Response) {
 </html>`);
 }
 
-function requireApiDocsDeveloper(req: Request, res: Response, next: NextFunction) {
+async function requireApiDocsDeveloper(req: Request, res: Response, next: NextFunction) {
   if (!process.env.JWT_SECRET) return res.status(500).json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' });
   const token = getBearerToken(req) ?? getCookieToken(req);
   if (!token) return apiDocsAccessDenied(req, res);
   try {
     const authService = new AuthService(null as any);
     const payload = authService.verifyToken(token);
-    if (!DEVELOPER_ACCESS_ROLES.includes(payload.role as (typeof DEVELOPER_ACCESS_ROLES)[number])) {
+    const currentUser = await getPrisma().user.findUnique({
+      where: { id: payload.sub },
+      select: { role: true },
+    });
+    const currentRole = currentUser?.role ?? payload.role;
+    if (!DEVELOPER_ACCESS_ROLES.includes(currentRole as (typeof DEVELOPER_ACCESS_ROLES)[number])) {
       return apiDocsAccessDenied(req, res);
     }
-    (req as any).jwtPayload = payload;
+    (req as any).jwtPayload = { ...payload, role: currentRole };
     return next();
   } catch {
     return apiDocsAccessDenied(req, res);
