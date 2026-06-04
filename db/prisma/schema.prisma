@@ -545,6 +545,7 @@ model Component {
   normalizedName           String?  @map("normalized_name") @db.VarChar(255)
   canonicalComponentKey    String?  @map("canonical_component_key") @db.VarChar(255)
   type                     String   @db.VarChar(50)
+  gameComponentCategory    String?  @map("game_component_category") @db.VarChar(50)
   subType                  String?  @map("sub_type") @db.VarChar(100)
   size                     Int?
   grade                    String?  @db.VarChar(10)
@@ -664,6 +665,7 @@ model Component {
   @@unique([className, env])
   @@index([manufacturerCode])
   @@index([type])
+  @@index([gameComponentCategory])
   @@index([subType])
   @@index([canonicalComponentKey])
   @@index([env])

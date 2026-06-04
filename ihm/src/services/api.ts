@@ -316,9 +316,10 @@ export const api = {
       size?: number;
       grade?: string;
       manufacturer?: string;
-      /** P4K category filter: weapons | systems | mounts | utility */
+      /** Game component category slug: weapons, shields, quantum-drives, etc. */
       category?: string;
     }) => get<PaginatedResponse<ComponentListItem>>('/components', p),
+    categories: (env?: string) => get<{ slug: string; label: string; types: string[] }[]>('/components/categories', { env }),
     filters: (env?: string) => get<Record<string, string[]>>('/components/filters', { env }),
     get: (uuid: string, env?: string) => get<Component>(`/components/${uuid}`, { env }),
     buyLocations: (uuid: string, env?: string) => get<BuyLocation[]>(`/components/${uuid}/buy-locations`, { env }),

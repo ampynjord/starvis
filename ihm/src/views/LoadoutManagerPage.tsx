@@ -18,6 +18,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { useDebounce } from '@/hooks/useDebounce';
+import { GAME_COMPONENT_CATEGORIES, GAME_COMPONENT_CATEGORY_ICONS, getGameComponentCategory } from '@/utils/constants';
 import { fNumber } from '@/utils/formatters';
 import type { CompatibleComponent, HardpointEntry, HardpointComponent, LoadoutResult, ShipListItem } from '@/types/api';
 
@@ -73,23 +74,42 @@ const TYPE_COLOR: Record<string, string> = {
   Turret: 'text-slate-400',
 };
 
-const CATEGORY_ORDER = [
-  'Weapons', 'Turrets', 'Missiles', 'Shields', 'Power Plants',
-  'Coolers', 'Quantum Drive', 'Radar', 'EMP', 'QED',
-  'Countermeasures', 'Mining', 'Salvage', 'Tractor', 'Repair', 'Other',
-];
+const CATEGORY_ORDER = [...GAME_COMPONENT_CATEGORIES, 'Other'] as const;
 
 const DEFAULT_LOADOUT_SHIP_UUID = '8e3a460d-6be2-ec95-782b-b14cdf97a8b3'; // Aurora Mk II
 
-const CAT_ICON: Record<string, string> = {
-  Weapons: '🔫', Turrets: '🗼', Missiles: '🚀', Shields: '🛡',
-  'Power Plants': '⚡', Coolers: '❄', 'Quantum Drive': '🌀',
-  Radar: '📡', EMP: '⚡', QED: '🌐', Countermeasures: '🎯',
-  Mining: '⛏', Salvage: '🔧', Tractor: '🔗', Repair: '🩹', Other: '⚙',
-};
-
 function typeColor(t?: string | null) {
   return TYPE_COLOR[t ?? ''] ?? 'text-slate-400';
+}
+
+function legacyCategory(category?: string | null): string {
+  switch (category) {
+    case 'Missiles':
+      return 'Ordnance';
+    case 'Countermeasures':
+      return 'CM Launchers';
+    case 'Quantum Drive':
+      return 'Quantum Drives';
+    case 'QED':
+      return 'EMP';
+    case 'Salvage':
+    case 'Tractor':
+    case 'Repair':
+      return 'Mining';
+    default:
+      return category ?? 'Other';
+  }
+}
+
+function hardpointCategory(hp: HardpointEntry): string {
+  const explicit = legacyCategory(hp.category);
+  if (explicit !== 'Other') return explicit;
+  const candidate =
+    hp.component?.type ??
+    hp.items.find((item) => item.type)?.type ??
+    hp.items.find((item) => item.sub_items?.some((sub) => sub.type))?.sub_items?.find((sub) => sub.type)?.type ??
+    hp.mount_type;
+  return getGameComponentCategory(candidate);
 }
 
 function typeIcon(t?: string | null) {
@@ -617,7 +637,7 @@ export default function LoadoutManagerPage() {
     if (!loadout?.hardpoints) return [];
     const map = new Map<string, HardpointEntry[]>();
     for (const hp of loadout.hardpoints) {
-      const cat = hp.category ?? 'Other';
+      const cat = hardpointCategory(hp);
       if (!map.has(cat)) map.set(cat, []);
       map.get(cat)!.push(hp);
     }
@@ -791,7 +811,7 @@ export default function LoadoutManagerPage() {
               {hardpointsByCategory.map(({ category, hardpoints }) => (
                 <ScifiPanel
                   key={category}
-                  title={`${CAT_ICON[category] ?? '⚙'} ${category}`}
+                  title={`${GAME_COMPONENT_CATEGORY_ICONS[category as keyof typeof GAME_COMPONENT_CATEGORY_ICONS] ?? GAME_COMPONENT_CATEGORY_ICONS.Other} ${category}`}
                   subtitle={`${hardpoints.length} hardpoint${hardpoints.length > 1 ? 's' : ''}`}
                 >
                   <div className="space-y-1.5">
