@@ -38,6 +38,7 @@ const COLOR_OUTLINE  = 0x00d4ff;
 const COLOR_RING     = 0x00c8f0;
 const MIN_SHIP_GAP   = 8;
 const SHIP_GAP_RATIO = 0.18;
+const FLEET_MODEL_FRONT_ROTATION_Y = Math.PI;
 
 export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
   const containerRef  = useRef<HTMLDivElement>(null);
@@ -336,7 +337,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
           outlineMesh.userData.isOutline = true;
 
           const inner = new THREE.Group();
-          inner.rotation.set(0, 0, 0);
+          inner.rotation.set(0, FLEET_MODEL_FRONT_ROTATION_Y, 0);
           inner.add(mesh);
           inner.add(outlineMesh);
 

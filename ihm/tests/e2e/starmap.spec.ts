@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('starmap renders a non-empty WebGL canvas', async ({ page }) => {
   await page.goto('/starmap');
 
-  await expect(page.getByRole('heading', { name: /ark verse map/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /starvis starmap/i })).toBeVisible();
 
   const canvas = page.locator('canvas').first();
   await expect(canvas).toBeVisible();

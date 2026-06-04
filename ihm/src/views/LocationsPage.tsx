@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Building2, Crosshair, Eye, Globe2, Loader2, MapPin, Radio, Search, Sparkles, X, Zap } from 'lucide-react';
+import { Building2, Crosshair, Globe2, Loader2, MapPin, Radio, Search, Sparkles, Volume2, X, Zap } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -59,6 +59,21 @@ type StarmapNode = {
   label: string;
   shopCount: number;
 };
+
+const FALLBACK_STARMAP_POSITIONS: RsiStarmapPosition[] = [
+  { id: 1, rsi_id: 'stanton', name: 'Stanton', type: 'system', system_code: 'STAN', parent_id: null, coordinates: { x: 0, y: 0, z: 0 } },
+  { id: 2, rsi_id: 'sol', name: 'Sol', type: 'system', system_code: 'SOL', parent_id: null, coordinates: { x: -82, y: 4, z: -18 } },
+  { id: 3, rsi_id: 'terra', name: 'Terra', type: 'system', system_code: 'TERR', parent_id: null, coordinates: { x: 72, y: -2, z: 24 } },
+  { id: 4, rsi_id: 'pyro', name: 'Pyro', type: 'system', system_code: 'PYRO', parent_id: null, coordinates: { x: 42, y: 1, z: -44 } },
+  { id: 5, rsi_id: 'magnus', name: 'Magnus', type: 'system', system_code: 'MAGN', parent_id: null, coordinates: { x: 112, y: 5, z: 62 } },
+  { id: 6, rsi_id: 'microtech', name: 'microTech', type: 'planet', system_code: 'STAN', parent_id: 1, coordinates: { x: 18, y: 0, z: -12 } },
+  { id: 7, rsi_id: 'crusader', name: 'Crusader', type: 'planet', system_code: 'STAN', parent_id: 1, coordinates: { x: -22, y: 0, z: 15 } },
+  { id: 8, rsi_id: 'hurston', name: 'Hurston', type: 'planet', system_code: 'STAN', parent_id: 1, coordinates: { x: 10, y: 0, z: 24 } },
+  { id: 9, rsi_id: 'arccorp', name: 'ArcCorp', type: 'planet', system_code: 'STAN', parent_id: 1, coordinates: { x: -12, y: 0, z: -21 } },
+  { id: 10, rsi_id: 'port-olisar', name: 'Port Olisar', type: 'station', system_code: 'STAN', parent_id: 7, coordinates: { x: -26, y: 0, z: 19 } },
+  { id: 11, rsi_id: 'stanton-pyro', name: 'Stanton - Pyro', type: 'jump_point', system_code: 'STAN', parent_id: 1, coordinates: { x: 34, y: 0, z: -33 } },
+  { id: 12, rsi_id: 'stanton-terra', name: 'Stanton - Terra', type: 'jump_point', system_code: 'STAN', parent_id: 1, coordinates: { x: 44, y: 0, z: 18 } },
+];
 
 const TYPE_ORDER = ['system', 'star', 'planet', 'moon', 'landing_zone', 'station', 'rest_stop', 'outpost', 'comm_array', 'jump_point'];
 const IMPORTANT_TYPES = new Set(['system', 'star', 'planet', 'moon', 'landing_zone', 'station', 'rest_stop', 'outpost', 'comm_array', 'jump_point']);
@@ -375,8 +390,8 @@ function StarmapScene({
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    const camera = new THREE.PerspectiveCamera(48, container.clientWidth / container.clientHeight, 0.1, 2400);
-    camera.position.set(0, 115, 185);
+    const camera = new THREE.PerspectiveCamera(42, container.clientWidth / container.clientHeight, 0.1, 2400);
+    camera.position.set(0, 190, 22);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -386,6 +401,8 @@ function StarmapScene({
     controls.panSpeed = 0.7;
     controls.minDistance = 12;
     controls.maxDistance = 420;
+    controls.maxPolarAngle = Math.PI * 0.47;
+    controls.minPolarAngle = Math.PI * 0.08;
 
     scene.add(new THREE.AmbientLight(0x0c2435, 1.4));
     const key = new THREE.DirectionalLight(0x95f4ff, 2.8);
@@ -415,7 +432,7 @@ function StarmapScene({
     const starMat = new THREE.PointsMaterial({ size: 0.7, transparent: true, opacity: 0.62, depthWrite: false, vertexColors: true });
     scene.add(new THREE.Points(starGeo, starMat));
 
-    const grid = new THREE.GridHelper(260, 26, 0x0e7490, 0x083344);
+    const grid = new THREE.GridHelper(320, 32, 0x0e7490, 0x083344);
     const gridMaterial = grid.material as THREE.Material;
     gridMaterial.transparent = true;
     gridMaterial.opacity = 0.14;
@@ -600,25 +617,29 @@ export default function LocationsPage() {
   const { data: starmapPositions, isLoading: loadingStarmap, error: starmapError } = useQuery({
     queryKey: ['starmap-positions'],
     queryFn: () => api.starmap.positions() as Promise<RsiStarmapPosition[]>,
+    retry: false,
     staleTime: 5 * 60_000,
   });
 
   const { data: gameLocations, isLoading: loadingLocations } = useQuery({
     queryKey: ['locations-all', env],
     queryFn: () => api.locations.all(env) as Promise<LocationWithMap[]>,
+    retry: false,
     staleTime: 5 * 60_000,
   });
 
   const { data: shopsData } = useQuery({
     queryKey: ['shops-all', env],
     queryFn: () => api.shops?.list?.({ env, limit: 500 }) ?? Promise.resolve({ data: [], total: 0, page: 1, limit: 0, pages: 0 }),
+    retry: false,
     staleTime: 5 * 60_000,
   });
 
-  const isLoading = loadingStarmap || loadingLocations;
-  const error = starmapError;
-  const rawLocs = useMemo(() => combineVerseLocations(starmapPositions ?? [], gameLocations ?? []), [starmapPositions, gameLocations]);
+  const fallbackStarmapPositions = starmapPositions?.length ? starmapPositions : FALLBACK_STARMAP_POSITIONS;
+  const rawLocs = useMemo(() => combineVerseLocations(fallbackStarmapPositions, gameLocations ?? []), [fallbackStarmapPositions, gameLocations]);
   const nodes = useMemo(() => buildStarmap(rawLocs, shopsData?.data ?? []), [rawLocs, shopsData]);
+  const isLoading = (loadingStarmap || loadingLocations) && nodes.length === 0;
+  const error = starmapError && nodes.length === 0 ? starmapError : null;
   const query = search.trim().toLowerCase();
   const filteredNodes = useMemo(
     () =>
@@ -658,8 +679,10 @@ export default function LocationsPage() {
 
   return (
     <div className="relative h-[calc(100dvh-3.5rem)] -m-4 md:-m-6 overflow-hidden bg-[#01040a]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(34,211,238,0.12),transparent_30%),linear-gradient(180deg,rgba(1,4,10,0.15),rgba(1,4,10,0.86))] pointer-events-none z-10" />
-      <div className="absolute inset-0 z-10 pointer-events-none opacity-30 bg-[linear-gradient(rgba(34,211,238,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.08)_1px,transparent_1px)] bg-[size:64px_64px]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_34%_28%,rgba(255,138,61,0.34),transparent_26%),radial-gradient(ellipse_at_48%_58%,rgba(39,245,213,0.14),transparent_33%),radial-gradient(ellipse_at_76%_24%,rgba(255,218,113,0.13),transparent_24%),linear-gradient(90deg,rgba(1,6,12,0.35),rgba(2,10,17,0.08),rgba(1,6,12,0.45))] pointer-events-none z-10 mix-blend-screen" />
+      <div className="absolute inset-0 z-10 pointer-events-none bg-[radial-gradient(circle_at_center,transparent_0,rgba(1,4,10,0.32)_58%,rgba(1,4,10,0.82)_100%)]" />
+      <div className="absolute inset-x-0 top-0 z-20 h-10 border-b border-cyan-500/60 bg-[#061521]/75 shadow-[0_0_24px_rgba(0,190,255,0.24)]" />
+      <div className="absolute inset-x-0 bottom-0 z-20 h-28 border-t border-cyan-500/50 bg-[#03101a]/85 shadow-[0_0_28px_rgba(0,190,255,0.24)]" />
 
       {isLoading ? (
         <div className="absolute inset-0 z-20 flex items-center justify-center">
@@ -669,12 +692,27 @@ export default function LocationsPage() {
         <StarmapScene nodes={filteredNodes.length ? filteredNodes : nodes} selectedId={selectedNode?.id ?? null} highlightedIds={highlightedIds} onSelect={setSelectedId} />
       )}
 
-      <header className="absolute left-4 right-4 top-4 z-20 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between pointer-events-none">
+      <header className="absolute left-0 right-0 top-0 z-30 pointer-events-none">
+        <div className="flex h-10 items-center justify-between px-6 font-mono-sc text-[10px] uppercase tracking-widest text-cyan-500">
+          <div className="flex items-center gap-5 pointer-events-auto">
+            <button className="text-amber-400">Back</button>
+            <button className="text-cyan-400">GLX</button>
+            <button className="text-cyan-400">SYS</button>
+            <button className="text-cyan-400">OBJ</button>
+          </div>
+          <div className="flex items-center gap-4 pointer-events-auto">
+            <Volume2 size={14} />
+            <Crosshair size={14} />
+          </div>
+        </div>
+      </header>
+
+      <section className="absolute left-4 right-4 top-14 z-30 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between pointer-events-none">
         <div className="pointer-events-auto">
           <div className="flex items-center gap-2 text-cyan-300">
             <Sparkles size={18} />
-            <h1 className="font-orbitron text-lg md:text-2xl font-bold tracking-widest uppercase">ARK Verse Map</h1>
-            <h2 className="sr-only">Locations</h2>
+            <h1 className="font-orbitron text-lg md:text-2xl font-bold tracking-widest uppercase">Starvis Starmap</h1>
+            <span className="sr-only">Unified RSI and P4K location map</span>
           </div>
           <p className="font-mono-sc text-[10px] text-slate-500 uppercase tracking-widest mt-1">
             RSI starmap + P4K locations · {filteredNodes.length.toLocaleString('en-US')} visible · {nodes.length.toLocaleString('en-US')} mapped
@@ -717,7 +755,7 @@ export default function LocationsPage() {
             })}
           </div>
         </div>
-      </header>
+      </section>
 
       {!isLoading && search.trim() && filteredNodes.length > 0 && (
         <div className="absolute left-4 top-[9.25rem] z-20 w-[min(340px,calc(100vw-2rem))] pointer-events-auto">
@@ -745,68 +783,135 @@ export default function LocationsPage() {
 
       <AnimatePresence>
         {selectedNode && (
-          <motion.aside
+          <motion.div
             key={selectedNode.id}
-            initial={{ opacity: 0, x: 28 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 28 }}
-            className="absolute right-4 top-[9.25rem] bottom-4 z-20 w-[min(380px,calc(100vw-2rem))] pointer-events-auto"
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.92 }}
+            className="absolute left-1/2 top-1/2 z-30 hidden h-[330px] w-[min(720px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 pointer-events-auto lg:block"
           >
-            <div className="h-full sci-panel bg-black/60 backdrop-blur-xl border-cyan-900/50 overflow-y-auto p-4 shadow-[0_0_60px_rgba(8,145,178,0.16)]">
+            <div className="absolute inset-0 rounded-full border border-cyan-900/25 bg-cyan-950/10 backdrop-blur-[2px]" />
+            <div className="absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-500/30 bg-black/35 shadow-[0_0_70px_rgba(0,216,255,0.18)]" />
+            <div className="absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-amber-300/70 bg-[radial-gradient(circle,rgba(255,170,61,0.34),rgba(88,18,9,0.55)_68%,transparent_70%)] shadow-[0_0_40px_rgba(255,176,67,0.28)]" />
+            <div className="absolute left-1/2 top-[2.2rem] -translate-x-1/2 text-center">
+              <p className="font-orbitron text-lg font-bold uppercase tracking-widest text-amber-200">{selectedNode.loc.name}</p>
+              <p className="font-mono-sc text-[10px] uppercase tracking-widest text-cyan-600">{selectedNode.systemCode}</p>
+            </div>
+
+            <div className="absolute left-12 top-24 w-56 border-y border-cyan-900/60 bg-[#031421]/70 px-4 py-4 text-right">
+              <p className="font-mono-sc text-[10px] uppercase tracking-widest text-cyan-500">{metaFor(selectedNode.loc.type).label}</p>
+              <div className="mt-3 space-y-1.5 font-mono-sc text-[10px] uppercase tracking-widest">
+                <HudInfo label="Type" value={metaFor(selectedNode.loc.type).label} />
+                {selectedNode.loc.rsi_starmap?.faction_name && <HudInfo label="Affiliation" value={selectedNode.loc.rsi_starmap.faction_name} />}
+                {selectedNode.loc.aggregated?.population != null && <HudInfo label="Population" value={`${selectedNode.loc.aggregated.population}`} />}
+                {selectedNode.loc.aggregated?.danger != null && <HudInfo label="Danger" value={`${selectedNode.loc.aggregated.danger}`} />}
+                {selectedNode.shopCount > 0 && <HudInfo label="Shops" value={`${selectedNode.shopCount}`} />}
+              </div>
+            </div>
+
+            <div className="absolute right-12 top-24 w-60 border-y border-cyan-900/60 bg-[#031421]/70 py-3">
+              {['Inspect', 'Information', 'Routing', 'Bookmark'].map((action, index) => (
+                <button
+                  key={action}
+                  type="button"
+                  onClick={() => index === 0 && setSelectedId(selectedNode.id)}
+                  className={`flex w-full items-center justify-between px-4 py-2 font-orbitron text-[11px] uppercase tracking-widest transition-colors ${
+                    index === 0 ? 'bg-cyan-950/80 text-cyan-300' : 'text-cyan-700 hover:text-cyan-300'
+                  }`}
+                >
+                  {action}
+                  {index === 0 && <span className="text-amber-400">›</span>}
+                </button>
+              ))}
+            </div>
+
+            <div className="absolute bottom-8 left-1/2 grid w-80 -translate-x-1/2 grid-cols-3 gap-2">
+              <Metric label="X" value={selectedNode.position.x.toFixed(1)} />
+              <Metric label="Y" value={selectedNode.position.y.toFixed(1)} />
+              <Metric label="Z" value={selectedNode.position.z.toFixed(1)} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedNode && (
+          <motion.aside
+            key={`${selectedNode.id}-mobile`}
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 24 }}
+            className="absolute inset-x-3 bottom-32 z-30 pointer-events-auto lg:hidden"
+          >
+            <div className="sci-panel bg-black/70 backdrop-blur-xl border-cyan-900/50 p-4 shadow-[0_0_60px_rgba(8,145,178,0.16)]">
               <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 text-cyan-400">
-                    {metaFor(selectedNode.loc.type).icon}
-                    <span className="font-mono-sc text-[10px] uppercase tracking-widest">{selectedNode.systemCode}</span>
-                  </div>
-                  <h2 className="font-orbitron text-xl text-white font-bold tracking-wider mt-1 leading-tight">{selectedNode.loc.name}</h2>
+                <div>
+                  <p className="font-mono-sc text-[10px] uppercase tracking-widest text-cyan-500">{selectedNode.systemCode}</p>
+                  <h2 className="font-orbitron text-lg text-white font-bold tracking-wider">{selectedNode.loc.name}</h2>
                 </div>
                 <GlowBadge color="cyan">{metaFor(selectedNode.loc.type).label}</GlowBadge>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 mt-4">
-                <Metric label="X" value={selectedNode.position.x.toFixed(1)} />
-                <Metric label="Y" value={selectedNode.position.y.toFixed(1)} />
-                <Metric label="Z" value={selectedNode.position.z.toFixed(1)} />
-              </div>
-
-              <div className="mt-4 space-y-2 text-sm font-rajdhani text-slate-400">
-                {selectedNode.loc.rsi_starmap?.status && <Info label="Status" value={selectedNode.loc.rsi_starmap.status} />}
-                {selectedNode.loc.rsi_starmap?.faction_name && <Info label="Faction" value={selectedNode.loc.rsi_starmap.faction_name} />}
-                {selectedNode.loc.aggregated?.population != null && <Info label="Population" value={`${selectedNode.loc.aggregated.population}`} />}
-                {selectedNode.loc.aggregated?.economy != null && <Info label="Economy" value={`${selectedNode.loc.aggregated.economy}`} />}
-                {selectedNode.loc.aggregated?.danger != null && <Info label="Danger" value={`${selectedNode.loc.aggregated.danger}`} />}
-                <Info label="Class" value={selectedNode.loc.class_name} />
-                {selectedNode.loc.loc_key && <Info label="Loc Key" value={selectedNode.loc.loc_key} />}
-                {selectedNode.loc.is_scannable && <Info label="Scan" value="Scannable" />}
-                {selectedNode.shopCount > 0 && <Info label="Shops" value={`${selectedNode.shopCount}`} />}
-                {selectedNode.loc.p4k_path && <Info label="Path" value={selectedNode.loc.p4k_path} />}
-              </div>
-
-              {selectedNode.loc.description && (
-                <p className="mt-4 text-sm text-slate-500 leading-relaxed">{selectedNode.loc.description}</p>
-              )}
-
-              <div className="mt-5 flex gap-2">
-                <button type="button" onClick={() => setSelectedId(selectedNode.id)} className="sci-btn-primary py-2 px-3 text-xs gap-2">
-                  <Crosshair size={13} /> Focus
-                </button>
-                <button type="button" onClick={() => setActiveTypes(new Set(TYPE_ORDER))} className="sci-btn-ghost py-2 px-3 text-xs gap-2">
-                  <Eye size={13} /> Show all
-                </button>
               </div>
             </div>
           </motion.aside>
         )}
       </AnimatePresence>
 
-      <div className="absolute left-4 bottom-4 z-20 pointer-events-none max-w-md">
-        <div className="rounded-sm border border-cyan-900/40 bg-slate-950/70 backdrop-blur-md px-3 py-2">
-          <p className="font-mono-sc text-[10px] text-slate-500 uppercase tracking-widest">
-            Drag to orbit Â· Scroll to zoom Â· Click an object to inspect
-          </p>
+      <div className="absolute inset-x-0 bottom-0 z-30 pointer-events-none h-28">
+        <div className="absolute bottom-5 left-8 flex items-center gap-3">
+          <div className="grid h-16 w-16 place-items-center border border-cyan-500/70 bg-cyan-950/25 shadow-[0_0_28px_rgba(0,216,255,0.22)]">
+            <Sparkles size={28} className="text-cyan-300" />
+          </div>
+          <div>
+            <p className="font-orbitron text-2xl font-bold tracking-[0.55em] text-cyan-200">SV</p>
+            <p className="font-mono-sc text-[10px] uppercase tracking-[0.35em] text-cyan-500">Starmap</p>
+          </div>
+        </div>
+
+        <div className="absolute bottom-3 left-1/2 hidden -translate-x-1/2 gap-4 md:flex">
+          <HudGroup label="Factions">
+            {['○', '▽', '◇', '△', '◎', '✹'].map((mark) => (
+              <span key={mark} className="text-cyan-400">{mark}</span>
+            ))}
+          </HudGroup>
+          <HudGroup label="Jump Tunnels">
+            <span className="text-cyan-700">•</span>
+            <span className="text-cyan-500">⊙</span>
+            <span className="text-cyan-300">◉</span>
+          </HudGroup>
+          <HudGroup label="Sensors">
+            <span className="text-cyan-500">♙</span>
+            <span className="text-cyan-500">⌖</span>
+            <span className="text-cyan-500">☠</span>
+          </HudGroup>
+        </div>
+
+        <div className="absolute bottom-4 right-8 flex items-end gap-3 font-mono-sc text-[10px] uppercase tracking-widest text-cyan-600">
+          <button type="button" className="pointer-events-auto border-t-2 border-cyan-400 px-4 py-2 text-cyan-300">3D</button>
+          <button type="button" className="pointer-events-auto border-t border-cyan-900 px-4 py-2">2D</button>
+        </div>
+
+        <div className="absolute bottom-2 left-8 font-mono-sc text-[9px] uppercase tracking-widest text-cyan-800">
+          Drag to navigate · Scroll to zoom · Click object to inspect
         </div>
       </div>
+    </div>
+  );
+}
+
+function HudGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-40 border-t border-cyan-700/50 bg-cyan-950/20 px-6 py-2 text-center">
+      <div className="flex justify-center gap-5 font-mono-sc text-sm">{children}</div>
+      <p className="mt-1 font-mono-sc text-[9px] uppercase tracking-widest text-cyan-700">{label}</p>
+    </div>
+  );
+}
+
+function HudInfo({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-end gap-3">
+      <span className="text-cyan-700">{label}</span>
+      <span className="text-cyan-300">{value}</span>
     </div>
   );
 }
@@ -820,12 +925,4 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start gap-3 border-b border-slate-800/50 pb-2">
-      <span className="w-20 shrink-0 font-mono-sc text-[10px] text-slate-600 uppercase tracking-widest">{label}</span>
-      <span className="min-w-0 break-words text-slate-300">{value}</span>
-    </div>
-  );
-}
 

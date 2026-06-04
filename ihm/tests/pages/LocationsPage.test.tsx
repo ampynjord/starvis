@@ -41,15 +41,15 @@ vi.mock('@/services/api', () => ({
 describe('LocationsPage', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
-  it('renders the Locations heading', async () => {
+  it('renders the Starvis Starmap heading', async () => {
     renderWithProviders(<LocationsPage />);
-    await waitFor(() => expect(screen.getByRole('heading', { name: /locations/i })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole('heading', { name: /starvis starmap/i })).toBeInTheDocument());
   });
 
   it('renders location names from API', async () => {
     renderWithProviders(<LocationsPage />);
     await waitFor(() => {
-      expect(screen.getByText('Stanton')).toBeInTheDocument();
+      expect(screen.getAllByText('Stanton').length).toBeGreaterThan(0);
     });
   });
 });

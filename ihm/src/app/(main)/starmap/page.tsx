@@ -1,10 +1,11 @@
-import LocationsPage from '@/views/LocationsPage';
+import type { Metadata } from 'next';
+import StarmapPage from '@/views/StarmapPage';
 
-export const metadata = {
-  title: 'Starmap',
-  description: 'Interactive 3D Star Citizen starmap with systems, planets, moons, stations and jump points.',
+export const metadata: Metadata = {
+  title: 'Starvis Starmap',
+  description: 'Interactive Star Citizen galaxy map — all star systems, factions and jump tunnel connections.',
 };
 
 export default function Page() {
-  return <LocationsPage />;
+  return <StarmapPage />;
 }
