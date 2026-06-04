@@ -23,6 +23,8 @@ type RsiStarmapPosition = {
   system_name?: string | null;
   parent_id?: number | string | null;
   parent_db_id?: number | null;
+  status?: string | null;
+  faction_name?: string | null;
   coordinates?: Coordinates | null;
   aggregated?: {
     planets?: number;
@@ -31,6 +33,16 @@ type RsiStarmapPosition = {
     population?: number;
     economy?: number;
     danger?: number;
+  } | null;
+  p4k_location?: {
+    uuid?: string | null;
+    name?: string | null;
+    type?: string | null;
+    system_code?: string | null;
+    parent_uuid?: string | null;
+    coordinates?: Coordinates | null;
+    p4k_path?: string | null;
+    is_scannable?: boolean | null;
   } | null;
 };
 
@@ -126,26 +138,30 @@ function systemCode(loc: LocationWithMap) {
 function posToLocation(pos: RsiStarmapPosition): LocationWithMap {
   const stableId = pos.rsi_id ?? String(pos.id);
   const parentStableId = pos.parent_id != null ? String(pos.parent_id) : null;
+  const p4k = pos.p4k_location;
   return {
     uuid: `starmap-${stableId}`,
     class_name: pos.rsi_id ? `RSI_${pos.rsi_id}` : `RSI_${pos.id}`,
     name: pos.name,
     type: normalizeType(pos.type),
-    system_code: pos.system_code ?? null,
+    system_code: pos.system_code ?? p4k?.system_code ?? null,
     parent_uuid: parentStableId ? `starmap-${parentStableId}` : null,
     parent_id: typeof pos.parent_id === 'number' ? pos.parent_id : null,
     loc_key: null,
     description: null,
-    is_scannable: false,
+    is_scannable: Boolean(p4k?.is_scannable),
     hide_in_starmap: false,
-    coordinates: pos.coordinates ?? null,
+    coordinates: pos.coordinates ?? p4k?.coordinates ?? null,
+    p4k_path: p4k?.p4k_path ?? null,
     rsi_starmap_location_id: pos.id,
     aggregated: pos.aggregated ?? null,
     rsi_starmap: {
       name: pos.name,
       type: pos.type,
+      status: pos.status ?? null,
       system_code: pos.system_code ?? null,
       system_name: pos.system_name ?? null,
+      faction_name: pos.faction_name ?? null,
       coordinates: pos.coordinates ?? null,
     },
   } as LocationWithMap;
@@ -153,14 +169,18 @@ function posToLocation(pos: RsiStarmapPosition): LocationWithMap {
 
 function mergeLocation(mapLoc: LocationWithMap, gameLoc: LocationWithMap): LocationWithMap {
   return {
-    ...mapLoc,
     ...gameLoc,
+    ...mapLoc,
     uuid: mapLoc.uuid,
     name: mapLoc.name || gameLoc.name,
     type: normalizeType(mapLoc.type || gameLoc.type),
     parent_uuid: mapLoc.parent_uuid ?? gameLoc.parent_uuid ?? null,
     parent_id: mapLoc.parent_id ?? gameLoc.parent_id ?? null,
-    system_code: gameLoc.system_code ?? mapLoc.system_code ?? null,
+    system_code: mapLoc.system_code ?? gameLoc.system_code ?? null,
+    loc_key: gameLoc.loc_key ?? mapLoc.loc_key ?? null,
+    description: gameLoc.description ?? mapLoc.description ?? null,
+    is_scannable: gameLoc.is_scannable ?? mapLoc.is_scannable ?? false,
+    p4k_path: mapLoc.p4k_path ?? gameLoc.p4k_path ?? null,
     coordinates: mapLoc.coordinates ?? gameLoc.coordinates ?? gameLoc.rsi_starmap?.coordinates ?? null,
     aggregated: mapLoc.aggregated ?? gameLoc.aggregated ?? null,
     rsi_starmap: {
@@ -183,7 +203,7 @@ function combineLocations(starmapPositions: RsiStarmapPosition[], gameLocations:
   for (const loc of gameLocations) {
     const normalized = { ...loc, type: normalizeType(loc.type) };
     const matched = normalized.rsi_starmap_location_id != null ? byRsiId.get(normalized.rsi_starmap_location_id) : null;
-    combined.set(matched?.uuid ?? normalized.uuid, matched ? mergeLocation(matched, normalized) : normalized);
+    if (matched) combined.set(matched.uuid, mergeLocation(matched, normalized));
   }
 
   return [...combined.values()];
