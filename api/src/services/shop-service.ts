@@ -85,8 +85,10 @@ export class ShopService {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT si.*, c.name as component_name, c.type as component_type, c.size as component_size
-       FROM game.shop_inventory si LEFT JOIN game.components c ON si.component_uuid = c.uuid AND c.env = si.env
-       WHERE si.env = ? AND si.shop_id = ? ORDER BY c.type, c.name`),
+       FROM game.shop_inventory si
+       JOIN game.shops s ON s.id = si.shop_id
+       LEFT JOIN game.components c ON si.component_uuid = c.uuid AND c.env = s.env
+       WHERE s.env = ? AND si.shop_id = ? ORDER BY c.type, c.name`),
       env,
       shopId,
     );

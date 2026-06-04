@@ -35,6 +35,8 @@ type LocationWithMap = Location & {
   parent_id?: number | null;
   aggregated?: RsiStarmapPosition['aggregated'];
   coordinates?: Coordinates | null;
+  rsi_starmap_location_id?: number | null;
+  p4k_path?: string | null;
   rsi_starmap?: {
     name?: string | null;
     type?: string | null;
@@ -131,6 +133,58 @@ function starmapPositionToLocation(pos: RsiStarmapPosition): LocationWithMap {
       coordinates: pos.coordinates ?? null,
     },
   } as LocationWithMap;
+}
+
+function mergeLocationData(mapLoc: LocationWithMap, gameLoc: LocationWithMap): LocationWithMap {
+  return {
+    ...mapLoc,
+    ...gameLoc,
+    uuid: mapLoc.uuid,
+    class_name: gameLoc.class_name || mapLoc.class_name,
+    name: mapLoc.name || gameLoc.name,
+    type: normalizeType(mapLoc.type || gameLoc.type),
+    system_code: gameLoc.system_code ?? mapLoc.system_code ?? mapLoc.rsi_starmap?.system_code ?? null,
+    parent_uuid: gameLoc.parent_uuid ?? mapLoc.parent_uuid ?? null,
+    parent_id: mapLoc.parent_id ?? gameLoc.parent_id ?? null,
+    rsi_starmap_location_id: mapLoc.rsi_starmap_location_id ?? gameLoc.rsi_starmap_location_id ?? null,
+    loc_key: gameLoc.loc_key ?? mapLoc.loc_key ?? null,
+    description: gameLoc.description ?? mapLoc.description ?? null,
+    coordinates: mapLoc.coordinates ?? gameLoc.coordinates ?? gameLoc.rsi_starmap?.coordinates ?? null,
+    p4k_path: gameLoc.p4k_path ?? mapLoc.p4k_path ?? null,
+    is_scannable: gameLoc.is_scannable ?? mapLoc.is_scannable ?? false,
+    hide_in_starmap: gameLoc.hide_in_starmap ?? mapLoc.hide_in_starmap ?? false,
+    aggregated: mapLoc.aggregated ?? gameLoc.aggregated ?? null,
+    rsi_starmap: {
+      ...(gameLoc.rsi_starmap ?? {}),
+      ...(mapLoc.rsi_starmap ?? {}),
+      coordinates: mapLoc.rsi_starmap?.coordinates ?? mapLoc.coordinates ?? gameLoc.rsi_starmap?.coordinates ?? gameLoc.coordinates ?? null,
+      system_code: gameLoc.rsi_starmap?.system_code ?? mapLoc.rsi_starmap?.system_code ?? gameLoc.system_code ?? mapLoc.system_code ?? null,
+    },
+  };
+}
+
+function combineVerseLocations(starmapPositions: RsiStarmapPosition[], gameLocations: LocationWithMap[]): LocationWithMap[] {
+  const mapLocations = starmapPositions.map(starmapPositionToLocation);
+  const byRsiId = new Map<number, LocationWithMap>();
+  const combined = new Map<string, LocationWithMap>();
+
+  for (const loc of mapLocations) {
+    if (loc.rsi_starmap_location_id != null) byRsiId.set(loc.rsi_starmap_location_id, loc);
+    combined.set(loc.uuid, loc);
+  }
+
+  for (const rawGameLoc of gameLocations) {
+    const gameLoc = { ...rawGameLoc, type: normalizeType(rawGameLoc.type) };
+    const rsiId = gameLoc.rsi_starmap_location_id ?? null;
+    const matchingMapLoc = rsiId != null ? byRsiId.get(rsiId) : undefined;
+    if (matchingMapLoc) {
+      combined.set(matchingMapLoc.uuid, mergeLocationData(matchingMapLoc, gameLoc));
+    } else {
+      combined.set(gameLoc.uuid, gameLoc);
+    }
+  }
+
+  return [...combined.values()];
 }
 
 function makeLabel(text: string, color: string) {
@@ -463,9 +517,15 @@ export default function LocationsPage() {
   const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set(['system', 'star', 'planet', 'moon', 'landing_zone', 'station', 'rest_stop', 'jump_point']));
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const { data: starmapPositions, isLoading, error } = useQuery({
+  const { data: starmapPositions, isLoading: loadingStarmap, error: starmapError } = useQuery({
     queryKey: ['starmap-positions'],
     queryFn: () => api.starmap.positions() as Promise<RsiStarmapPosition[]>,
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: gameLocations, isLoading: loadingLocations } = useQuery({
+    queryKey: ['locations-all', env],
+    queryFn: () => api.locations.all(env) as Promise<LocationWithMap[]>,
     staleTime: 5 * 60_000,
   });
 
@@ -475,7 +535,9 @@ export default function LocationsPage() {
     staleTime: 5 * 60_000,
   });
 
-  const rawLocs = useMemo(() => (starmapPositions ?? []).map(starmapPositionToLocation), [starmapPositions]);
+  const isLoading = loadingStarmap || loadingLocations;
+  const error = starmapError;
+  const rawLocs = useMemo(() => combineVerseLocations(starmapPositions ?? [], gameLocations ?? []), [starmapPositions, gameLocations]);
   const nodes = useMemo(() => buildStarmap(rawLocs, shopsData?.data ?? []), [rawLocs, shopsData]);
   const query = search.trim().toLowerCase();
   const filteredNodes = useMemo(
@@ -530,7 +592,7 @@ export default function LocationsPage() {
         <div className="pointer-events-auto">
           <div className="flex items-center gap-2 text-cyan-300">
             <Sparkles size={18} />
-            <h1 className="font-orbitron text-lg md:text-2xl font-bold tracking-widest uppercase">Starmap</h1>
+            <h1 className="font-orbitron text-lg md:text-2xl font-bold tracking-widest uppercase">Verse Map</h1>
             <h2 className="sr-only">Locations</h2>
           </div>
           <p className="font-mono-sc text-[10px] text-slate-500 uppercase tracking-widest mt-1">
@@ -630,8 +692,14 @@ export default function LocationsPage() {
               <div className="mt-4 space-y-2 text-sm font-rajdhani text-slate-400">
                 {selectedNode.loc.rsi_starmap?.status && <Info label="Status" value={selectedNode.loc.rsi_starmap.status} />}
                 {selectedNode.loc.rsi_starmap?.faction_name && <Info label="Faction" value={selectedNode.loc.rsi_starmap.faction_name} />}
+                {selectedNode.loc.aggregated?.population != null && <Info label="Population" value={`${selectedNode.loc.aggregated.population}`} />}
+                {selectedNode.loc.aggregated?.economy != null && <Info label="Economy" value={`${selectedNode.loc.aggregated.economy}`} />}
+                {selectedNode.loc.aggregated?.danger != null && <Info label="Danger" value={`${selectedNode.loc.aggregated.danger}`} />}
                 <Info label="Class" value={selectedNode.loc.class_name} />
+                {selectedNode.loc.loc_key && <Info label="Loc Key" value={selectedNode.loc.loc_key} />}
+                {selectedNode.loc.is_scannable && <Info label="Scan" value="Scannable" />}
                 {selectedNode.shopCount > 0 && <Info label="Shops" value={`${selectedNode.shopCount}`} />}
+                {selectedNode.loc.p4k_path && <Info label="Path" value={selectedNode.loc.p4k_path} />}
               </div>
 
               {selectedNode.loc.description && (
