@@ -10,11 +10,30 @@ vi.mock('@/contexts/AuthContext', () => ({
 
 vi.mock('@/services/api', () => ({
   api: {
+    starmap: {
+      positions: vi.fn().mockResolvedValue([
+        { id: 1, rsi_id: '1', name: 'Stanton', type: 'star', system_code: 'STAN', parent_id: null, coordinates: { x: 0, y: 0, z: 0 } },
+        { id: 2, rsi_id: '2', name: 'Hurston', type: 'planet', system_code: 'STAN', parent_id: 1, coordinates: { x: 10, y: 0, z: 0 } },
+      ]),
+    },
     locations: {
       all: vi.fn().mockResolvedValue([
-        { uuid: 'l1', name: 'Stanton', type: 'StarSystem', system_code: 'STAN', parent_uuid: null },
-        { uuid: 'l2', name: 'Hurston', type: 'Planet', system_code: 'STAN', parent_uuid: 'l1' },
+        {
+          uuid: 'game-hurston',
+          name: 'Hurston',
+          type: 'Planet',
+          system_code: 'STAN',
+          parent_uuid: null,
+          rsi_starmap_location_id: 2,
+          class_name: 'HurstonPlanet',
+          loc_key: 'hurston',
+          is_scannable: true,
+          hide_in_starmap: false,
+        },
       ]),
+    },
+    shops: {
+      list: vi.fn().mockResolvedValue({ data: [], total: 0, page: 1, limit: 0, pages: 0 }),
     },
   },
 }));

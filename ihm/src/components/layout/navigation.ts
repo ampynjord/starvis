@@ -60,7 +60,7 @@ const ECONOMY_ITEMS: NavItemDef[] = [
 
 const UNIVERSE_ITEMS: NavItemDef[] = [
   { to: '/missions', icon: ClipboardList, label: 'Missions' },
-  { to: '/locations', icon: MapPin, label: 'Starmap' },
+  { to: '/starmap', icon: MapPin, label: 'Starmap' },
   { to: '/factions', icon: Shield, label: 'Factions' },
   { to: '/manufacturers', icon: Wrench, label: 'Manufacturers' },
   { to: '/galactapedia', icon: Globe, label: 'Galactapedia' },

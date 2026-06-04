@@ -192,7 +192,7 @@ export class ComponentQueryService {
               s.canonical_shop_key, s.canonical_location_key,
               si.base_price, si.rental_price_1d, si.rental_price_3d, si.rental_price_7d, si.rental_price_30d
        FROM game.shop_inventory si JOIN game.shops s ON si.shop_id = s.id
-       WHERE si.env = ? AND si.component_uuid = ? ORDER BY si.base_price`),
+       WHERE s.env = ? AND si.component_uuid = ? ORDER BY si.base_price`),
       env,
       uuid,
     );

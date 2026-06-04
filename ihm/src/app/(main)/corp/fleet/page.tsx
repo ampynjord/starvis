@@ -50,9 +50,11 @@ interface Corp {
 
 // ── Ship search modal ─────────────────────────────────────────────────────────
 
-function AddShipModal({ onClose, onAdd }: {
+function AddShipModal({ onClose, onAdd, adding = false, error = '' }: {
   onClose: () => void;
-  onAdd: (ship: ShipListItem) => void;
+  onAdd: (ship: ShipListItem) => void | Promise<void>;
+  adding?: boolean;
+  error?: string;
 }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ShipListItem[]>([]);
@@ -106,9 +108,16 @@ function AddShipModal({ onClose, onAdd }: {
               onChange={handleChange}
               placeholder="Search by ship name or class…"
               className="sci-input w-full pl-9"
+              disabled={adding}
             />
             {loading && <Loader2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 animate-spin" />}
           </div>
+
+          {error && (
+            <div className="border border-red-900/60 bg-red-950/30 px-3 py-2 text-xs font-mono-sc text-red-300">
+              {error}
+            </div>
+          )}
 
           <div className="max-h-72 overflow-y-auto divide-y divide-border/30">
             {results.length === 0 && query && !loading && (
@@ -122,7 +131,8 @@ function AddShipModal({ onClose, onAdd }: {
                 key={ship.uuid}
                 type="button"
                 onClick={() => onAdd(ship)}
-                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left group"
+                disabled={adding}
+                className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-white/5 transition-colors text-left group disabled:cursor-wait disabled:opacity-60"
               >
                 {ship.thumbnail ? (
                   <img src={ship.thumbnail} alt={ship.name} className="w-10 h-6 object-contain shrink-0 opacity-80 group-hover:opacity-100" />
@@ -140,7 +150,11 @@ function AddShipModal({ onClose, onAdd }: {
                   </div>
                   <p className="text-[10px] text-slate-600 font-mono-sc">{ship.manufacturer_name} · {ship.role}</p>
                 </div>
-                <ArrowRight size={13} className="text-slate-700 group-hover:text-cyan-400 transition-colors shrink-0" />
+                {adding ? (
+                  <Loader2 size={13} className="text-cyan-500 animate-spin shrink-0" />
+                ) : (
+                  <ArrowRight size={13} className="text-slate-700 group-hover:text-cyan-400 transition-colors shrink-0" />
+                )}
               </button>
             ))}
           </div>
@@ -253,6 +267,7 @@ export default function FleetManagerPage() {
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
+  const [addError, setAddError] = useState('');
 
   // View mode
   const [viewMode, setViewMode] = useState<ViewMode>('mine');
@@ -326,13 +341,21 @@ export default function FleetManagerPage() {
 
   const handleAddShip = async (ship: ShipListItem) => {
     setAddLoading(true);
+    setAddError('');
     try {
       const res = await fetch('/api/corp/fleet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ shipUuid: ship.uuid, itemClassName: ship.class_name }),
       });
-      if (res.ok) { await loadFleet(); setShowAddModal(false); }
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(payload?.error || `Failed to declare ship (HTTP ${res.status})`);
+      }
+      await loadFleet();
+      setShowAddModal(false);
+    } catch (e: any) {
+      setAddError(e?.message || 'Failed to declare ship');
     } finally {
       setAddLoading(false);
     }
@@ -493,7 +516,7 @@ export default function FleetManagerPage() {
             </span>
             <button
               type="button"
-              onClick={() => setShowAddModal(true)}
+              onClick={() => { setAddError(''); setShowAddModal(true); }}
               disabled={addLoading}
               className="sci-btn-primary py-1.5 px-3 text-xs gap-1.5 flex items-center disabled:opacity-40"
             >
@@ -604,7 +627,12 @@ export default function FleetManagerPage() {
       {/* Add ship modal */}
       <AnimatePresence>
         {showAddModal && (
-          <AddShipModal onClose={() => setShowAddModal(false)} onAdd={handleAddShip} />
+          <AddShipModal
+            onClose={() => { if (!addLoading) { setAddError(''); setShowAddModal(false); } }}
+            onAdd={handleAddShip}
+            adding={addLoading}
+            error={addError}
+          />
         )}
       </AnimatePresence>
     </>

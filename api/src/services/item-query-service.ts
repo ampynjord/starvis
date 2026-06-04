@@ -505,7 +505,7 @@ export class ItemQueryService {
               si.base_price, si.rental_price_1d
        FROM game.shop_inventory si
        JOIN game.shops s ON si.shop_id = s.id
-       WHERE si.env = ? AND si.component_uuid = ?
+       WHERE s.env = ? AND si.component_uuid = ?
        ORDER BY si.base_price`),
       env,
       uuid,
