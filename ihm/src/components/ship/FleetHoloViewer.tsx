@@ -201,6 +201,53 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
 
     const loader = new CTMLoader();
     let loadedSoFar = 0;
+    const CARD_H = 14;
+    const CARD_W = CARD_H * 1.78;
+
+    const markLoaded = (entry: ShipEntry, radius: number, halfWidth: number) => {
+      entry.radius = radius;
+      entry.halfWidth = halfWidth;
+      entry.loaded = true;
+      loadedSoFar++;
+      setLoadedCount(loadedSoFar);
+      repositionShips();
+    };
+
+    const addFallbackCard = (entry: ShipEntry, texture: THREE.Texture | null) => {
+      const geo = new THREE.PlaneGeometry(CARD_W, CARD_H);
+      const frontMat = texture
+        ? new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.85, side: THREE.FrontSide })
+        : new THREE.MeshBasicMaterial({ color: 0x0d3040, transparent: true, opacity: 0.7 });
+      const front = new THREE.Mesh(geo, frontMat);
+      front.userData.fleetItemId = entry.ship.id;
+
+      const backMat = new THREE.MeshBasicMaterial({ color: 0x071820, transparent: true, opacity: 0.4, side: THREE.BackSide });
+      const back = new THREE.Mesh(geo, backMat);
+
+      const borderGeo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(CARD_W + 0.3, CARD_H + 0.3));
+      const borderMat = new THREE.LineBasicMaterial({ color: 0x1aa8c0, transparent: true, opacity: 0.7 });
+      const border = new THREE.LineSegments(borderGeo, borderMat);
+
+      const card = new THREE.Group();
+      card.add(front, back, border);
+      card.userData.fleetItemId = entry.ship.id;
+      entry.root.add(card);
+      entry.meshes.push(front);
+      markLoaded(entry, CARD_W / 2, CARD_W / 2);
+    };
+
+    const loadFallbackCard = (entry: ShipEntry) => {
+      if (!entry.ship.thumbnailUrl) {
+        addFallbackCard(entry, null);
+        return;
+      }
+      new THREE.TextureLoader().load(
+        entry.ship.thumbnailUrl,
+        (tex) => addFallbackCard(entry, tex),
+        undefined,
+        () => addFallbackCard(entry, null),
+      );
+    };
 
     entries.forEach((entry) => {
       if (!entry.ship.ctmUrl) {
@@ -334,9 +381,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
         },
         undefined,
         () => {
-          entry.loaded = true;
-          loadedSoFar++;
-          setLoadedCount(loadedSoFar);
+          loadFallbackCard(entry);
         },
       );
     });

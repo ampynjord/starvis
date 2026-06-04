@@ -53,6 +53,7 @@ export interface ShipListItem {
   production_status: string | null;
   variant_type: string | null;
   is_concept_only: boolean;
+  ctm_url: string | null;
   // Combat / flight stats returned by getAllShips query
   pitch_max: number | null;
   yaw_max: number | null;

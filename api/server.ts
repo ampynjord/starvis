@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { getPrisma, initPrisma } from '@starvis/db';
 import compression from 'compression';
 import cors from 'cors';
+import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
@@ -25,10 +26,12 @@ import { requireJwtAdmin } from './src/middleware/auth.js';
 import { prometheusMiddleware } from './src/middleware/prometheus.js';
 import { healthRouter } from './src/routes/health.js';
 import { createRoutes } from './src/routes/index.js';
+import { AuthService } from './src/services/auth-service.js';
 import { GameDataService } from './src/services/game-data-service.js';
 import { redis } from './src/services/redis.js';
 import { RsiWebsiteService } from './src/services/rsi-website-service.js';
 import { ShipMatrixService } from './src/services/ship-matrix-service.js';
+import { AUTH_COOKIE_NAME, DEVELOPER_ACCESS_ROLES } from './src/utils/config.js';
 import { buildDatabaseUrl, logger, RATE_LIMITS } from './src/utils/index.js';
 
 const PORT = process.env.PORT || 3000;
@@ -136,6 +139,60 @@ function makeSwaggerHtml(spec: OpenApiSpec, assetBasePath: string): string {
     .replace(/src="\.\//g, `src="${assetBasePath}/`);
 }
 
+function getBearerToken(req: Request): string | null {
+  const auth = req.headers.authorization;
+  return auth?.startsWith('Bearer ') ? auth.slice(7) : null;
+}
+
+function getCookieToken(req: Request): string | null {
+  const cookie = req.headers.cookie;
+  if (!cookie) return null;
+  const match = cookie.split(';').find((c) => c.trim().startsWith(`${AUTH_COOKIE_NAME}=`));
+  return match ? (match.split('=')[1]?.trim() ?? null) : null;
+}
+
+function apiDocsAccessDenied(req: Request, res: Response) {
+  const message =
+    'API documentation access requires the developer role. Please ask an administrator to grant you the developer role to access the Starvis API.';
+  const wantsHtml = req.accepts(['html', 'json']) === 'html';
+  if (!wantsHtml) return res.status(403).json({ success: false, error: message });
+  return res
+    .status(403)
+    .type('html')
+    .send(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Starvis API Access</title>
+  <style>
+    body{margin:0;min-height:100vh;display:grid;place-items:center;background:#050b12;color:#d7f7ff;font-family:Arial,sans-serif}
+    main{max-width:560px;padding:32px;border:1px solid #075b72;background:#07131f}
+    h1{margin:0 0 12px;font-size:20px;letter-spacing:.08em;text-transform:uppercase;color:#20e4ff}
+    p{margin:0;line-height:1.6;color:#9db4c4}
+  </style>
+</head>
+<body><main><h1>Developer role required</h1><p>${message}</p></main></body>
+</html>`);
+}
+
+function requireApiDocsDeveloper(req: Request, res: Response, next: NextFunction) {
+  if (!process.env.JWT_SECRET) return res.status(500).json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' });
+  const token = getBearerToken(req) ?? getCookieToken(req);
+  if (!token) return apiDocsAccessDenied(req, res);
+  try {
+    const authService = new AuthService(null as any);
+    const payload = authService.verifyToken(token);
+    if (!DEVELOPER_ACCESS_ROLES.includes(payload.role as (typeof DEVELOPER_ACCESS_ROLES)[number])) {
+      return apiDocsAccessDenied(req, res);
+    }
+    (req as any).jwtPayload = payload;
+    return next();
+  } catch {
+    return apiDocsAccessDenied(req, res);
+  }
+}
+
 const fullSwaggerSpec = JSON.parse(readFileSync(path.join(__dirname, 'openapi.json'), 'utf-8')) as OpenApiSpec;
 fullSwaggerSpec.servers = [{ url: '/', description: 'Current host' }];
 const publicSwaggerSpec = withoutAdminRoutes(fullSwaggerSpec);
@@ -144,8 +201,8 @@ const publicSwaggerSpec = withoutAdminRoutes(fullSwaggerSpec);
 // the browser URL has no trailing slash (./foo resolves to /foo instead of /api-docs/foo).
 const swaggerHtml = makeSwaggerHtml(publicSwaggerSpec, '/api-docs');
 const adminSwaggerHtml = makeSwaggerHtml(fullSwaggerSpec, '/api-docs');
-app.get('/api-docs', (_, res) => res.type('html').send(swaggerHtml));
-app.get('/api-docs/openapi.json', (_, res) => res.json(publicSwaggerSpec));
+app.get('/api-docs', requireApiDocsDeveloper, (_, res) => res.type('html').send(swaggerHtml));
+app.get('/api-docs/openapi.json', requireApiDocsDeveloper, (_, res) => res.json(publicSwaggerSpec));
 app.use('/api-docs', swaggerUi.serve);
 app.get('/admin/api-docs', requireJwtAdmin, (_, res) => res.type('html').send(adminSwaggerHtml));
 app.get('/admin/api-docs/openapi.json', requireJwtAdmin, (_, res) => res.json(fullSwaggerSpec));

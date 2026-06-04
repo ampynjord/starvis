@@ -8881,7 +8881,7 @@
       },
       "delete": {
         "tags": ["Admin", "Corporations"],
-        "summary": "Admin delete corporation",
+        "summary": "Admin reset Starvis corporation data",
         "parameters": [
           {
             "name": "id",
@@ -8905,7 +8905,18 @@
                       "example": true
                     },
                     "data": {
-                      "type": "object"
+                      "type": "object",
+                      "properties": {
+                        "corporation": {
+                          "$ref": "#/components/schemas/Corporation"
+                        },
+                        "removedMemberships": {
+                          "type": "integer"
+                        },
+                        "removedFleetItems": {
+                          "type": "integer"
+                        }
+                      }
                     }
                   }
                 }
