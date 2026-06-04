@@ -2,6 +2,7 @@
  * ComponentQueryService — Component listing, filters, buy locations, ships
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
+import { getGameComponentCategory } from './component-taxonomy.js';
 import { type FiltersResult, type PaginatedResult, paginate, type Row, stripInternal, toPostgres } from './shared.js';
 
 const COMP_SORT = new Set([
@@ -42,6 +43,10 @@ const COMP_SORT = new Set([
   'turret_max_pitch',
   'turret_max_yaw',
 ]);
+
+function withGameComponentCategory<T extends Row>(row: T): T {
+  return { ...row, game_component_category: getGameComponentCategory(String(row.type || '')) };
+}
 
 export class ComponentQueryService {
   constructor(private getClient: (env: string) => PrismaClient) {}
@@ -111,7 +116,8 @@ export class ComponentQueryService {
     const baseSql = `SELECT c.*, m.name as manufacturer_name FROM game.components c LEFT JOIN game.manufacturers m ON c.manufacturer_code = m.code${w}`;
     const countSql = `SELECT COUNT(*) as total FROM game.components c${w}`;
 
-    return paginate(prisma, baseSql, countSql, params, filters || {}, COMP_SORT, 'c');
+    const result = await paginate(prisma, baseSql, countSql, params, filters || {}, COMP_SORT, 'c');
+    return { ...result, data: result.data.map(withGameComponentCategory) };
   }
 
   async getComponentByUuid(uuid: string, env = 'live'): Promise<Row | null> {
@@ -123,7 +129,7 @@ export class ComponentQueryService {
       uuid,
       env,
     );
-    return rows[0] ? stripInternal(rows[0]) : null;
+    return rows[0] ? withGameComponentCategory(stripInternal(rows[0])) : null;
   }
 
   async getComponentByClassName(className: string, env = 'live'): Promise<Row | null> {
@@ -135,7 +141,7 @@ export class ComponentQueryService {
       className,
       env,
     );
-    return rows[0] ? stripInternal(rows[0]) : null;
+    return rows[0] ? withGameComponentCategory(stripInternal(rows[0])) : null;
   }
 
   async resolveComponent(id: string, env = 'live'): Promise<Row | null> {
@@ -178,6 +184,13 @@ export class ComponentQueryService {
       filters: {
         type: typeRows.map((r) => ({ value: String(r.value), label: String(r.value), count: Number(r.count) })),
         sub_type: subTypeRows.map((r) => ({ value: String(r.value), label: String(r.value), count: Number(r.count) })),
+        game_component_category: Object.entries(
+          typeRows.reduce<Record<string, number>>((acc, r) => {
+            const category = getGameComponentCategory(String(r.value));
+            acc[category] = (acc[category] ?? 0) + Number(r.count);
+            return acc;
+          }, {}),
+        ).map(([value, count]) => ({ value, label: value, count })),
         size: sizeRows.map((r) => ({ value: String(r.value), label: `S${r.value}` })),
         grade: gradeRows.map((r) => ({ value: String(r.value), label: String(r.value) })),
         manufacturer: mfrRows.map((r) => ({ value: String(r.value), label: String(r.label), count: Number(r.count) })),
@@ -279,6 +292,6 @@ export class ComponentQueryService {
       LIMIT ${limit}`;
 
     const rows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(sql), ...params);
-    return rows;
+    return rows.map(withGameComponentCategory);
   }
 }

@@ -8,6 +8,7 @@
 import { createHash } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import { canonicalizeCommodityRecord, canonicalizeComponentRecord, canonicalizeItemRecord } from './canonical-source.js';
+import { getGameComponentCategory } from './component-taxonomy.js';
 import { extractCraftingRecipes } from './crafting-extractor.js';
 import {
   applyDimensionsFallback,
@@ -628,7 +629,7 @@ export class ExtractionService {
     }
 
     const COMP_COLS = `env, uuid, class_name, name, normalized_name, canonical_component_key,
-          type, sub_type, size, grade, manufacturer_code,
+          type, game_component_category, sub_type, size, grade, manufacturer_code,
             mass, hp,
             power_draw, power_base, power_output,
             heat_generation, cooling_rate,
@@ -673,6 +674,7 @@ export class ExtractionService {
             normalized_name=EXCLUDED.normalized_name,
             canonical_component_key=EXCLUDED.canonical_component_key,
             type=EXCLUDED.type,
+            game_component_category=EXCLUDED.game_component_category,
             sub_type=EXCLUDED.sub_type, size=EXCLUDED.size, grade=EXCLUDED.grade,
             manufacturer_code=EXCLUDED.manufacturer_code,
             mass=EXCLUDED.mass, hp=EXCLUDED.hp,
@@ -742,7 +744,7 @@ export class ExtractionService {
             raw_json=EXCLUDED.raw_json,
             updated_at=CURRENT_TIMESTAMP`;
 
-    const COL_COUNT = 119; // number of columns above (stats + source metadata + env)
+    const COL_COUNT = 120; // number of columns above (stats + source metadata + env)
 
     /** Map a component object to a flat array of values */
     const toCanonicalRow = (c: any): (string | number | null)[] => {
@@ -763,6 +765,7 @@ export class ExtractionService {
         canonical.normalizedName,
         canonical.canonicalComponentKey,
         c.type,
+        getGameComponentCategory(c.type),
         c.subType || null,
         c.size ?? null,
         c.grade || null,

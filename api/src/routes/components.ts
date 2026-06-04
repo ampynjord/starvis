@@ -1,10 +1,16 @@
 import type { Router } from 'express';
 import { ComponentQuery } from '../schemas.js';
+import {
+  GAME_COMPONENT_CATEGORIES,
+  GAME_COMPONENT_CATEGORY_TYPES,
+  getGameComponentCategoryTypes,
+  slugifyGameComponentCategory,
+} from '../services/component-taxonomy.js';
 import { asyncHandler, makeGameDataGuard, sendCsvOrJson, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
-/** P4K-faithful component category → type array mapping */
-const COMPONENT_CATEGORY_TYPES: Record<string, string[]> = {
+/** Backward-compatible category aliases used by older clients. */
+const LEGACY_COMPONENT_CATEGORY_TYPES: Record<string, string[]> = {
   weapons: ['WeaponGun', 'Turret', 'TurretUnmanned', 'MissileRack', 'Missile', 'Ammunition', 'EMP', 'QuantumInterdictionGenerator'],
   systems: [
     'Shield',
@@ -23,6 +29,10 @@ const COMPONENT_CATEGORY_TYPES: Record<string, string[]> = {
   utility: ['MiningLaser', 'SalvageHead', 'TractorBeam'],
   modules: ['ShipModule'],
 };
+
+function resolveComponentCategoryTypes(category: string): string[] | undefined {
+  return getGameComponentCategoryTypes(category) ?? LEGACY_COMPONENT_CATEGORY_TYPES[category];
+}
 
 export function mountComponentRoutes(router: Router, deps: RouteDependencies): void {
   const { gameDataService } = deps;
@@ -65,13 +75,26 @@ export function mountComponentRoutes(router: Router, deps: RouteDependencies): v
   );
 
   router.get(
+    '/api/v1/components/categories',
+    requireGameData,
+    asyncHandler(async (_req, res) => {
+      const data = GAME_COMPONENT_CATEGORIES.map((category) => ({
+        slug: slugifyGameComponentCategory(category),
+        label: category,
+        types: GAME_COMPONENT_CATEGORY_TYPES[category],
+      }));
+      sendWithETag(_req, res, { success: true, data });
+    }),
+  );
+
+  router.get(
     '/api/v1/components',
     requireGameData,
     asyncHandler(async (req, res) => {
       const t = Date.now();
       // ?category= maps to a predefined type list; overrides individual ?type= param
       const categoryParam = req.query.category ? String(req.query.category) : undefined;
-      const categoryTypes = categoryParam ? COMPONENT_CATEGORY_TYPES[categoryParam] : undefined;
+      const categoryTypes = categoryParam ? resolveComponentCategoryTypes(categoryParam) : undefined;
       if (categoryParam && !categoryTypes) {
         return void res.status(400).json({ success: false, error: `Invalid category: ${categoryParam}` });
       }

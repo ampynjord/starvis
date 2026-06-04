@@ -6,6 +6,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import type { LoadoutNode, ShipModule } from '@/types/api';
+import { GAME_COMPONENT_CATEGORIES, type GameComponentCategory } from '@/utils/constants';
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -49,10 +50,6 @@ function isNoisyPort(n: LoadoutNode): boolean {
   if (p.endsWith('_door') || p.includes('_door_') || p === 'radar_helper') return true;
   if (n.component_type === 'FuelTank' || n.component_type === 'FuelIntake') return true;
   return false;
-}
-
-function toMN(n: number) {
-  return (n / 1_000_000).toFixed(2);
 }
 
 function parseJumpDriveName(className: string): string {
@@ -549,9 +546,9 @@ function ShieldCard({ node }: { node: LoadoutNode }) {
 // Data processing — slots individuels
 // ─────────────────────────────────────────────
 
-// Armes de combat (WeaponGun, EMP, QIG...)
+// Combat weapons only. EMP/QIG are displayed in their own game category.
 const WEAPON_TYPES = new Set([
-  'WeaponGun','Weapon','EMP','QuantumInterdictionGenerator','UtilityWeapon',
+  'WeaponGun','Weapon','UtilityWeapon',
 ]);
 // Outils utilitaires (mining, salvage, tractor, repair)
 const UTILITY_TYPES = new Set([
@@ -559,6 +556,8 @@ const UTILITY_TYPES = new Set([
 ]);
 // Tous types d'armes/outils (pour chercher dans les enfants)
 const ALL_WEAPON_TYPES = new Set([...WEAPON_TYPES, ...UTILITY_TYPES]);
+const EMP_TYPES = new Set(['EMP', 'QuantumInterdictionGenerator']);
+const ALL_MOUNTED_TYPES = new Set([...ALL_WEAPON_TYPES, ...EMP_TYPES]);
 
 interface WeaponSlot { portName: string; mount: LoadoutNode | null; weapon: LoadoutNode | null }
 interface RackSlot   { rack: LoadoutNode; missiles: LoadoutNode[] }
@@ -575,6 +574,7 @@ interface ModuleEntry {
 
 interface ProcessedLoadout {
   weapons:      WeaponSlot[];
+  emp:          WeaponSlot[];
   weapTurrets:  LoadoutNode[];  // turrets classified as "weapons"
   utilities:    LoadoutNode[];  // turrets/mounts classified as "utilities"
   racks:        RackSlot[];
@@ -650,6 +650,7 @@ function normalizeModuleNode(raw: Record<string, unknown>): LoadoutNode {
 
 function processLoadout(nodes: LoadoutNode[], activeModules: ShipModule[] = [], moduleSlots: ShipModule[][] = []): ProcessedLoadout {
   const weapons:       WeaponSlot[]    = [];
+  const emp:           WeaponSlot[]    = [];
   const weapTurrets:   LoadoutNode[]   = [];  // tourelles combat
   const utilities:     LoadoutNode[]   = [];  // tourelles utilitaires
   const racks:         RackSlot[]      = [];
@@ -702,15 +703,20 @@ function processLoadout(nodes: LoadoutNode[], activeModules: ShipModule[] = [], 
       continue;
     }
     if ((portType === 'Gimbal' || portType === 'WeaponRack') && node.component_uuid) {
-      const weapon = node.children.find(c => c.component_type && ALL_WEAPON_TYPES.has(c.component_type)) ?? null;
+      const weapon = node.children.find(c => c.component_type && ALL_MOUNTED_TYPES.has(c.component_type)) ?? null;
       const wt = weapon?.component_type;
       if (wt && UTILITY_TYPES.has(wt)) {
         // montage gimbal utilitaire → utilities
         utilities.push(node);
+      } else if (wt && EMP_TYPES.has(wt)) {
+        emp.push({ portName: node.port_name, mount: node, weapon });
       } else {
         weapons.push({ portName: node.port_name, mount: node, weapon });
       }
       continue;
+    }
+    if (compType && EMP_TYPES.has(compType) && node.component_uuid) {
+      emp.push({ portName: node.port_name, mount: null, weapon: node }); continue;
     }
     if (compType && WEAPON_TYPES.has(compType) && node.component_uuid) {
       weapons.push({ portName: node.port_name, mount: null, weapon: node }); continue;
@@ -763,7 +769,7 @@ function processLoadout(nodes: LoadoutNode[], activeModules: ShipModule[] = [], 
   ];
 
   return {
-    weapons, weapTurrets, utilities, racks, shields, systems, thrusters,
+    weapons, emp, weapTurrets, utilities, racks, shields, systems, thrusters,
     cmDecoys: Array.from(cmDecoyMap.values()),
     cmNoises: Array.from(cmNoiseMap.values()),
     defaultPaint,
@@ -823,7 +829,7 @@ function ModuleCard({ entry, onModuleChange }: {
     return words.slice(shared).join(' ') || name;
   }
 
-  const hasWeapons = sub.weapons.length > 0 || sub.weapTurrets.length > 0;
+  const hasWeapons = sub.weapons.length > 0 || sub.emp.length > 0 || sub.weapTurrets.length > 0;
   const hasRacks   = sub.racks.length > 0;
   const hasSystems = sub.systems.length > 0;
   const hasContent = hasWeapons || hasRacks || hasSystems;
@@ -896,6 +902,9 @@ function ModuleCard({ entry, onModuleChange }: {
                 {sub.weapons.map((slot, i) => (
                   <WeaponCard key={i} portName={slot.portName} mount={slot.mount} weapon={slot.weapon} />
                 ))}
+                {sub.emp.map((slot, i) => (
+                  <WeaponCard key={`emp${i}`} portName={slot.portName} mount={slot.mount} weapon={slot.weapon} />
+                ))}
                 {sub.weapTurrets.map((t, i) => <TurretCard key={`t${i}`} node={t} />)}
               </div>
             </div>
@@ -943,6 +952,39 @@ function ModuleCard({ entry, onModuleChange }: {
   );
 }
 
+function OrdnanceCard({ node }: { node: LoadoutNode }) {
+  const name = cleanCompName(node.component_name) ?? 'Ordnance';
+  const damage = node.missile_damage ? Math.round(parseFloat(String(node.missile_damage))).toLocaleString('en-US') : null;
+  return (
+    <div className="flex flex-col rounded-md border border-orange-900/40 bg-orange-950/10 hover:border-orange-700/40 transition-all overflow-hidden">
+      <div className="flex items-center justify-between gap-1 px-2 pt-1.5 pb-1 border-b border-orange-900/30">
+        <span className="text-[9px] font-mono-sc text-slate-600 truncate flex-1 min-w-0">
+          {cleanPortName(node.port_name)}
+        </span>
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="text-[8px] font-mono-sc text-orange-300 bg-orange-950/40 border border-orange-900/60 rounded-sm px-1 py-0.5 leading-none">
+            Ordnance
+          </span>
+          <SizeBadge size={node.component_size} />
+        </div>
+      </div>
+      <div className="flex-1 px-2 py-1.5 space-y-1">
+        <p className="text-[11px] font-semibold text-slate-200 leading-tight wrap-break-word">
+          {node.component_uuid
+            ? <Link href={`/components/${node.component_uuid}`} className="hover:text-cyan-400 transition-colors">{name}</Link>
+            : name}
+        </p>
+        {(damage || node.missile_signal_type) && (
+          <div className="flex flex-wrap gap-x-2 gap-y-0.5 pt-0.5">
+            {damage && <StatPill label="dmg" value={damage} color="text-orange-300" />}
+            {node.missile_signal_type && <StatPill label="sig" value={node.missile_signal_type} />}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────
 // Main component
 // ─────────────────────────────────────────────
@@ -960,21 +1002,45 @@ export function ShipLoadout({
 }) {
   const data = processLoadout(nodes, activeModules, moduleSlots);
 
-  // ── Tabs ─────────────────────────────────────────────────
-  type TabKey = 'weapons' | 'systems' | 'utility' | 'modules' | 'paint';
-  interface TabDef { key: TabKey; label: string; count: number }
-  const allTabs: TabDef[] = ([
-    { key: 'weapons' as TabKey, label: 'Weapons',     count: data.weapons.length + data.weapTurrets.length + data.racks.length },
-    { key: 'systems' as TabKey, label: 'Systems',     count: data.shields.length + data.systems.length + data.thrusters.length + data.cmDecoys.length + data.cmNoises.length },
-    { key: 'utility' as TabKey, label: 'Utility',     count: data.utilities.length },
-    { key: 'modules' as TabKey, label: 'Ship Modules',count: data.moduleEntries.length },
-    { key: 'paint'   as TabKey, label: 'Paint',       count: data.defaultPaint ? 1 : 0 },
-  ] as TabDef[]).filter(t => t.count > 0);
+  const coolers = data.systems.filter((item) => item.node.component_type === 'Cooler');
+  const powerPlants = data.systems.filter((item) => item.node.component_type === 'PowerPlant');
+  const quantumDrives = data.systems.filter((item) => item.node.component_type === 'QuantumDrive');
+  const radars = data.systems.filter((item) => item.node.component_type === 'Radar');
+  const jumpModules = data.systems.filter((item) => item.jumpModule);
+  const cmLaunchers = [...data.cmDecoys, ...data.cmNoises];
+  const ordnance = data.racks.flatMap((slot) => slot.missiles);
 
-  const [activeTab, setActiveTab] = useState<TabKey>(() => (allTabs[0]?.key ?? 'weapons') as TabKey);
-  const validTab: TabKey = allTabs.some(t => t.key === activeTab) ? activeTab : ((allTabs[0]?.key ?? 'weapons') as TabKey);
+  type TabKey = GameComponentCategory | 'Ship Modules';
+  interface TabDef { key: TabKey; label: string; count: number }
+  const categoryCounts: Record<GameComponentCategory, number> = {
+    Ordnance: ordnance.length,
+    Coolers: coolers.length,
+    EMP: data.emp.length,
+    Mining: data.utilities.length,
+    'Missile Racks': data.racks.length,
+    'Power Plants': powerPlants.length,
+    'Quantum Drives': quantumDrives.length,
+    Shields: data.shields.length,
+    Turrets: data.weapTurrets.length,
+    Weapons: data.weapons.length,
+    'CM Launchers': cmLaunchers.length,
+    Liveries: data.defaultPaint ? 1 : 0,
+    'Jump Modules': jumpModules.length,
+    Radar: radars.length,
+  };
+  const allTabs: TabDef[] = [
+    ...GAME_COMPONENT_CATEGORIES.map((category) => ({ key: category, label: category, count: categoryCounts[category] })),
+    { key: 'Ship Modules' as const, label: 'Ship Modules', count: data.moduleEntries.length },
+  ].filter((tab) => tab.count > 0);
+
+  const [activeTab, setActiveTab] = useState<TabKey>(() => (allTabs[0]?.key ?? 'Weapons') as TabKey);
+  const validTab: TabKey = allTabs.some(t => t.key === activeTab) ? activeTab : ((allTabs[0]?.key ?? 'Weapons') as TabKey);
 
   if (allTabs.length === 0) return null;
+
+  const renderGrid = (content: React.ReactNode) => (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">{content}</div>
+  );
 
   return (
     <div>
@@ -1002,117 +1068,43 @@ export function ShipLoadout({
         ))}
       </div>
 
-      {/* ── Tab content ── */}
-
-      {/* Weapons — combat guns, turrets, ordnance */}
-      {validTab === 'weapons' && (
-        <div className="space-y-5">
-          {(data.weapons.length > 0 || data.weapTurrets.length > 0) && (
-            <div>
-              <p className="text-[9px] font-mono-sc text-red-400/70 uppercase tracking-wider mb-3">Weapons</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                {data.weapons.map((slot, i) => (
-                  <WeaponCard key={i} portName={slot.portName} mount={slot.mount} weapon={slot.weapon} />
-                ))}
-                {data.weapTurrets.map((t, i) => (
-                  <TurretCard key={`t${i}`} node={t} />
-                ))}
-              </div>
+      {validTab === 'Ordnance' && renderGrid(ordnance.map((node, i) => <OrdnanceCard key={i} node={node} />))}
+      {validTab === 'Coolers' && renderGrid(coolers.map((item, i) => <SystemCard key={i} node={item.node} jumpModule={null} />))}
+      {validTab === 'EMP' && renderGrid(data.emp.map((slot, i) => <WeaponCard key={i} portName={slot.portName} mount={slot.mount} weapon={slot.weapon} />))}
+      {validTab === 'Mining' && renderGrid(data.utilities.map((node, i) => {
+        if (node.port_type === 'Turret') return <TurretCard key={i} node={node} />;
+        const weapon = node.children?.find(c => c.component_type && ALL_MOUNTED_TYPES.has(c.component_type)) ?? null;
+        return <WeaponCard key={i} portName={node.port_name} mount={node} weapon={weapon} />;
+      }))}
+      {validTab === 'Missile Racks' && renderGrid(data.racks.map((slot, i) => <RackCard key={i} rack={slot.rack} missiles={slot.missiles} />))}
+      {validTab === 'Power Plants' && renderGrid(powerPlants.map((item, i) => <SystemCard key={i} node={item.node} jumpModule={null} />))}
+      {validTab === 'Quantum Drives' && renderGrid(quantumDrives.map((item, i) => <SystemCard key={i} node={item.node} jumpModule={item.jumpModule} />))}
+      {validTab === 'Shields' && renderGrid(data.shields.map((node, i) => <ShieldCard key={i} node={node} />))}
+      {validTab === 'Turrets' && renderGrid(data.weapTurrets.map((node, i) => <TurretCard key={i} node={node} />))}
+      {validTab === 'Weapons' && renderGrid(data.weapons.map((slot, i) => <WeaponCard key={i} portName={slot.portName} mount={slot.mount} weapon={slot.weapon} />))}
+      {validTab === 'CM Launchers' && (
+        <div className="flex flex-wrap gap-2">
+          {cmLaunchers.map((cm, i) => (
+            <div key={i} className="flex items-center gap-2 rounded-md border border-teal-900/30 bg-teal-950/10 px-3 py-1.5">
+              <span className="text-xs text-slate-300">{cm.name}</span>
+              <span className="text-xs font-mono-sc text-teal-600">x{cm.count}</span>
+              {cm.ammoPerUnit != null && (
+                <span className="text-[9px] font-mono-sc text-slate-500 tabular-nums">{cm.ammoPerUnit * cm.count} shots</span>
+              )}
             </div>
-          )}
-          {data.racks.length > 0 && (
-            <div>
-              <p className="text-[9px] font-mono-sc text-orange-400/70 uppercase tracking-wider mb-3">Ordnance</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                {data.racks.map((slot, i) => (
-                  <RackCard key={i} rack={slot.rack} missiles={slot.missiles} />
-                ))}
-              </div>
-            </div>
-          )}
+          ))}
         </div>
       )}
+      {validTab === 'Liveries' && <p className="text-sm text-slate-400">{data.defaultPaint}</p>}
+      {validTab === 'Jump Modules' && renderGrid(jumpModules.map((item, i) => <SystemCard key={i} node={item.node} jumpModule={item.jumpModule} />))}
+      {validTab === 'Radar' && renderGrid(radars.map((item, i) => <SystemCard key={i} node={item.node} jumpModule={null} />))}
 
-      {/* Systems — shields, power/thermal/nav, thrusters, countermeasures */}
-      {validTab === 'systems' && (
-        <div className="space-y-5">
-          {data.shields.length > 0 && (
-            <div>
-              <p className="text-[9px] font-mono-sc text-blue-400/70 uppercase tracking-wider mb-3">Shields</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                {data.shields.map((node, i) => (
-                  <ShieldCard key={i} node={node} />
-                ))}
-              </div>
-            </div>
-          )}
-          {data.systems.length > 0 && (
-            <div>
-              <p className="text-[9px] font-mono-sc text-violet-400/70 uppercase tracking-wider mb-3">Systems</p>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                {data.systems.map((item, i) => (
-                  <SystemCard key={i} node={item.node} jumpModule={item.jumpModule} />
-                ))}
-              </div>
-            </div>
-          )}
-          {data.thrusters.length > 0 && (
-            <div>
-              <p className="text-[9px] font-mono-sc text-amber-400/70 uppercase tracking-wider mb-3">Thrusters</p>
-              <div className="flex flex-wrap gap-2">
-                {data.thrusters.map((g, i) => (
-                  <div key={i} className="flex items-center gap-2 rounded-md border border-amber-900/30 bg-amber-950/10 px-3 py-1.5">
-                    {g.size != null && <SizeBadge size={g.size} />}
-                    <span className="text-xs font-mono-sc text-amber-300">{g.type}</span>
-                    <span className="text-xs font-mono-sc text-slate-600">x{g.count}</span>
-                    <span className="text-[10px] font-orbitron text-slate-500 tabular-nums">{toMN(g.totalThrust)} MN</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {(data.cmDecoys.length > 0 || data.cmNoises.length > 0) && (
-            <div>
-              <p className="text-[9px] font-mono-sc text-teal-400/70 uppercase tracking-wider mb-3">Countermeasures</p>
-              <div className="flex flex-wrap gap-2">
-                {[...data.cmDecoys, ...data.cmNoises].map((cm, i) => (
-                  <div key={i} className="flex items-center gap-2 rounded-md border border-teal-900/30 bg-teal-950/10 px-3 py-1.5">
-                    <span className="text-xs text-slate-300">{cm.name}</span>
-                    <span className="text-xs font-mono-sc text-teal-600">x{cm.count}</span>
-                    {cm.ammoPerUnit != null && (
-                      <span className="text-[9px] font-mono-sc text-slate-500 tabular-nums">{cm.ammoPerUnit * cm.count} shots</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Utility */}
-      {validTab === 'utility' && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-          {data.utilities.map((node, i) => {
-            if (node.port_type === 'Turret') return <TurretCard key={i} node={node} />;
-            const weapon = node.children?.find(c => c.component_type && ALL_WEAPON_TYPES.has(c.component_type)) ?? null;
-            return <WeaponCard key={i} portName={node.port_name} mount={node} weapon={weapon} />;
-          })}
-        </div>
-      )}
-
-      {/* Ship Modules */}
-      {validTab === 'modules' && (
+      {validTab === 'Ship Modules' && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {data.moduleEntries.map((entry, i) => (
             <ModuleCard key={i} entry={entry} onModuleChange={onModuleChange} />
           ))}
         </div>
-      )}
-
-      {/* Paint */}
-      {validTab === 'paint' && (
-        <p className="text-sm text-slate-400">{data.defaultPaint}</p>
       )}
     </div>
   );

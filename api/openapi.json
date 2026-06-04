@@ -394,6 +394,28 @@
             "example": "WeaponGun",
             "description": "Component type: WeaponGun | Shield | QuantumDrive | PowerPlant | Cooler | FuelTank | FuelIntake | Thruster | Radar | Countermeasure | EMP | QuantumInterdictionGenerator | MiningLaser | TractorBeam | SalvageHead | MissileRack | Missile | Gimbal | Turret | TurretUnmanned | LifeSupport | JumpModule | ShipModule"
           },
+          "game_component_category": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "Ordnance",
+              "Coolers",
+              "EMP",
+              "Mining",
+              "Missile Racks",
+              "Power Plants",
+              "Quantum Drives",
+              "Shields",
+              "Turrets",
+              "Weapons",
+              "CM Launchers",
+              "Liveries",
+              "Jump Modules",
+              "Radar",
+              "Other"
+            ],
+            "description": "Game-facing component classification used by the UI and loadout tools."
+          },
           "sub_type": {
             "type": "string",
             "nullable": true,
@@ -3120,6 +3142,30 @@
             "description": "Component type (WeaponGun, Shield, QuantumDrive, …)"
           },
           {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ordnance",
+                "coolers",
+                "emp",
+                "mining",
+                "missile-racks",
+                "power-plants",
+                "quantum-drives",
+                "shields",
+                "turrets",
+                "weapons",
+                "cm-launchers",
+                "liveries",
+                "jump-modules",
+                "radar"
+              ]
+            },
+            "description": "Game component category. Overrides type when provided."
+          },
+          {
             "name": "sub_type",
             "in": "query",
             "schema": {
@@ -3261,6 +3307,58 @@
         "responses": {
           "200": {
             "description": "Available component types"
+          }
+        }
+      }
+    },
+    "/api/v1/components/categories": {
+      "get": {
+        "tags": ["Components"],
+        "summary": "List game component categories",
+        "operationId": "getComponentCategories",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/env"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Available game component categories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "slug": {
+                            "type": "string",
+                            "example": "quantum-drives"
+                          },
+                          "label": {
+                            "type": "string",
+                            "example": "Quantum Drives"
+                          },
+                          "types": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            },
+                            "example": ["QuantumDrive"]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }

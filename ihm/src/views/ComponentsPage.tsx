@@ -12,7 +12,13 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { GlowBadge } from "@/components/ui/GlowBadge";
 import { useListQueryState } from "@/hooks/useListQueryState";
-import { COMPONENT_TYPE_COLORS, COMPONENT_TYPE_LABELS } from "@/utils/constants";
+import {
+  COMPONENT_TYPE_COLORS,
+  COMPONENT_TYPE_LABELS,
+  GAME_COMPONENT_CATEGORIES,
+  GAME_COMPONENT_CATEGORY_TYPES,
+  type GameComponentCategory,
+} from "@/utils/constants";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PageShell } from "@/components/ui/PageShell";
 import type { ComponentListItem } from "@/types/api";
@@ -22,40 +28,18 @@ const LIMIT = 30;
 // ── P4K-faithful category taxonomy ────────────────────────────────────────────
 
 interface CategoryDef {
-  label: string;
-  /** Maps to API ?category= param */
-  apiSlug: string;
+  label: GameComponentCategory;
+  slug: string;
   types: string[];
 }
 
-const CATEGORIES: CategoryDef[] = [
-  {
-    label: "Weapons",
-    apiSlug: "weapons",
-    types: ["WeaponGun", "Turret", "TurretUnmanned", "MissileRack", "Missile", "Ammunition", "EMP", "QuantumInterdictionGenerator"],
-  },
-  {
-    label: "Systems",
-    apiSlug: "systems",
-    types: ["Shield", "PowerPlant", "Cooler", "QuantumDrive", "JumpModule", "Thruster", "FuelIntake", "FuelTank",
-            "Radar", "Countermeasure", "LifeSupport"],
-  },
-  {
-    label: "Mounts",
-    apiSlug: "mounts",
-    types: ["Gimbal"],
-  },
-  {
-    label: "Utility",
-    apiSlug: "utility",
-    types: ["MiningLaser", "SalvageHead", "TractorBeam"],
-  },
-  {
-    label: "Ship Modules",
-    apiSlug: "modules",
-    types: ["ShipModule"],
-  },
-];
+const categorySlug = (category: string) => category.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+const CATEGORIES: CategoryDef[] = GAME_COMPONENT_CATEGORIES.map((label) => ({
+  label,
+  slug: categorySlug(label),
+  types: GAME_COMPONENT_CATEGORY_TYPES[label],
+}));
 
 /** Sub-type chips available per primary type chip */
 const TYPE_SUBTYPES: Partial<Record<string, string[]>> = {
@@ -237,7 +221,19 @@ export default function ComponentsPage() {
   const [size, setSize] = useState("");
   const [grade, setGrade] = useState("");
 
-  const category = CATEGORIES[categoryIdx];
+  const { data: apiCategories } = useQuery({
+    queryKey: ["components.categories", env],
+    queryFn: () => api.components.categories(env),
+    staleTime: Number.POSITIVE_INFINITY,
+  });
+  const categories = (apiCategories?.length
+    ? apiCategories.map((cat) => ({
+        label: cat.label as GameComponentCategory,
+        slug: cat.slug,
+        types: cat.types,
+      }))
+    : CATEGORIES) as CategoryDef[];
+  const category = categories[Math.min(categoryIdx, categories.length - 1)] ?? CATEGORIES[0];
 
   function handleCategoryChange(idx: number) {
     setCategoryIdx(idx);
@@ -261,7 +257,7 @@ export default function ComponentsPage() {
     queryKey: [
       "components.list",
       env,
-      { page, search: debouncedSearch, category: category.apiSlug, type: selectedType, sub_type: selectedSubType, size, grade },
+      { page, search: debouncedSearch, category: category.slug, type: selectedType, sub_type: selectedSubType, size, grade },
     ],
     queryFn: () =>
       api.components.list({
@@ -269,9 +265,9 @@ export default function ComponentsPage() {
         page,
         limit: LIMIT,
         search: debouncedSearch || undefined,
-        // If user picked a specific type chip, use it; otherwise use category param
+        // If user picked a specific type chip, use it; otherwise use the game category.
         type: selectedType || undefined,
-        category: selectedType ? undefined : category.apiSlug,
+        category: selectedType ? undefined : category.slug,
         sub_type: selectedSubType || undefined,
         size: size ? Number(size) : undefined,
         grade: grade || undefined,
@@ -298,10 +294,10 @@ export default function ComponentsPage() {
 
       {/* Category tabs */}
       <div className="flex gap-1 mb-4 border-b border-border pb-3">
-        {CATEGORIES.map((cat, idx) => (
+        {categories.map((cat, idx) => (
           <button
             type="button"
-            key={cat.apiSlug}
+            key={cat.slug}
             onClick={() => handleCategoryChange(idx)}
             className={`px-4 py-2 text-sm font-rajdhani font-bold uppercase tracking-wide rounded-sm transition-colors ${
               categoryIdx === idx
@@ -434,4 +430,3 @@ export default function ComponentsPage() {
     </PageShell>
   );
 }
-

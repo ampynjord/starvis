@@ -242,6 +242,7 @@ export interface ComponentListItem {
   source_reference?: string | null;
   confidence_score?: number | null;
   type: string;
+  game_component_category?: string | null;
   sub_type: string | null;
   size: number | null;
   grade: string | null;
@@ -962,6 +963,7 @@ export interface HardpointComponent {
   name: string | null;
   display_name: string | null;
   type: string | null;
+  game_component_category?: string | null;
   sub_type: string | null;
   size: number | null;
   port_max_size: number | null;
@@ -1035,6 +1037,7 @@ export interface CompatibleComponent {
   class_name: string;
   name: string;
   type: string;
+  game_component_category?: string | null;
   sub_type: string | null;
   size: number | null;
   grade: string | null;

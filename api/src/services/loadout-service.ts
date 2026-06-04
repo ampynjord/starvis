@@ -2,6 +2,7 @@
  * LoadoutService — Loadout calculator, hardpoint builder, stat aggregation
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
+import { gameComponentCategorySort, getGameComponentCategory } from './component-taxonomy.js';
 import { int, num, type Row, r1, r2, r4, r6, toPostgres } from './shared.js';
 
 const UTILITY_WEAPON_RX = /tractor|mining|salvage|repair|grin_tractor|grin_salvage/i;
@@ -52,49 +53,17 @@ function cleanName(name: string, type: string): string {
 }
 
 const PORT_CATEGORY_MAP: Record<string, string> = {
-  WeaponGun: 'Weapons',
-  Weapon: 'Weapons',
   Gimbal: 'Weapons',
-  Turret: 'Turrets',
-  TurretBase: 'Turrets',
-  MissileRack: 'Missiles',
-  Missile: 'Missiles',
-  MissileLauncher: 'Missiles',
-  Shield: 'Shields',
+  MissileLauncher: 'Ordnance',
   ShieldGenerator: 'Shields',
-  PowerPlant: 'Power Plants',
-  Cooler: 'Coolers',
-  QuantumDrive: 'Quantum Drive',
-  Radar: 'Radar',
-  EMP: 'EMP',
-  QuantumInterdictionGenerator: 'QED',
-  Countermeasure: 'Countermeasures',
-  MiningLaser: 'Mining',
-  SalvageHead: 'Salvage',
-  TractorBeam: 'Tractor',
-  RepairBeam: 'Repair',
-};
-
-const CAT_ORDER: Record<string, number> = {
-  Weapons: 1,
-  Turrets: 2,
-  Missiles: 3,
-  Shields: 4,
-  'Power Plants': 5,
-  Coolers: 6,
-  'Quantum Drive': 7,
-  Radar: 8,
-  EMP: 9,
-  QED: 10,
-  Countermeasures: 11,
-  Mining: 12,
-  Salvage: 13,
-  Tractor: 14,
-  Repair: 15,
+  QuantumInterdictionGenerator: 'EMP',
+  SalvageHead: 'Mining',
+  TractorBeam: 'Mining',
+  RepairBeam: 'Mining',
 };
 
 function portCategory(portType: string): string {
-  return PORT_CATEGORY_MAP[portType] || 'Other';
+  return PORT_CATEGORY_MAP[portType] || getGameComponentCategory(portType);
 }
 
 function cleanPortName(name: string): string {
@@ -137,6 +106,7 @@ function buildComponentInfo(row: Row, childMap: Map<number, Row[]>): Record<stri
       name: c.name || null,
       display_name: c.name ? cleanName(c.name || '', cType) : cleanPortName(String(c.port_name || '')),
       type: cType,
+      game_component_category: portCategory(cType),
       sub_type: c.sub_type || null,
       size: int(c.size) || (cMountSize ? parseInt(cMountSize, 10) : null),
       grade: c.grade || null,
@@ -173,6 +143,7 @@ function buildComponentInfo(row: Row, childMap: Map<number, Row[]>): Record<stri
     name: row.name || null,
     display_name: row.name ? cleanName(row.name || '', type) : portDisplayName,
     type: effectiveType,
+    game_component_category: portCategory(effectiveType),
     size: int(row.size) || (mountSize ? parseInt(mountSize, 10) : null),
     port_max_size: int(row.port_max_size) || null,
     port_min_size: int(row.port_min_size) || null,
@@ -375,8 +346,8 @@ function buildHardpoints(loadout: Row[]): Record<string, unknown>[] {
   }
 
   hardpoints.sort((a, b) => {
-    const orderA = CAT_ORDER[a.category as string] || 99;
-    const orderB = CAT_ORDER[b.category as string] || 99;
+    const orderA = gameComponentCategorySort(a.category as string);
+    const orderB = gameComponentCategorySort(b.category as string);
     if (orderA !== orderB) return orderA - orderB;
     return (a.port_name as string).localeCompare(b.port_name as string);
   });
