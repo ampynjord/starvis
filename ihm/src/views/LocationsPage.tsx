@@ -9,6 +9,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { useEnv } from '@/contexts/EnvContext';
+import { createVisibilityTracker, disposeObject3D, getThreePixelRatio } from '@/lib/three-performance';
 import { api } from '@/services/api';
 import type { Location, Shop } from '@/types/api';
 
@@ -59,6 +60,8 @@ type StarmapNode = {
   label: string;
   shopCount: number;
 };
+
+type StarmapViewMode = 'galaxy' | 'system' | 'object';
 
 const FALLBACK_STARMAP_POSITIONS: RsiStarmapPosition[] = [
   { id: 1, rsi_id: 'stanton', name: 'Stanton', type: 'system', system_code: 'STAN', parent_id: null, coordinates: { x: 0, y: 0, z: 0 } },
@@ -243,10 +246,82 @@ function makeGlowTexture(color: string) {
   return texture;
 }
 
+function makeBodyTexture(seed: string, base: string, accent: string) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 160;
+  canvas.height = 160;
+  const ctx = canvas.getContext('2d')!;
+  const gradient = ctx.createRadialGradient(55, 45, 8, 80, 80, 94);
+  gradient.addColorStop(0, accent);
+  gradient.addColorStop(0.42, base);
+  gradient.addColorStop(1, '#020611');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.globalAlpha = 0.32;
+  for (let i = 0; i < 42; i++) {
+    const x = hashFloat(`${seed}:cloud-x:${i}`) * 160;
+    const y = hashFloat(`${seed}:cloud-y:${i}`) * 160;
+    const w = 24 + hashFloat(`${seed}:cloud-w:${i}`) * 90;
+    const h = 5 + hashFloat(`${seed}:cloud-h:${i}`) * 24;
+    ctx.fillStyle = i % 3 === 0 ? accent : '#d7fbff';
+    ctx.beginPath();
+    ctx.ellipse(x, y, w, h, hashFloat(`${seed}:cloud-r:${i}`) * Math.PI, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
+function geometryForNode(node: StarmapNode) {
+  const type = normalizeType(node.loc.type);
+  if (type === 'station' || type === 'rest_stop') return new THREE.OctahedronGeometry(node.radius * 1.35, 1);
+  if (type === 'landing_zone' || type === 'outpost') return new THREE.BoxGeometry(node.radius * 1.5, node.radius * 0.65, node.radius * 1.5);
+  if (type === 'comm_array') return new THREE.TetrahedronGeometry(node.radius * 1.4, 0);
+  return new THREE.SphereGeometry(node.radius * (type === 'system' ? 0.72 : 1), type === 'system' ? 20 : 18, type === 'system' ? 10 : 9);
+}
+
+function colorsForBody(node: StarmapNode) {
+  const type = normalizeType(node.loc.type);
+  if (type === 'star') return { base: '#ff9f2d', accent: '#fff2b8' };
+  if (type === 'moon') return { base: '#64748b', accent: '#dbeafe' };
+  if (node.loc.name.toLowerCase().includes('micro')) return { base: '#6ee7d8', accent: '#d9fff8' };
+  if (node.loc.name.toLowerCase().includes('crusader')) return { base: '#f7d38b', accent: '#fff7d1' };
+  if (node.loc.name.toLowerCase().includes('hurston')) return { base: '#8a5a33', accent: '#f59e0b' };
+  if (node.loc.name.toLowerCase().includes('arc')) return { base: '#475569', accent: '#38bdf8' };
+  return { base: '#0f766e', accent: '#67e8f9' };
+}
+
 function hashFloat(input: string) {
   let h = 2166136261;
   for (let i = 0; i < input.length; i++) h = Math.imul(h ^ input.charCodeAt(i), 16777619);
   return (h >>> 0) / 4294967295;
+}
+
+function descendantsOf(nodes: StarmapNode[], rootId: string) {
+  const byParent = new Map<string, StarmapNode[]>();
+  for (const node of nodes) {
+    if (!node.parentId) continue;
+    if (!byParent.has(node.parentId)) byParent.set(node.parentId, []);
+    byParent.get(node.parentId)!.push(node);
+  }
+  const result: StarmapNode[] = [];
+  const queue = [...(byParent.get(rootId) ?? [])];
+  while (queue.length) {
+    const node = queue.shift()!;
+    result.push(node);
+    queue.push(...(byParent.get(node.id) ?? []));
+  }
+  return result;
+}
+
+function rootSystemFor(nodes: StarmapNode[], nodeId: string | null) {
+  if (!nodeId) return null;
+  const byId = new Map(nodes.map((node) => [node.id, node]));
+  let current = byId.get(nodeId) ?? null;
+  while (current?.parentId) current = byId.get(current.parentId) ?? current;
+  return current;
 }
 
 function buildStarmap(locs: LocationWithMap[], shops: Shop[]): StarmapNode[] {
@@ -349,11 +424,13 @@ function buildStarmap(locs: LocationWithMap[], shops: Shop[]): StarmapNode[] {
 
 function StarmapScene({
   nodes,
+  mode,
   selectedId,
   highlightedIds,
   onSelect,
 }: {
   nodes: StarmapNode[];
+  mode: StarmapViewMode;
   selectedId: string | null;
   highlightedIds: Set<string>;
   onSelect: (id: string) => void;
@@ -384,14 +461,14 @@ function StarmapScene({
     } catch {
       return;
     }
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(getThreePixelRatio());
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    const camera = new THREE.PerspectiveCamera(42, container.clientWidth / container.clientHeight, 0.1, 2400);
-    camera.position.set(0, 190, 22);
+    const camera = new THREE.PerspectiveCamera(mode === 'galaxy' ? 42 : 46, container.clientWidth / container.clientHeight, 0.1, 2400);
+    camera.position.set(0, mode === 'galaxy' ? 190 : 58, mode === 'galaxy' ? 22 : 92);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -403,6 +480,7 @@ function StarmapScene({
     controls.maxDistance = 420;
     controls.maxPolarAngle = Math.PI * 0.47;
     controls.minPolarAngle = Math.PI * 0.08;
+    const visibility = createVisibilityTracker(container);
 
     scene.add(new THREE.AmbientLight(0x0c2435, 1.4));
     const key = new THREE.DirectionalLight(0x95f4ff, 2.8);
@@ -413,8 +491,9 @@ function StarmapScene({
     scene.add(rim);
 
     const starGeo = new THREE.BufferGeometry();
-    const starPositions = new Float32Array(3400 * 3);
-    const starColors = new Float32Array(3400 * 3);
+    const starCount = Math.min(mode === 'galaxy' ? 2600 : 1400, 900 + nodes.length * 18);
+    const starPositions = new Float32Array(starCount * 3);
+    const starColors = new Float32Array(starCount * 3);
     for (let i = 0; i < starPositions.length; i += 3) {
       const r = 280 + hashFloat(`r${i}`) * 520;
       const a = hashFloat(`a${i}`) * Math.PI * 2;
@@ -432,7 +511,7 @@ function StarmapScene({
     const starMat = new THREE.PointsMaterial({ size: 0.7, transparent: true, opacity: 0.62, depthWrite: false, vertexColors: true });
     scene.add(new THREE.Points(starGeo, starMat));
 
-    const grid = new THREE.GridHelper(320, 32, 0x0e7490, 0x083344);
+    const grid = new THREE.GridHelper(320, mode === 'galaxy' ? 24 : 18, 0x0e7490, 0x083344);
     const gridMaterial = grid.material as THREE.Material;
     gridMaterial.transparent = true;
     gridMaterial.opacity = 0.14;
@@ -446,6 +525,7 @@ function StarmapScene({
 
     const parentLinePositions: number[] = [];
     const routeLinePositions: number[] = [];
+    const animatedObjects: THREE.Object3D[] = [];
     const byId = new Map(nodes.map((node) => [node.id, node]));
     for (const node of nodes) {
       if (!node.parentId) continue;
@@ -456,8 +536,9 @@ function StarmapScene({
         const distance = parent.position.distanceTo(node.position);
         const orbit = new THREE.LineLoop(
           new THREE.BufferGeometry().setFromPoints(
-            Array.from({ length: 144 }, (_, i) => {
-              const angle = (i / 144) * Math.PI * 2;
+            Array.from({ length: mode === 'galaxy' ? 72 : 96 }, (_, i) => {
+              const segmentCount = mode === 'galaxy' ? 72 : 96;
+              const angle = (i / segmentCount) * Math.PI * 2;
               return new THREE.Vector3(Math.cos(angle) * distance, 0, Math.sin(angle) * distance).add(parent.position);
             }),
           ),
@@ -489,11 +570,14 @@ function StarmapScene({
 
     for (const node of nodes) {
       const normalizedType = normalizeType(node.loc.type);
-      const geo = new THREE.SphereGeometry(node.radius * (normalizedType === 'system' ? 0.72 : 1), normalizedType === 'system' ? 28 : 18, normalizedType === 'system' ? 14 : 9);
+      const geo = geometryForNode(node);
+      const bodyColors = colorsForBody(node);
+      const map = ['star', 'planet', 'moon'].includes(normalizedType) ? makeBodyTexture(node.id, bodyColors.base, bodyColors.accent) : undefined;
       const mat = new THREE.MeshPhongMaterial({
-        color: node.color,
-        emissive: node.glow,
-        shininess: 75,
+        color: normalizedType === 'star' ? 0xffd166 : node.color,
+        emissive: normalizedType === 'star' ? 0xff7a18 : node.glow,
+        map,
+        shininess: normalizedType === 'planet' ? 28 : 75,
         transparent: true,
         opacity: node.loc.type === 'outpost' ? 0.72 : 0.92,
       });
@@ -502,6 +586,19 @@ function StarmapScene({
       mesh.userData.nodeId = node.id;
       nodeGroup.add(mesh);
       objects.set(node.id, mesh);
+
+      if (normalizedType === 'jump_point') {
+        const jumpGroup = new THREE.Group();
+        jumpGroup.position.copy(node.position);
+        const ringMat = new THREE.MeshBasicMaterial({ color: 0xc084fc, transparent: true, opacity: 0.68, blending: THREE.AdditiveBlending });
+        const ringA = new THREE.Mesh(new THREE.TorusGeometry(node.radius * 2.8, node.radius * 0.08, 6, 64), ringMat);
+        const ringB = new THREE.Mesh(new THREE.TorusGeometry(node.radius * 1.8, node.radius * 0.045, 6, 64), ringMat.clone());
+        ringA.rotation.x = Math.PI / 2;
+        ringB.rotation.y = Math.PI / 2;
+        jumpGroup.add(ringA, ringB);
+        nodeGroup.add(jumpGroup);
+        animatedObjects.push(jumpGroup);
+      }
 
       const glow = new THREE.Sprite(
         new THREE.SpriteMaterial({
@@ -528,12 +625,23 @@ function StarmapScene({
 
       if (normalizedType === 'system' || normalizedType === 'star') {
         const ring = new THREE.Mesh(
-          new THREE.TorusGeometry(node.radius * (normalizedType === 'system' ? 3.8 : 2.6), 0.018, 6, 128),
+          new THREE.TorusGeometry(node.radius * (normalizedType === 'system' ? 3.8 : 2.6), 0.018, 5, 80),
           new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: 0.16 }),
         );
         ring.position.copy(node.position);
         ring.rotation.x = Math.PI / 2;
         nodeGroup.add(ring);
+      }
+
+      if (normalizedType === 'station' || normalizedType === 'rest_stop') {
+        const stationRing = new THREE.Mesh(
+          new THREE.TorusGeometry(node.radius * 1.9, 0.025, 5, 48),
+          new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.42 }),
+        );
+        stationRing.position.copy(node.position);
+        stationRing.rotation.x = Math.PI / 2;
+        nodeGroup.add(stationRing);
+        animatedObjects.push(stationRing);
       }
     }
 
@@ -557,6 +665,7 @@ function StarmapScene({
     const focus = new THREE.Vector3();
     const animate = () => {
       frame = requestAnimationFrame(animate);
+      if (!visibility.isVisible()) return;
       const t = clock.getElapsedTime();
       for (const [id, mesh] of objects) {
         const isSelected = selectedRef.current === id;
@@ -573,6 +682,10 @@ function StarmapScene({
         controls.target.lerp(focus, 0.045);
       }
       for (const label of labels) label.quaternion.copy(camera.quaternion);
+      animatedObjects.forEach((object, index) => {
+        object.rotation.y += 0.004 + index * 0.0004;
+        object.rotation.z += 0.002;
+      });
       controls.update();
       renderer.render(scene, camera);
     };
@@ -583,6 +696,7 @@ function StarmapScene({
       const h = container.clientHeight;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+      renderer.setPixelRatio(getThreePixelRatio());
       renderer.setSize(w, h);
     });
     resize.observe(container);
@@ -590,20 +704,15 @@ function StarmapScene({
     return () => {
       cancelAnimationFrame(frame);
       resize.disconnect();
+      visibility.dispose();
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
       controls.dispose();
-      scene.traverse((obj) => {
-        const mesh = obj as THREE.Mesh;
-        if (mesh.geometry) mesh.geometry.dispose();
-        const material = mesh.material as THREE.Material | THREE.Material[] | undefined;
-        if (Array.isArray(material)) material.forEach((m) => m.dispose());
-        else material?.dispose();
-      });
+      disposeObject3D(scene);
       renderer.dispose();
       if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
       rendererRef.current = null;
     };
-  }, [nodes]);
+  }, [nodes, mode]);
 
   return <div ref={containerRef} className="absolute inset-0" />;
 }
@@ -611,6 +720,7 @@ function StarmapScene({
 export default function LocationsPage() {
   const { env } = useEnv();
   const [search, setSearch] = useState('');
+  const [viewMode, setViewMode] = useState<StarmapViewMode>('galaxy');
   const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set(['system', 'star', 'planet', 'moon', 'landing_zone', 'station', 'rest_stop', 'jump_point']));
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
@@ -640,10 +750,22 @@ export default function LocationsPage() {
   const nodes = useMemo(() => buildStarmap(rawLocs, shopsData?.data ?? []), [rawLocs, shopsData]);
   const isLoading = (loadingStarmap || loadingLocations) && nodes.length === 0;
   const error = starmapError && nodes.length === 0 ? starmapError : null;
+  const rootSystem = useMemo(() => rootSystemFor(nodes, selectedId), [nodes, selectedId]);
+  const modeNodes = useMemo(() => {
+    if (viewMode === 'galaxy') return nodes.filter((node) => !node.parentId);
+    const root = rootSystem ?? nodes.find((node) => !node.parentId) ?? null;
+    if (viewMode === 'system' && root) return [root, ...descendantsOf(nodes, root.id)];
+    const selected = selectedId ? nodes.find((node) => node.id === selectedId) : null;
+    if (viewMode === 'object' && selected) {
+      const parent = selected.parentId ? nodes.find((node) => node.id === selected.parentId) : null;
+      return [parent, selected, ...descendantsOf(nodes, selected.id)].filter(Boolean) as StarmapNode[];
+    }
+    return nodes;
+  }, [nodes, rootSystem, selectedId, viewMode]);
   const query = search.trim().toLowerCase();
   const filteredNodes = useMemo(
     () =>
-      nodes.filter((node) => {
+      modeNodes.filter((node) => {
         const typeMatch = activeTypes.has(node.loc.type);
         const searchMatch =
           !query ||
@@ -652,10 +774,10 @@ export default function LocationsPage() {
           node.systemCode.toLowerCase().includes(query);
         return typeMatch && searchMatch;
       }),
-    [activeTypes, nodes, query],
+    [activeTypes, modeNodes, query],
   );
   const highlightedIds = useMemo(() => new Set(filteredNodes.map((node) => node.id)), [filteredNodes]);
-  const selectedNode = useMemo(() => nodes.find((node) => node.id === selectedId) ?? filteredNodes[0] ?? nodes[0] ?? null, [filteredNodes, nodes, selectedId]);
+  const selectedNode = useMemo(() => modeNodes.find((node) => node.id === selectedId) ?? filteredNodes[0] ?? modeNodes[0] ?? nodes[0] ?? null, [filteredNodes, modeNodes, nodes, selectedId]);
   const countsByType = useMemo(() => {
     const counts = new Map<string, number>();
     for (const node of nodes) counts.set(node.loc.type, (counts.get(node.loc.type) ?? 0) + 1);
@@ -689,16 +811,16 @@ export default function LocationsPage() {
           <Loader2 className="text-cyan-500 animate-spin" size={34} />
         </div>
       ) : (
-        <StarmapScene nodes={filteredNodes.length ? filteredNodes : nodes} selectedId={selectedNode?.id ?? null} highlightedIds={highlightedIds} onSelect={setSelectedId} />
+        <StarmapScene nodes={filteredNodes.length ? filteredNodes : modeNodes.length ? modeNodes : nodes} mode={viewMode} selectedId={selectedNode?.id ?? null} highlightedIds={highlightedIds} onSelect={setSelectedId} />
       )}
 
       <header className="absolute left-0 right-0 top-0 z-30 pointer-events-none">
         <div className="flex h-10 items-center justify-between px-6 font-mono-sc text-[10px] uppercase tracking-widest text-cyan-500">
           <div className="flex items-center gap-5 pointer-events-auto">
-            <button className="text-amber-400">Back</button>
-            <button className="text-cyan-400">GLX</button>
-            <button className="text-cyan-400">SYS</button>
-            <button className="text-cyan-400">OBJ</button>
+            <button type="button" onClick={() => setViewMode('galaxy')} className={viewMode === 'galaxy' ? 'text-amber-400' : 'text-cyan-500 hover:text-cyan-300'}>Back</button>
+            <button type="button" onClick={() => setViewMode('galaxy')} className={viewMode === 'galaxy' ? 'text-cyan-200' : 'text-cyan-500 hover:text-cyan-300'}>GLX</button>
+            <button type="button" onClick={() => setViewMode('system')} className={viewMode === 'system' ? 'text-cyan-200' : 'text-cyan-500 hover:text-cyan-300'}>SYS</button>
+            <button type="button" onClick={() => setViewMode('object')} className={viewMode === 'object' ? 'text-cyan-200' : 'text-cyan-500 hover:text-cyan-300'}>OBJ</button>
           </div>
           <div className="flex items-center gap-4 pointer-events-auto">
             <Volume2 size={14} />
@@ -715,7 +837,7 @@ export default function LocationsPage() {
             <span className="sr-only">Unified RSI and P4K location map</span>
           </div>
           <p className="font-mono-sc text-[10px] text-slate-500 uppercase tracking-widest mt-1">
-            RSI starmap + P4K locations · {filteredNodes.length.toLocaleString('en-US')} visible · {nodes.length.toLocaleString('en-US')} mapped
+            {viewMode.toUpperCase()} · RSI starmap + P4K locations · {filteredNodes.length.toLocaleString('en-US')} visible · {nodes.length.toLocaleString('en-US')} mapped
           </p>
         </div>
 
@@ -814,7 +936,10 @@ export default function LocationsPage() {
                 <button
                   key={action}
                   type="button"
-                  onClick={() => index === 0 && setSelectedId(selectedNode.id)}
+                  onClick={() => {
+                    if (index === 0) setViewMode('object');
+                    if (index === 1) setViewMode('system');
+                  }}
                   className={`flex w-full items-center justify-between px-4 py-2 font-orbitron text-[11px] uppercase tracking-widest transition-colors ${
                     index === 0 ? 'bg-cyan-950/80 text-cyan-300' : 'text-cyan-700 hover:text-cyan-300'
                   }`}
