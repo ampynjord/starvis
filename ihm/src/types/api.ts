@@ -895,6 +895,22 @@ export interface MissionListResponse extends PaginatedResponse<Mission> {
   };
 }
 
+export interface FactionSummary {
+  name: string;
+  mission_count: number;
+  legal_missions: number;
+  illegal_missions: number;
+  shareable_missions: number;
+  blueprint_reward_missions: number;
+  reward_min: number | null;
+  reward_max: number | null;
+  reward_average: number | null;
+  mission_givers: string[];
+  systems: string[];
+  categories: string[];
+  mission_types: string[];
+}
+
 export interface ChangelogEntry {
   id: number;
   entity_type: string;

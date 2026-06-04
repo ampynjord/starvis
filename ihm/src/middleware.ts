@@ -18,6 +18,8 @@ const PUBLIC_PATHS = new Set([
   '/fps-gear',
   '/consumables',
   '/commodities',
+  '/locations',
+  '/starmap',
   '/missions',
   '/factions',
   '/manufacturers',
@@ -37,6 +39,8 @@ const PUBLIC_PREFIXES = [
   '/items/',
   '/consumables/',
   '/commodities/',
+  '/locations/',
+  '/starmap/',
   '/galactapedia/',
   '/comm-links/',
   // Next.js internals & static assets

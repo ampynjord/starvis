@@ -8533,6 +8533,23 @@
             }
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": ["member", "leader"],
+                    "default": "member"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -8547,6 +8564,87 @@
                     },
                     "data": {
                       "$ref": "#/components/schemas/CorporationMembership"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/corp/memberships/{mid}/reject": {
+      "put": {
+        "tags": ["Corporations"],
+        "summary": "Reject a membership request as corporation leader/admin",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CorporationMembership"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/corp/members/{mid}": {
+      "delete": {
+        "tags": ["Corporations"],
+        "summary": "Remove a member from the corporation as corporation leader/admin",
+        "parameters": [
+          {
+            "name": "mid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
                     }
                   }
                 }
@@ -8659,27 +8757,45 @@
       },
       "post": {
         "tags": ["Admin", "Corporations"],
-        "summary": "Admin create corporation",
+        "summary": "Admin import RSI corporation",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["name"],
+                "required": ["symbol"],
                 "properties": {
+                  "symbol": {
+                    "type": "string"
+                  },
                   "name": {
                     "type": "string"
                   },
-                  "tag": {
-                    "type": "string"
-                  },
-                  "description": {
+                  "logoUrl": {
                     "type": "string",
                     "nullable": true
                   },
-                  "logoUrl": {
+                  "archetype": {
                     "type": "string",
+                    "nullable": true
+                  },
+                  "language": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "commitment": {
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "recruiting": {
+                    "type": "boolean"
+                  },
+                  "roleplay": {
+                    "type": "boolean"
+                  },
+                  "memberCount": {
+                    "type": "integer",
                     "nullable": true
                   }
                 }

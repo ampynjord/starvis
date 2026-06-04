@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Building2, Check, Package, ShieldCheck, Ship, Users } from 'lucide-react';
+import { Building2, Check, Crown, Package, ShieldCheck, Ship, UserCheck, UserMinus, Users, XCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 
 type MemberRole = 'member' | 'leader';
@@ -77,10 +77,24 @@ export default function CorpPage() {
   const fleetCount = useMemo(() => workspace?.fleet.filter((i) => i.itemType === 'ship').length ?? 0, [workspace]);
   const bankCount = useMemo(() => workspace?.fleet.filter((i) => i.itemType !== 'ship').length ?? 0, [workspace]);
 
-  const approve = async (id: number) => {
+  const approve = async (id: number, role: MemberRole = 'member') => {
     setBusy(id);
     try {
-      await apiFetch(`/api/corp/memberships/${id}/approve`, { method: 'PUT' });
+      await apiFetch(`/api/corp/memberships/${id}/approve`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role }),
+      });
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const reject = async (id: number) => {
+    setBusy(id);
+    try {
+      await apiFetch(`/api/corp/memberships/${id}/reject`, { method: 'PUT' });
       await load();
     } finally {
       setBusy(null);
@@ -95,6 +109,16 @@ export default function CorpPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role }),
       });
+      await load();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const removeMember = async (id: number) => {
+    setBusy(id);
+    try {
+      await apiFetch(`/api/corp/members/${id}`, { method: 'DELETE' });
       await load();
     } finally {
       setBusy(null);
@@ -142,6 +166,29 @@ export default function CorpPage() {
       </div>
 
       {isLeader && (
+        <section className="grid gap-2 md:grid-cols-3">
+          <Link href="/corp/fleet" className="sci-panel border border-slate-800/70 px-4 py-3 hover:border-cyan-700/60 transition-colors">
+            <p className="font-mono-sc text-[9px] text-cyan-700 uppercase tracking-widest flex items-center gap-1.5">
+              <Ship size={11} /> Fleet oversight
+            </p>
+            <p className="mt-1 text-xs text-slate-500 font-rajdhani">Review member ships and declared corporation assets.</p>
+          </Link>
+          <Link href="/corp/bank" className="sci-panel border border-slate-800/70 px-4 py-3 hover:border-cyan-700/60 transition-colors">
+            <p className="font-mono-sc text-[9px] text-cyan-700 uppercase tracking-widest flex items-center gap-1.5">
+              <Package size={11} /> Bank inventory
+            </p>
+            <p className="mt-1 text-xs text-slate-500 font-rajdhani">Track shared equipment, resources and logistics stock.</p>
+          </Link>
+          <div className="sci-panel border border-emerald-900/50 bg-emerald-950/10 px-4 py-3">
+            <p className="font-mono-sc text-[9px] text-emerald-500 uppercase tracking-widest flex items-center gap-1.5">
+              <ShieldCheck size={11} /> Leader controls
+            </p>
+            <p className="mt-1 text-xs text-slate-500 font-rajdhani">Approve recruits, assign leaders, reject requests and remove inactive members.</p>
+          </div>
+        </section>
+      )}
+
+      {isLeader && (
         <section className="sci-panel overflow-hidden">
           <div className="px-4 py-2.5 border-b border-border/50">
             <span className="text-[10px] font-mono-sc text-cyan-700 uppercase tracking-wider">Membership requests</span>
@@ -151,19 +198,37 @@ export default function CorpPage() {
           ) : (
             <div className="divide-y divide-border/30">
               {workspace.pendingMemberships.map((m) => (
-                <div key={m.id} className="flex items-center gap-3 px-4 py-3">
+                <div key={m.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-rajdhani font-semibold text-slate-200 truncate">{m.user.username}</p>
                     <p className="text-[10px] text-slate-600 font-mono-sc truncate">{m.user.email}</p>
                   </div>
-                  <button
-                    type="button"
-                    disabled={busy === m.id}
-                    onClick={() => approve(m.id)}
-                    className="sci-btn-primary py-1.5 px-3 text-xs"
-                  >
-                    Approve
-                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={busy === m.id}
+                      onClick={() => approve(m.id, 'member')}
+                      className="sci-btn-primary inline-flex items-center gap-1.5 py-1.5 px-3 text-xs"
+                    >
+                      <UserCheck size={12} /> Approve
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy === m.id}
+                      onClick={() => approve(m.id, 'leader')}
+                      className="inline-flex items-center gap-1.5 text-[10px] font-mono-sc text-emerald-400 hover:text-emerald-300 border border-emerald-900/60 bg-emerald-950/20 px-2.5 py-1.5 rounded-sm disabled:opacity-50"
+                    >
+                      <Crown size={12} /> Leader
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy === m.id}
+                      onClick={() => reject(m.id)}
+                      className="inline-flex items-center gap-1.5 text-[10px] font-mono-sc text-rose-400 hover:text-rose-300 border border-rose-900/60 bg-rose-950/20 px-2.5 py-1.5 rounded-sm disabled:opacity-50"
+                    >
+                      <XCircle size={12} /> Reject
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -180,24 +245,52 @@ export default function CorpPage() {
           </div>
         </div>
         <div className="divide-y divide-border/30">
-          {workspace.members.map((m) => (
-            <div key={m.id} className="flex items-center gap-3 px-4 py-3">
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-rajdhani font-semibold text-slate-200 truncate">{m.user.username}</p>
-                <p className="text-[10px] text-slate-600 font-mono-sc">{m.role}</p>
+          {workspace.members.map((m) => {
+            const isSelf = m.id === workspace.membership.id;
+
+            return (
+              <div key={m.id} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <p className="text-sm font-rajdhani font-semibold text-slate-200 truncate">{m.user.username}</p>
+                    {m.role === 'leader' && <Crown size={12} className="text-emerald-400 shrink-0" />}
+                    {isSelf && (
+                      <span className="text-[9px] font-mono-sc uppercase tracking-widest text-cyan-400 border border-cyan-900/60 px-1.5 py-0.5 rounded-sm">
+                        You
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-slate-600 font-mono-sc truncate">{m.user.email}</p>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[10px] font-mono-sc uppercase tracking-wider text-slate-500 border border-slate-800 px-2 py-1 rounded-sm">
+                    {m.role}
+                  </span>
+                  {isLeader && !isSelf && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={busy === m.id}
+                        onClick={() => setRole(m.id, m.role === 'leader' ? 'member' : 'leader')}
+                        className="inline-flex items-center gap-1.5 text-[10px] font-mono-sc text-slate-500 hover:text-emerald-400 border border-slate-800 px-2 py-1 rounded-sm disabled:opacity-50"
+                      >
+                        {m.role === 'leader' ? <ShieldCheck size={12} /> : <Crown size={12} />}
+                        {m.role === 'leader' ? 'Demote' : 'Make leader'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy === m.id}
+                        onClick={() => removeMember(m.id)}
+                        className="inline-flex items-center gap-1.5 text-[10px] font-mono-sc text-rose-400 hover:text-rose-300 border border-rose-900/60 bg-rose-950/10 px-2 py-1 rounded-sm disabled:opacity-50"
+                      >
+                        <UserMinus size={12} /> Remove
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-              {isLeader && m.id !== workspace.membership.id && (
-                <button
-                  type="button"
-                  disabled={busy === m.id}
-                  onClick={() => setRole(m.id, m.role === 'leader' ? 'member' : 'leader')}
-                  className="text-[10px] font-mono-sc text-slate-500 hover:text-emerald-400 border border-slate-800 px-2 py-1 rounded-sm"
-                >
-                  {m.role === 'leader' ? 'Demote' : 'Make leader'}
-                </button>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
     </div>

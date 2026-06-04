@@ -13,7 +13,27 @@ import { api } from '@/services/api';
 import type { Location, Shop } from '@/types/api';
 
 type Coordinates = { x?: number | string | null; y?: number | string | null; z?: number | string | null };
+type RsiStarmapPosition = {
+  id: number;
+  rsi_id?: string | null;
+  name: string;
+  type: string;
+  system_code?: string | null;
+  system_name?: string | null;
+  parent_id?: number | null;
+  coordinates?: Coordinates | null;
+  aggregated?: {
+    planets?: number;
+    moons?: number;
+    stations?: number;
+    population?: number;
+    economy?: number;
+    danger?: number;
+  } | null;
+};
 type LocationWithMap = Location & {
+  parent_id?: number | null;
+  aggregated?: RsiStarmapPosition['aggregated'];
   coordinates?: Coordinates | null;
   rsi_starmap?: {
     name?: string | null;
@@ -86,6 +106,33 @@ function systemCodeFor(loc: LocationWithMap) {
   return m?.[1]?.toUpperCase() ?? loc.uuid.slice(0, 8).toUpperCase();
 }
 
+function starmapPositionToLocation(pos: RsiStarmapPosition): LocationWithMap {
+  const uuid = `starmap-${pos.id}`;
+  return {
+    uuid,
+    class_name: pos.rsi_id ? `RSI_${pos.rsi_id}` : uuid,
+    name: pos.name,
+    type: normalizeType(pos.type),
+    system_code: pos.system_code ?? null,
+    parent_uuid: pos.parent_id != null ? `starmap-${pos.parent_id}` : null,
+    parent_id: pos.parent_id ?? null,
+    rsi_starmap_location_id: pos.id,
+    loc_key: null,
+    coordinates: pos.coordinates ?? null,
+    p4k_path: null,
+    is_scannable: false,
+    hide_in_starmap: false,
+    aggregated: pos.aggregated ?? null,
+    rsi_starmap: {
+      name: pos.name,
+      type: pos.type,
+      system_code: pos.system_code ?? null,
+      system_name: pos.system_name ?? null,
+      coordinates: pos.coordinates ?? null,
+    },
+  } as LocationWithMap;
+}
+
 function makeLabel(text: string, color: string) {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
@@ -121,15 +168,15 @@ function buildStarmap(locs: LocationWithMap[], shops: Shop[]): StarmapNode[] {
     .map((loc) => ({ ...loc, type: normalizeType(loc.type) }))
     .filter((loc) => !loc.hide_in_starmap && IMPORTANT_TYPES.has(loc.type));
   const byId = new Map(visible.map((loc) => [loc.uuid, loc]));
-  const systems = visible.filter((loc) => loc.type === 'system');
-  const systemByCode = new Map(systems.map((loc) => [systemCodeFor(loc), loc]));
+  const roots = visible.filter((loc) => loc.type === 'system' || (loc.type === 'star' && !loc.parent_uuid && loc.parent_id == null));
+  const rootByCode = new Map(roots.map((loc) => [systemCodeFor(loc), loc]));
   const shopsByLocKey = new Map<string, number>();
   for (const shop of shops) {
     if (!shop.loc_key) continue;
     shopsByLocKey.set(shop.loc_key, (shopsByLocKey.get(shop.loc_key) ?? 0) + 1);
   }
 
-  const rawSystemCoords = systems.map((loc) => getCoordinates(loc)).filter(Boolean) as THREE.Vector3[];
+  const rawSystemCoords = roots.map((loc) => getCoordinates(loc)).filter(Boolean) as THREE.Vector3[];
   const box = rawSystemCoords.length > 1 ? new THREE.Box3().setFromPoints(rawSystemCoords) : null;
   const size = box?.getSize(new THREE.Vector3()) ?? new THREE.Vector3(1, 1, 1);
   const center = box?.getCenter(new THREE.Vector3()) ?? new THREE.Vector3();
@@ -137,14 +184,14 @@ function buildStarmap(locs: LocationWithMap[], shops: Shop[]): StarmapNode[] {
   const normalizeSystemPos = (loc: LocationWithMap, index: number) => {
     const c = getCoordinates(loc);
     if (c && box) return c.clone().sub(center).multiplyScalar(150 / maxAxis);
-    const angle = (index / Math.max(systems.length, 1)) * Math.PI * 2;
+    const angle = (index / Math.max(roots.length, 1)) * Math.PI * 2;
     const ring = 42 + (index % 3) * 18;
     return new THREE.Vector3(Math.cos(angle) * ring, (hashFloat(loc.uuid) - 0.5) * 18, Math.sin(angle) * ring);
   };
 
   const nodes = new Map<string, StarmapNode>();
-  systems.forEach((loc, index) => {
-    const m = metaFor('system');
+  roots.forEach((loc, index) => {
+    const m = metaFor(loc.type);
     nodes.set(loc.uuid, {
       id: loc.uuid,
       loc,
@@ -162,8 +209,8 @@ function buildStarmap(locs: LocationWithMap[], shops: Shop[]): StarmapNode[] {
   const childrenByParent = new Map<string, LocationWithMap[]>();
   const getParentId = (loc: LocationWithMap) => {
     if (loc.parent_uuid && byId.has(loc.parent_uuid)) return loc.parent_uuid;
-    const system = systemByCode.get(systemCodeFor(loc));
-    return loc.type === 'system' ? null : system?.uuid ?? null;
+    const root = rootByCode.get(systemCodeFor(loc));
+    return loc.uuid === root?.uuid ? null : root?.uuid ?? null;
   };
   for (const loc of visible) {
     const parentId = getParentId(loc);
@@ -416,9 +463,9 @@ export default function LocationsPage() {
   const [activeTypes, setActiveTypes] = useState<Set<string>>(new Set(['system', 'star', 'planet', 'moon', 'landing_zone', 'station', 'rest_stop', 'jump_point']));
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const { data: rawLocs, isLoading, error } = useQuery({
-    queryKey: ['locations-all', env],
-    queryFn: () => api.locations.all(env) as Promise<LocationWithMap[]>,
+  const { data: starmapPositions, isLoading, error } = useQuery({
+    queryKey: ['starmap-positions'],
+    queryFn: () => api.starmap.positions() as Promise<RsiStarmapPosition[]>,
     staleTime: 5 * 60_000,
   });
 
@@ -428,7 +475,8 @@ export default function LocationsPage() {
     staleTime: 5 * 60_000,
   });
 
-  const nodes = useMemo(() => buildStarmap(rawLocs ?? [], shopsData?.data ?? []), [rawLocs, shopsData]);
+  const rawLocs = useMemo(() => (starmapPositions ?? []).map(starmapPositionToLocation), [starmapPositions]);
+  const nodes = useMemo(() => buildStarmap(rawLocs, shopsData?.data ?? []), [rawLocs, shopsData]);
   const query = search.trim().toLowerCase();
   const filteredNodes = useMemo(
     () =>

@@ -46,7 +46,6 @@ const nextConfig: NextConfig = {
       { source: '/other-items', destination: '/consumables', permanent: true },
       { source: '/items', destination: '/consumables', permanent: true },
       { source: '/items/:uuid', destination: '/consumables/:uuid', permanent: true },
-      { source: '/factions', destination: '/missions', permanent: true },
     ];
   },
 };

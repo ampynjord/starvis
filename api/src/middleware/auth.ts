@@ -1,4 +1,5 @@
 import { timingSafeEqual } from 'node:crypto';
+import { getPrisma } from '@starvis/db';
 import type { NextFunction, Request, Response } from 'express';
 import { AuthService } from '../services/auth-service.js';
 import { ADMIN_ROLE, AUTH_COOKIE_NAME, DEVELOPER_ACCESS_ROLES } from '../utils/config.js';
@@ -44,7 +45,7 @@ export function requireJwt(req: Request, res: Response, next: NextFunction) {
  * requireJwtDeveloperOrAdmin — verifies Bearer JWT AND that role is developer or admin.
  * Grants access to API token generation and other developer features.
  */
-export function requireJwtDeveloperOrAdmin(req: Request, res: Response, next: NextFunction) {
+export async function requireJwtDeveloperOrAdmin(req: Request, res: Response, next: NextFunction) {
   if (!process.env.JWT_SECRET) {
     return res.status(401).json({ success: false, error: 'Unauthorized' });
   }
@@ -55,10 +56,12 @@ export function requireJwtDeveloperOrAdmin(req: Request, res: Response, next: Ne
   try {
     const authService = new AuthService(null as any);
     const payload = authService.verifyToken(token);
-    if (!DEVELOPER_ACCESS_ROLES.includes(payload.role as (typeof DEVELOPER_ACCESS_ROLES)[number])) {
+    const currentUser = await getPrisma().user.findUnique({ where: { id: payload.sub }, select: { role: true } });
+    const currentRole = currentUser?.role ?? payload.role;
+    if (!DEVELOPER_ACCESS_ROLES.includes(currentRole as (typeof DEVELOPER_ACCESS_ROLES)[number])) {
       return res.status(403).json({ success: false, error: 'Developer or admin role required' });
     }
-    (req as any).jwtPayload = payload;
+    (req as any).jwtPayload = { ...payload, role: currentRole };
     next();
   } catch {
     res.status(401).json({ success: false, error: 'Invalid or expired token' });
@@ -72,7 +75,7 @@ export const requireJwtBetaOrAdmin = requireJwtDeveloperOrAdmin;
  * requireJwtAdmin — verifies Bearer JWT AND that role === 'admin'.
  * Also accepts ADMIN_API_KEY (X-Api-Key) for server-to-server compatibility.
  */
-export function requireJwtAdmin(req: Request, res: Response, next: NextFunction) {
+export async function requireJwtAdmin(req: Request, res: Response, next: NextFunction) {
   // 1. Always accept admin key (backward compat, server scripts)
   const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
   if (ADMIN_API_KEY) {
@@ -95,10 +98,12 @@ export function requireJwtAdmin(req: Request, res: Response, next: NextFunction)
   try {
     const authService = new AuthService(null as any);
     const payload = authService.verifyToken(token);
-    if (payload.role !== ADMIN_ROLE) {
+    const currentUser = await getPrisma().user.findUnique({ where: { id: payload.sub }, select: { role: true } });
+    const currentRole = currentUser?.role ?? payload.role;
+    if (currentRole !== ADMIN_ROLE) {
       return res.status(403).json({ success: false, error: 'Admin role required' });
     }
-    (req as any).jwtPayload = payload;
+    (req as any).jwtPayload = { ...payload, role: currentRole };
     next();
   } catch {
     res.status(401).json({ success: false, error: 'Invalid or expired token' });
