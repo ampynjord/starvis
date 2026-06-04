@@ -128,13 +128,20 @@ function cloneSpec(spec: OpenApiSpec): OpenApiSpec {
 function withoutAdminRoutes(spec: OpenApiSpec): OpenApiSpec {
   const publicSpec = cloneSpec(spec);
   publicSpec.paths = Object.fromEntries(Object.entries(publicSpec.paths ?? {}).filter(([route]) => !route.startsWith('/admin')));
-  publicSpec.tags = (publicSpec.tags ?? []).filter((tag) => tag.name !== 'Admin');
+  publicSpec.tags = (publicSpec.tags ?? []).filter((tag) => tag.name !== 'Admin' && tag.name !== 'Administration');
   return publicSpec;
 }
 
-function makeSwaggerHtml(spec: OpenApiSpec, assetBasePath: string): string {
+function makeSwaggerHtml(specUrl: string, assetBasePath: string): string {
   return swaggerUi
-    .generateHTML(spec)
+    .generateHTML(undefined, {
+      swaggerOptions: {
+        url: specUrl,
+        defaultModelsExpandDepth: 1,
+        displayRequestDuration: true,
+        persistAuthorization: true,
+      },
+    })
     .replace(/href="\.\//g, `href="${assetBasePath}/`)
     .replace(/src="\.\//g, `src="${assetBasePath}/`);
 }
@@ -204,8 +211,8 @@ const publicSwaggerSpec = withoutAdminRoutes(fullSwaggerSpec);
 // Generate HTML with absolute asset paths so it works at /api-docs (no trailing slash).
 // swagger-ui-express uses relative paths (./swagger-ui.css) by default, which break when
 // the browser URL has no trailing slash (./foo resolves to /foo instead of /api-docs/foo).
-const swaggerHtml = makeSwaggerHtml(publicSwaggerSpec, '/api-docs');
-const adminSwaggerHtml = makeSwaggerHtml(fullSwaggerSpec, '/api-docs');
+const swaggerHtml = makeSwaggerHtml('/api-docs/openapi.json', '/api-docs');
+const adminSwaggerHtml = makeSwaggerHtml('/admin/api-docs/openapi.json', '/api-docs');
 app.get('/api-docs', requireApiDocsDeveloper, (_, res) => res.type('html').send(swaggerHtml));
 app.get('/api-docs/openapi.json', requireApiDocsDeveloper, (_, res) => res.json(publicSwaggerSpec));
 app.use('/api-docs', swaggerUi.serve);
