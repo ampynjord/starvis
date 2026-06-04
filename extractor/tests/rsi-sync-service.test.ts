@@ -99,6 +99,6 @@ describe('RsiSyncService.syncStarmap', () => {
     const params = query.mock.calls[0][1] as unknown[];
     expect(JSON.parse(params[13] as string)).toEqual({ x: 1.25, y: -2.5, z: 3.75 });
     expect(params[1]).toBe('Test');
-    expect(params[2]).toBe('StarSystem');
+    expect(params[2]).toBe('system');
   });
 });

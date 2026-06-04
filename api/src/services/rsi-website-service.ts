@@ -352,10 +352,12 @@ export class RsiWebsiteService {
 
   async getStarmapPositions(): Promise<Row[]> {
     return this.prisma.$queryRawUnsafe<Row[]>(
-      `SELECT id, rsi_id, name, type, system_code, system_name, parent_id, coordinates, aggregated
-       FROM rsi.starmap_locations
-       WHERE coordinates IS NOT NULL OR aggregated IS NOT NULL
-       ORDER BY COALESCE(system_name, name), type, name`,
+      `SELECT sl.id, sl.rsi_id, sl.name, sl.type, sl.system_code, sl.system_name,
+              sl.parent_id, parent.id as parent_db_id, sl.coordinates, sl.aggregated
+       FROM rsi.starmap_locations sl
+       LEFT JOIN rsi.starmap_locations parent ON parent.rsi_id = sl.parent_id
+       WHERE sl.coordinates IS NOT NULL OR sl.aggregated IS NOT NULL
+       ORDER BY COALESCE(sl.system_name, sl.name), sl.type, sl.name`,
     );
   }
 
