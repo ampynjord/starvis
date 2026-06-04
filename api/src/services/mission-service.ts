@@ -79,6 +79,41 @@ export class MissionService {
     return rows.map((r) => String(r.faction));
   }
 
+  async getFactionDetails(env = 'live'): Promise<Row[]> {
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT
+          faction as name,
+          COUNT(*) as mission_count,
+          COUNT(*) FILTER (WHERE is_legal = true) as legal_missions,
+          COUNT(*) FILTER (WHERE is_legal = false) as illegal_missions,
+          COUNT(*) FILTER (WHERE can_be_shared = true) as shareable_missions,
+          COUNT(*) FILTER (WHERE has_blueprint_reward = true) as blueprint_reward_missions,
+          MIN(COALESCE(reward_min, reward_max)) as reward_min,
+          MAX(COALESCE(reward_max, reward_min)) as reward_max,
+          ROUND(AVG(COALESCE(reward_max, reward_min)) FILTER (WHERE COALESCE(reward_max, reward_min) IS NOT NULL)) as reward_average,
+          ARRAY_REMOVE(ARRAY_AGG(DISTINCT mission_giver), NULL) as mission_givers,
+          ARRAY_REMOVE(ARRAY_AGG(DISTINCT location_system), NULL) as systems,
+          ARRAY_REMOVE(ARRAY_AGG(DISTINCT category), NULL) as categories,
+          ARRAY_REMOVE(ARRAY_AGG(DISTINCT mission_type), NULL) as mission_types
+       FROM game.missions
+       WHERE env = ? AND not_for_release = false AND work_in_progress = false
+         AND faction IS NOT NULL AND faction != ''
+       GROUP BY faction
+       ORDER BY faction`),
+      env,
+    );
+    return convertBigIntToNumber(rows);
+  }
+
+  async getFactionDetail(faction: string, env = 'live'): Promise<Row | null> {
+    const all = await this.getFactionDetails(env);
+    const found = all.find((row) => String(row.name).toLowerCase() === faction.toLowerCase());
+    if (!found) return null;
+    const missions = await this.getMissions({ env, faction: String(found.name), limit: 20, sort: 'reward_desc' });
+    return { ...found, missions: missions.data, missions_total: missions.total };
+  }
+
   async getSystems(env = 'live'): Promise<string[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(

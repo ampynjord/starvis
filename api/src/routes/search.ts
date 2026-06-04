@@ -1,4 +1,4 @@
-import type { Router } from 'express';
+import type { Request, Response, Router } from 'express';
 import { LoadoutBody, SearchQuery } from '../schemas.js';
 import { asyncHandler, makeGameDataGuard, makeShipResolver, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
@@ -8,26 +8,39 @@ export function mountSearchRoutes(router: Router, deps: RouteDependencies): void
   const requireGameData = makeGameDataGuard(gameDataService);
   const { resolveShipUuid } = makeShipResolver(gameDataService!.ships);
 
+  async function sendSearch(req: Request, res: Response, search: string, env = 'live'): Promise<void> {
+    if (!search || search.length < 2)
+      return void res.status(400).json({ success: false, error: "Query 'search' must be at least 2 characters" });
+    const limit = parseInt(String(req.query.limit ?? '10'), 10) || 10;
+    const data = await gameDataService!.unifiedSearch(search, limit, env);
+    sendWithETag(req, res, {
+      success: true,
+      data,
+      total:
+        data.ships.length +
+        data.components.length +
+        data.items.length +
+        data.commodities.length +
+        data.missions.length +
+        data.recipes.length,
+    });
+  }
+
   router.get(
     '/api/v1/search',
     requireGameData,
     asyncHandler(async (req, res) => {
       const { search, env } = SearchQuery.parse(req.query);
-      if (!search || search.length < 2)
-        return void res.status(400).json({ success: false, error: "Query 'search' must be at least 2 characters" });
-      const limit = parseInt(String(req.query.limit ?? '10'), 10) || 10;
-      const data = await gameDataService!.unifiedSearch(search, limit, env);
-      sendWithETag(req, res, {
-        success: true,
-        data,
-        total:
-          data.ships.length +
-          data.components.length +
-          data.items.length +
-          data.commodities.length +
-          data.missions.length +
-          data.recipes.length,
-      });
+      await sendSearch(req, res, search ?? '', env);
+    }),
+  );
+
+  router.get(
+    '/api/v1/search/:query',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const { env } = SearchQuery.parse({ ...req.query, search: req.params.query });
+      await sendSearch(req, res, req.params.query, env);
     }),
   );
 

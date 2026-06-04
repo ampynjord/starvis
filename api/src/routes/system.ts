@@ -1,6 +1,14 @@
 import type { Router } from 'express';
 import { ChangelogQuery, GameVersionsQuery } from '../schemas.js';
-import { asyncHandler, getQueryString, makeGameDataGuard, mountEnvDataRoute, sendDataWithETag, sendWithETag } from './helpers.js';
+import {
+  asyncHandler,
+  getQueryEnv,
+  getQueryString,
+  makeGameDataGuard,
+  mountEnvDataRoute,
+  sendDataWithETag,
+  sendWithETag,
+} from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
 export function mountSystemRoutes(router: Router, deps: RouteDependencies): void {
@@ -37,6 +45,16 @@ export function mountSystemRoutes(router: Router, deps: RouteDependencies): void
   mountEnvDataRoute(router, '/api/v1/stats/overview', requireGameData, (env) => gameDataService!.getPublicStats(env));
 
   router.get(
+    '/api/v1/stats/latest',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = getQueryEnv(req);
+      const data = await gameDataService!.getLatestStats(env);
+      sendDataWithETag(req, res, data);
+    }),
+  );
+
+  router.get(
     '/api/v1/version',
     requireGameData,
     asyncHandler(async (req, res) => {
@@ -63,6 +81,33 @@ export function mountSystemRoutes(router: Router, deps: RouteDependencies): void
       const env = getQueryString(req, 'env') ?? 'live';
       const latest = await gameDataService!.getLatestExtraction(env);
       sendDataWithETag(req, res, latest || { message: `No extraction for env: ${env}` });
+    }),
+  );
+
+  router.get(
+    '/api/v1/game-versions/:version/changelog',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const result = await gameDataService!.getVersionChangelog(req.params.version, {
+        env: getQueryEnv(req),
+        limit: getQueryString(req, 'limit'),
+        offset: getQueryString(req, 'offset'),
+      });
+      sendWithETag(req, res, { success: true, ...result });
+    }),
+  );
+
+  router.get(
+    '/api/v1/game-versions/:version/changelog/changes',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const result = await gameDataService!.getVersionChangelog(req.params.version, {
+        env: getQueryEnv(req),
+        limit: getQueryString(req, 'limit'),
+        offset: getQueryString(req, 'offset'),
+        changesOnly: true,
+      });
+      sendWithETag(req, res, { success: true, ...result });
     }),
   );
 }
