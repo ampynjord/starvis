@@ -34,6 +34,17 @@ async function fetchJson(url: string): Promise<any> {
   return res.json();
 }
 
+async function postJson(url: string, body: unknown = {}): Promise<any> {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'User-Agent': SCRAPER_USER_AGENT },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} — ${url}`);
+  return res.json();
+}
+
 function json(value: unknown): string | null {
   return value == null ? null : JSON.stringify(value);
 }
@@ -560,7 +571,7 @@ export class RsiSyncService {
 
       let bootupData: any;
       try {
-        bootupData = await fetchJson(bootupUrl);
+        bootupData = await postJson(bootupUrl);
       } catch (err) {
         logger.warn(`[starmap] bootup fetch error: ${(err as Error).message}`);
         errors++;
@@ -643,7 +654,7 @@ export class RsiSyncService {
         if (systemCode) {
           try {
             const sysUrl = `${RSI_BASE_URL}/api/starmap/star-systems/${systemCode}`;
-            const sysData = await fetchJson(sysUrl);
+            const sysData = await postJson(sysUrl);
             const bodies: any[] = sysData.data?.celestial_objects ?? [];
 
             for (const body of bodies) {
