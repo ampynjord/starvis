@@ -49,7 +49,8 @@ export type ExtractionModule =
   | 'galactapedia'
   | 'comm-links'
   | 'starmap'
-  | 'ship-matrix';
+  | 'ship-matrix'
+  | 'organizations';
 
 export type GameEnv = 'live' | 'ptu' | 'custom';
 
@@ -550,7 +551,7 @@ export class ExtractionService {
     }
 
     // ── RSI/SC Wiki sync modules (outside main transaction — separate rsi_website DB) ──
-    const rsiModules: ExtractionModule[] = ['galactapedia', 'comm-links', 'starmap', 'ship-matrix'];
+    const rsiModules: ExtractionModule[] = ['galactapedia', 'comm-links', 'starmap', 'ship-matrix', 'organizations'];
     const hasRsiModules = rsiModules.some((m) => run(m));
 
     if (hasRsiModules) {
@@ -592,6 +593,17 @@ export class ExtractionService {
           }
         } else if (run('starmap')) {
           onProgress?.('Starmap sync skipped after extraction (already pre-synced for location cross-reference)');
+        }
+
+        if (run('organizations')) {
+          onProgress?.('Syncing RSI organizations for cached corporations...');
+          try {
+            const s = await rsiSync.syncOrganizations(onProgress);
+            onProgress?.(`Organizations: updated=${s.updated}, errors=${s.errors}, skipped=${s.skipped}`);
+            if (s.errors) stats.errors.push(`Organizations: ${s.errors} errors`);
+          } catch (e) {
+            stats.errors.push(`Organizations sync failed: ${(e as Error).message}`);
+          }
         }
       }
     }

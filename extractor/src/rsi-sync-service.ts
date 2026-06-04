@@ -12,6 +12,20 @@ import type { Pool } from 'pg';
 import { RSI_BASE_URL, RSI_SHIP_MATRIX_URL, SC_WIKI_API_URL, SCRAPER_USER_AGENT } from './config.js';
 import logger from './logger.js';
 
+const RSI_ORGS_API_URL = `${RSI_BASE_URL}/api/orgs/getOrgs`;
+
+interface RsiOrgSummary {
+  symbol: string;
+  name: string;
+  logoUrl: string | null;
+  archetype: string | null;
+  language: string | null;
+  commitment: string | null;
+  recruiting: boolean;
+  roleplay: boolean;
+  memberCount: number | null;
+}
+
 async function fetchJson(url: string): Promise<any> {
   const res = await fetch(url, {
     headers: { Accept: 'application/json', 'User-Agent': SCRAPER_USER_AGENT },
@@ -44,6 +58,63 @@ function sourceList(value: unknown): string[] | null {
   return null;
 }
 
+function resolveRsiUrl(src: string | null | undefined): string | null {
+  if (!src) return null;
+  if (src.startsWith('http')) return src;
+  if (src.startsWith('/')) return `${RSI_BASE_URL}${src}`;
+  return null;
+}
+
+function parseOrganizationsHtml(html: string): RsiOrgSummary[] {
+  const orgs: RsiOrgSummary[] = [];
+  const cells = html.split(/<div class="org-cell[^"]*">/);
+  for (const cell of cells.slice(1)) {
+    const name = cell.match(/class="trans-03s name">([^<]+)/)?.[1]?.trim() ?? null;
+    const symbol = cell.match(/class="symbol">([^<]+)/)?.[1]?.trim() ?? null;
+    if (!name || !symbol) continue;
+    const logoSrc = cell.match(/<span class="thumb">\s*<img src="([^"]+)"/)?.[1] ?? null;
+    const recruiting = cell.match(/Recruiting: <\/span><span class="value[^"]*">([^<]+)/)?.[1]?.trim() === 'Yes';
+    const roleplay = cell.match(/Role play: <\/span><span class="value[^"]*">([^<]+)/)?.[1]?.trim() === 'Yes';
+    const memberCountRaw = cell.match(/Members: <\/span><span class="value">([^<]+)/)?.[1]?.trim() ?? null;
+    orgs.push({
+      symbol,
+      name,
+      logoUrl: resolveRsiUrl(logoSrc),
+      archetype: cell.match(/Archetype: <\/span><span class="value">([^<]+)/)?.[1]?.trim() ?? null,
+      language: cell.match(/Lang: <\/span><span class="value">([^<]+)/)?.[1]?.trim() ?? null,
+      commitment: cell.match(/Commitment: <\/span><span class="value[^"]*">([^<]+)/)?.[1]?.trim() ?? null,
+      recruiting,
+      roleplay,
+      memberCount: memberCountRaw ? Number.parseInt(memberCountRaw, 10) : null,
+    });
+  }
+  return orgs;
+}
+
+async function fetchOrganizationBySymbol(symbol: string): Promise<RsiOrgSummary | null> {
+  const res = await fetch(RSI_ORGS_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'User-Agent': SCRAPER_USER_AGENT },
+    body: JSON.stringify({
+      sort: 'SIZE',
+      commitment: '',
+      roleplay: '',
+      membercount: '',
+      archetype: '',
+      language: '',
+      recruiting: '',
+      search: symbol,
+      pagesize: 5,
+      page: 1,
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = (await res.json()) as { success?: number; data?: { html?: string } };
+  if (!data.success) throw new Error('RSI organizations API returned failure');
+  return parseOrganizationsHtml(data.data?.html ?? '').find((org) => org.symbol.toUpperCase() === symbol.toUpperCase()) ?? null;
+}
+
 export interface SyncStats {
   inserted: number;
   updated: number;
@@ -52,6 +123,50 @@ export interface SyncStats {
 
 export class RsiSyncService {
   constructor(private pool: Pool) {}
+
+  async syncOrganizations(onProgress?: (msg: string) => void): Promise<{ updated: number; skipped: number; errors: number }> {
+    const stats = { updated: 0, skipped: 0, errors: 0 };
+    const conn = await this.pool.connect();
+    try {
+      const { rows } = await conn.query<{ id: number; tag: string }>(
+        "SELECT id, tag FROM meta.corporations WHERE tag IS NOT NULL AND tag != '' ORDER BY tag",
+      );
+      onProgress?.(`  [organizations] ${rows.length} cached corporation(s) to refresh`);
+      for (const row of rows) {
+        try {
+          const org = await fetchOrganizationBySymbol(row.tag);
+          if (!org) {
+            stats.skipped++;
+            onProgress?.(`  [organizations] ${row.tag}: not found on RSI`);
+            continue;
+          }
+          await conn.query(
+            `UPDATE meta.corporations SET
+              name = $1,
+              logo_url = $2,
+              rsi_archetype = $3,
+              rsi_language = $4,
+              rsi_commitment = $5,
+              rsi_recruiting = $6,
+              rsi_roleplay = $7,
+              rsi_member_count = $8,
+              rsi_synced_at = NOW(),
+              updated_at = NOW()
+             WHERE id = $9`,
+            [org.name, org.logoUrl, org.archetype, org.language, org.commitment, org.recruiting, org.roleplay, org.memberCount, row.id],
+          );
+          stats.updated++;
+          onProgress?.(`  [organizations] ${row.tag}: updated`);
+        } catch (err) {
+          logger.warn(`[organizations] sync error ${row.tag}: ${(err as Error).message}`);
+          stats.errors++;
+        }
+      }
+    } finally {
+      conn.release();
+    }
+    return stats;
+  }
 
   // ── Galactapedia ─────────────────────────────────────────────────────────────
 

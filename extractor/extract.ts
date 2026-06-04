@@ -76,13 +76,21 @@ const VALID_MODULES: ExtractionModule[] = [
   'comm-links',
   'starmap',
   'ship-matrix',
+  'organizations',
 ];
 
+const MODULE_ALIASES: Partial<Record<string, ExtractionModule>> = {
+  organisations: 'organizations',
+  organization: 'organizations',
+  organisation: 'organizations',
+  orgs: 'organizations',
+};
+
 /** Modules that don't need the P4K file (network or DB-only) */
-const P4K_FREE_MODULES = new Set<ExtractionModule>(['ctm', 'galactapedia', 'comm-links', 'starmap', 'ship-matrix']);
+const P4K_FREE_MODULES = new Set<ExtractionModule>(['ctm', 'galactapedia', 'comm-links', 'starmap', 'ship-matrix', 'organizations']);
 
 /** Modules that write to the rsi_website database instead of the game DB */
-const RSI_MODULES = new Set<ExtractionModule>(['galactapedia', 'comm-links', 'starmap', 'ship-matrix']);
+const RSI_MODULES = new Set<ExtractionModule>(['galactapedia', 'comm-links', 'starmap', 'ship-matrix', 'organizations']);
 
 // ── CLI ─────────────────────────────────────────────────────
 const program = new Command()
@@ -122,6 +130,8 @@ Network-only modules (no P4K required):
   comm-links       — sync RSI Comm-Links from SC Wiki API  → rsi.comm_links
   starmap          — sync RSI Starmap from SC Wiki API     → rsi.starmap_locations
 
+  organizations    — refresh cached RSI org metadata       → meta.corporations
+
 Examples:
   npx tsx extract.ts --env live
   npx tsx extract.ts --env ptu --modules missions,ships
@@ -159,7 +169,10 @@ function parseArgs(): {
   }
 
   // Parse modules
-  const modParts = opts.modules.split(',').map((s) => s.trim().toLowerCase());
+  const modParts = opts.modules.split(',').map((s) => {
+    const raw = s.trim().toLowerCase();
+    return MODULE_ALIASES[raw] ?? raw;
+  });
   const invalid = modParts.filter((m) => m !== 'all' && !VALID_MODULES.includes(m as ExtractionModule));
   if (invalid.length) {
     console.error(`Error: Unknown module(s): ${invalid.join(', ')}. Valid: all, ${VALID_MODULES.join(', ')}`);
