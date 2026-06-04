@@ -12,6 +12,7 @@ import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import type { ShipModule } from '@/types/api';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
+import { PageShell } from '@/components/ui/PageShell';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -211,7 +212,7 @@ export default function ShipDetailPage() {
   const hasInsurance = ship.insurance_claim_time != null || ship.insurance_expedite_cost != null;
 
   return (
-    <div className="max-w-(--breakpoint-xl) mx-auto space-y-6">
+    <PageShell size="xl">
 
       {/* ── Breadcrumb ─────────────────────────────────────────────────────── */}
       <div className="flex items-center gap-2 text-xs font-mono-sc text-slate-600">
@@ -514,6 +515,6 @@ export default function ShipDetailPage() {
           </div>
         </ScifiPanel>
       )}
-    </div>
+    </PageShell>
   );
 }

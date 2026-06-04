@@ -27,6 +27,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import type { MiningElement } from '@/types/api';
 import { ORE_PRICES } from '@/data/mining-static';
@@ -254,7 +255,7 @@ export default function MineralsLibraryPage() {
   if (!minerals.length) return <EmptyState title="No minerals found" />;
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto">
+    <PageShell>
       <PageHeader
         title="Minerals Library"
         count={minerals.length}
@@ -374,6 +375,6 @@ export default function MineralsLibraryPage() {
           <MineralDetail element={selectedElement} />
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

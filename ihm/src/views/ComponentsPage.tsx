@@ -14,6 +14,7 @@ import { GlowBadge } from "@/components/ui/GlowBadge";
 import { useListQueryState } from "@/hooks/useListQueryState";
 import { COMPONENT_TYPE_COLORS, COMPONENT_TYPE_LABELS } from "@/utils/constants";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PageShell } from "@/components/ui/PageShell";
 import type { ComponentListItem } from "@/types/api";
 
 const LIMIT = 30;
@@ -285,7 +286,7 @@ export default function ComponentsPage() {
   });
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto">
+    <PageShell>
       <PageHeader
         title="Components"
         count={data?.total}
@@ -430,8 +431,7 @@ export default function ComponentsPage() {
           )}
         </>
       )}
-    </div>
+    </PageShell>
   );
 }
-
 

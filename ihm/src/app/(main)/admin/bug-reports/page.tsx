@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Bug, CheckCheck, ChevronDown, ChevronRight, Clock, ExternalLink, GitMerge, Loader2, Paperclip, Search } from 'lucide-react';
 import { useState } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface BugReport {
@@ -220,17 +221,17 @@ export default function AdminBugReportsPage() {
 
   if (user?.role !== 'admin') {
     return (
-      <div className="max-w-4xl mx-auto">
+      <PageShell size="lg">
         <PageHeader title="Bug Reports" subtitle="Admin only." />
         <div className="sci-panel p-8 text-center"><p className="text-slate-500 font-rajdhani">Access denied.</p></div>
-      </div>
+      </PageShell>
     );
   }
 
   const reports: BugReport[] = data?.data ?? [];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4">
+    <PageShell size="lg">
       <PageHeader title="Bug Reports" subtitle={`${data?.total ?? 0} primary report${(data?.total ?? 0) !== 1 ? 's' : ''}`} />
 
       <div className="flex items-center gap-3">
@@ -251,6 +252,6 @@ export default function AdminBugReportsPage() {
       ) : (
         <div className="space-y-2">{reports.map((r) => <ReportRow key={r.id} report={r} />)}</div>
       )}
-    </div>
+    </PageShell>
   );
 }

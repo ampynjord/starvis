@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { PageShell } from '@/components/ui/PageShell';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 
 function parseArray(v: GalactapediaEntry['categories']): string[] {
@@ -44,7 +45,7 @@ export default function GalactapediaDetailPage() {
   const tags = parseArray(entry.tags);
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <PageShell size="lg">
       {/* Breadcrumb */}
       <div className="mb-6 flex items-center gap-2 text-xs font-mono-sc">
         <Link href="/galactapedia" className="flex items-center gap-1.5 text-slate-500 hover:text-cyan-400 transition-colors">
@@ -164,6 +165,6 @@ export default function GalactapediaDetailPage() {
           )}
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

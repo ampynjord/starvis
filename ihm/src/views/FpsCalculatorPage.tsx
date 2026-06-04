@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import type { ItemListItem } from '@/types/api';
 
@@ -131,7 +132,7 @@ export default function FpsCalculatorPage() {
   }, [computed]);
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto space-y-6">
+    <PageShell>
       <PageHeader title="FPS Calculator" subtitle="Weapon damage and TTK analysis with attachments, mitigation and hitbox simulation." />
 
       {loadingWeapons ? (
@@ -476,6 +477,6 @@ export default function FpsCalculatorPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

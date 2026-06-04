@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { Pagination } from '@/components/ui/Pagination';
 import { useDebounce } from '@/hooks/useDebounce';
 
@@ -108,7 +109,7 @@ export default function GalactapediaPage() {
   const hasFilters = !!(debouncedSearch || category);
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto">
+    <PageShell>
       <PageHeader
         title="Galactapedia"
         count={summary?.total}
@@ -167,6 +168,6 @@ export default function GalactapediaPage() {
           )}
         </>
       )}
-    </div>
+    </PageShell>
   );
 }

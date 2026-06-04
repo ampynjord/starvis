@@ -14,6 +14,7 @@ import { FilterPanel } from '@/components/ui/FilterPanel';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { useEnv } from '@/contexts/EnvContext';
 import { api } from '@/services/api';
 import type { RankingStat, ShipListItem } from '@/types/api';
@@ -140,7 +141,7 @@ export default function RankingPage() {
   };
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto space-y-4">
+    <PageShell>
       <PageHeader
         title="Ranking"
         subtitle={
@@ -356,6 +357,6 @@ export default function RankingPage() {
           )}
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

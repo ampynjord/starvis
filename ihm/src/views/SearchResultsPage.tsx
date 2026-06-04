@@ -9,6 +9,7 @@ import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { useDebounce } from '@/hooks/useDebounce';
 
@@ -76,7 +77,7 @@ export default function SearchResultsPage() {
   const totalCount = sections.reduce((sum, s) => sum + s.items.length, 0);
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto space-y-4">
+    <PageShell>
       <PageHeader title="Search" />
 
       {/* Search Input */}
@@ -159,6 +160,6 @@ export default function SearchResultsPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

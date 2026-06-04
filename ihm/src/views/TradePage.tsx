@@ -11,6 +11,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import type { Commodity, Shop, TradeRoute } from '@/types/api';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -118,7 +119,7 @@ export default function TradePage() {
   };
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto">
+    <PageShell>
       <PageHeader title="Trade Calculator" subtitle="Find the most profitable trade routes" />
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4">
@@ -392,6 +393,6 @@ export default function TradePage() {
           </ScifiPanel>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

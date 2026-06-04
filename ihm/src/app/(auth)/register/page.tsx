@@ -5,6 +5,7 @@ import { CheckCircle, Lock, Mail, UserPlus, User, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { AuthPanel } from '@/components/ui/AuthPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { RsiOrgPicker, type RsiOrg } from '@/components/ui/RsiOrgPicker';
 
@@ -96,11 +97,7 @@ export default function RegisterPage() {
       className="w-full max-w-sm"
     >
       {verificationPending ? (
-        <div className="sci-panel p-8 space-y-4 text-center">
-          <div className="w-12 h-12 rounded-full bg-green-950 border border-green-700/40 flex items-center justify-center mx-auto">
-            <CheckCircle size={20} className="text-green-400" />
-          </div>
-          <h1 className="text-lg font-orbitron font-bold text-white tracking-wider">CHECK YOUR EMAIL</h1>
+        <AuthPanel icon={CheckCircle} title="Check Your Email" accent="green" className="text-center">
           <p className="text-sm text-slate-400 font-rajdhani leading-relaxed">
             We sent a verification link to <span className="text-cyan-400">{email}</span>.
             Click the link in the email to activate your account.
@@ -109,17 +106,9 @@ export default function RegisterPage() {
           <Link href="/login" className="block text-xs text-cyan-500 hover:text-cyan-300 transition-colors mt-2">
             Already verified? Sign in &rarr;
           </Link>
-        </div>
+        </AuthPanel>
       ) : (
-      <div className="sci-panel p-8 space-y-6">
-        {/* Header */}
-        <div className="text-center space-y-1">
-          <div className="w-12 h-12 rounded-full bg-cyan-950 border border-cyan-700/40 flex items-center justify-center mx-auto mb-4">
-            <UserPlus size={20} className="text-cyan-400" />
-          </div>
-          <h1 className="text-xl font-orbitron font-bold text-white tracking-wider">REGISTER</h1>
-          <p className="text-xs text-slate-500 font-mono-sc">CREATE A STARVIS ACCOUNT</p>
-        </div>
+      <AuthPanel icon={UserPlus} title="Register" subtitle="Create a Starvis account">
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Email */}
@@ -273,7 +262,7 @@ export default function RegisterPage() {
             Sign in
           </Link>
         </p>
-      </div>
+      </AuthPanel>
       )}
     </motion.div>
   );

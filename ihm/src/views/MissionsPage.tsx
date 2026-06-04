@@ -40,6 +40,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { Pagination } from '@/components/ui/Pagination';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
@@ -509,7 +510,7 @@ export default function MissionsPage() {
   };
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto">
+    <PageShell>
       <PageHeader
         title="Mission Database"
         count={data?.total}
@@ -708,6 +709,6 @@ export default function MissionsPage() {
       </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }
