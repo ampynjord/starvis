@@ -133,17 +133,47 @@ function withoutAdminRoutes(spec: OpenApiSpec): OpenApiSpec {
 }
 
 function makeSwaggerHtml(specUrl: string, assetBasePath: string): string {
-  return swaggerUi
-    .generateHTML(undefined, {
-      swaggerOptions: {
-        url: specUrl,
-        defaultModelsExpandDepth: 1,
-        displayRequestDuration: true,
-        persistAuthorization: true,
-      },
-    })
-    .replace(/href="\.\//g, `href="${assetBasePath}/`)
-    .replace(/src="\.\//g, `src="${assetBasePath}/`);
+  const config = JSON.stringify({
+    url: specUrl,
+    dom_id: '#swagger-ui',
+    defaultModelsExpandDepth: 1,
+    displayRequestDuration: true,
+    persistAuthorization: true,
+    presets: ['SwaggerUIBundle.presets.apis', 'SwaggerUIStandalonePreset'],
+    plugins: ['SwaggerUIBundle.plugins.DownloadUrl'],
+    layout: 'StandaloneLayout',
+  })
+    .replace('"SwaggerUIBundle.presets.apis"', 'SwaggerUIBundle.presets.apis')
+    .replace('"SwaggerUIStandalonePreset"', 'SwaggerUIStandalonePreset')
+    .replace('"SwaggerUIBundle.plugins.DownloadUrl"', 'SwaggerUIBundle.plugins.DownloadUrl');
+
+  return `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Swagger UI</title>
+  <link rel="stylesheet" href="${assetBasePath}/swagger-ui.css" />
+  <link rel="icon" type="image/png" href="${assetBasePath}/favicon-32x32.png" sizes="32x32" />
+  <link rel="icon" type="image/png" href="${assetBasePath}/favicon-16x16.png" sizes="16x16" />
+  <style>
+    html{box-sizing:border-box;overflow-y:scroll}
+    *,*:before,*:after{box-sizing:inherit}
+    body{margin:0;background:#1b1f22}
+    .swagger-ui .topbar .download-url-wrapper{display:none}
+  </style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="${assetBasePath}/swagger-ui-bundle.js"></script>
+  <script src="${assetBasePath}/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.onload = () => {
+      window.ui = SwaggerUIBundle(${config});
+    };
+  </script>
+</body>
+</html>`;
 }
 
 function getBearerToken(req: Request): string | null {
@@ -213,11 +243,23 @@ const publicSwaggerSpec = withoutAdminRoutes(fullSwaggerSpec);
 // the browser URL has no trailing slash (./foo resolves to /foo instead of /api-docs/foo).
 const swaggerHtml = makeSwaggerHtml('/api-docs/openapi.json', '/api-docs');
 const adminSwaggerHtml = makeSwaggerHtml('/admin/api-docs/openapi.json', '/api-docs');
-app.get('/api-docs', requireApiDocsDeveloper, (_, res) => res.type('html').send(swaggerHtml));
-app.get('/api-docs/openapi.json', requireApiDocsDeveloper, (_, res) => res.json(publicSwaggerSpec));
+app.get('/api-docs', requireApiDocsDeveloper, (_, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.type('html').send(swaggerHtml);
+});
+app.get('/api-docs/openapi.json', requireApiDocsDeveloper, (_, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(publicSwaggerSpec);
+});
 app.use('/api-docs', swaggerUi.serve);
-app.get('/admin/api-docs', requireJwtAdmin, (_, res) => res.type('html').send(adminSwaggerHtml));
-app.get('/admin/api-docs/openapi.json', requireJwtAdmin, (_, res) => res.json(fullSwaggerSpec));
+app.get('/admin/api-docs', requireJwtAdmin, (_, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.type('html').send(adminSwaggerHtml);
+});
+app.get('/admin/api-docs/openapi.json', requireJwtAdmin, (_, res) => {
+  res.setHeader('Cache-Control', 'no-store');
+  res.json(fullSwaggerSpec);
+});
 
 // ===== ROOT =====
 app.get('/', (_, res) =>
