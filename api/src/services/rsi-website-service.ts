@@ -176,7 +176,7 @@ export class RsiWebsiteService {
   // ── Starmap (RSI web version) ──────────────────────────────────────────────
 
   async getStarmapSystems(opts: { search?: string; page?: number; limit?: number } = {}): Promise<PaginatedResult> {
-    const where: string[] = ["sl.type = 'star'"];
+    const where: string[] = ["sl.type IN ('star', 'StarSystem')"];
     const params: (string | number)[] = [];
 
     if (opts.search) {
