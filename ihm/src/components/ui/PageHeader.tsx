@@ -10,6 +10,7 @@ interface Props {
   searchPlaceholder?: string;
   onSearch?: (v: string) => void;
   actions?: ReactNode;
+  eyebrow?: string;
 }
 
 export function PageHeader({
@@ -21,27 +22,33 @@ export function PageHeader({
   searchPlaceholder = 'Search…',
   onSearch,
   actions,
+  eyebrow,
 }: Props) {
   return (
-    <div className="mb-4 flex items-center justify-between gap-4 flex-wrap">
-      <div>
-        <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase">
+    <header className="mb-4 flex flex-wrap items-start justify-between gap-4 border-b border-slate-800/70 pb-4">
+      <div className="min-w-0">
+        {eyebrow && (
+          <p className="mb-1 font-mono-sc text-[9px] uppercase tracking-[0.28em] text-cyan-700">
+            {eyebrow}
+          </p>
+        )}
+        <h1 className="font-orbitron text-xl font-bold text-cyan-400 tracking-widest uppercase leading-tight">
           {title}
         </h1>
         {subtitle && (
-          <p className="text-xs text-slate-600 mt-0.5 font-mono-sc">{subtitle}</p>
+          <p className="mt-0.5 max-w-2xl text-xs text-slate-600 font-mono-sc">{subtitle}</p>
         )}
         {count != null && (
-          <p className="text-sm text-slate-500 mt-0.5 font-mono-sc">
+          <p className="mt-0.5 text-sm text-slate-500 font-mono-sc">
             {count.toLocaleString('en-US')} {countLabel}
           </p>
         )}
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap">
+      <div className="flex flex-wrap items-center gap-2">
         {actions}
         {onSearch && (
-          <div className="relative w-72">
+          <div className="relative w-full sm:w-72">
             <Search
               className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600"
               size={13}
@@ -56,6 +63,6 @@ export function PageHeader({
           </div>
         )}
       </div>
-    </div>
+    </header>
   );
 }

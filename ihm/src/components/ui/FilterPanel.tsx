@@ -36,7 +36,7 @@ function FilterGroup({ label, options, value, onChange, defaultOpen = false }: F
             onClick={() => onChange('')}
             className={`w-full text-left px-2 py-1.5 rounded-sm text-xs transition-colors ${!value ? 'text-cyan-400 bg-cyan-950/40' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'}`}
           >
-            Tous
+            All
           </button>
           {options.map((opt, idx) => (
             <button
@@ -58,7 +58,7 @@ export function FilterPanel({ groups, onReset, hasFilters, className = '' }: Pro
   return (
     <div className={`sci-panel overflow-hidden ${className}`}>
       <div className="flex items-center justify-between px-3 py-2 border-b border-border">
-        <span className="text-xs font-orbitron text-cyan-600 tracking-widest uppercase">Filtres</span>
+        <span className="text-xs font-orbitron text-cyan-600 tracking-widest uppercase">Filters</span>
         {hasFilters && onReset && (
           <button
             onClick={onReset}
@@ -91,7 +91,7 @@ export function MobileFilterWrapper({ children, hasFilters }: { children: React.
         ].join(' ')}
       >
         <SlidersHorizontal size={13} />
-        Filtres
+        Filters
         {hasFilters && <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 ml-0.5" />}
       </button>
       <div className={open ? 'block md:block' : 'hidden md:block'}>

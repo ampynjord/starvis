@@ -14,6 +14,9 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
+import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { useAuth } from '@/contexts/AuthContext';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -326,26 +329,19 @@ export default function CorpBankPage() {
 
   return (
     <>
-      <div className="p-4 md:p-6 max-w-4xl mx-auto space-y-5">
-
-        {/* Header */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3 min-w-0">
-            <Package size={18} className="text-cyan-400 shrink-0" />
-            <h1 className="text-base font-orbitron font-bold text-white tracking-wider">Corp Bank</h1>
-            {corp && (
-              <span className="text-[10px] font-orbitron text-slate-500 border border-slate-800 px-1.5 py-0.5 rounded-sm shrink-0">
-                [{corp.tag}] {corp.name}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Link
-              href="/corp/fleet"
-              className="flex items-center gap-1.5 py-1.5 px-3 border border-slate-700/50 text-slate-500 hover:text-slate-300 hover:border-slate-600 font-mono-sc text-xs rounded transition-colors"
-            >
-              <Package size={11} /> Fleet Manager
-            </Link>
+      <PageShell size="lg" className="p-4 md:p-6">
+        <PageHeader
+          eyebrow="Corporation"
+          title="Corp Bank"
+          subtitle={corp ? `[${corp.tag}] ${corp.name}` : 'Shared corporation inventory.'}
+          actions={(
+            <>
+              <Link
+                href="/corp/fleet"
+                className="flex items-center gap-1.5 py-1.5 px-3 border border-slate-700/50 text-slate-500 hover:text-slate-300 hover:border-slate-600 font-mono-sc text-xs rounded-sm transition-colors"
+              >
+                <Package size={11} /> Fleet Manager
+              </Link>
             <button
               type="button"
               onClick={() => setShowAddModal(true)}
@@ -354,18 +350,15 @@ export default function CorpBankPage() {
             >
               <Plus size={12} /> Add item
             </button>
-          </div>
-        </div>
+            </>
+          )}
+        />
 
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <StatGrid>
           {ITEM_TYPES.map((t) => (
-            <div key={t.value} className="sci-panel px-3 py-2.5 border border-slate-800/60">
-              <p className={`font-mono-sc text-[9px] uppercase tracking-widest ${t.color}`}>{t.label}</p>
-              <p className="font-orbitron text-lg font-black text-slate-200 mt-0.5">{countByType[t.value] ?? 0}</p>
-            </div>
+            <StatCard key={t.value} label={t.label} value={countByType[t.value] ?? 0} />
           ))}
-        </div>
+        </StatGrid>
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-2">
@@ -429,7 +422,7 @@ export default function CorpBankPage() {
             </div>
           )}
         </motion.div>
-      </div>
+      </PageShell>
 
       <AnimatePresence>
         {showAddModal && (

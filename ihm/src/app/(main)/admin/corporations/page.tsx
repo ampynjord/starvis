@@ -19,7 +19,10 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { RsiOrgPicker, type RsiOrg } from '@/components/ui/RsiOrgPicker';
+import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { ADMIN_ROLE } from '@/lib/app-constants';
 
@@ -626,51 +629,34 @@ export default function CorporationsPage() {
 
   return (
     <>
-      <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
-
-        {/* Header */}
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
+      <PageShell size="lg" className="p-4 md:p-6">
+        <PageHeader
+          eyebrow="Administration"
+          title="Corporations"
+          subtitle="Import RSI organizations and manage Starvis corporation data."
+          actions={(
+            <div className="flex items-center gap-2">
             <Link href="/admin" className="text-slate-600 hover:text-slate-300 transition-colors">
               <ArrowLeft size={16} />
             </Link>
-            <Building2 size={18} className="text-cyan-400 shrink-0" />
-            <h1 className="text-base font-orbitron font-bold text-white tracking-wider">CORPORATIONS</h1>
-          </div>
-          <button
-            type="button"
-            onClick={() => setModal({ type: 'import' })}
-            className="sci-btn-primary py-1.5 px-3 text-xs gap-1.5 flex items-center"
-          >
-            <Plus size={12} /> Import Corporation
-          </button>
-        </div>
+              <button
+                type="button"
+                onClick={() => setModal({ type: 'import' })}
+                className="sci-btn-primary py-1.5 px-3 text-xs gap-1.5 flex items-center"
+              >
+                <Plus size={12} /> Import Corporation
+              </button>
+            </div>
+          )}
+        />
 
         {/* Stats bar */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          <div className="sci-panel px-3 py-2.5 border border-slate-800/60">
-            <p className="font-mono-sc text-[9px] text-slate-600 uppercase tracking-widest">Corporations</p>
-            <p className="font-orbitron text-lg font-black text-slate-200 mt-0.5">{corps.length}</p>
-          </div>
-          <div className="sci-panel px-3 py-2.5 border border-slate-800/60">
-            <p className="font-mono-sc text-[9px] text-slate-600 uppercase tracking-widest">Total Members</p>
-            <p className="font-orbitron text-lg font-black text-cyan-400 mt-0.5">
-              {corps.reduce((s, c) => s + c._count.memberships, 0)}
-            </p>
-          </div>
-          <div className="sci-panel px-3 py-2.5 border border-slate-800/60">
-            <p className="font-mono-sc text-[9px] text-slate-600 uppercase tracking-widest">Fleet Items</p>
-            <p className="font-orbitron text-lg font-black text-violet-400 mt-0.5">
-              {corps.reduce((s, c) => s + c._count.fleetItems, 0)}
-            </p>
-          </div>
-          <div className="sci-panel px-3 py-2.5 border border-slate-800/60">
-            <p className="font-mono-sc text-[9px] text-slate-600 uppercase tracking-widest">Bank Items</p>
-            <p className="font-orbitron text-lg font-black text-amber-400 mt-0.5">
-              {corps.reduce((s, c) => s + (c._count.bankItems ?? 0), 0)}
-            </p>
-          </div>
-        </div>
+        <StatGrid>
+          <StatCard icon={Building2} label="Corporations" value={corps.length} />
+          <StatCard icon={Users} label="Total Members" value={corps.reduce((s, c) => s + c._count.memberships, 0)} accent="cyan" />
+          <StatCard icon={Ship} label="Fleet Items" value={corps.reduce((s, c) => s + c._count.fleetItems, 0)} accent="purple" />
+          <StatCard icon={Package} label="Bank Items" value={corps.reduce((s, c) => s + (c._count.bankItems ?? 0), 0)} accent="amber" />
+        </StatGrid>
 
 
 
@@ -756,7 +742,7 @@ export default function CorporationsPage() {
             </div>
           )}
         </motion.div>
-      </div>
+      </PageShell>
 
       {/* Toast */}
       <AnimatePresence>

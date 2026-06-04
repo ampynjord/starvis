@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { DEFAULT_AUTH_COOKIE_NAME } from '@/lib/app-constants';
 
 export const metadata: Metadata = {
@@ -8,7 +10,7 @@ export const metadata: Metadata = {
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="border border-border rounded-sm bg-panel/60 p-6">
+    <section className="sci-panel p-6">
       <h2 className="font-orbitron text-sm font-bold tracking-widest text-cyan-400 uppercase mb-4">{title}</h2>
       <div className="space-y-3 text-sm text-slate-400 leading-relaxed">{children}</div>
     </section>
@@ -31,13 +33,12 @@ function Ul({ items }: { items: string[] }) {
 
 export default function LegalPage() {
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="font-orbitron text-xl font-bold tracking-widest text-slate-100 uppercase mb-1">
-          Legal notice
-        </h1>
-        <p className="text-xs text-slate-600 font-mono-sc">Last updated: May 2025</p>
-      </div>
+    <PageShell size="lg" className="p-4 md:p-6">
+      <PageHeader
+        eyebrow="Starvis"
+        title="Legal notice"
+        subtitle="Last updated: May 2025."
+      />
 
       <Section title="About the project">
         <P>
@@ -212,6 +213,6 @@ export default function LegalPage() {
           Cloud Imperium Games.
         </P>
       </Section>
-    </div>
+    </PageShell>
   );
 }

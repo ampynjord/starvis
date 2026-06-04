@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, Building2, Check, Package, ShieldCheck, Ship, Users } from 'lucide-react';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
+import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { useAuth } from '@/contexts/AuthContext';
 import { ADMIN_ROLE } from '@/lib/app-constants';
 
@@ -40,17 +43,6 @@ async function apiFetch(path: string, opts?: RequestInit) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error ?? 'Request failed');
   return data;
-}
-
-function Stat({ icon: Icon, label, value }: { icon: React.ElementType; label: string; value: number | string }) {
-  return (
-    <div className="sci-panel px-3 py-2.5 border border-slate-800/60">
-      <p className="font-mono-sc text-[9px] text-slate-600 uppercase tracking-widest flex items-center gap-1.5">
-        <Icon size={10} /> {label}
-      </p>
-      <p className="font-orbitron text-lg font-black text-slate-200 mt-0.5">{value}</p>
-    </div>
-  );
 }
 
 export default function AdminCorporationDetailPage() {
@@ -123,29 +115,30 @@ export default function AdminCorporationDetailPage() {
   if (!corp) return <div className="p-8 text-center text-slate-600 font-mono-sc text-sm">Corporation not found.</div>;
 
   return (
-    <div className="p-4 md:p-6 max-w-6xl mx-auto space-y-5">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3 min-w-0">
+    <PageShell size="xl" className="p-4 md:p-6">
+      <PageHeader
+        eyebrow="Administration"
+        title={corp.name}
+        subtitle={`[${corp.tag}] Corporation detail, memberships and assets.`}
+        actions={(
+          <div className="flex items-center gap-2">
           <Link href="/admin/corporations" className="text-slate-600 hover:text-slate-300 transition-colors">
             <ArrowLeft size={16} />
           </Link>
           <div className="w-11 h-11 rounded-sm bg-cyan-950 border border-cyan-800/40 flex items-center justify-center overflow-hidden shrink-0">
             {corp.logoUrl ? <img src={corp.logoUrl} alt={corp.tag} className="w-full h-full object-cover" /> : <Building2 size={18} className="text-cyan-400" />}
           </div>
-          <div className="min-w-0">
-            <h1 className="font-orbitron text-lg font-bold text-white tracking-wider truncate">{corp.name}</h1>
-            <p className="text-[10px] text-slate-600 font-mono-sc uppercase tracking-widest">[{corp.tag}] admin corporation detail</p>
+            <Link href={`/admin/corporations?edit=${corp.id}`} className="sci-btn-primary py-1.5 px-3 text-xs">Edit metadata</Link>
           </div>
-        </div>
-        <Link href={`/admin/corporations?edit=${corp.id}`} className="text-[10px] font-mono-sc text-slate-500 hover:text-cyan-400">Edit metadata</Link>
-      </div>
+        )}
+      />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <Stat icon={Users} label="Members" value={members.length} />
-        <Stat icon={Ship} label="Fleet" value={fleetCount} />
-        <Stat icon={Package} label="Bank Items" value={bankCount} />
-        <Stat icon={Check} label="Pending" value={pending.length} />
-      </div>
+      <StatGrid>
+        <StatCard icon={Users} label="Members" value={members.length} />
+        <StatCard icon={Ship} label="Fleet" value={fleetCount} accent="cyan" />
+        <StatCard icon={Package} label="Bank Items" value={bankCount} accent="purple" />
+        <StatCard icon={Check} label="Pending" value={pending.length} accent={pending.length ? 'amber' : 'slate'} />
+      </StatGrid>
 
       <section className="sci-panel overflow-hidden">
         <div className="px-4 py-2.5 border-b border-border/50">
@@ -210,6 +203,6 @@ export default function AdminCorporationDetailPage() {
           ))}
         </div>
       </section>
-    </div>
+    </PageShell>
   );
 }
