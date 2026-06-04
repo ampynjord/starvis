@@ -412,7 +412,7 @@ export default function FleetManagerPage() {
 
   return (
     <>
-      <div className="flex flex-col h-[calc(100dvh-3.5rem)] overflow-hidden">
+      <div className="-m-3 flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden sm:-m-6">
 
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-4 md:px-6 py-3 border-b border-border/50 shrink-0 flex-wrap gap-y-2">

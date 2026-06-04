@@ -336,7 +336,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
           outlineMesh.userData.isOutline = true;
 
           const inner = new THREE.Group();
-          inner.rotation.set(0, Math.PI / 2, 0);
+          inner.rotation.set(0, 0, 0);
           inner.add(mesh);
           inner.add(outlineMesh);
 
@@ -462,6 +462,11 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
     renderer.domElement.addEventListener('pointermove', onPointerMove);
     renderer.domElement.addEventListener('pointerup',   onPointerUp);
+    const preventPageWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    renderer.domElement.addEventListener('wheel', preventPageWheel, { passive: false });
 
     // ── Render loop ────────────────────────────────────────────────────────────
     const animate = () => {
@@ -528,6 +533,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       renderer.domElement.removeEventListener('pointerup',   onPointerUp);
+      renderer.domElement.removeEventListener('wheel', preventPageWheel);
       controls.dispose();
       holoMat.dispose();
       renderer.dispose();
