@@ -554,113 +554,147 @@ export class RsiSyncService {
     };
 
     try {
-      let page = 1;
-      while (true) {
-        const url = `${SC_WIKI_API_URL}/starsystems?page[number]=${page}&limit=100`;
-        onProgress?.(`  [starmap] systems page ${page}…`);
+      // ── Step 1: fetch all systems from RSI official starmap bootup API ─────────
+      const bootupUrl = `${RSI_BASE_URL}/api/starmap/bootup`;
+      onProgress?.(`  [starmap] fetching from RSI official API…`);
 
-        let data: any;
+      let bootupData: any;
+      try {
+        bootupData = await fetchJson(bootupUrl);
+      } catch (err) {
+        logger.warn(`[starmap] bootup fetch error: ${(err as Error).message}`);
+        errors++;
+        return { upserted, errors };
+      }
+
+      const systems: any[] = bootupData.data?.systems?.resultset ?? [];
+      if (systems.length === 0) {
+        logger.warn('[starmap] RSI bootup returned no systems');
+        return { upserted, errors };
+      }
+      onProgress?.(`  [starmap] ${systems.length} systems from RSI`);
+
+      // ── Step 2: upsert each system ──────────────────────────────────────────────
+      for (const sys of systems) {
+        const rsiId = String(sys.id ?? '');
+        const systemCode: string | null = sys.code ?? null;
+        if (!rsiId) continue;
+
+        // Jump points: store destination system codes for drawing connections
+        const jumpPoints = Array.isArray(sys.jumppoints)
+          ? sys.jumppoints
+              .map((jp: any) => ({
+                id: String(jp.id ?? ''),
+                direction: jp.direction ?? 'BIDIRECTIONAL',
+                status: jp.status ?? null,
+                exitSystemCode: jp.exit_system?.code ?? null,
+                exitSystemName: jp.exit_system?.name ?? null,
+              }))
+              .filter((jp: any) => jp.exitSystemCode)
+          : [];
+
+        // Description: RSI returns an object with language keys
+        const description =
+          typeof sys.description === 'object' && sys.description !== null
+            ? (sys.description.en_EN ?? Object.values(sys.description)[0] ?? null)
+            : (sys.description ?? null);
+
         try {
-          data = await fetchJson(url);
+          await upsert({
+            rsi_id: rsiId,
+            name: String(sys.name ?? rsiId),
+            type: 'StarSystem',
+            status: sys.status ?? null,
+            star_type: sys.type ?? null,
+            system_code: systemCode,
+            system_name: sys.name ?? null,
+            parent_id: null,
+            faction_name: sys.affiliation?.[0]?.name ?? null,
+            affiliations: json((sys.affiliation ?? []).map((a: any) => a.name).filter(Boolean)),
+            thumbnail: sys.thumbnail?.url ?? null,
+            description: typeof description === 'string' ? description : null,
+            web_url: systemCode ? `${RSI_BASE_URL}/starmap/systems/${systemCode}` : null,
+            coordinates: json(sys.position ? { x: Number(sys.position.x), y: Number(sys.position.y), z: Number(sys.position.z) } : null),
+            aggregated: json({
+              size: sys.aggregated_size,
+              population: sys.aggregated_population,
+              economy: sys.aggregated_economy,
+              danger: sys.aggregated_danger,
+            }),
+            size: sys.aggregated_size ?? null,
+            population: sys.aggregated_population ?? null,
+            economy: sys.aggregated_economy ?? null,
+            danger: sys.aggregated_danger ?? null,
+            frost_line: sys.frost_line ?? null,
+            habitable_zone_inner: sys.habitable_zone_inner ?? null,
+            habitable_zone_outer: sys.habitable_zone_outer ?? null,
+            jump_points: jumpPoints.length > 0 ? json(jumpPoints) : null,
+            raw_json: json(sys),
+            source_updated_at: sqlDate(sys.time_modified),
+          });
+          upserted++;
+          onProgress?.(`  [starmap] ✓ ${sys.name ?? rsiId}${jumpPoints.length > 0 ? ` (${jumpPoints.length} jumps)` : ''}`);
         } catch (err) {
-          logger.warn(`[starmap] fetch error page ${page}: ${(err as Error).message}`);
+          logger.warn(`[starmap] upsert error system ${rsiId}: ${(err as Error).message}`);
           errors++;
-          break;
         }
 
-        const systems: any[] = data.data ?? [];
-        if (systems.length === 0) break;
-        if (page === 1) onProgress?.(`  [starmap] total systems: ~${data.meta?.total ?? '?'}`);
-
-        for (const sys of systems) {
-          const systemCode: string | null = sys.code ?? null;
-          const rsiId = String(sys.id ?? sys.rsi_id ?? sys.code ?? '');
-
+        // ── Step 3: fetch celestial objects for this system ───────────────────────
+        if (systemCode) {
           try {
-            await upsert({
-              rsi_id: rsiId,
-              name: String(sys.name ?? rsiId),
-              type: 'star',
-              status: sys.status ?? null,
-              star_type: sys.type ?? null,
-              system_code: systemCode,
-              system_name: sys.name ?? null,
-              parent_id: null,
-              faction_name: sys.affiliation?.[0]?.name ?? null,
-              affiliations: json(sourceList(sys.affiliation)),
-              thumbnail: sys.thumbnail?.url ?? null,
-              description: sys.description ?? null,
-              web_url: sys.web_url ?? null,
-              coordinates: json(sys.position ? { x: sys.position.x, y: sys.position.y, z: sys.position.z } : null),
-              aggregated: json(sys.aggregated),
-              size: sys.aggregated?.size ?? null,
-              population: sys.aggregated?.population ?? null,
-              economy: sys.aggregated?.economy ?? null,
-              danger: sys.aggregated?.danger ?? null,
-              frost_line: sys.frost_line ?? null,
-              habitable_zone_inner: sys.habitable_zone_inner ?? null,
-              habitable_zone_outer: sys.habitable_zone_outer ?? null,
-              jump_points: json(sourceList(sys.jumppoints)),
-              raw_json: json(sys),
-              source_updated_at: sqlDate(sys.updated_at),
-            });
-            upserted++;
-          } catch (err) {
-            logger.warn(`[starmap] upsert error system ${rsiId}: ${(err as Error).message}`);
-            errors++;
-          }
+            const sysUrl = `${RSI_BASE_URL}/api/starmap/star-systems/${systemCode}`;
+            const sysData = await fetchJson(sysUrl);
+            const bodies: any[] = sysData.data?.celestial_objects ?? [];
 
-          // Celestial bodies for this system
-          if (sys.code && sys.system_api_url) {
-            try {
-              const bodiesData = await fetchJson(`${sys.system_api_url}?with=celestialObjects`);
-              const bodies: any[] =
-                bodiesData.data?.celestial_objects ?? bodiesData.data?.celestialObjects ?? bodiesData.celestial_objects ?? [];
-              for (const body of bodies) {
-                const bodyRsiId = String(body.id ?? body.rsi_id ?? '');
-                if (!bodyRsiId) continue;
-                try {
-                  await upsert({
-                    rsi_id: bodyRsiId,
-                    name: String(body.name ?? bodyRsiId),
-                    type: (body.type ?? 'unknown').toLowerCase(),
-                    status: body.status ?? null,
-                    star_type: null,
-                    system_code: systemCode,
-                    system_name: sys.name ?? null,
-                    parent_id: body.parent_id ? String(body.parent_id) : rsiId,
-                    faction_name: body.affiliation?.[0]?.name ?? null,
-                    affiliations: json(sourceList(body.affiliation)),
-                    thumbnail: body.thumbnail?.url ?? null,
-                    description: body.description ?? null,
-                    web_url: body.web_url ?? null,
-                    coordinates: null,
-                    aggregated: null,
-                    size: null,
-                    population: null,
-                    economy: null,
-                    danger: null,
-                    frost_line: null,
-                    habitable_zone_inner: null,
-                    habitable_zone_outer: null,
-                    jump_points: null,
-                    raw_json: json(body),
-                    source_updated_at: sqlDate(body.updated_at),
-                  });
-                  upserted++;
-                } catch (err) {
-                  logger.warn(`[starmap] upsert error body ${bodyRsiId}: ${(err as Error).message}`);
-                  errors++;
-                }
+            for (const body of bodies) {
+              const bodyId = String(body.id ?? '');
+              if (!bodyId) continue;
+
+              const bodyDesc =
+                typeof body.description === 'object' && body.description !== null
+                  ? (body.description.en_EN ?? Object.values(body.description)[0] ?? null)
+                  : (body.description ?? null);
+
+              try {
+                await upsert({
+                  rsi_id: bodyId,
+                  name: String(body.name ?? bodyId),
+                  type: (body.type ?? 'unknown').toLowerCase(),
+                  status: body.status ?? null,
+                  star_type: null,
+                  system_code: systemCode,
+                  system_name: sys.name ?? null,
+                  parent_id: body.parent_id ? String(body.parent_id) : rsiId,
+                  faction_name: body.affiliation?.[0]?.name ?? null,
+                  affiliations: json((body.affiliation ?? []).map((a: any) => a.name).filter(Boolean)),
+                  thumbnail: body.thumbnail?.url ?? null,
+                  description: typeof bodyDesc === 'string' ? bodyDesc : null,
+                  web_url: null,
+                  coordinates: json(
+                    body.position ? { x: Number(body.position.x), y: Number(body.position.y), z: Number(body.position.z) } : null,
+                  ),
+                  aggregated: null,
+                  size: body.size ?? null,
+                  population: null,
+                  economy: null,
+                  danger: null,
+                  frost_line: null,
+                  habitable_zone_inner: null,
+                  habitable_zone_outer: null,
+                  jump_points: null,
+                  raw_json: json(body),
+                  source_updated_at: sqlDate(body.time_modified),
+                });
+                upserted++;
+              } catch (err) {
+                logger.warn(`[starmap] upsert error body ${bodyId}: ${(err as Error).message}`);
+                errors++;
               }
-            } catch {
-              // system may not have detail data
             }
+          } catch {
+            // system may not expose celestial detail
           }
         }
-
-        if (!data.meta?.last_page || page >= data.meta.last_page) break;
-        page++;
       }
     } finally {
       conn.release();
