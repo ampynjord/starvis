@@ -12,6 +12,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { useListQueryState } from '@/hooks/useListQueryState';
 import type { PaintListItem, PaintManufacturerGroup } from '@/types/api';
 
@@ -149,7 +150,7 @@ export default function PaintsPage() {
   const hasFilters = !!selectedManufacturer;
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto">
+    <PageShell>
       <PageHeader
         title="Paints"
         count={data?.total}
@@ -195,6 +196,6 @@ export default function PaintsPage() {
           </div>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

@@ -5,6 +5,7 @@ import { Lock, LogIn, ShieldCheck, User } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
+import { AuthPanel } from '@/components/ui/AuthPanel';
 import { useAuth } from '@/contexts/AuthContext';
 
 function LoginForm() {
@@ -66,14 +67,7 @@ function LoginForm() {
         transition={{ duration: 0.3 }}
         className="w-full max-w-sm"
       >
-        <div className="sci-panel p-8 space-y-6">
-          <div className="text-center space-y-1">
-            <div className="w-12 h-12 rounded-full bg-cyan-950 border border-cyan-700/40 flex items-center justify-center mx-auto mb-4">
-              <ShieldCheck size={20} className="text-cyan-400" />
-            </div>
-            <h1 className="text-xl font-orbitron font-bold text-white tracking-wider">2FA REQUIRED</h1>
-            <p className="text-xs text-slate-500 font-mono-sc">ENTER YOUR AUTHENTICATOR CODE</p>
-          </div>
+        <AuthPanel icon={ShieldCheck} title="2FA Required" subtitle="Enter your authenticator code">
 
           <form onSubmit={handle2FASubmit} className="space-y-4">
             <div className="space-y-1.5">
@@ -113,7 +107,7 @@ function LoginForm() {
               &larr; Back to login
             </button>
           </form>
-        </div>
+        </AuthPanel>
       </motion.div>
     );
   }
@@ -125,15 +119,7 @@ function LoginForm() {
       transition={{ duration: 0.3 }}
       className="w-full max-w-sm"
     >
-      <div className="sci-panel p-8 space-y-6">
-        {/* Header */}
-        <div className="text-center space-y-1">
-          <div className="w-12 h-12 rounded-full bg-cyan-950 border border-cyan-700/40 flex items-center justify-center mx-auto mb-4">
-            <Lock size={20} className="text-cyan-400" />
-          </div>
-          <h1 className="text-xl font-orbitron font-bold text-white tracking-wider">SIGN IN</h1>
-          <p className="text-xs text-slate-500 font-mono-sc">STARVIS SECURE ACCESS</p>
-        </div>
+      <AuthPanel icon={Lock} title="Sign In" subtitle="Starvis secure access">
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
@@ -202,7 +188,7 @@ function LoginForm() {
             Create an account
           </Link>
         </p>
-      </div>
+      </AuthPanel>
     </motion.div>
   );
 }

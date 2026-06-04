@@ -25,6 +25,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { Pagination } from '@/components/ui/Pagination';
 import { fDate, fDateTime } from '@/utils/formatters';
 import type { ChangelogEntry } from '@/types/api';
@@ -380,7 +381,7 @@ export default function ChangelogPage() {
   const hasFilters = !!(entityType || changeType);
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto space-y-5">
+    <PageShell>
       <PageHeader
         title="Changelog"
         subtitle={summary ? `${summary.total.toLocaleString('en-US')} total entries${summary.last_extraction ? ` · Last extraction: ${fDateTime(summary.last_extraction)}` : ''}` : undefined}
@@ -535,6 +536,6 @@ export default function ChangelogPage() {
           )}
         </>
       )}
-    </div>
+    </PageShell>
   );
 }

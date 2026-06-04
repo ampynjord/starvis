@@ -36,6 +36,7 @@ import { useEnv } from '@/contexts/EnvContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { PageShell } from '@/components/ui/PageShell';
 import { NAV_GROUPS } from '@/components/layout/navigation';
 import { fDate, fNumber } from '@/utils/formatters';
 import type { ChangelogEntry, StatsOverview } from '@/types/api';
@@ -258,7 +259,7 @@ export default function HomePage() {
   }, {});
 
   return (
-    <div className="space-y-5 max-w-[1400px] mx-auto">
+    <PageShell>
 
       {/* ── Early access banner ───────────────────────────────────────── */}
       <div className="flex items-start gap-3 rounded-sm border border-amber-800/50 bg-amber-950/20 px-4 py-3">
@@ -573,6 +574,6 @@ export default function HomePage() {
       </motion.div>
 
 
-    </div>
+    </PageShell>
   );
 }

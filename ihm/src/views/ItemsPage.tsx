@@ -17,6 +17,7 @@ import { GlowBadge } from "@/components/ui/GlowBadge";
 import { useListQueryState } from "@/hooks/useListQueryState";
 import { ITEM_TYPE_LABELS } from "@/utils/constants";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { PageShell } from "@/components/ui/PageShell";
 import type { ItemListItem } from "@/types/api";
 
 const LIMIT = 30;
@@ -262,7 +263,7 @@ export default function ItemsPage({ group }: ItemsPageProps = {}) {
 	const pageTitle = resolvedGroup ? GROUP_LABELS[resolvedGroup] ?? 'Equipment' : 'Equipment';
 
 	return (
-		<div className="max-w-(--breakpoint-2xl) mx-auto">
+		<PageShell>
 			<PageHeader
 				title={pageTitle}
 				count={data?.total}
@@ -404,6 +405,6 @@ export default function ItemsPage({ group }: ItemsPageProps = {}) {
 					)}
 				</div>
 			</div>
-		</div>
+		</PageShell>
 	);
 }

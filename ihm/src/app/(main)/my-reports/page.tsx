@@ -5,6 +5,7 @@ import { AlertCircle, Bug, CheckCircle, Clock, GitMerge, XCircle } from 'lucide-
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 
 type BugReport = {
   id: number;
@@ -50,17 +51,17 @@ export default function MyReportsPage() {
 
   if (!user) {
     return (
-      <div className="max-w-2xl mx-auto space-y-3">
+      <PageShell size="lg">
         <PageHeader title="My reports" subtitle="Your submitted bug reports." />
         <div className="sci-panel p-8 text-center">
           <p className="text-slate-500 font-rajdhani">You must be logged in to view your reports.</p>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
+    <PageShell size="lg">
       <PageHeader title="My reports" subtitle="Track the status of your submitted bug reports." />
 
       <div className="sci-panel divide-y divide-border">
@@ -114,6 +115,6 @@ export default function MyReportsPage() {
           </button>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

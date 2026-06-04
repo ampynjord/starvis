@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { CheckCircle, Mail, Send } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
+import { AuthPanel } from '@/components/ui/AuthPanel';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -41,13 +42,14 @@ export default function ForgotPasswordPage() {
       transition={{ duration: 0.3 }}
       className="w-full max-w-sm"
     >
-      <div className="sci-panel p-8 space-y-6">
+      <AuthPanel
+        icon={submitted ? CheckCircle : Mail}
+        title={submitted ? 'Check Your Email' : 'Forgot Password'}
+        subtitle={submitted ? undefined : "We'll send you a reset link"}
+        accent={submitted ? 'green' : 'cyan'}
+      >
         {submitted ? (
           <div className="space-y-4 text-center">
-            <div className="w-12 h-12 rounded-full bg-green-950 border border-green-700/40 flex items-center justify-center mx-auto">
-              <CheckCircle size={20} className="text-green-400" />
-            </div>
-            <h1 className="text-lg font-orbitron font-bold text-white tracking-wider">CHECK YOUR EMAIL</h1>
             <p className="text-sm text-slate-400 font-rajdhani leading-relaxed">
               If an account with <span className="text-cyan-400">{email}</span> exists, we sent a password reset link.
             </p>
@@ -58,14 +60,6 @@ export default function ForgotPasswordPage() {
           </div>
         ) : (
           <>
-            <div className="text-center space-y-1">
-              <div className="w-12 h-12 rounded-full bg-cyan-950 border border-cyan-700/40 flex items-center justify-center mx-auto mb-4">
-                <Mail size={20} className="text-cyan-400" />
-              </div>
-              <h1 className="text-xl font-orbitron font-bold text-white tracking-wider">FORGOT PASSWORD</h1>
-              <p className="text-xs text-slate-500 font-mono-sc">WE'LL SEND YOU A RESET LINK</p>
-            </div>
-
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-xs font-mono-sc text-cyan-700 uppercase tracking-wider">Email address</label>
@@ -106,7 +100,7 @@ export default function ForgotPasswordPage() {
             </p>
           </>
         )}
-      </div>
+      </AuthPanel>
     </motion.div>
   );
 }

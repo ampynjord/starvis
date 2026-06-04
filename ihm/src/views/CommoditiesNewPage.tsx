@@ -31,6 +31,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { Pagination } from '@/components/ui/Pagination';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
 import { useListQueryState } from '@/hooks/useListQueryState';
@@ -479,7 +480,7 @@ export default function CommoditiesNewPage() {
   ];
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto">
+    <PageShell>
       <PageHeader
         title="Commodities"
         subtitle="Trade goods catalogue and complete minerals reference"
@@ -514,6 +515,6 @@ export default function CommoditiesNewPage() {
 
       {activeTab === 'trade' && <TradeGoodsTab />}
       {activeTab === 'minerals' && <MineralsTab />}
-    </div>
+    </PageShell>
   );
 }

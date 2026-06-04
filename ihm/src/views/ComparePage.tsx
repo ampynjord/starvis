@@ -19,6 +19,7 @@ import { useEnv } from '@/contexts/EnvContext';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { useDebounce } from '@/hooks/useDebounce';
 import { fDimension, fMass, fSpeed } from '@/utils/formatters';
@@ -158,7 +159,7 @@ export default function ComparePage() {
   };
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto space-y-6">
+    <PageShell>
       <PageHeader
         title="Compare"
         subtitle="Compare up to 4 ships side by side"
@@ -339,6 +340,6 @@ export default function ComparePage() {
           <p className="font-orbitron text-sm tracking-widest">Select up to 4 ships to compare</p>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

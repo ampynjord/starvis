@@ -10,6 +10,7 @@ import { useState } from 'react';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
+import { PageShell } from '@/components/ui/PageShell';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -260,7 +261,7 @@ export default function ItemDetailPage() {
   if (item.hp != null) quickStats.push({ icon: <Heart size={9} />, label: 'HP', value: f(item.hp) });
 
   return (
-    <div className="max-w-(--breakpoint-xl) mx-auto space-y-6">
+    <PageShell size="xl">
 
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs font-mono-sc text-slate-600">
@@ -477,6 +478,6 @@ export default function ItemDetailPage() {
           )}
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

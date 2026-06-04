@@ -5,6 +5,7 @@ import { CheckCircle, Loader2, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
+import { AuthPanel } from '@/components/ui/AuthPanel';
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
@@ -49,32 +50,24 @@ function VerifyEmailContent() {
       transition={{ duration: 0.3 }}
       className="w-full max-w-sm"
     >
-      <div className="sci-panel p-8 space-y-5 text-center">
-        {status === 'loading' && (
-          <>
-            <Loader2 size={32} className="text-cyan-400 animate-spin mx-auto" />
-            <h1 className="text-lg font-orbitron font-bold text-white tracking-wider">VERIFYING…</h1>
-            <p className="text-xs text-slate-500 font-mono-sc">Please wait while we verify your email.</p>
-          </>
-        )}
-        {status === 'success' && (
-          <>
-            <CheckCircle size={32} className="text-green-400 mx-auto" />
-            <h1 className="text-lg font-orbitron font-bold text-white tracking-wider">EMAIL VERIFIED</h1>
-            <p className="text-sm text-slate-400 font-rajdhani">Your account is now active. Redirecting…</p>
-          </>
-        )}
-        {status === 'error' && (
-          <>
-            <XCircle size={32} className="text-red-400 mx-auto" />
-            <h1 className="text-lg font-orbitron font-bold text-white tracking-wider">VERIFICATION FAILED</h1>
-            <p className="text-sm text-red-400 font-mono-sc">{error}</p>
-            <Link href="/login" className="block text-xs text-cyan-500 hover:text-cyan-300 transition-colors">
-              &larr; Back to login
-            </Link>
-          </>
-        )}
-      </div>
+      {status === 'loading' && (
+        <AuthPanel icon={Loader2} title="Verifying..." className="text-center [&_svg]:animate-spin">
+          <p className="text-xs text-slate-500 font-mono-sc">Please wait while we verify your email.</p>
+        </AuthPanel>
+      )}
+      {status === 'success' && (
+        <AuthPanel icon={CheckCircle} title="Email Verified" accent="green" className="text-center">
+          <p className="text-sm text-slate-400 font-rajdhani">Your account is now active. Redirecting...</p>
+        </AuthPanel>
+      )}
+      {status === 'error' && (
+        <AuthPanel icon={XCircle} title="Verification Failed" accent="red" className="text-center">
+          <p className="text-sm text-red-400 font-mono-sc">{error}</p>
+          <Link href="/login" className="block text-xs text-cyan-500 hover:text-cyan-300 transition-colors">
+            &larr; Back to login
+          </Link>
+        </AuthPanel>
+      )}
     </motion.div>
   );
 }

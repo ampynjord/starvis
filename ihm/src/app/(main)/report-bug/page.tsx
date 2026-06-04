@@ -4,6 +4,7 @@ import { AlertCircle, CheckCircle, Paperclip, Send, X } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 
 const MAX_FILES = 5;
 const MAX_FILE_MB = 4;
@@ -101,17 +102,17 @@ export default function ReportBugPage() {
 
   if (!user) {
     return (
-      <div className="max-w-2xl mx-auto space-y-3">
+      <PageShell size="lg">
         <PageHeader title="Report a bug" subtitle="Help us improve Starvis by reporting issues." />
         <div className="sci-panel p-8 text-center">
           <p className="text-slate-500 font-rajdhani">You must be logged in to submit a bug report.</p>
         </div>
-      </div>
+      </PageShell>
     );
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-4">
+    <PageShell size="lg">
       <PageHeader
         title="Report a bug"
         subtitle="Encountered something broken? Let us know — every report helps."
@@ -231,6 +232,6 @@ export default function ReportBugPage() {
           {submitting ? 'SUBMITTING…' : 'SUBMIT REPORT'}
         </button>
       </form>
-    </div>
+    </PageShell>
   );
 }

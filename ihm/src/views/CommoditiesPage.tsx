@@ -14,6 +14,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { useListQueryState } from '@/hooks/useListQueryState';
 
 const LIMIT = 30;
@@ -55,7 +56,7 @@ export default function CommoditiesPage() {
   ] : [];
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto">
+    <PageShell>
       <PageHeader
         title={title}
         count={data?.total}
@@ -120,6 +121,6 @@ export default function CommoditiesPage() {
         )}
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

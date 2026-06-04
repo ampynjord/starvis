@@ -15,6 +15,7 @@ import { useEnv } from '@/contexts/EnvContext';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { useDebounce } from '@/hooks/useDebounce';
 import { fNumber } from '@/utils/formatters';
@@ -629,7 +630,7 @@ export default function LoadoutManagerPage() {
   const swappedIds = new Set(Object.keys(swaps).map(Number));
 
   return (
-    <div className="max-w-(--breakpoint-xl) mx-auto space-y-4">
+    <PageShell size="xl">
       <PageHeader
         title="Loadout Manager"
         subtitle="Customize your ship loadout — real-time DPS, power budget, thermal balance"
@@ -850,6 +851,6 @@ export default function LoadoutManagerPage() {
           Search for a ship to start building your loadout
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

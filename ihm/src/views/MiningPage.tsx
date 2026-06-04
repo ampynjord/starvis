@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import type { MiningCompositionView } from '@/types/mining';
 import { CompositionSelector } from '@/components/mining/CompositionSelector';
@@ -120,7 +121,7 @@ export default function MiningPage() {
   }, []);
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto">
+    <PageShell>
       <PageHeader
         title="Mining Calculator"
         subtitle="Complete toolkit: yield workflow, profit, mineral reference, rock finder, crew split, refinery timers."
@@ -323,6 +324,6 @@ export default function MiningPage() {
           {activeTab === 'timer' && <RefineryTimer />}
         </motion.div>
       </AnimatePresence>
-    </div>
+    </PageShell>
   );
 }

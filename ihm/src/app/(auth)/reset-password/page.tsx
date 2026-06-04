@@ -5,6 +5,7 @@ import { CheckCircle, Lock, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
+import { AuthPanel } from '@/components/ui/AuthPanel';
 
 interface PasswordRule {
   label: string;
@@ -63,39 +64,28 @@ function ResetPasswordForm() {
 
   if (!token) {
     return (
-      <div className="sci-panel p-8 space-y-4 text-center">
-        <XCircle size={32} className="text-red-400 mx-auto" />
-        <h1 className="text-lg font-orbitron font-bold text-white tracking-wider">INVALID LINK</h1>
+      <AuthPanel icon={XCircle} title="Invalid Link" accent="red" className="text-center">
         <p className="text-sm text-red-400 font-mono-sc">No reset token found in the URL.</p>
         <Link href="/forgot-password" className="block text-xs text-cyan-500 hover:text-cyan-300 transition-colors">
           Request a new reset link &rarr;
         </Link>
-      </div>
+      </AuthPanel>
     );
   }
 
   if (success) {
     return (
-      <div className="sci-panel p-8 space-y-4 text-center">
-        <CheckCircle size={32} className="text-green-400 mx-auto" />
-        <h1 className="text-lg font-orbitron font-bold text-white tracking-wider">PASSWORD RESET</h1>
+      <AuthPanel icon={CheckCircle} title="Password Reset" accent="green" className="text-center">
         <p className="text-sm text-slate-400 font-rajdhani">Your password has been updated successfully.</p>
         <Link href="/login" className="block text-xs text-cyan-500 hover:text-cyan-300 transition-colors">
           Sign in with your new password &rarr;
         </Link>
-      </div>
+      </AuthPanel>
     );
   }
 
   return (
-    <div className="sci-panel p-8 space-y-6">
-      <div className="text-center space-y-1">
-        <div className="w-12 h-12 rounded-full bg-cyan-950 border border-cyan-700/40 flex items-center justify-center mx-auto mb-4">
-          <Lock size={20} className="text-cyan-400" />
-        </div>
-        <h1 className="text-xl font-orbitron font-bold text-white tracking-wider">RESET PASSWORD</h1>
-        <p className="text-xs text-slate-500 font-mono-sc">CHOOSE A NEW PASSWORD</p>
-      </div>
+    <AuthPanel icon={Lock} title="Reset Password" subtitle="Choose a new password">
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="space-y-1.5">
@@ -164,7 +154,7 @@ function ResetPasswordForm() {
           {loading ? 'RESETTING...' : 'RESET PASSWORD'}
         </button>
       </form>
-    </div>
+    </AuthPanel>
   );
 }
 

@@ -27,6 +27,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -580,7 +581,7 @@ export default function BlueprintsPage() {
   const hasFilters = !!(debouncedSearch || category || stationType);
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto">
+    <PageShell>
       <PageHeader
         title="Crafting Calculator"
         count={data?.total ?? recipes.length}
@@ -662,6 +663,6 @@ export default function BlueprintsPage() {
       </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { PageShell } from '@/components/ui/PageShell';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 
 type BadgeColor = 'cyan' | 'amber' | 'green' | 'purple' | 'slate';
@@ -56,7 +57,7 @@ export default function CommLinkDetailPage() {
   const color = categoryColor(entry.category);
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <PageShell size="lg">
       {/* Breadcrumb */}
       <div className="mb-6 flex items-center gap-2 text-xs font-mono-sc">
         <Link href="/comm-links" className="flex items-center gap-1.5 text-slate-500 hover:text-cyan-400 transition-colors">
@@ -178,6 +179,6 @@ export default function CommLinkDetailPage() {
           )}
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }

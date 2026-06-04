@@ -18,6 +18,7 @@ import { useParams, useRouter } from "next/navigation";
 import { api } from "@/services/api";
 import { useEnv } from "@/contexts/EnvContext";
 import { ScifiPanel } from "@/components/ui/ScifiPanel";
+import { PageShell } from "@/components/ui/PageShell";
 import { GlowBadge } from "@/components/ui/GlowBadge";
 import { LoadingGrid } from "@/components/ui/LoadingGrid";
 import { ErrorState } from "@/components/ui/ErrorState";
@@ -443,7 +444,7 @@ export default function ComponentDetailPage() {
 			Number(comp.weapon_damage_stun) > 0);
 
 	return (
-		<div className="max-w-(--breakpoint-xl) mx-auto space-y-6">
+		<PageShell size="xl">
 			{/* Breadcrumb */}
 			<div className="flex items-center gap-2 text-xs font-mono-sc text-slate-600">
 				<button
@@ -727,6 +728,6 @@ export default function ComponentDetailPage() {
 					)}
 				</div>
 			)}
-		</div>
+		</PageShell>
 	);
 }

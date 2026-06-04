@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
+import { PageShell } from '@/components/ui/PageShell';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { CanonicalMeta } from '@/components/ui/CanonicalMeta';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
@@ -109,7 +110,7 @@ export default function CommodityDetailPage() {
   const typeInitials = (commodity.type ?? 'COM').slice(0, 3).toUpperCase();
 
   return (
-    <div className="max-w-(--breakpoint-xl) mx-auto space-y-6">
+    <PageShell size="xl">
 
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-xs font-mono-sc text-slate-600">
@@ -272,6 +273,6 @@ export default function CommodityDetailPage() {
           )}
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }

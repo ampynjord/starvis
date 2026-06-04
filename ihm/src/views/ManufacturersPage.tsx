@@ -12,6 +12,7 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
 import { Pagination } from '@/components/ui/Pagination';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import type { ComponentListItem, ItemListItem, Manufacturer, ShipListItem } from '@/types/api';
@@ -262,7 +263,7 @@ export default function ManufacturersPage() {
   if (error) return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
 
   return (
-    <div className="max-w-(--breakpoint-2xl) mx-auto">
+    <PageShell>
       <PageHeader
         title="Manufacturers"
         count={manufacturers?.length}
@@ -534,6 +535,6 @@ export default function ManufacturersPage() {
           )}
         </div>
       </div>
-    </div>
+    </PageShell>
   );
 }
