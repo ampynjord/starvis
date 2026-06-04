@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useQuery } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -211,6 +211,23 @@ function makeLabel(text: string, color: string) {
   return sprite;
 }
 
+function makeGlowTexture(color: string) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d')!;
+  const gradient = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gradient.addColorStop(0, color);
+  gradient.addColorStop(0.22, color);
+  gradient.addColorStop(0.48, `${color}88`);
+  gradient.addColorStop(1, `${color}00`);
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 128, 128);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return texture;
+}
+
 function hashFloat(input: string) {
   let h = 2166136261;
   for (let i = 0; i < input.length; i++) h = Math.imul(h ^ input.charCodeAt(i), 16777619);
@@ -343,12 +360,12 @@ function StarmapScene({
     if (!container || !nodes.length) return;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x020812);
-    scene.fog = new THREE.FogExp2(0x020812, 0.0028);
+    scene.background = new THREE.Color(0x01040a);
+    scene.fog = new THREE.FogExp2(0x01040a, 0.0018);
 
     let renderer: THREE.WebGLRenderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
     } catch {
       return;
     }
@@ -358,56 +375,104 @@ function StarmapScene({
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
-    const camera = new THREE.PerspectiveCamera(50, container.clientWidth / container.clientHeight, 0.1, 2000);
-    camera.position.set(0, 80, 155);
+    const camera = new THREE.PerspectiveCamera(48, container.clientWidth / container.clientHeight, 0.1, 2400);
+    camera.position.set(0, 115, 185);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.07;
-    controls.autoRotate = true;
-    controls.autoRotateSpeed = 0.15;
-    controls.minDistance = 18;
-    controls.maxDistance = 360;
+    controls.dampingFactor = 0.065;
+    controls.autoRotate = false;
+    controls.enablePan = true;
+    controls.panSpeed = 0.7;
+    controls.minDistance = 12;
+    controls.maxDistance = 420;
 
-    scene.add(new THREE.AmbientLight(0x14324a, 1.3));
-    const key = new THREE.DirectionalLight(0x8defff, 2.4);
+    scene.add(new THREE.AmbientLight(0x0c2435, 1.4));
+    const key = new THREE.DirectionalLight(0x95f4ff, 2.8);
     key.position.set(1, 2, 1);
     scene.add(key);
+    const rim = new THREE.PointLight(0x15d7ff, 6, 420);
+    rim.position.set(-80, 80, -90);
+    scene.add(rim);
 
     const starGeo = new THREE.BufferGeometry();
-    const starPositions = new Float32Array(1800 * 3);
+    const starPositions = new Float32Array(3400 * 3);
+    const starColors = new Float32Array(3400 * 3);
     for (let i = 0; i < starPositions.length; i += 3) {
       const r = 280 + hashFloat(`r${i}`) * 520;
       const a = hashFloat(`a${i}`) * Math.PI * 2;
-      const y = (hashFloat(`y${i}`) - 0.5) * 420;
+      const y = (hashFloat(`y${i}`) - 0.5) * 460;
       starPositions[i] = Math.cos(a) * r;
       starPositions[i + 1] = y;
       starPositions[i + 2] = Math.sin(a) * r;
+      const cool = 0.55 + hashFloat(`c${i}`) * 0.45;
+      starColors[i] = 0.45 * cool;
+      starColors[i + 1] = 0.8 * cool;
+      starColors[i + 2] = cool;
     }
     starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
-    const starMat = new THREE.PointsMaterial({ color: 0x7dd3fc, size: 0.75, transparent: true, opacity: 0.55, depthWrite: false });
+    starGeo.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+    const starMat = new THREE.PointsMaterial({ size: 0.7, transparent: true, opacity: 0.62, depthWrite: false, vertexColors: true });
     scene.add(new THREE.Points(starGeo, starMat));
+
+    const grid = new THREE.GridHelper(260, 26, 0x0e7490, 0x083344);
+    const gridMaterial = grid.material as THREE.Material;
+    gridMaterial.transparent = true;
+    gridMaterial.opacity = 0.14;
+    grid.position.y = -18;
+    scene.add(grid);
 
     const objects = new Map<string, THREE.Mesh>();
     const labels: THREE.Sprite[] = [];
     const nodeGroup = new THREE.Group();
     scene.add(nodeGroup);
 
-    const linePositions: number[] = [];
+    const parentLinePositions: number[] = [];
+    const routeLinePositions: number[] = [];
     const byId = new Map(nodes.map((node) => [node.id, node]));
     for (const node of nodes) {
       if (!node.parentId) continue;
       const parent = byId.get(node.parentId);
       if (!parent) continue;
-      linePositions.push(parent.position.x, parent.position.y, parent.position.z, node.position.x, node.position.y, node.position.z);
+      parentLinePositions.push(parent.position.x, parent.position.y, parent.position.z, node.position.x, node.position.y, node.position.z);
+      if (node.loc.type === 'planet' || node.loc.type === 'moon') {
+        const distance = parent.position.distanceTo(node.position);
+        const orbit = new THREE.LineLoop(
+          new THREE.BufferGeometry().setFromPoints(
+            Array.from({ length: 144 }, (_, i) => {
+              const angle = (i / 144) * Math.PI * 2;
+              return new THREE.Vector3(Math.cos(angle) * distance, 0, Math.sin(angle) * distance).add(parent.position);
+            }),
+          ),
+          new THREE.LineBasicMaterial({ color: 0x164e63, transparent: true, opacity: node.loc.type === 'planet' ? 0.18 : 0.08 }),
+        );
+        nodeGroup.add(orbit);
+      }
     }
-    const lineGeo = new THREE.BufferGeometry();
-    lineGeo.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3));
-    const lineMat = new THREE.LineBasicMaterial({ color: 0x164e63, transparent: true, opacity: 0.34 });
-    nodeGroup.add(new THREE.LineSegments(lineGeo, lineMat));
+    const roots = nodes.filter((node) => !node.parentId);
+    for (const source of roots) {
+      const nearest = roots
+        .filter((target) => target.id !== source.id)
+        .sort((a, b) => source.position.distanceTo(a.position) - source.position.distanceTo(b.position))
+        .slice(0, 2);
+      for (const target of nearest) {
+        if (source.id > target.id) continue;
+        routeLinePositions.push(source.position.x, source.position.y, source.position.z, target.position.x, target.position.y, target.position.z);
+      }
+    }
+    const routeLineGeo = new THREE.BufferGeometry();
+    routeLineGeo.setAttribute('position', new THREE.Float32BufferAttribute(routeLinePositions, 3));
+    nodeGroup.add(new THREE.LineSegments(routeLineGeo, new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.16 })));
+    const parentLineGeo = new THREE.BufferGeometry();
+    parentLineGeo.setAttribute('position', new THREE.Float32BufferAttribute(parentLinePositions, 3));
+    nodeGroup.add(new THREE.LineSegments(parentLineGeo, new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.24 })));
+
+    const cyanGlow = makeGlowTexture('#22d3ee');
+    const amberGlow = makeGlowTexture('#fbbf24');
 
     for (const node of nodes) {
-      const geo = new THREE.SphereGeometry(node.radius, node.loc.type === 'system' ? 32 : 20, node.loc.type === 'system' ? 16 : 10);
+      const normalizedType = normalizeType(node.loc.type);
+      const geo = new THREE.SphereGeometry(node.radius * (normalizedType === 'system' ? 0.72 : 1), normalizedType === 'system' ? 28 : 18, normalizedType === 'system' ? 14 : 9);
       const mat = new THREE.MeshPhongMaterial({
         color: node.color,
         emissive: node.glow,
@@ -421,17 +486,32 @@ function StarmapScene({
       nodeGroup.add(mesh);
       objects.set(node.id, mesh);
 
-      if (node.loc.type === 'system' || node.loc.type === 'planet') {
-        const label = makeLabel(node.label, node.loc.type === 'system' ? '#22d3ee' : '#7dd3fc');
+      const glow = new THREE.Sprite(
+        new THREE.SpriteMaterial({
+          map: normalizedType === 'star' ? amberGlow : cyanGlow,
+          transparent: true,
+          opacity: normalizedType === 'system' || normalizedType === 'star' ? 0.42 : 0.18,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+        }),
+      );
+      glow.position.copy(node.position);
+      const glowScale = node.radius * (normalizedType === 'system' ? 9 : normalizedType === 'star' ? 7 : 4.4);
+      glow.scale.set(glowScale, glowScale, 1);
+      glow.userData.label = true;
+      nodeGroup.add(glow);
+
+      if (normalizedType === 'system' || normalizedType === 'star') {
+        const label = makeLabel(node.label, normalizedType === 'star' ? '#fbbf24' : '#22d3ee');
         label.position.copy(node.position).add(new THREE.Vector3(0, node.radius + 4, 0));
         label.userData.label = true;
         labels.push(label);
         nodeGroup.add(label);
       }
 
-      if (node.loc.type === 'planet' || node.loc.type === 'system') {
+      if (normalizedType === 'system' || normalizedType === 'star') {
         const ring = new THREE.Mesh(
-          new THREE.TorusGeometry(node.radius * 2.4, 0.025, 6, 96),
+          new THREE.TorusGeometry(node.radius * (normalizedType === 'system' ? 3.8 : 2.6), 0.018, 6, 128),
           new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: 0.16 }),
         );
         ring.position.copy(node.position);
@@ -577,8 +657,9 @@ export default function LocationsPage() {
   if (error) return <ErrorState error={error as Error} />;
 
   return (
-    <div className="relative h-[calc(100dvh-3.5rem)] -m-4 md:-m-6 overflow-hidden bg-[#020812]">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_20%,rgba(8,145,178,0.18),transparent_34%),linear-gradient(180deg,rgba(2,8,18,0.25),rgba(2,8,18,0.92))] pointer-events-none z-10" />
+    <div className="relative h-[calc(100dvh-3.5rem)] -m-4 md:-m-6 overflow-hidden bg-[#01040a]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_35%,rgba(34,211,238,0.12),transparent_30%),linear-gradient(180deg,rgba(1,4,10,0.15),rgba(1,4,10,0.86))] pointer-events-none z-10" />
+      <div className="absolute inset-0 z-10 pointer-events-none opacity-30 bg-[linear-gradient(rgba(34,211,238,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.08)_1px,transparent_1px)] bg-[size:64px_64px]" />
 
       {isLoading ? (
         <div className="absolute inset-0 z-20 flex items-center justify-center">
@@ -592,11 +673,11 @@ export default function LocationsPage() {
         <div className="pointer-events-auto">
           <div className="flex items-center gap-2 text-cyan-300">
             <Sparkles size={18} />
-            <h1 className="font-orbitron text-lg md:text-2xl font-bold tracking-widest uppercase">Verse Map</h1>
+            <h1 className="font-orbitron text-lg md:text-2xl font-bold tracking-widest uppercase">ARK Verse Map</h1>
             <h2 className="sr-only">Locations</h2>
           </div>
           <p className="font-mono-sc text-[10px] text-slate-500 uppercase tracking-widest mt-1">
-            {filteredNodes.length.toLocaleString('en-US')} visible objects · {nodes.length.toLocaleString('en-US')} mapped
+            RSI starmap + P4K locations · {filteredNodes.length.toLocaleString('en-US')} visible · {nodes.length.toLocaleString('en-US')} mapped
           </p>
         </div>
 
@@ -638,9 +719,9 @@ export default function LocationsPage() {
         </div>
       </header>
 
-      {!isLoading && filteredNodes.length > 0 && (
+      {!isLoading && search.trim() && filteredNodes.length > 0 && (
         <div className="absolute left-4 top-[9.25rem] z-20 w-[min(340px,calc(100vw-2rem))] pointer-events-auto">
-          <div className="max-h-[38vh] overflow-y-auto rounded-sm border border-cyan-900/30 bg-slate-950/62 backdrop-blur-xl p-2">
+          <div className="max-h-[38vh] overflow-y-auto rounded-sm border border-cyan-900/35 bg-black/55 backdrop-blur-xl p-2 shadow-[0_0_40px_rgba(8,145,178,0.12)]">
             {filteredNodes.filter((node) => node.id !== selectedNode?.id).slice(0, 10).map((node) => {
               const selected = selectedNode?.id === node.id;
               return (
@@ -671,7 +752,7 @@ export default function LocationsPage() {
             exit={{ opacity: 0, x: 28 }}
             className="absolute right-4 top-[9.25rem] bottom-4 z-20 w-[min(380px,calc(100vw-2rem))] pointer-events-auto"
           >
-            <div className="h-full sci-panel bg-slate-950/78 backdrop-blur-xl border-cyan-900/50 overflow-y-auto p-4">
+            <div className="h-full sci-panel bg-black/60 backdrop-blur-xl border-cyan-900/50 overflow-y-auto p-4 shadow-[0_0_60px_rgba(8,145,178,0.16)]">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 text-cyan-400">
@@ -722,7 +803,7 @@ export default function LocationsPage() {
       <div className="absolute left-4 bottom-4 z-20 pointer-events-none max-w-md">
         <div className="rounded-sm border border-cyan-900/40 bg-slate-950/70 backdrop-blur-md px-3 py-2">
           <p className="font-mono-sc text-[10px] text-slate-500 uppercase tracking-widest">
-            Drag to orbit · Scroll to zoom · Click an object to inspect
+            Drag to orbit Â· Scroll to zoom Â· Click an object to inspect
           </p>
         </div>
       </div>
@@ -747,3 +828,4 @@ function Info({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
