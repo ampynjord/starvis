@@ -9,7 +9,7 @@
  * Admin:
  * GET    /admin/corporations              — list all
  * GET    /admin/corporations/:id          — detail
- * DELETE /admin/corporations/:id          — delete corp record
+ * DELETE /admin/corporations/:id          — reset Starvis corp data, keep cached org
  * GET    /admin/corporations/:id/members  — list members
  * POST   /admin/corporations/:id/members  — add member (by userId)
  * DELETE /admin/corporations/members/:mid — remove member
@@ -158,9 +158,14 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
     const { sub } = (req as any).jwtPayload;
     try {
       const membership = await svc.getMyActiveMembership(sub);
-      if (!membership) return void res.status(403).json({ success: false, error: 'Not a corporation member' });
-      const items = await svc.getFleetItems(membership.corporationId, 'ship');
-      res.json({ success: true, data: items, corporation: membership.corporation });
+      const corporationId = membership?.corporationId ?? null;
+      const items = await svc.getFleetItems(corporationId, 'ship', sub);
+      res.json({
+        success: true,
+        data: items,
+        corporation: membership?.corporation ?? null,
+        scope: corporationId == null ? 'personal' : 'corporation',
+      });
     } catch {
       res.status(500).json({ success: false, error: 'Failed to fetch fleet' });
     }
@@ -174,8 +179,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
       return void res.status(400).json({ success: false, error: 'itemClassName required' });
     try {
       const membership = await svc.getMyActiveMembership(sub);
-      if (!membership) return void res.status(403).json({ success: false, error: 'Not a corporation member' });
-      const item = await svc.declareShip(sub, membership.corporationId, { shipUuid, itemClassName, notes });
+      const item = await svc.declareShip(sub, membership?.corporationId ?? null, { shipUuid, itemClassName, notes });
       res.status(201).json({ success: true, data: item });
     } catch {
       res.status(500).json({ success: false, error: 'Failed to declare ship' });
@@ -316,11 +320,11 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) return void res.status(400).json({ success: false, error: 'Invalid id' });
     try {
-      await svc.deleteCorporation(id);
-      res.json({ success: true });
+      const result = await svc.deleteCorporation(id);
+      res.json({ success: true, data: result });
     } catch (e: any) {
       if (e?.code === 'P2025') return void res.status(404).json({ success: false, error: 'Corporation not found' });
-      res.status(500).json({ success: false, error: 'Failed to delete corporation' });
+      res.status(500).json({ success: false, error: 'Failed to reset corporation' });
     }
   });
 

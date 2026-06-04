@@ -303,6 +303,13 @@ export default function FleetManagerPage() {
   useEffect(() => { if (user) loadFleet(); }, [user, loadFleet]);
 
   useEffect(() => {
+    if (!corp && viewMode !== 'mine') {
+      setViewMode('mine');
+      setSelectedItemId(null);
+    }
+  }, [corp, viewMode]);
+
+  useEffect(() => {
     if (viewMode !== 'member') return;
     if (selectedMemberId != null && members.some((m) => m.id === selectedMemberId)) return;
     const firstWithShips = members.find((m) => fleetItems.some((item) => getAddedById(item) === m.id));
@@ -364,7 +371,7 @@ export default function FleetManagerPage() {
         sizeX: (s as any).size_x ?? null, sizeY: (s as any).size_y ?? null, sizeZ: (s as any).size_z ?? null,
         isConceptOnly: (s as any).is_concept_only ?? false,
         thumbnailUrl: (s as any).thumbnail_large ?? (s as any).thumbnail ?? null,
-        ctmUrl: (s as any).is_concept_only ? null : `/api/v1/ships/${uuid}/model/file`,
+        ctmUrl: (s as any).ctm_url ? `/api/v1/ships/${uuid}/model/file` : null,
         declaredBy: i.addedBy?.username ?? null,
       } satisfies FleetShip;
     }),
@@ -378,16 +385,6 @@ export default function FleetManagerPage() {
 
   if (!user) return (
     <div className="p-8 text-center text-slate-500 font-mono-sc text-sm">Sign in to access the fleet manager.</div>
-  );
-
-  if (!loading && !corp) return (
-    <div className="p-8 text-center space-y-3">
-      <Building2 size={32} className="text-slate-700 mx-auto" />
-      <p className="text-slate-500 font-mono-sc text-sm">You are not part of any corporation.</p>
-      <Link href="/profile" className="text-cyan-500 hover:text-cyan-300 text-xs font-mono-sc transition-colors">
-        Join a corporation →
-      </Link>
-    </div>
   );
 
   return (
@@ -406,6 +403,11 @@ export default function FleetManagerPage() {
                 [{corp.tag}] {corp.name}
               </span>
             )}
+            {!loading && !corp && (
+              <span className="text-[10px] font-orbitron text-slate-500 border border-slate-800 px-1.5 py-0.5 rounded-sm shrink-0">
+                Personal Fleet
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
             {/* View mode selector */}
@@ -422,6 +424,7 @@ export default function FleetManagerPage() {
               </button>
 
               {/* Member picker */}
+              {corp && (
               <div className="relative">
               <button
                 type="button"
@@ -467,8 +470,10 @@ export default function FleetManagerPage() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* All Corp */}
+              {corp && (
               <button
                 type="button"
                 onClick={() => { setViewMode('all'); setSelectedItemId(null); }}
@@ -478,6 +483,7 @@ export default function FleetManagerPage() {
               >
                 <Building2 size={10} /> Corp
               </button>
+              )}
             </div>
 
             <span className="text-[10px] text-slate-600 font-mono-sc">
@@ -486,7 +492,7 @@ export default function FleetManagerPage() {
             <button
               type="button"
               onClick={() => setShowAddModal(true)}
-              disabled={!corp || addLoading}
+              disabled={addLoading}
               className="sci-btn-primary py-1.5 px-3 text-xs gap-1.5 flex items-center disabled:opacity-40"
             >
               <Plus size={12} /> Declare ship
@@ -510,7 +516,7 @@ export default function FleetManagerPage() {
                   {viewMode === 'mine' ? <>No ships declared yet.<br />Click "Declare ship" to add yours.</>
                    : viewMode === 'member' && selectedMember ? `${selectedMember.username} has no ships declared.`
                    : viewMode === 'member' ? 'Select a member to view their fleet.'
-                   : 'No ships declared in this corporation yet.'}
+                   : corp ? 'No ships declared in this corporation yet.' : 'No ships declared yet.'}
                 </p>
               </div>
             ) : (

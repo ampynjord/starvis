@@ -231,7 +231,7 @@ model CorporationMembership {
 
 model CorporationFleetItem {
   id            Int           @id @default(autoincrement())
-  corporationId Int           @map("corporation_id")
+  corporationId Int?          @map("corporation_id")
   itemType      FleetItemType @map("item_type")
   itemClassName String        @map("item_class_name") @db.VarChar(255)
   shipUuid      String?       @map("ship_uuid") @db.VarChar(64)
@@ -241,10 +241,11 @@ model CorporationFleetItem {
   addedAt       DateTime      @default(now()) @map("added_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")
 
-  corporation Corporation @relation(fields: [corporationId], references: [id], onDelete: Cascade)
+  corporation Corporation? @relation(fields: [corporationId], references: [id], onDelete: Cascade)
   addedBy     User?       @relation("AddedFleetItems", fields: [addedById], references: [id], onDelete: SetNull)
 
   @@index([corporationId])
+  @@index([addedById, itemType])
   @@map("corporation_fleet_items")
   @@schema("meta")
 }
