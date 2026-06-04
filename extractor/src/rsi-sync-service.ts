@@ -622,10 +622,16 @@ export class RsiSyncService {
             parent_id: null,
             faction_name: sys.affiliation?.[0]?.name ?? null,
             affiliations: json((sys.affiliation ?? []).map((a: any) => a.name).filter(Boolean)),
-            thumbnail: sys.thumbnail?.url ?? null,
+            thumbnail: sys.thumbnail?.images?.product_thumb_large ?? sys.thumbnail?.images?.post ?? sys.thumbnail?.url ?? null,
             description: typeof description === 'string' ? description : null,
             web_url: systemCode ? `${RSI_BASE_URL}/starmap/systems/${systemCode}` : null,
-            coordinates: json(sys.position ? { x: Number(sys.position.x), y: Number(sys.position.y), z: Number(sys.position.z) } : null),
+            coordinates: json(
+              sys.position_x !== undefined
+                ? { x: Number(sys.position_x), y: Number(sys.position_y ?? 0), z: Number(sys.position_z ?? 0) }
+                : sys.position
+                  ? { x: Number(sys.position.x), y: Number(sys.position.y), z: Number(sys.position.z) }
+                  : null,
+            ),
             aggregated: json({
               size: sys.aggregated_size,
               population: sys.aggregated_population,
