@@ -69,6 +69,25 @@ function sourceList(value: unknown): string[] | null {
   return null;
 }
 
+function normalizeStarmapObjectType(type: unknown): string {
+  const normalized = String(type ?? 'unknown')
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+  if (normalized === 'satellite') return 'moon';
+  if (normalized === 'jumppoint') return 'jump_point';
+  if (normalized === 'asteroid_belt' || normalized === 'asteroid_field') return 'asteroid_field';
+  if (normalized === 'manmade') return 'station';
+  return normalized;
+}
+
+function starmapObjectName(body: any): string {
+  return String(body.name ?? body.designation ?? body.code ?? body.id);
+}
+
+function starmapObjectParentId(body: any, systemRsiId: string): string {
+  return body.parent_id ? String(body.parent_id) : systemRsiId;
+}
+
 function resolveRsiUrl(src: string | null | undefined): string | null {
   if (!src) return null;
   if (src.startsWith('http')) return src;
@@ -526,13 +545,18 @@ export class RsiSyncService {
            system_code=EXCLUDED.system_code,
            system_name=EXCLUDED.system_name, parent_id=EXCLUDED.parent_id,
            faction_name=EXCLUDED.faction_name, affiliations=EXCLUDED.affiliations,
-           thumbnail=EXCLUDED.thumbnail, description=EXCLUDED.description, web_url=EXCLUDED.web_url,
-           coordinates=EXCLUDED.coordinates, aggregated=EXCLUDED.aggregated,
+           thumbnail=COALESCE(EXCLUDED.thumbnail, rsi.starmap_locations.thumbnail),
+           description=COALESCE(EXCLUDED.description, rsi.starmap_locations.description),
+           web_url=COALESCE(EXCLUDED.web_url, rsi.starmap_locations.web_url),
+           coordinates=COALESCE(EXCLUDED.coordinates, rsi.starmap_locations.coordinates),
+           aggregated=COALESCE(EXCLUDED.aggregated, rsi.starmap_locations.aggregated),
            size=EXCLUDED.size, population=EXCLUDED.population, economy=EXCLUDED.economy, danger=EXCLUDED.danger,
-           frost_line=EXCLUDED.frost_line, habitable_zone_inner=EXCLUDED.habitable_zone_inner,
-           habitable_zone_outer=EXCLUDED.habitable_zone_outer,
-           jump_points=EXCLUDED.jump_points, raw_json=EXCLUDED.raw_json,
-           source_updated_at=EXCLUDED.source_updated_at,
+           frost_line=COALESCE(EXCLUDED.frost_line, rsi.starmap_locations.frost_line),
+           habitable_zone_inner=COALESCE(EXCLUDED.habitable_zone_inner, rsi.starmap_locations.habitable_zone_inner),
+           habitable_zone_outer=COALESCE(EXCLUDED.habitable_zone_outer, rsi.starmap_locations.habitable_zone_outer),
+           jump_points=COALESCE(EXCLUDED.jump_points, rsi.starmap_locations.jump_points),
+           raw_json=EXCLUDED.raw_json,
+           source_updated_at=COALESCE(EXCLUDED.source_updated_at, rsi.starmap_locations.source_updated_at),
            synced_at=NOW()`,
         [
           row.rsi_id,
@@ -614,7 +638,7 @@ export class RsiSyncService {
           await upsert({
             rsi_id: rsiId,
             name: String(sys.name ?? rsiId),
-            type: 'StarSystem',
+            type: 'system',
             status: sys.status ?? null,
             star_type: sys.type ?? null,
             system_code: systemCode,
@@ -656,12 +680,19 @@ export class RsiSyncService {
           errors++;
         }
 
-        // ── Step 3: fetch celestial objects for this system ───────────────────────
+        // ── Step 3: fetch ARK map objects for this system ─────────────────────────
         if (systemCode) {
           try {
-            const sysUrl = `${RSI_BASE_URL}/api/starmap/star-systems/${systemCode}`;
-            const sysData = await postJson(sysUrl);
-            const bodies: any[] = sysData.data?.celestial_objects ?? [];
+            const findUrl = `${RSI_BASE_URL}/api/starmap/find`;
+            const findData = await postJson(findUrl, { query: sys.name ?? systemCode });
+            const foundBodies: any[] = findData.data?.objects?.resultset ?? [];
+            const bodies = foundBodies.filter((body) => String(body.star_system?.code ?? '').toUpperCase() === systemCode.toUpperCase());
+
+            if (bodies.length === 0) {
+              const sysUrl = `${RSI_BASE_URL}/api/starmap/star-systems/${systemCode}`;
+              const sysData = await postJson(sysUrl);
+              bodies.push(...(sysData.data?.celestial_objects ?? []));
+            }
 
             for (const body of bodies) {
               const bodyId = String(body.id ?? '');
@@ -675,13 +706,13 @@ export class RsiSyncService {
               try {
                 await upsert({
                   rsi_id: bodyId,
-                  name: String(body.name ?? bodyId),
-                  type: (body.type ?? 'unknown').toLowerCase(),
+                  name: starmapObjectName(body),
+                  type: normalizeStarmapObjectType(body.type),
                   status: body.status ?? null,
                   star_type: null,
                   system_code: systemCode,
                   system_name: sys.name ?? null,
-                  parent_id: body.parent_id ? String(body.parent_id) : rsiId,
+                  parent_id: starmapObjectParentId(body, rsiId),
                   faction_name: body.affiliation?.[0]?.name ?? null,
                   affiliations: json((body.affiliation ?? []).map((a: any) => a.name).filter(Boolean)),
                   thumbnail: body.thumbnail?.url ?? null,
@@ -708,6 +739,7 @@ export class RsiSyncService {
                 errors++;
               }
             }
+            onProgress?.(`  [starmap]   ${bodies.length} ARK objects`);
           } catch {
             // system may not expose celestial detail
           }

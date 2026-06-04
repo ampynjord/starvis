@@ -21,7 +21,8 @@ type RsiStarmapPosition = {
   type: string;
   system_code?: string | null;
   system_name?: string | null;
-  parent_id?: number | null;
+  parent_id?: number | string | null;
+  parent_db_id?: number | null;
   coordinates?: Coordinates | null;
   aggregated?: {
     planets?: number;
@@ -123,14 +124,16 @@ function systemCode(loc: LocationWithMap) {
 }
 
 function posToLocation(pos: RsiStarmapPosition): LocationWithMap {
+  const stableId = pos.rsi_id ?? String(pos.id);
+  const parentStableId = pos.parent_id != null ? String(pos.parent_id) : null;
   return {
-    uuid: `starmap-${pos.id}`,
+    uuid: `starmap-${stableId}`,
     class_name: pos.rsi_id ? `RSI_${pos.rsi_id}` : `RSI_${pos.id}`,
     name: pos.name,
     type: normalizeType(pos.type),
     system_code: pos.system_code ?? null,
-    parent_uuid: pos.parent_id != null ? `starmap-${pos.parent_id}` : null,
-    parent_id: pos.parent_id ?? null,
+    parent_uuid: parentStableId ? `starmap-${parentStableId}` : null,
+    parent_id: typeof pos.parent_id === 'number' ? pos.parent_id : null,
     loc_key: null,
     description: null,
     is_scannable: false,
@@ -155,7 +158,7 @@ function mergeLocation(mapLoc: LocationWithMap, gameLoc: LocationWithMap): Locat
     uuid: mapLoc.uuid,
     name: mapLoc.name || gameLoc.name,
     type: normalizeType(mapLoc.type || gameLoc.type),
-    parent_uuid: gameLoc.parent_uuid ?? mapLoc.parent_uuid ?? null,
+    parent_uuid: mapLoc.parent_uuid ?? gameLoc.parent_uuid ?? null,
     parent_id: mapLoc.parent_id ?? gameLoc.parent_id ?? null,
     system_code: gameLoc.system_code ?? mapLoc.system_code ?? null,
     coordinates: mapLoc.coordinates ?? gameLoc.coordinates ?? gameLoc.rsi_starmap?.coordinates ?? null,
@@ -563,23 +566,26 @@ export default function LocationsPage() {
 
   const query = search.trim().toLowerCase();
   const visibleNodes = useMemo(() => {
-    return allNodes.filter((node) => {
-      const inMode = !systemIds || systemIds.has(node.id);
+    const baseNodes = viewMode === 'galaxy'
+      ? roots
+      : allNodes.filter((node) => !systemIds || systemIds.has(node.id));
+    return baseNodes.filter((node) => {
       const typeMatch = typeFilter === 'all' || normalizeType(node.loc.type) === typeFilter;
       const textMatch =
         !query ||
         node.label.toLowerCase().includes(query) ||
         node.systemCode.toLowerCase().includes(query) ||
         (node.loc.class_name ?? '').toLowerCase().includes(query);
-      return inMode && typeMatch && textMatch;
+      return typeMatch && textMatch;
     });
-  }, [allNodes, query, systemIds, typeFilter]);
+  }, [allNodes, query, roots, systemIds, typeFilter, viewMode]);
 
   const countsByType = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const node of allNodes) counts.set(normalizeType(node.loc.type), (counts.get(normalizeType(node.loc.type)) ?? 0) + 1);
+    const baseNodes = viewMode === 'galaxy' ? roots : allNodes.filter((node) => !systemIds || systemIds.has(node.id));
+    for (const node of baseNodes) counts.set(normalizeType(node.loc.type), (counts.get(normalizeType(node.loc.type)) ?? 0) + 1);
     return counts;
-  }, [allNodes]);
+  }, [allNodes, roots, systemIds, viewMode]);
 
   useEffect(() => {
     if (!selectedId && allNodes[0]) setSelectedId(allNodes[0].id);

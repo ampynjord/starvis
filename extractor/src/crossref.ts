@@ -82,6 +82,7 @@ export const SM_TO_P4K_ALIASES: Record<string, string> = {
 function normalizeForMatch(name: string): string {
   return (
     name
+      .replace(/([a-z])([A-Z])/g, '$1 $2')
       .toLowerCase()
       .trim()
       .normalize('NFD')
@@ -208,7 +209,7 @@ function normalizeStarmapType(type: string | null | undefined): string {
 
 function stripLocationNoise(name: string): string {
   return normalizeForMatch(name)
-    .replace(/\b(star|sun|system|planet|moon)\b/g, '')
+    .replace(/\b(star|sun|system|planet|moon|jump|point)\b/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -242,6 +243,13 @@ function areStarmapTypesCompatible(p4kType: string, rsiType: string): boolean {
   if (p4k === 'planet' && ['planet', 'dwarf planet'].includes(rsi)) return true;
   if (p4k === 'moon' && ['moon', 'satellite'].includes(rsi)) return true;
   return false;
+}
+
+function starmapTypeSpecificityScore(p4kType: string, rsiType: string): number {
+  const p4k = normalizeStarmapType(p4kType);
+  const rsi = normalizeStarmapType(rsiType);
+  if (p4k === rsi && normalizeForMatch(rsiType) !== 'system') return 10;
+  return 0;
 }
 
 function inferSystemCode(location: { name: string; type: string; system_code: string | null; class_name?: string | null }): string {
@@ -309,7 +317,9 @@ export async function crossReferenceStarmapLocations(conn: PoolClient, env: Game
 
     let best: { id: number; score: number } | null = null;
     for (const candidate of candidates) {
-      const score = locationMatchScore(location.name, candidate.name, candidate.system_name);
+      const score =
+        locationMatchScore(location.name, candidate.name, candidate.system_name) +
+        starmapTypeSpecificityScore(location.type, candidate.type);
       if (!best || score > best.score) best = { id: candidate.id, score };
     }
 

@@ -378,6 +378,7 @@ model StarmapLocation {
   gameLocations Location[]
 
   @@index([systemCode])
+  @@index([parentId])
   @@index([type])
   @@map("starmap_locations")
   @@schema("rsi")
