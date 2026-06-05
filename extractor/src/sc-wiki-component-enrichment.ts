@@ -6,6 +6,13 @@ export type ComponentWikiEnrichment = {
   componentClass: string | null;
 };
 
+type WikiItemsPayload = {
+  data?: unknown;
+  meta?: {
+    last_page?: unknown;
+  };
+};
+
 const CLASS_VALUES = new Set(['Civilian', 'Competition', 'Industrial', 'Military', 'Stealth']);
 
 const TYPE_ALIASES: Record<string, string[]> = {
@@ -53,7 +60,7 @@ async function fetchWikiItemsByType(type: string): Promise<any[]> {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status} for ${url.toString()}`);
 
-    const payload = await res.json();
+    const payload = (await res.json()) as WikiItemsPayload;
     if (Array.isArray(payload.data)) items.push(...payload.data);
     lastPage = Number(payload.meta?.last_page ?? page);
     page += 1;
