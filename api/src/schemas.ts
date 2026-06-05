@@ -57,6 +57,7 @@ export const ComponentQuery = z
     sub_type: qStr,
     size: qStr,
     grade: qStr,
+    component_class: qStr,
     min_size: qStr,
     max_size: qStr,
     manufacturer: qStr,

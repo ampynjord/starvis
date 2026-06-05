@@ -10,6 +10,11 @@ import type { DataForgeContext } from './dataforge-utils.js';
 import { resolveComponentName } from './dataforge-utils.js';
 import logger from './logger.js';
 
+function mapAttachDefGrade(grade: unknown): string | null {
+  if (typeof grade !== 'number' || grade < 1) return null;
+  return String.fromCharCode(64 + grade);
+}
+
 // ── Type classification helpers ──
 
 interface ItemRecord {
@@ -327,7 +332,7 @@ export function extractItems(ctx: DataForgeContext): { items: ItemRecord[]; comm
           const ad = c.AttachDef;
           if (ad && typeof ad === 'object') {
             if (typeof ad.Size === 'number') item.size = ad.Size;
-            if (typeof ad.Grade === 'number') item.grade = String.fromCharCode(65 + ad.Grade);
+            item.grade = mapAttachDefGrade(ad.Grade);
             // Apply AttachDef.Type FIRST (authoritative source), BEFORE subType assignment.
             // The guard `if (!item.subType)` was removed: armor items with a weight subType (Light/Medium/Heavy)
             // were never re-typed because subType was already set when this code ran.

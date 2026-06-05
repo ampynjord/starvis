@@ -32,6 +32,7 @@ import {
   extractMissions,
 } from './mission-extractor.js';
 import { RsiSyncService } from './rsi-sync-service.js';
+import { fetchComponentWikiEnrichment } from './sc-wiki-component-enrichment.js';
 import { buildLocationSlugIndex, extractShopsFromPrefabs } from './shop-extractor.js';
 
 export type ExtractionModule =
@@ -305,7 +306,7 @@ export class ExtractionService {
         [env],
       );
       const { rows: oldCompsRaw } = await conn.query<any>(
-        'SELECT uuid, class_name, name, type, sub_type, size, grade, manufacturer_code FROM game.components WHERE env = $1',
+        'SELECT uuid, class_name, name, type, sub_type, size, grade, component_class, manufacturer_code FROM game.components WHERE env = $1',
         [env],
       );
       const oldShips = new Map(oldShipsRaw.map((s: any) => [s.class_name, s]));
@@ -628,8 +629,20 @@ export class ExtractionService {
       onProgress?.(`Localized ${components.length} component names`);
     }
 
+    onProgress?.('Enriching component grades/classes from SC Wiki…');
+    const wikiEnrichment = await fetchComponentWikiEnrichment(new Set(components.map((c) => String(c.type)).filter(Boolean)));
+    let wikiEnriched = 0;
+    for (const c of components) {
+      const enrichment = wikiEnrichment.get(String(c.className).toLowerCase());
+      if (!enrichment) continue;
+      if (enrichment.grade) c.grade = enrichment.grade;
+      if (enrichment.componentClass) c.componentClass = enrichment.componentClass;
+      wikiEnriched++;
+    }
+    onProgress?.(`Component grades/classes enriched: ${wikiEnriched}/${components.length}`);
+
     const COMP_COLS = `env, uuid, class_name, name, normalized_name, canonical_component_key,
-          type, game_component_category, sub_type, size, grade, manufacturer_code,
+          type, game_component_category, sub_type, size, grade, component_class, manufacturer_code,
             mass, hp,
             power_draw, power_base, power_output,
             heat_generation, cooling_rate,
@@ -676,6 +689,7 @@ export class ExtractionService {
             type=EXCLUDED.type,
             game_component_category=EXCLUDED.game_component_category,
             sub_type=EXCLUDED.sub_type, size=EXCLUDED.size, grade=EXCLUDED.grade,
+            component_class=EXCLUDED.component_class,
             manufacturer_code=EXCLUDED.manufacturer_code,
             mass=EXCLUDED.mass, hp=EXCLUDED.hp,
             power_draw=EXCLUDED.power_draw, power_base=EXCLUDED.power_base, power_output=EXCLUDED.power_output,
@@ -744,7 +758,7 @@ export class ExtractionService {
             raw_json=EXCLUDED.raw_json,
             updated_at=CURRENT_TIMESTAMP`;
 
-    const COL_COUNT = 120; // number of columns above (stats + source metadata + env)
+    const COL_COUNT = 121; // number of columns above (stats + source metadata + env)
 
     /** Map a component object to a flat array of values */
     const toCanonicalRow = (c: any): (string | number | null)[] => {
@@ -769,6 +783,7 @@ export class ExtractionService {
         c.subType || null,
         c.size ?? null,
         c.grade || null,
+        c.componentClass || null,
         c.manufacturerCode || null,
         c.mass ?? null,
         c.hp ?? null,
@@ -2010,7 +2025,7 @@ export class ExtractionService {
       [env],
     );
     const { rows: newCompsRaw } = await conn.query<any>(
-      'SELECT uuid, class_name, name, type, sub_type, size, grade, manufacturer_code FROM game.components WHERE env = $1',
+      'SELECT uuid, class_name, name, type, sub_type, size, grade, component_class, manufacturer_code FROM game.components WHERE env = $1',
       [env],
     );
     const newShips = new Map(newShipsRaw.map((s: any) => [s.class_name, s]));
@@ -2104,7 +2119,7 @@ export class ExtractionService {
       }
     }
 
-    const compDetailFields = ['type', 'sub_type', 'size', 'grade', 'manufacturer_code'];
+    const compDetailFields = ['type', 'sub_type', 'size', 'grade', 'component_class', 'manufacturer_code'];
 
     // Added components
     for (const [cn, comp] of newComps) {

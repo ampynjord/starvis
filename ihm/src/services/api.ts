@@ -315,12 +315,26 @@ export const api = {
       sub_type?: string;
       size?: number;
       grade?: string;
+      component_class?: string;
       manufacturer?: string;
       /** Game component category slug: weapons, shields, quantum-drives, etc. */
       category?: string;
     }) => get<PaginatedResponse<ComponentListItem>>('/components', p),
     categories: (env?: string) => get<{ slug: string; label: string; types: string[] }[]>('/components/categories', { env }),
-    filters: (env?: string) => get<Record<string, string[]>>('/components/filters', { env }),
+    filters: async (env?: string) => {
+      const res = await get<{
+        filters?: {
+          size?: { value: string; label?: string; count?: number }[];
+          grade?: { value: string; label?: string; count?: number }[];
+          component_class?: { value: string; label?: string; count?: number }[];
+        };
+      }>('/components/filters', { env });
+      return {
+        sizes: res.filters?.size?.map((f) => f.value) ?? [],
+        grades: res.filters?.grade?.map((f) => f.value) ?? [],
+        componentClasses: res.filters?.component_class ?? [],
+      };
+    },
     get: (uuid: string, env?: string) => get<Component>(`/components/${uuid}`, { env }),
     buyLocations: (uuid: string, env?: string) => get<BuyLocation[]>(`/components/${uuid}/buy-locations`, { env }),
     ships: (uuid: string, env?: string) => get<ShipListItem[]>(`/components/${uuid}/ships`, { env }),
