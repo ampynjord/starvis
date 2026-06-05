@@ -246,6 +246,7 @@ export interface ComponentListItem {
   sub_type: string | null;
   size: number | null;
   grade: string | null;
+  component_class: string | null;
   manufacturer_code: string | null;
   manufacturer_name: string | null;
   // Key stats (populated by list endpoint)

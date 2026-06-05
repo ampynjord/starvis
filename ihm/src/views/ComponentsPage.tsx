@@ -220,6 +220,7 @@ export default function ComponentsPage() {
   const [selectedSubType, setSelectedSubType] = useState("");
   const [size, setSize] = useState("");
   const [grade, setGrade] = useState("");
+  const [componentClass, setComponentClass] = useState("");
 
   const { data: apiCategories } = useQuery({
     queryKey: ["components.categories", env],
@@ -257,7 +258,7 @@ export default function ComponentsPage() {
     queryKey: [
       "components.list",
       env,
-      { page, search: debouncedSearch, category: category.slug, type: selectedType, sub_type: selectedSubType, size, grade },
+      { page, search: debouncedSearch, category: category.slug, type: selectedType, sub_type: selectedSubType, size, grade, componentClass },
     ],
     queryFn: () =>
       api.components.list({
@@ -271,6 +272,7 @@ export default function ComponentsPage() {
         sub_type: selectedSubType || undefined,
         size: size ? Number(size) : undefined,
         grade: grade || undefined,
+        component_class: componentClass || undefined,
       }),
   });
 
@@ -352,6 +354,20 @@ export default function ComponentsPage() {
             ))}
           </select>
         )}
+        {(filters?.componentClasses ?? []).length > 0 && (
+          <select
+            value={componentClass}
+            onChange={(e) => { setComponentClass(e.target.value); setPage(1); }}
+            className="bg-panel border border-border text-slate-400 text-xs rounded-sm px-2 py-1"
+          >
+            <option value="">All classes</option>
+            {(filters?.componentClasses ?? []).map((componentClassFilter) => (
+              <option key={componentClassFilter.value} value={componentClassFilter.value}>
+                {componentClassFilter.label ?? componentClassFilter.value}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Component list */}
@@ -391,6 +407,9 @@ export default function ComponentsPage() {
                       </span>
                       {comp.grade && (
                         <GlowBadge color="amber" size="xs">{comp.grade}</GlowBadge>
+                      )}
+                      {comp.component_class && (
+                        <GlowBadge color="cyan" size="xs">{comp.component_class}</GlowBadge>
                       )}
                       {comp.size != null && (
                         <GlowBadge color="slate" size="xs">S{comp.size}</GlowBadge>

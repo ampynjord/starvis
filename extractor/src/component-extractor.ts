@@ -8,6 +8,11 @@ import type { DataForgeContext } from './dataforge-utils.js';
 import { resolveComponentName } from './dataforge-utils.js';
 import logger from './logger.js';
 
+function mapAttachDefGrade(grade: unknown): string | null {
+  if (typeof grade !== 'number' || grade < 1) return null;
+  return String.fromCharCode(64 + grade);
+}
+
 /**
  * Extract all ship components from DataForge SCItem records.
  * Scans EntityClassDefinition records in weapon/system paths and resolves
@@ -127,7 +132,7 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
           const ad = c.AttachDef;
           if (ad && typeof ad === 'object') {
             if (typeof ad.Size === 'number') comp.size = ad.Size;
-            if (typeof ad.Grade === 'number') comp.grade = String.fromCharCode(65 + ad.Grade);
+            comp.grade = mapAttachDefGrade(ad.Grade);
             const loc = ad.Localization;
             if (loc?.Name && typeof loc.Name === 'string') {
               if (!loc.Name.startsWith('LOC_') && !loc.Name.startsWith('@')) {

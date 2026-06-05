@@ -550,6 +550,7 @@ model Component {
   subType                  String?  @map("sub_type") @db.VarChar(100)
   size                     Int?
   grade                    String?  @db.VarChar(10)
+  componentClass           String?  @map("component_class") @db.VarChar(30)
   manufacturerCode         String?  @map("manufacturer_code") @db.VarChar(10)
   mass                     Decimal? @db.Decimal(10, 2)
   hp                       Int?
@@ -668,6 +669,7 @@ model Component {
   @@index([type])
   @@index([gameComponentCategory])
   @@index([subType])
+  @@index([componentClass])
   @@index([canonicalComponentKey])
   @@index([env])
   @@map("components")

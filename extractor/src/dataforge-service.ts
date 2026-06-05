@@ -927,7 +927,7 @@ export class DataForgeService implements DataForgeContext {
         const ad = comp.AttachDef;
         if (ad) {
           if (typeof ad.Size === 'number') result.size = ad.Size;
-          if (typeof ad.Grade === 'number' && ad.Grade >= 0) result.grade = String.fromCharCode(65 + ad.Grade);
+          if (typeof ad.Grade === 'number' && ad.Grade > 0) result.grade = String.fromCharCode(64 + ad.Grade);
           if (typeof ad.SubType === 'string') result.subType = ad.SubType;
           if (typeof ad.Type === 'string') result.type = ad.Type;
           const loc = ad.Localization;

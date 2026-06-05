@@ -431,6 +431,12 @@
             "nullable": true,
             "example": "A"
           },
+          "component_class": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["Civilian", "Competition", "Industrial", "Military", "Stealth"],
+            "example": "Military"
+          },
           "manufacturer_code": {
             "type": "string",
             "nullable": true,
@@ -3185,6 +3191,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "component_class",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["Civilian", "Competition", "Industrial", "Military", "Stealth"]
+            },
+            "description": "Game component class"
           },
           {
             "name": "manufacturer",

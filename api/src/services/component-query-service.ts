@@ -11,6 +11,7 @@ const COMP_SORT = new Set([
   'type',
   'size',
   'grade',
+  'component_class',
   'manufacturer_code',
   'weapon_dps',
   'weapon_burst_dps',
@@ -59,6 +60,7 @@ export class ComponentQueryService {
     sub_type?: string;
     size?: string;
     grade?: string;
+    component_class?: string;
     min_size?: string;
     max_size?: string;
     manufacturer?: string;
@@ -101,6 +103,10 @@ export class ComponentQueryService {
     if (filters?.grade) {
       where.push('c.grade = ?');
       params.push(filters.grade);
+    }
+    if (filters?.component_class) {
+      where.push('c.component_class = ?');
+      params.push(filters.component_class);
     }
     if (filters?.manufacturer) {
       where.push('c.manufacturer_code = ?');
@@ -150,7 +156,7 @@ export class ComponentQueryService {
 
   async getComponentFilters(env = 'live'): Promise<FiltersResult> {
     const prisma = this.getClient(env);
-    const [typeRows, subTypeRows, sizeRows, gradeRows, mfrRows] = await Promise.all([
+    const [typeRows, subTypeRows, sizeRows, gradeRows, classRows, mfrRows] = await Promise.all([
       prisma.$queryRawUnsafe<Row[]>(
         toPostgres(
           "SELECT type as value, COUNT(*) as count FROM game.components WHERE env = ? AND type IS NOT NULL AND type != '' GROUP BY type ORDER BY type",
@@ -175,6 +181,12 @@ export class ComponentQueryService {
       ),
       prisma.$queryRawUnsafe<Row[]>(
         toPostgres(
+          "SELECT component_class as value, COUNT(*) as count FROM game.components WHERE env = ? AND component_class IS NOT NULL AND component_class != '' GROUP BY component_class ORDER BY component_class",
+        ),
+        env,
+      ),
+      prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(
           "SELECT c.manufacturer_code as value, COALESCE(m.name, c.manufacturer_code) as label, COUNT(c.uuid) as count FROM game.components c LEFT JOIN game.manufacturers m ON m.code = c.manufacturer_code WHERE c.env = ? AND c.manufacturer_code IS NOT NULL AND c.manufacturer_code != '' GROUP BY c.manufacturer_code, m.name ORDER BY label",
         ),
         env,
@@ -193,6 +205,7 @@ export class ComponentQueryService {
         ).map(([value, count]) => ({ value, label: value, count })),
         size: sizeRows.map((r) => ({ value: String(r.value), label: `S${r.value}` })),
         grade: gradeRows.map((r) => ({ value: String(r.value), label: String(r.value) })),
+        component_class: classRows.map((r) => ({ value: String(r.value), label: String(r.value), count: Number(r.count) })),
         manufacturer: mfrRows.map((r) => ({ value: String(r.value), label: String(r.label), count: Number(r.count) })),
       },
     };
@@ -275,7 +288,7 @@ export class ComponentQueryService {
 
     const sql = `
       SELECT c.uuid, c.class_name, c.name, c.type, c.sub_type, c.size, c.grade,
-             c.manufacturer_code, m.name as manufacturer_name,
+             c.component_class, c.manufacturer_code, m.name as manufacturer_name,
              c.weapon_dps, c.weapon_burst_dps, c.weapon_sustained_dps,
              c.weapon_damage, c.weapon_fire_rate, c.weapon_range,
              c.weapon_damage_energy, c.weapon_damage_physical, c.weapon_damage_distortion,
