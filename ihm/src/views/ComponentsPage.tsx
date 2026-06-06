@@ -35,6 +35,15 @@ interface CategoryDef {
   subcategories?: ComponentSubcategory[];
 }
 
+interface CategoryFilterConfig {
+  damage?: boolean;
+  size?: boolean;
+  grade?: boolean;
+  componentClass?: boolean;
+  bespoke?: boolean;
+  manufacturer?: boolean;
+}
+
 interface ComponentSubcategory {
   key: string;
   label: string;
@@ -84,6 +93,24 @@ const CATEGORY_SUBCATEGORIES: Partial<Record<GameComponentCategory, ComponentSub
 
 const WEAPON_DAMAGE_TYPES = ["Ballistic", "Laser", "Distortion", "Plasma", "Tachyon"];
 const COMPONENT_CLASS_FILTERS = ["Civilian", "Military", "Competition", "Stealth", "Industrial"];
+const DEFAULT_FILTER_CONFIG: CategoryFilterConfig = {
+  damage: false,
+  size: true,
+  grade: true,
+  componentClass: true,
+  bespoke: true,
+  manufacturer: true,
+};
+const CATEGORY_FILTER_CONFIG: Partial<Record<GameComponentCategory, CategoryFilterConfig>> = {
+  Liveries: { damage: false, size: false, grade: false, componentClass: false, bespoke: false, manufacturer: true },
+  "Jump Modules": { size: true, bespoke: true, manufacturer: true },
+  Radar: { size: true, bespoke: true, manufacturer: true },
+  EMP: { size: true, bespoke: true, manufacturer: true },
+  QI: { size: true, bespoke: true, manufacturer: true },
+  Turrets: { size: true, bespoke: true, manufacturer: true },
+  CM: { size: true, bespoke: true, manufacturer: true },
+  Weapons: { ...DEFAULT_FILTER_CONFIG, damage: true },
+};
 
 const CATEGORIES: CategoryDef[] = GAME_COMPONENT_CATEGORIES.map((label) => ({
   label,
@@ -194,6 +221,7 @@ export default function ComponentsPage() {
   const [grade, setGrade] = useState("");
   const [componentClass, setComponentClass] = useState("");
   const [bespoke, setBespoke] = useState("");
+  const [manufacturer, setManufacturer] = useState("");
 
   const { data: apiCategories } = useQuery({
     queryKey: ["components.categories", env],
@@ -210,11 +238,17 @@ export default function ComponentsPage() {
     : CATEGORIES) as CategoryDef[];
   const category = categories[Math.min(categoryIdx, categories.length - 1)] ?? CATEGORIES[0];
   const selectedSubcategory = category.subcategories?.find((item) => item.key === selectedSubcategoryKey);
+  const filterConfig = { ...DEFAULT_FILTER_CONFIG, ...CATEGORY_FILTER_CONFIG[category.label] };
 
   function handleCategoryChange(idx: number) {
     setCategoryIdx(idx);
     setSelectedSubcategoryKey("");
     setWeaponDamageType("");
+    setSize("");
+    setGrade("");
+    setComponentClass("");
+    setBespoke("");
+    setManufacturer("");
     setPage(1);
   }
 
@@ -227,7 +261,18 @@ export default function ComponentsPage() {
     queryKey: [
       "components.list",
       env,
-        { page, search: debouncedSearch, category: category.slug, subcategory: selectedSubcategoryKey, weaponDamageType, size, grade, componentClass, bespoke },
+      {
+        page,
+        search: debouncedSearch,
+        category: category.slug,
+        subcategory: selectedSubcategoryKey,
+        weaponDamageType,
+        size,
+        grade,
+        componentClass,
+        bespoke,
+        manufacturer,
+      },
     ],
     queryFn: () =>
       api.components.list({
@@ -238,12 +283,13 @@ export default function ComponentsPage() {
         category: category.slug,
         types: selectedSubcategory?.types?.join(",") || undefined,
         sub_types: selectedSubcategory?.subTypes?.join(",") || undefined,
-        weapon_damage_type: weaponDamageType || selectedSubcategory?.weaponDamageType || undefined,
+        weapon_damage_type: filterConfig.damage ? weaponDamageType || selectedSubcategory?.weaponDamageType || undefined : undefined,
         cm_type: selectedSubcategory?.cmType || undefined,
-        size: size ? Number(size) : undefined,
-        grade: grade || undefined,
-        component_class: componentClass || undefined,
-        is_bespoke: bespoke === "" ? undefined : bespoke === "true",
+        size: filterConfig.size && size ? Number(size) : undefined,
+        grade: filterConfig.grade ? grade || undefined : undefined,
+        component_class: filterConfig.componentClass ? componentClass || undefined : undefined,
+        is_bespoke: filterConfig.bespoke && bespoke !== "" ? bespoke === "true" : undefined,
+        manufacturer: filterConfig.manufacturer ? manufacturer || undefined : undefined,
       }),
   });
 
@@ -291,7 +337,7 @@ export default function ComponentsPage() {
         />
       )}
 
-      {category.label === "Weapons" && (
+      {filterConfig.damage && (
         <FilterChips
           items={WEAPON_DAMAGE_TYPES.map((item) => ({ key: item, label: item }))}
           selected={weaponDamageType}
@@ -305,7 +351,7 @@ export default function ComponentsPage() {
 
       {/* Size / Grade inline filters */}
       <div className="flex gap-2 mb-4 flex-wrap">
-        {(filters?.sizes ?? []).length > 0 && (
+        {filterConfig.size && (filters?.sizes ?? []).length > 0 && (
           <select
             value={size}
             onChange={(e) => { setSize(e.target.value); setPage(1); }}
@@ -317,7 +363,7 @@ export default function ComponentsPage() {
             ))}
           </select>
         )}
-        {(filters?.grades?.length ?? 0) > 0 && (
+        {filterConfig.grade && (filters?.grades?.length ?? 0) > 0 && (
           <select
             value={grade}
             onChange={(e) => { setGrade(e.target.value); setPage(1); }}
@@ -329,7 +375,7 @@ export default function ComponentsPage() {
             ))}
           </select>
         )}
-        {COMPONENT_CLASS_FILTERS.length > 0 && (
+        {filterConfig.componentClass && COMPONENT_CLASS_FILTERS.length > 0 && (
           <select
             value={componentClass}
             onChange={(e) => { setComponentClass(e.target.value); setPage(1); }}
@@ -346,15 +392,31 @@ export default function ComponentsPage() {
             ))}
           </select>
         )}
-        <select
-          value={bespoke}
-          onChange={(e) => { setBespoke(e.target.value); setPage(1); }}
-          className="bg-panel border border-border text-slate-400 text-xs rounded-sm px-2 py-1"
-        >
-          <option value="">All fitment</option>
-          <option value="false">Universal</option>
-          <option value="true">Bespoke</option>
-        </select>
+        {filterConfig.manufacturer && (filters?.manufacturers?.length ?? 0) > 0 && (
+          <select
+            value={manufacturer}
+            onChange={(e) => { setManufacturer(e.target.value); setPage(1); }}
+            className="bg-panel border border-border text-slate-400 text-xs rounded-sm px-2 py-1"
+          >
+            <option value="">All manufacturers</option>
+            {(filters?.manufacturers ?? []).map((item) => (
+              <option key={item.value} value={item.value}>
+                {item.label ?? item.value}
+              </option>
+            ))}
+          </select>
+        )}
+        {filterConfig.bespoke && (
+          <select
+            value={bespoke}
+            onChange={(e) => { setBespoke(e.target.value); setPage(1); }}
+            className="bg-panel border border-border text-slate-400 text-xs rounded-sm px-2 py-1"
+          >
+            <option value="">All fitment</option>
+            <option value="false">Universal</option>
+            <option value="true">Bespoke</option>
+          </select>
+        )}
       </div>
 
       {/* Component list */}
