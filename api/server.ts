@@ -247,9 +247,10 @@ app.get('/api-docs', requireApiDocsDeveloper, (_, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.type('html').send(swaggerHtml);
 });
-app.get('/api-docs/openapi.json', requireApiDocsDeveloper, (_, res) => {
+app.get('/api-docs/openapi.json', requireApiDocsDeveloper, (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
-  res.json(publicSwaggerSpec);
+  const role = (req as Request & { jwtPayload?: { role?: string } }).jwtPayload?.role;
+  res.json(role === 'admin' ? fullSwaggerSpec : publicSwaggerSpec);
 });
 app.use('/api-docs', swaggerUi.serve);
 app.get('/admin/api-docs', requireJwtAdmin, (_, res) => {

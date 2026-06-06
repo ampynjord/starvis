@@ -1,120 +1,230 @@
-import type { Metadata } from 'next';
-import { BookOpen, Code2, ExternalLink, Key, Lock, Terminal, Zap } from 'lucide-react';
+'use client';
+
+import { BookOpen, Check, Copy, ExternalLink, Key, Lock, ShieldCheck, Terminal, UserRound, X } from 'lucide-react';
 import Link from 'next/link';
+import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
+import { useAuth } from '@/contexts/AuthContext';
+import { ADMIN_ROLE, DEVELOPER_ROLE, hasDeveloperAccess } from '@/lib/app-constants';
 
-export const metadata: Metadata = {
-  title: 'Developer API - STARVIS',
-  description: 'Documentation and access instructions for the Starvis external REST API.',
-};
+type Notice = { type: 'success' | 'error'; text: string } | null;
 
 function Section({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
   return (
-    <div className="sci-panel p-5 space-y-4">
+    <section className="sci-panel p-5 space-y-4">
       <div className="flex items-center gap-2 border-b border-slate-800/60 pb-3">
         <Icon size={14} className="text-cyan-400 shrink-0" />
         <h2 className="font-orbitron text-[10px] font-bold tracking-widest uppercase text-slate-400">{title}</h2>
       </div>
-      <div className="space-y-3">{children}</div>
-    </div>
+      {children}
+    </section>
   );
 }
 
-function Code({ children }: { children: string }) {
+function CodeBlock({ children }: { children: string }) {
   return (
-    <pre className="bg-slate-950 border border-slate-800 rounded-sm px-4 py-3 text-[11px] font-mono text-slate-300 overflow-x-auto whitespace-pre">
+    <pre className="overflow-x-auto rounded-sm border border-slate-800 bg-slate-950 px-4 py-3 text-[11px] font-mono text-slate-300 whitespace-pre">
       {children}
     </pre>
   );
 }
 
-export default function DeveloperPage() {
+function StatusRow({ ok, label }: { ok: boolean; label: string }) {
+  const Icon = ok ? Check : X;
   return (
-    <PageShell size="lg" className="p-4 md:p-6">
+    <div className="flex items-center justify-between gap-3 border-b border-slate-900/80 py-2 last:border-b-0">
+      <span className="text-xs font-mono-sc text-slate-500">{label}</span>
+      <span className={`inline-flex items-center gap-1.5 text-xs font-mono-sc ${ok ? 'text-emerald-400' : 'text-slate-600'}`}>
+        <Icon size={13} />
+        {ok ? 'Enabled' : 'Locked'}
+      </span>
+    </div>
+  );
+}
+
+export default function DeveloperPage() {
+  const { user, loading } = useAuth();
+  const [apiToken, setApiToken] = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [notice, setNotice] = useState<Notice>(null);
+  const [origin, setOrigin] = useState('https://starvis.ampynjord.bzh');
+
+  const hasAccess = hasDeveloperAccess(user?.role);
+  const isAdmin = user?.role === ADMIN_ROLE;
+  const roleLabel = user?.role ?? 'anonymous';
+  const apiBaseUrl = `${origin}/api/v1`;
+
+  useEffect(() => {
+    setOrigin(window.location.origin);
+  }, []);
+
+  const swaggerLabel = useMemo(() => {
+    if (!user) return 'Login required';
+    if (!hasAccess) return 'Developer role required';
+    if (isAdmin) return 'Full admin documentation';
+    return 'Non-admin documentation';
+  }, [hasAccess, isAdmin, user]);
+
+  const generateToken = async () => {
+    setGenerating(true);
+    setApiToken(null);
+    setNotice(null);
+    setCopied(false);
+    try {
+      const res = await fetch('/api/auth/api-token', { method: 'POST' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? 'Token generation failed');
+      setApiToken(data.token);
+      setNotice({ type: 'success', text: 'Token generated. Copy it now, it will not be shown again.' });
+    } catch (err: any) {
+      setNotice({ type: 'error', text: err.message ?? 'Token generation failed' });
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const copyToken = async () => {
+    if (!apiToken) return;
+    await navigator.clipboard.writeText(apiToken);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  };
+
+  return (
+    <PageShell size="xl" className="p-4 md:p-6">
       <PageHeader
         eyebrow="Developer"
-        title="Developer API"
-        subtitle="External REST API - Developer access required."
+        title="API Access"
+        subtitle="Swagger access, external token generation and REST API connection details."
+        actions={
+          hasAccess ? (
+            <a
+              href="/api-docs"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded border border-cyan-700/50 bg-cyan-900/30 px-3 py-2 font-mono-sc text-xs text-cyan-300 transition-colors hover:border-cyan-500/70 hover:bg-cyan-900/50"
+            >
+              <BookOpen size={14} />
+              Open Swagger
+              <ExternalLink size={11} className="text-cyan-600" />
+            </a>
+          ) : undefined
+        }
       />
 
-      <div className="flex items-start gap-3 rounded-sm border border-amber-800/40 bg-amber-950/10 px-4 py-3">
-        <Lock size={14} className="text-amber-500 mt-0.5 shrink-0" />
-        <p className="font-rajdhani text-sm text-slate-400">
-          The external API is accessible to <span className="text-amber-400 font-semibold">developer</span> and{' '}
-          <span className="text-amber-400 font-semibold">admin</span> accounts only. Generate an API token from your
-          profile to authenticate your requests.
-        </p>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+        <div className="space-y-4">
+          <Section title="Access state" icon={ShieldCheck}>
+            <div className="grid gap-3 sm:grid-cols-3">
+              <div className="rounded-sm border border-slate-800 bg-slate-950/40 px-3 py-3">
+                <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Session</p>
+                <p className="mt-1 truncate font-orbitron text-sm text-slate-200">{loading ? 'Checking...' : user ? user.username : 'Not connected'}</p>
+              </div>
+              <div className="rounded-sm border border-slate-800 bg-slate-950/40 px-3 py-3">
+                <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Role</p>
+                <p className={`mt-1 font-orbitron text-sm ${hasAccess ? 'text-cyan-300' : 'text-slate-500'}`}>{roleLabel}</p>
+              </div>
+              <div className="rounded-sm border border-slate-800 bg-slate-950/40 px-3 py-3">
+                <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Swagger</p>
+                <p className={`mt-1 font-orbitron text-sm ${hasAccess ? 'text-emerald-400' : 'text-amber-400'}`}>{swaggerLabel}</p>
+              </div>
+            </div>
+
+            <div className="rounded-sm border border-slate-800/80 bg-slate-950/30 px-4">
+              <StatusRow ok={hasAccess} label="Swagger UI" />
+              <StatusRow ok={hasAccess} label="API token generation" />
+              <StatusRow ok={isAdmin} label="Admin routes in Swagger" />
+            </div>
+
+            {!user && !loading && (
+              <div className="flex flex-wrap items-center gap-3 rounded-sm border border-amber-800/40 bg-amber-950/10 px-4 py-3">
+                <UserRound size={14} className="text-amber-500" />
+                <p className="flex-1 font-rajdhani text-sm text-slate-400">Sign in with a developer or admin account to unlock Swagger and token generation.</p>
+                <Link href="/login?redirect=/developer" className="rounded border border-slate-700 px-3 py-2 font-mono-sc text-xs text-slate-300 hover:border-cyan-700/60">
+                  Login
+                </Link>
+              </div>
+            )}
+
+            {user && !hasAccess && (
+              <div className="flex items-start gap-3 rounded-sm border border-amber-800/40 bg-amber-950/10 px-4 py-3">
+                <Lock size={14} className="mt-0.5 shrink-0 text-amber-500" />
+                <p className="font-rajdhani text-sm leading-relaxed text-slate-400">
+                  Your account is currently <span className="font-semibold text-slate-300">{user.role}</span>. Ask an admin to assign the{' '}
+                  <span className="font-semibold text-cyan-300">{DEVELOPER_ROLE}</span> role for API documentation and external tokens.
+                </p>
+              </div>
+            )}
+          </Section>
+
+          <Section title="API token" icon={Key}>
+            <div className="space-y-3">
+              <p className="font-rajdhani text-sm leading-relaxed text-slate-400">
+                Generate a long-lived Bearer token for external scripts and integrations. Store it securely after copying it.
+              </p>
+
+              {notice && (
+                <p
+                  className={`rounded-sm border px-3 py-2 text-xs font-mono-sc ${
+                    notice.type === 'success' ? 'border-emerald-800/40 bg-emerald-950/20 text-emerald-400' : 'border-red-800/40 bg-red-950/20 text-red-400'
+                  }`}
+                >
+                  {notice.text}
+                </p>
+              )}
+
+              {apiToken && (
+                <div className="flex items-center gap-2">
+                  <code className="min-w-0 flex-1 truncate rounded border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-[10px] text-slate-300">
+                    {apiToken}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={copyToken}
+                    className="shrink-0 rounded border border-slate-700 p-2 text-slate-400 transition-colors hover:border-cyan-700/50 hover:bg-white/5"
+                    title="Copy token"
+                  >
+                    {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                  </button>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={generateToken}
+                disabled={!hasAccess || generating}
+                className="inline-flex items-center gap-2 rounded border border-cyan-700/50 bg-cyan-900/40 px-4 py-2 font-mono-sc text-sm text-cyan-300 transition-colors hover:border-cyan-500/70 hover:bg-cyan-900/60 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Key size={14} />
+                {generating ? 'Generating...' : 'Generate API token'}
+              </button>
+            </div>
+          </Section>
+        </div>
+
+        <div className="space-y-4">
+          <Section title="Request format" icon={Terminal}>
+            <div className="space-y-3">
+              <p className="font-rajdhani text-sm text-slate-400">Use the token as a Bearer credential against the REST API.</p>
+              <CodeBlock>{`curl -H "Authorization: Bearer YOUR_API_TOKEN" \\
+  "${apiBaseUrl}/ships?limit=20&page=1"`}</CodeBlock>
+            </div>
+          </Section>
+
+          <Section title="Base endpoints" icon={BookOpen}>
+            <CodeBlock>{`${apiBaseUrl}/ships
+${apiBaseUrl}/components
+${apiBaseUrl}/items
+${apiBaseUrl}/commodities
+${apiBaseUrl}/missions
+${apiBaseUrl}/locations
+${apiBaseUrl}/starmap/positions
+${apiBaseUrl}/search?search=aurora`}</CodeBlock>
+          </Section>
+        </div>
       </div>
-
-      <Section title="API Documentation" icon={BookOpen}>
-        <p className="font-rajdhani text-sm text-slate-400 leading-relaxed">
-          Swagger UI exposes the current endpoints, parameters, and response schemas for the public REST API.
-        </p>
-        <a
-          href="/api-docs"
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-2 py-2 px-4 bg-cyan-900/30 border border-cyan-700/50 hover:border-cyan-500/70 hover:bg-cyan-900/50 text-cyan-300 font-mono-sc text-sm rounded transition-colors"
-        >
-          <BookOpen size={14} />
-          Open Swagger UI
-          <ExternalLink size={11} className="text-cyan-600" />
-        </a>
-      </Section>
-
-      <Section title="Generate an API token" icon={Key}>
-        <p className="font-rajdhani text-sm text-slate-400 leading-relaxed">
-          API tokens are long-lived JWTs tied to your account. Generate one from your profile, then store it securely
-          because it will not be shown again.
-        </p>
-        <Link
-          href="/profile"
-          className="inline-flex items-center gap-2 py-2 px-4 bg-slate-800 border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-slate-100 font-mono-sc text-sm rounded transition-colors"
-        >
-          <Key size={14} />
-          Go to Profile / API Token
-        </Link>
-      </Section>
-
-      <Section title="Authentication" icon={Lock}>
-        <p className="font-rajdhani text-sm text-slate-400">
-          All API requests must include a Bearer token in the Authorization header:
-        </p>
-        <Code>{`GET /api/v1/ships HTTP/1.1
-Host: starvis.ampynjord.bzh
-Authorization: Bearer YOUR_API_TOKEN`}</Code>
-      </Section>
-
-      <Section title="Base URL & versioning" icon={Zap}>
-        <p className="font-rajdhani text-sm text-slate-400">
-          Game data endpoints are versioned under <code className="font-mono text-cyan-400">/api/v1/</code>.
-        </p>
-        <Code>{`https://starvis.ampynjord.bzh/api/v1/ships
-https://starvis.ampynjord.bzh/api/v1/components
-https://starvis.ampynjord.bzh/api/v1/manufacturers
-https://starvis.ampynjord.bzh/api/v1/items
-https://starvis.ampynjord.bzh/api/v1/commodities
-https://starvis.ampynjord.bzh/api/v1/missions
-https://starvis.ampynjord.bzh/api/v1/locations
-https://starvis.ampynjord.bzh/api/v1/ships/{uuid}/paints
-https://starvis.ampynjord.bzh/api/v1/search?q=aurora`}</Code>
-      </Section>
-
-      <Section title="Example request" icon={Terminal}>
-        <p className="font-rajdhani text-sm text-slate-400">Fetch the first page of ships with curl:</p>
-        <Code>{`curl -H "Authorization: Bearer YOUR_TOKEN" \\
-  "https://starvis.ampynjord.bzh/api/v1/ships?limit=20&page=1"`}</Code>
-      </Section>
-
-      <Section title="Rate limits" icon={Code2}>
-        <p className="font-rajdhani text-sm text-slate-400 leading-relaxed">
-          The API applies rate limiting to protect the service. Requests that exceed the limit receive a{' '}
-          <code className="font-mono text-amber-400">429 Too Many Requests</code> response. The headers{' '}
-          <code className="font-mono text-slate-300">X-RateLimit-Limit</code> and{' '}
-          <code className="font-mono text-slate-300">X-RateLimit-Remaining</code> indicate the current state.
-        </p>
-      </Section>
     </PageShell>
   );
 }
