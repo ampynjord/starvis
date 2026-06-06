@@ -428,7 +428,7 @@ export default function ComponentsPage() {
         <EmptyState icon="⚙" title="No components" message="Try adjusting your filters." />
       ) : (
         <>
-          <div className="space-y-1">
+          <div className="flex flex-col gap-3">
             {data?.data.map((comp, i) => {
               const isPaint = comp.type === "Paint" || comp.type === "Livery";
               const href = isPaint
@@ -444,7 +444,7 @@ export default function ComponentsPage() {
                 >
                   <Link
                     href={href}
-                    className="block sci-panel hover:border-cyan-800/60 transition-colors px-4 py-2.5 group"
+                    className="block sci-panel hover:border-cyan-800/60 transition-colors px-4 py-3 group"
                   >
                     <div className="flex items-start gap-4">
                       {/* Type color bar */}
