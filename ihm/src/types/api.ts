@@ -247,6 +247,7 @@ export interface ComponentListItem {
   size: number | null;
   grade: string | null;
   component_class: string | null;
+  is_bespoke?: boolean | null;
   manufacturer_code: string | null;
   manufacturer_name: string | null;
   // Key stats (populated by list endpoint)

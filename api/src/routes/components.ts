@@ -11,7 +11,7 @@ import type { RouteDependencies } from './types.js';
 
 /** Backward-compatible category aliases used by older clients. */
 const LEGACY_COMPONENT_CATEGORY_TYPES: Record<string, string[]> = {
-  weapons: ['WeaponGun', 'Turret', 'TurretUnmanned', 'MissileRack', 'Missile', 'Ammunition', 'EMP', 'QuantumInterdictionGenerator'],
+  weapons: ['WeaponGun', 'Turret', 'TurretUnmanned', 'MissileRack', 'Missile', 'EMP', 'QuantumInterdictionGenerator'],
   systems: [
     'Shield',
     'PowerPlant',
@@ -26,7 +26,7 @@ const LEGACY_COMPONENT_CATEGORY_TYPES: Record<string, string[]> = {
     'LifeSupport',
   ],
   mounts: ['Gimbal'],
-  utility: ['MiningLaser', 'SalvageHead', 'TractorBeam'],
+  utility: ['MiningLaser', 'MiningArm', 'MiningModifier', 'SalvageHead', 'TractorBeam', 'RepairBeam'],
   modules: ['ShipModule'],
 };
 
@@ -100,7 +100,7 @@ export function mountComponentRoutes(router: Router, deps: RouteDependencies): v
       }
       const queryWithCategory = categoryTypes ? { ...req.query, type: undefined } : req.query;
       const filters = ComponentQuery.parse(queryWithCategory);
-      if (categoryTypes) {
+      if (categoryTypes && !filters.types) {
         // Inject the multi-type list directly into the service call
         (filters as Record<string, unknown>).types = categoryTypes;
       }

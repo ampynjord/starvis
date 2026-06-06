@@ -24,6 +24,7 @@ import { LoadingGrid } from "@/components/ui/LoadingGrid";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { CanonicalMeta } from "@/components/ui/CanonicalMeta";
 import { COMPONENT_TYPE_COLORS } from "@/utils/constants";
+import { getComponentMetricGroups, type ComponentMetricGroup } from "@/utils/componentMetrics";
 import { fCredits } from "@/utils/formatters";
 import type { Component } from "@/types/api";
 
@@ -151,6 +152,33 @@ function DamageBreakdown({
 				{s > 0 && <span className="text-[10px] font-mono-sc text-yellow-400">Stun {s}%</span>}
 			</div>
 		</div>
+	);
+}
+
+function ComponentMetricPanels({ groups }: { groups: ComponentMetricGroup[] }) {
+	if (!groups.length) return null;
+
+	return (
+		<ScifiPanel title="Component Data">
+			<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+				{groups.map((group) => (
+					<div key={group.key} className="sci-panel p-3 bg-slate-950/30">
+						<p className="text-[10px] font-mono-sc uppercase tracking-widest text-cyan-600 mb-2">
+							{group.title}
+						</p>
+						<div className="divide-y divide-slate-800/50">
+							{group.metrics.map((metric) => (
+								<SpecRow
+									key={`${group.key}-${metric.label}`}
+									label={metric.label}
+									value={metric.value}
+								/>
+							))}
+						</div>
+					</div>
+				))}
+			</div>
+		</ScifiPanel>
 	);
 }
 
@@ -417,6 +445,7 @@ export default function ComponentDetailPage() {
 	const typeColor = COMPONENT_TYPE_COLORS[comp.type] ?? "text-slate-400";
 	const heroStats = getHeroStats(comp).filter((s) => s.value !== "—");
 	const typeSpecs = getTypeSpecs(comp).filter((s) => s.value !== "—");
+	const componentMetricGroups = getComponentMetricGroups(comp);
 	const sectionTitle = getSectionTitle(comp.type);
 	const rawPayload = comp.game_data ?? comp.data_json ?? null;
 
@@ -519,6 +548,8 @@ export default function ComponentDetailPage() {
 				canonicalKey={comp.canonical_component_key}
 				normalizedName={comp.normalized_name}
 			/>
+
+			<ComponentMetricPanels groups={componentMetricGroups} />
 
 			{/* Stats grid */}
 			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

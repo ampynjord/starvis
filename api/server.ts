@@ -312,8 +312,7 @@ async function start() {
   }
 
   // 2. Optionally push schema to PostgreSQL outside production deploys.
-  const shouldPushSchema =
-    process.env.DB_PUSH_ON_STARTUP === 'true' || (process.env.NODE_ENV !== 'production' && process.env.DB_PUSH_ON_STARTUP !== 'false');
+  const shouldPushSchema = process.env.DB_PUSH_ON_STARTUP === 'true';
   if (shouldPushSchema) {
     try {
       const { execFileSync } = await import('node:child_process');

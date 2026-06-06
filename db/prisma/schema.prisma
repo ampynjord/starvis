@@ -551,6 +551,7 @@ model Component {
   size                     Int?
   grade                    String?  @db.VarChar(10)
   componentClass           String?  @map("component_class") @db.VarChar(30)
+  isBespoke                Boolean  @default(false) @map("is_bespoke")
   manufacturerCode         String?  @map("manufacturer_code") @db.VarChar(10)
   mass                     Decimal? @db.Decimal(10, 2)
   hp                       Int?
@@ -670,6 +671,7 @@ model Component {
   @@index([gameComponentCategory])
   @@index([subType])
   @@index([componentClass])
+  @@index([isBespoke])
   @@index([canonicalComponentKey])
   @@index([env])
   @@map("components")

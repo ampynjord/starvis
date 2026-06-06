@@ -2,14 +2,15 @@ export const GAME_COMPONENT_CATEGORIES = [
   'Ordnance',
   'Coolers',
   'EMP',
-  'Mining',
-  'Missile Racks',
+  'QI',
+  'Utility',
+  'Ordnance Racks',
   'Power Plants',
   'Quantum Drives',
   'Shields',
   'Turrets',
   'Weapons',
-  'CM Launchers',
+  'CM',
   'Liveries',
   'Jump Modules',
   'Radar',
@@ -18,17 +19,18 @@ export const GAME_COMPONENT_CATEGORIES = [
 export type GameComponentCategory = (typeof GAME_COMPONENT_CATEGORIES)[number];
 
 export const GAME_COMPONENT_CATEGORY_TYPES: Record<GameComponentCategory, string[]> = {
-  Ordnance: ['Missile', 'WeaponMissile', 'Ammunition', 'Torpedo', 'Bomb'],
+  Ordnance: ['Missile', 'WeaponMissile', 'Torpedo', 'Bomb', 'Rocket'],
   Coolers: ['Cooler'],
-  EMP: ['EMP', 'QuantumInterdictionGenerator'],
-  Mining: ['MiningLaser', 'MiningArm', 'SalvageHead', 'TractorBeam', 'RepairBeam'],
-  'Missile Racks': ['MissileRack'],
+  EMP: ['EMP'],
+  QI: ['QuantumInterdictionGenerator'],
+  Utility: ['MiningLaser', 'MiningArm', 'MiningModifier', 'SalvageHead', 'TractorBeam', 'RepairBeam'],
+  'Ordnance Racks': ['MissileRack', 'TorpedoRack', 'BombRack', 'RocketPod'],
   'Power Plants': ['PowerPlant'],
   'Quantum Drives': ['QuantumDrive'],
   Shields: ['Shield'],
   Turrets: ['Turret', 'TurretBase', 'TurretUnmanned'],
   Weapons: ['WeaponGun', 'Weapon', 'UtilityWeapon'],
-  'CM Launchers': ['Countermeasure'],
+  CM: ['Countermeasure'],
   Liveries: ['Paint', 'Livery'],
   'Jump Modules': ['JumpModule', 'JumpDrive'],
   Radar: ['Radar'],
@@ -41,6 +43,20 @@ export const GAME_COMPONENT_CATEGORY_SLUGS: Record<string, GameComponentCategory
     [category.toLowerCase(), category],
   ]),
 ) as Record<string, GameComponentCategory>;
+
+Object.assign(GAME_COMPONENT_CATEGORY_SLUGS, {
+  mining: 'Utility',
+  utility: 'Utility',
+  'missile-racks': 'Ordnance Racks',
+  'missile racks': 'Ordnance Racks',
+  'Missile Racks': 'Ordnance Racks',
+  'ordnance-racks': 'Ordnance Racks',
+  'cm-launchers': 'CM',
+  'cm launchers': 'CM',
+  'CM Launchers': 'CM',
+  countermeasures: 'CM',
+  qed: 'QI',
+});
 
 const COMPONENT_TYPE_TO_GAME_CATEGORY = Object.fromEntries(
   GAME_COMPONENT_CATEGORIES.flatMap((category) => GAME_COMPONENT_CATEGORY_TYPES[category].map((type) => [type, category])),

@@ -77,7 +77,7 @@ RSI: ship_matrix_id, thumbnail, production_status (Flight Ready / In Production 
 weapons_dps_total, weapons_alpha_total, shield_capacity_total, shield_regen_total, shield_faces, power_output_total, heat_dissipation_total, qd_range (AU), qd_speed (m/s), qd_cooldown (s), countermeasure_count, missile_damage_total, hardpoints (slot list)
 
 ### Components (schema game, table components)
-uuid, name, class_name, type (WeaponGun/Shield/PowerPlant/Cooler/QuantumDrive/Countermeasure/Missile/Radar/MainThruster/ManoThrust…), sub_type, size (1-10), grade (A-E, A=best), component_class (Civilian/Competition/Industrial/Military/Stealth), manufacturer_code, mass
+uuid, name, class_name, type (WeaponGun/Shield/PowerPlant/Cooler/QuantumDrive/Countermeasure/Missile/Radar/MainThruster/ManoThrust…), sub_type, size (1-10), grade (A-D, A=best), component_class (Civilian/Competition/Industrial/Military/Stealth), manufacturer_code, mass
 Weapons: fire_rate (shots/min), ammo_speed (m/s), ammo_lifetime (s), range (m), dmg_physical, dmg_energy, dmg_distortion, dmg_thermal, dmg_biochemical, burst_dps, sustained_dps, alpha_damage
 Shields: shield_capacity, shield_regen, face_coverage (protected faces)
 QD: qd_range (AU), qd_speed (m/s), qd_cooldown (s), qd_fuel_rate
@@ -318,7 +318,7 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
               'Type: WeaponGun | Shield | PowerPlant | Cooler | QuantumDrive | Countermeasure | Missile | Radar | MainThruster | ManoThrust | EMP | QuantumInterdictionGenerator',
           },
           size: { type: 'number', description: 'Size 1-10' },
-          grade: { type: 'string', description: 'Grade A-E (A is best)' },
+          grade: { type: 'string', description: 'Grade A-D (A is best)' },
           component_class: { type: 'string', description: 'Civilian | Competition | Industrial | Military | Stealth' },
           manufacturer: { type: 'string', description: 'Manufacturer code' },
           env: { type: 'string', description: '"live" | "ptu"' },

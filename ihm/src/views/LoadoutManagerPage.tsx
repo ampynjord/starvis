@@ -87,15 +87,15 @@ function legacyCategory(category?: string | null): string {
     case 'Missiles':
       return 'Ordnance';
     case 'Countermeasures':
-      return 'CM Launchers';
+      return 'CM';
     case 'Quantum Drive':
       return 'Quantum Drives';
     case 'QED':
-      return 'EMP';
+      return 'QI';
     case 'Salvage':
     case 'Tractor':
     case 'Repair':
-      return 'Mining';
+      return 'Utility';
     default:
       return category ?? 'Other';
   }

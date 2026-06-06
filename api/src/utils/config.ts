@@ -16,8 +16,8 @@ export function buildDatabaseUrl(): string {
 
   const user = encodeURIComponent(requireEnv('DB_USER'));
   const pass = encodeURIComponent(requireEnv('DB_PASSWORD'));
-  const host = requireEnv('DB_HOST');
-  const port = process.env.DB_PORT || '5432';
+  const host = process.env.DB_HOST || 'localhost';
+  const port = process.env.DB_PORT || process.env.DB_EXTERNAL_PORT || '5432';
   const name = process.env.DB_NAME || requireEnv('DB_NAME');
   return `postgresql://${user}:${pass}@${host}:${port}/${name}`;
 }

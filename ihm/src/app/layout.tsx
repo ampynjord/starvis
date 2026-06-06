@@ -44,11 +44,20 @@ export const metadata: Metadata = {
     siteName: 'STARVIS',
     title: 'STARVIS — Star Citizen Database',
     description: 'Ships, components, FPS gear, commodities and more — extracted from game files.',
+    images: [{ url: '/brand/starvis.png', width: 1254, height: 1254, alt: 'STARVIS logo' }],
   },
   twitter: {
     card: 'summary',
     title: 'STARVIS — Star Citizen Database',
     description: 'Ships, components, FPS gear, commodities and more — extracted from game files.',
+    images: ['/brand/starvis.png'],
+  },
+  icons: {
+    icon: [
+      { url: '/favicon.png', type: 'image/png' },
+      { url: '/brand/starvis.png', type: 'image/png', sizes: '1254x1254' },
+    ],
+    apple: [{ url: '/brand/starvis.png', type: 'image/png' }],
   },
   robots: { index: true, follow: true },
 };
