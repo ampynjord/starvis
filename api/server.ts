@@ -22,7 +22,6 @@ import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
-import { requireJwtAdmin } from './src/middleware/auth.js';
 import { prometheusMiddleware } from './src/middleware/prometheus.js';
 import { healthRouter } from './src/routes/health.js';
 import { createRoutes } from './src/routes/index.js';
@@ -242,7 +241,6 @@ const publicSwaggerSpec = withoutAdminRoutes(fullSwaggerSpec);
 // swagger-ui-express uses relative paths (./swagger-ui.css) by default, which break when
 // the browser URL has no trailing slash (./foo resolves to /foo instead of /api-docs/foo).
 const swaggerHtml = makeSwaggerHtml('/api-docs/openapi.json', '/api-docs');
-const adminSwaggerHtml = makeSwaggerHtml('/admin/api-docs/openapi.json', '/api-docs');
 app.get('/api-docs', requireApiDocsDeveloper, (_, res) => {
   res.setHeader('Cache-Control', 'no-store');
   res.type('html').send(swaggerHtml);
@@ -253,14 +251,6 @@ app.get('/api-docs/openapi.json', requireApiDocsDeveloper, (req, res) => {
   res.json(role === 'admin' ? fullSwaggerSpec : publicSwaggerSpec);
 });
 app.use('/api-docs', swaggerUi.serve);
-app.get('/admin/api-docs', requireJwtAdmin, (_, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  res.type('html').send(adminSwaggerHtml);
-});
-app.get('/admin/api-docs/openapi.json', requireJwtAdmin, (_, res) => {
-  res.setHeader('Cache-Control', 'no-store');
-  res.json(fullSwaggerSpec);
-});
 
 // ===== ROOT =====
 app.get('/', (_, res) =>
