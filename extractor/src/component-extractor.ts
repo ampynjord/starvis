@@ -26,6 +26,11 @@ function inferComponentClass(className: string, name?: string | null): string | 
   return null;
 }
 
+function inferIsBespokeComponent(className: string, name?: string | null): boolean {
+  const text = `${className} ${name ?? ''}`;
+  return /(^|[_\s])(bespoke|custom)([_\s]|$)/i.test(text);
+}
+
 /**
  * Extract all ship components from DataForge SCItem records.
  * Scans EntityClassDefinition records in weapon/system paths and resolves
@@ -871,6 +876,7 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
       }
 
       if (!comp.componentClass) comp.componentClass = inferComponentClass(comp.className, comp.name);
+      comp.isBespoke = inferIsBespokeComponent(comp.className, comp.name);
 
       if (comp.type === 'MissileRack' && !comp.subType) {
         const rackText = `${className} ${comp.name || ''}`.toLowerCase();
