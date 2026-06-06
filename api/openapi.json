@@ -2,8 +2,8 @@
   "openapi": "3.0.0",
   "info": {
     "title": "Starvis API",
-    "version": "1.0.0",
-    "description": "Star Citizen Ships, Components, Items & Game Data API.\n\nData sources:\n- **P4K game data** (ships, components, items, commodities, shops, missions, mining, crafting, locations)\n- **RSI Website** (ship matrix, galactapedia, comm-links, starmap)\n\n### Authentication\nMost endpoints are public. Two authentication methods are supported:\n- **Bearer JWT** (`Authorization: Bearer <token>`): obtained via `POST /auth/login` or `POST /auth/api-token`. Required for `/auth/me`, beta-only tools, and admin routes.\n- **API Key** (`X-API-Key` header): for admin endpoints only.\n\n### User Roles\n| Role | Description |\n|---|---|\n| `user` | Standard account — access to all public data |\n| `beta_tester` | Early access to tools in active development (Loadout Manager, FPS Calculator, Mining Calculator, Trade Calculator, Crafting Calculator) |\n| `admin` | Full access including user management and admin API |\n\nRoles are assigned by an admin via `PUT /admin/users/{id}/role`.\n\n### Pagination\nAll list endpoints support `page` and `limit` query parameters and return `{ data, total, page, limit, pages }`.\n\n### Filters\nEvery domain has a `/filters` endpoint returning `{ filters: { fieldName: [{ value, label, count? }] } }`.\n\n### Game environments\nUse the `env` query parameter to select the game environment: `live` (default), `ptu`, `eptu`, `custom`."
+    "version": "2.0.0",
+    "description": "Star Citizen game data, RSI website data, accounts, corporations, chat and admin REST API.\n\nData sources:\n- **P4K game data** (ships, components, items, commodities, shops, missions, mining, crafting, locations)\n- **RSI Website** (ship matrix, galactapedia, comm-links, starmap, organizations)\n\n### Authentication\nMost data endpoints are public. Authenticated endpoints support:\n- **Bearer JWT** (`Authorization: Bearer <token>`): obtained via `POST /auth/login` or `POST /auth/api-token`. Required for `/auth/me`, chat, corporation workspace and admin routes.\n- **Auth cookie** (`starvis_token` by default): used by the Starvis web app and accepted by protected API and Swagger routes.\n- **API Key** (`X-API-Key` header): accepted for admin endpoints only, for server-to-server compatibility.\n\n### Swagger access\n- Anonymous users and standard `user` accounts cannot access Swagger.\n- `developer` accounts can access `/api-docs` with all non-admin routes.\n- `admin` accounts can access `/api-docs` and `/admin/api-docs` with all routes, including admin routes.\n\n### User Roles\n| Role | Description |\n|---|---|\n| `user` | Standard account — access to public data and authenticated user features |\n| `developer` | Developer account — can access API documentation and developer tools |\n| `admin` | Full access including user management and admin API |\n\nRoles are assigned by an admin via `PUT /admin/users/{id}/role`.\n\n### Pagination\nList endpoints generally support `page` and `limit` query parameters and return `{ data, total, page, limit, pages }`.\n\n### Filters\nDomain `/filters` endpoints return `{ filters: { fieldName: [{ value, label, count? }] } }` when available.\n\n### Game environments\nUse the `env` query parameter to select the game environment: `live` (default), `ptu`, `eptu`, `tech-preview`, `custom`."
   },
   "components": {
     "securitySchemes": {
@@ -174,8 +174,8 @@
       },
       "UserRole": {
         "type": "string",
-        "enum": ["user", "beta_tester", "admin"],
-        "description": "User role. `beta_tester` grants access to features in active development. `admin` has full access including user management."
+        "enum": ["user", "developer", "admin"],
+        "description": "User role. `developer` grants access to API documentation and developer tools. `admin` has full access including user management."
       },
       "User": {
         "type": "object",
@@ -1054,8 +1054,12 @@
       "Location": {
         "type": "object",
         "properties": {
-          "id": {
-            "type": "integer"
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "env": {
+            "type": "string"
           },
           "class_name": {
             "type": "string"
@@ -1067,21 +1071,50 @@
             "type": "string",
             "example": "SpaceStation"
           },
-          "system_name": {
+          "system_code": {
             "type": "string",
             "nullable": true
           },
-          "parent_id": {
+          "parent_uuid": {
+            "type": "string",
+            "nullable": true
+          },
+          "rsi_starmap_location_id": {
             "type": "integer",
             "nullable": true
           },
-          "is_available": {
+          "loc_key": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "coordinates": {
+            "type": "object",
+            "nullable": true
+          },
+          "p4k_path": {
+            "type": "string",
+            "nullable": true
+          },
+          "raw_json": {
+            "nullable": true
+          },
+          "is_scannable": {
             "type": "boolean"
           },
-          "affiliation": {
+          "hide_in_starmap": {
+            "type": "boolean"
+          },
+          "extracted_at": {
             "type": "string",
-            "nullable": true,
-            "description": "Political affiliation (UEE, Hurston, Outlaw, etc.)"
+            "format": "date-time"
+          },
+          "rsi_starmap": {
+            "$ref": "#/components/schemas/StarmapLocation",
+            "nullable": true
           }
         }
       },
@@ -2111,8 +2144,53 @@
           "aggregated": {
             "nullable": true
           },
+          "size": {
+            "type": "number",
+            "nullable": true
+          },
+          "population": {
+            "type": "number",
+            "nullable": true
+          },
+          "economy": {
+            "type": "number",
+            "nullable": true
+          },
+          "danger": {
+            "type": "number",
+            "nullable": true
+          },
+          "frost_line": {
+            "type": "number",
+            "nullable": true
+          },
+          "habitable_zone_inner": {
+            "type": "number",
+            "nullable": true
+          },
+          "habitable_zone_outer": {
+            "type": "number",
+            "nullable": true
+          },
           "jump_points": {
             "nullable": true
+          },
+          "source_updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "synced_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "children": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "object"
+            }
           },
           "p4k_location": {
             "nullable": true
@@ -2288,6 +2366,16 @@
       },
       "BadRequest": {
         "description": "Invalid request parameters",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Resource conflict",
         "content": {
           "application/json": {
             "schema": {
@@ -3614,6 +3702,38 @@
         }
       }
     },
+    "/api/v1/items/navigation": {
+      "get": {
+        "tags": ["Items"],
+        "summary": "Get item navigation taxonomy",
+        "operationId": "getItemNavigation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/env"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Grouped item navigation data for FPS item pages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/items/sub-types": {
       "get": {
         "tags": ["Items"],
@@ -3853,6 +3973,41 @@
         }
       }
     },
+    "/api/v1/commodities/categories": {
+      "get": {
+        "tags": ["Commodities"],
+        "summary": "List commodity categories",
+        "operationId": "getCommodityCategories",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/env"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Available commodity categories",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/commodities/filters": {
       "get": {
         "tags": ["Commodities"],
@@ -3961,6 +4116,52 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/FiltersResult"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/paints/groups": {
+      "get": {
+        "tags": ["Paints"],
+        "summary": "List paint groups",
+        "operationId": "getPaintGroups",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/env"
+          },
+          {
+            "$ref": "#/components/parameters/search"
+          },
+          {
+            "name": "manufacturer",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Manufacturer code or name"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paint groups for catalogue navigation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -4173,25 +4374,25 @@
         }
       }
     },
-    "/api/v1/locations/{id}": {
+    "/api/v1/locations/{uuid}": {
       "get": {
         "tags": ["Locations"],
-        "summary": "Get location by ID or class_name",
-        "operationId": "getLocationById",
+        "summary": "Get location by UUID or class_name",
+        "operationId": "getLocationByUuid",
         "parameters": [
           {
-            "name": "id",
+            "name": "uuid",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string"
             },
-            "description": "Location ID or class_name"
+            "description": "Location UUID or class_name"
           }
         ],
         "responses": {
           "200": {
-            "description": "Location details with political affiliation",
+            "description": "Location details with optional RSI starmap correlation",
             "content": {
               "application/json": {
                 "schema": {
@@ -4214,24 +4415,46 @@
         }
       }
     },
-    "/api/v1/locations/{id}/children": {
+    "/api/v1/locations/{uuid}/children": {
       "get": {
         "tags": ["Locations"],
         "summary": "Get child locations",
         "operationId": "getLocationChildren",
         "parameters": [
           {
-            "name": "id",
+            "name": "uuid",
             "in": "path",
             "required": true,
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "Parent location UUID or class_name"
           }
         ],
         "responses": {
           "200": {
-            "description": "Child locations list"
+            "description": "Child locations list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Location"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -4317,24 +4540,41 @@
         }
       }
     },
-    "/api/v1/missions/{id}": {
+    "/api/v1/missions/{uuid}": {
       "get": {
         "tags": ["Missions"],
-        "summary": "Get mission by ID",
-        "operationId": "getMissionById",
+        "summary": "Get mission by UUID",
+        "operationId": "getMissionByUuid",
         "parameters": [
           {
-            "name": "id",
+            "name": "uuid",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
-            }
+              "type": "string",
+              "format": "uuid"
+            },
+            "description": "Mission UUID"
           }
         ],
         "responses": {
           "200": {
-            "description": "Mission details"
+            "description": "Mission details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Mission"
+                    }
+                  }
+                }
+              }
+            }
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -6795,6 +7035,78 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Admin"],
+        "summary": "Create a user (admin only)",
+        "operationId": "adminCreateUser",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "username", "password"],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "username": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 50
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password",
+                    "description": "Must be 8+ chars with uppercase, lowercase, digit and special character"
+                  },
+                  "role": {
+                    "$ref": "#/components/schemas/UserRole"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
           }
         }
       }

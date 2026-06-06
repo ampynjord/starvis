@@ -1,14 +1,14 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { AlertTriangle, Building2, Copy, Key, Lock, LogOut, QrCode, Save, Shield, ShieldCheck, ShieldOff, Trash2, User, X } from 'lucide-react';
+import { AlertTriangle, Building2, Code2, LogOut, QrCode, Save, Shield, ShieldCheck, ShieldOff, Trash2, User, X } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
 import { RsiOrgPicker, type RsiOrg } from '@/components/ui/RsiOrgPicker';
 import { useAuth } from '@/contexts/AuthContext';
-import { hasDeveloperAccess } from '@/lib/app-constants';
 
 interface Membership {
   id: number;
@@ -26,9 +26,6 @@ export default function ProfilePage() {
   const [avatarUrl, setAvatarUrl] = useState('');
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [apiToken, setApiToken] = useState<string | null>(null);
-  const [generatingToken, setGeneratingToken] = useState(false);
-  const [tokenCopied, setTokenCopied] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -149,30 +146,6 @@ export default function ProfilePage() {
       setDeleting(false);
     }
   };
-
-  const handleGenerateApiToken = async () => {
-    setGeneratingToken(true);
-    setApiToken(null);
-    try {
-      const res = await fetch('/api/auth/api-token', { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error ?? 'Failed');
-      setApiToken(data.token);
-    } catch (err: any) {
-      setMessage({ type: 'error', text: err.message });
-    } finally {
-      setGeneratingToken(false);
-    }
-  };
-
-  const handleCopyToken = () => {
-    if (!apiToken) return;
-    navigator.clipboard.writeText(apiToken);
-    setTokenCopied(true);
-    setTimeout(() => setTokenCopied(false), 2000);
-  };
-
-  const isDeveloperOrAdmin = hasDeveloperAccess(user?.role);
 
   const handleSetup2FA = async () => {
     setTwoFaLoading(true);
@@ -401,7 +374,7 @@ export default function ProfilePage() {
         )}
       </motion.div>
 
-      {/* API Token */}
+      {/* Developer API */}
       <motion.div
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -410,49 +383,21 @@ export default function ProfilePage() {
       >
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <h2 className="text-sm font-mono-sc text-cyan-700 uppercase tracking-wider">External API token</h2>
-            {!isDeveloperOrAdmin && (
-              <span className="text-[9px] font-orbitron font-bold tracking-widest text-violet-400 bg-violet-950/40 border border-violet-700/50 px-1.5 py-0.5 rounded-sm">
-                DEV
-              </span>
-            )}
+            <h2 className="text-sm font-mono-sc text-cyan-700 uppercase tracking-wider">Developer API</h2>
+            <span className="text-[9px] font-orbitron font-bold tracking-widest text-violet-400 bg-violet-950/40 border border-violet-700/50 px-1.5 py-0.5 rounded-sm">
+              DEV
+            </span>
           </div>
-          <p className="text-xs text-slate-600">Generate a long-lived token (1 year) to access the API from external projects.</p>
+          <p className="text-xs text-slate-600">Swagger access and external API tokens are now managed from the developer console.</p>
         </div>
 
-        {isDeveloperOrAdmin ? (
-          apiToken ? (
-            <div className="space-y-2">
-              <p className="text-xs text-amber-400 font-mono-sc">Copy this token now — it will not be shown again.</p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 text-[10px] font-mono text-slate-300 bg-slate-900 border border-slate-700 rounded px-3 py-2 truncate">
-                  {apiToken}
-                </code>
-                <button
-                  onClick={handleCopyToken}
-                  className="shrink-0 p-2 rounded border border-slate-700 hover:border-cyan-700/50 hover:bg-white/5 transition-colors"
-                  title="Copier"
-                >
-                  <Copy size={14} className={tokenCopied ? 'text-green-400' : 'text-slate-400'} />
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button
-              onClick={handleGenerateApiToken}
-              disabled={generatingToken}
-              className="flex items-center gap-2 py-2 px-4 bg-cyan-900/40 border border-cyan-700/50 hover:border-cyan-500/70 hover:bg-cyan-900/60 text-cyan-300 font-mono-sc text-sm rounded transition-colors disabled:opacity-50"
-            >
-              <Key size={14} />
-              {generatingToken ? 'GENERATING...' : 'GENERATE API TOKEN'}
-            </button>
-          )
-        ) : (
-          <div className="flex items-center gap-3 opacity-40 cursor-not-allowed select-none">
-            <Lock size={14} className="text-slate-500 shrink-0" />
-            <span className="text-xs text-slate-500 font-mono-sc">Available for developer and admin accounts only.</span>
-          </div>
-        )}
+        <Link
+          href="/developer"
+          className="inline-flex items-center gap-2 py-2 px-4 bg-cyan-900/40 border border-cyan-700/50 hover:border-cyan-500/70 hover:bg-cyan-900/60 text-cyan-300 font-mono-sc text-sm rounded transition-colors"
+        >
+          <Code2 size={14} />
+          Open API Access
+        </Link>
       </motion.div>
 
       {/* 2FA */}
