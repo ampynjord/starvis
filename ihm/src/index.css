@@ -249,6 +249,44 @@
   overflow: hidden;
 }
 
+.lore-entry-content,
+.comm-link-content {
+  color: rgb(148 163 184);
+  font-size: 0.9375rem;
+  line-height: 1.8;
+}
+
+.lore-entry-content p,
+.comm-link-content p {
+  margin-bottom: 1rem;
+}
+
+.comm-link-content a,
+.lore-entry-content a {
+  color: rgb(34 211 238);
+  text-decoration: underline;
+  text-decoration-color: rgb(8 145 178 / 0.5);
+  text-underline-offset: 3px;
+}
+
+.comm-link-content h1,
+.comm-link-content h2,
+.comm-link-content h3,
+.lore-entry-content h1,
+.lore-entry-content h2,
+.lore-entry-content h3 {
+  margin: 1.5rem 0 0.75rem;
+  color: rgb(226 232 240);
+  font-family: 'Orbitron', sans-serif;
+  letter-spacing: 0;
+}
+
+.comm-link-content img,
+.lore-entry-content img {
+  margin: 1rem 0;
+  border: 1px solid rgb(30 41 59);
+}
+
 /* ─── Fonts ────────────────────────────────────────────────────────────────── */
 @layer base {
   :root {
