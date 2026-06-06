@@ -336,12 +336,20 @@ export const api = {
           manufacturer?: { value: string; label?: string; count?: number }[];
         };
       }>('/components/filters', { env });
+      const manufacturers = [
+        ...new Map(
+          (res.filters?.manufacturer ?? []).map((item) => {
+            const value = String(item.value).trim().toUpperCase();
+            return [value, { ...item, value, label: item.label ?? value }];
+          }),
+        ).values(),
+      ].sort((a, b) => String(a.label).localeCompare(String(b.label)));
       return {
         sizes: res.filters?.size?.map((f) => f.value) ?? [],
         grades: res.filters?.grade?.map((f) => f.value) ?? [],
         componentClasses: res.filters?.component_class ?? [],
         bespoke: res.filters?.is_bespoke ?? [],
-        manufacturers: res.filters?.manufacturer ?? [],
+        manufacturers,
       };
     },
     get: (uuid: string, env?: string) => get<Component>(`/components/${uuid}`, { env }),

@@ -206,7 +206,7 @@ export class ComponentQueryService {
       where.push(`${IS_BESPOKE_EXPR} = ${wantsBespoke ? 'TRUE' : 'FALSE'}`);
     }
     if (filters?.manufacturer) {
-      where.push('c.manufacturer_code = ?');
+      where.push('UPPER(TRIM(c.manufacturer_code)) = ?');
       params.push(filters.manufacturer.toUpperCase());
     }
     if (filters?.search) {
@@ -244,7 +244,7 @@ export class ComponentQueryService {
       params.push(t, t, t);
     }
     if (filters?.manufacturer) {
-      where.push('s.manufacturer_code = ?');
+      where.push('UPPER(TRIM(s.manufacturer_code)) = ?');
       params.push(filters.manufacturer.toUpperCase());
     }
     if (filters?.is_bespoke != null) {
@@ -378,7 +378,15 @@ export class ComponentQueryService {
       ),
       prisma.$queryRawUnsafe<Row[]>(
         toPostgres(
-          `SELECT c.manufacturer_code as value, COALESCE(m.name, c.manufacturer_code) as label, COUNT(c.uuid) as count FROM game.components c LEFT JOIN game.manufacturers m ON m.code = c.manufacturer_code WHERE c.env = ? AND ${COMPONENT_VISIBLE_WHERE} AND c.manufacturer_code IS NOT NULL AND c.manufacturer_code != '' GROUP BY c.manufacturer_code, m.name ORDER BY label`,
+          `SELECT UPPER(TRIM(c.manufacturer_code)) as value,
+                  COALESCE(MAX(NULLIF(m.name, '')), UPPER(TRIM(c.manufacturer_code))) as label,
+                  COUNT(c.uuid) as count
+           FROM game.components c
+           LEFT JOIN game.manufacturers m ON UPPER(TRIM(m.code)) = UPPER(TRIM(c.manufacturer_code))
+           WHERE c.env = ? AND ${COMPONENT_VISIBLE_WHERE}
+             AND c.manufacturer_code IS NOT NULL AND TRIM(c.manufacturer_code) != ''
+           GROUP BY UPPER(TRIM(c.manufacturer_code))
+           ORDER BY label`,
         ),
         env,
       ),
