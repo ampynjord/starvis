@@ -5,7 +5,7 @@
  * Extraction logic (components, shops, paints) is delegated to dedicated modules.
  */
 
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { extractAllComponents as _extractAllComponents } from './component-extractor.js';
 import { type CryXmlNode, isCryXmlB, parseCryXml } from './cryxml-parser.js';
@@ -76,6 +76,49 @@ function parsePlainXmlShallow(xml: string): CryXmlNode {
   return root.children?.[0] ?? root;
 }
 
+function normalizePublicGameVersion(value: unknown): string | null {
+  const match = String(value ?? '').match(/(\d+\.\d+\.\d+)(?:[-+][\w.-]+)?/);
+  return match?.[1] ?? null;
+}
+
+async function findLauncherVersionForP4KBuild(p4kPath: string, changeNumber: unknown, branch: unknown): Promise<string | null> {
+  const requestedChange = String(changeNumber ?? '').trim();
+  if (!requestedChange) return null;
+
+  const channel = dirname(p4kPath).split(/[\\/]/).pop()?.toUpperCase();
+  const branchVersion = normalizePublicGameVersion(branch);
+  const branchMinor = branchVersion?.split('.').slice(0, 2).join('.');
+  const launcherLogDir = process.env.APPDATA ? join(process.env.APPDATA, 'rsilauncher', 'logs') : null;
+  if (!launcherLogDir) return null;
+
+  try {
+    const files = (await readdir(launcherLogDir, { withFileTypes: true }))
+      .filter((entry) => entry.isFile() && entry.name.endsWith('.log'))
+      .map((entry) => join(launcherLogDir, entry.name));
+
+    let latest: { timestamp: string; version: string } | null = null;
+    const pattern = /"t":"([^"]+)".*?\bSC\s+(LIVE|PTU)\s+(\d+\.\d+\.\d+)-(live|ptu)\.(\d+)/gi;
+
+    for (const file of files) {
+      const raw = await readFile(file, 'utf8');
+      pattern.lastIndex = 0;
+      for (;;) {
+        const match = pattern.exec(raw);
+        if (!match) break;
+        const [, timestamp, logChannel, version, , logChange] = match;
+        if (logChange !== requestedChange) continue;
+        if (channel && logChannel !== channel) continue;
+        if (branchMinor && !version.startsWith(`${branchMinor}.`)) continue;
+        if (!latest || timestamp > latest.timestamp) latest = { timestamp, version };
+      }
+    }
+
+    return latest?.version ?? null;
+  } catch (_err) {
+    return null;
+  }
+}
+
 export class DataForgeService implements DataForgeContext {
   private provider: P4KProvider | null = null;
   private dcbBuffer: Buffer | null = null;
@@ -127,23 +170,32 @@ export class DataForgeService implements DataForgeContext {
       if (c % 100000 === 0) onProgress?.(`Loading: ${c.toLocaleString()}/${t.toLocaleString()}`);
     });
 
-    // 0. Try to read build_manifest.id from the SC install dir (next to Data.p4k)
+    // 0. Try to read P4K install metadata. CIG may keep Branch on the base patch
+    // (for example sc-alpha-4.8.0-hotfix), so prefer the launcher public version
+    // when it matches the exact RequestedP4ChangeNum of this installed P4K build.
     try {
       const manifestPath = join(dirname(this.p4kPath), 'build_manifest.id');
       const raw = await readFile(manifestPath, 'utf8');
       const parsed = JSON.parse(raw);
       const data = parsed?.Data ?? parsed;
-      // Prefer the public-facing version from Branch (e.g. "sc-alpha-4.7.0-hotfix" → "4.7.0")
       const branch: string | undefined = data?.Branch;
-      const branchMatch = branch?.match(/(\d+\.\d+(?:\.\d+)*)/);
-      if (branchMatch) {
-        this.scVersion = branchMatch[1];
-        logger.info(`SC game version: ${this.scVersion} (from Branch "${branch}")`, { module: 'dataforge' });
+      const launcherVersion = await findLauncherVersionForP4KBuild(this.p4kPath, data?.RequestedP4ChangeNum, branch);
+      if (launcherVersion) {
+        this.scVersion = launcherVersion;
+        logger.info(`SC game version: ${this.scVersion} (from launcher cache matching P4K build ${data?.RequestedP4ChangeNum})`, {
+          module: 'dataforge',
+        });
       } else {
-        const ver = data?.Version;
-        if (ver) {
-          this.scVersion = String(ver);
-          logger.info(`SC game version: ${this.scVersion} (from Version field)`, { module: 'dataforge' });
+        const branchVersion = normalizePublicGameVersion(branch);
+        if (branchVersion) {
+          this.scVersion = branchVersion;
+          logger.info(`SC game version: ${this.scVersion} (from Branch "${branch}")`, { module: 'dataforge' });
+        } else {
+          const ver = normalizePublicGameVersion(data?.Version);
+          if (ver) {
+            this.scVersion = ver;
+            logger.info(`SC game version: ${this.scVersion} (from Version field)`, { module: 'dataforge' });
+          }
         }
       }
     } catch (_e) {

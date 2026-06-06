@@ -67,7 +67,7 @@ npx tsx extractor/extract.ts [options]
 | `--dry-run` | Parse le P4K et affiche les stats sans écrire en base | — |
 | `--prod-db` | Utilise `.env.prod` (base de prod, port 5433 via tunnel SSH) | — |
 
-> **Note** : CIG ne stocke pas toujours la version publique dans les fichiers du jeu (ex: LIVE 4.7.2 indique `sc-alpha-4.7.0` dans `build_manifest.id`). Utiliser `--game-version 4.7.2` pour forcer la bonne valeur en base.
+> **Note** : la version publique est auto-detectee depuis le build P4K installe. L'extracteur lit `build_manifest.id`, recupere son `RequestedP4ChangeNum`, puis cherche le libelle public `X.X.X` correspondant dans le cache launcher local. `--game-version` reste disponible uniquement comme override manuel.
 
 ### Modules disponibles
 
@@ -111,7 +111,7 @@ npx tsx extractor/extract.ts --env live --game-version 4.7.2
 npx tsx extractor/extract.ts --env ptu
 
 # Extraction LIVE vers la prod (tunnel SSH requis, voir ci-dessous)
-npx tsx extractor/extract.ts --env live --prod-db --game-version 4.7.2
+npx tsx extractor/extract.ts --env live --prod-db
 
 # Extraction PTU vers la prod
 npx tsx extractor/extract.ts --env ptu --prod-db
