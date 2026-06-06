@@ -2,7 +2,23 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Crosshair, Globe2, Loader2, MapPin, Search, Sparkles, X, Zap } from 'lucide-react';
+import {
+  Activity,
+  Building2,
+  CircleDot,
+  Eye,
+  Globe2,
+  Loader2,
+  MapPin,
+  RadioTower,
+  Route,
+  Search,
+  ShieldAlert,
+  Sparkles,
+  Store,
+  Telescope,
+  X,
+} from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -92,17 +108,17 @@ const FALLBACK_POSITIONS: RsiStarmapPosition[] = [
 const TYPE_ORDER = ['system', 'star', 'planet', 'moon', 'station', 'landing_zone', 'rest_stop', 'outpost', 'jump_point', 'comm_array'];
 const MAP_TYPES = new Set(TYPE_ORDER);
 
-const TYPE_STYLE: Record<string, { label: string; color: number; radius: number; icon: React.ReactNode }> = {
-  system: { label: 'System', color: 0x39e7ff, radius: 2.6, icon: <Sparkles size={12} /> },
-  star: { label: 'Star', color: 0xffcc66, radius: 3.1, icon: <Sparkles size={12} /> },
-  planet: { label: 'Planet', color: 0x2dd4bf, radius: 1.45, icon: <Globe2 size={12} /> },
-  moon: { label: 'Moon', color: 0x94a3b8, radius: 0.78, icon: <Globe2 size={11} /> },
-  station: { label: 'Station', color: 0xa78bfa, radius: 0.72, icon: <MapPin size={11} /> },
-  landing_zone: { label: 'Landing zone', color: 0x38bdf8, radius: 0.66, icon: <MapPin size={11} /> },
-  rest_stop: { label: 'Rest stop', color: 0xf59e0b, radius: 0.66, icon: <MapPin size={11} /> },
-  outpost: { label: 'Outpost', color: 0x64748b, radius: 0.48, icon: <MapPin size={10} /> },
-  jump_point: { label: 'Jump point', color: 0xc084fc, radius: 0.86, icon: <Zap size={11} /> },
-  comm_array: { label: 'Comm array', color: 0x22d3ee, radius: 0.52, icon: <Crosshair size={10} /> },
+const TYPE_STYLE: Record<string, { label: string; color: number; radius: number; icon: React.ReactNode; text: string; accent: string }> = {
+  system: { label: 'System', color: 0x39e7ff, radius: 3, icon: <Sparkles size={12} />, text: 'text-cyan-300', accent: 'border-cyan-700/60 bg-cyan-950/25' },
+  star: { label: 'Star', color: 0xffcc66, radius: 3.4, icon: <Sparkles size={12} />, text: 'text-amber-300', accent: 'border-amber-700/60 bg-amber-950/25' },
+  planet: { label: 'Planet', color: 0x2dd4bf, radius: 1.55, icon: <Globe2 size={12} />, text: 'text-teal-300', accent: 'border-teal-700/60 bg-teal-950/25' },
+  moon: { label: 'Moon', color: 0x94a3b8, radius: 0.82, icon: <CircleDot size={11} />, text: 'text-slate-300', accent: 'border-slate-700/60 bg-slate-900/35' },
+  station: { label: 'Station', color: 0xa78bfa, radius: 0.76, icon: <Building2 size={11} />, text: 'text-violet-300', accent: 'border-violet-700/60 bg-violet-950/25' },
+  landing_zone: { label: 'Landing zone', color: 0x38bdf8, radius: 0.7, icon: <MapPin size={11} />, text: 'text-sky-300', accent: 'border-sky-700/60 bg-sky-950/25' },
+  rest_stop: { label: 'Rest stop', color: 0xf59e0b, radius: 0.7, icon: <Store size={11} />, text: 'text-amber-300', accent: 'border-amber-700/60 bg-amber-950/25' },
+  outpost: { label: 'Outpost', color: 0x64748b, radius: 0.5, icon: <MapPin size={10} />, text: 'text-slate-400', accent: 'border-slate-800 bg-slate-950/35' },
+  jump_point: { label: 'Jump point', color: 0xc084fc, radius: 0.92, icon: <Route size={11} />, text: 'text-purple-300', accent: 'border-purple-700/60 bg-purple-950/25' },
+  comm_array: { label: 'Comm array', color: 0x22d3ee, radius: 0.55, icon: <RadioTower size={10} />, text: 'text-cyan-300', accent: 'border-cyan-800/60 bg-cyan-950/20' },
 };
 
 function normalizeType(type: string) {
@@ -114,7 +130,14 @@ function normalizeType(type: string) {
 }
 
 function typeStyle(type: string) {
-  return TYPE_STYLE[normalizeType(type)] ?? { label: normalizeType(type).replace(/_/g, ' '), color: 0x64748b, radius: 0.42, icon: <MapPin size={10} /> };
+  return TYPE_STYLE[normalizeType(type)] ?? {
+    label: normalizeType(type).replace(/_/g, ' '),
+    color: 0x64748b,
+    radius: 0.42,
+    icon: <MapPin size={10} />,
+    text: 'text-slate-400',
+    accent: 'border-slate-800 bg-slate-950/35',
+  };
 }
 
 function toNumber(value: unknown) {
@@ -333,8 +356,8 @@ function Scene({
     if (!container || nodes.length === 0) return;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x020711);
-    scene.fog = new THREE.FogExp2(0x020711, 0.0026);
+    scene.background = new THREE.Color(0x01040a);
+    scene.fog = new THREE.FogExp2(0x020711, 0.0022);
 
     let renderer: THREE.WebGLRenderer;
     try {
@@ -347,48 +370,71 @@ function Scene({
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
 
-    const camera = new THREE.PerspectiveCamera(48, container.clientWidth / container.clientHeight, 0.1, 1200);
-    camera.position.set(0, 92, 108);
+    const camera = new THREE.PerspectiveCamera(46, container.clientWidth / container.clientHeight, 0.1, 1400);
+    camera.position.set(0, 108, 132);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.07;
-    controls.minDistance = 16;
-    controls.maxDistance = 260;
-    controls.maxPolarAngle = Math.PI * 0.52;
+    controls.minDistance = 12;
+    controls.maxDistance = 320;
+    controls.maxPolarAngle = Math.PI * 0.56;
     controls.minPolarAngle = Math.PI * 0.08;
     controls.target.set(0, 0, 0);
 
     const visibility = createVisibilityTracker(container);
-    scene.add(new THREE.AmbientLight(0x3b8aa0, 0.7));
-    const light = new THREE.DirectionalLight(0xbdf8ff, 2.2);
+    scene.add(new THREE.AmbientLight(0x2d7890, 0.72));
+    const light = new THREE.DirectionalLight(0xbdf8ff, 2.45);
     light.position.set(80, 120, 40);
     scene.add(light);
+    const rimLight = new THREE.PointLight(0x7dd3fc, 1.2, 360);
+    rimLight.position.set(-80, 70, -90);
+    scene.add(rimLight);
 
-    const starCount = 1700;
+    const starCount = 2300;
     const starPositions = new Float32Array(starCount * 3);
+    const starColors = new Float32Array(starCount * 3);
+    const starPalette = [new THREE.Color(0xb7ecff), new THREE.Color(0x5eead4), new THREE.Color(0xfef3c7), new THREE.Color(0xc4b5fd)];
     for (let i = 0; i < starPositions.length; i += 3) {
       const r = 160 + hash(`star-r-${i}`) * 520;
       const a = hash(`star-a-${i}`) * Math.PI * 2;
       starPositions[i] = Math.cos(a) * r;
       starPositions[i + 1] = (hash(`star-y-${i}`) - 0.5) * 260;
       starPositions[i + 2] = Math.sin(a) * r;
+      const color = starPalette[Math.floor(hash(`star-c-${i}`) * starPalette.length)] ?? starPalette[0];
+      starColors[i] = color.r;
+      starColors[i + 1] = color.g;
+      starColors[i + 2] = color.b;
     }
+    const starGeometry = new THREE.BufferGeometry()
+      .setAttribute('position', new THREE.BufferAttribute(starPositions, 3))
+      .setAttribute('color', new THREE.BufferAttribute(starColors, 3));
     const stars = new THREE.Points(
-      new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(starPositions, 3)),
-      new THREE.PointsMaterial({ color: 0xb7ecff, size: 0.55, transparent: true, opacity: 0.62, depthWrite: false }),
+      starGeometry,
+      new THREE.PointsMaterial({ size: 0.62, transparent: true, opacity: 0.68, depthWrite: false, vertexColors: true }),
     );
     scene.add(stars);
 
     const group = new THREE.Group();
     scene.add(group);
 
-    const grid = new THREE.GridHelper(260, 26, 0x155e75, 0x082f49);
+    const grid = new THREE.GridHelper(320, 32, 0x155e75, 0x082f49);
     const gridMaterial = grid.material as THREE.Material;
     gridMaterial.transparent = true;
-    gridMaterial.opacity = 0.18;
+    gridMaterial.opacity = 0.13;
     grid.position.y = -8;
     group.add(grid);
+
+    const horizon = new THREE.LineLoop(
+      new THREE.BufferGeometry().setFromPoints(
+        Array.from({ length: 192 }, (_, i) => {
+          const a = (i / 192) * Math.PI * 2;
+          return new THREE.Vector3(Math.cos(a) * 155, -7.95, Math.sin(a) * 155);
+        }),
+      ),
+      new THREE.LineBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.2 }),
+    );
+    group.add(horizon);
 
     const byId = new Map(nodes.map((node) => [node.id, node]));
     const linePositions: number[] = [];
@@ -400,12 +446,32 @@ function Scene({
     }
     const links = new THREE.LineSegments(
       new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3)),
-      new THREE.LineBasicMaterial({ color: 0x0ea5e9, transparent: true, opacity: 0.32 }),
+      new THREE.LineBasicMaterial({ color: 0x0ea5e9, transparent: true, opacity: 0.34 }),
     );
     group.add(links);
 
     const meshes = new Map<string, THREE.Mesh>();
+    const halos = new Map<string, THREE.Sprite>();
     const labels: THREE.Sprite[] = [];
+
+    function glowSprite(color: number) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      const gradient = ctx.createRadialGradient(64, 64, 4, 64, 64, 62);
+      const c = new THREE.Color(color);
+      const rgb = `${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)}`;
+      gradient.addColorStop(0, `rgba(${rgb},0.72)`);
+      gradient.addColorStop(0.35, `rgba(${rgb},0.24)`);
+      gradient.addColorStop(1, `rgba(${rgb},0)`);
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 128, 128);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      return new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    }
 
     function labelSprite(text: string, color: string) {
       const canvas = document.createElement('canvas');
@@ -445,6 +511,17 @@ function Scene({
       group.add(mesh);
       meshes.set(node.id, mesh);
 
+      const halo = glowSprite(node.color);
+      if (halo) {
+        const scale = type === 'system' || type === 'star' ? node.radius * 8.5 : node.radius * 5.2;
+        halo.position.copy(node.position);
+        halo.scale.set(scale, scale, 1);
+        halo.userData.baseScale = scale;
+        halo.userData.nodeId = node.id;
+        halos.set(node.id, halo);
+        group.add(halo);
+      }
+
       if (type === 'system' || type === 'star' || type === 'planet') {
         const label = labelSprite(node.label, type === 'star' ? '#facc15' : '#67e8f9');
         if (label) {
@@ -470,6 +547,20 @@ function Scene({
           );
           group.add(orbit);
         }
+      }
+
+      if (type === 'jump_point') {
+        const ring = new THREE.LineLoop(
+          new THREE.BufferGeometry().setFromPoints(
+            Array.from({ length: 72 }, (_, i) => {
+              const a = (i / 72) * Math.PI * 2;
+              return new THREE.Vector3(Math.cos(a) * node.radius * 2.2, Math.sin(a) * node.radius * 2.2, 0).add(node.position);
+            }),
+          ),
+          new THREE.LineBasicMaterial({ color: node.color, transparent: true, opacity: 0.55 }),
+        );
+        ring.rotation.x = Math.PI * 0.5;
+        group.add(ring);
       }
     }
 
@@ -497,7 +588,17 @@ function Scene({
         mesh.rotation.y += 0.0018;
         mesh.scale.setScalar(selected ? 1.34 + Math.sin(t * 5) * 0.04 : 1);
         material.emissiveIntensity = selected ? 1.1 : normalizeType(byId.get(id)?.loc.type ?? '') === 'system' ? 0.45 : 0.22;
+        const halo = halos.get(id);
+        if (halo) {
+          const baseScale = Number(halo.userData.baseScale ?? 1);
+          const pulse = selected ? 1.25 + Math.sin(t * 5) * 0.08 : 1 + Math.sin(t * 0.8 + hash(id) * 10) * 0.03;
+          halo.scale.set(baseScale * pulse, baseScale * pulse, 1);
+          halo.position.copy(mesh.position);
+          halo.quaternion.copy(camera.quaternion);
+          (halo.material as THREE.SpriteMaterial).opacity = selected ? 0.98 : 0.42;
+        }
       }
+      links.rotation.y = Math.sin(t * 0.08) * 0.015;
       labels.forEach((label) => label.quaternion.copy(camera.quaternion));
       const selected = selectedRef.current ? byId.get(selectedRef.current) : null;
       if (selected) controls.target.lerp(selected.position, 0.04);
@@ -607,6 +708,31 @@ export default function LocationsPage() {
     return counts;
   }, [allNodes, roots, systemIds, viewMode]);
 
+  const systemSummaries = useMemo(() => roots
+    .map((root) => {
+      const ids = descendants(allNodes, root.id);
+      const children = allNodes.filter((node) => ids.has(node.id) && node.id !== root.id);
+      return {
+        root,
+        objects: children.length + 1,
+        planets: children.filter((node) => normalizeType(node.loc.type) === 'planet').length,
+        stations: children.filter((node) => ['station', 'rest_stop', 'landing_zone'].includes(normalizeType(node.loc.type))).length,
+        danger: root.loc.aggregated?.danger,
+        economy: root.loc.aggregated?.economy,
+      };
+    })
+    .sort((a, b) => a.root.label.localeCompare(b.root.label)), [allNodes, roots]);
+
+  const selectedChildren = useMemo(() => {
+    if (!selectedNode) return [];
+    const direct = allNodes.filter((node) => node.parentId === selectedNode.id);
+    return direct.sort((a, b) => TYPE_ORDER.indexOf(normalizeType(a.loc.type)) - TYPE_ORDER.indexOf(normalizeType(b.loc.type)) || a.label.localeCompare(b.label)).slice(0, 10);
+  }, [allNodes, selectedNode]);
+
+  const currentSystemSummary = useMemo(() => (
+    currentRoot ? systemSummaries.find((summary) => summary.root.id === currentRoot.id) ?? null : null
+  ), [currentRoot, systemSummaries]);
+
   useEffect(() => {
     if (!selectedId && allNodes[0]) setSelectedId(allNodes[0].id);
   }, [allNodes, selectedId]);
@@ -615,32 +741,55 @@ export default function LocationsPage() {
   if (starmapError && allNodes.length === 0) return <ErrorState error={starmapError as Error} />;
 
   return (
-    <div className="-m-3 flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden bg-[#020711] sm:-m-6">
-      <div className="flex items-center justify-between gap-3 border-b border-cyan-950/70 bg-slate-950/80 px-4 py-3 backdrop-blur md:px-6">
-        <div>
-          <h1 className="font-orbitron text-lg font-bold uppercase tracking-widest text-cyan-300">Starvis Starmap</h1>
-          <p className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">
-            {allNodes.length.toLocaleString('en-US')} mapped objects - RSI + P4K correlated
-          </p>
-        </div>
-        <div className="hidden items-center gap-1 rounded-sm border border-cyan-900/50 bg-cyan-950/20 p-1 md:flex">
-          {(['galaxy', 'system'] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setViewMode(mode)}
-              className={`rounded-sm px-3 py-1.5 font-orbitron text-[10px] uppercase tracking-wider transition-colors ${
-                viewMode === mode ? 'bg-cyan-900/70 text-cyan-200' : 'text-slate-500 hover:text-slate-300'
-              }`}
-            >
-              {mode}
-            </button>
-          ))}
+    <div className="-m-3 flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden bg-[#01040a] text-slate-200 sm:-m-6">
+      <div className="relative border-b border-cyan-950/70 bg-slate-950/85 px-4 py-3 backdrop-blur md:px-6">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(14,165,233,0.18),transparent_24%),radial-gradient(circle_at_82%_10%,rgba(168,85,247,0.14),transparent_22%)]" />
+        <div className="relative flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-sm border border-cyan-700/50 bg-cyan-950/30 shadow-[0_0_22px_rgba(34,211,238,0.18)]">
+              <Telescope size={20} className="text-cyan-300" />
+            </div>
+            <div className="min-w-0">
+              <h1 className="font-orbitron text-lg font-bold uppercase tracking-widest text-cyan-200">Starvis Starmap</h1>
+              <p className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">
+                {allNodes.length.toLocaleString('en-US')} mapped objects · {roots.length.toLocaleString('en-US')} systems · RSI + P4K correlated
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 rounded-sm border border-cyan-900/50 bg-cyan-950/20 p-1">
+              {(['galaxy', 'system'] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setViewMode(mode)}
+                  className={`rounded-sm px-3 py-1.5 font-orbitron text-[10px] uppercase tracking-wider transition-colors ${
+                    viewMode === mode ? 'bg-cyan-800/80 text-cyan-100 shadow-[0_0_16px_rgba(34,211,238,0.16)]' : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+            {currentRoot && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedId(currentRoot.id);
+                  setViewMode('system');
+                }}
+                className="rounded-sm border border-purple-800/50 bg-purple-950/20 px-3 py-2 font-mono-sc text-[10px] uppercase tracking-widest text-purple-300 transition-colors hover:border-purple-500/60"
+              >
+                Focus {currentRoot.label}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[300px_1fr_320px]">
-        <aside className="z-20 flex min-h-0 flex-col border-b border-cyan-950/60 bg-slate-950/75 p-3 backdrop-blur lg:border-b-0 lg:border-r">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[340px_1fr_360px]">
+        <aside className="z-20 flex min-h-0 flex-col border-b border-cyan-950/60 bg-slate-950/80 p-3 backdrop-blur lg:border-b-0 lg:border-r">
           <div className="relative mb-3">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
             <input
@@ -656,11 +805,17 @@ export default function LocationsPage() {
             )}
           </div>
 
-          <div className="mb-3 flex gap-1 overflow-x-auto pb-1 lg:flex-wrap">
+          <div className="mb-3 grid grid-cols-3 gap-2">
+            <HudMetric icon={<Sparkles size={11} />} label="Systems" value={roots.length.toLocaleString('en-US')} />
+            <HudMetric icon={<Globe2 size={11} />} label="Objects" value={allNodes.length.toLocaleString('en-US')} />
+            <HudMetric icon={<Store size={11} />} label="Shops" value={(shopsData?.data?.length ?? 0).toLocaleString('en-US')} />
+          </div>
+
+          <div className="mb-3 flex gap-1 overflow-x-auto border-b border-slate-900 pb-3 lg:flex-wrap">
             <button
               type="button"
               onClick={() => setTypeFilter('all')}
-              className={`shrink-0 rounded-sm border px-2 py-1 font-mono-sc text-[10px] uppercase ${typeFilter === 'all' ? 'border-cyan-700 text-cyan-300' : 'border-slate-800 text-slate-600'}`}
+              className={`shrink-0 rounded-sm border px-2 py-1 font-mono-sc text-[10px] uppercase ${typeFilter === 'all' ? 'border-cyan-700 bg-cyan-950/30 text-cyan-300' : 'border-slate-800 text-slate-600 hover:text-slate-300'}`}
             >
               All
             </button>
@@ -669,31 +824,45 @@ export default function LocationsPage() {
                 key={type}
                 type="button"
                 onClick={() => setTypeFilter(type)}
-                className={`shrink-0 rounded-sm border px-2 py-1 font-mono-sc text-[10px] uppercase ${typeFilter === type ? 'border-cyan-700 text-cyan-300' : 'border-slate-800 text-slate-600 hover:text-slate-300'}`}
+                className={`shrink-0 rounded-sm border px-2 py-1 font-mono-sc text-[10px] uppercase ${typeFilter === type ? `${typeStyle(type).accent} ${typeStyle(type).text}` : 'border-slate-800 text-slate-600 hover:text-slate-300'}`}
               >
                 {typeStyle(type).label} {countsByType.get(type)}
               </button>
             ))}
           </div>
 
+          <div className="mb-2 flex items-center justify-between">
+            <p className="font-orbitron text-[10px] uppercase tracking-widest text-slate-600">
+              {viewMode === 'galaxy' ? 'Known systems' : 'Local objects'}
+            </p>
+            <span className="font-mono-sc text-[10px] text-cyan-700">{visibleNodes.length}</span>
+          </div>
+
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-            {visibleNodes.slice(0, 140).map((node) => {
+            {(viewMode === 'galaxy' && !query && typeFilter === 'all' ? systemSummaries.map((summary) => summary.root) : visibleNodes).slice(0, 180).map((node) => {
               const active = selectedNode?.id === node.id;
               const style = typeStyle(node.loc.type);
+              const summary = systemSummaries.find((item) => item.root.id === node.id);
               return (
                 <button
                   key={node.id}
                   type="button"
-                  onClick={() => setSelectedId(node.id)}
+                  onClick={() => {
+                    setSelectedId(node.id);
+                    if (!node.parentId && viewMode === 'system') setViewMode('system');
+                  }}
                   className={`mb-1 flex w-full items-center gap-2 rounded-sm border px-2 py-2 text-left transition-colors ${
-                    active ? 'border-cyan-700/70 bg-cyan-950/45 text-cyan-200' : 'border-slate-900 bg-slate-950/45 text-slate-400 hover:border-slate-800 hover:text-slate-200'
+                    active ? 'border-cyan-700/70 bg-cyan-950/45 text-cyan-100 shadow-[inset_2px_0_0_rgba(34,211,238,0.8)]' : 'border-slate-900 bg-slate-950/45 text-slate-400 hover:border-slate-800 hover:text-slate-200'
                   }`}
                 >
-                  <span className="shrink-0 text-cyan-500">{style.icon}</span>
+                  <span className={`shrink-0 ${style.text}`}>{style.icon}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-rajdhani text-sm font-semibold">{node.label}</span>
-                    <span className="font-mono-sc text-[9px] uppercase tracking-wider text-slate-600">{style.label} - {node.systemCode}</span>
+                    <span className="font-mono-sc text-[9px] uppercase tracking-wider text-slate-600">
+                      {summary ? `${summary.objects} objects · ${summary.planets} planets · ${summary.stations} hubs` : `${style.label} · ${node.systemCode}`}
+                    </span>
                   </span>
+                  {node.shopCount > 0 && <Store size={10} className="shrink-0 text-amber-400" />}
                 </button>
               );
             })}
@@ -701,7 +870,23 @@ export default function LocationsPage() {
         </aside>
 
         <main className="relative min-h-[420px] overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_35%_30%,rgba(21,94,117,0.22),transparent_28%),radial-gradient(circle_at_70%_60%,rgba(168,85,247,0.12),transparent_24%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_22%,rgba(21,94,117,0.28),transparent_30%),radial-gradient(circle_at_75%_68%,rgba(168,85,247,0.15),transparent_26%),linear-gradient(135deg,rgba(8,47,73,0.14),transparent_42%)]" />
+          <div className="pointer-events-none absolute inset-x-8 top-6 z-10 hidden items-center justify-between rounded-sm border border-cyan-950/70 bg-slate-950/50 px-4 py-2 backdrop-blur md:flex">
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1 font-mono-sc text-[10px] uppercase tracking-widest text-cyan-500">
+                <Eye size={11} />
+                {viewMode === 'galaxy' ? 'Galaxy overview' : currentRoot?.label ?? 'System view'}
+              </span>
+              {currentSystemSummary && (
+                <span className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">
+                  {currentSystemSummary.objects} objects · {currentSystemSummary.planets} planets · {currentSystemSummary.stations} ports
+                </span>
+              )}
+            </div>
+            <span className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-700">
+              Drag rotate · Scroll zoom · Click object
+            </span>
+          </div>
           {loading ? (
             <div className="absolute inset-0 grid place-items-center">
               <Loader2 className="animate-spin text-cyan-400" size={32} />
@@ -709,8 +894,11 @@ export default function LocationsPage() {
           ) : (
             <Scene nodes={visibleNodes.length ? visibleNodes : allNodes} selectedId={selectedNode?.id ?? null} onSelect={setSelectedId} />
           )}
-          <div className="pointer-events-none absolute bottom-3 left-4 rounded-sm border border-slate-800/80 bg-slate-950/70 px-3 py-2 font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">
-            Drag rotate - Scroll zoom - Click object
+          <div className="pointer-events-none absolute bottom-4 left-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+            <LegendSwatch type="system" />
+            <LegendSwatch type="planet" />
+            <LegendSwatch type="station" />
+            <LegendSwatch type="jump_point" />
           </div>
         </main>
 
@@ -724,9 +912,17 @@ export default function LocationsPage() {
               className="z-20 border-t border-cyan-950/60 bg-slate-950/80 p-4 backdrop-blur lg:border-l lg:border-t-0"
             >
               <div className="mb-4">
-                <p className="font-mono-sc text-[10px] uppercase tracking-widest text-cyan-600">{selectedNode.systemCode}</p>
-                <h2 className="mt-1 font-orbitron text-xl font-bold uppercase tracking-wider text-slate-100">{selectedNode.label}</h2>
-                <p className="mt-1 text-xs text-slate-600">{typeStyle(selectedNode.loc.type).label}</p>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <span className={`inline-flex items-center gap-1 rounded-sm border px-2 py-1 font-mono-sc text-[10px] uppercase tracking-widest ${typeStyle(selectedNode.loc.type).accent} ${typeStyle(selectedNode.loc.type).text}`}>
+                    {typeStyle(selectedNode.loc.type).icon}
+                    {typeStyle(selectedNode.loc.type).label}
+                  </span>
+                  <span className="font-mono-sc text-[10px] uppercase tracking-widest text-cyan-700">{selectedNode.systemCode}</span>
+                </div>
+                <h2 className="font-orbitron text-xl font-bold uppercase tracking-wider text-slate-100">{selectedNode.label}</h2>
+                {selectedNode.loc.rsi_starmap?.system_name && (
+                  <p className="mt-1 text-xs text-slate-600">{selectedNode.loc.rsi_starmap.system_name}</p>
+                )}
               </div>
 
               <div className="mb-4 grid grid-cols-3 gap-2">
@@ -734,6 +930,15 @@ export default function LocationsPage() {
                 <Metric label="Y" value={selectedNode.position.y.toFixed(1)} />
                 <Metric label="Z" value={selectedNode.position.z.toFixed(1)} />
               </div>
+
+              {currentSystemSummary && (
+                <div className="mb-4 grid grid-cols-2 gap-2">
+                  <InfoTile icon={<Globe2 size={12} />} label="Objects" value={currentSystemSummary.objects} />
+                  <InfoTile icon={<ShieldAlert size={12} />} label="Danger" value={currentSystemSummary.danger ?? 'N/A'} />
+                  <InfoTile icon={<Activity size={12} />} label="Economy" value={currentSystemSummary.economy ?? 'N/A'} />
+                  <InfoTile icon={<Store size={12} />} label="Ports" value={currentSystemSummary.stations} />
+                </div>
+              )}
 
               <div className="sci-panel p-3">
                 <DetailRow label="Class" value={selectedNode.loc.class_name} />
@@ -748,6 +953,26 @@ export default function LocationsPage() {
 
               {selectedNode.loc.description && (
                 <p className="mt-4 text-sm leading-relaxed text-slate-400">{selectedNode.loc.description}</p>
+              )}
+
+              {selectedChildren.length > 0 && (
+                <div className="mt-4">
+                  <p className="mb-2 font-orbitron text-[10px] uppercase tracking-widest text-slate-600">Orbit / children</p>
+                  <div className="space-y-1">
+                    {selectedChildren.map((child) => (
+                      <button
+                        key={child.id}
+                        type="button"
+                        onClick={() => setSelectedId(child.id)}
+                        className="flex w-full items-center gap-2 rounded-sm border border-slate-900 bg-slate-950/45 px-2 py-2 text-left text-slate-400 transition-colors hover:border-cyan-900/60 hover:text-slate-200"
+                      >
+                        <span className={typeStyle(child.loc.type).text}>{typeStyle(child.loc.type).icon}</span>
+                        <span className="min-w-0 flex-1 truncate font-rajdhani text-sm font-semibold">{child.label}</span>
+                        <span className="font-mono-sc text-[9px] uppercase text-slate-700">{typeStyle(child.loc.type).label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
 
               <div className="mt-4 flex gap-2">
@@ -771,6 +996,42 @@ function Metric({ label, value }: { label: string; value: string }) {
     <div className="rounded-sm border border-slate-800 bg-slate-950/70 px-2 py-2">
       <p className="font-mono-sc text-[9px] uppercase text-slate-600">{label}</p>
       <p className="font-orbitron text-sm text-cyan-300">{value}</p>
+    </div>
+  );
+}
+
+function HudMetric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-sm border border-slate-800 bg-slate-950/55 px-2 py-2">
+      <p className="flex items-center gap-1 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+        <span className="text-cyan-500">{icon}</span>
+        {label}
+      </p>
+      <p className="mt-0.5 font-orbitron text-sm text-slate-200">{value}</p>
+    </div>
+  );
+}
+
+function LegendSwatch({ type }: { type: string }) {
+  const style = typeStyle(type);
+  return (
+    <div className={`rounded-sm border px-2 py-1.5 backdrop-blur ${style.accent}`}>
+      <span className={`flex items-center gap-1 font-mono-sc text-[9px] uppercase tracking-widest ${style.text}`}>
+        {style.icon}
+        {style.label}
+      </span>
+    </div>
+  );
+}
+
+function InfoTile({ icon, label, value }: { icon: React.ReactNode; label: string; value: React.ReactNode }) {
+  return (
+    <div className="rounded-sm border border-slate-800 bg-slate-950/60 px-3 py-2">
+      <p className="flex items-center gap-1 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+        <span className="text-cyan-500">{icon}</span>
+        {label}
+      </p>
+      <p className="mt-1 font-orbitron text-sm text-slate-200">{value}</p>
     </div>
   );
 }
