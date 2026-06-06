@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, ChevronRight, LogIn, User, LogOut, Settings, Menu } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/services/api';
@@ -20,6 +20,7 @@ export function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) {
   const debouncedQuery = useDebounce(query, 300);
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const userMenuRef = useRef<HTMLDivElement | null>(null);
 
   const { data: results } = useQuery({
     queryKey: ['search', debouncedQuery, env],
@@ -49,6 +50,16 @@ export function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) {
     results.ships.length + results.components.length + results.items.length +
     (results.commodities?.length ?? 0) + (results.missions?.length ?? 0) + (results.recipes?.length ?? 0) > 0
   );
+
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    const handler = (event: MouseEvent) => {
+      if (userMenuRef.current?.contains(event.target as Node)) return;
+      setUserMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [userMenuOpen]);
 
   return (
     <header className="h-14 flex items-center gap-2 sm:gap-4 px-3 sm:px-4 border-b border-border bg-panel/60 backdrop-blur-sm z-10">
@@ -211,12 +222,11 @@ export function TopBar({ onMenuToggle }: { onMenuToggle?: () => void }) {
       )}
 
       {/* User menu */}
-      <div className="relative ml-auto shrink-0">
+      <div className="relative ml-auto shrink-0" ref={userMenuRef}>
         {user ? (
           <>
             <button
               onClick={() => setUserMenuOpen((v) => !v)}
-              onBlur={() => setTimeout(() => setUserMenuOpen(false), 150)}
               className="flex items-center gap-2 px-2.5 py-1.5 rounded border border-transparent hover:border-cyan-700/40 hover:bg-cyan-950/30 transition-colors"
             >
               <div className="w-6 h-6 rounded-full bg-cyan-950 border border-cyan-700/40 flex items-center justify-center overflow-hidden shrink-0">

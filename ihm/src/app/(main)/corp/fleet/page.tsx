@@ -274,6 +274,7 @@ export default function FleetManagerPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
   const [memberDropdownOpen, setMemberDropdownOpen] = useState(false);
+  const memberDropdownRef = useRef<HTMLDivElement | null>(null);
 
   const loadFleet = useCallback(async () => {
     setLoading(true);
@@ -334,7 +335,10 @@ export default function FleetManagerPage() {
   // Close member dropdown on outside click
   useEffect(() => {
     if (!memberDropdownOpen) return;
-    const handler = () => setMemberDropdownOpen(false);
+    const handler = (event: MouseEvent) => {
+      if (memberDropdownRef.current?.contains(event.target as Node)) return;
+      setMemberDropdownOpen(false);
+    };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [memberDropdownOpen]);
@@ -448,10 +452,9 @@ export default function FleetManagerPage() {
               </button>
 
               {/* Member picker */}
-              <div className="relative">
+              <div className="relative" ref={memberDropdownRef}>
               <button
                 type="button"
-                onMouseDown={(e) => e.stopPropagation()}
                 onClick={(e) => {
                   e.stopPropagation();
                   setViewMode('member');
@@ -478,7 +481,13 @@ export default function FleetManagerPage() {
                       <button
                         key={m.id}
                         type="button"
-                        onClick={() => { setSelectedMemberId(m.id); setMemberDropdownOpen(false); setViewMode('member'); setSelectedItemId(null); }}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setSelectedMemberId(m.id);
+                          setMemberDropdownOpen(false);
+                          setViewMode('member');
+                          setSelectedItemId(null);
+                        }}
                         className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5 transition-colors ${
                           m.id === selectedMemberId ? 'text-cyan-400' : 'text-slate-300'
                         }`}
