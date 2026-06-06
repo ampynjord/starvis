@@ -86,13 +86,9 @@ const COMPONENT_VISIBLE_WHERE = `NOT (
   OR c.name ~* '(^temp\\s|\\stemp\\s|temporary|template|placeholder)'
 )`;
 
-const IS_BESPOKE_EXPR = `(EXISTS (
-  SELECT 1 FROM game.ship_loadouts sl
-  WHERE sl.env = c.env AND sl.component_uuid = c.uuid
-) AND NOT EXISTS (
-  SELECT 1 FROM game.shop_inventory si
-  WHERE si.component_uuid = c.uuid
-))`;
+const IS_BESPOKE_EXPR = `(COALESCE(c.is_bespoke, FALSE)
+  OR c.class_name ~* '(^|_)(bespoke|custom)(_|$)'
+  OR c.name ~* '(^|\\s)(bespoke|custom)(\\s|$)')`;
 
 function withGameComponentCategory<T extends Row>(row: T): T {
   return { ...row, game_component_category: getGameComponentCategory(String(row.type || '')) };
