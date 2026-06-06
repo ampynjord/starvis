@@ -148,7 +148,7 @@ export function mountComponentRoutes(router: Router, deps: RouteDependencies): v
       const env = String(req.query.env ?? 'live');
       const comp = await gameDataService!.components.resolveComponent(req.params.uuid, env);
       if (!comp) return void res.status(404).json({ success: false, error: 'Component not found' });
-      const data = await gameDataService!.components.getComponentBuyLocations(String(comp.uuid), env);
+      const data = await gameDataService!.components.getComponentBuyLocations(comp, env);
       if (req.query.format === 'csv')
         return void sendCsvOrJson(req, res, data as Record<string, unknown>[], { success: true, count: data.length, data });
       sendWithETag(req, res, { success: true, count: data.length, data });
@@ -162,7 +162,7 @@ export function mountComponentRoutes(router: Router, deps: RouteDependencies): v
       const env = String(req.query.env ?? 'live');
       const comp = await gameDataService!.components.resolveComponent(req.params.uuid, env);
       if (!comp) return void res.status(404).json({ success: false, error: 'Component not found' });
-      const data = await gameDataService!.components.getComponentShips(comp.uuid, env);
+      const data = await gameDataService!.components.getComponentShips(comp, env);
       sendWithETag(req, res, { success: true, count: data.length, data });
     }),
   );

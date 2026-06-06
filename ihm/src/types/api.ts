@@ -64,6 +64,10 @@ export interface ShipListItem {
   missile_damage_total: number | null;
   hydrogen_fuel_capacity: number | null;
   quantum_fuel_capacity: number | null;
+  equipped_count?: number | null;
+  equipped_ports?: string[] | null;
+  port_min_size?: number | null;
+  port_max_size?: number | null;
 }
 
 export interface Ship extends ShipListItem {
@@ -391,6 +395,11 @@ export interface BuyLocation {
   location: string;
   system: string | null;
   city: string | null;
+  planet_moon?: string | null;
+  shop_type?: string | null;
+  component_uuid?: string | null;
+  component_class_name?: string | null;
+  match_type?: string | null;
   terminal: string | null;
   shop_source_type?: string | null;
   shop_source_name?: string | null;
@@ -400,6 +409,10 @@ export interface BuyLocation {
   canonical_location_key?: string | null;
   confidence_score?: number | null;
   base_price: number | null;
+  rental_price_1d?: number | null;
+  rental_price_3d?: number | null;
+  rental_price_7d?: number | null;
+  rental_price_30d?: number | null;
   inventory: number | null;
 }
 

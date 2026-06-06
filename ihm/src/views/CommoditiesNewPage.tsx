@@ -33,7 +33,7 @@ import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
 import { GlowBadge } from '@/components/ui/GlowBadge';
-import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
+import { ListFilterBar, ListFilterResetButton, ListFilterSelect } from '@/components/ui/ListFilters';
 import { useListQueryState } from '@/hooks/useListQueryState';
 import { useDebounce } from '@/hooks/useDebounce';
 import type { MiningElement } from '@/types/api';
@@ -70,31 +70,20 @@ function TradeGoodsTab() {
       }),
   });
 
-  const filterGroups = categories && categories.length > 0 ? [{
-    key: 'category',
-    label: 'Category',
-    options: categories.map((c) => ({ label: c.count ? `${c.label} (${c.count})` : c.label, value: c.label })),
-    value: activeCategory,
-    onChange: (v: string) => { setActiveCategory(v); setPage(1); },
-  }] : [];
-
   return (
-    <div className="flex gap-4">
-      <div className="w-44 shrink-0">
-        <MobileFilterWrapper hasFilters={activeCategory !== 'All'}>
-          {filterGroups.length > 0 ? (
-            <FilterPanel
-              hasFilters={activeCategory !== 'All'}
-              onReset={() => { setActiveCategory('All'); setPage(1); }}
-              groups={filterGroups}
-            />
-          ) : (
-            <div className="sci-panel p-3 text-xs text-slate-600 animate-pulse">Loading…</div>
-          )}
-        </MobileFilterWrapper>
-      </div>
+    <div className="min-w-0">
+      <ListFilterBar>
+        <ListFilterSelect
+          value={activeCategory === 'All' ? '' : activeCategory}
+          onChange={(value) => { setActiveCategory(value || 'All'); setPage(1); }}
+          options={(categories ?? []).map((c) => ({ label: c.count ? `${c.label} (${c.count})` : c.label, value: c.label }))}
+          allLabel="All categories"
+        />
+        {activeCategory !== 'All' && (
+          <ListFilterResetButton onClick={() => { setActiveCategory('All'); setPage(1); }} />
+        )}
+      </ListFilterBar>
 
-      <div className="flex-1 min-w-0">
         <div className="sci-panel p-3 mb-4 flex items-center justify-between gap-3">
           <p className="text-xs text-slate-400 font-mono-sc">Raw ores, refined materials, fuel/gas and trade goods. Use Mining Calculator for yield and profit tools.</p>
           <Link href="/mining-calculator" className="text-xs text-cyan-400 hover:text-cyan-300 whitespace-nowrap">Open Mining Calculator</Link>
@@ -146,7 +135,6 @@ function TradeGoodsTab() {
               {data && <Pagination className="mt-6" page={data.page} totalPages={data.pages} onPageChange={updatePageWithScroll} />}
             </>
           )}
-      </div>
     </div>
   );
 }

@@ -10,12 +10,12 @@ import { useSearchParams } from 'next/navigation';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { ShipCard } from '@/components/ship/ShipCard';
-import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { Pagination } from '@/components/ui/Pagination';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useListQueryState } from '@/hooks/useListQueryState';
+import { ListFilterBar, ListFilterResetButton, ListFilterSelect } from '@/components/ui/ListFilters';
 
 const LIMIT = 24;
 
@@ -144,17 +144,54 @@ export default function ShipsPage() {
         onChange={switchCategory}
       />
 
-      {/* Sort toolbar */}
-      <div className="mb-4 flex items-center justify-end gap-2">
-        <select
+      <ListFilterBar>
+        {filters && (filters.manufacturers ?? []).length > 0 && (
+          <ListFilterSelect
+            value={manufacturer}
+            onChange={(value) => { setManufacturer(value); setPage(1); }}
+            allLabel="All manufacturers"
+            options={(filters.manufacturers ?? []).map((m) => ({ label: m.name, value: m.code }))}
+          />
+        )}
+        {category === 'ship' && filters && (filters.statuses ?? []).length > 0 && (
+          <ListFilterSelect
+            value={status}
+            onChange={(value) => { setStatus(value); setPage(1); }}
+            allLabel="All statuses"
+            options={(filters.statuses ?? []).map((s) => ({ label: formatStatusLabel(s.value), value: s.value, count: s.count }))}
+          />
+        )}
+        {category === 'ship' && filters && filters.careers.length > 0 && (
+          <ListFilterSelect
+            value={career}
+            onChange={(value) => { setCareer(value); setPage(1); }}
+            allLabel="All careers"
+            options={filters.careers.map((c) => ({ label: c, value: c }))}
+          />
+        )}
+        {category === 'ship' && filters && filters.roles.length > 0 && (
+          <ListFilterSelect
+            value={role}
+            onChange={(value) => { setRole(value); setPage(1); }}
+            allLabel="All roles"
+            options={filters.roles.map((r) => ({ label: r, value: r }))}
+          />
+        )}
+        {filters && filters.variant_types.length > 0 && (
+          <ListFilterSelect
+            value={variantType}
+            onChange={(value) => { setVariantType(value); setPage(1); }}
+            allLabel="All types"
+            options={filters.variant_types.map((vt) => ({ label: vt, value: vt }))}
+          />
+        )}
+        <ListFilterSelect
           value={sort}
-          onChange={e => { setSort(e.target.value); setPage(1); }}
-          className="sci-input text-xs py-1.5"
-        >
-          {availableSorts.map(o => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+          onChange={(value) => { setSort(value); setPage(1); }}
+          allLabel="Sort"
+          options={availableSorts.map((o) => ({ value: o.value, label: `Sort: ${o.label}` }))}
+          showAllOption={false}
+        />
         <button
           onClick={toggleOrder}
           title={order === 'asc' ? 'Ascending — click to reverse' : 'Descending — click to reverse'}
@@ -162,89 +199,38 @@ export default function ShipsPage() {
         >
           <ArrowUpDown size={13} className={order === 'desc' ? 'rotate-180 transition-transform' : 'transition-transform'} />
         </button>
-      </div>
+        {hasFilters && (
+          <ListFilterResetButton onClick={resetFilters} />
+        )}
+      </ListFilterBar>
 
-      <div className="flex gap-4">
-        {/* Filters */}
-        <div className="w-44 shrink-0">
-          <MobileFilterWrapper hasFilters={hasFilters}>
-            {filters ? (
-              <FilterPanel
-              hasFilters={hasFilters}
-              onReset={resetFilters}
-              groups={[
-                {
-                  key: 'manufacturer', label: 'Manufacturer',
-                  options: (filters.manufacturers ?? []).map(m => ({ label: m.name, value: m.code })),
-                  value: manufacturer,
-                  onChange: v => { setManufacturer(v); setPage(1); },
-                },
-                ...(category === 'ship' ? [
-                  {
-                    key: 'status', label: 'Status',
-                    options: (filters.statuses ?? []).map(s => ({ label: s.label ? formatStatusLabel(s.value) : formatStatusLabel(s.value), value: s.value, count: s.count })),
-                    value: status,
-                    onChange: (v: string) => { setStatus(v); setPage(1); },
-                    defaultOpen: true,
-                  },
-                  {
-                    key: 'career', label: 'Career',
-                    options: filters.careers.map(c => ({ label: c, value: c })),
-                    value: career,
-                    onChange: (v: string) => { setCareer(v); setPage(1); },
-                  },
-                  {
-                    key: 'role', label: 'Role',
-                    options: filters.roles.map(r => ({ label: r, value: r })),
-                    value: role,
-                    onChange: (v: string) => { setRole(v); setPage(1); },
-                  },
-                ] : []),
-                {
-                  key: 'variant_type', label: 'Type',
-                  options: filters.variant_types.map(vt => ({ label: vt, value: vt })),
-                  value: variantType,
-                  onChange: v => { setVariantType(v); setPage(1); },
-                },
-              ]}
+      {isLoading ? (
+        <LoadingGrid
+          rows={3}
+          cols={4}
+          message={`LOADING ${CATEGORIES.find(c => c.value === category)?.label.toUpperCase() ?? 'SHIPS'}…`}
+        />
+      ) : error ? (
+        <ErrorState error={error as Error} onRetry={() => void refetch()} />
+      ) : data?.data.length === 0 ? (
+        <EmptyState icon="🚀" title="Nothing found" message="Try adjusting your filters." />
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
+            {data?.data.map((ship, i) => (
+              <ShipCard key={ship.uuid} ship={ship} index={i} />
+            ))}
+          </div>
+          {data && (
+            <Pagination
+              className="mt-6"
+              page={data.page}
+              totalPages={data.pages}
+              onPageChange={updatePageWithScroll}
             />
-          ) : (
-            <div className="sci-panel p-3 text-xs text-slate-600 animate-pulse">Loading…</div>
           )}
-          </MobileFilterWrapper>
-        </div>
-
-        {/* Grid */}
-        <div className="flex-1 min-w-0">
-          {isLoading ? (
-            <LoadingGrid
-              rows={3}
-              cols={4}
-              message={`LOADING ${CATEGORIES.find(c => c.value === category)?.label.toUpperCase() ?? 'SHIPS'}…`}
-            />
-          ) : error ? (
-            <ErrorState error={error as Error} onRetry={() => void refetch()} />
-          ) : data?.data.length === 0 ? (
-            <EmptyState icon="🚀" title="Nothing found" message="Try adjusting your filters." />
-          ) : (
-            <>
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3">
-                {data?.data.map((ship, i) => (
-                  <ShipCard key={ship.uuid} ship={ship} index={i} />
-                ))}
-              </div>
-              {data && (
-                <Pagination
-                  className="mt-6"
-                  page={data.page}
-                  totalPages={data.pages}
-                  onPageChange={updatePageWithScroll}
-                />
-              )}
-            </>
-          )}
-        </div>
-      </div>
+        </>
+      )}
     </PageShell>
   );
 }

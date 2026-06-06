@@ -10,10 +10,11 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { FilterPanel } from '@/components/ui/FilterPanel';
 import { GlowBadge } from '@/components/ui/GlowBadge';
+import { ListFilterBar, ListFilterResetButton, ListFilterSelect } from '@/components/ui/ListFilters';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
+import { PageTabs } from '@/components/ui/PageTabs';
 import { PageShell } from '@/components/ui/PageShell';
 import { useEnv } from '@/contexts/EnvContext';
 import { api } from '@/services/api';
@@ -151,13 +152,6 @@ export default function RankingPage() {
         }
         actions={
           <div className="flex items-center gap-2 flex-wrap">
-            <select value={topN} onChange={(e) => setTopN(Number(e.target.value))} className="sci-input text-xs py-1.5">
-              {topOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
             <div className="flex gap-1 border border-slate-800 rounded-sm p-0.5">
               <button
                 type="button"
@@ -176,54 +170,48 @@ export default function RankingPage() {
                 <BarChart2 size={14} />
               </button>
             </div>
-            <div className="flex gap-1">
-              {vehicleCategories.map(({ label, value }) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => switchVehicleCat(value)}
-                  className={`px-3 py-1.5 text-xs font-rajdhani font-semibold uppercase tracking-wider rounded border transition-all ${
-                    vehicleCat === value
-                      ? 'bg-cyan-950/60 border-cyan-800 text-cyan-400'
-                      : 'border-slate-800 text-slate-500 hover:text-slate-300 hover:border-slate-600'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
           </div>
         }
       />
 
-      <div className="flex gap-4">
-        <div className="w-40 shrink-0 space-y-3">
-          <FilterPanel
-            hasFilters={hasFilters || statCat !== 'All'}
-            onReset={() => {
+      <PageTabs
+        className="mb-4"
+        items={vehicleCategories}
+        value={vehicleCat}
+        onChange={switchVehicleCat}
+      />
+
+      <ListFilterBar>
+        <ListFilterSelect
+          value={statCat}
+          onChange={(value) => setStatCat(value || 'All')}
+          options={statCategories.filter((category) => category !== 'All').map((category) => ({ label: category, value: category }))}
+          allLabel="All stat categories"
+        />
+        <ListFilterSelect
+          value={manufacturer}
+          onChange={setManufacturer}
+          options={manufacturerOptions}
+          allLabel="All manufacturers"
+        />
+        <ListFilterSelect
+          value={String(topN)}
+          onChange={(value) => setTopN(Number(value))}
+          options={topOptions.map((option) => ({ label: option.label, value: String(option.value) }))}
+          allLabel="Top"
+          showAllOption={false}
+        />
+        {(hasFilters || statCat !== 'All') && (
+          <ListFilterResetButton
+            onClick={() => {
               setStatCat('All');
               setManufacturer('');
             }}
-            groups={[
-              {
-                key: 'cat',
-                label: 'Stat category',
-                options: statCategories.map((category) => ({ label: category, value: category })),
-                value: statCat,
-                onChange: (value: string) => setStatCat(value),
-              },
-              {
-                key: 'manufacturer',
-                label: 'Manufacturer',
-                options: manufacturerOptions,
-                value: manufacturer,
-                onChange: (value: string) => setManufacturer(value),
-              },
-            ]}
           />
-        </div>
+        )}
+      </ListFilterBar>
 
-        <div className="flex-1 min-w-0 overflow-x-auto">
+      <div className="min-w-0 overflow-x-auto">
           {isLoading ? (
             <LoadingGrid message="COMPUTING RANKINGS…" />
           ) : error ? (
@@ -355,7 +343,6 @@ export default function RankingPage() {
               </tbody>
             </table>
           )}
-        </div>
       </div>
     </PageShell>
   );
