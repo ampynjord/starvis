@@ -333,6 +333,7 @@ export const api = {
           grade?: { value: string; label?: string; count?: number }[];
           component_class?: { value: string; label?: string; count?: number }[];
           is_bespoke?: { value: string; label?: string; count?: number }[];
+          manufacturer?: { value: string; label?: string; count?: number }[];
         };
       }>('/components/filters', { env });
       return {
@@ -340,6 +341,7 @@ export const api = {
         grades: res.filters?.grade?.map((f) => f.value) ?? [],
         componentClasses: res.filters?.component_class ?? [],
         bespoke: res.filters?.is_bespoke ?? [],
+        manufacturers: res.filters?.manufacturer ?? [],
       };
     },
     get: (uuid: string, env?: string) => get<Component>(`/components/${uuid}`, { env }),
