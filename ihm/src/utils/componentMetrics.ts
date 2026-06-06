@@ -93,6 +93,18 @@ function damageBreakdown(comp: ComponentLike, prefix: 'weapon' | 'missile') {
   ]);
 }
 
+function weaponPerformanceTitle(comp: ComponentLike): string {
+  const damageType = String(comp.weapon_damage_type ?? '')
+    .trim()
+    .toLowerCase();
+  if (damageType === 'ballistic' || damageType === 'physical') return 'Ballistics';
+  if (damageType === 'laser' || damageType === 'energy') return 'Laser Performance';
+  if (damageType === 'distortion') return 'Distortion Performance';
+  if (damageType === 'plasma' || damageType === 'thermal') return 'Plasma Performance';
+  if (damageType === 'tachyon') return 'Tachyon Performance';
+  return 'Weapon Performance';
+}
+
 export function getComponentMetricGroups(comp: ComponentLike): ComponentMetricGroup[] {
   const groups: Array<ComponentMetricGroup | null> = [
     group(comp, 'identity', 'Identity', [
@@ -146,7 +158,7 @@ export function getComponentMetricGroups(comp: ComponentLike): ComponentMetricGr
         { field: 'weapon_alpha_damage', label: 'Alpha', digits: 1 },
         textMetric('Damage Type', comp.weapon_damage_type),
       ]),
-      group(comp, 'weapon-ballistics', 'Ballistics', [
+      group(comp, 'weapon-performance', weaponPerformanceTitle(comp), [
         { field: 'weapon_range', label: 'Range', unit: 'm' },
         { field: 'weapon_full_damage_range', label: 'Full Range', unit: 'm' },
         { field: 'weapon_zero_damage_range', label: 'Zero Range', unit: 'm' },
