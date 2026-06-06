@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Globe, Tag, X } from 'lucide-react';
+import { Globe, Tag } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
@@ -15,6 +15,7 @@ import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
 import { Pagination } from '@/components/ui/Pagination';
+import { ListFilterBar, ListFilterChips, ListFilterResetButton } from '@/components/ui/ListFilters';
 import { useDebounce } from '@/hooks/useDebounce';
 
 const LIMIT = 30;
@@ -23,30 +24,6 @@ function parseArray(v: GalactapediaEntry['categories']): string[] {
   if (!v) return [];
   if (Array.isArray(v)) return v;
   try { return JSON.parse(v as string); } catch { return []; }
-}
-
-function ChipGroup({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="flex flex-wrap gap-1">
-      <button
-        type="button"
-        onClick={() => onChange('')}
-        className={`px-2 py-1 rounded-sm text-xs font-mono-sc transition-colors ${!value ? 'bg-cyan-950/60 text-cyan-400 border border-cyan-800' : 'text-slate-500 hover:text-slate-300 border border-transparent hover:border-border'}`}
-      >
-        All
-      </button>
-      {options.map((opt) => (
-        <button
-          key={opt}
-          type="button"
-          onClick={() => onChange(value === opt ? '' : opt)}
-          className={`px-2 py-1 rounded-sm text-xs font-mono-sc transition-colors border ${value === opt ? 'bg-purple-950/60 text-purple-400 border-purple-800' : 'text-slate-500 hover:text-slate-300 border-transparent hover:border-border'}`}
-        >
-          {opt}
-        </button>
-      ))}
-    </div>
-  );
 }
 
 function GalactapediaCard({ entry }: { entry: GalactapediaEntry }) {
@@ -119,26 +96,17 @@ export default function GalactapediaPage() {
         onSearch={(v) => { setSearch(v); setPage(1); }}
       />
 
-      {/* Filter bar */}
-      <div className="mb-4">
-        <div className="sci-panel p-3 flex flex-wrap items-center gap-3">
-          {allCategories.length > 0 && (
-            <>
-              <p className="text-[10px] font-orbitron text-slate-600 tracking-widest uppercase shrink-0">Category</p>
-              <ChipGroup options={allCategories} value={category} onChange={(v) => { setCategory(v); setPage(1); }} />
-            </>
-          )}
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={() => { setSearch(''); setCategory(''); setPage(1); }}
-              className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300 transition-colors ml-auto"
-            >
-              <X size={12} /> Reset
-            </button>
-          )}
-        </div>
-      </div>
+      <ListFilterBar>
+        {allCategories.length > 0 && (
+          <ListFilterChips
+            items={allCategories.map((item) => ({ key: item, label: item }))}
+            selected={category}
+            onSelect={(value) => { setCategory(value); setPage(1); }}
+            className="mb-0"
+          />
+        )}
+        {hasFilters && <ListFilterResetButton onClick={() => { setSearch(''); setCategory(''); setPage(1); }} />}
+      </ListFilterBar>
 
       {/* List */}
       {isLoading ? (

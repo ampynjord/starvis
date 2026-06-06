@@ -21,6 +21,8 @@ import {
 } from "@/utils/constants";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PageShell } from "@/components/ui/PageShell";
+import { PageTabs } from "@/components/ui/PageTabs";
+import { ListFilterBar, ListFilterChips, ListFilterSelect } from "@/components/ui/ListFilters";
 import type { ComponentListItem } from "@/types/api";
 import { getComponentMetricGroups, getComponentPrimaryMetrics } from "@/utils/componentMetrics";
 
@@ -168,45 +170,6 @@ function ComponentMetricStrip({ comp }: { comp: ComponentListItem }) {
   );
 }
 
-// ── Sub-type chips ─────────────────────────────────────────────────────────────
-
-function FilterChips({
-  items,
-  selected,
-  onSelect,
-  allLabel = "All",
-}: { items: { key: string; label: string }[]; selected: string; onSelect: (v: string) => void; allLabel?: string }) {
-  return (
-    <div className="flex flex-wrap gap-1.5 mb-4">
-      <button
-        type="button"
-        onClick={() => onSelect("")}
-        className={`px-3 py-1 rounded-sm text-xs font-mono-sc uppercase tracking-wide border transition-colors ${
-          !selected
-            ? "bg-cyan-950/40 border-cyan-700 text-cyan-300"
-            : "border-border text-slate-500 hover:text-slate-300 hover:border-slate-600"
-        }`}
-      >
-        {allLabel}
-      </button>
-      {items.map((item) => (
-        <button
-          type="button"
-          key={item.key}
-          onClick={() => onSelect(selected === item.key ? "" : item.key)}
-          className={`px-3 py-1 rounded-sm text-xs font-mono-sc uppercase tracking-wide border transition-colors ${
-            selected === item.key
-              ? "bg-cyan-950/40 border-cyan-700 text-cyan-300"
-              : "border-border text-slate-500 hover:text-slate-300 hover:border-slate-600"
-          }`}
-        >
-          {item.label}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function ComponentsPage() {
@@ -311,26 +274,18 @@ export default function ComponentsPage() {
         onSearch={updateSearch}
       />
 
-      {/* Category tabs */}
-      <div className="flex gap-1 mb-4 border-b border-border pb-3">
-        {categories.map((cat, idx) => (
-          <button
-            type="button"
-            key={cat.slug}
-            onClick={() => handleCategoryChange(idx)}
-            className={`px-4 py-2 text-sm font-rajdhani font-bold uppercase tracking-wide rounded-sm transition-colors ${
-              categoryIdx === idx
-                ? "bg-cyan-950/40 border border-cyan-800 text-cyan-300"
-                : "border border-transparent text-slate-500 hover:text-slate-300 hover:border-slate-700"
-            }`}
-          >
-            {cat.label}
-          </button>
-        ))}
-      </div>
+      <PageTabs
+        className="mb-4"
+        items={categories.map((cat) => ({ value: cat.slug, label: cat.label }))}
+        value={category.slug}
+        onChange={(slug) => {
+          const idx = categories.findIndex((cat) => cat.slug === slug);
+          if (idx >= 0) handleCategoryChange(idx);
+        }}
+      />
 
       {(category.subcategories?.length ?? 0) > 0 && (
-        <FilterChips
+        <ListFilterChips
           items={category.subcategories!.map((item) => ({ key: item.key, label: item.label }))}
           selected={selectedSubcategoryKey}
           onSelect={handleSubcategorySelect}
@@ -338,7 +293,7 @@ export default function ComponentsPage() {
       )}
 
       {filterConfig.damage && (
-        <FilterChips
+        <ListFilterChips
           items={WEAPON_DAMAGE_TYPES.map((item) => ({ key: item, label: item }))}
           selected={weaponDamageType}
           onSelect={(value) => {
@@ -350,74 +305,57 @@ export default function ComponentsPage() {
       )}
 
       {/* Size / Grade inline filters */}
-      <div className="flex gap-2 mb-4 flex-wrap">
+      <ListFilterBar>
         {filterConfig.size && (filters?.sizes ?? []).length > 0 && (
-          <select
+          <ListFilterSelect
             value={size}
-            onChange={(e) => { setSize(e.target.value); setPage(1); }}
-            className="bg-panel border border-border text-slate-400 text-xs rounded-sm px-2 py-1"
-          >
-            <option value="">All sizes</option>
-            {[...new Set((filters?.sizes ?? []).map(Number))].sort((a, b) => a - b).map((s) => (
-              <option key={s} value={String(s)}>S{s}</option>
-            ))}
-          </select>
+            onChange={(value) => { setSize(value); setPage(1); }}
+            allLabel="All sizes"
+            options={[...new Set((filters?.sizes ?? []).map(Number))].sort((a, b) => a - b).map((s) => ({ value: String(s), label: `S${s}` }))}
+          />
         )}
         {filterConfig.grade && (filters?.grades?.length ?? 0) > 0 && (
-          <select
+          <ListFilterSelect
             value={grade}
-            onChange={(e) => { setGrade(e.target.value); setPage(1); }}
-            className="bg-panel border border-border text-slate-400 text-xs rounded-sm px-2 py-1"
-          >
-            <option value="">All grades</option>
-            {(filters?.grades ?? []).map((item) => (
-              <option key={item} value={item}>{item}</option>
-            ))}
-          </select>
+            onChange={(value) => { setGrade(value); setPage(1); }}
+            allLabel="All grades"
+            options={(filters?.grades ?? []).map((item) => ({ value: item, label: item }))}
+          />
         )}
         {filterConfig.componentClass && COMPONENT_CLASS_FILTERS.length > 0 && (
-          <select
+          <ListFilterSelect
             value={componentClass}
-            onChange={(e) => { setComponentClass(e.target.value); setPage(1); }}
-            className="bg-panel border border-border text-slate-400 text-xs rounded-sm px-2 py-1"
-          >
-            <option value="">All classes</option>
-            {[...new Map<string, { value: string; label?: string; count?: number }>([
+            onChange={(value) => { setComponentClass(value); setPage(1); }}
+            allLabel="All classes"
+            options={[...new Map<string, { value: string; label?: string; count?: number }>([
               ...COMPONENT_CLASS_FILTERS.map((value) => [value, { value, label: value }] as const),
               ...(filters?.componentClasses ?? []).map((item) => [item.value, item] as const),
-            ]).values()].map((componentClassFilter) => (
-              <option key={componentClassFilter.value} value={componentClassFilter.value}>
-                {componentClassFilter.label ?? componentClassFilter.value}
-              </option>
-            ))}
-          </select>
+            ]).values()].map((componentClassFilter) => ({
+              value: componentClassFilter.value,
+              label: componentClassFilter.label ?? componentClassFilter.value,
+            }))}
+          />
         )}
         {filterConfig.manufacturer && (filters?.manufacturers?.length ?? 0) > 0 && (
-          <select
+          <ListFilterSelect
             value={manufacturer}
-            onChange={(e) => { setManufacturer(e.target.value); setPage(1); }}
-            className="bg-panel border border-border text-slate-400 text-xs rounded-sm px-2 py-1"
-          >
-            <option value="">All manufacturers</option>
-            {(filters?.manufacturers ?? []).map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label ?? item.value}
-              </option>
-            ))}
-          </select>
+            onChange={(value) => { setManufacturer(value); setPage(1); }}
+            allLabel="All manufacturers"
+            options={(filters?.manufacturers ?? []).map((item) => ({ value: item.value, label: item.label ?? item.value }))}
+          />
         )}
         {filterConfig.bespoke && (
-          <select
+          <ListFilterSelect
             value={bespoke}
-            onChange={(e) => { setBespoke(e.target.value); setPage(1); }}
-            className="bg-panel border border-border text-slate-400 text-xs rounded-sm px-2 py-1"
-          >
-            <option value="">All fitment</option>
-            <option value="false">Universal</option>
-            <option value="true">Bespoke</option>
-          </select>
+            onChange={(value) => { setBespoke(value); setPage(1); }}
+            allLabel="All fitment"
+            options={[
+              { value: "false", label: "Universal" },
+              { value: "true", label: "Bespoke" },
+            ]}
+          />
         )}
-      </div>
+      </ListFilterBar>
 
       {/* Component list */}
       {isLoading ? (

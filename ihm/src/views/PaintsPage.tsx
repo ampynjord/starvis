@@ -9,7 +9,7 @@ import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
+import { ListFilterBar, ListFilterResetButton, ListFilterSelect } from '@/components/ui/ListFilters';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
@@ -160,6 +160,24 @@ export default function PaintsPage() {
         onSearch={updateSearch}
       />
 
+      {data && data.manufacturerOptions.length > 0 && (
+        <ListFilterBar>
+          <ListFilterSelect
+            value={selectedManufacturer}
+            onChange={setSelectedManufacturer}
+            allLabel="All manufacturers"
+            options={data.manufacturerOptions.map((option) => ({
+              value: option.value,
+              label: option.label,
+              count: option.count,
+            }))}
+          />
+          {hasFilters && (
+            <ListFilterResetButton onClick={() => setSelectedManufacturer('')} />
+          )}
+        </ListFilterBar>
+      )}
+
       {isLoading ? (
         <LoadingGrid message="LOADING PAINTS…" />
       ) : error ? (
@@ -167,34 +185,9 @@ export default function PaintsPage() {
       ) : !data?.groups.length ? (
         <EmptyState icon="🎨" title="No paints found" />
       ) : (
-        <div className="flex gap-4">
-          {/* Sidebar filter */}
-          <div className="w-44 shrink-0">
-            <MobileFilterWrapper hasFilters={hasFilters}>
-              <FilterPanel
-                hasFilters={hasFilters}
-                onReset={() => setSelectedManufacturer('')}
-                groups={[
-                  {
-                    key: 'manufacturer',
-                    label: 'Manufacturer',
-                    options: data.manufacturerOptions.map((option) => ({ value: option.value, label: `${option.label} (${option.count})` })),
-                    value: selectedManufacturer,
-                    onChange: (v) => setSelectedManufacturer(v),
-                    defaultOpen: true,
-                  },
-                ]}
-              />
-            </MobileFilterWrapper>
-          </div>
-
-          {/* Groups */}
-          <div className="flex-1 min-w-0">
-            {data.groups.map((g) => (
-              <ManufacturerSection key={g.manufacturerName} group={g} />
-            ))}
-          </div>
-        </div>
+        data.groups.map((g) => (
+          <ManufacturerSection key={g.manufacturerName} group={g} />
+        ))
       )}
     </PageShell>
   );

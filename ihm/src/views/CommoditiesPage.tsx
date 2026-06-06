@@ -11,7 +11,7 @@ import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { Pagination } from '@/components/ui/Pagination';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
+import { ListFilterBar, ListFilterResetButton, ListFilterSelect } from '@/components/ui/ListFilters';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
@@ -45,16 +45,6 @@ export default function CommoditiesPage() {
   const isIndustrial = pathname?.startsWith('/industrial');
   const title = isIndustrial ? 'Industrial' : 'Trade Goods';
 
-  const filterGroups = categories && categories.length > 0 ? [
-    {
-      key: 'category',
-      label: 'Category',
-      options: categories.map(c => ({ label: c.count ? `${c.label} (${c.count})` : c.label, value: c.label })),
-      value: activeCategory,
-      onChange: (v: string) => { setActiveCategory(v); setPage(1); },
-    },
-  ] : [];
-
   return (
     <PageShell>
       <PageHeader
@@ -73,23 +63,21 @@ export default function CommoditiesPage() {
         </div>
       )}
 
-      <div className="flex gap-4">
-        <div className="w-44 shrink-0">
-          <MobileFilterWrapper hasFilters={activeCategory !== 'All'}>
-          {filterGroups.length > 0 ? (
-            <FilterPanel
-              hasFilters={activeCategory !== 'All'}
-              onReset={() => { setActiveCategory('All'); setPage(1); }}
-              groups={filterGroups}
-            />
-          ) : (
-            <div className="sci-panel p-3 text-xs text-slate-600 animate-pulse">Loading…</div>
-          )}
-          </MobileFilterWrapper>
-        </div>
+      <ListFilterBar>
+        {(categories ?? []).length > 0 && (
+          <ListFilterSelect
+            value={activeCategory === 'All' ? '' : activeCategory}
+            onChange={(value) => { setActiveCategory(value || 'All'); setPage(1); }}
+            allLabel="All categories"
+            options={(categories ?? []).map((c) => ({ value: c.label, label: c.label, count: c.count }))}
+          />
+        )}
+        {activeCategory !== 'All' && (
+          <ListFilterResetButton onClick={() => { setActiveCategory('All'); setPage(1); }} />
+        )}
+      </ListFilterBar>
 
-        <div className="flex-1 min-w-0">
-        {isLoading ? <LoadingGrid message="LOADING…" />
+      {isLoading ? <LoadingGrid message="LOADING…" />
         : error ? <ErrorState error={error as Error} onRetry={() => void refetch()} />
         : !data?.data?.length ? <EmptyState icon="📦" title="No commodities found" />
         : (
@@ -119,8 +107,6 @@ export default function CommoditiesPage() {
             {data && <Pagination className="mt-6" page={data.page} totalPages={data.pages} onPageChange={updatePageWithScroll} />}
           </>
         )}
-        </div>
-      </div>
     </PageShell>
   );
 }

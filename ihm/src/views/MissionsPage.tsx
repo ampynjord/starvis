@@ -43,7 +43,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
 import { Pagination } from '@/components/ui/Pagination';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
-import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
+import { ListFilterBar, ListFilterResetButton, ListFilterSelect } from '@/components/ui/ListFilters';
 import { useDebounce } from '@/hooks/useDebounce';
 
 const LIMIT = 40;
@@ -605,61 +605,50 @@ export default function MissionsPage() {
         </div>
       )}
 
+      <ListFilterBar>
+        <ListFilterSelect
+          value={type}
+          onChange={(v) => { setType(v); setPage(1); }}
+          options={(types ?? []).map((t) => ({ label: getTypeMeta(t).label, value: t }))}
+          allLabel="All mission types"
+        />
+        <ListFilterSelect
+          value={faction}
+          onChange={(v) => { setFaction(v); setPage(1); }}
+          options={(factions ?? []).map((f) => ({ label: f, value: f }))}
+          allLabel="All factions"
+        />
+        <ListFilterSelect
+          value={category}
+          onChange={(v) => { setCategory(v); setPage(1); }}
+          options={(categories ?? []).map((c) => ({ label: c, value: c }))}
+          allLabel="All categories"
+        />
+        <ListFilterSelect
+          value={legal}
+          onChange={(v) => { setLegal(v); setPage(1); }}
+          options={[{ label: 'Legal', value: 'true' }, { label: 'Illegal', value: 'false' }]}
+          allLabel="All legality"
+        />
+        <ListFilterSelect
+          value={sharing}
+          onChange={(v) => { setSharing(v); setPage(1); }}
+          options={[{ label: 'Group', value: 'true' }, { label: 'Solo', value: 'false' }]}
+          allLabel="All play"
+        />
+        <ListFilterSelect
+          value={availability}
+          onChange={(v) => { setAvailability(v); setPage(1); }}
+          options={[{ label: 'Unique', value: 'unique' }, { label: 'Repeatable', value: 'repeatable' }]}
+          allLabel="All recurrence"
+        />
+        {hasFilters && (
+          <ListFilterResetButton onClick={resetAll} />
+        )}
+      </ListFilterBar>
+
       {/* Content */}
-      <div className="flex gap-4">
-        <div className="w-44 shrink-0">
-          <MobileFilterWrapper hasFilters={hasFilters}>
-            <FilterPanel
-              hasFilters={hasFilters}
-              onReset={resetAll}
-              groups={[
-                {
-                  key: 'type',
-                  label: 'Mission Type',
-                  options: (types ?? []).map((t) => ({ label: getTypeMeta(t).label, value: t })),
-                  value: type,
-                  onChange: (v) => { setType(v); setPage(1); },
-                },
-                {
-                  key: 'faction',
-                  label: 'Faction',
-                  options: (factions ?? []).map((f) => ({ label: f, value: f })),
-                  value: faction,
-                  onChange: (v) => { setFaction(v); setPage(1); },
-                },
-                {
-                  key: 'category',
-                  label: 'Category',
-                  options: (categories ?? []).map((c) => ({ label: c, value: c })),
-                  value: category,
-                  onChange: (v) => { setCategory(v); setPage(1); },
-                },
-                {
-                  key: 'legal',
-                  label: 'Legality',
-                  options: [{ label: 'Legal', value: 'true' }, { label: 'Illegal', value: 'false' }],
-                  value: legal,
-                  onChange: (v) => { setLegal(v); setPage(1); },
-                },
-                {
-                  key: 'sharing',
-                  label: 'Group Play',
-                  options: [{ label: 'Group', value: 'true' }, { label: 'Solo', value: 'false' }],
-                  value: sharing,
-                  onChange: (v) => { setSharing(v); setPage(1); },
-                },
-                {
-                  key: 'availability',
-                  label: 'Recurrence',
-                  options: [{ label: 'Unique', value: 'unique' }, { label: 'Repeatable', value: 'repeatable' }],
-                  value: availability,
-                  onChange: (v) => { setAvailability(v); setPage(1); },
-                },
-              ]}
-            />
-          </MobileFilterWrapper>
-        </div>
-        <div className="flex-1 min-w-0">
+      <div className="min-w-0">
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_360px] gap-4 items-start">
         {/* Mission list */}
         <div>
@@ -705,7 +694,6 @@ export default function MissionsPage() {
               <p className="text-xs text-slate-500">Click a mission in the list to view its details.</p>
             </ScifiPanel>
           )}
-        </div>
       </div>
         </div>
       </div>

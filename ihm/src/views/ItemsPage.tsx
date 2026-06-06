@@ -8,7 +8,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { api } from "@/services/api";
 import { useEnv } from "@/contexts/EnvContext";
-import { FilterPanel, MobileFilterWrapper } from "@/components/ui/FilterPanel";
 import { LoadingGrid } from "@/components/ui/LoadingGrid";
 import { Pagination } from "@/components/ui/Pagination";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -18,6 +17,7 @@ import { useListQueryState } from "@/hooks/useListQueryState";
 import { ITEM_TYPE_LABELS } from "@/utils/constants";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PageShell } from "@/components/ui/PageShell";
+import { ListFilterBar, ListFilterChips, ListFilterResetButton, ListFilterSelect } from "@/components/ui/ListFilters";
 import type { ItemListItem } from "@/types/api";
 
 const LIMIT = 30;
@@ -234,27 +234,6 @@ export default function ItemsPage({ group }: ItemsPageProps = {}) {
 		setItemsSlug("all");
 	};
 
-	const filterGroups = [
-		...(fpsSubTypeOptions.length > 0
-			? [{
-					key: "subtype",
-					label: resolvedGroup === "weapons" ? "Weapon type" : resolvedGroup === "armor" ? "Weight" : "Type",
-					options: fpsSubTypeOptions,
-					value: subType,
-					onChange: (v: string) => { setSubType(v); setPage(1); },
-				}]
-			: []),
-		{
-			key: "mfr",
-			label: "Manufacturer",
-			options: (mfrData?.manufacturers ?? []).map((m) => ({
-				label: m.name,
-				value: m.code,
-			})),
-			value: manufacturer,
-			onChange: (v: string) => { setManufacturer(v); setPage(1); },
-		},
-	];
 	const isFiltersLoading = !mfrData || !navigation;
 
 	const getItemName = (item: ItemListItem) =>
@@ -275,62 +254,49 @@ export default function ItemsPage({ group }: ItemsPageProps = {}) {
 
 			{/* Category chips — filtered to the current taxonomy group */}
 			{chips.length > 0 && (
-				<div className="flex flex-wrap gap-1.5 mb-4">
-					{chips.map((chip) => (
-						<button
-							key={chip.slug}
-							type="button"
-							onClick={() => selectSlug(chip.slug)}
-							className={[
-								"px-3 py-1 rounded-sm text-xs font-rajdhani font-semibold tracking-wider transition-all border",
-								activeSlug === chip.slug
-									? "bg-cyan-950/60 border-cyan-700 text-cyan-400"
-									: "border-border text-slate-500 hover:text-slate-300 hover:border-slate-600",
-								chip.parentSlug ? "ml-3 text-[11px]" : "",
-							].join(" ")}
-						>
-							{chip.parentSlug && <span className="mr-1 opacity-40">└</span>}
-							{chip.label}
-							{chip.count > 0 && (
-								<span className="ml-1 text-[10px] text-slate-600">{chip.count.toLocaleString()}</span>
-							)}
-						</button>
-					))}
-				</div>
+				<ListFilterChips
+					items={chips.map((chip) => ({
+						key: chip.slug,
+						label: `${chip.parentSlug ? "└ " : ""}${chip.label}`,
+						count: chip.count > 0 ? chip.count : null,
+					}))}
+				selected={activeSlug === "all" || activeSlug === resolvedGroup ? "" : activeSlug}
+					onSelect={(value) => selectSlug(value || initSlug)}
+				/>
 			)}
 
-			<div className="flex gap-4">
-				<div className="w-44 shrink-0">
-					<MobileFilterWrapper hasFilters={hasFilters}>
-					{isFiltersLoading ? (
-						<div className="sci-panel p-3 text-xs text-slate-600 animate-pulse">
-							Loading…
-						</div>
-					) : filterGroups.length > 0 ? (
-						<FilterPanel
-							hasFilters={hasFilters}
-							onReset={resetFilters}
-							groups={filterGroups}
-						/>
-					) : (
-						<div className="sci-panel p-3 text-xs text-slate-600">
-							No extra filters for this category.
-						</div>
-					)}
-					</MobileFilterWrapper>
-				</div>
+			<ListFilterBar>
+				{!isFiltersLoading && fpsSubTypeOptions.length > 0 && (
+					<ListFilterSelect
+						value={subType}
+						onChange={(value) => { setSubType(value); setPage(1); }}
+						allLabel={resolvedGroup === "weapons" ? "All weapon types" : resolvedGroup === "armor" ? "All weights" : "All types"}
+						options={fpsSubTypeOptions.map((option) => ({ value: option.value, label: option.label }))}
+					/>
+				)}
+				{!isFiltersLoading && (mfrData?.manufacturers ?? []).length > 0 && (
+					<ListFilterSelect
+						value={manufacturer}
+						onChange={(value) => { setManufacturer(value); setPage(1); }}
+						allLabel="All manufacturers"
+						options={(mfrData?.manufacturers ?? []).map((m) => ({ value: m.code, label: m.name }))}
+					/>
+				)}
+				{hasFilters && (
+					<ListFilterResetButton onClick={resetFilters} />
+				)}
+			</ListFilterBar>
 
-				<div className="flex-1 min-w-0">
-					{isLoading ? (
-						<LoadingGrid message="LOADING…" />
-					) : error ? (
-						<ErrorState error={error as Error} onRetry={() => void refetch()} />
-					) : data?.data.length === 0 ? (
-						<EmptyState icon="🛡" title="No items found" message="Try adjusting your filters." />
-					) : (
-						<>
-							<div className="space-y-1">
-								{data?.data.map((item, i) => (
+			{isLoading ? (
+				<LoadingGrid message="LOADING…" />
+			) : error ? (
+				<ErrorState error={error as Error} onRetry={() => void refetch()} />
+			) : data?.data.length === 0 ? (
+				<EmptyState icon="🛡" title="No items found" message="Try adjusting your filters." />
+			) : (
+				<>
+					<div className="space-y-1">
+						{data?.data.map((item, i) => (
 									<motion.div
 										key={item.uuid}
 										initial={{ opacity: 0, x: -8 }}
@@ -391,20 +357,18 @@ export default function ItemsPage({ group }: ItemsPageProps = {}) {
 											</Link>
 										</div>
 									</motion.div>
-								))}
-							</div>
-							{data && (
-								<Pagination
-									className="mt-6"
-									page={data.page}
-									totalPages={data.pages}
-									onPageChange={updatePageWithScroll}
-								/>
-							)}
-						</>
+						))}
+					</div>
+					{data && (
+						<Pagination
+							className="mt-6"
+							page={data.page}
+							totalPages={data.pages}
+							onPageChange={updatePageWithScroll}
+						/>
 					)}
-				</div>
-			</div>
+				</>
+			)}
 		</PageShell>
 	);
 }

@@ -200,12 +200,30 @@ describe('ComponentQueryService', () => {
     it('joins manufacturers to provide manufacturer_name safely', async () => {
       const prisma = createMockPrisma([[row({ uuid: 'ship-1', name: 'Gladius', class_name: 'AEGS_Gladius', manufacturer_code: 'AEGS' })]]);
       const svc = new ComponentQueryService(createGetClient(prisma));
-      const result = await svc.getComponentShips('component-uuid');
+      const result = await svc.getComponentShips({ uuid: 'component-uuid', class_name: 'KLWE_LaserRepeater_S1' });
 
       expect(result).toHaveLength(1);
       const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
       expect(callArgs[0]).toContain('LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code');
       expect(callArgs[3]).toEqual('component-uuid');
+      expect(callArgs[4]).toEqual('KLWE_LaserRepeater_S1');
+      expect(callArgs[0]).toContain('ARRAY_AGG(sl.port_name');
+    });
+  });
+
+  describe('getComponentBuyLocations', () => {
+    it('matches shop inventory by uuid and class name', async () => {
+      const prisma = createMockPrisma([[row({ shop_id: 1, shop_name: 'CenterMass', base_price: 1200 })]]);
+      const svc = new ComponentQueryService(createGetClient(prisma));
+      const result = await svc.getComponentBuyLocations({ uuid: 'component-uuid', class_name: 'KLWE_LaserRepeater_S1' });
+
+      expect(result).toHaveLength(1);
+      const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
+      expect(callArgs[0]).toContain('si.component_uuid = $');
+      expect(callArgs[0]).toContain('si.component_class_name = $');
+      expect(callArgs[0]).toContain('LOWER(si.component_class_name) = LOWER');
+      expect(callArgs).toContain('component-uuid');
+      expect(callArgs).toContain('KLWE_LaserRepeater_S1');
     });
   });
 
@@ -215,6 +233,25 @@ describe('ComponentQueryService', () => {
       const svc = new ComponentQueryService(createGetClient(prisma));
       await svc.getAllComponents({ env: 'ptu' });
       expect((prisma as any).$queryRawUnsafe).toHaveBeenCalled();
+    });
+  });
+
+  describe('getAllComponents weapon subcategory filtering', () => {
+    it('derives weapon subtypes used by the frontend chips', async () => {
+      const prisma = createMockPrisma([[row({ total: 0 })], []]);
+      const svc = new ComponentQueryService(createGetClient(prisma));
+      await svc.getAllComponents({ types: 'WeaponGun', sub_types: 'Beam,Repeater,Scattergun' });
+
+      const countSql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
+      const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
+
+      expect(countSql).toContain('weapon_beam_dps IS NOT NULL');
+      expect(countSql).toContain("THEN 'Repeater'");
+      expect(countSql).toContain("THEN 'Scattergun'");
+      expect(countSql).toContain('IN ($');
+      expect(callArgs).toContain('Beam');
+      expect(callArgs).toContain('Repeater');
+      expect(callArgs).toContain('Scattergun');
     });
   });
 });

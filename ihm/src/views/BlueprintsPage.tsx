@@ -29,7 +29,7 @@ import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
-import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
+import { ListFilterBar, ListFilterResetButton, ListFilterSelect } from '@/components/ui/ListFilters';
 import { useDebounce } from '@/hooks/useDebounce';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -591,36 +591,29 @@ export default function BlueprintsPage() {
         onSearch={setSearch}
       />
 
+      <ListFilterBar>
+        <ListFilterSelect
+          value={category}
+          onChange={setCategory}
+          options={(categories ?? []).map((c) => ({
+            label: c.displayCategory ?? c.display_category ?? c.category,
+            value: c.category,
+          }))}
+          allLabel="All categories"
+        />
+        <ListFilterSelect
+          value={stationType}
+          onChange={setStationType}
+          options={(stationTypes ?? []).map((st) => ({ label: st, value: st }))}
+          allLabel="All stations"
+        />
+        {hasFilters && (
+          <ListFilterResetButton onClick={() => { setSearch(''); setCategory(''); setStationType(''); }} />
+        )}
+      </ListFilterBar>
+
       {/* Content */}
-      <div className="flex gap-4">
-        <div className="w-44 shrink-0">
-          <MobileFilterWrapper hasFilters={hasFilters}>
-            <FilterPanel
-              hasFilters={hasFilters}
-              onReset={() => { setSearch(''); setCategory(''); setStationType(''); }}
-              groups={[
-                {
-                  key: 'category',
-                  label: 'Category',
-                  options: (categories ?? []).map((c) => ({
-                    label: c.displayCategory ?? c.display_category ?? c.category,
-                    value: c.category,
-                  })),
-                  value: category,
-                  onChange: setCategory,
-                },
-                {
-                  key: 'stationType',
-                  label: 'Station Type',
-                  options: (stationTypes ?? []).map((st) => ({ label: st, value: st })),
-                  value: stationType,
-                  onChange: setStationType,
-                },
-              ]}
-            />
-          </MobileFilterWrapper>
-        </div>
-        <div className="flex-1 min-w-0">
+      <div className="min-w-0">
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-4 items-start">
         {/* Blueprint list */}
         <div>
@@ -659,7 +652,6 @@ export default function BlueprintsPage() {
               <p className="text-xs text-slate-500">Click a recipe to view ingredients, quality modifiers, batch calculator, and unlock missions.</p>
             </ScifiPanel>
           )}
-        </div>
       </div>
         </div>
       </div>

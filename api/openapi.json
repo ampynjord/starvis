@@ -3607,7 +3607,98 @@
         ],
         "responses": {
           "200": {
-            "description": "Buy locations list"
+            "description": "Buy locations list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "type": "object",
+                      "required": ["success"],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "example": true
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "shop_id": {
+                                "type": "integer"
+                              },
+                              "shop_name": {
+                                "type": "string"
+                              },
+                              "location": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "system": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "city": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "planet_moon": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "shop_type": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "component_uuid": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "component_class_name": {
+                                "type": "string"
+                              },
+                              "match_type": {
+                                "type": "string",
+                                "enum": ["uuid", "class_name", "class_name_ci"]
+                              },
+                              "base_price": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "rental_price_1d": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "rental_price_3d": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "rental_price_7d": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "rental_price_30d": {
+                                "type": "number",
+                                "nullable": true
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
@@ -3635,7 +3726,76 @@
         ],
         "responses": {
           "200": {
-            "description": "Ships list"
+            "description": "Ships equipped with this component in extracted default loadouts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "type": "object",
+                      "required": ["success"],
+                      "properties": {
+                        "success": {
+                          "type": "boolean",
+                          "example": true
+                        }
+                      }
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "integer"
+                        },
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "uuid": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "class_name": {
+                                "type": "string"
+                              },
+                              "manufacturer_code": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "manufacturer_name": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "equipped_count": {
+                                "type": "integer"
+                              },
+                              "equipped_ports": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "port_min_size": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "port_max_size": {
+                                "type": "integer",
+                                "nullable": true
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
           },
           "404": {
             "$ref": "#/components/responses/NotFound"

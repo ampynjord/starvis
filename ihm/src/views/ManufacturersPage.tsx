@@ -9,7 +9,7 @@ import { useEnv } from '@/contexts/EnvContext';
 import { ShipCard } from '@/components/ship/ShipCard';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { FilterPanel, MobileFilterWrapper } from '@/components/ui/FilterPanel';
+import { ListFilterBar, ListFilterResetButton, ListFilterSelect } from '@/components/ui/ListFilters';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
@@ -273,32 +273,22 @@ export default function ManufacturersPage() {
         onSearch={(v) => { setMfrSearch(v); setSelected(null); }}
       />
 
-      <div className="flex gap-4">
-        {/* Filter sidebar */}
-        <div className="w-52 shrink-0">
-          <MobileFilterWrapper hasFilters={!!selected}>
-            <FilterPanel
-              hasFilters={!!selected}
-              onReset={() => selectMfr('')}
-              groups={[
-                {
-                  key: 'manufacturer',
-                  label: `Manufacturer (${filteredMfrs.length})`,
-                  options: filteredMfrs.map((m: Manufacturer) => ({
-                    label: `${m.code} — ${m.name}`,
-                    value: m.code,
-                  })),
-                  value: selected ?? '',
-                  onChange: selectMfr,
-                  defaultOpen: true,
-                },
-              ]}
-            />
-          </MobileFilterWrapper>
-        </div>
+      <ListFilterBar>
+        <ListFilterSelect
+          value={selected ?? ''}
+          onChange={selectMfr}
+          options={filteredMfrs.map((m: Manufacturer) => ({
+            label: `${m.code} - ${m.name}`,
+            value: m.code,
+          }))}
+          allLabel={`All manufacturers (${filteredMfrs.length})`}
+        />
+        {!!selected && (
+          <ListFilterResetButton onClick={() => selectMfr('')} />
+        )}
+      </ListFilterBar>
 
-        {/* Content */}
-        <div className="flex-1 min-w-0 space-y-4">
+      <div className="min-w-0 space-y-4">
           {selectedMfr ? (
             <>
               {/* Manufacturer header */}
@@ -533,7 +523,6 @@ export default function ManufacturersPage() {
               <p className="font-orbitron text-sm tracking-widest">Select a manufacturer</p>
             </div>
           )}
-        </div>
       </div>
     </PageShell>
   );

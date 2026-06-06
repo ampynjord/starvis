@@ -69,6 +69,11 @@ const COMPONENT_SUB_TYPE_EXPR = `CASE
   WHEN c.type IN ('MissileRack', 'RocketPod') AND (c.class_name ~* 'rocket' OR c.name ~* 'rocket') THEN 'Rocket'
   WHEN c.type IN ('MissileRack', 'TorpedoRack') AND (c.class_name ~* 'torpedo' OR c.name ~* 'torpedo') THEN 'Torpedo'
   WHEN c.type IN ('MissileRack', 'BombRack') AND (c.class_name ~* 'bomb' OR c.name ~* 'bomb') THEN 'Bomb'
+  WHEN c.type IN ('WeaponGun', 'Weapon', 'UtilityWeapon') AND (c.weapon_beam_dps IS NOT NULL OR c.sub_type ~* 'beam' OR c.class_name ~* 'beam' OR c.name ~* 'beam') THEN 'Beam'
+  WHEN c.type IN ('WeaponGun', 'Weapon', 'UtilityWeapon') AND (c.sub_type ~* 'scatter|shotgun' OR c.class_name ~* 'scatter|shotgun' OR c.name ~* 'scatter|shotgun') THEN 'Scattergun'
+  WHEN c.type IN ('WeaponGun', 'Weapon', 'UtilityWeapon') AND (c.sub_type ~* 'gatling' OR c.class_name ~* 'gatling' OR c.name ~* 'gatling') THEN 'Gatling'
+  WHEN c.type IN ('WeaponGun', 'Weapon', 'UtilityWeapon') AND (c.sub_type ~* 'repeater' OR c.class_name ~* 'repeater' OR c.name ~* 'repeater') THEN 'Repeater'
+  WHEN c.type IN ('WeaponGun', 'Weapon', 'UtilityWeapon') AND (c.sub_type ~* 'cannon' OR c.class_name ~* 'cannon' OR c.name ~* 'cannon') THEN 'Cannon'
   ELSE c.sub_type
 END`;
 
@@ -402,31 +407,72 @@ export class ComponentQueryService {
     };
   }
 
-  async getComponentBuyLocations(uuid: string, env = 'live'): Promise<Row[]> {
+  async getComponentBuyLocations(component: Row | string, env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
+    const comp = typeof component === 'string' ? await this.resolveComponent(component, env) : component;
+    if (!comp) return [];
+    const uuid = String(comp.uuid);
+    const className = String(comp.class_name ?? '');
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT s.name as shop_name, s.location, s.planet_moon, s.shop_type,
-              s.canonical_shop_key, s.canonical_location_key,
+      toPostgres(`SELECT DISTINCT ON (s.id)
+              s.id as shop_id, s.name as shop_name, s.location, s.system, s.city, s.planet_moon, s.shop_type,
+              s.franchise_slug, s.location_slug, s.canonical_shop_key, s.canonical_location_key,
+              si.component_uuid, si.component_class_name,
+              CASE
+                WHEN si.component_uuid = ? THEN 'uuid'
+                WHEN si.component_class_name = ? THEN 'class_name'
+                ELSE 'class_name_ci'
+              END as match_type,
               si.base_price, si.rental_price_1d, si.rental_price_3d, si.rental_price_7d, si.rental_price_30d
        FROM game.shop_inventory si JOIN game.shops s ON si.shop_id = s.id
-       WHERE s.env = ? AND si.component_uuid = ? ORDER BY si.base_price`),
+       WHERE s.env = ?
+         AND (
+           si.component_uuid = ?
+           OR si.component_class_name = ?
+           OR LOWER(si.component_class_name) = LOWER(?)
+         )
+       ORDER BY s.id,
+         CASE
+           WHEN si.component_uuid = ? THEN 0
+           WHEN si.component_class_name = ? THEN 1
+           ELSE 2
+         END,
+         si.base_price NULLS LAST`),
+      uuid,
+      className,
       env,
       uuid,
+      className,
+      className,
+      uuid,
+      className,
     );
     return rows;
   }
 
-  async getComponentShips(uuid: string, env = 'live'): Promise<Row[]> {
+  async getComponentShips(component: Row | string, env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
+    const comp = typeof component === 'string' ? await this.resolveComponent(component, env) : component;
+    if (!comp) return [];
+    const uuid = String(comp.uuid);
+    const className = String(comp.class_name ?? '');
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT DISTINCT s.uuid, s.name, s.class_name, s.manufacturer_code, m.name as manufacturer_name
+      toPostgres(`SELECT s.uuid, s.name, s.class_name, s.manufacturer_code, m.name as manufacturer_name,
+              COUNT(sl.id) as equipped_count,
+              ARRAY_AGG(sl.port_name ORDER BY sl.port_name) FILTER (WHERE sl.port_name IS NOT NULL) as equipped_ports,
+              MIN(sl.port_min_size) as port_min_size,
+              MAX(sl.port_max_size) as port_max_size
        FROM game.ship_loadouts sl
        JOIN game.ships s ON sl.ship_uuid = s.uuid AND s.env = ?
        LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code
-       WHERE sl.env = ? AND sl.component_uuid = ? ORDER BY s.name`),
+       WHERE sl.env = ?
+         AND (sl.component_uuid = ? OR sl.component_class_name = ?)
+       GROUP BY s.uuid, s.name, s.class_name, s.manufacturer_code, m.name
+       ORDER BY s.name`),
       env,
       env,
       uuid,
+      className,
     );
     return rows;
   }
