@@ -142,7 +142,7 @@ function StatPill({ label, value, color = 'text-slate-400' }: {
 const WEAPON_TYPE_LABELS: Record<string, string> = {
   WeaponGun: '', MiningLaser: 'Mining', SalvageHead: 'Salvage',
   TractorBeam: 'Tractor', RepairBeam: 'Repair',
-  EMP: 'EMP', QuantumInterdictionGenerator: 'QED', UtilityWeapon: 'Utility',
+  EMP: 'EMP', QuantumInterdictionGenerator: 'QI', UtilityWeapon: 'Utility',
 };
 
 const DMGTYPE_SHORT: Record<string, { label: string; color: string }> = {
@@ -1009,21 +1009,24 @@ export function ShipLoadout({
   const jumpModules = data.systems.filter((item) => item.jumpModule);
   const cmLaunchers = [...data.cmDecoys, ...data.cmNoises];
   const ordnance = data.racks.flatMap((slot) => slot.missiles);
+  const empSlots = data.emp.filter((slot) => slot.weapon?.component_type !== 'QuantumInterdictionGenerator');
+  const qiSlots = data.emp.filter((slot) => slot.weapon?.component_type === 'QuantumInterdictionGenerator');
 
   type TabKey = GameComponentCategory | 'Ship Modules';
   interface TabDef { key: TabKey; label: string; count: number }
   const categoryCounts: Record<GameComponentCategory, number> = {
     Ordnance: ordnance.length,
     Coolers: coolers.length,
-    EMP: data.emp.length,
-    Mining: data.utilities.length,
-    'Missile Racks': data.racks.length,
+    EMP: empSlots.length,
+    QI: qiSlots.length,
+    Utility: data.utilities.length,
+    'Ordnance Racks': data.racks.length,
     'Power Plants': powerPlants.length,
     'Quantum Drives': quantumDrives.length,
     Shields: data.shields.length,
     Turrets: data.weapTurrets.length,
     Weapons: data.weapons.length,
-    'CM Launchers': cmLaunchers.length,
+    CM: cmLaunchers.length,
     Liveries: data.defaultPaint ? 1 : 0,
     'Jump Modules': jumpModules.length,
     Radar: radars.length,
@@ -1070,19 +1073,20 @@ export function ShipLoadout({
 
       {validTab === 'Ordnance' && renderGrid(ordnance.map((node, i) => <OrdnanceCard key={i} node={node} />))}
       {validTab === 'Coolers' && renderGrid(coolers.map((item, i) => <SystemCard key={i} node={item.node} jumpModule={null} />))}
-      {validTab === 'EMP' && renderGrid(data.emp.map((slot, i) => <WeaponCard key={i} portName={slot.portName} mount={slot.mount} weapon={slot.weapon} />))}
-      {validTab === 'Mining' && renderGrid(data.utilities.map((node, i) => {
+      {validTab === 'EMP' && renderGrid(empSlots.map((slot, i) => <WeaponCard key={i} portName={slot.portName} mount={slot.mount} weapon={slot.weapon} />))}
+      {validTab === 'QI' && renderGrid(qiSlots.map((slot, i) => <WeaponCard key={i} portName={slot.portName} mount={slot.mount} weapon={slot.weapon} />))}
+      {validTab === 'Utility' && renderGrid(data.utilities.map((node, i) => {
         if (node.port_type === 'Turret') return <TurretCard key={i} node={node} />;
         const weapon = node.children?.find(c => c.component_type && ALL_MOUNTED_TYPES.has(c.component_type)) ?? null;
         return <WeaponCard key={i} portName={node.port_name} mount={node} weapon={weapon} />;
       }))}
-      {validTab === 'Missile Racks' && renderGrid(data.racks.map((slot, i) => <RackCard key={i} rack={slot.rack} missiles={slot.missiles} />))}
+      {validTab === 'Ordnance Racks' && renderGrid(data.racks.map((slot, i) => <RackCard key={i} rack={slot.rack} missiles={slot.missiles} />))}
       {validTab === 'Power Plants' && renderGrid(powerPlants.map((item, i) => <SystemCard key={i} node={item.node} jumpModule={null} />))}
       {validTab === 'Quantum Drives' && renderGrid(quantumDrives.map((item, i) => <SystemCard key={i} node={item.node} jumpModule={item.jumpModule} />))}
       {validTab === 'Shields' && renderGrid(data.shields.map((node, i) => <ShieldCard key={i} node={node} />))}
       {validTab === 'Turrets' && renderGrid(data.weapTurrets.map((node, i) => <TurretCard key={i} node={node} />))}
       {validTab === 'Weapons' && renderGrid(data.weapons.map((slot, i) => <WeaponCard key={i} portName={slot.portName} mount={slot.mount} weapon={slot.weapon} />))}
-      {validTab === 'CM Launchers' && (
+      {validTab === 'CM' && (
         <div className="flex flex-wrap gap-2">
           {cmLaunchers.map((cm, i) => (
             <div key={i} className="flex items-center gap-2 rounded-md border border-teal-900/30 bg-teal-950/10 px-3 py-1.5">

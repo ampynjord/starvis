@@ -46,6 +46,7 @@ const PUBLIC_PREFIXES = [
   // Next.js internals & static assets
   '/api/',
   '/_next/',
+  '/brand/',
   '/favicon',
   '/robots',
   '/sitemap',

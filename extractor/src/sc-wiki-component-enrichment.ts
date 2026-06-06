@@ -31,7 +31,8 @@ const TYPE_ALIASES: Record<string, string[]> = {
 function normalizeGrade(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const grade = value.trim().toUpperCase();
-  return /^[A-Z]$/.test(grade) ? grade : null;
+  if (grade === 'A' || grade === 'B' || grade === 'C') return grade;
+  return /^[A-Z]$/.test(grade) ? 'D' : null;
 }
 
 function normalizeComponentClass(value: unknown): string | null {

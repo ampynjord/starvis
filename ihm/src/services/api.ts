@@ -312,10 +312,15 @@ export const api = {
       limit?: number;
       search?: string;
       type?: string;
+      types?: string;
       sub_type?: string;
+      sub_types?: string;
+      weapon_damage_type?: string;
+      cm_type?: string;
       size?: number;
       grade?: string;
       component_class?: string;
+      is_bespoke?: boolean;
       manufacturer?: string;
       /** Game component category slug: weapons, shields, quantum-drives, etc. */
       category?: string;
@@ -327,12 +332,14 @@ export const api = {
           size?: { value: string; label?: string; count?: number }[];
           grade?: { value: string; label?: string; count?: number }[];
           component_class?: { value: string; label?: string; count?: number }[];
+          is_bespoke?: { value: string; label?: string; count?: number }[];
         };
       }>('/components/filters', { env });
       return {
         sizes: res.filters?.size?.map((f) => f.value) ?? [],
         grades: res.filters?.grade?.map((f) => f.value) ?? [],
         componentClasses: res.filters?.component_class ?? [],
+        bespoke: res.filters?.is_bespoke ?? [],
       };
     },
     get: (uuid: string, env?: string) => get<Component>(`/components/${uuid}`, { env }),

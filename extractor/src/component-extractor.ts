@@ -10,7 +10,20 @@ import logger from './logger.js';
 
 function mapAttachDefGrade(grade: unknown): string | null {
   if (typeof grade !== 'number' || grade < 1) return null;
-  return String.fromCharCode(64 + grade);
+  if (grade === 1) return 'A';
+  if (grade === 2) return 'B';
+  if (grade === 3) return 'C';
+  return 'D';
+}
+
+function inferComponentClass(className: string, name?: string | null): string | null {
+  const text = `${className} ${name ?? ''}`.toLowerCase();
+  if (/stealth|_ste_|_ghost|eclipse|raven|razor_ex/.test(text)) return 'Stealth';
+  if (/competition|_comp_|racing|_rac_|razor|m50|350r/.test(text)) return 'Competition';
+  if (/military|_mil_|_navy|hornet|gladius|sabre|vanguard|redeemer|hammerhead|idris|javelin/.test(text)) return 'Military';
+  if (/industrial|_ind_|mining|mininglaser|salvage|tractor|reclaimer|prospector|mole|vulture|srv|argo/.test(text)) return 'Industrial';
+  if (/civilian|_civ_|aurora|mustang|nomad|freelancer|constellation|cutlass|caterpillar|starfarer|600i|890/.test(text)) return 'Civilian';
+  return null;
 }
 
 /**
@@ -35,7 +48,9 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
     WeaponGun: /scitem.*weapons\/[^/\\]+$/i,
     Turret: /ships\/turret[/\\](?!.*unmanned)/i,
     TurretUnmanned: /turret_?unmanned[/\\]/i,
+    RocketPod: /rocket_?pods?[/\\]|rocket_?racks?[/\\]/i,
     MissileRack: /missile_?racks?[/\\]/i,
+    Rocket: /rocket[s]?[/\\]/i,
     Missile: /missile[s]?[/\\](?!rack|launcher|_rack)/i,
     Torpedo: /torpedo(?:es)?[/\\]|torped[os][/\\]/i,
     Bomb: /bomb[s]?[/\\]/i,
@@ -60,8 +75,9 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
     // ── Weapon mounts ─────────────────────────────────────────────────────────
     Gimbal: /weapon_mounts\/gimbal[/\\]/i,
     // ── Utility ───────────────────────────────────────────────────────────────
-    MiningLaser: /utility\/mining\/miningarm[/\\]|mining_?laser[/\\]|miningsubitems[/\\]/i,
-    SalvageHead: /utility\/salvage\/salvagehead[/\\]/i,
+    MiningLaser:
+      /utility\/mining\/miningarm[/\\]|mining_?laser[/\\]|mining(?:sub)?items[/\\]|mining_?(?:gadgets?|modules?|modifiers?)[/\\]/i,
+    SalvageHead: /utility\/salvage\/salvagehead[/\\]|salvage_?heads?[/\\]|salvagehead/i,
     TractorBeam: /utility\/tractorbeam[/\\]/i,
     // ── Modular ship modules ──────────────────────────────────────────────────
     ShipModule: /ship_?modules?[/\\]|modular_?modules?[/\\]|cargo_?modules?[/\\]/i,
@@ -99,6 +115,9 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
         lcName.startsWith('test_') ||
         lcName.includes('_debug') ||
         lcName.includes('_template') ||
+        lcName.includes('_temp') ||
+        lcName.startsWith('temp_') ||
+        lcName.includes('_temporary') ||
         lcName.includes('_indestructible') ||
         lcName.includes('_npc_only') ||
         lcName.includes('_placeholder') ||
@@ -219,9 +238,12 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
 
         if (cType === 'SCItemWeaponGunParams' || cType === 'SCItemGunParams') {
           if (typeof c.ammoContainerRecord === 'string') {
-            if (c.ammoContainerRecord.toLowerCase().includes('ballistic')) comp.subType = 'Ballistic';
-            else if (c.ammoContainerRecord.toLowerCase().includes('energy')) comp.subType = 'Energy';
-            else if (c.ammoContainerRecord.toLowerCase().includes('distortion')) comp.subType = 'Distortion';
+            const ammoRecord = c.ammoContainerRecord.toLowerCase();
+            if (ammoRecord.includes('tachyon')) comp.weaponDamageType = 'Tachyon';
+            else if (ammoRecord.includes('plasma') || ammoRecord.includes('thermal')) comp.weaponDamageType = 'Plasma';
+            else if (ammoRecord.includes('ballistic')) comp.weaponDamageType = 'Ballistic';
+            else if (ammoRecord.includes('energy')) comp.weaponDamageType = 'Laser';
+            else if (ammoRecord.includes('distortion')) comp.weaponDamageType = 'Distortion';
           }
         }
 
@@ -289,7 +311,17 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
                       ['biochemical', biochemical],
                       ['stun', stun],
                     ];
-                    comp.weaponDamageType = dtypes.sort((a, b) => b[1] - a[1])[0][0];
+                    const dominantDamageType = dtypes.sort((a, b) => b[1] - a[1])[0][0];
+                    comp.weaponDamageType =
+                      dominantDamageType === 'physical'
+                        ? 'Ballistic'
+                        : dominantDamageType === 'energy'
+                          ? 'Laser'
+                          : dominantDamageType === 'distortion'
+                            ? 'Distortion'
+                            : dominantDamageType === 'thermal'
+                              ? 'Plasma'
+                              : dominantDamageType;
                   }
 
                   if (typeof pp.speed === 'number' && !comp.weaponSpeed) comp.weaponSpeed = Math.round(pp.speed * 100) / 100;
@@ -433,7 +465,17 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
             const dt = Object.entries(bDmg).find(([_k, v]) => typeof v === 'number' && (v as number) > 0);
             if (dt) {
               comp.weaponDamage = Math.round((dt[1] as number) * 10000) / 10000;
-              comp.weaponDamageType = dt[0];
+              const damageKey = dt[0].replace(/^Damage/i, '').toLowerCase();
+              comp.weaponDamageType =
+                damageKey === 'physical'
+                  ? 'Ballistic'
+                  : damageKey === 'energy'
+                    ? 'Laser'
+                    : damageKey === 'distortion'
+                      ? 'Distortion'
+                      : damageKey === 'thermal'
+                        ? 'Plasma'
+                        : dt[0];
             }
           }
           if (typeof c.speed === 'number' && !comp.weaponSpeed) comp.weaponSpeed = Math.round(c.speed * 100) / 100;
@@ -775,7 +817,7 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
       if (comp.type === 'MiningLaser' && fn.includes('miningarm')) continue;
 
       // Mining modules (miningsubitems/ path) are consumable modifiers, not lasers
-      if (comp.type === 'MiningLaser' && fn.includes('miningsubitems')) {
+      if (comp.type === 'MiningLaser' && /mining(?:sub)?items|mining_?(?:gadgets?|modules?|modifiers?)/i.test(fn)) {
         comp.type = 'MiningModifier';
       }
 
@@ -812,17 +854,37 @@ export function extractAllComponents(ctx: DataForgeContext): any[] {
         comp.subType = 'Gimbal';
       }
 
-      // WeaponGun: derive sub_type from weaponDamageType when ammoContainerRecord didn't resolve
-      if (comp.type === 'WeaponGun' && !comp.subType && comp.weaponDamageType) {
-        if (comp.weaponDamageType === 'physical') comp.subType = 'Ballistic';
-        else if (comp.weaponDamageType === 'energy') comp.subType = 'Energy';
-        else if (comp.weaponDamageType === 'distortion') comp.subType = 'Distortion';
+      // WeaponGun: sub_type is the weapon family; damage stays in weapon_damage_type.
+      if (comp.type === 'WeaponGun') {
+        const weaponText = `${className} ${comp.name || ''}`.toLowerCase();
+        if (weaponText.includes('scatter') || weaponText.includes('shotgun')) comp.subType = 'Scattergun';
+        else if (weaponText.includes('gatling')) comp.subType = 'Gatling';
+        else if (weaponText.includes('repeater')) comp.subType = 'Repeater';
+        else if (weaponText.includes('cannon')) comp.subType = 'Cannon';
+        else if (weaponText.includes('beam')) comp.subType = 'Beam';
+        if (weaponText.includes('tachyon')) comp.weaponDamageType = 'Tachyon';
+        else if (weaponText.includes('plasma')) comp.weaponDamageType = 'Plasma';
+        else if (comp.weaponDamageType === 'physical') comp.weaponDamageType = 'Ballistic';
+        else if (comp.weaponDamageType === 'energy') comp.weaponDamageType = 'Laser';
+        else if (comp.weaponDamageType === 'distortion') comp.weaponDamageType = 'Distortion';
+        else if (comp.weaponDamageType === 'thermal') comp.weaponDamageType = 'Plasma';
+      }
+
+      if (!comp.componentClass) comp.componentClass = inferComponentClass(comp.className, comp.name);
+
+      if (comp.type === 'MissileRack' && !comp.subType) {
+        const rackText = `${className} ${comp.name || ''}`.toLowerCase();
+        if (rackText.includes('rocket')) comp.subType = 'Rocket';
+        else if (rackText.includes('torpedo')) comp.subType = 'Torpedo';
+        else if (rackText.includes('bomb')) comp.subType = 'Bomb';
+        else comp.subType = 'Missile';
       }
 
       // Missile: tag torpedoes and bombs from class_name / resolved display name
       if (comp.type === 'Missile' && !comp.subType) {
         const lcDispName = (comp.name || '').toLowerCase();
-        if (lcName.startsWith('bomb_') || lcDispName.includes(' bomb')) comp.subType = 'Bomb';
+        if (lcName.includes('rocket') || lcDispName.includes('rocket')) comp.subType = 'Rocket';
+        else if (lcName.startsWith('bomb_') || lcDispName.includes(' bomb')) comp.subType = 'Bomb';
         else if (lcDispName.includes('torpedo') || /^misl_s(?:09|10|11|12)_/i.test(className)) comp.subType = 'Torpedo';
         else comp.subType = 'Missile';
       }

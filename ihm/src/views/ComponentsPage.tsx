@@ -22,6 +22,7 @@ import {
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PageShell } from "@/components/ui/PageShell";
 import type { ComponentListItem } from "@/types/api";
+import { getComponentMetricGroups, getComponentPrimaryMetrics } from "@/utils/componentMetrics";
 
 const LIMIT = 30;
 
@@ -31,114 +32,123 @@ interface CategoryDef {
   label: GameComponentCategory;
   slug: string;
   types: string[];
+  subcategories?: ComponentSubcategory[];
+}
+
+interface ComponentSubcategory {
+  key: string;
+  label: string;
+  types?: string[];
+  subTypes?: string[];
+  weaponDamageType?: string;
+  cmType?: string;
 }
 
 const categorySlug = (category: string) => category.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+
+const CATEGORY_SUBCATEGORIES: Partial<Record<GameComponentCategory, ComponentSubcategory[]>> = {
+  Ordnance: [
+    { key: "missile", label: "Missile", subTypes: ["Missile"] },
+    { key: "torpedo", label: "Torpedo", subTypes: ["Torpedo"] },
+    { key: "bomb", label: "Bomb", subTypes: ["Bomb"] },
+    { key: "rockets", label: "Rockets", subTypes: ["Rocket"] },
+  ],
+  Utility: [
+    { key: "mining-laser", label: "Mining Laser", types: ["MiningLaser"] },
+    { key: "mining-laser-gadget", label: "Mining Laser Gadget", types: ["MiningArm", "MiningModifier"] },
+    { key: "salvage-head", label: "Salvage Head", types: ["SalvageHead"] },
+    { key: "tractor-beam", label: "Tractor Beam", types: ["TractorBeam"] },
+  ],
+  "Ordnance Racks": [
+    { key: "missile-racks", label: "Missile Racks", types: ["MissileRack"], subTypes: ["Missile", "MissileRack", "Missile Rack"] },
+    { key: "torpedo-racks", label: "Torpedo Racks", types: ["TorpedoRack", "MissileRack"], subTypes: ["Torpedo", "TorpedoRack", "Torpedo Rack"] },
+    { key: "bomb-racks", label: "Bomb Racks", types: ["BombRack", "MissileRack"], subTypes: ["Bomb", "BombRack", "Bomb Rack"] },
+    { key: "rocket-pods", label: "Rocket Pods", types: ["RocketPod", "MissileRack"], subTypes: ["Rocket", "RocketPod", "Rocket Pod"] },
+  ],
+  Turrets: [
+    { key: "manned-turrets", label: "Manned Turrets", types: ["Turret", "TurretBase"] },
+    { key: "remote-turrets", label: "Remote Turrets", types: ["TurretUnmanned"] },
+  ],
+  Weapons: [
+    { key: "beam", label: "Beam", subTypes: ["Beam"] },
+    { key: "cannon", label: "Cannon", subTypes: ["Cannon"] },
+    { key: "gatling", label: "Gatling", subTypes: ["Gatling"] },
+    { key: "repeater", label: "Repeater", subTypes: ["Repeater"] },
+    { key: "scattergun", label: "Scattergun", subTypes: ["Scattergun"] },
+  ],
+  CM: [
+    { key: "noise", label: "Noise", cmType: "Noise" },
+    { key: "decoy", label: "Decoy", cmType: "Decoy" },
+  ],
+};
+
+const WEAPON_DAMAGE_TYPES = ["Ballistic", "Laser", "Distortion", "Plasma", "Tachyon"];
+const COMPONENT_CLASS_FILTERS = ["Civilian", "Military", "Competition", "Stealth", "Industrial"];
 
 const CATEGORIES: CategoryDef[] = GAME_COMPONENT_CATEGORIES.map((label) => ({
   label,
   slug: categorySlug(label),
   types: GAME_COMPONENT_CATEGORY_TYPES[label],
+  subcategories: CATEGORY_SUBCATEGORIES[label],
 }));
 
-/** Sub-type chips available per primary type chip */
-const TYPE_SUBTYPES: Partial<Record<string, string[]>> = {
-  WeaponGun:      ["Ballistic", "Energy", "Distortion"],
-  Missile:        ["Missile", "Torpedo", "Bomb"],
-  Thruster:       ["Main", "Maneuvering", "Retro", "VTOL"],
-  Countermeasure: ["Noise Launcher", "Decoy Launcher"],
-};
-
-// ── Key stats per type ─────────────────────────────────────────────────────────
-
-interface KeyStat {
-  label: string;
-  value: (c: ComponentListItem) => number | null | undefined;
-  format: (v: number) => string;
-}
-
-const fNum = (v: number, dec = 0) =>
-  v.toLocaleString("en-US", {
-    maximumFractionDigits: dec,
-    minimumFractionDigits: dec,
-  });
-
-const KEY_STATS: Partial<Record<string, KeyStat[]>> = {
-  Shield: [
-    { label: "HP", value: (c) => c.shield_hp, format: (v) => fNum(v) },
-    { label: "Regen", value: (c) => c.shield_regen, format: (v) => `${fNum(v, 1)}/s` },
-  ],
-  WeaponGun: [
-    { label: "DPS", value: (c) => c.weapon_dps, format: (v) => fNum(v, 1) },
-    { label: "Range", value: (c) => c.weapon_range, format: (v) => `${fNum(v)}m` },
-  ],
-  Missile: [{ label: "Dmg", value: (c) => c.missile_damage, format: (v) => fNum(v) }],
-  Bomb: [{ label: "Dmg", value: (c) => c.missile_damage, format: (v) => fNum(v) }],
-  Torpedo: [{ label: "Dmg", value: (c) => c.missile_damage, format: (v) => fNum(v) }],
-  MissileRack: [
-    { label: "Racks", value: (c) => c.rack_count, format: (v) => String(v) },
-    { label: "Size", value: (c) => c.rack_missile_size, format: (v) => `S${v}` },
-  ],
-  QuantumDrive: [
-    { label: "Speed", value: (c) => c.qd_speed, format: (v) => `${(v / 1e6).toFixed(0)} Mm/s` },
-    { label: "Spool", value: (c) => c.qd_spool_time, format: (v) => `${v}s` },
-    { label: "Range", value: (c) => c.qd_range, format: (v) =>
-      v >= 1e9 ? `${(v / 1e9).toFixed(0)} Gm` : v >= 1e6 ? `${(v / 1e6).toFixed(0)} Mm` : `${fNum(v)}m` },
-  ],
-  PowerPlant: [{ label: "Power", value: (c) => c.power_output, format: (v) => fNum(v) }],
-  Cooler: [{ label: "Cooling", value: (c) => c.cooling_rate, format: (v) => fNum(v) }],
-  FuelTank: [{ label: "Cap", value: (c) => c.fuel_capacity, format: (v) => fNum(v) }],
-  FuelIntake: [{ label: "Rate", value: (c) => c.fuel_intake_rate, format: (v) => `${fNum(v, 1)}/s` }],
-  Radar: [{ label: "Range", value: (c) => c.radar_range, format: (v) => `${fNum(v)}m` }],
-  Countermeasure: [{ label: "Ammo", value: (c) => c.cm_ammo_count, format: (v) => String(v) }],
-  Thruster: [{ label: "Thrust", value: (c) => c.thruster_max_thrust, format: (v) => `${(v / 1000).toFixed(0)}kN` }],
-  EMP: [
-    { label: "Dmg", value: (c) => c.emp_damage, format: (v) => fNum(v) },
-    { label: "Radius", value: (c) => c.emp_radius, format: (v) => `${fNum(v)}m` },
-  ],
-  QuantumInterdictionGenerator: [
-    { label: "Jammer", value: (c) => c.qig_jammer_range, format: (v) => `${fNum(v)}m` },
-  ],
-  MiningLaser: [{ label: "Speed", value: (c) => c.mining_speed, format: (v) => fNum(v, 1) }],
-  TractorBeam: [{ label: "Force", value: (c) => c.tractor_max_force, format: (v) => `${(v / 1000).toFixed(0)}kN` }],
-  SalvageHead: [{ label: "Speed", value: (c) => c.salvage_speed, format: (v) => fNum(v, 1) }],
-  Gimbal: [{ label: "Max Angle", value: (c) => c.gimbal_max_angle, format: (v) => `${fNum(v, 1)}°` }],
-  Turret: [
-    { label: "Pitch", value: (c) => c.turret_max_pitch, format: (v) => `${fNum(v, 0)}°` },
-    { label: "Yaw", value: (c) => c.turret_max_yaw, format: (v) => `${fNum(v, 0)}°` },
-  ],
-  TurretUnmanned: [
-    { label: "Pitch", value: (c) => c.turret_max_pitch, format: (v) => `${fNum(v, 0)}°` },
-    { label: "Yaw", value: (c) => c.turret_max_yaw, format: (v) => `${fNum(v, 0)}°` },
-  ],
-};
-
 function ComponentStats({ comp }: { comp: ComponentListItem }) {
-  const stats = KEY_STATS[comp.type];
-  if (!stats) return null;
-  const rendered = stats
-    .map((s) => ({ ...s, v: s.value(comp) }))
-    .filter((s) => s.v != null && s.v > 0);
+  const rendered = getComponentPrimaryMetrics(comp);
   if (!rendered.length) return null;
   return (
     <div className="flex items-center gap-3 flex-wrap">
       {rendered.map((s) => (
         <span key={s.label} className="flex items-center gap-1">
           <span className="text-[10px] font-mono-sc text-slate-600 uppercase">{s.label}</span>
-          <span className="text-xs font-mono-sc text-slate-300 font-semibold">{s.format(s.v!)}</span>
+          <span className="text-xs font-mono-sc text-slate-300 font-semibold">{s.value}</span>
         </span>
       ))}
     </div>
   );
 }
 
+function ComponentMetricStrip({ comp }: { comp: ComponentListItem }) {
+  const groups = getComponentMetricGroups(comp).filter((group) => group.key !== "identity");
+  if (!groups.length) return null;
+
+  return (
+    <div className="mt-3 overflow-x-auto pb-1">
+      <div className="flex gap-2 min-w-max">
+        {groups.map((group) => (
+          <div
+            key={group.key}
+            className="min-w-44 rounded-sm border border-slate-800/80 bg-slate-950/35 px-2.5 py-2"
+          >
+            <p className="text-[10px] font-mono-sc uppercase tracking-widest text-cyan-700 mb-1.5">
+              {group.title}
+            </p>
+            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+              {group.metrics.map((metric) => (
+                <div key={`${group.key}-${metric.label}`} className="min-w-0">
+                  <p className="text-[9px] font-mono-sc uppercase text-slate-600 truncate">
+                    {metric.label}
+                  </p>
+                  <p className="text-[11px] font-mono-sc text-slate-300 tabular-nums truncate">
+                    {metric.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Sub-type chips ─────────────────────────────────────────────────────────────
 
-function SubTypeChips({
-  subTypes,
+function FilterChips({
+  items,
   selected,
   onSelect,
-}: { subTypes: string[]; selected: string; onSelect: (v: string) => void }) {
+  allLabel = "All",
+}: { items: { key: string; label: string }[]; selected: string; onSelect: (v: string) => void; allLabel?: string }) {
   return (
     <div className="flex flex-wrap gap-1.5 mb-4">
       <button
@@ -150,58 +160,20 @@ function SubTypeChips({
             : "border-border text-slate-500 hover:text-slate-300 hover:border-slate-600"
         }`}
       >
-        All
+        {allLabel}
       </button>
-      {subTypes.map((st) => (
+      {items.map((item) => (
         <button
           type="button"
-          key={st}
-          onClick={() => onSelect(selected === st ? "" : st)}
+          key={item.key}
+          onClick={() => onSelect(selected === item.key ? "" : item.key)}
           className={`px-3 py-1 rounded-sm text-xs font-mono-sc uppercase tracking-wide border transition-colors ${
-            selected === st
+            selected === item.key
               ? "bg-cyan-950/40 border-cyan-700 text-cyan-300"
               : "border-border text-slate-500 hover:text-slate-300 hover:border-slate-600"
           }`}
         >
-          {st}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ── Type chips ─────────────────────────────────────────────────────────────────
-
-function TypeChips({
-  types,
-  selected,
-  onSelect,
-}: { types: string[]; selected: string; onSelect: (v: string) => void }) {
-  return (
-    <div className="flex flex-wrap gap-1.5 mb-3">
-      <button
-        type="button"
-        onClick={() => onSelect("")}
-        className={`px-2.5 py-0.5 rounded-sm text-[11px] font-mono-sc uppercase tracking-wide border transition-colors ${
-          !selected
-            ? "bg-slate-800 border-slate-600 text-slate-200"
-            : "border-border text-slate-600 hover:text-slate-400 hover:border-slate-700"
-        }`}
-      >
-        All
-      </button>
-      {types.map((t) => (
-        <button
-          type="button"
-          key={t}
-          onClick={() => onSelect(selected === t ? "" : t)}
-          className={`px-2.5 py-0.5 rounded-sm text-[11px] font-mono-sc border transition-colors ${
-            selected === t
-              ? `${COMPONENT_TYPE_COLORS[t]?.replace("text-", "bg-").replace(/\/([\d]+)$/, "/20") ?? "bg-slate-800"} border-current ${COMPONENT_TYPE_COLORS[t] ?? "text-slate-300"}`
-              : `border-border ${COMPONENT_TYPE_COLORS[t] ?? "text-slate-600"} opacity-60 hover:opacity-100`
-          }`}
-        >
-          {COMPONENT_TYPE_LABELS[t] ?? t}
+          {item.label}
         </button>
       ))}
     </div>
@@ -214,13 +186,14 @@ export default function ComponentsPage() {
   const { env } = useEnv();
   const { page, search, debouncedSearch, setPage, updateSearch, updatePageWithScroll } = useListQueryState();
 
-  // Category (tab) and type/subType within that category
+  // Category tab and optional curated subcategory within that category.
   const [categoryIdx, setCategoryIdx] = useState(0);
-  const [selectedType, setSelectedType] = useState("");
-  const [selectedSubType, setSelectedSubType] = useState("");
+  const [selectedSubcategoryKey, setSelectedSubcategoryKey] = useState("");
+  const [weaponDamageType, setWeaponDamageType] = useState("");
   const [size, setSize] = useState("");
   const [grade, setGrade] = useState("");
   const [componentClass, setComponentClass] = useState("");
+  const [bespoke, setBespoke] = useState("");
 
   const { data: apiCategories } = useQuery({
     queryKey: ["components.categories", env],
@@ -232,25 +205,21 @@ export default function ComponentsPage() {
         label: cat.label as GameComponentCategory,
         slug: cat.slug,
         types: cat.types,
+        subcategories: CATEGORY_SUBCATEGORIES[cat.label as GameComponentCategory],
       }))
     : CATEGORIES) as CategoryDef[];
   const category = categories[Math.min(categoryIdx, categories.length - 1)] ?? CATEGORIES[0];
+  const selectedSubcategory = category.subcategories?.find((item) => item.key === selectedSubcategoryKey);
 
   function handleCategoryChange(idx: number) {
     setCategoryIdx(idx);
-    setSelectedType("");
-    setSelectedSubType("");
+    setSelectedSubcategoryKey("");
+    setWeaponDamageType("");
     setPage(1);
   }
 
-  function handleTypeSelect(t: string) {
-    setSelectedType(t);
-    setSelectedSubType("");
-    setPage(1);
-  }
-
-  function handleSubTypeSelect(st: string) {
-    setSelectedSubType(st);
+  function handleSubcategorySelect(key: string) {
+    setSelectedSubcategoryKey(key);
     setPage(1);
   }
 
@@ -258,7 +227,7 @@ export default function ComponentsPage() {
     queryKey: [
       "components.list",
       env,
-      { page, search: debouncedSearch, category: category.slug, type: selectedType, sub_type: selectedSubType, size, grade, componentClass },
+        { page, search: debouncedSearch, category: category.slug, subcategory: selectedSubcategoryKey, weaponDamageType, size, grade, componentClass, bespoke },
     ],
     queryFn: () =>
       api.components.list({
@@ -266,13 +235,15 @@ export default function ComponentsPage() {
         page,
         limit: LIMIT,
         search: debouncedSearch || undefined,
-        // If user picked a specific type chip, use it; otherwise use the game category.
-        type: selectedType || undefined,
-        category: selectedType ? undefined : category.slug,
-        sub_type: selectedSubType || undefined,
+        category: category.slug,
+        types: selectedSubcategory?.types?.join(",") || undefined,
+        sub_types: selectedSubcategory?.subTypes?.join(",") || undefined,
+        weapon_damage_type: weaponDamageType || selectedSubcategory?.weaponDamageType || undefined,
+        cm_type: selectedSubcategory?.cmType || undefined,
         size: size ? Number(size) : undefined,
         grade: grade || undefined,
         component_class: componentClass || undefined,
+        is_bespoke: bespoke === "" ? undefined : bespoke === "true",
       }),
   });
 
@@ -312,19 +283,23 @@ export default function ComponentsPage() {
         ))}
       </div>
 
-      {/* Type chips */}
-      <TypeChips
-        types={category.types}
-        selected={selectedType}
-        onSelect={handleTypeSelect}
-      />
+      {(category.subcategories?.length ?? 0) > 0 && (
+        <FilterChips
+          items={category.subcategories!.map((item) => ({ key: item.key, label: item.label }))}
+          selected={selectedSubcategoryKey}
+          onSelect={handleSubcategorySelect}
+        />
+      )}
 
-      {/* SubType chips — only when a specific type is selected and has sub-types */}
-      {selectedType && (TYPE_SUBTYPES[selectedType]?.length ?? 0) > 0 && (
-        <SubTypeChips
-          subTypes={TYPE_SUBTYPES[selectedType]!}
-          selected={selectedSubType}
-          onSelect={handleSubTypeSelect}
+      {category.label === "Weapons" && (
+        <FilterChips
+          items={WEAPON_DAMAGE_TYPES.map((item) => ({ key: item, label: item }))}
+          selected={weaponDamageType}
+          onSelect={(value) => {
+            setWeaponDamageType(value);
+            setPage(1);
+          }}
+          allLabel="All damage"
         />
       )}
 
@@ -342,32 +317,44 @@ export default function ComponentsPage() {
             ))}
           </select>
         )}
-        {(filters?.grades ?? []).length > 0 && (
+        {(filters?.grades?.length ?? 0) > 0 && (
           <select
             value={grade}
             onChange={(e) => { setGrade(e.target.value); setPage(1); }}
             className="bg-panel border border-border text-slate-400 text-xs rounded-sm px-2 py-1"
           >
             <option value="">All grades</option>
-            {(filters?.grades ?? []).map((g: string) => (
-              <option key={g} value={g}>{g}</option>
+            {(filters?.grades ?? []).map((item) => (
+              <option key={item} value={item}>{item}</option>
             ))}
           </select>
         )}
-        {(filters?.componentClasses ?? []).length > 0 && (
+        {COMPONENT_CLASS_FILTERS.length > 0 && (
           <select
             value={componentClass}
             onChange={(e) => { setComponentClass(e.target.value); setPage(1); }}
             className="bg-panel border border-border text-slate-400 text-xs rounded-sm px-2 py-1"
           >
             <option value="">All classes</option>
-            {(filters?.componentClasses ?? []).map((componentClassFilter) => (
+            {[...new Map<string, { value: string; label?: string; count?: number }>([
+              ...COMPONENT_CLASS_FILTERS.map((value) => [value, { value, label: value }] as const),
+              ...(filters?.componentClasses ?? []).map((item) => [item.value, item] as const),
+            ]).values()].map((componentClassFilter) => (
               <option key={componentClassFilter.value} value={componentClassFilter.value}>
                 {componentClassFilter.label ?? componentClassFilter.value}
               </option>
             ))}
           </select>
         )}
+        <select
+          value={bespoke}
+          onChange={(e) => { setBespoke(e.target.value); setPage(1); }}
+          className="bg-panel border border-border text-slate-400 text-xs rounded-sm px-2 py-1"
+        >
+          <option value="">All fitment</option>
+          <option value="false">Universal</option>
+          <option value="true">Bespoke</option>
+        </select>
       </div>
 
       {/* Component list */}
@@ -380,61 +367,79 @@ export default function ComponentsPage() {
       ) : (
         <>
           <div className="space-y-1">
-            {data?.data.map((comp, i) => (
-              <motion.div
-                key={comp.uuid}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: Math.min(i * 0.02, 0.3) }}
-              >
-                <Link
-                  href={`/components/${comp.uuid}`}
-                  className="flex items-center gap-4 sci-panel hover:border-cyan-800/60 transition-colors px-4 py-2.5 group"
+            {data?.data.map((comp, i) => {
+              const isPaint = comp.type === "Paint" || comp.type === "Livery";
+              const href = isPaint
+                ? `/paints?search=${encodeURIComponent(comp.name)}`
+                : `/components/${comp.uuid}`;
+
+              return (
+                <motion.div
+                  key={comp.uuid}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: Math.min(i * 0.02, 0.3) }}
                 >
-                  {/* Type color bar */}
-                  <div
-                    className={`w-0.5 self-stretch rounded-full shrink-0 ${
-                      COMPONENT_TYPE_COLORS[comp.type]
-                        ?.replace("text-", "bg-") ?? "bg-slate-700"
-                    } opacity-60`}
-                  />
+                  <Link
+                    href={href}
+                    className="block sci-panel hover:border-cyan-800/60 transition-colors px-4 py-2.5 group"
+                  >
+                    <div className="flex items-start gap-4">
+                      {/* Type color bar */}
+                      <div
+                        className={`w-0.5 self-stretch rounded-full shrink-0 ${
+                          COMPONENT_TYPE_COLORS[comp.type]
+                            ?.replace("text-", "bg-") ?? "bg-slate-700"
+                        } opacity-60`}
+                      />
 
-                  {/* Main info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-orbitron text-sm text-slate-200 group-hover:text-cyan-400 transition-colors truncate">
-                        {comp.name}
-                      </span>
-                      {comp.grade && (
-                        <GlowBadge color="amber" size="xs">{comp.grade}</GlowBadge>
-                      )}
-                      {comp.component_class && (
-                        <GlowBadge color="cyan" size="xs">{comp.component_class}</GlowBadge>
-                      )}
-                      {comp.size != null && (
-                        <GlowBadge color="slate" size="xs">S{comp.size}</GlowBadge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
-                      <span className={`text-xs font-mono-sc ${COMPONENT_TYPE_COLORS[comp.type] ?? "text-slate-500"}`}>
-                        {COMPONENT_TYPE_LABELS[comp.type] ?? comp.type}
-                      </span>
-                      {comp.sub_type && (
-                        <span className="text-xs text-slate-600">{comp.sub_type}</span>
-                      )}
-                      {comp.manufacturer_name && (
-                        <span className="text-xs text-slate-600">{comp.manufacturer_name}</span>
-                      )}
-                    </div>
-                  </div>
+                      {/* Main info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-orbitron text-sm text-slate-200 group-hover:text-cyan-400 transition-colors truncate">
+                                {comp.name}
+                              </span>
+                              {comp.grade && (
+                                <GlowBadge color="amber" size="xs">{comp.grade}</GlowBadge>
+                              )}
+                              {comp.component_class && (
+                                <GlowBadge color="cyan" size="xs">{comp.component_class}</GlowBadge>
+                              )}
+                              {comp.is_bespoke && (
+                                <GlowBadge color="purple" size="xs">Bespoke</GlowBadge>
+                              )}
+                              {comp.size != null && (
+                                <GlowBadge color="slate" size="xs">S{comp.size}</GlowBadge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                              <span className={`text-xs font-mono-sc ${COMPONENT_TYPE_COLORS[comp.type] ?? "text-slate-500"}`}>
+                                {COMPONENT_TYPE_LABELS[comp.type] ?? comp.type}
+                              </span>
+                              {comp.sub_type && (
+                                <span className="text-xs text-slate-600">{comp.sub_type}</span>
+                              )}
+                              {comp.manufacturer_name && (
+                                <span className="text-xs text-slate-600">{comp.manufacturer_name}</span>
+                              )}
+                            </div>
+                          </div>
 
-                  {/* Key stats */}
-                  <div className="shrink-0 text-right">
-                    <ComponentStats comp={comp} />
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
+                          {/* Key stats */}
+                          <div className="hidden lg:block shrink-0 text-right">
+                            <ComponentStats comp={comp} />
+                          </div>
+                        </div>
+
+                        <ComponentMetricStrip comp={comp} />
+                      </div>
+                    </div>
+                  </Link>
+                </motion.div>
+              );
+            })}
           </div>
           {data && (
             <Pagination

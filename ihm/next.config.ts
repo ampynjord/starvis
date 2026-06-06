@@ -12,7 +12,7 @@ const SECURITY_HEADERS = [
   },
 ];
 
-const BACKEND_API_URL = (process.env.API_URL ?? 'http://api:3000').replace(/\/$/, '');
+const BACKEND_API_URL = (process.env.API_URL ?? process.env.NEXT_PUBLIC_API_URL ?? 'http://127.0.0.1:3000').replace(/\/$/, '');
 
 const nextConfig: NextConfig = {
   output: 'standalone',

@@ -392,7 +392,7 @@
           "type": {
             "type": "string",
             "example": "WeaponGun",
-            "description": "Component type: WeaponGun | Shield | QuantumDrive | PowerPlant | Cooler | FuelTank | FuelIntake | Thruster | Radar | Countermeasure | EMP | QuantumInterdictionGenerator | MiningLaser | TractorBeam | SalvageHead | MissileRack | Missile | Gimbal | Turret | TurretUnmanned | LifeSupport | JumpModule | ShipModule"
+            "description": "Component type: WeaponGun | Weapon | UtilityWeapon | Shield | QuantumDrive | PowerPlant | Cooler | Radar | Countermeasure | EMP | QuantumInterdictionGenerator | MiningLaser | MiningArm | MiningModifier | TractorBeam | SalvageHead | RepairBeam | MissileRack | TorpedoRack | BombRack | RocketPod | Missile | WeaponMissile | Torpedo | Bomb | Rocket | Turret | TurretBase | TurretUnmanned | JumpModule | JumpDrive | Paint | Livery"
           },
           "game_component_category": {
             "type": "string",
@@ -401,14 +401,15 @@
               "Ordnance",
               "Coolers",
               "EMP",
-              "Mining",
-              "Missile Racks",
+              "QI",
+              "Utility",
+              "Ordnance Racks",
               "Power Plants",
               "Quantum Drives",
               "Shields",
               "Turrets",
               "Weapons",
-              "CM Launchers",
+              "CM",
               "Liveries",
               "Jump Modules",
               "Radar",
@@ -429,6 +430,7 @@
           "grade": {
             "type": "string",
             "nullable": true,
+            "enum": ["A", "B", "C", "D"],
             "example": "A"
           },
           "component_class": {
@@ -436,6 +438,10 @@
             "nullable": true,
             "enum": ["Civilian", "Competition", "Industrial", "Military", "Stealth"],
             "example": "Military"
+          },
+          "is_bespoke": {
+            "type": "boolean",
+            "description": "True when the component appears to be ship-specific rather than universally swappable."
           },
           "manufacturer_code": {
             "type": "string",
@@ -3244,20 +3250,32 @@
                 "ordnance",
                 "coolers",
                 "emp",
-                "mining",
-                "missile-racks",
+                "qi",
+                "utility",
+                "ordnance-racks",
                 "power-plants",
                 "quantum-drives",
                 "shields",
                 "turrets",
                 "weapons",
-                "cm-launchers",
+                "cm",
                 "liveries",
                 "jump-modules",
-                "radar"
+                "radar",
+                "mining",
+                "missile-racks",
+                "cm-launchers"
               ]
             },
-            "description": "Game component category. Overrides type when provided."
+            "description": "Game component category. New slugs are utility, ordnance-racks and cm; legacy slugs mining, missile-racks and cm-launchers are still accepted."
+          },
+          {
+            "name": "types",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated component types for curated subcategory filters, e.g. Missile,WeaponMissile."
           },
           {
             "name": "sub_type",
@@ -3265,6 +3283,32 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "sub_types",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated component sub_type values."
+          },
+          {
+            "name": "weapon_damage_type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["Ballistic", "Laser", "Distortion", "Plasma", "Tachyon"]
+            },
+            "description": "Weapon damage family filter."
+          },
+          {
+            "name": "cm_type",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["Noise", "Decoy"]
+            },
+            "description": "Countermeasure launcher type filter."
           },
           {
             "name": "size",
@@ -3277,8 +3321,10 @@
             "name": "grade",
             "in": "query",
             "schema": {
-              "type": "string"
-            }
+              "type": "string",
+              "enum": ["A", "B", "C", "D"]
+            },
+            "description": "Component grade exposed by Starvis."
           },
           {
             "name": "component_class",
@@ -3288,6 +3334,14 @@
               "enum": ["Civilian", "Competition", "Industrial", "Military", "Stealth"]
             },
             "description": "Game component class"
+          },
+          {
+            "name": "is_bespoke",
+            "in": "query",
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Filter ship-specific bespoke components versus universal components."
           },
           {
             "name": "manufacturer",

@@ -91,9 +91,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       {/* Header — logo + env switcher */}
       <div className="h-14 flex items-center justify-between px-4 border-b border-border gap-2">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-7 h-7 border-2 border-cyan-400 rounded-sm flex items-center justify-center shrink-0">
-            <span className="font-orbitron text-cyan-400 text-[10px] font-bold">SV</span>
-          </div>
+          <img src="/brand/starvis.png" alt="STARVIS" className="w-8 h-8 rounded-sm object-cover shrink-0" />
           <span className="font-orbitron text-cyan-400 text-sm font-bold tracking-widest glow-text truncate">
             STARVIS
           </span>

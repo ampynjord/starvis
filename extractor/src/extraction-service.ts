@@ -642,7 +642,7 @@ export class ExtractionService {
     onProgress?.(`Component grades/classes enriched: ${wikiEnriched}/${components.length}`);
 
     const COMP_COLS = `env, uuid, class_name, name, normalized_name, canonical_component_key,
-          type, game_component_category, sub_type, size, grade, component_class, manufacturer_code,
+          type, game_component_category, sub_type, size, grade, component_class, is_bespoke, manufacturer_code,
             mass, hp,
             power_draw, power_base, power_output,
             heat_generation, cooling_rate,
@@ -690,6 +690,7 @@ export class ExtractionService {
             game_component_category=EXCLUDED.game_component_category,
             sub_type=EXCLUDED.sub_type, size=EXCLUDED.size, grade=EXCLUDED.grade,
             component_class=EXCLUDED.component_class,
+            is_bespoke=EXCLUDED.is_bespoke,
             manufacturer_code=EXCLUDED.manufacturer_code,
             mass=EXCLUDED.mass, hp=EXCLUDED.hp,
             power_draw=EXCLUDED.power_draw, power_base=EXCLUDED.power_base, power_output=EXCLUDED.power_output,
@@ -758,10 +759,10 @@ export class ExtractionService {
             raw_json=EXCLUDED.raw_json,
             updated_at=CURRENT_TIMESTAMP`;
 
-    const COL_COUNT = 121; // number of columns above (stats + source metadata + env)
+    const COL_COUNT = 122; // number of columns above (stats + source metadata + env)
 
     /** Map a component object to a flat array of values */
-    const toCanonicalRow = (c: any): (string | number | null)[] => {
+    const toCanonicalRow = (c: any): (string | number | boolean | null)[] => {
       const canonical = canonicalizeComponentRecord({
         name: c.name,
         className: c.className,
@@ -784,6 +785,7 @@ export class ExtractionService {
         c.size ?? null,
         c.grade || null,
         c.componentClass || null,
+        c.isBespoke ?? false,
         c.manufacturerCode || null,
         c.mass ?? null,
         c.hp ?? null,

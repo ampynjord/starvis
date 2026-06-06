@@ -290,6 +290,11 @@ export default function HomePage() {
         <div className="absolute top-0 left-0 right-0 h-px bg-linear-to-r from-transparent via-cyan-500/40 to-transparent" />
         <div className="relative px-6 py-8 flex flex-col items-center gap-5 text-center">
           <div>
+            <img
+              src="/brand/starvis.png"
+              alt="STARVIS"
+              className="mx-auto mb-4 h-24 w-24 rounded-sm object-cover sm:h-28 sm:w-28"
+            />
             <h1 className="font-orbitron text-5xl sm:text-6xl font-black text-cyan-400 glow-text tracking-widest leading-none">
               STARVIS
             </h1>

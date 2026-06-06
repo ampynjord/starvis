@@ -56,10 +56,10 @@ const PORT_CATEGORY_MAP: Record<string, string> = {
   Gimbal: 'Weapons',
   MissileLauncher: 'Ordnance',
   ShieldGenerator: 'Shields',
-  QuantumInterdictionGenerator: 'EMP',
-  SalvageHead: 'Mining',
-  TractorBeam: 'Mining',
-  RepairBeam: 'Mining',
+  QuantumInterdictionGenerator: 'QI',
+  SalvageHead: 'Utility',
+  TractorBeam: 'Utility',
+  RepairBeam: 'Utility',
 };
 
 function portCategory(portType: string): string {
