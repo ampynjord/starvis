@@ -168,6 +168,8 @@ describe('ComponentQueryService', () => {
         [row({ value: 1 }), row({ value: 2 })],
         [row({ value: 'A' }), row({ value: 'B' })],
         [],
+        [],
+        [row({ value: 'RSI', label: 'Roberts Space Industries', count: 4 })],
       ]);
       const svc = new ComponentQueryService(createGetClient(prisma));
       const f = await svc.getComponentFilters();
@@ -175,6 +177,10 @@ describe('ComponentQueryService', () => {
       expect(f.filters.sub_type?.map((r) => r.value)).toEqual(['Laser']);
       expect(f.filters.size?.map((r) => r.value)).toEqual(['1', '2']);
       expect(f.filters.grade?.map((r) => r.value)).toEqual(['A', 'B']);
+      expect(f.filters.manufacturer).toEqual([{ value: 'RSI', label: 'Roberts Space Industries', count: 4 }]);
+      const manufacturerSql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[6][0];
+      expect(manufacturerSql).toContain('UPPER(TRIM(c.manufacturer_code)) as value');
+      expect(manufacturerSql).toContain('GROUP BY UPPER(TRIM(c.manufacturer_code))');
     });
   });
 

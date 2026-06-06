@@ -80,7 +80,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
     <aside
       className={[
         // Desktop: static sidebar
-        'md:relative md:translate-x-0 md:w-56',
+        'md:relative md:translate-x-0 md:w-64',
         // Mobile: fixed drawer
         'fixed inset-y-0 left-0 z-40 w-72',
         'transition-transform duration-300 ease-in-out',
@@ -89,10 +89,10 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
       ].join(' ')}
     >
       {/* Header — logo + env switcher */}
-      <div className="h-14 flex items-center justify-between px-4 border-b border-border gap-2">
+      <div className="h-14 flex items-center justify-between px-4 border-b border-border gap-3">
         <div className="flex items-center gap-2.5 min-w-0">
           <img src="/brand/starvis.png" alt="STARVIS" className="w-8 h-8 rounded-sm object-cover shrink-0" />
-          <span className="font-orbitron text-cyan-400 text-sm font-bold tracking-widest glow-text truncate">
+          <span className="font-orbitron text-cyan-400 text-sm font-bold tracking-widest glow-text whitespace-nowrap">
             STARVIS
           </span>
         </div>
