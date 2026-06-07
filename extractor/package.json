@@ -15,7 +15,7 @@
   "author": "ampynjord - Dawnstar",
   "license": "UNLICENSED",
   "dependencies": {
-    "commander": "^13.1.0",
+    "commander": "^15.0.0",
     "dotenv": "^16.3.1",
     "fzstd": "^0.1.1",
     "pg": "^8.12.0",
