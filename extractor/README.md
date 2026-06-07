@@ -34,7 +34,7 @@ cp extractor/.env.example extractor/.env.dev
 | `P4K_PTU_PATH` | Chemin vers `Data.p4k` du canal PTU |
 | `P4K_PATH` | Chemin générique (fallback si les deux ci-dessus sont vides) |
 | `CTM_CACHE_DIR` | Répertoire de cache des modèles CTM (défaut : `./ctm-cache`) |
-| `LOG_LEVEL` | Niveau de log : `debug` \| `info` \| `warn` \| `error` |
+| `LOG_LEVEL` | Niveau de log : `debug` \| `info` \| `warn` \| `error` \| `silent` |
 
 **Chemins P4K typiques (Windows) :**
 ```
@@ -56,6 +56,8 @@ C:\Program Files\Roberts Space Industries\StarCitizen\PTU\Data.p4k
 npx tsx extractor/extract.ts [options]
 ```
 
+`extractor/extract.ts` reste le point d'entree stable. L'orchestration CLI vit dans `extractor/src/cli/main.ts`, le parsing des arguments dans `src/cli/options.ts`, la selection des modules dans `src/cli/modules.ts`, et la resolution runtime dans `src/cli/resolve.ts`.
+
 ### Options CLI
 
 | Option | Description | Défaut |
@@ -66,6 +68,13 @@ npx tsx extractor/extract.ts [options]
 | `--game-version <ver>` | Version du jeu à enregistrer en base (ex: `4.7.2`) | auto-détectée |
 | `--dry-run` | Parse le P4K et affiche les stats sans écrire en base | — |
 | `--prod-db` | Utilise `.env.prod` (base de prod, port 5433 via tunnel SSH) | — |
+| `--log-level <level>` | Niveau de log : `debug`, `info`, `warn`, `error`, `silent` | `info` |
+| `--verbose` | Raccourci pour `--log-level debug` | - |
+| `--quiet` | Coupe les logs CLI | - |
+| `--json` | Emet les logs en JSON lines | - |
+| `--no-color` | Desactive les couleurs des logs texte | - |
+| `--list-modules` | Affiche les modules disponibles puis quitte | - |
+| `--check-config` | Valide la config CLI/P4K/DB sans extraire | - |
 
 > **Note** : la version publique est auto-detectee depuis le build P4K installe. L'extracteur lit `build_manifest.id`, recupere son `RequestedP4ChangeNum`, puis cherche le libelle public `X.X.X` correspondant dans le cache launcher local. `--game-version` reste disponible uniquement comme override manuel.
 

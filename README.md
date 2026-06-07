@@ -39,6 +39,8 @@ cd starvis
 npm install        # installs all workspaces (api, ihm, bot, extractor, db)
 ```
 
+The monorepo uses the root `package-lock.json` as the single dependency lockfile. Workspace packages should not keep nested lockfiles. The extractor keeps `extractor/extract.ts` as its stable command wrapper; implementation code lives under `extractor/src/`.
+
 ### 2 — Configure the environment
 
 ```bash
