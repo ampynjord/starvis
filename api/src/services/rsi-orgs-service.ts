@@ -7,7 +7,6 @@
 
 const RSI_BASE = 'https://robertsspaceindustries.com';
 const RSI_ORGS_API = `${RSI_BASE}/api/orgs/getOrgs`;
-const _RSI_CDN = 'https://cdn.robertsspaceindustries.com';
 
 export interface RsiOrg {
   symbol: string;

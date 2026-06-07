@@ -385,7 +385,6 @@ export class ItemQueryService {
     const throwables = sub('FPS_Weapon', 'Throwable') + sub('FPS_Weapon', 'Mine');
     const fpsWeaponTotal = type('FPS_Weapon');
     const weaponsAll = fpsWeaponTotal - throwables;
-    const _fpsGadget = sub('FPS_Weapon', 'Gadget');
     const gadgetHand = sub('Gadget', 'Handheld') + sub('Gadget', 'Two-handed') + sub('Gadget', 'Device');
     const medicalSubs = sub('Consumable', 'Medical') + sub('Consumable', 'MedPack') + sub('Consumable', 'Stim') + sub('Tool', 'Medical');
     const cryptokeys = sub('Consumable', 'Hacking') + sub('Consumable', 'SystemAccess');
@@ -529,10 +528,8 @@ export class ItemQueryService {
     const consumableEntries = consumableSubTypes.sub_types
       .map((entry) => ({ value: entry.value, count: Number(entry.count) }))
       .filter((entry) => entry.count > 0);
-    const consumableCountMap = Object.fromEntries(consumableEntries.map((entry) => [entry.value, entry.count]));
     const otherTypes = (filters.filters.type ?? []).map((entry) => entry.value).filter((type) => !FPS_COVERED_TYPES.has(type));
     const nonConsumableOtherTypes = otherTypes.filter((type) => type !== 'Consumable');
-    const _chipCount = CHIP_SUBTYPES.reduce((sum, value) => sum + (consumableCountMap[value] ?? 0), 0);
     const otherCount = nonConsumableOtherTypes.reduce((sum, value) => sum + (typeCounts[value] ?? 0), 0);
     const orderedConsumableEntries = orderConsumableEntries(consumableEntries.filter((entry) => !CHIP_SUBTYPES.includes(entry.value)));
     type NavCategory = { slug: string; label: string; count: number; group: string; parentSlug?: string };
