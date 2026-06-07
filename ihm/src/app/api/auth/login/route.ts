@@ -18,7 +18,14 @@ export async function POST(req: Request) {
 
     // 2FA step — return pending token to client, no cookie yet
     if (data.requires2FA) {
+      if (!data.pendingToken) {
+        return NextResponse.json({ error: 'Login service returned an invalid 2FA response' }, { status: 502 });
+      }
       return NextResponse.json({ requires2FA: true, pendingToken: data.pendingToken });
+    }
+
+    if (!data.user || !data.token) {
+      return NextResponse.json({ error: 'Login service returned an invalid response' }, { status: 502 });
     }
 
     const res = NextResponse.json({ user: data.user });

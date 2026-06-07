@@ -13,7 +13,7 @@ export async function readUpstreamJson(upstream: Response): Promise<any> {
   try {
     return JSON.parse(text);
   } catch {
-    return {};
+    return { error: 'Upstream returned a non-JSON response' };
   }
 }
 

@@ -29,6 +29,16 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+async function readJsonSafe(res: Response): Promise<any> {
+  const text = await res.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: 'Service unavailable. Please try again later.' };
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({ user: null, loading: true });
 
@@ -36,7 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await fetch('/api/auth/me');
       if (res.ok) {
-        const data = await res.json();
+        const data = await readJsonSafe(res);
         setState({ user: data.user, loading: false });
       } else {
         setState({ user: null, loading: false });
@@ -56,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ emailOrUsername, password }),
     });
-    const data = await res.json();
+    const data = await readJsonSafe(res);
     if (!res.ok) throw new Error(data.error ?? 'Login failed');
     if (data.requires2FA) {
       return { requires2FA: true as const, pendingToken: data.pendingToken as string };
@@ -70,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pendingToken, code }),
     });
-    const data = await res.json();
+    const data = await readJsonSafe(res);
     if (!res.ok) throw new Error(data.error ?? '2FA verification failed');
     setState({ user: data.user, loading: false });
   }, []);
@@ -81,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, username, password }),
     });
-    const data = await res.json();
+    const data = await readJsonSafe(res);
     if (!res.ok) throw new Error(data.error ?? 'Registration failed');
     if (data.requiresVerification) {
       return { requiresVerification: true as const };
