@@ -5,7 +5,7 @@ import { DEFAULT_AUTH_COOKIE_NAME } from '@/lib/app-constants';
 
 export const metadata: Metadata = {
   title: 'Legal notice — STARVIS',
-  description: 'Legal notice, credits, GDPR privacy policy and license for the STARVIS project.',
+  description: 'Legal notice, credits, GDPR privacy policy and proprietary source code notice for the STARVIS project.',
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -49,14 +49,14 @@ export default function LegalPage() {
           <span className="text-slate-200">Roberts Space Industries Corp.</span>
         </P>
         <P>
-          The source code is published under the{' '}
+          The source code is proprietary and all rights are reserved under the{' '}
           <a
             href="https://github.com/ampynjord/starvis/blob/main/LICENSE"
             target="_blank"
             rel="noreferrer"
             className="text-cyan-500 hover:text-cyan-300 underline underline-offset-2"
           >
-            MIT license
+            STARVIS Proprietary License
           </a>
           .
         </P>
@@ -203,14 +203,15 @@ export default function LegalPage() {
 
       <Section title="Source code license">
         <P>
-          The STARVIS source code is distributed under the{' '}
-          <span className="text-slate-200">MIT license</span>. You are free to use, modify and
-          redistribute it provided you retain the copyright notices and the Cloud Imperium Games
-          intellectual property notice included in the LICENSE file.
+          The STARVIS source code and associated project files are proprietary and owned by{' '}
+          <span className="text-slate-200">ampynjord</span>, unless a separate written agreement says otherwise.
+          Access to the repository does not grant permission to use, copy, modify, host, distribute, sublicense,
+          sell, or otherwise exploit the software without prior written authorization.
         </P>
         <P>
-          The MIT license applies to the code only — it does not cover data or content owned by
-          Cloud Imperium Games.
+          This source code notice applies only to STARVIS code owned by ampynjord. It does not cover, license,
+          or claim ownership over Star Citizen, RSI, CIG, or Cloud Imperium Games data, assets, names, lore,
+          imagery, or related intellectual property.
         </P>
       </Section>
     </PageShell>
