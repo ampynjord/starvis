@@ -1,0 +1,230 @@
+// ║  META SCHEMA — extraction log, changelog, users              ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+enum ExtractionStatus {
+  success
+  partial
+  failed
+
+  @@schema("meta")
+}
+
+enum ChangelogEntityType {
+  ship
+  component
+  item
+  commodity
+  shop
+  module
+  recipe
+
+  @@schema("meta")
+}
+
+enum ChangelogChangeType {
+  added
+  removed
+  modified
+
+  @@schema("meta")
+}
+
+model ExtractionLog {
+  id                 Int              @id @default(autoincrement())
+  extractionHash     String           @map("extraction_hash") @db.Char(64)
+  gameVersion        String?          @map("game_version") @db.VarChar(50)
+  gameEnv            String           @default("live") @map("game_env") @db.VarChar(10)
+  shipsCount         Int              @default(0) @map("ships_count")
+  componentsCount    Int              @default(0) @map("components_count")
+  itemsCount         Int              @default(0) @map("items_count")
+  commoditiesCount   Int              @default(0) @map("commodities_count")
+  manufacturersCount Int              @default(0) @map("manufacturers_count")
+  loadoutPortsCount  Int              @default(0) @map("loadout_ports_count")
+  shopsCount         Int              @default(0) @map("shops_count")
+  recipesCount       Int              @default(0) @map("recipes_count")
+  durationMs         Int?             @map("duration_ms")
+  status             ExtractionStatus @default(success)
+  errorMessage       String?          @map("error_message")
+  extractedAt        DateTime         @default(now()) @map("extracted_at")
+
+  changelogs Changelog[]
+
+  @@index([extractionHash])
+  @@index([gameEnv])
+  @@map("extraction_log")
+  @@schema("meta")
+}
+
+model Changelog {
+  id           Int                 @id @default(autoincrement())
+  extractionId Int                 @map("extraction_id")
+  entityType   ChangelogEntityType @map("entity_type")
+  entityUuid   String              @map("entity_uuid") @db.VarChar(255)
+  entityName   String?             @map("entity_name") @db.VarChar(255)
+  changeType   ChangelogChangeType @map("change_type")
+  fieldName    String?             @map("field_name") @db.VarChar(100)
+  oldValue     String?             @map("old_value")
+  newValue     String?             @map("new_value")
+  createdAt    DateTime            @default(now()) @map("created_at")
+
+  extraction ExtractionLog @relation(fields: [extractionId], references: [id], onDelete: Cascade)
+
+  @@index([extractionId])
+  @@index([entityType, entityUuid])
+  @@map("changelog")
+  @@schema("meta")
+}
+
+enum UserRole {
+  user
+  developer
+  admin
+
+  @@schema("meta")
+}
+
+model User {
+  id                Int       @id @default(autoincrement())
+  uuid              String    @unique @default(cuid()) @db.VarChar(36)
+  email             String    @unique @db.VarChar(255)
+  username          String    @unique @db.VarChar(50)
+  passwordHash      String    @map("password_hash") @db.VarChar(255)
+  role              UserRole  @default(user)
+  avatarUrl         String?   @map("avatar_url") @db.VarChar(500)
+  emailVerified     Boolean   @default(true) @map("email_verified")
+  verificationToken String?   @unique @map("verification_token") @db.VarChar(255)
+  resetToken        String?   @unique @map("reset_token") @db.VarChar(255)
+  resetTokenExpiry  DateTime? @map("reset_token_expiry")
+  twoFactorSecret   String?   @map("two_factor_secret") @db.VarChar(255)
+  twoFactorEnabled  Boolean   @default(false) @map("two_factor_enabled")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  bugReports      BugReport[]
+  memberships     CorporationMembership[]
+  addedFleetItems CorporationFleetItem[]  @relation("AddedFleetItems")
+
+  @@index([email])
+  @@map("users")
+  @@schema("meta")
+}
+
+model BugReport {
+  id               Int      @id @default(autoincrement())
+  userId           Int      @map("user_id")
+  title            String   @db.VarChar(200)
+  description      String   @db.Text
+  attachments      Json     @default("[]")
+  status           String   @default("open") @db.VarChar(20)
+  duplicateOfId    Int?     @map("duplicate_of_id")
+  duplicateComment String?  @map("duplicate_comment") @db.Text
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  duplicateOf   BugReport?  @relation("BugReportDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
+  duplicateOfMe BugReport[] @relation("BugReportDuplicates")
+
+  @@index([userId])
+  @@index([status])
+  @@index([duplicateOfId])
+  @@index([createdAt])
+  @@map("bug_reports")
+  @@schema("meta")
+}
+
+// ─── Corporations ─────────────────────────────────────────────────────────────
+
+enum FleetItemType {
+  ship
+  component
+  item
+  commodity
+  other
+
+  @@schema("meta")
+}
+
+enum CorporationMembershipRole {
+  member
+  leader
+
+  @@schema("meta")
+}
+
+enum CorporationMembershipStatus {
+  pending
+  active
+  rejected
+
+  @@schema("meta")
+}
+
+model Corporation {
+  id                   Int      @id @default(autoincrement())
+  name                 String   @unique @db.VarChar(100)
+  tag                  String   @unique @db.VarChar(20)
+  description          String?  @db.Text
+  logoUrl              String?  @map("logo_url") @db.VarChar(500)
+  // RSI org data (cached from live API)
+  rsiArchetype         String?  @map("rsi_archetype") @db.VarChar(50)
+  rsiLanguage          String?  @map("rsi_language") @db.VarChar(50)
+  rsiCommitment        String?  @map("rsi_commitment") @db.VarChar(20)
+  rsiRecruiting        Boolean? @map("rsi_recruiting")
+  rsiRoleplay          Boolean? @map("rsi_roleplay")
+  rsiMemberCount       Int?     @map("rsi_member_count")
+  rsiSyncedAt          DateTime? @map("rsi_synced_at")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  memberships CorporationMembership[]
+  fleetItems  CorporationFleetItem[]
+
+  @@map("corporations")
+  @@schema("meta")
+}
+
+model CorporationMembership {
+  id            Int      @id @default(autoincrement())
+  userId        Int      @map("user_id")
+  corporationId Int      @map("corporation_id")
+  rank          String?  @db.VarChar(50)
+  role          CorporationMembershipRole   @default(member)
+  status        CorporationMembershipStatus @default(active)
+  reviewedById  Int?     @map("reviewed_by_id")
+  reviewedAt    DateTime? @map("reviewed_at")
+  declaredAt    DateTime @default(now()) @map("declared_at")
+
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  corporation Corporation @relation(fields: [corporationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, corporationId])
+  @@index([corporationId])
+  @@index([corporationId, status])
+  @@index([userId, status])
+  @@map("corporation_memberships")
+  @@schema("meta")
+}
+
+model CorporationFleetItem {
+  id            Int           @id @default(autoincrement())
+  corporationId Int?          @map("corporation_id")
+  itemType      FleetItemType @map("item_type")
+  itemClassName String        @map("item_class_name") @db.VarChar(255)
+  shipUuid      String?       @map("ship_uuid") @db.VarChar(64)
+  quantity      Int           @default(1)
+  notes         String?       @db.Text
+  addedById     Int?          @map("added_by_id")
+  addedAt       DateTime      @default(now()) @map("added_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  corporation Corporation? @relation(fields: [corporationId], references: [id], onDelete: Cascade)
+  addedBy     User?       @relation("AddedFleetItems", fields: [addedById], references: [id], onDelete: SetNull)
+
+  @@index([corporationId])
+  @@index([addedById, itemType])
+  @@map("corporation_fleet_items")
+  @@schema("meta")
+}
+
+// ╔══════════════════════════════════════════════════════════════╗

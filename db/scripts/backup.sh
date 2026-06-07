@@ -3,7 +3,7 @@
 # PostgreSQL backup script.
 #
 # Intended for the VPS, for example:
-#   0 3 * * * /home/debian/starvis/db/backup.sh
+#   0 3 * * * /home/debian/starvis/db/scripts/backup.sh
 #
 # Defaults match docker-compose.prod.yml and .env.prod.
 # ==============================================================

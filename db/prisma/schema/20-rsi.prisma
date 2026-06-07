@@ -1,0 +1,134 @@
+// ║  RSI SCHEMA — RSI website + SC Wiki scraped data             ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+model ShipMatrix {
+  id                Int      @id
+  name              String   @db.VarChar(255)
+  chassisId         Int?     @map("chassis_id")
+  manufacturerCode  String?  @map("manufacturer_code") @db.VarChar(10)
+  manufacturerName  String?  @map("manufacturer_name") @db.VarChar(100)
+  focus             String?  @db.VarChar(255)
+  type              String?  @db.VarChar(50)
+  description       String?
+  productionStatus  String?  @map("production_status") @db.VarChar(50)
+  productionNote    String?  @map("production_note")
+  size              String?  @db.VarChar(20)
+  url               String?  @db.VarChar(500)
+  length            Decimal? @db.Decimal(10, 2)
+  beam              Decimal? @db.Decimal(10, 2)
+  height            Decimal? @db.Decimal(10, 2)
+  mass              Int?
+  cargocapacity     Int?
+  minCrew           Int?     @default(1) @map("min_crew")
+  maxCrew           Int?     @default(1) @map("max_crew")
+  scmSpeed          Int?     @map("scm_speed")
+  afterburnerSpeed  Int?     @map("afterburner_speed")
+  pitchMax          Decimal? @map("pitch_max") @db.Decimal(10, 2)
+  yawMax            Decimal? @map("yaw_max") @db.Decimal(10, 2)
+  rollMax           Decimal? @map("roll_max") @db.Decimal(10, 2)
+  xaxisAcceleration Decimal? @map("xaxis_acceleration") @db.Decimal(10, 4)
+  yaxisAcceleration Decimal? @map("yaxis_acceleration") @db.Decimal(10, 4)
+  zaxisAcceleration Decimal? @map("zaxis_acceleration") @db.Decimal(10, 4)
+  mediaSourceUrl    String?  @map("media_source_url")
+  mediaStoreSmall   String?  @map("media_store_small")
+  mediaStoreLarge   String?  @map("media_store_large")
+  ctmUrl            String?  @map("ctm_url") @db.VarChar(500)
+  compiled          Json?
+  syncedAt          DateTime @default(now()) @map("synced_at")
+
+  @@map("ship_matrix")
+  @@schema("rsi")
+}
+
+model Galactapedia {
+  id                   String    @id @db.VarChar(50)
+  slug                 String    @db.VarChar(255)
+  title                String    @db.VarChar(500)
+  content              String?
+  excerpt              String?   @db.VarChar(500)
+  type                 String?   @db.VarChar(100)
+  template             String?   @db.VarChar(100)
+  categories           Json?
+  tags                 Json?
+  categoriesCount      Int?      @map("categories_count")
+  tagsCount            Int?      @map("tags_count")
+  relatedArticlesCount Int?      @map("related_articles_count")
+  thumbnailUrl         String?   @map("thumbnail_url") @db.VarChar(500)
+  rsiUrl               String?   @map("rsi_url") @db.VarChar(500)
+  apiUrl               String?   @map("api_url") @db.VarChar(500)
+  webUrl               String?   @map("web_url") @db.VarChar(500)
+  sourceCreatedAt      DateTime? @map("source_created_at")
+  rawJson              Json?     @map("raw_json")
+  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@index([slug])
+  @@map("galactapedia")
+  @@schema("rsi")
+}
+
+model CommLink {
+  id           Int       @id @default(autoincrement())
+  rsiId        String    @unique @map("rsi_id") @db.VarChar(20)
+  slug         String?   @db.VarChar(255)
+  title        String    @db.VarChar(500)
+  content      String?
+  excerpt      String?   @db.VarChar(500)
+  category     String?   @db.VarChar(100)
+  sourceCategory String? @map("source_category") @db.VarChar(100)
+  channel      String?   @db.VarChar(100)
+  series       String?   @db.VarChar(100)
+  thumbnailUrl String?   @map("thumbnail_url") @db.VarChar(500)
+  rsiUrl       String?   @map("rsi_url") @db.VarChar(500)
+  apiUrl       String?   @map("api_url") @db.VarChar(500)
+  apiPublicUrl String?   @map("api_public_url") @db.VarChar(500)
+  imagesCount  Int?      @map("images_count")
+  linksCount   Int?      @map("links_count")
+  commentCount Int?      @map("comment_count")
+  rawJson      Json?     @map("raw_json")
+  publishedAt  DateTime? @map("published_at")
+
+  @@index([category])
+  @@index([publishedAt])
+  @@map("comm_links")
+  @@schema("rsi")
+}
+
+model StarmapLocation {
+  id                 Int       @id @default(autoincrement())
+  rsiId              String    @unique @map("rsi_id") @db.VarChar(50)
+  name               String    @db.VarChar(255)
+  type               String    @db.VarChar(50)
+  status             String?   @db.VarChar(20)
+  starType           String?   @map("star_type") @db.VarChar(50)
+  systemCode         String?   @map("system_code") @db.VarChar(20)
+  systemName         String?   @map("system_name") @db.VarChar(255)
+  parentId           String?   @map("parent_id") @db.VarChar(50)
+  factionName        String?   @map("faction_name") @db.VarChar(100)
+  affiliations       Json?
+  thumbnail          String?   @db.VarChar(500)
+  description        String?
+  webUrl             String?   @map("web_url") @db.VarChar(500)
+  coordinates        Json?
+  aggregated         Json?
+  size               Decimal?  @db.Decimal(12, 2)
+  population         Decimal?  @db.Decimal(12, 2)
+  economy            Decimal?  @db.Decimal(12, 2)
+  danger             Decimal?  @db.Decimal(12, 2)
+  frostLine          Decimal?  @map("frost_line") @db.Decimal(12, 2)
+  habitableZoneInner Decimal?  @map("habitable_zone_inner") @db.Decimal(12, 2)
+  habitableZoneOuter Decimal?  @map("habitable_zone_outer") @db.Decimal(12, 2)
+  jumpPoints         Json?     @map("jump_points")
+  rawJson            Json?     @map("raw_json")
+  sourceUpdatedAt    DateTime? @map("source_updated_at")
+  syncedAt           DateTime  @default(now()) @map("synced_at")
+
+  gameLocations Location[]
+
+  @@index([systemCode])
+  @@index([parentId])
+  @@index([type])
+  @@map("starmap_locations")
+  @@schema("rsi")
+}
+
+// ╔══════════════════════════════════════════════════════════════╗
