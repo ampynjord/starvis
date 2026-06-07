@@ -455,6 +455,8 @@ ssh -i ~/.ssh/starvis_vps debian@ampynjord.bzh
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --no-deps --force-recreate <service>
 ```
 
+Production routing note: Traefik sends only backend public paths (`/api/v1`, `/api-docs`, `/health`, `/admin`) to the Express API. Other `/api/*` paths are handled by the Next.js IHM route handlers, especially auth/session proxy routes such as `/api/auth/login`.
+
 ---
 
 ## Tests
