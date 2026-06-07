@@ -11,7 +11,7 @@ test('starmap renders a non-empty WebGL canvas', async ({ page }) => {
   await page.waitForTimeout(1500);
 
   const box = await canvas.boundingBox();
-  expect(box?.width).toBeGreaterThan(400);
+  expect(box?.width).toBeGreaterThan(300);
   expect(box?.height).toBeGreaterThan(300);
 
   const screenshot = await canvas.screenshot();

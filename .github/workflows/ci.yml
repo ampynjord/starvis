@@ -33,7 +33,7 @@ jobs:
 
       - name: Restore node_modules cache
         id: nm-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             node_modules
@@ -50,7 +50,7 @@ jobs:
 
       - name: Restore db/generated cache
         id: db-gen-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: db/generated/
           key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma', 'db/prisma.config.ts') }}
@@ -101,7 +101,7 @@ jobs:
 
       - name: Restore node_modules cache
         id: nm-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             node_modules
@@ -280,7 +280,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       - name: Restore node_modules cache
         id: nm-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             node_modules
@@ -321,7 +321,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       - name: Restore node_modules cache
         id: nm-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             node_modules
@@ -335,7 +335,7 @@ jobs:
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
       - name: Restore db/generated cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: db/generated/
           key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma', 'db/prisma.config.ts') }}
@@ -381,7 +381,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       - name: Restore node_modules cache
         id: nm-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             node_modules
@@ -395,7 +395,7 @@ jobs:
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
       - name: Restore db/generated cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: db/generated/
           key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma', 'db/prisma.config.ts') }}
@@ -427,7 +427,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       - name: Restore node_modules cache
         id: nm-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             node_modules
@@ -458,7 +458,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
       - name: Restore node_modules cache
         id: nm-cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             node_modules
@@ -473,6 +473,35 @@ jobs:
         run: npm ci
       - run: npm run test --workspace=starvis-ihm -- --reporter=verbose
 
+  test-e2e:
+    name: Tests E2E (Playwright)
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Restore node_modules cache
+        id: nm-cache
+        uses: actions/cache@v5
+        with:
+          path: |
+            node_modules
+            api/node_modules
+            ihm/node_modules
+            extractor/node_modules
+            bot/node_modules
+            db/node_modules
+          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install (fallback)
+        if: steps.nm-cache.outputs.cache-hit != 'true'
+        run: npm ci
+      - name: Install Playwright browsers
+        run: npm exec --workspace=starvis-ihm -- playwright install --with-deps chromium
+      - name: Run Playwright tests
+        run: npm run test:e2e --workspace=starvis-ihm
+
 # ─────────────────────────────────────────────────────────────
 # BUILD Docker images (main uniquement)
 # ─────────────────────────────────────────────────────────────
@@ -480,7 +509,7 @@ jobs:
     name: Build ${{ matrix.image.name }}
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [lint, typecheck, test-api, test-extractor, test-ihm, checks, config, api-only-smoke]
+    needs: [lint, typecheck, test-api, test-extractor, test-ihm, test-e2e, checks, config, api-only-smoke]
     permissions:
       contents: read
       packages: write
