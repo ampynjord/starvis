@@ -10,7 +10,8 @@
     "lint": "biome check --write .",
     "lint:ci": "biome check .",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit --project tsconfig.json"
   },
   "author": "ampynjord - Dawnstar",
   "license": "UNLICENSED",

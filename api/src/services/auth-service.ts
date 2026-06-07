@@ -1,11 +1,10 @@
 import { randomBytes } from 'node:crypto';
-import { createRequire } from 'node:module';
 import type { PrismaLike } from '@starvis/db';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { generateSecret, generateURI, verify } from 'otplib';
+import QRCode from 'qrcode';
 import { JWT_2FA_PENDING_EXPIRES, JWT_API_TOKEN_EXPIRES, JWT_EXPIRES, RESET_TOKEN_TTL_MS } from '../utils/config.js';
-
-const _require = createRequire(import.meta.url);
 
 export interface JwtPayload {
   sub: number;
@@ -151,9 +150,8 @@ export class AuthService {
     const user = await (this.prisma as any).user.findUnique({ where: { id: payload.sub } });
     if (!user?.twoFactorEnabled || !user?.twoFactorSecret) throw new Error('INVALID_TOKEN');
 
-    const { authenticator } = _require('otplib');
-    const valid = authenticator.verify({ token: code, secret: user.twoFactorSecret });
-    if (!valid) throw new Error('INVALID_2FA_CODE');
+    const result = await verify({ token: code, secret: user.twoFactorSecret });
+    if (!result.valid) throw new Error('INVALID_2FA_CODE');
 
     const sessionToken = this.signToken(user);
     return { token: sessionToken, user: toPublicUser(user) };
@@ -194,16 +192,14 @@ export class AuthService {
     const user = await (this.prisma as any).user.findUnique({ where: { id: userId } });
     if (!user) throw new Error('USER_NOT_FOUND');
 
-    const { authenticator } = _require('otplib');
-    const secret = authenticator.generateSecret();
-    const otpauth = authenticator.keyuri(user.email, 'Starvis', secret);
+    const secret = generateSecret();
+    const otpauth = generateURI({ issuer: 'Starvis', label: user.email, secret });
 
     await (this.prisma as any).user.update({
       where: { id: userId },
       data: { twoFactorSecret: secret, twoFactorEnabled: false },
     });
 
-    const QRCode = _require('qrcode');
     const qrCodeUrl: string = await QRCode.toDataURL(otpauth);
 
     return { secret, qrCodeUrl };
@@ -213,9 +209,8 @@ export class AuthService {
     const user = await (this.prisma as any).user.findUnique({ where: { id: userId } });
     if (!user?.twoFactorSecret) throw new Error('2FA_NOT_SETUP');
 
-    const { authenticator } = _require('otplib');
-    const valid = authenticator.verify({ token: code, secret: user.twoFactorSecret });
-    if (!valid) throw new Error('INVALID_2FA_CODE');
+    const result = await verify({ token: code, secret: user.twoFactorSecret });
+    if (!result.valid) throw new Error('INVALID_2FA_CODE');
 
     await (this.prisma as any).user.update({
       where: { id: userId },
@@ -227,9 +222,8 @@ export class AuthService {
     const user = await (this.prisma as any).user.findUnique({ where: { id: userId } });
     if (!user?.twoFactorEnabled || !user?.twoFactorSecret) throw new Error('2FA_NOT_ENABLED');
 
-    const { authenticator } = _require('otplib');
-    const valid = authenticator.verify({ token: code, secret: user.twoFactorSecret });
-    if (!valid) throw new Error('INVALID_2FA_CODE');
+    const result = await verify({ token: code, secret: user.twoFactorSecret });
+    if (!result.valid) throw new Error('INVALID_2FA_CODE');
 
     await (this.prisma as any).user.update({
       where: { id: userId },

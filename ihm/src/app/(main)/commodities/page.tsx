@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import CommoditiesNewPage from '@/views/CommoditiesNewPage';
+import CommoditiesLibraryPage from '@/views/CommoditiesLibraryPage';
 
 export const metadata: Metadata = {
   title: 'Commodities & Trade',
@@ -13,5 +13,5 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <CommoditiesNewPage />;
+  return <CommoditiesLibraryPage />;
 }

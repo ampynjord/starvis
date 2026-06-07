@@ -465,10 +465,10 @@ Production routing note: Traefik sends only backend public paths (`/api/v1`, `/a
 
 ```bash
 npm run test                                           # All workspaces
-npm run test --workspace=api                           # API only
-npm run typecheck --workspace=api                      # API type-check
-npx tsc --noEmit --project extractor/tsconfig.json    # Extractor type-check
-npm run lint                                           # Biome lint (all workspaces)
+npm run test --workspace=@starvis/api                  # API only
+npm run typecheck                                      # Type-check all workspaces that expose it
+npm run typecheck --workspace=@starvis/extractor       # Extractor type-check
+npm run lint:ci                                        # Biome lint/check, CI-style
 ```
 
 ---
