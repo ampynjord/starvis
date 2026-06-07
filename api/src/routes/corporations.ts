@@ -72,7 +72,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
   // ── User: declare / leave org ────────────────────────────────────────────────
 
   router.get('/auth/me/corporation', requireJwt, async (req, res) => {
-    const { sub } = (req as any).jwtPayload;
+    const { sub } = req.jwtPayload;
     try {
       const membership = await svc.getMyMembership(sub);
       res.json({ success: true, data: membership });
@@ -83,7 +83,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
 
   // POST body: { symbol: 'TEST' }  — client already fetched RSI data, or we do it here
   router.post('/auth/me/corporation', requireJwt, async (req, res) => {
-    const { sub } = (req as any).jwtPayload;
+    const { sub } = req.jwtPayload;
     const { symbol, name, logoUrl, archetype, language, commitment, recruiting, roleplay, memberCount } = req.body ?? {};
     if (!symbol || typeof symbol !== 'string') {
       return void res.status(400).json({ success: false, error: 'symbol required' });
@@ -114,7 +114,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
   });
 
   router.get('/corp', requireJwt, async (req, res) => {
-    const { sub } = (req as any).jwtPayload;
+    const { sub } = req.jwtPayload;
     try {
       const membership = await svc.getMyActiveMembership(sub);
       if (!membership) return void res.status(403).json({ success: false, error: 'Not an approved corporation member' });
@@ -141,7 +141,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
   // ── Corp members (any member can view) ──────────────────────────────────────
 
   router.get('/corp/members', requireJwt, async (req, res) => {
-    const { sub } = (req as any).jwtPayload;
+    const { sub } = req.jwtPayload;
     try {
       const membership = await svc.getMyActiveMembership(sub);
       if (!membership) return void res.status(403).json({ success: false, error: 'Not a corporation member' });
@@ -155,7 +155,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
   // ── User fleet (ships declared by corp members) ──────────────────────────────
 
   router.get('/corp/fleet', requireJwt, async (req, res) => {
-    const { sub } = (req as any).jwtPayload;
+    const { sub } = req.jwtPayload;
     try {
       const membership = await svc.getMyActiveMembership(sub);
       const corporationId = membership?.corporationId ?? null;
@@ -172,7 +172,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
   });
 
   router.post('/corp/fleet', requireJwt, async (req, res) => {
-    const { sub } = (req as any).jwtPayload;
+    const { sub } = req.jwtPayload;
     const { shipUuid, itemClassName, notes } = req.body ?? {};
     if (!shipUuid || typeof shipUuid !== 'string') return void res.status(400).json({ success: false, error: 'shipUuid required' });
     if (!itemClassName || typeof itemClassName !== 'string')
@@ -187,7 +187,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
   });
 
   router.delete('/corp/fleet/:id', requireJwt, async (req, res) => {
-    const { sub } = (req as any).jwtPayload;
+    const { sub } = req.jwtPayload;
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) return void res.status(400).json({ success: false, error: 'Invalid id' });
     try {
@@ -204,7 +204,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
   // ── Corp bank (equipment, components, items, commodities) ────────────────────
 
   router.get('/corp/bank', requireJwt, async (req, res) => {
-    const { sub } = (req as any).jwtPayload;
+    const { sub } = req.jwtPayload;
     try {
       const membership = await svc.getMyActiveMembership(sub);
       if (!membership) return void res.status(403).json({ success: false, error: 'Not a corporation member' });
@@ -216,7 +216,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
   });
 
   router.post('/corp/bank', requireJwt, async (req, res) => {
-    const { sub } = (req as any).jwtPayload;
+    const { sub } = req.jwtPayload;
     const { itemType, itemClassName, quantity, notes } = req.body ?? {};
     if (!itemType || !['component', 'item', 'commodity', 'other'].includes(itemType)) {
       return void res.status(400).json({ success: false, error: 'itemType must be component, item, commodity, or other' });
@@ -234,7 +234,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
   });
 
   router.delete('/corp/bank/:id', requireJwt, async (req, res) => {
-    const { sub } = (req as any).jwtPayload;
+    const { sub } = req.jwtPayload;
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) return void res.status(400).json({ success: false, error: 'Invalid id' });
     try {
@@ -249,7 +249,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
   });
 
   router.delete('/auth/me/corporation', requireJwt, async (req, res) => {
-    const { sub } = (req as any).jwtPayload;
+    const { sub } = req.jwtPayload;
     try {
       await svc.leaveOrg(sub);
       res.json({ success: true });
@@ -385,7 +385,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
 
   router.put('/admin/corporations/memberships/:mid/approve', requireJwtAdmin, async (req, res) => {
     const mid = Number(req.params.mid);
-    const reviewerId = (req as any).jwtPayload?.sub;
+    const reviewerId = req.jwtPayload?.sub;
     if (!Number.isInteger(mid) || mid <= 0) return void res.status(400).json({ success: false, error: 'Invalid membership id' });
     const role = VALID_MEMBER_ROLES.includes(req.body?.role) ? req.body.role : 'member';
     try {
@@ -400,7 +400,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
 
   router.put('/admin/corporations/memberships/:mid/reject', requireJwtAdmin, async (req, res) => {
     const mid = Number(req.params.mid);
-    const reviewerId = (req as any).jwtPayload?.sub;
+    const reviewerId = req.jwtPayload?.sub;
     if (!Number.isInteger(mid) || mid <= 0) return void res.status(400).json({ success: false, error: 'Invalid membership id' });
     try {
       const membership = await svc.rejectMembership(mid, reviewerId);
@@ -426,7 +426,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
   });
 
   router.get('/corp/pending', requireJwt, async (req, res) => {
-    const membership = await svc.getMyActiveMembership((req as any).jwtPayload.sub);
+    const membership = await svc.getMyActiveMembership(req.jwtPayload.sub);
     if (!membership) return void res.status(403).json({ success: false, error: 'Not a corporation member' });
     if (!(await requireLeaderOrAdmin(req, res, membership.corporationId))) return;
     const pending = await svc.listPendingMemberships(membership.corporationId);
@@ -435,7 +435,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
 
   router.put('/corp/memberships/:mid/approve', requireJwt, async (req, res) => {
     const mid = Number(req.params.mid);
-    const reviewerId = (req as any).jwtPayload.sub;
+    const reviewerId = req.jwtPayload.sub;
     if (!Number.isInteger(mid) || mid <= 0) return void res.status(400).json({ success: false, error: 'Invalid membership id' });
     const role = VALID_MEMBER_ROLES.includes(req.body?.role) ? req.body.role : 'member';
     const membership = await svc.getMembership(mid);
@@ -447,7 +447,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
 
   router.put('/corp/memberships/:mid/reject', requireJwt, async (req, res) => {
     const mid = Number(req.params.mid);
-    const reviewerId = (req as any).jwtPayload.sub;
+    const reviewerId = req.jwtPayload.sub;
     if (!Number.isInteger(mid) || mid <= 0) return void res.status(400).json({ success: false, error: 'Invalid membership id' });
     const membership = await svc.getMembership(mid);
     if (!membership) return void res.status(404).json({ success: false, error: 'Membership not found' });
@@ -470,7 +470,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
 
   router.delete('/corp/members/:mid', requireJwt, async (req, res) => {
     const mid = Number(req.params.mid);
-    const requesterId = (req as any).jwtPayload.sub;
+    const requesterId = req.jwtPayload.sub;
     if (!Number.isInteger(mid) || mid <= 0) return void res.status(400).json({ success: false, error: 'Invalid membership id' });
     const membership = await svc.getMembership(mid);
     if (!membership) return void res.status(404).json({ success: false, error: 'Membership not found' });
@@ -548,7 +548,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
 
   router.post('/admin/corporations/:id/fleet', requireJwtAdmin, async (req, res) => {
     const id = Number(req.params.id);
-    const adminId = (req as any).jwtPayload?.sub;
+    const adminId = req.jwtPayload?.sub;
     if (!Number.isInteger(id) || id <= 0) return void res.status(400).json({ success: false, error: 'Invalid id' });
     const { itemType, itemClassName, quantity, notes } = req.body ?? {};
     if (!itemType || !VALID_FLEET_TYPES.includes(itemType)) {

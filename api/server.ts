@@ -227,7 +227,7 @@ async function requireApiDocsDeveloper(req: Request, res: Response, next: NextFu
     if (!DEVELOPER_ACCESS_ROLES.includes(currentRole as (typeof DEVELOPER_ACCESS_ROLES)[number])) {
       return apiDocsAccessDenied(req, res);
     }
-    (req as any).jwtPayload = { ...payload, role: currentRole };
+    req.jwtPayload = { ...payload, role: currentRole };
     return next();
   } catch {
     return apiDocsAccessDenied(req, res);

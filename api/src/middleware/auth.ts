@@ -34,7 +34,7 @@ export function requireJwt(req: Request, res: Response, next: NextFunction) {
   }
   try {
     const authService = new AuthService(null as any); // verifyToken does not use prisma
-    (req as any).jwtPayload = authService.verifyToken(token);
+    req.jwtPayload = authService.verifyToken(token);
     next();
   } catch {
     res.status(401).json({ success: false, error: 'Invalid or expired token' });
@@ -61,7 +61,7 @@ export async function requireJwtDeveloperOrAdmin(req: Request, res: Response, ne
     if (!DEVELOPER_ACCESS_ROLES.includes(currentRole as (typeof DEVELOPER_ACCESS_ROLES)[number])) {
       return res.status(403).json({ success: false, error: 'Developer or admin role required' });
     }
-    (req as any).jwtPayload = { ...payload, role: currentRole };
+    req.jwtPayload = { ...payload, role: currentRole };
     next();
   } catch {
     res.status(401).json({ success: false, error: 'Invalid or expired token' });
@@ -103,7 +103,7 @@ export async function requireJwtAdmin(req: Request, res: Response, next: NextFun
     if (currentRole !== ADMIN_ROLE) {
       return res.status(403).json({ success: false, error: 'Admin role required' });
     }
-    (req as any).jwtPayload = { ...payload, role: currentRole };
+    req.jwtPayload = { ...payload, role: currentRole };
     next();
   } catch {
     res.status(401).json({ success: false, error: 'Invalid or expired token' });

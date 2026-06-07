@@ -22,6 +22,7 @@
 import type { PrismaLike } from '@starvis/db';
 import OpenAI from 'openai';
 import { CHAT_MAX_ITER, CHAT_PROVIDER_BASE_URL, CHAT_RESPONSE_MODEL, CHAT_TOOL_MODEL } from '../utils/config.js';
+import { logger } from '../utils/index.js';
 import type { GameDataService } from './game-data-service.js';
 import type { RsiWebsiteService } from './rsi-website-service.js';
 import type { ShipMatrixService } from './ship-matrix-service.js';
@@ -1066,7 +1067,11 @@ export class ChatService {
         // ── DB brute ──────────────────────────────────────────────────────
         case 'query_database': {
           const validation = validateQueryDatabaseSql(args.sql, args.params);
-          if (!validation.ok) return { error: validation.error };
+          if (!validation.ok) {
+            logger.warn('Chat database query rejected', { module: 'Chat', reason: validation.error });
+            return { error: validation.error };
+          }
+          logger.info('Chat database query accepted', { module: 'Chat', params: validation.params.length });
           const rows = await (this.prisma as any).$queryRawUnsafe(validation.sql, ...validation.params);
           const data = Array.isArray(rows) ? rows.slice(0, 50) : rows;
           return { rows: data, count: Array.isArray(data) ? data.length : 1 };

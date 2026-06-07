@@ -2,7 +2,7 @@
 
 [![CI/CD](https://github.com/ampynjord/starvis/actions/workflows/ci.yml/badge.svg)](https://github.com/ampynjord/starvis/actions/workflows/ci.yml)
 [![Node v22](https://img.shields.io/badge/node-v22-green)](https://nodejs.org)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 
 Star Citizen data platform
 
@@ -489,8 +489,8 @@ STARVIS claims no ownership over this content.
 
 ### Source code license
 
-The code is distributed under the **MIT license** (see [LICENSE](LICENSE)).
-The MIT license covers the code only — it does not apply to data or content owned by CIG.
+The STARVIS source code is proprietary and all rights are reserved (see [LICENSE](LICENSE)).
+This code license covers only the STARVIS code owned by ampynjord; it does not apply to data or content owned by CIG/RSI.
 
 ### GDPR / Data protection
 
