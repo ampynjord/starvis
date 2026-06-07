@@ -1,12 +1,10 @@
 ﻿'use client';
 
 /**
- * CommoditiesNewPage — Merged commodities & minerals library
+ * CommoditiesLibraryPage - merged commodities & minerals library.
  * Combines trade goods (paginated list with filters) and the full minerals
  * reference (sortable table with detail drawer), using the Minerals Library style.
  */
-'use client';
-
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import {
@@ -459,7 +457,7 @@ function MineralsTab() {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-export default function CommoditiesNewPage() {
+export default function CommoditiesLibraryPage() {
   const [activeTab, setActiveTab] = useState<Tab>('trade');
 
   const TABS: { id: Tab; label: string; icon: React.ReactNode; subtitle: string }[] = [

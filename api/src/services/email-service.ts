@@ -1,7 +1,5 @@
-import { createRequire } from 'node:module';
+import nodemailer from 'nodemailer';
 import logger from '../utils/logger.js';
-
-const _require = createRequire(import.meta.url);
 
 function getSiteUrl(): string {
   const url = process.env.SITE_URL || process.env.CORS_ORIGIN?.split(',')[0].trim() || 'http://localhost:8080';
@@ -14,7 +12,6 @@ async function createTransporter() {
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
   if (!host || !user || !pass) return null;
-  const nodemailer = _require('nodemailer');
   return nodemailer.createTransport({ host, port, secure: port === 465, auth: { user, pass } });
 }
 
