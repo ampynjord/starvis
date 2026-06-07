@@ -109,8 +109,8 @@ const TYPE_ORDER = ['system', 'star', 'planet', 'moon', 'station', 'landing_zone
 const MAP_TYPES = new Set(TYPE_ORDER);
 
 const TYPE_STYLE: Record<string, { label: string; color: number; radius: number; icon: React.ReactNode; text: string; accent: string }> = {
-  system: { label: 'System', color: 0x39e7ff, radius: 3, icon: <Sparkles size={12} />, text: 'text-cyan-300', accent: 'border-cyan-700/60 bg-cyan-950/25' },
-  star: { label: 'Star', color: 0xffcc66, radius: 3.4, icon: <Sparkles size={12} />, text: 'text-amber-300', accent: 'border-amber-700/60 bg-amber-950/25' },
+  system: { label: 'System', color: 0x39e7ff, radius: 1.65, icon: <Sparkles size={12} />, text: 'text-cyan-300', accent: 'border-cyan-700/60 bg-cyan-950/25' },
+  star: { label: 'Star', color: 0xffcc66, radius: 1.25, icon: <Sparkles size={12} />, text: 'text-amber-300', accent: 'border-amber-700/60 bg-amber-950/25' },
   planet: { label: 'Planet', color: 0x2dd4bf, radius: 1.55, icon: <Globe2 size={12} />, text: 'text-teal-300', accent: 'border-teal-700/60 bg-teal-950/25' },
   moon: { label: 'Moon', color: 0x94a3b8, radius: 0.82, icon: <CircleDot size={11} />, text: 'text-slate-300', accent: 'border-slate-700/60 bg-slate-900/35' },
   station: { label: 'Station', color: 0xa78bfa, radius: 0.76, icon: <Building2 size={11} />, text: 'text-violet-300', accent: 'border-violet-700/60 bg-violet-950/25' },
@@ -149,9 +149,12 @@ function coords(loc: LocationWithMap) {
   const c = loc.coordinates ?? loc.rsi_starmap?.coordinates;
   if (!c) return null;
   const x = toNumber(c.x);
+  const y = toNumber(c.y);
   const z = toNumber(c.z);
-  if (x == null || z == null) return null;
-  return new THREE.Vector3(x, toNumber(c.y) ?? 0, z);
+  if (x == null) return null;
+  if (z != null) return new THREE.Vector3(x, y ?? 0, z);
+  if (y != null) return new THREE.Vector3(x, 0, y);
+  return null;
 }
 
 function systemCode(loc: LocationWithMap) {
@@ -238,6 +241,16 @@ function hash(input: string) {
   return (h >>> 0) / 4294967295;
 }
 
+function factionColor(faction?: string | null) {
+  const value = (faction ?? '').toLowerCase();
+  if (value.includes('uee')) return 0x38bdf8;
+  if (value.includes("xi'an") || value.includes('xian')) return 0xa78bfa;
+  if (value.includes('banu')) return 0x34d399;
+  if (value.includes('vanduul')) return 0xf87171;
+  if (value.includes('unclaimed')) return 0x94a3b8;
+  return 0xfacc15;
+}
+
 function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
   const visible = locations
     .map((loc) => ({ ...loc, type: normalizeType(loc.type) }))
@@ -260,17 +273,20 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
   const bounds = rootCoords.length > 1 ? new THREE.Box3().setFromPoints(rootCoords) : null;
   const center = bounds?.getCenter(new THREE.Vector3()) ?? new THREE.Vector3();
   const size = bounds?.getSize(new THREE.Vector3()) ?? new THREE.Vector3(1, 1, 1);
-  const scale = 120 / Math.max(size.x, size.z, 1);
+  const scale = 145 / Math.max(size.x, size.z, 1);
   const normalizedRootPosition = (loc: LocationWithMap, index: number) => {
     const c = coords(loc);
     if (c && bounds) return c.clone().sub(center).multiplyScalar(scale);
-    const a = (index / Math.max(roots.length, 1)) * Math.PI * 2;
-    return new THREE.Vector3(Math.cos(a) * 48, (hash(`${loc.uuid}:y`) - 0.5) * 8, Math.sin(a) * 48);
+    const t = (index + 0.5) / Math.max(roots.length, 1);
+    const a = index * 2.399963229728653;
+    const r = Math.sqrt(t) * 72;
+    return new THREE.Vector3(Math.cos(a) * r, (hash(`${loc.uuid}:y`) - 0.5) * 5, Math.sin(a) * r);
   };
 
   const nodes = new Map<string, MapNode>();
   roots.forEach((loc, index) => {
     const style = typeStyle(loc.type);
+    const color = loc.type === 'star' || loc.type === 'system' ? factionColor(loc.rsi_starmap?.faction_name) : style.color;
     nodes.set(loc.uuid, {
       id: loc.uuid,
       loc,
@@ -278,7 +294,7 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
       systemCode: systemCode(loc),
       position: normalizedRootPosition(loc, index),
       radius: style.radius,
-      color: style.color,
+      color,
       label: loc.name,
       shopCount: loc.loc_key ? shopsByLocKey.get(loc.loc_key) ?? 0 : 0,
     });
@@ -336,10 +352,12 @@ function descendants(nodes: MapNode[], rootId: string) {
 function Scene({
   nodes,
   selectedId,
+  focusSelected,
   onSelect,
 }: {
   nodes: MapNode[];
   selectedId: string | null;
+  focusSelected: boolean;
   onSelect: (id: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -499,10 +517,11 @@ function Scene({
         type === 'outpost' || type === 'landing_zone' ? new THREE.BoxGeometry(node.radius * 1.5, node.radius * 0.65, node.radius * 1.5) :
         type === 'jump_point' ? new THREE.TorusGeometry(node.radius * 1.6, node.radius * 0.1, 8, 42) :
         new THREE.SphereGeometry(node.radius, type === 'system' || type === 'star' ? 32 : 24, type === 'system' || type === 'star' ? 16 : 12);
+      const isRoot = !node.parentId;
       const material = new THREE.MeshPhongMaterial({
         color: node.color,
         emissive: node.color,
-        emissiveIntensity: type === 'star' ? 0.8 : type === 'system' ? 0.45 : 0.22,
+        emissiveIntensity: isRoot ? 0.42 : type === 'star' ? 0.8 : type === 'system' ? 0.45 : 0.22,
         shininess: 70,
       });
       const mesh = new THREE.Mesh(geometry, material);
@@ -513,7 +532,7 @@ function Scene({
 
       const halo = glowSprite(node.color);
       if (halo) {
-        const scale = type === 'system' || type === 'star' ? node.radius * 8.5 : node.radius * 5.2;
+        const scale = isRoot ? node.radius * 4.8 : type === 'system' || type === 'star' ? node.radius * 7 : node.radius * 4.8;
         halo.position.copy(node.position);
         halo.scale.set(scale, scale, 1);
         halo.userData.baseScale = scale;
@@ -522,7 +541,7 @@ function Scene({
         group.add(halo);
       }
 
-      if (type === 'system' || type === 'star' || type === 'planet') {
+      if ((!isRoot && (type === 'system' || type === 'star' || type === 'planet')) || (isRoot && node.label.length <= 9)) {
         const label = labelSprite(node.label, type === 'star' ? '#facc15' : '#67e8f9');
         if (label) {
           label.position.copy(node.position).add(new THREE.Vector3(0, node.radius + 2.2, 0));
@@ -600,8 +619,9 @@ function Scene({
       }
       links.rotation.y = Math.sin(t * 0.08) * 0.015;
       labels.forEach((label) => label.quaternion.copy(camera.quaternion));
-      const selected = selectedRef.current ? byId.get(selectedRef.current) : null;
+      const selected = focusSelected && selectedRef.current ? byId.get(selectedRef.current) : null;
       if (selected) controls.target.lerp(selected.position, 0.04);
+      if (!selected) controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.02);
       controls.update();
       renderer.render(scene, camera);
     };
@@ -627,7 +647,7 @@ function Scene({
       renderer.dispose();
       if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
     };
-  }, [nodes]);
+  }, [nodes, focusSelected]);
 
   return <div ref={containerRef} className="absolute inset-0" />;
 }
@@ -892,7 +912,12 @@ export default function LocationsPage() {
               <Loader2 className="animate-spin text-cyan-400" size={32} />
             </div>
           ) : (
-            <Scene nodes={visibleNodes.length ? visibleNodes : allNodes} selectedId={selectedNode?.id ?? null} onSelect={setSelectedId} />
+            <Scene
+              nodes={visibleNodes.length ? visibleNodes : allNodes}
+              selectedId={selectedNode?.id ?? null}
+              focusSelected={viewMode === 'system'}
+              onSelect={setSelectedId}
+            />
           )}
           <div className="pointer-events-none absolute bottom-4 left-4 grid grid-cols-2 gap-2 md:grid-cols-4">
             <LegendSwatch type="system" />
