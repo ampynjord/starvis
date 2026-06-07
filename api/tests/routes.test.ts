@@ -12,6 +12,7 @@ vi.mock('../src/middleware/auth.js', () => ({
   requireJwt: (_req: any, _res: any, next: any) => next(),
   requireJwtAdmin: (_req: any, _res: any, next: any) => next(),
   requireJwtBetaOrAdmin: (_req: any, _res: any, next: any) => next(),
+  requireJwtDeveloperOrAdmin: (_req: any, _res: any, next: any) => next(),
   authMiddleware: (_req: any, _res: any, next: any) => next(),
 }));
 

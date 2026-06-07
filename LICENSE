@@ -1,43 +1,48 @@
-MIT License
+STARVIS Proprietary License
 
-Copyright (c) 2024 ampynjord and contributors
+Copyright (c) 2024-present ampynjord. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This source code and the associated project files are proprietary and confidential.
+They are owned by ampynjord unless a separate written agreement says otherwise.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+No permission is granted to use, copy, modify, merge, publish, distribute,
+sublicense, sell, host, or otherwise exploit this software, in whole or in part,
+without prior written authorization from ampynjord.
+
+Access to this repository does not grant any license to the software. Any
+authorized access is limited to evaluation, development, maintenance, or
+operation expressly approved by ampynjord.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NONINFRINGEMENT. IN NO EVENT
+SHALL THE OWNER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY ARISING
+FROM OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
 
----
+Prior Releases
+--------------
 
-NOTICE — Third-party intellectual property
-==========================================
+Any copy of this project that was previously distributed under another license
+remains governed by the license terms that applied to that specific copy. This
+license governs this version and later versions unless replaced by a later
+written license from ampynjord.
 
-Star Citizen® and all associated game data, assets, ship names, item names,
-lore, imagery, and related content are the intellectual property of
-Cloud Imperium Games Corporation and/or Roberts Space Industries Corp.
-© 2012–2025 Cloud Imperium Rights LLC. All rights reserved.
+Third-Party Intellectual Property Notice
+----------------------------------------
 
-Data sourced from the Star Citizen game client (P4K/DataForge), the RSI Ship
-Matrix API, and the Roberts Space Industries website (robertsspaceindustries.com)
-is used for non-commercial, fan/community purposes only.
+Star Citizen, Roberts Space Industries, Cloud Imperium Games, and all associated
+game data, assets, ship names, item names, lore, imagery, and related content
+are the intellectual property of Cloud Imperium Games Corporation and/or Roberts
+Space Industries Corp. All rights reserved by their respective owners.
 
-STARVIS is an independent, non-profit community project and is not affiliated
-with, endorsed by, or officially connected to Cloud Imperium Games or Roberts
-Space Industries in any way.
+Data sourced from the Star Citizen game client, P4K/DataForge, the RSI Ship
+Matrix API, and the Roberts Space Industries website is used for fan/community
+purposes only.
 
-Use of this data is governed by Cloud Imperium Games' Terms of Service and
-Community License Policy. This project makes no claim of ownership over any
-Star Citizen IP.
+STARVIS is an independent community project and is not affiliated with,
+endorsed by, sponsored by, or officially connected to Cloud Imperium Games or
+Roberts Space Industries.
+
+This license applies only to the STARVIS source code and project files owned by
+ampynjord. It does not claim ownership over any Star Citizen, RSI, or CIG
+intellectual property.

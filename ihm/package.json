@@ -2,6 +2,7 @@
   "name": "starvis-ihm",
   "private": true,
   "version": "3.0.0",
+  "license": "UNLICENSED",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

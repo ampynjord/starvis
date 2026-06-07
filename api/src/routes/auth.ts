@@ -142,7 +142,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
 
   // GET /auth/me
   router.get('/auth/me', requireJwt, async (req, res) => {
-    const payload = (req as any).jwtPayload;
+    const payload = req.jwtPayload;
     const user = await authService.me(payload.sub);
     if (!user) return void res.status(404).json({ success: false, error: 'User not found' });
     res.json({ success: true, user });
@@ -150,7 +150,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
 
   // PUT /auth/me
   router.put('/auth/me', requireJwt, async (req, res) => {
-    const payload = (req as any).jwtPayload;
+    const payload = req.jwtPayload;
     const { username, avatarUrl } = req.body ?? {};
     try {
       const user = await authService.updateProfile(payload.sub, {
@@ -165,7 +165,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
 
   // DELETE /auth/me — delete own account
   router.delete('/auth/me', requireJwt, async (req, res) => {
-    const payload = (req as any).jwtPayload;
+    const payload = req.jwtPayload;
     try {
       await authService.deleteUser(payload.sub);
       res.json({ success: true });
@@ -177,7 +177,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
 
   // ── API Token (external project access) ──────────────────────────────────
   router.post('/auth/api-token', requireJwtBetaOrAdmin, async (req, res) => {
-    const payload = (req as any).jwtPayload;
+    const payload = req.jwtPayload;
     const user = await authService.me(payload.sub);
     if (!user) return void res.status(404).json({ success: false, error: 'User not found' });
     const token = authService.generateApiToken(user);
@@ -188,7 +188,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
 
   // POST /auth/2fa/setup
   router.post('/auth/2fa/setup', requireJwt, async (req, res) => {
-    const payload = (req as any).jwtPayload;
+    const payload = req.jwtPayload;
     try {
       const result = await authService.setup2FA(payload.sub);
       res.json({ success: true, ...result });
@@ -199,7 +199,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
 
   // POST /auth/2fa/enable
   router.post('/auth/2fa/enable', requireJwt, async (req, res) => {
-    const payload = (req as any).jwtPayload;
+    const payload = req.jwtPayload;
     const { code } = req.body ?? {};
     if (typeof code !== 'string' || code.length !== 6) {
       return void res.status(400).json({ success: false, error: '6-digit code required' });
@@ -217,7 +217,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
 
   // POST /auth/2fa/disable
   router.post('/auth/2fa/disable', requireJwt, async (req, res) => {
-    const payload = (req as any).jwtPayload;
+    const payload = req.jwtPayload;
     const { code } = req.body ?? {};
     if (typeof code !== 'string' || code.length !== 6) {
       return void res.status(400).json({ success: false, error: '6-digit code required' });
@@ -324,7 +324,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
 
   router.delete('/admin/users/:id', requireJwtAdmin, async (req, res) => {
     const id = Number(req.params.id);
-    const requesterId = (req as any).jwtPayload?.sub;
+    const requesterId = req.jwtPayload?.sub;
     if (requesterId === id) {
       return void res.status(400).json({ success: false, error: 'Cannot delete your own account' });
     }

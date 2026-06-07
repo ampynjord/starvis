@@ -54,7 +54,7 @@ export function mountBugReportRoutes(router: Router, deps: RouteDependencies): v
     '/api/v1/bug-reports',
     requireJwt,
     asyncHandler(async (req, res) => {
-      const payload = (req as any).jwtPayload;
+      const payload = req.jwtPayload;
       const { title, description, attachments } = req.body ?? {};
 
       if (typeof title !== 'string' || title.trim().length === 0 || title.length > 200) {
@@ -101,7 +101,7 @@ export function mountBugReportRoutes(router: Router, deps: RouteDependencies): v
     '/api/v1/bug-reports',
     requireJwt,
     asyncHandler(async (req, res) => {
-      const payload = (req as any).jwtPayload;
+      const payload = req.jwtPayload;
       const page = Math.max(1, Number(req.query.page ?? 1));
       const limit = Math.min(20, Math.max(1, Number(req.query.limit ?? 10)));
       const offset = (page - 1) * limit;

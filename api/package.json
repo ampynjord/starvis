@@ -23,7 +23,7 @@
     "path-to-regexp": "0.1.13"
   },
   "author": "ampynjord - Dawnstar",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "dependencies": {
     "@starvis/db": "*",
     "bcryptjs": "^2.4.3",

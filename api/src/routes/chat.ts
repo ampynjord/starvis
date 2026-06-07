@@ -7,7 +7,7 @@
  */
 
 import type { Router } from 'express';
-import { requireJwt } from '../middleware/index.js';
+import { requireJwtDeveloperOrAdmin } from '../middleware/index.js';
 import { ChatService } from '../services/chat-service.js';
 import type { RouteDependencies } from './types.js';
 
@@ -26,7 +26,7 @@ export function mountChatRoutes(router: Router, deps: RouteDependencies): void {
   const chatService = new ChatService(deps.gameDataService, deps.shipMatrixService, deps.rsiWebsiteService, deps.prisma);
 
   // ── SSE streaming (web widget — beta testers & admins only) ─────────────
-  router.post('/api/v1/chat', requireJwt, (req, res) => {
+  router.post('/api/v1/chat', requireJwtDeveloperOrAdmin, (req, res) => {
     const { messages } = req.body as { messages?: { role: string; content: string }[] };
 
     if (!Array.isArray(messages) || messages.length === 0) {
@@ -69,7 +69,7 @@ export function mountChatRoutes(router: Router, deps: RouteDependencies): void {
   });
 
   // ── JSON sync (Discord bot / external — beta testers & admins only) ─────
-  router.post('/api/v1/chat/ask', requireJwt, async (req, res) => {
+  router.post('/api/v1/chat/ask', requireJwtDeveloperOrAdmin, async (req, res) => {
     const { messages } = req.body as { messages?: { role: string; content: string }[] };
 
     if (!Array.isArray(messages) || messages.length === 0) {
