@@ -19,7 +19,7 @@ Star Citizen data platform
 | `ihm/` | Next.js + Tailwind CSS web interface |
 | `bot/` | Discord bot with slash commands |
 | `extractor/` | P4K → PostgreSQL extraction CLI (runs locally) |
-| `db/` | Prisma schemas, PostgreSQL init, backup script |
+| `db/` | Prisma schema modules, shared database client, PostgreSQL init/backup scripts |
 
 ---
 
@@ -39,7 +39,7 @@ cd starvis
 npm install        # installs all workspaces (api, ihm, bot, extractor, db)
 ```
 
-The monorepo uses the root `package-lock.json` as the single dependency lockfile. Workspace packages should not keep nested lockfiles. The extractor keeps `extractor/extract.ts` as its stable command wrapper; implementation code lives under `extractor/src/`.
+The monorepo uses the root `package-lock.json` as the single dependency lockfile. Workspace packages should not keep nested lockfiles. The extractor keeps `extractor/extract.ts` as its stable command wrapper; implementation code lives under `extractor/src/`. The database schema is split by domain under `db/prisma/schema/`; see `db/README.md` before adding database models.
 
 ### 2 — Configure the environment
 

@@ -117,13 +117,13 @@ jobs:
         run: npm ci
 
       - name: Validate Prisma schema
-        run: npm exec --workspace=@starvis/db -- prisma validate --schema=prisma/schema.prisma
+        run: npm exec --workspace=@starvis/db -- prisma validate --schema=prisma/schema
         env:
           DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_test
 
       - name: Guard Prisma 7 datasource config
         run: |
-          if grep -R 'url *= *env(' db/prisma/*.prisma; then
+          if grep -R 'url *= *env(' db/prisma/schema/*.prisma; then
             echo "Prisma 7 requires datasource URLs in db/prisma.config.ts, not schema.prisma"
             exit 1
           fi
@@ -131,8 +131,8 @@ jobs:
 
       - name: Validate shell scripts
         run: |
-          bash -n db/init.sh
-          bash -n db/backup.sh
+          bash -n db/scripts/init.sh
+          bash -n db/scripts/backup.sh
 
       - name: Validate compose files with example envs
         run: |
@@ -325,6 +325,8 @@ jobs:
             cmd: ./node_modules/.bin/tsc --noEmit --project extractor/tsconfig.json
           - name: bot
             cmd: ./node_modules/.bin/tsc --noEmit --project bot/tsconfig.json
+          - name: db
+            cmd: ./node_modules/.bin/tsc --noEmit --project db/tsconfig.json
           - name: ihm
             cmd: ./node_modules/.bin/tsc --noEmit --project ihm/tsconfig.json
     steps:
