@@ -15,6 +15,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: data.error ?? 'Verification failed' }, { status: upstream.status });
     }
 
+    if (!data.user || !data.token) {
+      return NextResponse.json({ error: 'Login service returned an invalid response' }, { status: 502 });
+    }
+
     const res = NextResponse.json({ user: data.user });
     setSessionCookie(res, data.token);
     return res;
