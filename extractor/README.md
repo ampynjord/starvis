@@ -120,6 +120,7 @@ P4K modules require `Data.p4k`:
 | `paints` | Ship liveries and paints. |
 | `shops` | In-game shops, inventory and prices. |
 | `locations` | Systems, planets, moons, cities, stations and child locations. |
+| `game-insights` | Extended discovery records plus normalized tables for factions, reputation standings/scopes, loot tables/archetypes, blueprint rewards, ammo and inventory containers. |
 
 Network modules do not require `Data.p4k`:
 
@@ -149,7 +150,10 @@ npx tsx extractor/extract.ts --env ptu
 npx tsx extractor/extract.ts --modules ship-matrix,galactapedia,comm-links,starmap
 
 # Fast P4K extraction without CTM
-npx tsx extractor/extract.ts --env live --modules ships,components,items,commodities,paints,mining,missions,crafting,locations,shops
+npx tsx extractor/extract.ts --env live --modules ships,components,items,commodities,paints,mining,missions,crafting,locations,shops,game-insights
+
+# Extended game data discovery only
+npx tsx extractor/extract.ts --env live --modules game-insights
 
 # Validate configuration without writing data
 npx tsx extractor/extract.ts --check-config
@@ -157,6 +161,15 @@ npx tsx extractor/extract.ts --check-config
 # Dry-run parse without DB writes
 npx tsx extractor/extract.ts --dry-run --env ptu
 ```
+
+`game-insights` writes the raw discovery layer to `game.game_insights` and the most useful normalized families to dedicated tables:
+
+| Table family | Tables |
+|---|---|
+| Factions | `game.factions` |
+| Reputation | `game.reputation_standings`, `game.reputation_scopes` |
+| Loot and rewards | `game.loot_tables`, `game.loot_table_entries`, `game.loot_archetypes`, `game.blueprint_rewards` |
+| FPS and inventory details | `game.ammo`, `game.inventory_containers` |
 
 ---
 
