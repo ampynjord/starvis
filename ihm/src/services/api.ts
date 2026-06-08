@@ -26,8 +26,6 @@ import type {
   LoadoutNode,
   LoadoutResult,
   Location,
-  LootArchetypeInsight,
-  LootTableEntryInsight,
   LootTableInsight,
   Manufacturer,
   MiningComposition,
@@ -423,6 +421,20 @@ export const api = {
     buyLocations: (uuid: string, env?: string) => get<ItemBuyLocation[]>(`/items/${uuid}/buy-locations`, { env }),
   },
 
+  ammo: {
+    stats: (p?: { env?: string; page?: number; limit?: number; search?: string }) => get<PaginatedResponse<AmmoInsight>>('/ammo/stats', p),
+  },
+
+  armor: {
+    inventoryContainers: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
+      get<PaginatedResponse<InventoryContainerInsight>>('/armor/inventory-containers', p),
+  },
+
+  utility: {
+    inventoryContainers: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
+      get<PaginatedResponse<InventoryContainerInsight>>('/utility/inventory-containers', p),
+  },
+
   // ─── Manufacturers ─────────────────────────────────────────────────
   manufacturers: {
     list: (env?: string) => get<Manufacturer[]>('/manufacturers', { env }),
@@ -528,27 +540,12 @@ export const api = {
   factions: {
     list: (env?: string) => get<FactionSummary[]>('/factions', { env }),
     get: (name: string, env?: string) => get<FactionSummary>(`/factions/${encodeURIComponent(name)}`, { env }),
-  },
-
-  gameInsights: {
-    factions: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
-      get<PaginatedResponse<GameFactionInsight>>('/game-insights/factions', p),
+    registry: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
+      get<PaginatedResponse<GameFactionInsight>>('/factions/registry', p),
     reputationStandings: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
-      get<PaginatedResponse<ReputationStandingInsight>>('/game-insights/reputation-standings', p),
+      get<PaginatedResponse<ReputationStandingInsight>>('/factions/reputation-standings', p),
     reputationScopes: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
-      get<PaginatedResponse<ReputationScopeInsight>>('/game-insights/reputation-scopes', p),
-    lootTables: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
-      get<PaginatedResponse<LootTableInsight>>('/game-insights/loot-tables', p),
-    lootTableEntries: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
-      get<PaginatedResponse<LootTableEntryInsight>>('/game-insights/loot-table-entries', p),
-    lootArchetypes: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
-      get<PaginatedResponse<LootArchetypeInsight>>('/game-insights/loot-archetypes', p),
-    blueprintRewards: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
-      get<PaginatedResponse<BlueprintRewardInsight>>('/game-insights/blueprint-rewards', p),
-    ammo: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
-      get<PaginatedResponse<AmmoInsight>>('/game-insights/ammo', p),
-    inventoryContainers: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
-      get<PaginatedResponse<InventoryContainerInsight>>('/game-insights/inventory-containers', p),
+      get<PaginatedResponse<ReputationScopeInsight>>('/factions/reputation-scopes', p),
   },
 
   // ─── Crafting ────────────────────────────────────────────────────────
@@ -573,6 +570,13 @@ export const api = {
     resources: async (env?: string) => (await get<CraftingResource[]>('/crafting/resources', { env })).map(mapCraftingResource),
     recipesByResource: async (itemName: string, env?: string) =>
       (await get<CraftingRecipe[]>(`/crafting/resources/${encodeURIComponent(itemName)}/recipes`, { env })).map(mapCraftingRecipe),
+  },
+
+  blueprints: {
+    rewards: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
+      get<PaginatedResponse<BlueprintRewardInsight>>('/blueprints/rewards', p),
+    lootTables: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
+      get<PaginatedResponse<LootTableInsight>>('/blueprints/loot-tables', p),
   },
 
   // ─── Trade ──────────────────────────────────────────────────────────

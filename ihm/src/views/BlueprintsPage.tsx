@@ -617,14 +617,14 @@ export default function BlueprintsPage() {
   });
 
   const { data: blueprintRewardData } = useQuery({
-    queryKey: ['game-insights.blueprint-rewards', env, debouncedSearch],
-    queryFn: () => api.gameInsights.blueprintRewards({ env, search: debouncedSearch || undefined, limit: 100 }),
+    queryKey: ['blueprints.rewards', env, debouncedSearch],
+    queryFn: () => api.blueprints.rewards({ env, search: debouncedSearch || undefined, limit: 100 }),
     staleTime: 5 * 60_000,
   });
 
   const { data: lootTableData } = useQuery({
-    queryKey: ['game-insights.loot-tables', env, debouncedSearch],
-    queryFn: () => api.gameInsights.lootTables({ env, search: debouncedSearch || undefined, limit: 100 }),
+    queryKey: ['blueprints.loot-tables', env, debouncedSearch],
+    queryFn: () => api.blueprints.lootTables({ env, search: debouncedSearch || undefined, limit: 100 }),
     staleTime: 5 * 60_000,
   });
 

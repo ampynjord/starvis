@@ -314,15 +314,18 @@ export default function ItemsPage({ group }: ItemsPageProps = {}) {
 	const showInventoryInsights = resolvedGroup === "armor" || resolvedGroup === "utility";
 
 	const { data: ammoInsights } = useQuery({
-		queryKey: ["game-insights.ammo", env, debouncedSearch],
-		queryFn: () => api.gameInsights.ammo({ env, search: debouncedSearch || undefined, limit: 100 }),
+		queryKey: ["ammo.stats", env, debouncedSearch],
+		queryFn: () => api.ammo.stats({ env, search: debouncedSearch || undefined, limit: 100 }),
 		staleTime: 5 * 60_000,
 		enabled: showAmmoInsights,
 	});
 
 	const { data: inventoryInsights } = useQuery({
-		queryKey: ["game-insights.inventory-containers", env, debouncedSearch],
-		queryFn: () => api.gameInsights.inventoryContainers({ env, search: debouncedSearch || undefined, limit: 100 }),
+		queryKey: [`${resolvedGroup}.inventory-containers`, env, debouncedSearch],
+		queryFn: () => {
+			const client = resolvedGroup === "armor" ? api.armor : api.utility;
+			return client.inventoryContainers({ env, search: debouncedSearch || undefined, limit: 100 });
+		},
 		staleTime: 5 * 60_000,
 		enabled: showInventoryInsights,
 	});

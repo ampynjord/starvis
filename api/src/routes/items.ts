@@ -1,7 +1,16 @@
 import type { Router } from 'express';
 import { ItemQuery } from '../schemas.js';
 import { parseIncludes } from '../services/shared.js';
-import { asyncHandler, makeGameDataGuard, sendCsvOrJson, sendWithETag } from './helpers.js';
+import {
+  asyncHandler,
+  getQueryEnv,
+  getQueryNumber,
+  getQueryString,
+  makeGameDataGuard,
+  sendCsvOrJson,
+  sendPaginatedWithETag,
+  sendWithETag,
+} from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
 type CategoryDef = { types: string[]; subTypes?: string[]; excludeSubTypes?: string[]; label: string; group: string };
@@ -161,6 +170,39 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
   );
 
   /** Generic item list — supports all filters via query params */
+  router.get(
+    '/api/v1/ammo/stats',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const result = await gameDataService!.items.getAmmoStats({
+        env: getQueryEnv(req),
+        search: getQueryString(req, 'search'),
+        page: getQueryNumber(req, 'page'),
+        limit: getQueryNumber(req, 'limit'),
+      });
+      sendPaginatedWithETag(req, res, result, Date.now());
+    }),
+  );
+
+  const mountInventoryContainerRoute = (path: string) => {
+    router.get(
+      path,
+      requireGameData,
+      asyncHandler(async (req, res) => {
+        const result = await gameDataService!.items.getInventoryContainers({
+          env: getQueryEnv(req),
+          search: getQueryString(req, 'search'),
+          page: getQueryNumber(req, 'page'),
+          limit: getQueryNumber(req, 'limit'),
+        });
+        sendPaginatedWithETag(req, res, result, Date.now());
+      }),
+    );
+  };
+
+  mountInventoryContainerRoute('/api/v1/armor/inventory-containers');
+  mountInventoryContainerRoute('/api/v1/utility/inventory-containers');
+
   router.get(
     '/api/v1/items',
     requireGameData,
