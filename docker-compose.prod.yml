@@ -1,98 +1,100 @@
-# ============================================================
-# STARVIS — Production (VPS derrière Traefik)
-# Images pré-buildées depuis GHCR, routage via Traefik
-# Usage : docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
-# ============================================================
+# STARVIS - production stack behind Traefik.
+# Usage: docker compose -f docker-compose.prod.yml --env-file .env.prod up -d
 
 services:
   postgres:
-    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
-    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-postgres
+    image: ${POSTGRES_IMAGE}
+    container_name: ${COMPOSE_PROJECT_NAME}-postgres
     environment:
-      POSTGRES_DB: ${DB_NAME:-starvis}
-      POSTGRES_USER: ${DB_USER:-starvis_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-starvis_pass}
-    # Port exposé en loopback uniquement — pour extractions locales via tunnel SSH
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "127.0.0.1:${DB_EXTERNAL_PORT:-5432}:5432"
+      - "${DB_BIND_HOST}:${DB_EXTERNAL_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
+      - ./db/scripts/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    restart: ${RESTART_POLICY}
     deploy:
       resources:
         limits:
-          memory: ${POSTGRES_MEMORY_LIMIT:-512M}
+          memory: ${POSTGRES_MEMORY_LIMIT}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: ${HEALTHCHECK_INTERVAL}
+      timeout: ${HEALTHCHECK_TIMEOUT}
+      retries: ${HEALTHCHECK_RETRIES}
 
   redis:
-    image: ${REDIS_IMAGE:-redis:7-alpine}
-    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-redis
+    image: ${REDIS_IMAGE}
+    container_name: ${COMPOSE_PROJECT_NAME}-redis
     volumes:
       - redis_data:/data
-    restart: unless-stopped
+    restart: ${RESTART_POLICY}
     deploy:
       resources:
         limits:
-          memory: ${REDIS_MEMORY_LIMIT:-64M}
+          memory: ${REDIS_MEMORY_LIMIT}
+    command: redis-server --appendonly yes --maxmemory ${REDIS_MAXMEMORY} --maxmemory-policy ${REDIS_MAXMEMORY_POLICY}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    command: redis-server --appendonly yes --maxmemory ${REDIS_MAXMEMORY:-32mb} --maxmemory-policy allkeys-lru
+      interval: ${HEALTHCHECK_INTERVAL}
+      timeout: ${HEALTHCHECK_TIMEOUT}
+      retries: ${HEALTHCHECK_RETRIES}
 
   api:
-    image: ${API_IMAGE:-ghcr.io/ampynjord/starvis-api:latest}
-    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-api
+    image: ${API_IMAGE}
+    container_name: ${COMPOSE_PROJECT_NAME}-api
     volumes:
       - ctm_cache:/app/ctm-cache
     environment:
-      NODE_ENV: production
-      PORT: ${API_INTERNAL_PORT:-3000}
-      DATABASE_URL: postgresql://${DB_USER:-starvis_user}:${DB_PASSWORD:-starvis_pass}@postgres:5432/${DB_NAME:-starvis}
+      NODE_ENV: ${API_NODE_ENV}
+      PORT: ${API_INTERNAL_PORT}
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
       REDIS_HOST: redis
-      REDIS_PORT: ${REDIS_INTERNAL_PORT:-6379}
-      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
-      CORS_ORIGIN: ${CORS_ORIGIN:-https://${DOMAIN}}
-      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-200}
-      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-30}
-      CTM_CACHE_DIR: /app/ctm-cache
-      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
-      JWT_SECRET: ${JWT_SECRET:-}
-      SMTP_HOST: ${SMTP_HOST:-}
-      SMTP_PORT: ${SMTP_PORT:-587}
-      SMTP_USER: ${SMTP_USER:-}
-      SMTP_PASS: ${SMTP_PASS:-}
-      SMTP_FROM: ${SMTP_FROM:-}
-      CONTACT_EMAIL: ${CONTACT_EMAIL:-}
-    restart: unless-stopped
+      REDIS_PORT: ${REDIS_INTERNAL_PORT}
+      ADMIN_API_KEY: ${ADMIN_API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME}
+      LOG_LEVEL: ${LOG_LEVEL}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX}
+      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST}
+      RATE_LIMIT_ADMIN_MAX: ${RATE_LIMIT_ADMIN_MAX}
+      CTM_CACHE_DIR: ${CTM_CACHE_DIR}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
+      CHAT_PROVIDER_BASE_URL: ${CHAT_PROVIDER_BASE_URL}
+      CHAT_TOOL_MODEL: ${CHAT_TOOL_MODEL}
+      CHAT_RESPONSE_MODEL: ${CHAT_RESPONSE_MODEL}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+      CONTACT_EMAIL: ${CONTACT_EMAIL}
+    restart: ${RESTART_POLICY}
     deploy:
       resources:
         limits:
-          memory: ${API_MEMORY_LIMIT:-256M}
+          memory: ${API_MEMORY_LIMIT}
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:${API_INTERNAL_PORT:-3000}/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
+      test: ["CMD", "wget", "-qO-", "http://localhost:${API_INTERNAL_PORT}/health/live"]
+      interval: ${HEALTHCHECK_INTERVAL}
+      timeout: ${HEALTHCHECK_TIMEOUT}
+      retries: ${HEALTHCHECK_RETRIES}
+      start_period: ${API_HEALTHCHECK_START_PERIOD}
     networks:
       - default
       - traefik-network
     labels:
       traefik.enable: "true"
-      traefik.docker.network: "${TRAEFIK_NETWORK:-traefik-network}"
+      traefik.docker.network: "${TRAEFIK_NETWORK}"
       traefik.http.routers.starvis-api.rule: "Host(`${DOMAIN}`) && (PathPrefix(`/api/v1`) || PathPrefix(`/api-docs`) || PathPrefix(`/health`))"
-      traefik.http.routers.starvis-api.entrypoints: "websecure"
-      traefik.http.routers.starvis-api.tls.certresolver: "${TRAEFIK_CERT_RESOLVER:-letsencrypt}"
+      traefik.http.routers.starvis-api.entrypoints: "${TRAEFIK_ENTRYPOINT}"
+      traefik.http.routers.starvis-api.tls.certresolver: "${TRAEFIK_CERT_RESOLVER}"
       traefik.http.routers.starvis-api.service: "starvis-api-svc"
-      traefik.http.routers.starvis-api.priority: "90"
-      traefik.http.services.starvis-api-svc.loadbalancer.server.port: "${API_INTERNAL_PORT:-3000}"
+      traefik.http.routers.starvis-api.priority: "${TRAEFIK_API_PRIORITY}"
+      traefik.http.services.starvis-api-svc.loadbalancer.server.port: "${API_INTERNAL_PORT}"
     depends_on:
       postgres:
         condition: service_healthy
@@ -100,51 +102,57 @@ services:
         condition: service_healthy
 
   ihm:
-    image: ${IHM_IMAGE:-ghcr.io/ampynjord/starvis-ihm:latest}
-    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-ihm
+    image: ${IHM_IMAGE}
+    container_name: ${COMPOSE_PROJECT_NAME}-ihm
     environment:
-      API_URL: http://${API_HOST:-api}:${API_INTERNAL_PORT:-3000}
-      JWT_SECRET: ${JWT_SECRET:-}
-      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-}
-    restart: unless-stopped
+      NODE_ENV: ${IHM_NODE_ENV}
+      PORT: ${IHM_INTERNAL_PORT}
+      API_URL: http://${API_HOST}:${API_INTERNAL_PORT}
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+      NEXT_PUBLIC_RSI_URL: ${NEXT_PUBLIC_RSI_URL}
+    restart: ${RESTART_POLICY}
     deploy:
       resources:
         limits:
-          memory: ${IHM_MEMORY_LIMIT:-128M}
+          memory: ${IHM_MEMORY_LIMIT}
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8080/"]
-      interval: 30s
-      timeout: 3s
-      start_period: 10s
-      retries: 3
-    depends_on:
-      - api
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:${IHM_INTERNAL_PORT}/"]
+      interval: ${IHM_HEALTHCHECK_INTERVAL}
+      timeout: ${IHM_HEALTHCHECK_TIMEOUT}
+      start_period: ${IHM_HEALTHCHECK_START_PERIOD}
+      retries: ${IHM_HEALTHCHECK_RETRIES}
     networks:
       - default
       - traefik-network
     labels:
       traefik.enable: "true"
-      traefik.docker.network: "${TRAEFIK_NETWORK:-traefik-network}"
+      traefik.docker.network: "${TRAEFIK_NETWORK}"
       traefik.http.routers.starvis-ihm.rule: "Host(`${DOMAIN}`)"
-      traefik.http.routers.starvis-ihm.entrypoints: "websecure"
-      traefik.http.routers.starvis-ihm.tls.certresolver: "${TRAEFIK_CERT_RESOLVER:-letsencrypt}"
-      traefik.http.services.starvis-ihm.loadbalancer.server.port: "8080"
+      traefik.http.routers.starvis-ihm.entrypoints: "${TRAEFIK_ENTRYPOINT}"
+      traefik.http.routers.starvis-ihm.tls.certresolver: "${TRAEFIK_CERT_RESOLVER}"
+      traefik.http.services.starvis-ihm.loadbalancer.server.port: "${IHM_INTERNAL_PORT}"
+    depends_on:
+      api:
+        condition: service_healthy
 
   bot:
-    image: ${BOT_IMAGE:-ghcr.io/ampynjord/starvis-bot:latest}
-    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-bot
+    image: ${BOT_IMAGE}
+    container_name: ${COMPOSE_PROJECT_NAME}-bot
     environment:
-      DISCORD_TOKEN: ${DISCORD_TOKEN:-}
-      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
-      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
-      API_URL: http://${API_HOST:-api}:${API_INTERNAL_PORT:-3000}
-      SITE_URL: ${SITE_URL:-https://${DOMAIN}}
-      API_TOKEN: ${API_TOKEN:-}
-    restart: unless-stopped
+      NODE_ENV: ${BOT_NODE_ENV}
+      DISCORD_TOKEN: ${DISCORD_TOKEN}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
+      API_URL: http://${API_HOST}:${API_INTERNAL_PORT}
+      SITE_URL: ${SITE_URL}
+      API_TOKEN: ${API_TOKEN}
+    restart: ${RESTART_POLICY}
     deploy:
       resources:
         limits:
-          memory: ${BOT_MEMORY_LIMIT:-128M}
+          memory: ${BOT_MEMORY_LIMIT}
     depends_on:
       api:
         condition: service_healthy
@@ -157,4 +165,4 @@ volumes:
 networks:
   traefik-network:
     external: true
-    name: ${TRAEFIK_NETWORK:-traefik-network}
+    name: ${TRAEFIK_NETWORK}

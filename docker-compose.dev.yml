@@ -1,78 +1,85 @@
-# ============================================================
-# STARVIS — Développement local (hot reload)
-# Usage : docker compose -f docker-compose.dev.yml --env-file .env.dev up
-# Toutes les valeurs configurables via .env.dev (voir .env.dev.example)
-# ============================================================
+# STARVIS - local development stack.
+# Usage: docker compose -f docker-compose.dev.yml --env-file .env.dev up
 
 services:
   postgres:
-    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
-    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-postgres
+    image: ${POSTGRES_IMAGE}
+    container_name: ${COMPOSE_PROJECT_NAME}-postgres
     environment:
-      POSTGRES_DB: ${DB_NAME:-starvis}
-      POSTGRES_USER: ${DB_USER:-starvis_user}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-starvis_pass}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "${DB_EXTERNAL_PORT:-5432}:5432"
+      - "${DB_BIND_HOST}:${DB_EXTERNAL_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./db/scripts/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
-    restart: unless-stopped
+    restart: ${RESTART_POLICY}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: ${HEALTHCHECK_INTERVAL}
+      timeout: ${HEALTHCHECK_TIMEOUT}
+      retries: ${HEALTHCHECK_RETRIES}
 
   redis:
-    image: ${REDIS_IMAGE:-redis:7-alpine}
-    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-redis
+    image: ${REDIS_IMAGE}
+    container_name: ${COMPOSE_PROJECT_NAME}-redis
     ports:
-      - "${REDIS_EXTERNAL_PORT:-6379}:6379"
+      - "${REDIS_BIND_HOST}:${REDIS_EXTERNAL_PORT}:6379"
     volumes:
       - redis_data:/data
-    restart: unless-stopped
+    restart: ${RESTART_POLICY}
+    command: redis-server --appendonly yes --maxmemory ${REDIS_MAXMEMORY} --maxmemory-policy ${REDIS_MAXMEMORY_POLICY}
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    command: redis-server --appendonly yes
+      interval: ${HEALTHCHECK_INTERVAL}
+      timeout: ${HEALTHCHECK_TIMEOUT}
+      retries: ${HEALTHCHECK_RETRIES}
 
   api:
     build:
       context: .
       dockerfile: api/Dockerfile
       target: development
-    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-api
+    container_name: ${COMPOSE_PROJECT_NAME}-api
     volumes:
       - ./:/app
       - api_node_modules:/app/node_modules
       - ctm_cache:/app/ctm-cache
     ports:
-      - "${API_PORT:-3000}:${API_INTERNAL_PORT:-3000}"
+      - "${API_BIND_HOST}:${API_PORT}:${API_INTERNAL_PORT}"
     environment:
-      NODE_ENV: development
-      PORT: ${API_INTERNAL_PORT:-3000}
-      DATABASE_URL: postgresql://${DB_USER:-starvis_user}:${DB_PASSWORD:-starvis_pass}@postgres:5432/${DB_NAME:-starvis}
+      NODE_ENV: ${API_NODE_ENV}
+      PORT: ${API_INTERNAL_PORT}
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME}
       REDIS_HOST: redis
-      REDIS_PORT: ${REDIS_INTERNAL_PORT:-6379}
-      ADMIN_API_KEY: ${ADMIN_API_KEY:-}
-      LOG_LEVEL: ${LOG_LEVEL:-debug}
-      CORS_ORIGIN: ${CORS_ORIGIN:-*}
-      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-500}
-      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST:-200}
-      RATE_LIMIT_ADMIN_MAX: ${RATE_LIMIT_ADMIN_MAX:-500}
-      CTM_CACHE_DIR: /app/ctm-cache
-      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
-      JWT_SECRET: ${JWT_SECRET:-}
-    restart: unless-stopped
+      REDIS_PORT: ${REDIS_INTERNAL_PORT}
+      ADMIN_API_KEY: ${ADMIN_API_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME}
+      LOG_LEVEL: ${LOG_LEVEL}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX}
+      RATE_LIMIT_BURST: ${RATE_LIMIT_BURST}
+      RATE_LIMIT_ADMIN_MAX: ${RATE_LIMIT_ADMIN_MAX}
+      CTM_CACHE_DIR: ${CTM_CACHE_DIR}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY}
+      CHAT_PROVIDER_BASE_URL: ${CHAT_PROVIDER_BASE_URL}
+      CHAT_TOOL_MODEL: ${CHAT_TOOL_MODEL}
+      CHAT_RESPONSE_MODEL: ${CHAT_RESPONSE_MODEL}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASS: ${SMTP_PASS}
+      SMTP_FROM: ${SMTP_FROM}
+      CONTACT_EMAIL: ${CONTACT_EMAIL}
+    restart: ${RESTART_POLICY}
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:${API_INTERNAL_PORT:-3000}/health/live"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 15s
+      test: ["CMD", "wget", "-qO-", "http://localhost:${API_INTERNAL_PORT}/health/live"]
+      interval: ${HEALTHCHECK_INTERVAL}
+      timeout: ${HEALTHCHECK_TIMEOUT}
+      retries: ${HEALTHCHECK_RETRIES}
+      start_period: ${API_HEALTHCHECK_START_PERIOD}
     depends_on:
       postgres:
         condition: service_healthy
@@ -80,41 +87,47 @@ services:
         condition: service_healthy
 
   ihm:
-    image: node:22-alpine
-    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-ihm
+    image: ${NODE_DEV_IMAGE}
+    container_name: ${COMPOSE_PROJECT_NAME}-ihm
     working_dir: /app
     volumes:
       - ./:/app
       - ihm_node_modules:/app/node_modules
-    command: sh -c "npm install --prefer-offline && npm run dev --workspace=ihm -- -p ${IHM_INTERNAL_PORT:-5173} -H 0.0.0.0"
+    command: sh -c "npm install --prefer-offline && npm run dev --workspace=ihm -- -p ${IHM_INTERNAL_PORT} -H 0.0.0.0"
     ports:
-      - "${IHM_DEV_PORT:-5173}:${IHM_INTERNAL_PORT:-5173}"
+      - "${IHM_BIND_HOST}:${IHM_PORT}:${IHM_INTERNAL_PORT}"
     environment:
-      API_URL: http://${API_HOST:-api}:${API_INTERNAL_PORT:-3000}
-      JWT_SECRET: ${JWT_SECRET:-}
-      # Nécessaire sur Windows : Docker Desktop ne propage pas inotify vers le conteneur
-      CHOKIDAR_USEPOLLING: "true"
-      CHOKIDAR_INTERVAL: "300"
-      WATCHPACK_POLLING: "true"
+      NODE_ENV: ${IHM_NODE_ENV}
+      API_URL: http://${API_HOST}:${API_INTERNAL_PORT}
+      JWT_SECRET: ${JWT_SECRET}
+      AUTH_COOKIE_NAME: ${AUTH_COOKIE_NAME}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+      NEXT_PUBLIC_RSI_URL: ${NEXT_PUBLIC_RSI_URL}
+      CHOKIDAR_USEPOLLING: ${CHOKIDAR_USEPOLLING}
+      CHOKIDAR_INTERVAL: ${CHOKIDAR_INTERVAL}
+      WATCHPACK_POLLING: ${WATCHPACK_POLLING}
+    restart: ${RESTART_POLICY}
     depends_on:
       api:
         condition: service_healthy
 
   bot:
-    image: node:22-alpine
-    container_name: ${COMPOSE_PROJECT_NAME:-starvis}-bot
+    image: ${NODE_DEV_IMAGE}
+    container_name: ${COMPOSE_PROJECT_NAME}-bot
     working_dir: /app
     volumes:
       - ./:/app
       - bot_node_modules:/app/node_modules
     command: sh -c "npm install --prefer-offline --silent && npm run dev --workspace=@starvis/bot"
     environment:
-      DISCORD_TOKEN: ${DISCORD_TOKEN:-}
-      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID:-}
-      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID:-}
-      API_URL: http://${API_HOST:-api}:${API_INTERNAL_PORT:-3000}
-      SITE_URL: ${SITE_URL:-http://localhost:5173}
-      API_TOKEN: ${API_TOKEN:-}
+      NODE_ENV: ${BOT_NODE_ENV}
+      DISCORD_TOKEN: ${DISCORD_TOKEN}
+      DISCORD_CLIENT_ID: ${DISCORD_CLIENT_ID}
+      DISCORD_GUILD_ID: ${DISCORD_GUILD_ID}
+      API_URL: http://${API_HOST}:${API_INTERNAL_PORT}
+      SITE_URL: ${SITE_URL}
+      API_TOKEN: ${API_TOKEN}
+    restart: ${RESTART_POLICY}
     depends_on:
       api:
         condition: service_healthy
