@@ -1,211 +1,251 @@
-# starvis-extractor
+# STARVIS Extractor
 
-CLI local qui lit `Data.p4k` (fichier du jeu Star Citizen) et pousse les données extraites dans la base PostgreSQL.
+Local CLI that reads Star Citizen `Data.p4k` files and writes extracted data to the STARVIS PostgreSQL database.
 
-> **Prérequis** : Star Citizen installé sur Windows ou WSL. L'extractor tourne en dehors de Docker.
+The extractor runs outside Docker. It connects to the same PostgreSQL service used by the full STARVIS stack:
 
-Supporte les formats DataForge v6 (SC ≤ 4.7.x) et v8 (SC 4.8+).
+- dev: `docker-compose.dev.yml`, usually exposed on `127.0.0.1:5432` or `0.0.0.0:5432`;
+- prod: `docker-compose.prod.yml`, exposed on VPS loopback and reached from your machine through an SSH tunnel.
+
+It supports DataForge v6 for Star Citizen 4.7.x and older, and DataForge v8 for Star Citizen 4.8+.
 
 ---
 
 ## Installation
 
+From the monorepo root:
+
 ```bash
-# Depuis la racine du monorepo
 npm install
 
-cp extractor/.env.example extractor/.env.dev
-# Remplir : DB_PASSWORD
+cp extractor/.env.extractor.example extractor/.env.dev
+# Fill DB_PASSWORD and P4K paths as needed.
 ```
+
+The stable command entrypoint is `extractor/extract.ts`. CLI orchestration lives in `extractor/src/cli/main.ts`, option parsing in `extractor/src/cli/options.ts`, module selection in `extractor/src/cli/modules.ts`, and runtime resolution in `extractor/src/cli/resolve.ts`.
 
 ---
 
-## Configuration
+## Database Configuration
 
 | Variable | Description |
 |---|---|
-| `DB_HOST` | Hôte PostgreSQL (défaut : `127.0.0.1`) |
-| `DB_PORT` | Port PostgreSQL (défaut : `5432`) |
-| `DB_USER` | Utilisateur (défaut : `starvis_user`) |
-| `DB_PASSWORD` | Mot de passe **à renseigner** |
-| `DB_NAME` | Nom de la base (défaut : `starvis`) |
-| `DATABASE_URL` | URL complète — remplace les variables DB_* si définie |
-| `P4K_LIVE_PATH` | Chemin vers `Data.p4k` du canal LIVE |
-| `P4K_PTU_PATH` | Chemin vers `Data.p4k` du canal PTU |
-| `P4K_PATH` | Chemin générique (fallback si les deux ci-dessus sont vides) |
-| `CTM_CACHE_DIR` | Répertoire de cache des modèles CTM (défaut : `./ctm-cache`) |
-| `LOG_LEVEL` | Niveau de log : `debug` \| `info` \| `warn` \| `error` \| `silent` |
+| `DATABASE_URL` | Full PostgreSQL URL. Takes priority over individual `DB_*` variables. |
+| `DB_HOST` | PostgreSQL host. Default: `127.0.0.1`. |
+| `DB_PORT` | PostgreSQL port. Default: `5432`. |
+| `DB_USER` | PostgreSQL user. Default: `starvis_user`. |
+| `DB_PASSWORD` | PostgreSQL password. Required unless `DATABASE_URL` is set. |
+| `DB_NAME` | Database name. Default: `starvis`. |
 
-**Chemins P4K typiques (Windows) :**
+For local dev, start the full stack first:
+
+```bash
+docker compose -f docker-compose.dev.yml --env-file .env.dev up -d postgres redis api
 ```
+
+Then use matching DB values in `extractor/.env.dev`.
+
+---
+
+## P4K Configuration
+
+| Variable | Description |
+|---|---|
+| `P4K_LIVE_PATH` | Path to the LIVE `Data.p4k`. Used with `--env live`. |
+| `P4K_PTU_PATH` | Path to the PTU `Data.p4k`. Used with `--env ptu`. |
+| `P4K_PATH` | Generic fallback path when channel-specific paths are empty. |
+| `CTM_CACHE_DIR` | CTM model cache directory. Default: `./ctm-cache`. |
+| `LOG_LEVEL` | `debug`, `info`, `warn`, `error`, or `silent`. |
+
+Typical Windows paths:
+
+```text
 C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Data.p4k
 C:\Program Files\Roberts Space Industries\StarCitizen\PTU\Data.p4k
 ```
 
-**Chemins P4K typiques (WSL) :**
-```
+Typical WSL path:
+
+```text
 /mnt/c/Program Files/Roberts Space Industries/StarCitizen/LIVE/Data.p4k
 ```
 
----
-
-## Utilisation
+You can also pass a P4K path directly:
 
 ```bash
-# Depuis la racine du monorepo
+npx tsx extractor/extract.ts --env live --p4k "C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Data.p4k"
+```
+
+---
+
+## Usage
+
+```bash
 npx tsx extractor/extract.ts [options]
 ```
 
-`extractor/extract.ts` reste le point d'entree stable. L'orchestration CLI vit dans `extractor/src/cli/main.ts`, le parsing des arguments dans `src/cli/options.ts`, la selection des modules dans `src/cli/modules.ts`, et la resolution runtime dans `src/cli/resolve.ts`.
-
-### Options CLI
-
-| Option | Description | Défaut |
+| Option | Description | Default |
 |---|---|---|
-| `-e, --env <env>` | Environnement : `live` \| `ptu` \| `custom` | `live` |
-| `-m, --modules <list>` | Modules à extraire, séparés par virgule | `all` |
-| `-p, --p4k <path>` | Chemin vers `Data.p4k` (prioritaire sur les variables d'env) | — |
-| `--game-version <ver>` | Version du jeu à enregistrer en base (ex: `4.7.2`) | auto-détectée |
-| `--dry-run` | Parse le P4K et affiche les stats sans écrire en base | — |
-| `--prod-db` | Utilise `.env.prod` (base de prod, port 5433 via tunnel SSH) | — |
-| `--log-level <level>` | Niveau de log : `debug`, `info`, `warn`, `error`, `silent` | `info` |
-| `--verbose` | Raccourci pour `--log-level debug` | - |
-| `--quiet` | Coupe les logs CLI | - |
-| `--json` | Emet les logs en JSON lines | - |
-| `--no-color` | Desactive les couleurs des logs texte | - |
-| `--list-modules` | Affiche les modules disponibles puis quitte | - |
-| `--check-config` | Valide la config CLI/P4K/DB sans extraire | - |
+| `-e, --env <env>` | Target game environment: `live`, `ptu`, or `custom`. | `live` |
+| `-m, --modules <list>` | Comma-separated modules to extract. | `all` |
+| `-p, --p4k <path>` | Explicit `Data.p4k` path. Overrides env variables. | none |
+| `--game-version <ver>` | Manual public game version label, for example `4.7.2`. | auto-detected |
+| `--dry-run` | Parse and report without writing to DB. | false |
+| `--prod-db` | Load production DB settings and use the production tunnel port. | false |
+| `--log-level <level>` | `debug`, `info`, `warn`, `error`, or `silent`. | `info` |
+| `--verbose` | Shortcut for `--log-level debug`. | false |
+| `--quiet` | Disable normal CLI logs. | false |
+| `--json` | Emit JSON-lines logs. | false |
+| `--no-color` | Disable ANSI colors. | false |
+| `--list-modules` | Print available modules and exit. | false |
+| `--check-config` | Validate P4K and DB configuration without extraction. | false |
 
-> **Note** : la version publique est auto-detectee depuis le build P4K installe. L'extracteur lit `build_manifest.id`, recupere son `RequestedP4ChangeNum`, puis cherche le libelle public `X.X.X` correspondant dans le cache launcher local. `--game-version` reste disponible uniquement comme override manuel.
-
-### Modules disponibles
-
-**Données P4K (nécessitent le fichier Data.p4k) :**
-
-| Module | Contenu |
-|---|---|
-| `ships` | Vaisseaux et véhicules avec attributs et ports de chargement |
-| `components` | Composants vaisseaux : armes, boucliers, moteurs QD, thrusters, radars, EMP, QIG, mining lasers (stats de minage), tractor beams (force/portée), salvage heads (vitesse/portée), missiles, tourelles… |
-| `items` | Objets FPS (15 types : armes, armures, gadgets, consommables…) |
-| `commodities` | Commodités échangeables (métaux, gaz, nourriture…) |
-| `mining` | Éléments minéraux, compositions de dépôts, lasers |
-| `missions` | Contrats disponibles (type, faction, récompenses, légalité) |
-| `crafting` | Recettes de fabrication avec ingrédients |
-| `paints` | Livrées et peintures de vaisseaux |
-| `shops` | Boutiques in-game avec inventaire et prix |
-| `locations` | Systèmes, planètes, lunes, stations |
-
-**Modules réseau (ne nécessitent pas le P4K) :**
-
-| Module | Contenu |
-|---|---|
-| `ship-matrix` | Données marketing officielles depuis l'API RSI |
-| `galactapedia` | Articles encyclopédiques RSI |
-| `comm-links` | Articles de lore RSI |
-| `starmap` | Carte stellaire officielle |
-| `ctm` | Modèles 3D CTM depuis le site RSI (~1h) |
+The public game version is auto-detected from the installed P4K when possible. `--game-version` remains available as a manual override for hotfix builds or launcher cache gaps.
 
 ---
 
-## Exemples
+## Modules
+
+P4K modules require `Data.p4k`:
+
+| Module | Content |
+|---|---|
+| `ships` | Ships, vehicles, attributes and loadout ports. |
+| `components` | Ship components: weapons, shields, quantum drives, coolers, power plants, missiles, turrets, mining, tractor, salvage and utility components. |
+| `items` | FPS items: weapons, armor, clothing, gadgets, consumables and attachments. |
+| `commodities` | Trade commodities, raw materials, gases and food. |
+| `mining` | Mining elements, deposits, compositions, lasers and gadgets. |
+| `missions` | Contracts, rewards, factions, legality and blueprint rewards. |
+| `crafting` | Recipes, ingredients, modifiers and station requirements. |
+| `paints` | Ship liveries and paints. |
+| `shops` | In-game shops, inventory and prices. |
+| `locations` | Systems, planets, moons, cities, stations and child locations. |
+
+Network modules do not require `Data.p4k`:
+
+| Module | Content |
+|---|---|
+| `ship-matrix` | Official RSI Ship Matrix data. |
+| `galactapedia` | RSI encyclopedia entries. |
+| `comm-links` | RSI Comm-Link articles and images. |
+| `starmap` | RSI Starmap systems, locations and jump points. |
+| `ctm` | CTM model metadata and cache. This can take around one hour. |
+
+---
+
+## Examples
 
 ```bash
-# Extraction complète LIVE (dev local, version auto-détectée)
+# Full LIVE extraction, dev DB, version auto-detected
 npx tsx extractor/extract.ts --env live
 
-# Extraction LIVE avec version forcée (recommandé pour les builds hotfix)
+# Full LIVE extraction with a forced public version label
 npx tsx extractor/extract.ts --env live --game-version 4.7.2
 
-# Extraction PTU (dev local)
+# PTU extraction
 npx tsx extractor/extract.ts --env ptu
 
-# Extraction LIVE vers la prod (tunnel SSH requis, voir ci-dessous)
-npx tsx extractor/extract.ts --env live --prod-db
+# Network-only RSI sync, no P4K needed
+npx tsx extractor/extract.ts --modules ship-matrix,galactapedia,comm-links,starmap
 
-# Extraction PTU vers la prod
-npx tsx extractor/extract.ts --env ptu --prod-db
-
-# Extraction rapide sans CTM (~1.5 min)
+# Fast P4K extraction without CTM
 npx tsx extractor/extract.ts --env live --modules ships,components,items,commodities,paints,mining,missions,crafting,locations,shops
 
-# PTU — vaisseaux et missions uniquement
-npx tsx extractor/extract.ts --env ptu --modules ships,missions
+# Validate configuration without writing data
+npx tsx extractor/extract.ts --check-config
 
-# Modules réseau seuls (pas de P4K nécessaire)
-npx tsx extractor/extract.ts --modules ship-matrix,galactapedia,starmap
-
-# Test sans écriture en base
+# Dry-run parse without DB writes
 npx tsx extractor/extract.ts --dry-run --env ptu
 ```
 
 ---
 
-## Extraction vers la production
+## Production Extraction
 
-La base de prod n'est pas exposée publiquement. Ouvrir un tunnel SSH avant de lancer.
-La base de prod écoute sur le port **5433** (mappé en local via le tunnel).
+Production PostgreSQL is not exposed publicly. Open an SSH tunnel before running `--prod-db`.
+
+The current production compose binds PostgreSQL to VPS loopback through `DB_BIND_HOST=127.0.0.1` and `DB_EXTERNAL_PORT=5432`. From your workstation, map that remote port to a local tunnel port, usually `5433`:
 
 ```bash
-# Ouvrir le tunnel vers la prod (port 5433)
-ssh -f -N -L 5433:localhost:5432 -i ~/.ssh/starvis_vps -o IdentitiesOnly=yes debian@ampynjord.bzh
+ssh -f -N -L 5433:127.0.0.1:5432 -i ~/.ssh/starvis_vps -o IdentitiesOnly=yes debian@ampynjord.bzh
+```
 
-# Extraction LIVE vers la prod
-npx tsx extractor/extract.ts --env live --prod-db --game-version 4.7.2
+Then run:
 
-# Extraction PTU vers la prod
+```bash
+npx tsx extractor/extract.ts --env live --prod-db
 npx tsx extractor/extract.ts --env ptu --prod-db
-
-# Fermer le tunnel après
-pkill -f "ssh.*5433:localhost:5432"
 ```
 
-Les deux environnements (LIVE et PTU) utilisent la même base prod — les données sont séparées par la colonne `env` dans chaque table.
-
----
-
-## Ordre d'exécution interne
-
-L'extraction complète suit cet ordre (transaction atomique par environnement) :
-
-```
-1. Ship-matrix pre-sync  →  schéma rsi
-   (utilisé comme référence pour le cross-reference)
-
-2. Transaction atomique (live ou ptu)
-   ├── Snapshot des données existantes  →  base du changelog
-   ├── Nettoyage des anciennes données (env courant uniquement)
-   ├── Manufacturers
-   ├── Components, Items, Commodities
-   ├── Ships + ports de chargement  (~1.5 min)
-   ├── Mining, Missions, Crafting, Locations, Shops
-   ├── Cross-reference ship_matrix  (lie chaque ship à son entrée RSI)
-   ├── Tag + suppression des variants exclus  (npc, event, special…)
-   ├── CTM scraping  [optionnel, ~1h]
-   ├── Génération du changelog  (filtré par env dans l'API)
-   └── COMMIT  (rollback automatique si sanity check échoue)
-
-3. Galactapedia, Comm-links, Starmap  →  schéma rsi  (hors transaction)
-```
-
-> En cas d'erreur ou de régression détectée (ex: nombre de vaisseaux chute de >20 %), la transaction est annulée automatiquement et les données existantes restent intactes.
-
----
-
-## Scripts utilitaires
+Close the tunnel when finished:
 
 ```bash
-# Diagnostic DataForge 4.8+ — liste les structs/records disponibles
+pkill -f "ssh.*5433:127.0.0.1:5432"
+```
+
+LIVE and PTU share the same production database. Data is separated by the `env` column in `game` schema tables.
+
+---
+
+## Internal Execution Order
+
+A full extraction runs in this order:
+
+```text
+1. Ship Matrix pre-sync -> rsi schema
+   Used as reference data for cross-reference.
+
+2. Atomic transaction for the selected env
+   - snapshot previous data for changelog generation
+   - clean old data for current env only
+   - manufacturers
+   - components, items and commodities
+   - ships and loadout ports
+   - mining, missions, crafting, locations and shops
+   - Ship Matrix cross-reference
+   - variant tagging and excluded variant cleanup
+   - optional CTM scraping
+   - changelog generation
+   - commit
+
+3. Galactapedia, Comm-links and Starmap -> rsi schema
+   These network modules run outside the P4K transaction.
+```
+
+If an extraction fails or a sanity check detects a large regression, the transaction is rolled back and existing data remains available.
+
+---
+
+## Utility Scripts
+
+```bash
+# DataForge 4.8+ diagnostic
 npx tsx extractor/scripts/diagnose-48.ts
 
-# Audit qualité des données extraites
+# Extracted data quality audit
 npx tsx extractor/scripts/audit-quality.ts
 
-# Audit des locations manquantes
+# Missing locations audit
 npx tsx extractor/scripts/audit-locations.ts
 
-# Test du scraper CTM sans écriture
+# CTM scraper dry-run
 npx tsx extractor/scripts/test-ctm-scraper.ts
 
-# Dry-run des adapters de sources
+# Source adapter dry-run
 npx tsx extractor/scripts/dry-run-adapters.ts
+```
+
+---
+
+## Verification
+
+```bash
+npm run test --workspace=@starvis/extractor
+npm run typecheck --workspace=@starvis/extractor
+```
+
+After publishing data to production, run the platform-level data audit:
+
+```bash
+npm run quality:audit:data:prod
 ```

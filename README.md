@@ -123,36 +123,6 @@ See [`extractor/README.md`](extractor/README.md) for CLI options, module names, 
 
 ---
 
-## API-only Self-host
-
-Use this mode when you only want the REST API, PostgreSQL, Redis, and the local extractor workflow.
-
-```bash
-cp .env.api-only.example .env.api-only
-# Fill DB_PASSWORD, JWT_SECRET, ADMIN_API_KEY and CORS_ORIGIN
-
-docker compose -f docker-compose.api-only.yml --env-file .env.api-only up -d
-```
-
-Health checks:
-
-```bash
-curl http://127.0.0.1:3000/health/live
-curl http://127.0.0.1:3000/health/ready
-```
-
-For host-side extraction against this stack, use the database values from `.env.api-only`:
-
-```bash
-DB_HOST=127.0.0.1
-DB_PORT=<DB_EXTERNAL_PORT, default 5432>
-DB_USER=starvis_user
-DB_PASSWORD=<same as .env.api-only>
-DB_NAME=starvis
-```
-
----
-
 ## Data
 
 STARVIS combines local game data and public RSI data.
@@ -300,6 +270,17 @@ npm run typecheck
 npm run lint:ci
 ```
 
+### Intelligent quality audits
+
+```bash
+npm run quality:audit:data       # real API/data coherence audit against localhost:3000
+npm run quality:audit:data:prod  # strict audit against production
+npm run quality:audit:ui         # critical Playwright user flows with deterministic API fixtures
+npm run quality:audit            # data audit + UI critical flows
+```
+
+The data audit checks health, version metadata, core list/detail endpoints, search, duplicate identifiers, numeric sanity and placeholder-like values. See [`quality/README.md`](quality/README.md).
+
 ### Workspace checks
 
 ```bash
@@ -320,7 +301,6 @@ npm run test:e2e --workspace=starvis-ihm
 
 ```bash
 docker compose -f docker-compose.dev.yml --env-file .env.dev.example config --quiet
-docker compose -f docker-compose.api-only.yml --env-file .env.api-only.example config --quiet
 docker compose -f docker-compose.prod.yml --env-file .env.prod.example config --quiet
 ```
 
@@ -341,17 +321,17 @@ Main jobs:
 | Job | What it checks |
 |---|---|
 | Install & Generate | npm dependencies and Prisma client generation cache. |
-| Security & Dockerfile | Critical npm audit and Dockerfile lint. |
-| Config & Schema | Prisma validate, compose validation, shell script syntax and env contract. |
-| API-only Smoke | API production image and API-only compose smoke test. |
+| Security & Dockerfiles | Critical npm audit and Dockerfile lint. |
+| Config, Schema & Docs | OpenAPI validation, Prisma validation, compose validation, shell script syntax and env contract. |
 | Lint | Biome CI. |
 | Typecheck | API, IHM, extractor, bot and DB TypeScript checks. |
 | Tests API | API Vitest suite with PostgreSQL and Redis services. |
 | Tests Extractor | Extractor Vitest suite. |
 | Tests IHM | IHM Vitest suite. |
-| Tests E2E | Playwright Chromium suite. |
+| Tests E2E | Full Playwright Chromium suite, including critical UI flows. |
 | Build | API, IHM and bot images pushed to GHCR on `main`. |
 | Deploy | VPS deployment on `main` after images are built. |
+| Production Data Audit | Strict API/data coherence audit after production deployment. |
 
 Before pushing, run the checks for every touched workspace, plus lint and typecheck. Run Playwright when a change affects UI, routing, rendering or browser interaction. After pushing, verify the GitHub CI run and fix it if it fails.
 
@@ -359,7 +339,7 @@ Before pushing, run the checks for every touched workspace, plus lint and typech
 
 ## Production
 
-Production uses prebuilt GHCR images and `.env.prod` on the VPS.
+Production uses prebuilt GHCR images and `.env.prod` on the VPS. The production compose keeps the same service model as dev: PostgreSQL, Redis, API, IHM and bot. Differences are limited to image source, Traefik routing, resource limits and safer host bindings.
 
 Configuration update without rebuilding:
 
