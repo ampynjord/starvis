@@ -154,14 +154,14 @@ export default function FactionsPage() {
   });
 
   const { data: registryData } = useQuery({
-    queryKey: ['game-insights.factions', env],
-    queryFn: () => api.gameInsights.factions({ env, limit: 200 }),
+    queryKey: ['factions.registry', env],
+    queryFn: () => api.factions.registry({ env, limit: 200 }),
     staleTime: 5 * 60_000,
   });
 
   const { data: standingsData } = useQuery({
-    queryKey: ['game-insights.reputation-standings', env],
-    queryFn: () => api.gameInsights.reputationStandings({ env, limit: 200 }),
+    queryKey: ['factions.reputation-standings', env],
+    queryFn: () => api.factions.reputationStandings({ env, limit: 200 }),
     staleTime: 5 * 60_000,
   });
 

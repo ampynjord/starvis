@@ -46,6 +46,39 @@ function normalizeResourceRow(row: Row): Row {
 export class CraftingService {
   constructor(private getClient: (env: string) => PrismaClient) {}
 
+  private async getInsightPage(
+    table: 'game.blueprint_rewards' | 'game.loot_tables',
+    opts: { env?: string; search?: string; page?: number; limit?: number },
+    searchColumns: string[],
+    orderBy: string,
+  ): Promise<PaginatedResult> {
+    const { env = 'live', search, page = 1, limit = 50 } = opts;
+    const prisma = this.getClient(env);
+    const safeLimit = Math.min(Math.max(1, limit), 200);
+    const offset = (page - 1) * safeLimit;
+    const where = ['env = ?'];
+    const params: (string | number)[] = [env];
+
+    if (search) {
+      const q = `%${search.replace(/[%_]/g, '\\$&')}%`;
+      where.push(`(${searchColumns.map((column) => `${column} ILIKE ?`).join(' OR ')})`);
+      params.push(...searchColumns.map(() => q));
+    }
+
+    const whereClause = where.join(' AND ');
+    const [countRows, rows] = await Promise.all([
+      prisma.$queryRawUnsafe<Row[]>(toPostgres(`SELECT COUNT(*) as total FROM ${table} WHERE ${whereClause}`), ...params),
+      prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT * FROM ${table} WHERE ${whereClause} ORDER BY ${orderBy} LIMIT ? OFFSET ?`),
+        ...params,
+        safeLimit,
+        offset,
+      ),
+    ]);
+    const total = Number(countRows[0]?.total ?? 0);
+    return { data: convertBigIntToNumber(rows), total, page, limit: safeLimit, pages: Math.ceil(total / safeLimit) };
+  }
+
   async getCategories(env = 'live'): Promise<{ category: string; count: number }[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
@@ -170,6 +203,19 @@ export class CraftingService {
       limit: safeLimit,
       pages: Math.ceil(total / safeLimit),
     };
+  }
+
+  async getBlueprintRewards(opts: { env?: string; search?: string; page?: number; limit?: number }): Promise<PaginatedResult> {
+    return this.getInsightPage(
+      'game.blueprint_rewards',
+      opts,
+      ['pool_class_name', 'blueprint_class_name'],
+      'COALESCE(pool_class_name, blueprint_class_name) ASC, reward_index ASC',
+    );
+  }
+
+  async getLootTables(opts: { env?: string; search?: string; page?: number; limit?: number }): Promise<PaginatedResult> {
+    return this.getInsightPage('game.loot_tables', opts, ['name', 'class_name'], 'COALESCE(name, class_name) ASC');
   }
 
   async getResources(env = 'live'): Promise<Row[]> {

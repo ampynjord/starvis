@@ -3,7 +3,15 @@
  */
 import type { PrismaLike as PrismaClient } from '@starvis/db';
 import { cleanItemDisplayName } from '../normalizers/items.js';
-import { type FiltersResult, type PaginatedResult, paginate, type Row, stripInternal, toPostgres } from './shared.js';
+import {
+  convertBigIntToNumber,
+  type FiltersResult,
+  type PaginatedResult,
+  paginate,
+  type Row,
+  stripInternal,
+  toPostgres,
+} from './shared.js';
 
 const ITEM_JSON_SORT_MAP: Record<string, string> = {
   'game_data.weapon_damage': "(i.game_data#>>'{weapon_damage}')::numeric",
@@ -168,6 +176,39 @@ function orderConsumableEntries(entries: { value: string; count: number }[]) {
 export class ItemQueryService {
   constructor(private getClient: (env: string) => PrismaClient) {}
 
+  private async getInsightPage(
+    table: 'game.ammo' | 'game.inventory_containers',
+    opts: { env?: string; search?: string; page?: number; limit?: number },
+    searchColumns: string[],
+    orderBy: string,
+  ): Promise<PaginatedResult> {
+    const { env = 'live', search, page = 1, limit = 50 } = opts;
+    const prisma = this.getClient(env);
+    const safeLimit = Math.min(Math.max(1, limit), 200);
+    const offset = (page - 1) * safeLimit;
+    const where = ['env = ?'];
+    const params: (string | number)[] = [env];
+
+    if (search) {
+      const q = `%${search.replace(/[%_]/g, '\\$&')}%`;
+      where.push(`(${searchColumns.map((column) => `${column} ILIKE ?`).join(' OR ')})`);
+      params.push(...searchColumns.map(() => q));
+    }
+
+    const whereClause = where.join(' AND ');
+    const [countRows, rows] = await Promise.all([
+      prisma.$queryRawUnsafe<Row[]>(toPostgres(`SELECT COUNT(*) as total FROM ${table} WHERE ${whereClause}`), ...params),
+      prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT * FROM ${table} WHERE ${whereClause} ORDER BY ${orderBy} LIMIT ? OFFSET ?`),
+        ...params,
+        safeLimit,
+        offset,
+      ),
+    ]);
+    const total = Number(countRows[0]?.total ?? 0);
+    return { data: convertBigIntToNumber(rows), total, page, limit: safeLimit, pages: Math.ceil(total / safeLimit) };
+  }
+
   private normalizeItemRow(row: Row): Row {
     const name = String(row.name ?? '');
     return {
@@ -275,6 +316,19 @@ export class ItemQueryService {
       ...result,
       data: result.data.map((row) => this.normalizeItemRow(row)),
     };
+  }
+
+  async getAmmoStats(opts: { env?: string; search?: string; page?: number; limit?: number }): Promise<PaginatedResult> {
+    return this.getInsightPage('game.ammo', opts, ['name', 'class_name', 'ammo_category'], 'COALESCE(name, class_name) ASC');
+  }
+
+  async getInventoryContainers(opts: { env?: string; search?: string; page?: number; limit?: number }): Promise<PaginatedResult> {
+    return this.getInsightPage(
+      'game.inventory_containers',
+      opts,
+      ['name', 'class_name', 'inventory_type'],
+      'COALESCE(capacity_micro_scu, 0) DESC, COALESCE(name, class_name) ASC',
+    );
   }
 
   async getItemByUuid(uuid: string, env = 'live'): Promise<Row | null> {

@@ -53,6 +53,39 @@ export interface MissionListResult extends PaginatedResult {
 export class MissionService {
   constructor(private getClient: (env: string) => PrismaClient) {}
 
+  private async getInsightPage(
+    table: 'game.factions' | 'game.reputation_standings' | 'game.reputation_scopes',
+    opts: { env?: string; search?: string; page?: number; limit?: number },
+    searchColumns: string[],
+    orderBy: string,
+  ): Promise<PaginatedResult> {
+    const { env = 'live', search, page = 1, limit = 50 } = opts;
+    const prisma = this.getClient(env);
+    const safeLimit = Math.min(Math.max(1, limit), 200);
+    const offset = (page - 1) * safeLimit;
+    const where = ['env = ?'];
+    const params: (string | number)[] = [env];
+
+    if (search) {
+      const q = `%${search.replace(/[%_]/g, '\\$&')}%`;
+      where.push(`(${searchColumns.map((column) => `${column} ILIKE ?`).join(' OR ')})`);
+      params.push(...searchColumns.map(() => q));
+    }
+
+    const whereClause = where.join(' AND ');
+    const [countRows, rows] = await Promise.all([
+      prisma.$queryRawUnsafe<Row[]>(toPostgres(`SELECT COUNT(*) as total FROM ${table} WHERE ${whereClause}`), ...params),
+      prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT * FROM ${table} WHERE ${whereClause} ORDER BY ${orderBy} LIMIT ? OFFSET ?`),
+        ...params,
+        safeLimit,
+        offset,
+      ),
+    ]);
+    const total = Number(countRows[0]?.total ?? 0);
+    return { data: convertBigIntToNumber(rows), total, page, limit: safeLimit, pages: Math.ceil(total / safeLimit) };
+  }
+
   async getMissionTypes(env = 'live'): Promise<string[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
@@ -81,8 +114,9 @@ export class MissionService {
 
   async getFactionDetails(env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
-    const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT
+    const [missionRows, registryRows] = await Promise.all([
+      prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT
           faction as name,
           COUNT(*) as mission_count,
           COUNT(*) FILTER (WHERE is_legal = true) as legal_missions,
@@ -101,9 +135,57 @@ export class MissionService {
          AND faction IS NOT NULL AND faction != ''
        GROUP BY faction
        ORDER BY faction`),
-      env,
+        env,
+      ),
+      prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT uuid as game_faction_uuid, class_name as game_faction_class_name, name as game_faction_name,
+            description as game_faction_description, faction_type, default_reaction, able_to_arrest, no_legal_rights,
+            polices_criminality, polices_lawful_trespass, faction_reputation_uuid, allies, enemies, organization_tags
+         FROM game.factions
+         WHERE env = ?
+         ORDER BY COALESCE(name, class_name)`),
+        env,
+      ),
+    ]);
+
+    const registryByName = new Map<string, Row>();
+    for (const row of convertBigIntToNumber(registryRows)) {
+      for (const value of [row.game_faction_name, row.game_faction_class_name]) {
+        if (value) registryByName.set(String(value).toLowerCase(), row);
+      }
+    }
+
+    return convertBigIntToNumber(missionRows).map((row) => ({
+      ...row,
+      ...(registryByName.get(String(row.name).toLowerCase()) ?? {}),
+    }));
+  }
+
+  async getFactionRegistry(opts: { env?: string; search?: string; page?: number; limit?: number }): Promise<PaginatedResult> {
+    return this.getInsightPage(
+      'game.factions',
+      opts,
+      ['name', 'class_name', 'faction_type', 'default_reaction'],
+      'COALESCE(name, class_name) ASC',
     );
-    return convertBigIntToNumber(rows);
+  }
+
+  async getReputationStandings(opts: { env?: string; search?: string; page?: number; limit?: number }): Promise<PaginatedResult> {
+    return this.getInsightPage(
+      'game.reputation_standings',
+      opts,
+      ['name', 'display_name', 'class_name', 'description'],
+      'COALESCE(min_reputation, 0) ASC, COALESCE(display_name, name, class_name) ASC',
+    );
+  }
+
+  async getReputationScopes(opts: { env?: string; search?: string; page?: number; limit?: number }): Promise<PaginatedResult> {
+    return this.getInsightPage(
+      'game.reputation_scopes',
+      opts,
+      ['scope_name', 'display_name', 'class_name', 'description'],
+      'COALESCE(display_name, scope_name, class_name) ASC',
+    );
   }
 
   async getFactionDetail(faction: string, env = 'live'): Promise<Row | null> {

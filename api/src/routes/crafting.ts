@@ -50,6 +50,36 @@ export function mountCraftingRoutes(router: Router, deps: RouteDependencies): vo
     }),
   );
 
+  router.get(
+    '/api/v1/blueprints/rewards',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const t = Date.now();
+      const result = await gameDataService!.crafting.getBlueprintRewards({
+        env: getQueryString(req, 'env'),
+        search: getQueryString(req, 'search'),
+        page: getQueryNumber(req, 'page'),
+        limit: getQueryNumber(req, 'limit'),
+      });
+      sendPaginatedWithETag(req, res, result, t);
+    }),
+  );
+
+  router.get(
+    '/api/v1/blueprints/loot-tables',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const t = Date.now();
+      const result = await gameDataService!.crafting.getLootTables({
+        env: getQueryString(req, 'env'),
+        search: getQueryString(req, 'search'),
+        page: getQueryNumber(req, 'page'),
+        limit: getQueryNumber(req, 'limit'),
+      });
+      sendPaginatedWithETag(req, res, result, t);
+    }),
+  );
+
   /**
    * GET /api/v1/crafting/resources
    * Lists all distinct crafting resources with usage counts
