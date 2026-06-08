@@ -129,7 +129,7 @@ STARVIS combines local game data and public RSI data.
 
 | Source | Content | Update path |
 |---|---|---|
-| P4K / DataForge | Ships, components, FPS items, commodities, shops, missions, mining, crafting, locations, paints. | `extractor/` CLI. |
+| P4K / DataForge | Ships, components, FPS items, commodities, shops, missions, mining, crafting, locations, paints and extended game insights for loot, reputation, factions, navigation, environments, services, medical data, FPS details, ammo and inventory containers. The IHM surfaces normalized insight data on the existing factions, equipment and blueprint pages. | `extractor/` CLI. |
 | RSI Ship Matrix | Official marketing ship data. | Extractor network module and API startup sync. |
 | RSI website | Galactapedia, Comm-links, Starmap, CTM metadata. | Extractor network modules. |
 
@@ -171,6 +171,8 @@ Local developer machine
 Star Citizen Data.p4k
   -> extractor CLI
   -> PostgreSQL game schema
+  -> game.game_insights discovery table
+  -> normalized insight tables: game.factions, game.reputation_*, game.loot_*, game.blueprint_rewards, game.ammo, game.inventory_containers
 
 RSI website modules
   -> extractor CLI

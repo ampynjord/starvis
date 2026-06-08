@@ -2337,6 +2337,111 @@
             "nullable": true
           }
         }
+      },
+      "GameInsight": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "env": {
+            "type": "string",
+            "example": "live"
+          },
+          "category": {
+            "type": "string",
+            "example": "loot"
+          },
+          "source_type": {
+            "type": "string",
+            "example": "BlueprintPoolRecord"
+          },
+          "class_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "subtype": {
+            "type": "string",
+            "nullable": true
+          },
+          "related_class": {
+            "type": "string",
+            "nullable": true
+          },
+          "related_uuid": {
+            "type": "string",
+            "nullable": true
+          },
+          "location_hint": {
+            "type": "string",
+            "nullable": true
+          },
+          "faction": {
+            "type": "string",
+            "nullable": true
+          },
+          "reputation_key": {
+            "type": "string",
+            "nullable": true
+          },
+          "value_numeric": {
+            "type": "number",
+            "nullable": true
+          },
+          "value_text": {
+            "type": "string",
+            "nullable": true
+          },
+          "p4k_path": {
+            "type": "string",
+            "nullable": true
+          },
+          "raw_json": {
+            "type": "object",
+            "nullable": true
+          },
+          "extracted_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "GameInsightDatasetRow": {
+        "type": "object",
+        "description": "Normalized row from one of the game insight datasets. The exact fields depend on the selected dataset.",
+        "additionalProperties": true,
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "nullable": true
+          },
+          "env": {
+            "type": "string",
+            "example": "live"
+          },
+          "class_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "raw_json": {
+            "type": "object",
+            "nullable": true
+          },
+          "extracted_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
       }
     },
     "responses": {
@@ -2500,6 +2605,10 @@
     {
       "name": "Health",
       "description": "Liveness, readiness probes and Prometheus metrics"
+    },
+    {
+      "name": "Game Insights",
+      "description": "Extended P4K/DataForge discovery data for loot, reputation, navigation, services and related game systems."
     }
   ],
   "paths": {
@@ -11090,6 +11199,299 @@
                     },
                     "data": {
                       "$ref": "#/components/schemas/CommLinkImage"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found"
+          }
+        }
+      }
+    },
+    "/api/v1/game-insights/categories": {
+      "get": {
+        "tags": ["Game Insights"],
+        "summary": "List game insight categories",
+        "parameters": [
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Category counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/game-insights": {
+      "get": {
+        "tags": ["Game Insights"],
+        "summary": "Search extended game insights extracted from DataForge/P4K",
+        "parameters": [
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["loot", "reputation", "faction", "navigation", "environment", "service", "medical", "fps_detail", "shop_inventory"]
+            }
+          },
+          {
+            "name": "sourceType",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "faction",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "relatedClass",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated game insights",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "pages": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/GameInsight"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/game-insights/{dataset}": {
+      "get": {
+        "tags": ["Game Insights"],
+        "summary": "List a normalized game insight dataset",
+        "description": "Supported datasets: factions, reputation-standings, reputation-scopes, loot-tables, loot-table-entries, loot-archetypes, blueprint-rewards, ammo, inventory-containers.",
+        "parameters": [
+          {
+            "name": "dataset",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "factions",
+                "reputation-standings",
+                "reputation-scopes",
+                "loot-tables",
+                "loot-table-entries",
+                "loot-archetypes",
+                "blueprint-rewards",
+                "ammo",
+                "inventory-containers"
+              ]
+            }
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "default": 50,
+              "maximum": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Normalized game insight rows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Pagination"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/GameInsightDatasetRow"
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/game-insights/{category}/{uuid}": {
+      "get": {
+        "tags": ["Game Insights"],
+        "summary": "Get one game insight by category and UUID",
+        "parameters": [
+          {
+            "name": "category",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Game insight",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/GameInsight"
                     }
                   }
                 }

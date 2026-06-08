@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Banknote, ClipboardList, Filter, Loader2, Scale, Search, Skull, Users, X } from 'lucide-react';
+import { Banknote, ClipboardList, Filter, Loader2, Scale, Search, ShieldAlert, Skull, Star, Users, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
@@ -12,13 +12,17 @@ import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { useEnv } from '@/contexts/EnvContext';
 import { api } from '@/services/api';
-import type { FactionSummary } from '@/types/api';
+import type { FactionSummary, GameFactionInsight, ReputationStandingInsight } from '@/types/api';
 
 function formatUec(value: number | null) {
   return value == null ? 'N/A' : `${Math.round(value).toLocaleString('en-US')} aUEC`;
 }
 
-function FactionCard({ faction }: { faction: FactionSummary }) {
+function formatClassName(value: string | null | undefined) {
+  return value?.replace(/_/g, ' ') ?? 'Unknown';
+}
+
+function FactionCard({ faction, insight }: { faction: FactionSummary; insight?: GameFactionInsight }) {
   const illegalRatio = faction.mission_count > 0 ? faction.illegal_missions / faction.mission_count : 0;
   const badge = illegalRatio > 0.5 ? 'Hostile' : faction.illegal_missions > 0 ? 'Mixed' : 'Lawful';
   const color = badge === 'Hostile' ? 'red' : badge === 'Mixed' ? 'amber' : 'cyan';
@@ -28,7 +32,7 @@ function FactionCard({ faction }: { faction: FactionSummary }) {
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="sci-panel border border-slate-800/70 p-4 hover:border-cyan-900/60 transition-colors"
+      className="sci-panel min-w-0 max-w-full overflow-hidden border border-slate-800/70 p-4 transition-colors hover:border-cyan-900/60"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -36,23 +40,89 @@ function FactionCard({ faction }: { faction: FactionSummary }) {
           <p className="mt-1 font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">
             {faction.mission_count} missions - {faction.shareable_missions} shareable
           </p>
+          {insight?.faction_type && (
+            <p className="mt-1 font-mono-sc text-[10px] uppercase tracking-widest text-cyan-700">{formatClassName(insight.faction_type)}</p>
+          )}
         </div>
         <GlowBadge color={color as 'cyan' | 'amber' | 'red'}>{badge}</GlowBadge>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
+      <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
         <StatCard icon={Scale} label="Legal" value={faction.legal_missions} />
         <StatCard icon={Skull} label="Illegal" value={faction.illegal_missions} accent={faction.illegal_missions ? 'rose' : 'slate'} />
         <StatCard icon={Banknote} label="Avg" value={<span className="text-sm">{formatUec(faction.reward_average)}</span>} />
       </div>
 
       <div className="mt-4 space-y-2">
+        {insight && (
+          <Chips
+            label="DataForge"
+            values={[
+              insight.default_reaction ? `Reaction: ${formatClassName(insight.default_reaction)}` : '',
+              insight.able_to_arrest ? 'Can arrest' : '',
+              insight.polices_criminality ? 'Polices crime' : '',
+              insight.polices_lawful_trespass ? 'Trespass enforcement' : '',
+            ].filter(Boolean)}
+          />
+        )}
         {faction.mission_types.length > 0 && <Chips label="Types" values={faction.mission_types} />}
         {faction.categories.length > 0 && <Chips label="Categories" values={faction.categories} />}
         {faction.systems.length > 0 && <Chips label="Systems" values={faction.systems} />}
         {faction.mission_givers.length > 0 && <Chips label="Givers" values={faction.mission_givers} />}
       </div>
     </motion.article>
+  );
+}
+
+function FactionRegistry({ factions }: { factions: GameFactionInsight[] }) {
+  if (!factions.length) return null;
+  return (
+    <ScifiPanel title="DataForge Faction Registry" subtitle={`${factions.length} loaded`} className="overflow-hidden p-4">
+      <div className="grid min-w-0 gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {factions.slice(0, 12).map((faction) => (
+          <div key={faction.uuid} className="sci-panel min-w-0 overflow-hidden border border-slate-800/60 p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 overflow-hidden">
+                <p className="truncate font-orbitron text-sm font-bold text-slate-100">{faction.name ?? formatClassName(faction.class_name)}</p>
+                <p className="mt-0.5 truncate font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">{faction.class_name}</p>
+              </div>
+              {faction.faction_type && (
+                <GlowBadge color="slate" className="max-w-[96px] shrink-0 truncate">
+                  {formatClassName(faction.faction_type)}
+                </GlowBadge>
+              )}
+            </div>
+            <div className="mt-3 flex min-w-0 flex-wrap gap-x-3 gap-y-1 font-mono-sc text-[10px] uppercase tracking-widest">
+              <span className={faction.able_to_arrest ? 'text-amber-400' : 'text-slate-700'}>Arrest</span>
+              <span className={faction.polices_criminality ? 'text-cyan-400' : 'text-slate-700'}>Crime</span>
+              <span className={faction.polices_lawful_trespass ? 'text-rose-400' : 'text-slate-700'}>Trespass</span>
+              <span className={faction.no_legal_rights ? 'text-rose-400' : 'text-slate-700'}>No rights</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </ScifiPanel>
+  );
+}
+
+function ReputationPanel({ standings }: { standings: ReputationStandingInsight[] }) {
+  if (!standings.length) return null;
+  return (
+    <ScifiPanel title="Reputation Standings" subtitle={`${standings.length} known levels`} actions={<Star size={14} className="text-amber-500" />}>
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+        {standings.slice(0, 8).map((standing) => (
+          <div key={standing.uuid} className="rounded-sm border border-slate-800/70 bg-slate-950/40 p-3">
+            <p className="truncate font-orbitron text-xs font-bold text-slate-100">
+              {standing.display_name ?? standing.name ?? formatClassName(standing.class_name)}
+            </p>
+            <p className="mt-1 font-mono-sc text-[10px] uppercase tracking-widest text-amber-500">
+              Min rep {standing.min_reputation?.toLocaleString('en-US') ?? 'N/A'}
+            </p>
+            {standing.gated && <p className="mt-1 font-mono-sc text-[10px] uppercase tracking-widest text-rose-400">Gated</p>}
+          </div>
+        ))}
+      </div>
+    </ScifiPanel>
   );
 }
 
@@ -83,7 +153,29 @@ export default function FactionsPage() {
     staleTime: 5 * 60_000,
   });
 
+  const { data: registryData } = useQuery({
+    queryKey: ['game-insights.factions', env],
+    queryFn: () => api.gameInsights.factions({ env, limit: 200 }),
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: standingsData } = useQuery({
+    queryKey: ['game-insights.reputation-standings', env],
+    queryFn: () => api.gameInsights.reputationStandings({ env, limit: 200 }),
+    staleTime: 5 * 60_000,
+  });
+
   const factions = data ?? [];
+  const registry = registryData?.data ?? [];
+  const standings = standingsData?.data ?? [];
+  const registryByName = useMemo(() => {
+    const map = new Map<string, GameFactionInsight>();
+    for (const item of registry) {
+      if (item.name) map.set(item.name.toLowerCase(), item);
+      map.set(formatClassName(item.class_name).toLowerCase(), item);
+    }
+    return map;
+  }, [registry]);
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     return factions.filter((faction) => {
@@ -108,8 +200,10 @@ export default function FactionsPage() {
       legal: factions.reduce((sum, faction) => sum + faction.legal_missions, 0),
       illegal: factions.reduce((sum, faction) => sum + faction.illegal_missions, 0),
       blueprints: factions.reduce((sum, faction) => sum + faction.blueprint_reward_missions, 0),
+      dataForgeFactions: registry.length,
+      reputationLevels: standings.length,
     }),
-    [factions],
+    [factions, registry.length, standings.length],
   );
 
   if (error) return <ErrorState error={error as Error} />;
@@ -148,7 +242,12 @@ export default function FactionsPage() {
         <StatCard icon={ClipboardList} label="Missions" value={totals.missions} accent="cyan" />
         <StatCard icon={Scale} label="Legal" value={totals.legal} accent="emerald" />
         <StatCard icon={Skull} label="Illegal" value={totals.illegal} accent={totals.illegal ? 'rose' : 'slate'} />
+        <StatCard icon={ShieldAlert} label="DF Factions" value={totals.dataForgeFactions} accent="purple" />
+        <StatCard icon={Star} label="Rep Levels" value={totals.reputationLevels} accent="amber" />
       </StatGrid>
+
+      <FactionRegistry factions={registry} />
+      <ReputationPanel standings={standings} />
 
       <ScifiPanel
         title="Faction Index"
@@ -165,7 +264,7 @@ export default function FactionsPage() {
         ) : (
           <div className="grid gap-3 lg:grid-cols-2">
             {filtered.map((faction) => (
-              <FactionCard key={faction.name} faction={faction} />
+              <FactionCard key={faction.name} faction={faction} insight={registryByName.get(faction.name.toLowerCase())} />
             ))}
           </div>
         )}
