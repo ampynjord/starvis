@@ -400,6 +400,4 @@ Data collected at registration: email, username, password hash, role and avatar 
 
 No payment data, no advertising cookies, and no transfer to third parties for commercial purposes.
 
-GDPR contact: gwenvaelcaouissin@gmail.com
-
 Full policy: [starvis.ampynjord.bzh/legal](https://starvis.ampynjord.bzh/legal)
