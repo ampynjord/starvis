@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     template: '%s — STARVIS',
   },
   description:
-    'Starvis is the most complete Star Citizen database: ships, components, FPS gear, commodities, missions, manufacturers, galactapedia and more. Data extracted directly from the game files.',
+    'Starvis is an unofficial Star Citizen data platform not affiliated with Cloud Imperium Games: ships, components, FPS gear, commodities, missions, manufacturers, galactapedia and more.',
   keywords: ['star citizen', 'star citizen ships', 'star citizen database', 'sc ships', 'star citizen components', 'star citizen wiki', 'starvis', 'star citizen data', 'ship stats', 'galactapedia'],
   authors: [{ name: 'ampynjord' }],
   openGraph: {
@@ -43,13 +43,13 @@ export const metadata: Metadata = {
     url: PUBLIC_SITE_URL,
     siteName: 'STARVIS',
     title: 'STARVIS — Star Citizen Database',
-    description: 'Ships, components, FPS gear, commodities and more — extracted from game files.',
+    description: 'Unofficial Star Citizen database. Not affiliated with Cloud Imperium Games.',
     images: [{ url: '/brand/starvis.png', width: 1254, height: 1254, alt: 'STARVIS logo' }],
   },
   twitter: {
     card: 'summary',
     title: 'STARVIS — Star Citizen Database',
-    description: 'Ships, components, FPS gear, commodities and more — extracted from game files.',
+    description: 'Unofficial Star Citizen database. Not affiliated with Cloud Imperium Games.',
     images: ['/brand/starvis.png'],
   },
   icons: {

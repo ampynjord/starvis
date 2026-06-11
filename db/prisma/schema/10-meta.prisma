@@ -214,6 +214,8 @@ model CorporationFleetItem {
   shipUuid      String?       @map("ship_uuid") @db.VarChar(64)
   quantity      Int           @default(1)
   notes         String?       @db.Text
+  gridX         Float?        @map("grid_x")
+  gridZ         Float?        @map("grid_z")
   addedById     Int?          @map("added_by_id")
   addedAt       DateTime      @default(now()) @map("added_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")

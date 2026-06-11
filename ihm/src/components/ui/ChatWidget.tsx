@@ -233,16 +233,27 @@ export function ChatWidget() {
             <Bot size={28} style={{ color: '#00d4ff' }} />
             <div>
               <p className="font-orbitron text-xs tracking-widest text-cyan-400 uppercase mb-1">STARVIS</p>
-              <p className="text-sm text-slate-400">Sign in to access the Star Citizen AI assistant.</p>
+              <p className="text-sm text-slate-400">
+                Sign in or create a free account to access the Starvis AI assistant and other connected features.
+              </p>
             </div>
-            <Link
-              href="/login"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2 px-4 py-2 border border-cyan-700/50 hover:border-cyan-500/70 bg-cyan-900/20 hover:bg-cyan-900/40 text-cyan-400 hover:text-cyan-300 font-mono-sc text-xs rounded transition-colors"
-            >
-              <LogIn size={13} />
-              SIGN IN
-            </Link>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Link
+                href="/login"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2 px-4 py-2 border border-cyan-700/50 hover:border-cyan-500/70 bg-cyan-900/20 hover:bg-cyan-900/40 text-cyan-400 hover:text-cyan-300 font-mono-sc text-xs rounded transition-colors"
+              >
+                <LogIn size={13} />
+                SIGN IN
+              </Link>
+              <Link
+                href="/register"
+                onClick={() => setOpen(false)}
+                className="flex items-center gap-2 px-4 py-2 border border-slate-700 hover:border-cyan-700/60 text-slate-400 hover:text-cyan-300 font-mono-sc text-xs rounded transition-colors"
+              >
+                CREATE ACCOUNT
+              </Link>
+            </div>
           </motion.div>
         )}
 

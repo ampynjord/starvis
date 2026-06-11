@@ -201,6 +201,27 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
     }
   });
 
+  router.patch('/corp/fleet/:id/position', requireJwt, async (req, res) => {
+    const { sub } = req.jwtPayload;
+    const id = Number(req.params.id);
+    const gridX = Number(req.body?.gridX);
+    const gridZ = Number(req.body?.gridZ);
+    if (!Number.isInteger(id) || id <= 0) return void res.status(400).json({ success: false, error: 'Invalid id' });
+    if (!Number.isFinite(gridX) || !Number.isFinite(gridZ)) {
+      return void res.status(400).json({ success: false, error: 'gridX and gridZ must be numbers' });
+    }
+    try {
+      const membership = await svc.getMyActiveMembership(sub);
+      const item = await svc.updateOwnFleetItemPosition(id, sub, { gridX, gridZ }, membership?.corporationId ?? null, false);
+      res.json({ success: true, data: item });
+    } catch (e: any) {
+      if (e.message === 'NOT_FOUND') return void res.status(404).json({ success: false, error: 'Fleet item not found' });
+      if (e.message === 'FORBIDDEN')
+        return void res.status(403).json({ success: false, error: 'You can only move fleet positions in your scope' });
+      res.status(500).json({ success: false, error: 'Failed to update fleet position' });
+    }
+  });
+
   // ── Corp bank (equipment, components, items, commodities) ────────────────────
 
   router.get('/corp/bank', requireJwt, async (req, res) => {

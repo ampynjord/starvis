@@ -10,6 +10,7 @@ import {
   Home,
   Lock,
   Package,
+  Radar,
   Scale,
   Shield,
   Ship,
@@ -146,6 +147,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             items={[
               { to: '/corp',       icon: Building2, label: 'Corporation HQ', exact: true },
               { to: '/corp/fleet', icon: Ship,    label: 'Fleet Manager' },
+              { to: '/corp/tactics', icon: Radar, label: 'Tactics' },
               { to: '/corp/bank',  icon: Package, label: 'Corp Bank' },
             ]}
             onNavigate={onClose}
@@ -200,13 +202,22 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             )}
           </Link>
         ) : (
-          <Link
-            href="/login"
-            className="flex items-center gap-2 text-xs text-slate-600 hover:text-slate-400 transition-colors"
-          >
-            <User size={12} />
-            <span className="font-mono-sc">Sign in</span>
-          </Link>
+          <div className="space-y-2">
+            <Link
+              href="/login"
+              className="flex items-center gap-2 text-xs text-slate-600 hover:text-slate-400 transition-colors"
+            >
+              <User size={12} />
+              <span className="font-mono-sc">Sign in</span>
+            </Link>
+            <p className="text-[10px] leading-snug text-slate-700">
+              Create a free account to unlock connected features: profile, corporation tools, reports, API access
+              and AI assistant.
+            </p>
+            <Link href="/register" className="inline-flex text-[10px] font-mono-sc text-cyan-600 hover:text-cyan-400">
+              Create account
+            </Link>
+          </div>
         )}
 
         {/* Secondary links */}
@@ -233,7 +244,8 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         </div>
 
         <p className="text-[9px] text-slate-800 leading-tight">
-          Star Citizen® © Cloud Imperium Games.
+          Unofficial fan project. Not affiliated with Cloud Imperium Games. Star Citizen and related content are
+          property of Cloud Imperium Games.
         </p>
       </div>
     </aside>

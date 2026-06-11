@@ -23,12 +23,15 @@ export interface FleetShip {
   thumbnailUrl?: string | null;
   ctmUrl: string | null;
   declaredBy?: string | null;
+  gridX?: number | null;
+  gridZ?: number | null;
 }
 
 interface Props {
   ships: FleetShip[];
   selectedId: number | null;
   onSelect: (id: number) => void;
+  onPositionChange?: (id: number, position: { gridX: number; gridZ: number }) => void;
 }
 
 // ── Materials ──────────────────────────────────────────────────────────────────
@@ -41,16 +44,23 @@ const MIN_SHIP_GAP   = 8;
 const SHIP_GAP_RATIO = 0.18;
 const FLEET_MODEL_FRONT_ROTATION_Y = Math.PI;
 
-export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
+export function FleetHoloViewer({ ships, selectedId, onSelect, onPositionChange }: Props) {
   const containerRef  = useRef<HTMLDivElement>(null);
   const rendererRef   = useRef<THREE.WebGLRenderer | null>(null);
   const frameRef      = useRef<number>(0);
   const clockRef      = useRef(new THREE.Clock());
   const onSelectRef   = useRef(onSelect);
+  const selectedIdRef = useRef(selectedId);
+  const onPositionChangeRef = useRef(onPositionChange);
   const [loadedCount, setLoadedCount] = useState(0);
+  const shipsKey = ships
+    .map((ship) => [ship.id, ship.shipUuid, ship.ctmUrl ?? '', ship.gridX ?? '', ship.gridZ ?? ''].join(':'))
+    .join('|');
 
   // Keep onSelect ref current without rebuilding the scene
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
+  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
+  useEffect(() => { onPositionChangeRef.current = onPositionChange; }, [onPositionChange]);
 
   useEffect(() => {
     if (!containerRef.current || ships.length === 0) return;
@@ -165,17 +175,18 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
       return span;
     };
 
-    const repositionShips = () => {
+    const placeShipsOnce = () => {
       const totalSpan = getTotalSpan();
       const gap = getGap();
       let x = -totalSpan / 2;
       entries.forEach((e) => {
-        e.root.position.x = x + e.halfWidth;
-        e.root.position.z = 0;
+        e.root.position.x = Number.isFinite(e.ship.gridX ?? NaN) ? Number(e.ship.gridX) : x + e.halfWidth;
+        e.root.position.z = Number.isFinite(e.ship.gridZ ?? NaN) ? Number(e.ship.gridZ) : 0;
         x += e.halfWidth * 2 + gap;
       });
-      // Move rings to ship positions
-      entries.forEach((e) => { if (e.ring) e.ring.position.x = 0; });
+    };
+
+    const refreshLayout = () => {
       updateGrid();
       fitCamera();
     };
@@ -207,13 +218,16 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
     const CARD_H = 14;
     const CARD_W = CARD_H * 1.78;
 
+    placeShipsOnce();
+    refreshLayout();
+
     const markLoaded = (entry: ShipEntry, radius: number, halfWidth: number) => {
       entry.radius = radius;
       entry.halfWidth = halfWidth;
       entry.loaded = true;
       loadedSoFar++;
       setLoadedCount(loadedSoFar);
-      repositionShips();
+      refreshLayout();
     };
 
     const addFallbackCard = (entry: ShipEntry, texture: THREE.Texture | null) => {
@@ -296,7 +310,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
               entry.loaded = true;
               loadedSoFar++;
               setLoadedCount(loadedSoFar);
-              repositionShips();
+              refreshLayout();
             },
             undefined,
             () => {
@@ -308,7 +322,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
               entry.loaded = true;
               loadedSoFar++;
               setLoadedCount(loadedSoFar);
-              repositionShips();
+              refreshLayout();
             },
           );
         } else {
@@ -320,7 +334,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
           entry.loaded = true;
           loadedSoFar++;
           setLoadedCount(loadedSoFar);
-          repositionShips();
+          refreshLayout();
         }
         return;
       }
@@ -380,7 +394,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
           entry.loaded = true;
           loadedSoFar++;
           setLoadedCount(loadedSoFar);
-          repositionShips();
+          refreshLayout();
         },
         undefined,
         () => {
@@ -458,6 +472,11 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
       controls.enabled = true;
       if (!isDragging && dragEntry) {
         onSelectRef.current(dragEntry.ship.id);
+      } else if (isDragging && dragEntry) {
+        onPositionChangeRef.current?.(dragEntry.ship.id, {
+          gridX: dragEntry.root.position.x,
+          gridZ: dragEntry.root.position.z,
+        });
       }
       dragEntry = null;
     };
@@ -514,11 +533,6 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
       renderer.render(scene, camera);
     };
 
-    // We need a ref to track selectedId reactively in the loop
-    const selectedIdRef = { current: selectedId };
-    // Patch: we'll update this ref when the outer selectedId changes via a shared object
-    (renderer.domElement as any).__selectedIdRef = selectedIdRef;
-
     animate();
 
     // ── Resize ─────────────────────────────────────────────────────────────────
@@ -548,16 +562,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect }: Props) {
       rendererRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ships]);
-
-  // ── Sync selectedId into running animation loop ───────────────────────────
-  useEffect(() => {
-    const canvas = rendererRef.current?.domElement;
-    if (canvas) {
-      const ref = (canvas as any).__selectedIdRef;
-      if (ref) ref.current = selectedId;
-    }
-  }, [selectedId]);
+  }, [shipsKey]);
 
   return (
     <div

@@ -92,6 +92,8 @@ const FLEET_SELECT = {
   itemClassName: true,
   quantity: true,
   notes: true,
+  gridX: true,
+  gridZ: true,
   addedById: true,
   addedAt: true,
   updatedAt: true,
@@ -482,6 +484,28 @@ export class CorporationService {
     if (!item) throw new Error('NOT_FOUND');
     if (!isAdmin && item.addedById !== userId) throw new Error('FORBIDDEN');
     await this.db.corporationFleetItem.delete({ where: { id: itemId } });
+  }
+
+  async updateOwnFleetItemPosition(
+    itemId: number,
+    userId: number,
+    position: { gridX: number; gridZ: number },
+    allowedCorporationId: number | null = null,
+    isAdmin = false,
+  ): Promise<FleetItemData> {
+    const item = await this.db.corporationFleetItem.findUnique({ where: { id: itemId } });
+    if (!item) throw new Error('NOT_FOUND');
+    if (!isAdmin && item.addedById !== userId && (allowedCorporationId == null || item.corporationId !== allowedCorporationId)) {
+      throw new Error('FORBIDDEN');
+    }
+    return this.db.corporationFleetItem.update({
+      where: { id: itemId },
+      data: {
+        gridX: position.gridX,
+        gridZ: position.gridZ,
+      },
+      select: { ...FLEET_SELECT, shipUuid: true } as typeof FLEET_SELECT,
+    });
   }
 
   async declareBankItem(

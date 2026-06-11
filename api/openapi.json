@@ -1990,6 +1990,14 @@
             "type": "string",
             "nullable": true
           },
+          "gridX": {
+            "type": "number",
+            "nullable": true
+          },
+          "gridZ": {
+            "type": "number",
+            "nullable": true
+          },
           "addedById": {
             "type": "integer",
             "nullable": true
@@ -8894,6 +8902,67 @@
         },
         "responses": {
           "201": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CorporationFleetItem"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/corp/fleet/{id}/position": {
+      "patch": {
+        "tags": ["Corporations"],
+        "summary": "Update one of my fleet ship grid positions",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["gridX", "gridZ"],
+                "properties": {
+                  "gridX": {
+                    "type": "number"
+                  },
+                  "gridZ": {
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
             "description": "OK",
             "content": {
               "application/json": {

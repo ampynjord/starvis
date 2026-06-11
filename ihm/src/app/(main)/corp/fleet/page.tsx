@@ -36,6 +36,8 @@ interface FleetItem {
   shipUuid: string | null;
   itemClassName: string;
   notes: string | null;
+  gridX: number | null;
+  gridZ: number | null;
   addedAt: string;
   addedBy: { id: number; username: string } | null;
 }
@@ -275,6 +277,25 @@ export default function FleetManagerPage() {
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
   const [memberDropdownOpen, setMemberDropdownOpen] = useState(false);
   const memberDropdownRef = useRef<HTMLDivElement | null>(null);
+  const shipCacheRef = useRef<Map<string, ShipListItem>>(new Map());
+
+  const hydrateShips = useCallback(async (uuids: string[]) => {
+    const missing = uuids.filter((uuid) => !shipCacheRef.current.has(uuid));
+    if (missing.length === 0) {
+      setShipData(new Map(shipCacheRef.current));
+      return;
+    }
+
+    await Promise.allSettled(
+      missing.map(async (uuid) => {
+        const ship = await api.ships.get(uuid);
+        if (ship) {
+          shipCacheRef.current.set(uuid, ship as unknown as ShipListItem);
+          setShipData(new Map(shipCacheRef.current));
+        }
+      }),
+    );
+  }, []);
 
   const loadFleet = useCallback(async () => {
     setLoading(true);
@@ -288,6 +309,10 @@ export default function FleetManagerPage() {
       setCorp(fleetData.corporation ?? null);
       const items: FleetItem[] = fleetData.data ?? [];
       setFleetItems(items);
+      const uuids = [...new Set(items.map((i: FleetItem) => getShipUuid(i)).filter(Boolean))] as string[];
+      setShipData(new Map([...shipCacheRef.current].filter(([uuid]) => uuids.includes(uuid))));
+      setLoading(false);
+      void hydrateShips(uuids);
 
       if (membersRes.ok) {
         const membersData = await membersRes.json();
@@ -298,23 +323,10 @@ export default function FleetManagerPage() {
         }));
         setMembers(memberList);
       }
-
-      // Enrich with ship data
-      const uuids = [...new Set(items.map((i: FleetItem) => getShipUuid(i)).filter(Boolean))] as string[];
-      const shipMap = new Map<string, ShipListItem>();
-      await Promise.all(
-        uuids.map(async (uuid) => {
-          try {
-            const r = await api.ships.get(uuid);
-            if (r) shipMap.set(uuid, r as unknown as ShipListItem);
-          } catch {}
-        })
-      );
-      setShipData(shipMap);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [hydrateShips]);
 
   useEffect(() => { if (user) loadFleet(); }, [user, loadFleet]);
 
@@ -365,6 +377,15 @@ export default function FleetManagerPage() {
     }
   };
 
+  const handlePositionChange = useCallback((itemId: number, position: { gridX: number; gridZ: number }) => {
+    setFleetItems((prev) => prev.map((item) => (item.id === itemId ? { ...item, ...position } : item)));
+    void fetch(`/api/corp/fleet/${itemId}/position`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(position),
+    }).catch(() => {});
+  }, []);
+
   const handleRemove = async (itemId: number) => {
     try {
       await fetch(`/api/corp/fleet/${itemId}`, { method: 'DELETE' });
@@ -384,22 +405,21 @@ export default function FleetManagerPage() {
 
   // Memoize fleetShips — prevents scene rebuild on selection change
   const fleetShips: FleetShip[] = useMemo(() => visibleItems
-    .filter((i) => {
-      const uuid = getShipUuid(i);
-      return uuid && shipData.has(uuid);
-    })
+    .filter((i) => getShipUuid(i))
     .map((i) => {
       const uuid = getShipUuid(i)!;
-      const s = shipData.get(uuid)!;
+      const s = shipData.get(uuid);
       return {
-        id: i.id, shipUuid: uuid, name: s.name, className: s.class_name,
-        manufacturerCode: s.manufacturer_code, role: s.role, career: s.career,
-        crewSize: s.crew_size, scmSpeed: s.scm_speed,
-        sizeX: (s as any).size_x ?? null, sizeY: (s as any).size_y ?? null, sizeZ: (s as any).size_z ?? null,
-        isConceptOnly: (s as any).is_concept_only ?? false,
-        thumbnailUrl: (s as any).thumbnail_large ?? (s as any).thumbnail ?? null,
-        ctmUrl: (s as any).ctm_url ? `/api/v1/ships/${uuid}/model/file` : null,
+        id: i.id, shipUuid: uuid, name: s?.name ?? i.itemClassName, className: s?.class_name ?? i.itemClassName,
+        manufacturerCode: s?.manufacturer_code ?? null, role: s?.role ?? null, career: s?.career ?? null,
+        crewSize: s?.crew_size ?? null, scmSpeed: s?.scm_speed ?? null,
+        sizeX: (s as any)?.size_x ?? null, sizeY: (s as any)?.size_y ?? null, sizeZ: (s as any)?.size_z ?? null,
+        isConceptOnly: (s as any)?.is_concept_only ?? false,
+        thumbnailUrl: (s as any)?.thumbnail_large ?? (s as any)?.thumbnail ?? null,
+        ctmUrl: (s as any)?.ctm_url ? `/api/v1/ships/${uuid}/model/file` : null,
         declaredBy: i.addedBy?.username ?? null,
+        gridX: i.gridX,
+        gridZ: i.gridZ,
       } satisfies FleetShip;
     }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -558,6 +578,7 @@ export default function FleetManagerPage() {
                 ships={fleetShips}
                 selectedId={selectedItemId}
                 onSelect={setSelectedItemId}
+                onPositionChange={handlePositionChange}
               />
             )}
 
