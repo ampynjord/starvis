@@ -27,11 +27,24 @@ export interface FleetShip {
   gridZ?: number | null;
 }
 
+export interface TacticalMarker {
+  id: string;
+  type: 'objective' | 'poi' | 'obstacle' | 'vector';
+  label: string;
+  gridX: number;
+  gridZ: number;
+  rotation?: number;
+}
+
 interface Props {
   ships: FleetShip[];
   selectedId: number | null;
   onSelect: (id: number) => void;
   onPositionChange?: (id: number, position: { gridX: number; gridZ: number }) => void;
+  tacticalMarkers?: TacticalMarker[];
+  selectedMarkerId?: string | null;
+  onMarkerSelect?: (id: string) => void;
+  onMarkerPositionChange?: (id: string, position: { gridX: number; gridZ: number }) => void;
 }
 
 // ── Materials ──────────────────────────────────────────────────────────────────
@@ -44,26 +57,41 @@ const MIN_SHIP_GAP   = 8;
 const SHIP_GAP_RATIO = 0.18;
 const FLEET_MODEL_FRONT_ROTATION_Y = Math.PI;
 
-export function FleetHoloViewer({ ships, selectedId, onSelect, onPositionChange }: Props) {
+export function FleetHoloViewer({
+  ships,
+  selectedId,
+  onSelect,
+  onPositionChange,
+  tacticalMarkers = [],
+  selectedMarkerId = null,
+  onMarkerSelect,
+  onMarkerPositionChange,
+}: Props) {
   const containerRef  = useRef<HTMLDivElement>(null);
   const rendererRef   = useRef<THREE.WebGLRenderer | null>(null);
   const frameRef      = useRef<number>(0);
   const clockRef      = useRef(new THREE.Clock());
   const onSelectRef   = useRef(onSelect);
   const selectedIdRef = useRef(selectedId);
+  const selectedMarkerIdRef = useRef(selectedMarkerId);
   const onPositionChangeRef = useRef(onPositionChange);
+  const onMarkerSelectRef = useRef(onMarkerSelect);
+  const onMarkerPositionChangeRef = useRef(onMarkerPositionChange);
   const [loadedCount, setLoadedCount] = useState(0);
   const shipsKey = ships
     .map((ship) => [ship.id, ship.shipUuid, ship.ctmUrl ?? '', ship.gridX ?? '', ship.gridZ ?? ''].join(':'))
-    .join('|');
+    .join('|') + `::${tacticalMarkers.map((marker) => [marker.id, marker.type, marker.gridX, marker.gridZ, marker.rotation ?? 0].join(':')).join('|')}`;
 
   // Keep onSelect ref current without rebuilding the scene
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
   useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
+  useEffect(() => { selectedMarkerIdRef.current = selectedMarkerId; }, [selectedMarkerId]);
   useEffect(() => { onPositionChangeRef.current = onPositionChange; }, [onPositionChange]);
+  useEffect(() => { onMarkerSelectRef.current = onMarkerSelect; }, [onMarkerSelect]);
+  useEffect(() => { onMarkerPositionChangeRef.current = onMarkerPositionChange; }, [onMarkerPositionChange]);
 
   useEffect(() => {
-    if (!containerRef.current || ships.length === 0) return;
+    if (!containerRef.current || (ships.length === 0 && tacticalMarkers.length === 0)) return;
     const container = containerRef.current;
     const W = container.clientWidth;
     const H = container.clientHeight;
@@ -113,11 +141,20 @@ export function FleetHoloViewer({ ships, selectedId, onSelect, onPositionChange 
       halfWidth: number;
       loaded: boolean;
     };
-    const entries: ShipEntry[] = ships.map((ship) => ({
-      ship, root: new THREE.Group(), inner: null,
-      meshes: [], outlineMeshes: [], ring: null,
-      radius: 10, halfWidth: 10, loaded: false,
-    }));
+    const estimateShipFootprint = (ship: FleetShip) => {
+      const width = Math.max(Number(ship.sizeX ?? 0), Number(ship.sizeZ ?? 0), Number(ship.sizeY ?? 0), 18);
+      const radius = Math.max(width / 2, 10);
+      return { radius, halfWidth: radius };
+    };
+
+    const entries: ShipEntry[] = ships.map((ship) => {
+      const footprint = estimateShipFootprint(ship);
+      return {
+        ship, root: new THREE.Group(), inner: null,
+        meshes: [], outlineMeshes: [], ring: null,
+        radius: footprint.radius, halfWidth: footprint.halfWidth, loaded: false,
+      };
+    });
 
     entries.forEach((e) => {
       e.root.userData.fleetItemId = e.ship.id;
@@ -139,16 +176,106 @@ export function FleetHoloViewer({ ships, selectedId, onSelect, onPositionChange 
         opacity: 0,
       });
 
+    type MarkerEntry = {
+      marker: TacticalMarker;
+      root: THREE.Group;
+      meshes: THREE.Object3D[];
+      pulse: THREE.Mesh | null;
+    };
+
+    const makeLabelSprite = (text: string) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'rgba(2, 12, 18, 0.72)';
+        ctx.strokeStyle = 'rgba(34, 211, 238, 0.78)';
+        ctx.lineWidth = 3;
+        ctx.fillRect(8, 24, 496, 72);
+        ctx.strokeRect(8, 24, 496, 72);
+        ctx.font = '700 34px Arial';
+        ctx.fillStyle = '#a5f3fc';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text.slice(0, 24).toUpperCase(), 256, 61);
+      }
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.colorSpace = THREE.SRGBColorSpace;
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0.92 });
+      const sprite = new THREE.Sprite(material);
+      sprite.scale.set(34, 8.5, 1);
+      sprite.position.y = 12;
+      return sprite;
+    };
+
+    const makeMarkerEntry = (marker: TacticalMarker): MarkerEntry => {
+      const root = new THREE.Group();
+      root.position.set(marker.gridX, 0, marker.gridZ);
+      root.rotation.y = marker.rotation ?? 0;
+      root.userData.tacticalMarkerId = marker.id;
+
+      const colorByType = {
+        objective: 0xfacc15,
+        poi: 0x22d3ee,
+        obstacle: 0xef4444,
+        vector: 0x34d399,
+      } satisfies Record<TacticalMarker['type'], number>;
+      const color = colorByType[marker.type];
+      const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.72 });
+      const lineMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.88 });
+      const meshes: THREE.Object3D[] = [];
+
+      let body: THREE.Mesh;
+      if (marker.type === 'obstacle') {
+        body = new THREE.Mesh(new THREE.BoxGeometry(10, 5, 10), mat);
+        body.position.y = 2.5;
+      } else if (marker.type === 'vector') {
+        body = new THREE.Mesh(new THREE.ConeGeometry(4, 12, 4), mat);
+        body.rotation.z = -Math.PI / 2;
+        body.position.set(6, 3, 0);
+        const shaft = new THREE.Mesh(new THREE.BoxGeometry(14, 1.2, 1.2), mat);
+        shaft.position.set(-3, 3, 0);
+        shaft.userData.tacticalMarkerId = marker.id;
+        root.add(shaft);
+        meshes.push(shaft);
+      } else {
+        body = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 10, 6), mat);
+        body.position.y = 5;
+      }
+      body.userData.tacticalMarkerId = marker.id;
+      root.add(body);
+      meshes.push(body);
+
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(marker.type === 'obstacle' ? 8 : 6, 0.12, 8, 48), mat.clone());
+      ring.rotation.x = -Math.PI / 2;
+      ring.position.y = 0.2;
+      ring.userData.tacticalMarkerId = marker.id;
+      root.add(ring);
+      meshes.push(ring);
+
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(12, 0.1, 12)), lineMat);
+      edges.position.y = 0.1;
+      edges.userData.tacticalMarkerId = marker.id;
+      root.add(edges);
+
+      root.add(makeLabelSprite(marker.label));
+      scene.add(root);
+      return { marker, root, meshes, pulse: ring };
+    };
+
+    const markerEntries = tacticalMarkers.map(makeMarkerEntry);
+
     // ── Grid (dynamic) ─────────────────────────────────────────────────────────
     let gridHelper: THREE.GridHelper | null = null;
     const updateGrid = () => {
       if (gridHelper) scene.remove(gridHelper);
       const loaded = entries.filter((e) => e.loaded && e.inner);
-      if (loaded.length === 0) return;
-      const maxR = Math.max(...entries.map((e) => e.radius));
-      const totalSpan = getTotalSpan();
-      const size = Math.max(totalSpan * 1.6, maxR * 8);
-      const divs = Math.min(48, Math.max(10, Math.round(size / (maxR / 2))));
+      if (entries.length === 0 && markerEntries.length === 0) return;
+      const metrics = getSceneMetrics();
+      const size = Math.max(metrics.span * 1.6, metrics.radius * 8, 80);
+      const divs = Math.min(48, Math.max(10, Math.round(size / Math.max(metrics.radius / 2, 8))));
 
       // Find floor Y from all loaded ships
       let minY = 0;
@@ -158,7 +285,7 @@ export function FleetHoloViewer({ ships, selectedId, onSelect, onPositionChange 
       });
 
       gridHelper = new THREE.GridHelper(size, divs, 0x1a5472, 0x0a2233);
-      gridHelper.position.y = minY - maxR * 0.04;
+      gridHelper.position.y = minY - metrics.radius * 0.04;
       scene.add(gridHelper);
     };
 
@@ -173,6 +300,36 @@ export function FleetHoloViewer({ ships, selectedId, onSelect, onPositionChange 
         if (i < entries.length - 1) span += gap;
       });
       return span;
+    };
+
+    const getSceneMetrics = () => {
+      const xs: number[] = [];
+      const zs: number[] = [];
+      entries.forEach((entry) => {
+        const half = Math.max(entry.halfWidth, entry.radius, 10);
+        xs.push(entry.root.position.x - half, entry.root.position.x + half);
+        zs.push(entry.root.position.z - half, entry.root.position.z + half);
+      });
+      markerEntries.forEach((entry) => {
+        xs.push(entry.root.position.x - 14, entry.root.position.x + 14);
+        zs.push(entry.root.position.z - 14, entry.root.position.z + 14);
+      });
+      if (xs.length === 0 || zs.length === 0) {
+        return { radius: 20, span: 80, centerX: 0, centerZ: 0 };
+      }
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      const minZ = Math.min(...zs);
+      const maxZ = Math.max(...zs);
+      const width = Math.max(maxX - minX, getTotalSpan(), 40);
+      const depth = Math.max(maxZ - minZ, 40);
+      const radius = Math.max(...entries.map((entry) => entry.radius), 20);
+      return {
+        radius,
+        span: Math.max(width, depth),
+        centerX: (minX + maxX) / 2,
+        centerZ: (minZ + maxZ) / 2,
+      };
     };
 
     const placeShipsOnce = () => {
@@ -192,17 +349,16 @@ export function FleetHoloViewer({ ships, selectedId, onSelect, onPositionChange 
     };
 
     const fitCamera = () => {
-      const maxR = Math.max(...entries.map((e) => e.radius));
-      const totalSpan = getTotalSpan();
-      const dist = Math.max(totalSpan, maxR * 3) * 1.2;
-      const height = maxR * 0.5;
+      const metrics = getSceneMetrics();
+      const dist = Math.max(metrics.span, metrics.radius * 3, 80) * 1.2;
+      const height = metrics.radius * 0.5;
       camera.near = dist * 0.001;
       camera.far  = dist * 200;
       camera.updateProjectionMatrix();
       // Position camera like the single HoloViewer, but pulled back for fleet width
-      camera.position.set(0, height, dist);
-      controls.target.set(0, 0, 0);
-      controls.minDistance = maxR * 0.3;
+      camera.position.set(metrics.centerX, height, metrics.centerZ + dist);
+      controls.target.set(metrics.centerX, 0, metrics.centerZ);
+      controls.minDistance = metrics.radius * 0.3;
       controls.maxDistance = dist * 10;
       controls.update();
     };
@@ -408,24 +564,33 @@ export function FleetHoloViewer({ ships, selectedId, onSelect, onPositionChange 
     const mouse     = new THREE.Vector2();
     let mouseStart  = { x: 0, y: 0 };
     let isDragging  = false;
-    let dragEntry: ShipEntry | null = null;
+    type DragTarget =
+      | { kind: 'ship'; entry: ShipEntry; root: THREE.Group }
+      | { kind: 'marker'; entry: MarkerEntry; root: THREE.Group };
+    let dragTarget: DragTarget | null = null;
     const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     const dragPoint = new THREE.Vector3();
     const dragOffset = new THREE.Vector3();
 
-    const getHitEntry = (clientX: number, clientY: number): ShipEntry | null => {
+    const getHitTarget = (clientX: number, clientY: number): DragTarget | null => {
       const rect = renderer.domElement.getBoundingClientRect();
       mouse.x = ((clientX - rect.left) / rect.width)  * 2 - 1;
       mouse.y = -((clientY - rect.top)  / rect.height) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
       const meshes: THREE.Object3D[] = [];
       entries.forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
+      markerEntries.forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
       const hits = raycaster.intersectObjects(meshes, true);
       if (!hits.length) return null;
       let obj: THREE.Object3D | null = hits[0].object;
       while (obj) {
         if (obj.userData.fleetItemId !== undefined) {
-          return entries.find((e) => e.ship.id === obj!.userData.fleetItemId) ?? null;
+          const entry = entries.find((e) => e.ship.id === obj!.userData.fleetItemId);
+          return entry ? { kind: 'ship', entry, root: entry.root } : null;
+        }
+        if (obj.userData.tacticalMarkerId !== undefined) {
+          const entry = markerEntries.find((e) => e.marker.id === obj!.userData.tacticalMarkerId);
+          return entry ? { kind: 'marker', entry, root: entry.root } : null;
         }
         obj = obj.parent;
       }
@@ -435,9 +600,9 @@ export function FleetHoloViewer({ ships, selectedId, onSelect, onPositionChange 
     const onPointerDown = (e: PointerEvent) => {
       mouseStart = { x: e.clientX, y: e.clientY };
       isDragging = false;
-      const entry = getHitEntry(e.clientX, e.clientY);
-      if (entry) {
-        dragEntry = entry;
+      const target = getHitTarget(e.clientX, e.clientY);
+      if (target) {
+        dragTarget = target;
         controls.enabled = false;
 
         // Compute drag offset
@@ -445,9 +610,9 @@ export function FleetHoloViewer({ ships, selectedId, onSelect, onPositionChange 
         mouse.x = ((e.clientX - rect.left) / rect.width)  * 2 - 1;
         mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
-        dragPlane.constant = -entry.root.position.y;
+        dragPlane.constant = -target.root.position.y;
         raycaster.ray.intersectPlane(dragPlane, dragPoint);
-        dragOffset.copy(entry.root.position).sub(dragPoint);
+        dragOffset.copy(target.root.position).sub(dragPoint);
       }
     };
 
@@ -456,29 +621,38 @@ export function FleetHoloViewer({ ships, selectedId, onSelect, onPositionChange 
       const dy = e.clientY - mouseStart.y;
       if (Math.hypot(dx, dy) > 4) isDragging = true;
 
-      if (dragEntry && isDragging) {
+      if (dragTarget && isDragging) {
         const rect = renderer.domElement.getBoundingClientRect();
         mouse.x = ((e.clientX - rect.left) / rect.width)  * 2 - 1;
         mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
-        dragPlane.constant = -dragEntry.root.position.y;
+        dragPlane.constant = -dragTarget.root.position.y;
         raycaster.ray.intersectPlane(dragPlane, dragPoint);
-        dragEntry.root.position.x = dragPoint.x + dragOffset.x;
-        dragEntry.root.position.z = dragPoint.z + dragOffset.z;
+        dragTarget.root.position.x = dragPoint.x + dragOffset.x;
+        dragTarget.root.position.z = dragPoint.z + dragOffset.z;
       }
     };
 
     const onPointerUp = (_e: PointerEvent) => {
       controls.enabled = true;
-      if (!isDragging && dragEntry) {
-        onSelectRef.current(dragEntry.ship.id);
-      } else if (isDragging && dragEntry) {
-        onPositionChangeRef.current?.(dragEntry.ship.id, {
-          gridX: dragEntry.root.position.x,
-          gridZ: dragEntry.root.position.z,
-        });
+      if (!isDragging && dragTarget) {
+        if (dragTarget.kind === 'ship') onSelectRef.current(dragTarget.entry.ship.id);
+        if (dragTarget.kind === 'marker') onMarkerSelectRef.current?.(dragTarget.entry.marker.id);
+      } else if (isDragging && dragTarget) {
+        if (dragTarget.kind === 'ship') {
+          onPositionChangeRef.current?.(dragTarget.entry.ship.id, {
+            gridX: dragTarget.root.position.x,
+            gridZ: dragTarget.root.position.z,
+          });
+        }
+        if (dragTarget.kind === 'marker') {
+          onMarkerPositionChangeRef.current?.(dragTarget.entry.marker.id, {
+            gridX: dragTarget.root.position.x,
+            gridZ: dragTarget.root.position.z,
+          });
+        }
       }
-      dragEntry = null;
+      dragTarget = null;
     };
 
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
@@ -526,6 +700,19 @@ export function FleetHoloViewer({ ships, selectedId, onSelect, onPositionChange 
             const pulse = 1 + Math.sin(t * 3) * 0.06;
             entry.ring.scale.set(pulse, 1, pulse);
           }
+        }
+      });
+
+      markerEntries.forEach((entry) => {
+        const isSelected = entry.marker.id === selectedMarkerIdRef.current;
+        entry.root.children.forEach((child) => {
+          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial) {
+            child.material.opacity = isSelected ? 0.9 : 0.62 + Math.sin(t * 2.5) * 0.08;
+          }
+        });
+        if (entry.pulse) {
+          const scale = isSelected ? 1.18 + Math.sin(t * 4) * 0.08 : 1;
+          entry.pulse.scale.set(scale, scale, scale);
         }
       });
 

@@ -78,6 +78,7 @@ docker compose -f docker-compose.dev.yml --env-file .env.dev up
 ```
 
 On first start, PostgreSQL is initialized with the `game`, `rsi`, and `meta` schemas. The API uses the Prisma schema from `db/prisma/schema/`.
+The IHM container keeps its `.next` cache in a Docker volume so the Next.js dev server does not reuse host-generated Windows build artifacts.
 
 | Service | URL / Port |
 |---|---|
@@ -252,6 +253,8 @@ Important route groups:
 
 The browser uses same-origin `/api/*` calls. Server-side route handlers use `API_URL` to reach the Express API.
 
+Corporation tools include the 3D Fleet Manager and Tactics board. Fleet Manager lays spawned ships side by side by default and persists their grid positions. Tactics reuses the same 3D holographic viewer to place real fleet ship models, save local strategies, build reusable formations, and add objectives, obstacles, points of interest, and movement vectors.
+
 ---
 
 ## Roles
@@ -421,6 +424,6 @@ The AI assistant is optional and requires `MISTRAL_API_KEY`. When enabled, promp
 provider (`CHAT_PROVIDER_BASE_URL`, Mistral by default). Users must not send passwords, API tokens, private keys,
 confidential information or third-party personal data in AI prompts or Discord bot commands.
 
-GDPR contact: `gwenvaelcaouissin@gmail.com`
+GDPR contact: configure `CONTACT_EMAIL` and `NEXT_PUBLIC_CONTACT_EMAIL` in the deployment environment.
 
 Full policy: [starvis.ampynjord.bzh/legal](https://starvis.ampynjord.bzh/legal)

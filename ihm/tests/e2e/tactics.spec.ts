@@ -62,9 +62,10 @@ test('corporation tactics board adds ships and tactical markers', async ({ conte
 
   await expect(page.getByRole('heading', { name: 'Tactics' })).toBeVisible();
   await expect(page.getByText('[DNR] Dawnstar')).toBeVisible();
-  await page.getByRole('button', { name: /Aurora MR/i }).click();
   const board = page.getByTestId('tactics-board');
-  await expect(board.getByRole('button', { name: /Aurora MR/i })).toBeVisible();
+  await page.getByRole('button', { name: /Add formation/i }).click();
+  await expect(board.locator('canvas')).toBeVisible();
+  await expect(board.getByText(/4 ships/i)).toBeVisible();
   await page.getByRole('button', { name: /Objective/i }).click();
-  await expect(board.getByRole('button', { name: /Objective/i })).toBeVisible();
+  await expect(board.getByText(/1 objects/i)).toBeVisible();
 });

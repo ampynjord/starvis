@@ -94,7 +94,8 @@ services:
     volumes:
       - ./:/app
       - ihm_node_modules:/app/node_modules
-    command: sh -c "npm install --prefer-offline && npm run dev --workspace=ihm -- -p ${IHM_INTERNAL_PORT} -H 0.0.0.0"
+      - ihm_next_cache:/app/ihm/.next
+    command: sh -c "npm install --prefer-offline && npm run dev --workspace=starvis-ihm -- -p ${IHM_INTERNAL_PORT} -H 0.0.0.0"
     ports:
       - "${IHM_BIND_HOST}:${IHM_PORT}:${IHM_INTERNAL_PORT}"
     environment:
@@ -149,5 +150,6 @@ volumes:
   redis_data:
   api_node_modules:
   ihm_node_modules:
+  ihm_next_cache:
   bot_node_modules:
   ctm_cache:
