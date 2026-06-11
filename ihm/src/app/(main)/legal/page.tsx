@@ -8,7 +8,7 @@ function env(name: string, fallback: string): string {
   return value || fallback;
 }
 
-const CONTACT_EMAIL = env('NEXT_PUBLIC_CONTACT_EMAIL', env('CONTACT_EMAIL', 'gwenvaelcaouissin@gmail.com'));
+const CONTACT_EMAIL = env('NEXT_PUBLIC_CONTACT_EMAIL', env('CONTACT_EMAIL', 'contact@example.com'));
 const PUBLISHER_NAME = env('LEGAL_PUBLISHER_NAME', 'ampynjord');
 const PUBLISHER_STATUS = env('LEGAL_PUBLISHER_STATUS', 'Individual publisher');
 const PUBLISHER_ADDRESS = env('LEGAL_PUBLISHER_ADDRESS', 'Available on legitimate legal request through the contact email.');
