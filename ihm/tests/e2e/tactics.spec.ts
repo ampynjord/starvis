@@ -24,12 +24,34 @@ test('corporation tactics board adds ships and tactical markers', async ({ conte
       json: {
         success: true,
         corporation: { id: 42, name: 'Dawnstar', tag: 'DNR' },
+        data: [],
+      },
+    });
+  });
+  await page.route('**/api/v1/ships?**', async (route) => {
+    await route.fulfill({
+      json: {
+        success: true,
+        total: 1,
+        page: 1,
+        limit: 120,
+        pages: 1,
+        count: 1,
         data: [
           {
-            id: 101,
-            shipUuid: 'ship-aurora',
-            itemClassName: 'rsi_aurora_mr',
-            addedBy: { id: 7, username: 'pilot' },
+            uuid: 'ship-aurora',
+            name: 'Aurora MR',
+            class_name: 'rsi_aurora_mr',
+            manufacturer_name: 'Roberts Space Industries',
+            manufacturer_code: 'RSI',
+            role: 'Starter',
+            career: 'General',
+            crew_size: 1,
+            scm_speed: 210,
+            thumbnail: null,
+            thumbnail_large: null,
+            is_concept_only: false,
+            ctm_url: null,
           },
         ],
       },
@@ -62,6 +84,7 @@ test('corporation tactics board adds ships and tactical markers', async ({ conte
 
   await expect(page.getByRole('heading', { name: 'Tactics' })).toBeVisible();
   await expect(page.getByText('[DNR] Dawnstar')).toBeVisible();
+  await expect(page.getByLabel('Formation ship')).toContainText('Aurora MR');
   const board = page.getByTestId('tactics-board');
   await page.getByRole('button', { name: /Add formation/i }).click();
   await expect(board.locator('canvas')).toBeVisible();

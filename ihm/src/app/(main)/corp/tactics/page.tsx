@@ -69,6 +69,7 @@ type MarkerType = TacticalMarker['type'];
 const getShipUuid = (item: FleetItem) => item.shipUuid?.trim() || null;
 const makeId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 const nowIso = () => new Date().toISOString();
+const makeLibraryFleetId = (uuid: string) => -Math.abs([...uuid].reduce((acc, char) => ((acc * 31) + char.charCodeAt(0)) % 1_000_000_000, 7));
 
 const defaultStrategy = (): Strategy => ({
   id: makeId(),
@@ -103,6 +104,7 @@ export default function CorporationTacticsPage() {
   const { user } = useAuth();
   const [corp, setCorp] = useState<Corp | null>(null);
   const [fleetItems, setFleetItems] = useState<FleetItem[]>([]);
+  const [libraryShips, setLibraryShips] = useState<ShipListItem[]>([]);
   const [shipData, setShipData] = useState<Map<string, ShipListItem>>(new Map());
   const [strategies, setStrategies] = useState<Strategy[]>([defaultStrategy()]);
   const [activeStrategyId, setActiveStrategyId] = useState<string>('');
@@ -133,15 +135,21 @@ export default function CorporationTacticsPage() {
     async function load() {
       setLoading(true);
       try {
-        const res = await fetch('/api/corp/fleet');
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok || cancelled) return;
+        const [fleetRes, libraryRes] = await Promise.all([
+          fetch('/api/corp/fleet'),
+          api.ships.list({ page: 1, limit: 120, sort: 'name', order: 'asc' }).catch(() => ({ data: [] as ShipListItem[] })),
+        ]);
+        const data = await fleetRes.json().catch(() => ({}));
+        if (!fleetRes.ok || cancelled) return;
         const items: FleetItem[] = data.data ?? [];
+        const library = libraryRes.data ?? [];
         const nextCorp: Corp | null = data.corporation ?? null;
         setCorp(nextCorp);
         setFleetItems(items);
+        setLibraryShips(library);
         const firstShip = items.find((item) => getShipUuid(item));
-        setFormationShipId(firstShip?.id ?? null);
+        const firstLibraryShip = library.find((ship) => ship.uuid);
+        setFormationShipId(firstShip?.id ?? (firstLibraryShip ? makeLibraryFleetId(firstLibraryShip.uuid) : null));
 
         const key = `starvis-tactics-3d-${nextCorp?.id ?? `user-${userId}`}`;
         setStorageKey(key);
@@ -157,7 +165,7 @@ export default function CorporationTacticsPage() {
         const uuids = [...new Set(items.map(getShipUuid).filter(Boolean))] as string[];
         const entries = await Promise.allSettled(uuids.map(async (uuid) => [uuid, await api.ships.get(uuid)] as const));
         if (cancelled) return;
-        const map = new Map<string, ShipListItem>();
+        const map = new Map<string, ShipListItem>(library.map((ship) => [ship.uuid, ship]));
         entries.forEach((entry) => {
           if (entry.status === 'fulfilled' && entry.value[1]) map.set(entry.value[0], entry.value[1] as unknown as ShipListItem);
         });
@@ -175,9 +183,22 @@ export default function CorporationTacticsPage() {
     localStorage.setItem(storageKey, JSON.stringify({ activeStrategyId, strategies }));
   }, [activeStrategyId, storageKey, strategies, user]);
 
+  const availableFleet = useMemo(() => {
+    const knownFleetUuids = new Set(fleetItems.map(getShipUuid).filter(Boolean));
+    const libraryItems: FleetItem[] = libraryShips
+      .filter((ship) => ship.uuid && !knownFleetUuids.has(ship.uuid))
+      .map((ship) => ({
+        id: makeLibraryFleetId(ship.uuid),
+        shipUuid: ship.uuid,
+        itemClassName: ship.class_name,
+        addedBy: null,
+      }));
+    return [...fleetItems, ...libraryItems];
+  }, [fleetItems, libraryShips]);
+
   const filteredFleet = useMemo(() => {
     const q = shipQuery.trim().toLowerCase();
-    return fleetItems
+    return availableFleet
       .filter((item) => getShipUuid(item))
       .filter((item) => {
         if (!q) return true;
@@ -185,7 +206,7 @@ export default function CorporationTacticsPage() {
         const ship = uuid ? shipData.get(uuid) : null;
         return `${ship?.name ?? item.itemClassName} ${ship?.role ?? ''} ${item.addedBy?.username ?? ''}`.toLowerCase().includes(q);
       });
-  }, [fleetItems, shipData, shipQuery]);
+  }, [availableFleet, shipData, shipQuery]);
 
   const tacticShips: FleetShip[] = useMemo(() => activeStrategy.ships.map((node) => {
     const ship = shipData.get(node.shipUuid);
@@ -237,7 +258,7 @@ export default function CorporationTacticsPage() {
   }, [activeStrategy.ships, formationName, formationQuantity, formationSpacing, formationType, shipData, updateActiveStrategy]);
 
   const addSelectedFormation = () => {
-    const item = fleetItems.find((fleetItem) => fleetItem.id === formationShipId);
+    const item = availableFleet.find((fleetItem) => fleetItem.id === formationShipId);
     if (item) addFormation(item);
   };
 
@@ -389,11 +410,21 @@ export default function CorporationTacticsPage() {
                 className="sci-input col-span-2 w-full"
                 placeholder="Group name"
               />
-              <select value={formationShipId ?? ''} onChange={(event) => setFormationShipId(Number(event.target.value))} className="sci-input col-span-2 w-full">
-                {filteredFleet.map((item) => {
+              <select
+                aria-label="Formation ship"
+                value={formationShipId ?? ''}
+                onChange={(event) => setFormationShipId(event.target.value ? Number(event.target.value) : null)}
+                disabled={availableFleet.length === 0}
+                className="sci-input col-span-2 w-full disabled:opacity-60"
+              >
+                {availableFleet.length === 0 ? (
+                  <option value="">{loading ? 'Loading ships...' : 'No ships available'}</option>
+                ) : null}
+                {availableFleet.map((item) => {
                   const uuid = getShipUuid(item);
                   const ship = uuid ? shipData.get(uuid) : null;
-                  return <option key={item.id} value={item.id}>{ship?.name ?? item.itemClassName}</option>;
+                  const source = item.addedBy ? 'Corp fleet' : 'Ship library';
+                  return <option key={item.id} value={item.id}>{ship?.name ?? item.itemClassName} - {source}</option>;
                 })}
               </select>
               <label className="space-y-1">
@@ -409,8 +440,8 @@ export default function CorporationTacticsPage() {
                 <option value="line">Line formation</option>
                 <option value="box">Box formation</option>
               </select>
-              <button type="button" onClick={addSelectedFormation} disabled={!formationShipId} className="sci-btn-primary col-span-2 flex items-center justify-center gap-1.5 px-3 py-2 text-xs disabled:opacity-40">
-                <Ship size={12} /> Add formation
+              <button type="button" onClick={addSelectedFormation} disabled={!formationShipId || availableFleet.length === 0} className="sci-btn-primary col-span-2 flex items-center justify-center gap-1.5 px-3 py-2 text-xs disabled:opacity-40">
+                <Ship size={12} /> {availableFleet.length === 0 ? 'No ships available' : 'Add formation'}
               </button>
             </div>
           </div>
@@ -441,7 +472,9 @@ export default function CorporationTacticsPage() {
             {loading ? (
               <div className="flex items-center justify-center py-8 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
             ) : filteredFleet.length === 0 ? (
-              <p className="px-2 py-6 text-center font-mono-sc text-xs text-slate-700">No fleet ships available.</p>
+              <p className="px-2 py-6 text-center font-mono-sc text-xs text-slate-700">
+                {availableFleet.length === 0 ? 'No ships available.' : 'No ship matches this filter.'}
+              </p>
             ) : filteredFleet.slice(0, 30).map((item) => {
               const uuid = getShipUuid(item);
               const ship = uuid ? shipData.get(uuid) : null;
