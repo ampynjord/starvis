@@ -33,8 +33,9 @@ export function CookieBanner() {
         <div className="flex items-start gap-3 mb-3">
           <Cookie size={16} className="text-cyan-500 shrink-0 mt-0.5" />
           <p className="font-rajdhani text-sm text-slate-300 leading-snug">
-            Starvis uses a single session cookie (<code className="font-mono-sc text-xs text-cyan-400">{DEFAULT_AUTH_COOKIE_NAME}</code>)
-            strictly necessary for authentication. No advertising or tracking cookies are used.{' '}
+            Starvis uses the strictly necessary authentication cookie{' '}
+            <code className="font-mono-sc text-xs text-cyan-400">{DEFAULT_AUTH_COOKIE_NAME}</code>. No advertising or tracking cookies are
+            used. Declining only hides this notice and does not disable login cookies.{' '}
             <Link href="/legal#cookies" className="text-cyan-500 hover:text-cyan-300 underline underline-offset-2">
               Learn more
             </Link>
@@ -45,7 +46,7 @@ export function CookieBanner() {
             onClick={() => respond('declined')}
             className="py-1 px-3 text-xs font-mono-sc text-slate-500 hover:text-slate-300 border border-slate-700 hover:border-slate-500 rounded-sm transition-colors"
           >
-            DECLINE
+            DECLINE NOTICE
           </button>
           <button
             onClick={() => respond('accepted')}
