@@ -7,7 +7,7 @@ Database workspace for Prisma, PostgreSQL bootstrap scripts, and the shared Pris
 | Path | Role |
 |---|---|
 | `prisma/schema/00-base.prisma` | Prisma generator and datasource. |
-| `prisma/schema/10-meta.prisma` | Users, corporations, bug reports, extraction logs and changelog. |
+| `prisma/schema/10-meta.prisma` | Users, corporations, fleet/tactical metadata, bug reports, extraction logs and changelog. |
 | `prisma/schema/20-rsi.prisma` | RSI website data: ship matrix, Galactapedia, comm-links, starmap. |
 | `prisma/schema/30-game.prisma` | P4K/DataForge game data: ships, components, items, commodities, shops, missions, crafting. |
 | `src/client/` | Prisma singleton client. |

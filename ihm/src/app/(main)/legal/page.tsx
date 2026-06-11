@@ -22,7 +22,8 @@ const CHAT_PROVIDER_URL = env('NEXT_PUBLIC_CHAT_PROVIDER_URL', 'https://mistral.
 
 export const metadata: Metadata = {
   title: 'Legal notice and privacy policy - STARVIS',
-  description: 'Legal notice, terms of use, GDPR privacy policy, cookies and proprietary source code notice for STARVIS.',
+  description:
+    'Legal notice, terms of use, GDPR privacy policy, cookies and proprietary source code notice for STARVIS, an unofficial project not affiliated with Cloud Imperium Games.',
 };
 
 export const dynamic = 'force-dynamic';
@@ -69,7 +70,7 @@ export default function LegalPage() {
       <PageHeader
         eyebrow="Starvis"
         title="Legal notice"
-        subtitle="Legal notice, privacy policy, cookies and terms of use. Last updated: June 2026."
+        subtitle="Unofficial project, not affiliated with Cloud Imperium Games. Legal notice, privacy policy, cookies and terms of use. Last updated: June 2026."
       />
 
       <Section title="Legal publisher">
@@ -101,13 +102,14 @@ export default function LegalPage() {
 
       <Section title="About the project">
         <P>
-          <span className="font-semibold text-slate-200">STARVIS</span> is an independent, non-commercial community
-          project for Star Citizen players. It provides searchable game data, calculators, comparison tools,
-          corporation tools, a Discord bot and an optional AI assistant.
+          <span className="font-semibold text-slate-200">STARVIS</span> is an unofficial, independent,
+          non-commercial community project for Star Citizen players. It provides searchable game data, calculators,
+          comparison tools, corporation tools, a Discord bot and an optional AI assistant.
         </P>
         <P>
-          STARVIS is not affiliated with, endorsed by, sponsored by, or officially connected to Cloud Imperium
-          Games Corporation, Cloud Imperium Rights LLC, Roberts Space Industries Corp. or their affiliates.
+          STARVIS is not an official Cloud Imperium Games product and is not affiliated with, endorsed by,
+          sponsored by, or officially connected to Cloud Imperium Games Corporation, Cloud Imperium Rights LLC,
+          Roberts Space Industries Corp. or their affiliates.
         </P>
       </Section>
 

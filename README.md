@@ -4,7 +4,9 @@
 [![Node v22](https://img.shields.io/badge/node-v22-green)](https://nodejs.org)
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 
-Star Citizen data platform: game data extraction, REST API, web interface, Discord bot, and database tooling.
+Unofficial Star Citizen data platform: game data extraction, REST API, web interface, Discord bot, and database tooling.
+STARVIS is an independent community project and is not affiliated with, endorsed by, sponsored by, or officially
+connected to Cloud Imperium Games, Cloud Imperium Rights LLC, Roberts Space Industries Corp. or their affiliates.
 
 - Production: [starvis.ampynjord.bzh](https://starvis.ampynjord.bzh)
 - API docs: [starvis.ampynjord.bzh/api-docs](https://starvis.ampynjord.bzh/api-docs)
@@ -244,7 +246,7 @@ Important route groups:
 | Tools | `/compare`, `/loadout-manager`, `/fps-calculator`, `/mining-calculator`, `/trade-calculator`, `/crafting-calculator`, `/outfitter` |
 | RSI content | `/galactapedia`, `/comm-links`, `/manufacturers`, `/paints`, `/factions` |
 | Account | `/login`, `/register`, `/profile`, `/my-reports`, `/report-bug` |
-| Corporation | `/corp`, `/corp/fleet`, `/corp/bank` |
+| Corporation | `/corp`, `/corp/fleet`, `/corp/tactics`, `/corp/bank` |
 | Admin | `/admin`, `/admin/corporations`, `/admin/bug-reports` |
 | Legal | `/legal` |
 
@@ -381,7 +383,9 @@ Deployment from CI:
 
 ### Community project
 
-STARVIS is an independent, community-driven, non-profit project. It is not affiliated with, endorsed by, or officially connected to Cloud Imperium Games Corporation or Roberts Space Industries Corp.
+STARVIS is an unofficial, independent, community-driven, non-profit project. It is not affiliated with, endorsed by,
+sponsored by, or officially connected to Cloud Imperium Games Corporation, Cloud Imperium Rights LLC,
+Roberts Space Industries Corp. or their affiliates.
 
 ### Credits and intellectual property
 
