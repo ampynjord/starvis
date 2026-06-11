@@ -59,10 +59,13 @@ Minimum values to set in `.env.dev`:
 |---|---|---|
 | `DB_PASSWORD` | yes | PostgreSQL password for local dev. |
 | `JWT_SECRET` | yes | JWT signing secret, at least 32 characters. |
+| `TWO_FACTOR_ENCRYPTION_KEY` | recommended | Dedicated key for encrypting TOTP 2FA secrets. Falls back to `JWT_SECRET` if omitted. |
 | `ADMIN_API_KEY` | yes | API key used by server-side admin operations. |
 | `MISTRAL_API_KEY` | optional | Enables the AI chat assistant. |
 | `DISCORD_TOKEN` | optional | Enables the Discord bot. |
 | `SMTP_HOST` | optional | Enables email verification and password reset emails. |
+| `CONTACT_EMAIL` / `NEXT_PUBLIC_CONTACT_EMAIL` | yes in prod | Contact address displayed in legal/privacy notices and used for support emails. |
+| `LEGAL_*` | yes in prod | Publisher and hosting details displayed on `/legal`. |
 
 All supported variables and defaults are documented in `.env.dev.example`.
 
@@ -396,8 +399,24 @@ This code license covers only STARVIS source code owned by ampynjord. It does no
 
 ### GDPR / data protection
 
-Data collected at registration: email, username, password hash, role and avatar URL.
+The public legal and privacy policy is maintained at `/legal`. Production deployments expose `LEGAL_*`,
+`CONTACT_EMAIL`, and `NEXT_PUBLIC_CONTACT_EMAIL`; keep these values accurate in `.env.prod`. The production template
+uses the public STARVIS domain, the project contact email, and OVH SAS hosting details.
 
-No payment data, no advertising cookies, and no transfer to third parties for commercial purposes.
+Personal data handled by the project may include:
+
+- account data: email, username, role, avatar URL, timestamps and email verification state;
+- security data: bcrypt password hash, hashed email verification/password reset tokens, encrypted 2FA secret, JWT sessions and API tokens;
+- user content: bug reports, corporation memberships, ranks and fleet notes;
+- technical data: logs and request metadata needed for security, diagnostics and abuse prevention;
+- optional AI/Discord data: prompts/messages sent to the STARVIS assistant or Discord bot.
+
+No payment data, no advertising cookies, and no sale of personal data are used by STARVIS.
+
+The AI assistant is optional and requires `MISTRAL_API_KEY`. When enabled, prompts are sent to the configured chat
+provider (`CHAT_PROVIDER_BASE_URL`, Mistral by default). Users must not send passwords, API tokens, private keys,
+confidential information or third-party personal data in AI prompts or Discord bot commands.
+
+GDPR contact: `gwenvaelcaouissin@gmail.com`
 
 Full policy: [starvis.ampynjord.bzh/legal](https://starvis.ampynjord.bzh/legal)

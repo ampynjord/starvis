@@ -1,4 +1,4 @@
-import { randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import type { PrismaLike } from '@starvis/db';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -39,6 +39,32 @@ function generateToken(bytes = 32): string {
   return randomBytes(bytes).toString('hex');
 }
 
+function hashToken(token: string): string {
+  return createHash('sha256').update(token, 'utf8').digest('hex');
+}
+
+function getEncryptionKey(): Buffer {
+  const secret = process.env.TWO_FACTOR_ENCRYPTION_KEY || getSecret();
+  return createHash('sha256').update(secret, 'utf8').digest();
+}
+
+function encryptSecret(secret: string): string {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv('aes-256-gcm', getEncryptionKey(), iv);
+  const ciphertext = Buffer.concat([cipher.update(secret, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `enc:v1:${iv.toString('base64url')}:${tag.toString('base64url')}:${ciphertext.toString('base64url')}`;
+}
+
+function decryptSecret(value: string): string {
+  if (!value.startsWith('enc:v1:')) return value;
+  const [, , ivRaw, tagRaw, ciphertextRaw] = value.split(':');
+  if (!ivRaw || !tagRaw || !ciphertextRaw) throw new Error('INVALID_2FA_SECRET');
+  const decipher = createDecipheriv('aes-256-gcm', getEncryptionKey(), Buffer.from(ivRaw, 'base64url'));
+  decipher.setAuthTag(Buffer.from(tagRaw, 'base64url'));
+  return Buffer.concat([decipher.update(Buffer.from(ciphertextRaw, 'base64url')), decipher.final()]).toString('utf8');
+}
+
 function toPublicUser(u: {
   id: number;
   uuid: string;
@@ -66,7 +92,11 @@ function toPublicUser(u: {
 export class AuthService {
   constructor(private prisma: PrismaLike) {}
 
-  async register(email: string, username: string, password: string): Promise<{ requiresVerification: true; email: string }> {
+  async register(
+    email: string,
+    username: string,
+    password: string,
+  ): Promise<{ requiresVerification: true; email: string; verificationToken: string }> {
     const emailLower = email.toLowerCase().trim();
     const usernameTrimmed = username.trim();
 
@@ -80,19 +110,24 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
     const verificationToken = generateToken();
+    const verificationTokenHash = hashToken(verificationToken);
     await (this.prisma as any).user.create({
       data: {
         email: emailLower,
         username: usernameTrimmed,
         passwordHash,
         emailVerified: false,
-        verificationToken,
+        verificationToken: verificationTokenHash,
       },
     });
 
-    return { requiresVerification: true, email: emailLower };
+    return { requiresVerification: true, email: emailLower, verificationToken };
   }
 
+  /**
+   * Compatibility helper for legacy plaintext tokens. Newly created
+   * verification tokens are stored hashed and cannot be read back in clear text.
+   */
   getVerificationToken(email: string): Promise<{ username: string; token: string } | null> {
     return (this.prisma as any).user
       .findUnique({ where: { email: email.toLowerCase().trim() }, select: { username: true, verificationToken: true } })
@@ -100,10 +135,13 @@ export class AuthService {
   }
 
   async verifyEmail(token: string): Promise<{ token: string; user: PublicUser }> {
+    const tokenHash = hashToken(token);
     const user = await (this.prisma as any).user.findFirst({
-      where: { verificationToken: token },
+      where: { OR: [{ verificationToken: tokenHash }, { verificationToken: token }] },
     });
     if (!user) throw new Error('INVALID_TOKEN');
+    const verificationAgeMs = Date.now() - new Date(user.createdAt).getTime();
+    if (verificationAgeMs > 48 * 60 * 60 * 1000) throw new Error('INVALID_TOKEN');
 
     const updated = await (this.prisma as any).user.update({
       where: { id: user.id },
@@ -150,7 +188,7 @@ export class AuthService {
     const user = await (this.prisma as any).user.findUnique({ where: { id: payload.sub } });
     if (!user?.twoFactorEnabled || !user?.twoFactorSecret) throw new Error('INVALID_TOKEN');
 
-    const result = await verify({ token: code, secret: user.twoFactorSecret });
+    const result = await verify({ token: code, secret: decryptSecret(user.twoFactorSecret) });
     if (!result.valid) throw new Error('INVALID_2FA_CODE');
 
     const sessionToken = this.signToken(user);
@@ -164,19 +202,21 @@ export class AuthService {
     if (!user) return null;
 
     const resetToken = generateToken();
+    const resetTokenHash = hashToken(resetToken);
     const resetTokenExpiry = new Date(Date.now() + RESET_TOKEN_TTL_MS);
 
     await (this.prisma as any).user.update({
       where: { id: user.id },
-      data: { resetToken, resetTokenExpiry },
+      data: { resetToken: resetTokenHash, resetTokenExpiry },
     });
 
     return { username: user.username, token: resetToken };
   }
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
+    const tokenHash = hashToken(token);
     const user = await (this.prisma as any).user.findFirst({
-      where: { resetToken: token },
+      where: { OR: [{ resetToken: tokenHash }, { resetToken: token }] },
     });
     if (!user) throw new Error('INVALID_TOKEN');
     if (!user.resetTokenExpiry || user.resetTokenExpiry < new Date()) throw new Error('TOKEN_EXPIRED');
@@ -197,7 +237,7 @@ export class AuthService {
 
     await (this.prisma as any).user.update({
       where: { id: userId },
-      data: { twoFactorSecret: secret, twoFactorEnabled: false },
+      data: { twoFactorSecret: encryptSecret(secret), twoFactorEnabled: false },
     });
 
     const qrCodeUrl: string = await QRCode.toDataURL(otpauth);
@@ -209,7 +249,7 @@ export class AuthService {
     const user = await (this.prisma as any).user.findUnique({ where: { id: userId } });
     if (!user?.twoFactorSecret) throw new Error('2FA_NOT_SETUP');
 
-    const result = await verify({ token: code, secret: user.twoFactorSecret });
+    const result = await verify({ token: code, secret: decryptSecret(user.twoFactorSecret) });
     if (!result.valid) throw new Error('INVALID_2FA_CODE');
 
     await (this.prisma as any).user.update({
@@ -222,7 +262,7 @@ export class AuthService {
     const user = await (this.prisma as any).user.findUnique({ where: { id: userId } });
     if (!user?.twoFactorEnabled || !user?.twoFactorSecret) throw new Error('2FA_NOT_ENABLED');
 
-    const result = await verify({ token: code, secret: user.twoFactorSecret });
+    const result = await verify({ token: code, secret: decryptSecret(user.twoFactorSecret) });
     if (!result.valid) throw new Error('INVALID_2FA_CODE');
 
     await (this.prisma as any).user.update({
