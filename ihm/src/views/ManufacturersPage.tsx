@@ -15,6 +15,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
 import { Pagination } from '@/components/ui/Pagination';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
+import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import type { ComponentListItem, ItemListItem, Manufacturer, ShipListItem } from '@/types/api';
 import { COMPONENT_TYPE_COLORS, COMPONENT_TYPE_LABELS } from '@/utils/constants';
 
@@ -142,10 +143,10 @@ function ManufacturerCard({ m, selected, onSelect }: { m: Manufacturer; selected
     <button
       type="button"
       onClick={() => onSelect(m.code)}
-      className={`group rounded-sm border p-4 text-left transition-all ${
+      className={`sci-panel group p-4 text-left transition-all ${
         selected
           ? 'border-cyan-600/80 bg-cyan-950/25 shadow-[0_0_24px_rgba(34,211,238,0.12)]'
-          : 'border-slate-800/70 bg-slate-950/35 hover:border-cyan-900/70 hover:bg-cyan-950/10'
+          : 'hover:border-cyan-900/70 hover:bg-cyan-950/10'
       }`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -330,24 +331,12 @@ export default function ManufacturersPage() {
         )}
       </ListFilterBar>
 
-      <div className="grid gap-2 sm:grid-cols-4">
-        <div className="rounded-sm border border-slate-800/70 bg-slate-950/40 p-3">
-          <p className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">Manufacturers</p>
-          <p className="mt-1 font-orbitron text-xl font-black text-cyan-300">{filteredMfrs.length.toLocaleString('en-US')}</p>
-        </div>
-        <div className="rounded-sm border border-slate-800/70 bg-slate-950/40 p-3">
-          <p className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">Ships</p>
-          <p className="mt-1 font-orbitron text-xl font-black text-cyan-300">{totals.ships.toLocaleString('en-US')}</p>
-        </div>
-        <div className="rounded-sm border border-slate-800/70 bg-slate-950/40 p-3">
-          <p className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">Components</p>
-          <p className="mt-1 font-orbitron text-xl font-black text-blue-300">{totals.components.toLocaleString('en-US')}</p>
-        </div>
-        <div className="rounded-sm border border-slate-800/70 bg-slate-950/40 p-3">
-          <p className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">FPS Items</p>
-          <p className="mt-1 font-orbitron text-xl font-black text-purple-300">{totals.items.toLocaleString('en-US')}</p>
-        </div>
-      </div>
+      <StatGrid>
+        <StatCard icon={Building2} label="Manufacturers" value={filteredMfrs.length.toLocaleString('en-US')} accent="cyan" />
+        <StatCard icon={Rocket} label="Ships" value={totals.ships.toLocaleString('en-US')} accent="cyan" />
+        <StatCard icon={Settings2} label="Components" value={totals.components.toLocaleString('en-US')} accent="slate" />
+        <StatCard icon={ShoppingBag} label="FPS Items" value={totals.items.toLocaleString('en-US')} accent="purple" />
+      </StatGrid>
 
       <div className="min-w-0 space-y-4">
           {selectedMfr ? (
