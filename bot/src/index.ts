@@ -2,6 +2,7 @@ import type { AutocompleteInteraction, ChatInputCommandInteraction, Interaction 
 import { Client, Events, GatewayIntentBits } from 'discord.js';
 import { commands } from './commands/index.js';
 import { errorEmbed } from './embeds.js';
+import { startRichPresence } from './presence.js';
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -10,11 +11,13 @@ if (!token) {
 }
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
+let stopRichPresence: (() => void) | undefined;
 
 // Build command map for lookup
 const commandMap = new Map(commands.map((c) => [c.data.name, c]));
 
 client.once(Events.ClientReady, (c) => {
+  stopRichPresence = startRichPresence(c, commandMap.size);
   console.log(`✅ Starvis Bot connected as ${c.user.tag}`);
   console.log(`   Serving ${commandMap.size} commands in ${c.guilds.cache.size} server(s)`);
 });
@@ -42,7 +45,7 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
     await command.execute(interaction as ChatInputCommandInteraction);
   } catch (err) {
     console.error(`Command /${interaction.commandName} failed:`, err);
-    const reply = { embeds: [errorEmbed('Une erreur interne est survenue.')], ephemeral: true };
+    const reply = { embeds: [errorEmbed('An internal error occurred.')], ephemeral: true };
     if (interaction.replied || interaction.deferred) {
       await interaction.followUp(reply);
     } else {
@@ -55,6 +58,7 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {
   process.on(signal, () => {
     console.log(`\n${signal} received — shutting down…`);
+    stopRichPresence?.();
     client.destroy();
     process.exit(0);
   });
