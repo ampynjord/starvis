@@ -4030,6 +4030,90 @@
         }
       }
     },
+    "/api/v1/items/weapon-attachments/modifiers": {
+      "get": {
+        "tags": ["Items"],
+        "summary": "List weapon attachment stat modifiers",
+        "operationId": "getWeaponAttachmentModifiers",
+        "description": "Returns compact, extracted weapon attachment modifiers used by the FPS calculator. Values come from SWeaponModifierComponentParams in game data.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/env"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Weapon attachment modifiers grouped by slot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "uuid": {
+                            "type": "string"
+                          },
+                          "class_name": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "display_name": {
+                            "type": "string"
+                          },
+                          "slot": {
+                            "type": "string",
+                            "enum": ["barrel", "underbarrel", "optic", "other"]
+                          },
+                          "fire_rate_bonus": {
+                            "type": "number"
+                          },
+                          "damage_bonus": {
+                            "type": "number"
+                          },
+                          "effects": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "key": {
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "type": "string"
+                                },
+                                "value": {
+                                  "type": "number"
+                                },
+                                "unit": {
+                                  "type": "string",
+                                  "enum": ["percent"]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/items/category/{slug}": {
       "get": {
         "tags": ["Items"],
@@ -6209,7 +6293,29 @@
                       "type": "object",
                       "properties": {
                         "ships": {
-                          "type": "integer"
+                          "type": "integer",
+                          "description": "Total base vehicles in game.ships, including space ships, ground vehicles, and gravlev vehicles."
+                        },
+                        "space_ships": {
+                          "type": "integer",
+                          "description": "Base ship records whose vehicle_category is ship."
+                        },
+                        "flyable_ships": {
+                          "type": "integer",
+                          "deprecated": true,
+                          "description": "Legacy alias for space_ships. Kept for external consumers."
+                        },
+                        "ground_vehicles": {
+                          "type": "integer",
+                          "description": "Base ship records whose vehicle_category is ground."
+                        },
+                        "gravlev_vehicles": {
+                          "type": "integer",
+                          "description": "Base ship records whose vehicle_category is gravlev."
+                        },
+                        "vehicles": {
+                          "type": "integer",
+                          "description": "Ground plus gravlev vehicles."
                         },
                         "components": {
                           "type": "integer"
@@ -6223,23 +6329,26 @@
                         "manufacturers": {
                           "type": "integer"
                         },
-                        "missions": {
-                          "type": "integer"
-                        },
-                        "locations": {
+                        "paints": {
                           "type": "integer"
                         },
                         "shops": {
                           "type": "integer"
                         },
-                        "galactapedia": {
+                        "component_types": {
                           "type": "integer"
                         },
-                        "comm_links": {
+                        "item_types": {
                           "type": "integer"
                         },
-                        "starmap_systems": {
-                          "type": "integer"
+                        "game_version": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "last_extraction": {
+                          "type": "string",
+                          "nullable": true,
+                          "format": "date-time"
                         }
                       }
                     }

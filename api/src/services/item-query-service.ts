@@ -153,6 +153,21 @@ const FPS_SUBTYPE_OPTIONS: Record<string, { label: string; value: string }[]> = 
   ],
 };
 
+type AttachmentSlot = 'barrel' | 'underbarrel' | 'optic' | 'other';
+
+interface WeaponAttachmentModifier {
+  uuid: string;
+  class_name: string;
+  name: string;
+  display_name: string;
+  slot: AttachmentSlot;
+  manufacturer_code: string | null;
+  manufacturer_name: string | null;
+  fire_rate_bonus: number;
+  damage_bonus: number;
+  effects: { key: string; label: string; value: number; unit: 'percent' }[];
+}
+
 function formatConsumableLabel(subType: string): string {
   const explicitLabels: Record<string, string> = {
     SystemAccess: 'System Access',
@@ -171,6 +186,107 @@ function orderConsumableEntries(entries: { value: string; count: number }[]) {
     if (leftRank !== rightRank) return leftRank - rightRank;
     return formatConsumableLabel(left.value).localeCompare(formatConsumableLabel(right.value));
   });
+}
+
+function readObject(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+}
+
+function readArray(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.map(readObject).filter((entry): entry is Record<string, unknown> => !!entry) : [];
+}
+
+function percentFromMultiplier(multiplier: unknown): number {
+  const value = Number(multiplier);
+  if (!Number.isFinite(value) || value === 0 || value === 1) return 0;
+  return Math.round((value - 1) * 1000) / 10;
+}
+
+function addMultiplierEffect(effects: WeaponAttachmentModifier['effects'], key: string, label: string, multiplier: unknown): number {
+  const value = percentFromMultiplier(multiplier);
+  if (value !== 0) effects.push({ key, label, value, unit: 'percent' });
+  return value;
+}
+
+function inferAttachmentSlot(dataJson: Record<string, unknown>): AttachmentSlot {
+  const rawData = readObject(readObject(dataJson.rawJson)?.data);
+  const components = readArray(rawData?.Components);
+  const attachDef = readObject(components.map((component) => readObject(component.AttachDef)).find(Boolean));
+  const probe = [
+    attachDef?.SubType,
+    readObject(attachDef?.mannequinTags)?.mannequinBaseTag,
+    readObject(attachDef?.mannequinTags)?.mannequinTypeTag,
+    dataJson.p4kPath,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  if (/bottom|underbarrel|ubarrel/.test(probe)) return 'underbarrel';
+  if (/barrel|muzzle|suppressor/.test(probe)) return 'barrel';
+  if (/optic|scope|sight/.test(probe)) return 'optic';
+  return 'other';
+}
+
+function extractWeaponAttachmentModifier(row: Row): WeaponAttachmentModifier {
+  const dataJson = readObject(row.data_json) ?? readObject(row.dataJson) ?? {};
+  const rawData = readObject(readObject(dataJson.rawJson)?.data);
+  const components = readArray(rawData?.Components);
+  const modifierComponent = components.find((component) => component.__type === 'SWeaponModifierComponentParams');
+  const weaponStats = readObject(readObject(modifierComponent?.modifier)?.weaponStats) ?? {};
+  const effects: WeaponAttachmentModifier['effects'] = [];
+
+  const fireRateBonus = addMultiplierEffect(effects, 'fire_rate', 'Fire rate', weaponStats.fireRateMultiplier);
+  const damageBonus = addMultiplierEffect(effects, 'damage', 'Damage', weaponStats.damageMultiplier);
+  addMultiplierEffect(effects, 'projectile_speed', 'Projectile speed', weaponStats.projectileSpeedMultiplier);
+  addMultiplierEffect(effects, 'ammo_cost', 'Ammo cost', weaponStats.ammoCostMultiplier);
+  addMultiplierEffect(effects, 'heat_generation', 'Heat generation', weaponStats.heatGenerationMultiplier);
+  addMultiplierEffect(effects, 'charge_time', 'Charge time', weaponStats.chargeTimeMultiplier);
+  addMultiplierEffect(effects, 'sound_radius', 'Sound radius', weaponStats.soundRadiusMultiplier);
+
+  const spreadModifier = readObject(weaponStats.spreadModifier);
+  const spreadValues = [
+    spreadModifier?.minMultiplier,
+    spreadModifier?.maxMultiplier,
+    spreadModifier?.attackMultiplier,
+    spreadModifier?.firstAttackMultiplier,
+  ]
+    .map(Number)
+    .filter((value) => Number.isFinite(value) && value > 0 && value !== 1);
+  if (spreadValues.length) {
+    const averageSpread = spreadValues.reduce((sum, value) => sum + value, 0) / spreadValues.length;
+    effects.push({ key: 'spread', label: 'Spread', value: percentFromMultiplier(averageSpread), unit: 'percent' });
+  }
+
+  const recoilModifier = readObject(weaponStats.recoilModifier);
+  const recoilValues = [
+    recoilModifier?.decayMultiplier,
+    recoilModifier?.endDecayMultiplier,
+    recoilModifier?.randomnessMultiplier,
+    recoilModifier?.fireRecoilTimeMultiplier,
+    recoilModifier?.fireRecoilStrengthMultiplier,
+    recoilModifier?.angleRecoilStrengthMultiplier,
+    recoilModifier?.fireRecoilStrengthFirstMultiplier,
+  ]
+    .map(Number)
+    .filter((value) => Number.isFinite(value) && value > 0 && value !== 1);
+  if (recoilValues.length) {
+    const averageRecoil = recoilValues.reduce((sum, value) => sum + value, 0) / recoilValues.length;
+    effects.push({ key: 'recoil', label: 'Recoil', value: percentFromMultiplier(averageRecoil), unit: 'percent' });
+  }
+
+  return {
+    uuid: String(row.uuid),
+    class_name: String(row.class_name),
+    name: String(row.name),
+    display_name: String(row.display_name ?? cleanItemDisplayName(String(row.name))),
+    slot: inferAttachmentSlot(dataJson),
+    manufacturer_code: row.manufacturer_code ?? null,
+    manufacturer_name: row.manufacturer_name ?? null,
+    fire_rate_bonus: fireRateBonus,
+    damage_bonus: damageBonus,
+    effects,
+  };
 }
 
 export class ItemQueryService {
@@ -329,6 +445,29 @@ export class ItemQueryService {
       ['name', 'class_name', 'inventory_type'],
       'COALESCE(capacity_micro_scu, 0) DESC, COALESCE(name, class_name) ASC',
     );
+  }
+
+  async getWeaponAttachmentModifiers(env = 'live'): Promise<WeaponAttachmentModifier[]> {
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT i.uuid, i.class_name, i.name, i.manufacturer_code, i.data_json,
+             m.name as manufacturer_name
+        FROM game.items i
+        LEFT JOIN game.manufacturers m ON i.manufacturer_code = m.code
+        WHERE i.env = ? AND i.type = 'Attachment' AND i.sub_type = 'Weapon Modifier'
+        ORDER BY i.name`),
+      env,
+    );
+
+    return rows
+      .map((row) => extractWeaponAttachmentModifier(this.normalizeItemRow(row)))
+      .sort((left, right) => {
+        if (left.slot !== right.slot) return left.slot.localeCompare(right.slot);
+        const leftHasEffects = left.effects.length > 0 ? 0 : 1;
+        const rightHasEffects = right.effects.length > 0 ? 0 : 1;
+        if (leftHasEffects !== rightHasEffects) return leftHasEffects - rightHasEffects;
+        return left.display_name.localeCompare(right.display_name);
+      });
   }
 
   async getItemByUuid(uuid: string, env = 'live'): Promise<Row | null> {

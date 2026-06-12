@@ -45,9 +45,18 @@ export interface MiningYieldResult {
   gadgets: MiningLaserInfo[];
 }
 
-async function fetchMiningComponent(prisma: PrismaClient, uuid: string, _env: string): Promise<MiningLaserInfo | null> {
+function roundPercent(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function normalizeInstability(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0;
+  return value > 1 ? value / 1000 : value;
+}
+
+async function fetchMiningComponent(prisma: PrismaClient, uuid: string, env: string): Promise<MiningLaserInfo | null> {
   const comp = await prisma.component.findFirst({
-    where: { uuid },
+    where: { uuid, env },
     select: {
       uuid: true,
       name: true,
@@ -78,12 +87,12 @@ export async function calculateMiningYield(prisma: PrismaClient, input: MiningYi
   const env = input.env || 'live';
 
   const composition = await prisma.miningComposition.findFirst({
-    where: { uuid: input.compositionUuid },
+    where: { uuid: input.compositionUuid, env },
   });
   if (!composition) return null;
 
   const parts = await prisma.miningCompositionPart.findMany({
-    where: { compositionUuid: input.compositionUuid },
+    where: { compositionUuid: input.compositionUuid, compositionEnv: env },
     include: { element: true },
   });
 
@@ -121,15 +130,15 @@ export async function calculateMiningYield(prisma: PrismaClient, input: MiningYi
     const resistance = Math.max(0, Number(p.element?.resistance ?? 0) - totalResistMod);
 
     const baseYield = (probability * (maxPct + minPct)) / 2;
-    const riskPenalty = Math.max(0, 1 - (instability + resistance) / 2);
+    const riskPenalty = Math.max(0, 1 - (normalizeInstability(instability) + resistance) / 2);
     const optimizedYield = baseYield * riskPenalty * laserSpeed * 1.2;
 
     return {
       elementName: p.element?.name ?? p.elementUuid,
       elementUuid: p.elementUuid,
       probability,
-      baseYield: Math.round(baseYield * 10000) / 100,
-      optimizedYield: Math.round(optimizedYield * 10000) / 100,
+      baseYield: roundPercent(baseYield),
+      optimizedYield: roundPercent(optimizedYield),
       optimalWindow,
       windowStart: Math.max(0, optimalWindow - windowWidth / 2),
       windowEnd: Math.min(1, optimalWindow + windowWidth / 2),
@@ -139,7 +148,9 @@ export async function calculateMiningYield(prisma: PrismaClient, input: MiningYi
   const withRisk = parts.filter((p) => p.element?.instability != null || p.element?.resistance != null);
   let risk: MiningRiskAggregates | null = null;
   if (withRisk.length > 0) {
-    const instabilities = withRisk.map((p) => Math.max(0, Number(p.element?.instability ?? 0) + totalInstabMod)).filter(Number.isFinite);
+    const instabilities = withRisk
+      .map((p) => normalizeInstability(Math.max(0, Number(p.element?.instability ?? 0) + totalInstabMod)))
+      .filter(Number.isFinite);
     const resistances = withRisk.map((p) => Math.max(0, Number(p.element?.resistance ?? 0) - totalResistMod)).filter(Number.isFinite);
     risk = {
       maxInstability: Math.max(...instabilities, 0),
