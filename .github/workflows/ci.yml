@@ -385,7 +385,7 @@ jobs:
             target: production
           - name: bot
             file: bot/Dockerfile
-            target: ''
+            target: production
     steps:
       - uses: actions/checkout@v6
 
@@ -417,8 +417,8 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           target: ${{ matrix.image.target }}
-          cache-from: type=gha,scope=${{ matrix.image.name }}
-          cache-to: type=gha,scope=${{ matrix.image.name }},mode=max
+          cache-from: type=registry,ref=${{ env.IMAGE_PREFIX }}-${{ matrix.image.name }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE_PREFIX }}-${{ matrix.image.name }}:buildcache,mode=max
           provenance: false
 
   deploy:
