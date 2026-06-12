@@ -4,7 +4,7 @@ import { chatAsk } from '../api.js';
 
 const API_TOKEN = process.env.API_TOKEN ?? '';
 const DISCORD_REPLY_HINT =
-  'Answer for Discord embeds. Be concise, structured and data-driven. Never use markdown tables or code-block tables because Discord wraps them badly. Use short headings and bullet lists. For multiple records, use one bullet per record with the name in bold and only the most useful stats. Mention uncertainty when data is missing.';
+  'Answer for Discord embeds. Be concise, structured and data-driven. Never use markdown tables or code-block tables because Discord wraps them badly. Use short headings and bullet lists. For multiple records, use one bullet per record with the name in bold and only the most useful stats. Mention uncertainty when data is missing. When a specialized command would be better, suggest it explicitly: /ship, /compare, /loadout, /component, /item, /commodity, /paint, /trade, /shop, /mining, /crafting, /mission, /location, /faction, /lore, /manufacturers, /search, /top, /version, /changelog or /status.';
 
 export const data = new SlashCommandBuilder()
   .setName('starvis')
