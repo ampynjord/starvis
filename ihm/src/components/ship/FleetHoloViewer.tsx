@@ -52,6 +52,7 @@ interface Props {
   selectedId: number | null;
   onSelect: (id: number) => void;
   onPositionChange?: (id: number, position: { gridX: number; gridZ: number }) => void;
+  onGroupPositionChange?: (updates: Array<{ id: number; gridX: number; gridZ: number }>) => void;
   tacticalMarkers?: TacticalMarker[];
   selectedMarkerId?: string | null;
   onMarkerSelect?: (id: string) => void;
@@ -78,6 +79,7 @@ export function FleetHoloViewer({
   selectedId,
   onSelect,
   onPositionChange,
+  onGroupPositionChange,
   tacticalMarkers = [],
   selectedMarkerId = null,
   onMarkerSelect,
@@ -102,12 +104,13 @@ export function FleetHoloViewer({
   const onVectorSelectRef = useRef(onVectorSelect);
   const onVectorChangeRef = useRef(onVectorChange);
   const onVectorCreateRef = useRef(onVectorCreate);
+  const onGroupPositionChangeRef = useRef(onGroupPositionChange);
   const [loadedCount, setLoadedCount] = useState(0);
   const shipsKey = ships
     .map((ship) => [ship.id, ship.shipUuid, ship.ctmUrl ?? '', ship.group ?? ''].join(':'))
     .join('|')
     + `::${tacticalMarkers.map((marker) => [marker.id, marker.type].join(':')).join('|')}`
-    + `::${tacticalVectors.map((vector) => [vector.id, vector.sourceType, vector.sourceId].join(':')).join('|')}`;
+    + `::${tacticalVectors.map((v) => [v.id, v.sourceType, v.sourceId, v.endX.toFixed(1), v.endZ.toFixed(1), v.controlX.toFixed(1), v.controlZ.toFixed(1)].join(':')).join('|')}`;
 
   // Keep onSelect ref current without rebuilding the scene
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
@@ -120,6 +123,7 @@ export function FleetHoloViewer({
   useEffect(() => { onVectorSelectRef.current = onVectorSelect; }, [onVectorSelect]);
   useEffect(() => { onVectorChangeRef.current = onVectorChange; }, [onVectorChange]);
   useEffect(() => { onVectorCreateRef.current = onVectorCreate; }, [onVectorCreate]);
+  useEffect(() => { onGroupPositionChangeRef.current = onGroupPositionChange; }, [onGroupPositionChange]);
 
   useEffect(() => {
     if (!containerRef.current || (ships.length === 0 && tacticalMarkers.length === 0 && tacticalVectors.length === 0)) return;
@@ -201,8 +205,15 @@ export function FleetHoloViewer({
           new THREE.MeshBasicMaterial({ color: COLOR_RING, transparent: true, opacity: 0 }),
         );
         mesh.rotation.x = -Math.PI / 2;
-        scene.add(mesh);
-        return { group, mesh };
+        const hitDisc = new THREE.Mesh(
+          new THREE.CylinderGeometry(1, 1, 0.5, 32),
+          new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+        );
+        hitDisc.userData.groupDragTarget = group;
+        const container = new THREE.Group();
+        container.add(mesh, hitDisc);
+        scene.add(container);
+        return { group, mesh, hitDisc, container };
       });
 
     // ── Material factory ────────────────────────────────────────────────────────
@@ -244,6 +255,8 @@ export function FleetHoloViewer({
     type GroupRingEntry = {
       group: string;
       mesh: THREE.Mesh;
+      hitDisc: THREE.Mesh;
+      container: THREE.Group;
     };
 
     const makeLabelSprite = (text: string) => {
@@ -361,12 +374,14 @@ export function FleetHoloViewer({
       head.position.y = 0.8;
       head.rotation.set(Math.PI / 2, 0, -angle);
       head.userData.tacticalVectorId = vector.id;
-      const endHandle = new THREE.Mesh(new THREE.SphereGeometry(2.2, 14, 10), new THREE.MeshBasicMaterial({ color: 0xa7f3d0, transparent: true, opacity: 0.88 }));
+      const endHandle = new THREE.Mesh(new THREE.SphereGeometry(4.2, 16, 12), new THREE.MeshBasicMaterial({ color: 0xa7f3d0, transparent: true, opacity: 0.92 }));
       endHandle.position.copy(end);
+      endHandle.position.y = 2;
       endHandle.userData.tacticalVectorId = vector.id;
       endHandle.userData.vectorHandle = 'end';
-      const curveHandle = new THREE.Mesh(new THREE.TorusGeometry(2.8, 0.35, 8, 24), new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0.74 }));
+      const curveHandle = new THREE.Mesh(new THREE.TorusGeometry(5.0, 0.7, 8, 28), new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0.85 }));
       curveHandle.position.copy(control);
+      curveHandle.position.y = 1.5;
       curveHandle.rotation.x = -Math.PI / 2;
       curveHandle.userData.tacticalVectorId = vector.id;
       curveHandle.userData.vectorHandle = 'control';
@@ -708,6 +723,7 @@ export function FleetHoloViewer({
     let isDragging  = false;
     type DragTarget =
       | { kind: 'ship'; entry: ShipEntry; root: THREE.Group }
+      | { kind: 'group'; group: string; root: THREE.Group; startCenter: THREE.Vector3; startPositions: Map<number, THREE.Vector3> }
       | { kind: 'marker'; entry: MarkerEntry; root: THREE.Group }
       | { kind: 'vector-handle'; entry: VectorEntry; root: THREE.Object3D; handle: 'end' | 'control' }
       | { kind: 'vector-launcher'; entry: VectorLauncherEntry; root: THREE.Group };
@@ -726,10 +742,21 @@ export function FleetHoloViewer({
       markerEntries.forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
       vectorEntries.forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
       vectorLaunchers.filter((entry) => entry.root.visible).forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
+      groupRings.forEach((ring) => meshes.push(ring.hitDisc));
       const hits = raycaster.intersectObjects(meshes, true);
       if (!hits.length) return null;
       let obj: THREE.Object3D | null = hits[0].object;
       while (obj) {
+        if (obj.userData.groupDragTarget !== undefined) {
+          const groupName = obj.userData.groupDragTarget as string;
+          const groupEntries = entries.filter((e) => e.ship.group === groupName);
+          const ring = groupRings.find((r) => r.group === groupName);
+          if (!ring) return null;
+          const startPositions = new Map<number, THREE.Vector3>();
+          groupEntries.forEach((e) => startPositions.set(e.ship.id, e.root.position.clone()));
+          const startCenter = ring.container.position.clone();
+          return { kind: 'group', group: groupName, root: ring.container, startCenter, startPositions };
+        }
         if (obj.userData.vectorLauncherShipId !== undefined) {
           const entry = vectorLaunchers.find((launcher) => launcher.ship.id === obj!.userData.vectorLauncherShipId);
           return entry ? { kind: 'vector-launcher', entry, root: entry.root } : null;
@@ -766,9 +793,10 @@ export function FleetHoloViewer({
         mouse.x = ((e.clientX - rect.left) / rect.width)  * 2 - 1;
         mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
-        dragPlane.constant = -target.root.position.y;
+        const refPos = target.kind === 'group' ? target.startCenter : target.root.position;
+        dragPlane.constant = -refPos.y;
         raycaster.ray.intersectPlane(dragPlane, dragPoint);
-        dragOffset.copy(target.root.position).sub(dragPoint);
+        dragOffset.copy(refPos).sub(dragPoint);
       }
     };
 
@@ -790,6 +818,18 @@ export function FleetHoloViewer({
         } else if (dragTarget.kind === 'vector-launcher') {
           dragTarget.root.position.x = dragPoint.x;
           dragTarget.root.position.z = dragPoint.z;
+        } else if (dragTarget.kind === 'group') {
+          const groupTarget = dragTarget;
+          const dx = dragPoint.x + dragOffset.x - groupTarget.startCenter.x;
+          const dz = dragPoint.z + dragOffset.z - groupTarget.startCenter.z;
+          const groupEntries = entries.filter((e) => e.ship.group === groupTarget.group);
+          groupEntries.forEach((e) => {
+            const start = groupTarget.startPositions.get(e.ship.id);
+            if (start) {
+              e.root.position.x = start.x + dx;
+              e.root.position.z = start.z + dz;
+            }
+          });
         } else {
           dragTarget.root.position.x = dragPoint.x + dragOffset.x;
           dragTarget.root.position.z = dragPoint.z + dragOffset.z;
@@ -822,6 +862,13 @@ export function FleetHoloViewer({
             gridX: dragTarget.root.position.x,
             gridZ: dragTarget.root.position.z,
           });
+        }
+        if (dragTarget.kind === 'group') {
+          const groupTarget = dragTarget;
+          const groupEntries = entries.filter((e) => e.ship.group === groupTarget.group);
+          onGroupPositionChangeRef.current?.(
+            groupEntries.map((e) => ({ id: e.ship.id, gridX: e.root.position.x, gridZ: e.root.position.z })),
+          );
         }
         if (dragTarget.kind === 'marker') {
           onMarkerPositionChangeRef.current?.(dragTarget.entry.marker.id, {
@@ -910,11 +957,6 @@ export function FleetHoloViewer({
       });
 
       groupRings.forEach((ring) => {
-        const selected = showGroupSelection && ring.group === selectedGroup;
-        if (ring.mesh.material instanceof THREE.MeshBasicMaterial) {
-          ring.mesh.material.opacity = selected ? 0.68 + Math.sin(t * 5) * 0.18 : 0;
-        }
-        if (!selected) return;
         const groupEntries = entries.filter((entry) => entry.ship.group === ring.group);
         const minX = Math.min(...groupEntries.map((entry) => entry.root.position.x - Math.max(entry.halfWidth, entry.radius * 0.4)));
         const maxX = Math.max(...groupEntries.map((entry) => entry.root.position.x + Math.max(entry.halfWidth, entry.radius * 0.4)));
@@ -923,8 +965,13 @@ export function FleetHoloViewer({
         const centerX = (minX + maxX) / 2;
         const centerZ = (minZ + maxZ) / 2;
         const radius = Math.max(maxX - minX, maxZ - minZ, 22) / 2 + 8;
-        ring.mesh.position.set(centerX, 0.22, centerZ);
+        ring.container.position.set(centerX, 0, centerZ);
         ring.mesh.scale.set(radius, radius, radius);
+        ring.hitDisc.scale.set(radius, 1, radius);
+        const selected = showGroupSelection && ring.group === selectedGroup;
+        if (ring.mesh.material instanceof THREE.MeshBasicMaterial) {
+          ring.mesh.material.opacity = selected ? 0.68 + Math.sin(t * 5) * 0.18 : 0.18;
+        }
         ring.mesh.rotation.z = t * 0.45;
       });
 
