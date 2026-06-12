@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { motion, AnimatePresence } from 'framer-motion';
 import {
+  Activity,
   Building2,
   Eye,
   EyeOff,
@@ -578,13 +579,22 @@ export default function AdminPage() {
         />
 
         {/* Nav links */}
-        <Link
-          href="/admin/corporations"
-          className="flex items-center gap-2 sci-panel px-3 py-2.5 border border-slate-800/60 hover:border-cyan-800/50 text-slate-500 hover:text-cyan-400 transition-colors w-fit"
-        >
-          <Building2 size={13} />
-          <span className="text-[10px] font-orbitron uppercase tracking-widest">Corporations</span>
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href="/admin/corporations"
+            className="flex items-center gap-2 sci-panel px-3 py-2.5 border border-slate-800/60 hover:border-cyan-800/50 text-slate-500 hover:text-cyan-400 transition-colors w-fit"
+          >
+            <Building2 size={13} />
+            <span className="text-[10px] font-orbitron uppercase tracking-widest">Corporations</span>
+          </Link>
+          <Link
+            href="/admin/monitoring"
+            className="flex items-center gap-2 sci-panel px-3 py-2.5 border border-slate-800/60 hover:border-cyan-800/50 text-slate-500 hover:text-cyan-400 transition-colors w-fit"
+          >
+            <Activity size={13} />
+            <span className="text-[10px] font-orbitron uppercase tracking-widest">Monitoring</span>
+          </Link>
+        </div>
 
         {/* Stats */}
         <StatGrid>
