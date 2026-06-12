@@ -30,11 +30,11 @@ function buildWedge(total: number, gap: number) {
   const points: FormationPoint[] = [];
   let row = 0;
   while (points.length < total) {
-    const rowWidth = row + 1;
+    const rowWidth = row === 0 ? 1 : row * 2;
     for (let col = 0; col < rowWidth && points.length < total; col += 1) {
       points.push({
         gridX: (col - (rowWidth - 1) / 2) * gap,
-        gridZ: row * gap * 1.05,
+        gridZ: row * gap * 1.18,
       });
     }
     row += 1;
@@ -44,15 +44,15 @@ function buildWedge(total: number, gap: number) {
 
 function buildV(total: number, gap: number) {
   if (total <= 1) return [{ gridX: 0, gridZ: 0 }];
-  const points: FormationPoint[] = [{ gridX: 0, gridZ: -gap * 0.9 }];
+  const points: FormationPoint[] = [{ gridX: 0, gridZ: -gap * 1.15 }];
   let rank = 1;
   while (points.length < total) {
     if (total - points.length === 1) {
-      points.push({ gridX: 0, gridZ: rank * gap * 0.95 });
+      points.push({ gridX: 0, gridZ: rank * gap * 1.15 });
       break;
     }
-    points.push({ gridX: -rank * gap * 0.9, gridZ: rank * gap * 0.78 });
-    if (points.length < total) points.push({ gridX: rank * gap * 0.9, gridZ: rank * gap * 0.78 });
+    points.push({ gridX: -rank * gap * 1.05, gridZ: rank * gap * 0.9 });
+    if (points.length < total) points.push({ gridX: rank * gap * 1.05, gridZ: rank * gap * 0.9 });
     rank += 1;
   }
   return center(points);
@@ -60,19 +60,30 @@ function buildV(total: number, gap: number) {
 
 function buildDiamond(total: number, gap: number) {
   if (total <= 1) return [{ gridX: 0, gridZ: 0 }];
+  if (total === 2)
+    return center([
+      { gridX: 0, gridZ: -gap },
+      { gridX: 0, gridZ: gap },
+    ]);
+  if (total === 3)
+    return center([
+      { gridX: 0, gridZ: -gap },
+      { gridX: gap, gridZ: gap * 0.45 },
+      { gridX: -gap, gridZ: gap * 0.45 },
+    ]);
   const points: FormationPoint[] = [
-    { gridX: 0, gridZ: -gap },
-    { gridX: gap, gridZ: 0 },
-    { gridX: 0, gridZ: gap },
-    { gridX: -gap, gridZ: 0 },
+    { gridX: 0, gridZ: -gap * 1.25 },
+    { gridX: gap * 1.15, gridZ: 0 },
+    { gridX: 0, gridZ: gap * 1.25 },
+    { gridX: -gap * 1.15, gridZ: 0 },
   ].slice(0, total);
   let ring = 2;
   while (points.length < total) {
     const ringPoints = [
-      { gridX: 0, gridZ: -ring * gap },
-      { gridX: ring * gap, gridZ: 0 },
-      { gridX: 0, gridZ: ring * gap },
-      { gridX: -ring * gap, gridZ: 0 },
+      { gridX: 0, gridZ: -ring * gap * 1.2 },
+      { gridX: ring * gap * 1.15, gridZ: 0 },
+      { gridX: 0, gridZ: ring * gap * 1.2 },
+      { gridX: -ring * gap * 1.15, gridZ: 0 },
     ];
     for (const point of ringPoints) {
       if (points.length >= total) break;
@@ -94,7 +105,7 @@ function buildCircle(total: number, gap: number) {
 
 export function formationPositions(total: number, spacing: number, formation: FormationType): FormationPoint[] {
   const count = Math.max(0, Math.floor(total));
-  const gap = Math.max(spacing, 22);
+  const gap = Math.max(spacing, 36);
   if (count === 0) return [];
 
   if (formation === 'line') {

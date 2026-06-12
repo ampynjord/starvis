@@ -3,6 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import {
+  AlertTriangle,
   Bookmark,
   BookmarkCheck,
   Copy,
@@ -72,7 +73,8 @@ interface FormationPreset {
   id: string;
   name: string;
   type: FormationType;
-  quantity: number;
+  composition?: Record<string, number>;
+  quantity?: number;
   spacing: number;
 }
 
@@ -91,6 +93,9 @@ const defaultStrategy = (): Strategy => ({
 
 const PRESETS_STORAGE_KEY = 'starvis-formation-presets';
 
+const presetShipCount = (preset: FormationPreset) =>
+  Object.values(preset.composition ?? {}).reduce((sum, qty) => sum + qty, 0) || preset.quantity || 0;
+
 function estimateFormationGap(ship: ShipListItem | undefined, fallbackSpacing: number) {
   const size = Math.max(
     Number((ship as any)?.size_x ?? 0),
@@ -101,7 +106,7 @@ function estimateFormationGap(ship: ShipListItem | undefined, fallbackSpacing: n
     Number(ship?.cross_section_y ?? 0),
     24,
   );
-  return Math.max(fallbackSpacing, size * 3, 64);
+  return Math.max(fallbackSpacing, size * 3.6, 78);
 }
 
 function boundsOfPositions(positions: Array<{ gridX: number; gridZ: number }>, padding: number) {
@@ -132,6 +137,7 @@ export default function CorporationTacticsPage() {
   const [formationType, setFormationType] = useState<FormationType>('wedge');
   const [formationQuantity, setFormationQuantity] = useState(4);
   const [formationSpacing, setFormationSpacing] = useState(28);
+  const [formationComposition, setFormationComposition] = useState<Record<string, number>>({});
   const [savedPresets, setSavedPresets] = useState<FormationPreset[]>(() => {
     if (typeof window === 'undefined') return [];
     try { return JSON.parse(localStorage.getItem(PRESETS_STORAGE_KEY) ?? '[]') as FormationPreset[]; } catch { return []; }
@@ -216,6 +222,29 @@ export default function CorporationTacticsPage() {
       });
   }, [fleetItems, shipData, shipQuery]);
 
+  const availableFleetByUuid = useMemo(() => {
+    const map = new Map<string, FleetItem[]>();
+    for (const item of fleetItems) {
+      const uuid = getShipUuid(item);
+      if (!uuid || !item.availableForTactics) continue;
+      const list = map.get(uuid) ?? [];
+      list.push(item);
+      map.set(uuid, list);
+    }
+    return map;
+  }, [fleetItems]);
+
+  const availableShipTypes = useMemo(
+    () =>
+      [...availableFleetByUuid.entries()].map(([uuid, items]) => ({
+        uuid,
+        items,
+        ship: shipData.get(uuid),
+        label: shipData.get(uuid)?.name ?? items[0]?.itemClassName ?? uuid,
+      })).sort((a, b) => a.label.localeCompare(b.label)),
+    [availableFleetByUuid, shipData],
+  );
+
   useEffect(() => {
     if (filteredFleet.length === 0) {
       if (formationShipId !== null) setFormationShipId(null);
@@ -225,6 +254,35 @@ export default function CorporationTacticsPage() {
       setFormationShipId(filteredFleet[0]?.id ?? null);
     }
   }, [filteredFleet, formationShipId]);
+
+  const formationDraftComposition = useMemo(() => {
+    const cleaned = Object.fromEntries(
+      Object.entries(formationComposition)
+        .map(([uuid, qty]) => [uuid, Math.max(0, Math.floor(Number(qty) || 0))] as const)
+        .filter(([, qty]) => qty > 0),
+    );
+    if (Object.keys(cleaned).length > 0) return cleaned;
+    const item = filteredFleet.find((fleetItem) => fleetItem.id === formationShipId);
+    const uuid = item ? getShipUuid(item) : null;
+    return uuid ? { [uuid]: Math.max(1, Math.floor(formationQuantity || 1)) } : {};
+  }, [filteredFleet, formationComposition, formationQuantity, formationShipId]);
+
+  const formationAvailabilityWarnings = useMemo(
+    () =>
+      Object.entries(formationDraftComposition)
+        .map(([uuid, requested]) => {
+          const available = availableFleetByUuid.get(uuid)?.length ?? 0;
+          const label = shipData.get(uuid)?.name ?? uuid;
+          return requested > available ? `${label}: ${requested} requested / ${available} available` : null;
+        })
+        .filter(Boolean) as string[],
+    [availableFleetByUuid, formationDraftComposition, shipData],
+  );
+
+  const formationTotalQuantity = useMemo(
+    () => Object.values(formationDraftComposition).reduce((sum, qty) => sum + qty, 0),
+    [formationDraftComposition],
+  );
 
   const tacticShips: FleetShip[] = useMemo(() => activeStrategy.ships.map((node) => {
     const ship = shipData.get(node.shipUuid);
@@ -258,10 +316,36 @@ export default function CorporationTacticsPage() {
     ? activeStrategy.ships.filter((ship) => ship.group === selectedShip.group).length
     : 0;
 
-  const addFormation = useCallback((item: FleetItem, quantity = formationQuantity, group = formationName, type = formationType, spacing = formationSpacing) => {
-    const uuid = getShipUuid(item);
+  const setCompositionQty = (uuid: string, quantity: number) => {
+    setFormationComposition((prev) => {
+      const next = { ...prev };
+      const clean = Math.max(0, Math.floor(quantity || 0));
+      if (clean <= 0) delete next[uuid];
+      else next[uuid] = clean;
+      return next;
+    });
+  };
+
+  const addShipTypeToComposition = () => {
+    const item = filteredFleet.find((fleetItem) => fleetItem.id === formationShipId);
+    const uuid = item ? getShipUuid(item) : null;
     if (!uuid) return;
-    const ship = shipData.get(uuid);
+    setFormationComposition((prev) => ({
+      ...prev,
+      [uuid]: Math.max(1, (prev[uuid] ?? 0) + Math.max(1, Math.floor(formationQuantity || 1))),
+    }));
+  };
+
+  const addFormation = useCallback((composition: Record<string, number>, group = formationName, type = formationType, spacing = formationSpacing) => {
+    const entriesToPlace = Object.entries(composition)
+      .flatMap(([uuid, quantity]) => {
+        const items = availableFleetByUuid.get(uuid) ?? [];
+        return Array.from({ length: Math.max(0, Math.floor(quantity)) }, (_, index) => {
+          const item = items[index % Math.max(items.length, 1)];
+          return item ? { uuid, item, ship: shipData.get(uuid), index } : null;
+        }).filter(Boolean) as Array<{ uuid: string; item: FleetItem; ship: ShipListItem | undefined; index: number }>;
+      });
+    if (!entriesToPlace.length || formationAvailabilityWarnings.length > 0) return;
 
     // Auto-increment group name to avoid merging with existing formations
     const existingGroups = new Set(activeStrategy.ships.map((s) => s.group));
@@ -271,33 +355,32 @@ export default function CorporationTacticsPage() {
       uniqueGroup = `${group} ${counter++}`;
     }
 
-    const effectiveSpacing = estimateFormationGap(ship, spacing);
-    const draftPositions = Array.from({ length: quantity }, (_, index) => formationPosition(index, quantity, effectiveSpacing, type, 0, 0));
+    const effectiveSpacing = Math.max(...entriesToPlace.map((entry) => estimateFormationGap(entry.ship, spacing)), spacing);
+    const draftPositions = Array.from({ length: entriesToPlace.length }, (_, index) => formationPosition(index, entriesToPlace.length, effectiveSpacing, type, 0, 0));
     const draftBounds = boundsOfPositions(draftPositions, effectiveSpacing * 0.55);
     const existingBounds = boundsOfPositions(activeStrategy.ships, effectiveSpacing * 0.65);
     const baseOffsetX = activeStrategy.ships.length
       ? existingBounds.maxX - draftBounds.minX + effectiveSpacing * 0.8
       : 0;
-    const nextShips = Array.from({ length: quantity }, (_, index) => {
-      const pos = formationPosition(index, quantity, effectiveSpacing, type, baseOffsetX, activeStrategy.ships.length ? existingBounds.minZ - draftBounds.minZ : 0);
+    const nextShips = entriesToPlace.map((entry, index) => {
+      const pos = formationPosition(index, entriesToPlace.length, effectiveSpacing, type, baseOffsetX, activeStrategy.ships.length ? existingBounds.minZ - draftBounds.minZ : 0);
       const id = nextShipIdRef.current++;
       return {
         id,
-        fleetItemId: item.id,
-        shipUuid: uuid,
-        label: quantity > 1 ? `${ship?.name ?? item.itemClassName} ${index + 1}` : ship?.name ?? item.itemClassName,
-        owner: item.addedBy?.username ?? null,
+        fleetItemId: entry.item.id,
+        shipUuid: entry.uuid,
+        label: entriesToPlace.length > 1 ? `${entry.ship?.name ?? entry.item.itemClassName} ${index + 1}` : entry.ship?.name ?? entry.item.itemClassName,
+        owner: entry.item.addedBy?.username ?? null,
         group: uniqueGroup,
         gridX: pos.gridX,
         gridZ: pos.gridZ,
       } satisfies TacticalShip;
     });
     updateActiveStrategy((strategy) => ({ ...strategy, ships: [...strategy.ships, ...nextShips] }));
-  }, [activeStrategy.ships, formationName, formationQuantity, formationSpacing, formationType, shipData, updateActiveStrategy]);
+  }, [activeStrategy.ships, availableFleetByUuid, formationAvailabilityWarnings.length, formationName, formationSpacing, formationType, shipData, updateActiveStrategy]);
 
   const addSelectedFormation = () => {
-    const item = filteredFleet.find((fleetItem) => fleetItem.id === formationShipId);
-    if (item) addFormation(item);
+    addFormation(formationDraftComposition);
   };
 
   const updateGroupPositions = useCallback((updates: Array<{ id: number; gridX: number; gridZ: number }>) => {
@@ -315,7 +398,7 @@ export default function CorporationTacticsPage() {
       id: makeId(),
       name: formationName,
       type: formationType,
-      quantity: formationQuantity,
+      composition: formationDraftComposition,
       spacing: formationSpacing,
     };
     const next = [...savedPresets, preset];
@@ -332,7 +415,8 @@ export default function CorporationTacticsPage() {
   const loadPreset = (preset: FormationPreset) => {
     setFormationName(preset.name);
     setFormationType(preset.type);
-    setFormationQuantity(preset.quantity);
+    setFormationComposition(preset.composition ?? {});
+    setFormationQuantity(presetShipCount(preset) || 1);
     setFormationSpacing(preset.spacing);
   };
 
@@ -540,17 +624,17 @@ export default function CorporationTacticsPage() {
                 aria-label="Formation ship"
                 value={formationShipId ?? ''}
                 onChange={(event) => setFormationShipId(event.target.value ? Number(event.target.value) : null)}
-                disabled={fleetItems.length === 0}
+                disabled={availableShipTypes.length === 0}
                 className="sci-input col-span-2 w-full disabled:opacity-60"
               >
-                {filteredFleet.length === 0 ? (
+                {availableShipTypes.length === 0 ? (
                   <option value="">{loading ? 'Loading ships...' : 'No ships available for tactics'}</option>
                 ) : null}
-                {filteredFleet.map((item) => {
-                  const uuid = getShipUuid(item);
-                  const ship = uuid ? shipData.get(uuid) : null;
-                  return <option key={item.id} value={item.id}>{ship?.name ?? item.itemClassName}</option>;
-                })}
+                {availableShipTypes.map((type) => (
+                  <option key={type.uuid} value={type.items[0]?.id ?? ''}>
+                    {type.label} ({type.items.length} available)
+                  </option>
+                ))}
               </select>
               <label className="space-y-1">
                 <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Qty</span>
@@ -565,8 +649,48 @@ export default function CorporationTacticsPage() {
                   <option key={value} value={value}>{label}</option>
                 ))}
               </select>
-              <button type="button" onClick={addSelectedFormation} disabled={!formationShipId || filteredFleet.length === 0} className="sci-btn-primary col-span-2 flex items-center justify-center gap-1.5 px-3 py-2 text-xs disabled:opacity-40">
-                <Ship size={12} /> {filteredFleet.length === 0 ? 'No tactics ships' : 'Add formation'}
+              <button type="button" onClick={addShipTypeToComposition} disabled={!formationShipId || availableShipTypes.length === 0} className="col-span-2 flex items-center justify-center gap-1.5 rounded-sm border border-cyan-900/50 px-3 py-1.5 font-mono-sc text-xs text-cyan-400 hover:border-cyan-600/70 disabled:opacity-40">
+                <Plus size={12} /> Add to mix
+              </button>
+              {Object.keys(formationDraftComposition).length > 0 && (
+                <div className="col-span-2 space-y-1 rounded-sm border border-slate-800/70 bg-slate-950/35 p-2">
+                  <div className="flex items-center justify-between font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                    <span>Formation mix</span>
+                    <span>{formationTotalQuantity} ships</span>
+                  </div>
+                  {Object.entries(formationDraftComposition).map(([uuid, qty]) => {
+                    const available = availableFleetByUuid.get(uuid)?.length ?? 0;
+                    const label = shipData.get(uuid)?.name ?? uuid;
+                    return (
+                      <div key={uuid} className="flex items-center gap-2">
+                        <span className="min-w-0 flex-1 truncate text-xs text-slate-300">{label}</span>
+                        <span className={qty > available ? 'font-mono-sc text-[10px] text-amber-400' : 'font-mono-sc text-[10px] text-slate-600'}>{available} avail.</span>
+                        <input
+                          aria-label={`${label} quantity`}
+                          type="number"
+                          min={0}
+                          max={24}
+                          value={qty}
+                          onChange={(event) => setCompositionQty(uuid, Number(event.target.value))}
+                          className="sci-input h-7 w-16 py-1 text-xs"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {formationAvailabilityWarnings.length > 0 && (
+                <div className="col-span-2 rounded-sm border border-amber-900/60 bg-amber-950/20 p-2 text-xs text-amber-300">
+                  <p className="mb-1 flex items-center gap-1.5 font-mono-sc text-[10px] uppercase tracking-widest">
+                    <AlertTriangle size={12} /> Not enough available ships
+                  </p>
+                  {formationAvailabilityWarnings.map((warning) => (
+                    <p key={warning} className="text-amber-400/80">{warning}</p>
+                  ))}
+                </div>
+              )}
+              <button type="button" onClick={addSelectedFormation} disabled={formationTotalQuantity === 0 || formationAvailabilityWarnings.length > 0} className="sci-btn-primary col-span-2 flex items-center justify-center gap-1.5 px-3 py-2 text-xs disabled:opacity-40">
+                <Ship size={12} /> Add formation
               </button>
               <button type="button" onClick={savePreset} className="col-span-2 flex items-center justify-center gap-1.5 rounded-sm border border-slate-700 px-3 py-1.5 font-mono-sc text-xs text-slate-400 hover:border-cyan-800/70 hover:text-cyan-300">
                 <Bookmark size={11} /> Save as preset
@@ -588,7 +712,7 @@ export default function CorporationTacticsPage() {
                     className="min-w-0 flex-1 truncate rounded-sm border border-slate-800/60 bg-slate-950/35 px-2 py-1.5 text-left font-mono-sc text-xs text-slate-300 hover:border-cyan-800/70 hover:text-cyan-300"
                   >
                     <span className="block truncate">{preset.name}</span>
-                    <span className="block font-mono-sc text-[9px] text-slate-600">{FORMATION_LABELS[preset.type]} · ×{preset.quantity} · gap {preset.spacing}</span>
+                    <span className="block font-mono-sc text-[9px] text-slate-600">{FORMATION_LABELS[preset.type]} - x{presetShipCount(preset)} - gap {preset.spacing}</span>
                   </button>
                   <button type="button" onClick={() => deletePreset(preset.id)} className="shrink-0 p-1.5 text-slate-700 hover:text-red-400">
                     <X size={11} />
@@ -631,7 +755,10 @@ export default function CorporationTacticsPage() {
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => addFormation(item, 1, formationName)}
+                  onClick={() => {
+                    if (!uuid) return;
+                    setCompositionQty(uuid, (formationDraftComposition[uuid] ?? 0) + 1);
+                  }}
                   className="mb-1.5 flex w-full items-center gap-2 rounded-sm border border-slate-800/60 bg-slate-950/35 px-2 py-2 text-left transition-colors hover:border-cyan-800/70 hover:bg-cyan-950/20"
                 >
                   {ship?.thumbnail ? <img src={ship.thumbnail} alt={ship.name} className="h-7 w-11 shrink-0 object-contain opacity-80" /> : <Ship size={15} className="text-slate-600" />}

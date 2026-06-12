@@ -17,19 +17,19 @@ describe('tactics formations', () => {
 
   it('places a V formation with a lead ship and symmetric wings', () => {
     expect(roundedShape('v')).toEqual([
-      [0, -70],
-      [-45, 14],
-      [45, 14],
-      [0, 70],
+      [0, -86],
+      [-52, 16],
+      [53, 16],
+      [0, 86],
     ]);
   });
 
   it('places a diamond formation on four cardinal points', () => {
     expect(roundedShape('diamond')).toEqual([
-      [0, -50],
-      [50, 0],
-      [0, 50],
-      [-50, 0],
+      [0, -62],
+      [57, 0],
+      [0, 63],
+      [-57, 0],
     ]);
   });
 });

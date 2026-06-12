@@ -34,6 +34,27 @@ test('corporation tactics board adds ships and tactical markers', async ({ conte
             addedBy: { id: 7, username: 'pilot' },
           },
           {
+            id: 103,
+            shipUuid: 'ship-aurora',
+            itemClassName: 'rsi_aurora_mr',
+            availableForTactics: true,
+            addedBy: { id: 7, username: 'pilot' },
+          },
+          {
+            id: 104,
+            shipUuid: 'ship-aurora',
+            itemClassName: 'rsi_aurora_mr',
+            availableForTactics: true,
+            addedBy: { id: 7, username: 'pilot' },
+          },
+          {
+            id: 105,
+            shipUuid: 'ship-aurora',
+            itemClassName: 'rsi_aurora_mr',
+            availableForTactics: true,
+            addedBy: { id: 7, username: 'pilot' },
+          },
+          {
             id: 102,
             shipUuid: 'ship-private',
             itemClassName: 'aegis_private',
