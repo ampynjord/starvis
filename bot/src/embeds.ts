@@ -1,6 +1,7 @@
 import { type ColorResolvable, EmbedBuilder } from 'discord.js';
 import type { ShipResult, TradeRoute } from './api.js';
 import { SITE_URL } from './config.js';
+import { datasetStatFields } from './stats-format.js';
 
 const COLORS = {
   primary: 0x5865f2,
@@ -125,7 +126,7 @@ export function searchEmbed(title: string, description: string): EmbedBuilder {
     .setFooter({ text: 'Starvis - Star Citizen Database' });
 }
 
-export function statusEmbed(healthy: boolean, stats?: Record<string, number>): EmbedBuilder {
+export function statusEmbed(healthy: boolean, stats?: Record<string, number | string | null>): EmbedBuilder {
   const embed = new EmbedBuilder()
     .setColor(healthy ? COLORS.success : COLORS.error)
     .setTitle(healthy ? 'Starvis - Online' : 'Starvis - Offline')
@@ -133,13 +134,7 @@ export function statusEmbed(healthy: boolean, stats?: Record<string, number>): E
     .setFooter({ text: 'Starvis - Star Citizen Database' });
 
   if (stats) {
-    embed.addFields(
-      Object.entries(stats).map(([key, value]) => ({
-        name: key,
-        value: value.toLocaleString('en-US'),
-        inline: true,
-      })),
-    );
+    embed.addFields(datasetStatFields(stats));
   }
 
   return embed;

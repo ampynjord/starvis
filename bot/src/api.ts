@@ -143,7 +143,7 @@ interface HealthResponse {
 
 interface StatsResponse {
   success: boolean;
-  data: Record<string, number>;
+  data: Record<string, number | string | null>;
 }
 
 export interface MiningElementResult {

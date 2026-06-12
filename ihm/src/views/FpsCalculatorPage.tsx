@@ -12,21 +12,7 @@ import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
-import type { ItemListItem } from '@/types/api';
-
-const FIRE_RATE_PROFILES = [
-  { value: 0, label: 'No boost' },
-  { value: 5, label: 'Light boost (+5%)' },
-  { value: 10, label: 'Medium boost (+10%)' },
-  { value: 15, label: 'High boost (+15%)' },
-] as const;
-
-const DAMAGE_PROFILES = [
-  { value: 0, label: 'No boost' },
-  { value: 5, label: 'Light boost (+5%)' },
-  { value: 10, label: 'Medium boost (+10%)' },
-  { value: 15, label: 'High boost (+15%)' },
-] as const;
+import type { ItemListItem, WeaponAttachmentModifier } from '@/types/api';
 
 type FireMode = 'Single' | 'Burst' | 'Auto';
 type TargetMode = 'normal' | 'advanced';
@@ -43,6 +29,16 @@ function clamp(v: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, v));
 }
 
+function formatEffectValue(value: number): string {
+  if (value === 0) return '0%';
+  return `${value > 0 ? '+' : ''}${value.toLocaleString('en-US', { maximumFractionDigits: 1 })}%`;
+}
+
+function attachmentLabel(attachment: WeaponAttachmentModifier): string {
+  const effects = attachment.effects.map((effect) => `${effect.label} ${formatEffectValue(effect.value)}`).join(', ');
+  return effects ? `${attachment.display_name} (${effects})` : `${attachment.display_name} (no stat modifier)`;
+}
+
 export default function FpsCalculatorPage() {
   const { env } = useEnv();
 
@@ -54,8 +50,8 @@ export default function FpsCalculatorPage() {
   const [armorClass, setArmorClass] = useState<'none' | 'light' | 'medium' | 'heavy'>('medium');
   const [hitbox, setHitbox] = useState<Hitbox>('torso');
   const [health, setHealth] = useState<number>(100);
-  const [barrelRateBonus, setBarrelRateBonus] = useState<number>(0);
-  const [underbarrelDamageBonus, setUnderbarrelDamageBonus] = useState<number>(0);
+  const [selectedBarrelAttachmentUuid, setSelectedBarrelAttachmentUuid] = useState<string>('');
+  const [selectedUnderbarrelAttachmentUuid, setSelectedUnderbarrelAttachmentUuid] = useState<string>('');
 
   const { data: itemFilters, isLoading: loadingFilters } = useQuery({
     queryKey: ['items.filters', env],
@@ -67,6 +63,12 @@ export default function FpsCalculatorPage() {
     const allTypes = (itemFilters?.types ?? []).filter(Boolean);
     return allTypes.filter((t) => /(weapon|gun|rifle|pistol|shotgun|smg|sniper|launcher)/i.test(t));
   }, [itemFilters]);
+
+  const { data: attachmentModifiers = [] } = useQuery({
+    queryKey: ['fps.attachment-modifiers', env],
+    queryFn: () => api.items.weaponAttachmentModifiers(env),
+    staleTime: Infinity,
+  });
 
   const { data: weaponListData, isLoading: loadingWeaponList, error: weaponsError, refetch: refetchWeapons } = useQuery({
     queryKey: ['fps.weapon-list', env, weaponTypes.join(',')],
@@ -107,6 +109,41 @@ export default function FpsCalculatorPage() {
     queryFn: () => api.items.get(selectedWeapon!.uuid, env),
     enabled: !!selectedWeapon?.uuid,
   });
+
+  const barrelAttachments = useMemo(
+    () => attachmentModifiers.filter((attachment) => attachment.slot === 'barrel'),
+    [attachmentModifiers],
+  );
+
+  const underbarrelAttachments = useMemo(
+    () => attachmentModifiers.filter((attachment) => attachment.slot === 'underbarrel'),
+    [attachmentModifiers],
+  );
+
+  const selectedBarrelAttachment = useMemo(
+    () => attachmentModifiers.find((attachment) => attachment.uuid === selectedBarrelAttachmentUuid) ?? null,
+    [attachmentModifiers, selectedBarrelAttachmentUuid],
+  );
+
+  const selectedUnderbarrelAttachment = useMemo(
+    () => attachmentModifiers.find((attachment) => attachment.uuid === selectedUnderbarrelAttachmentUuid) ?? null,
+    [attachmentModifiers, selectedUnderbarrelAttachmentUuid],
+  );
+
+  const selectedAttachments = useMemo(
+    () => [selectedBarrelAttachment, selectedUnderbarrelAttachment].filter((attachment): attachment is WeaponAttachmentModifier => !!attachment),
+    [selectedBarrelAttachment, selectedUnderbarrelAttachment],
+  );
+
+  const barrelRateBonus = useMemo(
+    () => selectedAttachments.reduce((sum, attachment) => sum + attachment.fire_rate_bonus, 0),
+    [selectedAttachments],
+  );
+
+  const underbarrelDamageBonus = useMemo(
+    () => selectedAttachments.reduce((sum, attachment) => sum + attachment.damage_bonus, 0),
+    [selectedAttachments],
+  );
 
   const { data: computed } = useQuery({
     queryKey: ['fps.calculate', env, selectedWeapon?.uuid, fireMode, hitbox, armorClass, health, barrelRateBonus, underbarrelDamageBonus, craftedMitigationBonus],
@@ -200,20 +237,21 @@ export default function FpsCalculatorPage() {
               </div>
             </ScifiPanel>
 
-            <ScifiPanel title="Attachments & Crafting" subtitle="Rate and damage enhancements">
+            <ScifiPanel title="Attachments & Crafting" subtitle="Real attachment modifiers from game data">
               <div className="space-y-3">
                 <div>
                   <label className="block text-[11px] text-slate-500 mb-1 font-mono-sc uppercase tracking-wider">
-                    Barrel (rate)
+                    Barrel attachment
                   </label>
                   <select
                     className="sci-select w-full text-xs"
-                    value={barrelRateBonus}
-                    onChange={(e) => setBarrelRateBonus(Number(e.target.value))}
+                    value={selectedBarrelAttachmentUuid}
+                    onChange={(e) => setSelectedBarrelAttachmentUuid(e.target.value)}
                   >
-                    {FIRE_RATE_PROFILES.map((p) => (
-                      <option key={p.value} value={p.value}>
-                        {p.label}
+                    <option value="">No barrel attachment</option>
+                    {barrelAttachments.map((attachment) => (
+                      <option key={attachment.uuid} value={attachment.uuid}>
+                        {attachmentLabel(attachment)}
                       </option>
                     ))}
                   </select>
@@ -221,20 +259,38 @@ export default function FpsCalculatorPage() {
 
                 <div>
                   <label className="block text-[11px] text-slate-500 mb-1 font-mono-sc uppercase tracking-wider">
-                    Underbarrel (damage)
+                    Underbarrel attachment
                   </label>
                   <select
                     className="sci-select w-full text-xs"
-                    value={underbarrelDamageBonus}
-                    onChange={(e) => setUnderbarrelDamageBonus(Number(e.target.value))}
+                    value={selectedUnderbarrelAttachmentUuid}
+                    onChange={(e) => setSelectedUnderbarrelAttachmentUuid(e.target.value)}
                   >
-                    {DAMAGE_PROFILES.map((p) => (
-                      <option key={p.value} value={p.value}>
-                        {p.label}
+                    <option value="">No underbarrel attachment</option>
+                    {underbarrelAttachments.map((attachment) => (
+                      <option key={attachment.uuid} value={attachment.uuid}>
+                        {attachmentLabel(attachment)}
                       </option>
                     ))}
                   </select>
                 </div>
+
+                {selectedAttachments.length > 0 && (
+                  <div className="space-y-1.5 border-t border-border pt-3">
+                    {selectedAttachments.map((attachment) => (
+                      <div key={attachment.uuid} className="text-[11px] text-slate-500">
+                        <span className="text-slate-300">{attachment.display_name}</span>
+                        {attachment.effects.length > 0 ? (
+                          <span className="block font-mono-sc">
+                            {attachment.effects.map((effect) => `${effect.label} ${formatEffectValue(effect.value)}`).join(' / ')}
+                          </span>
+                        ) : (
+                          <span className="block font-mono-sc text-slate-600">No extracted stat modifier.</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </ScifiPanel>
 
@@ -439,8 +495,27 @@ export default function FpsCalculatorPage() {
                     </ScifiPanel>
 
                     <ScifiPanel title="Active Modifiers" className="p-3" actions={<SlidersHorizontal size={14} className="text-cyan-500" />}>
+                      {selectedAttachments.length > 0 && (
+                        <ul className="space-y-1 mb-3">
+                          {selectedAttachments.map((attachment) => (
+                            <li key={attachment.uuid} className="text-xs text-slate-300 flex items-start gap-2">
+                              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 mt-1.5" />
+                              <span>
+                                <span className="block">{attachment.display_name}</span>
+                                <span className="block text-[10px] text-slate-600 font-mono-sc">
+                                  {attachment.effects.length
+                                    ? attachment.effects.map((effect) => `${effect.label} ${formatEffectValue(effect.value)}`).join(' / ')
+                                    : 'No extracted stat modifier'}
+                                </span>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                       {computed.activeModifiers.length === 0 ? (
-                        <p className="text-xs text-slate-600">No active modifiers.</p>
+                        <p className="text-xs text-slate-600">
+                          {selectedAttachments.length > 0 ? 'No active DPS/TTK modifiers.' : 'No active modifiers.'}
+                        </p>
                       ) : (
                         <ul className="space-y-1">
                           {computed.activeModifiers.map((m) => (

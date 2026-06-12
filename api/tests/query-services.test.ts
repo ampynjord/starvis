@@ -290,6 +290,57 @@ describe('ItemQueryService', () => {
     });
   });
 
+  describe('getWeaponAttachmentModifiers', () => {
+    it('extracts real weapon modifier multipliers from attachment data_json', async () => {
+      const prisma = createMockPrisma([
+        [
+          row({
+            uuid: 'attachment-1',
+            class_name: 'test_barrel_s1',
+            name: 'Test Barrel',
+            display_name: 'Test Barrel',
+            manufacturer_code: 'BEHR',
+            manufacturer_name: 'Behring',
+            data_json: {
+              p4kPath: 'libs/foundry/records/entities/scitem/weapons/weapon_modifier/test_barrel_s1.xml',
+              rawJson: {
+                data: {
+                  Components: [
+                    {
+                      __type: 'SAttachableComponentParams',
+                      AttachDef: {
+                        SubType: 'BarrelAttachment',
+                        mannequinTags: { mannequinBaseTag: 'barrel' },
+                      },
+                    },
+                    {
+                      __type: 'SWeaponModifierComponentParams',
+                      modifier: {
+                        weaponStats: {
+                          fireRateMultiplier: 1.12,
+                          damageMultiplier: 1.08,
+                          spreadModifier: { minMultiplier: 0.9, maxMultiplier: 0.9 },
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          }),
+        ],
+      ]);
+      const svc = new ItemQueryService(createGetClient(prisma));
+      const result = await svc.getWeaponAttachmentModifiers();
+      expect(result[0]).toMatchObject({
+        slot: 'barrel',
+        fire_rate_bonus: 12,
+        damage_bonus: 8,
+      });
+      expect(result[0].effects.map((effect) => effect.key)).toEqual(['fire_rate', 'damage', 'spread']);
+    });
+  });
+
   describe('getAllItems env filtering', () => {
     it('passes env=ptu to SQL queries', async () => {
       const prisma = createMockPrisma([[row({ total: 0 })], []]);
@@ -344,8 +395,10 @@ describe('GameDataService cache', () => {
   it('caches getPublicStats for subsequent calls', async () => {
     const statsRow = row({
       ships: 100,
-      flyable_ships: 80,
+      space_ships: 70,
       ground_vehicles: 20,
+      gravlev_vehicles: 10,
+      vehicles: 30,
       components: 5000,
       items: 300,
       commodities: 50,
@@ -367,6 +420,14 @@ describe('GameDataService cache', () => {
     const r1 = await svc.getPublicStats();
     const r2 = await svc.getPublicStats();
     expect(r1).toEqual(r2);
+    expect(r1).toMatchObject({
+      ships: 100,
+      space_ships: 70,
+      flyable_ships: 70,
+      ground_vehicles: 20,
+      gravlev_vehicles: 10,
+      vehicles: 30,
+    });
     // prisma.$queryRawUnsafe should only be called twice (once for stats, once for latest)
     expect((prisma as any).$queryRawUnsafe).toHaveBeenCalledTimes(2);
   });
@@ -374,8 +435,10 @@ describe('GameDataService cache', () => {
   it('getPublicStats passes env to extraction_log query', async () => {
     const statsRow = row({
       ships: 100,
-      flyable_ships: 80,
+      space_ships: 70,
       ground_vehicles: 20,
+      gravlev_vehicles: 10,
+      vehicles: 30,
       components: 5000,
       items: 300,
       commodities: 50,

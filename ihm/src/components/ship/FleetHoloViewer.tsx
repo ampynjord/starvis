@@ -345,85 +345,125 @@ export function FleetHoloViewer({
         obstacle: 0xef4444,
       } satisfies Record<TacticalMarker['type'], number>;
       const color = colorByType[marker.type];
-      const mat = new THREE.MeshPhongMaterial({
-        color,
-        emissive: color,
-        emissiveIntensity: 0.82,
-        transparent: true,
-        opacity: 0.9,
-        shininess: 80,
-      });
-      const ghostMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthWrite: false });
-      const lineMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 });
       const meshes: THREE.Object3D[] = [];
 
-      let body: THREE.Object3D;
-      if (marker.type === 'obstacle') {
-        body = new THREE.Group();
-        const stem = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.8, 16, 12), mat);
-        stem.position.y = 13;
-        const dot = new THREE.Mesh(new THREE.SphereGeometry(3.3, 24, 16), mat.clone());
-        dot.position.y = 3.2;
-        const diamond = new THREE.Mesh(new THREE.OctahedronGeometry(7.2, 0), mat.clone());
-        diamond.position.y = 25.5;
-        diamond.rotation.y = Math.PI / 4;
-        const backplate = new THREE.Mesh(new THREE.OctahedronGeometry(9.4, 0), ghostMat.clone());
-        backplate.position.y = 25.5;
-        backplate.rotation.y = Math.PI / 4;
-        const base = new THREE.Mesh(new THREE.TorusGeometry(12.5, 0.35, 8, 72), ghostMat.clone());
-        base.rotation.x = -Math.PI / 2;
-        base.position.y = 0.25;
-        body.add(backplate, stem, dot, diamond, base);
-      } else if (marker.type === 'poi') {
-        body = new THREE.Group();
-        const arc = new THREE.Mesh(new THREE.TorusGeometry(8.8, 1.25, 12, 64, Math.PI * 1.45), mat);
-        arc.position.y = 22;
-        arc.rotation.set(Math.PI / 2, 0, Math.PI * 0.12);
-        const neck = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.9, 7.8, 14), mat.clone());
-        neck.position.set(2.9, 13.8, 0);
-        neck.rotation.z = -0.42;
-        const dot = new THREE.Mesh(new THREE.SphereGeometry(4.2, 24, 16), mat.clone());
-        dot.position.y = 5.6;
-        const scan = new THREE.Mesh(new THREE.TorusGeometry(12.5, 0.36, 8, 72), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.78, depthTest: false }));
-        scan.position.y = 13.2;
-        scan.rotation.x = -Math.PI / 2;
-        const halo = new THREE.Mesh(new THREE.TorusGeometry(14.5, 0.22, 8, 72), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.72, depthTest: false }));
-        halo.position.y = 0.35;
-        halo.rotation.x = -Math.PI / 2;
-        body.add(arc, neck, dot, scan, halo);
-      } else {
-        body = new THREE.Group();
-        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(1.25, 1.6, 24, 18), mat);
-        shaft.position.y = 18;
-        const fins = new THREE.Mesh(new THREE.CylinderGeometry(6.8, 9.5, 2.2, 4), ghostMat.clone());
-        fins.position.y = 9.6;
-        fins.rotation.y = Math.PI / 4;
-        const tip = new THREE.Mesh(new THREE.ConeGeometry(7.3, 13, 36), mat.clone());
-        tip.position.y = 4.7;
-        tip.rotation.x = Math.PI;
-        const cap = new THREE.Mesh(new THREE.SphereGeometry(3, 20, 12), mat.clone());
-        cap.position.y = 31;
-        const target = new THREE.Mesh(new THREE.TorusGeometry(13.5, 0.36, 8, 72), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.84, depthTest: false }));
-        target.position.y = 0.25;
-        target.rotation.x = -Math.PI / 2;
-        body.add(shaft, fins, tip, cap, target);
-      }
-      body.scale.setScalar(5.4);
-      body.traverse((child) => { child.userData.tacticalMarkerId = marker.id; });
-      root.add(body);
-      meshes.push(body);
+      const markerSize = marker.type === 'obstacle' ? 108 : 100;
+      const lineMat = new THREE.MeshBasicMaterial({
+        color,
+        transparent: true,
+        opacity: 0.82,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        depthTest: false,
+        blending: THREE.AdditiveBlending,
+      });
+      const fillMat = lineMat.clone();
+      fillMat.opacity = 0.24;
 
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(marker.type === 'obstacle' ? 78 : 70, 1.1, 8, 128), mat.clone());
+      const hitDisc = new THREE.Mesh(
+        new THREE.CylinderGeometry(markerSize * 0.62, markerSize * 0.62, 1.2, 48),
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
+      );
+      hitDisc.position.y = 2;
+      hitDisc.userData.tacticalMarkerId = marker.id;
+      hitDisc.userData.keepInvisible = true;
+      root.add(hitDisc);
+      meshes.push(hitDisc);
+
+      const glyphCanvas = document.createElement('canvas');
+      glyphCanvas.width = 512;
+      glyphCanvas.height = 512;
+      const ctx = glyphCanvas.getContext('2d');
+      if (ctx) {
+        const colorValue = new THREE.Color(color);
+        const rgb = `${Math.round(colorValue.r * 255)},${Math.round(colorValue.g * 255)},${Math.round(colorValue.b * 255)}`;
+        ctx.clearRect(0, 0, 512, 512);
+        ctx.shadowColor = `rgba(${rgb},0.95)`;
+        ctx.shadowBlur = 30;
+        ctx.strokeStyle = `rgba(${rgb},0.92)`;
+        ctx.fillStyle = `rgba(${rgb},0.18)`;
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.roundRect(66, 66, 380, 380, 38);
+        ctx.stroke();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(256, 256, 178, 0, Math.PI * 2);
+        ctx.lineWidth = 6;
+        ctx.stroke();
+        ctx.font = marker.type === 'objective' ? '900 250px Orbitron, Rajdhani, Arial' : '900 285px Orbitron, Rajdhani, Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = `rgba(${rgb},0.96)`;
+        ctx.strokeStyle = `rgba(255,255,255,0.22)`;
+        ctx.lineWidth = 4;
+        const glyph = marker.type === 'objective' ? '↓' : marker.type === 'poi' ? '?' : '!';
+        ctx.strokeText(glyph, 256, marker.type === 'objective' ? 248 : 260);
+        ctx.fillText(glyph, 256, marker.type === 'objective' ? 248 : 260);
+      }
+      const glyphTexture = new THREE.CanvasTexture(glyphCanvas);
+      glyphTexture.colorSpace = THREE.SRGBColorSpace;
+      const glyph = new THREE.Mesh(
+        new THREE.PlaneGeometry(markerSize, markerSize),
+        new THREE.MeshBasicMaterial({
+          map: glyphTexture,
+          transparent: true,
+          opacity: 0.96,
+          depthWrite: false,
+          depthTest: false,
+          side: THREE.DoubleSide,
+          blending: THREE.AdditiveBlending,
+        }),
+      );
+      glyph.rotation.x = -Math.PI / 2;
+      glyph.position.y = 3.2;
+      glyph.renderOrder = 92;
+      glyph.userData.tacticalMarkerId = marker.id;
+      root.add(glyph);
+      meshes.push(glyph);
+
+      const shape = new THREE.Shape();
+      if (marker.type === 'objective') {
+        shape.moveTo(0, -markerSize * 0.36);
+        shape.lineTo(markerSize * 0.28, markerSize * 0.02);
+        shape.lineTo(markerSize * 0.11, markerSize * 0.02);
+        shape.lineTo(markerSize * 0.11, markerSize * 0.34);
+        shape.lineTo(-markerSize * 0.11, markerSize * 0.34);
+        shape.lineTo(-markerSize * 0.11, markerSize * 0.02);
+        shape.lineTo(-markerSize * 0.28, markerSize * 0.02);
+      } else if (marker.type === 'poi') {
+        shape.absarc(0, 0, markerSize * 0.3, 0, Math.PI * 2, false);
+      } else {
+        shape.moveTo(0, -markerSize * 0.34);
+        shape.lineTo(markerSize * 0.34, 0);
+        shape.lineTo(0, markerSize * 0.34);
+        shape.lineTo(-markerSize * 0.34, 0);
+      }
+      shape.closePath();
+      const fill = new THREE.Mesh(new THREE.ShapeGeometry(shape), fillMat);
+      fill.rotation.x = -Math.PI / 2;
+      fill.position.y = 2.7;
+      fill.renderOrder = 90;
+      fill.userData.tacticalMarkerId = marker.id;
+      root.add(fill);
+      meshes.push(fill);
+
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(markerSize * 0.58, 1.9, 8, 128), lineMat.clone());
       ring.rotation.x = -Math.PI / 2;
-      ring.position.y = 0.2;
+      ring.position.y = 3.8;
+      ring.renderOrder = 91;
       ring.userData.tacticalMarkerId = marker.id;
       root.add(ring);
       meshes.push(ring);
 
-      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(92, 0.1, 92)), lineMat);
-      edges.position.y = 0.1;
-      edges.userData.tacticalMarkerId = marker.id;
-      root.add(edges);
+      const outerRing = new THREE.Mesh(new THREE.TorusGeometry(markerSize * 0.72, 0.85, 8, 128), lineMat.clone());
+      outerRing.rotation.x = -Math.PI / 2;
+      outerRing.position.y = 3.6;
+      outerRing.renderOrder = 91;
+      outerRing.userData.tacticalMarkerId = marker.id;
+      root.add(outerRing);
+      meshes.push(outerRing);
+
       scene.add(root);
       return { marker, root, meshes, pulse: ring };
     };
@@ -462,30 +502,33 @@ export function FleetHoloViewer({
       const control = new THREE.Vector3(vector.controlX, 0.55, vector.controlZ);
       const end = new THREE.Vector3(vector.endX, 0.55, vector.endZ);
       const curve = new THREE.QuadraticBezierCurve3(start, control, end);
-      const mat = new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.84, side: THREE.DoubleSide, depthTest: false });
-      const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 48, 1.4, 8, false), mat);
-      tube.userData.tacticalVectorId = vector.id;
       const direction = end.clone().sub(control);
-      const angle = Math.atan2(direction.x, direction.z);
-      const head = new THREE.Mesh(new THREE.ConeGeometry(10, 24, 3), mat.clone());
-      head.position.copy(end);
-      head.position.y = 1.2;
-      head.rotation.set(Math.PI / 2, 0, -angle);
+      const length = Math.max(start.distanceTo(end), 1);
+      const width = Math.max(18, Math.min(46, length * 0.08));
+      const mat = new THREE.MeshBasicMaterial({ color: 0x22f5df, transparent: true, opacity: 0.56, side: THREE.DoubleSide, depthTest: false });
+      const glowMat = new THREE.MeshBasicMaterial({ color: 0x67fff2, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthTest: false });
+      const ribbon = new THREE.Mesh(makeFlatVectorRibbon(curve, width), mat);
+      ribbon.userData.tacticalVectorId = vector.id;
+      const glow = new THREE.Mesh(makeFlatVectorRibbon(curve, width * 1.55), glowMat);
+      glow.userData.tacticalVectorId = vector.id;
+      const head = new THREE.Mesh(makeFlatArrowHead(end, direction, width * 1.25), mat.clone());
       head.userData.tacticalVectorId = vector.id;
-      const endHandle = new THREE.Mesh(new THREE.SphereGeometry(12, 20, 14), new THREE.MeshBasicMaterial({ color: 0xa7f3d0, transparent: true, opacity: 0.96, depthTest: false }));
+      const headGlow = new THREE.Mesh(makeFlatArrowHead(end, direction, width * 1.85), glowMat.clone());
+      headGlow.userData.tacticalVectorId = vector.id;
+      const endHandle = new THREE.Mesh(new THREE.SphereGeometry(17, 24, 16), new THREE.MeshBasicMaterial({ color: 0xa7f3d0, transparent: true, opacity: 0.98, depthTest: false }));
       endHandle.position.copy(end);
-      endHandle.position.y = 3;
+      endHandle.position.y = 8;
       endHandle.userData.tacticalVectorId = vector.id;
       endHandle.userData.vectorHandle = 'end';
-      const curveHandle = new THREE.Mesh(new THREE.TorusGeometry(16, 1.8, 8, 48), new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0.95, depthTest: false }));
+      const curveHandle = new THREE.Mesh(new THREE.TorusGeometry(24, 3.4, 10, 64), new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0.95, depthTest: false }));
       curveHandle.position.copy(control);
-      curveHandle.position.y = 2.5;
+      curveHandle.position.y = 5.5;
       curveHandle.rotation.x = -Math.PI / 2;
       curveHandle.userData.tacticalVectorId = vector.id;
       curveHandle.userData.vectorHandle = 'control';
-      root.add(tube, head, endHandle, curveHandle);
+      root.add(glow, ribbon, headGlow, head, endHandle, curveHandle);
       scene.add(root);
-      return { vector, root, meshes: [tube, head, endHandle, curveHandle], endHandle, curveHandle };
+      return { vector, root, meshes: [glow, ribbon, headGlow, head, endHandle, curveHandle], endHandle, curveHandle };
     };
 
     const vectorEntries = tacticalVectors.map(makeVectorEntry);
@@ -499,6 +542,52 @@ export function FleetHoloViewer({
       x: sourceEntries.length ? sourceEntries.reduce((sum, entry) => sum + entry.root.position.x, 0) / sourceEntries.length : 0,
       z: sourceEntries.length ? sourceEntries.reduce((sum, entry) => sum + entry.root.position.z, 0) / sourceEntries.length : 0,
     });
+
+    const makeFlatVectorRibbon = (curve: THREE.QuadraticBezierCurve3, width: number) => {
+      const points = curve.getPoints(64);
+      const vertices: number[] = [];
+      const indices: number[] = [];
+      for (let i = 0; i < points.length; i++) {
+        const prev = points[Math.max(0, i - 1)];
+        const next = points[Math.min(points.length - 1, i + 1)];
+        const tangent = next.clone().sub(prev);
+        if (tangent.lengthSq() < 0.001) tangent.set(0, 0, 1);
+        tangent.normalize();
+        const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).multiplyScalar(width / 2);
+        const left = points[i].clone().add(normal);
+        const right = points[i].clone().sub(normal);
+        vertices.push(left.x, 0.72, left.z, right.x, 0.72, right.z);
+        if (i < points.length - 1) {
+          const a = i * 2;
+          indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+        }
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      return geometry;
+    };
+
+    const makeFlatArrowHead = (end: THREE.Vector3, direction: THREE.Vector3, width: number) => {
+      const forward = direction.clone();
+      if (forward.lengthSq() < 0.001) forward.copy(TACTICAL_FRONT_DIRECTION);
+      forward.normalize();
+      const side = new THREE.Vector3(-forward.z, 0, forward.x);
+      const length = width * 2.2;
+      const back = end.clone().sub(forward.multiplyScalar(length));
+      const left = back.clone().add(side.clone().multiplyScalar(width * 0.95));
+      const right = back.clone().sub(side.clone().multiplyScalar(width * 0.95));
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+        end.x, 0.76, end.z,
+        left.x, 0.76, left.z,
+        right.x, 0.76, right.z,
+      ], 3));
+      geometry.setIndex([0, 1, 2]);
+      geometry.computeVertexNormals();
+      return geometry;
+    };
 
     const vectorPayloadFromLauncher = (launcher: VectorLauncherEntry, endX: number, endZ: number): Omit<TacticalVector, 'id'> => {
       const sourceEntries = sourceEntriesForLauncher(launcher);
@@ -832,6 +921,38 @@ export function FleetHoloViewer({
     const dragPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     const dragPoint = new THREE.Vector3();
     const dragOffset = new THREE.Vector3();
+    const launcherDragPreview = new THREE.Group();
+    launcherDragPreview.visible = false;
+    launcherDragPreview.renderOrder = 95;
+    scene.add(launcherDragPreview);
+
+    const clearLauncherDragPreview = () => {
+      launcherDragPreview.children.forEach((child) => disposeObject3D(child));
+      launcherDragPreview.clear();
+      launcherDragPreview.visible = false;
+    };
+
+    const updateLauncherDragPreview = (launcher: VectorLauncherEntry, endX: number, endZ: number) => {
+      clearLauncherDragPreview();
+      const payload = vectorPayloadFromLauncher(launcher, endX, endZ);
+      const sourceEntries = sourceEntriesForLauncher(launcher);
+      const startPoint = sourceCenter(sourceEntries);
+      const start = new THREE.Vector3(startPoint.x, 0.55, startPoint.z);
+      const control = new THREE.Vector3(payload.controlX, 0.55, payload.controlZ);
+      const end = new THREE.Vector3(payload.endX, 0.55, payload.endZ);
+      const curve = new THREE.QuadraticBezierCurve3(start, control, end);
+      const direction = end.clone().sub(control);
+      const length = Math.max(start.distanceTo(end), 1);
+      const width = Math.max(22, Math.min(58, length * 0.09));
+      const mat = new THREE.MeshBasicMaterial({ color: 0x7dfff4, transparent: true, opacity: 0.68, side: THREE.DoubleSide, depthTest: false });
+      const glowMat = new THREE.MeshBasicMaterial({ color: 0x7dfff4, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthTest: false });
+      const ribbon = new THREE.Mesh(makeFlatVectorRibbon(curve, width), mat);
+      const glow = new THREE.Mesh(makeFlatVectorRibbon(curve, width * 1.75), glowMat);
+      const head = new THREE.Mesh(makeFlatArrowHead(end, direction, width * 1.3), mat.clone());
+      const headGlow = new THREE.Mesh(makeFlatArrowHead(end, direction, width * 2), glowMat.clone());
+      launcherDragPreview.add(glow, ribbon, headGlow, head);
+      launcherDragPreview.visible = true;
+    };
 
     const getHitTarget = (clientX: number, clientY: number): DragTarget | null => {
       const rect = renderer.domElement.getBoundingClientRect();
@@ -906,6 +1027,7 @@ export function FleetHoloViewer({
       if (target) {
         dragTarget = target;
         controls.enabled = false;
+        renderer.domElement.style.cursor = target.kind === 'vector-launcher' ? 'grabbing' : 'move';
 
         // Compute drag offset
         const rect = renderer.domElement.getBoundingClientRect();
@@ -937,6 +1059,7 @@ export function FleetHoloViewer({
         } else if (dragTarget.kind === 'vector-launcher') {
           dragTarget.root.position.x = dragPoint.x;
           dragTarget.root.position.z = dragPoint.z;
+          updateLauncherDragPreview(dragTarget.entry, dragPoint.x, dragPoint.z);
         } else if (dragTarget.kind === 'group') {
           const groupTarget = dragTarget;
           const dx = dragPoint.x + dragOffset.x - groupTarget.startCenter.x;
@@ -958,6 +1081,7 @@ export function FleetHoloViewer({
 
     const onPointerUp = (_e: PointerEvent) => {
       controls.enabled = true;
+      renderer.domElement.style.cursor = 'grab';
       if (!isDragging && dragTarget) {
         if (dragTarget.kind === 'ship') onSelectRef.current(dragTarget.entry.ship.id);
         if (dragTarget.kind === 'group') {
@@ -1013,6 +1137,7 @@ export function FleetHoloViewer({
         }
       }
       saveCameraView();
+      clearLauncherDragPreview();
       dragTarget = null;
     };
 
@@ -1097,9 +1222,14 @@ export function FleetHoloViewer({
         ring.vectorLauncher.root.rotation.y = Math.atan2(tacticalFrontDirection.x, tacticalFrontDirection.z);
         ring.vectorLauncher.root.scale.setScalar(launcherScale);
         ring.vectorLauncher.root.visible = selected;
+        const isDraggingThisLauncher = dragTarget?.kind === 'vector-launcher' && dragTarget.entry === ring.vectorLauncher;
+        const grabPulse = isDraggingThisLauncher ? 1.28 + Math.sin(t * 13) * 0.14 : 1;
+        ring.vectorLauncher.root.scale.setScalar(launcherScale * grabPulse);
         ring.vectorLauncher.meshes.forEach((mesh, index) => {
           if (mesh.material instanceof THREE.MeshBasicMaterial) {
-            mesh.material.opacity = index === 0 ? 0.16 : index === 1 ? 0.82 + Math.sin(t * 5) * 0.16 : 0.98 + Math.sin(t * 5) * 0.02;
+            mesh.material.opacity = isDraggingThisLauncher
+              ? (index === 0 ? 0.36 : 1)
+              : index === 0 ? 0.16 : index === 1 ? 0.82 + Math.sin(t * 5) * 0.16 : 0.98 + Math.sin(t * 5) * 0.02;
           }
         });
       });
@@ -1108,6 +1238,10 @@ export function FleetHoloViewer({
         const isSelected = entry.marker.id === selectedMarkerIdRef.current;
         entry.root.traverse((child) => {
           if (child instanceof THREE.Mesh && (child.material instanceof THREE.MeshBasicMaterial || child.material instanceof THREE.MeshPhongMaterial)) {
+            if (child.userData.keepInvisible) {
+              child.material.opacity = 0;
+              return;
+            }
             child.material.opacity = isSelected ? 0.9 : 0.62 + Math.sin(t * 2.5) * 0.08;
           }
         });
@@ -1144,9 +1278,14 @@ export function FleetHoloViewer({
         launcher.root.rotation.y = Math.atan2(tacticalFrontDirection.x, tacticalFrontDirection.z);
         launcher.root.scale.setScalar(launcherScale);
         launcher.root.visible = isSelected && !isPartOfSelectedGroup;
+        const isDraggingThisLauncher = dragTarget?.kind === 'vector-launcher' && dragTarget.entry === launcher;
+        const grabPulse = isDraggingThisLauncher ? 1.32 + Math.sin(t * 13) * 0.16 : 1;
+        launcher.root.scale.setScalar(launcherScale * grabPulse);
         launcher.meshes.forEach((mesh, index) => {
           if (mesh.material instanceof THREE.MeshBasicMaterial) {
-            mesh.material.opacity = index === 0 ? 0.12 : index === 1 ? 0.7 + Math.sin(t * 5) * 0.18 : 0.94 + Math.sin(t * 5) * 0.06;
+            mesh.material.opacity = isDraggingThisLauncher
+              ? (index === 0 ? 0.34 : 1)
+              : index === 0 ? 0.12 : index === 1 ? 0.7 + Math.sin(t * 5) * 0.18 : 0.94 + Math.sin(t * 5) * 0.06;
           }
         });
       });

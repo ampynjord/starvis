@@ -3,6 +3,7 @@ import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 import { getStats } from '../api.js';
 import { SITE_URL } from '../config.js';
 import { errorEmbed } from '../embeds.js';
+import { datasetStatLines } from '../stats-format.js';
 
 const COMMAND_GROUPS: Array<{ name: string; value: string }> = [
   {
@@ -44,9 +45,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       .setFooter({ text: 'Starvis - Discord command map' });
 
     if (stats?.data) {
-      const lines = Object.entries(stats.data)
-        .slice(0, 9)
-        .map(([key, value]) => `${humanize(key)}: **${value.toLocaleString('en-US')}**`);
+      const lines = datasetStatLines(stats.data).slice(0, 11);
       embed.addFields({ name: 'Current dataset', value: lines.join('\n') || 'No stats available.', inline: false });
     }
 
@@ -55,8 +54,4 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
     const msg = err instanceof Error ? err.message : 'Unknown error';
     await interaction.editReply({ embeds: [errorEmbed(msg)] });
   }
-}
-
-function humanize(key: string): string {
-  return key.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }

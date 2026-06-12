@@ -171,6 +171,15 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
 
   /** Generic item list — supports all filters via query params */
   router.get(
+    '/api/v1/items/weapon-attachments/modifiers',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const data = await gameDataService!.items.getWeaponAttachmentModifiers(getQueryEnv(req));
+      sendWithETag(req, res, { success: true, count: data.length, data });
+    }),
+  );
+
+  router.get(
     '/api/v1/ammo/stats',
     requireGameData,
     asyncHandler(async (req, res) => {

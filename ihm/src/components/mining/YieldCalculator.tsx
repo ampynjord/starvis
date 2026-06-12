@@ -53,13 +53,13 @@ export function YieldCalculator({ yieldResults, selectedElementUuid }: YieldCalc
             if (aSelected === bSelected) return 0;
             return aSelected ? -1 : 1;
           })
-          .map((result) => {
+          .map((result, index) => {
             const isSelected =
               selectedElementUuid != null && result.elementUuid === selectedElementUuid;
 
             return (
               <motion.div
-                key={result.elementName}
+                key={`${result.elementUuid}-${index}`}
                 initial={{ opacity: 0, x: -8 }}
                 animate={{ opacity: 1, x: 0 }}
                 className={`sci-panel px-4 py-3 ${isSelected ? 'border-cyan-500/70 bg-cyan-500/5' : ''}`}

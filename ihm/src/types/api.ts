@@ -463,6 +463,19 @@ export interface Item extends ItemListItem {
   game_data: Record<string, unknown> | null;
 }
 
+export interface WeaponAttachmentModifier {
+  uuid: string;
+  class_name: string;
+  name: string;
+  display_name: string;
+  slot: 'barrel' | 'underbarrel' | 'optic' | 'other';
+  manufacturer_code: string | null;
+  manufacturer_name: string | null;
+  fire_rate_bonus: number;
+  damage_bonus: number;
+  effects: { key: string; label: string; value: number; unit: 'percent' }[];
+}
+
 export interface ItemNavigation {
   fpsCategories: { slug: string; label: string; count: number; group: string; parentSlug?: string }[];
   otherCategories: { slug: string; label: string; count: number; group: string }[];

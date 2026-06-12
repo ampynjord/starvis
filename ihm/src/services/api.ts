@@ -50,6 +50,7 @@ import type {
   StatsOverview,
   TradeRoute,
   Version,
+  WeaponAttachmentModifier,
 } from '@/types/api';
 import { API_BASE } from '@/utils/constants';
 
@@ -399,6 +400,7 @@ export const api = {
       p?: { env?: string; page?: number; limit?: number; search?: string; sub_type?: string; manufacturer?: string },
     ) => mapPaginated(await get<PaginatedResponse<ItemListItem>>(`/items/category/${slug}`, p), mapItem),
     categories: (env?: string) => get<{ slug: string; label: string; count: number }[]>('/items/categories', { env }),
+    weaponAttachmentModifiers: (env?: string) => get<WeaponAttachmentModifier[]>('/items/weapon-attachments/modifiers', { env }),
     subTypes: (type?: string, env?: string) => get<{ sub_types: { value: string; count: number }[] }>('/items/sub-types', { type, env }),
     manufacturers: (type?: string, env?: string) =>
       get<{ manufacturers: { code: string; name: string; count: number }[] }>('/items/manufacturers', { type, env }),

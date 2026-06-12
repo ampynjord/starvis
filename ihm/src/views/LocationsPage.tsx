@@ -332,7 +332,7 @@ function factionColor(faction?: string | null) {
   if (value.includes('banu')) return 0x34d399;
   if (value.includes('vanduul')) return 0xf87171;
   if (value.includes('unclaimed')) return 0x94a3b8;
-  return 0xfacc15;
+  return 0x39e7ff;
 }
 
 function factionHex(faction?: string | null) {
@@ -479,6 +479,124 @@ function descendants(nodes: MapNode[], rootId: string) {
     }
   }
   return result;
+}
+
+function orbitalPosition(center: THREE.Vector3, distance: number, angle: number, height = 0) {
+  return center.clone().add(new THREE.Vector3(Math.cos(angle) * distance, height, Math.sin(angle) * distance));
+}
+
+function relaxGalaxyNodes(nodes: MapNode[]) {
+  const display = nodes.map((node) => ({ ...node, position: node.position.clone(), radius: Math.max(node.radius * 0.88, 0.9) }));
+  const minDistance = 8.8;
+  for (let iteration = 0; iteration < 90; iteration++) {
+    for (let i = 0; i < display.length; i++) {
+      for (let j = i + 1; j < display.length; j++) {
+        const a = display[i];
+        const b = display[j];
+        const delta = b.position.clone().sub(a.position);
+        delta.y = 0;
+        const distance = Math.max(delta.length(), 0.001);
+        const wanted = minDistance + a.radius + b.radius;
+        if (distance >= wanted) continue;
+        const push = delta.normalize().multiplyScalar((wanted - distance) * 0.5);
+        a.position.add(push.clone().multiplyScalar(-1));
+        b.position.add(push);
+      }
+    }
+  }
+  return display.map((node) => {
+    const radial = Math.hypot(node.position.x, node.position.z);
+    if (radial > 158) {
+      const scale = 158 / radial;
+      node.position.x *= scale;
+      node.position.z *= scale;
+    }
+    node.position.y = (hash(`${node.id}:galaxy-layer`) - 0.5) * 7;
+    return node;
+  });
+}
+
+function layoutSystemNodes(nodes: MapNode[], currentRoot: MapNode | null) {
+  if (!currentRoot) return nodes;
+  const ids = descendants(nodes, currentRoot.id);
+  const source = nodes.filter((node) => ids.has(node.id));
+  const byId = new Map(source.map((node) => [node.id, node]));
+  const childrenByParent = new Map<string, MapNode[]>();
+  for (const node of source) {
+    if (!node.parentId) continue;
+    const list = childrenByParent.get(node.parentId);
+    if (list) list.push(node);
+    else childrenByParent.set(node.parentId, [node]);
+  }
+  for (const list of childrenByParent.values()) {
+    list.sort(
+      (a, b) =>
+        TYPE_ORDER.indexOf(normalizeType(a.loc.type)) - TYPE_ORDER.indexOf(normalizeType(b.loc.type)) ||
+        a.label.localeCompare(b.label),
+    );
+  }
+
+  const positions = new Map<string, THREE.Vector3>([[currentRoot.id, new THREE.Vector3(0, 0, 0)]]);
+  const rootChildren = childrenByParent.get(currentRoot.id) ?? [];
+  const starChildren = rootChildren.filter((node) => normalizeType(node.loc.type) === 'star');
+  const planets = rootChildren.filter((node) => normalizeType(node.loc.type) === 'planet');
+  const rootPorts = rootChildren.filter((node) => ['station', 'landing_zone', 'rest_stop', 'outpost', 'comm_array'].includes(normalizeType(node.loc.type)));
+  const jumpPoints = rootChildren.filter((node) => normalizeType(node.loc.type) === 'jump_point');
+  const otherRootChildren = rootChildren.filter(
+    (node) => !starChildren.includes(node) && !planets.includes(node) && !rootPorts.includes(node) && !jumpPoints.includes(node),
+  );
+
+  starChildren.forEach((node, index) => {
+    positions.set(node.id, index === 0 ? new THREE.Vector3(0, 0.1, 0) : orbitalPosition(new THREE.Vector3(), 4 + index * 2.2, index * 2.399963229728653, 0.25));
+  });
+
+  planets.forEach((node, index) => {
+    const angle = -Math.PI * 0.12 + index * 2.399963229728653;
+    const ring = 10 + index * 5.2;
+    positions.set(node.id, orbitalPosition(new THREE.Vector3(), ring, angle, (hash(`${node.id}:system-y`) - 0.5) * 0.5));
+  });
+
+  rootPorts.forEach((node, index) => {
+    positions.set(node.id, orbitalPosition(new THREE.Vector3(), 14 + index * 2.4, Math.PI * 0.75 + index * 1.35, 0.45));
+  });
+
+  jumpPoints.forEach((node, index) => {
+    positions.set(node.id, orbitalPosition(new THREE.Vector3(), 34 + (index % 2) * 4, -Math.PI * 0.35 + index * 0.9, 0.2));
+  });
+
+  otherRootChildren.forEach((node, index) => {
+    positions.set(node.id, orbitalPosition(new THREE.Vector3(), 18 + index * 2.8, Math.PI * 1.25 + index * 1.2, 0.1));
+  });
+
+  const orderedParents = [...planets, ...rootPorts, ...otherRootChildren, ...starChildren];
+  for (const parent of orderedParents) {
+    const parentPosition = positions.get(parent.id);
+    if (!parentPosition) continue;
+    const children = childrenByParent.get(parent.id) ?? [];
+    children.forEach((child, index) => {
+      const type = normalizeType(child.loc.type);
+      const distance =
+        type === 'moon' ? 3.5 + index * 0.9 :
+        type === 'station' || type === 'rest_stop' || type === 'landing_zone' ? 4.8 + index * 0.7 :
+        5.8 + index * 0.8;
+      const angle = index * 2.399963229728653 + hash(child.id) * 0.5;
+      positions.set(child.id, orbitalPosition(parentPosition, distance, angle, 0.35));
+    });
+  }
+
+  return source.map((node) => {
+    const type = normalizeType(node.loc.type);
+    const positioned = positions.get(node.id) ?? byId.get(node.parentId ?? '')?.position ?? new THREE.Vector3();
+    return {
+      ...node,
+      position: positioned.clone(),
+      radius:
+        node.id === currentRoot.id ? 1.15 :
+        type === 'star' ? Math.max(node.radius, 1.35) :
+        type === 'planet' ? Math.max(node.radius, 1.3) :
+        node.radius,
+    };
+  });
 }
 
 function Scene({
@@ -629,6 +747,7 @@ function Scene({
     const meshes = new Map<string, THREE.Mesh>();
     const halos = new Map<string, THREE.Sprite>();
     const labels: THREE.Sprite[] = [];
+    const denseScene = nodes.filter((node) => !node.parentId).length > 45;
 
     function glowSprite(color: number) {
       const canvas = document.createElement('canvas');
@@ -712,7 +831,8 @@ function Scene({
         }
       }
 
-      if ((!isRoot && (type === 'star' || type === 'planet')) || (isRoot && node.label.length <= 14)) {
+      const showRootLabel = isRoot && node.label.length <= 14 && (!denseScene || node.id === selectedId || node.id === highlightId);
+      if ((!isRoot && (type === 'star' || type === 'planet')) || showRootLabel) {
         const label = labelSprite(node.label, type === 'star' ? '#facc15' : '#67e8f9');
         if (label) {
           label.position.copy(node.position).add(new THREE.Vector3(0, node.radius + 2.2, 0));
@@ -1002,6 +1122,14 @@ export default function LocationsPage() {
     });
   }, [allNodes, query, roots, systemIds, typeFilter, viewMode]);
 
+  const sceneNodes = useMemo(() => {
+    const base =
+      viewMode === 'galaxy'
+        ? visibleNodes.length ? visibleNodes : roots
+        : allNodes.filter((node) => !systemIds || systemIds.has(node.id));
+    return viewMode === 'galaxy' ? relaxGalaxyNodes(base) : layoutSystemNodes(base, currentRoot);
+  }, [allNodes, currentRoot, roots, systemIds, viewMode, visibleNodes]);
+
   const countsByType = useMemo(() => {
     const counts = new Map<string, number>();
     const baseNodes = viewMode === 'galaxy' ? roots : allNodes.filter((node) => !systemIds || systemIds.has(node.id));
@@ -1085,6 +1213,10 @@ export default function LocationsPage() {
     () => jumpConnections.map((connection) => ({ a: connection.from.id, b: connection.to.id })),
     [jumpConnections],
   );
+  const sceneJumpLinkPairs = useMemo(() => {
+    const visibleIds = new Set(sceneNodes.map((node) => node.id));
+    return jumpLinkPairs.filter((link) => visibleIds.has(link.a) && visibleIds.has(link.b));
+  }, [jumpLinkPairs, sceneNodes]);
 
   const selectedJumpLinks = useMemo(() => {
     if (!currentRoot) return [];
@@ -1287,8 +1419,8 @@ export default function LocationsPage() {
             </div>
           ) : (
             <Scene
-              nodes={visibleNodes.length ? visibleNodes : allNodes}
-              jumpLinks={jumpLinkPairs}
+              nodes={sceneNodes}
+              jumpLinks={sceneJumpLinkPairs}
               selectedId={selectedNode?.id ?? null}
               highlightId={currentRoot?.id ?? null}
               focusSelected

@@ -252,8 +252,10 @@ export class GameDataService {
       toPostgres(`
       SELECT
         (SELECT COUNT(*) FROM game.ships WHERE env = ? AND variant_type IS NULL) as ships,
-        (SELECT COUNT(*) FROM game.ships WHERE env = ? AND variant_type IS NULL AND vehicle_category = 'ship') as flyable_ships,
+        (SELECT COUNT(*) FROM game.ships WHERE env = ? AND variant_type IS NULL AND vehicle_category = 'ship') as space_ships,
         (SELECT COUNT(*) FROM game.ships WHERE env = ? AND variant_type IS NULL AND vehicle_category = 'ground') as ground_vehicles,
+        (SELECT COUNT(*) FROM game.ships WHERE env = ? AND variant_type IS NULL AND vehicle_category = 'gravlev') as gravlev_vehicles,
+        (SELECT COUNT(*) FROM game.ships WHERE env = ? AND variant_type IS NULL AND vehicle_category IN ('ground', 'gravlev')) as vehicles,
         (SELECT COUNT(*) FROM game.components WHERE env = ?) as components,
         (SELECT COUNT(*) FROM game.items WHERE env = ?) as items,
         (SELECT COUNT(*) FROM game.commodities WHERE env = ?) as commodities,
@@ -273,13 +275,19 @@ export class GameDataService {
       env,
       env,
       env,
+      env,
+      env,
     );
     const latest = await this.getLatestExtraction(env);
     const raw = rows[0];
     const result = {
       ships: Number(raw.ships),
-      flyable_ships: Number(raw.flyable_ships),
+      space_ships: Number(raw.space_ships),
+      // Legacy field kept for external consumers. It means space ships, not an actual flyable status.
+      flyable_ships: Number(raw.space_ships),
       ground_vehicles: Number(raw.ground_vehicles),
+      gravlev_vehicles: Number(raw.gravlev_vehicles),
+      vehicles: Number(raw.vehicles),
       components: Number(raw.components),
       items: Number(raw.items),
       commodities: Number(raw.commodities),
