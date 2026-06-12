@@ -19,6 +19,8 @@ DISCORD_CLIENT_ID=
 NEXT_PUBLIC_DISCORD_CLIENT_ID=
 DISCORD_GUILD_ID=
 API_TOKEN=
+DISCORD_PRESENCE_INTERVAL_MS=60000
+DISCORD_PRESENCE_STATUS=online
 ```
 
 - `DISCORD_TOKEN` runs the bot.
@@ -26,5 +28,17 @@ API_TOKEN=
 - `NEXT_PUBLIC_DISCORD_CLIENT_ID` exposes the invite URL in the IHM.
 - `DISCORD_GUILD_ID` limits command deployment to one guild when set.
 - `API_TOKEN` lets `/starvis` call the protected Starvis AI endpoint.
+- `DISCORD_PRESENCE_INTERVAL_MS` controls the rich presence rotation speed. Discord rate limits presence updates, so keep it above 15000 ms.
+- `DISCORD_PRESENCE_STATUS` can be `online`, `idle`, `dnd` or `invisible`.
+
+## Rich Presence
+
+When the bot is ready, it rotates useful Discord activities:
+
+- watching Star Citizen data;
+- listening for `/starvis` questions;
+- playing `/intel` for the current command count;
+- watching API and data status;
+- watching the number of Starvis servers.
 
 The bot remains disabled when `DISCORD_TOKEN` is not set.
