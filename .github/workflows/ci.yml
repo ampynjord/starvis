@@ -464,30 +464,44 @@ jobs:
             echo "==> DB migrations..."
             docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm --no-deps api npm run migrate:deploy --workspace=@starvis/db
 
+            wait_for_health() {
+              container="$1"
+              label="$2"
+              attempts="${3:-24}"
+              for i in $(seq 1 "$attempts"); do
+                health="$(docker inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null || echo missing)"
+                if [ "$health" = "healthy" ]; then
+                  return 0
+                fi
+                echo "Waiting for ${label} health... ${health}"
+                sleep 5
+              done
+              echo "${label} health check FAILED"
+              docker logs --tail=200 "$container" || true
+              return 1
+            }
+
             echo "==> Rolling restart..."
-            if ! docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --remove-orphans; then
+            if ! docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --remove-orphans api; then
+              echo "==> API logs..."
+              docker logs --tail=200 starvis-api || true
+              exit 1
+            fi
+            wait_for_health starvis-api API
+
+            if ! docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --remove-orphans ihm bot; then
               echo "==> API logs..."
               docker logs --tail=200 starvis-api || true
               echo "==> IHM logs..."
               docker logs --tail=200 starvis-ihm || true
+              echo "==> Bot logs..."
+              docker logs --tail=200 starvis-bot || true
               exit 1
             fi
 
             echo "==> Health check..."
-            for i in $(seq 1 18); do
-              API_HEALTH="$(docker inspect --format='{{.State.Health.Status}}' starvis-api 2>/dev/null || echo missing)"
-              IHM_HEALTH="$(docker inspect --format='{{.State.Health.Status}}' starvis-ihm 2>/dev/null || echo missing)"
-              if [ "$API_HEALTH" = "healthy" ] && [ "$IHM_HEALTH" = "healthy" ]; then
-                break
-              fi
-              echo "Waiting for healthy containers... api=${API_HEALTH} ihm=${IHM_HEALTH}"
-              sleep 5
-            done
-
-            docker inspect --format='{{.State.Health.Status}}' starvis-api | grep -q "^healthy$" \
-              || (echo "API health check FAILED" && docker logs --tail=200 starvis-api && exit 1)
-            docker inspect --format='{{.State.Health.Status}}' starvis-ihm | grep -q "^healthy$" \
-              || (echo "IHM health check FAILED" && docker logs --tail=200 starvis-ihm && exit 1)
+            wait_for_health starvis-api API
+            wait_for_health starvis-ihm IHM
 
             echo "==> Runtime smoke tests..."
             docker exec starvis-api sh -c 'wget -qO- "http://127.0.0.1:${PORT:-3000}/health/live" >/dev/null'
