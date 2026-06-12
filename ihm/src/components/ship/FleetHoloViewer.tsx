@@ -104,10 +104,10 @@ export function FleetHoloViewer({
   const onVectorCreateRef = useRef(onVectorCreate);
   const [loadedCount, setLoadedCount] = useState(0);
   const shipsKey = ships
-    .map((ship) => [ship.id, ship.shipUuid, ship.ctmUrl ?? '', ship.gridX ?? '', ship.gridZ ?? ''].join(':'))
+    .map((ship) => [ship.id, ship.shipUuid, ship.ctmUrl ?? '', ship.group ?? ''].join(':'))
     .join('|')
-    + `::${tacticalMarkers.map((marker) => [marker.id, marker.type, marker.gridX, marker.gridZ, marker.rotation ?? 0].join(':')).join('|')}`
-    + `::${tacticalVectors.map((vector) => [vector.id, vector.sourceType, vector.sourceId, vector.endX, vector.endZ, vector.controlX, vector.controlZ].join(':')).join('|')}`;
+    + `::${tacticalMarkers.map((marker) => [marker.id, marker.type].join(':')).join('|')}`
+    + `::${tacticalVectors.map((vector) => [vector.id, vector.sourceType, vector.sourceId].join(':')).join('|')}`;
 
   // Keep onSelect ref current without rebuilding the scene
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
