@@ -6,10 +6,8 @@ import {
   Copy,
   Crosshair,
   Flag,
-  GitBranch,
   Layers3,
   Loader2,
-  MoveRight,
   Plus,
   Radar,
   Save,
@@ -22,7 +20,7 @@ import {
 import createDynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import type { FleetShip, TacticalMarker } from '@/components/ship/FleetHoloViewer';
+import type { FleetShip, TacticalMarker, TacticalVector } from '@/components/ship/FleetHoloViewer';
 import { api } from '@/services/api';
 import type { ShipListItem } from '@/types/api';
 
@@ -60,6 +58,7 @@ interface Strategy {
   name: string;
   ships: TacticalShip[];
   markers: TacticalMarker[];
+  vectors: TacticalVector[];
   updatedAt: string;
 }
 
@@ -69,13 +68,13 @@ type MarkerType = TacticalMarker['type'];
 const getShipUuid = (item: FleetItem) => item.shipUuid?.trim() || null;
 const makeId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
 const nowIso = () => new Date().toISOString();
-const makeLibraryFleetId = (uuid: string) => -Math.abs([...uuid].reduce((acc, char) => ((acc * 31) + char.charCodeAt(0)) % 1_000_000_000, 7));
 
 const defaultStrategy = (): Strategy => ({
   id: makeId(),
   name: 'New strategy',
   ships: [],
   markers: [],
+  vectors: [],
   updatedAt: nowIso(),
 });
 
@@ -104,15 +103,15 @@ export default function CorporationTacticsPage() {
   const { user } = useAuth();
   const [corp, setCorp] = useState<Corp | null>(null);
   const [fleetItems, setFleetItems] = useState<FleetItem[]>([]);
-  const [libraryShips, setLibraryShips] = useState<ShipListItem[]>([]);
   const [shipData, setShipData] = useState<Map<string, ShipListItem>>(new Map());
   const [strategies, setStrategies] = useState<Strategy[]>([defaultStrategy()]);
   const [activeStrategyId, setActiveStrategyId] = useState<string>('');
   const [selectedShipId, setSelectedShipId] = useState<number | null>(null);
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
+  const [selectedVectorId, setSelectedVectorId] = useState<string | null>(null);
   const [shipQuery, setShipQuery] = useState('');
   const [loading, setLoading] = useState(true);
-  const [storageKey, setStorageKey] = useState('starvis-tactics-personal');
+  const [storageKey, setStorageKey] = useState('');
   const [formationShipId, setFormationShipId] = useState<number | null>(null);
   const [formationName, setFormationName] = useState('Squadron');
   const [formationType, setFormationType] = useState<FormationType>('wedge');
@@ -130,32 +129,34 @@ export default function CorporationTacticsPage() {
 
   useEffect(() => {
     if (!user) return;
-    const userId = user.id;
     let cancelled = false;
     async function load() {
       setLoading(true);
       try {
-        const [fleetRes, libraryRes] = await Promise.all([
-          fetch('/api/corp/fleet'),
-          api.ships.list({ page: 1, limit: 120, sort: 'name', order: 'asc' }).catch(() => ({ data: [] as ShipListItem[] })),
-        ]);
+        const fleetRes = await fetch('/api/corp/fleet');
         const data = await fleetRes.json().catch(() => ({}));
         if (!fleetRes.ok || cancelled) return;
         const items: FleetItem[] = data.data ?? [];
-        const library = libraryRes.data ?? [];
         const nextCorp: Corp | null = data.corporation ?? null;
         setCorp(nextCorp);
         setFleetItems(items);
-        setLibraryShips(library);
         const firstShip = items.find((item) => getShipUuid(item));
-        const firstLibraryShip = library.find((ship) => ship.uuid);
-        setFormationShipId(firstShip?.id ?? (firstLibraryShip ? makeLibraryFleetId(firstLibraryShip.uuid) : null));
+        setFormationShipId(firstShip?.id ?? null);
 
-        const key = `starvis-tactics-3d-${nextCorp?.id ?? `user-${userId}`}`;
+        if (!nextCorp) {
+          setStorageKey('');
+          setStrategies([defaultStrategy()]);
+          setActiveStrategyId('');
+          setShipData(new Map());
+          return;
+        }
+
+        const key = `starvis-corp-tactics-3d-${nextCorp.id}`;
         setStorageKey(key);
         const saved = localStorage.getItem(key);
         const parsed = saved ? JSON.parse(saved) as { activeStrategyId?: string; strategies?: Strategy[] } : null;
-        const loadedStrategies = parsed?.strategies?.length ? parsed.strategies : [defaultStrategy()];
+        const loadedStrategies = (parsed?.strategies?.length ? parsed.strategies : [defaultStrategy()])
+          .map((strategy) => ({ ...strategy, vectors: strategy.vectors ?? [] }));
         setStrategies(loadedStrategies);
         setActiveStrategyId(parsed?.activeStrategyId && loadedStrategies.some((s) => s.id === parsed.activeStrategyId)
           ? parsed.activeStrategyId
@@ -165,7 +166,7 @@ export default function CorporationTacticsPage() {
         const uuids = [...new Set(items.map(getShipUuid).filter(Boolean))] as string[];
         const entries = await Promise.allSettled(uuids.map(async (uuid) => [uuid, await api.ships.get(uuid)] as const));
         if (cancelled) return;
-        const map = new Map<string, ShipListItem>(library.map((ship) => [ship.uuid, ship]));
+        const map = new Map<string, ShipListItem>();
         entries.forEach((entry) => {
           if (entry.status === 'fulfilled' && entry.value[1]) map.set(entry.value[0], entry.value[1] as unknown as ShipListItem);
         });
@@ -183,22 +184,9 @@ export default function CorporationTacticsPage() {
     localStorage.setItem(storageKey, JSON.stringify({ activeStrategyId, strategies }));
   }, [activeStrategyId, storageKey, strategies, user]);
 
-  const availableFleet = useMemo(() => {
-    const knownFleetUuids = new Set(fleetItems.map(getShipUuid).filter(Boolean));
-    const libraryItems: FleetItem[] = libraryShips
-      .filter((ship) => ship.uuid && !knownFleetUuids.has(ship.uuid))
-      .map((ship) => ({
-        id: makeLibraryFleetId(ship.uuid),
-        shipUuid: ship.uuid,
-        itemClassName: ship.class_name,
-        addedBy: null,
-      }));
-    return [...fleetItems, ...libraryItems];
-  }, [fleetItems, libraryShips]);
-
   const filteredFleet = useMemo(() => {
     const q = shipQuery.trim().toLowerCase();
-    return availableFleet
+    return fleetItems
       .filter((item) => getShipUuid(item))
       .filter((item) => {
         if (!q) return true;
@@ -206,7 +194,7 @@ export default function CorporationTacticsPage() {
         const ship = uuid ? shipData.get(uuid) : null;
         return `${ship?.name ?? item.itemClassName} ${ship?.role ?? ''} ${item.addedBy?.username ?? ''}`.toLowerCase().includes(q);
       });
-  }, [availableFleet, shipData, shipQuery]);
+  }, [fleetItems, shipData, shipQuery]);
 
   const tacticShips: FleetShip[] = useMemo(() => activeStrategy.ships.map((node) => {
     const ship = shipData.get(node.shipUuid);
@@ -227,6 +215,7 @@ export default function CorporationTacticsPage() {
       thumbnailUrl: ship?.thumbnail_large ?? ship?.thumbnail ?? null,
       ctmUrl: ship?.ctm_url ? `/api/v1/ships/${node.shipUuid}/model/file` : null,
       declaredBy: node.owner,
+      group: node.group,
       gridX: node.gridX,
       gridZ: node.gridZ,
     } satisfies FleetShip;
@@ -234,6 +223,7 @@ export default function CorporationTacticsPage() {
 
   const selectedShip = activeStrategy.ships.find((ship) => ship.id === selectedShipId) ?? null;
   const selectedMarker = activeStrategy.markers.find((marker) => marker.id === selectedMarkerId) ?? null;
+  const selectedVector = activeStrategy.vectors.find((vector) => vector.id === selectedVectorId) ?? null;
 
   const addFormation = useCallback((item: FleetItem, quantity = formationQuantity, group = formationName) => {
     const uuid = getShipUuid(item);
@@ -258,7 +248,7 @@ export default function CorporationTacticsPage() {
   }, [activeStrategy.ships, formationName, formationQuantity, formationSpacing, formationType, shipData, updateActiveStrategy]);
 
   const addSelectedFormation = () => {
-    const item = availableFleet.find((fleetItem) => fleetItem.id === formationShipId);
+    const item = fleetItems.find((fleetItem) => fleetItem.id === formationShipId);
     if (item) addFormation(item);
   };
 
@@ -267,7 +257,6 @@ export default function CorporationTacticsPage() {
       objective: 'Objective',
       poi: 'Point of interest',
       obstacle: 'Obstacle',
-      vector: 'Movement vector',
     };
     const offset = activeStrategy.markers.length * 18;
     const marker: TacticalMarker = {
@@ -275,12 +264,13 @@ export default function CorporationTacticsPage() {
       type,
       label: labels[type],
       gridX: offset,
-      gridZ: type === 'vector' ? -42 : 42,
-      rotation: type === 'vector' ? -Math.PI / 2 : 0,
+      gridZ: 42,
+      rotation: 0,
     };
     updateActiveStrategy((strategy) => ({ ...strategy, markers: [...strategy.markers, marker] }));
     setSelectedMarkerId(marker.id);
     setSelectedShipId(null);
+    setSelectedVectorId(null);
   };
 
   const updateShipPosition = (id: number, position: { gridX: number; gridZ: number }) => {
@@ -294,6 +284,25 @@ export default function CorporationTacticsPage() {
     updateActiveStrategy((strategy) => ({
       ...strategy,
       markers: strategy.markers.map((marker) => (marker.id === id ? { ...marker, ...position } : marker)),
+    }));
+  };
+
+  const createVector = (vector: Omit<TacticalVector, 'id'>) => {
+    const sourceShip = activeStrategy.ships.find((ship) => ship.id === vector.sourceId);
+    const groupSize = sourceShip ? activeStrategy.ships.filter((ship) => ship.group === sourceShip.group).length : 0;
+    const source = sourceShip && groupSize > 1
+      ? { sourceType: 'group' as const, sourceId: sourceShip.group }
+      : { sourceType: vector.sourceType, sourceId: vector.sourceId };
+    const nextVector = { ...vector, ...source, id: makeId() };
+    updateActiveStrategy((strategy) => ({ ...strategy, vectors: [...strategy.vectors, nextVector] }));
+    setSelectedVectorId(nextVector.id);
+    setSelectedMarkerId(null);
+  };
+
+  const updateVector = (id: string, vector: Pick<TacticalVector, 'endX' | 'endZ' | 'controlX' | 'controlZ'>) => {
+    updateActiveStrategy((strategy) => ({
+      ...strategy,
+      vectors: strategy.vectors.map((item) => (item.id === id ? { ...item, ...vector } : item)),
     }));
   };
 
@@ -321,6 +330,10 @@ export default function CorporationTacticsPage() {
       updateActiveStrategy((strategy) => ({ ...strategy, markers: strategy.markers.filter((marker) => marker.id !== selectedMarker.id) }));
       setSelectedMarkerId(null);
     }
+    if (selectedVector) {
+      updateActiveStrategy((strategy) => ({ ...strategy, vectors: strategy.vectors.filter((vector) => vector.id !== selectedVector.id) }));
+      setSelectedVectorId(null);
+    }
   };
 
   const createStrategy = () => {
@@ -338,6 +351,7 @@ export default function CorporationTacticsPage() {
       name: `${activeStrategy.name} copy`,
       ships: activeStrategy.ships.map((ship) => ({ ...ship, id: nextShipIdRef.current++ })),
       markers: activeStrategy.markers.map((marker) => ({ ...marker, id: makeId() })),
+      vectors: activeStrategy.vectors.map((vector) => ({ ...vector, id: makeId() })),
       updatedAt: nowIso(),
     };
     setStrategies((prev) => [...prev, strategy]);
@@ -346,7 +360,7 @@ export default function CorporationTacticsPage() {
 
   const deleteStrategy = () => {
     if (strategies.length <= 1) {
-      updateActiveStrategy((strategy) => ({ ...strategy, ships: [], markers: [] }));
+      updateActiveStrategy((strategy) => ({ ...strategy, ships: [], markers: [], vectors: [] }));
       return;
     }
     const next = strategies.filter((strategy) => strategy.id !== activeStrategy.id);
@@ -355,6 +369,19 @@ export default function CorporationTacticsPage() {
   };
 
   if (!user) return <div className="p-8 text-center text-slate-500 font-mono-sc text-sm">Sign in to access corporation tactics.</div>;
+  if (!loading && !corp) {
+    return (
+      <div className="flex min-h-[32rem] items-center justify-center p-8 text-center">
+        <div className="max-w-md rounded-sm border border-cyan-900/40 bg-panel/80 p-6">
+          <Radar size={34} className="mx-auto mb-4 text-cyan-500" />
+          <h1 className="font-orbitron text-sm font-bold uppercase tracking-widest text-white">Corporation tactics required</h1>
+          <p className="mt-3 text-sm text-slate-500">
+            Tactics strategies belong to a corporation. Join or declare a corporation before creating tactical plans.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="-m-3 flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden sm:-m-6">
@@ -364,7 +391,7 @@ export default function CorporationTacticsPage() {
           <div className="min-w-0">
             <h1 className="truncate font-orbitron text-sm font-bold uppercase tracking-wider text-white">Tactics</h1>
             <p className="truncate font-mono-sc text-[10px] text-slate-600">
-              {corp ? `[${corp.tag}] ${corp.name}` : 'Personal 3D tactical board'}
+              {corp ? `[${corp.tag}] ${corp.name}` : 'Corporation tactical board'}
             </p>
           </div>
         </div>
@@ -414,17 +441,16 @@ export default function CorporationTacticsPage() {
                 aria-label="Formation ship"
                 value={formationShipId ?? ''}
                 onChange={(event) => setFormationShipId(event.target.value ? Number(event.target.value) : null)}
-                disabled={availableFleet.length === 0}
+                disabled={fleetItems.length === 0}
                 className="sci-input col-span-2 w-full disabled:opacity-60"
               >
-                {availableFleet.length === 0 ? (
-                  <option value="">{loading ? 'Loading ships...' : 'No ships available'}</option>
+                {fleetItems.length === 0 ? (
+                  <option value="">{loading ? 'Loading ships...' : 'No corporation ships available'}</option>
                 ) : null}
-                {availableFleet.map((item) => {
+                {fleetItems.map((item) => {
                   const uuid = getShipUuid(item);
                   const ship = uuid ? shipData.get(uuid) : null;
-                  const source = item.addedBy ? 'Corp fleet' : 'Ship library';
-                  return <option key={item.id} value={item.id}>{ship?.name ?? item.itemClassName} - {source}</option>;
+                  return <option key={item.id} value={item.id}>{ship?.name ?? item.itemClassName}</option>;
                 })}
               </select>
               <label className="space-y-1">
@@ -440,8 +466,8 @@ export default function CorporationTacticsPage() {
                 <option value="line">Line formation</option>
                 <option value="box">Box formation</option>
               </select>
-              <button type="button" onClick={addSelectedFormation} disabled={!formationShipId || availableFleet.length === 0} className="sci-btn-primary col-span-2 flex items-center justify-center gap-1.5 px-3 py-2 text-xs disabled:opacity-40">
-                <Ship size={12} /> {availableFleet.length === 0 ? 'No ships available' : 'Add formation'}
+              <button type="button" onClick={addSelectedFormation} disabled={!formationShipId || fleetItems.length === 0} className="sci-btn-primary col-span-2 flex items-center justify-center gap-1.5 px-3 py-2 text-xs disabled:opacity-40">
+                <Ship size={12} /> {fleetItems.length === 0 ? 'No corporation ships' : 'Add formation'}
               </button>
             </div>
           </div>
@@ -451,7 +477,7 @@ export default function CorporationTacticsPage() {
               <Flag size={13} className="text-cyan-500" />
               <span className="font-orbitron text-[10px] font-bold uppercase tracking-widest text-slate-400">Tactical Objects</span>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <button type="button" onClick={() => addMarker('objective')} className="sci-btn-primary flex items-center justify-center gap-1.5 px-2 py-2 text-xs">
                 <Flag size={12} /> Objective
               </button>
@@ -460,9 +486,6 @@ export default function CorporationTacticsPage() {
               </button>
               <button type="button" onClick={() => addMarker('obstacle')} className="rounded-sm border border-slate-800 px-2 py-2 font-mono-sc text-xs text-slate-400 hover:border-red-800/70 hover:text-red-300">
                 <Square size={12} className="mr-1 inline" /> Obstacle
-              </button>
-              <button type="button" onClick={() => addMarker('vector')} className="rounded-sm border border-slate-800 px-2 py-2 font-mono-sc text-xs text-slate-400 hover:border-emerald-800/70 hover:text-emerald-300">
-                <MoveRight size={12} className="mr-1 inline" /> Vector
               </button>
             </div>
           </div>
@@ -473,7 +496,7 @@ export default function CorporationTacticsPage() {
               <div className="flex items-center justify-center py-8 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
             ) : filteredFleet.length === 0 ? (
               <p className="px-2 py-6 text-center font-mono-sc text-xs text-slate-700">
-                {availableFleet.length === 0 ? 'No ships available.' : 'No ship matches this filter.'}
+                {fleetItems.length === 0 ? 'No corporation ships available.' : 'No ship matches this filter.'}
               </p>
             ) : filteredFleet.slice(0, 30).map((item) => {
               const uuid = getShipUuid(item);
@@ -509,31 +532,37 @@ export default function CorporationTacticsPage() {
             <FleetHoloViewer
               ships={tacticShips}
               selectedId={selectedShipId}
-              onSelect={(id) => { setSelectedShipId(id); setSelectedMarkerId(null); }}
+              onSelect={(id) => { setSelectedShipId(id); setSelectedMarkerId(null); setSelectedVectorId(null); }}
               onPositionChange={updateShipPosition}
               tacticalMarkers={activeStrategy.markers}
               selectedMarkerId={selectedMarkerId}
-              onMarkerSelect={(id) => { setSelectedMarkerId(id); setSelectedShipId(null); }}
+              onMarkerSelect={(id) => { setSelectedMarkerId(id); setSelectedShipId(null); setSelectedVectorId(null); }}
               onMarkerPositionChange={updateMarkerPosition}
+              tacticalVectors={activeStrategy.vectors}
+              selectedVectorId={selectedVectorId}
+              onVectorSelect={(id) => { setSelectedVectorId(id); setSelectedShipId(null); setSelectedMarkerId(null); }}
+              onVectorCreate={createVector}
+              onVectorChange={updateVector}
             />
           )}
           <div className="pointer-events-none absolute left-3 top-3 rounded-sm border border-cyan-900/40 bg-slate-950/70 px-3 py-2 font-mono-sc text-[10px] text-cyan-500">
             <span className="mr-3"><Ship size={10} className="mr-1 inline" />{activeStrategy.ships.length} ships</span>
             <span><Flag size={10} className="mr-1 inline" />{activeStrategy.markers.length} objects</span>
+            <span className="ml-3">{activeStrategy.vectors.length} vectors</span>
           </div>
         </main>
 
         <aside className="min-h-0 overflow-y-auto border-t border-border/50 bg-panel/85 p-3 lg:border-l lg:border-t-0">
           <div className="flex items-center justify-between border-b border-border/50 pb-2">
             <span className="font-orbitron text-[10px] font-bold uppercase tracking-widest text-slate-400">Control</span>
-            {(selectedShip || selectedMarker) && (
-              <button type="button" onClick={() => { setSelectedShipId(null); setSelectedMarkerId(null); }} className="text-slate-600 hover:text-slate-300">
+            {(selectedShip || selectedMarker || selectedVector) && (
+              <button type="button" onClick={() => { setSelectedShipId(null); setSelectedMarkerId(null); setSelectedVectorId(null); }} className="text-slate-600 hover:text-slate-300">
                 <X size={14} />
               </button>
             )}
           </div>
 
-          {!selectedShip && !selectedMarker ? (
+          {!selectedShip && !selectedMarker && !selectedVector ? (
             <div className="space-y-3 py-6">
               <div className="rounded-sm border border-cyan-900/40 bg-cyan-950/10 p-3">
                 <p className="flex items-center gap-1.5 font-mono-sc text-[10px] uppercase tracking-widest text-cyan-500">
@@ -550,13 +579,15 @@ export default function CorporationTacticsPage() {
               <div className="rounded-sm border border-slate-800 bg-slate-950/40 p-3">
                 <p className="flex items-center gap-1.5 font-mono-sc text-[10px] uppercase tracking-widest text-cyan-500">
                   {selectedShip ? <Ship size={11} /> : <Shield size={11} />}
-                  {selectedShip ? 'Ship element' : selectedMarker?.type}
+                  {selectedShip ? 'Ship element' : selectedMarker ? selectedMarker.type : 'Movement vector'}
                 </p>
               </div>
-              <label className="block">
-                <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Label</span>
-                <input value={selectedShip?.label ?? selectedMarker?.label ?? ''} onChange={(event) => updateSelectedLabel(event.target.value)} className="sci-input mt-1 w-full" />
-              </label>
+              {(selectedShip || selectedMarker) && (
+                <label className="block">
+                  <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Label</span>
+                  <input value={selectedShip?.label ?? selectedMarker?.label ?? ''} onChange={(event) => updateSelectedLabel(event.target.value)} className="sci-input mt-1 w-full" />
+                </label>
+              )}
               {selectedShip && (
                 <label className="block">
                   <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Group</span>
@@ -570,33 +601,10 @@ export default function CorporationTacticsPage() {
                   />
                 </label>
               )}
-              {selectedMarker && selectedMarker.type === 'vector' && (
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => updateActiveStrategy((strategy) => ({
-                      ...strategy,
-                      markers: strategy.markers.map((marker) => (marker.id === selectedMarker.id ? { ...marker, rotation: (marker.rotation ?? 0) - Math.PI / 12 } : marker)),
-                    }))}
-                    className="rounded-sm border border-slate-800 px-2 py-2 font-mono-sc text-xs text-slate-400 hover:border-cyan-800/70 hover:text-cyan-300"
-                  >
-                    <GitBranch size={12} className="mr-1 inline" /> -15
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => updateActiveStrategy((strategy) => ({
-                      ...strategy,
-                      markers: strategy.markers.map((marker) => (marker.id === selectedMarker.id ? { ...marker, rotation: (marker.rotation ?? 0) + Math.PI / 12 } : marker)),
-                    }))}
-                    className="rounded-sm border border-slate-800 px-2 py-2 font-mono-sc text-xs text-slate-400 hover:border-cyan-800/70 hover:text-cyan-300"
-                  >
-                    <GitBranch size={12} className="mr-1 inline" /> +15
-                  </button>
-                </div>
-              )}
+              {selectedVector && <p className="text-xs text-slate-500">Drag the arrow tip to set the destination. Drag the center handle to curve the vector.</p>}
               <div className="grid grid-cols-2 gap-2 font-mono-sc text-[10px] text-slate-600">
-                <span>X {(selectedShip?.gridX ?? selectedMarker?.gridX ?? 0).toFixed(1)}</span>
-                <span>Z {(selectedShip?.gridZ ?? selectedMarker?.gridZ ?? 0).toFixed(1)}</span>
+                <span>X {(selectedShip?.gridX ?? selectedMarker?.gridX ?? selectedVector?.endX ?? 0).toFixed(1)}</span>
+                <span>Z {(selectedShip?.gridZ ?? selectedMarker?.gridZ ?? selectedVector?.endZ ?? 0).toFixed(1)}</span>
               </div>
               <button type="button" onClick={removeSelection} className="flex w-full items-center justify-center gap-2 rounded-sm border border-red-900/60 bg-red-950/20 px-3 py-2 font-mono-sc text-xs text-red-400 hover:border-red-700/70">
                 <Trash2 size={13} /> Remove selected
