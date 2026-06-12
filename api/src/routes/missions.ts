@@ -51,6 +51,78 @@ export function mountMissionRoutes(router: Router, deps: RouteDependencies): voi
   );
 
   router.get(
+    '/api/v1/factions/registry',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const t = Date.now();
+      const result = await gameDataService!.missions.getFactionRegistry({
+        env: getQueryEnv(req),
+        search: getQueryString(req, 'search'),
+        page: getQueryNumber(req, 'page'),
+        limit: getQueryNumber(req, 'limit'),
+      });
+      sendWithETag(req, res, {
+        success: true,
+        count: result.data.length,
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        pages: result.pages,
+        data: result.data,
+        meta: { responseTime: `${Date.now() - t}ms` },
+      });
+    }),
+  );
+
+  router.get(
+    '/api/v1/factions/reputation-standings',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const t = Date.now();
+      const result = await gameDataService!.missions.getReputationStandings({
+        env: getQueryEnv(req),
+        search: getQueryString(req, 'search'),
+        page: getQueryNumber(req, 'page'),
+        limit: getQueryNumber(req, 'limit'),
+      });
+      sendWithETag(req, res, {
+        success: true,
+        count: result.data.length,
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        pages: result.pages,
+        data: result.data,
+        meta: { responseTime: `${Date.now() - t}ms` },
+      });
+    }),
+  );
+
+  router.get(
+    '/api/v1/factions/reputation-scopes',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const t = Date.now();
+      const result = await gameDataService!.missions.getReputationScopes({
+        env: getQueryEnv(req),
+        search: getQueryString(req, 'search'),
+        page: getQueryNumber(req, 'page'),
+        limit: getQueryNumber(req, 'limit'),
+      });
+      sendWithETag(req, res, {
+        success: true,
+        count: result.data.length,
+        total: result.total,
+        page: result.page,
+        limit: result.limit,
+        pages: result.pages,
+        data: result.data,
+        meta: { responseTime: `${Date.now() - t}ms` },
+      });
+    }),
+  );
+
+  router.get(
     '/api/v1/factions/:faction',
     requireGameData,
     asyncHandler(async (req, res) => {

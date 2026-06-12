@@ -927,6 +927,134 @@ export interface FactionSummary {
   mission_types: string[];
 }
 
+export interface GameFactionInsight {
+  uuid: string;
+  env: string;
+  class_name: string;
+  name: string | null;
+  description: string | null;
+  faction_type: string | null;
+  default_reaction: string | null;
+  able_to_arrest: boolean | null;
+  no_legal_rights: boolean | null;
+  polices_criminality: boolean | null;
+  polices_lawful_trespass: boolean | null;
+  faction_reputation_uuid: string | null;
+  allies: unknown[] | null;
+  enemies: unknown[] | null;
+  organization_tags: unknown[] | null;
+}
+
+export interface ReputationStandingInsight {
+  uuid: string;
+  env: string;
+  class_name: string;
+  name: string | null;
+  display_name: string | null;
+  description: string | null;
+  icon: string | null;
+  min_reputation: number | null;
+  drift_time_hours: number | null;
+  drift_reputation: number | null;
+  gated: boolean;
+  perk_description: string | null;
+}
+
+export interface ReputationScopeInsight {
+  uuid: string;
+  env: string;
+  class_name: string;
+  scope_name: string | null;
+  display_name: string | null;
+  description: string | null;
+  initial_reputation: number | null;
+  reputation_ceiling: number | null;
+  standings: unknown[] | null;
+}
+
+export interface LootTableInsight {
+  uuid: string;
+  env: string;
+  class_name: string;
+  name: string | null;
+}
+
+export interface LootTableEntryInsight {
+  id: number;
+  env: string;
+  table_uuid: string;
+  table_class_name: string | null;
+  entry_index: number;
+  archetype_uuid: string | null;
+  archetype_class_name: string | null;
+  weight: number | null;
+  min_results: number | null;
+  max_results: number | null;
+}
+
+export interface LootArchetypeInsight {
+  uuid: string;
+  env: string;
+  class_name: string;
+  name: string | null;
+  primary_entries: unknown[] | null;
+  secondary_entries: unknown[] | null;
+  excluded_tags: unknown[] | null;
+}
+
+export interface BlueprintRewardInsight {
+  id: number;
+  env: string;
+  pool_uuid: string;
+  pool_class_name: string | null;
+  reward_index: number;
+  blueprint_uuid: string | null;
+  blueprint_class_name: string | null;
+  weight: number | null;
+}
+
+export interface AmmoInsight {
+  uuid: string;
+  env: string;
+  class_name: string;
+  name: string | null;
+  size: number | null;
+  speed: number | null;
+  lifetime: number | null;
+  ammo_category: string | null;
+  conversion_rate_micro_scu: number | null;
+  damage_physical: number | null;
+  damage_energy: number | null;
+  damage_distortion: number | null;
+  damage_thermal: number | null;
+  damage_biochemical: number | null;
+  damage_stun: number | null;
+  explosion_damage_physical: number | null;
+  explosion_damage_energy: number | null;
+  explosion_damage_distortion: number | null;
+  explosion_damage_thermal: number | null;
+  explosion_damage_biochemical: number | null;
+  explosion_damage_stun: number | null;
+  impact_radius: number | null;
+  explosion_min_radius: number | null;
+  explosion_max_radius: number | null;
+  mass: number | null;
+}
+
+export interface InventoryContainerInsight {
+  uuid: string;
+  env: string;
+  class_name: string;
+  name: string | null;
+  inventory_type: string | null;
+  capacity_micro_scu: number | null;
+  capacity_scu: number | null;
+  size_x: number | null;
+  size_y: number | null;
+  size_z: number | null;
+  excluded_item_subtypes: unknown[] | null;
+}
+
 export interface ChangelogEntry {
   id: number;
   entity_type: string;

@@ -1,5 +1,5 @@
 import { generate } from 'otplib';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { AuthService } from '../src/services/auth-service.js';
 
 function makePrismaUser() {
@@ -31,6 +31,11 @@ function makePrismaUser() {
 }
 
 describe('AuthService 2FA', () => {
+  beforeEach(() => {
+    process.env.JWT_SECRET = 'test-jwt-secret-at-least-32-characters-long';
+    process.env.TWO_FACTOR_ENCRYPTION_KEY = 'test-2fa-secret-at-least-32-characters-long';
+  });
+
   it('sets up, enables and disables TOTP 2FA', async () => {
     const { prisma, user } = makePrismaUser();
     const service = new AuthService(prisma as any);
@@ -40,7 +45,8 @@ describe('AuthService 2FA', () => {
     expect(setup.secret).toBeTruthy();
     expect(setup.qrCodeUrl).toMatch(/^data:image\/png;base64,/);
     expect(user.twoFactorEnabled).toBe(false);
-    expect(user.twoFactorSecret).toBe(setup.secret);
+    expect(user.twoFactorSecret).toMatch(/^enc:v1:/);
+    expect(user.twoFactorSecret).not.toBe(setup.secret);
 
     const enableCode = await generate({ secret: setup.secret });
     await service.enable2FA(user.id, enableCode);

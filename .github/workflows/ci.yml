@@ -16,10 +16,6 @@ env:
   NODE_VERSION: '22'
 
 jobs:
-# ─────────────────────────────────────────────────────────────
-# INSTALL — node_modules + db/generated/ en cache
-# db:generate ne tourne que si les schémas Prisma ont changé
-# ─────────────────────────────────────────────────────────────
   install:
     name: Install & Generate
     runs-on: ubuntu-latest
@@ -48,48 +44,50 @@ jobs:
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
 
-      - name: Restore db/generated cache
+      - name: Restore Prisma client cache
         id: db-gen-cache
         uses: actions/cache@v5
         with:
           path: db/generated/
           key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma', 'db/prisma.config.ts') }}
 
-      - name: Generate DB clients
+      - name: Generate Prisma client
         if: steps.db-gen-cache.outputs.cache-hit != 'true'
         run: npm run db:generate
 
-# ─────────────────────────────────────────────────────────────
-# CHECKS — security audit + hadolint (1 seul runner)
-# ─────────────────────────────────────────────────────────────
-  checks:
-    name: Security & Dockerfile
+  security:
+    name: Security & Dockerfiles
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - run: npm audit --omit=dev --audit-level=critical
+          cache: npm
+
+      - run: npm ci
+
+      - name: Critical dependency audit
+        run: npm audit --omit=dev --audit-level=critical
+
       - uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: api/Dockerfile
           failure-threshold: error
+
       - uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: ihm/Dockerfile
           failure-threshold: error
+
       - uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: bot/Dockerfile
           failure-threshold: error
 
-# ---------------------------------------------------------------------------
-# CONFIG & SCHEMA
-# Validate deploy-critical config that unit tests do not exercise directly.
-# ---------------------------------------------------------------------------
   config:
-    name: Config & Schema
+    name: Config, Schema & Docs
     needs: install
     runs-on: ubuntu-latest
     steps:
@@ -112,33 +110,35 @@ jobs:
             db/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      - name: Install (fallback)
+      - name: Install fallback
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
 
+      - name: Validate OpenAPI
+        run: npm run openapi:lint --workspace=@starvis/api
+
       - name: Validate Prisma schema
-        run: npm exec --workspace=@starvis/db -- prisma validate --schema=prisma/schema.prisma
+        run: npm exec --workspace=@starvis/db -- prisma validate --schema=prisma/schema
         env:
           DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_test
 
-      - name: Guard Prisma 7 datasource config
+      - name: Guard Prisma datasource config
         run: |
-          if grep -R 'url *= *env(' db/prisma/*.prisma; then
-            echo "Prisma 7 requires datasource URLs in db/prisma.config.ts, not schema.prisma"
+          if grep -R 'url *= *env(' db/prisma/schema/*.prisma; then
+            echo "Prisma 7 requires datasource URLs in db/prisma.config.ts, not schema files"
             exit 1
           fi
           test -f db/prisma.config.ts
 
       - name: Validate shell scripts
         run: |
-          bash -n db/init.sh
-          bash -n db/backup.sh
+          bash -n db/scripts/init.sh
+          bash -n db/scripts/backup.sh
 
-      - name: Validate compose files with example envs
+      - name: Validate compose files
         run: |
           docker compose -f docker-compose.dev.yml --env-file .env.dev.example config --quiet
           docker compose -f docker-compose.prod.yml --env-file .env.prod.example config --quiet
-          docker compose -f docker-compose.api-only.yml --env-file .env.api-only.example config --quiet
 
       - name: Check env examples cover compose variables
         run: |
@@ -163,7 +163,6 @@ jobs:
           const checks = [
             ['docker-compose.dev.yml', '.env.dev.example'],
             ['docker-compose.prod.yml', '.env.prod.example'],
-            ['docker-compose.api-only.yml', '.env.api-only.example'],
           ];
 
           let failed = false;
@@ -204,93 +203,17 @@ jobs:
           if (failed) process.exit(1);
           NODE
 
-  api-only-smoke:
-    name: API-only Smoke
-    needs: config
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Build API image
-        run: |
-          for attempt in 1 2 3; do
-            if docker build --target production -f api/Dockerfile -t starvis-api-only-ci:latest .; then
-              exit 0
-            fi
-            echo "Docker build failed on attempt ${attempt}/3"
-            sleep 15
-          done
-          exit 1
-
-      - name: Write API-only env
-        run: |
-          cat > .env.api-only.ci <<'EOF'
-          COMPOSE_PROJECT_NAME=starvis-api-only-ci
-          POSTGRES_IMAGE=postgres:16-alpine
-          REDIS_IMAGE=redis:7-alpine
-          API_IMAGE=starvis-api-only-ci:latest
-          API_PORT=127.0.0.1:18080
-          DB_EXTERNAL_PORT=15432
-          DB_NAME=starvis_api_only_ci
-          DB_USER=starvis_ci
-          DB_PASSWORD=ci_password
-          JWT_SECRET=ci_jwt_secret_at_least_32_chars_long
-          ADMIN_API_KEY=ci_admin_key
-          AUTH_COOKIE_NAME=starvis_token
-          CORS_ORIGIN=*
-          REDIS_MAXMEMORY=64mb
-          RATE_LIMIT_MAX=500
-          RATE_LIMIT_BURST=50
-          RATE_LIMIT_ADMIN_MAX=100
-          LOG_LEVEL=info
-          MISTRAL_API_KEY=
-          CHAT_PROVIDER_BASE_URL=https://api.mistral.ai/v1
-          CHAT_TOOL_MODEL=mistral-small-latest
-          CHAT_RESPONSE_MODEL=mistral-small-latest
-          SMTP_HOST=
-          SMTP_PORT=587
-          SMTP_USER=
-          SMTP_PASS=
-          SMTP_FROM=
-          CONTACT_EMAIL=
-          EOF
-
-      - name: Start API-only stack
-        run: docker compose -f docker-compose.api-only.yml --env-file .env.api-only.ci up -d --wait
-
-      - name: Smoke test API-only stack
-        run: |
-          curl -fsS http://127.0.0.1:18080/health/live
-          curl -fsS http://127.0.0.1:18080/health/ready
-          docker compose -f docker-compose.api-only.yml --env-file .env.api-only.ci ps
-
-      - name: Dump logs on failure
-        if: failure()
-        run: |
-          if [ -f .env.api-only.ci ]; then
-            docker compose -f docker-compose.api-only.yml --env-file .env.api-only.ci ps || true
-            docker compose -f docker-compose.api-only.yml --env-file .env.api-only.ci logs --no-color --tail=200 || true
-          fi
-
-      - name: Stop API-only stack
-        if: always()
-        run: |
-          if [ -f .env.api-only.ci ]; then
-            docker compose -f docker-compose.api-only.yml --env-file .env.api-only.ci down -v --remove-orphans || true
-          fi
-
-# ─────────────────────────────────────────────────────────────
-# LINT (Biome)
-# ─────────────────────────────────────────────────────────────
   lint:
     name: Lint (Biome)
     needs: install
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+
       - name: Restore node_modules cache
         id: nm-cache
         uses: actions/cache@v5
@@ -303,14 +226,13 @@ jobs:
             bot/node_modules
             db/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - name: Install (fallback)
+
+      - name: Install fallback
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
-      - run: ./node_modules/.bin/biome ci .
 
-# ─────────────────────────────────────────────────────────────
-# TYPECHECK — matrix par workspace
-# ─────────────────────────────────────────────────────────────
+      - run: npm run lint:ci
+
   typecheck:
     name: Typecheck (${{ matrix.name }})
     needs: install
@@ -320,18 +242,22 @@ jobs:
       matrix:
         include:
           - name: api
-            cmd: ./node_modules/.bin/tsc --noEmit --project api/tsconfig.json
-          - name: extractor
-            cmd: ./node_modules/.bin/tsc --noEmit --project extractor/tsconfig.json
-          - name: bot
-            cmd: ./node_modules/.bin/tsc --noEmit --project bot/tsconfig.json
+            cmd: npm run typecheck --workspace=@starvis/api
           - name: ihm
-            cmd: ./node_modules/.bin/tsc --noEmit --project ihm/tsconfig.json
+            cmd: npm run typecheck --workspace=starvis-ihm
+          - name: extractor
+            cmd: npm run typecheck --workspace=@starvis/extractor
+          - name: bot
+            cmd: npm run typecheck --workspace=@starvis/bot
+          - name: db
+            cmd: npm run typecheck --workspace=@starvis/db
     steps:
       - uses: actions/checkout@v6
+
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+
       - name: Restore node_modules cache
         id: nm-cache
         uses: actions/cache@v5
@@ -344,24 +270,25 @@ jobs:
             bot/node_modules
             db/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - name: Install (fallback)
+
+      - name: Install fallback
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
-      - name: Restore db/generated cache
+
+      - name: Restore Prisma client cache
         uses: actions/cache@v5
         with:
           path: db/generated/
           key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma', 'db/prisma.config.ts') }}
-      - name: Setup IHM next types
+
+      - name: Setup IHM generated Next types
         if: matrix.name == 'ihm'
         run: |
           printf '/// <reference types="next" />\n/// <reference types="next/image-types/global" />\n' > ihm/next-env.d.ts
           mkdir -p ihm/.next/types && echo 'export {}' > ihm/.next/types/routes.d.ts
+
       - run: ${{ matrix.cmd }}
 
-# ─────────────────────────────────────────────────────────────
-# TESTS API (postgres + redis)
-# ─────────────────────────────────────────────────────────────
   test-api:
     name: Tests API
     needs: install
@@ -389,9 +316,11 @@ jobs:
           --health-retries=10
     steps:
       - uses: actions/checkout@v6
+
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+
       - name: Restore node_modules cache
         id: nm-cache
         uses: actions/cache@v5
@@ -404,18 +333,37 @@ jobs:
             bot/node_modules
             db/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - name: Install (fallback)
+
+      - name: Install fallback
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
-      - name: Restore db/generated cache
+
+      - name: Restore Prisma client cache
         uses: actions/cache@v5
         with:
           path: db/generated/
           key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma', 'db/prisma.config.ts') }}
-      - name: Apply DB schema
-        run: npm run push --workspace=@starvis/db
+
+      - name: Apply DB migrations
+        run: npm run migrate:deploy --workspace=@starvis/db
         env:
           DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_test
+
+      # Replays the migration history into a clean shadow DB and diffs it
+      # against the schema: fails (exit 2) whenever a schema change ships
+      # without a migration. Replay avoids live-DB introspection, whose
+      # multi-schema index reporting produces false positives.
+      - name: Check schema/migrations drift
+        run: |
+          PGPASSWORD=ci_password psql -h 127.0.0.1 -U ci_user -d starvis_test -c 'CREATE DATABASE starvis_shadow'
+          npm exec --workspace=@starvis/db -- prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema prisma/schema \
+            --exit-code
+        env:
+          DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_test
+          SHADOW_DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_shadow
+
       - name: Run API tests
         run: npm run test --workspace=@starvis/api -- --reporter=verbose
         env:
@@ -426,18 +374,17 @@ jobs:
           JWT_SECRET: ci_test_secret_at_least_32_chars_long
           ADMIN_API_KEY: ci_admin_key
 
-# ─────────────────────────────────────────────────────────────
-# TESTS EXTRACTOR
-# ─────────────────────────────────────────────────────────────
   test-extractor:
     name: Tests Extractor
     needs: install
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+
       - name: Restore node_modules cache
         id: nm-cache
         uses: actions/cache@v5
@@ -450,25 +397,26 @@ jobs:
             bot/node_modules
             db/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - name: Install (fallback)
+
+      - name: Install fallback
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
+
       - run: npm run test --workspace=@starvis/extractor -- --reporter=verbose
         env:
           NODE_ENV: test
 
-# ─────────────────────────────────────────────────────────────
-# TESTS IHM
-# ─────────────────────────────────────────────────────────────
   test-ihm:
     name: Tests IHM
     needs: install
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+
       - name: Restore node_modules cache
         id: nm-cache
         uses: actions/cache@v5
@@ -481,9 +429,11 @@ jobs:
             bot/node_modules
             db/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - name: Install (fallback)
+
+      - name: Install fallback
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
+
       - run: npm run test --workspace=starvis-ihm -- --reporter=verbose
 
   test-e2e:
@@ -492,9 +442,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+
       - name: Restore node_modules cache
         id: nm-cache
         uses: actions/cache@v5
@@ -507,22 +459,37 @@ jobs:
             bot/node_modules
             db/node_modules
           key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-      - name: Install (fallback)
+
+      - name: Install fallback
         if: steps.nm-cache.outputs.cache-hit != 'true'
         run: npm ci
+
       - name: Install Playwright browsers
         run: npm exec --workspace=starvis-ihm -- playwright install --with-deps chromium
+
       - name: Run Playwright tests
         run: npm run test:e2e --workspace=starvis-ihm
 
-# ─────────────────────────────────────────────────────────────
-# BUILD Docker images (main uniquement)
-# ─────────────────────────────────────────────────────────────
+  quality-data-prod:
+    name: Production Data Audit
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: deploy
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Audit production API data
+        run: npm run quality:audit:data:prod
+
   build:
     name: Build ${{ matrix.image.name }}
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [lint, typecheck, test-api, test-extractor, test-ihm, test-e2e, checks, config, api-only-smoke]
+    needs: [lint, typecheck, test-api, test-extractor, test-ihm, test-e2e, security, config]
     permissions:
       contents: read
       packages: write
@@ -548,7 +515,7 @@ jobs:
       - name: Log in to GHCR
         uses: docker/login-action@v4
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
@@ -574,9 +541,6 @@ jobs:
           cache-to: type=gha,scope=${{ matrix.image.name }},mode=max
           provenance: false
 
-# ─────────────────────────────────────────────────────────────
-# DEPLOY VPS — main uniquement
-# ─────────────────────────────────────────────────────────────
   deploy:
     name: Deploy to VPS
     runs-on: ubuntu-latest
@@ -608,29 +572,29 @@ jobs:
             echo "==> Login GHCR..."
             echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ampynjord --password-stdin
 
+            echo "==> Validate production compose..."
+            docker compose -f docker-compose.prod.yml --env-file .env.prod config --quiet
+
             echo "==> Pull new images..."
             docker compose -f docker-compose.prod.yml --env-file .env.prod pull
 
             echo "==> Ensure database services..."
             docker compose -f docker-compose.prod.yml --env-file .env.prod up -d postgres redis
 
-            echo "==> DB schema push..."
-            docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm --no-deps api npm run push --workspace=@starvis/db
+            echo "==> DB migrations..."
+            docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm --no-deps api npm run migrate:deploy --workspace=@starvis/db
 
             echo "==> Rolling restart..."
             if ! docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --remove-orphans; then
               echo "==> API logs..."
               docker logs --tail=200 starvis-api || true
-              echo "==> API health inspect..."
-              docker inspect --format='{{json .State.Health}}' starvis-api || true
+              echo "==> IHM logs..."
+              docker logs --tail=200 starvis-ihm || true
               exit 1
             fi
 
-            echo "==> Prune old images..."
-            docker image prune -af --filter "until=24h"
-
             echo "==> Health check..."
-            for i in $(seq 1 12); do
+            for i in $(seq 1 18); do
               API_HEALTH="$(docker inspect --format='{{.State.Health.Status}}' starvis-api 2>/dev/null || echo missing)"
               IHM_HEALTH="$(docker inspect --format='{{.State.Health.Status}}' starvis-ihm 2>/dev/null || echo missing)"
               if [ "$API_HEALTH" = "healthy" ] && [ "$IHM_HEALTH" = "healthy" ]; then
@@ -648,6 +612,9 @@ jobs:
             echo "==> Runtime smoke tests..."
             docker exec starvis-api sh -c 'wget -qO- "http://127.0.0.1:${PORT:-3000}/health/live" >/dev/null'
             docker exec starvis-api sh -c 'wget -qO- "http://127.0.0.1:${PORT:-3000}/health/ready" >/dev/null'
-            docker exec starvis-ihm wget -qO- http://127.0.0.1:8080/ >/dev/null
+            docker exec starvis-ihm wget -qO- "http://127.0.0.1:${PORT:-8080}/" >/dev/null
+
+            echo "==> Prune old images..."
+            docker image prune -af --filter "until=24h"
 
             echo "==> Deploy complete."
