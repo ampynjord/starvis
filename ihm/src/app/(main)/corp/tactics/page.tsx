@@ -79,23 +79,27 @@ const defaultStrategy = (): Strategy => ({
 });
 
 function formationPosition(index: number, total: number, spacing: number, formation: FormationType, offset: number) {
+  const gap = Math.max(spacing, 22);
   if (formation === 'line') {
-    return { gridX: (index - (total - 1) / 2) * spacing + offset, gridZ: offset * 0.35 };
+    return { gridX: (index - (total - 1) / 2) * gap + offset, gridZ: offset * 0.35 };
   }
   if (formation === 'box') {
     const cols = Math.ceil(Math.sqrt(total));
     const row = Math.floor(index / cols);
     const col = index % cols;
+    const rows = Math.ceil(total / cols);
     return {
-      gridX: (col - (cols - 1) / 2) * spacing + offset,
-      gridZ: (row - Math.ceil(total / cols) / 2) * spacing + offset * 0.35,
+      gridX: (col - (cols - 1) / 2) * gap + offset,
+      gridZ: (row - (rows - 1) / 2) * gap + offset * 0.35,
     };
   }
-  const side = index % 2 === 0 ? 1 : -1;
-  const rank = Math.ceil(index / 2);
+  const row = Math.floor((Math.sqrt(8 * index + 1) - 1) / 2);
+  const rowStart = (row * (row + 1)) / 2;
+  const col = index - rowStart;
+  const rowWidth = row + 1;
   return {
-    gridX: side * rank * spacing + offset,
-    gridZ: rank * spacing * 0.8 + offset * 0.35,
+    gridX: (col - (rowWidth - 1) / 2) * gap + offset,
+    gridZ: row * gap * 0.82 + offset * 0.35,
   };
 }
 

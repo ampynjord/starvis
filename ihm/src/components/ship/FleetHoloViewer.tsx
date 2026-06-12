@@ -106,7 +106,6 @@ export function FleetHoloViewer({
   const shipsKey = ships
     .map((ship) => [ship.id, ship.shipUuid, ship.ctmUrl ?? '', ship.gridX ?? '', ship.gridZ ?? ''].join(':'))
     .join('|')
-    + `::selected:${selectedId ?? ''}`
     + `::${tacticalMarkers.map((marker) => [marker.id, marker.type, marker.gridX, marker.gridZ, marker.rotation ?? 0].join(':')).join('|')}`
     + `::${tacticalVectors.map((vector) => [vector.id, vector.sourceType, vector.sourceId, vector.endX, vector.endZ, vector.controlX, vector.controlZ].join(':')).join('|')}`;
 
@@ -193,6 +192,18 @@ export function FleetHoloViewer({
       scene.add(e.root);
     });
 
+    const groupRings: GroupRingEntry[] = [...new Set(entries.map((entry) => entry.ship.group).filter((group): group is string => !!group))]
+      .filter((group) => entries.filter((entry) => entry.ship.group === group).length > 1)
+      .map((group) => {
+        const mesh = new THREE.Mesh(
+          new THREE.TorusGeometry(1, 0.018, 8, 96),
+          new THREE.MeshBasicMaterial({ color: COLOR_RING, transparent: true, opacity: 0 }),
+        );
+        mesh.rotation.x = -Math.PI / 2;
+        scene.add(mesh);
+        return { group, mesh };
+      });
+
     // ── Material factory ────────────────────────────────────────────────────────
     const makeMat = (color: number, emissive: number) =>
       new THREE.MeshPhongMaterial({
@@ -227,6 +238,11 @@ export function FleetHoloViewer({
       root: THREE.Group;
       mesh: THREE.Mesh;
       ship: FleetShip;
+    };
+
+    type GroupRingEntry = {
+      group: string;
+      mesh: THREE.Mesh;
     };
 
     const makeLabelSprite = (text: string) => {
@@ -441,7 +457,6 @@ export function FleetHoloViewer({
     };
 
     const vectorLaunchers: VectorLauncherEntry[] = entries
-      .filter((entry) => entry.ship.id === selectedIdRef.current)
       .map((entry) => {
         const root = new THREE.Group();
         const distance = Math.max(entry.radius * 1.1, 14);
@@ -451,6 +466,7 @@ export function FleetHoloViewer({
           new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0.9 }),
         );
         mesh.rotation.x = -Math.PI / 2;
+        mesh.visible = false;
         mesh.userData.vectorLauncherShipId = entry.ship.id;
         root.add(mesh);
         scene.add(root);
@@ -697,7 +713,7 @@ export function FleetHoloViewer({
       entries.forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
       markerEntries.forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
       vectorEntries.forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
-      vectorLaunchers.forEach((entry) => meshes.push(entry.mesh));
+      vectorLaunchers.filter((entry) => entry.mesh.visible).forEach((entry) => meshes.push(entry.mesh));
       const hits = raycaster.intersectObjects(meshes, true);
       if (!hits.length) return null;
       let obj: THREE.Object3D | null = hits[0].object;
@@ -841,17 +857,22 @@ export function FleetHoloViewer({
       frameRef.current = requestAnimationFrame(animate);
       if (!visibility.isVisible()) return;
       const t = clockRef.current.getElapsedTime();
+      const selectedEntry = entries.find((entry) => entry.ship.id === selectedIdRef.current);
+      const selectedGroup = selectedEntry?.ship.group;
+      const selectedGroupEntries = selectedGroup ? entries.filter((entry) => entry.ship.group === selectedGroup) : [];
+      const showGroupSelection = selectedGroupEntries.length > 1;
 
       // Animate selected ship
       entries.forEach((entry) => {
         const isSelected = entry.ship.id === selectedIdRef.current;
+        const isGroupSelected = showGroupSelection && entry.ship.group === selectedGroup;
 
         // Mesh material
         entry.meshes.forEach((m) => {
           if (m.material instanceof THREE.MeshPhongMaterial && !m.userData.isOutline) {
-            m.material.color.setHex(isSelected ? COLOR_SELECTED : COLOR_DEFAULT);
+            m.material.color.setHex(isSelected || isGroupSelected ? COLOR_SELECTED : COLOR_DEFAULT);
             m.material.emissive.setHex(
-              isSelected ? 0x082a3a + Math.round(Math.sin(t * 3) * 0.15 * 0x050a10) : EMISS_DEFAULT
+              isSelected || isGroupSelected ? 0x082a3a + Math.round(Math.sin(t * 3) * 0.15 * 0x050a10) : EMISS_DEFAULT
             );
           }
         });
@@ -866,13 +887,32 @@ export function FleetHoloViewer({
 
         // Ring
         if (entry.ring && entry.ring.material instanceof THREE.MeshBasicMaterial) {
-          entry.ring.material.opacity = isSelected ? 0.6 + Math.sin(t * 5) * 0.25 : 0;
+          entry.ring.material.opacity = isSelected && !showGroupSelection ? 0.6 + Math.sin(t * 5) * 0.25 : 0;
           entry.ring.rotation.z = t * 1.2;
-          if (isSelected) {
+          if (isSelected && !showGroupSelection) {
             const pulse = 1 + Math.sin(t * 3) * 0.06;
             entry.ring.scale.set(pulse, 1, pulse);
           }
         }
+      });
+
+      groupRings.forEach((ring) => {
+        const selected = showGroupSelection && ring.group === selectedGroup;
+        if (ring.mesh.material instanceof THREE.MeshBasicMaterial) {
+          ring.mesh.material.opacity = selected ? 0.68 + Math.sin(t * 5) * 0.18 : 0;
+        }
+        if (!selected) return;
+        const groupEntries = entries.filter((entry) => entry.ship.group === ring.group);
+        const minX = Math.min(...groupEntries.map((entry) => entry.root.position.x - Math.max(entry.halfWidth, entry.radius * 0.4)));
+        const maxX = Math.max(...groupEntries.map((entry) => entry.root.position.x + Math.max(entry.halfWidth, entry.radius * 0.4)));
+        const minZ = Math.min(...groupEntries.map((entry) => entry.root.position.z - Math.max(entry.halfWidth, entry.radius * 0.4)));
+        const maxZ = Math.max(...groupEntries.map((entry) => entry.root.position.z + Math.max(entry.halfWidth, entry.radius * 0.4)));
+        const centerX = (minX + maxX) / 2;
+        const centerZ = (minZ + maxZ) / 2;
+        const radius = Math.max(maxX - minX, maxZ - minZ, 22) / 2 + 8;
+        ring.mesh.position.set(centerX, 0.22, centerZ);
+        ring.mesh.scale.set(radius, radius, radius);
+        ring.mesh.rotation.z = t * 0.45;
       });
 
       markerEntries.forEach((entry) => {
@@ -903,8 +943,21 @@ export function FleetHoloViewer({
       vectorLaunchers.forEach((launcher) => {
         const entry = entries.find((candidate) => candidate.ship.id === launcher.ship.id);
         if (!entry) return;
+        const isSelected = entry.ship.id === selectedIdRef.current;
         const distance = Math.max(entry.radius * 1.1, 14);
-        launcher.root.position.set(entry.root.position.x, 0.75, entry.root.position.z - distance);
+        if (isSelected && showGroupSelection) {
+          const minX = Math.min(...selectedGroupEntries.map((groupEntry) => groupEntry.root.position.x - Math.max(groupEntry.halfWidth, groupEntry.radius * 0.4)));
+          const maxX = Math.max(...selectedGroupEntries.map((groupEntry) => groupEntry.root.position.x + Math.max(groupEntry.halfWidth, groupEntry.radius * 0.4)));
+          const minZ = Math.min(...selectedGroupEntries.map((groupEntry) => groupEntry.root.position.z - Math.max(groupEntry.halfWidth, groupEntry.radius * 0.4)));
+          const maxZ = Math.max(...selectedGroupEntries.map((groupEntry) => groupEntry.root.position.z + Math.max(groupEntry.halfWidth, groupEntry.radius * 0.4)));
+          const centerX = (minX + maxX) / 2;
+          const centerZ = (minZ + maxZ) / 2;
+          const radius = Math.max(maxX - minX, maxZ - minZ, 22) / 2 + 8;
+          launcher.root.position.set(centerX, 0.75, centerZ - radius);
+        } else {
+          launcher.root.position.set(entry.root.position.x, 0.75, entry.root.position.z - distance);
+        }
+        launcher.mesh.visible = isSelected;
         if (launcher.mesh.material instanceof THREE.MeshBasicMaterial) {
           launcher.mesh.material.opacity = 0.76 + Math.sin(t * 5) * 0.14;
         }
