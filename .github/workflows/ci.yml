@@ -349,16 +349,20 @@ jobs:
         env:
           DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_test
 
-      # The test DB just received `migrate:deploy`, so diffing it against the
-      # schema fails (exit 2) whenever a schema change ships without a migration.
+      # Replays the migration history into a clean shadow DB and diffs it
+      # against the schema: fails (exit 2) whenever a schema change ships
+      # without a migration. Replay avoids live-DB introspection, whose
+      # multi-schema index reporting produces false positives.
       - name: Check schema/migrations drift
         run: |
+          PGPASSWORD=ci_password psql -h 127.0.0.1 -U ci_user -d starvis_test -c 'CREATE DATABASE starvis_shadow'
           npm exec --workspace=@starvis/db -- prisma migrate diff \
-            --from-config-datasource \
+            --from-migrations prisma/migrations \
             --to-schema prisma/schema \
             --exit-code
         env:
           DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_test
+          SHADOW_DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_shadow
 
       - name: Run API tests
         run: npm run test --workspace=@starvis/api -- --reporter=verbose
