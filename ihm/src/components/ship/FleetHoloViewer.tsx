@@ -74,6 +74,19 @@ const MIN_SHIP_GAP   = 8;
 const SHIP_GAP_RATIO = 0.18;
 const FLEET_MODEL_FRONT_ROTATION_Y = Math.PI;
 
+const geometryCache = new Map<string, Promise<THREE.BufferGeometry>>();
+
+function loadCachedGeometry(loader: CTMLoader, url: string): Promise<THREE.BufferGeometry> {
+  let cached = geometryCache.get(url);
+  if (!cached) {
+    cached = new Promise((resolve, reject) => {
+      loader.load(url, resolve, undefined, reject);
+    });
+    geometryCache.set(url, cached);
+  }
+  return cached.then((geometry) => geometry.clone());
+}
+
 interface CameraViewState {
   position: THREE.Vector3;
   target: THREE.Vector3;
@@ -282,28 +295,28 @@ export function FleetHoloViewer({
 
     const makeLabelSprite = (text: string) => {
       const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 128;
+      canvas.width = 384;
+      canvas.height = 96;
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = 'rgba(2, 12, 18, 0.72)';
-        ctx.strokeStyle = 'rgba(34, 211, 238, 0.78)';
-        ctx.lineWidth = 3;
-        ctx.fillRect(8, 24, 496, 72);
-        ctx.strokeRect(8, 24, 496, 72);
-        ctx.font = '700 34px Arial';
+        ctx.fillStyle = 'rgba(2, 12, 18, 0.58)';
+        ctx.strokeStyle = 'rgba(34, 211, 238, 0.62)';
+        ctx.lineWidth = 2;
+        ctx.fillRect(10, 26, 364, 44);
+        ctx.strokeRect(10, 26, 364, 44);
+        ctx.font = '700 22px Arial';
         ctx.fillStyle = '#a5f3fc';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(text.slice(0, 24).toUpperCase(), 256, 61);
+        ctx.fillText(text.slice(0, 24).toUpperCase(), 192, 49);
       }
       const texture = new THREE.CanvasTexture(canvas);
       texture.colorSpace = THREE.SRGBColorSpace;
-      const material = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0.92 });
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true, opacity: 0.84, depthTest: false });
       const sprite = new THREE.Sprite(material);
-      sprite.scale.set(34, 8.5, 1);
-      sprite.position.y = 12;
+      sprite.scale.set(18, 4.5, 1);
+      sprite.position.y = 20;
       return sprite;
     };
 
@@ -319,50 +332,71 @@ export function FleetHoloViewer({
         obstacle: 0xef4444,
       } satisfies Record<TacticalMarker['type'], number>;
       const color = colorByType[marker.type];
-      const mat = new THREE.MeshPhongMaterial({ color, emissive: color, emissiveIntensity: 0.28, transparent: true, opacity: 0.78 });
-      const lineMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.88 });
+      const mat = new THREE.MeshPhongMaterial({
+        color,
+        emissive: color,
+        emissiveIntensity: 0.55,
+        transparent: true,
+        opacity: 0.82,
+        shininess: 80,
+      });
+      const ghostMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.14, side: THREE.DoubleSide, depthWrite: false });
+      const lineMat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.9 });
       const meshes: THREE.Object3D[] = [];
 
       let body: THREE.Object3D;
       if (marker.type === 'obstacle') {
         body = new THREE.Group();
-        const stem = new THREE.Mesh(new THREE.BoxGeometry(2.2, 11, 2.2), mat);
-        stem.position.y = 8;
-        const dot = new THREE.Mesh(new THREE.SphereGeometry(2.1, 18, 12), mat);
-        dot.position.y = 1.5;
-        body.add(stem, dot);
+        const stem = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.7, 11, 6), mat);
+        stem.position.y = 8.5;
+        stem.rotation.z = -0.18;
+        const dot = new THREE.Mesh(new THREE.SphereGeometry(2.1, 18, 12), mat.clone());
+        dot.position.set(0, 1.8, 0);
+        const glow = new THREE.Mesh(new THREE.CylinderGeometry(5.8, 6.8, 0.25, 3), ghostMat.clone());
+        glow.rotation.y = Math.PI / 3;
+        glow.position.y = 0.18;
+        body.add(stem, dot, glow);
       } else if (marker.type === 'poi') {
         body = new THREE.Group();
-        const arc = new THREE.Mesh(new THREE.TorusGeometry(4.2, 0.85, 10, 28, Math.PI * 1.35), mat);
-        arc.position.y = 10.5;
-        arc.rotation.z = -Math.PI * 0.18;
-        const hook = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 5.2, 12), mat);
-        hook.position.set(2.8, 6.6, 0);
-        hook.rotation.z = -0.55;
-        const dot = new THREE.Mesh(new THREE.SphereGeometry(1.5, 18, 12), mat);
-        dot.position.y = 1.5;
-        body.add(arc, hook, dot);
+        const arc = new THREE.Mesh(new THREE.TorusGeometry(3.9, 0.72, 12, 42, Math.PI * 1.55), mat);
+        arc.position.y = 12;
+        arc.rotation.set(0.08, 0, -Math.PI * 0.3);
+        const hook = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, 4.9, 14), mat.clone());
+        hook.position.set(2.1, 7.2, 0);
+        hook.rotation.z = -0.45;
+        const dot = new THREE.Mesh(new THREE.SphereGeometry(1.55, 20, 14), mat.clone());
+        dot.position.y = 2;
+        const halo = new THREE.Mesh(new THREE.TorusGeometry(5.2, 0.12, 8, 52), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7, depthTest: false }));
+        halo.position.y = 0.35;
+        halo.rotation.x = -Math.PI / 2;
+        body.add(arc, hook, dot, halo);
       } else {
         body = new THREE.Group();
-        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 11, 12), mat);
-        shaft.position.y = 9;
-        const tip = new THREE.Mesh(new THREE.ConeGeometry(3.1, 6.5, 18), mat);
-        tip.position.y = 1.8;
+        const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.82, 1.1, 12, 14), mat);
+        shaft.position.y = 10.5;
+        const fins = new THREE.Mesh(new THREE.ConeGeometry(4.4, 5.4, 4), ghostMat.clone());
+        fins.position.y = 7.2;
+        fins.rotation.y = Math.PI / 4;
+        const tip = new THREE.Mesh(new THREE.ConeGeometry(3.5, 7.2, 24), mat.clone());
+        tip.position.y = 3.5;
         tip.rotation.x = Math.PI;
-        body.add(shaft, tip);
+        const target = new THREE.Mesh(new THREE.TorusGeometry(6.5, 0.18, 8, 72), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.82, depthTest: false }));
+        target.position.y = 0.25;
+        target.rotation.x = -Math.PI / 2;
+        body.add(shaft, fins, tip, target);
       }
       body.traverse((child) => { child.userData.tacticalMarkerId = marker.id; });
       root.add(body);
       meshes.push(body);
 
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(marker.type === 'obstacle' ? 8 : 6, 0.12, 8, 48), mat.clone());
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(marker.type === 'obstacle' ? 8 : 6, 0.16, 8, 64), mat.clone());
       ring.rotation.x = -Math.PI / 2;
       ring.position.y = 0.2;
       ring.userData.tacticalMarkerId = marker.id;
       root.add(ring);
       meshes.push(ring);
 
-      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(12, 0.1, 12)), lineMat);
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(10, 0.1, 10)), lineMat);
       edges.position.y = 0.1;
       edges.userData.tacticalMarkerId = marker.id;
       root.add(edges);
@@ -496,29 +530,32 @@ export function FleetHoloViewer({
     const vectorLaunchers: VectorLauncherEntry[] = entries
       .map((entry) => {
         const root = new THREE.Group();
-        const distance = Math.max(entry.radius * 1.1, 14);
-        root.position.set(entry.root.position.x, 3, entry.root.position.z - distance);
+        const distance = Math.max(entry.radius * 1.35, 22);
+        root.position.set(entry.root.position.x, 6, entry.root.position.z - distance);
         root.visible = false;
-        const material = new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthTest: false });
+        const material = new THREE.MeshBasicMaterial({ color: 0x67fff0, transparent: true, opacity: 0.98, side: THREE.DoubleSide, depthTest: false });
         const halo = new THREE.Mesh(
-          new THREE.TorusGeometry(8.5, 0.65, 8, 40),
+          new THREE.TorusGeometry(11, 0.9, 8, 56),
           material.clone(),
         );
         halo.rotation.x = -Math.PI / 2;
         halo.userData.vectorLauncherShipId = entry.ship.id;
         const arrow = new THREE.Mesh(
-          new THREE.ConeGeometry(6.8, 14, 3),
+          new THREE.ConeGeometry(7.5, 16, 3),
           material,
         );
         arrow.rotation.x = -Math.PI / 2;
-        arrow.position.z = -4;
+        arrow.position.z = -6;
         arrow.userData.vectorLauncherShipId = entry.ship.id;
-        const stem = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 12), material.clone());
-        stem.position.z = 5;
+        const stem = new THREE.Mesh(new THREE.BoxGeometry(2.4, 2.4, 18), material.clone());
+        stem.position.z = 6;
         stem.userData.vectorLauncherShipId = entry.ship.id;
-        root.add(halo, arrow, stem);
+        const beacon = new THREE.Mesh(new THREE.SphereGeometry(3.4, 18, 12), material.clone());
+        beacon.position.y = 5.5;
+        beacon.userData.vectorLauncherShipId = entry.ship.id;
+        root.add(halo, arrow, stem, beacon);
         scene.add(root);
-        return { root, meshes: [halo, arrow, stem], ship: entry.ship };
+        return { root, meshes: [halo, arrow, stem, beacon], ship: entry.ship };
       });
 
     const refreshLayout = (fitView = !userHasMovedView) => {
@@ -674,9 +711,9 @@ export function FleetHoloViewer({
         return;
       }
 
-      loader.load(
-        `/api/v1/ships/${entry.ship.shipUuid}/model/file`,
-        (geometry) => {
+      const modelUrl = `/api/v1/ships/${entry.ship.shipUuid}/model/file`;
+      void loadCachedGeometry(loader, modelUrl)
+        .then((geometry) => {
           const mat = makeMat(COLOR_DEFAULT, EMISS_DEFAULT);
           const mesh = new THREE.Mesh(geometry, mat);
           mesh.userData.fleetItemId = entry.ship.id;
@@ -730,12 +767,10 @@ export function FleetHoloViewer({
           loadedSoFar++;
           setLoadedCount(loadedSoFar);
           refreshLayout();
-        },
-        undefined,
-        () => {
+        })
+        .catch(() => {
           loadFallbackCard(entry);
-        },
-      );
+        });
     });
 
     // ── Raycasting ─────────────────────────────────────────────────────────────
@@ -1032,23 +1067,24 @@ export function FleetHoloViewer({
         const entry = entries.find((candidate) => candidate.ship.id === launcher.ship.id);
         if (!entry) return;
         const isSelected = entry.ship.id === selectedIdRef.current;
-        const distance = Math.max(entry.radius * 1.1, 14);
-        if (isSelected && showGroupSelection) {
+        const isFirstSelectedGroupShip = showGroupSelection && selectedGroupEntries[0]?.ship.id === entry.ship.id;
+        const distance = Math.max(entry.radius * 1.35, 22);
+        if (isFirstSelectedGroupShip) {
           const minX = Math.min(...selectedGroupEntries.map((groupEntry) => groupEntry.root.position.x - Math.max(groupEntry.halfWidth, groupEntry.radius * 0.4)));
           const maxX = Math.max(...selectedGroupEntries.map((groupEntry) => groupEntry.root.position.x + Math.max(groupEntry.halfWidth, groupEntry.radius * 0.4)));
           const minZ = Math.min(...selectedGroupEntries.map((groupEntry) => groupEntry.root.position.z - Math.max(groupEntry.halfWidth, groupEntry.radius * 0.4)));
           const maxZ = Math.max(...selectedGroupEntries.map((groupEntry) => groupEntry.root.position.z + Math.max(groupEntry.halfWidth, groupEntry.radius * 0.4)));
           const centerX = (minX + maxX) / 2;
           const centerZ = (minZ + maxZ) / 2;
-          const radius = Math.max(maxX - minX, maxZ - minZ, 22) / 2 + 8;
-          launcher.root.position.set(centerX, 3, centerZ - radius);
+          const radius = Math.max(maxX - minX, maxZ - minZ, 22) / 2 + 18;
+          launcher.root.position.set(centerX, 6, centerZ - radius);
         } else {
-          launcher.root.position.set(entry.root.position.x, 3, entry.root.position.z - distance);
+          launcher.root.position.set(entry.root.position.x, 6, entry.root.position.z - distance);
         }
-        launcher.root.visible = isSelected;
+        launcher.root.visible = isSelected || isFirstSelectedGroupShip;
         launcher.meshes.forEach((mesh, index) => {
           if (mesh.material instanceof THREE.MeshBasicMaterial) {
-            mesh.material.opacity = index === 0 ? 0.52 + Math.sin(t * 5) * 0.18 : 0.88 + Math.sin(t * 5) * 0.1;
+            mesh.material.opacity = index === 0 ? 0.62 + Math.sin(t * 5) * 0.18 : 0.9 + Math.sin(t * 5) * 0.08;
           }
         });
       });

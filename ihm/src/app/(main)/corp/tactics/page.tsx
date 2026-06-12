@@ -118,8 +118,8 @@ function formationPosition(index: number, total: number, spacing: number, format
     const side = index < half ? -1 : 1;
     const pos = index < half ? index : index - half;
     return {
-      gridX: side * (pos + 1) * gap * 0.8 + offsetX,
-      gridZ: (pos + 1) * gap * 0.7 + offsetZ,
+      gridX: side * (pos + 1) * gap * 1.1 + offsetX,
+      gridZ: (pos + 1) * gap * 0.95 + offsetZ,
     };
   }
   if (formation === 'echelon') {
@@ -150,7 +150,7 @@ function formationPosition(index: number, total: number, spacing: number, format
   const rowWidth = row + 1;
   return {
     gridX: (col - (rowWidth - 1) / 2) * gap + offsetX,
-    gridZ: row * gap * 0.82 + offsetZ,
+    gridZ: row * gap * 1.05 + offsetZ,
   };
 }
 
@@ -166,7 +166,17 @@ function estimateFormationGap(ship: ShipListItem | undefined, fallbackSpacing: n
     Number(ship?.cross_section_y ?? 0),
     24,
   );
-  return Math.max(fallbackSpacing, size * 1.35);
+  return Math.max(fallbackSpacing, size * 3, 64);
+}
+
+function boundsOfPositions(positions: Array<{ gridX: number; gridZ: number }>, padding: number) {
+  if (!positions.length) return { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
+  return {
+    minX: Math.min(...positions.map((pos) => pos.gridX)) - padding,
+    maxX: Math.max(...positions.map((pos) => pos.gridX)) + padding,
+    minZ: Math.min(...positions.map((pos) => pos.gridZ)) - padding,
+    maxZ: Math.max(...positions.map((pos) => pos.gridZ)) + padding,
+  };
 }
 
 export default function CorporationTacticsPage() {
@@ -316,11 +326,14 @@ export default function CorporationTacticsPage() {
     }
 
     const effectiveSpacing = estimateFormationGap(ship, spacing);
+    const draftPositions = Array.from({ length: quantity }, (_, index) => formationPosition(index, quantity, effectiveSpacing, type, 0, 0));
+    const draftBounds = boundsOfPositions(draftPositions, effectiveSpacing * 0.55);
+    const existingBounds = boundsOfPositions(activeStrategy.ships, effectiveSpacing * 0.65);
     const baseOffsetX = activeStrategy.ships.length
-      ? Math.max(...activeStrategy.ships.map((n) => n.gridX)) + effectiveSpacing * 2
+      ? existingBounds.maxX - draftBounds.minX + effectiveSpacing * 0.8
       : 0;
     const nextShips = Array.from({ length: quantity }, (_, index) => {
-      const pos = formationPosition(index, quantity, effectiveSpacing, type, baseOffsetX, 0);
+      const pos = formationPosition(index, quantity, effectiveSpacing, type, baseOffsetX, activeStrategy.ships.length ? existingBounds.minZ - draftBounds.minZ : 0);
       const id = nextShipIdRef.current++;
       return {
         id,

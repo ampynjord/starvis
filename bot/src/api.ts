@@ -1,6 +1,6 @@
 import { API_BASE_URL, API_TIMEOUT_MS } from './config.js';
 
-async function apiFetch<T>(path: string): Promise<T> {
+export async function apiFetch<T>(path: string): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
   const res = await fetch(url, {
     signal: AbortSignal.timeout(API_TIMEOUT_MS),
@@ -146,6 +146,147 @@ interface StatsResponse {
   data: Record<string, number>;
 }
 
+export interface MiningElementResult {
+  uuid: string;
+  name: string;
+  symbol?: string;
+  type?: string;
+  rarity?: string;
+  instability?: number;
+  resistance?: number;
+  value?: number;
+}
+
+export interface MiningCompositionResult {
+  uuid: string;
+  name: string;
+  displayName?: string;
+  type?: string;
+  partCount?: number;
+  elements?: Array<{ name?: string; symbol?: string; probability?: number; percentage?: number }>;
+}
+
+export interface MiningLaserResult {
+  uuid: string;
+  name: string;
+  size?: number;
+  grade?: string;
+  manufacturerCode?: string;
+  miningSpeed?: number;
+  miningRange?: number;
+  miningResistance?: number;
+  miningInstability?: number;
+}
+
+export interface CraftingRecipeResult {
+  uuid: string;
+  name?: string;
+  displayName?: string;
+  category?: string;
+  subCategory?: string;
+  skillLevel?: number;
+  stationType?: string;
+  craftingTime?: number;
+  outputItemName?: string;
+  outputQuantity?: number;
+  ingredients?: Array<{ itemName?: string; quantity?: number; type?: string }>;
+}
+
+export interface BlueprintRewardResult {
+  uuid?: string;
+  name?: string;
+  blueprintName?: string;
+  itemName?: string;
+  sourceName?: string;
+  rarity?: string;
+  type?: string;
+}
+
+export interface LocationResult {
+  uuid: string;
+  name: string;
+  type?: string;
+  system?: string;
+  parentName?: string;
+  planet?: string;
+  jurisdiction?: string;
+  hasQuantumMarker?: boolean;
+  positionX?: number;
+  positionY?: number;
+  positionZ?: number;
+}
+
+export interface ShopResult {
+  id: number;
+  name: string;
+  locationName?: string;
+  location_name?: string;
+  type?: string;
+  shopType?: string;
+  category?: string;
+  system?: string;
+  itemCount?: number;
+  inventoryCount?: number;
+}
+
+export interface ShopInventoryItem {
+  itemName?: string;
+  name?: string;
+  type?: string;
+  subType?: string;
+  basePrice?: number;
+  price?: number;
+  buyPrice?: number;
+  sellPrice?: number;
+}
+
+export interface PaintResult {
+  uuid: string;
+  name: string;
+  manufacturer?: string;
+  vehicleName?: string;
+  vehicle_name?: string;
+  color?: string;
+  description?: string;
+}
+
+export interface FactionResult {
+  uuid?: string;
+  code?: string;
+  name: string;
+  description?: string;
+  reputationScope?: string;
+  lawfulness?: string;
+  type?: string;
+}
+
+export interface GalactapediaResult {
+  id: number | string;
+  title: string;
+  excerpt?: string;
+  type?: string;
+  url?: string;
+}
+
+export interface CommLinkResult {
+  id: number | string;
+  title: string;
+  subtitle?: string;
+  category?: string;
+  publishedAt?: string;
+  url?: string;
+}
+
+export interface StarmapSystemResult {
+  code: string;
+  name: string;
+  type?: string;
+  affiliation?: string;
+  economy?: string;
+  danger?: string;
+  description?: string;
+}
+
 // --- Public API functions ---
 
 export async function searchAll(query: string): Promise<SearchResponse> {
@@ -190,6 +331,25 @@ export async function getStats(): Promise<StatsResponse> {
   return apiFetch<StatsResponse>('/api/v1/stats/overview');
 }
 
+export async function getMiningStats(): Promise<{ success: boolean; data: Record<string, number> }> {
+  return apiFetch('/api/v1/mining/stats');
+}
+
+export async function getMiningElements(): Promise<{ success: boolean; count: number; data: MiningElementResult[] }> {
+  return apiFetch('/api/v1/mining/elements');
+}
+
+export async function getMiningCompositions(query?: string): Promise<{ success: boolean; count: number; data: MiningCompositionResult[] }> {
+  const data = await apiFetch<{ success: boolean; count: number; data: MiningCompositionResult[] }>('/api/v1/mining/compositions');
+  if (!query?.trim()) return data;
+  const needle = query.toLowerCase();
+  return { ...data, data: data.data.filter((item) => (item.displayName ?? item.name ?? '').toLowerCase().includes(needle)) };
+}
+
+export async function getMiningLasers(): Promise<{ success: boolean; count: number; data: MiningLaserResult[] }> {
+  return apiFetch('/api/v1/mining/lasers');
+}
+
 export async function getComponents(query: string, type?: string): Promise<PaginatedResponse<ComponentResult>> {
   const params = new URLSearchParams();
   params.set('search', query);
@@ -214,6 +374,57 @@ export async function getTopComponents(opts: {
 
 export async function getItems(query: string): Promise<PaginatedResponse<ItemResult>> {
   return apiFetch<PaginatedResponse<ItemResult>>(`/api/v1/items?search=${encodeURIComponent(query)}&limit=5`);
+}
+
+export async function getCraftingRecipes(query: string, limit = 5): Promise<PaginatedResponse<CraftingRecipeResult>> {
+  return apiFetch<PaginatedResponse<CraftingRecipeResult>>(`/api/v1/crafting/recipes?search=${encodeURIComponent(query)}&limit=${limit}`);
+}
+
+export async function getBlueprintRewards(query: string, limit = 5): Promise<PaginatedResponse<BlueprintRewardResult>> {
+  return apiFetch<PaginatedResponse<BlueprintRewardResult>>(
+    `/api/v1/blueprints/rewards?search=${encodeURIComponent(query)}&limit=${limit}`,
+  );
+}
+
+export async function getLocations(query: string, limit = 6): Promise<PaginatedResponse<LocationResult>> {
+  return apiFetch<PaginatedResponse<LocationResult>>(`/api/v1/locations?search=${encodeURIComponent(query)}&limit=${limit}`);
+}
+
+export async function getShops(query: string, limit = 6): Promise<PaginatedResponse<ShopResult>> {
+  return apiFetch<PaginatedResponse<ShopResult>>(`/api/v1/shops?search=${encodeURIComponent(query)}&limit=${limit}`);
+}
+
+export async function getShopInventory(shopId: number): Promise<{ success: boolean; count: number; data: ShopInventoryItem[] }> {
+  return apiFetch(`/api/v1/shops/${shipIdSafe(shopId)}/inventory`);
+}
+
+function shipIdSafe(id: number): number {
+  if (!Number.isInteger(id) || id < 1) throw new Error('Invalid shop ID');
+  return id;
+}
+
+export async function getPaints(query: string, limit = 6): Promise<PaginatedResponse<PaintResult>> {
+  return apiFetch<PaginatedResponse<PaintResult>>(`/api/v1/paints?search=${encodeURIComponent(query)}&limit=${limit}`);
+}
+
+export async function getFactions(query?: string): Promise<{ success: boolean; count: number; data: FactionResult[] }> {
+  const params = new URLSearchParams();
+  if (query) params.set('search', query);
+  return apiFetch(`/api/v1/factions${params.size ? `?${params}` : ''}`);
+}
+
+export async function getGalactapedia(query: string, limit = 5): Promise<PaginatedResponse<GalactapediaResult>> {
+  return apiFetch<PaginatedResponse<GalactapediaResult>>(`/api/v1/galactapedia?search=${encodeURIComponent(query)}&limit=${limit}`);
+}
+
+export async function getCommLinks(query: string, limit = 5): Promise<PaginatedResponse<CommLinkResult>> {
+  return apiFetch<PaginatedResponse<CommLinkResult>>(`/api/v1/comm-links?search=${encodeURIComponent(query)}&limit=${limit}`);
+}
+
+export async function getStarmapSystems(query?: string): Promise<{ success: boolean; count: number; data: StarmapSystemResult[] }> {
+  const params = new URLSearchParams();
+  if (query) params.set('search', query);
+  return apiFetch(`/api/v1/starmap/systems${params.size ? `?${params}` : ''}`);
 }
 
 export async function getGameVersion(): Promise<VersionResponse> {

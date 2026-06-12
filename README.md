@@ -239,6 +239,29 @@ When adding, changing, or deleting an API route, update [`api/openapi.json`](api
 
 ---
 
+## Discord Bot
+
+The Discord bot exposes STARVIS through focused slash commands plus the AI assistant:
+
+| Area | Commands |
+|---|---|
+| Ships and equipment | `/ship`, `/compare`, `/loadout`, `/component`, `/item`, `/commodity`, `/paint`, `/top` |
+| Economy and operations | `/trade`, `/shop`, `/mining`, `/crafting`, `/mission` |
+| Universe knowledge | `/location`, `/faction`, `/lore`, `/manufacturers`, `/search` |
+| Platform and AI | `/starvis`, `/intel`, `/version`, `/changelog`, `/status` |
+
+`/intel` lists the bot capabilities and dataset counters directly in Discord. `/starvis` uses the STARVIS AI endpoint for free-form questions and suggests a specialized command when structured data is a better fit.
+
+Deploy or refresh Discord slash commands with:
+
+```bash
+npm run deploy-commands --workspace=@starvis/bot
+```
+
+The bot remains disabled when `DISCORD_TOKEN` is not set.
+
+---
+
 ## IHM
 
 The web app is a Next.js 15 application in `ihm/`.
