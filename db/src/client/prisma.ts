@@ -19,4 +19,5 @@ export function getPrisma(): PrismaClient {
   return prismaClient;
 }
 
+export type { UserRole } from '../../generated/client/index.js';
 export { PrismaClient };

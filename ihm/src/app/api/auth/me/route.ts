@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logApiError } from '@/lib/server-logger';
 import { clearSessionCookie, getAuthToken, readUpstreamJson, upstreamUrl } from '../../_utils/proxy';
 
 export async function GET() {
@@ -19,7 +20,7 @@ export async function GET() {
     const data = await upstream.json();
     return NextResponse.json({ user: data.user });
   } catch (e: any) {
-    console.error('[auth/me GET]', e);
+    logApiError('auth/me GET', e);
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
   }
 }
@@ -43,7 +44,7 @@ export async function DELETE() {
     clearSessionCookie(res);
     return res;
   } catch (e: any) {
-    console.error('[auth/me DELETE]', e);
+    logApiError('auth/me DELETE', e);
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
   }
 }
@@ -67,7 +68,7 @@ export async function PUT(req: Request) {
     }
     return NextResponse.json({ user: data.user });
   } catch (e: any) {
-    console.error('[auth/me PUT]', e);
+    logApiError('auth/me PUT', e);
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
   }
 }

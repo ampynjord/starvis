@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logApiError } from '@/lib/server-logger';
 import { upstreamUrl } from '../_utils/proxy';
 
 export async function GET(req: Request) {
@@ -13,7 +14,7 @@ export async function GET(req: Request) {
     const data = await upstream.json().catch(() => ({}));
     return NextResponse.json(data, { status: upstream.status });
   } catch (e: any) {
-    console.error('[rsi-orgs GET]', e);
+    logApiError('rsi-orgs GET', e);
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
   }
 }

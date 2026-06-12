@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { getPrisma } from '@starvis/db';
 import type { NextFunction, Request, Response } from 'express';
-import { AuthService } from '../services/auth-service.js';
+import { verifyAuthToken } from '../services/auth-service.js';
 import { ADMIN_ROLE, AUTH_COOKIE_NAME, DEVELOPER_ACCESS_ROLES } from '../utils/config.js';
 
 // ── Admin API Key ─────────────────────────────────────────────────────────────
@@ -33,8 +33,7 @@ export function requireJwt(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ success: false, error: 'Authentication required' });
   }
   try {
-    const authService = new AuthService(null as any); // verifyToken does not use prisma
-    req.jwtPayload = authService.verifyToken(token);
+    req.jwtPayload = verifyAuthToken(token);
     next();
   } catch {
     res.status(401).json({ success: false, error: 'Invalid or expired token' });
@@ -54,8 +53,7 @@ export async function requireJwtDeveloperOrAdmin(req: Request, res: Response, ne
     return res.status(401).json({ success: false, error: 'Authentication required' });
   }
   try {
-    const authService = new AuthService(null as any);
-    const payload = authService.verifyToken(token);
+    const payload = verifyAuthToken(token);
     const currentUser = await getPrisma().user.findUnique({ where: { id: payload.sub }, select: { role: true } });
     const currentRole = currentUser?.role ?? payload.role;
     if (!DEVELOPER_ACCESS_ROLES.includes(currentRole as (typeof DEVELOPER_ACCESS_ROLES)[number])) {
@@ -96,8 +94,7 @@ export async function requireJwtAdmin(req: Request, res: Response, next: NextFun
     return res.status(401).json({ success: false, error: 'Authentication required' });
   }
   try {
-    const authService = new AuthService(null as any);
-    const payload = authService.verifyToken(token);
+    const payload = verifyAuthToken(token);
     const currentUser = await getPrisma().user.findUnique({ where: { id: payload.sub }, select: { role: true } });
     const currentRole = currentUser?.role ?? payload.role;
     if (currentRole !== ADMIN_ROLE) {

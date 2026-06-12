@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logApiError } from '@/lib/server-logger';
 import { getAuthToken, readUpstreamJson, upstreamUrl } from '../../../../_utils/proxy';
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -21,7 +22,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
     return NextResponse.json(data);
   } catch (e: any) {
-    console.error('[admin/users/role PUT]', e);
+    logApiError('admin/users/role PUT', e);
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
   }
 }

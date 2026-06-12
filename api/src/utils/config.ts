@@ -29,6 +29,8 @@ export const RATE_LIMITS = {
   max: parseInt(process.env.RATE_LIMIT_MAX || '200', 10),
   // Strict limit for admin endpoints
   adminMax: parseInt(process.env.RATE_LIMIT_ADMIN_MAX || '20', 10),
+  // Strict limit for failed authentication attempts (login, reset, 2FA)
+  authMax: parseInt(process.env.RATE_LIMIT_AUTH_MAX || '10', 10),
   // Burst: max requests per minute per IP
   burstWindowMs: 60 * 1000,
   burst: parseInt(process.env.RATE_LIMIT_BURST || '60', 10),

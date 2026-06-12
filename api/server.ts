@@ -25,7 +25,7 @@ import swaggerUi from 'swagger-ui-express';
 import { prometheusMiddleware } from './src/middleware/prometheus.js';
 import { healthRouter } from './src/routes/health.js';
 import { createRoutes } from './src/routes/index.js';
-import { AuthService } from './src/services/auth-service.js';
+import { verifyAuthToken } from './src/services/auth-service.js';
 import { GameDataService } from './src/services/game-data-service.js';
 import { redis } from './src/services/redis.js';
 import { RsiWebsiteService } from './src/services/rsi-website-service.js';
@@ -50,7 +50,14 @@ app.use(
   }),
 );
 
-app.use(cors({ origin: process.env.CORS_ORIGIN || '*', credentials: true }));
+// Credentialed CORS only with an explicit allowlist: `Access-Control-Allow-Origin: *`
+// is incompatible with credentials, so the wildcard fallback stays credential-less.
+const corsOrigin = process.env.CORS_ORIGIN;
+app.use(
+  corsOrigin && corsOrigin !== '*'
+    ? cors({ origin: corsOrigin.split(',').map((o) => o.trim()), credentials: true })
+    : cors({ origin: '*' }),
+);
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
 
@@ -96,8 +103,25 @@ const burstLimiter = rateLimit({
   skip: () => isTest,
 });
 
+// Strict limiter for credential-sensitive endpoints (password brute-force,
+// TOTP guessing, reset-email spam). Successful requests are not counted so
+// legitimate users are unaffected.
+const authLimiter = rateLimit({
+  windowMs: RATE_LIMITS.windowMs,
+  max: RATE_LIMITS.authMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many authentication attempts, please try again later' },
+  skipSuccessfulRequests: true,
+  skip: () => isTest,
+});
+
 app.use('/api', burstLimiter, speedLimiter, apiLimiter);
 app.use('/admin', adminLimiter);
+app.use(
+  ['/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password', '/auth/verify-email', '/auth/2fa/verify'],
+  authLimiter,
+);
 
 app.use((req, res, next) => {
   if (req.path === '/health') return next();
@@ -217,8 +241,7 @@ async function requireApiDocsDeveloper(req: Request, res: Response, next: NextFu
   const token = getBearerToken(req) ?? getCookieToken(req);
   if (!token) return apiDocsAccessDenied(req, res);
   try {
-    const authService = new AuthService(null as any);
-    const payload = authService.verifyToken(token);
+    const payload = verifyAuthToken(token);
     const currentUser = await getPrisma().user.findUnique({
       where: { id: payload.sub },
       select: { role: true },
@@ -311,23 +334,25 @@ async function start() {
     process.exit(1);
   }
 
-  // 2. Optionally push schema to PostgreSQL outside production deploys.
-  const shouldPushSchema = process.env.DB_PUSH_ON_STARTUP === 'true';
-  if (shouldPushSchema) {
+  // 2. Optionally apply pending migrations at startup (DB_MIGRATE_ON_STARTUP=true).
+  //    Never uses `db push --accept-data-loss`: destructive changes must go
+  //    through reviewed migration files in db/prisma/migrations.
+  const shouldMigrate = process.env.DB_MIGRATE_ON_STARTUP === 'true' || process.env.DB_PUSH_ON_STARTUP === 'true';
+  if (shouldMigrate) {
     try {
       const { execFileSync } = await import('node:child_process');
-      execFileSync('npm', ['run', 'push', '--workspace=@starvis/db', '--', '--accept-data-loss'], {
+      execFileSync('npm', ['run', 'migrate:deploy', '--workspace=@starvis/db'], {
         cwd: path.resolve(__dirname, '..'),
         stdio: 'pipe',
         env: { ...process.env, DATABASE_URL: buildDatabaseUrl() },
       });
-      logger.info('✅ Schema synced → PostgreSQL', { module: 'DB' });
+      logger.info('✅ Migrations applied → PostgreSQL', { module: 'DB' });
     } catch (e: any) {
-      logger.error(`Schema sync failed: ${e.stderr?.toString() || e.message}`, { module: 'DB' });
+      logger.error(`Migration deploy failed: ${e.stderr?.toString() || e.message}`, { module: 'DB' });
       process.exit(1);
     }
   } else {
-    logger.info('Schema sync skipped at startup', { module: 'DB' });
+    logger.info('Migration deploy skipped at startup', { module: 'DB' });
   }
 
   // 3. Initialize Redis (non-blocking)

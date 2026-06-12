@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logApiError } from '@/lib/server-logger';
 import { getAuthToken, proxyJson } from '../../_utils/proxy';
 
 export async function GET() {
@@ -7,7 +8,7 @@ export async function GET() {
     if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     return proxyJson('GET', '/corp/members', token);
   } catch (e: any) {
-    console.error('[corp/members GET]', e);
+    logApiError('corp/members GET', e);
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
   }
 }

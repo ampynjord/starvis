@@ -1,4 +1,5 @@
 import { getAuthToken, proxyJson } from '@/app/api/_utils/proxy';
+import { logApiError } from '@/lib/server-logger';
 
 export async function PUT(_req: Request, { params }: { params: Promise<{ mid: string }> }) {
   const token = await getAuthToken();
@@ -7,7 +8,7 @@ export async function PUT(_req: Request, { params }: { params: Promise<{ mid: st
   try {
     return proxyJson('PUT', `/corp/memberships/${mid}/reject`, token);
   } catch (e) {
-    console.error('[corp/memberships/:mid/reject PUT]', e);
+    logApiError('corp/memberships/:mid/reject PUT', e);
     return Response.json({ success: false, error: 'Proxy error' }, { status: 500 });
   }
 }

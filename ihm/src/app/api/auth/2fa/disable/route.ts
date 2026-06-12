@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logApiError } from '@/lib/server-logger';
 import { getAuthToken, readUpstreamJson, upstreamUrl } from '../../../_utils/proxy';
 
 export async function POST(req: Request) {
@@ -19,7 +20,7 @@ export async function POST(req: Request) {
     }
     return NextResponse.json({ success: true });
   } catch (e: any) {
-    console.error('[auth/2fa/disable]', e);
+    logApiError('auth/2fa/disable', e);
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
   }
 }

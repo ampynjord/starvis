@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logApiError } from '@/lib/server-logger';
 import { readUpstreamJson, upstreamUrl } from '../../_utils/proxy';
 
 export async function POST(req: Request) {
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ requiresVerification: true });
   } catch (e: any) {
     const msg = e?.cause?.code ?? e?.message ?? String(e);
-    console.error('[auth/register]', upstreamUrl(''), msg);
+    logApiError('auth/register', `API unreachable (${upstreamUrl('')}): ${msg}`);
     const isDev = process.env.NODE_ENV !== 'production';
     return NextResponse.json({ error: isDev ? `API unreachable (${upstreamUrl('')}): ${msg}` : 'Service unavailable' }, { status: 503 });
   }
