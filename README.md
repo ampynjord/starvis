@@ -253,7 +253,7 @@ Important route groups:
 
 The browser uses same-origin `/api/*` calls. Server-side route handlers use `API_URL` to reach the Express API.
 
-Corporation tools include the 3D Fleet Manager and Tactics board. Fleet Manager lays spawned ships side by side by default and persists their grid positions. Tactics reuses the same 3D holographic viewer to place real fleet ship models, save local strategies, build reusable formations, and add objectives, obstacles, points of interest, and movement vectors.
+Corporation tools include the 3D Fleet Manager and corporation-owned Tactics board. Fleet Manager lays spawned ships side by side by default and persists their grid positions. Tactics reuses the same 3D holographic viewer to place real corporation fleet ship models, save corporation strategies, build reusable formations, add 3D objectives/obstacles/points of interest, and draw flat movement vectors directly from selected ships or squadrons.
 
 ---
 
