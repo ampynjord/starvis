@@ -14,10 +14,11 @@ env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/${{ github.repository }}
   NODE_VERSION: '22'
+  NEXT_TELEMETRY_DISABLED: '1'
 
 jobs:
-  install:
-    name: Install & Generate
+  dependency-audit:
+    name: Dependency Audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -26,69 +27,36 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
-
-      - name: Restore node_modules cache
-        id: nm-cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules
-            api/node_modules
-            ihm/node_modules
-            extractor/node_modules
-            bot/node_modules
-            db/node_modules
-          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
       - name: Install dependencies
-        if: steps.nm-cache.outputs.cache-hit != 'true'
-        run: npm ci
-
-      - name: Restore Prisma client cache
-        id: db-gen-cache
-        uses: actions/cache@v5
-        with:
-          path: db/generated/
-          key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma', 'db/prisma.config.ts') }}
-
-      - name: Generate Prisma client
-        if: steps.db-gen-cache.outputs.cache-hit != 'true'
-        run: npm run db:generate
-
-  security:
-    name: Security & Dockerfiles
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - run: npm ci
+        run: npm ci --prefer-offline --no-audit
 
       - name: Critical dependency audit
         run: npm audit --omit=dev --audit-level=critical
 
-      - uses: hadolint/hadolint-action@v3.1.0
-        with:
-          dockerfile: api/Dockerfile
-          failure-threshold: error
+  dockerfile-lint:
+    name: Dockerfile Lint (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: api
+            file: api/Dockerfile
+          - name: ihm
+            file: ihm/Dockerfile
+          - name: bot
+            file: bot/Dockerfile
+    steps:
+      - uses: actions/checkout@v6
 
       - uses: hadolint/hadolint-action@v3.1.0
         with:
-          dockerfile: ihm/Dockerfile
-          failure-threshold: error
-
-      - uses: hadolint/hadolint-action@v3.1.0
-        with:
-          dockerfile: bot/Dockerfile
+          dockerfile: ${{ matrix.file }}
           failure-threshold: error
 
   config:
     name: Config, Schema & Docs
-    needs: install
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -96,23 +64,10 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
-      - name: Restore node_modules cache
-        id: nm-cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules
-            api/node_modules
-            ihm/node_modules
-            extractor/node_modules
-            bot/node_modules
-            db/node_modules
-          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Install fallback
-        if: steps.nm-cache.outputs.cache-hit != 'true'
-        run: npm ci
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
 
       - name: Validate OpenAPI
         run: npm run openapi:lint --workspace=@starvis/api
@@ -205,7 +160,6 @@ jobs:
 
   lint:
     name: Lint (Biome)
-    needs: install
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -213,29 +167,15 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
-      - name: Restore node_modules cache
-        id: nm-cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules
-            api/node_modules
-            ihm/node_modules
-            extractor/node_modules
-            bot/node_modules
-            db/node_modules
-          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Install fallback
-        if: steps.nm-cache.outputs.cache-hit != 'true'
-        run: npm ci
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
 
       - run: npm run lint:ci
 
   typecheck:
     name: Typecheck (${{ matrix.name }})
-    needs: install
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -245,6 +185,7 @@ jobs:
             cmd: npm run typecheck --workspace=@starvis/api
           - name: ihm
             cmd: npm run typecheck --workspace=starvis-ihm
+            setupNextTypes: true
           - name: extractor
             cmd: npm run typecheck --workspace=@starvis/extractor
           - name: bot
@@ -257,32 +198,13 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
-      - name: Restore node_modules cache
-        id: nm-cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules
-            api/node_modules
-            ihm/node_modules
-            extractor/node_modules
-            bot/node_modules
-            db/node_modules
-          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Install fallback
-        if: steps.nm-cache.outputs.cache-hit != 'true'
-        run: npm ci
-
-      - name: Restore Prisma client cache
-        uses: actions/cache@v5
-        with:
-          path: db/generated/
-          key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma', 'db/prisma.config.ts') }}
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
 
       - name: Setup IHM generated Next types
-        if: matrix.name == 'ihm'
+        if: matrix.setupNextTypes == true
         run: |
           printf '/// <reference types="next" />\n/// <reference types="next/image-types/global" />\n' > ihm/next-env.d.ts
           mkdir -p ihm/.next/types && echo 'export {}' > ihm/.next/types/routes.d.ts
@@ -291,7 +213,6 @@ jobs:
 
   test-api:
     name: Tests API
-    needs: install
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -320,39 +241,16 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
-      - name: Restore node_modules cache
-        id: nm-cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules
-            api/node_modules
-            ihm/node_modules
-            extractor/node_modules
-            bot/node_modules
-            db/node_modules
-          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      - name: Install fallback
-        if: steps.nm-cache.outputs.cache-hit != 'true'
-        run: npm ci
-
-      - name: Restore Prisma client cache
-        uses: actions/cache@v5
-        with:
-          path: db/generated/
-          key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma', 'db/prisma.config.ts') }}
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
 
       - name: Apply DB migrations
         run: npm run migrate:deploy --workspace=@starvis/db
         env:
           DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_test
 
-      # Replays the migration history into a clean shadow DB and diffs it
-      # against the schema: fails (exit 2) whenever a schema change ships
-      # without a migration. Replay avoids live-DB introspection, whose
-      # multi-schema index reporting produces false positives.
       - name: Check schema/migrations drift
         run: |
           PGPASSWORD=ci_password psql -h 127.0.0.1 -U ci_user -d starvis_test -c 'CREATE DATABASE starvis_shadow'
@@ -374,71 +272,58 @@ jobs:
           JWT_SECRET: ci_test_secret_at_least_32_chars_long
           ADMIN_API_KEY: ci_admin_key
 
-  test-extractor:
-    name: Tests Extractor
-    needs: install
+  test-workspace:
+    name: Tests (${{ matrix.name }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ihm
+            cmd: npm run test --workspace=starvis-ihm -- --reporter=verbose
+          - name: extractor
+            cmd: npm run test --workspace=@starvis/extractor -- --reporter=verbose
     steps:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
-      - name: Restore node_modules cache
-        id: nm-cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules
-            api/node_modules
-            ihm/node_modules
-            extractor/node_modules
-            bot/node_modules
-            db/node_modules
-          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
 
-      - name: Install fallback
-        if: steps.nm-cache.outputs.cache-hit != 'true'
-        run: npm ci
-
-      - run: npm run test --workspace=@starvis/extractor -- --reporter=verbose
+      - run: ${{ matrix.cmd }}
         env:
           NODE_ENV: test
 
-  test-ihm:
-    name: Tests IHM
-    needs: install
+  build-app:
+    name: Build App (${{ matrix.name }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ihm
+            cmd: npm run build --workspace=starvis-ihm
+          - name: bot
+            cmd: npm run build --workspace=@starvis/bot
     steps:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
-      - name: Restore node_modules cache
-        id: nm-cache
-        uses: actions/cache@v5
-        with:
-          path: |
-            node_modules
-            api/node_modules
-            ihm/node_modules
-            extractor/node_modules
-            bot/node_modules
-            db/node_modules
-          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
 
-      - name: Install fallback
-        if: steps.nm-cache.outputs.cache-hit != 'true'
-        run: npm ci
-
-      - run: npm run test --workspace=starvis-ihm -- --reporter=verbose
+      - run: ${{ matrix.cmd }}
 
   test-e2e:
     name: Tests E2E (Playwright)
-    needs: install
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -446,50 +331,45 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: ${{ env.NODE_VERSION }}
+          cache: npm
 
-      - name: Restore node_modules cache
-        id: nm-cache
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit
+
+      - name: Cache Playwright browsers
         uses: actions/cache@v5
         with:
-          path: |
-            node_modules
-            api/node_modules
-            ihm/node_modules
-            extractor/node_modules
-            bot/node_modules
-            db/node_modules
-          key: nm-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-      - name: Install fallback
-        if: steps.nm-cache.outputs.cache-hit != 'true'
-        run: npm ci
-
-      - name: Install Playwright browsers
+      - name: Install Playwright Chromium
         run: npm exec --workspace=starvis-ihm -- playwright install --with-deps chromium
 
       - name: Run Playwright tests
         run: npm run test:e2e --workspace=starvis-ihm
 
-  quality-data-prod:
-    name: Production Data Audit
+  quality-gate:
+    name: Quality Gate
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: deploy
+    needs:
+      - dependency-audit
+      - dockerfile-lint
+      - config
+      - lint
+      - typecheck
+      - test-api
+      - test-workspace
+      - build-app
+      - test-e2e
     steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: Audit production API data
-        run: npm run quality:audit:data:prod
+      - name: All checks passed
+        run: echo "All verification jobs completed successfully."
 
   build:
-    name: Build ${{ matrix.image.name }}
+    name: Build Image (${{ matrix.image.name }})
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [lint, typecheck, test-api, test-extractor, test-ihm, test-e2e, security, config]
+    needs: quality-gate
     permissions:
       contents: read
       packages: write
@@ -618,3 +498,18 @@ jobs:
             docker image prune -af --filter "until=24h"
 
             echo "==> Deploy complete."
+
+  quality-data-prod:
+    name: Production Data Audit
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: deploy
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Audit production API data
+        run: npm run quality:audit:data:prod

@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bot,
   ClipboardList,
   Crosshair,
   Factory,
@@ -28,7 +29,7 @@ export type NavItemDef = {
 };
 
 export type NavGroupDef = {
-  id: 'ships' | 'equipment' | 'economy' | 'universe';
+  id: 'ships' | 'equipment' | 'economy' | 'universe' | 'integrations';
   label: string;
   items: NavItemDef[];
 };
@@ -67,9 +68,12 @@ const UNIVERSE_ITEMS: NavItemDef[] = [
   { to: '/comm-links', icon: Newspaper, label: 'Comm-Links' },
 ];
 
+const INTEGRATION_ITEMS: NavItemDef[] = [{ to: '/discord', icon: Bot, label: 'Discord Bot' }];
+
 export const NAV_GROUPS: NavGroupDef[] = [
   { id: 'ships', label: 'Ships & Vehicles', items: SHIPS_ITEMS },
   { id: 'equipment', label: 'FPS & Equipment', items: EQUIPMENT_ITEMS },
   { id: 'economy', label: 'Economy & Industry', items: ECONOMY_ITEMS },
   { id: 'universe', label: 'Universe', items: UNIVERSE_ITEMS },
+  { id: 'integrations', label: 'Integrations', items: INTEGRATION_ITEMS },
 ];

@@ -1,4 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
+import { gotoApp } from './helpers';
 
 type Json = Record<string, unknown>;
 
@@ -172,11 +173,13 @@ test.describe('@critical application flows', () => {
 
   test('home search navigates to populated search results', async ({ page }) => {
     const pageErrors = watchBrowserErrors(page);
-    await page.goto('/');
+    await gotoApp(page, '/');
     await expect(page.getByRole('heading', { name: 'STARVIS' })).toBeVisible();
     const heroSearch = page.getByRole('main').getByPlaceholder(/search ships/i);
-    await heroSearch.fill('aurora');
-    await heroSearch.press('Enter');
+    await heroSearch.click();
+    await heroSearch.pressSequentially('aurora');
+    await expect(heroSearch).toHaveValue('aurora');
+    await page.getByRole('button', { name: /Search Starvis/i }).click();
     await expect(page).toHaveURL(/\/search\?q=aurora/);
     await expect(page.getByRole('heading', { name: 'Search' })).toBeVisible();
     await expect(page.getByText('Aurora MR').first()).toBeVisible();
@@ -193,7 +196,7 @@ test.describe('@critical application flows', () => {
     ];
 
     for (const target of pages) {
-      await page.goto(target.path);
+      await gotoApp(page, target.path);
       await expect(page.getByRole('heading', { name: target.heading })).toBeVisible();
       await expect(page.getByText(target.text).first()).toBeVisible();
     }

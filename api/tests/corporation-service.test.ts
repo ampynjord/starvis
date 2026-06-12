@@ -115,6 +115,38 @@ describe('CorporationService', () => {
     });
   });
 
+  describe('updateOwnFleetItemAvailability', () => {
+    it('lets the ship owner make a corporation ship available for tactics', async () => {
+      const db: any = {
+        corporationFleetItem: {
+          findUnique: vi.fn().mockResolvedValue({ id: 11, addedById: 7, corporationId: 42, itemType: 'ship' }),
+          update: vi.fn().mockResolvedValue({ id: 11, availableForTactics: true }),
+        },
+      };
+
+      const result = await new CorporationService(db).updateOwnFleetItemAvailability(11, 7, true);
+
+      expect(result).toEqual({ id: 11, availableForTactics: true });
+      expect(db.corporationFleetItem.update).toHaveBeenCalledWith({
+        where: { id: 11 },
+        data: { availableForTactics: true },
+        select: expect.any(Object),
+      });
+    });
+
+    it('rejects availability changes from another member', async () => {
+      const db: any = {
+        corporationFleetItem: {
+          findUnique: vi.fn().mockResolvedValue({ id: 11, addedById: 8, corporationId: 42, itemType: 'ship' }),
+          update: vi.fn(),
+        },
+      };
+
+      await expect(new CorporationService(db).updateOwnFleetItemAvailability(11, 7, true)).rejects.toThrow('FORBIDDEN');
+      expect(db.corporationFleetItem.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe('deleteCorporation', () => {
     it('resets Starvis-owned corporation data without deleting the corporation or users', async () => {
       const resetCorporation = {

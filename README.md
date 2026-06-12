@@ -273,6 +273,7 @@ Important route groups:
 | Public data | `/ships`, `/components`, `/items`, `/commodities`, `/shops`, `/locations`, `/missions`, `/starmap` |
 | Tools | `/compare`, `/loadout-manager`, `/fps-calculator`, `/mining-calculator`, `/trade-calculator`, `/crafting-calculator`, `/outfitter` |
 | RSI content | `/galactapedia`, `/comm-links`, `/manufacturers`, `/paints`, `/factions` |
+| Integrations | `/discord` |
 | Account | `/login`, `/register`, `/profile`, `/my-reports`, `/report-bug` |
 | Corporation | `/corp`, `/corp/fleet`, `/corp/tactics`, `/corp/bank` |
 | Admin | `/admin`, `/admin/corporations`, `/admin/bug-reports`, `/admin/monitoring` |
@@ -280,9 +281,13 @@ Important route groups:
 
 The browser uses same-origin `/api/*` calls. Server-side route handlers use `API_URL` to reach the Express API.
 
-Corporation tools include the 3D Fleet Manager, Corp Bank and corporation-owned Tactics board. Fleet Manager lays spawned ships side by side by default and persists their grid positions. Corp Bank lets members declare shared components, items, commodities and custom entries; owners and corporation leaders can edit or remove entries. Tactics reuses the same 3D holographic viewer to place real corporation fleet ship models, save corporation strategies, build reusable formations, add 3D objectives/obstacles/points of interest, and draw flat movement vectors directly from selected ships or squadrons.
+Manufacturers exposes a catalogue-first view with global ship/component/FPS item counters, searchable manufacturer cards, and detail tabs for the selected manufacturer's ships, components and inventory items. The Starmap follows the RSI parent hierarchy more closely, uses real extracted coordinates when available, avoids duplicate system/star suns, and presents a darker ARK-style holographic map for browsing systems, planets, stations, jump points and commerce locations.
 
-Admin Monitoring combines service health, Prometheus traffic metrics, cache/runtime stats, top routes and the latest in-memory API request logs. Request logs are kept only since the API process started and deliberately exclude request bodies, query values and emails.
+Corporation tools include the 3D Fleet Manager, Corp Bank and corporation-owned Tactics board. Fleet Manager lays spawned ships side by side by default, persists their grid positions, and lets each owner decide whether their corporation ship is available for tactical planning. Corp Bank lets members declare shared components, items, commodities and custom entries; owners and corporation leaders can edit or remove entries. Tactics reuses the same 3D holographic viewer to place only corporation ships made available by their owners, save corporation strategies, build reusable formations, add 3D objectives/obstacles/points of interest, and draw flat movement vectors directly from selected ships or squadrons.
+
+The Discord Bot page exposes the Starvis bot invitation link and slash-command help for AI, ships, loadouts, trade, shops, mining, crafting, missions, lore, status and changelog commands. Configure `NEXT_PUBLIC_DISCORD_CLIENT_ID` or `DISCORD_CLIENT_ID` to enable the invitation link.
+
+Admin Monitoring combines service health, Prometheus traffic metrics, cache/runtime stats, Discord bot configuration, top routes and the latest in-memory API request logs. Request logs show the authenticated username and role when a valid Starvis JWT is present, otherwise the actor stays anonymous. Logs are kept only since the API process started and deliberately exclude request bodies, query values, emails and the request-log viewer endpoint itself.
 
 ---
 
@@ -356,20 +361,26 @@ npm run openapi:lint --workspace=@starvis/api
 
 GitHub Actions runs on pushes to any branch and pull requests to `main`.
 
+The pipeline is split into independent jobs so lint, typechecks, tests, browser checks,
+builds and configuration guards can run in parallel instead of waiting on a shared
+install job. Each job installs dependencies with the npm cache and only waits for the
+final quality gate when an ordering constraint is required.
+
 Main jobs:
 
 | Job | What it checks |
 |---|---|
-| Install & Generate | npm dependencies and Prisma client generation cache. |
-| Security & Dockerfiles | Critical npm audit and Dockerfile lint. |
+| Dependency Audit | Critical npm audit. |
+| Dockerfile Lint | API, IHM and bot Dockerfiles in parallel. |
 | Config, Schema & Docs | OpenAPI validation, Prisma validation, compose validation, shell script syntax and env contract. |
 | Lint | Biome CI. |
-| Typecheck | API, IHM, extractor, bot and DB TypeScript checks. |
+| Typecheck | API, IHM, extractor, bot and DB TypeScript checks in parallel. |
 | Tests API | API Vitest suite with PostgreSQL and Redis services. |
-| Tests Extractor | Extractor Vitest suite. |
-| Tests IHM | IHM Vitest suite. |
+| Tests Workspace | IHM and extractor Vitest suites in parallel. |
 | Tests E2E | Full Playwright Chromium suite, including critical UI flows. |
-| Build | API, IHM and bot images pushed to GHCR on `main`. |
+| Build App | IHM and bot application builds on branches and pull requests. |
+| Quality Gate | Requires every verification job to pass before deployment work starts. |
+| Build Images | API, IHM and bot images pushed to GHCR on `main`. |
 | Deploy | VPS deployment on `main` after images are built. |
 | Production Data Audit | Strict API/data coherence audit after production deployment. |
 

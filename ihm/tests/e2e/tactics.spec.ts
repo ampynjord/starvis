@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { gotoApp } from './helpers';
 
 test('corporation tactics board adds ships and tactical markers', async ({ context, page }) => {
   await context.addCookies([
@@ -29,7 +30,15 @@ test('corporation tactics board adds ships and tactical markers', async ({ conte
             id: 101,
             shipUuid: 'ship-aurora',
             itemClassName: 'rsi_aurora_mr',
+            availableForTactics: true,
             addedBy: { id: 7, username: 'pilot' },
+          },
+          {
+            id: 102,
+            shipUuid: 'ship-private',
+            itemClassName: 'aegis_private',
+            availableForTactics: false,
+            addedBy: { id: 8, username: 'owner' },
           },
         ],
       },
@@ -58,11 +67,12 @@ test('corporation tactics board adds ships and tactical markers', async ({ conte
     });
   });
 
-  await page.goto('/corp/tactics');
+  await gotoApp(page, '/corp/tactics');
 
   await expect(page.getByRole('heading', { name: 'Tactics' })).toBeVisible();
   await expect(page.getByText('[DNR] Dawnstar')).toBeVisible();
   await expect(page.getByLabel('Formation ship')).toContainText('Aurora MR');
+  await expect(page.getByLabel('Formation ship')).not.toContainText('aegis_private');
   const board = page.getByTestId('tactics-board');
   await page.getByRole('button', { name: /Add formation/i }).click();
   await expect(board.locator('canvas')).toBeVisible();

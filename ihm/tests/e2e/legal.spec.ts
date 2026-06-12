@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
+import { gotoApp } from './helpers';
 
 test('legal page presents proprietary source code terms', async ({ page }) => {
-  await page.goto('/legal');
+  await gotoApp(page, '/legal');
 
   await expect(page.getByRole('heading', { name: /legal notice/i })).toBeVisible();
   await expect(page.getByText(/Unofficial project, not affiliated with Cloud Imperium Games/i)).toBeVisible();

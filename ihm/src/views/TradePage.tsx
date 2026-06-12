@@ -104,6 +104,9 @@ export default function TradePage() {
       (s: Shop) => s.shop_type === 'Commodities' || s.shop_type === 'General',
     );
   }, [shops]);
+  const commodityCount = commodities?.total ?? commodities?.data?.length ?? 0;
+  const shopCount = commodityShops.length;
+  const systemCount = systems?.length ?? 0;
 
   const handleReport = () => {
     if (!reportCommodityUuid || !reportShopId) return;
@@ -121,6 +124,27 @@ export default function TradePage() {
   return (
     <PageShell>
       <PageHeader title="Trade Calculator" subtitle="Find the most profitable trade routes" />
+
+      <div className="grid gap-2 sm:grid-cols-3">
+        <div className="rounded-sm border border-slate-800/70 bg-slate-950/40 p-3">
+          <p className="flex items-center gap-1.5 font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">
+            <Package size={11} className="text-cyan-500" /> Commodities
+          </p>
+          <p className="mt-1 font-orbitron text-lg font-black text-cyan-300">{commodityCount.toLocaleString('en-US')}</p>
+        </div>
+        <div className="rounded-sm border border-slate-800/70 bg-slate-950/40 p-3">
+          <p className="flex items-center gap-1.5 font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">
+            <MapPin size={11} className="text-amber-500" /> Trade shops
+          </p>
+          <p className="mt-1 font-orbitron text-lg font-black text-amber-300">{shopCount.toLocaleString('en-US')}</p>
+        </div>
+        <div className="rounded-sm border border-slate-800/70 bg-slate-950/40 p-3">
+          <p className="flex items-center gap-1.5 font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">
+            <Truck size={11} className="text-emerald-500" /> Systems
+          </p>
+          <p className="mt-1 font-orbitron text-lg font-black text-emerald-300">{systemCount.toLocaleString('en-US')}</p>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_340px] gap-4">
         {/* Main content */}

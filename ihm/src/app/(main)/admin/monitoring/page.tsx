@@ -6,6 +6,7 @@ import {
   Activity,
   AlertTriangle,
   ArrowLeft,
+  Bot,
   Clock,
   Cpu,
   Database,
@@ -61,6 +62,7 @@ interface RequestLogEntry {
   statusCode: number;
   durationMs: number;
   userId: number | null;
+  username: string | null;
   role: string | null;
   ip: string | null;
   userAgent: string | null;
@@ -79,6 +81,14 @@ interface Snapshot {
   routes: RouteTraffic[];
   statusCounts: Record<string, number>;
   fetchedAt: number;
+}
+
+interface DiscordBotStatus {
+  configured: boolean;
+  clientId: string | null;
+  inviteUrl: string | null;
+  commandCount: number;
+  commands: Array<{ name: string; category: string; description: string }>;
 }
 
 // ── Prometheus text parser ───────────────────────────────────────────────────
@@ -207,6 +217,12 @@ function statusStyle(statusCode: number) {
   return 'border-emerald-800/60 bg-emerald-950/30 text-emerald-300';
 }
 
+function actorLabel(log: RequestLogEntry) {
+  if (log.username) return `${log.username}${log.role ? ` · ${log.role}` : ''}`;
+  if (log.userId) return `${log.role ?? 'user'} #${log.userId}`;
+  return 'anonymous';
+}
+
 const STATUS_FAMILY_STYLE: Record<string, string> = {
   '2xx': 'bg-emerald-500/70',
   '3xx': 'bg-cyan-500/70',
@@ -240,6 +256,7 @@ export default function AdminMonitoringPage() {
   const { user: me } = useAuth();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [requestLogs, setRequestLogs] = useState<RequestLogEntry[]>([]);
+  const [discordBot, setDiscordBot] = useState<DiscordBotStatus | null>(null);
   const [reqPerSec, setReqPerSec] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -247,10 +264,11 @@ export default function AdminMonitoringPage() {
 
   const refresh = useCallback(async () => {
     try {
-      const [readyRes, cacheRes, metricsRes] = await Promise.allSettled([
+      const [readyRes, cacheRes, metricsRes, discordRes] = await Promise.allSettled([
         fetch('/health/ready'),
         fetch('/health/cache/stats'),
         fetch('/health/metrics'),
+        fetch('/api/admin/discord-bot'),
       ]);
       const logsPromise = fetch('/api/admin/request-logs?limit=80');
 
@@ -263,6 +281,10 @@ export default function AdminMonitoringPage() {
       const metricsText = metricsRes.status === 'fulfilled' && metricsRes.value.ok
         ? await metricsRes.value.text()
         : '';
+      if (discordRes.status === 'fulfilled' && discordRes.value.ok) {
+        const discordJson = await discordRes.value.json().catch(() => null);
+        setDiscordBot(discordJson?.data ?? null);
+      }
       const logsRes = await logsPromise.catch(() => null);
       if (logsRes?.ok) {
         const logsJson = await logsRes.json().catch(() => null);
@@ -338,10 +360,11 @@ export default function AdminMonitoringPage() {
       )}
 
       {/* Service health */}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
         <ServiceBadge label="API" ok={apiOk} icon={Server} />
         <ServiceBadge label="PostgreSQL" ok={snapshot?.ready?.checks.database ?? null} icon={Database} />
         <ServiceBadge label="Redis" ok={snapshot?.ready?.checks.redis ?? (snapshot?.cache?.connected ?? null)} icon={Zap} />
+        <ServiceBadge label="Discord bot" ok={discordBot ? discordBot.configured : null} icon={Bot} />
       </div>
 
       {/* Runtime stats */}
@@ -367,6 +390,34 @@ export default function AdminMonitoringPage() {
         <StatCard icon={Gauge} label="Hit rate" value={snapshot?.cache ? `${snapshot.cache.hitRate}%` : '—'} accent="cyan" />
         <StatCard icon={Zap} label="Redis link" value={snapshot?.cache ? (snapshot.cache.connected ? 'CONNECTED' : 'OFFLINE') : '—'} accent={snapshot?.cache?.connected ? 'emerald' : 'rose'} />
       </StatGrid>
+
+      <div className="sci-panel border border-slate-800/60 p-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+              <Bot size={12} className="text-cyan-500" /> Discord bot
+            </p>
+            <p className="mt-2 text-sm text-slate-400">
+              {discordBot?.configured
+                ? `${discordBot.commandCount} slash commands configured.`
+                : 'Invite link not configured. Set NEXT_PUBLIC_DISCORD_CLIENT_ID or DISCORD_CLIENT_ID.'}
+            </p>
+            {discordBot?.clientId && (
+              <p className="mt-1 font-mono-sc text-[10px] text-slate-600">Client ID {discordBot.clientId}</p>
+            )}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/discord" className="rounded-sm border border-slate-800 px-3 py-2 font-mono-sc text-xs text-slate-400 hover:border-cyan-800/70 hover:text-cyan-300">
+              Command help
+            </Link>
+            {discordBot?.inviteUrl && (
+              <a href={discordBot.inviteUrl} target="_blank" rel="noreferrer" className="sci-btn-primary px-3 py-2 text-xs">
+                Invite bot
+              </a>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Status code distribution */}
       {snapshot && statusTotal > 0 && (
@@ -474,7 +525,7 @@ export default function AdminMonitoringPage() {
                     <td className="px-3 py-2">
                       <div className="flex items-center gap-1.5 font-mono-sc text-xs text-slate-500">
                         <User size={11} className="text-slate-600" />
-                        {log.userId ? `${log.role ?? 'user'} #${log.userId}` : 'anonymous'}
+                        {actorLabel(log)}
                       </div>
                     </td>
                     <td className="px-3 py-2">

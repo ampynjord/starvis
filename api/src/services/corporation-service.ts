@@ -47,6 +47,7 @@ export interface FleetItemData {
   shipUuid?: string | null;
   quantity: number;
   notes: string | null;
+  availableForTactics: boolean;
   addedById: number | null;
   addedAt: Date;
   updatedAt: Date;
@@ -95,6 +96,7 @@ const FLEET_SELECT = {
   notes: true,
   gridX: true,
   gridZ: true,
+  availableForTactics: true,
   addedById: true,
   addedAt: true,
   updatedAt: true,
@@ -443,7 +445,7 @@ export class CorporationService {
 
   async updateFleetItem(
     itemId: number,
-    data: { itemType?: string; itemClassName?: string; quantity?: number; notes?: string | null },
+    data: { itemType?: string; itemClassName?: string; quantity?: number; notes?: string | null; availableForTactics?: boolean },
   ): Promise<FleetItemData> {
     return this.db.corporationFleetItem.update({
       where: { id: itemId },
@@ -452,6 +454,7 @@ export class CorporationService {
         ...(data.itemClassName !== undefined ? { itemClassName: data.itemClassName.trim() } : {}),
         ...(data.quantity !== undefined ? { quantity: data.quantity } : {}),
         ...(data.notes !== undefined ? { notes: data.notes } : {}),
+        ...(data.availableForTactics !== undefined ? { availableForTactics: data.availableForTactics } : {}),
       },
       select: FLEET_SELECT,
     });
@@ -519,6 +522,18 @@ export class CorporationService {
     if (!item) throw new Error('NOT_FOUND');
     if (!isAdmin && item.addedById !== userId) throw new Error('FORBIDDEN');
     await this.db.corporationFleetItem.delete({ where: { id: itemId } });
+  }
+
+  async updateOwnFleetItemAvailability(itemId: number, userId: number, availableForTactics: boolean): Promise<FleetItemData> {
+    const item = await this.db.corporationFleetItem.findUnique({ where: { id: itemId } });
+    if (!item) throw new Error('NOT_FOUND');
+    if (item.addedById !== userId) throw new Error('FORBIDDEN');
+    if (item.itemType !== 'ship' || item.corporationId == null) throw new Error('INVALID_SCOPE');
+    return this.db.corporationFleetItem.update({
+      where: { id: itemId },
+      data: { availableForTactics },
+      select: { ...FLEET_SELECT, shipUuid: true } as typeof FLEET_SELECT,
+    });
   }
 
   async updateOwnFleetItemPosition(

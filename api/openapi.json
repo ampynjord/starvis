@@ -1998,6 +1998,10 @@
             "type": "number",
             "nullable": true
           },
+          "availableForTactics": {
+            "type": "boolean",
+            "description": "Whether the ship owner made this corporation ship available to tactical boards."
+          },
           "addedById": {
             "type": "integer",
             "nullable": true
@@ -7276,6 +7280,7 @@
                           "statusCode": { "type": "integer" },
                           "durationMs": { "type": "integer" },
                           "userId": { "type": "integer", "nullable": true },
+                          "username": { "type": "string", "nullable": true },
                           "role": { "type": "string", "nullable": true },
                           "ip": { "type": "string", "nullable": true },
                           "userAgent": { "type": "string", "nullable": true }
@@ -9043,6 +9048,74 @@
                       "$ref": "#/components/schemas/CorporationFleetItem"
                     }
                   }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/corp/fleet/{id}/availability": {
+      "patch": {
+        "tags": ["Corporations"],
+        "summary": "Allow or remove one of my corporation ships from tactical boards",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["availableForTactics"],
+                "properties": {
+                  "availableForTactics": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CorporationFleetItem"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the ship owner can change tactics availability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }

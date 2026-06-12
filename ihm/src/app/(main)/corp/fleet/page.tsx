@@ -38,6 +38,7 @@ interface FleetItem {
   notes: string | null;
   gridX: number | null;
   gridZ: number | null;
+  availableForTactics: boolean;
   addedAt: string;
   addedBy: { id: number; username: string } | null;
 }
@@ -168,11 +169,13 @@ function AddShipModal({ onClose, onAdd, adding = false, error = '' }: {
 
 // ── Selected ship info panel ──────────────────────────────────────────────────
 
-function ShipInfoPanel({ ship, item, onRemove, canRemove }: {
+function ShipInfoPanel({ ship, item, onRemove, canRemove, onAvailabilityChange, canChangeAvailability }: {
   ship: ShipListItem;
   item: FleetItem;
   onRemove: () => void;
   canRemove: boolean;
+  onAvailabilityChange: (available: boolean) => void;
+  canChangeAvailability: boolean;
 }) {
   return (
     <div className="space-y-4">
@@ -229,6 +232,27 @@ function ShipInfoPanel({ ship, item, onRemove, canRemove }: {
 
       {/* Actions */}
       <div className="space-y-2 pt-1">
+        {item.addedBy && (
+          <label className={`flex items-center justify-between gap-3 rounded-sm border px-3 py-2 ${
+            item.availableForTactics
+              ? 'border-cyan-800/60 bg-cyan-950/25 text-cyan-300'
+              : 'border-slate-800/70 bg-slate-950/35 text-slate-500'
+          } ${canChangeAvailability ? 'cursor-pointer' : 'opacity-70'}`}>
+            <span className="min-w-0">
+              <span className="block font-orbitron text-[10px] font-bold uppercase tracking-widest">Available for tactics</span>
+              <span className="block font-mono-sc text-[9px] text-slate-600">
+                {canChangeAvailability ? 'Allow corporation tactical planners to use this ship.' : 'Only the owner can change this.'}
+              </span>
+            </span>
+            <input
+              type="checkbox"
+              checked={item.availableForTactics}
+              disabled={!canChangeAvailability}
+              onChange={(event) => onAvailabilityChange(event.target.checked)}
+              className="h-4 w-4 accent-cyan-500"
+            />
+          </label>
+        )}
         <Link
           href={`/ships/${ship.uuid}`}
           className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-cyan-900/40 border border-cyan-700/50 hover:border-cyan-500/70 hover:bg-cyan-900/60 text-cyan-300 font-mono-sc text-xs rounded transition-colors"
@@ -393,6 +417,17 @@ export default function FleetManagerPage() {
       if (selectedItemId === itemId) setSelectedItemId(null);
     } catch {}
   };
+
+  const handleAvailabilityChange = useCallback((itemId: number, availableForTactics: boolean) => {
+    setFleetItems((prev) => prev.map((item) => (item.id === itemId ? { ...item, availableForTactics } : item)));
+    void fetch(`/api/corp/fleet/${itemId}/availability`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ availableForTactics }),
+    }).catch(() => {
+      setFleetItems((prev) => prev.map((item) => (item.id === itemId ? { ...item, availableForTactics: !availableForTactics } : item)));
+    });
+  }, []);
 
   // Filter items by view mode
   const visibleItems = fleetItems.filter((i) => {
@@ -608,6 +643,11 @@ export default function FleetManagerPage() {
                         {item.addedBy && (
                           <span className="text-[9px] text-slate-600 font-mono-sc">by {item.addedBy.username}</span>
                         )}
+                        {item.availableForTactics && (
+                          <span className="rounded-sm border border-cyan-800/50 bg-cyan-950/30 px-1 py-0.5 font-mono-sc text-[8px] uppercase tracking-wider text-cyan-400">
+                            Tactics
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -646,6 +686,8 @@ export default function FleetManagerPage() {
                     item={selectedItem}
                     onRemove={() => handleRemove(selectedItem.id)}
                     canRemove={getAddedById(selectedItem) === Number(user?.id)}
+                    onAvailabilityChange={(available) => handleAvailabilityChange(selectedItem.id, available)}
+                    canChangeAvailability={!!corp && getAddedById(selectedItem) === Number(user?.id)}
                   />
                 </div>
               </motion.aside>

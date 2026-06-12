@@ -18,6 +18,9 @@ Database workspace for Prisma, PostgreSQL bootstrap scripts, and the shared Pris
 
 `src/index.ts` is the public entrypoint consumed as `@starvis/db`.
 
+Corporation fleet entries include `availableForTactics`, which records whether the
+ship owner made that corporation ship usable on tactical boards.
+
 ## Commands
 
 ```bash
