@@ -73,6 +73,7 @@ const COLOR_RING     = 0x00c8f0;
 const MIN_SHIP_GAP   = 8;
 const SHIP_GAP_RATIO = 0.18;
 const FLEET_MODEL_FRONT_ROTATION_Y = Math.PI;
+const TACTICAL_FRONT_DIRECTION = new THREE.Vector3(0, 0, 1);
 
 const geometryCache = new Map<string, Promise<THREE.BufferGeometry>>();
 
@@ -284,30 +285,33 @@ export function FleetHoloViewer({
       root.visible = false;
       root.renderOrder = 80;
       const material = new THREE.MeshBasicMaterial({ color: 0x7dfff4, transparent: true, opacity: 0.98, side: THREE.DoubleSide, depthTest: false });
-      const halo = new THREE.Mesh(new THREE.TorusGeometry(28, 2.2, 10, 72), material.clone());
+      const halo = new THREE.Mesh(new THREE.TorusGeometry(38, 2.8, 10, 96), material.clone());
       halo.rotation.x = -Math.PI / 2;
       const hitDisc = new THREE.Mesh(
-        new THREE.CylinderGeometry(36, 36, 3, 48),
-        new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.12, depthTest: false }),
+        new THREE.CylinderGeometry(52, 52, 4, 64),
+        new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.16, depthTest: false }),
       );
       hitDisc.position.y = -0.8;
-      const arrow = new THREE.Mesh(new THREE.ConeGeometry(16, 32, 3), material);
+      const arrow = new THREE.Mesh(new THREE.ConeGeometry(24, 42, 3), material);
       arrow.rotation.x = -Math.PI / 2;
-      arrow.position.z = -13;
-      const stem = new THREE.Mesh(new THREE.BoxGeometry(5, 5, 42), material.clone());
-      stem.position.z = 13;
-      const mast = new THREE.Mesh(new THREE.CylinderGeometry(1.7, 1.7, 28, 10), material.clone());
-      mast.position.y = 16;
-      const beacon = new THREE.Mesh(new THREE.SphereGeometry(8, 24, 16), material.clone());
-      beacon.position.y = 32;
-      for (const mesh of [halo, hitDisc, arrow, stem, mast, beacon]) {
+      arrow.position.z = 22;
+      const stem = new THREE.Mesh(new THREE.BoxGeometry(6, 6, 64), material.clone());
+      stem.position.z = -12;
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 42, 12), material.clone());
+      mast.position.y = 24;
+      const beacon = new THREE.Mesh(new THREE.SphereGeometry(12, 28, 18), material.clone());
+      beacon.position.y = 48;
+      const chevron = new THREE.Mesh(new THREE.ConeGeometry(18, 18, 3), material.clone());
+      chevron.rotation.x = -Math.PI / 2;
+      chevron.position.z = 54;
+      for (const mesh of [halo, hitDisc, arrow, stem, mast, beacon, chevron]) {
         mesh.renderOrder = 80;
         mesh.userData.vectorLauncherSourceType = sourceType;
         mesh.userData.vectorLauncherSourceId = sourceId;
       }
-      root.add(hitDisc, halo, arrow, stem, mast, beacon);
+      root.add(hitDisc, halo, arrow, stem, mast, beacon, chevron);
       scene.add(root);
-      return { root, meshes: [hitDisc, halo, arrow, stem, mast, beacon], sourceType, sourceId, anchorShip, group: sourceType === 'group' ? String(sourceId) : undefined };
+      return { root, meshes: [hitDisc, halo, arrow, stem, mast, beacon, chevron], sourceType, sourceId, anchorShip, group: sourceType === 'group' ? String(sourceId) : undefined };
     };
 
     const groupRings: GroupRingEntry[] = [...new Set(entries.map((entry) => entry.ship.group).filter((group): group is string => !!group))]
@@ -404,19 +408,19 @@ export function FleetHoloViewer({
         target.rotation.x = -Math.PI / 2;
         body.add(shaft, fins, tip, cap, target);
       }
-      body.scale.setScalar(2.8);
+      body.scale.setScalar(5.4);
       body.traverse((child) => { child.userData.tacticalMarkerId = marker.id; });
       root.add(body);
       meshes.push(body);
 
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(marker.type === 'obstacle' ? 34 : 30, 0.52, 8, 96), mat.clone());
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(marker.type === 'obstacle' ? 78 : 70, 1.1, 8, 128), mat.clone());
       ring.rotation.x = -Math.PI / 2;
       ring.position.y = 0.2;
       ring.userData.tacticalMarkerId = marker.id;
       root.add(ring);
       meshes.push(ring);
 
-      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(42, 0.1, 42)), lineMat);
+      const edges = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(92, 0.1, 92)), lineMat);
       edges.position.y = 0.1;
       edges.userData.tacticalMarkerId = marker.id;
       root.add(edges);
@@ -458,24 +462,24 @@ export function FleetHoloViewer({
       const control = new THREE.Vector3(vector.controlX, 0.55, vector.controlZ);
       const end = new THREE.Vector3(vector.endX, 0.55, vector.endZ);
       const curve = new THREE.QuadraticBezierCurve3(start, control, end);
-      const mat = new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.82, side: THREE.DoubleSide, depthTest: false });
-      const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 32, 0.35, 6, false), mat);
+      const mat = new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.84, side: THREE.DoubleSide, depthTest: false });
+      const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 48, 1.4, 8, false), mat);
       tube.userData.tacticalVectorId = vector.id;
       const direction = end.clone().sub(control);
       const angle = Math.atan2(direction.x, direction.z);
-      const head = new THREE.Mesh(new THREE.ConeGeometry(3.2, 8, 3), mat.clone());
+      const head = new THREE.Mesh(new THREE.ConeGeometry(10, 24, 3), mat.clone());
       head.position.copy(end);
-      head.position.y = 0.8;
+      head.position.y = 1.2;
       head.rotation.set(Math.PI / 2, 0, -angle);
       head.userData.tacticalVectorId = vector.id;
-      const endHandle = new THREE.Mesh(new THREE.SphereGeometry(5.8, 16, 12), new THREE.MeshBasicMaterial({ color: 0xa7f3d0, transparent: true, opacity: 0.96, depthTest: false }));
+      const endHandle = new THREE.Mesh(new THREE.SphereGeometry(12, 20, 14), new THREE.MeshBasicMaterial({ color: 0xa7f3d0, transparent: true, opacity: 0.96, depthTest: false }));
       endHandle.position.copy(end);
-      endHandle.position.y = 2;
+      endHandle.position.y = 3;
       endHandle.userData.tacticalVectorId = vector.id;
       endHandle.userData.vectorHandle = 'end';
-      const curveHandle = new THREE.Mesh(new THREE.TorusGeometry(7.2, 0.9, 8, 32), new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0.95, depthTest: false }));
+      const curveHandle = new THREE.Mesh(new THREE.TorusGeometry(16, 1.8, 8, 48), new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0.95, depthTest: false }));
       curveHandle.position.copy(control);
-      curveHandle.position.y = 1.5;
+      curveHandle.position.y = 2.5;
       curveHandle.rotation.x = -Math.PI / 2;
       curveHandle.userData.tacticalVectorId = vector.id;
       curveHandle.userData.vectorHandle = 'control';
@@ -485,6 +489,35 @@ export function FleetHoloViewer({
     };
 
     const vectorEntries = tacticalVectors.map(makeVectorEntry);
+
+    const sourceEntriesForLauncher = (launcher: VectorLauncherEntry) =>
+      launcher.sourceType === 'group'
+        ? entries.filter((entry) => entry.ship.group === launcher.sourceId)
+        : entries.filter((entry) => entry.ship.id === launcher.sourceId);
+
+    const sourceCenter = (sourceEntries: ShipEntry[]) => ({
+      x: sourceEntries.length ? sourceEntries.reduce((sum, entry) => sum + entry.root.position.x, 0) / sourceEntries.length : 0,
+      z: sourceEntries.length ? sourceEntries.reduce((sum, entry) => sum + entry.root.position.z, 0) / sourceEntries.length : 0,
+    });
+
+    const vectorPayloadFromLauncher = (launcher: VectorLauncherEntry, endX: number, endZ: number): Omit<TacticalVector, 'id'> => {
+      const sourceEntries = sourceEntriesForLauncher(launcher);
+      const start = sourceCenter(sourceEntries);
+      const forward = TACTICAL_FRONT_DIRECTION;
+      const dx = endX - start.x;
+      const dz = endZ - start.z;
+      const length = Math.max(Math.hypot(dx, dz), 1);
+      const lateral = dx * forward.z - dz * forward.x;
+      const curveBias = Math.max(-140, Math.min(140, lateral * 0.42));
+      return {
+        sourceType: launcher.sourceType,
+        sourceId: launcher.sourceId,
+        endX,
+        endZ,
+        controlX: (start.x + endX) / 2 + forward.z * curveBias,
+        controlZ: (start.z + endZ) / 2 - forward.x * curveBias + length * 0.08,
+      };
+    };
 
     // ── Grid (dynamic) ─────────────────────────────────────────────────────────
     let gridHelper: THREE.GridHelper | null = null;
@@ -805,11 +838,26 @@ export function FleetHoloViewer({
       mouse.x = ((clientX - rect.left) / rect.width)  * 2 - 1;
       mouse.y = -((clientY - rect.top)  / rect.height) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
+      const launcherMeshes: THREE.Object3D[] = [];
+      allVectorLaunchers.filter((entry) => entry.root.visible).forEach((entry) => entry.meshes.forEach((mesh) => launcherMeshes.push(mesh)));
+      const launcherHits = raycaster.intersectObjects(launcherMeshes, true);
+      if (launcherHits.length) {
+        let launcherObj: THREE.Object3D | null = launcherHits[0].object;
+        while (launcherObj) {
+          if (launcherObj.userData.vectorLauncherSourceId !== undefined) {
+            const entry = allVectorLaunchers.find(
+              (launcher) =>
+                launcher.sourceType === launcherObj!.userData.vectorLauncherSourceType && String(launcher.sourceId) === String(launcherObj!.userData.vectorLauncherSourceId),
+            );
+            return entry ? { kind: 'vector-launcher', entry, root: entry.root } : null;
+          }
+          launcherObj = launcherObj.parent;
+        }
+      }
       const meshes: THREE.Object3D[] = [];
       entries.forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
       markerEntries.forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
       vectorEntries.forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
-      allVectorLaunchers.filter((entry) => entry.root.visible).forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
       groupRings.forEach((ring) => meshes.push(ring.hitDisc));
       const hits = raycaster.intersectObjects(meshes, true);
       if (!hits.length) return null;
@@ -865,7 +913,7 @@ export function FleetHoloViewer({
         mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
         const refPos = target.kind === 'group' ? target.startCenter : target.root.position;
-        dragPlane.constant = -refPos.y;
+        dragPlane.constant = target.kind === 'vector-launcher' || target.kind === 'vector-handle' ? 0 : -refPos.y;
         raycaster.ray.intersectPlane(dragPlane, dragPoint);
         dragOffset.copy(refPos).sub(dragPoint);
       }
@@ -881,7 +929,7 @@ export function FleetHoloViewer({
         mouse.x = ((e.clientX - rect.left) / rect.width)  * 2 - 1;
         mouse.y = -((e.clientY - rect.top)  / rect.height) * 2 + 1;
         raycaster.setFromCamera(mouse, camera);
-        dragPlane.constant = -dragTarget.root.position.y;
+        dragPlane.constant = dragTarget.kind === 'vector-launcher' || dragTarget.kind === 'vector-handle' ? 0 : -dragTarget.root.position.y;
         raycaster.ray.intersectPlane(dragPlane, dragPoint);
         if (dragTarget.kind === 'vector-handle') {
           dragTarget.root.position.x = dragPoint.x;
@@ -921,22 +969,14 @@ export function FleetHoloViewer({
         if (dragTarget.kind === 'vector-handle') onVectorSelectRef.current?.(dragTarget.entry.vector.id);
         if (dragTarget.kind === 'vector-launcher') {
           const launcherTarget = dragTarget;
-          const sourceEntries =
-            launcherTarget.entry.sourceType === 'group'
-              ? entries.filter((entry) => entry.ship.group === launcherTarget.entry.sourceId)
-              : entries.filter((entry) => entry.ship.id === launcherTarget.entry.sourceId);
-          const startX = sourceEntries.length ? sourceEntries.reduce((sum, entry) => sum + entry.root.position.x, 0) / sourceEntries.length : 0;
-          const startZ = sourceEntries.length ? sourceEntries.reduce((sum, entry) => sum + entry.root.position.z, 0) / sourceEntries.length : 0;
-          const endX = launcherTarget.entry.root.position.x;
-          const endZ = launcherTarget.entry.root.position.z - 48;
-          onVectorCreateRef.current?.({
-            sourceType: launcherTarget.entry.sourceType,
-            sourceId: launcherTarget.entry.sourceId,
-            endX,
-            endZ,
-            controlX: (startX + endX) / 2,
-            controlZ: (startZ + endZ) / 2 - 18,
-          });
+          const sourceEntries = sourceEntriesForLauncher(launcherTarget.entry);
+          const start = sourceCenter(sourceEntries);
+          const defaultDistance = Math.max(160, ...sourceEntries.map((entry) => entry.radius * 2.8));
+          onVectorCreateRef.current?.(vectorPayloadFromLauncher(
+            launcherTarget.entry,
+            start.x + TACTICAL_FRONT_DIRECTION.x * defaultDistance,
+            start.z + TACTICAL_FRONT_DIRECTION.z * defaultDistance,
+          ));
         }
       } else if (isDragging && dragTarget) {
         if (dragTarget.kind === 'ship') {
@@ -969,20 +1009,7 @@ export function FleetHoloViewer({
         }
         if (dragTarget.kind === 'vector-launcher') {
           const launcherTarget = dragTarget;
-          const sourceEntries =
-            launcherTarget.entry.sourceType === 'group'
-              ? entries.filter((entry) => entry.ship.group === launcherTarget.entry.sourceId)
-              : entries.filter((entry) => entry.ship.id === launcherTarget.entry.sourceId);
-          const startX = sourceEntries.length ? sourceEntries.reduce((sum, entry) => sum + entry.root.position.x, 0) / sourceEntries.length : 0;
-          const startZ = sourceEntries.length ? sourceEntries.reduce((sum, entry) => sum + entry.root.position.z, 0) / sourceEntries.length : 0;
-          onVectorCreateRef.current?.({
-            sourceType: launcherTarget.entry.sourceType,
-            sourceId: launcherTarget.entry.sourceId,
-            endX: launcherTarget.root.position.x,
-            endZ: launcherTarget.root.position.z,
-            controlX: (startX + launcherTarget.root.position.x) / 2,
-            controlZ: (startZ + launcherTarget.root.position.z) / 2 - 18,
-          });
+          onVectorCreateRef.current?.(vectorPayloadFromLauncher(launcherTarget.entry, launcherTarget.root.position.x, launcherTarget.root.position.z));
         }
       }
       saveCameraView();
@@ -1042,13 +1069,7 @@ export function FleetHoloViewer({
         }
       });
 
-      const cameraFrontDirection = new THREE.Vector3(
-        camera.position.x - controls.target.x,
-        0,
-        camera.position.z - controls.target.z,
-      );
-      if (cameraFrontDirection.lengthSq() < 0.001) cameraFrontDirection.set(0, 0, 1);
-      cameraFrontDirection.normalize();
+      const tacticalFrontDirection = TACTICAL_FRONT_DIRECTION;
 
       groupRings.forEach((ring) => {
         const groupEntries = entries.filter((entry) => entry.ship.group === ring.group);
@@ -1069,11 +1090,11 @@ export function FleetHoloViewer({
         ring.mesh.rotation.z = t * 0.45;
         const launcherScale = Math.max(2.8, Math.min(9, radius / 34));
         ring.vectorLauncher.root.position.set(
-          centerX + cameraFrontDirection.x * (radius + launcherScale * 24),
+          centerX + tacticalFrontDirection.x * (radius + launcherScale * 34),
           Math.max(34, launcherScale * 15),
-          centerZ + cameraFrontDirection.z * (radius + launcherScale * 24),
+          centerZ + tacticalFrontDirection.z * (radius + launcherScale * 34),
         );
-        ring.vectorLauncher.root.rotation.y = Math.atan2(cameraFrontDirection.x, cameraFrontDirection.z);
+        ring.vectorLauncher.root.rotation.y = Math.atan2(tacticalFrontDirection.x, tacticalFrontDirection.z);
         ring.vectorLauncher.root.scale.setScalar(launcherScale);
         ring.vectorLauncher.root.visible = selected;
         ring.vectorLauncher.meshes.forEach((mesh, index) => {
@@ -1114,13 +1135,13 @@ export function FleetHoloViewer({
         const isSelected = entry.ship.id === selectedIdRef.current;
         const isPartOfSelectedGroup = showGroupSelection && entry.ship.group === selectedGroup;
         const launcherScale = Math.max(2.4, Math.min(7, entry.radius / 22));
-        const distance = Math.max(entry.radius * 1.55, launcherScale * 36);
+        const distance = Math.max(entry.radius * 1.75, launcherScale * 46);
         launcher.root.position.set(
-          entry.root.position.x + cameraFrontDirection.x * distance,
+          entry.root.position.x + tacticalFrontDirection.x * distance,
           Math.max(30, launcherScale * 14),
-          entry.root.position.z + cameraFrontDirection.z * distance,
+          entry.root.position.z + tacticalFrontDirection.z * distance,
         );
-        launcher.root.rotation.y = Math.atan2(cameraFrontDirection.x, cameraFrontDirection.z);
+        launcher.root.rotation.y = Math.atan2(tacticalFrontDirection.x, tacticalFrontDirection.z);
         launcher.root.scale.setScalar(launcherScale);
         launcher.root.visible = isSelected && !isPartOfSelectedGroup;
         launcher.meshes.forEach((mesh, index) => {
