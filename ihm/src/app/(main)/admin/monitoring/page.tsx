@@ -1,0 +1,402 @@
+'use client';
+
+export const dynamic = 'force-dynamic';
+
+import {
+  Activity,
+  AlertTriangle,
+  ArrowLeft,
+  Clock,
+  Cpu,
+  Database,
+  Gauge,
+  HardDrive,
+  Loader2,
+  RefreshCw,
+  Server,
+  Zap,
+} from 'lucide-react';
+import Link from 'next/link';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { PageHeader } from '@/components/ui/PageHeader';
+import { PageShell } from '@/components/ui/PageShell';
+import { StatCard, StatGrid } from '@/components/ui/StatCard';
+import { useAuth } from '@/contexts/AuthContext';
+import { ADMIN_ROLE } from '@/lib/app-constants';
+
+// ── Types ────────────────────────────────────────────────────────────────────
+
+interface ReadyState {
+  status: string;
+  checks: { database: boolean; redis: boolean };
+}
+
+interface CacheStats {
+  hits: number;
+  misses: number;
+  total: number;
+  hitRate: string;
+  connected: boolean;
+}
+
+interface PromSample {
+  labels: Record<string, string>;
+  value: number;
+}
+
+interface RouteTraffic {
+  route: string;
+  requests: number;
+  errors: number;
+  avgMs: number | null;
+}
+
+interface Snapshot {
+  ready: ReadyState | null;
+  cache: CacheStats | null;
+  totalRequests: number;
+  totalErrors: number;
+  avgLatencyMs: number | null;
+  memoryBytes: number | null;
+  heapUsedBytes: number | null;
+  eventLoopLagMs: number | null;
+  uptimeSeconds: number | null;
+  routes: RouteTraffic[];
+  statusCounts: Record<string, number>;
+  fetchedAt: number;
+}
+
+// ── Prometheus text parser ───────────────────────────────────────────────────
+
+function parsePrometheus(text: string): Map<string, PromSample[]> {
+  const out = new Map<string, PromSample[]>();
+  for (const line of text.split('\n')) {
+    if (!line || line.startsWith('#')) continue;
+    const match = line.match(/^([a-zA-Z_:][a-zA-Z0-9_:]*)(\{[^}]*\})?\s+([^\s]+)/);
+    if (!match) continue;
+    const [, name, rawLabels, rawValue] = match;
+    const value = Number(rawValue);
+    if (!Number.isFinite(value)) continue;
+    const labels: Record<string, string> = {};
+    if (rawLabels) {
+      for (const part of rawLabels.slice(1, -1).matchAll(/(\w+)="((?:[^"\\]|\\.)*)"/g)) {
+        labels[part[1]] = part[2];
+      }
+    }
+    const list = out.get(name) ?? [];
+    list.push({ labels, value });
+    out.set(name, list);
+  }
+  return out;
+}
+
+function sum(samples: PromSample[] | undefined, filter?: (labels: Record<string, string>) => boolean) {
+  if (!samples) return 0;
+  return samples.reduce((acc, s) => (filter && !filter(s.labels) ? acc : acc + s.value), 0);
+}
+
+function buildSnapshot(metrics: Map<string, PromSample[]>, ready: ReadyState | null, cache: CacheStats | null): Snapshot {
+  const requests = metrics.get('starvis_http_requests_total') ?? [];
+  const durSum = metrics.get('starvis_http_request_duration_seconds_sum') ?? [];
+  const durCount = metrics.get('starvis_http_request_duration_seconds_count') ?? [];
+
+  const totalRequests = sum(requests);
+  const totalErrors = sum(requests, (l) => l.status_code >= '500');
+  const totalDurSum = sum(durSum);
+  const totalDurCount = sum(durCount);
+
+  const byRoute = new Map<string, { requests: number; errors: number; durSum: number; durCount: number }>();
+  for (const s of requests) {
+    const route = s.labels.route ?? 'unknown';
+    const entry = byRoute.get(route) ?? { requests: 0, errors: 0, durSum: 0, durCount: 0 };
+    entry.requests += s.value;
+    if ((s.labels.status_code ?? '') >= '500') entry.errors += s.value;
+    byRoute.set(route, entry);
+  }
+  for (const s of durSum) {
+    const entry = byRoute.get(s.labels.route ?? 'unknown');
+    if (entry) entry.durSum += s.value;
+  }
+  for (const s of durCount) {
+    const entry = byRoute.get(s.labels.route ?? 'unknown');
+    if (entry) entry.durCount += s.value;
+  }
+
+  const routes: RouteTraffic[] = [...byRoute.entries()]
+    .map(([route, e]) => ({
+      route,
+      requests: e.requests,
+      errors: e.errors,
+      avgMs: e.durCount > 0 ? (e.durSum / e.durCount) * 1000 : null,
+    }))
+    .sort((a, b) => b.requests - a.requests)
+    .slice(0, 12);
+
+  const statusCounts: Record<string, number> = {};
+  for (const s of requests) {
+    const code = s.labels.status_code ?? '???';
+    const family = `${code[0]}xx`;
+    statusCounts[family] = (statusCounts[family] ?? 0) + s.value;
+  }
+
+  const startTime = metrics.get('starvis_process_start_time_seconds')?.[0]?.value ?? null;
+  const lag = metrics.get('starvis_nodejs_eventloop_lag_seconds')?.[0]?.value ?? null;
+
+  return {
+    ready,
+    cache,
+    totalRequests,
+    totalErrors,
+    avgLatencyMs: totalDurCount > 0 ? (totalDurSum / totalDurCount) * 1000 : null,
+    memoryBytes: metrics.get('starvis_process_resident_memory_bytes')?.[0]?.value ?? null,
+    heapUsedBytes: metrics.get('starvis_nodejs_heap_size_used_bytes')?.[0]?.value ?? null,
+    eventLoopLagMs: lag !== null ? lag * 1000 : null,
+    uptimeSeconds: startTime !== null ? Date.now() / 1000 - startTime : null,
+    routes,
+    statusCounts,
+    fetchedAt: Date.now(),
+  };
+}
+
+// ── Formatting helpers ───────────────────────────────────────────────────────
+
+function fmtBytes(bytes: number | null) {
+  if (bytes === null) return '—';
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(2)} GB`;
+  return `${(bytes / 1024 ** 2).toFixed(0)} MB`;
+}
+
+function fmtUptime(seconds: number | null) {
+  if (seconds === null) return '—';
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${m}m`;
+  return `${m}m`;
+}
+
+function fmtMs(ms: number | null) {
+  if (ms === null) return '—';
+  return ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${ms.toFixed(1)} ms`;
+}
+
+const STATUS_FAMILY_STYLE: Record<string, string> = {
+  '2xx': 'bg-emerald-500/70',
+  '3xx': 'bg-cyan-500/70',
+  '4xx': 'bg-amber-500/70',
+  '5xx': 'bg-rose-500/70',
+};
+
+// ── Sub-components ───────────────────────────────────────────────────────────
+
+function ServiceBadge({ label, ok, icon: Icon }: { label: string; ok: boolean | null; icon: React.ElementType }) {
+  const style = ok === null
+    ? 'border-slate-700/50 text-slate-500'
+    : ok
+      ? 'border-emerald-700/50 bg-emerald-950/30 text-emerald-400'
+      : 'border-rose-700/50 bg-rose-950/30 text-rose-400';
+  return (
+    <div className={`flex items-center gap-2.5 rounded-sm border px-3 py-2.5 ${style}`}>
+      <Icon size={14} />
+      <span className="font-orbitron text-[10px] font-bold uppercase tracking-widest">{label}</span>
+      <span className={`ml-auto h-2 w-2 rounded-full ${ok === null ? 'bg-slate-600' : ok ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
+      <span className="font-mono-sc text-[10px]">{ok === null ? 'UNKNOWN' : ok ? 'ONLINE' : 'DOWN'}</span>
+    </div>
+  );
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────────
+
+const REFRESH_INTERVAL_MS = 10_000;
+
+export default function AdminMonitoringPage() {
+  const { user: me } = useAuth();
+  const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [reqPerSec, setReqPerSec] = useState<number | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const prevRef = useRef<{ total: number; at: number } | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const [readyRes, cacheRes, metricsRes] = await Promise.allSettled([
+        fetch('/health/ready'),
+        fetch('/health/cache/stats'),
+        fetch('/health/metrics'),
+      ]);
+
+      const ready: ReadyState | null = readyRes.status === 'fulfilled'
+        ? await readyRes.value.json().catch(() => null)
+        : null;
+      const cache: CacheStats | null = cacheRes.status === 'fulfilled' && cacheRes.value.ok
+        ? await cacheRes.value.json().catch(() => null)
+        : null;
+      const metricsText = metricsRes.status === 'fulfilled' && metricsRes.value.ok
+        ? await metricsRes.value.text()
+        : '';
+
+      if (!ready && !metricsText) {
+        setError('API unreachable — all health endpoints failed.');
+        setSnapshot(null);
+        return;
+      }
+
+      const next = buildSnapshot(parsePrometheus(metricsText), ready, cache);
+      const prev = prevRef.current;
+      if (prev && next.totalRequests >= prev.total && next.fetchedAt > prev.at) {
+        setReqPerSec((next.totalRequests - prev.total) / ((next.fetchedAt - prev.at) / 1000));
+      }
+      prevRef.current = { total: next.totalRequests, at: next.fetchedAt };
+      setSnapshot(next);
+      setError(null);
+    } catch {
+      setError('Failed to load monitoring data.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (me?.role !== ADMIN_ROLE) return;
+    void refresh();
+    const timer = setInterval(() => void refresh(), REFRESH_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [me?.role, refresh]);
+
+  if (!me) return <div className="p-6 text-center text-slate-500 font-mono-sc text-sm">Sign in required.</div>;
+  if (me.role !== ADMIN_ROLE) {
+    return <div className="p-6 text-center text-slate-500 font-mono-sc text-sm">ACCESS DENIED — Admin role required</div>;
+  }
+
+  const apiOk = snapshot ? snapshot.ready !== null || snapshot.totalRequests > 0 : null;
+  const statusTotal = snapshot ? Object.values(snapshot.statusCounts).reduce((a, b) => a + b, 0) : 0;
+
+  return (
+    <PageShell size="lg" className="p-4 md:p-6">
+      <PageHeader
+        eyebrow="Administration"
+        title="Monitoring"
+        subtitle="Live service health, traffic and runtime metrics."
+        actions={(
+          <button
+            type="button"
+            onClick={() => { setLoading(true); void refresh(); }}
+            className="sci-btn-primary flex items-center gap-1.5 px-3 py-1.5 text-xs"
+          >
+            {loading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+            Refresh
+          </button>
+        )}
+      />
+
+      <Link
+        href="/admin"
+        className="flex w-fit items-center gap-2 sci-panel border border-slate-800/60 px-3 py-2.5 text-slate-500 transition-colors hover:border-cyan-800/50 hover:text-cyan-400"
+      >
+        <ArrowLeft size={13} />
+        <span className="font-orbitron text-[10px] uppercase tracking-widest">Back to admin</span>
+      </Link>
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-sm border border-rose-800/60 bg-rose-950/20 px-3 py-2.5 font-mono-sc text-xs text-rose-400">
+          <AlertTriangle size={13} /> {error}
+        </div>
+      )}
+
+      {/* Service health */}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <ServiceBadge label="API" ok={apiOk} icon={Server} />
+        <ServiceBadge label="PostgreSQL" ok={snapshot?.ready?.checks.database ?? null} icon={Database} />
+        <ServiceBadge label="Redis" ok={snapshot?.ready?.checks.redis ?? (snapshot?.cache?.connected ?? null)} icon={Zap} />
+      </div>
+
+      {/* Runtime stats */}
+      <StatGrid>
+        <StatCard icon={Clock} label="Uptime" value={fmtUptime(snapshot?.uptimeSeconds ?? null)} accent="cyan" />
+        <StatCard icon={HardDrive} label="Memory (RSS)" value={fmtBytes(snapshot?.memoryBytes ?? null)} accent="purple" />
+        <StatCard icon={Cpu} label="Heap used" value={fmtBytes(snapshot?.heapUsedBytes ?? null)} accent="purple" />
+        <StatCard icon={Gauge} label="Event loop lag" value={fmtMs(snapshot?.eventLoopLagMs ?? null)} accent={snapshot?.eventLoopLagMs != null && snapshot.eventLoopLagMs > 50 ? 'rose' : 'slate'} />
+      </StatGrid>
+
+      {/* Traffic stats */}
+      <StatGrid>
+        <StatCard icon={Activity} label="Total requests" value={snapshot ? snapshot.totalRequests.toLocaleString() : '—'} accent="cyan" />
+        <StatCard icon={Activity} label="Traffic" value={reqPerSec !== null ? `${reqPerSec.toFixed(1)} req/s` : '—'} accent="emerald" />
+        <StatCard icon={Clock} label="Avg latency" value={fmtMs(snapshot?.avgLatencyMs ?? null)} accent="amber" />
+        <StatCard icon={AlertTriangle} label="5xx errors" value={snapshot ? snapshot.totalErrors.toLocaleString() : '—'} accent={snapshot && snapshot.totalErrors > 0 ? 'rose' : 'slate'} />
+      </StatGrid>
+
+      {/* Cache stats */}
+      <StatGrid>
+        <StatCard icon={Zap} label="Cache hits" value={snapshot?.cache ? snapshot.cache.hits.toLocaleString() : '—'} accent="emerald" />
+        <StatCard icon={Zap} label="Cache misses" value={snapshot?.cache ? snapshot.cache.misses.toLocaleString() : '—'} accent="slate" />
+        <StatCard icon={Gauge} label="Hit rate" value={snapshot?.cache ? `${snapshot.cache.hitRate}%` : '—'} accent="cyan" />
+        <StatCard icon={Zap} label="Redis link" value={snapshot?.cache ? (snapshot.cache.connected ? 'CONNECTED' : 'OFFLINE') : '—'} accent={snapshot?.cache?.connected ? 'emerald' : 'rose'} />
+      </StatGrid>
+
+      {/* Status code distribution */}
+      {snapshot && statusTotal > 0 && (
+        <div className="sci-panel border border-slate-800/60 p-3">
+          <p className="mb-2 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">HTTP status distribution</p>
+          <div className="flex h-3 w-full overflow-hidden rounded-sm bg-slate-900">
+            {Object.entries(snapshot.statusCounts).sort().map(([family, count]) => (
+              <div
+                key={family}
+                className={STATUS_FAMILY_STYLE[family] ?? 'bg-slate-600'}
+                style={{ width: `${(count / statusTotal) * 100}%` }}
+                title={`${family}: ${count.toLocaleString()}`}
+              />
+            ))}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-3">
+            {Object.entries(snapshot.statusCounts).sort().map(([family, count]) => (
+              <span key={family} className="flex items-center gap-1.5 font-mono-sc text-[10px] text-slate-500">
+                <span className={`h-2 w-2 rounded-sm ${STATUS_FAMILY_STYLE[family] ?? 'bg-slate-600'}`} />
+                {family} · {count.toLocaleString()} ({((count / statusTotal) * 100).toFixed(1)}%)
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Top routes */}
+      <div className="sci-panel border border-slate-800/60">
+        <p className="border-b border-slate-800/60 px-3 py-2.5 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+          Top routes by traffic
+        </p>
+        {loading && !snapshot ? (
+          <div className="flex items-center justify-center py-10 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
+        ) : !snapshot || snapshot.routes.length === 0 ? (
+          <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No traffic recorded yet.</p>
+        ) : (
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                <th className="px-3 py-2 font-normal">Route</th>
+                <th className="px-3 py-2 text-right font-normal">Requests</th>
+                <th className="px-3 py-2 text-right font-normal">Avg</th>
+                <th className="px-3 py-2 text-right font-normal">5xx</th>
+              </tr>
+            </thead>
+            <tbody>
+              {snapshot.routes.map((r) => (
+                <tr key={r.route} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
+                  <td className="max-w-[16rem] truncate px-3 py-2 font-mono-sc text-xs text-slate-300">{r.route}</td>
+                  <td className="px-3 py-2 text-right font-mono-sc text-xs text-cyan-400">{r.requests.toLocaleString()}</td>
+                  <td className="px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{fmtMs(r.avgMs)}</td>
+                  <td className={`px-3 py-2 text-right font-mono-sc text-xs ${r.errors > 0 ? 'text-rose-400' : 'text-slate-700'}`}>{r.errors > 0 ? r.errors.toLocaleString() : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <p className="font-mono-sc text-[10px] text-slate-700">
+        Auto-refresh every {REFRESH_INTERVAL_MS / 1000}s · counters since last API restart
+        {snapshot ? ` · updated ${new Date(snapshot.fetchedAt).toLocaleTimeString()}` : ''}
+      </p>
+    </PageShell>
+  );
+}

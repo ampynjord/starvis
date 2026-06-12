@@ -3,6 +3,8 @@
 export const dynamic = 'force-dynamic';
 
 import {
+  Bookmark,
+  BookmarkCheck,
   Copy,
   Crosshair,
   Flag,
@@ -62,8 +64,26 @@ interface Strategy {
   updatedAt: string;
 }
 
-type FormationType = 'line' | 'wedge' | 'box';
+type FormationType = 'line' | 'wedge' | 'box' | 'v' | 'echelon' | 'diamond' | 'circle';
 type MarkerType = TacticalMarker['type'];
+
+interface FormationPreset {
+  id: string;
+  name: string;
+  type: FormationType;
+  quantity: number;
+  spacing: number;
+}
+
+const FORMATION_LABELS: Record<FormationType, string> = {
+  line: 'Line',
+  wedge: 'Wedge',
+  box: 'Box',
+  v: 'V-shape',
+  echelon: 'Echelon',
+  diamond: 'Diamond',
+  circle: 'Circle',
+};
 
 const getShipUuid = (item: FleetItem) => item.shipUuid?.trim() || null;
 const makeId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
@@ -78,10 +98,10 @@ const defaultStrategy = (): Strategy => ({
   updatedAt: nowIso(),
 });
 
-function formationPosition(index: number, total: number, spacing: number, formation: FormationType, offset: number) {
+function formationPosition(index: number, total: number, spacing: number, formation: FormationType, offsetX: number, offsetZ: number) {
   const gap = Math.max(spacing, 22);
   if (formation === 'line') {
-    return { gridX: (index - (total - 1) / 2) * gap + offset, gridZ: offset * 0.35 };
+    return { gridX: (index - (total - 1) / 2) * gap + offsetX, gridZ: offsetZ };
   }
   if (formation === 'box') {
     const cols = Math.ceil(Math.sqrt(total));
@@ -89,19 +109,52 @@ function formationPosition(index: number, total: number, spacing: number, format
     const col = index % cols;
     const rows = Math.ceil(total / cols);
     return {
-      gridX: (col - (cols - 1) / 2) * gap + offset,
-      gridZ: (row - (rows - 1) / 2) * gap + offset * 0.35,
+      gridX: (col - (cols - 1) / 2) * gap + offsetX,
+      gridZ: (row - (rows - 1) / 2) * gap + offsetZ,
     };
   }
+  if (formation === 'v') {
+    const half = Math.floor(total / 2);
+    const side = index < half ? -1 : 1;
+    const pos = index < half ? index : index - half;
+    return {
+      gridX: side * (pos + 1) * gap * 0.8 + offsetX,
+      gridZ: (pos + 1) * gap * 0.7 + offsetZ,
+    };
+  }
+  if (formation === 'echelon') {
+    return {
+      gridX: (index - (total - 1) / 2) * gap + offsetX,
+      gridZ: index * gap * 0.6 + offsetZ,
+    };
+  }
+  if (formation === 'diamond') {
+    const half = (total - 1) / 2;
+    const dist = Math.abs(index - half);
+    const width = (half - dist) * gap;
+    const row = index;
+    return {
+      gridX: (row % 2 === 0 ? 0 : width * (row < half ? 1 : -1)) + offsetX,
+      gridZ: (index - half) * gap * 0.8 + offsetZ,
+    };
+  }
+  if (formation === 'circle') {
+    const angle = (index / total) * Math.PI * 2 - Math.PI / 2;
+    const r = (total * gap) / (2 * Math.PI);
+    return { gridX: Math.cos(angle) * r + offsetX, gridZ: Math.sin(angle) * r + offsetZ };
+  }
+  // wedge (default)
   const row = Math.floor((Math.sqrt(8 * index + 1) - 1) / 2);
   const rowStart = (row * (row + 1)) / 2;
   const col = index - rowStart;
   const rowWidth = row + 1;
   return {
-    gridX: (col - (rowWidth - 1) / 2) * gap + offset,
-    gridZ: row * gap * 0.82 + offset * 0.35,
+    gridX: (col - (rowWidth - 1) / 2) * gap + offsetX,
+    gridZ: row * gap * 0.82 + offsetZ,
   };
 }
+
+const PRESETS_STORAGE_KEY = 'starvis-formation-presets';
 
 export default function CorporationTacticsPage() {
   const { user } = useAuth();
@@ -121,6 +174,10 @@ export default function CorporationTacticsPage() {
   const [formationType, setFormationType] = useState<FormationType>('wedge');
   const [formationQuantity, setFormationQuantity] = useState(4);
   const [formationSpacing, setFormationSpacing] = useState(28);
+  const [savedPresets, setSavedPresets] = useState<FormationPreset[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try { return JSON.parse(localStorage.getItem(PRESETS_STORAGE_KEY) ?? '[]') as FormationPreset[]; } catch { return []; }
+  });
   const nextShipIdRef = useRef(1);
 
   const activeStrategy = strategies.find((strategy) => strategy.id === activeStrategyId) ?? strategies[0] ?? defaultStrategy();
@@ -229,13 +286,22 @@ export default function CorporationTacticsPage() {
   const selectedMarker = activeStrategy.markers.find((marker) => marker.id === selectedMarkerId) ?? null;
   const selectedVector = activeStrategy.vectors.find((vector) => vector.id === selectedVectorId) ?? null;
 
-  const addFormation = useCallback((item: FleetItem, quantity = formationQuantity, group = formationName) => {
+  const addFormation = useCallback((item: FleetItem, quantity = formationQuantity, group = formationName, type = formationType, spacing = formationSpacing) => {
     const uuid = getShipUuid(item);
     if (!uuid) return;
     const ship = shipData.get(uuid);
-    const baseOffset = activeStrategy.ships.length ? Math.max(...activeStrategy.ships.map((node) => node.gridX)) + formationSpacing * 1.8 : 0;
+
+    // Auto-increment group name to avoid merging with existing formations
+    const existingGroups = new Set(activeStrategy.ships.map((s) => s.group));
+    let uniqueGroup = group;
+    let counter = 2;
+    while (existingGroups.has(uniqueGroup)) {
+      uniqueGroup = `${group} ${counter++}`;
+    }
+
+    const baseOffsetX = activeStrategy.ships.length ? Math.max(...activeStrategy.ships.map((n) => n.gridX)) + spacing * 2 : 0;
     const nextShips = Array.from({ length: quantity }, (_, index) => {
-      const pos = formationPosition(index, quantity, formationSpacing, formationType, baseOffset);
+      const pos = formationPosition(index, quantity, spacing, type, baseOffsetX, 0);
       const id = nextShipIdRef.current++;
       return {
         id,
@@ -243,7 +309,7 @@ export default function CorporationTacticsPage() {
         shipUuid: uuid,
         label: quantity > 1 ? `${ship?.name ?? item.itemClassName} ${index + 1}` : ship?.name ?? item.itemClassName,
         owner: item.addedBy?.username ?? null,
-        group,
+        group: uniqueGroup,
         gridX: pos.gridX,
         gridZ: pos.gridZ,
       } satisfies TacticalShip;
@@ -254,6 +320,42 @@ export default function CorporationTacticsPage() {
   const addSelectedFormation = () => {
     const item = fleetItems.find((fleetItem) => fleetItem.id === formationShipId);
     if (item) addFormation(item);
+  };
+
+  const updateGroupPositions = useCallback((updates: Array<{ id: number; gridX: number; gridZ: number }>) => {
+    updateActiveStrategy((strategy) => ({
+      ...strategy,
+      ships: strategy.ships.map((ship) => {
+        const upd = updates.find((u) => u.id === ship.id);
+        return upd ? { ...ship, gridX: upd.gridX, gridZ: upd.gridZ } : ship;
+      }),
+    }));
+  }, [updateActiveStrategy]);
+
+  const savePreset = () => {
+    const preset: FormationPreset = {
+      id: makeId(),
+      name: formationName,
+      type: formationType,
+      quantity: formationQuantity,
+      spacing: formationSpacing,
+    };
+    const next = [...savedPresets, preset];
+    setSavedPresets(next);
+    localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(next));
+  };
+
+  const deletePreset = (id: string) => {
+    const next = savedPresets.filter((p) => p.id !== id);
+    setSavedPresets(next);
+    localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(next));
+  };
+
+  const loadPreset = (preset: FormationPreset) => {
+    setFormationName(preset.name);
+    setFormationType(preset.type);
+    setFormationQuantity(preset.quantity);
+    setFormationSpacing(preset.spacing);
   };
 
   const addMarker = (type: MarkerType) => {
@@ -466,15 +568,42 @@ export default function CorporationTacticsPage() {
                 <input type="number" min={12} max={120} value={formationSpacing} onChange={(event) => setFormationSpacing(Number(event.target.value))} className="sci-input w-full" />
               </label>
               <select value={formationType} onChange={(event) => setFormationType(event.target.value as FormationType)} className="sci-input col-span-2 w-full">
-                <option value="wedge">Wedge formation</option>
-                <option value="line">Line formation</option>
-                <option value="box">Box formation</option>
+                {Object.entries(FORMATION_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
               </select>
               <button type="button" onClick={addSelectedFormation} disabled={!formationShipId || fleetItems.length === 0} className="sci-btn-primary col-span-2 flex items-center justify-center gap-1.5 px-3 py-2 text-xs disabled:opacity-40">
                 <Ship size={12} /> {fleetItems.length === 0 ? 'No corporation ships' : 'Add formation'}
               </button>
+              <button type="button" onClick={savePreset} className="col-span-2 flex items-center justify-center gap-1.5 rounded-sm border border-slate-700 px-3 py-1.5 font-mono-sc text-xs text-slate-400 hover:border-cyan-800/70 hover:text-cyan-300">
+                <Bookmark size={11} /> Save as preset
+              </button>
             </div>
           </div>
+
+          {savedPresets.length > 0 && (
+            <div className="space-y-2 border-b border-border/50 p-3">
+              <div className="flex items-center gap-2">
+                <BookmarkCheck size={13} className="text-cyan-500" />
+                <span className="font-orbitron text-[10px] font-bold uppercase tracking-widest text-slate-400">Presets</span>
+              </div>
+              {savedPresets.map((preset) => (
+                <div key={preset.id} className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => loadPreset(preset)}
+                    className="min-w-0 flex-1 truncate rounded-sm border border-slate-800/60 bg-slate-950/35 px-2 py-1.5 text-left font-mono-sc text-xs text-slate-300 hover:border-cyan-800/70 hover:text-cyan-300"
+                  >
+                    <span className="block truncate">{preset.name}</span>
+                    <span className="block font-mono-sc text-[9px] text-slate-600">{FORMATION_LABELS[preset.type]} · ×{preset.quantity} · gap {preset.spacing}</span>
+                  </button>
+                  <button type="button" onClick={() => deletePreset(preset.id)} className="shrink-0 p-1.5 text-slate-700 hover:text-red-400">
+                    <X size={11} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <div className="space-y-3 border-b border-border/50 p-3">
             <div className="flex items-center gap-2">
@@ -547,6 +676,7 @@ export default function CorporationTacticsPage() {
               onVectorSelect={(id) => { setSelectedVectorId(id); setSelectedShipId(null); setSelectedMarkerId(null); }}
               onVectorCreate={createVector}
               onVectorChange={updateVector}
+              onGroupPositionChange={updateGroupPositions}
             />
           )}
           <div className="pointer-events-none absolute left-3 top-3 rounded-sm border border-cyan-900/40 bg-slate-950/70 px-3 py-2 font-mono-sc text-[10px] text-cyan-500">

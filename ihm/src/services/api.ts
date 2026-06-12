@@ -614,6 +614,7 @@ export const api = {
 
   starmap: {
     positions: () => get<any[]>('/starmap/positions'),
+    jumpPoints: () => get<any[]>('/starmap/jump-points'),
   },
 
   // ─── CommLinks ──────────────────────────────────────────────────────

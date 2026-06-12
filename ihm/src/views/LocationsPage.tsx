@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import {
   Activity,
   Building2,
+  ChevronRight,
   CircleDot,
   Eye,
   Globe2,
@@ -17,6 +18,7 @@ import {
   Sparkles,
   Store,
   Telescope,
+  Users,
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -30,6 +32,14 @@ import type { Location, Shop } from '@/types/api';
 
 type Coordinates = { x?: number | string | null; y?: number | string | null; z?: number | string | null };
 
+type JumpPointLink = {
+  id?: string | null;
+  direction?: string | null;
+  status?: string | null;
+  exitSystemCode?: string | null;
+  exitSystemName?: string | null;
+};
+
 type RsiStarmapPosition = {
   id: number;
   rsi_id?: string | null;
@@ -42,6 +52,15 @@ type RsiStarmapPosition = {
   status?: string | null;
   faction_name?: string | null;
   coordinates?: Coordinates | null;
+  thumbnail?: string | null;
+  description?: string | null;
+  star_type?: string | null;
+  habitable_zone_inner?: number | string | null;
+  habitable_zone_outer?: number | string | null;
+  population?: number | string | null;
+  economy?: number | string | null;
+  danger?: number | string | null;
+  jump_points?: JumpPointLink[] | null;
   aggregated?: {
     planets?: number;
     moons?: number;
@@ -62,12 +81,30 @@ type RsiStarmapPosition = {
   } | null;
 };
 
+type JumpPointRow = {
+  id: number;
+  rsi_id?: string | null;
+  name: string;
+  system_code?: string | null;
+  system_name?: string | null;
+  jump_points?: JumpPointLink[] | null;
+  web_url?: string | null;
+};
+
 type LocationWithMap = Location & {
   parent_id?: number | null;
   aggregated?: RsiStarmapPosition['aggregated'];
   coordinates?: Coordinates | null;
   rsi_starmap_location_id?: number | null;
   p4k_path?: string | null;
+  thumbnail?: string | null;
+  star_type?: string | null;
+  habitable_zone_inner?: number | null;
+  habitable_zone_outer?: number | null;
+  population?: number | null;
+  economy?: number | null;
+  danger?: number | null;
+  jump_points?: JumpPointLink[] | null;
   rsi_starmap?: {
     name?: string | null;
     type?: string | null;
@@ -91,12 +128,44 @@ type MapNode = {
   shopCount: number;
 };
 
+type JumpConnection = { from: MapNode; to: MapNode; status: string | null };
+
 type ViewMode = 'galaxy' | 'system';
 
 const FALLBACK_POSITIONS: RsiStarmapPosition[] = [
-  { id: 1, rsi_id: 'stanton', name: 'Stanton', type: 'system', system_code: 'STAN', coordinates: { x: 0, y: 0, z: 0 } },
-  { id: 2, rsi_id: 'pyro', name: 'Pyro', type: 'system', system_code: 'PYRO', coordinates: { x: 42, y: 0, z: -36 } },
-  { id: 3, rsi_id: 'terra', name: 'Terra', type: 'system', system_code: 'TERR', coordinates: { x: 78, y: 0, z: 24 } },
+  {
+    id: 1,
+    rsi_id: 'stanton',
+    name: 'Stanton',
+    type: 'system',
+    system_code: 'STAN',
+    coordinates: { x: 0, y: 0, z: 0 },
+    jump_points: [
+      { exitSystemCode: 'PYRO', exitSystemName: 'Pyro' },
+      { exitSystemCode: 'TERR', exitSystemName: 'Terra' },
+    ],
+  },
+  {
+    id: 2,
+    rsi_id: 'pyro',
+    name: 'Pyro',
+    type: 'system',
+    system_code: 'PYRO',
+    coordinates: { x: 42, y: 0, z: -36 },
+    jump_points: [{ exitSystemCode: 'STAN', exitSystemName: 'Stanton' }],
+  },
+  {
+    id: 3,
+    rsi_id: 'terra',
+    name: 'Terra',
+    type: 'system',
+    system_code: 'TERR',
+    coordinates: { x: 78, y: 0, z: 24 },
+    jump_points: [
+      { exitSystemCode: 'STAN', exitSystemName: 'Stanton' },
+      { exitSystemCode: 'SOL', exitSystemName: 'Sol' },
+    ],
+  },
   { id: 4, rsi_id: 'sol', name: 'Sol', type: 'system', system_code: 'SOL', coordinates: { x: -82, y: 0, z: -18 } },
   { id: 5, rsi_id: 'microtech', name: 'microTech', type: 'planet', system_code: 'STAN', parent_id: 1, coordinates: { x: 18, y: 0, z: -12 } },
   { id: 6, rsi_id: 'hurston', name: 'Hurston', type: 'planet', system_code: 'STAN', parent_id: 1, coordinates: { x: 10, y: 0, z: 24 } },
@@ -141,6 +210,7 @@ function typeStyle(type: string) {
 }
 
 function toNumber(value: unknown) {
+  if (value == null || value === '') return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
 }
@@ -161,6 +231,12 @@ function systemCode(loc: LocationWithMap) {
   return (loc.system_code ?? loc.rsi_starmap?.system_code ?? loc.rsi_starmap?.system_name ?? loc.uuid.slice(0, 4)).toUpperCase();
 }
 
+function rsiImageUrl(url?: string | null) {
+  if (!url) return null;
+  if (url.startsWith('http')) return url;
+  return `https://robertsspaceindustries.com${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
 function posToLocation(pos: RsiStarmapPosition): LocationWithMap {
   const stableId = pos.rsi_id ?? String(pos.id);
   const parentStableId = pos.parent_id != null ? String(pos.parent_id) : null;
@@ -174,13 +250,21 @@ function posToLocation(pos: RsiStarmapPosition): LocationWithMap {
     parent_uuid: parentStableId ? `starmap-${parentStableId}` : null,
     parent_id: typeof pos.parent_id === 'number' ? pos.parent_id : null,
     loc_key: null,
-    description: null,
+    description: pos.description ?? null,
     is_scannable: Boolean(p4k?.is_scannable),
     hide_in_starmap: false,
     coordinates: pos.coordinates ?? p4k?.coordinates ?? null,
     p4k_path: p4k?.p4k_path ?? null,
     rsi_starmap_location_id: pos.id,
     aggregated: pos.aggregated ?? null,
+    thumbnail: pos.thumbnail ?? null,
+    star_type: pos.star_type ?? null,
+    habitable_zone_inner: toNumber(pos.habitable_zone_inner),
+    habitable_zone_outer: toNumber(pos.habitable_zone_outer),
+    population: toNumber(pos.population),
+    economy: toNumber(pos.economy),
+    danger: toNumber(pos.danger),
+    jump_points: Array.isArray(pos.jump_points) ? pos.jump_points : null,
     rsi_starmap: {
       name: pos.name,
       type: pos.type,
@@ -204,7 +288,7 @@ function mergeLocation(mapLoc: LocationWithMap, gameLoc: LocationWithMap): Locat
     parent_id: mapLoc.parent_id ?? gameLoc.parent_id ?? null,
     system_code: mapLoc.system_code ?? gameLoc.system_code ?? null,
     loc_key: gameLoc.loc_key ?? mapLoc.loc_key ?? null,
-    description: gameLoc.description ?? mapLoc.description ?? null,
+    description: mapLoc.description ?? gameLoc.description ?? null,
     is_scannable: gameLoc.is_scannable ?? mapLoc.is_scannable ?? false,
     p4k_path: mapLoc.p4k_path ?? gameLoc.p4k_path ?? null,
     coordinates: mapLoc.coordinates ?? gameLoc.coordinates ?? gameLoc.rsi_starmap?.coordinates ?? null,
@@ -251,6 +335,10 @@ function factionColor(faction?: string | null) {
   return 0xfacc15;
 }
 
+function factionHex(faction?: string | null) {
+  return `#${factionColor(faction).toString(16).padStart(6, '0')}`;
+}
+
 function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
   const visible = locations
     .map((loc) => ({ ...loc, type: normalizeType(loc.type) }))
@@ -286,6 +374,8 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
   const nodes = new Map<string, MapNode>();
   roots.forEach((loc, index) => {
     const style = typeStyle(loc.type);
+    const planetCount = toNumber(loc.aggregated?.planets) ?? 0;
+    const radius = 1.05 + Math.min(planetCount, 7) * 0.16;
     const color = loc.type === 'star' || loc.type === 'system' ? factionColor(loc.rsi_starmap?.faction_name) : style.color;
     nodes.set(loc.uuid, {
       id: loc.uuid,
@@ -293,7 +383,7 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
       parentId: null,
       systemCode: systemCode(loc),
       position: normalizedRootPosition(loc, index),
-      radius: style.radius,
+      radius,
       color,
       label: loc.name,
       shopCount: loc.loc_key ? shopsByLocKey.get(loc.loc_key) ?? 0 : 0,
@@ -351,23 +441,29 @@ function descendants(nodes: MapNode[], rootId: string) {
 
 function Scene({
   nodes,
+  jumpLinks,
   selectedId,
+  highlightId,
   focusSelected,
   onSelect,
 }: {
   nodes: MapNode[];
+  jumpLinks: { a: string; b: string }[];
   selectedId: string | null;
+  highlightId: string | null;
   focusSelected: boolean;
   onSelect: (id: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const selectedRef = useRef(selectedId);
+  const highlightRef = useRef(highlightId);
   const onSelectRef = useRef(onSelect);
 
   useEffect(() => {
     selectedRef.current = selectedId;
+    highlightRef.current = highlightId;
     onSelectRef.current = onSelect;
-  }, [selectedId, onSelect]);
+  }, [selectedId, highlightId, onSelect]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -464,9 +560,29 @@ function Scene({
     }
     const links = new THREE.LineSegments(
       new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3)),
-      new THREE.LineBasicMaterial({ color: 0x0ea5e9, transparent: true, opacity: 0.34 }),
+      new THREE.LineBasicMaterial({ color: 0x0ea5e9, transparent: true, opacity: 0.22 }),
     );
     group.add(links);
+
+    const jumpLines: { a: string; b: string; material: THREE.LineBasicMaterial }[] = [];
+    for (const link of jumpLinks) {
+      const a = byId.get(link.a);
+      const b = byId.get(link.b);
+      if (!a || !b) continue;
+      const mid = a.position.clone().add(b.position).multiplyScalar(0.5);
+      mid.y += a.position.distanceTo(b.position) * 0.16;
+      const curve = new THREE.QuadraticBezierCurve3(a.position.clone(), mid, b.position.clone());
+      const material = new THREE.LineBasicMaterial({
+        color: 0x0891b2,
+        transparent: true,
+        opacity: 0.16,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(curve.getPoints(48)), material);
+      group.add(line);
+      jumpLines.push({ a: link.a, b: link.b, material });
+    }
 
     const meshes = new Map<string, THREE.Mesh>();
     const halos = new Map<string, THREE.Sprite>();
@@ -521,7 +637,7 @@ function Scene({
       const material = new THREE.MeshPhongMaterial({
         color: node.color,
         emissive: node.color,
-        emissiveIntensity: isRoot ? 0.42 : type === 'star' ? 0.8 : type === 'system' ? 0.45 : 0.22,
+        emissiveIntensity: isRoot ? 0.55 : type === 'star' ? 0.8 : type === 'system' ? 0.45 : 0.22,
         shininess: 70,
       });
       const mesh = new THREE.Mesh(geometry, material);
@@ -532,13 +648,24 @@ function Scene({
 
       const halo = glowSprite(node.color);
       if (halo) {
-        const scale = isRoot ? node.radius * 4.8 : type === 'system' || type === 'star' ? node.radius * 7 : node.radius * 4.8;
+        const scale = isRoot ? node.radius * 6.4 : type === 'system' || type === 'star' ? node.radius * 7 : node.radius * 4.8;
         halo.position.copy(node.position);
         halo.scale.set(scale, scale, 1);
         halo.userData.baseScale = scale;
         halo.userData.nodeId = node.id;
         halos.set(node.id, halo);
         group.add(halo);
+      }
+
+      if (isRoot || type === 'star') {
+        const corona = glowSprite(node.color);
+        if (corona) {
+          const coronaScale = node.radius * 13;
+          corona.position.copy(node.position);
+          corona.scale.set(coronaScale, coronaScale, 1);
+          (corona.material as THREE.SpriteMaterial).opacity = 0.16;
+          group.add(corona);
+        }
       }
 
       if ((!isRoot && (type === 'system' || type === 'star' || type === 'planet')) || (isRoot && node.label.length <= 9)) {
@@ -556,13 +683,13 @@ function Scene({
         if (parent) {
           const orbit = new THREE.LineLoop(
             new THREE.BufferGeometry().setFromPoints(
-              Array.from({ length: 96 }, (_, i) => {
-                const a = (i / 96) * Math.PI * 2;
+              Array.from({ length: 128 }, (_, i) => {
+                const a = (i / 128) * Math.PI * 2;
                 const d = parent.position.distanceTo(node.position);
                 return new THREE.Vector3(Math.cos(a) * d, 0, Math.sin(a) * d).add(parent.position);
               }),
             ),
-            new THREE.LineBasicMaterial({ color: 0x164e63, transparent: true, opacity: type === 'planet' ? 0.28 : 0.14 }),
+            new THREE.LineBasicMaterial({ color: type === 'planet' ? 0x0e7490 : 0x164e63, transparent: true, opacity: type === 'planet' ? 0.34 : 0.16 }),
           );
           group.add(orbit);
         }
@@ -585,15 +712,25 @@ function Scene({
 
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
-    const onPointerUp = (event: PointerEvent) => {
+    const hoverRef = { current: null as string | null };
+    const pick = (event: PointerEvent) => {
       const rect = renderer.domElement.getBoundingClientRect();
       pointer.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
-      const hit = raycaster.intersectObjects([...meshes.values()], false)[0]?.object.userData.nodeId as string | undefined;
+      return raycaster.intersectObjects([...meshes.values()], false)[0]?.object.userData.nodeId as string | undefined;
+    };
+    const onPointerUp = (event: PointerEvent) => {
+      const hit = pick(event);
       if (hit) onSelectRef.current(hit);
     };
+    const onPointerMove = (event: PointerEvent) => {
+      const hit = pick(event);
+      hoverRef.current = hit ?? null;
+      renderer.domElement.style.cursor = hit ? 'pointer' : 'grab';
+    };
     renderer.domElement.addEventListener('pointerup', onPointerUp);
+    renderer.domElement.addEventListener('pointermove', onPointerMove);
 
     let frame = 0;
     const clock = new THREE.Clock();
@@ -603,10 +740,11 @@ function Scene({
       const t = clock.getElapsedTime();
       for (const [id, mesh] of meshes) {
         const selected = selectedRef.current === id;
+        const hovered = hoverRef.current === id;
         const material = mesh.material as THREE.MeshPhongMaterial;
         mesh.rotation.y += 0.0018;
-        mesh.scale.setScalar(selected ? 1.34 + Math.sin(t * 5) * 0.04 : 1);
-        material.emissiveIntensity = selected ? 1.1 : normalizeType(byId.get(id)?.loc.type ?? '') === 'system' ? 0.45 : 0.22;
+        mesh.scale.setScalar(selected ? 1.34 + Math.sin(t * 5) * 0.04 : hovered ? 1.16 : 1);
+        material.emissiveIntensity = selected ? 1.1 : hovered ? 0.78 : normalizeType(byId.get(id)?.loc.type ?? '') === 'system' ? 0.45 : 0.22;
         const halo = halos.get(id);
         if (halo) {
           const baseScale = Number(halo.userData.baseScale ?? 1);
@@ -614,8 +752,14 @@ function Scene({
           halo.scale.set(baseScale * pulse, baseScale * pulse, 1);
           halo.position.copy(mesh.position);
           halo.quaternion.copy(camera.quaternion);
-          (halo.material as THREE.SpriteMaterial).opacity = selected ? 0.98 : 0.42;
+          (halo.material as THREE.SpriteMaterial).opacity = selected ? 0.98 : hovered ? 0.72 : 0.42;
         }
+      }
+      const activeSystem = hoverRef.current && byId.has(hoverRef.current) ? hoverRef.current : highlightRef.current;
+      for (const jump of jumpLines) {
+        const active = activeSystem != null && (jump.a === activeSystem || jump.b === activeSystem);
+        jump.material.opacity = active ? 0.85 : 0.15;
+        jump.material.color.setHex(active ? 0x67e8f9 : 0x0891b2);
       }
       links.rotation.y = Math.sin(t * 0.08) * 0.015;
       labels.forEach((label) => label.quaternion.copy(camera.quaternion));
@@ -642,12 +786,13 @@ function Scene({
       resize.disconnect();
       visibility.dispose();
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
+      renderer.domElement.removeEventListener('pointermove', onPointerMove);
       controls.dispose();
       disposeObject3D(scene);
       renderer.dispose();
       if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
     };
-  }, [nodes, focusSelected]);
+  }, [nodes, jumpLinks, focusSelected]);
 
   return <div ref={containerRef} className="absolute inset-0" />;
 }
@@ -662,16 +807,105 @@ function DetailRow({ label, value }: { label: string; value: React.ReactNode }) 
   );
 }
 
+function TreeRow({
+  node,
+  depth,
+  childrenByParent,
+  expanded,
+  visibleIds,
+  selectedId,
+  onToggle,
+  onSelect,
+}: {
+  node: MapNode;
+  depth: number;
+  childrenByParent: Map<string, MapNode[]>;
+  expanded: Set<string>;
+  visibleIds: Set<string> | null;
+  selectedId: string | null;
+  onToggle: (id: string) => void;
+  onSelect: (node: MapNode) => void;
+}) {
+  const children = (childrenByParent.get(node.id) ?? []).filter((child) => !visibleIds || visibleIds.has(child.id));
+  const isRoot = !node.parentId;
+  const isExpanded = visibleIds ? children.length > 0 : expanded.has(node.id);
+  const active = selectedId === node.id;
+  const style = typeStyle(node.loc.type);
+  const faction = node.loc.rsi_starmap?.faction_name;
+  return (
+    <div>
+      <div
+        className={`mb-0.5 flex items-center rounded-sm border transition-colors ${
+          active
+            ? 'border-cyan-700/70 bg-cyan-950/45 text-cyan-100 shadow-[inset_2px_0_0_rgba(34,211,238,0.8)]'
+            : 'border-transparent text-slate-400 hover:border-slate-800 hover:bg-slate-950/45 hover:text-slate-200'
+        }`}
+        style={{ paddingLeft: depth * 14 }}
+      >
+        {children.length > 0 ? (
+          <button type="button" onClick={() => onToggle(node.id)} className="shrink-0 p-1 text-slate-600 hover:text-cyan-300">
+            <ChevronRight size={12} className={`transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+          </button>
+        ) : (
+          <span className="w-5 shrink-0" />
+        )}
+        <button type="button" onClick={() => onSelect(node)} className="flex min-w-0 flex-1 items-center gap-2 py-1.5 pr-2 text-left">
+          {isRoot ? (
+            <span
+              className="size-2 shrink-0 rounded-full"
+              style={{ backgroundColor: factionHex(faction), boxShadow: `0 0 6px ${factionHex(faction)}` }}
+            />
+          ) : (
+            <span className={`shrink-0 ${style.text}`}>{style.icon}</span>
+          )}
+          <span className="min-w-0 flex-1">
+            <span className={`block truncate font-rajdhani text-sm font-semibold ${isRoot ? 'uppercase tracking-wide' : ''}`}>{node.label}</span>
+            {isRoot && (
+              <span className="block truncate font-mono-sc text-[9px] uppercase tracking-wider text-slate-600">
+                {node.systemCode}
+                {faction ? ` · ${faction}` : ''}
+              </span>
+            )}
+          </span>
+          {node.shopCount > 0 && <Store size={10} className="shrink-0 text-amber-400" />}
+        </button>
+      </div>
+      {isExpanded &&
+        children.map((child) => (
+          <TreeRow
+            key={child.id}
+            node={child}
+            depth={depth + 1}
+            childrenByParent={childrenByParent}
+            expanded={expanded}
+            visibleIds={visibleIds}
+            selectedId={selectedId}
+            onToggle={onToggle}
+            onSelect={onSelect}
+          />
+        ))}
+    </div>
+  );
+}
+
 export default function LocationsPage() {
   const { env } = useEnv();
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('galaxy');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState('all');
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const { data: starmapPositions, isLoading: loadingStarmap, error: starmapError } = useQuery({
     queryKey: ['starmap-positions'],
     queryFn: () => api.starmap.positions() as Promise<RsiStarmapPosition[]>,
+    retry: false,
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: jumpRows } = useQuery({
+    queryKey: ['starmap-jump-points'],
+    queryFn: () => api.starmap.jumpPoints() as Promise<JumpPointRow[]>,
     retry: false,
     staleTime: 5 * 60_000,
   });
@@ -696,7 +930,10 @@ export default function LocationsPage() {
   );
   const allNodes = useMemo(() => buildNodes(allLocations, shopsData?.data ?? []), [allLocations, shopsData]);
   const roots = useMemo(() => allNodes.filter((node) => !node.parentId), [allNodes]);
-  const selectedNode = useMemo(() => allNodes.find((node) => node.id === selectedId) ?? allNodes[0] ?? null, [allNodes, selectedId]);
+  const selectedNode = useMemo(
+    () => allNodes.find((node) => node.id === selectedId) ?? roots[0] ?? allNodes[0] ?? null,
+    [allNodes, roots, selectedId],
+  );
   const currentRoot = useMemo(() => {
     if (!selectedNode) return roots[0] ?? null;
     let cursor: MapNode | null = selectedNode;
@@ -736,12 +973,84 @@ export default function LocationsPage() {
         root,
         objects: children.length + 1,
         planets: children.filter((node) => normalizeType(node.loc.type) === 'planet').length,
+        moons: children.filter((node) => normalizeType(node.loc.type) === 'moon').length,
         stations: children.filter((node) => ['station', 'rest_stop', 'landing_zone'].includes(normalizeType(node.loc.type))).length,
         danger: root.loc.aggregated?.danger,
         economy: root.loc.aggregated?.economy,
       };
     })
     .sort((a, b) => a.root.label.localeCompare(b.root.label)), [allNodes, roots]);
+
+  const childrenByParent = useMemo(() => {
+    const map = new Map<string, MapNode[]>();
+    for (const node of allNodes) {
+      if (!node.parentId) continue;
+      const list = map.get(node.parentId);
+      if (list) list.push(node);
+      else map.set(node.parentId, [node]);
+    }
+    for (const list of map.values()) {
+      list.sort(
+        (a, b) =>
+          TYPE_ORDER.indexOf(normalizeType(a.loc.type)) - TYPE_ORDER.indexOf(normalizeType(b.loc.type)) || a.label.localeCompare(b.label),
+      );
+    }
+    return map;
+  }, [allNodes]);
+
+  const treeRoots = useMemo(() => [...roots].sort((a, b) => a.label.localeCompare(b.label)), [roots]);
+
+  const treeVisibleIds = useMemo(() => {
+    if (!query) return null;
+    const ids = new Set<string>();
+    const visit = (node: MapNode): boolean => {
+      let match = node.label.toLowerCase().includes(query) || node.systemCode.toLowerCase().includes(query);
+      for (const child of childrenByParent.get(node.id) ?? []) {
+        if (visit(child)) match = true;
+      }
+      if (match) ids.add(node.id);
+      return match;
+    };
+    for (const root of treeRoots) visit(root);
+    return ids;
+  }, [childrenByParent, query, treeRoots]);
+
+  const jumpConnections = useMemo(() => {
+    const rootByCode = new Map(roots.map((root) => [root.systemCode, root]));
+    const sources = jumpRows?.length
+      ? jumpRows.map((row) => ({ code: (row.system_code ?? '').toUpperCase(), links: row.jump_points ?? [] }))
+      : roots.map((root) => ({ code: root.systemCode, links: root.loc.jump_points ?? [] }));
+    const seen = new Set<string>();
+    const connections: JumpConnection[] = [];
+    for (const source of sources) {
+      const from = rootByCode.get(source.code);
+      if (!from) continue;
+      for (const link of source.links) {
+        const to = link.exitSystemCode ? rootByCode.get(link.exitSystemCode.toUpperCase()) : null;
+        if (!to || to.id === from.id) continue;
+        const key = [from.id, to.id].sort().join('>');
+        if (seen.has(key)) continue;
+        seen.add(key);
+        connections.push({ from, to, status: link.status ?? null });
+      }
+    }
+    return connections;
+  }, [jumpRows, roots]);
+
+  const jumpLinkPairs = useMemo(
+    () => jumpConnections.map((connection) => ({ a: connection.from.id, b: connection.to.id })),
+    [jumpConnections],
+  );
+
+  const selectedJumpLinks = useMemo(() => {
+    if (!currentRoot) return [];
+    return jumpConnections
+      .filter((connection) => connection.from.id === currentRoot.id || connection.to.id === currentRoot.id)
+      .map((connection) => ({
+        target: connection.from.id === currentRoot.id ? connection.to : connection.from,
+        status: connection.status,
+      }));
+  }, [currentRoot, jumpConnections]);
 
   const selectedChildren = useMemo(() => {
     if (!selectedNode) return [];
@@ -754,11 +1063,44 @@ export default function LocationsPage() {
   ), [currentRoot, systemSummaries]);
 
   useEffect(() => {
-    if (!selectedId && allNodes[0]) setSelectedId(allNodes[0].id);
+    if (!selectedId && allNodes.length > 0) {
+      const first = allNodes.find((node) => !node.parentId) ?? allNodes[0];
+      setSelectedId(first.id);
+    }
   }, [allNodes, selectedId]);
+
+  const toggleExpanded = (id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleTreeSelect = (node: MapNode) => {
+    setSelectedId(node.id);
+    if (!node.parentId) {
+      setExpanded((prev) => new Set(prev).add(node.id));
+    } else {
+      setViewMode('system');
+    }
+  };
+
+  const navigateToSystem = (target: MapNode) => {
+    setSelectedId(target.id);
+    setExpanded((prev) => new Set(prev).add(target.id));
+  };
 
   const loading = (loadingStarmap || loadingLocations) && allNodes.length === 0;
   if (starmapError && allNodes.length === 0) return <ErrorState error={starmapError as Error} />;
+
+  const selectedLoc = selectedNode?.loc;
+  const selectedFaction = selectedLoc?.rsi_starmap?.faction_name;
+  const selectedThumbnail = rsiImageUrl(selectedLoc?.thumbnail);
+  const hzInner = selectedLoc?.habitable_zone_inner;
+  const hzOuter = selectedLoc?.habitable_zone_outer;
+  const aggregated = currentRoot?.loc.aggregated;
 
   return (
     <div className="-m-3 flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden bg-[#01040a] text-slate-200 sm:-m-6">
@@ -772,7 +1114,7 @@ export default function LocationsPage() {
             <div className="min-w-0">
               <h1 className="font-orbitron text-lg font-bold uppercase tracking-widest text-cyan-200">Starvis Starmap</h1>
               <p className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">
-                {allNodes.length.toLocaleString('en-US')} mapped objects · {roots.length.toLocaleString('en-US')} systems · RSI + P4K correlated
+                {allNodes.length.toLocaleString('en-US')} mapped objects · {roots.length.toLocaleString('en-US')} systems · {jumpConnections.length.toLocaleString('en-US')} jump routes
               </p>
             </div>
           </div>
@@ -828,7 +1170,7 @@ export default function LocationsPage() {
           <div className="mb-3 grid grid-cols-3 gap-2">
             <HudMetric icon={<Sparkles size={11} />} label="Systems" value={roots.length.toLocaleString('en-US')} />
             <HudMetric icon={<Globe2 size={11} />} label="Objects" value={allNodes.length.toLocaleString('en-US')} />
-            <HudMetric icon={<Store size={11} />} label="Shops" value={(shopsData?.data?.length ?? 0).toLocaleString('en-US')} />
+            <HudMetric icon={<Route size={11} />} label="Routes" value={jumpConnections.length.toLocaleString('en-US')} />
           </div>
 
           <div className="mb-3 flex gap-1 overflow-x-auto border-b border-slate-900 pb-3 lg:flex-wrap">
@@ -852,40 +1194,28 @@ export default function LocationsPage() {
           </div>
 
           <div className="mb-2 flex items-center justify-between">
-            <p className="font-orbitron text-[10px] uppercase tracking-widest text-slate-600">
-              {viewMode === 'galaxy' ? 'Known systems' : 'Local objects'}
-            </p>
-            <span className="font-mono-sc text-[10px] text-cyan-700">{visibleNodes.length}</span>
+            <p className="font-orbitron text-[10px] uppercase tracking-widest text-slate-600">Known systems</p>
+            <span className="font-mono-sc text-[10px] text-cyan-700">
+              {(treeVisibleIds ? treeRoots.filter((root) => treeVisibleIds.has(root.id)) : treeRoots).length}
+            </span>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-            {(viewMode === 'galaxy' && !query && typeFilter === 'all' ? systemSummaries.map((summary) => summary.root) : visibleNodes).slice(0, 180).map((node) => {
-              const active = selectedNode?.id === node.id;
-              const style = typeStyle(node.loc.type);
-              const summary = systemSummaries.find((item) => item.root.id === node.id);
-              return (
-                <button
-                  key={node.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedId(node.id);
-                    if (!node.parentId && viewMode === 'system') setViewMode('system');
-                  }}
-                  className={`mb-1 flex w-full items-center gap-2 rounded-sm border px-2 py-2 text-left transition-colors ${
-                    active ? 'border-cyan-700/70 bg-cyan-950/45 text-cyan-100 shadow-[inset_2px_0_0_rgba(34,211,238,0.8)]' : 'border-slate-900 bg-slate-950/45 text-slate-400 hover:border-slate-800 hover:text-slate-200'
-                  }`}
-                >
-                  <span className={`shrink-0 ${style.text}`}>{style.icon}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-rajdhani text-sm font-semibold">{node.label}</span>
-                    <span className="font-mono-sc text-[9px] uppercase tracking-wider text-slate-600">
-                      {summary ? `${summary.objects} objects · ${summary.planets} planets · ${summary.stations} hubs` : `${style.label} · ${node.systemCode}`}
-                    </span>
-                  </span>
-                  {node.shopCount > 0 && <Store size={10} className="shrink-0 text-amber-400" />}
-                </button>
-              );
-            })}
+            {treeRoots
+              .filter((root) => !treeVisibleIds || treeVisibleIds.has(root.id))
+              .map((root) => (
+                <TreeRow
+                  key={root.id}
+                  node={root}
+                  depth={0}
+                  childrenByParent={childrenByParent}
+                  expanded={expanded}
+                  visibleIds={treeVisibleIds}
+                  selectedId={selectedNode?.id ?? null}
+                  onToggle={toggleExpanded}
+                  onSelect={handleTreeSelect}
+                />
+              ))}
           </div>
         </aside>
 
@@ -914,8 +1244,10 @@ export default function LocationsPage() {
           ) : (
             <Scene
               nodes={visibleNodes.length ? visibleNodes : allNodes}
+              jumpLinks={jumpLinkPairs}
               selectedId={selectedNode?.id ?? null}
-              focusSelected={viewMode === 'system'}
+              highlightId={currentRoot?.id ?? null}
+              focusSelected
               onSelect={setSelectedId}
             />
           )}
@@ -928,27 +1260,101 @@ export default function LocationsPage() {
         </main>
 
         <AnimatePresence mode="wait">
-          {selectedNode && (
+          {selectedNode && selectedLoc && (
             <motion.aside
               key={selectedNode.id}
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
-              className="z-20 border-t border-cyan-950/60 bg-slate-950/80 p-4 backdrop-blur lg:border-l lg:border-t-0"
+              className="z-20 flex min-h-0 flex-col overflow-y-auto border-t border-cyan-950/60 bg-slate-950/80 p-4 backdrop-blur lg:border-l lg:border-t-0"
             >
+              {selectedThumbnail && (
+                <div className="relative -mx-4 -mt-4 mb-4 h-36 shrink-0 overflow-hidden border-b border-cyan-950/60">
+                  <img src={selectedThumbnail} alt={selectedNode.label} className="h-full w-full object-cover" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/35 to-transparent" />
+                </div>
+              )}
+
               <div className="mb-4">
                 <div className="mb-3 flex items-center justify-between gap-3">
-                  <span className={`inline-flex items-center gap-1 rounded-sm border px-2 py-1 font-mono-sc text-[10px] uppercase tracking-widest ${typeStyle(selectedNode.loc.type).accent} ${typeStyle(selectedNode.loc.type).text}`}>
-                    {typeStyle(selectedNode.loc.type).icon}
-                    {typeStyle(selectedNode.loc.type).label}
+                  <span className={`inline-flex items-center gap-1 rounded-sm border px-2 py-1 font-mono-sc text-[10px] uppercase tracking-widest ${typeStyle(selectedLoc.type).accent} ${typeStyle(selectedLoc.type).text}`}>
+                    {typeStyle(selectedLoc.type).icon}
+                    {typeStyle(selectedLoc.type).label}
                   </span>
                   <span className="font-mono-sc text-[10px] uppercase tracking-widest text-cyan-700">{selectedNode.systemCode}</span>
                 </div>
                 <h2 className="font-orbitron text-xl font-bold uppercase tracking-wider text-slate-100">{selectedNode.label}</h2>
-                {selectedNode.loc.rsi_starmap?.system_name && (
-                  <p className="mt-1 text-xs text-slate-600">{selectedNode.loc.rsi_starmap.system_name}</p>
+                {selectedLoc.rsi_starmap?.system_name && (
+                  <p className="mt-1 text-xs text-slate-600">{selectedLoc.rsi_starmap.system_name}</p>
+                )}
+                {selectedFaction && (
+                  <span
+                    className="mt-2 inline-flex items-center gap-1.5 rounded-sm border px-2 py-1 font-mono-sc text-[10px] uppercase tracking-widest"
+                    style={{
+                      borderColor: `${factionHex(selectedFaction)}66`,
+                      backgroundColor: `${factionHex(selectedFaction)}14`,
+                      color: factionHex(selectedFaction),
+                    }}
+                  >
+                    <span className="size-1.5 rounded-full" style={{ backgroundColor: factionHex(selectedFaction) }} />
+                    {selectedFaction}
+                  </span>
                 )}
               </div>
+
+              {selectedLoc.description && (
+                <div className="mb-4 max-h-32 shrink-0 overflow-y-auto pr-1">
+                  <p className="text-xs leading-relaxed text-slate-400">{selectedLoc.description}</p>
+                </div>
+              )}
+
+              <div className="sci-panel mb-4 p-3">
+                <StatBar
+                  icon={<Users size={10} />}
+                  label="Population"
+                  value={selectedLoc.population ?? toNumber(selectedLoc.aggregated?.population)}
+                  color="#22d3ee"
+                />
+                <StatBar
+                  icon={<Activity size={10} />}
+                  label="Economy"
+                  value={selectedLoc.economy ?? toNumber(selectedLoc.aggregated?.economy)}
+                  color="#34d399"
+                />
+                <StatBar
+                  icon={<ShieldAlert size={10} />}
+                  label="Danger"
+                  value={selectedLoc.danger ?? toNumber(selectedLoc.aggregated?.danger)}
+                  color="#f87171"
+                />
+              </div>
+
+              {(selectedLoc.star_type || (hzInner != null && hzOuter != null)) && (
+                <div className="sci-panel mb-4 p-3">
+                  <DetailRow label="Star type" value={selectedLoc.star_type} />
+                  <DetailRow label="Habitable zone" value={hzInner != null && hzOuter != null ? `${hzInner} – ${hzOuter} AU` : null} />
+                </div>
+              )}
+
+              {currentSystemSummary && (
+                <div className="mb-4 grid grid-cols-3 gap-2">
+                  <InfoTile
+                    icon={<Globe2 size={12} />}
+                    label="Planets"
+                    value={toNumber(aggregated?.planets) ?? currentSystemSummary.planets}
+                  />
+                  <InfoTile
+                    icon={<CircleDot size={12} />}
+                    label="Moons"
+                    value={toNumber(aggregated?.moons) ?? currentSystemSummary.moons}
+                  />
+                  <InfoTile
+                    icon={<Building2 size={12} />}
+                    label="Stations"
+                    value={toNumber(aggregated?.stations) ?? currentSystemSummary.stations}
+                  />
+                </div>
+              )}
 
               <div className="mb-4 grid grid-cols-3 gap-2">
                 <Metric label="X" value={selectedNode.position.x.toFixed(1)} />
@@ -956,28 +1362,31 @@ export default function LocationsPage() {
                 <Metric label="Z" value={selectedNode.position.z.toFixed(1)} />
               </div>
 
-              {currentSystemSummary && (
-                <div className="mb-4 grid grid-cols-2 gap-2">
-                  <InfoTile icon={<Globe2 size={12} />} label="Objects" value={currentSystemSummary.objects} />
-                  <InfoTile icon={<ShieldAlert size={12} />} label="Danger" value={currentSystemSummary.danger ?? 'N/A'} />
-                  <InfoTile icon={<Activity size={12} />} label="Economy" value={currentSystemSummary.economy ?? 'N/A'} />
-                  <InfoTile icon={<Store size={12} />} label="Ports" value={currentSystemSummary.stations} />
-                </div>
-              )}
-
               <div className="sci-panel p-3">
-                <DetailRow label="Class" value={selectedNode.loc.class_name} />
-                <DetailRow label="RSI status" value={selectedNode.loc.rsi_starmap?.status} />
-                <DetailRow label="Faction" value={selectedNode.loc.rsi_starmap?.faction_name} />
-                <DetailRow label="Scannable" value={selectedNode.loc.is_scannable ? 'Yes' : 'No'} />
+                <DetailRow label="Class" value={selectedLoc.class_name} />
+                <DetailRow label="RSI status" value={selectedLoc.rsi_starmap?.status} />
+                <DetailRow label="Scannable" value={selectedLoc.is_scannable ? 'Yes' : 'No'} />
                 <DetailRow label="Shops" value={selectedNode.shopCount || null} />
-                <DetailRow label="Population" value={selectedNode.loc.aggregated?.population} />
-                <DetailRow label="Danger" value={selectedNode.loc.aggregated?.danger} />
-                <DetailRow label="Economy" value={selectedNode.loc.aggregated?.economy} />
               </div>
 
-              {selectedNode.loc.description && (
-                <p className="mt-4 text-sm leading-relaxed text-slate-400">{selectedNode.loc.description}</p>
+              {selectedJumpLinks.length > 0 && (
+                <div className="mt-4">
+                  <p className="mb-2 font-orbitron text-[10px] uppercase tracking-widest text-slate-600">Jump connections</p>
+                  <div className="space-y-1">
+                    {selectedJumpLinks.map((jump) => (
+                      <button
+                        key={jump.target.id}
+                        type="button"
+                        onClick={() => navigateToSystem(jump.target)}
+                        className="flex w-full items-center gap-2 rounded-sm border border-slate-900 bg-slate-950/45 px-2 py-2 text-left text-slate-400 transition-colors hover:border-purple-800/60 hover:text-purple-200"
+                      >
+                        <Route size={11} className="shrink-0 text-purple-400" />
+                        <span className="min-w-0 flex-1 truncate font-rajdhani text-sm font-semibold">{jump.target.label}</span>
+                        <span className="font-mono-sc text-[9px] uppercase text-slate-700">{jump.status ?? jump.target.systemCode}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               )}
 
               {selectedChildren.length > 0 && (
@@ -1057,6 +1466,34 @@ function InfoTile({ icon, label, value }: { icon: React.ReactNode; label: string
         {label}
       </p>
       <p className="mt-1 font-orbitron text-sm text-slate-200">{value}</p>
+    </div>
+  );
+}
+
+function StatBar({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number | null; color: string }) {
+  const clamped = value == null ? null : Math.max(0, Math.min(10, value));
+  const segments = Array.from({ length: 10 }, (_, index) => ({
+    key: `${label}-${index}`,
+    filled: clamped != null && index < Math.round(clamped),
+  }));
+  return (
+    <div className="py-1.5">
+      <div className="mb-1 flex items-center justify-between">
+        <span className="flex items-center gap-1 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+          <span className="text-cyan-500">{icon}</span>
+          {label}
+        </span>
+        <span className="font-orbitron text-[10px] text-slate-300">{clamped == null ? 'N/A' : clamped.toFixed(1)}</span>
+      </div>
+      <div className="flex h-1.5 gap-0.5">
+        {segments.map((segment) => (
+          <span
+            key={segment.key}
+            className="flex-1 rounded-[1px]"
+            style={{ backgroundColor: segment.filled ? color : 'rgba(30,41,59,0.85)' }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
