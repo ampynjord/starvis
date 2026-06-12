@@ -56,8 +56,18 @@ export const DISCORD_BOT_COMMANDS: DiscordBotCommand[] = [
   { name: 'status', description: 'Starvis status for API and database.', usage: '/status', category: 'System' },
 ];
 
+export const DEFAULT_DISCORD_GUILD_ID = '931662690101895198';
+
 export function getDiscordClientId() {
   return (process.env.NEXT_PUBLIC_DISCORD_CLIENT_ID ?? process.env.DISCORD_CLIENT_ID ?? '').trim();
+}
+
+export function getDiscordGuildId() {
+  return (process.env.NEXT_PUBLIC_DISCORD_GUILD_ID ?? process.env.DISCORD_GUILD_ID ?? DEFAULT_DISCORD_GUILD_ID).trim();
+}
+
+export function getDiscordServerInviteUrl() {
+  return (process.env.NEXT_PUBLIC_DISCORD_SERVER_INVITE_URL ?? process.env.DISCORD_SERVER_INVITE_URL ?? '').trim();
 }
 
 export function buildDiscordInviteUrl(clientId: string) {

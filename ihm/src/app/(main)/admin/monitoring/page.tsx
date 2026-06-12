@@ -86,7 +86,9 @@ interface Snapshot {
 interface DiscordBotStatus {
   configured: boolean;
   clientId: string | null;
+  guildId: string | null;
   inviteUrl: string | null;
+  serverInviteUrl: string | null;
   commandCount: number;
   commands: Array<{ name: string; category: string; description: string }>;
 }
@@ -232,7 +234,19 @@ const STATUS_FAMILY_STYLE: Record<string, string> = {
 
 // ── Sub-components ───────────────────────────────────────────────────────────
 
-function ServiceBadge({ label, ok, icon: Icon }: { label: string; ok: boolean | null; icon: React.ElementType }) {
+function ServiceBadge({
+  label,
+  ok,
+  icon: Icon,
+  okText = 'ONLINE',
+  downText = 'DOWN',
+}: {
+  label: string;
+  ok: boolean | null;
+  icon: React.ElementType;
+  okText?: string;
+  downText?: string;
+}) {
   const style = ok === null
     ? 'border-slate-700/50 text-slate-500'
     : ok
@@ -243,7 +257,7 @@ function ServiceBadge({ label, ok, icon: Icon }: { label: string; ok: boolean | 
       <Icon size={14} />
       <span className="font-orbitron text-[10px] font-bold uppercase tracking-widest">{label}</span>
       <span className={`ml-auto h-2 w-2 rounded-full ${ok === null ? 'bg-slate-600' : ok ? 'bg-emerald-400 animate-pulse' : 'bg-rose-500'}`} />
-      <span className="font-mono-sc text-[10px]">{ok === null ? 'UNKNOWN' : ok ? 'ONLINE' : 'DOWN'}</span>
+      <span className="font-mono-sc text-[10px]">{ok === null ? 'UNKNOWN' : ok ? okText : downText}</span>
     </div>
   );
 }
@@ -364,7 +378,13 @@ export default function AdminMonitoringPage() {
         <ServiceBadge label="API" ok={apiOk} icon={Server} />
         <ServiceBadge label="PostgreSQL" ok={snapshot?.ready?.checks.database ?? null} icon={Database} />
         <ServiceBadge label="Redis" ok={snapshot?.ready?.checks.redis ?? (snapshot?.cache?.connected ?? null)} icon={Zap} />
-        <ServiceBadge label="Discord bot" ok={discordBot ? discordBot.configured : null} icon={Bot} />
+        <ServiceBadge
+          label="Discord bot"
+          ok={discordBot ? discordBot.configured : null}
+          icon={Bot}
+          okText="CONFIGURED"
+          downText="MISSING"
+        />
       </div>
 
       {/* Runtime stats */}
@@ -405,11 +425,19 @@ export default function AdminMonitoringPage() {
             {discordBot?.clientId && (
               <p className="mt-1 font-mono-sc text-[10px] text-slate-600">Client ID {discordBot.clientId}</p>
             )}
+            {discordBot?.guildId && (
+              <p className="mt-1 font-mono-sc text-[10px] text-slate-600">Official server {discordBot.guildId}</p>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link href="/discord" className="rounded-sm border border-slate-800 px-3 py-2 font-mono-sc text-xs text-slate-400 hover:border-cyan-800/70 hover:text-cyan-300">
               Command help
             </Link>
+            {discordBot?.serverInviteUrl && (
+              <a href={discordBot.serverInviteUrl} target="_blank" rel="noreferrer" className="rounded-sm border border-cyan-900/70 px-3 py-2 font-mono-sc text-xs text-cyan-300 hover:border-cyan-500 hover:text-cyan-100">
+                Join server
+              </a>
+            )}
             {discordBot?.inviteUrl && (
               <a href={discordBot.inviteUrl} target="_blank" rel="noreferrer" className="sci-btn-primary px-3 py-2 text-xs">
                 Invite bot
