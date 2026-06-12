@@ -85,7 +85,16 @@ export async function saveMiningData(ctx: PersistContext): Promise<{ elements: n
   for (const comp of compositions) {
     for (const part of comp.parts) {
       if (elementUuidSet.has(part.elementUuid)) {
-        partRows.push([env, env, comp.uuid, part.elementUuid, part.minPercentage, part.maxPercentage, part.probability, part.curveExponent]);
+        partRows.push([
+          env,
+          env,
+          comp.uuid,
+          part.elementUuid,
+          part.minPercentage,
+          part.maxPercentage,
+          part.probability,
+          part.curveExponent,
+        ]);
       }
     }
   }
