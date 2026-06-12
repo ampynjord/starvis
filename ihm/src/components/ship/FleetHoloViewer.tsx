@@ -384,8 +384,8 @@ export function FleetHoloViewer({
       const loaded = entries.filter((e) => e.loaded && e.inner);
       if (entries.length === 0 && markerEntries.length === 0) return;
       const metrics = getSceneMetrics();
-      const size = Math.max(metrics.span * 1.6, metrics.radius * 8, 80);
-      const divs = Math.min(48, Math.max(10, Math.round(size / Math.max(metrics.radius / 2, 8))));
+      const size = Math.max(metrics.span * 2.8, metrics.radius * 14, 180);
+      const divs = Math.min(96, Math.max(18, Math.round(size / Math.max(metrics.radius / 2, 8))));
 
       // Find floor Y from all loaded ships
       let minY = 0;
