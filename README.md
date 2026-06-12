@@ -252,12 +252,14 @@ Important route groups:
 | RSI content | `/galactapedia`, `/comm-links`, `/manufacturers`, `/paints`, `/factions` |
 | Account | `/login`, `/register`, `/profile`, `/my-reports`, `/report-bug` |
 | Corporation | `/corp`, `/corp/fleet`, `/corp/tactics`, `/corp/bank` |
-| Admin | `/admin`, `/admin/corporations`, `/admin/bug-reports` |
+| Admin | `/admin`, `/admin/corporations`, `/admin/bug-reports`, `/admin/monitoring` |
 | Legal | `/legal` |
 
 The browser uses same-origin `/api/*` calls. Server-side route handlers use `API_URL` to reach the Express API.
 
-Corporation tools include the 3D Fleet Manager and corporation-owned Tactics board. Fleet Manager lays spawned ships side by side by default and persists their grid positions. Tactics reuses the same 3D holographic viewer to place real corporation fleet ship models, save corporation strategies, build reusable formations, add 3D objectives/obstacles/points of interest, and draw flat movement vectors directly from selected ships or squadrons.
+Corporation tools include the 3D Fleet Manager, Corp Bank and corporation-owned Tactics board. Fleet Manager lays spawned ships side by side by default and persists their grid positions. Corp Bank lets members declare shared components, items, commodities and custom entries; owners and corporation leaders can edit or remove entries. Tactics reuses the same 3D holographic viewer to place real corporation fleet ship models, save corporation strategies, build reusable formations, add 3D objectives/obstacles/points of interest, and draw flat movement vectors directly from selected ships or squadrons.
+
+Admin Monitoring combines service health, Prometheus traffic metrics, cache/runtime stats, top routes and the latest in-memory API request logs. Request logs are kept only since the API process started and deliberately exclude request bodies, query values and emails.
 
 ---
 
@@ -267,7 +269,7 @@ Corporation tools include the 3D Fleet Manager and corporation-owned Tactics boa
 |---|---|
 | `user` | Public data and account features. |
 | `beta_tester` | Early access tools and API token generation. |
-| `admin` | Admin UI, user management, corporation moderation and full operational access. |
+| `admin` | Admin UI, user management, user/corporation fleet and bank management, corporation moderation, monitoring and full operational access. |
 
 Roles are managed through the admin UI or `PUT /admin/users/:id/role`.
 

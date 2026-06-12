@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Building2, Check, Package, ShieldCheck, Ship, Users } from 'lucide-react';
+import { ArrowLeft, Building2, Check, Package, ShieldCheck, Ship, Trash2, Users } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
@@ -110,6 +110,16 @@ export default function AdminCorporationDetailPage() {
     }
   };
 
+  const removeAsset = async (assetId: number) => {
+    setBusy(assetId);
+    try {
+      await apiFetch(`/api/admin/fleet/${assetId}`, { method: 'DELETE' });
+      setFleet((prev) => prev.filter((item) => item.id !== assetId));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   if (user?.role !== ADMIN_ROLE) return <div className="p-6 text-center text-slate-500 font-mono-sc text-sm">ACCESS DENIED - Admin role required</div>;
   if (loading) return <div className="p-8 text-center text-slate-600 font-mono-sc text-sm">Loading corporation...</div>;
   if (!corp) return <div className="p-8 text-center text-slate-600 font-mono-sc text-sm">Corporation not found.</div>;
@@ -199,6 +209,14 @@ export default function AdminCorporationDetailPage() {
               <span className="text-[10px] font-orbitron text-slate-500 uppercase w-20">{item.itemType}</span>
               <span className="text-xs font-mono-sc text-slate-300 truncate flex-1">{item.itemClassName}</span>
               <span className="text-[10px] text-slate-600 font-mono-sc">x{item.quantity}</span>
+              <button
+                type="button"
+                disabled={busy === item.id}
+                onClick={() => removeAsset(item.id)}
+                className="p-1 text-slate-700 transition-colors hover:text-red-500 disabled:opacity-40"
+              >
+                <Trash2 size={12} />
+              </button>
             </div>
           ))}
         </div>

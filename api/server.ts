@@ -28,6 +28,7 @@ import { createRoutes } from './src/routes/index.js';
 import { verifyAuthToken } from './src/services/auth-service.js';
 import { GameDataService } from './src/services/game-data-service.js';
 import { redis } from './src/services/redis.js';
+import { recordRequestLog } from './src/services/request-log-service.js';
 import { RsiWebsiteService } from './src/services/rsi-website-service.js';
 import { ShipMatrixService } from './src/services/ship-matrix-service.js';
 import { AUTH_COOKIE_NAME, DEVELOPER_ACCESS_ROLES } from './src/utils/config.js';
@@ -129,6 +130,7 @@ app.use((req, res, next) => {
   res.on('finish', () => {
     const ms = Date.now() - start;
     const status = res.statusCode;
+    recordRequestLog(req, status, ms);
     const color = status >= 400 ? 'warn' : 'info';
     logger[color](`${req.method} ${req.path} → ${status}`, { module: 'HTTP', duration: `${ms}ms` });
   });

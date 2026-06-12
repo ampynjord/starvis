@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Building2,
+  Pencil,
   Loader2,
   Package,
   Plus,
@@ -34,15 +35,10 @@ interface BankItem {
 interface Corp { id: number; name: string; tag: string }
 
 const ITEM_TYPES = [
-  { value: 'armor',      label: 'Armor',            color: 'text-blue-400',   bg: 'bg-blue-950/30 border-blue-800/40' },
-  { value: 'clothing',   label: 'Clothing',          color: 'text-pink-400',   bg: 'bg-pink-950/30 border-pink-800/40' },
-  { value: 'weapon',     label: 'Weapon',            color: 'text-red-400',    bg: 'bg-red-950/30 border-red-800/40' },
-  { value: 'utility',    label: 'Utility',           color: 'text-green-400',  bg: 'bg-green-950/30 border-green-800/40' },
-  { value: 'ammo',       label: 'Ammo',              color: 'text-amber-400',  bg: 'bg-amber-950/30 border-amber-800/40' },
-  { value: 'vehicle',    label: 'Vehicle Equipment', color: 'text-cyan-400',   bg: 'bg-cyan-950/30 border-cyan-800/40' },
-  { value: 'sustenance', label: 'Sustenance',        color: 'text-orange-400', bg: 'bg-orange-950/30 border-orange-800/40' },
-  { value: 'container',  label: 'Container',         color: 'text-violet-400', bg: 'bg-violet-950/30 border-violet-800/40' },
-  { value: 'other',      label: 'Other',             color: 'text-slate-400',  bg: 'bg-slate-800/30 border-slate-700/40' },
+  { value: 'component', label: 'Component', color: 'text-cyan-400',   bg: 'bg-cyan-950/30 border-cyan-800/40' },
+  { value: 'item',      label: 'Item',      color: 'text-violet-400', bg: 'bg-violet-950/30 border-violet-800/40' },
+  { value: 'commodity', label: 'Commodity', color: 'text-amber-400',  bg: 'bg-amber-950/30 border-amber-800/40' },
+  { value: 'other',     label: 'Other',     color: 'text-slate-400',  bg: 'bg-slate-800/30 border-slate-700/40' },
 ] as const;
 
 type ItemTypeValue = (typeof ITEM_TYPES)[number]['value'];
@@ -53,7 +49,7 @@ function AddItemModal({ onClose, onAdd }: {
   onClose: () => void;
   onAdd: (data: { itemType: ItemTypeValue; itemClassName: string; quantity: number; notes: string }) => void;
 }) {
-  const [itemType, setItemType] = useState<ItemTypeValue>('vehicle');
+  const [itemType, setItemType] = useState<ItemTypeValue>('component');
   const [className, setClassName] = useState('');
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
@@ -75,14 +71,9 @@ function AddItemModal({ onClose, onAdd }: {
     setSearching(true);
     try {
       const endpointMap: Record<string, string> = {
-        armor:      `/api/v1/items/category/armor?search=${encodeURIComponent(q)}&limit=8`,
-        clothing:   `/api/v1/items/category/clothing?search=${encodeURIComponent(q)}&limit=8`,
-        weapon:     `/api/v1/items/category/weapons?search=${encodeURIComponent(q)}&limit=8`,
-        utility:    `/api/v1/items/category/utility?search=${encodeURIComponent(q)}&limit=8`,
-        ammo:       `/api/v1/items/category/ammo?search=${encodeURIComponent(q)}&limit=8`,
-        vehicle:    `/api/v1/components?search=${encodeURIComponent(q)}&limit=8`,
-        sustenance: `/api/v1/items/category/sustenance?search=${encodeURIComponent(q)}&limit=8`,
-        container:  `/api/v1/commodities?search=${encodeURIComponent(q)}&limit=8`,
+        component: `/api/v1/components?search=${encodeURIComponent(q)}&limit=8`,
+        item: `/api/v1/items?search=${encodeURIComponent(q)}&limit=8`,
+        commodity: `/api/v1/commodities?search=${encodeURIComponent(q)}&limit=8`,
       };
       const endpoint = endpointMap[itemType];
       if (endpoint) {
@@ -226,7 +217,46 @@ function AddItemModal({ onClose, onAdd }: {
 
 // ── Item row ──────────────────────────────────────────────────────────────────
 
-function ItemRow({ item, onRemove, canRemove }: { item: BankItem; onRemove: () => void; canRemove: boolean }) {
+function EditItemModal({ item, onClose, onSave }: {
+  item: BankItem;
+  onClose: () => void;
+  onSave: (id: number, data: { itemType: ItemTypeValue; itemClassName: string; quantity: number; notes: string }) => void;
+}) {
+  const [itemType, setItemType] = useState<ItemTypeValue>(ITEM_TYPES.some((t) => t.value === item.itemType) ? item.itemType as ItemTypeValue : 'other');
+  const [itemClassName, setItemClassName] = useState(item.itemClassName);
+  const [quantity, setQuantity] = useState(item.quantity);
+  const [notes, setNotes] = useState(item.notes ?? '');
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }} className="relative w-full max-w-md sci-panel border border-border/80 p-4">
+        <div className="mb-3 flex items-center justify-between border-b border-border/50 pb-3">
+          <span className="font-orbitron text-xs font-bold uppercase tracking-widest text-slate-300">Edit bank item</span>
+          <button type="button" onClick={onClose} className="text-slate-600 hover:text-slate-300"><X size={16} /></button>
+        </div>
+        <div className="space-y-3">
+          <select value={itemType} onChange={(event) => setItemType(event.target.value as ItemTypeValue)} className="sci-input w-full">
+            {ITEM_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
+          </select>
+          <input value={itemClassName} onChange={(event) => setItemClassName(event.target.value)} className="sci-input w-full font-mono-sc text-xs" />
+          <input type="number" min={1} value={quantity} onChange={(event) => setQuantity(Math.max(1, Number(event.target.value)))} className="sci-input w-full" />
+          <input value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Notes..." className="sci-input w-full text-sm" />
+          <button
+            type="button"
+            onClick={() => onSave(item.id, { itemType, itemClassName: itemClassName.trim(), quantity, notes })}
+            disabled={!itemClassName.trim()}
+            className="sci-btn-primary w-full py-2 text-xs disabled:opacity-40"
+          >
+            Save item
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
+function ItemRow({ item, onRemove, onEdit, canManage }: { item: BankItem; onRemove: () => void; onEdit: () => void; canManage: boolean }) {
   const typeStyle = ITEM_TYPES.find((t) => t.value === item.itemType) ?? ITEM_TYPES[3];
   return (
     <div className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors">
@@ -245,7 +275,16 @@ function ItemRow({ item, onRemove, canRemove }: { item: BankItem; onRemove: () =
           <p className="text-[10px] text-slate-700 mt-0.5 font-mono-sc">by {item.addedBy.username}</p>
         )}
       </div>
-      {canRemove && (
+      {canManage && (
+        <button
+          type="button"
+          onClick={onEdit}
+          className="p-1.5 rounded border border-transparent hover:border-cyan-800/50 hover:bg-cyan-950/20 text-slate-700 hover:text-cyan-500 transition-colors"
+        >
+          <Pencil size={13} />
+        </button>
+      )}
+      {canManage && (
         <button
           type="button"
           onClick={onRemove}
@@ -266,8 +305,11 @@ export default function CorpBankPage() {
   const [items, setItems] = useState<BankItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingItem, setEditingItem] = useState<BankItem | null>(null);
   const [filter, setFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
+  const [canManageBank, setCanManageBank] = useState(false);
+  const [error, setError] = useState('');
 
   const loadBank = useCallback(async () => {
     setLoading(true);
@@ -277,6 +319,7 @@ export default function CorpBankPage() {
       if (!res.ok) { setLoading(false); return; }
       setCorp(data.corporation ?? null);
       setItems(data.data ?? []);
+      setCanManageBank(Boolean(data.canManage));
     } finally {
       setLoading(false);
     }
@@ -286,20 +329,48 @@ export default function CorpBankPage() {
 
   const handleAdd = async (data: { itemType: ItemTypeValue; itemClassName: string; quantity: number; notes: string }) => {
     try {
+      setError('');
       const res = await fetch('/api/corp/bank', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
       });
-      if (res.ok) { await loadBank(); setShowAddModal(false); }
-    } catch {}
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? 'Failed to add item');
+      await loadBank();
+      setShowAddModal(false);
+    } catch (e: any) {
+      setError(e.message);
+    }
   };
 
   const handleRemove = async (id: number) => {
     try {
-      await fetch(`/api/corp/bank/${id}`, { method: 'DELETE' });
+      setError('');
+      const res = await fetch(`/api/corp/bank/${id}`, { method: 'DELETE' });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? 'Failed to remove item');
       setItems((prev) => prev.filter((i) => i.id !== id));
-    } catch {}
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
+  const handleUpdate = async (id: number, data: { itemType: ItemTypeValue; itemClassName: string; quantity: number; notes: string }) => {
+    try {
+      setError('');
+      const res = await fetch(`/api/corp/bank/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error ?? 'Failed to update item');
+      await loadBank();
+      setEditingItem(null);
+    } catch (e: any) {
+      setError(e.message);
+    }
   };
 
   if (!user) return (
@@ -359,6 +430,7 @@ export default function CorpBankPage() {
             <StatCard key={t.value} label={t.label} value={countByType[t.value] ?? 0} />
           ))}
         </StatGrid>
+        {error && <div className="rounded-sm border border-red-800/50 bg-red-950/20 px-3 py-2 font-mono-sc text-xs text-red-400">{error}</div>}
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-2">
@@ -416,7 +488,8 @@ export default function CorpBankPage() {
                   key={item.id}
                   item={item}
                   onRemove={() => handleRemove(item.id)}
-                  canRemove={item.addedBy?.id === user?.id}
+                  onEdit={() => setEditingItem(item)}
+                  canManage={canManageBank || item.addedBy?.id === user?.id}
                 />
               ))}
             </div>
@@ -427,6 +500,9 @@ export default function CorpBankPage() {
       <AnimatePresence>
         {showAddModal && (
           <AddItemModal onClose={() => setShowAddModal(false)} onAdd={handleAdd} />
+        )}
+        {editingItem && (
+          <EditItemModal item={editingItem} onClose={() => setEditingItem(null)} onSave={handleUpdate} />
         )}
       </AnimatePresence>
     </>

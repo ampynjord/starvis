@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import {
+  Activity,
   BookOpen,
   Bug,
   Building2,
@@ -169,6 +170,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
               { to: '/admin',              icon: Shield,    label: 'Users',         exact: true },
               { to: '/admin/corporations', icon: Building2, label: 'Corporations' },
               { to: '/admin/bug-reports',  icon: Bug,       label: 'Bug Reports' },
+              { to: '/admin/monitoring',    icon: Activity,  label: 'Monitoring' },
             ]}
             onNavigate={onClose}
           />

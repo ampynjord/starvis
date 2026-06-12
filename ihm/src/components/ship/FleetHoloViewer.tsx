@@ -74,6 +74,12 @@ const MIN_SHIP_GAP   = 8;
 const SHIP_GAP_RATIO = 0.18;
 const FLEET_MODEL_FRONT_ROTATION_Y = Math.PI;
 
+interface CameraViewState {
+  position: THREE.Vector3;
+  target: THREE.Vector3;
+  userHasMoved: boolean;
+}
+
 export function FleetHoloViewer({
   ships,
   selectedId,
@@ -105,6 +111,7 @@ export function FleetHoloViewer({
   const onVectorChangeRef = useRef(onVectorChange);
   const onVectorCreateRef = useRef(onVectorCreate);
   const onGroupPositionChangeRef = useRef(onGroupPositionChange);
+  const cameraViewRef = useRef<CameraViewState | null>(null);
   const [loadedCount, setLoadedCount] = useState(0);
   const shipsKey = ships
     .map((ship) => [ship.id, ship.shipUuid, ship.ctmUrl ?? '', ship.group ?? ''].join(':'))
@@ -162,7 +169,21 @@ export function FleetHoloViewer({
     controls.autoRotate = false;
     controls.autoRotateSpeed = 0.3;
     controls.enablePan = true;
-    let userHasMovedView = false;
+    const savedView = cameraViewRef.current;
+    if (savedView) {
+      camera.position.copy(savedView.position);
+      controls.target.copy(savedView.target);
+      controls.update();
+    }
+    let userHasMovedView = savedView?.userHasMoved ?? false;
+    const saveCameraView = () => {
+      cameraViewRef.current = {
+        position: camera.position.clone(),
+        target: controls.target.clone(),
+        userHasMoved: userHasMovedView,
+      };
+    };
+    controls.addEventListener('change', saveCameraView);
     const visibility = createVisibilityTracker(container);
 
     // ── Per-ship state ─────────────────────────────────────────────────────────
@@ -364,7 +385,7 @@ export function FleetHoloViewer({
       const control = new THREE.Vector3(vector.controlX, 0.55, vector.controlZ);
       const end = new THREE.Vector3(vector.endX, 0.55, vector.endZ);
       const curve = new THREE.QuadraticBezierCurve3(start, control, end);
-      const mat = new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.82, side: THREE.DoubleSide });
+      const mat = new THREE.MeshBasicMaterial({ color: 0x34d399, transparent: true, opacity: 0.82, side: THREE.DoubleSide, depthTest: false });
       const tube = new THREE.Mesh(new THREE.TubeGeometry(curve, 32, 0.35, 6, false), mat);
       tube.userData.tacticalVectorId = vector.id;
       const direction = end.clone().sub(control);
@@ -374,12 +395,12 @@ export function FleetHoloViewer({
       head.position.y = 0.8;
       head.rotation.set(Math.PI / 2, 0, -angle);
       head.userData.tacticalVectorId = vector.id;
-      const endHandle = new THREE.Mesh(new THREE.SphereGeometry(4.2, 16, 12), new THREE.MeshBasicMaterial({ color: 0xa7f3d0, transparent: true, opacity: 0.92 }));
+      const endHandle = new THREE.Mesh(new THREE.SphereGeometry(5.8, 16, 12), new THREE.MeshBasicMaterial({ color: 0xa7f3d0, transparent: true, opacity: 0.96, depthTest: false }));
       endHandle.position.copy(end);
       endHandle.position.y = 2;
       endHandle.userData.tacticalVectorId = vector.id;
       endHandle.userData.vectorHandle = 'end';
-      const curveHandle = new THREE.Mesh(new THREE.TorusGeometry(5.0, 0.7, 8, 28), new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0.85 }));
+      const curveHandle = new THREE.Mesh(new THREE.TorusGeometry(7.2, 0.9, 8, 32), new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0.95, depthTest: false }));
       curveHandle.position.copy(control);
       curveHandle.position.y = 1.5;
       curveHandle.rotation.x = -Math.PI / 2;
@@ -478,22 +499,22 @@ export function FleetHoloViewer({
         const distance = Math.max(entry.radius * 1.1, 14);
         root.position.set(entry.root.position.x, 3, entry.root.position.z - distance);
         root.visible = false;
-        const material = new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0.95, side: THREE.DoubleSide });
+        const material = new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0.95, side: THREE.DoubleSide, depthTest: false });
         const halo = new THREE.Mesh(
-          new THREE.TorusGeometry(5.6, 0.38, 8, 36),
+          new THREE.TorusGeometry(8.5, 0.65, 8, 40),
           material.clone(),
         );
         halo.rotation.x = -Math.PI / 2;
         halo.userData.vectorLauncherShipId = entry.ship.id;
         const arrow = new THREE.Mesh(
-          new THREE.ConeGeometry(4.6, 10, 3),
+          new THREE.ConeGeometry(6.8, 14, 3),
           material,
         );
         arrow.rotation.x = -Math.PI / 2;
-        arrow.position.z = -2.5;
+        arrow.position.z = -4;
         arrow.userData.vectorLauncherShipId = entry.ship.id;
-        const stem = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 8), material.clone());
-        stem.position.z = 3.5;
+        const stem = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 12), material.clone());
+        stem.position.z = 5;
         stem.userData.vectorLauncherShipId = entry.ship.id;
         root.add(halo, arrow, stem);
         scene.add(root);
@@ -518,6 +539,7 @@ export function FleetHoloViewer({
       controls.minDistance = metrics.radius * 0.3;
       controls.maxDistance = dist * 10;
       controls.update();
+      saveCameraView();
     };
 
     // ── Load CTM models ────────────────────────────────────────────────────────
@@ -841,6 +863,11 @@ export function FleetHoloViewer({
       controls.enabled = true;
       if (!isDragging && dragTarget) {
         if (dragTarget.kind === 'ship') onSelectRef.current(dragTarget.entry.ship.id);
+        if (dragTarget.kind === 'group') {
+          const groupName = dragTarget.group;
+          const firstShip = entries.find((entry) => entry.ship.group === groupName);
+          if (firstShip) onSelectRef.current(firstShip.ship.id);
+        }
         if (dragTarget.kind === 'marker') onMarkerSelectRef.current?.(dragTarget.entry.marker.id);
         if (dragTarget.kind === 'vector-handle') onVectorSelectRef.current?.(dragTarget.entry.vector.id);
         if (dragTarget.kind === 'vector-launcher') {
@@ -900,6 +927,7 @@ export function FleetHoloViewer({
           });
         }
       }
+      saveCameraView();
       dragTarget = null;
     };
 
@@ -1050,6 +1078,8 @@ export function FleetHoloViewer({
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       renderer.domElement.removeEventListener('pointerup',   onPointerUp);
       renderer.domElement.removeEventListener('wheel', preventPageWheel);
+      saveCameraView();
+      controls.removeEventListener('change', saveCameraView);
       controls.dispose();
       holoMat.dispose();
       disposeObject3D(scene);

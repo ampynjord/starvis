@@ -12,6 +12,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Ship,
   Trash2,
   UserCheck,
   X,
@@ -28,6 +29,18 @@ import { ADMIN_ROLE, DEVELOPER_ROLE, USER_ROLE, USER_ROLES } from '@/lib/app-con
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type Role = (typeof USER_ROLES)[number];
+
+interface AdminFleetItem {
+  id: number;
+  corporationId: number | null;
+  itemType: string;
+  itemClassName: string;
+  shipUuid?: string | null;
+  quantity: number;
+  notes: string | null;
+  addedAt: string;
+  corporation?: { id: number; name: string; tag: string } | null;
+}
 
 const ROLES = [...USER_ROLES];
 
@@ -488,6 +501,104 @@ function CorpModal({ target, onClose }: { target: AuthUser; onClose: () => void 
   );
 }
 
+function UserFleetModal({ target, onClose }: { target: AuthUser; onClose: () => void }) {
+  const [items, setItems] = useState<AdminFleetItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState<number | null>(null);
+  const [editing, setEditing] = useState<AdminFleetItem | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await apiFetch(`/api/admin/users/${target.id}/fleet`);
+      setItems(data.data ?? []);
+    } finally {
+      setLoading(false);
+    }
+  }, [target.id]);
+
+  useEffect(() => { void load(); }, [load]);
+
+  const remove = async (id: number) => {
+    setBusy(id);
+    try {
+      await apiFetch(`/api/admin/fleet/${id}`, { method: 'DELETE' });
+      setItems((prev) => prev.filter((item) => item.id !== id));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const save = async () => {
+    if (!editing) return;
+    setBusy(editing.id);
+    try {
+      const data = await apiFetch(`/api/admin/fleet/${editing.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          itemType: editing.itemType,
+          itemClassName: editing.itemClassName,
+          quantity: editing.quantity,
+          notes: editing.notes,
+        }),
+      });
+      setItems((prev) => prev.map((item) => (item.id === editing.id ? data.data : item)));
+      setEditing(null);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Modal title={`Fleet — ${target.username}`} onClose={onClose}>
+      <div className="space-y-3">
+        {loading ? (
+          <p className="py-4 text-center font-mono-sc text-xs text-slate-600">Loading...</p>
+        ) : items.length === 0 ? (
+          <p className="py-4 text-center font-mono-sc text-xs text-slate-600">No fleet or bank item declared by this user.</p>
+        ) : (
+          <div className="max-h-[45vh] space-y-1 overflow-y-auto pr-1">
+            {items.map((item) => (
+              <div key={item.id} className="rounded-sm border border-slate-800/60 bg-slate-950/40 px-2.5 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="w-20 shrink-0 font-orbitron text-[9px] uppercase tracking-widest text-slate-600">{item.itemType}</span>
+                  <span className="min-w-0 flex-1 truncate font-mono-sc text-xs text-slate-300">{item.itemClassName}</span>
+                  <span className="font-mono-sc text-[10px] text-slate-600">x{item.quantity}</span>
+                  <button type="button" onClick={() => setEditing(item)} className="p-1 text-slate-700 hover:text-cyan-400">
+                    <Pencil size={11} />
+                  </button>
+                  <button type="button" disabled={busy === item.id} onClick={() => remove(item.id)} className="p-1 text-slate-700 hover:text-red-500 disabled:opacity-40">
+                    <Trash2 size={11} />
+                  </button>
+                </div>
+                <p className="mt-1 truncate font-mono-sc text-[10px] text-slate-700">
+                  {item.corporation ? `[${item.corporation.tag}] ${item.corporation.name}` : 'Personal fleet'}
+                  {item.notes ? ` · ${item.notes}` : ''}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {editing && (
+          <div className="space-y-2 rounded-sm border border-cyan-900/50 bg-cyan-950/10 p-3">
+            <select value={editing.itemType} onChange={(event) => setEditing({ ...editing, itemType: event.target.value })} className="sci-input w-full text-xs">
+              {['ship', 'component', 'item', 'commodity', 'other'].map((type) => <option key={type} value={type}>{type}</option>)}
+            </select>
+            <Input value={editing.itemClassName} onChange={(event) => setEditing({ ...editing, itemClassName: event.target.value })} />
+            <Input type="number" min={1} value={editing.quantity} onChange={(event) => setEditing({ ...editing, quantity: Math.max(1, Number(event.target.value)) })} />
+            <Input value={editing.notes ?? ''} onChange={(event) => setEditing({ ...editing, notes: event.target.value || null })} placeholder="Notes" />
+            <button type="button" onClick={save} disabled={busy === editing.id || !editing.itemClassName.trim()} className="sci-btn-primary w-full py-2 text-xs disabled:opacity-40">
+              Save asset
+            </button>
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 type ModalState =
@@ -497,6 +608,7 @@ type ModalState =
   | { type: 'delete'; user: AuthUser }
   | { type: 'create' }
   | { type: 'corp'; user: AuthUser }
+  | { type: 'fleet'; user: AuthUser }
   | null;
 
 export default function AdminPage() {
@@ -693,6 +805,14 @@ export default function AdminPage() {
                     </button>
                     <button
                       type="button"
+                      onClick={() => setModal({ type: 'fleet', user: u })}
+                      title="Fleet and bank items"
+                      className="p-1.5 rounded border border-transparent hover:border-slate-700/50 hover:bg-white/5 text-slate-600 hover:text-violet-400 transition-colors"
+                    >
+                      <Ship size={13} />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => setModal({ type: 'edit', user: u })}
                       title="Edit"
                       className="p-1.5 rounded border border-transparent hover:border-slate-700/50 hover:bg-white/5 text-slate-600 hover:text-slate-300 transition-colors"
@@ -755,6 +875,7 @@ export default function AdminPage() {
         {modal?.type === 'delete'   && <DeleteModal        key="delete"   target={modal.user} onClose={() => setModal(null)} onDeleted={removeUser} />}
         {modal?.type === 'create'   && <CreateModal        key="create"                       onClose={() => setModal(null)} onCreated={addUser} />}
         {modal?.type === 'corp'     && <CorpModal          key="corp"     target={modal.user} onClose={() => setModal(null)} />}
+        {modal?.type === 'fleet'    && <UserFleetModal     key="fleet"    target={modal.user} onClose={() => setModal(null)} />}
       </AnimatePresence>
     </>
   );

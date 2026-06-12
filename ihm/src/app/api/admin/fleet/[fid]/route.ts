@@ -2,27 +2,27 @@ import { NextResponse } from 'next/server';
 import { logApiError } from '@/lib/server-logger';
 import { getAuthToken, proxyJson } from '../../../_utils/proxy';
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function PUT(req: Request, { params }: { params: Promise<{ fid: string }> }) {
   try {
-    const { id } = await params;
+    const { fid } = await params;
     const token = await getAuthToken();
     if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-    return proxyJson('DELETE', `/corp/bank/${id}`, token);
+    const body = await req.json().catch(() => ({}));
+    return proxyJson('PUT', `/admin/fleet/${fid}`, token, body);
   } catch (e: any) {
-    logApiError('corp/bank/:id DELETE', e);
+    logApiError('admin/fleet/:fid PUT', e);
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
   }
 }
 
-export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(_req: Request, { params }: { params: Promise<{ fid: string }> }) {
   try {
-    const { id } = await params;
+    const { fid } = await params;
     const token = await getAuthToken();
     if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-    const body = await req.json().catch(() => ({}));
-    return proxyJson('PUT', `/corp/bank/${id}`, token, body);
+    return proxyJson('DELETE', `/admin/fleet/${fid}`, token);
   } catch (e: any) {
-    logApiError('corp/bank/:id PUT', e);
+    logApiError('admin/fleet/:fid DELETE', e);
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
   }
 }

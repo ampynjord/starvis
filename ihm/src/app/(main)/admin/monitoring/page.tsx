@@ -10,10 +10,12 @@ import {
   Cpu,
   Database,
   Gauge,
+  Globe,
   HardDrive,
   Loader2,
   RefreshCw,
   Server,
+  User,
   Zap,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -49,6 +51,19 @@ interface RouteTraffic {
   requests: number;
   errors: number;
   avgMs: number | null;
+}
+
+interface RequestLogEntry {
+  id: number;
+  timestamp: string;
+  method: string;
+  path: string;
+  statusCode: number;
+  durationMs: number;
+  userId: number | null;
+  role: string | null;
+  ip: string | null;
+  userAgent: string | null;
 }
 
 interface Snapshot {
@@ -181,6 +196,17 @@ function fmtMs(ms: number | null) {
   return ms >= 1000 ? `${(ms / 1000).toFixed(2)} s` : `${ms.toFixed(1)} ms`;
 }
 
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function statusStyle(statusCode: number) {
+  if (statusCode >= 500) return 'border-rose-800/60 bg-rose-950/30 text-rose-300';
+  if (statusCode >= 400) return 'border-amber-800/60 bg-amber-950/30 text-amber-300';
+  if (statusCode >= 300) return 'border-cyan-800/60 bg-cyan-950/30 text-cyan-300';
+  return 'border-emerald-800/60 bg-emerald-950/30 text-emerald-300';
+}
+
 const STATUS_FAMILY_STYLE: Record<string, string> = {
   '2xx': 'bg-emerald-500/70',
   '3xx': 'bg-cyan-500/70',
@@ -213,6 +239,7 @@ const REFRESH_INTERVAL_MS = 10_000;
 export default function AdminMonitoringPage() {
   const { user: me } = useAuth();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [requestLogs, setRequestLogs] = useState<RequestLogEntry[]>([]);
   const [reqPerSec, setReqPerSec] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -225,6 +252,7 @@ export default function AdminMonitoringPage() {
         fetch('/health/cache/stats'),
         fetch('/health/metrics'),
       ]);
+      const logsPromise = fetch('/api/admin/request-logs?limit=80');
 
       const ready: ReadyState | null = readyRes.status === 'fulfilled'
         ? await readyRes.value.json().catch(() => null)
@@ -235,6 +263,11 @@ export default function AdminMonitoringPage() {
       const metricsText = metricsRes.status === 'fulfilled' && metricsRes.value.ok
         ? await metricsRes.value.text()
         : '';
+      const logsRes = await logsPromise.catch(() => null);
+      if (logsRes?.ok) {
+        const logsJson = await logsRes.json().catch(() => null);
+        setRequestLogs(Array.isArray(logsJson?.data) ? logsJson.data : []);
+      }
 
       if (!ready && !metricsText) {
         setError('API unreachable — all health endpoints failed.');
@@ -390,6 +423,73 @@ export default function AdminMonitoringPage() {
               ))}
             </tbody>
           </table>
+        )}
+      </div>
+
+      {/* Recent request logs */}
+      <div className="sci-panel border border-slate-800/60">
+        <div className="flex flex-col gap-1 border-b border-slate-800/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+            Recent request logs
+          </p>
+          <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-700">
+            Last {requestLogs.length.toLocaleString()} API requests
+          </span>
+        </div>
+        {loading && requestLogs.length === 0 ? (
+          <div className="flex items-center justify-center py-10 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
+        ) : requestLogs.length === 0 ? (
+          <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No recent request logs yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left">
+              <thead>
+                <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                  <th className="px-3 py-2 font-normal">Time</th>
+                  <th className="px-3 py-2 font-normal">Request</th>
+                  <th className="px-3 py-2 text-right font-normal">Status</th>
+                  <th className="px-3 py-2 text-right font-normal">Duration</th>
+                  <th className="px-3 py-2 font-normal">Actor</th>
+                  <th className="px-3 py-2 font-normal">Client</th>
+                </tr>
+              </thead>
+              <tbody>
+                {requestLogs.map((log) => (
+                  <tr key={log.id} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
+                    <td className="whitespace-nowrap px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtTime(log.timestamp)}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="rounded-sm border border-cyan-900/60 bg-cyan-950/20 px-1.5 py-0.5 font-mono-sc text-[10px] font-bold text-cyan-400">
+                          {log.method}
+                        </span>
+                        <span className="max-w-[24rem] truncate font-mono-sc text-xs text-slate-300">{log.path}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <span className={`inline-flex rounded-sm border px-1.5 py-0.5 font-mono-sc text-[10px] font-bold ${statusStyle(log.statusCode)}`}>
+                        {log.statusCode}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{fmtMs(log.durationMs)}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-1.5 font-mono-sc text-xs text-slate-500">
+                        <User size={11} className="text-slate-600" />
+                        {log.userId ? `${log.role ?? 'user'} #${log.userId}` : 'anonymous'}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex min-w-0 items-center gap-1.5 font-mono-sc text-xs text-slate-500">
+                        <Globe size={11} className="shrink-0 text-slate-600" />
+                        <span className="max-w-[18rem] truncate" title={log.userAgent ?? undefined}>
+                          {log.ip ?? 'unknown'}{log.userAgent ? ` · ${log.userAgent}` : ''}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
