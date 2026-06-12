@@ -491,6 +491,52 @@ export function FleetHoloViewer({
       });
     };
 
+    const makeFlatVectorRibbon = (curve: THREE.QuadraticBezierCurve3, width: number) => {
+      const points = curve.getPoints(64);
+      const vertices: number[] = [];
+      const indices: number[] = [];
+      for (let i = 0; i < points.length; i++) {
+        const prev = points[Math.max(0, i - 1)];
+        const next = points[Math.min(points.length - 1, i + 1)];
+        const tangent = next.clone().sub(prev);
+        if (tangent.lengthSq() < 0.001) tangent.set(0, 0, 1);
+        tangent.normalize();
+        const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).multiplyScalar(width / 2);
+        const left = points[i].clone().add(normal);
+        const right = points[i].clone().sub(normal);
+        vertices.push(left.x, 0.72, left.z, right.x, 0.72, right.z);
+        if (i < points.length - 1) {
+          const a = i * 2;
+          indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+        }
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      return geometry;
+    };
+
+    const makeFlatArrowHead = (end: THREE.Vector3, direction: THREE.Vector3, width: number) => {
+      const forward = direction.clone();
+      if (forward.lengthSq() < 0.001) forward.copy(TACTICAL_FRONT_DIRECTION);
+      forward.normalize();
+      const side = new THREE.Vector3(-forward.z, 0, forward.x);
+      const length = width * 2.2;
+      const back = end.clone().sub(forward.multiplyScalar(length));
+      const left = back.clone().add(side.clone().multiplyScalar(width * 0.95));
+      const right = back.clone().sub(side.clone().multiplyScalar(width * 0.95));
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+        end.x, 0.76, end.z,
+        left.x, 0.76, left.z,
+        right.x, 0.76, right.z,
+      ], 3));
+      geometry.setIndex([0, 1, 2]);
+      geometry.computeVertexNormals();
+      return geometry;
+    };
+
     const makeVectorEntry = (vector: TacticalVector): VectorEntry => {
       const root = new THREE.Group();
       const sourceEntries = vector.sourceType === 'group'
@@ -542,52 +588,6 @@ export function FleetHoloViewer({
       x: sourceEntries.length ? sourceEntries.reduce((sum, entry) => sum + entry.root.position.x, 0) / sourceEntries.length : 0,
       z: sourceEntries.length ? sourceEntries.reduce((sum, entry) => sum + entry.root.position.z, 0) / sourceEntries.length : 0,
     });
-
-    const makeFlatVectorRibbon = (curve: THREE.QuadraticBezierCurve3, width: number) => {
-      const points = curve.getPoints(64);
-      const vertices: number[] = [];
-      const indices: number[] = [];
-      for (let i = 0; i < points.length; i++) {
-        const prev = points[Math.max(0, i - 1)];
-        const next = points[Math.min(points.length - 1, i + 1)];
-        const tangent = next.clone().sub(prev);
-        if (tangent.lengthSq() < 0.001) tangent.set(0, 0, 1);
-        tangent.normalize();
-        const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).multiplyScalar(width / 2);
-        const left = points[i].clone().add(normal);
-        const right = points[i].clone().sub(normal);
-        vertices.push(left.x, 0.72, left.z, right.x, 0.72, right.z);
-        if (i < points.length - 1) {
-          const a = i * 2;
-          indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
-        }
-      }
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-      geometry.setIndex(indices);
-      geometry.computeVertexNormals();
-      return geometry;
-    };
-
-    const makeFlatArrowHead = (end: THREE.Vector3, direction: THREE.Vector3, width: number) => {
-      const forward = direction.clone();
-      if (forward.lengthSq() < 0.001) forward.copy(TACTICAL_FRONT_DIRECTION);
-      forward.normalize();
-      const side = new THREE.Vector3(-forward.z, 0, forward.x);
-      const length = width * 2.2;
-      const back = end.clone().sub(forward.multiplyScalar(length));
-      const left = back.clone().add(side.clone().multiplyScalar(width * 0.95));
-      const right = back.clone().sub(side.clone().multiplyScalar(width * 0.95));
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-        end.x, 0.76, end.z,
-        left.x, 0.76, left.z,
-        right.x, 0.76, right.z,
-      ], 3));
-      geometry.setIndex([0, 1, 2]);
-      geometry.computeVertexNormals();
-      return geometry;
-    };
 
     const vectorPayloadFromLauncher = (launcher: VectorLauncherEntry, endX: number, endZ: number): Omit<TacticalVector, 'id'> => {
       const sourceEntries = sourceEntriesForLauncher(launcher);

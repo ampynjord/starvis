@@ -28,6 +28,20 @@ interface AuthContextValue extends AuthState {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const E2E_AUTH_ENABLED = process.env.NEXT_PUBLIC_E2E_AUTH === '1';
+
+declare global {
+  interface Window {
+    __STARVIS_E2E_USER__?: AuthUser | null;
+  }
+}
+
+function getInitialAuthState(): AuthState {
+  if (E2E_AUTH_ENABLED && typeof window !== 'undefined' && window.__STARVIS_E2E_USER__ !== undefined) {
+    return { user: window.__STARVIS_E2E_USER__, loading: false };
+  }
+  return { user: null, loading: true };
+}
 
 async function readJsonSafe(res: Response): Promise<any> {
   const text = await res.text();
@@ -40,7 +54,7 @@ async function readJsonSafe(res: Response): Promise<any> {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>({ user: null, loading: true });
+  const [state, setState] = useState<AuthState>(getInitialAuthState);
 
   const refresh = useCallback(async () => {
     try {
@@ -57,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
+    if (E2E_AUTH_ENABLED && window.__STARVIS_E2E_USER__ !== undefined) return;
     refresh();
   }, [refresh]);
 

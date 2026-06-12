@@ -2,6 +2,20 @@ import { expect, test } from '@playwright/test';
 import { gotoApp } from './helpers';
 
 test('corporation tactics board adds ships and tactical markers', async ({ context, page }) => {
+  await page.addInitScript(() => {
+    window.__STARVIS_E2E_USER__ = {
+      id: 7,
+      uuid: 'user-pilot',
+      username: 'pilot',
+      email: 'pilot@example.test',
+      role: 'user',
+      avatarUrl: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      emailVerified: true,
+      twoFactorEnabled: false,
+    };
+  });
+
   await context.addCookies([
     {
       name: 'starvis_token',
