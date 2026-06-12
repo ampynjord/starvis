@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logApiError } from '@/lib/server-logger';
 import { readUpstreamJson, setSessionCookie, upstreamUrl } from '../../_utils/proxy';
 
 export async function POST(req: Request) {
@@ -32,7 +33,7 @@ export async function POST(req: Request) {
     setSessionCookie(res, data.token);
     return res;
   } catch (e: any) {
-    console.error('[auth/login]', e);
+    logApiError('auth/login', e);
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
   }
 }

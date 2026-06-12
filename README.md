@@ -160,10 +160,14 @@ Common commands:
 
 ```bash
 npm run db:generate
-npm run db:push
+npm run db:push                                  # dev only — prod/CI use migrations
+npm run migrate --workspace=@starvis/db          # create a migration from schema changes
+npm run migrate:deploy --workspace=@starvis/db   # apply pending migrations
 npm run db:studio
 npm run typecheck --workspace=@starvis/db
 ```
+
+Schema changes must ship with a versioned migration in `db/prisma/migrations/` — CI rejects drift between the schema and the migration history, and production deploys apply `migrate:deploy` (never `db push --accept-data-loss`).
 
 See [`db/README.md`](db/README.md) before adding or moving database models.
 
@@ -366,7 +370,7 @@ Deployment from CI:
 1. Pull latest `main` on the VPS.
 2. Pull fresh API, IHM and bot images from GHCR.
 3. Ensure PostgreSQL and Redis are running.
-4. Run `npm run push --workspace=@starvis/db` from the API image.
+4. Run `npm run migrate:deploy --workspace=@starvis/db` from the API image.
 5. Restart the stack.
 6. Check API and IHM health.
 7. Run runtime smoke tests.

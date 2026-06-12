@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
-import type { PrismaLike } from '@starvis/db';
+import type { PrismaClient, UserRole } from '@starvis/db';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { generateSecret, generateURI, verify } from 'otplib';
@@ -89,8 +89,16 @@ function toPublicUser(u: {
   };
 }
 
+/** Subset of the Prisma client required by the auth layer (typed `user` delegate). */
+export type AuthDb = Pick<PrismaClient, 'user'>;
+
+/** Verify a Starvis JWT and return its payload. Throws on invalid/expired tokens. */
+export function verifyAuthToken(token: string): JwtPayload {
+  return jwt.verify(token, getSecret()) as unknown as JwtPayload;
+}
+
 export class AuthService {
-  constructor(private prisma: PrismaLike) {}
+  constructor(private prisma: AuthDb) {}
 
   async register(
     email: string,
@@ -100,7 +108,7 @@ export class AuthService {
     const emailLower = email.toLowerCase().trim();
     const usernameTrimmed = username.trim();
 
-    const existing = await (this.prisma as any).user.findFirst({
+    const existing = await this.prisma.user.findFirst({
       where: { OR: [{ email: emailLower }, { username: usernameTrimmed }] },
     });
     if (existing) {
@@ -111,7 +119,7 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
     const verificationToken = generateToken();
     const verificationTokenHash = hashToken(verificationToken);
-    await (this.prisma as any).user.create({
+    await this.prisma.user.create({
       data: {
         email: emailLower,
         username: usernameTrimmed,
@@ -129,21 +137,21 @@ export class AuthService {
    * verification tokens are stored hashed and cannot be read back in clear text.
    */
   getVerificationToken(email: string): Promise<{ username: string; token: string } | null> {
-    return (this.prisma as any).user
+    return this.prisma.user
       .findUnique({ where: { email: email.toLowerCase().trim() }, select: { username: true, verificationToken: true } })
-      .then((u: any) => (u?.verificationToken ? { username: u.username, token: u.verificationToken } : null));
+      .then((u) => (u?.verificationToken ? { username: u.username, token: u.verificationToken } : null));
   }
 
   async verifyEmail(token: string): Promise<{ token: string; user: PublicUser }> {
     const tokenHash = hashToken(token);
-    const user = await (this.prisma as any).user.findFirst({
+    const user = await this.prisma.user.findFirst({
       where: { OR: [{ verificationToken: tokenHash }, { verificationToken: token }] },
     });
     if (!user) throw new Error('INVALID_TOKEN');
     const verificationAgeMs = Date.now() - new Date(user.createdAt).getTime();
     if (verificationAgeMs > 48 * 60 * 60 * 1000) throw new Error('INVALID_TOKEN');
 
-    const updated = await (this.prisma as any).user.update({
+    const updated = await this.prisma.user.update({
       where: { id: user.id },
       data: { emailVerified: true, verificationToken: null },
     });
@@ -157,7 +165,7 @@ export class AuthService {
     password: string,
   ): Promise<{ token: string; user: PublicUser } | { requires2FA: true; pendingToken: string }> {
     const lower = emailOrUsername.toLowerCase().trim();
-    const user = await (this.prisma as any).user.findFirst({
+    const user = await this.prisma.user.findFirst({
       where: { OR: [{ email: lower }, { username: lower }] },
     });
     if (!user) throw new Error('INVALID_CREDENTIALS');
@@ -185,7 +193,7 @@ export class AuthService {
     }
     if (payload.type !== '2fa_pending') throw new Error('INVALID_TOKEN');
 
-    const user = await (this.prisma as any).user.findUnique({ where: { id: payload.sub } });
+    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user?.twoFactorEnabled || !user?.twoFactorSecret) throw new Error('INVALID_TOKEN');
 
     const result = await verify({ token: code, secret: decryptSecret(user.twoFactorSecret) });
@@ -196,7 +204,7 @@ export class AuthService {
   }
 
   async requestPasswordReset(email: string): Promise<{ username: string; token: string } | null> {
-    const user = await (this.prisma as any).user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { email: email.toLowerCase().trim() },
     });
     if (!user) return null;
@@ -205,7 +213,7 @@ export class AuthService {
     const resetTokenHash = hashToken(resetToken);
     const resetTokenExpiry = new Date(Date.now() + RESET_TOKEN_TTL_MS);
 
-    await (this.prisma as any).user.update({
+    await this.prisma.user.update({
       where: { id: user.id },
       data: { resetToken: resetTokenHash, resetTokenExpiry },
     });
@@ -215,27 +223,27 @@ export class AuthService {
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
     const tokenHash = hashToken(token);
-    const user = await (this.prisma as any).user.findFirst({
+    const user = await this.prisma.user.findFirst({
       where: { OR: [{ resetToken: tokenHash }, { resetToken: token }] },
     });
     if (!user) throw new Error('INVALID_TOKEN');
     if (!user.resetTokenExpiry || user.resetTokenExpiry < new Date()) throw new Error('TOKEN_EXPIRED');
 
     const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    await (this.prisma as any).user.update({
+    await this.prisma.user.update({
       where: { id: user.id },
       data: { passwordHash, resetToken: null, resetTokenExpiry: null },
     });
   }
 
   async setup2FA(userId: number): Promise<{ secret: string; qrCodeUrl: string }> {
-    const user = await (this.prisma as any).user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error('USER_NOT_FOUND');
 
     const secret = generateSecret();
     const otpauth = generateURI({ issuer: 'Starvis', label: user.email, secret });
 
-    await (this.prisma as any).user.update({
+    await this.prisma.user.update({
       where: { id: userId },
       data: { twoFactorSecret: encryptSecret(secret), twoFactorEnabled: false },
     });
@@ -246,38 +254,38 @@ export class AuthService {
   }
 
   async enable2FA(userId: number, code: string): Promise<void> {
-    const user = await (this.prisma as any).user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user?.twoFactorSecret) throw new Error('2FA_NOT_SETUP');
 
     const result = await verify({ token: code, secret: decryptSecret(user.twoFactorSecret) });
     if (!result.valid) throw new Error('INVALID_2FA_CODE');
 
-    await (this.prisma as any).user.update({
+    await this.prisma.user.update({
       where: { id: userId },
       data: { twoFactorEnabled: true },
     });
   }
 
   async disable2FA(userId: number, code: string): Promise<void> {
-    const user = await (this.prisma as any).user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user?.twoFactorEnabled || !user?.twoFactorSecret) throw new Error('2FA_NOT_ENABLED');
 
     const result = await verify({ token: code, secret: decryptSecret(user.twoFactorSecret) });
     if (!result.valid) throw new Error('INVALID_2FA_CODE');
 
-    await (this.prisma as any).user.update({
+    await this.prisma.user.update({
       where: { id: userId },
       data: { twoFactorEnabled: false, twoFactorSecret: null },
     });
   }
 
   async me(userId: number): Promise<PublicUser | null> {
-    const user = await (this.prisma as any).user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
     return user ? toPublicUser(user) : null;
   }
 
   async updateProfile(userId: number, updates: { username?: string; avatarUrl?: string }): Promise<PublicUser> {
-    const user = await (this.prisma as any).user.update({
+    const user = await this.prisma.user.update({
       where: { id: userId },
       data: updates,
     });
@@ -285,14 +293,14 @@ export class AuthService {
   }
 
   async listUsers(): Promise<PublicUser[]> {
-    const users = await (this.prisma as any).user.findMany({
+    const users = await this.prisma.user.findMany({
       orderBy: { createdAt: 'desc' },
     });
     return users.map(toPublicUser);
   }
 
-  async setRole(userId: number, role: string): Promise<PublicUser> {
-    const user = await (this.prisma as any).user.update({
+  async setRole(userId: number, role: UserRole): Promise<PublicUser> {
+    const user = await this.prisma.user.update({
       where: { id: userId },
       data: { role },
     });
@@ -304,23 +312,23 @@ export class AuthService {
     if (updates.username !== undefined) data.username = updates.username.trim();
     if (updates.email !== undefined) data.email = updates.email.toLowerCase().trim();
     if (updates.avatarUrl !== undefined) data.avatarUrl = updates.avatarUrl;
-    const user = await (this.prisma as any).user.update({ where: { id: userId }, data });
+    const user = await this.prisma.user.update({ where: { id: userId }, data });
     return toPublicUser(user);
   }
 
   async adminResetPassword(userId: number, newPassword: string): Promise<void> {
     const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
-    await (this.prisma as any).user.update({ where: { id: userId }, data: { passwordHash } });
+    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash } });
   }
 
   async deleteUser(userId: number): Promise<void> {
-    await (this.prisma as any).user.delete({ where: { id: userId } });
+    await this.prisma.user.delete({ where: { id: userId } });
   }
 
-  async adminCreateUser(email: string, username: string, password: string, role = 'user'): Promise<PublicUser> {
+  async adminCreateUser(email: string, username: string, password: string, role: UserRole = 'user'): Promise<PublicUser> {
     const emailLower = email.toLowerCase().trim();
     const usernameTrimmed = username.trim();
-    const existing = await (this.prisma as any).user.findFirst({
+    const existing = await this.prisma.user.findFirst({
       where: { OR: [{ email: emailLower }, { username: usernameTrimmed }] },
     });
     if (existing) {
@@ -328,7 +336,7 @@ export class AuthService {
       throw new Error('USERNAME_TAKEN');
     }
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
-    const user = await (this.prisma as any).user.create({
+    const user = await this.prisma.user.create({
       data: { email: emailLower, username: usernameTrimmed, passwordHash, role, emailVerified: true },
     });
     return toPublicUser(user);
@@ -346,7 +354,7 @@ export class AuthService {
   }
 
   verifyToken(token: string): JwtPayload {
-    return jwt.verify(token, getSecret()) as unknown as JwtPayload;
+    return verifyAuthToken(token);
   }
 
   private signToken(user: { id: number; uuid: string; email: string; username: string; role: string }): string {
