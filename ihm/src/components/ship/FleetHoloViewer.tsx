@@ -236,7 +236,7 @@ export function FleetHoloViewer({
 
     type VectorLauncherEntry = {
       root: THREE.Group;
-      mesh: THREE.Mesh;
+      meshes: THREE.Mesh[];
       ship: FleetShip;
     };
 
@@ -460,17 +460,28 @@ export function FleetHoloViewer({
       .map((entry) => {
         const root = new THREE.Group();
         const distance = Math.max(entry.radius * 1.1, 14);
-        root.position.set(entry.root.position.x, 0.75, entry.root.position.z - distance);
-        const mesh = new THREE.Mesh(
-          new THREE.ConeGeometry(2.8, 6, 3),
-          new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0.9 }),
+        root.position.set(entry.root.position.x, 3, entry.root.position.z - distance);
+        root.visible = false;
+        const material = new THREE.MeshBasicMaterial({ color: 0x5eead4, transparent: true, opacity: 0.95, side: THREE.DoubleSide });
+        const halo = new THREE.Mesh(
+          new THREE.TorusGeometry(5.6, 0.38, 8, 36),
+          material.clone(),
         );
-        mesh.rotation.x = -Math.PI / 2;
-        mesh.visible = false;
-        mesh.userData.vectorLauncherShipId = entry.ship.id;
-        root.add(mesh);
+        halo.rotation.x = -Math.PI / 2;
+        halo.userData.vectorLauncherShipId = entry.ship.id;
+        const arrow = new THREE.Mesh(
+          new THREE.ConeGeometry(4.6, 10, 3),
+          material,
+        );
+        arrow.rotation.x = -Math.PI / 2;
+        arrow.position.z = -2.5;
+        arrow.userData.vectorLauncherShipId = entry.ship.id;
+        const stem = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 8), material.clone());
+        stem.position.z = 3.5;
+        stem.userData.vectorLauncherShipId = entry.ship.id;
+        root.add(halo, arrow, stem);
         scene.add(root);
-        return { root, mesh, ship: entry.ship };
+        return { root, meshes: [halo, arrow, stem], ship: entry.ship };
       });
 
     const refreshLayout = () => {
@@ -713,7 +724,7 @@ export function FleetHoloViewer({
       entries.forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
       markerEntries.forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
       vectorEntries.forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
-      vectorLaunchers.filter((entry) => entry.mesh.visible).forEach((entry) => meshes.push(entry.mesh));
+      vectorLaunchers.filter((entry) => entry.root.visible).forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
       const hits = raycaster.intersectObjects(meshes, true);
       if (!hits.length) return null;
       let obj: THREE.Object3D | null = hits[0].object;
@@ -953,14 +964,16 @@ export function FleetHoloViewer({
           const centerX = (minX + maxX) / 2;
           const centerZ = (minZ + maxZ) / 2;
           const radius = Math.max(maxX - minX, maxZ - minZ, 22) / 2 + 8;
-          launcher.root.position.set(centerX, 0.75, centerZ - radius);
+          launcher.root.position.set(centerX, 3, centerZ - radius);
         } else {
-          launcher.root.position.set(entry.root.position.x, 0.75, entry.root.position.z - distance);
+          launcher.root.position.set(entry.root.position.x, 3, entry.root.position.z - distance);
         }
-        launcher.mesh.visible = isSelected;
-        if (launcher.mesh.material instanceof THREE.MeshBasicMaterial) {
-          launcher.mesh.material.opacity = 0.76 + Math.sin(t * 5) * 0.14;
-        }
+        launcher.root.visible = isSelected;
+        launcher.meshes.forEach((mesh, index) => {
+          if (mesh.material instanceof THREE.MeshBasicMaterial) {
+            mesh.material.opacity = index === 0 ? 0.52 + Math.sin(t * 5) * 0.18 : 0.88 + Math.sin(t * 5) * 0.1;
+          }
+        });
       });
 
       controls.update();
