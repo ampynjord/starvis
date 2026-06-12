@@ -52,10 +52,7 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     try {
       const result = await authService.register(email, username, password);
       // Fire-and-forget verification email
-      const vtInfo = await authService.getVerificationToken(result.email);
-      if (vtInfo) {
-        sendVerificationEmail(result.email, vtInfo.username, vtInfo.token).catch(() => {});
-      }
+      sendVerificationEmail(result.email, username.trim(), result.verificationToken).catch(() => {});
       res.status(201).json({ success: true, requiresVerification: true });
     } catch (e: any) {
       if (e.message === 'EMAIL_TAKEN') return void res.status(409).json({ success: false, error: 'Email already in use' });

@@ -6,11 +6,12 @@
   "main": "src/index.ts",
   "types": "src/index.ts",
   "scripts": {
-    "generate": "prisma generate --schema=prisma/schema.prisma",
-    "push": "prisma db push --schema=prisma/schema.prisma",
-    "migrate": "prisma migrate dev --schema=prisma/schema.prisma",
-    "migrate:deploy": "prisma migrate deploy --schema=prisma/schema.prisma",
-    "studio": "prisma studio --schema=prisma/schema.prisma",
+    "generate": "prisma generate --schema=prisma/schema",
+    "push": "prisma db push --schema=prisma/schema",
+    "migrate": "prisma migrate dev --schema=prisma/schema",
+    "migrate:deploy": "node scripts/migrate-deploy.mjs",
+    "studio": "prisma studio --schema=prisma/schema",
+    "typecheck": "tsc --noEmit --project tsconfig.json",
     "postinstall": "npm run generate"
   },
   "dependencies": {

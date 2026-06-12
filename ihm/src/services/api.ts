@@ -1,4 +1,6 @@
 import type {
+  AmmoInsight,
+  BlueprintRewardInsight,
   BuyLocation,
   ChangelogEntry,
   ChangelogSummary,
@@ -15,6 +17,8 @@ import type {
   FactionSummary,
   FpsDamageResult,
   GalactapediaEntry,
+  GameFactionInsight,
+  InventoryContainerInsight,
   Item,
   ItemBuyLocation,
   ItemListItem,
@@ -22,6 +26,7 @@ import type {
   LoadoutNode,
   LoadoutResult,
   Location,
+  LootTableInsight,
   Manufacturer,
   MiningComposition,
   MiningElement,
@@ -32,6 +37,8 @@ import type {
   PaginatedResponse,
   PaintGroupsResponse,
   PaintListItem,
+  ReputationScopeInsight,
+  ReputationStandingInsight,
   SearchResult,
   Ship,
   ShipFilters,
@@ -414,6 +421,20 @@ export const api = {
     buyLocations: (uuid: string, env?: string) => get<ItemBuyLocation[]>(`/items/${uuid}/buy-locations`, { env }),
   },
 
+  ammo: {
+    stats: (p?: { env?: string; page?: number; limit?: number; search?: string }) => get<PaginatedResponse<AmmoInsight>>('/ammo/stats', p),
+  },
+
+  armor: {
+    inventoryContainers: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
+      get<PaginatedResponse<InventoryContainerInsight>>('/armor/inventory-containers', p),
+  },
+
+  utility: {
+    inventoryContainers: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
+      get<PaginatedResponse<InventoryContainerInsight>>('/utility/inventory-containers', p),
+  },
+
   // ─── Manufacturers ─────────────────────────────────────────────────
   manufacturers: {
     list: (env?: string) => get<Manufacturer[]>('/manufacturers', { env }),
@@ -519,6 +540,12 @@ export const api = {
   factions: {
     list: (env?: string) => get<FactionSummary[]>('/factions', { env }),
     get: (name: string, env?: string) => get<FactionSummary>(`/factions/${encodeURIComponent(name)}`, { env }),
+    registry: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
+      get<PaginatedResponse<GameFactionInsight>>('/factions/registry', p),
+    reputationStandings: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
+      get<PaginatedResponse<ReputationStandingInsight>>('/factions/reputation-standings', p),
+    reputationScopes: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
+      get<PaginatedResponse<ReputationScopeInsight>>('/factions/reputation-scopes', p),
   },
 
   // ─── Crafting ────────────────────────────────────────────────────────
@@ -543,6 +570,13 @@ export const api = {
     resources: async (env?: string) => (await get<CraftingResource[]>('/crafting/resources', { env })).map(mapCraftingResource),
     recipesByResource: async (itemName: string, env?: string) =>
       (await get<CraftingRecipe[]>(`/crafting/resources/${encodeURIComponent(itemName)}/recipes`, { env })).map(mapCraftingRecipe),
+  },
+
+  blueprints: {
+    rewards: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
+      get<PaginatedResponse<BlueprintRewardInsight>>('/blueprints/rewards', p),
+    lootTables: (p?: { env?: string; page?: number; limit?: number; search?: string }) =>
+      get<PaginatedResponse<LootTableInsight>>('/blueprints/loot-tables', p),
   },
 
   // ─── Trade ──────────────────────────────────────────────────────────
@@ -580,6 +614,7 @@ export const api = {
 
   starmap: {
     positions: () => get<any[]>('/starmap/positions'),
+    jumpPoints: () => get<any[]>('/starmap/jump-points'),
   },
 
   // ─── CommLinks ──────────────────────────────────────────────────────

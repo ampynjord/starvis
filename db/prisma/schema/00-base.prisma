@@ -1,0 +1,23 @@
+// ============================================================
+// schema.prisma — Unified PostgreSQL multi-schema definition
+//
+// Schemas:
+//   game  — game data extracted from P4K (ships, components, manufacturers…)
+//            env = "live" | "ptu" replaces the live/ptu DB split
+//   rsi   — data scraped from RSI website / SC Wiki
+//   meta  — extraction metadata, changelogs, users
+//
+// Run: npm run generate --workspace=@starvis/db
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["game", "rsi", "meta"]
+}
+
+// ╔══════════════════════════════════════════════════════════════╗

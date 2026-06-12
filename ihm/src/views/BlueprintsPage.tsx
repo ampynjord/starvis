@@ -19,7 +19,7 @@ import {
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import type { CraftingRecipe } from '@/types/api';
+import type { BlueprintRewardInsight, CraftingRecipe, LootTableInsight } from '@/types/api';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { EmptyState } from '@/components/ui/EmptyState';
@@ -119,6 +119,51 @@ const CAT_ICON: Record<string, React.ReactNode> = {
 
 function getCatIcon(cat: string | null): React.ReactNode {
   return CAT_ICON[cat ?? ''] ?? <Scroll size={10} />;
+}
+
+function InsightStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: number | string }) {
+  return (
+    <div className="rounded-sm border border-slate-800/70 bg-slate-950/50 p-3">
+      <p className="flex items-center gap-1.5 font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">
+        {icon}
+        {label}
+      </p>
+      <p className="mt-1 font-orbitron text-lg font-black text-cyan-300">{value}</p>
+    </div>
+  );
+}
+
+function BlueprintInsightPanel({
+  rewards,
+  lootTables,
+}: {
+  rewards: BlueprintRewardInsight[];
+  lootTables: LootTableInsight[];
+}) {
+  if (!rewards.length && !lootTables.length) return null;
+  const topPools = rewards.slice(0, 6);
+  return (
+    <ScifiPanel title="DataForge Rewards" subtitle="Blueprint and loot sources extracted from the game data">
+      <div className="grid gap-2 sm:grid-cols-3">
+        <InsightStat icon={<Trophy size={10} />} label="Blueprint Rewards" value={rewards.length} />
+        <InsightStat icon={<Package size={10} />} label="Loot Tables" value={lootTables.length} />
+        <InsightStat icon={<Layers size={10} />} label="Pools" value={new Set(rewards.map((reward) => reward.pool_uuid)).size} />
+      </div>
+      {topPools.length > 0 && (
+        <div className="mt-3 grid gap-2 lg:grid-cols-2">
+          {topPools.map((reward) => (
+            <div key={`${reward.pool_uuid}-${reward.reward_index}`} className="rounded-sm border border-slate-800/70 bg-slate-950/40 p-3">
+              <p className="truncate font-orbitron text-xs font-bold text-slate-100">{reward.blueprint_class_name ?? 'Blueprint reward'}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2 font-mono-sc text-[10px] uppercase tracking-widest">
+                <span className="text-slate-600">{reward.pool_class_name ?? 'Pool'}</span>
+                {reward.weight != null && <span className="text-amber-400">Weight {Number(reward.weight).toLocaleString('en-US')}</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </ScifiPanel>
+  );
 }
 
 // ── BlueprintCard ─────────────────────────────────────────────────────────────
@@ -571,6 +616,18 @@ export default function BlueprintsPage() {
       }),
   });
 
+  const { data: blueprintRewardData } = useQuery({
+    queryKey: ['blueprints.rewards', env, debouncedSearch],
+    queryFn: () => api.blueprints.rewards({ env, search: debouncedSearch || undefined, limit: 100 }),
+    staleTime: 5 * 60_000,
+  });
+
+  const { data: lootTableData } = useQuery({
+    queryKey: ['blueprints.loot-tables', env, debouncedSearch],
+    queryFn: () => api.blueprints.lootTables({ env, search: debouncedSearch || undefined, limit: 100 }),
+    staleTime: 5 * 60_000,
+  });
+
   const recipes = useMemo(() => data?.data ?? [], [data]);
 
   const selectedRecipe = useMemo(
@@ -611,6 +668,8 @@ export default function BlueprintsPage() {
           <ListFilterResetButton onClick={() => { setSearch(''); setCategory(''); setStationType(''); }} />
         )}
       </ListFilterBar>
+
+      <BlueprintInsightPanel rewards={blueprintRewardData?.data ?? []} lootTables={lootTableData?.data ?? []} />
 
       {/* Content */}
       <div className="min-w-0">

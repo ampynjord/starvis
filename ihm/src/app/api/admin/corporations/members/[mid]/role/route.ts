@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getAuthToken, proxyJson } from '@/app/api/_utils/proxy';
+import { logApiError } from '@/lib/server-logger';
 
 export async function PUT(req: Request, { params }: { params: Promise<{ mid: string }> }) {
   const { mid } = await params;
@@ -9,7 +10,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ mid: str
     const body = await req.json().catch(() => ({}));
     return proxyJson('PUT', `/admin/corporations/members/${mid}/role`, token, body);
   } catch (e) {
-    console.error('[admin/corporations/members/:mid/role PUT]', e);
+    logApiError('admin/corporations/members/:mid/role PUT', e);
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
   }
 }

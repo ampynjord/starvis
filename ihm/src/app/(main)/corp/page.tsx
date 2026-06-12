@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Building2, Check, Crown, Package, ShieldCheck, Ship, UserCheck, UserMinus, Users, XCircle } from 'lucide-react';
+import { Building2, Check, Crown, Package, Radar, ShieldCheck, Ship, UserCheck, UserMinus, Users, XCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
@@ -172,12 +172,12 @@ export default function CorpPage() {
             </p>
             <p className="mt-1 text-xs text-slate-500 font-rajdhani">Track shared equipment, resources and logistics stock.</p>
           </Link>
-          <div className="sci-panel border border-emerald-900/50 bg-emerald-950/10 px-4 py-3">
+          <Link href="/corp/tactics" className="sci-panel border border-slate-800/70 px-4 py-3 hover:border-cyan-700/60 transition-colors">
             <p className="font-mono-sc text-[9px] text-emerald-500 uppercase tracking-widest flex items-center gap-1.5">
-              <ShieldCheck size={11} /> Leader controls
+              <Radar size={11} /> Tactics
             </p>
-            <p className="mt-1 text-xs text-slate-500 font-rajdhani">Approve recruits, assign leaders, reject requests and remove inactive members.</p>
-          </div>
+            <p className="mt-1 text-xs text-slate-500 font-rajdhani">Build holographic battle plans with ships, objectives and vectors.</p>
+          </Link>
         </section>
       )}
 

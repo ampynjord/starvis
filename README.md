@@ -4,132 +4,95 @@
 [![Node v22](https://img.shields.io/badge/node-v22-green)](https://nodejs.org)
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 
-Star Citizen data platform
+Unofficial Star Citizen data platform: game data extraction, REST API, web interface, Discord bot, and database tooling.
+STARVIS is an independent community project and is not affiliated with, endorsed by, sponsored by, or officially
+connected to Cloud Imperium Games, Cloud Imperium Rights LLC, Roberts Space Industries Corp. or their affiliates.
 
-- **Production**: [starvis.ampynjord.bzh](https://starvis.ampynjord.bzh)
-- **API Docs**: [starvis.ampynjord.bzh/api-docs](https://starvis.ampynjord.bzh/api-docs)
+- Production: [starvis.ampynjord.bzh](https://starvis.ampynjord.bzh)
+- API docs: [starvis.ampynjord.bzh/api-docs](https://starvis.ampynjord.bzh/api-docs)
+- OpenAPI source: [`api/openapi.json`](api/openapi.json)
 
 ---
 
-## Monorepo structure
+## Monorepo
 
 | Directory | Role |
 |---|---|
-| `api/` | Express.js REST API + Prisma (deployed on VPS) |
-| `ihm/` | Next.js + Tailwind CSS web interface |
-| `bot/` | Discord bot with slash commands |
-| `extractor/` | P4K → PostgreSQL extraction CLI (runs locally) |
-| `db/` | Prisma schemas, PostgreSQL init, backup script |
+| `api/` | Express REST API, Swagger/OpenAPI, auth, admin, corporation and data routes. |
+| `ihm/` | Next.js 15 web interface, API route proxies, UI tests and Playwright tests. |
+| `bot/` | Discord bot with slash commands. |
+| `extractor/` | Local CLI that extracts P4K/DataForge and RSI website data into PostgreSQL. |
+| `db/` | Prisma 7 schema modules, shared Prisma client, PostgreSQL init and backup scripts. |
+
+The monorepo uses npm workspaces and one root `package-lock.json`. Do not add nested lockfiles in workspaces.
 
 ---
 
-## Local install
+## Requirements
 
-### Prerequisites
-
-- [Node.js 22+](https://nodejs.org)
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine + Compose v2)
+- Node.js 22+
+- Docker Desktop or Docker Engine with Compose v2
 - Git
+- Star Citizen installed locally only when running P4K extraction
 
-### 1 — Clone and install dependencies
+---
+
+## Local Development
+
+### 1. Install
 
 ```bash
 git clone https://github.com/ampynjord/starvis.git
 cd starvis
-npm install        # installs all workspaces (api, ihm, bot, extractor, db)
+npm install
 ```
 
-The monorepo uses the root `package-lock.json` as the single dependency lockfile. Workspace packages should not keep nested lockfiles. The extractor keeps `extractor/extract.ts` as its stable command wrapper; implementation code lives under `extractor/src/`.
+`npm install` installs every workspace and generates the Prisma client through the `@starvis/db` postinstall script.
 
-### 2 — Configure the environment
+### 2. Configure
 
 ```bash
 cp .env.dev.example .env.dev
 ```
 
-Open `.env.dev` and set at minimum:
+Minimum values to set in `.env.dev`:
 
 | Variable | Required | Description |
 |---|---|---|
-| `DB_PASSWORD` | yes | PostgreSQL password (any string in dev) |
-| `JWT_SECRET` | yes | Random secret for JWT signing (≥ 32 chars) |
-| `ADMIN_API_KEY` | yes | API key for admin endpoints |
-| `MISTRAL_API_KEY` | optional | Enables the AI chat assistant |
-| `DISCORD_TOKEN` | optional | Discord bot (can skip for UI-only dev) |
-| `SMTP_HOST` | optional | Outgoing email for password reset / verification |
+| `DB_PASSWORD` | yes | PostgreSQL password for local dev. |
+| `JWT_SECRET` | yes | JWT signing secret, at least 32 characters. |
+| `TWO_FACTOR_ENCRYPTION_KEY` | recommended | Dedicated key for encrypting TOTP 2FA secrets. Falls back to `JWT_SECRET` if omitted. |
+| `ADMIN_API_KEY` | yes | API key used by server-side admin operations. |
+| `MISTRAL_API_KEY` | optional | Enables the AI chat assistant. |
+| `DISCORD_TOKEN` | optional | Enables the Discord bot. |
+| `SMTP_HOST` | optional | Enables email verification and password reset emails. |
+| `CONTACT_EMAIL` / `NEXT_PUBLIC_CONTACT_EMAIL` | yes in prod | Contact address displayed in legal/privacy notices and used for support emails. |
+| `LEGAL_*` | yes in prod | Publisher and hosting details displayed on `/legal`. |
 
-All variables and their defaults are documented in `.env.dev.example`.
+All supported variables and defaults are documented in `.env.dev.example`.
 
-### 3 — Start the stack
+### 3. Start the stack
 
 ```bash
 docker compose -f docker-compose.dev.yml --env-file .env.dev up
 ```
 
-On first start Docker creates the PostgreSQL database and the three schemas (`game`, `rsi`, `meta`).
-The API then runs `prisma db push` automatically to create all tables before serving requests.
+On first start, PostgreSQL is initialized with the `game`, `rsi`, and `meta` schemas. The API uses the Prisma schema from `db/prisma/schema/`.
+The IHM container keeps its `.next` cache in a Docker volume so the Next.js dev server does not reuse host-generated Windows build artifacts.
 
 | Service | URL / Port |
 |---|---|
-| **IHM** (Next.js, hot reload) | http://localhost:5173 |
-| **API** (Express, hot reload) | http://localhost:3000 |
-| **Swagger UI** | http://localhost:3000/api-docs |
+| IHM, Next.js dev server | http://localhost:5173 |
+| API, Express dev server | http://localhost:3000 |
+| Swagger UI | http://localhost:3000/api-docs |
 | PostgreSQL | localhost:5432 |
 | Redis | localhost:6379 |
 
-> The Discord bot starts automatically but does nothing if `DISCORD_TOKEN` is empty.
+The Discord bot container is started in dev, but it remains inactive when `DISCORD_TOKEN` is empty.
 
-### 4 — Load game data (optional)
+### 4. Create an admin account
 
-The database is empty on first start — the UI will show no ships or items.
-To populate it, run the extractor with your local Star Citizen installation:
-
-```bash
-cp extractor/.env.extractor.example extractor/.env.dev
-# Set DB_PASSWORD to match .env.dev
-
-# Populate LIVE data (requires Data.p4k)
-npx tsx extractor/extract.ts --env live --game-version 4.7.2
-
-# Network-only modules (no Data.p4k needed)
-npx tsx extractor/extract.ts --modules ship-matrix,galactapedia,starmap
-```
-
-See [`extractor/README.md`](extractor/README.md) for the full list of modules and options.
-
----
-
-## API-only self-host
-
-Use this mode when you only want the REST API, PostgreSQL, Redis and the local extractor workflow, without the Next.js UI or Discord bot.
-
-```bash
-cp .env.api-only.example .env.api-only
-# Fill DB_PASSWORD, JWT_SECRET, ADMIN_API_KEY and CORS_ORIGIN
-
-docker compose -f docker-compose.api-only.yml --env-file .env.api-only up -d
-```
-
-The stack starts PostgreSQL and Redis, runs a one-shot Prisma `db push`, then starts the API. Check it with:
-
-```bash
-curl http://127.0.0.1:3000/health/live
-curl http://127.0.0.1:3000/health/ready
-```
-
-To populate data from the extractor running on the host, use the DB values from `.env.api-only`:
-
-```bash
-DB_HOST=127.0.0.1
-DB_PORT=5432
-DB_USER=starvis_user
-DB_PASSWORD=<same as .env.api-only>
-DB_NAME=starvis
-```
-
-### 5 — Create an admin account
-
-Register via the UI at http://localhost:5173/register, then promote your account:
+Register from the UI, then promote the user with the admin API key:
 
 ```bash
 curl -X PUT http://localhost:3000/admin/users/1/role \
@@ -138,368 +101,333 @@ curl -X PUT http://localhost:3000/admin/users/1/role \
   -d '{"role":"admin"}'
 ```
 
+### 5. Load game data
+
+The database starts empty. To populate it from your local Star Citizen install:
+
+```bash
+cp extractor/.env.extractor.example extractor/.env.dev
+# Set DB_PASSWORD to match .env.dev
+
+npx tsx extractor/extract.ts --env live
+```
+
+Useful variants:
+
+```bash
+# Force a visible game version label
+npx tsx extractor/extract.ts --env live --game-version 4.7.2
+
+# Extract only network-backed RSI modules, no Data.p4k required
+npx tsx extractor/extract.ts --modules ship-matrix,galactapedia,comm-links,starmap
+
+# Check configuration without extracting
+npx tsx extractor/extract.ts --check-config
+```
+
+See [`extractor/README.md`](extractor/README.md) for CLI options, module names, production extraction, logging, and troubleshooting.
+
 ---
 
-## Data sources
+## Data
 
-The application combines two complementary sources:
+STARVIS combines local game data and public RSI data.
 
-| Source | Content | Update |
+| Source | Content | Update path |
 |---|---|---|
-| **P4K / DataForge** | Real in-game data (~350 ships, ~3,000 components across 22 types, ~10,000 FPS items…) | Via `extractor/` CLI |
-| **RSI Ship Matrix** | Official marketing data (~246 ships) | Auto-synced at API startup |
-| **RSI Website** | Galactapedia, Comm-links, Starmap, CTM | Via `extractor/` CLI |
+| P4K / DataForge | Ships, components, FPS items, commodities, shops, missions, mining, crafting, locations, paints and extended game insights for loot, reputation, factions, navigation, environments, services, medical data, FPS details, ammo and inventory containers. The IHM consumes normalized insight data through page-named API routes such as factions, ammo, armor, utility and blueprints. | `extractor/` CLI. |
+| RSI Ship Matrix | Official marketing ship data. | Extractor network module and API startup sync. |
+| RSI website | Galactapedia, Comm-links, Starmap, CTM metadata. | Extractor network modules. |
 
-P4K extraction runs locally — see [`extractor/README.md`](extractor/README.md).
+LIVE and PTU data share the same PostgreSQL database and are separated by `env = 'live'` or `env = 'ptu'` in the `game` schema.
 
 ---
 
-## LIVE / PTU environments
+## Database
 
-LIVE and PTU data coexist in the same PostgreSQL database, separated by an `env` column (`'live'` or `'ptu'`) on each table in the `game` schema.
+The database workspace is intentionally split by domain:
 
-| Env | Current version | Description |
-|---|---|---|
-| `live` | 4.7.2 | Star Citizen production servers |
-| `ptu` | 4.8.0 | Public Test Universe |
+| Path | Role |
+|---|---|
+| `db/prisma/schema/00-base.prisma` | Prisma generator and datasource declaration. |
+| `db/prisma/schema/10-meta.prisma` | Users, roles, corporations, bug reports, changelog and extraction logs. |
+| `db/prisma/schema/20-rsi.prisma` | Ship Matrix, Galactapedia, Comm-links and Starmap. |
+| `db/prisma/schema/30-game.prisma` | P4K/DataForge game data. |
+| `db/src/` | Shared Prisma client and database helpers exposed as `@starvis/db`. |
+| `db/scripts/` | PostgreSQL init and backup scripts. |
 
-All API endpoints accept a `?env=live` (default) or `?env=ptu` parameter. The interface switches between them via a selector persisted in `localStorage`.
+Common commands:
+
+```bash
+npm run db:generate
+npm run db:push                                  # dev only — prod/CI use migrations
+npm run migrate --workspace=@starvis/db          # create a migration from schema changes
+npm run migrate:deploy --workspace=@starvis/db   # apply pending migrations
+npm run db:studio
+npm run typecheck --workspace=@starvis/db
+```
+
+Schema changes must ship with a versioned migration in `db/prisma/migrations/` — CI rejects drift between the schema and the migration history, and production deploys apply `migrate:deploy` (never `db push --accept-data-loss`).
+
+See [`db/README.md`](db/README.md) before adding or moving database models.
 
 ---
 
 ## Architecture
 
-```
-┌──────────────────────────────────────────────────────┐
-│  Local (developer)                                    │
-│                                                      │
-│  Star Citizen → P4K → extractor CLI → PostgreSQL VPS │
-│  (LIVE & PTU, data separated by env column)          │
-└──────────────────────────────────────────────────────┘
+```text
+Local developer machine
 
-┌──────────────────────────────────────────────────────┐
-│  VPS (Docker Compose)                                 │
-│                                                      │
-│  Traefik (HTTPS) → IHM (Next.js)                     │
-│                  → API (Express)  → PostgreSQL        │
-│                                   → Redis (cache)    │
-│  Discord Bot      → API                              │
-└──────────────────────────────────────────────────────┘
+Star Citizen Data.p4k
+  -> extractor CLI
+  -> PostgreSQL game schema
+  -> game.game_insights discovery table
+  -> normalized insight tables: game.factions, game.reputation_*, game.loot_*, game.blueprint_rewards, game.ammo, game.inventory_containers
+  -> page-named API routes: /factions, /ammo, /armor, /utility, /blueprints
+
+RSI website modules
+  -> extractor CLI
+  -> PostgreSQL rsi schema
 ```
 
-### Databases (PostgreSQL 16)
+```text
+Docker / production
 
-| Schema | Content |
-|---|---|
-| `game` | Ships, components, items, commodities, missions, crafting — `env = 'live'` or `'ptu'` columns |
-| `rsi` | Ship Matrix, Galactapedia, Comm-links, Starmap |
-| `meta` | User accounts & roles, extraction logs, auto-changelog |
+Traefik HTTPS
+  -> IHM, Next.js
+      -> /api/* route handlers for auth, admin and corporation browser flows
+      -> /api/v1/* proxied public API calls
+  -> API, Express
+      -> PostgreSQL
+      -> Redis
+
+Discord bot
+  -> API
+```
+
+Production Traefik routes only backend public paths (`/api/v1`, `/api-docs`, `/health`) directly to Express. Browser admin/auth/corporation flows use the IHM route handlers under `/api/*`, which proxy to Express internally.
 
 ---
 
-## User roles
+## API
+
+Swagger is the source of truth:
+
+- Local UI: http://localhost:3000/api-docs
+- Production UI: https://starvis.ampynjord.bzh/api-docs
+- Spec file: [`api/openapi.json`](api/openapi.json)
+
+Main route families:
+
+| Family | Prefixes |
+|---|---|
+| Public game data | `/api/v1/ships`, `/api/v1/components`, `/api/v1/items`, `/api/v1/commodities`, `/api/v1/shops`, `/api/v1/trade` |
+| Gameplay tools | `/api/v1/calculate`, `/api/v1/loadout`, `/api/v1/mining`, `/api/v1/crafting` |
+| World and lore | `/api/v1/locations`, `/api/v1/missions`, `/api/v1/factions`, `/api/v1/starmap`, `/api/v1/galactapedia`, `/api/v1/comm-links` |
+| RSI and media | `/api/v1/ship-matrix`, `/api/v1/comm-link-images`, `/api/v1/manufacturers`, `/api/v1/paints` |
+| Search and system | `/api/v1/search`, `/api/v1/stats`, `/api/v1/version`, `/api/v1/game-versions`, `/api/v1/changelog` |
+| AI chat | `/api/v1/chat`, `/api/v1/chat/ask` |
+| Auth | `/auth/*` |
+| User reports | `/api/v1/bug-reports` |
+| Corporations | `/corporations`, `/rsi-orgs`, `/corp/*` |
+| Admin | `/admin/*` |
+| Health | `/health`, `/health/live`, `/health/ready`, `/health/metrics`, `/health/cache/stats` |
+
+Most public list endpoints support pagination and filtering parameters such as `page`, `limit`, `search`, `sort`, `order`, and `env`.
+
+When adding, changing, or deleting an API route, update [`api/openapi.json`](api/openapi.json) in the same change.
+
+---
+
+## IHM
+
+The web app is a Next.js 15 application in `ihm/`.
+
+Important route groups:
+
+| Area | Examples |
+|---|---|
+| Public data | `/ships`, `/components`, `/items`, `/commodities`, `/shops`, `/locations`, `/missions`, `/starmap` |
+| Tools | `/compare`, `/loadout-manager`, `/fps-calculator`, `/mining-calculator`, `/trade-calculator`, `/crafting-calculator`, `/outfitter` |
+| RSI content | `/galactapedia`, `/comm-links`, `/manufacturers`, `/paints`, `/factions` |
+| Account | `/login`, `/register`, `/profile`, `/my-reports`, `/report-bug` |
+| Corporation | `/corp`, `/corp/fleet`, `/corp/tactics`, `/corp/bank` |
+| Admin | `/admin`, `/admin/corporations`, `/admin/bug-reports` |
+| Legal | `/legal` |
+
+The browser uses same-origin `/api/*` calls. Server-side route handlers use `API_URL` to reach the Express API.
+
+Corporation tools include the 3D Fleet Manager and corporation-owned Tactics board. Fleet Manager lays spawned ships side by side by default and persists their grid positions. Tactics reuses the same 3D holographic viewer to place real corporation fleet ship models, save corporation strategies, build reusable formations, add 3D objectives/obstacles/points of interest, and draw flat movement vectors directly from selected ships or squadrons.
+
+---
+
+## Roles
 
 | Role | Access |
 |---|---|
-| `user` | All public data |
-| `beta_tester` | Early access to tools in active development |
-| `admin` | Full access + user management |
+| `user` | Public data and account features. |
+| `beta_tester` | Early access tools and API token generation. |
+| `admin` | Admin UI, user management, corporation moderation and full operational access. |
 
-**Beta** tools (accessible to `beta_tester` and `admin` only):
-- Loadout Manager (`/loadout-manager`)
-- FPS Calculator (`/fps-calculator`)
-- Mining Calculator (`/mining-calculator`)
-- Trade Calculator (`/trade-calculator`)
-- Crafting Calculator (`/crafting-calculator`)
-
-Roles are assigned by an admin via `PUT /admin/users/:id/role`.
+Roles are managed through the admin UI or `PUT /admin/users/:id/role`.
 
 ---
 
-## API — Endpoints
+## Commands
 
-Base: `/api/v1/`. All data endpoints accept `?env=live` (default) or `?env=ptu`.
-Lists: `page`, `limit`, `search`, `sort`, `order`, `format=csv`. Full spec at `/api-docs`.
+### Whole project
 
-### Ships & vehicles
+```bash
+npm run dev
+npm run build
+npm run test
+npm run typecheck
+npm run lint:ci
+```
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/ships` | Ship list (paginated, filterable) |
-| `GET` | `/ships/ranking` | Ranking by stat (`sort_by`) |
-| `GET` | `/ships/search` | Autocomplete ≥ 2 characters |
-| `GET` | `/ships/random` | Random ship |
-| `GET` | `/ships/manufacturers` | Manufacturers with ships |
-| `GET` | `/ships/filters` | Available filter values |
-| `GET` | `/ships/:uuid` | Detail (includes `manufacturer`, `paints`, `similar` via `?include=`) |
-| `GET` | `/ships/:uuid/loadout` | Recursive port tree (turret → gimbal → weapon) |
-| `GET` | `/ships/:uuid/modules` | Optional modules (Retaliator, Apollo…) |
-| `GET` | `/ships/:uuid/paints` | Ship paints |
-| `GET` | `/ships/:uuid/stats` | Summary: weapons, shields, QD, coolers… |
-| `GET` | `/ships/:uuid/hardpoints` | Flat hardpoint list |
-| `GET` | `/ships/:uuid/similar` | Similar ships (same career/role) |
-| `GET` | `/ships/:uuid/variants` | Variants of the same hull |
-| `GET` | `/ships/:uuid/compare/:uuid2` | Side-by-side comparison with deltas |
-| `GET` | `/ships/:uuid/model` | 3D model metadata (.ctm) |
-| `GET` | `/ships/:uuid/model/file` | .ctm binary (RSI proxy with disk cache) |
-| `GET` | `/ground-vehicles` | Ground vehicles (Cyclone, Ursa…) |
-| `GET` | `/ground-vehicles/filters` | Ground vehicle filters |
-| `GET` | `/gravlev` | Grav-lev vehicles (Nox, Dragonfly…) |
-| `GET` | `/gravlev/filters` | Grav-lev filters |
-| `GET` | `/ship-modules` | Ship modules (filterable by ship_uuid) |
+### Intelligent quality audits
 
-### Components
+```bash
+npm run quality:audit:data       # real API/data coherence audit against localhost:3000
+npm run quality:audit:data:prod  # strict audit against production
+npm run quality:audit:ui         # critical Playwright user flows with deterministic API fixtures
+npm run quality:audit            # data audit + UI critical flows
+```
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/components` | Paginated list (`type`, `size`, `grade`, `manufacturer`…) |
-| `GET` | `/components/filters` | Filter values |
-| `GET` | `/components/types` | Available types |
-| `GET` | `/components/compatible` | Compatible components by type & size |
-| `GET` | `/components/:uuid` | Full detail (all stats by type) |
-| `GET` | `/components/:uuid/buy-locations` | Where to buy this component |
-| `GET` | `/components/:uuid/ships` | Ships that equip it by default |
+The data audit checks health, version metadata, core list/detail endpoints, search, duplicate identifiers, numeric sanity and placeholder-like values. See [`quality/README.md`](quality/README.md).
 
-### FPS Items
+### Workspace checks
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/items` | Paginated list (weapons, armor, gadgets, clothing…) |
-| `GET` | `/items/filters` | Filter values |
-| `GET` | `/items/types` | Item types |
-| `GET` | `/items/sub-types` | Sub-types for a given type |
-| `GET` | `/items/manufacturers` | Manufacturers for a given type |
-| `GET` | `/items/categories` | Semantic categories with item count |
-| `GET` | `/items/category/:slug` | Items in a category (weapons, helmet, core, arms, legs, backpack, undersuit, tools-medics, magazines, attachments, clothing, throwable, other) |
-| `GET` | `/items/:uuid` | Item detail |
-| `GET` | `/items/:uuid/buy-locations` | Where to buy this item |
+```bash
+npm run test --workspace=@starvis/api
+npm run test --workspace=starvis-ihm
+npm run test --workspace=@starvis/extractor
 
-### Commodities & Trade
+npm run typecheck --workspace=@starvis/api
+npm run typecheck --workspace=starvis-ihm
+npm run typecheck --workspace=@starvis/extractor
+npm run typecheck --workspace=@starvis/bot
+npm run typecheck --workspace=@starvis/db
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/commodities` | Paginated list |
-| `GET` | `/commodities/filters` | Filters |
-| `GET` | `/commodities/types` | Commodity types |
-| `GET` | `/commodities/:uuid` | Commodity detail |
-| `GET` | `/trade/locations` | Shops with price data |
-| `GET` | `/trade/systems` | Systems with trade data |
-| `GET` | `/trade/prices/:commodityUuid` | Prices for a commodity across all shops |
-| `GET` | `/trade/location/:shopId/prices` | All prices at a shop |
-| `GET` | `/trade/routes` | Best routes (`scu` param required) |
-| `POST` | `/trade/prices` | Submit a price report |
-| `GET` | `/shops` | Shop list |
-| `GET` | `/shops/filters` | Shop filters |
-| `GET` | `/shops/:id/inventory` | Shop inventory |
+npm run test:e2e --workspace=starvis-ihm
+```
 
-### Mining & Crafting
+### Config validation
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/mining/elements` | Mineral elements |
-| `GET` | `/mining/elements/:uuid` | Element detail + rocks containing it |
-| `GET` | `/mining/compositions` | Rock compositions |
-| `GET` | `/mining/compositions/:uuid` | Composition detail |
-| `GET` | `/mining/solver` | Best targets for an element or composition |
-| `GET` | `/mining/stats` | Global mining statistics |
-| `GET` | `/mining/lasers` | Mining lasers and gadgets |
-| `GET` | `/crafting/recipes` | Paginated recipes |
-| `GET` | `/crafting/recipes/:uuid` | Recipe detail with ingredients |
-| `GET` | `/crafting/categories` | Crafting categories |
-| `GET` | `/crafting/station-types` | Station types |
-| `GET` | `/crafting/resources` | Resources used as ingredients |
-| `GET` | `/crafting/resources/:itemName/recipes` | Recipes using a resource |
+```bash
+docker compose -f docker-compose.dev.yml --env-file .env.dev.example config --quiet
+docker compose -f docker-compose.prod.yml --env-file .env.prod.example config --quiet
+```
 
-### Calculators
+### API docs
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/calculate/fps-damage` | FPS weapon damage calculation (armor, hitbox, fire mode) |
-| `POST` | `/calculate/mining-yield` | Mining yield calculation (composition, laser, gadgets) |
-| `POST` | `/loadout/calculate` | Loadout calculation with component swaps |
-
-### Missions & Locations _(beta_tester+)_
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/missions` | Paginated list (filters: type, faction, system…) |
-| `GET` | `/missions/filters` | Mission filters |
-| `GET` | `/missions/types` | Mission types |
-| `GET` | `/missions/factions` | Factions |
-| `GET` | `/missions/systems` | Systems |
-| `GET` | `/missions/categories` | Categories |
-| `GET` | `/missions/:uuid` | Mission detail |
-| `GET` | `/locations` | Paginated list (**requires** `beta_tester` or `admin`) |
-| `GET` | `/locations/filters` | Filters |
-| `GET` | `/locations/types` | Location types |
-| `GET` | `/locations/systems` | Systems with locations |
-| `GET` | `/locations/all` | Full unpaginated list (for trees) |
-| `GET` | `/locations/:uuid` | Location detail |
-| `GET` | `/locations/:uuid/children` | Child locations |
-
-### Manufacturers & Paints
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/manufacturers` | Manufacturer list with data |
-| `GET` | `/manufacturers/:code` | Manufacturer detail |
-| `GET` | `/manufacturers/:code/ships` | Manufacturer's ships |
-| `GET` | `/manufacturers/:code/components` | Manufacturer's components |
-| `GET` | `/manufacturers/:code/items` | Manufacturer's FPS items |
-| `GET` | `/paints` | Paint list |
-| `GET` | `/paints/filters` | Paint filters |
-
-### Ship Matrix & RSI Website
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/ship-matrix` | RSI Ship Matrix data (246 ships) |
-| `GET` | `/ship-matrix/stats` | Aggregated statistics |
-| `GET` | `/ship-matrix/:id` | Entry by ID or name |
-| `GET` | `/galactapedia` | Galactapedia entries (paginated) |
-| `GET` | `/galactapedia/:id` | Full article |
-| `GET` | `/comm-links` | Comm-links (paginated, sorted by date) |
-| `GET` | `/comm-links/categories` | Comm-link categories |
-| `GET` | `/comm-links/:id` | Full article |
-| `GET` | `/starmap/systems` | RSI stellar systems |
-| `GET` | `/starmap/systems/:code` | System with celestial bodies |
-
-### System
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/search` | Unified search: ships, components, items, commodities, missions, recipes |
-| `GET` | `/version` | Current extraction game version |
-| `GET` | `/game-versions` | Extraction history |
-| `GET` | `/game-versions/default` | Latest LIVE extraction |
-| `GET` | `/stats/overview` | Counts: ships, components, items… |
-| `GET` | `/changelog` | Data changelog (additions/removals/changes) |
-| `GET` | `/changelog/summary` | Grouped changelog summary |
-
-### AI Chat _(beta_tester+, requires MISTRAL_API_KEY)_
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/chat` | SSE streaming — Star Citizen AI assistant |
-| `POST` | `/chat/ask` | Synchronous JSON response (Discord bot / external) |
-
-### Authentication
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/auth/register` | Create an account (sends a verification email) |
-| `POST` | `/auth/login` | Log in → JWT 24h (or `requires2FA: true`) |
-| `POST` | `/auth/verify-email` | Verify email with received token |
-| `POST` | `/auth/forgot-password` | Request a password reset link |
-| `POST` | `/auth/reset-password` | Reset password (token valid 1h) |
-| `GET` | `/auth/me` | Logged-in user profile |
-| `PUT` | `/auth/me` | Update profile (username, avatarUrl) |
-| `DELETE` | `/auth/me` | Delete account |
-| `POST` | `/auth/api-token` | Generate a long-lived token (1 year) — `beta_tester+` |
-| `POST` | `/auth/2fa/setup` | Configure TOTP 2FA (generates secret + QR) |
-| `POST` | `/auth/2fa/enable` | Enable 2FA with a TOTP code |
-| `POST` | `/auth/2fa/disable` | Disable 2FA |
-| `POST` | `/auth/2fa/verify` | Complete 2FA login (pendingToken + code) |
-
-### Bug Reports
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/v1/bug-reports` | Submit a report (authenticated user) |
-| `GET` | `/api/v1/bug-reports` | List own reports |
-
-### Admin _(admin only)_
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/admin/stats` | Ship Matrix + game data statistics |
-| `GET` | `/admin/extraction-log` | Extraction log |
-| `GET` | `/admin/users` | User list |
-| `POST` | `/admin/users` | Create a user |
-| `PUT` | `/admin/users/:id` | Update a user |
-| `PUT` | `/admin/users/:id/role` | Change role |
-| `POST` | `/admin/users/:id/reset-password` | Reset password |
-| `DELETE` | `/admin/users/:id` | Delete a user |
-| `GET` | `/admin/bug-reports` | List all reports |
-| `GET` | `/admin/bug-reports/:id` | Report detail |
-| `PATCH` | `/admin/bug-reports/:id` | Update status |
-
-### Health
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/health` | DB connection + gameData state check |
-| `GET` | `/health/live` | Liveness probe (Docker/K8s) |
-| `GET` | `/health/ready` | Readiness probe (checks DB + Redis) |
-| `GET` | `/health/metrics` | Prometheus metrics |
-| `GET` | `/health/cache/stats` | Redis statistics |
+```bash
+npm run openapi:lint --workspace=@starvis/api
+```
 
 ---
 
 ## CI/CD
 
-GitHub Actions pipeline on every push to `main`:
+GitHub Actions runs on pushes to any branch and pull requests to `main`.
 
-1. **Quality** — Lint (Biome), tests (Vitest), type-check (tsc)
-2. **Build** — Docker images API + IHM + Bot → GHCR
-3. **Deploy** — SSH to VPS → `docker compose up`
+Main jobs:
+
+| Job | What it checks |
+|---|---|
+| Install & Generate | npm dependencies and Prisma client generation cache. |
+| Security & Dockerfiles | Critical npm audit and Dockerfile lint. |
+| Config, Schema & Docs | OpenAPI validation, Prisma validation, compose validation, shell script syntax and env contract. |
+| Lint | Biome CI. |
+| Typecheck | API, IHM, extractor, bot and DB TypeScript checks. |
+| Tests API | API Vitest suite with PostgreSQL and Redis services. |
+| Tests Extractor | Extractor Vitest suite. |
+| Tests IHM | IHM Vitest suite. |
+| Tests E2E | Full Playwright Chromium suite, including critical UI flows. |
+| Build | API, IHM and bot images pushed to GHCR on `main`. |
+| Deploy | VPS deployment on `main` after images are built. |
+| Production Data Audit | Strict API/data coherence audit after production deployment. |
+
+Before pushing, run the checks for every touched workspace, plus lint and typecheck. Run Playwright when a change affects UI, routing, rendering or browser interaction. After pushing, verify the GitHub CI run and fix it if it fails.
 
 ---
 
 ## Production
 
-Deployment uses `.env.prod` on the VPS. To update configuration without rebuilding:
+Production uses prebuilt GHCR images and `.env.prod` on the VPS. The production compose keeps the same service model as dev: PostgreSQL, Redis, API, IHM and bot. Differences are limited to image source, Traefik routing, resource limits and safer host bindings.
+
+Configuration update without rebuilding:
 
 ```bash
 ssh -i ~/.ssh/starvis_vps debian@ampynjord.bzh
-# Edit /home/debian/starvis/.env.prod
-# Then restart the relevant service:
+cd /home/debian/starvis
+# edit .env.prod
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --no-deps --force-recreate <service>
 ```
 
-Production routing note: Traefik sends only backend public paths (`/api/v1`, `/api-docs`, `/health`) to the Express API. Other paths, including `/admin` pages and `/api/*` Next.js route handlers, stay on the IHM. Web admin calls use `/api/admin/*` route handlers, which proxy internally to Express `/admin/*`.
+Deployment from CI:
+
+1. Pull latest `main` on the VPS.
+2. Pull fresh API, IHM and bot images from GHCR.
+3. Ensure PostgreSQL and Redis are running.
+4. Run `npm run migrate:deploy --workspace=@starvis/db` from the API image.
+5. Restart the stack.
+6. Check API and IHM health.
+7. Run runtime smoke tests.
 
 ---
 
-## Tests
+## Documentation Maintenance
 
-```bash
-npm run test                                           # All workspaces
-npm run test --workspace=api                           # API only
-npm run typecheck --workspace=api                      # API type-check
-npx tsc --noEmit --project extractor/tsconfig.json    # Extractor type-check
-npm run lint                                           # Biome lint (all workspaces)
-```
+- Update this README when project structure, commands, deployment, local setup or developer workflow changes.
+- Update workspace READMEs when changing a workspace-specific workflow.
+- Update [`api/openapi.json`](api/openapi.json) whenever API routes are added, changed or removed.
+- Keep `.env.*.example` files aligned with compose variables.
 
 ---
 
-## Legal & Compliance
+## Legal and Compliance
 
-### Non-profit community project
+### Community project
 
-STARVIS is an **independent, community-driven, non-profit project**. It is not affiliated with, endorsed by,
-or officially connected to **Cloud Imperium Games Corporation** or **Roberts Space Industries Corp.**
+STARVIS is an unofficial, independent, community-driven, non-profit project. It is not affiliated with, endorsed by,
+sponsored by, or officially connected to Cloud Imperium Games Corporation, Cloud Imperium Rights LLC,
+Roberts Space Industries Corp. or their affiliates.
 
-### Credits — Intellectual property
+### Credits and intellectual property
 
-**Star Citizen®** and all game data (ship names, components, items, lore, etc.)
-are the property of **Cloud Imperium Games Corporation** and/or **Roberts Space Industries Corp.**
+Star Citizen and all game data, including ship names, components, items and lore, are the property of Cloud Imperium Games Corporation and/or Roberts Space Industries Corp.
 
-> © 2012–2025 Cloud Imperium Rights LLC. All rights reserved.
+Copyright 2012-2025 Cloud Imperium Rights LLC. All rights reserved.
 
-The data displayed (extracted from P4K via DataForge, RSI Ship Matrix, and the RSI website) is used
-in a strictly non-commercial, community context, in accordance with CIG's community licensing policy.
-STARVIS claims no ownership over this content.
+The data displayed by STARVIS is used in a strictly non-commercial community context, in accordance with CIG's community licensing policy. STARVIS claims no ownership over CIG/RSI content.
 
 ### Source code license
 
-The STARVIS source code is proprietary and all rights are reserved (see [LICENSE](LICENSE)).
-This code license covers only the STARVIS code owned by ampynjord; it does not apply to data or content owned by CIG/RSI.
+The STARVIS source code is proprietary and all rights are reserved. See [`LICENSE`](LICENSE).
 
-### GDPR / Data protection
+This code license covers only STARVIS source code owned by ampynjord. It does not apply to data, trademarks, media or content owned by CIG/RSI.
 
-Data collected at registration: email, username, password hash, role, avatar.
-No payment data, no advertising cookies, no transmission to third parties for commercial purposes.
+### GDPR / data protection
 
-GDPR contact: gwenvaelcaouissin@gmail.com  
-Full policy available at [/legal](https://starvis.ampynjord.bzh/legal).
+The public legal and privacy policy is maintained at `/legal`. Production deployments expose `LEGAL_*`,
+`CONTACT_EMAIL`, and `NEXT_PUBLIC_CONTACT_EMAIL`; keep these values accurate in `.env.prod`. The production template
+uses the public STARVIS domain, the project contact email, and OVH SAS hosting details.
+
+Personal data handled by the project may include:
+
+- account data: email, username, role, avatar URL, timestamps and email verification state;
+- security data: bcrypt password hash, hashed email verification/password reset tokens, encrypted 2FA secret, JWT sessions and API tokens;
+- user content: bug reports, corporation memberships, ranks and fleet notes;
+- technical data: logs and request metadata needed for security, diagnostics and abuse prevention;
+- optional AI/Discord data: prompts/messages sent to the STARVIS assistant or Discord bot.
+
+No payment data, no advertising cookies, and no sale of personal data are used by STARVIS.
+
+The AI assistant is optional and requires `MISTRAL_API_KEY`. When enabled, prompts are sent to the configured chat
+provider (`CHAT_PROVIDER_BASE_URL`, Mistral by default). Users must not send passwords, API tokens, private keys,
+confidential information or third-party personal data in AI prompts or Discord bot commands.
+
+GDPR contact: configure `CONTACT_EMAIL` and `NEXT_PUBLIC_CONTACT_EMAIL` in the deployment environment.
+
+Full policy: [starvis.ampynjord.bzh/legal](https://starvis.ampynjord.bzh/legal)

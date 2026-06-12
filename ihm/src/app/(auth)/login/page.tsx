@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Lock, LogIn, ShieldCheck, User } from 'lucide-react';
+import { Lock, LogIn, ShieldCheck, User, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useState } from 'react';
@@ -13,6 +13,7 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') ?? '/';
+  const redirectedToProtectedFeature = redirect !== '/';
 
   const [step, setStep] = useState<'credentials' | '2fa'>('credentials');
   const [field, setField] = useState('');
@@ -120,6 +121,12 @@ function LoginForm() {
       className="w-full max-w-sm"
     >
       <AuthPanel icon={Lock} title="Sign In" subtitle="Starvis secure access">
+        {redirectedToProtectedFeature && (
+          <div className="rounded-sm border border-cyan-900/40 bg-cyan-950/20 px-3 py-2 text-xs leading-relaxed text-slate-400">
+            This feature is available after sign-in. Create a free account to unlock profile tools,
+            corporation features, bug reports, API access and the Starvis AI assistant.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1.5">
@@ -184,7 +191,11 @@ function LoginForm() {
 
         <p className="text-center text-xs text-slate-600">
           No account yet?{' '}
-          <Link href="/register" className="text-cyan-500 hover:text-cyan-300 transition-colors">
+          <Link
+            href="/register"
+            className="inline-flex items-center gap-1 text-cyan-500 hover:text-cyan-300 transition-colors"
+          >
+            <UserPlus size={11} />
             Create an account
           </Link>
         </p>

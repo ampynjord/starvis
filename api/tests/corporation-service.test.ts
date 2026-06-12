@@ -66,6 +66,55 @@ describe('CorporationService', () => {
     });
   });
 
+  describe('updateOwnFleetItemPosition', () => {
+    it('persists a user fleet item position', async () => {
+      const db: any = {
+        corporationFleetItem: {
+          findUnique: vi.fn().mockResolvedValue({ id: 11, addedById: 7 }),
+          update: vi.fn().mockResolvedValue({ id: 11, gridX: 12, gridZ: -4 }),
+        },
+      };
+
+      const result = await new CorporationService(db).updateOwnFleetItemPosition(11, 7, { gridX: 12, gridZ: -4 });
+
+      expect(result).toEqual({ id: 11, gridX: 12, gridZ: -4 });
+      expect(db.corporationFleetItem.update).toHaveBeenCalledWith({
+        where: { id: 11 },
+        data: { gridX: 12, gridZ: -4 },
+        select: expect.any(Object),
+      });
+    });
+
+    it('rejects moving another user fleet item', async () => {
+      const db: any = {
+        corporationFleetItem: {
+          findUnique: vi.fn().mockResolvedValue({ id: 11, addedById: 8 }),
+          update: vi.fn(),
+        },
+      };
+
+      await expect(new CorporationService(db).updateOwnFleetItemPosition(11, 7, { gridX: 1, gridZ: 2 })).rejects.toThrow('FORBIDDEN');
+      expect(db.corporationFleetItem.update).not.toHaveBeenCalled();
+    });
+
+    it('allows moving another member fleet item in the same corporation', async () => {
+      const db: any = {
+        corporationFleetItem: {
+          findUnique: vi.fn().mockResolvedValue({ id: 11, addedById: 8, corporationId: 42 }),
+          update: vi.fn().mockResolvedValue({ id: 11, gridX: 1, gridZ: 2 }),
+        },
+      };
+
+      await new CorporationService(db).updateOwnFleetItemPosition(11, 7, { gridX: 1, gridZ: 2 }, 42);
+
+      expect(db.corporationFleetItem.update).toHaveBeenCalledWith({
+        where: { id: 11 },
+        data: { gridX: 1, gridZ: 2 },
+        select: expect.any(Object),
+      });
+    });
+  });
+
   describe('deleteCorporation', () => {
     it('resets Starvis-owned corporation data without deleting the corporation or users', async () => {
       const resetCorporation = {

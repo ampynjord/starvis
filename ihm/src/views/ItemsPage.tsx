@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { ExternalLink } from "lucide-react";
+import { Boxes, Crosshair, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -18,7 +18,7 @@ import { ITEM_TYPE_LABELS } from "@/utils/constants";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PageShell } from "@/components/ui/PageShell";
 import { ListFilterBar, ListFilterChips, ListFilterResetButton, ListFilterSelect } from "@/components/ui/ListFilters";
-import type { ItemListItem } from "@/types/api";
+import type { AmmoInsight, InventoryContainerInsight, ItemListItem } from "@/types/api";
 
 const LIMIT = 30;
 
@@ -64,6 +64,91 @@ function fNum(v: number | string | null | undefined, dec = 0): string {
 	if (v == null) return "—";
 	const n = Number(v);
 	return Number.isNaN(n) ? "—" : n.toLocaleString("en-US", { maximumFractionDigits: dec, minimumFractionDigits: dec });
+}
+
+function totalDamage(ammo: AmmoInsight): number {
+	return [
+		ammo.damage_physical,
+		ammo.damage_energy,
+		ammo.damage_distortion,
+		ammo.damage_thermal,
+		ammo.damage_biochemical,
+		ammo.damage_stun,
+		ammo.explosion_damage_physical,
+		ammo.explosion_damage_energy,
+		ammo.explosion_damage_distortion,
+		ammo.explosion_damage_thermal,
+		ammo.explosion_damage_biochemical,
+		ammo.explosion_damage_stun,
+	].reduce<number>((sum, value) => sum + (Number(value) || 0), 0);
+}
+
+function AmmoInsightPanel({ rows, total }: { rows: AmmoInsight[]; total: number }) {
+	if (!rows.length) return null;
+	const sorted = [...rows].sort((a, b) => totalDamage(b) - totalDamage(a)).slice(0, 6);
+	return (
+		<div className="sci-panel p-4">
+			<div className="mb-3 flex items-start justify-between gap-4">
+				<div>
+					<h2 className="font-orbitron text-sm font-bold uppercase tracking-widest text-cyan-400">Ammo DataForge</h2>
+					<p className="mt-0.5 font-mono-sc text-xs text-slate-500">{total.toLocaleString("en-US")} ammo records with ballistic, energy and explosive stats.</p>
+				</div>
+				<Crosshair size={16} className="shrink-0 text-red-400" />
+			</div>
+			<div className="grid gap-2 lg:grid-cols-3">
+				{sorted.map((ammo) => (
+					<div key={ammo.uuid} className="rounded-sm border border-slate-800/70 bg-slate-950/50 p-3">
+						<p className="truncate font-orbitron text-xs font-bold text-slate-100">{ammo.name ?? ammo.class_name}</p>
+						<p className="mt-1 truncate font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">{ammo.class_name}</p>
+						<div className="mt-3 grid grid-cols-3 gap-2 font-mono-sc text-[10px] uppercase tracking-widest">
+							<span className="text-red-400">DMG {fNum(totalDamage(ammo), 0)}</span>
+							<span className="text-cyan-400">VEL {fNum(ammo.speed, 0)}</span>
+							<span className="text-amber-400">S{ammo.size ?? 0}</span>
+						</div>
+						{ammo.explosion_max_radius != null && (
+							<p className="mt-2 font-mono-sc text-[10px] uppercase tracking-widest text-rose-400">Blast {fNum(ammo.explosion_max_radius, 1)}m</p>
+						)}
+					</div>
+				))}
+			</div>
+		</div>
+	);
+}
+
+function InventoryContainerPanel({ rows, total }: { rows: InventoryContainerInsight[]; total: number }) {
+	if (!rows.length) return null;
+	const sorted = [...rows]
+		.filter((row) => row.capacity_scu != null || row.capacity_micro_scu != null)
+		.sort((a, b) => Number(b.capacity_micro_scu ?? 0) - Number(a.capacity_micro_scu ?? 0))
+		.slice(0, 6);
+	if (!sorted.length) return null;
+	return (
+		<div className="sci-panel p-4">
+			<div className="mb-3 flex items-start justify-between gap-4">
+				<div>
+					<h2 className="font-orbitron text-sm font-bold uppercase tracking-widest text-cyan-400">Inventory Containers</h2>
+					<p className="mt-0.5 font-mono-sc text-xs text-slate-500">{total.toLocaleString("en-US")} container definitions extracted from DataForge.</p>
+				</div>
+				<Boxes size={16} className="shrink-0 text-amber-400" />
+			</div>
+			<div className="grid gap-2 lg:grid-cols-3">
+				{sorted.map((container) => (
+					<div key={container.uuid} className="rounded-sm border border-slate-800/70 bg-slate-950/50 p-3">
+						<p className="truncate font-orbitron text-xs font-bold text-slate-100">{container.name ?? container.class_name}</p>
+						<p className="mt-1 truncate font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">{container.inventory_type ?? "Inventory"}</p>
+						<div className="mt-3 flex flex-wrap items-center gap-3 font-mono-sc text-[10px] uppercase tracking-widest">
+							<span className="text-amber-400">{fNum(container.capacity_scu, 3)} SCU</span>
+							{container.size_x != null && container.size_y != null && container.size_z != null && (
+								<span className="text-slate-500">
+									{fNum(container.size_x, 1)}x{fNum(container.size_y, 1)}x{fNum(container.size_z, 1)}
+								</span>
+							)}
+						</div>
+					</div>
+				))}
+			</div>
+		</div>
+	);
 }
 
 function ItemStats({ item }: { item: ItemListItem }) {
@@ -225,6 +310,26 @@ export default function ItemsPage({ group }: ItemsPageProps = {}) {
 		enabled: !!navigation,
 	});
 
+	const showAmmoInsights = resolvedGroup === "ammo";
+	const showInventoryInsights = resolvedGroup === "armor" || resolvedGroup === "utility";
+
+	const { data: ammoInsights } = useQuery({
+		queryKey: ["ammo.stats", env, debouncedSearch],
+		queryFn: () => api.ammo.stats({ env, search: debouncedSearch || undefined, limit: 100 }),
+		staleTime: 5 * 60_000,
+		enabled: showAmmoInsights,
+	});
+
+	const { data: inventoryInsights } = useQuery({
+		queryKey: [`${resolvedGroup}.inventory-containers`, env, debouncedSearch],
+		queryFn: () => {
+			const client = resolvedGroup === "armor" ? api.armor : api.utility;
+			return client.inventoryContainers({ env, search: debouncedSearch || undefined, limit: 100 });
+		},
+		staleTime: 5 * 60_000,
+		enabled: showInventoryInsights,
+	});
+
 	const hasFilters = !!(manufacturer || debouncedSearch || subType || (activeSlug !== "all" && activeSlug !== resolvedGroup));
 	const resetFilters = () => {
 		resetListState();
@@ -286,6 +391,13 @@ export default function ItemsPage({ group }: ItemsPageProps = {}) {
 					<ListFilterResetButton onClick={resetFilters} />
 				)}
 			</ListFilterBar>
+
+			{showAmmoInsights && (
+				<AmmoInsightPanel rows={ammoInsights?.data ?? []} total={ammoInsights?.total ?? 0} />
+			)}
+			{showInventoryInsights && (
+				<InventoryContainerPanel rows={inventoryInsights?.data ?? []} total={inventoryInsights?.total ?? 0} />
+			)}
 
 			{isLoading ? (
 				<LoadingGrid message="LOADING…" />

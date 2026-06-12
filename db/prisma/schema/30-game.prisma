@@ -1,390 +1,3 @@
-// ============================================================
-// schema.prisma — Unified PostgreSQL multi-schema definition
-//
-// Schemas:
-//   game  — game data extracted from P4K (ships, components, manufacturers…)
-//            env = "live" | "ptu" replaces the live/ptu DB split
-//   rsi   — data scraped from RSI website / SC Wiki
-//   meta  — extraction metadata, changelogs, users
-//
-// Run: npm run generate --workspace=@starvis/db
-// ============================================================
-
-generator client {
-  provider = "prisma-client-js"
-  output   = "../generated/client"
-}
-
-datasource db {
-  provider = "postgresql"
-  schemas  = ["game", "rsi", "meta"]
-}
-
-// ╔══════════════════════════════════════════════════════════════╗
-// ║  META SCHEMA — extraction log, changelog, users              ║
-// ╚══════════════════════════════════════════════════════════════╝
-
-enum ExtractionStatus {
-  success
-  partial
-  failed
-
-  @@schema("meta")
-}
-
-enum ChangelogEntityType {
-  ship
-  component
-  item
-  commodity
-  shop
-  module
-  recipe
-
-  @@schema("meta")
-}
-
-enum ChangelogChangeType {
-  added
-  removed
-  modified
-
-  @@schema("meta")
-}
-
-model ExtractionLog {
-  id                 Int              @id @default(autoincrement())
-  extractionHash     String           @map("extraction_hash") @db.Char(64)
-  gameVersion        String?          @map("game_version") @db.VarChar(50)
-  gameEnv            String           @default("live") @map("game_env") @db.VarChar(10)
-  shipsCount         Int              @default(0) @map("ships_count")
-  componentsCount    Int              @default(0) @map("components_count")
-  itemsCount         Int              @default(0) @map("items_count")
-  commoditiesCount   Int              @default(0) @map("commodities_count")
-  manufacturersCount Int              @default(0) @map("manufacturers_count")
-  loadoutPortsCount  Int              @default(0) @map("loadout_ports_count")
-  shopsCount         Int              @default(0) @map("shops_count")
-  recipesCount       Int              @default(0) @map("recipes_count")
-  durationMs         Int?             @map("duration_ms")
-  status             ExtractionStatus @default(success)
-  errorMessage       String?          @map("error_message")
-  extractedAt        DateTime         @default(now()) @map("extracted_at")
-
-  changelogs Changelog[]
-
-  @@index([extractionHash])
-  @@index([gameEnv])
-  @@map("extraction_log")
-  @@schema("meta")
-}
-
-model Changelog {
-  id           Int                 @id @default(autoincrement())
-  extractionId Int                 @map("extraction_id")
-  entityType   ChangelogEntityType @map("entity_type")
-  entityUuid   String              @map("entity_uuid") @db.VarChar(255)
-  entityName   String?             @map("entity_name") @db.VarChar(255)
-  changeType   ChangelogChangeType @map("change_type")
-  fieldName    String?             @map("field_name") @db.VarChar(100)
-  oldValue     String?             @map("old_value")
-  newValue     String?             @map("new_value")
-  createdAt    DateTime            @default(now()) @map("created_at")
-
-  extraction ExtractionLog @relation(fields: [extractionId], references: [id], onDelete: Cascade)
-
-  @@index([extractionId])
-  @@index([entityType, entityUuid])
-  @@map("changelog")
-  @@schema("meta")
-}
-
-enum UserRole {
-  user
-  developer
-  admin
-
-  @@schema("meta")
-}
-
-model User {
-  id                Int       @id @default(autoincrement())
-  uuid              String    @unique @default(cuid()) @db.VarChar(36)
-  email             String    @unique @db.VarChar(255)
-  username          String    @unique @db.VarChar(50)
-  passwordHash      String    @map("password_hash") @db.VarChar(255)
-  role              UserRole  @default(user)
-  avatarUrl         String?   @map("avatar_url") @db.VarChar(500)
-  emailVerified     Boolean   @default(true) @map("email_verified")
-  verificationToken String?   @unique @map("verification_token") @db.VarChar(255)
-  resetToken        String?   @unique @map("reset_token") @db.VarChar(255)
-  resetTokenExpiry  DateTime? @map("reset_token_expiry")
-  twoFactorSecret   String?   @map("two_factor_secret") @db.VarChar(255)
-  twoFactorEnabled  Boolean   @default(false) @map("two_factor_enabled")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-
-  bugReports      BugReport[]
-  memberships     CorporationMembership[]
-  addedFleetItems CorporationFleetItem[]  @relation("AddedFleetItems")
-
-  @@index([email])
-  @@map("users")
-  @@schema("meta")
-}
-
-model BugReport {
-  id               Int      @id @default(autoincrement())
-  userId           Int      @map("user_id")
-  title            String   @db.VarChar(200)
-  description      String   @db.Text
-  attachments      Json     @default("[]")
-  status           String   @default("open") @db.VarChar(20)
-  duplicateOfId    Int?     @map("duplicate_of_id")
-  duplicateComment String?  @map("duplicate_comment") @db.Text
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
-
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  duplicateOf   BugReport?  @relation("BugReportDuplicates", fields: [duplicateOfId], references: [id], onDelete: SetNull)
-  duplicateOfMe BugReport[] @relation("BugReportDuplicates")
-
-  @@index([userId])
-  @@index([status])
-  @@index([duplicateOfId])
-  @@index([createdAt])
-  @@map("bug_reports")
-  @@schema("meta")
-}
-
-// ─── Corporations ─────────────────────────────────────────────────────────────
-
-enum FleetItemType {
-  ship
-  component
-  item
-  commodity
-  other
-
-  @@schema("meta")
-}
-
-enum CorporationMembershipRole {
-  member
-  leader
-
-  @@schema("meta")
-}
-
-enum CorporationMembershipStatus {
-  pending
-  active
-  rejected
-
-  @@schema("meta")
-}
-
-model Corporation {
-  id                   Int      @id @default(autoincrement())
-  name                 String   @unique @db.VarChar(100)
-  tag                  String   @unique @db.VarChar(20)
-  description          String?  @db.Text
-  logoUrl              String?  @map("logo_url") @db.VarChar(500)
-  // RSI org data (cached from live API)
-  rsiArchetype         String?  @map("rsi_archetype") @db.VarChar(50)
-  rsiLanguage          String?  @map("rsi_language") @db.VarChar(50)
-  rsiCommitment        String?  @map("rsi_commitment") @db.VarChar(20)
-  rsiRecruiting        Boolean? @map("rsi_recruiting")
-  rsiRoleplay          Boolean? @map("rsi_roleplay")
-  rsiMemberCount       Int?     @map("rsi_member_count")
-  rsiSyncedAt          DateTime? @map("rsi_synced_at")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
-
-  memberships CorporationMembership[]
-  fleetItems  CorporationFleetItem[]
-
-  @@map("corporations")
-  @@schema("meta")
-}
-
-model CorporationMembership {
-  id            Int      @id @default(autoincrement())
-  userId        Int      @map("user_id")
-  corporationId Int      @map("corporation_id")
-  rank          String?  @db.VarChar(50)
-  role          CorporationMembershipRole   @default(member)
-  status        CorporationMembershipStatus @default(active)
-  reviewedById  Int?     @map("reviewed_by_id")
-  reviewedAt    DateTime? @map("reviewed_at")
-  declaredAt    DateTime @default(now()) @map("declared_at")
-
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  corporation Corporation @relation(fields: [corporationId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, corporationId])
-  @@index([corporationId])
-  @@index([corporationId, status])
-  @@index([userId, status])
-  @@map("corporation_memberships")
-  @@schema("meta")
-}
-
-model CorporationFleetItem {
-  id            Int           @id @default(autoincrement())
-  corporationId Int?          @map("corporation_id")
-  itemType      FleetItemType @map("item_type")
-  itemClassName String        @map("item_class_name") @db.VarChar(255)
-  shipUuid      String?       @map("ship_uuid") @db.VarChar(64)
-  quantity      Int           @default(1)
-  notes         String?       @db.Text
-  addedById     Int?          @map("added_by_id")
-  addedAt       DateTime      @default(now()) @map("added_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
-
-  corporation Corporation? @relation(fields: [corporationId], references: [id], onDelete: Cascade)
-  addedBy     User?       @relation("AddedFleetItems", fields: [addedById], references: [id], onDelete: SetNull)
-
-  @@index([corporationId])
-  @@index([addedById, itemType])
-  @@map("corporation_fleet_items")
-  @@schema("meta")
-}
-
-// ╔══════════════════════════════════════════════════════════════╗
-// ║  RSI SCHEMA — RSI website + SC Wiki scraped data             ║
-// ╚══════════════════════════════════════════════════════════════╝
-
-model ShipMatrix {
-  id                Int      @id
-  name              String   @db.VarChar(255)
-  chassisId         Int?     @map("chassis_id")
-  manufacturerCode  String?  @map("manufacturer_code") @db.VarChar(10)
-  manufacturerName  String?  @map("manufacturer_name") @db.VarChar(100)
-  focus             String?  @db.VarChar(255)
-  type              String?  @db.VarChar(50)
-  description       String?
-  productionStatus  String?  @map("production_status") @db.VarChar(50)
-  productionNote    String?  @map("production_note")
-  size              String?  @db.VarChar(20)
-  url               String?  @db.VarChar(500)
-  length            Decimal? @db.Decimal(10, 2)
-  beam              Decimal? @db.Decimal(10, 2)
-  height            Decimal? @db.Decimal(10, 2)
-  mass              Int?
-  cargocapacity     Int?
-  minCrew           Int?     @default(1) @map("min_crew")
-  maxCrew           Int?     @default(1) @map("max_crew")
-  scmSpeed          Int?     @map("scm_speed")
-  afterburnerSpeed  Int?     @map("afterburner_speed")
-  pitchMax          Decimal? @map("pitch_max") @db.Decimal(10, 2)
-  yawMax            Decimal? @map("yaw_max") @db.Decimal(10, 2)
-  rollMax           Decimal? @map("roll_max") @db.Decimal(10, 2)
-  xaxisAcceleration Decimal? @map("xaxis_acceleration") @db.Decimal(10, 4)
-  yaxisAcceleration Decimal? @map("yaxis_acceleration") @db.Decimal(10, 4)
-  zaxisAcceleration Decimal? @map("zaxis_acceleration") @db.Decimal(10, 4)
-  mediaSourceUrl    String?  @map("media_source_url")
-  mediaStoreSmall   String?  @map("media_store_small")
-  mediaStoreLarge   String?  @map("media_store_large")
-  ctmUrl            String?  @map("ctm_url") @db.VarChar(500)
-  compiled          Json?
-  syncedAt          DateTime @default(now()) @map("synced_at")
-
-  @@map("ship_matrix")
-  @@schema("rsi")
-}
-
-model Galactapedia {
-  id                   String    @id @db.VarChar(50)
-  slug                 String    @db.VarChar(255)
-  title                String    @db.VarChar(500)
-  content              String?
-  excerpt              String?   @db.VarChar(500)
-  type                 String?   @db.VarChar(100)
-  template             String?   @db.VarChar(100)
-  categories           Json?
-  tags                 Json?
-  categoriesCount      Int?      @map("categories_count")
-  tagsCount            Int?      @map("tags_count")
-  relatedArticlesCount Int?      @map("related_articles_count")
-  thumbnailUrl         String?   @map("thumbnail_url") @db.VarChar(500)
-  rsiUrl               String?   @map("rsi_url") @db.VarChar(500)
-  apiUrl               String?   @map("api_url") @db.VarChar(500)
-  webUrl               String?   @map("web_url") @db.VarChar(500)
-  sourceCreatedAt      DateTime? @map("source_created_at")
-  rawJson              Json?     @map("raw_json")
-  updatedAt            DateTime  @default(now()) @updatedAt @map("updated_at")
-
-  @@index([slug])
-  @@map("galactapedia")
-  @@schema("rsi")
-}
-
-model CommLink {
-  id           Int       @id @default(autoincrement())
-  rsiId        String    @unique @map("rsi_id") @db.VarChar(20)
-  slug         String?   @db.VarChar(255)
-  title        String    @db.VarChar(500)
-  content      String?
-  excerpt      String?   @db.VarChar(500)
-  category     String?   @db.VarChar(100)
-  sourceCategory String? @map("source_category") @db.VarChar(100)
-  channel      String?   @db.VarChar(100)
-  series       String?   @db.VarChar(100)
-  thumbnailUrl String?   @map("thumbnail_url") @db.VarChar(500)
-  rsiUrl       String?   @map("rsi_url") @db.VarChar(500)
-  apiUrl       String?   @map("api_url") @db.VarChar(500)
-  apiPublicUrl String?   @map("api_public_url") @db.VarChar(500)
-  imagesCount  Int?      @map("images_count")
-  linksCount   Int?      @map("links_count")
-  commentCount Int?      @map("comment_count")
-  rawJson      Json?     @map("raw_json")
-  publishedAt  DateTime? @map("published_at")
-
-  @@index([category])
-  @@index([publishedAt])
-  @@map("comm_links")
-  @@schema("rsi")
-}
-
-model StarmapLocation {
-  id                 Int       @id @default(autoincrement())
-  rsiId              String    @unique @map("rsi_id") @db.VarChar(50)
-  name               String    @db.VarChar(255)
-  type               String    @db.VarChar(50)
-  status             String?   @db.VarChar(20)
-  starType           String?   @map("star_type") @db.VarChar(50)
-  systemCode         String?   @map("system_code") @db.VarChar(20)
-  systemName         String?   @map("system_name") @db.VarChar(255)
-  parentId           String?   @map("parent_id") @db.VarChar(50)
-  factionName        String?   @map("faction_name") @db.VarChar(100)
-  affiliations       Json?
-  thumbnail          String?   @db.VarChar(500)
-  description        String?
-  webUrl             String?   @map("web_url") @db.VarChar(500)
-  coordinates        Json?
-  aggregated         Json?
-  size               Decimal?  @db.Decimal(12, 2)
-  population         Decimal?  @db.Decimal(12, 2)
-  economy            Decimal?  @db.Decimal(12, 2)
-  danger             Decimal?  @db.Decimal(12, 2)
-  frostLine          Decimal?  @map("frost_line") @db.Decimal(12, 2)
-  habitableZoneInner Decimal?  @map("habitable_zone_inner") @db.Decimal(12, 2)
-  habitableZoneOuter Decimal?  @map("habitable_zone_outer") @db.Decimal(12, 2)
-  jumpPoints         Json?     @map("jump_points")
-  rawJson            Json?     @map("raw_json")
-  sourceUpdatedAt    DateTime? @map("source_updated_at")
-  syncedAt           DateTime  @default(now()) @map("synced_at")
-
-  gameLocations Location[]
-
-  @@index([systemCode])
-  @@index([parentId])
-  @@index([type])
-  @@map("starmap_locations")
-  @@schema("rsi")
-}
-
-// ╔══════════════════════════════════════════════════════════════╗
 // ║  GAME SCHEMA — P4K extracted data, live + ptu via env field  ║
 // ╚══════════════════════════════════════════════════════════════╝
 //
@@ -1052,5 +665,255 @@ model Location {
   @@index([rsiStarmapLocationId])
   @@index([env])
   @@map("locations")
+  @@schema("game")
+}
+
+// ─── Game insights ────────────────────────────────────────────────────────────
+
+model GameInsight {
+  uuid          String   @db.Char(36)
+  env           String   @default("live") @db.VarChar(10)
+  category      String   @db.VarChar(50)
+  sourceType    String   @map("source_type") @db.VarChar(100)
+  className     String?  @map("class_name") @db.VarChar(300)
+  name          String?  @db.VarChar(500)
+  subtype       String?  @db.VarChar(100)
+  relatedClass  String?  @map("related_class") @db.VarChar(300)
+  relatedUuid   String?  @map("related_uuid") @db.Char(36)
+  locationHint  String?  @map("location_hint") @db.VarChar(300)
+  faction       String?  @db.VarChar(150)
+  reputationKey String?  @map("reputation_key") @db.VarChar(200)
+  valueNumeric  Decimal? @map("value_numeric") @db.Decimal(15, 4)
+  valueText     String?  @map("value_text")
+  p4kPath       String?  @map("p4k_path") @db.VarChar(500)
+  rawJson       Json?    @map("raw_json")
+  extractedAt   DateTime @default(now()) @map("extracted_at")
+
+  @@id([uuid, env, category])
+  @@index([category])
+  @@index([sourceType])
+  @@index([className])
+  @@index([relatedClass])
+  @@index([faction])
+  @@index([reputationKey])
+  @@index([env])
+  @@map("game_insights")
+  @@schema("game")
+}
+
+model GameFaction {
+  uuid                   String   @db.Char(36)
+  env                    String   @default("live") @db.VarChar(10)
+  className              String   @map("class_name") @db.VarChar(300)
+  name                   String?  @db.VarChar(500)
+  description            String?
+  factionType            String?  @map("faction_type") @db.VarChar(100)
+  defaultReaction        String?  @map("default_reaction") @db.VarChar(100)
+  ableToArrest           Boolean? @map("able_to_arrest")
+  noLegalRights          Boolean? @map("no_legal_rights")
+  policesCriminality     Boolean? @map("polices_criminality")
+  policesLawfulTrespass  Boolean? @map("polices_lawful_trespass")
+  factionReputationUuid  String?  @map("faction_reputation_uuid") @db.Char(36)
+  allies                 Json?
+  enemies                Json?
+  organizationTags       Json?    @map("organization_tags")
+  stringVariants         Json?    @map("string_variants")
+  p4kPath                String?  @map("p4k_path") @db.VarChar(500)
+  rawJson                Json?    @map("raw_json")
+  extractedAt            DateTime @default(now()) @map("extracted_at")
+
+  @@id([uuid, env])
+  @@unique([className, env])
+  @@index([factionType])
+  @@index([factionReputationUuid])
+  @@index([env])
+  @@map("factions")
+  @@schema("game")
+}
+
+model ReputationStanding {
+  uuid              String   @db.Char(36)
+  env               String   @default("live") @db.VarChar(10)
+  className         String   @map("class_name") @db.VarChar(300)
+  name              String?  @db.VarChar(255)
+  displayName       String?  @map("display_name") @db.VarChar(500)
+  description       String?
+  icon              String?  @db.VarChar(500)
+  minReputation     Int?     @map("min_reputation")
+  driftTimeHours    Decimal? @map("drift_time_hours") @db.Decimal(10, 2)
+  driftReputation   Int?     @map("drift_reputation")
+  gated             Boolean  @default(false)
+  perkDescription   String?  @map("perk_description")
+  p4kPath           String?  @map("p4k_path") @db.VarChar(500)
+  rawJson           Json?    @map("raw_json")
+  extractedAt       DateTime @default(now()) @map("extracted_at")
+
+  @@id([uuid, env])
+  @@unique([className, env])
+  @@index([minReputation])
+  @@index([env])
+  @@map("reputation_standings")
+  @@schema("game")
+}
+
+model ReputationScope {
+  uuid              String   @db.Char(36)
+  env               String   @default("live") @db.VarChar(10)
+  className         String   @map("class_name") @db.VarChar(300)
+  scopeName         String?  @map("scope_name") @db.VarChar(255)
+  displayName       String?  @map("display_name") @db.VarChar(500)
+  description       String?
+  icon              String?  @db.VarChar(500)
+  initialReputation Int?     @map("initial_reputation")
+  reputationCeiling Int?     @map("reputation_ceiling")
+  standings         Json?
+  p4kPath           String?  @map("p4k_path") @db.VarChar(500)
+  rawJson           Json?    @map("raw_json")
+  extractedAt       DateTime @default(now()) @map("extracted_at")
+
+  @@id([uuid, env])
+  @@unique([className, env])
+  @@index([scopeName])
+  @@index([env])
+  @@map("reputation_scopes")
+  @@schema("game")
+}
+
+model GameLootTable {
+  uuid        String   @db.Char(36)
+  env         String   @default("live") @db.VarChar(10)
+  className   String   @map("class_name") @db.VarChar(300)
+  name        String?  @db.VarChar(500)
+  p4kPath     String?  @map("p4k_path") @db.VarChar(500)
+  rawJson     Json?    @map("raw_json")
+  extractedAt DateTime @default(now()) @map("extracted_at")
+
+  @@id([uuid, env])
+  @@unique([className, env])
+  @@index([env])
+  @@map("loot_tables")
+  @@schema("game")
+}
+
+model GameLootTableEntry {
+  id                 Int      @id @default(autoincrement())
+  env                String   @default("live") @db.VarChar(10)
+  tableUuid          String   @map("table_uuid") @db.Char(36)
+  tableClassName     String?  @map("table_class_name") @db.VarChar(300)
+  entryIndex         Int      @map("entry_index")
+  archetypeUuid      String?  @map("archetype_uuid") @db.Char(36)
+  archetypeClassName String?  @map("archetype_class_name") @db.VarChar(300)
+  weight             Decimal? @db.Decimal(12, 4)
+  minResults         Int?     @map("min_results")
+  maxResults         Int?     @map("max_results")
+  rawJson            Json?    @map("raw_json")
+  extractedAt        DateTime @default(now()) @map("extracted_at")
+
+  @@unique([env, tableUuid, entryIndex])
+  @@index([tableUuid, env])
+  @@index([archetypeUuid])
+  @@map("loot_table_entries")
+  @@schema("game")
+}
+
+model GameLootArchetype {
+  uuid             String   @db.Char(36)
+  env              String   @default("live") @db.VarChar(10)
+  className        String   @map("class_name") @db.VarChar(300)
+  name             String?  @db.VarChar(500)
+  primaryEntries   Json?    @map("primary_entries")
+  secondaryEntries Json?    @map("secondary_entries")
+  excludedTags     Json?    @map("excluded_tags")
+  p4kPath          String?  @map("p4k_path") @db.VarChar(500)
+  rawJson          Json?    @map("raw_json")
+  extractedAt      DateTime @default(now()) @map("extracted_at")
+
+  @@id([uuid, env])
+  @@unique([className, env])
+  @@index([env])
+  @@map("loot_archetypes")
+  @@schema("game")
+}
+
+model GameBlueprintReward {
+  id                 Int      @id @default(autoincrement())
+  env                String   @default("live") @db.VarChar(10)
+  poolUuid           String   @map("pool_uuid") @db.Char(36)
+  poolClassName      String?  @map("pool_class_name") @db.VarChar(300)
+  rewardIndex        Int      @map("reward_index")
+  blueprintUuid      String?  @map("blueprint_uuid") @db.Char(36)
+  blueprintClassName String?  @map("blueprint_class_name") @db.VarChar(300)
+  weight             Decimal? @db.Decimal(12, 4)
+  rawJson            Json?    @map("raw_json")
+  extractedAt        DateTime @default(now()) @map("extracted_at")
+
+  @@unique([env, poolUuid, rewardIndex])
+  @@index([poolUuid, env])
+  @@index([blueprintUuid])
+  @@map("blueprint_rewards")
+  @@schema("game")
+}
+
+model GameAmmo {
+  uuid                         String   @db.Char(36)
+  env                          String   @default("live") @db.VarChar(10)
+  className                    String   @map("class_name") @db.VarChar(300)
+  name                         String?  @db.VarChar(500)
+  size                         Int?
+  speed                        Decimal? @db.Decimal(12, 2)
+  lifetime                     Decimal? @db.Decimal(12, 4)
+  ammoCategory                 String?  @map("ammo_category") @db.VarChar(100)
+  conversionRateMicroScu       Decimal? @map("conversion_rate_micro_scu") @db.Decimal(15, 4)
+  damagePhysical               Decimal? @map("damage_physical") @db.Decimal(12, 4)
+  damageEnergy                 Decimal? @map("damage_energy") @db.Decimal(12, 4)
+  damageDistortion             Decimal? @map("damage_distortion") @db.Decimal(12, 4)
+  damageThermal                Decimal? @map("damage_thermal") @db.Decimal(12, 4)
+  damageBiochemical            Decimal? @map("damage_biochemical") @db.Decimal(12, 4)
+  damageStun                   Decimal? @map("damage_stun") @db.Decimal(12, 4)
+  explosionDamagePhysical      Decimal? @map("explosion_damage_physical") @db.Decimal(12, 4)
+  explosionDamageEnergy        Decimal? @map("explosion_damage_energy") @db.Decimal(12, 4)
+  explosionDamageDistortion    Decimal? @map("explosion_damage_distortion") @db.Decimal(12, 4)
+  explosionDamageThermal       Decimal? @map("explosion_damage_thermal") @db.Decimal(12, 4)
+  explosionDamageBiochemical   Decimal? @map("explosion_damage_biochemical") @db.Decimal(12, 4)
+  explosionDamageStun          Decimal? @map("explosion_damage_stun") @db.Decimal(12, 4)
+  impactRadius                 Decimal? @map("impact_radius") @db.Decimal(12, 4)
+  explosionMinRadius           Decimal? @map("explosion_min_radius") @db.Decimal(12, 4)
+  explosionMaxRadius           Decimal? @map("explosion_max_radius") @db.Decimal(12, 4)
+  mass                         Decimal? @db.Decimal(12, 4)
+  p4kPath                      String?  @map("p4k_path") @db.VarChar(500)
+  rawJson                      Json?    @map("raw_json")
+  extractedAt                  DateTime @default(now()) @map("extracted_at")
+
+  @@id([uuid, env])
+  @@unique([className, env])
+  @@index([ammoCategory])
+  @@index([size])
+  @@index([env])
+  @@map("ammo")
+  @@schema("game")
+}
+
+model GameInventoryContainer {
+  uuid                 String   @db.Char(36)
+  env                  String   @default("live") @db.VarChar(10)
+  className            String   @map("class_name") @db.VarChar(300)
+  name                 String?  @db.VarChar(500)
+  inventoryType        String?  @map("inventory_type") @db.VarChar(100)
+  capacityMicroScu     Decimal? @map("capacity_micro_scu") @db.Decimal(15, 4)
+  capacityScu          Decimal? @map("capacity_scu") @db.Decimal(12, 6)
+  sizeX                Decimal? @map("size_x") @db.Decimal(12, 4)
+  sizeY                Decimal? @map("size_y") @db.Decimal(12, 4)
+  sizeZ                Decimal? @map("size_z") @db.Decimal(12, 4)
+  excludedItemSubtypes Json?    @map("excluded_item_subtypes")
+  p4kPath              String?  @map("p4k_path") @db.VarChar(500)
+  rawJson              Json?    @map("raw_json")
+  extractedAt          DateTime @default(now()) @map("extracted_at")
+
+  @@id([uuid, env])
+  @@unique([className, env])
+  @@index([inventoryType])
+  @@index([capacityMicroScu])
+  @@index([env])
+  @@map("inventory_containers")
   @@schema("game")
 }
