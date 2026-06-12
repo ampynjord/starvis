@@ -349,13 +349,13 @@ jobs:
         env:
           DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_test
 
+      # The test DB just received `migrate:deploy`, so diffing it against the
+      # schema fails (exit 2) whenever a schema change ships without a migration.
       - name: Check schema/migrations drift
         run: |
-          PGPASSWORD=ci_password psql -h 127.0.0.1 -U ci_user -d starvis_test -c 'CREATE DATABASE starvis_shadow'
           npm exec --workspace=@starvis/db -- prisma migrate diff \
-            --from-migrations prisma/migrations \
+            --from-config-datasource \
             --to-schema prisma/schema \
-            --shadow-database-url postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_shadow \
             --exit-code
         env:
           DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_test
