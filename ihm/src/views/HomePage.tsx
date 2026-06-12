@@ -89,7 +89,7 @@ const HOME_SECTION_META: Record<string, Omit<SectionDef, 'label' | 'links'>> = {
   },
 };
 
-const SECTIONS: SectionDef[] = NAV_GROUPS.map((group) => ({
+const SECTIONS: SectionDef[] = NAV_GROUPS.filter((group) => group.id in HOME_SECTION_META).map((group) => ({
   ...HOME_SECTION_META[group.id],
   label: group.label,
   links: group.items.filter((item) => !item.auth).map((item) => ({
@@ -226,7 +226,9 @@ export default function HomePage() {
   const [heroSearch, setHeroSearch] = useState('');
   const handleHeroSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (heroSearch.trim()) router.push(`/search?q=${encodeURIComponent(heroSearch.trim())}`);
+    const form = e.currentTarget as HTMLFormElement;
+    const query = String(new FormData(form).get('q') ?? '').trim();
+    if (query) router.push(`/search?q=${encodeURIComponent(query)}`);
   };
 
   const { data: stats } = useQuery({
@@ -317,16 +319,24 @@ export default function HomePage() {
               <div className="w-40 h-6 bg-slate-900/50 rounded animate-pulse" />
             )}
           </div>
-          <form onSubmit={handleHeroSearch} className="w-full max-w-xl">
+          <form action="/search" method="get" onSubmit={handleHeroSearch} className="w-full max-w-xl">
             <div className="relative">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-600" size={16} />
               <input
                 type="text"
+                name="q"
                 value={heroSearch}
                 onChange={(e) => setHeroSearch(e.target.value)}
                 placeholder="Search ships, components, items…"
-                className="w-full bg-slate-900/80 border border-slate-700 rounded-sm pl-10 pr-4 py-2.5 text-sm font-rajdhani text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-600 focus:bg-slate-900 transition-colors"
+                className="w-full bg-slate-900/80 border border-slate-700 rounded-sm pl-10 pr-11 py-2.5 text-sm font-rajdhani text-slate-300 placeholder-slate-600 focus:outline-none focus:border-cyan-600 focus:bg-slate-900 transition-colors"
               />
+              <button
+                type="submit"
+                aria-label="Search Starvis"
+                className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-sm border border-cyan-900/70 bg-cyan-950/30 text-cyan-400 transition-colors hover:border-cyan-600 hover:bg-cyan-950/60 focus:outline-none focus:border-cyan-500"
+              >
+                <Search size={13} />
+              </button>
             </div>
           </form>
         </div>

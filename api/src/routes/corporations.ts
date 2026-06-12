@@ -225,6 +225,24 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
     }
   });
 
+  router.patch('/corp/fleet/:id/availability', requireJwt, async (req, res) => {
+    const { sub } = req.jwtPayload;
+    const id = Number(req.params.id);
+    const availableForTactics = Boolean(req.body?.availableForTactics);
+    if (!Number.isInteger(id) || id <= 0) return void res.status(400).json({ success: false, error: 'Invalid id' });
+    try {
+      const item = await svc.updateOwnFleetItemAvailability(id, sub, availableForTactics);
+      res.json({ success: true, data: item });
+    } catch (e: any) {
+      if (e.message === 'NOT_FOUND') return void res.status(404).json({ success: false, error: 'Fleet item not found' });
+      if (e.message === 'FORBIDDEN')
+        return void res.status(403).json({ success: false, error: 'Only the ship owner can change tactics availability' });
+      if (e.message === 'INVALID_SCOPE')
+        return void res.status(400).json({ success: false, error: 'Only corporation ships can be made available for tactics' });
+      res.status(500).json({ success: false, error: 'Failed to update fleet availability' });
+    }
+  });
+
   // ── Corp bank (equipment, components, items, commodities) ────────────────────
 
   router.get('/corp/bank', requireJwt, async (req, res) => {

@@ -1,4 +1,6 @@
 import type { Request } from 'express';
+import { AUTH_COOKIE_NAME } from '../utils/config.js';
+import { type JwtPayload, verifyAuthToken } from './auth-service.js';
 
 export interface RequestLogEntry {
   id: number;
@@ -8,6 +10,7 @@ export interface RequestLogEntry {
   statusCode: number;
   durationMs: number;
   userId: number | null;
+  username: string | null;
   role: string | null;
   ip: string | null;
   userAgent: string | null;
@@ -44,16 +47,53 @@ function requestUserAgent(req: Request): string | null {
   return userAgent.length > 160 ? `${userAgent.slice(0, 157)}...` : userAgent;
 }
 
+function shouldRecordRequestLog(path: string): boolean {
+  return path !== '/admin/request-logs';
+}
+
+function extractBearer(req: Request): string | null {
+  const auth = req.headers.authorization;
+  if (!auth?.startsWith('Bearer ')) return null;
+  return auth.slice(7).trim() || null;
+}
+
+function extractCookieToken(req: Request): string | null {
+  const cookie = req.headers.cookie;
+  if (!cookie) return null;
+  const match = cookie.split(';').find((c) => c.trim().startsWith(`${AUTH_COOKIE_NAME}=`));
+  const rawToken = match?.split('=').slice(1).join('=').trim();
+  if (!rawToken) return null;
+  try {
+    return decodeURIComponent(rawToken);
+  } catch {
+    return rawToken;
+  }
+}
+
+function resolveRequestActor(req: Request): JwtPayload | null {
+  if (req.jwtPayload?.sub) return req.jwtPayload;
+  const token = extractBearer(req) ?? extractCookieToken(req);
+  if (!token || !process.env.JWT_SECRET) return null;
+  try {
+    return verifyAuthToken(token);
+  } catch {
+    return null;
+  }
+}
+
 export function recordRequestLog(req: Request, statusCode: number, durationMs: number): void {
-  const payload = req.jwtPayload;
+  const path = requestPath(req);
+  if (!shouldRecordRequestLog(path)) return;
+  const payload = resolveRequestActor(req);
   requestLogs.unshift({
     id: nextId++,
     timestamp: new Date().toISOString(),
     method: req.method,
-    path: requestPath(req),
+    path,
     statusCode,
     durationMs: Math.max(0, Math.round(durationMs)),
     userId: typeof payload?.sub === 'number' ? payload.sub : null,
+    username: payload?.username ?? null,
     role: payload?.role ?? null,
     ip: anonymizeIp(req.ip),
     userAgent: requestUserAgent(req),

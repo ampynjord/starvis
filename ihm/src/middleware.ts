@@ -51,6 +51,7 @@ const PUBLIC_PATHS = new Set([
   '/items',
   '/legal',
   '/developer',
+  '/discord',
 ]);
 
 // Public path prefixes — detail pages and sub-routes

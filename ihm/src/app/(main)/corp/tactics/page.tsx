@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { FleetShip, TacticalMarker, TacticalVector } from '@/components/ship/FleetHoloViewer';
 import { api } from '@/services/api';
+import { FORMATION_LABELS, type FormationType, formationPosition } from '@/lib/tacticsFormations';
 import type { ShipListItem } from '@/types/api';
 
 const FleetHoloViewer = createDynamic(
@@ -35,6 +36,7 @@ interface FleetItem {
   id: number;
   shipUuid: string | null;
   itemClassName: string;
+  availableForTactics: boolean;
   addedBy: { id: number; username: string } | null;
 }
 
@@ -64,7 +66,6 @@ interface Strategy {
   updatedAt: string;
 }
 
-type FormationType = 'line' | 'wedge' | 'box' | 'v' | 'echelon' | 'diamond' | 'circle';
 type MarkerType = TacticalMarker['type'];
 
 interface FormationPreset {
@@ -74,16 +75,6 @@ interface FormationPreset {
   quantity: number;
   spacing: number;
 }
-
-const FORMATION_LABELS: Record<FormationType, string> = {
-  line: 'Line',
-  wedge: 'Wedge',
-  box: 'Box',
-  v: 'V-shape',
-  echelon: 'Echelon',
-  diamond: 'Diamond',
-  circle: 'Circle',
-};
 
 const getShipUuid = (item: FleetItem) => item.shipUuid?.trim() || null;
 const makeId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
@@ -97,62 +88,6 @@ const defaultStrategy = (): Strategy => ({
   vectors: [],
   updatedAt: nowIso(),
 });
-
-function formationPosition(index: number, total: number, spacing: number, formation: FormationType, offsetX: number, offsetZ: number) {
-  const gap = Math.max(spacing, 22);
-  if (formation === 'line') {
-    return { gridX: (index - (total - 1) / 2) * gap + offsetX, gridZ: offsetZ };
-  }
-  if (formation === 'box') {
-    const cols = Math.ceil(Math.sqrt(total));
-    const row = Math.floor(index / cols);
-    const col = index % cols;
-    const rows = Math.ceil(total / cols);
-    return {
-      gridX: (col - (cols - 1) / 2) * gap + offsetX,
-      gridZ: (row - (rows - 1) / 2) * gap + offsetZ,
-    };
-  }
-  if (formation === 'v') {
-    const half = Math.floor(total / 2);
-    const side = index < half ? -1 : 1;
-    const pos = index < half ? index : index - half;
-    return {
-      gridX: side * (pos + 1) * gap * 1.1 + offsetX,
-      gridZ: (pos + 1) * gap * 0.95 + offsetZ,
-    };
-  }
-  if (formation === 'echelon') {
-    return {
-      gridX: (index - (total - 1) / 2) * gap + offsetX,
-      gridZ: index * gap * 0.6 + offsetZ,
-    };
-  }
-  if (formation === 'diamond') {
-    const half = (total - 1) / 2;
-    const dist = Math.abs(index - half);
-    const width = (half - dist) * gap;
-    const row = index;
-    return {
-      gridX: (row % 2 === 0 ? 0 : width * (row < half ? 1 : -1)) + offsetX,
-      gridZ: (index - half) * gap * 0.8 + offsetZ,
-    };
-  }
-  if (formation === 'circle') {
-    const angle = (index / total) * Math.PI * 2 - Math.PI / 2;
-    const r = (total * gap) / (2 * Math.PI);
-    return { gridX: Math.cos(angle) * r + offsetX, gridZ: Math.sin(angle) * r + offsetZ };
-  }
-  // wedge (default)
-  const row = Math.floor((Math.sqrt(8 * index + 1) - 1) / 2);
-  const rowStart = (row * (row + 1)) / 2;
-  const col = index - rowStart;
-  const rowWidth = row + 1;
-  return {
-    gridX: (col - (rowWidth - 1) / 2) * gap + offsetX,
-    gridZ: row * gap * 1.05 + offsetZ,
-  };
-}
 
 const PRESETS_STORAGE_KEY = 'starvis-formation-presets';
 
@@ -224,7 +159,7 @@ export default function CorporationTacticsPage() {
         const nextCorp: Corp | null = data.corporation ?? null;
         setCorp(nextCorp);
         setFleetItems(items);
-        const firstShip = items.find((item) => getShipUuid(item));
+        const firstShip = items.find((item) => item.availableForTactics && getShipUuid(item));
         setFormationShipId(firstShip?.id ?? null);
 
         if (!nextCorp) {
@@ -272,6 +207,7 @@ export default function CorporationTacticsPage() {
     const q = shipQuery.trim().toLowerCase();
     return fleetItems
       .filter((item) => getShipUuid(item))
+      .filter((item) => item.availableForTactics)
       .filter((item) => {
         if (!q) return true;
         const uuid = getShipUuid(item);
@@ -279,6 +215,16 @@ export default function CorporationTacticsPage() {
         return `${ship?.name ?? item.itemClassName} ${ship?.role ?? ''} ${item.addedBy?.username ?? ''}`.toLowerCase().includes(q);
       });
   }, [fleetItems, shipData, shipQuery]);
+
+  useEffect(() => {
+    if (filteredFleet.length === 0) {
+      if (formationShipId !== null) setFormationShipId(null);
+      return;
+    }
+    if (!filteredFleet.some((item) => item.id === formationShipId)) {
+      setFormationShipId(filteredFleet[0]?.id ?? null);
+    }
+  }, [filteredFleet, formationShipId]);
 
   const tacticShips: FleetShip[] = useMemo(() => activeStrategy.ships.map((node) => {
     const ship = shipData.get(node.shipUuid);
@@ -350,7 +296,7 @@ export default function CorporationTacticsPage() {
   }, [activeStrategy.ships, formationName, formationQuantity, formationSpacing, formationType, shipData, updateActiveStrategy]);
 
   const addSelectedFormation = () => {
-    const item = fleetItems.find((fleetItem) => fleetItem.id === formationShipId);
+    const item = filteredFleet.find((fleetItem) => fleetItem.id === formationShipId);
     if (item) addFormation(item);
   };
 
@@ -597,10 +543,10 @@ export default function CorporationTacticsPage() {
                 disabled={fleetItems.length === 0}
                 className="sci-input col-span-2 w-full disabled:opacity-60"
               >
-                {fleetItems.length === 0 ? (
-                  <option value="">{loading ? 'Loading ships...' : 'No corporation ships available'}</option>
+                {filteredFleet.length === 0 ? (
+                  <option value="">{loading ? 'Loading ships...' : 'No ships available for tactics'}</option>
                 ) : null}
-                {fleetItems.map((item) => {
+                {filteredFleet.map((item) => {
                   const uuid = getShipUuid(item);
                   const ship = uuid ? shipData.get(uuid) : null;
                   return <option key={item.id} value={item.id}>{ship?.name ?? item.itemClassName}</option>;
@@ -619,8 +565,8 @@ export default function CorporationTacticsPage() {
                   <option key={value} value={value}>{label}</option>
                 ))}
               </select>
-              <button type="button" onClick={addSelectedFormation} disabled={!formationShipId || fleetItems.length === 0} className="sci-btn-primary col-span-2 flex items-center justify-center gap-1.5 px-3 py-2 text-xs disabled:opacity-40">
-                <Ship size={12} /> {fleetItems.length === 0 ? 'No corporation ships' : 'Add formation'}
+              <button type="button" onClick={addSelectedFormation} disabled={!formationShipId || filteredFleet.length === 0} className="sci-btn-primary col-span-2 flex items-center justify-center gap-1.5 px-3 py-2 text-xs disabled:opacity-40">
+                <Ship size={12} /> {filteredFleet.length === 0 ? 'No tactics ships' : 'Add formation'}
               </button>
               <button type="button" onClick={savePreset} className="col-span-2 flex items-center justify-center gap-1.5 rounded-sm border border-slate-700 px-3 py-1.5 font-mono-sc text-xs text-slate-400 hover:border-cyan-800/70 hover:text-cyan-300">
                 <Bookmark size={11} /> Save as preset
@@ -676,7 +622,7 @@ export default function CorporationTacticsPage() {
               <div className="flex items-center justify-center py-8 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
             ) : filteredFleet.length === 0 ? (
               <p className="px-2 py-6 text-center font-mono-sc text-xs text-slate-700">
-                {fleetItems.length === 0 ? 'No corporation ships available.' : 'No ship matches this filter.'}
+                {fleetItems.length === 0 ? 'No corporation ships available.' : 'No available tactics ship matches this filter.'}
               </p>
             ) : filteredFleet.slice(0, 30).map((item) => {
               const uuid = getShipUuid(item);

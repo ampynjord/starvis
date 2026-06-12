@@ -216,6 +216,7 @@ model CorporationFleetItem {
   notes         String?       @db.Text
   gridX         Float?        @map("grid_x")
   gridZ         Float?        @map("grid_z")
+  availableForTactics Boolean @default(false) @map("available_for_tactics")
   addedById     Int?          @map("added_by_id")
   addedAt       DateTime      @default(now()) @map("added_at")
   updatedAt     DateTime      @updatedAt @map("updated_at")

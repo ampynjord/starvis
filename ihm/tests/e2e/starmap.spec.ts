@@ -1,7 +1,8 @@
 import { expect, test } from '@playwright/test';
+import { gotoApp } from './helpers';
 
 test('starmap renders a non-empty WebGL canvas', async ({ page }) => {
-  await page.goto('/starmap');
+  await gotoApp(page, '/starmap');
 
   await expect(page.getByRole('heading', { name: /starvis starmap/i })).toBeVisible();
 

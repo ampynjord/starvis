@@ -349,10 +349,22 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
     shopsByLocKey.set(shop.loc_key, (shopsByLocKey.get(shop.loc_key) ?? 0) + 1);
   }
 
-  const roots = visible.filter((loc) => loc.type === 'system' || (loc.type === 'star' && !loc.parent_uuid && loc.parent_id == null));
+  const systems = visible.filter((loc) => loc.type === 'system');
+  const roots = systems.length > 0
+    ? systems
+    : visible.filter((loc) => loc.type === 'star' && !loc.parent_uuid && loc.parent_id == null);
   const rootByCode = new Map(roots.map((loc) => [systemCode(loc), loc]));
+  const visibleIds = new Set(visible.map((loc) => loc.uuid));
+  const byRsiId = new Map<number, LocationWithMap>();
+  for (const loc of visible) {
+    if (loc.rsi_starmap_location_id != null) byRsiId.set(loc.rsi_starmap_location_id, loc);
+  }
   const parentIdFor = (loc: LocationWithMap) => {
-    if (loc.parent_uuid && visible.some((candidate) => candidate.uuid === loc.parent_uuid)) return loc.parent_uuid;
+    if (loc.parent_id != null) {
+      const parent = byRsiId.get(loc.parent_id);
+      if (parent?.uuid && parent.uuid !== loc.uuid) return parent.uuid;
+    }
+    if (loc.parent_uuid && visibleIds.has(loc.parent_uuid)) return loc.parent_uuid;
     const root = rootByCode.get(systemCode(loc));
     return root && root.uuid !== loc.uuid ? root.uuid : null;
   };
@@ -394,6 +406,34 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
     .filter((loc) => !nodes.has(loc.uuid))
     .sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.name.localeCompare(b.name));
 
+  const rootIdFor = (loc: LocationWithMap) => {
+    const root = rootByCode.get(systemCode(loc));
+    return root?.uuid ?? null;
+  };
+  const coordinateBoundsByRoot = new Map<string, THREE.Box3>();
+  for (const root of roots) {
+    const points = children
+      .filter((loc) => rootIdFor(loc) === root.uuid)
+      .map((loc) => coords(loc))
+      .filter(Boolean) as THREE.Vector3[];
+    if (points.length > 1) coordinateBoundsByRoot.set(root.uuid, new THREE.Box3().setFromPoints(points));
+  }
+  const positionFromCoordinates = (loc: LocationWithMap, parent: MapNode | null) => {
+    const c = coords(loc);
+    const rootId = rootIdFor(loc);
+    const boundsForRoot = rootId ? coordinateBoundsByRoot.get(rootId) : null;
+    const rootNode = rootId ? nodes.get(rootId) : null;
+    if (!c || !boundsForRoot || !rootNode) return null;
+    const localCenter = boundsForRoot.getCenter(new THREE.Vector3());
+    const localSize = boundsForRoot.getSize(new THREE.Vector3());
+    const scaleFactor = loc.type === 'moon' ? 15 : 48;
+    const localScale = scaleFactor / Math.max(localSize.x, localSize.z, localSize.y * 0.6, 1);
+    const targetBase = loc.type === 'moon' && parent ? parent.position : rootNode.position;
+    const centered = c.clone().sub(localCenter).multiplyScalar(localScale);
+    centered.y *= 0.32;
+    return targetBase.clone().add(centered);
+  };
+
   for (const loc of children) {
     const parentId = parentIdFor(loc);
     const parent = parentId ? nodes.get(parentId) : null;
@@ -407,7 +447,9 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
       loc.type === 'jump_point' ? 17 + index * 1.2 :
       5.4 + index * 0.3;
     const base = parent?.position ?? new THREE.Vector3();
-    const position = base.clone().add(new THREE.Vector3(Math.cos(angle) * distance, (hash(`${loc.uuid}:height`) - 0.5) * 3, Math.sin(angle) * distance));
+    const position =
+      positionFromCoordinates(loc, parent ?? null) ??
+      base.clone().add(new THREE.Vector3(Math.cos(angle) * distance, (hash(`${loc.uuid}:height`) - 0.5) * 3, Math.sin(angle) * distance));
     nodes.set(loc.uuid, {
       id: loc.uuid,
       loc,
@@ -470,8 +512,8 @@ function Scene({
     if (!container || nodes.length === 0) return;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x01040a);
-    scene.fog = new THREE.FogExp2(0x020711, 0.0022);
+    scene.background = new THREE.Color(0x000204);
+    scene.fog = new THREE.FogExp2(0x01060c, 0.0018);
 
     let renderer: THREE.WebGLRenderer;
     try {
@@ -485,7 +527,7 @@ function Scene({
     container.appendChild(renderer.domElement);
 
     const camera = new THREE.PerspectiveCamera(46, container.clientWidth / container.clientHeight, 0.1, 1400);
-    camera.position.set(0, 108, 132);
+    camera.position.set(0, 118, 148);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -497,23 +539,23 @@ function Scene({
     controls.target.set(0, 0, 0);
 
     const visibility = createVisibilityTracker(container);
-    scene.add(new THREE.AmbientLight(0x2d7890, 0.72));
-    const light = new THREE.DirectionalLight(0xbdf8ff, 2.45);
+    scene.add(new THREE.AmbientLight(0x123647, 0.55));
+    const light = new THREE.DirectionalLight(0xbdf8ff, 1.9);
     light.position.set(80, 120, 40);
     scene.add(light);
-    const rimLight = new THREE.PointLight(0x7dd3fc, 1.2, 360);
+    const rimLight = new THREE.PointLight(0x38bdf8, 0.7, 360);
     rimLight.position.set(-80, 70, -90);
     scene.add(rimLight);
 
-    const starCount = 2300;
+    const starCount = 3000;
     const starPositions = new Float32Array(starCount * 3);
     const starColors = new Float32Array(starCount * 3);
     const starPalette = [new THREE.Color(0xb7ecff), new THREE.Color(0x5eead4), new THREE.Color(0xfef3c7), new THREE.Color(0xc4b5fd)];
     for (let i = 0; i < starPositions.length; i += 3) {
-      const r = 160 + hash(`star-r-${i}`) * 520;
+      const r = 180 + hash(`star-r-${i}`) * 620;
       const a = hash(`star-a-${i}`) * Math.PI * 2;
       starPositions[i] = Math.cos(a) * r;
-      starPositions[i + 1] = (hash(`star-y-${i}`) - 0.5) * 260;
+      starPositions[i + 1] = (hash(`star-y-${i}`) - 0.5) * 320;
       starPositions[i + 2] = Math.sin(a) * r;
       const color = starPalette[Math.floor(hash(`star-c-${i}`) * starPalette.length)] ?? starPalette[0];
       starColors[i] = color.r;
@@ -525,17 +567,17 @@ function Scene({
       .setAttribute('color', new THREE.BufferAttribute(starColors, 3));
     const stars = new THREE.Points(
       starGeometry,
-      new THREE.PointsMaterial({ size: 0.62, transparent: true, opacity: 0.68, depthWrite: false, vertexColors: true }),
+      new THREE.PointsMaterial({ size: 0.46, transparent: true, opacity: 0.58, depthWrite: false, vertexColors: true }),
     );
     scene.add(stars);
 
     const group = new THREE.Group();
     scene.add(group);
 
-    const grid = new THREE.GridHelper(320, 32, 0x155e75, 0x082f49);
+    const grid = new THREE.GridHelper(360, 24, 0x0e7490, 0x052536);
     const gridMaterial = grid.material as THREE.Material;
     gridMaterial.transparent = true;
-    gridMaterial.opacity = 0.13;
+    gridMaterial.opacity = 0.055;
     grid.position.y = -8;
     group.add(grid);
 
@@ -546,7 +588,7 @@ function Scene({
           return new THREE.Vector3(Math.cos(a) * 155, -7.95, Math.sin(a) * 155);
         }),
       ),
-      new THREE.LineBasicMaterial({ color: 0x06b6d4, transparent: true, opacity: 0.2 }),
+      new THREE.LineBasicMaterial({ color: 0x0ea5e9, transparent: true, opacity: 0.11 }),
     );
     group.add(horizon);
 
@@ -560,7 +602,7 @@ function Scene({
     }
     const links = new THREE.LineSegments(
       new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3)),
-      new THREE.LineBasicMaterial({ color: 0x0ea5e9, transparent: true, opacity: 0.22 }),
+      new THREE.LineBasicMaterial({ color: 0x0ea5e9, transparent: true, opacity: 0.12 }),
     );
     group.add(links);
 
@@ -575,7 +617,7 @@ function Scene({
       const material = new THREE.LineBasicMaterial({
         color: 0x0891b2,
         transparent: true,
-        opacity: 0.16,
+        opacity: 0.13,
         blending: THREE.AdditiveBlending,
         depthWrite: false,
       });
@@ -597,8 +639,8 @@ function Scene({
       const gradient = ctx.createRadialGradient(64, 64, 4, 64, 64, 62);
       const c = new THREE.Color(color);
       const rgb = `${Math.round(c.r * 255)},${Math.round(c.g * 255)},${Math.round(c.b * 255)}`;
-      gradient.addColorStop(0, `rgba(${rgb},0.72)`);
-      gradient.addColorStop(0.35, `rgba(${rgb},0.24)`);
+      gradient.addColorStop(0, `rgba(${rgb},0.62)`);
+      gradient.addColorStop(0.35, `rgba(${rgb},0.18)`);
       gradient.addColorStop(1, `rgba(${rgb},0)`);
       ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, 128, 128);
@@ -613,10 +655,10 @@ function Scene({
       canvas.height = 64;
       const ctx = canvas.getContext('2d');
       if (!ctx) return null;
-      ctx.font = '700 28px Rajdhani, Arial';
+      ctx.font = '700 25px Rajdhani, Arial';
       ctx.textAlign = 'center';
       ctx.shadowColor = color;
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = 7;
       ctx.fillStyle = color;
       ctx.fillText(text.toUpperCase(), 128, 36);
       const texture = new THREE.CanvasTexture(canvas);
@@ -629,6 +671,7 @@ function Scene({
     for (const node of nodes) {
       const type = normalizeType(node.loc.type);
       const geometry =
+        type === 'system' ? new THREE.TorusGeometry(node.radius * 1.9, node.radius * 0.08, 8, 72) :
         type === 'station' || type === 'rest_stop' ? new THREE.OctahedronGeometry(node.radius * 1.25, 1) :
         type === 'outpost' || type === 'landing_zone' ? new THREE.BoxGeometry(node.radius * 1.5, node.radius * 0.65, node.radius * 1.5) :
         type === 'jump_point' ? new THREE.TorusGeometry(node.radius * 1.6, node.radius * 0.1, 8, 42) :
@@ -637,18 +680,19 @@ function Scene({
       const material = new THREE.MeshPhongMaterial({
         color: node.color,
         emissive: node.color,
-        emissiveIntensity: isRoot ? 0.55 : type === 'star' ? 0.8 : type === 'system' ? 0.45 : 0.22,
+        emissiveIntensity: isRoot ? 0.48 : type === 'star' ? 0.72 : type === 'system' ? 0.38 : 0.16,
         shininess: 70,
       });
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.copy(node.position);
+      if (type === 'system') mesh.rotation.x = Math.PI * 0.5;
       mesh.userData.nodeId = node.id;
       group.add(mesh);
       meshes.set(node.id, mesh);
 
       const halo = glowSprite(node.color);
       if (halo) {
-        const scale = isRoot ? node.radius * 6.4 : type === 'system' || type === 'star' ? node.radius * 7 : node.radius * 4.8;
+        const scale = isRoot ? node.radius * 5.6 : type === 'system' || type === 'star' ? node.radius * 6.2 : node.radius * 3.2;
         halo.position.copy(node.position);
         halo.scale.set(scale, scale, 1);
         halo.userData.baseScale = scale;
@@ -660,15 +704,15 @@ function Scene({
       if (isRoot || type === 'star') {
         const corona = glowSprite(node.color);
         if (corona) {
-          const coronaScale = node.radius * 13;
+          const coronaScale = node.radius * 10;
           corona.position.copy(node.position);
           corona.scale.set(coronaScale, coronaScale, 1);
-          (corona.material as THREE.SpriteMaterial).opacity = 0.16;
+          (corona.material as THREE.SpriteMaterial).opacity = 0.12;
           group.add(corona);
         }
       }
 
-      if ((!isRoot && (type === 'system' || type === 'star' || type === 'planet')) || (isRoot && node.label.length <= 9)) {
+      if ((!isRoot && (type === 'star' || type === 'planet')) || (isRoot && node.label.length <= 14)) {
         const label = labelSprite(node.label, type === 'star' ? '#facc15' : '#67e8f9');
         if (label) {
           label.position.copy(node.position).add(new THREE.Vector3(0, node.radius + 2.2, 0));
@@ -689,7 +733,7 @@ function Scene({
                 return new THREE.Vector3(Math.cos(a) * d, 0, Math.sin(a) * d).add(parent.position);
               }),
             ),
-            new THREE.LineBasicMaterial({ color: type === 'planet' ? 0x0e7490 : 0x164e63, transparent: true, opacity: type === 'planet' ? 0.34 : 0.16 }),
+            new THREE.LineBasicMaterial({ color: type === 'planet' ? 0x0e7490 : 0x164e63, transparent: true, opacity: type === 'planet' ? 0.2 : 0.1 }),
           );
           group.add(orbit);
         }
@@ -1103,12 +1147,12 @@ export default function LocationsPage() {
   const aggregated = currentRoot?.loc.aggregated;
 
   return (
-    <div className="-m-3 flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden bg-[#01040a] text-slate-200 sm:-m-6">
-      <div className="relative border-b border-cyan-950/70 bg-slate-950/85 px-4 py-3 backdrop-blur md:px-6">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(14,165,233,0.18),transparent_24%),radial-gradient(circle_at_82%_10%,rgba(168,85,247,0.14),transparent_22%)]" />
+    <div className="-m-3 flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden bg-black text-slate-200 sm:-m-6">
+      <div className="relative border-b border-cyan-950/80 bg-[#092231]/95 px-4 py-3 backdrop-blur md:px-6">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-cyan-400/25" />
         <div className="relative flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-sm border border-cyan-700/50 bg-cyan-950/30 shadow-[0_0_22px_rgba(34,211,238,0.18)]">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-sm border border-cyan-800/60 bg-black/25">
               <Telescope size={20} className="text-cyan-300" />
             </div>
             <div className="min-w-0">
@@ -1150,8 +1194,8 @@ export default function LocationsPage() {
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[340px_1fr_360px]">
-        <aside className="z-20 flex min-h-0 flex-col border-b border-cyan-950/60 bg-slate-950/80 p-3 backdrop-blur lg:border-b-0 lg:border-r">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[320px_1fr_340px]">
+        <aside className="z-20 flex min-h-0 flex-col border-b border-cyan-950/70 bg-[#020b12]/88 p-3 backdrop-blur lg:border-b-0 lg:border-r">
           <div className="relative mb-3">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
             <input
@@ -1219,9 +1263,9 @@ export default function LocationsPage() {
           </div>
         </aside>
 
-        <main className="relative min-h-[420px] overflow-hidden">
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_22%,rgba(21,94,117,0.28),transparent_30%),radial-gradient(circle_at_75%_68%,rgba(168,85,247,0.15),transparent_26%),linear-gradient(135deg,rgba(8,47,73,0.14),transparent_42%)]" />
-          <div className="pointer-events-none absolute inset-x-8 top-6 z-10 hidden items-center justify-between rounded-sm border border-cyan-950/70 bg-slate-950/50 px-4 py-2 backdrop-blur md:flex">
+        <main className="relative min-h-[420px] overflow-hidden bg-black">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(8,47,73,0.24),transparent_38%)]" />
+          <div className="pointer-events-none absolute inset-x-8 top-6 z-10 hidden items-center justify-between border-b border-cyan-950/70 bg-black/20 px-1 py-2 backdrop-blur-sm md:flex">
             <div className="flex items-center gap-3">
               <span className="flex items-center gap-1 font-mono-sc text-[10px] uppercase tracking-widest text-cyan-500">
                 <Eye size={11} />
@@ -1266,7 +1310,7 @@ export default function LocationsPage() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
-              className="z-20 flex min-h-0 flex-col overflow-y-auto border-t border-cyan-950/60 bg-slate-950/80 p-4 backdrop-blur lg:border-l lg:border-t-0"
+              className="z-20 flex min-h-0 flex-col overflow-y-auto border-t border-cyan-950/70 bg-[#020b12]/88 p-4 backdrop-blur lg:border-l lg:border-t-0"
             >
               {selectedThumbnail && (
                 <div className="relative -mx-4 -mt-4 mb-4 h-36 shrink-0 overflow-hidden border-b border-cyan-950/60">

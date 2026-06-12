@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { ArrowUpDown, Cpu, Crosshair, Package, Pill, Rocket, Settings2, Shield, Shirt, ShoppingBag, SlidersHorizontal, Wrench, Zap } from 'lucide-react';
+import { ArrowUpDown, Building2, Cpu, Crosshair, Package, Pill, Rocket, Settings2, Shield, Shirt, ShoppingBag, SlidersHorizontal, Wrench, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { api } from '@/services/api';
@@ -136,6 +136,36 @@ function ItemRow({ item, category }: { item: ItemListItem; category: string }) {
   );
 }
 
+function ManufacturerCard({ m, selected, onSelect }: { m: Manufacturer; selected: boolean; onSelect: (code: string) => void }) {
+  const total = (m.ship_count ?? 0) + (m.component_count ?? 0) + (m.item_count ?? 0);
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(m.code)}
+      className={`group rounded-sm border p-4 text-left transition-all ${
+        selected
+          ? 'border-cyan-600/80 bg-cyan-950/25 shadow-[0_0_24px_rgba(34,211,238,0.12)]'
+          : 'border-slate-800/70 bg-slate-950/35 hover:border-cyan-900/70 hover:bg-cyan-950/10'
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-mono-sc text-[10px] uppercase tracking-widest text-cyan-600">{m.code}</p>
+          <h3 className="mt-1 truncate font-orbitron text-sm font-bold uppercase tracking-wide text-slate-100">{m.name}</h3>
+        </div>
+        <Building2 size={16} className={selected ? 'text-cyan-300' : 'text-slate-600 group-hover:text-cyan-500'} />
+      </div>
+      {m.known_for && <p className="mt-2 line-clamp-2 min-h-9 text-xs leading-5 text-slate-500">{m.known_for}</p>}
+      <div className="mt-3 grid grid-cols-4 gap-2 font-mono-sc text-[10px] uppercase tracking-wider">
+        <span className="text-cyan-400">{m.ship_count ?? 0} ships</span>
+        <span className="text-blue-400">{m.component_count ?? 0} comps</span>
+        <span className="text-purple-400">{m.item_count ?? 0} items</span>
+        <span className="text-slate-600">{total} total</span>
+      </div>
+    </button>
+  );
+}
+
 export default function ManufacturersPage() {
   const { env } = useEnv();
   const [selected, setSelected] = useState<string | null>(null);
@@ -243,6 +273,18 @@ export default function ManufacturersPage() {
   );
 
   const selectedMfr = (manufacturers ?? []).find((m: Manufacturer) => m.code === selected);
+  const totals = useMemo(
+    () =>
+      (manufacturers ?? []).reduce(
+        (acc: { ships: number; components: number; items: number }, m: Manufacturer) => ({
+          ships: acc.ships + (m.ship_count ?? 0),
+          components: acc.components + (m.component_count ?? 0),
+          items: acc.items + (m.item_count ?? 0),
+        }),
+        { ships: 0, components: 0, items: 0 },
+      ),
+    [manufacturers],
+  );
 
   const selectMfr = (code: string) => {
     setSelected(code || null);
@@ -287,6 +329,25 @@ export default function ManufacturersPage() {
           <ListFilterResetButton onClick={() => selectMfr('')} />
         )}
       </ListFilterBar>
+
+      <div className="grid gap-2 sm:grid-cols-4">
+        <div className="rounded-sm border border-slate-800/70 bg-slate-950/40 p-3">
+          <p className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">Manufacturers</p>
+          <p className="mt-1 font-orbitron text-xl font-black text-cyan-300">{filteredMfrs.length.toLocaleString('en-US')}</p>
+        </div>
+        <div className="rounded-sm border border-slate-800/70 bg-slate-950/40 p-3">
+          <p className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">Ships</p>
+          <p className="mt-1 font-orbitron text-xl font-black text-cyan-300">{totals.ships.toLocaleString('en-US')}</p>
+        </div>
+        <div className="rounded-sm border border-slate-800/70 bg-slate-950/40 p-3">
+          <p className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">Components</p>
+          <p className="mt-1 font-orbitron text-xl font-black text-blue-300">{totals.components.toLocaleString('en-US')}</p>
+        </div>
+        <div className="rounded-sm border border-slate-800/70 bg-slate-950/40 p-3">
+          <p className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">FPS Items</p>
+          <p className="mt-1 font-orbitron text-xl font-black text-purple-300">{totals.items.toLocaleString('en-US')}</p>
+        </div>
+      </div>
 
       <div className="min-w-0 space-y-4">
           {selectedMfr ? (
@@ -518,9 +579,23 @@ export default function ManufacturersPage() {
               )}
             </>
           ) : (
-            <div className="flex flex-col items-center justify-center gap-3 py-24 text-slate-700">
-              <Zap size={32} />
-              <p className="font-orbitron text-sm tracking-widest">Select a manufacturer</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-orbitron text-[10px] font-bold uppercase tracking-widest text-slate-600">Manufacturer catalogue</p>
+                <span className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-700">Select one to inspect ships, components and items</span>
+              </div>
+              {filteredMfrs.length > 0 ? (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {filteredMfrs.map((m: Manufacturer) => (
+                    <ManufacturerCard key={m.code} m={m} selected={selected === m.code} onSelect={selectMfr} />
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-3 py-20 text-slate-700">
+                  <Zap size={32} />
+                  <p className="font-orbitron text-sm tracking-widest">No manufacturer matches your search</p>
+                </div>
+              )}
             </div>
           )}
       </div>
