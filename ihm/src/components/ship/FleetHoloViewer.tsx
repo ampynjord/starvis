@@ -158,6 +158,7 @@ export function FleetHoloViewer({
     controls.autoRotate = false;
     controls.autoRotateSpeed = 0.3;
     controls.enablePan = true;
+    let userHasMovedView = false;
     const visibility = createVisibilityTracker(container);
 
     // ── Per-ship state ─────────────────────────────────────────────────────────
@@ -484,9 +485,9 @@ export function FleetHoloViewer({
         return { root, meshes: [halo, arrow, stem], ship: entry.ship };
       });
 
-    const refreshLayout = () => {
+    const refreshLayout = (fitView = !userHasMovedView) => {
       updateGrid();
-      fitCamera();
+      if (fitView) fitCamera();
     };
 
     const fitCamera = () => {
@@ -752,6 +753,7 @@ export function FleetHoloViewer({
     };
 
     const onPointerDown = (e: PointerEvent) => {
+      userHasMovedView = true;
       mouseStart = { x: e.clientX, y: e.clientY };
       isDragging = false;
       const target = getHitTarget(e.clientX, e.clientY);
