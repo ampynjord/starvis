@@ -156,6 +156,19 @@ function formationPosition(index: number, total: number, spacing: number, format
 
 const PRESETS_STORAGE_KEY = 'starvis-formation-presets';
 
+function estimateFormationGap(ship: ShipListItem | undefined, fallbackSpacing: number) {
+  const size = Math.max(
+    Number((ship as any)?.size_x ?? 0),
+    Number((ship as any)?.size_z ?? 0),
+    Number((ship as any)?.size_y ?? 0),
+    Number(ship?.cross_section_x ?? 0),
+    Number(ship?.cross_section_z ?? 0),
+    Number(ship?.cross_section_y ?? 0),
+    24,
+  );
+  return Math.max(fallbackSpacing, size * 1.35);
+}
+
 export default function CorporationTacticsPage() {
   const { user } = useAuth();
   const [corp, setCorp] = useState<Corp | null>(null);
@@ -285,6 +298,9 @@ export default function CorporationTacticsPage() {
   const selectedShip = activeStrategy.ships.find((ship) => ship.id === selectedShipId) ?? null;
   const selectedMarker = activeStrategy.markers.find((marker) => marker.id === selectedMarkerId) ?? null;
   const selectedVector = activeStrategy.vectors.find((vector) => vector.id === selectedVectorId) ?? null;
+  const selectedFormationSize = selectedShip?.group
+    ? activeStrategy.ships.filter((ship) => ship.group === selectedShip.group).length
+    : 0;
 
   const addFormation = useCallback((item: FleetItem, quantity = formationQuantity, group = formationName, type = formationType, spacing = formationSpacing) => {
     const uuid = getShipUuid(item);
@@ -299,9 +315,12 @@ export default function CorporationTacticsPage() {
       uniqueGroup = `${group} ${counter++}`;
     }
 
-    const baseOffsetX = activeStrategy.ships.length ? Math.max(...activeStrategy.ships.map((n) => n.gridX)) + spacing * 2 : 0;
+    const effectiveSpacing = estimateFormationGap(ship, spacing);
+    const baseOffsetX = activeStrategy.ships.length
+      ? Math.max(...activeStrategy.ships.map((n) => n.gridX)) + effectiveSpacing * 2
+      : 0;
     const nextShips = Array.from({ length: quantity }, (_, index) => {
-      const pos = formationPosition(index, quantity, spacing, type, baseOffsetX, 0);
+      const pos = formationPosition(index, quantity, effectiveSpacing, type, baseOffsetX, 0);
       const id = nextShipIdRef.current++;
       return {
         id,
@@ -429,7 +448,22 @@ export default function CorporationTacticsPage() {
 
   const removeSelection = () => {
     if (selectedShip) {
-      updateActiveStrategy((strategy) => ({ ...strategy, ships: strategy.ships.filter((ship) => ship.id !== selectedShip.id) }));
+      const selectedGroup = selectedShip.group.trim();
+      const removedShipIds = selectedGroup
+        ? activeStrategy.ships.filter((ship) => ship.group === selectedGroup).map((ship) => ship.id)
+        : [selectedShip.id];
+      const groupSize = removedShipIds.length;
+      updateActiveStrategy((strategy) => ({
+        ...strategy,
+        ships: groupSize > 1
+          ? strategy.ships.filter((ship) => ship.group !== selectedGroup)
+          : strategy.ships.filter((ship) => ship.id !== selectedShip.id),
+        vectors: strategy.vectors.filter((vector) => (
+          groupSize > 1
+            ? !(vector.sourceType === 'group' && vector.sourceId === selectedGroup) && !(vector.sourceType === 'ship' && removedShipIds.includes(Number(vector.sourceId)))
+            : !(vector.sourceType === 'ship' && vector.sourceId === selectedShip.id)
+        )),
+      }));
       setSelectedShipId(null);
     }
     if (selectedMarker) {
@@ -741,7 +775,7 @@ export default function CorporationTacticsPage() {
                 <span>Z {(selectedShip?.gridZ ?? selectedMarker?.gridZ ?? selectedVector?.endZ ?? 0).toFixed(1)}</span>
               </div>
               <button type="button" onClick={removeSelection} className="flex w-full items-center justify-center gap-2 rounded-sm border border-red-900/60 bg-red-950/20 px-3 py-2 font-mono-sc text-xs text-red-400 hover:border-red-700/70">
-                <Trash2 size={13} /> Remove selected
+                <Trash2 size={13} /> {selectedFormationSize > 1 ? 'Remove formation' : 'Remove selected'}
               </button>
             </div>
           )}

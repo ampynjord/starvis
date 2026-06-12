@@ -13,3 +13,16 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
   }
 }
+
+export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const token = await getAuthToken();
+    if (!token) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    const body = await req.json().catch(() => ({}));
+    return proxyJson('PUT', `/corp/bank/${id}`, token, body);
+  } catch (e: any) {
+    logApiError('corp/bank/:id PUT', e);
+    return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
+  }
+}

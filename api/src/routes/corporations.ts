@@ -17,6 +17,9 @@
  * POST   /admin/corporations/:id/fleet    — add fleet item
  * PUT    /admin/corporations/fleet/:fid   — update fleet item
  * DELETE /admin/corporations/fleet/:fid   — delete fleet item
+ * GET    /admin/users/:id/fleet           — list fleet/bank items declared by user
+ * PUT    /admin/fleet/:fid                — update any fleet/bank item
+ * DELETE /admin/fleet/:fid                — delete any fleet/bank item
  * GET    /admin/users/:id/corporation     — get user's corp
  * PUT    /admin/users/:id/corporation     — set user's corp (RSI symbol)
  * DELETE /admin/users/:id/corporation     — remove user from corp
@@ -230,9 +233,39 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
       const membership = await svc.getMyActiveMembership(sub);
       if (!membership) return void res.status(403).json({ success: false, error: 'Not a corporation member' });
       const items = await svc.getFleetItems(membership.corporationId, 'non-ship');
-      res.json({ success: true, data: items, corporation: membership.corporation });
+      res.json({ success: true, data: items, corporation: membership.corporation, canManage: membership.role === 'leader' });
     } catch {
       res.status(500).json({ success: false, error: 'Failed to fetch bank' });
+    }
+  });
+
+  router.put('/corp/bank/:id', requireJwt, async (req, res) => {
+    const { sub, role } = req.jwtPayload;
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return void res.status(400).json({ success: false, error: 'Invalid id' });
+    const { itemType, itemClassName, quantity, notes } = req.body ?? {};
+    if (itemType !== undefined && !['component', 'item', 'commodity', 'other'].includes(itemType)) {
+      return void res.status(400).json({ success: false, error: 'itemType must be component, item, commodity, or other' });
+    }
+    if (quantity !== undefined && (!Number.isInteger(Number(quantity)) || Number(quantity) <= 0)) {
+      return void res.status(400).json({ success: false, error: 'quantity must be a positive integer' });
+    }
+    try {
+      const membership = await svc.getMyActiveMembership(sub);
+      if (!membership) return void res.status(403).json({ success: false, error: 'Not a corporation member' });
+      const canManage = role === 'admin' || membership.role === 'leader';
+      const item = await svc.updateCorporationFleetItem(id, membership.corporationId, sub, canManage, {
+        itemType,
+        itemClassName,
+        quantity: quantity !== undefined ? Number(quantity) : undefined,
+        notes: notes === undefined ? undefined : notes?.trim() || null,
+      });
+      res.json({ success: true, data: item });
+    } catch (e: any) {
+      if (e.message === 'NOT_FOUND') return void res.status(404).json({ success: false, error: 'Item not found' });
+      if (e.message === 'FORBIDDEN')
+        return void res.status(403).json({ success: false, error: 'You can only manage items in your corporation scope' });
+      res.status(500).json({ success: false, error: 'Failed to update item' });
     }
   });
 
@@ -259,7 +292,10 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) return void res.status(400).json({ success: false, error: 'Invalid id' });
     try {
-      await svc.removeOwnFleetItem(id, sub, false);
+      const membership = await svc.getMyActiveMembership(sub);
+      if (!membership) return void res.status(403).json({ success: false, error: 'Not a corporation member' });
+      const canManage = req.jwtPayload.role === 'admin' || membership.role === 'leader';
+      await svc.removeCorporationFleetItem(id, membership.corporationId, sub, canManage);
       res.json({ success: true });
     } catch (e: any) {
       if (e.message === 'NOT_FOUND') return void res.status(404).json({ success: false, error: 'Item not found' });
@@ -554,6 +590,17 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
     }
   });
 
+  router.get('/admin/users/:id/fleet', requireJwtAdmin, async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return void res.status(400).json({ success: false, error: 'Invalid id' });
+    try {
+      const items = await svc.getFleetItemsByUser(id);
+      res.json({ success: true, data: items });
+    } catch {
+      res.status(500).json({ success: false, error: 'Failed to fetch user fleet' });
+    }
+  });
+
   // ── Admin: fleet ─────────────────────────────────────────────────────────────
 
   router.get('/admin/corporations/:id/fleet', requireJwtAdmin, async (req, res) => {
@@ -604,6 +651,39 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
   });
 
   router.delete('/admin/corporations/fleet/:fid', requireJwtAdmin, async (req, res) => {
+    const fid = Number(req.params.fid);
+    if (!Number.isInteger(fid) || fid <= 0) return void res.status(400).json({ success: false, error: 'Invalid fleet item id' });
+    try {
+      await svc.deleteFleetItem(fid);
+      res.json({ success: true });
+    } catch (e: any) {
+      if (e?.code === 'P2025') return void res.status(404).json({ success: false, error: 'Fleet item not found' });
+      res.status(500).json({ success: false, error: 'Failed to delete fleet item' });
+    }
+  });
+
+  router.put('/admin/fleet/:fid', requireJwtAdmin, async (req, res) => {
+    const fid = Number(req.params.fid);
+    if (!Number.isInteger(fid) || fid <= 0) return void res.status(400).json({ success: false, error: 'Invalid fleet item id' });
+    const { itemType, itemClassName, quantity, notes } = req.body ?? {};
+    if (itemType !== undefined && !VALID_FLEET_TYPES.includes(itemType)) {
+      return void res.status(400).json({ success: false, error: `itemType must be one of: ${VALID_FLEET_TYPES.join(', ')}` });
+    }
+    try {
+      const item = await svc.updateFleetItem(fid, {
+        itemType,
+        itemClassName,
+        quantity: quantity !== undefined ? Number(quantity) : undefined,
+        notes: notes === undefined ? undefined : notes?.trim() || null,
+      });
+      res.json({ success: true, data: item });
+    } catch (e: any) {
+      if (e?.code === 'P2025') return void res.status(404).json({ success: false, error: 'Fleet item not found' });
+      res.status(500).json({ success: false, error: 'Failed to update fleet item' });
+    }
+  });
+
+  router.delete('/admin/fleet/:fid', requireJwtAdmin, async (req, res) => {
     const fid = Number(req.params.fid);
     if (!Number.isInteger(fid) || fid <= 0) return void res.status(400).json({ success: false, error: 'Invalid fleet item id' });
     try {

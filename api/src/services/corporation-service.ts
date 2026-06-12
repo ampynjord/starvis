@@ -51,6 +51,7 @@ export interface FleetItemData {
   addedAt: Date;
   updatedAt: Date;
   addedBy?: { id: number; username: string } | null;
+  corporation?: { id: number; name: string; tag: string } | null;
 }
 
 const CORP_SELECT = {
@@ -408,6 +409,18 @@ export class CorporationService {
     });
   }
 
+  async getFleetItemsByUser(userId: number): Promise<FleetItemData[]> {
+    return this.db.corporationFleetItem.findMany({
+      where: { addedById: userId },
+      select: {
+        ...FLEET_SELECT,
+        shipUuid: true,
+        corporation: { select: { id: true, name: true, tag: true } },
+      },
+      orderBy: [{ itemType: 'asc' }, { addedAt: 'desc' }],
+    });
+  }
+
   async addFleetItem(
     corporationId: number,
     data: { itemType: string; itemClassName: string; quantity?: number; notes?: string },
@@ -445,6 +458,28 @@ export class CorporationService {
   }
 
   async deleteFleetItem(itemId: number): Promise<void> {
+    await this.db.corporationFleetItem.delete({ where: { id: itemId } });
+  }
+
+  async updateCorporationFleetItem(
+    itemId: number,
+    corporationId: number,
+    userId: number,
+    canManage: boolean,
+    data: { itemType?: string; itemClassName?: string; quantity?: number; notes?: string | null },
+  ): Promise<FleetItemData> {
+    const item = await this.db.corporationFleetItem.findUnique({ where: { id: itemId } });
+    if (!item) throw new Error('NOT_FOUND');
+    if (item.corporationId !== corporationId) throw new Error('FORBIDDEN');
+    if (!canManage && item.addedById !== userId) throw new Error('FORBIDDEN');
+    return this.updateFleetItem(itemId, data);
+  }
+
+  async removeCorporationFleetItem(itemId: number, corporationId: number, userId: number, canManage: boolean): Promise<void> {
+    const item = await this.db.corporationFleetItem.findUnique({ where: { id: itemId } });
+    if (!item) throw new Error('NOT_FOUND');
+    if (item.corporationId !== corporationId) throw new Error('FORBIDDEN');
+    if (!canManage && item.addedById !== userId) throw new Error('FORBIDDEN');
     await this.db.corporationFleetItem.delete({ where: { id: itemId } });
   }
 
