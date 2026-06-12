@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { logApiError } from '@/lib/server-logger';
 import { getAuthToken, proxyJson } from '../../../../_utils/proxy';
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -9,7 +10,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const body = await req.json().catch(() => ({}));
     return proxyJson('PATCH', `/corp/fleet/${id}/position`, token, body);
   } catch (e: any) {
-    console.error('[corp/fleet/:id/position PATCH]', e);
+    logApiError('corp/fleet/:id/position PATCH', e);
     return NextResponse.json({ error: 'Service unavailable' }, { status: 503 });
   }
 }

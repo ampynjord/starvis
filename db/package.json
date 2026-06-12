@@ -9,7 +9,7 @@
     "generate": "prisma generate --schema=prisma/schema",
     "push": "prisma db push --schema=prisma/schema",
     "migrate": "prisma migrate dev --schema=prisma/schema",
-    "migrate:deploy": "prisma migrate deploy --schema=prisma/schema",
+    "migrate:deploy": "node scripts/migrate-deploy.mjs",
     "studio": "prisma studio --schema=prisma/schema",
     "typecheck": "tsc --noEmit --project tsconfig.json",
     "postinstall": "npm run generate"

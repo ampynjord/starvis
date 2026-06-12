@@ -344,8 +344,19 @@ jobs:
           path: db/generated/
           key: db-gen-${{ runner.os }}-${{ hashFiles('db/prisma/**/*.prisma', 'db/prisma.config.ts') }}
 
-      - name: Apply DB schema
-        run: npm run push --workspace=@starvis/db
+      - name: Apply DB migrations
+        run: npm run migrate:deploy --workspace=@starvis/db
+        env:
+          DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_test
+
+      - name: Check schema/migrations drift
+        run: |
+          PGPASSWORD=ci_password psql -h 127.0.0.1 -U ci_user -d starvis_test -c 'CREATE DATABASE starvis_shadow'
+          npm exec --workspace=@starvis/db -- prisma migrate diff \
+            --from-migrations prisma/migrations \
+            --to-schema prisma/schema \
+            --shadow-database-url postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_shadow \
+            --exit-code
         env:
           DATABASE_URL: postgresql://ci_user:ci_password@127.0.0.1:5432/starvis_test
 
@@ -566,8 +577,8 @@ jobs:
             echo "==> Ensure database services..."
             docker compose -f docker-compose.prod.yml --env-file .env.prod up -d postgres redis
 
-            echo "==> DB schema push..."
-            docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm --no-deps api npm run push --workspace=@starvis/db
+            echo "==> DB migrations..."
+            docker compose -f docker-compose.prod.yml --env-file .env.prod run --rm --no-deps api npm run migrate:deploy --workspace=@starvis/db
 
             echo "==> Rolling restart..."
             if ! docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --remove-orphans; then
