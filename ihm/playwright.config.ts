@@ -28,6 +28,7 @@ export default defineConfig({
     env: {
       ...process.env,
       API_URL: process.env.API_URL ?? 'http://127.0.0.1:3000',
+      NEXT_PUBLIC_E2E_AUTH: '1',
     },
   },
   projects: [
