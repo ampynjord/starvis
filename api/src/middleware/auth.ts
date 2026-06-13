@@ -1,7 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { getPrisma } from '@starvis/db';
 import type { NextFunction, Request, Response } from 'express';
-import { verifyAuthToken } from '../services/auth-service.js';
+import { type JwtPayload, verifyAuthToken } from '../services/auth-service.js';
 import { ADMIN_ROLE, AUTH_COOKIE_NAME, DEVELOPER_ACCESS_ROLES } from '../utils/config.js';
 
 // ── Admin API Key ─────────────────────────────────────────────────────────────
@@ -21,11 +21,37 @@ function extractCookieToken(req: Request): string | null {
   return match ? (match.split('=')[1]?.trim() ?? null) : null;
 }
 
+function hasValidAdminApiKey(req: Request): boolean {
+  const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
+  if (!ADMIN_API_KEY) return false;
+  const apiKey = String(req.headers['x-api-key'] || '');
+  if (!apiKey) return false;
+  const k = Buffer.from(apiKey);
+  const e = Buffer.from(ADMIN_API_KEY);
+  return k.length === e.length && timingSafeEqual(k, e);
+}
+
+async function resolveCurrentPayload(token: string): Promise<JwtPayload> {
+  const payload = verifyAuthToken(token);
+  const currentUser = await getPrisma().user.findUnique({
+    where: { id: payload.sub },
+    select: { uuid: true, email: true, username: true, role: true },
+  });
+  if (!currentUser) return payload;
+  return {
+    ...payload,
+    uuid: currentUser.uuid,
+    email: currentUser.email,
+    username: currentUser.username,
+    role: currentUser.role,
+  };
+}
+
 /**
  * requireJwt — verifies Bearer JWT, injects req.jwtPayload.
  * Accepts any role (user, admin).
  */
-export function requireJwt(req: Request, res: Response, next: NextFunction) {
+export async function requireJwt(req: Request, res: Response, next: NextFunction) {
   if (!process.env.JWT_SECRET) return res.status(500).json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' });
 
   const token = extractBearer(req) ?? extractCookieToken(req);
@@ -33,11 +59,37 @@ export function requireJwt(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ success: false, error: 'Authentication required' });
   }
   try {
-    req.jwtPayload = verifyAuthToken(token);
+    req.jwtPayload = await resolveCurrentPayload(token);
     next();
   } catch {
     res.status(401).json({ success: false, error: 'Invalid or expired token' });
   }
+}
+
+/**
+ * requireExternalApiAccess — protects the documented external /api/v1 surface.
+ * A signed-in web session or generated Bearer token is preferred so request logs
+ * keep the real user. ADMIN_API_KEY is accepted only for server-side Starvis
+ * services such as the public IHM proxy, bot and audits.
+ */
+export async function requireExternalApiAccess(req: Request, res: Response, next: NextFunction) {
+  if (!process.env.JWT_SECRET) {
+    return res.status(500).json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' });
+  }
+
+  const token = extractBearer(req) ?? extractCookieToken(req);
+  if (token) {
+    try {
+      req.jwtPayload = await resolveCurrentPayload(token);
+      return next();
+    } catch {
+      return res.status(401).json({ success: false, error: 'Invalid or expired token' });
+    }
+  }
+
+  if (hasValidAdminApiKey(req)) return next();
+
+  return res.status(401).json({ success: false, error: 'API token or signed-in session required' });
 }
 
 /**
@@ -53,9 +105,8 @@ export async function requireJwtDeveloperOrAdmin(req: Request, res: Response, ne
     return res.status(401).json({ success: false, error: 'Authentication required' });
   }
   try {
-    const payload = verifyAuthToken(token);
-    const currentUser = await getPrisma().user.findUnique({ where: { id: payload.sub }, select: { role: true } });
-    const currentRole = currentUser?.role ?? payload.role;
+    const payload = await resolveCurrentPayload(token);
+    const currentRole = payload.role;
     if (!DEVELOPER_ACCESS_ROLES.includes(currentRole as (typeof DEVELOPER_ACCESS_ROLES)[number])) {
       return res.status(403).json({ success: false, error: 'Developer or admin role required' });
     }
@@ -75,15 +126,7 @@ export const requireJwtBetaOrAdmin = requireJwtDeveloperOrAdmin;
  */
 export async function requireJwtAdmin(req: Request, res: Response, next: NextFunction) {
   // 1. Always accept admin key (backward compat, server scripts)
-  const ADMIN_API_KEY = process.env.ADMIN_API_KEY;
-  if (ADMIN_API_KEY) {
-    const apiKey = String(req.headers['x-api-key'] || '');
-    if (apiKey.length > 0) {
-      const k = Buffer.from(apiKey);
-      const e = Buffer.from(ADMIN_API_KEY);
-      if (k.length === e.length && timingSafeEqual(k, e)) return next();
-    }
-  }
+  if (hasValidAdminApiKey(req)) return next();
 
   // 2. Otherwise validate JWT with admin role
   if (!process.env.JWT_SECRET) {
@@ -94,9 +137,8 @@ export async function requireJwtAdmin(req: Request, res: Response, next: NextFun
     return res.status(401).json({ success: false, error: 'Authentication required' });
   }
   try {
-    const payload = verifyAuthToken(token);
-    const currentUser = await getPrisma().user.findUnique({ where: { id: payload.sub }, select: { role: true } });
-    const currentRole = currentUser?.role ?? payload.role;
+    const payload = await resolveCurrentPayload(token);
+    const currentRole = payload.role;
     if (currentRole !== ADMIN_ROLE) {
       return res.status(403).json({ success: false, error: 'Admin role required' });
     }

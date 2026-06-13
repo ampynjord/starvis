@@ -22,6 +22,7 @@ import rateLimit from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
+import { requireExternalApiAccess } from './src/middleware/auth.js';
 import { prometheusMiddleware } from './src/middleware/prometheus.js';
 import { healthRouter } from './src/routes/health.js';
 import { createRoutes } from './src/routes/index.js';
@@ -136,6 +137,8 @@ app.use((req, res, next) => {
   });
   next();
 });
+
+app.use('/api/v1', requireExternalApiAccess);
 
 // ===== SWAGGER / OPENAPI =====
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

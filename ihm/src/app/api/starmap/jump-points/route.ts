@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
-import { upstreamUrl } from '../../_utils/proxy';
+import { serverApiHeaders, upstreamUrl } from '../../_utils/proxy';
 
 export async function GET() {
   try {
-    const upstream = await fetch(upstreamUrl('/api/v1/starmap/jump-points'));
+    const upstream = await fetch(upstreamUrl('/api/v1/starmap/jump-points'), { headers: await serverApiHeaders() });
     const data = await upstream.json().catch(() => ({}));
     return NextResponse.json(data, { status: upstream.status });
   } catch {

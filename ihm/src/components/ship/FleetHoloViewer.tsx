@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CTMLoader } from '@/lib/CTMLoader';
 import { createVisibilityTracker, disposeObject3D, getThreePixelRatio } from '@/lib/three-performance';
+import { API_BASE } from '@/utils/constants';
 
 export interface FleetShip {
   id: number;
@@ -882,7 +883,7 @@ export function FleetHoloViewer({
         return;
       }
 
-      const modelUrl = `/api/v1/ships/${entry.ship.shipUuid}/model/file`;
+      const modelUrl = `${API_BASE}/ships/${entry.ship.shipUuid}/model/file`;
       void loadCachedGeometry(loader, modelUrl)
         .then((geometry) => {
           const mat = makeMat(COLOR_DEFAULT, EMISS_DEFAULT);

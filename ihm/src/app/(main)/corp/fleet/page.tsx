@@ -24,6 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import type { FleetShip } from '@/components/ship/FleetHoloViewer';
 import { api } from '@/services/api';
+import { API_BASE } from '@/utils/constants';
 
 const FleetHoloViewer = createDynamic(
   () => import('@/components/ship/FleetHoloViewer').then((m) => m.FleetHoloViewer),
@@ -451,7 +452,7 @@ export default function FleetManagerPage() {
         sizeX: (s as any)?.size_x ?? null, sizeY: (s as any)?.size_y ?? null, sizeZ: (s as any)?.size_z ?? null,
         isConceptOnly: (s as any)?.is_concept_only ?? false,
         thumbnailUrl: (s as any)?.thumbnail_large ?? (s as any)?.thumbnail ?? null,
-        ctmUrl: (s as any)?.ctm_url ? `/api/v1/ships/${uuid}/model/file` : null,
+        ctmUrl: (s as any)?.ctm_url ? `${API_BASE}/ships/${uuid}/model/file` : null,
         declaredBy: i.addedBy?.username ?? null,
         gridX: i.gridX,
         gridZ: i.gridZ,

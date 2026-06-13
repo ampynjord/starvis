@@ -25,6 +25,8 @@ const baseUrl = String(args.get('base-url') ?? process.env.STARVIS_AUDIT_API_URL
 const env = String(args.get('env') ?? process.env.STARVIS_AUDIT_ENV ?? DEFAULT_ENV);
 const strict = args.get('strict') === 'true' || process.env.STARVIS_AUDIT_STRICT === 'true';
 const output = args.get('output') ? resolve(String(args.get('output'))) : null;
+const apiToken = String(args.get('api-token') ?? process.env.STARVIS_AUDIT_API_TOKEN ?? process.env.API_TOKEN ?? '');
+const adminApiKey = String(args.get('api-key') ?? process.env.STARVIS_AUDIT_API_KEY ?? '');
 
 const failures = [];
 const warnings = [];
@@ -94,7 +96,13 @@ async function requestJson(name, path, params = {}) {
   const started = performance.now();
   let response;
   try {
-    response = await fetch(url, { headers: { accept: 'application/json' } });
+    response = await fetch(url, {
+      headers: {
+        accept: 'application/json',
+        ...(apiToken ? { authorization: `Bearer ${apiToken}` } : {}),
+        ...(adminApiKey ? { 'x-api-key': adminApiKey } : {}),
+      },
+    });
   } catch (error) {
     fail(`${name}: request failed`, { url: String(url), error: error.message });
     return null;

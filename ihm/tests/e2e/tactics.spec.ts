@@ -79,7 +79,7 @@ test('corporation tactics board adds ships and tactical markers', async ({ conte
       },
     });
   });
-  await page.route('**/api/v1/ships/ship-aurora**', async (route) => {
+  await page.route('**/api/public/v1/ships/ship-aurora**', async (route) => {
     await route.fulfill({
       json: {
         success: true,

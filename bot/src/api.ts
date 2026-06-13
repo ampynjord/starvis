@@ -1,10 +1,13 @@
-import { API_BASE_URL, API_TIMEOUT_MS } from './config.js';
+import { API_BASE_URL, API_TIMEOUT_MS, API_TOKEN } from './config.js';
 
 export async function apiFetch<T>(path: string): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
   const res = await fetch(url, {
     signal: AbortSignal.timeout(API_TIMEOUT_MS),
-    headers: { Accept: 'application/json' },
+    headers: {
+      Accept: 'application/json',
+      ...(API_TOKEN ? { Authorization: `Bearer ${API_TOKEN}` } : {}),
+    },
   });
   if (!res.ok) {
     throw new Error(`API ${res.status}: ${res.statusText}`);
