@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { API_BASE, COMPONENT_TYPE_COLORS, VARIANT_TYPE_LABELS } from '@/utils/constants';
 
 describe('API_BASE', () => {
-  it('equals /api/v1', () => {
-    expect(API_BASE).toBe('/api/v1');
+  it('equals /api/public/v1', () => {
+    expect(API_BASE).toBe('/api/public/v1');
   });
 });
 

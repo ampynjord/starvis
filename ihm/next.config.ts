@@ -28,7 +28,6 @@ const nextConfig: NextConfig = {
       { source: '/api-docs/:path*', destination: `${BACKEND_API_URL}/api-docs/:path*` },
       { source: '/admin/api-docs', destination: `${BACKEND_API_URL}/admin/api-docs` },
       { source: '/admin/api-docs/:path*', destination: `${BACKEND_API_URL}/admin/api-docs/:path*` },
-      { source: '/api/v1/:path*', destination: `${BACKEND_API_URL}/api/v1/:path*` },
       { source: '/health/:path*', destination: `${BACKEND_API_URL}/health/:path*` },
       { source: '/health', destination: `${BACKEND_API_URL}/health/live` },
     ];

@@ -8,6 +8,7 @@ import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
 import type { MiningElement } from '@/types/api';
+import { API_BASE } from '@/utils/constants';
 import { dangerColor, fNum, pct } from '@/views/mining-helpers';
 import { ORE_PRICES } from '@/data/mining-static';
 
@@ -49,7 +50,7 @@ export function RockFinder() {
     queryKey: ['mining.solver', selectedElementUuid, minProbability, env],
     queryFn: async () => {
       if (!selectedElementUuid) return [];
-      const url = `/api/v1/mining/solver?element=${selectedElementUuid}&min_probability=${minProbability}${env ? `&env=${env}` : ''}`;
+      const url = `${API_BASE}/mining/solver?element=${selectedElementUuid}&min_probability=${minProbability}${env ? `&env=${env}` : ''}`;
       const res = await fetch(url);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);

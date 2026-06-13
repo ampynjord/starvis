@@ -61,7 +61,7 @@ process.env.ADMIN_API_KEY = ADMIN_API_KEY;
 
 const { mountAuthRoutes } = await import('../src/routes/auth.js');
 const { mountCorporationRoutes } = await import('../src/routes/corporations.js');
-const { requireJwt } = await import('../src/middleware/index.js');
+const { requireExternalApiAccess, requireJwt } = await import('../src/middleware/index.js');
 
 function signToken(id: number, role: string): string {
   return jwt.sign({ sub: id, uuid: `uuid-${id}`, email: `user${id}@example.com`, username: `user${id}`, role }, JWT_SECRET, {
@@ -75,6 +75,9 @@ beforeAll(() => {
   app = express();
   app.use(express.json());
   const router = express.Router();
+  router.get('/api/v1/protected-data', requireExternalApiAccess, (req, res) => {
+    res.json({ success: true, actor: req.jwtPayload?.username ?? null, role: req.jwtPayload?.role ?? null });
+  });
   router.use('/api', requireJwt);
   const deps = { prisma: { user: mockUserDelegate }, getGamePrisma: vi.fn(), shipMatrixService: {} } as any;
   mountAuthRoutes(router, deps);
@@ -168,6 +171,28 @@ describe('admin routes authorization', () => {
   it('rejects unauthenticated access to admin corporation routes with 401', async () => {
     const res = await request(app).get('/admin/corporations');
     expect(res.status).toBe(401);
+  });
+});
+
+describe('external API authorization', () => {
+  it('rejects anonymous /api/v1 calls with 401', async () => {
+    const res = await request(app).get('/api/v1/protected-data');
+    expect(res.status).toBe(401);
+  });
+
+  it('allows /api/v1 calls with a valid user JWT and refreshes the DB role', async () => {
+    const res = await request(app)
+      .get('/api/v1/protected-data')
+      .set('Authorization', `Bearer ${signToken(3, 'beta_tester')}`);
+    expect(res.status).toBe(200);
+    expect(res.body.actor).toBe('user3');
+    expect(res.body.role).toBe('developer');
+  });
+
+  it('allows trusted server-to-server /api/v1 calls with X-Api-Key', async () => {
+    const res = await request(app).get('/api/v1/protected-data').set('X-Api-Key', ADMIN_API_KEY);
+    expect(res.status).toBe(200);
+    expect(res.body.actor).toBeNull();
   });
 });
 

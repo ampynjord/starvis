@@ -60,7 +60,7 @@ async function installApiFixtures(page: Page) {
     await route.fulfill({ json: { user: null } });
   });
 
-  await page.route('**/api/v1/**', async (route) => {
+  await page.route('**/api/public/v1/**', async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
 

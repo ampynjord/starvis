@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { AUTH_COOKIE_NAME, SERVER_API_URL, SESSION_COOKIE_MAX_AGE_SECONDS } from '@/lib/server-config';
+import { AUTH_COOKIE_NAME, SERVER_API_KEY, SERVER_API_URL, SESSION_COOKIE_MAX_AGE_SECONDS } from '@/lib/server-config';
 
 export async function getAuthToken(): Promise<string | null> {
   const cookieStore = await cookies();
@@ -19,6 +19,15 @@ export async function readUpstreamJson(upstream: Response): Promise<any> {
 
 export function upstreamUrl(path: string): string {
   return `${SERVER_API_URL}${path}`;
+}
+
+export async function serverApiHeaders(includeJson = false): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {};
+  const token = await getAuthToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (SERVER_API_KEY) headers['X-API-Key'] = SERVER_API_KEY;
+  if (includeJson) headers['Content-Type'] = 'application/json';
+  return headers;
 }
 
 export function jsonError(message: string, status: number): NextResponse {

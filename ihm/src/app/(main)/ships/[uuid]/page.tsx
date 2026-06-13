@@ -1,11 +1,14 @@
 import type { Metadata } from 'next';
-import { SERVER_API_URL } from '@/lib/server-config';
+import { SERVER_API_KEY, SERVER_API_URL } from '@/lib/server-config';
 import ShipDetailPage from '@/views/ShipDetailPage';
 
 export async function generateMetadata({ params }: { params: Promise<{ uuid: string }> }): Promise<Metadata> {
   try {
     const { uuid } = await params;
-    const res = await fetch(`${SERVER_API_URL}/api/v1/ships/${uuid}`, { next: { revalidate: 3600 } });
+    const res = await fetch(`${SERVER_API_URL}/api/v1/ships/${uuid}`, {
+      headers: SERVER_API_KEY ? { 'X-API-Key': SERVER_API_KEY } : undefined,
+      next: { revalidate: 3600 },
+    });
     if (!res.ok) throw new Error();
     const { data } = await res.json();
     const mfr = data.manufacturer_name ? `${data.manufacturer_name} ` : '';

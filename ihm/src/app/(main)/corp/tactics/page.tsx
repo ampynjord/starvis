@@ -28,6 +28,7 @@ import type { FleetShip, TacticalMarker, TacticalVector } from '@/components/shi
 import { api } from '@/services/api';
 import { FORMATION_LABELS, type FormationType, formationPosition } from '@/lib/tacticsFormations';
 import type { ShipListItem } from '@/types/api';
+import { API_BASE } from '@/utils/constants';
 
 const FleetHoloViewer = createDynamic(
   () => import('@/components/ship/FleetHoloViewer').then((m) => m.FleetHoloViewer),
@@ -302,7 +303,7 @@ export default function CorporationTacticsPage() {
       sizeZ: (ship as any)?.size_z ?? ship?.cross_section_z ?? null,
       isConceptOnly: ship?.is_concept_only ?? false,
       thumbnailUrl: ship?.thumbnail_large ?? ship?.thumbnail ?? null,
-      ctmUrl: ship?.ctm_url ? `/api/v1/ships/${node.shipUuid}/model/file` : null,
+      ctmUrl: ship?.ctm_url ? `${API_BASE}/ships/${node.shipUuid}/model/file` : null,
       declaredBy: node.owner,
       group: node.group,
       gridX: node.gridX,

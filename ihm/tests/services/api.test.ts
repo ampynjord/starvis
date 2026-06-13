@@ -24,20 +24,20 @@ describe('api.stats', () => {
     vi.restoreAllMocks();
   });
 
-  it('overview() calls /api/v1/stats/overview', async () => {
+  it('overview() calls /api/public/v1/stats/overview', async () => {
     global.fetch = mockFetch(mockOverview);
     const result = await api.stats.overview();
     expect(result).toEqual(mockOverview);
     expect(fetch).toHaveBeenCalledTimes(1);
     const [url] = vi.mocked(fetch).mock.calls[0];
-    expect(String(url)).toContain('/api/v1/stats/overview');
+    expect(String(url)).toContain('/api/public/v1/stats/overview');
   });
 
-  it('version() calls /api/v1/version', async () => {
+  it('version() calls /api/public/v1/version', async () => {
     global.fetch = mockFetch(mockVersion);
     const result = await api.stats.version();
     expect(result).toEqual(mockVersion);
-    expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('/api/v1/version');
+    expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('/api/public/v1/version');
   });
 });
 
@@ -46,11 +46,11 @@ describe('api.ships', () => {
     vi.restoreAllMocks();
   });
 
-  it('list() calls /api/v1/ships', async () => {
+  it('list() calls /api/public/v1/ships', async () => {
     global.fetch = mockFetch(mockShipList);
     const result = await api.ships.list({});
     expect(result).toEqual(mockShipList);
-    expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('/api/v1/ships');
+    expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('/api/public/v1/ships');
   });
 
   it('list() forwards pagination parameters', async () => {
@@ -62,11 +62,11 @@ describe('api.ships', () => {
     expect(url).toContain('search=hornet');
   });
 
-  it('get() calls /api/v1/ships/:uuid', async () => {
+  it('get() calls /api/public/v1/ships/:uuid', async () => {
     global.fetch = mockFetch(mockShip);
     const result = await api.ships.get('abc');
     expect(result).toEqual(mockShip);
-    expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('/api/v1/ships/abc');
+    expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('/api/public/v1/ships/abc');
   });
 
   it('throws an error if the response is not ok', async () => {
@@ -80,11 +80,11 @@ describe('api.search', () => {
     vi.restoreAllMocks();
   });
 
-  it('calls /api/v1/search with the search parameter', async () => {
+  it('calls /api/public/v1/search with the search parameter', async () => {
     global.fetch = mockFetch({ ships: [], components: [] });
     await api.search('aurora');
     const url = String(vi.mocked(fetch).mock.calls[0][0]);
-    expect(url).toContain('/api/v1/search');
+    expect(url).toContain('/api/public/v1/search');
     expect(url).toContain('search=aurora');
   });
 });
@@ -94,16 +94,16 @@ describe('api.components', () => {
     vi.restoreAllMocks();
   });
 
-  it('list() calls /api/v1/components', async () => {
+  it('list() calls /api/public/v1/components', async () => {
     global.fetch = mockFetch({ data: [], pagination: {} });
     await api.components.list({});
-    expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('/api/v1/components');
+    expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('/api/public/v1/components');
   });
 
-  it('get() calls /api/v1/components/:uuid', async () => {
+  it('get() calls /api/public/v1/components/:uuid', async () => {
     global.fetch = mockFetch({ uuid: 'comp-123' });
     await api.components.get('comp-123');
-    expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('/api/v1/components/comp-123');
+    expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('/api/public/v1/components/comp-123');
   });
 });
 
@@ -112,10 +112,10 @@ describe('api.changelog', () => {
     vi.restoreAllMocks();
   });
 
-  it('summary() calls /api/v1/changelog/summary', async () => {
+  it('summary() calls /api/public/v1/changelog/summary', async () => {
     global.fetch = mockFetch({});
     await api.changelog.summary();
-    expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('/api/v1/changelog/summary');
+    expect(String(vi.mocked(fetch).mock.calls[0][0])).toContain('/api/public/v1/changelog/summary');
   });
 });
 

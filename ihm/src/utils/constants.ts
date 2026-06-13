@@ -1,4 +1,4 @@
-export const API_BASE = '/api/v1';
+export const API_BASE = '/api/public/v1';
 
 export const GAME_COMPONENT_CATEGORIES = [
   'Ordnance',

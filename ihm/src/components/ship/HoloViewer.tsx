@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CTMLoader } from '@/lib/CTMLoader';
 import { createVisibilityTracker, disposeObject3D, getThreePixelRatio } from '@/lib/three-performance';
+import { API_BASE } from '@/utils/constants';
 
 interface Props {
   shipUuid: string;
@@ -15,7 +16,7 @@ interface Props {
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
 export function HoloViewer({ shipUuid, shipName }: Props) {
-  const ctmUrl = `/api/v1/ships/${shipUuid}/model/file`;
+  const ctmUrl = `${API_BASE}/ships/${shipUuid}/model/file`;
   const canvasRef = useRef<HTMLDivElement>(null);
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);

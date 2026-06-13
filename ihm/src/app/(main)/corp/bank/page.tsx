@@ -19,6 +19,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
 import { StatCard, StatGrid } from '@/components/ui/StatCard';
 import { useAuth } from '@/contexts/AuthContext';
+import { API_BASE } from '@/utils/constants';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -71,9 +72,9 @@ function AddItemModal({ onClose, onAdd }: {
     setSearching(true);
     try {
       const endpointMap: Record<string, string> = {
-        component: `/api/v1/components?search=${encodeURIComponent(q)}&limit=8`,
-        item: `/api/v1/items?search=${encodeURIComponent(q)}&limit=8`,
-        commodity: `/api/v1/commodities?search=${encodeURIComponent(q)}&limit=8`,
+        component: `${API_BASE}/components?search=${encodeURIComponent(q)}&limit=8`,
+        item: `${API_BASE}/items?search=${encodeURIComponent(q)}&limit=8`,
+        commodity: `${API_BASE}/commodities?search=${encodeURIComponent(q)}&limit=8`,
       };
       const endpoint = endpointMap[itemType];
       if (endpoint) {

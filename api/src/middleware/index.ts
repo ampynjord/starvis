@@ -2,4 +2,4 @@
  * Middleware - Index des exportations
  */
 
-export { requireJwt, requireJwtAdmin, requireJwtBetaOrAdmin, requireJwtDeveloperOrAdmin } from './auth.js';
+export { requireExternalApiAccess, requireJwt, requireJwtAdmin, requireJwtBetaOrAdmin, requireJwtDeveloperOrAdmin } from './auth.js';
