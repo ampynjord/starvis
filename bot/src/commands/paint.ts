@@ -33,7 +33,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
           .setTitle(`Paints - "${search}"`)
           .setURL(`${SITE_URL}/paints`)
           .setDescription(lines.join('\n\n').slice(0, 3900))
-          .setFooter({ text: 'Starvis - Paint and livery data' }),
+          .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' }),
       ],
     });
   } catch (err) {

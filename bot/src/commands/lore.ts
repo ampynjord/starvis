@@ -58,7 +58,7 @@ function embed(title: string, url: string, description: string): EmbedBuilder {
     .setTitle(title)
     .setURL(url)
     .setDescription(description.slice(0, 3900))
-    .setFooter({ text: 'Starvis - RSI knowledge data' });
+    .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 }
 
 function truncate(text: string, max: number): string {

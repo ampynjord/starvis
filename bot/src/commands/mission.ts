@@ -43,7 +43,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       .setColor(0xe74c3c)
       .setTitle(`🎯 Missions (${res.total} found)`)
       .setURL(`${SITE_URL}/missions`)
-      .setFooter({ text: 'Starvis — Star Citizen Database' });
+      .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 
     const lines = res.data.map((m) => {
       const icon = m.is_legal === false ? '🔴' : '🟢';

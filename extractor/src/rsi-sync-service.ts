@@ -589,9 +589,9 @@ export class RsiSyncService {
     };
 
     try {
-      // ── Step 1: fetch all systems from RSI official starmap bootup API ─────────
+      // ── Step 1: fetch all systems from the RSI starmap bootup API ─────────
       const bootupUrl = `${RSI_BASE_URL}/api/starmap/bootup`;
-      onProgress?.(`  [starmap] fetching from RSI official API…`);
+      onProgress?.(`  [starmap] fetching from RSI API…`);
 
       let bootupData: any;
       try {

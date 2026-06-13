@@ -426,7 +426,7 @@ export default function AdminMonitoringPage() {
               <p className="mt-1 font-mono-sc text-[10px] text-slate-600">Client ID {discordBot.clientId}</p>
             )}
             {discordBot?.guildId && (
-              <p className="mt-1 font-mono-sc text-[10px] text-slate-600">Official server {discordBot.guildId}</p>
+              <p className="mt-1 font-mono-sc text-[10px] text-slate-600">Community server {discordBot.guildId}</p>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">

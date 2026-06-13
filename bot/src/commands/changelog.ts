@@ -64,7 +64,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       .setTitle(`📝 Changelog Starvis (${res.total} entries)`)
       .setDescription(description.length > 4000 ? `${description.slice(0, 3997)}…` : description)
       .setURL(`${SITE_URL}/changelog`)
-      .setFooter({ text: 'Starvis — Star Citizen Database' });
+      .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 
     await interaction.editReply({ embeds: [embed] });
   } catch (err) {

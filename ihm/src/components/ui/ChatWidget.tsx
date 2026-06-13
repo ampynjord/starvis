@@ -333,7 +333,7 @@ export function ChatWidget() {
                   <Send size={16} />
                 </button>
               </div>
-              <p className="text-center text-slate-700 text-[10px] mt-1.5 font-mono">Starvis - live Star Citizen data</p>
+              <p className="text-center text-slate-700 text-[10px] mt-1.5 font-mono">Starvis - Star Citizen Database & Toolset</p>
             </div>
           </motion.div>
         )}

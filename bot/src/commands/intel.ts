@@ -42,7 +42,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         ].join('\n\n'),
       )
       .addFields(COMMAND_GROUPS)
-      .setFooter({ text: 'Starvis - Discord command map' });
+      .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 
     if (stats?.data) {
       const lines = datasetStatLines(stats.data).slice(0, 11);

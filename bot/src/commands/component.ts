@@ -62,7 +62,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       .setTitle(comp.name)
       .setURL(`${SITE_URL}/components/${comp.uuid}`)
       .setDescription(stats.join('\n') || 'No detailed stats available.')
-      .setFooter({ text: 'Starvis - Component data' });
+      .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 
     if (res.data.length > 1) {
       embed.addFields({

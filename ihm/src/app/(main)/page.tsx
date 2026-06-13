@@ -3,11 +3,11 @@ import { PUBLIC_SITE_URL } from '@/lib/server-config';
 import HomePage from '@/views/HomePage';
 
 export const metadata: Metadata = {
-  title: 'Star Citizen Database — Ships, Components, FPS Gear & More',
+  title: 'Starvis - Star Citizen Database & Toolset',
   description:
-    'STARVIS is the most complete Star Citizen database. Browse ships, components, FPS gear, commodities, missions and more — data extracted directly from game files.',
+    'Starvis - Star Citizen Database & Toolset lets you browse ships, components, FPS gear, commodities, missions and more — data extracted directly from game files.',
   openGraph: {
-    title: 'STARVIS — Star Citizen Database',
+    title: 'Starvis - Star Citizen Database & Toolset',
     description: 'Ships, components, FPS gear, commodities and more — extracted from SC game files.',
   },
 };
@@ -17,7 +17,7 @@ const jsonLd = {
   '@type': 'WebSite',
   name: 'STARVIS',
   url: PUBLIC_SITE_URL,
-  description: 'The most complete Star Citizen database — ships, components, FPS gear and more.',
+  description: 'Starvis - Star Citizen Database & Toolset — ships, components, FPS gear and more.',
   potentialAction: {
     '@type': 'SearchAction',
     target: `${PUBLIC_SITE_URL}/search?q={search_term_string}`,

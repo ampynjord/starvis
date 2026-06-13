@@ -276,7 +276,7 @@ function inferSystemCode(location: { name: string; type: string; system_code: st
  *
  * The sources overlap but are not equivalent:
  * - game.locations is the in-game/DataForge view (coordinates, hierarchy, loc keys).
- * - rsi.starmap_locations is the official web/lore view (status, affiliations, descriptions, web URLs).
+ * - rsi.starmap_locations is the RSI web/lore view (status, affiliations, descriptions, web URLs).
  */
 export async function crossReferenceStarmapLocations(conn: PoolClient, env: GameEnv): Promise<number> {
   await conn.query('UPDATE game.locations SET rsi_starmap_location_id = NULL WHERE env = $1', [env]);

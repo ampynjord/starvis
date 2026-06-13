@@ -45,7 +45,7 @@ export default function DiscordBotPage() {
       <PageHeader
         eyebrow="Integration"
         title="Discord Bot"
-        subtitle="Join the official Starvis server, invite the bot and query ships, trade, missions, lore and AI answers from slash commands."
+        subtitle="Join the Starvis community server, invite the bot and query ships, trade, missions, lore and AI answers from slash commands."
         actions={(
           <div className="flex flex-wrap items-center gap-2">
             {serverInviteUrl ? (
@@ -92,7 +92,7 @@ export default function DiscordBotPage() {
 
         <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-1">
           <div className="sci-panel border border-slate-800/60 p-3">
-            <p className="flex items-center gap-2 font-orbitron text-[10px] font-bold uppercase tracking-widest text-cyan-400"><UsersRound size={12} /> Official server</p>
+            <p className="flex items-center gap-2 font-orbitron text-[10px] font-bold uppercase tracking-widest text-cyan-400"><UsersRound size={12} /> Community server</p>
             <p className="mt-2 font-mono-sc text-xs text-slate-400">{guildId ? `Guild ${guildId}` : 'Guild not configured'}</p>
           </div>
           <div className="sci-panel border border-slate-800/60 p-3">
@@ -117,7 +117,7 @@ export default function DiscordBotPage() {
               <UsersRound size={24} />
             </div>
             <div className="min-w-0">
-              <h2 className="font-orbitron text-sm font-bold uppercase tracking-widest text-white">Official Starvis server</h2>
+              <h2 className="font-orbitron text-sm font-bold uppercase tracking-widest text-white">Starvis community server</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-400">
                 Community hub for Starvis users: questions, bug reports, suggestions, devlog, changelog, service status,
                 fleet manager, tactics, API integrations and Star Citizen data discussions.

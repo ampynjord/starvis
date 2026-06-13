@@ -7,7 +7,7 @@ test('discord bot page exposes invite and command help', async ({ page }) => {
   await expect(page.getByRole('heading', { name: /discord bot/i })).toBeVisible();
   await expect(page.getByRole('heading', { name: /command help/i })).toBeVisible();
   await expect(page.getByText(/Starvis in Discord/i)).toBeVisible();
-  await expect(page.getByRole('heading', { name: /official starvis server/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /starvis community server/i })).toBeVisible();
   await expect(page.getByRole('heading', { name: /bot invitation link/i })).toBeVisible();
   await expect(page.getByText('/starvis question: best starter hauling ship?')).toBeVisible();
   await expect(page.getByRole('heading', { name: '/ship' })).toBeVisible();

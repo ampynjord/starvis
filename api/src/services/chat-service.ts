@@ -13,7 +13,7 @@
  *   Trade routes            — best trade itineraries
  *   Shops                   — inventories
  *   Manufacturers           — ship manufacturers
- *   Ship Matrix (RSI)       — official RSI data (dimensions, prices, lore)
+ *   Ship Matrix (RSI)       — RSI source data (dimensions, prices, lore)
  *   Galactapedia            — RSI lore
  *   Comm-links              — CIG communications
  *   Starmap                 — star systems
@@ -378,8 +378,7 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'get_ship_matrix',
-      description:
-        'Official RSI data for a ship: official dimensions, prices ($USD and aUEC), lore, production status, official description.',
+      description: 'RSI source data for a ship: dimensions, prices ($USD and aUEC), lore, production status and description.',
       parameters: {
         type: 'object',
         properties: {
@@ -635,7 +634,7 @@ const TOOLS: OpenAI.Chat.Completions.ChatCompletionTool[] = [
     type: 'function',
     function: {
       name: 'search_comm_links',
-      description: 'Search CIG Comm-links: official announcements, letters from the chairman, patch notes, lore.',
+      description: 'Search CIG Comm-links: announcements, letters from the chairman, patch notes, lore.',
       parameters: {
         type: 'object',
         properties: {

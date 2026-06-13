@@ -29,7 +29,7 @@ export function shipEmbed(ship: ShipResult): EmbedBuilder {
     .setColor(COLORS.ship)
     .setTitle(ship.name)
     .setURL(shipUrl)
-    .setFooter({ text: 'Starvis - Star Citizen Database' });
+    .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 
   const thumb = ship.thumbnail ?? ship.thumbnail_large ?? ship.mediaStoreSmall ?? ship.mediaStoreLarge;
   if (thumb) embed.setThumbnail(thumb);
@@ -101,7 +101,7 @@ export function tradeRoutesEmbed(routes: TradeRoute[], scu: number): EmbedBuilde
     .setColor(COLORS.trade)
     .setTitle(`Top ${routes.length} trade routes (${scu} SCU)`)
     .setURL(`${SITE_URL}/trade`)
-    .setFooter({ text: 'Starvis - Star Citizen Database' });
+    .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 
   if (!routes.length) return embed.setDescription('No profitable routes found.');
 
@@ -123,7 +123,7 @@ export function searchEmbed(title: string, description: string): EmbedBuilder {
     .setTitle(title)
     .setDescription(description)
     .setURL(SITE_URL)
-    .setFooter({ text: 'Starvis - Star Citizen Database' });
+    .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 }
 
 export function statusEmbed(healthy: boolean, stats?: Record<string, number | string | null>): EmbedBuilder {
@@ -131,7 +131,7 @@ export function statusEmbed(healthy: boolean, stats?: Record<string, number | st
     .setColor(healthy ? COLORS.success : COLORS.error)
     .setTitle(healthy ? 'Starvis - Online' : 'Starvis - Offline')
     .setURL(SITE_URL)
-    .setFooter({ text: 'Starvis - Star Citizen Database' });
+    .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 
   if (stats) {
     embed.addFields(datasetStatFields(stats));

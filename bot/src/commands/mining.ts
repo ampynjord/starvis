@@ -88,7 +88,7 @@ function baseEmbed(title: string, description: string): EmbedBuilder {
     .setTitle(title)
     .setURL(`${SITE_URL}/mining`)
     .setDescription(description.slice(0, 3900))
-    .setFooter({ text: 'Starvis - Mining data' });
+    .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 }
 
 function format(value: number): string {

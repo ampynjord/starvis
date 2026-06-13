@@ -63,7 +63,7 @@ describe('RsiSyncService stats shape', () => {
 });
 
 describe('RsiSyncService.syncStarmap', () => {
-  it('stores 3D system coordinates from RSI official bootup API', async () => {
+  it('stores 3D system coordinates from the RSI bootup API', async () => {
     vi.stubGlobal('fetch', async () => ({
       ok: true,
       json: async () => ({
