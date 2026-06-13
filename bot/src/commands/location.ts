@@ -56,5 +56,5 @@ function embed(title: string, description: string): EmbedBuilder {
     .setTitle(title)
     .setURL(`${SITE_URL}/locations`)
     .setDescription(description.slice(0, 3900))
-    .setFooter({ text: 'Starvis - Location and starmap data' });
+    .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 }

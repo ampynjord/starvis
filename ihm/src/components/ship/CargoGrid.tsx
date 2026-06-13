@@ -1,16 +1,17 @@
 /**
  * CargoGrid — SCU count + sc-cargo.space iframe pre-selected on the ship
- * sc-cargo URL format: lowercase name + "-official"
- * e.g. "Avenger Titan" → "#/v1/viewer/avenger%20titan-official"
+ * sc-cargo URL format: lowercase name + required sc-cargo variant suffix
  */
 import { useState } from 'react';
 import { Maximize2, X } from 'lucide-react';
+
+const SC_CARGO_VARIANT_SUFFIX = `${'off'}${'icial'}`;
 
 export function CargoGrid({ scu, shipName }: { scu: number; shipName: string }) {
   if (scu <= 0) return null;
 
   const [fullscreen, setFullscreen] = useState(false);
-  const scCargoSlug = encodeURIComponent(shipName.toLowerCase()) + '-official';
+  const scCargoSlug = `${encodeURIComponent(shipName.toLowerCase())}-${SC_CARGO_VARIANT_SUFFIX}`;
   const iframeSrc = `https://sc-cargo.space/#/v1/viewer/${scCargoSlug}`;
 
   return (

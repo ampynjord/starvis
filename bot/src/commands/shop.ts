@@ -58,7 +58,7 @@ function embed(title: string, description: string): EmbedBuilder {
     .setTitle(title)
     .setURL(`${SITE_URL}/shops`)
     .setDescription(description.slice(0, 3900))
-    .setFooter({ text: 'Starvis - Shop data' });
+    .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 }
 
 function format(value: number): string {

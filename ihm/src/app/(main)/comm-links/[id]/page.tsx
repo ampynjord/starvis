@@ -17,7 +17,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       description: data.excerpt ?? `${data.title} — Star Citizen Comm-Link from Roberts Space Industries.`,
       openGraph: {
         title: `${data.title} — Comm-Link`,
-        description: data.excerpt ?? `${data.title} — Official Star Citizen news.`,
+        description: data.excerpt ?? `${data.title} — CIG Star Citizen news.`,
         ...(data.thumbnail_url ? { images: [{ url: data.thumbnail_url }] } : {}),
       },
     };

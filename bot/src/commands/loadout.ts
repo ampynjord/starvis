@@ -52,7 +52,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       .setColor(0x2ecc71)
       .setTitle(`🔧 Loadout — ${ship.name}`)
       .setURL(`${SITE_URL}/ships/${ship.uuid}`)
-      .setFooter({ text: 'Starvis — Star Citizen Database' });
+      .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 
     const fields: { name: string; value: string; inline: boolean }[] = [];
 

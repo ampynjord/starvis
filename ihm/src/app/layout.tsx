@@ -30,7 +30,7 @@ const shareTechMono = Share_Tech_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL(PUBLIC_SITE_URL),
   title: {
-    default: 'STARVIS — Star Citizen Database',
+    default: 'Starvis - Star Citizen Database & Toolset',
     template: '%s — STARVIS',
   },
   description:
@@ -42,14 +42,14 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: PUBLIC_SITE_URL,
     siteName: 'STARVIS',
-    title: 'STARVIS — Star Citizen Database',
-    description: 'Unofficial Star Citizen database. Not affiliated with Cloud Imperium Games.',
+    title: 'Starvis - Star Citizen Database & Toolset',
+    description: 'Unofficial Star Citizen Database & Toolset. Not affiliated with Cloud Imperium Games.',
     images: [{ url: '/brand/starvis.png', width: 1254, height: 1254, alt: 'STARVIS logo' }],
   },
   twitter: {
     card: 'summary',
-    title: 'STARVIS — Star Citizen Database',
-    description: 'Unofficial Star Citizen database. Not affiliated with Cloud Imperium Games.',
+    title: 'Starvis - Star Citizen Database & Toolset',
+    description: 'Unofficial Star Citizen Database & Toolset. Not affiliated with Cloud Imperium Games.',
     images: ['/brand/starvis.png'],
   },
   icons: {

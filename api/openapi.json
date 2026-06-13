@@ -2463,7 +2463,7 @@
     },
     {
       "name": "Ship Matrix",
-      "description": "RSI Ship Matrix — official ship specs mirror"
+      "description": "RSI Ship Matrix specs mirror"
     },
     {
       "name": "Galactapedia",
@@ -2942,7 +2942,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Comma-separated relations: manufacturer, paints, similar, matrix. Similar ships have same career/role; matrix includes official RSI specs."
+            "description": "Comma-separated relations: manufacturer, paints, similar, matrix. Similar ships have same career/role; matrix includes RSI specs."
           }
         ],
         "responses": {
@@ -5058,7 +5058,7 @@
         "tags": ["Ship Matrix"],
         "summary": "List RSI Ship Matrix entries",
         "operationId": "getShipMatrix",
-        "description": "Returns the official RSI Ship Matrix data, auto-synced daily.",
+        "description": "Returns RSI Ship Matrix data, auto-synced daily.",
         "parameters": [
           {
             "$ref": "#/components/parameters/search"

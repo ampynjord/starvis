@@ -126,7 +126,7 @@ Network modules do not require `Data.p4k`:
 
 | Module | Content |
 |---|---|
-| `ship-matrix` | Official RSI Ship Matrix data. |
+| `ship-matrix` | RSI Ship Matrix data. |
 | `galactapedia` | RSI encyclopedia entries. |
 | `comm-links` | RSI Comm-Link articles and images. |
 | `starmap` | RSI Starmap systems, locations and jump points. |

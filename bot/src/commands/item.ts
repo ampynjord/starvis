@@ -38,7 +38,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       .setTitle(`📦 Items — "${name}"`)
       .setDescription(description)
       .setURL(`${SITE_URL}/equipment`)
-      .setFooter({ text: 'Starvis — Star Citizen Database' });
+      .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 
     await interaction.editReply({ embeds: [embed] });
   } catch (err) {

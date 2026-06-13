@@ -1,7 +1,7 @@
 {
   "name": "@starvis/api",
   "version": "1.0.0",
-  "description": "Starvis - REST API for Star Citizen ships",
+  "description": "Starvis - REST API for Star Citizen Database & Toolset",
   "main": "server.ts",
   "type": "module",
   "scripts": {

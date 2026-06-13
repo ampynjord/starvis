@@ -64,7 +64,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
       .setURL(`${SITE_URL}/compare`)
       .setDescription(summary)
       .addFields({ name: 'Scorecard', value: lines.join('\n') || 'No comparable stats available.', inline: false })
-      .setFooter({ text: 'Starvis - Game data comparison' });
+      .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 
     await interaction.editReply({ embeds: [embed] });
   } catch (err) {

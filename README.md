@@ -4,7 +4,7 @@
 [![Node v22](https://img.shields.io/badge/node-v22-green)](https://nodejs.org)
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 
-Unofficial Star Citizen data platform: game data extraction, REST API, web interface, Discord bot, and database tooling.
+Starvis - Star Citizen Database & Toolset is an unofficial Star Citizen data platform: game data extraction, REST API, web interface, Discord bot, and database tooling.
 STARVIS is an independent community project and is not affiliated with, endorsed by, sponsored by, or officially
 connected to Cloud Imperium Games, Cloud Imperium Rights LLC, Roberts Space Industries Corp. or their affiliates.
 
@@ -136,7 +136,7 @@ STARVIS combines local game data and public RSI data.
 | Source | Content | Update path |
 |---|---|---|
 | P4K / DataForge | Ships, components, FPS items, commodities, shops, missions, mining, crafting, locations, paints and extended game insights for loot, reputation, factions, navigation, environments, services, medical data, FPS details, ammo and inventory containers. The IHM consumes normalized insight data through page-named API routes such as factions, ammo, armor, utility and blueprints. | `extractor/` CLI. |
-| RSI Ship Matrix | Official marketing ship data. | Extractor network module and API startup sync. |
+| RSI Ship Matrix | RSI marketing ship data. | Extractor network module and API startup sync. |
 | RSI website | Galactapedia, Comm-links, Starmap, CTM metadata. | Extractor network modules. |
 
 LIVE and PTU data share the same PostgreSQL database and are separated by `env = 'live'` or `env = 'ptu'` in the `game` schema.
@@ -290,7 +290,7 @@ Calculators use normalized game data from the API: FPS combines real weapon stat
 
 Corporation tools include the 3D Fleet Manager, Corp Bank and corporation-owned Tactics board. Fleet Manager lays spawned ships side by side by default, persists their grid positions, and lets each owner decide whether their corporation ship is available for tactical planning. Corp Bank lets members declare shared components, items, commodities and custom entries; owners and corporation leaders can edit or remove entries. Tactics reuses the same 3D holographic viewer to place only corporation ships made available by their owners, save corporation strategies, build reusable mixed-ship formations with availability warnings, add 3D objectives/obstacles/points of interest, and draw flat movement vectors directly from selected ships or squadrons.
 
-The Discord Bot page exposes the official Starvis Discord server, the generated bot invitation link and slash-command help for AI, ships, loadouts, trade, shops, mining, crafting, missions, lore, status and changelog commands. The bot rotates a rich presence with useful prompts such as `/starvis`, `/intel`, API/data status and server count. Configure `NEXT_PUBLIC_DISCORD_CLIENT_ID` or `DISCORD_CLIENT_ID` to enable the bot invitation link. Configure `NEXT_PUBLIC_DISCORD_SERVER_INVITE_URL` or `DISCORD_SERVER_INVITE_URL` to show the community server invite. `NEXT_PUBLIC_DISCORD_GUILD_ID`/`DISCORD_GUILD_ID` identify the official Starvis server (`931662690101895198` by default).
+The Discord Bot page exposes the Starvis community Discord server, the generated bot invitation link and slash-command help for AI, ships, loadouts, trade, shops, mining, crafting, missions, lore, status and changelog commands. The bot rotates a rich presence with useful prompts such as `/starvis`, `/intel`, API/data status and server count. Configure `NEXT_PUBLIC_DISCORD_CLIENT_ID` or `DISCORD_CLIENT_ID` to enable the bot invitation link. Configure `NEXT_PUBLIC_DISCORD_SERVER_INVITE_URL` or `DISCORD_SERVER_INVITE_URL` to show the community server invite. `NEXT_PUBLIC_DISCORD_GUILD_ID`/`DISCORD_GUILD_ID` identify the Starvis community server (`931662690101895198` by default).
 
 Admin Monitoring combines service health, Prometheus traffic metrics, cache/runtime stats, Discord bot configuration, top routes and the latest in-memory API request logs. Request logs show the authenticated username and role when a valid Starvis JWT is present, otherwise the actor stays anonymous. Logs are kept only since the API process started and deliberately exclude request bodies, query values, emails and the request-log viewer endpoint itself.
 

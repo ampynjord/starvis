@@ -68,5 +68,5 @@ function embed(title: string, description: string): EmbedBuilder {
     .setTitle(title)
     .setURL(`${SITE_URL}/blueprints`)
     .setDescription(description.slice(0, 3900))
-    .setFooter({ text: 'Starvis - Crafting and blueprint data' });
+    .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 }

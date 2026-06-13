@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
@@ -301,7 +301,7 @@ export default function HomePage() {
               STARVIS
             </h1>
             <p className="font-mono-sc text-[10px] text-slate-600 tracking-widest uppercase mt-2">
-              Star Citizen · Game Database & Toolset
+              Star Citizen Database & Toolset
             </p>
           </div>
           <div className="flex items-center gap-3 flex-wrap justify-center">

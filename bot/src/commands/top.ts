@@ -87,7 +87,7 @@ async function shipTopEmbed(metric: string, limit: number): Promise<EmbedBuilder
     .setTitle(`Top ${lines.length} ships - ${cfg.label}`)
     .setURL(`${SITE_URL}/ranking?sort=${encodeURIComponent(cfg.sort)}`)
     .setDescription(lines.join('\n\n') || 'No data found.')
-    .setFooter({ text: 'Starvis - Game data ranking' });
+    .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 }
 
 async function componentTopEmbed(metric: string, limit: number): Promise<EmbedBuilder> {
@@ -112,7 +112,7 @@ async function componentTopEmbed(metric: string, limit: number): Promise<EmbedBu
     .setTitle(`Top ${lines.length} components - ${cfg.label}`)
     .setURL(`${SITE_URL}/components?type=${encodeURIComponent(cfg.type)}&sort=${encodeURIComponent(cfg.sort)}`)
     .setDescription(lines.join('\n\n') || 'No data found.')
-    .setFooter({ text: 'Starvis - Game data ranking' });
+    .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 }
 
 function formatValue(value: unknown, unit: string): string {

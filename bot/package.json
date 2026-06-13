@@ -1,7 +1,7 @@
 {
   "name": "@starvis/bot",
   "version": "1.0.0",
-  "description": "Discord bot for Starvis — Star Citizen database",
+  "description": "Discord bot for Starvis - Star Citizen Database & Toolset",
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {

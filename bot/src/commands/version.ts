@@ -46,7 +46,7 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
         { name: '📦 Items', value: v.items_count?.toLocaleString() ?? '—', inline: true },
         { name: '🕐 Last extraction', value: extractedDate, inline: false },
       ])
-      .setFooter({ text: 'Starvis — Star Citizen Database' });
+      .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
 
     await interaction.editReply({ embeds: [embed] });
   } catch (err) {
