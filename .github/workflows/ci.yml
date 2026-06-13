@@ -526,4 +526,6 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Audit production API data
+        env:
+          STARVIS_AUDIT_API_KEY: ${{ secrets.STARVIS_AUDIT_API_KEY }}
         run: npm run quality:audit:data:prod
