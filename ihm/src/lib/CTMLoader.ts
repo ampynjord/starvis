@@ -887,7 +887,7 @@ export class CTMLoader extends THREE.Loader {
     if (body.normals) geo.setAttribute('normal', new THREE.BufferAttribute(body.normals, 3));
     if (body.uvMaps?.length) geo.setAttribute('uv', new THREE.BufferAttribute(body.uvMaps[0].uv, 2));
 
-    if (!body.normals) geo.computeVertexNormals();
+    geo.computeVertexNormals();
 
     // Centre la gÃ©omÃ©trie
     geo.computeBoundingBox();
