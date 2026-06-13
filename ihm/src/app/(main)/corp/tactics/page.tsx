@@ -8,6 +8,7 @@ import {
   BookmarkCheck,
   Copy,
   Crosshair,
+  ExternalLink,
   Flag,
   Layers3,
   Loader2,
@@ -855,7 +856,57 @@ export default function CorporationTacticsPage() {
                   />
                 </label>
               )}
-              {selectedVector && <p className="text-xs text-slate-500">Drag the arrow tip to set the destination. Drag the center handle to curve the vector.</p>}
+              {selectedVector && <p className="text-xs text-slate-500">Drag the arrow tip to move the vector destination.</p>}
+              {selectedShip && (() => {
+                const info = shipData.get(selectedShip.shipUuid);
+                if (!info) return null;
+                return (
+                  <div className="rounded-sm border border-slate-800/70 bg-slate-950/30 p-2 space-y-2">
+                    {(info.thumbnail_large ?? info.thumbnail) && (
+                      <img
+                        src={info.thumbnail_large ?? info.thumbnail ?? ''}
+                        alt={info.name}
+                        className="w-full h-[72px] object-contain opacity-80"
+                      />
+                    )}
+                    <div>
+                      <p className="font-rajdhani text-sm font-semibold leading-tight text-slate-200">{info.name}</p>
+                      {info.manufacturer_name && (
+                        <p className="font-mono-sc text-[9px] text-slate-500">{info.manufacturer_name}</p>
+                      )}
+                      {info.role && (
+                        <p className="font-mono-sc text-[9px] text-cyan-600/80">{info.role}</p>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 font-mono-sc text-[9px]">
+                      {info.crew_size !== null && (
+                        <span className="text-slate-600">Crew <span className="text-slate-300">{info.crew_size}</span></span>
+                      )}
+                      {info.scm_speed !== null && (
+                        <span className="text-slate-600">SCM <span className="text-slate-300">{info.scm_speed} m/s</span></span>
+                      )}
+                      {(info.cross_section_x !== null || info.cross_section_z !== null) && (
+                        <span className="col-span-2 text-slate-600">
+                          Size <span className="text-slate-300">
+                            {(info.cross_section_x ?? 0).toFixed(0)}×{(info.cross_section_z ?? 0).toFixed(0)} m
+                          </span>
+                        </span>
+                      )}
+                      {info.cargo_capacity !== null && info.cargo_capacity > 0 && (
+                        <span className="col-span-2 text-slate-600">Cargo <span className="text-slate-300">{info.cargo_capacity} SCU</span></span>
+                      )}
+                    </div>
+                    <a
+                      href={`/ships/${selectedShip.shipUuid}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-1.5 w-full rounded-sm border border-cyan-900/60 bg-cyan-950/15 px-2 py-1.5 font-mono-sc text-[10px] text-cyan-400 hover:border-cyan-700/70 hover:text-cyan-300 transition-colors"
+                    >
+                      <ExternalLink size={10} /> Ship page
+                    </a>
+                  </div>
+                );
+              })()}
               <div className="grid grid-cols-2 gap-2 font-mono-sc text-[10px] text-slate-600">
                 <span>X {(selectedShip?.gridX ?? selectedMarker?.gridX ?? selectedVector?.endX ?? 0).toFixed(1)}</span>
                 <span>Z {(selectedShip?.gridZ ?? selectedMarker?.gridZ ?? selectedVector?.endZ ?? 0).toFixed(1)}</span>
