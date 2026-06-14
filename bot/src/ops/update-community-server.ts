@@ -11,10 +11,10 @@ import {
 } from 'discord.js';
 
 const DEFAULT_GUILD_ID = '931662690101895198';
-const CHANGELOG_MARKER = '<!-- starvis-changelog-addendum-2026-06-15 -->';
+const OLD_CHANGELOG_MARKER = '<!-- starvis-changelog-addendum-2026-06-15 -->';
+const ADDENDUM_HEADING = '**Latest addendum**';
 
-const ADDENDUM = `${CHANGELOG_MARKER}
-**Latest addendum**
+const ADDENDUM = `${ADDENDUM_HEADING}
 - The \`/developer\` page is now reserved for accounts with Developer or Admin access.
 - Standard users can request external API access with a motivation message.
 - Admins can review external API access requests and approve them to grant Developer access.
@@ -62,6 +62,10 @@ function normalizeName(value: string): string {
     .replace(/^-|-$/g, '');
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 function findRole(guild: Guild, candidates: string[]): Role | null {
   const normalizedCandidates = new Set(candidates.map(normalizeName));
   return guild.roles.cache.find((role) => normalizedCandidates.has(normalizeName(role.name))) ?? null;
@@ -91,12 +95,14 @@ function pickChangelogChannel(guild: Guild): GuildTextBasedChannel | null {
 }
 
 function mergeAddendum(content: string): string {
-  if (content.includes(CHANGELOG_MARKER)) {
-    return content.replace(new RegExp(`${CHANGELOG_MARKER}[\\s\\S]*$`), ADDENDUM);
+  const cleanedContent = content.replace(`${OLD_CHANGELOG_MARKER}\n`, '').trim();
+
+  if (cleanedContent.includes(ADDENDUM_HEADING)) {
+    return cleanedContent.replace(new RegExp(`${escapeRegExp(ADDENDUM_HEADING)}[\\s\\S]*$`), ADDENDUM);
   }
 
-  const separator = content.trim() ? '\n\n' : '';
-  const merged = `${content.trim()}${separator}${ADDENDUM}`;
+  const separator = cleanedContent ? '\n\n' : '';
+  const merged = `${cleanedContent}${separator}${ADDENDUM}`;
   return merged.length <= 2000 ? merged : ADDENDUM;
 }
 
@@ -148,7 +154,7 @@ async function updateChangelog(guild: Guild, clientUserId: string): Promise<stri
     return `Edited latest bot changelog message in #${changelogChannel.name}.`;
   }
 
-  await changelogChannel.send(ADDENDUM.replace(`${CHANGELOG_MARKER}\n`, ''));
+  await changelogChannel.send(ADDENDUM);
   return `No editable bot changelog message found; posted addendum in #${changelogChannel.name}.`;
 }
 
