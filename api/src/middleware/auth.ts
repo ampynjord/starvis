@@ -67,6 +67,12 @@ function requestUserAgent(req: Request): string | null {
   return userAgent.length > 160 ? `${userAgent.slice(0, 157)}...` : userAgent;
 }
 
+function applyInternalClientMarker(req: Request): void {
+  if (!process.env.SERVER_API_KEY || req.headers['x-api-key'] !== process.env.SERVER_API_KEY) return;
+  const internalClient = String(req.headers['x-starvis-internal-client'] || '').trim();
+  if (/^[a-z0-9_-]{1,40}$/i.test(internalClient)) req.internalClient = internalClient;
+}
+
 /**
  * requireJwt — verifies Bearer JWT, injects req.jwtPayload.
  * Accepts any role (user, admin).
@@ -94,6 +100,7 @@ export async function requireJwt(req: Request, res: Response, next: NextFunction
  * services such as the public IHM proxy, bot and audits.
  */
 export async function requireExternalApiAccess(req: Request, res: Response, next: NextFunction) {
+  applyInternalClientMarker(req);
   if (!process.env.JWT_SECRET) {
     return res.status(500).json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' });
   }

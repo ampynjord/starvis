@@ -42,6 +42,7 @@ async function proxyPublicApi(req: NextRequest, context: { params: Promise<{ pat
   const headers: Record<string, string> = {
     Accept: req.headers.get('accept') ?? 'application/json',
     'X-API-Key': SERVER_API_KEY,
+    'X-Starvis-Internal-Client': 'ihm-public-proxy',
   };
 
   const token = await getAuthToken();

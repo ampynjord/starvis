@@ -28,9 +28,10 @@ describe('request-log-service', () => {
       userId: 7,
       username: null,
       role: 'admin',
-      isExternalApi: true,
+      isExternalApi: false,
       authMethod: 'session',
       clientType: 'web_session',
+      internalClient: null,
       ip: '192.168.1.0',
       userAgent: 'Vitest',
     });
@@ -64,8 +65,62 @@ describe('request-log-service', () => {
       userId: 42,
       username: 'ampynjord',
       role: 'user',
-      isExternalApi: true,
+      isExternalApi: false,
       clientType: 'web_session',
+    });
+  });
+
+  it('classifies internal IHM public proxy traffic outside external API supervision', () => {
+    clearRequestLogsForTests();
+    recordRequestLog(
+      {
+        method: 'GET',
+        originalUrl: '/api/v1/ships/ship-id',
+        url: '/api/v1/ships/ship-id',
+        headers: {},
+        internalClient: 'ihm-public-proxy',
+        authMethod: 'admin_key',
+        ip: '172.19.0.4',
+        get: (name: string) => (name === 'user-agent' ? 'node' : undefined),
+      } as any,
+      200,
+      9,
+    );
+
+    expect(listRequestLogs(1)[0]).toMatchObject({
+      path: '/api/v1/ships/ship-id',
+      isExternalApi: false,
+      authMethod: 'admin_key',
+      clientType: 'internal_web_proxy',
+      internalClient: 'ihm-public-proxy',
+      username: null,
+    });
+  });
+
+  it('keeps generated API token calls in external API supervision', () => {
+    clearRequestLogsForTests();
+    recordRequestLog(
+      {
+        method: 'GET',
+        originalUrl: '/api/v1/ships',
+        url: '/api/v1/ships',
+        headers: {},
+        authMethod: 'api_token',
+        apiToken: { id: 5, jti: 'token-jti', name: 'Partner app', userId: 42 },
+        jwtPayload: { sub: 42, username: 'developer', role: 'developer', type: 'api_token', jti: 'token-jti' },
+        ip: '203.0.113.10',
+        get: () => 'External SDK',
+      } as any,
+      200,
+      14,
+    );
+
+    expect(listRequestLogs(1)[0]).toMatchObject({
+      isExternalApi: true,
+      clientType: 'external_api',
+      apiTokenId: 5,
+      apiTokenName: 'Partner app',
+      username: 'developer',
     });
   });
 
