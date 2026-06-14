@@ -2479,6 +2479,16 @@
             }
           }
         }
+      },
+      "Forbidden": {
+        "description": "Forbidden",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
       }
     }
   },
@@ -12970,12 +12980,10 @@
                       "type": "boolean"
                     },
                     "data": {
-                      "oneOf": [
+                      "nullable": true,
+                      "allOf": [
                         {
                           "$ref": "#/components/schemas/ExternalApiAccessRequest"
-                        },
-                        {
-                          "type": "null"
                         }
                       ]
                     }
