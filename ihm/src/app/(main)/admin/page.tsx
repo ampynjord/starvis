@@ -612,9 +612,10 @@ type ModalState =
   | null;
 
 export default function AdminPage() {
-  const { user: me } = useAuth();
+  const { user: me, loading: authLoading } = useAuth();
   const [users, setUsers] = useState<AuthUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
   const [modal, setModal] = useState<ModalState>(null);
@@ -625,13 +626,32 @@ export default function AdminPage() {
     setTimeout(() => setToast(''), 3000);
   }, []);
 
+  const loadUsers = useCallback(async () => {
+    if (authLoading) return;
+    if (me?.role !== ADMIN_ROLE) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setLoadError('');
+    try {
+      const res = await fetch('/api/admin/users');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? `Users request failed (${res.status})`);
+      if (!Array.isArray(data.data)) throw new Error('Users response is invalid');
+      setUsers(data.data);
+    } catch (error) {
+      setUsers([]);
+      setLoadError(error instanceof Error ? error.message : 'Failed to load users');
+    } finally {
+      setLoading(false);
+    }
+  }, [authLoading, me?.role]);
+
   useEffect(() => {
-    if (me?.role !== ADMIN_ROLE) return;
-    fetch('/api/admin/users')
-      .then((r) => r.json())
-      .then((d) => setUsers(d.data ?? []))
-      .finally(() => setLoading(false));
-  }, [me]);
+    void loadUsers();
+  }, [loadUsers]);
 
   const updateUser = useCallback((updated: AuthUser) => {
     setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
@@ -650,6 +670,14 @@ export default function AdminPage() {
     setModal(null);
     showToast(`${created.username} created.`);
   }, [showToast]);
+
+  if (authLoading) {
+    return (
+      <div className="p-6 text-center text-slate-500 font-mono-sc text-sm">
+        LOADING SESSION...
+      </div>
+    );
+  }
 
   if (me?.role !== ADMIN_ROLE) {
     return (
@@ -768,6 +796,13 @@ export default function AdminPage() {
 
           {loading ? (
             <div className="p-8 text-center text-slate-600 text-sm font-mono-sc">Loading…</div>
+          ) : loadError ? (
+            <div className="space-y-3 p-8 text-center">
+              <p className="font-mono-sc text-sm text-red-400">{loadError}</p>
+              <button type="button" onClick={() => void loadUsers()} className="sci-btn-ghost px-3 py-2 text-xs">
+                Retry
+              </button>
+            </div>
           ) : filtered.length === 0 ? (
             <div className="p-8 text-center text-slate-700 text-sm font-mono-sc">No results</div>
           ) : (

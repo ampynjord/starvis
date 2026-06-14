@@ -574,9 +574,10 @@ type ModalState =
   | null;
 
 export default function CorporationsPage() {
-  const { user: me } = useAuth();
+  const { user: me, loading: authLoading } = useAuth();
   const [corps, setCorps] = useState<Corporation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [modal, setModal] = useState<ModalState>(null);
   const [toast, setToast] = useState('');
 
@@ -586,19 +587,33 @@ export default function CorporationsPage() {
   }, []);
 
   const loadCorps = useCallback(async () => {
+    if (authLoading) return;
+    if (me?.role !== ADMIN_ROLE) {
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
+    setLoadError('');
     try {
       const data = await apiFetch('/api/admin/corporations');
+      if (!Array.isArray(data.data)) throw new Error('Corporations response is invalid');
       setCorps(data.data ?? []);
+    } catch (error) {
+      setCorps([]);
+      setLoadError(error instanceof Error ? error.message : 'Failed to load corporations');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authLoading, me?.role]);
 
   useEffect(() => {
-    if (me?.role !== ADMIN_ROLE) return;
-    loadCorps();
-  }, [me, loadCorps]);
+    void loadCorps();
+  }, [loadCorps]);
+
+  if (authLoading) {
+    return <div className="p-6 text-center text-slate-500 font-mono-sc text-sm">LOADING SESSION...</div>;
+  }
 
   if (me?.role !== ADMIN_ROLE) {
     return <div className="p-6 text-center text-slate-500 font-mono-sc text-sm">ACCESS DENIED — Admin role required</div>;
@@ -665,6 +680,13 @@ export default function CorporationsPage() {
 
           {loading ? (
             <div className="p-8 text-center text-slate-600 text-sm font-mono-sc">Loading…</div>
+          ) : loadError ? (
+            <div className="space-y-3 p-8 text-center">
+              <p className="font-mono-sc text-sm text-red-400">{loadError}</p>
+              <button type="button" onClick={() => void loadCorps()} className="sci-btn-ghost px-3 py-2 text-xs">
+                Retry
+              </button>
+            </div>
           ) : corps.length === 0 ? (
             <div className="p-8 text-center text-slate-700 text-sm font-mono-sc">No corporations yet.</div>
           ) : (

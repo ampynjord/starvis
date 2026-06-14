@@ -34,8 +34,8 @@ export const metadata: Metadata = {
     template: '%s — STARVIS',
   },
   description:
-    'Starvis is an unofficial Star Citizen data platform not affiliated with Cloud Imperium Games: ships, components, FPS gear, commodities, missions, manufacturers, galactapedia and more.',
-  keywords: ['star citizen', 'star citizen ships', 'star citizen database', 'sc ships', 'star citizen components', 'star citizen wiki', 'starvis', 'star citizen data', 'ship stats', 'galactapedia'],
+    'Starvis is an unofficial Star Citizen Database & Toolset in active development: extracted game data, calculators, external API, Discord bot, AI assistant and corporation tools.',
+  keywords: ['star citizen', 'star citizen ships', 'star citizen database', 'sc ships', 'star citizen components', 'star citizen API', 'star citizen AI', 'star citizen tools', 'starvis', 'star citizen data', 'ship stats', 'galactapedia'],
   authors: [{ name: 'ampynjord' }],
   openGraph: {
     type: 'website',
@@ -43,13 +43,13 @@ export const metadata: Metadata = {
     url: PUBLIC_SITE_URL,
     siteName: 'STARVIS',
     title: 'Starvis - Star Citizen Database & Toolset',
-    description: 'Unofficial Star Citizen Database & Toolset. Not affiliated with Cloud Imperium Games.',
+    description: 'Unofficial Star Citizen Database & Toolset with external API, Discord bot and AI assistant. Not affiliated with Cloud Imperium Games.',
     images: [{ url: '/brand/starvis.png', width: 1254, height: 1254, alt: 'STARVIS logo' }],
   },
   twitter: {
     card: 'summary',
     title: 'Starvis - Star Citizen Database & Toolset',
-    description: 'Unofficial Star Citizen Database & Toolset. Not affiliated with Cloud Imperium Games.',
+    description: 'Unofficial Star Citizen Database & Toolset with external API, Discord bot and AI assistant. Not affiliated with Cloud Imperium Games.',
     images: ['/brand/starvis.png'],
   },
   icons: {

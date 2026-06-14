@@ -7,6 +7,7 @@ import { BarChart3, Clock, DollarSign, Pickaxe, Search, Users } from 'lucide-rea
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { EarlyAccessNotice } from '@/components/ui/EarlyAccessNotice';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -126,6 +127,9 @@ export default function MiningPage() {
         title="Mining Calculator"
         subtitle="Complete toolkit: yield workflow, profit, mineral reference, rock finder, crew split, refinery timers."
       />
+      <EarlyAccessNotice className="mb-4">
+        Mining yields, rock matching, refinery timing and profit estimates are based on extracted and normalized data. Verify high-value routes or jobs in game before committing resources.
+      </EarlyAccessNotice>
 
       {/* Tab navigation */}
       <div className="mb-6 overflow-x-auto">

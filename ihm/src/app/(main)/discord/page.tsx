@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
+import { EarlyAccessNotice } from '@/components/ui/EarlyAccessNotice';
 import {
   DISCORD_BOT_COMMANDS,
   buildDiscordInviteUrl,
@@ -61,6 +62,10 @@ export default function DiscordBotPage() {
           </div>
         )}
       />
+
+      <EarlyAccessNotice className="mb-4">
+        Bot answers and command outputs use the same early-access Starvis data as the web app. Missing or uncertain values should be verified in game.
+      </EarlyAccessNotice>
 
       <section className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(18rem,0.8fr)]">
         <div className="sci-panel border border-cyan-900/50 p-5">

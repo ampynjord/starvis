@@ -3,6 +3,7 @@ import { PUBLIC_SITE_URL } from '@/lib/server-config';
 
 const STATIC_ROUTES: { path: string; priority: number; changefreq: MetadataRoute.Sitemap[number]['changeFrequency'] }[] = [
   { path: '/', priority: 1.0, changefreq: 'daily' },
+  { path: '/about', priority: 0.8, changefreq: 'monthly' },
   { path: '/ships', priority: 0.9, changefreq: 'weekly' },
   { path: '/vehicles', priority: 0.8, changefreq: 'weekly' },
   { path: '/compare', priority: 0.7, changefreq: 'monthly' },

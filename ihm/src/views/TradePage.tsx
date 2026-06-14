@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { EarlyAccessNotice } from '@/components/ui/EarlyAccessNotice';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
@@ -124,6 +125,9 @@ export default function TradePage() {
   return (
     <PageShell>
       <PageHeader title="Trade Calculator" subtitle="Find the most profitable trade routes" />
+      <EarlyAccessNotice className="mb-4">
+        Trade prices and route profitability depend on available reports and extracted shop data. Check live terminals before large cargo runs.
+      </EarlyAccessNotice>
 
       <div className="grid gap-2 sm:grid-cols-3">
         <div className="rounded-sm border border-slate-800/70 bg-slate-950/40 p-3">

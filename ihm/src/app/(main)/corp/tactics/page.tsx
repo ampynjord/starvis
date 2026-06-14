@@ -64,6 +64,7 @@ export default function CorporationTacticsPage() {
   const [selectedVectorId, setSelectedVectorId] = useState<string | null>(null);
   const [shipQuery, setShipQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [storageKey, setStorageKey] = useState('');
   const [formationShipId, setFormationShipId] = useState<number | null>(null);
   const [formationName, setFormationName] = useState('Squadron');
@@ -90,10 +91,12 @@ export default function CorporationTacticsPage() {
     let cancelled = false;
     async function load() {
       setLoading(true);
+      setLoadError('');
       try {
         const fleetRes = await fetch('/api/corp/fleet');
         const data = await fleetRes.json().catch(() => ({}));
-        if (!fleetRes.ok || cancelled) return;
+        if (!fleetRes.ok) throw new Error(data.error ?? `Tactics fleet request failed (${fleetRes.status})`);
+        if (cancelled) return;
         const items: FleetItem[] = data.data ?? [];
         const nextCorp: Corp | null = data.corporation ?? null;
         setCorp(nextCorp);
@@ -129,6 +132,13 @@ export default function CorporationTacticsPage() {
           if (entry.status === 'fulfilled' && entry.value[1]) map.set(entry.value[0], entry.value[1] as unknown as ShipListItem);
         });
         setShipData(map);
+      } catch (error) {
+        if (!cancelled) {
+          setCorp(null);
+          setFleetItems([]);
+          setShipData(new Map());
+          setLoadError(error instanceof Error ? error.message : 'Failed to load tactics data');
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -485,6 +495,20 @@ export default function CorporationTacticsPage() {
   };
 
   if (!user) return <div className="p-8 text-center text-slate-500 font-mono-sc text-sm">Sign in to access corporation tactics.</div>;
+  if (!loading && loadError) {
+    return (
+      <div className="flex min-h-[32rem] items-center justify-center p-8 text-center">
+        <div className="max-w-md rounded-sm border border-red-900/40 bg-panel/80 p-6">
+          <AlertTriangle size={34} className="mx-auto mb-4 text-red-500" />
+          <h1 className="font-orbitron text-sm font-bold uppercase tracking-widest text-white">Unable to load tactics</h1>
+          <p className="mt-3 font-mono-sc text-sm text-red-400">{loadError}</p>
+          <button type="button" onClick={() => window.location.reload()} className="sci-btn-ghost mt-4 px-3 py-2 text-xs">
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
   if (!loading && !corp) {
     return (
       <div className="flex min-h-[32rem] items-center justify-center p-8 text-center">
@@ -677,6 +701,10 @@ export default function CorporationTacticsPage() {
             <input value={shipQuery} onChange={(event) => setShipQuery(event.target.value)} placeholder="Filter fleet..." className="sci-input mb-2 w-full" />
             {loading ? (
               <div className="flex items-center justify-center py-8 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
+            ) : loadError ? (
+              <div className="px-2 py-6 text-center">
+                <p className="font-mono-sc text-xs text-red-400">{loadError}</p>
+              </div>
             ) : filteredFleet.length === 0 ? (
               <p className="px-2 py-6 text-center font-mono-sc text-xs text-slate-700">
                 {fleetItems.length === 0 ? 'No corporation ships available.' : 'No available tactics ship matches this filter.'}

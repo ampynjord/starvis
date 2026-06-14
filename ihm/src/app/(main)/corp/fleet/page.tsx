@@ -309,6 +309,7 @@ export default function FleetManagerPage() {
   const [fleetItems, setFleetItems] = useState<FleetItem[]>([]);
   const [shipData, setShipData] = useState<Map<string, ShipListItem>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
@@ -342,13 +343,14 @@ export default function FleetManagerPage() {
 
   const loadFleet = useCallback(async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const [fleetRes, membersRes] = await Promise.all([
         fetch('/api/corp/fleet'),
         fetch('/api/corp/members'),
       ]);
-      const fleetData = await fleetRes.json();
-      if (!fleetRes.ok) { setLoading(false); return; }
+      const fleetData = await fleetRes.json().catch(() => ({}));
+      if (!fleetRes.ok) throw new Error(fleetData.error ?? `Fleet request failed (${fleetRes.status})`);
       setCorp(fleetData.corporation ?? null);
       const items: FleetItem[] = fleetData.data ?? [];
       setFleetItems(items);
@@ -357,15 +359,19 @@ export default function FleetManagerPage() {
       setLoading(false);
       void hydrateShips(uuids);
 
-      if (membersRes.ok) {
-        const membersData = await membersRes.json();
-        const memberList: Member[] = (membersData.data ?? []).map((m: any) => ({
-          id: Number(m.user.id),
-          username: m.user.username,
-          avatarUrl: m.user.avatarUrl,
-        }));
-        setMembers(memberList);
-      }
+      const membersData = await membersRes.json().catch(() => ({}));
+      if (!membersRes.ok) throw new Error(membersData.error ?? `Members request failed (${membersRes.status})`);
+      const memberList: Member[] = (membersData.data ?? []).map((m: any) => ({
+        id: Number(m.user.id),
+        username: m.user.username,
+        avatarUrl: m.user.avatarUrl,
+      }));
+      setMembers(memberList);
+    } catch (error) {
+      setCorp(null);
+      setFleetItems([]);
+      setMembers([]);
+      setLoadError(error instanceof Error ? error.message : 'Failed to load corporation fleet');
     } finally {
       setLoading(false);
     }
@@ -622,6 +628,13 @@ export default function FleetManagerPage() {
             {loading ? (
               <div className="absolute inset-0 flex items-center justify-center">
                 <Loader2 size={24} className="text-cyan-700 animate-spin" />
+              </div>
+            ) : loadError ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center">
+                <p className="font-mono-sc text-sm text-red-400">{loadError}</p>
+                <button type="button" onClick={() => void loadFleet()} className="sci-btn-ghost px-3 py-2 text-xs">
+                  Retry
+                </button>
               </div>
             ) : fleetShips.length === 0 ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">

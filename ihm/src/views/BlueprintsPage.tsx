@@ -23,6 +23,7 @@ import type { BlueprintRewardInsight, CraftingRecipe, LootTableInsight } from '@
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { EarlyAccessNotice } from '@/components/ui/EarlyAccessNotice';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
@@ -647,6 +648,10 @@ export default function BlueprintsPage() {
         searchPlaceholder="Search recipe, output item…"
         onSearch={setSearch}
       />
+
+      <EarlyAccessNotice className="mb-4">
+        Crafting recipes, rewards and loot sources are still being validated against live gameplay. Use them as planning data, not as guaranteed acquisition paths.
+      </EarlyAccessNotice>
 
       <ListFilterBar>
         <ListFilterSelect

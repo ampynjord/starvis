@@ -5,6 +5,7 @@ import { AUTH_COOKIE_NAME } from '@/lib/server-config';
 // Exact public paths (no login required)
 const PUBLIC_PATHS = new Set([
   '/',
+  '/about',
   '/login',
   '/register',
   '/verify-email',
