@@ -7023,6 +7023,17 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
           "201": {
             "description": "Account created — verification email sent",
             "content": {
@@ -7382,17 +7393,45 @@
                       "items": {
                         "type": "object",
                         "properties": {
-                          "id": { "type": "integer" },
-                          "timestamp": { "type": "string", "format": "date-time" },
-                          "method": { "type": "string" },
-                          "path": { "type": "string" },
-                          "statusCode": { "type": "integer" },
-                          "durationMs": { "type": "integer" },
-                          "userId": { "type": "integer", "nullable": true },
-                          "username": { "type": "string", "nullable": true },
-                          "role": { "type": "string", "nullable": true },
-                          "ip": { "type": "string", "nullable": true },
-                          "userAgent": { "type": "string", "nullable": true }
+                          "id": {
+                            "type": "integer"
+                          },
+                          "timestamp": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "method": {
+                            "type": "string"
+                          },
+                          "path": {
+                            "type": "string"
+                          },
+                          "statusCode": {
+                            "type": "integer"
+                          },
+                          "durationMs": {
+                            "type": "integer"
+                          },
+                          "userId": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "username": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "role": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "ip": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "userAgent": {
+                            "type": "string",
+                            "nullable": true
+                          }
                         }
                       }
                     }
@@ -7487,6 +7526,17 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
           "201": {
             "description": "User created",
             "content": {
@@ -8020,6 +8070,17 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
           "201": {
             "description": "Report created — confirmation email sent to user and notification to admin",
             "content": {
@@ -8693,7 +8754,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicShipsAudit"
       }
     },
     "/rsi-orgs": {
@@ -8766,7 +8828,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getRsiOrgs"
       }
     },
     "/corporations": {
@@ -8796,7 +8859,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getCorporations"
       }
     },
     "/auth/me/corporation": {
@@ -8838,7 +8902,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "getAuthMeCorporation"
       },
       "post": {
         "tags": ["Corporations"],
@@ -8866,6 +8931,17 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
           "202": {
             "description": "OK",
             "content": {
@@ -8900,7 +8976,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "postAuthMeCorporation"
       },
       "delete": {
         "tags": ["Corporations"],
@@ -8940,7 +9017,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "deleteAuthMeCorporation"
       }
     },
     "/corp": {
@@ -8982,7 +9060,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "getCorp"
       }
     },
     "/corp/members": {
@@ -9017,7 +9096,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "getCorpMembers"
       }
     },
     "/corp/fleet": {
@@ -9052,7 +9132,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "getCorpFleet"
       },
       "post": {
         "tags": ["Corporations"],
@@ -9081,6 +9162,17 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
           "201": {
             "description": "OK",
             "content": {
@@ -9105,7 +9197,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "postCorpFleet"
       }
     },
     "/corp/fleet/{id}/position": {
@@ -9166,7 +9259,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "patchCorpFleetIdPosition"
       }
     },
     "/corp/fleet/{id}/availability": {
@@ -9234,7 +9328,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "patchCorpFleetIdAvailability"
       }
     },
     "/corp/fleet/{id}": {
@@ -9286,7 +9381,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "deleteCorpFleetId"
       }
     },
     "/corp/bank": {
@@ -9321,7 +9417,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "getCorpBank"
       },
       "post": {
         "tags": ["Corporations"],
@@ -9355,6 +9452,17 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
           "201": {
             "description": "OK",
             "content": {
@@ -9379,7 +9487,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "postCorpBank"
       }
     },
     "/corp/bank/{id}": {
@@ -9457,7 +9566,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "putCorpBankId"
       },
       "delete": {
         "tags": ["Corporations"],
@@ -9507,7 +9617,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "deleteCorpBankId"
       }
     },
     "/corp/pending": {
@@ -9552,7 +9663,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "getCorpPending"
       }
     },
     "/corp/memberships/{mid}/approve": {
@@ -9611,7 +9723,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "putCorpMembershipsMidApprove"
       }
     },
     "/corp/memberships/{mid}/reject": {
@@ -9653,7 +9766,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "putCorpMembershipsMidReject"
       }
     },
     "/corp/members/{mid}": {
@@ -9692,7 +9806,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "deleteCorpMembersMid"
       }
     },
     "/corp/members/{mid}/role": {
@@ -9751,7 +9866,8 @@
           {
             "bearerAuth": []
           }
-        ]
+        ],
+        "operationId": "putCorpMembersMidRole"
       }
     },
     "/admin/corporations": {
@@ -9789,7 +9905,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "getAdminCorporations"
       },
       "post": {
         "tags": ["Admin", "Corporations"],
@@ -9840,6 +9957,17 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
           "201": {
             "description": "OK",
             "content": {
@@ -9867,7 +9995,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "postAdminCorporations"
       }
     },
     "/admin/corporations/pending": {
@@ -9905,7 +10034,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "getAdminCorporationsPending"
       }
     },
     "/admin/corporations/{id}": {
@@ -9960,7 +10090,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "getAdminCorporationsId"
       },
       "put": {
         "tags": ["Admin", "Corporations"],
@@ -10029,7 +10160,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "putAdminCorporationsId"
       },
       "delete": {
         "tags": ["Admin", "Corporations"],
@@ -10083,7 +10215,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "deleteAdminCorporationsId"
       }
     },
     "/admin/corporations/{id}/members": {
@@ -10131,7 +10264,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "getAdminCorporationsIdMembers"
       },
       "post": {
         "tags": ["Admin", "Corporations"],
@@ -10163,6 +10297,17 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
           "201": {
             "description": "OK",
             "content": {
@@ -10190,7 +10335,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "postAdminCorporationsIdMembers"
       }
     },
     "/admin/corporations/{id}/fleet": {
@@ -10238,7 +10384,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "getAdminCorporationsIdFleet"
       },
       "post": {
         "tags": ["Admin", "Corporations"],
@@ -10281,6 +10428,17 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
           "201": {
             "description": "OK",
             "content": {
@@ -10308,7 +10466,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "postAdminCorporationsIdFleet"
       }
     },
     "/admin/corporations/members/{mid}": {
@@ -10353,7 +10512,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "deleteAdminCorporationsMembersMid"
       }
     },
     "/admin/corporations/memberships/{mid}/approve": {
@@ -10415,7 +10575,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "putAdminCorporationsMembershipsMidApprove"
       }
     },
     "/admin/corporations/memberships/{mid}/reject": {
@@ -10460,7 +10621,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "putAdminCorporationsMembershipsMidReject"
       }
     },
     "/admin/corporations/members/{mid}/role": {
@@ -10522,7 +10684,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "putAdminCorporationsMembersMidRole"
       }
     },
     "/admin/corporations/fleet/{fid}": {
@@ -10593,7 +10756,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "putAdminCorporationsFleetFid"
       },
       "delete": {
         "tags": ["Admin", "Corporations"],
@@ -10636,7 +10800,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "deleteAdminCorporationsFleetFid"
       }
     },
     "/admin/fleet/{fid}": {
@@ -10707,7 +10872,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "putAdminFleetFid"
       },
       "delete": {
         "tags": ["Admin", "Corporations"],
@@ -10746,7 +10912,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "deleteAdminFleetFid"
       }
     },
     "/admin/users/{id}/fleet": {
@@ -10793,7 +10960,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "getAdminUsersIdFleet"
       }
     },
     "/admin/users/{id}/corporation": {
@@ -10838,7 +11006,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "getAdminUsersIdCorporation"
       },
       "put": {
         "tags": ["Admin", "Corporations"],
@@ -10903,7 +11072,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "putAdminUsersIdCorporation"
       },
       "delete": {
         "tags": ["Admin", "Corporations"],
@@ -10946,7 +11116,8 @@
           {
             "apiKey": []
           }
-        ]
+        ],
+        "operationId": "deleteAdminUsersIdCorporation"
       }
     },
     "/api/v1/starmap/filters": {
@@ -10957,7 +11128,8 @@
           "200": {
             "description": "OK"
           }
-        }
+        },
+        "operationId": "getPublicStarmapFilters"
       }
     },
     "/api/v1/starmap/positions": {
@@ -10989,7 +11161,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicStarmapPositions"
       }
     },
     "/api/v1/starmap/jump-points": {
@@ -11021,7 +11194,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicStarmapJumpPoints"
       }
     },
     "/api/v1/starmap/locations": {
@@ -11126,7 +11300,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicStarmapLocations"
       }
     },
     "/api/v1/starmap/locations/{identifier}": {
@@ -11165,7 +11340,8 @@
           "404": {
             "description": "Not found"
           }
-        }
+        },
+        "operationId": "getPublicStarmapLocationsIdentifier"
       }
     },
     "/api/v1/factions": {
@@ -11216,7 +11392,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicFactions"
       }
     },
     "/api/v1/factions/{faction}": {
@@ -11271,7 +11448,8 @@
           "404": {
             "description": "Not found"
           }
-        }
+        },
+        "operationId": "getPublicFactionsFaction"
       }
     },
     "/api/v1/search/{query}": {
@@ -11313,7 +11491,8 @@
           "400": {
             "description": "Invalid search query"
           }
-        }
+        },
+        "operationId": "getPublicSearchQuery"
       }
     },
     "/api/v1/stats/latest": {
@@ -11357,7 +11536,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicStatsLatest"
       }
     },
     "/api/v1/game-versions/{version}/changelog": {
@@ -11402,7 +11582,8 @@
           "200": {
             "description": "OK"
           }
-        }
+        },
+        "operationId": "getPublicGameVersionsVersionChangelog"
       }
     },
     "/api/v1/game-versions/{version}/changelog/changes": {
@@ -11447,7 +11628,8 @@
           "200": {
             "description": "OK"
           }
-        }
+        },
+        "operationId": "getPublicGameVersionsVersionChangelogChanges"
       }
     },
     "/api/v1/comm-link-images": {
@@ -11516,7 +11698,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicCommLinkImages"
       }
     },
     "/api/v1/comm-link-images/search": {
@@ -11585,7 +11768,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicCommLinkImagesSearch"
       }
     },
     "/api/v1/comm-link-images/random": {
@@ -11614,7 +11798,8 @@
           "404": {
             "description": "Not found"
           }
-        }
+        },
+        "operationId": "getPublicCommLinkImagesRandom"
       }
     },
     "/api/v1/comm-link-images/{id}": {
@@ -11653,7 +11838,8 @@
           "404": {
             "description": "Not found"
           }
-        }
+        },
+        "operationId": "getPublicCommLinkImagesId"
       }
     },
     "/api/v1/factions/registry": {
@@ -11739,7 +11925,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicFactionsRegistry"
       }
     },
     "/api/v1/factions/reputation-standings": {
@@ -11825,7 +12012,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicFactionsReputationStandings"
       }
     },
     "/api/v1/factions/reputation-scopes": {
@@ -11911,7 +12099,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicFactionsReputationScopes"
       }
     },
     "/api/v1/ammo/stats": {
@@ -11997,7 +12186,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicAmmoStats"
       }
     },
     "/api/v1/armor/inventory-containers": {
@@ -12083,7 +12273,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicArmorInventoryContainers"
       }
     },
     "/api/v1/utility/inventory-containers": {
@@ -12169,7 +12360,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicUtilityInventoryContainers"
       }
     },
     "/api/v1/blueprints/rewards": {
@@ -12255,7 +12447,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicBlueprintsRewards"
       }
     },
     "/api/v1/blueprints/loot-tables": {
@@ -12341,7 +12534,8 @@
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicBlueprintsLootTables"
       }
     }
   }

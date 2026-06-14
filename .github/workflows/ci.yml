@@ -72,6 +72,9 @@ jobs:
       - name: Validate OpenAPI
         run: npm run openapi:lint --workspace=@starvis/api
 
+      - name: Audit API contract coverage
+        run: npm run quality:audit:contracts
+
       - name: Validate Prisma schema
         run: npm exec --workspace=@starvis/db -- prisma validate --schema=prisma/schema
         env:

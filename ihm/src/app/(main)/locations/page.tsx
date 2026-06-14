@@ -1,8 +1,12 @@
 'use client';
 
 import { Suspense } from 'react';
-import LocationsPage from '@/views/LocationsPage';
+import UniverseExplorerPage from '@/views/UniverseExplorerPage';
 
 export default function Page() {
-  return <Suspense><LocationsPage /></Suspense>;
+  return (
+    <Suspense>
+      <UniverseExplorerPage />
+    </Suspense>
+  );
 }
