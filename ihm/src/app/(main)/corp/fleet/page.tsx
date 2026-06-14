@@ -282,6 +282,24 @@ interface Member { id: number; username: string; avatarUrl: string | null }
 
 const getAddedById = (item: FleetItem) => item.addedBy?.id != null ? Number(item.addedBy.id) : null;
 const getShipUuid = (item: FleetItem) => item.shipUuid?.trim() || null;
+const isFiniteGrid = (value: number | null | undefined): value is number => typeof value === 'number' && Number.isFinite(value);
+
+function nextShipSpawnPosition(items: FleetItem[], newShip: ShipListItem) {
+  const sceneItems = items.filter((item) => getShipUuid(item));
+  const estimatedWidth = Math.max(Number((newShip as any).size_x) || 0, Number((newShip as any).size_z) || 0, 28);
+  const gap = Math.max(estimatedWidth * 0.35, 24);
+  if (sceneItems.length === 0) return { gridX: 0, gridZ: 0 };
+
+  const rightEdge = sceneItems.reduce((max, item, index) => {
+    const x = isFiniteGrid(item.gridX) ? item.gridX : index * gap;
+    return Math.max(max, x);
+  }, Number.NEGATIVE_INFINITY);
+
+  return {
+    gridX: rightEdge + gap,
+    gridZ: 0,
+  };
+}
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
@@ -384,16 +402,22 @@ export default function FleetManagerPage() {
     setAddLoading(true);
     setAddError('');
     try {
+      const position = nextShipSpawnPosition(fleetItems, ship);
       const res = await fetch('/api/corp/fleet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shipUuid: ship.uuid, itemClassName: ship.class_name }),
+        body: JSON.stringify({ shipUuid: ship.uuid, itemClassName: ship.class_name, ...position }),
       });
       const payload = await res.json().catch(() => ({}));
       if (!res.ok) {
         throw new Error(payload?.error || `Failed to declare ship (HTTP ${res.status})`);
       }
-      await loadFleet();
+      const created = payload.data as FleetItem;
+      shipCacheRef.current.set(ship.uuid, ship);
+      setShipData(new Map(shipCacheRef.current));
+      setFleetItems((prev) => [created, ...prev]);
+      setSelectedItemId(created.id);
+      setViewMode('mine');
       setShowAddModal(false);
     } catch (e: any) {
       setAddError(e?.message || 'Failed to declare ship');

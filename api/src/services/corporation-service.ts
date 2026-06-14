@@ -19,10 +19,11 @@ export interface CorporationData {
   _count?: { memberships: number; fleetItems: number; bankItems?: number; pendingMemberships?: number };
 }
 
-export interface CorporationResetResult {
+export interface CorporationDeleteResult {
   corporation: CorporationData;
   removedMemberships: number;
   removedFleetItems: number;
+  deleted: true;
 }
 
 export interface MembershipData {
@@ -165,8 +166,8 @@ export class CorporationService {
     });
   }
 
-  async deleteCorporation(id: number): Promise<CorporationResetResult> {
-    const run = async (tx: any): Promise<CorporationResetResult> => {
+  async deleteCorporation(id: number): Promise<CorporationDeleteResult> {
+    const run = async (tx: any): Promise<CorporationDeleteResult> => {
       const corp = await tx.corporation.findUnique({ where: { id }, select: CORP_SELECT });
       if (!corp) {
         const err = new Error('CORP_NOT_FOUND') as Error & { code?: string };
@@ -179,25 +180,21 @@ export class CorporationService {
         tx.corporationMembership.deleteMany({ where: { corporationId: id } }),
       ]);
 
-      const refreshed = await tx.corporation.findUnique({ where: { id }, select: CORP_SELECT });
-      if (!refreshed) {
-        const err = new Error('CORP_NOT_FOUND') as Error & { code?: string };
-        err.code = 'P2025';
-        throw err;
-      }
+      await tx.corporation.delete({ where: { id } });
 
       return {
         corporation: {
-          ...refreshed,
+          ...corp,
           _count: {
-            memberships: refreshed?._count?.memberships ?? 0,
-            fleetItems: refreshed?._count?.fleetItems ?? 0,
+            memberships: 0,
+            fleetItems: 0,
             bankItems: 0,
             pendingMemberships: 0,
           },
         },
         removedMemberships: Number(membershipResult.count ?? 0),
         removedFleetItems: Number(fleetResult.count ?? 0),
+        deleted: true,
       };
     };
 
@@ -501,7 +498,7 @@ export class CorporationService {
   async declareShip(
     userId: number,
     corporationId: number | null,
-    shipData: { shipUuid: string; itemClassName: string; notes?: string },
+    shipData: { shipUuid: string; itemClassName: string; notes?: string; gridX?: number; gridZ?: number },
   ): Promise<FleetItemData> {
     return this.db.corporationFleetItem.create({
       data: {
@@ -511,6 +508,8 @@ export class CorporationService {
         shipUuid: shipData.shipUuid,
         quantity: 1,
         notes: shipData.notes?.trim() || null,
+        ...(Number.isFinite(shipData.gridX) ? { gridX: shipData.gridX } : {}),
+        ...(Number.isFinite(shipData.gridZ) ? { gridZ: shipData.gridZ } : {}),
         addedById: userId,
       },
       select: { ...FLEET_SELECT, shipUuid: true } as typeof FLEET_SELECT,

@@ -9,7 +9,7 @@
  * Admin:
  * GET    /admin/corporations              — list all
  * GET    /admin/corporations/:id          — detail
- * DELETE /admin/corporations/:id          — reset Starvis corp data, keep cached org
+ * DELETE /admin/corporations/:id          — delete corporation data without deleting users
  * GET    /admin/corporations/:id/members  — list members
  * POST   /admin/corporations/:id/members  — add member (by userId)
  * DELETE /admin/corporations/members/:mid — remove member
@@ -176,13 +176,21 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
 
   router.post('/corp/fleet', requireJwt, async (req, res) => {
     const { sub } = req.jwtPayload;
-    const { shipUuid, itemClassName, notes } = req.body ?? {};
+    const { shipUuid, itemClassName, notes, gridX, gridZ } = req.body ?? {};
     if (!shipUuid || typeof shipUuid !== 'string') return void res.status(400).json({ success: false, error: 'shipUuid required' });
     if (!itemClassName || typeof itemClassName !== 'string')
       return void res.status(400).json({ success: false, error: 'itemClassName required' });
+    const initialGridX = typeof gridX === 'number' && Number.isFinite(gridX) ? gridX : undefined;
+    const initialGridZ = typeof gridZ === 'number' && Number.isFinite(gridZ) ? gridZ : undefined;
     try {
       const membership = await svc.getMyActiveMembership(sub);
-      const item = await svc.declareShip(sub, membership?.corporationId ?? null, { shipUuid, itemClassName, notes });
+      const item = await svc.declareShip(sub, membership?.corporationId ?? null, {
+        shipUuid,
+        itemClassName,
+        notes,
+        gridX: initialGridX,
+        gridZ: initialGridZ,
+      });
       res.status(201).json({ success: true, data: item });
     } catch {
       res.status(500).json({ success: false, error: 'Failed to declare ship' });
@@ -414,7 +422,7 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
       res.json({ success: true, data: result });
     } catch (e: any) {
       if (e?.code === 'P2025') return void res.status(404).json({ success: false, error: 'Corporation not found' });
-      res.status(500).json({ success: false, error: 'Failed to reset corporation' });
+      res.status(500).json({ success: false, error: 'Failed to delete corporation' });
     }
   });
 
