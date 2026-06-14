@@ -311,16 +311,23 @@ export default function CorpBankPage() {
   const [search, setSearch] = useState('');
   const [canManageBank, setCanManageBank] = useState(false);
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
 
   const loadBank = useCallback(async () => {
     setLoading(true);
+    setLoadError('');
     try {
       const res = await fetch('/api/corp/bank');
-      const data = await res.json();
-      if (!res.ok) { setLoading(false); return; }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? `Corp bank request failed (${res.status})`);
       setCorp(data.corporation ?? null);
       setItems(data.data ?? []);
       setCanManageBank(Boolean(data.canManage));
+    } catch (error) {
+      setCorp(null);
+      setItems([]);
+      setCanManageBank(false);
+      setLoadError(error instanceof Error ? error.message : 'Failed to load corp bank');
     } finally {
       setLoading(false);
     }
@@ -477,6 +484,13 @@ export default function CorpBankPage() {
           {loading ? (
             <div className="p-8 text-center text-slate-600 text-sm font-mono-sc flex items-center justify-center gap-2">
               <Loader2 size={16} className="animate-spin" /> Loading…
+            </div>
+          ) : loadError ? (
+            <div className="space-y-3 p-8 text-center">
+              <p className="font-mono-sc text-sm text-red-400">{loadError}</p>
+              <button type="button" onClick={() => void loadBank()} className="sci-btn-ghost px-3 py-2 text-xs">
+                Retry
+              </button>
             </div>
           ) : filtered.length === 0 ? (
             <div className="p-8 text-center text-slate-700 text-sm font-mono-sc">

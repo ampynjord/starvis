@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { EarlyAccessNotice } from '@/components/ui/EarlyAccessNotice';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -53,10 +54,11 @@ export default function FpsCalculatorPage() {
   const [selectedBarrelAttachmentUuid, setSelectedBarrelAttachmentUuid] = useState<string>('');
   const [selectedUnderbarrelAttachmentUuid, setSelectedUnderbarrelAttachmentUuid] = useState<string>('');
 
-  const { data: itemFilters, isLoading: loadingFilters } = useQuery({
+  const { data: itemFilters, isLoading: loadingFilters, error: filtersError } = useQuery({
     queryKey: ['items.filters', env],
     queryFn: () => api.items.filters(env),
     staleTime: Infinity,
+    retry: false,
   });
 
   const weaponTypes = useMemo(() => {
@@ -74,6 +76,7 @@ export default function FpsCalculatorPage() {
     queryKey: ['fps.weapon-list', env, weaponTypes.join(',')],
     queryFn: () => api.items.list({ env, page: 1, limit: 200, types: weaponTypes.join(',') || undefined }),
     enabled: weaponTypes.length > 0,
+    retry: false,
   });
 
   const loadingWeapons = loadingFilters || (weaponTypes.length > 0 && loadingWeaponList);
@@ -171,9 +174,14 @@ export default function FpsCalculatorPage() {
   return (
     <PageShell>
       <PageHeader title="FPS Calculator" subtitle="Weapon damage and TTK analysis with attachments, mitigation and hitbox simulation." />
+      <EarlyAccessNotice className="mb-4">
+        FPS calculations use extracted weapon stats, attachment modifiers and simulated mitigation rules. Treat results as guidance until values are cross-checked in game.
+      </EarlyAccessNotice>
 
       {loadingWeapons ? (
         <LoadingGrid message="Loading FPS weapons..." />
+      ) : filtersError ? (
+        <EmptyState icon="+" title="No FPS weapon data" message="Weapon filters are unavailable for the current environment." />
       ) : weaponsError ? (
         <ErrorState error={weaponsError as Error} onRetry={() => void refetchWeapons()} />
       ) : weapons.length === 0 ? (

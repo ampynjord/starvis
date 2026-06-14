@@ -9,6 +9,7 @@ import {
   Code2,
   ExternalLink,
   Home,
+  Info,
   Lock,
   Package,
   Radar,
@@ -226,6 +227,9 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         <div className="flex flex-wrap gap-x-3 gap-y-1">
           <Link href="/changelog" className="flex items-center gap-1 text-[10px] text-slate-700 hover:text-slate-500 transition-colors font-mono-sc">
             <BookOpen size={9} /> Changelog
+          </Link>
+          <Link href="/about" className="flex items-center gap-1 text-[10px] text-slate-700 hover:text-slate-500 transition-colors font-mono-sc">
+            <Info size={9} /> About
           </Link>
           {user && (
             <Link href="/report-bug" className="flex items-center gap-1 text-[10px] text-slate-700 hover:text-slate-500 transition-colors font-mono-sc">

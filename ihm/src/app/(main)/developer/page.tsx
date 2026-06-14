@@ -1,10 +1,12 @@
 'use client';
 
-import { BookOpen, Check, Copy, ExternalLink, Key, Lock, ShieldCheck, Terminal, UserRound, X } from 'lucide-react';
+import { BookOpen, Bot, BrainCircuit, Check, Copy, Database, ExternalLink, Key, Lock, Radar, ShieldCheck, Terminal, UserRound, X } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
+import { EarlyAccessNotice } from '@/components/ui/EarlyAccessNotice';
+import { OpenAiButton } from '@/components/ui/OpenAiButton';
 import { useAuth } from '@/contexts/AuthContext';
 import { ADMIN_ROLE, DEVELOPER_ROLE, hasDeveloperAccess } from '@/lib/app-constants';
 
@@ -42,6 +44,13 @@ function StatusRow({ ok, label }: { ok: boolean; label: string }) {
     </div>
   );
 }
+
+const API_USE_CASES = [
+  { icon: Bot, title: 'Bots and overlays', text: 'Power Discord commands, widgets, companion tools or public utilities with normalized Starvis data.' },
+  { icon: Database, title: 'Data products', text: 'Query ships, loadouts, economy, items, missions, lore and changelog data without rebuilding an extractor.' },
+  { icon: Radar, title: 'Operations', text: 'Feed corporation dashboards, fleet tools, quality audits or monitoring with authenticated API access.' },
+  { icon: BrainCircuit, title: 'AI workflows', text: 'Use the Starvis chat endpoints as a tool-using Star Citizen assistant connected to the same database.' },
+];
 
 export default function DeveloperPage() {
   const { user, loading } = useAuth();
@@ -109,7 +118,7 @@ export default function DeveloperPage() {
       <PageHeader
         eyebrow="Developer"
         title="API Access"
-        subtitle="Swagger access, external token generation and REST API connection details."
+        subtitle="External API, Swagger documentation, project tokens and AI endpoints for tools built on Starvis data."
         actions={
           hasAccess ? (
             <a
@@ -125,6 +134,42 @@ export default function DeveloperPage() {
           ) : undefined
         }
       />
+
+      <EarlyAccessNotice className="mb-4">
+        External API schemas are stabilizing, but Starvis is still in early access. Use Swagger as the source of truth and expect some data fields to evolve with extraction improvements.
+      </EarlyAccessNotice>
+
+      <section className="sci-panel p-5">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.55fr)]">
+          <div>
+            <p className="mb-2 font-mono-sc text-[9px] uppercase tracking-widest text-cyan-600">Platform surface</p>
+            <h2 className="font-orbitron text-lg font-bold uppercase tracking-widest text-cyan-300">Build on Starvis instead of rebuilding Starvis</h2>
+            <p className="mt-3 max-w-3xl font-rajdhani text-sm leading-relaxed text-slate-400">
+              The external API is the integration layer for third-party projects: bots, community tools, corporation dashboards, audits and AI workflows can reuse the same extracted and normalized data as the web interface.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-start gap-2 lg:justify-end">
+            <OpenAiButton
+              prompt="Help me build a third-party integration with the Starvis external API. Explain authentication, useful endpoints and one example workflow."
+              className="rounded-sm border border-violet-800/50 bg-violet-950/20 px-3 py-2 font-mono-sc text-xs text-violet-300 transition-colors hover:border-violet-500/70 hover:bg-violet-950/40"
+            >
+              Ask AI for an integration plan
+            </OpenAiButton>
+            <a href="/api-docs" target="_blank" rel="noreferrer" className="sci-btn-primary px-3 py-2 text-xs">
+              Open Swagger
+            </a>
+          </div>
+        </div>
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {API_USE_CASES.map(({ icon: Icon, title, text }) => (
+            <div key={title} className="rounded-sm border border-slate-800 bg-slate-950/35 p-3">
+              <Icon size={15} className="mb-2 text-cyan-400" />
+              <p className="font-orbitron text-[10px] font-bold uppercase tracking-widest text-slate-300">{title}</p>
+              <p className="mt-2 font-rajdhani text-xs leading-relaxed text-slate-500">{text}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
         <div className="space-y-4">
@@ -250,7 +295,7 @@ export default function DeveloperPage() {
         <div className="space-y-4">
           <Section title="Request format" icon={Terminal}>
             <div className="space-y-3">
-              <p className="font-rajdhani text-sm text-slate-400">Use the token as a Bearer credential against the REST API.</p>
+              <p className="font-rajdhani text-sm text-slate-400">Use the token as a Bearer credential against the REST API. Public browser pages use an internal proxy; external projects must authenticate directly.</p>
               <CodeBlock>{`curl -H "Authorization: Bearer YOUR_API_TOKEN" \\
   "${apiBaseUrl}/ships?limit=20&page=1"`}</CodeBlock>
             </div>
@@ -264,7 +309,8 @@ ${apiBaseUrl}/commodities
 ${apiBaseUrl}/missions
 ${apiBaseUrl}/locations
 ${apiBaseUrl}/starmap/positions
-${apiBaseUrl}/search?search=aurora`}</CodeBlock>
+${apiBaseUrl}/search?search=aurora
+${apiBaseUrl}/chat/ask`}</CodeBlock>
           </Section>
         </div>
       </div>

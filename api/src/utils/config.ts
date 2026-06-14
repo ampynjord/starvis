@@ -64,6 +64,6 @@ export const JWT_2FA_PENDING_EXPIRES = (process.env.JWT_2FA_PENDING_EXPIRES ?? '
 export const RESET_TOKEN_TTL_MS = parseInt(process.env.RESET_TOKEN_TTL_MS ?? String(60 * 60 * 1000), 10);
 
 export const CHAT_TOOL_MODEL = process.env.CHAT_TOOL_MODEL ?? 'mistral-small-latest';
-export const CHAT_RESPONSE_MODEL = process.env.CHAT_RESPONSE_MODEL ?? 'mistral-small-latest';
-export const CHAT_MAX_ITER = parseInt(process.env.CHAT_MAX_ITER ?? '2', 10);
+export const CHAT_RESPONSE_MODEL = process.env.CHAT_RESPONSE_MODEL ?? 'mistral-large-latest';
+export const CHAT_MAX_ITER = parseInt(process.env.CHAT_MAX_ITER ?? '3', 10);
 export const CHAT_PROVIDER_BASE_URL = process.env.CHAT_PROVIDER_BASE_URL ?? 'https://api.mistral.ai/v1';

@@ -46,7 +46,7 @@ async function apiFetch(path: string, opts?: RequestInit) {
 }
 
 export default function AdminCorporationDetailPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const params = useParams<{ id: string }>();
   const id = Number(params?.id);
   const [corp, setCorp] = useState<Corporation | null>(null);
@@ -54,11 +54,18 @@ export default function AdminCorporationDetailPage() {
   const [pending, setPending] = useState<Membership[]>([]);
   const [fleet, setFleet] = useState<FleetItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [busy, setBusy] = useState<number | null>(null);
 
   const load = useCallback(async () => {
+    if (authLoading) return;
+    if (user?.role !== ADMIN_ROLE) {
+      setLoading(false);
+      return;
+    }
     if (!Number.isInteger(id)) return;
     setLoading(true);
+    setLoadError('');
     try {
       const [corpData, membersData, pendingData, fleetData] = await Promise.all([
         apiFetch(`/api/admin/corporations/${id}`),
@@ -70,14 +77,20 @@ export default function AdminCorporationDetailPage() {
       setMembers(membersData.data ?? []);
       setPending((pendingData.data ?? []).filter((m: Membership) => m.corporationId === id));
       setFleet(fleetData.data ?? []);
+    } catch (error) {
+      setCorp(null);
+      setMembers([]);
+      setPending([]);
+      setFleet([]);
+      setLoadError(error instanceof Error ? error.message : 'Failed to load corporation');
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [authLoading, id, user?.role]);
 
   useEffect(() => {
-    if (user?.role === ADMIN_ROLE) void load();
-  }, [user, load]);
+    void load();
+  }, [load]);
 
   const fleetCount = useMemo(() => fleet.filter((i) => i.itemType === 'ship').length, [fleet]);
   const bankCount = useMemo(() => fleet.filter((i) => i.itemType !== 'ship').length, [fleet]);
@@ -120,8 +133,19 @@ export default function AdminCorporationDetailPage() {
     }
   };
 
+  if (authLoading) return <div className="p-6 text-center text-slate-500 font-mono-sc text-sm">LOADING SESSION...</div>;
   if (user?.role !== ADMIN_ROLE) return <div className="p-6 text-center text-slate-500 font-mono-sc text-sm">ACCESS DENIED - Admin role required</div>;
   if (loading) return <div className="p-8 text-center text-slate-600 font-mono-sc text-sm">Loading corporation...</div>;
+  if (loadError) {
+    return (
+      <div className="space-y-3 p-8 text-center">
+        <p className="font-mono-sc text-sm text-red-400">{loadError}</p>
+        <button type="button" onClick={() => void load()} className="sci-btn-ghost px-3 py-2 text-xs">
+          Retry
+        </button>
+      </div>
+    );
+  }
   if (!corp) return <div className="p-8 text-center text-slate-600 font-mono-sc text-sm">Corporation not found.</div>;
 
   return (

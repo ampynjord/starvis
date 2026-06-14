@@ -73,7 +73,7 @@ describe('HomePage', () => {
 
   it('renders the subtitle', () => {
     renderWithProviders(<HomePage />);
-    expect(screen.getByText(/Star Citizen/i)).toBeInTheDocument();
+    expect(screen.getByText('Star Citizen Database & Toolset')).toBeInTheDocument();
   });
 
   it('renders stat card labels', async () => {

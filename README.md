@@ -4,13 +4,30 @@
 [![Node v22](https://img.shields.io/badge/node-v22-green)](https://nodejs.org)
 [![License: Proprietary](https://img.shields.io/badge/License-Proprietary-red.svg)](LICENSE)
 
-Starvis - Star Citizen Database & Toolset is an unofficial Star Citizen data platform: game data extraction, REST API, web interface, Discord bot, and database tooling.
+Starvis - Star Citizen Database & Toolset is an unofficial Star Citizen data platform in active development: game data extraction, REST API, web interface, Discord bot, AI assistant, corporation tools, and database tooling.
 STARVIS is an independent community project and is not affiliated with, endorsed by, sponsored by, or officially
 connected to Cloud Imperium Games, Cloud Imperium Rights LLC, Roberts Space Industries Corp. or their affiliates.
 
 - Production: [starvis.ampynjord.bzh](https://starvis.ampynjord.bzh)
 - API docs: [starvis.ampynjord.bzh/api-docs](https://starvis.ampynjord.bzh/api-docs)
 - OpenAPI source: [`api/openapi.json`](api/openapi.json)
+
+## Project Positioning
+
+Starvis aims to reduce the fragmentation of Star Citizen tooling. Instead of jumping between many disconnected
+websites, spreadsheets, Discord snippets and partial calculators, players and organizations can use one coherent
+platform backed by extracted and normalized game data.
+
+The project focuses on:
+
+- a searchable Star Citizen database for ships, components, FPS gear, commodities, missions, locations, lore and manufacturers;
+- practical tools and calculators for combat, loadouts, FPS, mining, crafting, trade and corporation workflows;
+- an authenticated external API for third-party tools, Discord bots, dashboards, audits and community projects;
+- a Starvis AI assistant that uses database tools before answering, instead of producing generic unsupported replies;
+- a Discord bot connected to the same API and AI layer.
+
+The data and product surface are still evolving. Some fields may be incomplete, outdated or corrected over time while
+the extractor, validation rules, quality audits and UI flows improve.
 
 ---
 
@@ -72,7 +89,11 @@ Minimum values to set in `.env.dev`:
 | `TWO_FACTOR_ENCRYPTION_KEY` | recommended | Dedicated key for encrypting TOTP 2FA secrets. Falls back to `JWT_SECRET` if omitted. |
 | `ADMIN_API_KEY` | yes | API key used by server-side admin operations. |
 | `MISTRAL_API_KEY` | optional | Enables the AI chat assistant. |
+| `CHAT_TOOL_MODEL` | optional | Model used for AI tool selection. Defaults to `mistral-small-latest`. |
+| `CHAT_RESPONSE_MODEL` | optional | Model used for final AI answers. Defaults to `mistral-large-latest`. |
+| `CHAT_MAX_ITER` | optional | Max AI tool-use iterations. Defaults to `3`. |
 | `DISCORD_TOKEN` | optional | Enables the Discord bot. |
+| `DISCORD_DEFAULT_MEMBER_ROLE_NAME` / `DISCORD_DEFAULT_MEMBER_ROLE_ID` | optional | Assigns a default Discord role to new server members. Defaults to the `Member` role by name. |
 | `SMTP_HOST` | optional | Enables email verification and password reset emails. |
 | `CONTACT_EMAIL` / `NEXT_PUBLIC_CONTACT_EMAIL` | yes in prod | Contact address displayed in legal/privacy notices and used for support emails. |
 | `LEGAL_*` | yes in prod | Publisher and hosting details displayed on `/legal`. |
@@ -228,6 +249,11 @@ Swagger is the source of truth:
 
 External `/api/v1` requests require authentication. Use `Authorization: Bearer <token>` with a token generated from a Starvis user account; anonymous visitors should use the public web interface instead of calling `/api/v1` directly.
 
+The external API is a first-class platform surface. It is meant for external projects that need reliable Starvis data
+without rebuilding the extraction stack: Discord bots, overlays, corporation dashboards, public tools, quality audits,
+data exports and AI workflows. The IHM keeps public browsing separated from external API traffic through server-side
+proxies, so monitoring can distinguish anonymous web usage from token/JWT-based integrations.
+
 Main route families:
 
 | Family | Prefixes |
@@ -284,13 +310,15 @@ Important route groups:
 | Public data | `/ships`, `/components`, `/items`, `/commodities`, `/shops`, `/locations`, `/missions`, `/starmap` |
 | Tools | `/compare`, `/loadout-manager`, `/fps-calculator`, `/mining-calculator`, `/trade-calculator`, `/crafting-calculator`, `/outfitter` |
 | RSI content | `/galactapedia`, `/comm-links`, `/manufacturers`, `/paints`, `/factions` |
-| Integrations | `/discord` |
+| Platform | `/about`, `/developer`, `/discord` |
 | Account | `/login`, `/register`, `/profile`, `/my-reports`, `/report-bug` |
 | Corporation | `/corp`, `/corp/fleet`, `/corp/tactics`, `/corp/bank` |
 | Admin | `/admin`, `/admin/corporations`, `/admin/bug-reports`, `/admin/monitoring` |
 | Legal | `/legal` |
 
 The browser uses same-origin `/api/*` calls. Server-side route handlers use `API_URL` to reach the Express API.
+The `/about` page presents Starvis as an active, unofficial Star Citizen Database & Toolset with a strong focus on the
+external API and the AI data assistant.
 
 Manufacturers exposes a catalogue-first view with global ship/component/FPS item counters, searchable manufacturer cards, and detail tabs for the selected manufacturer's ships, components and inventory items. The Starmap follows the RSI parent hierarchy more closely, uses real extracted coordinates when available, avoids duplicate system/star suns, detangles dense galaxy/system layouts, and presents a darker ARK-style holographic map for browsing systems, planets, stations, jump points and commerce locations.
 
@@ -298,7 +326,13 @@ Calculators use normalized game data from the API: FPS combines real weapon stat
 
 Corporation tools include the 3D Fleet Manager, Corp Bank and corporation-owned Tactics board. Fleet Manager lays spawned ships side by side by default, persists their grid positions from the first spawn, and lets each owner decide whether their corporation ship is available for tactical planning. Corp Bank lets members declare shared components, items, commodities and custom entries; owners and corporation leaders can edit or remove entries. Admins can delete a corporation without deleting users or their personal fleet managers; only corporation-scoped memberships, fleet and bank data are removed. Tactics reuses the same 3D holographic viewer to place only corporation ships made available by their owners, save corporation strategies, build reusable mixed-ship formations with availability warnings, add 3D objectives/obstacles/points of interest, and draw flat movement vectors directly from selected ships or squadrons.
 
-The Discord Bot page exposes the Starvis community Discord server, the generated bot invitation link and slash-command help for AI, ships, loadouts, trade, shops, mining, crafting, missions, lore, status and changelog commands. The bot rotates a rich presence with useful prompts such as `/starvis`, `/intel`, API/data status and server count. Configure `NEXT_PUBLIC_DISCORD_CLIENT_ID` or `DISCORD_CLIENT_ID` to enable the bot invitation link. Configure `NEXT_PUBLIC_DISCORD_SERVER_INVITE_URL` or `DISCORD_SERVER_INVITE_URL` to show the community server invite. `NEXT_PUBLIC_DISCORD_GUILD_ID`/`DISCORD_GUILD_ID` identify the Starvis community server (`931662690101895198` by default).
+The Discord Bot page exposes the Starvis community Discord server, the generated bot invitation link and slash-command help for AI, ships, loadouts, trade, shops, mining, crafting, missions, lore, status and changelog commands. The bot rotates a rich presence with useful prompts such as `/starvis`, `/intel`, API/data status and server count. Configure `NEXT_PUBLIC_DISCORD_CLIENT_ID` or `DISCORD_CLIENT_ID` to enable the bot invitation link. Configure `NEXT_PUBLIC_DISCORD_SERVER_INVITE_URL` or `DISCORD_SERVER_INVITE_URL` to show the community server invite. `NEXT_PUBLIC_DISCORD_GUILD_ID`/`DISCORD_GUILD_ID` identify the Starvis community server (`931662690101895198` by default). `DISCORD_DEFAULT_MEMBER_ROLE_NAME`/`DISCORD_DEFAULT_MEMBER_ROLE_ID` let the bot assign the default `Member` role to new arrivals.
+
+Discord role intent: `Member` is the default community role. `Developer` means access to Starvis developer tools and external API capabilities, not project contribution status. Use `Contributor` or `Core Team` for people contributing to the project itself.
+
+The global AI widget receives page context from the IHM, suggests prompts based on the current route and can be opened
+from presentation/API surfaces with prefilled questions. This makes the assistant a transversal platform helper instead
+of a separate chat zone.
 
 Admin Monitoring combines service health, Prometheus traffic metrics, cache/runtime stats, Discord bot configuration, top routes and the latest in-memory API request logs. It also supervises the external `/api/v1` surface with active users, connected projects, generated token status, recent external API calls, server-key traffic and token usage counters. Internal IHM proxies are tagged separately and excluded from the external API counters, so public browsing does not get mixed with third-party API usage. Request logs show the authenticated username, role, auth method, client type, internal IHM marker and API token/project name when available; otherwise the actor stays anonymous. Logs are kept only since the API process started and deliberately exclude request bodies, query values, emails and the request-log/supervision viewer endpoints themselves.
 

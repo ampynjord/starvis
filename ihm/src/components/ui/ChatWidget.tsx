@@ -1,8 +1,9 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { Bot, ChevronDown, Grip, LogIn, Send, X } from 'lucide-react';
+import { Bot, ChevronDown, Grip, LogIn, Send, Sparkles, X } from 'lucide-react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   type CSSProperties,
   type KeyboardEvent,
@@ -34,6 +35,61 @@ const CHAT_SIZE_LIMITS = {
   viewportMargin: 24,
 } as const;
 
+const PAGE_CONTEXTS: { match: RegExp; label: string; prompts: string[] }[] = [
+  {
+    match: /^\/ships/,
+    label: 'Ship analysis',
+    prompts: ['Compare this ship with alternatives for solo play', 'Explain the combat strengths and weaknesses', 'Find useful loadout ideas from Starvis data'],
+  },
+  {
+    match: /^\/compare|^\/ranking|^\/loadout-manager/,
+    label: 'Ship tools',
+    prompts: ['Help me choose the best ship for my use case', 'Summarize the biggest stat trade-offs', 'Which data should I check before deciding?'],
+  },
+  {
+    match: /^\/trade|^\/trade-calculator|^\/commodities/,
+    label: 'Economy',
+    prompts: ['Find profitable trade opportunities with the available data', 'Explain what commodity metrics matter here', 'Help me build a low-risk cargo plan'],
+  },
+  {
+    match: /^\/mining|^\/mining-calculator|^\/minerals/,
+    label: 'Mining',
+    prompts: ['Help me plan a mining run', 'Explain the best ores by risk and value', 'What should I verify before refining?'],
+  },
+  {
+    match: /^\/crafting|^\/crafting-calculator|^\/blueprints/,
+    label: 'Crafting',
+    prompts: ['Help me optimize this crafting recipe', 'Explain required ingredients and modifiers', 'Find useful crafting data for this item'],
+  },
+  {
+    match: /^\/starmap|^\/locations|^\/missions|^\/factions|^\/galactapedia|^\/comm-links/,
+    label: 'Universe',
+    prompts: ['Summarize the important lore and gameplay data', 'Find related locations, factions or missions', 'Explain this area with Starvis data'],
+  },
+  {
+    match: /^\/developer/,
+    label: 'External API',
+    prompts: ['Help me use the Starvis external API', 'Generate a curl example for ships and search', 'Explain authentication and API tokens'],
+  },
+  {
+    match: /^\/discord/,
+    label: 'Discord bot',
+    prompts: ['Which Discord commands should I use?', 'Explain how the bot connects to Starvis data', 'Help me choose commands for my server'],
+  },
+];
+
+function getPageContext(pathname: string | null) {
+  return PAGE_CONTEXTS.find((context) => context.match.test(pathname ?? '')) ?? {
+    label: 'Starvis',
+    prompts: ['What can Starvis do for me?', 'Help me find the right tool', 'Explain the API and AI features'],
+  };
+}
+
+function buildContextualPrompt(pathname: string | null, text: string) {
+  const context = getPageContext(pathname);
+  return `User interface context: the user is currently on "${pathname ?? '/'}" (${context.label}). Use this page context when useful, but answer the actual question first.\n\nQuestion: ${text}`;
+}
+
 function clampChatSize(size: ChatSize): ChatSize {
   if (typeof window === 'undefined') return size;
 
@@ -48,6 +104,7 @@ function clampChatSize(size: ChatSize): ChatSize {
 
 export function ChatWidget() {
   const { user, loading: authLoading } = useAuth();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -86,6 +143,17 @@ export function ChatWidget() {
     } catch {
       localStorage.removeItem(CHAT_SIZE_STORAGE_KEY);
     }
+  }, []);
+
+  useEffect(() => {
+    const onOpenAi = (event: Event) => {
+      const detail = (event as CustomEvent<{ prompt?: string }>).detail;
+      setOpen(true);
+      if (detail?.prompt) setInput(detail.prompt);
+      setTimeout(() => inputRef.current?.focus(), 120);
+    };
+    window.addEventListener('starvis:open-ai', onOpenAi);
+    return () => window.removeEventListener('starvis:open-ai', onOpenAi);
   }, []);
 
   useEffect(() => {
@@ -141,7 +209,10 @@ export function ChatWidget() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: history.map((m) => ({ role: m.role, content: m.content })),
+          messages: history.map((m, index) => ({
+            role: m.role,
+            content: m.role === 'user' && index === history.length - 1 ? buildContextualPrompt(pathname, m.content) : m.content,
+          })),
         }),
         signal: abortRef.current.signal,
       });
@@ -206,7 +277,7 @@ export function ChatWidget() {
       setLoading(false);
       setMessages((prev) => prev.map((m, i) => (i === assistantIdx ? { ...m, streaming: false } : m)));
     }
-  }, [input, messages, loading]);
+  }, [input, messages, loading, pathname]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -216,6 +287,7 @@ export function ChatWidget() {
   };
 
   if (authLoading) return null;
+  const pageContext = getPageContext(pathname);
 
   return (
     <div className="fixed inset-x-3 bottom-3 z-[60] flex flex-col items-end gap-3 sm:inset-x-auto sm:right-6 sm:bottom-6">
@@ -293,6 +365,29 @@ export function ChatWidget() {
             </div>
 
             <div className="flex-1 space-y-4 overflow-y-auto px-3 py-3 sm:px-4" style={{ minHeight: 0 }}>
+              {messages.length <= 1 && (
+                <div className="rounded-sm border border-cyan-900/40 bg-cyan-950/10 p-3">
+                  <p className="mb-2 flex items-center gap-1.5 font-mono-sc text-[9px] uppercase tracking-widest text-cyan-500">
+                    <Sparkles size={11} />
+                    Contextual AI - {pageContext.label}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {pageContext.prompts.map((prompt) => (
+                      <button
+                        key={prompt}
+                        type="button"
+                        onClick={() => {
+                          setInput(prompt);
+                          setTimeout(() => inputRef.current?.focus(), 80);
+                        }}
+                        className="rounded-sm border border-slate-800 bg-slate-950/60 px-2 py-1 text-left font-mono-sc text-[10px] text-slate-400 transition-colors hover:border-cyan-800/70 hover:text-cyan-300"
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {messages.map((msg, i) => (
                 <div key={`${msg.role}-${i}`} className={`flex min-w-0 gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                   {msg.role === 'assistant' && (

@@ -7,12 +7,16 @@ import Image from 'next/image';
 import {
   ArrowRight,
   BarChart3,
+  Bot,
+  BrainCircuit,
   BookOpen,
   Bug,
   ChevronRight,
   ClipboardList,
+  Code2,
   Clock,
   Crosshair,
+  Database,
   Globe,
   Layers,
   Minus,
@@ -36,6 +40,7 @@ import { useEnv } from '@/contexts/EnvContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
+import { OpenAiButton } from '@/components/ui/OpenAiButton';
 import { PageShell } from '@/components/ui/PageShell';
 import { NAV_GROUPS } from '@/components/layout/navigation';
 import { fDate, fNumber } from '@/utils/formatters';
@@ -116,6 +121,30 @@ const TOOLS: {
   { to: '/fps-calculator',      icon: Crosshair,         label: 'FPS Calculator',      sub: 'TTK & damage breakdown for weapons',     category: 'combat',  badge: 'TTK' },
   { to: '/trade-calculator',    icon: TrendingUp,        label: 'Trade Calculator',    sub: 'Profit & commodity prices',              category: 'economy', badge: 'aUEC' },
   { to: '/mining-calculator',   icon: Pickaxe,           label: 'Mining Calculator',   sub: 'Ore yield & laser settings',             category: 'economy', badge: 'Yield' },
+];
+
+const PLATFORM_PILLARS = [
+  {
+    to: '/about',
+    icon: Database,
+    label: 'Unified Hub',
+    sub: 'One Star Citizen data platform instead of scattered tools',
+    accent: 'text-cyan-400',
+  },
+  {
+    to: '/developer',
+    icon: Code2,
+    label: 'External API',
+    sub: 'Authenticated REST API, Swagger and project tokens',
+    accent: 'text-emerald-400',
+  },
+  {
+    to: '/discord',
+    icon: Bot,
+    label: 'Discord Bot',
+    sub: 'Slash commands connected to Starvis data',
+    accent: 'text-blue-400',
+  },
 ];
 
 const CATEGORY_LABEL: Record<ToolCategory, { label: string; color: string; border: string }> = {
@@ -339,6 +368,59 @@ export default function HomePage() {
               </button>
             </div>
           </form>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.62fr)]">
+        <div className="sci-panel p-5">
+          <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-800/70 pb-3">
+            <div>
+              <p className="font-mono-sc text-[9px] uppercase tracking-widest text-cyan-700">Platform direction</p>
+              <h2 className="mt-1 font-orbitron text-sm font-bold uppercase tracking-widest text-cyan-300">
+                Database, tools, API and AI in one place
+              </h2>
+            </div>
+            <Link href="/about" className="sci-btn-ghost px-3 py-2 text-xs">
+              About
+            </Link>
+          </div>
+          <p className="font-rajdhani text-sm leading-relaxed text-slate-400">
+            Starvis is built to reduce the need for countless disconnected Star Citizen tools. The same extracted data feeds the web interface, calculators, corporation workflows,
+            Discord commands, external API and AI assistant.
+          </p>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            {PLATFORM_PILLARS.map(({ to, icon: Icon, label, sub, accent }) => (
+              <Link key={to} href={to} className="rounded-sm border border-slate-800 bg-slate-950/35 p-3 transition-colors hover:border-cyan-800/70 hover:bg-slate-950/55">
+                <Icon size={16} className={accent} />
+                <p className="mt-2 font-orbitron text-[10px] font-bold uppercase tracking-widest text-slate-300">{label}</p>
+                <p className="mt-1 font-rajdhani text-xs leading-snug text-slate-600">{sub}</p>
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        <div className="sci-panel border-violet-900/50 bg-violet-950/10 p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <BrainCircuit size={16} className="text-violet-400" />
+            <div>
+              <p className="font-mono-sc text-[9px] uppercase tracking-widest text-violet-500">AI layer</p>
+              <h2 className="font-orbitron text-sm font-bold uppercase tracking-widest text-slate-200">Ask the data directly</h2>
+            </div>
+          </div>
+          <p className="font-rajdhani text-sm leading-relaxed text-slate-400">
+            The assistant uses Starvis tools and data to compare, summarize, recommend and guide you toward the right page, command or API endpoint.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <OpenAiButton
+              prompt="What can Starvis AI do with ships, economy, lore, corporation tools, Discord and the external API?"
+              className="rounded-sm border border-violet-800/50 bg-violet-950/30 px-3 py-2 font-mono-sc text-xs text-violet-300 transition-colors hover:border-violet-500/70 hover:bg-violet-950/50"
+            >
+              Ask Starvis AI
+            </OpenAiButton>
+            <Link href="/developer" className="sci-btn-ghost px-3 py-2 text-xs">
+              API Access
+            </Link>
+          </div>
         </div>
       </div>
 

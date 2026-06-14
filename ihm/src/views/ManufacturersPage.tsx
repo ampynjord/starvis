@@ -8,6 +8,7 @@ import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { ShipCard } from '@/components/ship/ShipCard';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { EarlyAccessNotice } from '@/components/ui/EarlyAccessNotice';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListFilterBar, ListFilterResetButton, ListFilterSelect } from '@/components/ui/ListFilters';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
@@ -315,6 +316,10 @@ export default function ManufacturersPage() {
         searchPlaceholder="Search manufacturer…"
         onSearch={(v) => { setMfrSearch(v); setSelected(null); }}
       />
+
+      <EarlyAccessNotice className="mb-4">
+        Manufacturer inventories combine extracted game data and normalized relationships. Counts and linked ships, components or items can shift after each extraction pass.
+      </EarlyAccessNotice>
 
       <ListFilterBar>
         <ListFilterSelect

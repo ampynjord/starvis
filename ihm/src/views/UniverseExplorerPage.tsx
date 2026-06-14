@@ -24,6 +24,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EarlyAccessNotice } from '@/components/ui/EarlyAccessNotice';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useEnv } from '@/contexts/EnvContext';
 import { createVisibilityTracker, disposeObject3D, getThreePixelRatio } from '@/lib/three-performance';
@@ -1285,6 +1286,9 @@ export default function UniverseExplorerPage() {
               </p>
             </div>
           </div>
+          <EarlyAccessNotice className="max-w-xl border-cyan-900/45 bg-cyan-950/10">
+            Starmap positions mix extracted coordinates, RSI hierarchy and layout normalization. Use it for navigation and discovery, not as guaranteed astronomical precision.
+          </EarlyAccessNotice>
 
           <div className="flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1 rounded-sm border border-cyan-900/50 bg-cyan-950/20 p-1">
