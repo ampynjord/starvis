@@ -1,5 +1,6 @@
 import type { Router } from 'express';
 import { requireJwtAdmin } from '../middleware/index.js';
+import { buildApiSupervisionSnapshot } from '../services/api-supervision-service.js';
 import { listRequestLogs } from '../services/request-log-service.js';
 import { asyncHandler, makeGameDataGuard } from './helpers.js';
 import type { RouteDependencies } from './types.js';
@@ -34,6 +35,13 @@ export function mountAdminRoutes(router: Router, deps: RouteDependencies): void 
     asyncHandler(async (req, res) => {
       const limit = Number.parseInt(String(req.query.limit ?? '100'), 10);
       res.json({ success: true, data: listRequestLogs(limit) });
+    }),
+  );
+
+  router.get(
+    '/admin/api-supervision',
+    asyncHandler(async (_req, res) => {
+      res.json({ success: true, data: await buildApiSupervisionSnapshot(prisma) });
     }),
   );
 

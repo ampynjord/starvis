@@ -175,13 +175,25 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   // ── API Token (external project access) ──────────────────────────────────
   router.post('/auth/api-token', requireJwtBetaOrAdmin, async (req, res) => {
     const payload = req.jwtPayload;
+    const { name, description } = req.body ?? {};
     const user = await authService.me(payload.sub);
     if (!user) return void res.status(404).json({ success: false, error: 'User not found' });
-    const token = authService.generateApiToken(user);
-    res.json({ success: true, token, expiresIn: '1y', note: 'Store this token securely — it will not be shown again.' });
+    const result = await authService.generateApiToken(user, {
+      name: typeof name === 'string' ? name : undefined,
+      description: typeof description === 'string' ? description : undefined,
+    });
+    res.json({
+      success: true,
+      token: result.token,
+      tokenId: result.tokenId,
+      name: result.name,
+      expiresAt: result.expiresAt,
+      expiresIn: '1y',
+      note: 'Store this token securely - it will not be shown again.',
+    });
   });
 
-  // ── 2FA endpoints ─────────────────────────────────────────────────────────
+  // ---- 2FA endpoints ─────────────────────────────────────────────────────────
 
   // POST /auth/2fa/setup
   router.post('/auth/2fa/setup', requireJwt, async (req, res) => {

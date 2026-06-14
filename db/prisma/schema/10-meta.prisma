@@ -103,9 +103,37 @@ model User {
   bugReports      BugReport[]
   memberships     CorporationMembership[]
   addedFleetItems CorporationFleetItem[]  @relation("AddedFleetItems")
+  apiTokens       ApiToken[]
 
   @@index([email])
   @@map("users")
+  @@schema("meta")
+}
+
+model ApiToken {
+  id            Int       @id @default(autoincrement())
+  jti           String    @unique @db.VarChar(64)
+  tokenHash     String    @unique @map("token_hash") @db.Char(64)
+  name          String    @db.VarChar(120)
+  description   String?   @db.VarChar(500)
+  userId        Int       @map("user_id")
+  roleSnapshot  UserRole  @map("role_snapshot")
+  expiresAt     DateTime  @map("expires_at")
+  revokedAt     DateTime? @map("revoked_at")
+  lastUsedAt    DateTime? @map("last_used_at")
+  lastUsedIp    String?   @map("last_used_ip") @db.VarChar(80)
+  lastUserAgent String?   @map("last_user_agent") @db.VarChar(160)
+  usageCount    Int       @default(0) @map("usage_count")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+  @@index([lastUsedAt])
+  @@map("api_tokens")
   @@schema("meta")
 }
 

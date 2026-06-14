@@ -13,9 +13,11 @@ import {
   Gauge,
   Globe,
   HardDrive,
+  KeyRound,
   Loader2,
   RefreshCw,
   Server,
+  ShieldCheck,
   User,
   Zap,
 } from 'lucide-react';
@@ -61,6 +63,11 @@ interface RequestLogEntry {
   path: string;
   statusCode: number;
   durationMs: number;
+  isExternalApi: boolean;
+  authMethod: 'admin_key' | 'api_token' | 'session' | 'anonymous' | 'unknown';
+  clientType: 'external_api' | 'web_session' | 'server_key' | 'anonymous_web' | 'unknown';
+  apiTokenId: number | null;
+  apiTokenName: string | null;
   userId: number | null;
   username: string | null;
   role: string | null;
@@ -91,6 +98,53 @@ interface DiscordBotStatus {
   serverInviteUrl: string | null;
   commandCount: number;
   commands: Array<{ name: string; category: string; description: string }>;
+}
+
+interface ApiSupervisionUser {
+  userId: number;
+  username: string | null;
+  role: string | null;
+  lastSeenAt: string;
+  requestCount: number;
+  externalApiRequests: number;
+  webRequests: number;
+}
+
+interface ApiSupervisionProject {
+  tokenId: number;
+  name: string;
+  description: string | null;
+  owner: { id: number; username: string; email: string; role: string } | null;
+  status: 'active' | 'expired' | 'revoked';
+  connected: boolean;
+  createdAt: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  lastUsedAt: string | null;
+  usageCount: number;
+  requestsInBuffer: number;
+  recentRequests: number;
+  lastUsedIp: string | null;
+  lastUserAgent: string | null;
+}
+
+interface ApiSupervisionSnapshot {
+  generatedAt: string;
+  summary: {
+    externalApiRequests15m: number;
+    externalApiRequests24h: number;
+    serverKeyRequests15m: number;
+    activeUsers15m: number;
+    generatedTokens: number;
+    activeTokens: number;
+    revokedTokens: number;
+    expiredTokens: number;
+    tokensUsed24h: number;
+    connectedProjects: number;
+  };
+  activeUsers: ApiSupervisionUser[];
+  projects: ApiSupervisionProject[];
+  recentExternalRequests: RequestLogEntry[];
 }
 
 // ── Prometheus text parser ───────────────────────────────────────────────────
@@ -212,6 +266,11 @@ function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
+function fmtDateTime(iso: string | null) {
+  if (!iso) return 'Never';
+  return new Date(iso).toLocaleString([], { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
 function statusStyle(statusCode: number) {
   if (statusCode >= 500) return 'border-rose-800/60 bg-rose-950/30 text-rose-300';
   if (statusCode >= 400) return 'border-amber-800/60 bg-amber-950/30 text-amber-300';
@@ -220,9 +279,24 @@ function statusStyle(statusCode: number) {
 }
 
 function actorLabel(log: RequestLogEntry) {
+  if (log.apiTokenName) return `${log.apiTokenName}${log.username ? ` · ${log.username}` : ''}`;
   if (log.username) return `${log.username}${log.role ? ` · ${log.role}` : ''}`;
   if (log.userId) return `${log.role ?? 'user'} #${log.userId}`;
   return 'anonymous';
+}
+
+function clientLabel(log: RequestLogEntry) {
+  if (log.clientType === 'external_api') return 'External API token';
+  if (log.clientType === 'server_key') return 'Server API key';
+  if (log.clientType === 'web_session') return 'Web session';
+  if (log.clientType === 'anonymous_web') return 'Public web';
+  return log.authMethod ?? 'unknown';
+}
+
+function projectStatusStyle(status: ApiSupervisionProject['status']) {
+  if (status === 'active') return 'border-emerald-800/60 bg-emerald-950/30 text-emerald-300';
+  if (status === 'revoked') return 'border-rose-800/60 bg-rose-950/30 text-rose-300';
+  return 'border-amber-800/60 bg-amber-950/30 text-amber-300';
 }
 
 const STATUS_FAMILY_STYLE: Record<string, string> = {
@@ -270,6 +344,7 @@ export default function AdminMonitoringPage() {
   const { user: me } = useAuth();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [requestLogs, setRequestLogs] = useState<RequestLogEntry[]>([]);
+  const [apiSupervision, setApiSupervision] = useState<ApiSupervisionSnapshot | null>(null);
   const [discordBot, setDiscordBot] = useState<DiscordBotStatus | null>(null);
   const [reqPerSec, setReqPerSec] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -285,6 +360,7 @@ export default function AdminMonitoringPage() {
         fetch('/api/admin/discord-bot'),
       ]);
       const logsPromise = fetch('/api/admin/request-logs?limit=80');
+      const supervisionPromise = fetch('/api/admin/api-supervision');
 
       const ready: ReadyState | null = readyRes.status === 'fulfilled'
         ? await readyRes.value.json().catch(() => null)
@@ -303,6 +379,11 @@ export default function AdminMonitoringPage() {
       if (logsRes?.ok) {
         const logsJson = await logsRes.json().catch(() => null);
         setRequestLogs(Array.isArray(logsJson?.data) ? logsJson.data : []);
+      }
+      const supervisionRes = await supervisionPromise.catch(() => null);
+      if (supervisionRes?.ok) {
+        const supervisionJson = await supervisionRes.json().catch(() => null);
+        setApiSupervision(supervisionJson?.data ?? null);
       }
 
       if (!ready && !metricsText) {
@@ -401,6 +482,13 @@ export default function AdminMonitoringPage() {
         <StatCard icon={Activity} label="Traffic" value={reqPerSec !== null ? `${reqPerSec.toFixed(1)} req/s` : '—'} accent="emerald" />
         <StatCard icon={Clock} label="Avg latency" value={fmtMs(snapshot?.avgLatencyMs ?? null)} accent="amber" />
         <StatCard icon={AlertTriangle} label="5xx errors" value={snapshot ? snapshot.totalErrors.toLocaleString() : '—'} accent={snapshot && snapshot.totalErrors > 0 ? 'rose' : 'slate'} />
+      </StatGrid>
+
+      <StatGrid>
+        <StatCard icon={Globe} label="External API 15m" value={apiSupervision ? apiSupervision.summary.externalApiRequests15m.toLocaleString() : '—'} accent="cyan" />
+        <StatCard icon={User} label="Active users 15m" value={apiSupervision ? apiSupervision.summary.activeUsers15m.toLocaleString() : '—'} accent="emerald" />
+        <StatCard icon={KeyRound} label="Active tokens" value={apiSupervision ? apiSupervision.summary.activeTokens.toLocaleString() : '—'} accent="purple" />
+        <StatCard icon={ShieldCheck} label="Connected projects" value={apiSupervision ? apiSupervision.summary.connectedProjects.toLocaleString() : '—'} accent="amber" />
       </StatGrid>
 
       {/* Cache stats */}
@@ -505,6 +593,138 @@ export default function AdminMonitoringPage() {
         )}
       </div>
 
+      {apiSupervision && (
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
+          <div className="sci-panel border border-slate-800/60">
+            <div className="flex flex-col gap-1 border-b border-slate-800/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+              <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">External API projects and tokens</p>
+              <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-700">
+                {apiSupervision.summary.tokensUsed24h.toLocaleString()} used in 24h · {apiSupervision.summary.revokedTokens.toLocaleString()} revoked
+              </span>
+            </div>
+            {apiSupervision.projects.length === 0 ? (
+              <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No generated API tokens yet.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[820px] text-left">
+                  <thead>
+                    <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                      <th className="px-3 py-2 font-normal">Project</th>
+                      <th className="px-3 py-2 font-normal">Owner</th>
+                      <th className="px-3 py-2 font-normal">Status</th>
+                      <th className="px-3 py-2 text-right font-normal">Recent</th>
+                      <th className="px-3 py-2 text-right font-normal">Total</th>
+                      <th className="px-3 py-2 font-normal">Last used</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {apiSupervision.projects.slice(0, 12).map((project) => (
+                      <tr key={project.tokenId} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
+                        <td className="px-3 py-2">
+                          <div className="min-w-0">
+                            <p className="truncate font-mono-sc text-xs text-slate-300">{project.name}</p>
+                            {project.description && <p className="truncate font-rajdhani text-xs text-slate-600">{project.description}</p>}
+                          </div>
+                        </td>
+                        <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">
+                          {project.owner ? `${project.owner.username} · ${project.owner.role}` : 'Unknown'}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className={`inline-flex rounded-sm border px-1.5 py-0.5 font-mono-sc text-[10px] font-bold uppercase ${projectStatusStyle(project.status)}`}>
+                            {project.connected ? 'connected' : project.status}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono-sc text-xs text-cyan-400">{project.recentRequests.toLocaleString()}</td>
+                        <td className="px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{project.usageCount.toLocaleString()}</td>
+                        <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtDateTime(project.lastUsedAt)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="sci-panel border border-slate-800/60">
+            <p className="border-b border-slate-800/60 px-3 py-2.5 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+              Connected users
+            </p>
+            {apiSupervision.activeUsers.length === 0 ? (
+              <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No authenticated user activity in the last 15 minutes.</p>
+            ) : (
+              <div className="divide-y divide-slate-800/50">
+                {apiSupervision.activeUsers.slice(0, 10).map((user) => (
+                  <div key={user.userId} className="px-3 py-2.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="truncate font-mono-sc text-xs text-slate-300">{user.username ?? `user #${user.userId}`}</p>
+                      <span className="font-mono-sc text-[10px] text-slate-600">{fmtDateTime(user.lastSeenAt)}</span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-2 font-mono-sc text-[10px] text-slate-600">
+                      <span>{user.role ?? 'user'}</span>
+                      <span>{user.requestCount.toLocaleString()} req</span>
+                      <span>{user.externalApiRequests.toLocaleString()} external</span>
+                      <span>{user.webRequests.toLocaleString()} web</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {apiSupervision && (
+        <div className="sci-panel border border-slate-800/60">
+          <div className="flex flex-col gap-1 border-b border-slate-800/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Recent external API requests</p>
+            <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-700">
+              {apiSupervision.summary.externalApiRequests24h.toLocaleString()} in current buffer
+            </span>
+          </div>
+          {apiSupervision.recentExternalRequests.length === 0 ? (
+            <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No external API request recorded yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[760px] text-left">
+                <thead>
+                  <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                    <th className="px-3 py-2 font-normal">Time</th>
+                    <th className="px-3 py-2 font-normal">Request</th>
+                    <th className="px-3 py-2 font-normal">Project</th>
+                    <th className="px-3 py-2 font-normal">Client</th>
+                    <th className="px-3 py-2 text-right font-normal">Status</th>
+                    <th className="px-3 py-2 text-right font-normal">Duration</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {apiSupervision.recentExternalRequests.slice(0, 25).map((log) => (
+                    <tr key={log.id} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
+                      <td className="whitespace-nowrap px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtTime(log.timestamp)}</td>
+                      <td className="px-3 py-2">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="rounded-sm border border-cyan-900/60 bg-cyan-950/20 px-1.5 py-0.5 font-mono-sc text-[10px] font-bold text-cyan-400">
+                            {log.method}
+                          </span>
+                          <span className="max-w-[24rem] truncate font-mono-sc text-xs text-slate-300">{log.path}</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{actorLabel(log)}</td>
+                      <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{clientLabel(log)}</td>
+                      <td className="px-3 py-2 text-right">
+                        <span className={`inline-flex rounded-sm border px-1.5 py-0.5 font-mono-sc text-[10px] font-bold ${statusStyle(log.statusCode)}`}>
+                          {log.statusCode}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{fmtMs(log.durationMs)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Recent request logs */}
       <div className="sci-panel border border-slate-800/60">
         <div className="flex flex-col gap-1 border-b border-slate-800/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
@@ -560,7 +780,7 @@ export default function AdminMonitoringPage() {
                       <div className="flex min-w-0 items-center gap-1.5 font-mono-sc text-xs text-slate-500">
                         <Globe size={11} className="shrink-0 text-slate-600" />
                         <span className="max-w-[18rem] truncate" title={log.userAgent ?? undefined}>
-                          {log.ip ?? 'unknown'}{log.userAgent ? ` · ${log.userAgent}` : ''}
+                          {clientLabel(log)} · {log.ip ?? 'unknown'}{log.userAgent ? ` · ${log.userAgent}` : ''}
                         </span>
                       </div>
                     </td>

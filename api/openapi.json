@@ -7258,6 +7258,16 @@
                     },
                     "note": {
                       "type": "string"
+                    },
+                    "tokenId": {
+                      "type": "integer"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "expiresAt": {
+                      "type": "string",
+                      "format": "date-time"
                     }
                   }
                 }
@@ -7266,6 +7276,28 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 120,
+                    "description": "Human-readable project or integration name."
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "nullable": true
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -7411,6 +7443,25 @@
                           },
                           "durationMs": {
                             "type": "integer"
+                          },
+                          "isExternalApi": {
+                            "type": "boolean"
+                          },
+                          "authMethod": {
+                            "type": "string",
+                            "enum": ["admin_key", "api_token", "session", "anonymous", "unknown"]
+                          },
+                          "clientType": {
+                            "type": "string",
+                            "enum": ["external_api", "web_session", "server_key", "anonymous_web", "unknown"]
+                          },
+                          "apiTokenId": {
+                            "type": "integer",
+                            "nullable": true
+                          },
+                          "apiTokenName": {
+                            "type": "string",
+                            "nullable": true
                           },
                           "userId": {
                             "type": "integer",
@@ -12536,6 +12587,262 @@
           }
         },
         "operationId": "getPublicBlueprintsLootTables"
+      }
+    },
+    "/admin/api-supervision": {
+      "get": {
+        "tags": ["Admin"],
+        "summary": "External API, active user and generated token supervision",
+        "description": "Aggregates recent in-memory request logs with generated API token metadata for admin monitoring.",
+        "operationId": "adminApiSupervision",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "External API supervision snapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "generatedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "summary": {
+                          "type": "object",
+                          "properties": {
+                            "externalApiRequests15m": {
+                              "type": "integer"
+                            },
+                            "externalApiRequests24h": {
+                              "type": "integer"
+                            },
+                            "serverKeyRequests15m": {
+                              "type": "integer"
+                            },
+                            "activeUsers15m": {
+                              "type": "integer"
+                            },
+                            "generatedTokens": {
+                              "type": "integer"
+                            },
+                            "activeTokens": {
+                              "type": "integer"
+                            },
+                            "revokedTokens": {
+                              "type": "integer"
+                            },
+                            "expiredTokens": {
+                              "type": "integer"
+                            },
+                            "tokensUsed24h": {
+                              "type": "integer"
+                            },
+                            "connectedProjects": {
+                              "type": "integer"
+                            }
+                          }
+                        },
+                        "activeUsers": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "userId": {
+                                "type": "integer"
+                              },
+                              "username": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "role": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "lastSeenAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "requestCount": {
+                                "type": "integer"
+                              },
+                              "externalApiRequests": {
+                                "type": "integer"
+                              },
+                              "webRequests": {
+                                "type": "integer"
+                              }
+                            }
+                          }
+                        },
+                        "projects": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "tokenId": {
+                                "type": "integer"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "description": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "owner": {
+                                "type": "object",
+                                "nullable": true,
+                                "properties": {
+                                  "id": {
+                                    "type": "integer"
+                                  },
+                                  "username": {
+                                    "type": "string"
+                                  },
+                                  "email": {
+                                    "type": "string"
+                                  },
+                                  "role": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": ["active", "expired", "revoked"]
+                              },
+                              "connected": {
+                                "type": "boolean"
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "expiresAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "revokedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              },
+                              "lastUsedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              },
+                              "usageCount": {
+                                "type": "integer"
+                              },
+                              "requestsInBuffer": {
+                                "type": "integer"
+                              },
+                              "recentRequests": {
+                                "type": "integer"
+                              },
+                              "lastUsedIp": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "lastUserAgent": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            }
+                          }
+                        },
+                        "recentExternalRequests": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer"
+                              },
+                              "timestamp": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "method": {
+                                "type": "string"
+                              },
+                              "path": {
+                                "type": "string"
+                              },
+                              "statusCode": {
+                                "type": "integer"
+                              },
+                              "durationMs": {
+                                "type": "integer"
+                              },
+                              "isExternalApi": {
+                                "type": "boolean"
+                              },
+                              "authMethod": {
+                                "type": "string",
+                                "enum": ["admin_key", "api_token", "session", "anonymous", "unknown"]
+                              },
+                              "clientType": {
+                                "type": "string",
+                                "enum": ["external_api", "web_session", "server_key", "anonymous_web", "unknown"]
+                              },
+                              "apiTokenId": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "apiTokenName": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "userId": {
+                                "type": "integer",
+                                "nullable": true
+                              },
+                              "username": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "role": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "ip": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "userAgent": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
       }
     }
   }

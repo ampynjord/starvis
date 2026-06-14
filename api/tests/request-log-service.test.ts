@@ -1,3 +1,4 @@
+import jwt from 'jsonwebtoken';
 import { describe, expect, it } from 'vitest';
 import { clearRequestLogsForTests, listRequestLogs, recordRequestLog } from '../src/services/request-log-service.js';
 
@@ -27,27 +28,23 @@ describe('request-log-service', () => {
       userId: 7,
       username: null,
       role: 'admin',
+      isExternalApi: true,
+      authMethod: 'session',
+      clientType: 'web_session',
       ip: '192.168.1.0',
       userAgent: 'Vitest',
     });
   });
 
   it('resolves authenticated actors from bearer tokens on public routes', async () => {
-    const { AuthService } = await import('../src/services/auth-service.js');
     process.env.JWT_SECRET = 'request-log-test-secret';
     clearRequestLogsForTests();
 
-    const token = new AuthService({} as any).generateApiToken({
-      id: 42,
-      uuid: 'user-uuid',
-      email: 'user@example.test',
-      username: 'ampynjord',
-      role: 'user',
-      avatarUrl: null,
-      createdAt: new Date(),
-      emailVerified: true,
-      twoFactorEnabled: false,
-    });
+    const token = jwt.sign(
+      { sub: 42, uuid: 'user-uuid', email: 'user@example.test', username: 'ampynjord', role: 'user' },
+      process.env.JWT_SECRET,
+      { expiresIn: '5m' },
+    );
 
     recordRequestLog(
       {
@@ -55,6 +52,7 @@ describe('request-log-service', () => {
         originalUrl: '/api/v1/ships',
         url: '/api/v1/ships',
         headers: { authorization: `Bearer ${token}` },
+        authMethod: 'session',
         ip: '10.0.0.55',
         get: (name: string) => (name === 'user-agent' ? 'Vitest' : undefined),
       } as any,
@@ -66,6 +64,8 @@ describe('request-log-service', () => {
       userId: 42,
       username: 'ampynjord',
       role: 'user',
+      isExternalApi: true,
+      clientType: 'web_session',
     });
   });
 

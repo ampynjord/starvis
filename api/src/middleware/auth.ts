@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { getPrisma } from '@starvis/db';
 import type { NextFunction, Request, Response } from 'express';
+import { ApiTokenService } from '../services/api-token-service.js';
 import { type JwtPayload, verifyAuthToken } from '../services/auth-service.js';
 import { ADMIN_ROLE, AUTH_COOKIE_NAME, DEVELOPER_ACCESS_ROLES } from '../utils/config.js';
 
@@ -47,6 +48,25 @@ async function resolveCurrentPayload(token: string): Promise<JwtPayload> {
   };
 }
 
+async function applyApiTokenState(req: Request, payload: JwtPayload, token: string): Promise<void> {
+  if (payload.type !== 'api_token' || !payload.jti) {
+    req.authMethod = 'session';
+    return;
+  }
+  const tokenService = new ApiTokenService(getPrisma());
+  const tokenRow = await tokenService.validateActive(payload.jti, token);
+  if (!tokenRow) throw new Error('INVALID_API_TOKEN');
+  req.apiToken = { id: tokenRow.id, jti: tokenRow.jti, name: tokenRow.name, userId: tokenRow.userId };
+  req.authMethod = 'api_token';
+  await tokenService.touch(payload.jti, { ip: req.ip, userAgent: requestUserAgent(req) });
+}
+
+function requestUserAgent(req: Request): string | null {
+  const userAgent = req.get('user-agent')?.trim();
+  if (!userAgent) return null;
+  return userAgent.length > 160 ? `${userAgent.slice(0, 157)}...` : userAgent;
+}
+
 /**
  * requireJwt — verifies Bearer JWT, injects req.jwtPayload.
  * Accepts any role (user, admin).
@@ -60,6 +80,7 @@ export async function requireJwt(req: Request, res: Response, next: NextFunction
   }
   try {
     req.jwtPayload = await resolveCurrentPayload(token);
+    await applyApiTokenState(req, req.jwtPayload, token);
     next();
   } catch {
     res.status(401).json({ success: false, error: 'Invalid or expired token' });
@@ -80,14 +101,19 @@ export async function requireExternalApiAccess(req: Request, res: Response, next
   const token = extractBearer(req) ?? extractCookieToken(req);
   if (token) {
     try {
-      req.jwtPayload = await resolveCurrentPayload(token);
+      const payload = await resolveCurrentPayload(token);
+      await applyApiTokenState(req, payload, token);
+      req.jwtPayload = payload;
       return next();
     } catch {
       return res.status(401).json({ success: false, error: 'Invalid or expired token' });
     }
   }
 
-  if (hasValidAdminApiKey(req)) return next();
+  if (hasValidAdminApiKey(req)) {
+    req.authMethod = 'admin_key';
+    return next();
+  }
 
   return res.status(401).json({ success: false, error: 'API token or signed-in session required' });
 }
@@ -111,6 +137,7 @@ export async function requireJwtDeveloperOrAdmin(req: Request, res: Response, ne
       return res.status(403).json({ success: false, error: 'Developer or admin role required' });
     }
     req.jwtPayload = { ...payload, role: currentRole };
+    await applyApiTokenState(req, req.jwtPayload, token);
     next();
   } catch {
     res.status(401).json({ success: false, error: 'Invalid or expired token' });
@@ -126,7 +153,10 @@ export const requireJwtBetaOrAdmin = requireJwtDeveloperOrAdmin;
  */
 export async function requireJwtAdmin(req: Request, res: Response, next: NextFunction) {
   // 1. Always accept admin key (backward compat, server scripts)
-  if (hasValidAdminApiKey(req)) return next();
+  if (hasValidAdminApiKey(req)) {
+    req.authMethod = 'admin_key';
+    return next();
+  }
 
   // 2. Otherwise validate JWT with admin role
   if (!process.env.JWT_SECRET) {
@@ -143,6 +173,7 @@ export async function requireJwtAdmin(req: Request, res: Response, next: NextFun
       return res.status(403).json({ success: false, error: 'Admin role required' });
     }
     req.jwtPayload = { ...payload, role: currentRole };
+    await applyApiTokenState(req, req.jwtPayload, token);
     next();
   } catch {
     res.status(401).json({ success: false, error: 'Invalid or expired token' });

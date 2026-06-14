@@ -46,6 +46,9 @@ function StatusRow({ ok, label }: { ok: boolean; label: string }) {
 export default function DeveloperPage() {
   const { user, loading } = useAuth();
   const [apiToken, setApiToken] = useState<string | null>(null);
+  const [apiTokenName, setApiTokenName] = useState('External project token');
+  const [apiTokenDescription, setApiTokenDescription] = useState('');
+  const [apiTokenMeta, setApiTokenMeta] = useState<{ name: string; expiresAt: string } | null>(null);
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
@@ -70,13 +73,22 @@ export default function DeveloperPage() {
   const generateToken = async () => {
     setGenerating(true);
     setApiToken(null);
+    setApiTokenMeta(null);
     setNotice(null);
     setCopied(false);
     try {
-      const res = await fetch('/api/auth/api-token', { method: 'POST' });
+      const res = await fetch('/api/auth/api-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: apiTokenName,
+          description: apiTokenDescription || undefined,
+        }),
+      });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? 'Token generation failed');
       setApiToken(data.token);
+      setApiTokenMeta({ name: data.name ?? apiTokenName, expiresAt: data.expiresAt });
       setNotice({ type: 'success', text: 'Token generated. Copy it now, it will not be shown again.' });
     } catch (err: any) {
       setNotice({ type: 'error', text: err.message ?? 'Token generation failed' });
@@ -165,6 +177,30 @@ export default function DeveloperPage() {
                 Generate a long-lived Bearer token for external scripts and integrations. Store it securely after copying it.
               </p>
 
+              <div className="grid gap-3 sm:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+                <label className="block">
+                  <span className="mb-1 block font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Project name</span>
+                  <input
+                    value={apiTokenName}
+                    onChange={(event) => setApiTokenName(event.target.value)}
+                    maxLength={120}
+                    disabled={!hasAccess || generating}
+                    className="w-full rounded-sm border border-slate-800 bg-slate-950/70 px-3 py-2 font-rajdhani text-sm text-slate-200 outline-none transition-colors focus:border-cyan-700/70 disabled:opacity-50"
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Description</span>
+                  <input
+                    value={apiTokenDescription}
+                    onChange={(event) => setApiTokenDescription(event.target.value)}
+                    maxLength={500}
+                    placeholder="Discord bot, public tool, data audit..."
+                    disabled={!hasAccess || generating}
+                    className="w-full rounded-sm border border-slate-800 bg-slate-950/70 px-3 py-2 font-rajdhani text-sm text-slate-200 outline-none transition-colors placeholder:text-slate-700 focus:border-cyan-700/70 disabled:opacity-50"
+                  />
+                </label>
+              </div>
+
               {notice && (
                 <p
                   className={`rounded-sm border px-3 py-2 text-xs font-mono-sc ${
@@ -176,18 +212,25 @@ export default function DeveloperPage() {
               )}
 
               {apiToken && (
-                <div className="flex items-center gap-2">
-                  <code className="min-w-0 flex-1 truncate rounded border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-[10px] text-slate-300">
-                    {apiToken}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={copyToken}
-                    className="shrink-0 rounded border border-slate-700 p-2 text-slate-400 transition-colors hover:border-cyan-700/50 hover:bg-white/5"
-                    title="Copy token"
-                  >
-                    {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-                  </button>
+                <div className="space-y-2">
+                  {apiTokenMeta && (
+                    <p className="font-mono-sc text-[10px] text-slate-500">
+                      {apiTokenMeta.name} · expires {new Date(apiTokenMeta.expiresAt).toLocaleDateString()}
+                    </p>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <code className="min-w-0 flex-1 truncate rounded border border-slate-700 bg-slate-950 px-3 py-2 font-mono text-[10px] text-slate-300">
+                      {apiToken}
+                    </code>
+                    <button
+                      type="button"
+                      onClick={copyToken}
+                      className="shrink-0 rounded border border-slate-700 p-2 text-slate-400 transition-colors hover:border-cyan-700/50 hover:bg-white/5"
+                      title="Copy token"
+                    >
+                      {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
+                    </button>
+                  </div>
                 </div>
               )}
 

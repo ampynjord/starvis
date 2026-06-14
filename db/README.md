@@ -7,7 +7,7 @@ Database workspace for Prisma, PostgreSQL bootstrap scripts, and the shared Pris
 | Path | Role |
 |---|---|
 | `prisma/schema/00-base.prisma` | Prisma generator and datasource. |
-| `prisma/schema/10-meta.prisma` | Users, corporations, fleet/tactical metadata, bug reports, extraction logs and changelog. |
+| `prisma/schema/10-meta.prisma` | Users, generated API tokens, corporations, fleet/tactical metadata, bug reports, extraction logs and changelog. |
 | `prisma/schema/20-rsi.prisma` | RSI website data: ship matrix, Galactapedia, comm-links, starmap. |
 | `prisma/schema/30-game.prisma` | P4K/DataForge game data: ships, components, items, commodities, shops, missions, crafting. |
 | `src/client/` | Prisma singleton client. |
@@ -20,6 +20,9 @@ Database workspace for Prisma, PostgreSQL bootstrap scripts, and the shared Pris
 
 Corporation fleet entries include `availableForTactics`, which records whether the
 ship owner made that corporation ship usable on tactical boards.
+
+Generated external API tokens are stored in `meta.api_tokens` as SHA-256 hashes with
+owner, project name, expiry, revocation and last-use metadata for admin monitoring.
 
 ## Commands
 
