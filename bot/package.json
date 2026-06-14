@@ -9,6 +9,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "deploy-commands": "tsx src/deploy-commands.ts",
+    "update-community-server": "tsx src/ops/update-community-server.ts",
     "lint": "biome check .",
     "lint:ci": "biome check .",
     "lint:fix": "biome check --write .",
