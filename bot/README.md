@@ -36,7 +36,19 @@ DISCORD_PRESENCE_STATUS=online
 - `DISCORD_PRESENCE_STATUS` can be `online`, `idle`, `dnd` or `invisible`.
 
 The default member role requires the Discord Developer Portal "Server Members Intent" to be enabled and the bot role to stay above the target role.
-The `Developer` Discord role means access to Starvis developer tools and external API capabilities, not project contribution status. Use `Contributor` or `Core Team` for people contributing to the project itself.
+The `Developer` Discord role means access to Starvis developer tools and external API capabilities, not project contribution status. It must not grant access to staff/private categories. Use `Contributor`, `Core Team`, `Staff` or `Admin` for people contributing to or moderating the project itself.
+
+## Community Server Operations
+
+```bash
+npm run update-community-server --workspace=@starvis/bot -- --envPath=.env.dev
+```
+
+This maintenance command updates the Starvis community Discord server by:
+
+- appending the latest developer/API access notes to the most recent editable bot changelog message, or posting an addendum if no editable message exists;
+- denying staff/category visibility to the `Developer` role, because this role is only for external API users;
+- applying the same deny overwrite to channels under staff-like categories.
 
 ## Rich Presence
 
