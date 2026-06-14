@@ -30,6 +30,16 @@ The audit checks:
 - placeholder-like text values;
 - a representative global search.
 
+## API contract audit
+
+The API contract audit checks the OpenAPI document, operation identifiers, the public API proxy, and the broad IHM type surface.
+
+```bash
+npm run quality:audit:contracts
+```
+
+Use it after route, Swagger, proxy or API type changes. It is intentionally fast and complements the full data audit.
+
 ## UI critical flows
 
 The UI critical flows run Playwright against the Next.js app with deterministic API fixtures. They verify that key pages render, navigate and consume API-shaped data without browser errors.

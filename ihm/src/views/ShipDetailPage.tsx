@@ -20,7 +20,7 @@ import { ShipCard } from '@/components/ship/ShipCard';
 import { ShipLoadout } from '@/components/ship/ShipLoadout';
 import { ShipStatsBanner } from '@/components/ship/ShipStatsBanner';
 import { CargoGrid } from '@/components/ship/CargoGrid';
-import { HoloViewer } from '@/components/ship/HoloViewer';
+import { ShipHoloViewer } from '@/components/ship/ShipHoloViewer';
 import { fCredits, fMass } from '@/utils/formatters';
 import { VARIANT_TYPE_LABELS } from '@/utils/constants';
 
@@ -348,9 +348,9 @@ export default function ShipDetailPage() {
         {/* ════ LEFT — 3D · Dimensions · Cargo · Loadout ════ */}
         <div className="lg:col-span-3 space-y-6">
 
-          {/* HoloViewer — only if 3D model available */}
+          {/* Ship holoviewer — only if 3D model available */}
           {ship.ctm_url && (
-            <HoloViewer shipUuid={ship.uuid} shipName={ship.name} />
+            <ShipHoloViewer shipUuid={ship.uuid} shipName={ship.name} />
           )}
 
           {/* Dimensions */}

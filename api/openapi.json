@@ -3163,7 +3163,7 @@
       "get": {
         "tags": ["Ships"],
         "summary": "List ship modules (optional equipment slots)",
-        "operationId": "getShipModules",
+        "operationId": "listShipModules",
         "parameters": [
           {
             "name": "ship_uuid",

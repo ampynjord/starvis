@@ -24,102 +24,33 @@ import {
 import createDynamic from 'next/dynamic';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import type { FleetShip, TacticalMarker, TacticalVector } from '@/components/ship/FleetHoloViewer';
+import type { FleetShip, TacticalMarker, TacticalVector } from '@/components/holo/fleet-tactics-types';
 import { api } from '@/services/api';
 import { FORMATION_LABELS, type FormationType, formationPosition } from '@/lib/tacticsFormations';
 import type { ShipListItem } from '@/types/api';
 import { API_BASE } from '@/utils/constants';
+import {
+  type Corp,
+  type FleetItem,
+  type FormationPreset,
+  PRESETS_STORAGE_KEY,
+  type Strategy,
+  type TacticalShip,
+  boundsOfPositions,
+  defaultStrategy,
+  estimateFormationGap,
+  getShipUuid,
+  makeId,
+  nowIso,
+  presetShipCount,
+} from './tactics-model';
 
-const FleetHoloViewer = createDynamic(
-  () => import('@/components/ship/FleetHoloViewer').then((m) => m.FleetHoloViewer),
+const FleetTacticsHoloViewer = createDynamic(
+  () => import('@/components/holo/FleetTacticsHoloViewer').then((m) => m.FleetTacticsHoloViewer),
   { ssr: false },
 );
 
-interface FleetItem {
-  id: number;
-  shipUuid: string | null;
-  itemClassName: string;
-  availableForTactics: boolean;
-  addedBy: { id: number; username: string } | null;
-}
-
-interface Corp {
-  id: number;
-  name: string;
-  tag: string;
-}
-
-interface TacticalShip {
-  id: number;
-  fleetItemId: number;
-  shipUuid: string;
-  label: string;
-  owner: string | null;
-  group: string;
-  gridX: number;
-  gridZ: number;
-}
-
-interface Strategy {
-  id: string;
-  name: string;
-  ships: TacticalShip[];
-  markers: TacticalMarker[];
-  vectors: TacticalVector[];
-  updatedAt: string;
-}
-
 type MarkerType = TacticalMarker['type'];
-
-interface FormationPreset {
-  id: string;
-  name: string;
-  type: FormationType;
-  composition?: Record<string, number>;
-  quantity?: number;
-  spacing: number;
-}
-
-const getShipUuid = (item: FleetItem) => item.shipUuid?.trim() || null;
-const makeId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
-const nowIso = () => new Date().toISOString();
-
-const defaultStrategy = (): Strategy => ({
-  id: makeId(),
-  name: 'New strategy',
-  ships: [],
-  markers: [],
-  vectors: [],
-  updatedAt: nowIso(),
-});
-
-const PRESETS_STORAGE_KEY = 'starvis-formation-presets';
-
-const presetShipCount = (preset: FormationPreset) =>
-  Object.values(preset.composition ?? {}).reduce((sum, qty) => sum + qty, 0) || preset.quantity || 0;
-
-function estimateFormationGap(ship: ShipListItem | undefined, fallbackSpacing: number) {
-  const size = Math.max(
-    Number((ship as any)?.size_x ?? 0),
-    Number((ship as any)?.size_z ?? 0),
-    Number((ship as any)?.size_y ?? 0),
-    Number(ship?.cross_section_x ?? 0),
-    Number(ship?.cross_section_z ?? 0),
-    Number(ship?.cross_section_y ?? 0),
-    24,
-  );
-  return Math.max(fallbackSpacing, size * 3.6, 78);
-}
-
-function boundsOfPositions(positions: Array<{ gridX: number; gridZ: number }>, padding: number) {
-  if (!positions.length) return { minX: 0, maxX: 0, minZ: 0, maxZ: 0 };
-  return {
-    minX: Math.min(...positions.map((pos) => pos.gridX)) - padding,
-    maxX: Math.max(...positions.map((pos) => pos.gridX)) + padding,
-    minZ: Math.min(...positions.map((pos) => pos.gridZ)) - padding,
-    maxZ: Math.max(...positions.map((pos) => pos.gridZ)) + padding,
-  };
-}
 
 export default function CorporationTacticsPage() {
   const { user } = useAuth();
@@ -784,7 +715,7 @@ export default function CorporationTacticsPage() {
               </p>
             </div>
           ) : (
-            <FleetHoloViewer
+            <FleetTacticsHoloViewer
               ships={tacticShips}
               selectedId={selectedShipId}
               onSelect={(id) => { setSelectedShipId(id); setSelectedMarkerId(null); setSelectedVectorId(null); }}
