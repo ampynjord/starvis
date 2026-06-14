@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import StarmapPage from '@/views/StarmapPage';
+import UniverseExplorerPage from '@/views/UniverseExplorerPage';
 
 export const metadata: Metadata = {
   title: 'Starvis Starmap',
@@ -7,5 +7,5 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <StarmapPage />;
+  return <UniverseExplorerPage />;
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import { renderWithProviders } from '../utils';
-import LocationsPage from '@/views/LocationsPage';
+import UniverseExplorerPage from '@/views/UniverseExplorerPage';
 
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: { id: 1, username: 'tester', role: 'user' }, loading: false, login: vi.fn(), register: vi.fn(), logout: vi.fn(), refresh: vi.fn() }),
@@ -38,16 +38,16 @@ vi.mock('@/services/api', () => ({
   },
 }));
 
-describe('LocationsPage', () => {
+describe('UniverseExplorerPage', () => {
   beforeEach(() => { vi.clearAllMocks(); });
 
   it('renders the Starvis Starmap heading', async () => {
-    renderWithProviders(<LocationsPage />);
+    renderWithProviders(<UniverseExplorerPage />);
     await waitFor(() => expect(screen.getByRole('heading', { name: /starvis starmap/i })).toBeInTheDocument());
   });
 
   it('renders location names from API', async () => {
-    renderWithProviders(<LocationsPage />);
+    renderWithProviders(<UniverseExplorerPage />);
     await waitFor(() => {
       expect(screen.getAllByText('Stanton').length).toBeGreaterThan(0);
     });

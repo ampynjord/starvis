@@ -28,7 +28,8 @@ connected to Cloud Imperium Games, Cloud Imperium Rights LLC, Roberts Space Indu
 Notable internal modules:
 
 - `ihm/src/components/holo/` centralizes shared 3D holoviewer code: fleet/tactics types, holographic constants and CTM geometry caching.
-- `ihm/src/views/UniverseExplorerPage.tsx` is the shared universe explorer used by the Locations and Starmap route entries.
+- `ihm/src/components/ship/ShipHoloViewer.tsx` is the dedicated ship-detail holoviewer; fleet and tactics use `ihm/src/components/holo/FleetTacticsHoloViewer.tsx`.
+- `ihm/src/views/UniverseExplorerPage.tsx` is the shared universe explorer used directly by the Locations and Starmap route entries, with small HUD/detail panels in `ihm/src/views/universe-explorer-panels.tsx`.
 - `api/src/services/chat/` contains focused support modules for the Starvis AI service, including the SQL safety guard.
 
 The monorepo uses npm workspaces and one root `package-lock.json`. Do not add nested lockfiles in workspaces.
@@ -385,7 +386,7 @@ Main jobs:
 |---|---|
 | Dependency Audit | Critical npm audit. |
 | Dockerfile Lint | API, IHM and bot Dockerfiles in parallel. |
-| Config, Schema & Docs | OpenAPI validation, Prisma validation, compose validation, shell script syntax and env contract. |
+| Config, Schema & Docs | OpenAPI validation, API contract audit, Prisma validation, compose validation, shell script syntax and env contract. |
 | Lint | Biome CI. |
 | Typecheck | API, IHM, extractor, bot and DB TypeScript checks in parallel. |
 | Tests API | API Vitest suite with PostgreSQL and Redis services. |
