@@ -1,1 +1,1 @@
-export { default } from './LocationsPage';
+export { default } from './UniverseExplorerPage';

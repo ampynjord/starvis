@@ -22,12 +22,12 @@ import createDynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import type { FleetShip } from '@/components/ship/FleetHoloViewer';
+import type { FleetShip } from '@/components/holo/fleet-tactics-types';
 import { api } from '@/services/api';
 import { API_BASE } from '@/utils/constants';
 
-const FleetHoloViewer = createDynamic(
-  () => import('@/components/ship/FleetHoloViewer').then((m) => m.FleetHoloViewer),
+const FleetTacticsHoloViewer = createDynamic(
+  () => import('@/components/holo/FleetTacticsHoloViewer').then((m) => m.FleetTacticsHoloViewer),
   { ssr: false },
 );
 import type { ShipListItem } from '@/types/api';
@@ -610,7 +610,7 @@ export default function FleetManagerPage() {
                 </p>
               </div>
             ) : (
-              <FleetHoloViewer
+              <FleetTacticsHoloViewer
                 ships={fleetShips}
                 selectedId={selectedItemId}
                 onSelect={setSelectedItemId}

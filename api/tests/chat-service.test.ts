@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { validateQueryDatabaseSql } from '../src/services/chat-service.js';
+import { validateQueryDatabaseSql } from '../src/services/chat/sql-guard.js';
 
 describe('validateQueryDatabaseSql', () => {
   it('allows schema-qualified public SELECT queries and caps returned rows', () => {

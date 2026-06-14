@@ -23,6 +23,13 @@ connected to Cloud Imperium Games, Cloud Imperium Rights LLC, Roberts Space Indu
 | `bot/` | Discord bot with slash commands. |
 | `extractor/` | Local CLI that extracts P4K/DataForge and RSI website data into PostgreSQL. |
 | `db/` | Prisma 7 schema modules, shared Prisma client, PostgreSQL init and backup scripts. |
+| `quality/` | Fast contract, API/data and UI flow audits. |
+
+Notable internal modules:
+
+- `ihm/src/components/holo/` centralizes shared 3D holoviewer code: fleet/tactics types, holographic constants and CTM geometry caching.
+- `ihm/src/views/UniverseExplorerPage.tsx` is the shared universe explorer used by the Locations and Starmap route entries.
+- `api/src/services/chat/` contains focused support modules for the Starvis AI service, including the SQL safety guard.
 
 The monorepo uses npm workspaces and one root `package-lock.json`. Do not add nested lockfiles in workspaces.
 
@@ -323,13 +330,14 @@ npm run lint:ci
 ### Intelligent quality audits
 
 ```bash
+npm run quality:audit:contracts  # OpenAPI/proxy/IHM type surface contract audit
 npm run quality:audit:data       # real API/data coherence audit against localhost:3000
 npm run quality:audit:data:prod  # strict audit against production
 npm run quality:audit:ui         # critical Playwright user flows with deterministic API fixtures
-npm run quality:audit            # data audit + UI critical flows
+npm run quality:audit            # contract audit + data audit + UI critical flows
 ```
 
-The data audit checks health, version metadata, core list/detail endpoints, search, duplicate identifiers, numeric sanity and placeholder-like values. See [`quality/README.md`](quality/README.md).
+The contract audit checks OpenAPI structure, operation identifiers, the public API proxy and the broad IHM type surface. The data audit checks health, version metadata, core list/detail endpoints, search, duplicate identifiers, numeric sanity and placeholder-like values. See [`quality/README.md`](quality/README.md).
 
 ### Workspace checks
 
