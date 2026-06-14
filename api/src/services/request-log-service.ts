@@ -9,6 +9,11 @@ export interface RequestLogEntry {
   path: string;
   statusCode: number;
   durationMs: number;
+  isExternalApi: boolean;
+  authMethod: 'admin_key' | 'api_token' | 'session' | 'anonymous' | 'unknown';
+  clientType: 'external_api' | 'web_session' | 'server_key' | 'anonymous_web' | 'unknown';
+  apiTokenId: number | null;
+  apiTokenName: string | null;
   userId: number | null;
   username: string | null;
   role: string | null;
@@ -48,7 +53,29 @@ function requestUserAgent(req: Request): string | null {
 }
 
 function shouldRecordRequestLog(path: string): boolean {
-  return path !== '/admin/request-logs';
+  return path !== '/admin/request-logs' && path !== '/admin/api-supervision';
+}
+
+function isExternalApiPath(path: string): boolean {
+  return path === '/api/v1' || path.startsWith('/api/v1/');
+}
+
+function resolveAuthMethod(req: Request, payload: JwtPayload | null): RequestLogEntry['authMethod'] {
+  if (req.authMethod) return req.authMethod;
+  if (payload) return payload.type === 'api_token' ? 'api_token' : 'session';
+  return 'anonymous';
+}
+
+function resolveClientType(
+  path: string,
+  authMethod: RequestLogEntry['authMethod'],
+  payload: JwtPayload | null,
+): RequestLogEntry['clientType'] {
+  if (authMethod === 'admin_key') return 'server_key';
+  if (isExternalApiPath(path) && authMethod === 'api_token') return 'external_api';
+  if (payload || authMethod === 'session') return 'web_session';
+  if (!isExternalApiPath(path)) return 'anonymous_web';
+  return 'unknown';
 }
 
 function extractBearer(req: Request): string | null {
@@ -85,6 +112,8 @@ export function recordRequestLog(req: Request, statusCode: number, durationMs: n
   const path = requestPath(req);
   if (!shouldRecordRequestLog(path)) return;
   const payload = resolveRequestActor(req);
+  const authMethod = resolveAuthMethod(req, payload);
+  const externalApi = isExternalApiPath(path);
   requestLogs.unshift({
     id: nextId++,
     timestamp: new Date().toISOString(),
@@ -92,6 +121,11 @@ export function recordRequestLog(req: Request, statusCode: number, durationMs: n
     path,
     statusCode,
     durationMs: Math.max(0, Math.round(durationMs)),
+    isExternalApi: externalApi,
+    authMethod,
+    clientType: resolveClientType(path, authMethod, payload),
+    apiTokenId: req.apiToken?.id ?? null,
+    apiTokenName: req.apiToken?.name ?? null,
     userId: typeof payload?.sub === 'number' ? payload.sub : null,
     username: payload?.username ?? null,
     role: payload?.role ?? null,

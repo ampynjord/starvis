@@ -46,8 +46,25 @@ const mockUserDelegate = {
   delete: vi.fn(),
 };
 
+const mockApiTokenDelegate = {
+  create: vi.fn(async ({ data }: { data: any }) => ({
+    id: 10,
+    ...data,
+    revokedAt: null,
+    lastUsedAt: null,
+    lastUsedIp: null,
+    lastUserAgent: null,
+    usageCount: 0,
+    createdAt: new Date('2026-01-01T00:00:00.000Z'),
+    updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+  })),
+  findUnique: vi.fn(async () => null),
+  updateMany: vi.fn(async () => ({ count: 0 })),
+  findMany: vi.fn(async () => []),
+};
+
 vi.mock('@starvis/db', () => ({
-  getPrisma: () => ({ user: mockUserDelegate }),
+  getPrisma: () => ({ user: mockUserDelegate, apiToken: mockApiTokenDelegate }),
   initPrisma: vi.fn(),
   resolveEnv: (env: string | undefined) => (env === 'ptu' ? 'ptu' : 'live'),
   getGamePrisma: vi.fn(),
@@ -79,7 +96,7 @@ beforeAll(() => {
     res.json({ success: true, actor: req.jwtPayload?.username ?? null, role: req.jwtPayload?.role ?? null });
   });
   router.use('/api', requireJwt);
-  const deps = { prisma: { user: mockUserDelegate }, getGamePrisma: vi.fn(), shipMatrixService: {} } as any;
+  const deps = { prisma: { user: mockUserDelegate, apiToken: mockApiTokenDelegate }, getGamePrisma: vi.fn(), shipMatrixService: {} } as any;
   mountAuthRoutes(router, deps);
   mountCorporationRoutes(router, deps);
   app.use('/', router);

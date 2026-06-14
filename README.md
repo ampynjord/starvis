@@ -300,7 +300,7 @@ Corporation tools include the 3D Fleet Manager, Corp Bank and corporation-owned 
 
 The Discord Bot page exposes the Starvis community Discord server, the generated bot invitation link and slash-command help for AI, ships, loadouts, trade, shops, mining, crafting, missions, lore, status and changelog commands. The bot rotates a rich presence with useful prompts such as `/starvis`, `/intel`, API/data status and server count. Configure `NEXT_PUBLIC_DISCORD_CLIENT_ID` or `DISCORD_CLIENT_ID` to enable the bot invitation link. Configure `NEXT_PUBLIC_DISCORD_SERVER_INVITE_URL` or `DISCORD_SERVER_INVITE_URL` to show the community server invite. `NEXT_PUBLIC_DISCORD_GUILD_ID`/`DISCORD_GUILD_ID` identify the Starvis community server (`931662690101895198` by default).
 
-Admin Monitoring combines service health, Prometheus traffic metrics, cache/runtime stats, Discord bot configuration, top routes and the latest in-memory API request logs. Request logs show the authenticated username and role when a valid Starvis JWT is present, otherwise the actor stays anonymous. Logs are kept only since the API process started and deliberately exclude request bodies, query values, emails and the request-log viewer endpoint itself.
+Admin Monitoring combines service health, Prometheus traffic metrics, cache/runtime stats, Discord bot configuration, top routes and the latest in-memory API request logs. It also supervises the external `/api/v1` surface with active users, connected projects, generated token status, recent external API calls, server-key traffic and token usage counters. Request logs show the authenticated username, role, auth method, client type and API token/project name when available; otherwise the actor stays anonymous. Logs are kept only since the API process started and deliberately exclude request bodies, query values, emails and the request-log/supervision viewer endpoints themselves.
 
 ---
 
@@ -468,7 +468,7 @@ uses the public STARVIS domain, the project contact email, and OVH SAS hosting d
 Personal data handled by the project may include:
 
 - account data: email, username, role, avatar URL, timestamps and email verification state;
-- security data: bcrypt password hash, hashed email verification/password reset tokens, encrypted 2FA secret, JWT sessions and API tokens;
+- security data: bcrypt password hash, hashed email verification/password reset tokens, encrypted 2FA secret, JWT sessions and hashed generated API tokens with usage metadata;
 - user content: bug reports, corporation memberships, ranks and fleet notes;
 - technical data: logs and request metadata needed for security, diagnostics and abuse prevention;
 - optional AI/Discord data: prompts/messages sent to the STARVIS assistant or Discord bot.

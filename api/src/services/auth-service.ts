@@ -5,6 +5,7 @@ import jwt from 'jsonwebtoken';
 import { generateSecret, generateURI, verify } from 'otplib';
 import QRCode from 'qrcode';
 import { JWT_2FA_PENDING_EXPIRES, JWT_API_TOKEN_EXPIRES, JWT_EXPIRES, RESET_TOKEN_TTL_MS } from '../utils/config.js';
+import { ApiTokenService, apiTokenExpiryFromNow, normalizeApiTokenDescription, normalizeApiTokenName } from './api-token-service.js';
 
 export interface JwtPayload {
   sub: number;
@@ -13,6 +14,7 @@ export interface JwtPayload {
   username: string;
   role: string;
   type?: string;
+  jti?: string;
 }
 
 export interface PublicUser {
@@ -90,7 +92,7 @@ function toPublicUser(u: {
 }
 
 /** Subset of the Prisma client required by the auth layer (typed `user` delegate). */
-export type AuthDb = Pick<PrismaClient, 'user'>;
+export type AuthDb = Pick<PrismaClient, 'apiToken' | 'user'>;
 
 /** Verify a Starvis JWT and return its payload. Throws on invalid/expired tokens. */
 export function verifyAuthToken(token: string): JwtPayload {
@@ -342,15 +344,32 @@ export class AuthService {
     return toPublicUser(user);
   }
 
-  generateApiToken(user: PublicUser): string {
+  async generateApiToken(
+    user: PublicUser,
+    options?: { name?: string | null; description?: string | null },
+  ): Promise<{ token: string; tokenId: number; name: string; expiresAt: Date }> {
+    const jti = generateToken(16);
     const payload: JwtPayload = {
       sub: user.id,
       uuid: user.uuid,
       email: user.email,
       username: user.username,
       role: user.role,
+      type: 'api_token',
+      jti,
     };
-    return jwt.sign(payload, getSecret(), { expiresIn: JWT_API_TOKEN_EXPIRES });
+    const token = jwt.sign(payload, getSecret(), { expiresIn: JWT_API_TOKEN_EXPIRES });
+    const name = normalizeApiTokenName(options?.name);
+    const row = await new ApiTokenService(this.prisma).create({
+      jti,
+      token,
+      name,
+      description: normalizeApiTokenDescription(options?.description),
+      userId: user.id,
+      roleSnapshot: user.role as UserRole,
+      expiresAt: apiTokenExpiryFromNow(JWT_API_TOKEN_EXPIRES as string | number),
+    });
+    return { token, tokenId: row.id, name, expiresAt: row.expiresAt };
   }
 
   verifyToken(token: string): JwtPayload {
