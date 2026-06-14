@@ -9210,6 +9210,16 @@
                   "notes": {
                     "type": "string",
                     "nullable": true
+                  },
+                  "gridX": {
+                    "type": "number",
+                    "nullable": true,
+                    "description": "Initial X position on the fleet manager grid"
+                  },
+                  "gridZ": {
+                    "type": "number",
+                    "nullable": true,
+                    "description": "Initial Z position on the fleet manager grid"
                   }
                 }
               }
@@ -10220,7 +10230,7 @@
       },
       "delete": {
         "tags": ["Admin", "Corporations"],
-        "summary": "Admin reset Starvis corporation data",
+        "summary": "Admin delete corporation",
         "parameters": [
           {
             "name": "id",
@@ -10254,6 +10264,10 @@
                         },
                         "removedFleetItems": {
                           "type": "integer"
+                        },
+                        "deleted": {
+                          "type": "boolean",
+                          "example": true
                         }
                       }
                     }

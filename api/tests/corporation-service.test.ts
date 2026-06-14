@@ -148,15 +148,11 @@ describe('CorporationService', () => {
   });
 
   describe('deleteCorporation', () => {
-    it('resets Starvis-owned corporation data without deleting the corporation or users', async () => {
-      const resetCorporation = {
-        ...corporation,
-        _count: { memberships: 0, fleetItems: 0 },
-      };
+    it('deletes the corporation and only removes corporation-scoped fleet data', async () => {
       const db: any = {
         corporation: {
-          findUnique: vi.fn().mockResolvedValueOnce(corporation).mockResolvedValueOnce(resetCorporation),
-          delete: vi.fn(),
+          findUnique: vi.fn().mockResolvedValueOnce(corporation),
+          delete: vi.fn().mockResolvedValue(corporation),
         },
         corporationFleetItem: {
           deleteMany: vi.fn().mockResolvedValue({ count: 3 }),
@@ -175,16 +171,17 @@ describe('CorporationService', () => {
 
       expect(db.corporationMembership.deleteMany).toHaveBeenCalledWith({ where: { corporationId: 42 } });
       expect(db.corporationFleetItem.deleteMany).toHaveBeenCalledWith({ where: { corporationId: 42 } });
-      expect(db.corporation.delete).not.toHaveBeenCalled();
+      expect(db.corporation.delete).toHaveBeenCalledWith({ where: { id: 42 } });
       expect(db.user.delete).not.toHaveBeenCalled();
       expect(db.user.deleteMany).not.toHaveBeenCalled();
       expect(result).toEqual({
         corporation: {
-          ...resetCorporation,
+          ...corporation,
           _count: { memberships: 0, fleetItems: 0, bankItems: 0, pendingMemberships: 0 },
         },
         removedMemberships: 2,
         removedFleetItems: 3,
+        deleted: true,
       });
     });
   });

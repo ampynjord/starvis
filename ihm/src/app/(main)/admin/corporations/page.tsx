@@ -246,38 +246,35 @@ function CorpFormModal({
   );
 }
 
-// ── Reset corp modal ──────────────────────────────────────────────────────────
+// ── Delete corp modal ─────────────────────────────────────────────────────────
 
-function ResetCorpModal({ corp, onClose, onReset }: { corp: Corporation; onClose: () => void; onReset: (corp: Corporation) => void }) {
+function DeleteCorpModal({ corp, onClose, onDeleted }: { corp: Corporation; onClose: () => void; onDeleted: (corp: Corporation) => void }) {
   const [loading, setLoading] = useState(false);
 
-  const handleReset = async () => {
+  const handleDelete = async () => {
     setLoading(true);
     try {
-      const data = await apiFetch(`/api/admin/corporations/${corp.id}`, { method: 'DELETE' });
-      onReset(data.data?.corporation ?? {
-        ...corp,
-        _count: { ...corp._count, memberships: 0, fleetItems: 0, bankItems: 0, pendingMemberships: 0 },
-      });
+      await apiFetch(`/api/admin/corporations/${corp.id}`, { method: 'DELETE' });
+      onDeleted(corp);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Modal title="Reset Corporation" onClose={onClose}>
+    <Modal title="Delete Corporation" onClose={onClose}>
       <div className="space-y-4">
         <p className="text-sm text-slate-400">
-          Reset Starvis data for <span className="text-white font-semibold">{corp.name}</span>? This removes memberships,
-          pending requests, fleet and bank items. Users are not deleted, and the RSI organization stays available in corp search.
+          Delete <span className="text-white font-semibold">{corp.name}</span> from Starvis? This removes its memberships,
+          pending requests, corporation fleet and corporation bank items. Users and personal fleet managers are kept.
         </p>
         <button
           type="button"
-          onClick={handleReset}
+          onClick={handleDelete}
           disabled={loading}
           className="w-full py-2 px-4 bg-red-950/40 border border-red-700/50 hover:border-red-500 text-red-400 font-mono-sc text-xs rounded transition-colors disabled:opacity-40"
         >
-          {loading ? 'Resetting...' : 'Reset Starvis Data'}
+          {loading ? 'Deleting...' : 'Delete Corporation'}
         </button>
       </div>
     </Modal>
@@ -571,7 +568,7 @@ function FleetModal({ corp, onClose }: { corp: Corporation; onClose: () => void 
 type ModalState =
   | { type: 'import' }
   | { type: 'edit'; corp: Corporation }
-  | { type: 'reset'; corp: Corporation }
+  | { type: 'delete'; corp: Corporation }
   | { type: 'members'; corp: Corporation }
   | { type: 'fleet'; corp: Corporation }
   | null;
@@ -621,10 +618,10 @@ export default function CorporationsPage() {
     showToast(`${corp.name} saved.`);
   };
 
-  const onReset = (corp: Corporation) => {
-    setCorps((prev) => prev.map((c) => (c.id === corp.id ? corp : c)));
+  const onDeleted = (corp: Corporation) => {
+    setCorps((prev) => prev.filter((c) => c.id !== corp.id));
     setModal(null);
-    showToast('Corporation Starvis data reset.');
+    showToast(`${corp.name} deleted. Personal fleets kept.`);
   };
 
   return (
@@ -733,7 +730,7 @@ export default function CorporationsPage() {
                     <button type="button" onClick={() => setModal({ type: 'edit', corp: c })} title="Edit" className="p-1.5 rounded border border-transparent hover:border-slate-700/50 hover:bg-white/5 text-slate-600 hover:text-slate-300 transition-colors">
                       <Pencil size={13} />
                     </button>
-                    <button type="button" onClick={() => setModal({ type: 'reset', corp: c })} title="Reset Starvis data" className="p-1.5 rounded border border-transparent hover:border-red-800/50 hover:bg-red-950/20 text-slate-700 hover:text-red-500 transition-colors">
+                    <button type="button" onClick={() => setModal({ type: 'delete', corp: c })} title="Delete corporation" className="p-1.5 rounded border border-transparent hover:border-red-800/50 hover:bg-red-950/20 text-slate-700 hover:text-red-500 transition-colors">
                       <Trash2 size={13} />
                     </button>
                   </div>
@@ -762,7 +759,7 @@ export default function CorporationsPage() {
       <AnimatePresence>
         {modal?.type === 'import'  && <ImportCorpModal key="import"  onClose={() => setModal(null)} onSaved={onSaved} />}
         {modal?.type === 'edit'    && <CorpFormModal key="edit"    corp={modal.corp} onClose={() => setModal(null)} onSaved={onSaved} />}
-        {modal?.type === 'reset'   && <ResetCorpModal key="reset" corp={modal.corp} onClose={() => setModal(null)} onReset={onReset} />}
+        {modal?.type === 'delete'  && <DeleteCorpModal key="delete" corp={modal.corp} onClose={() => setModal(null)} onDeleted={onDeleted} />}
         {modal?.type === 'members' && <MembersModal key="members" corp={modal.corp} onClose={() => setModal(null)} />}
         {modal?.type === 'fleet'   && <FleetModal key="fleet" corp={modal.corp} onClose={() => setModal(null)} />}
       </AnimatePresence>
