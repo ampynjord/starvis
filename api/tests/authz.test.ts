@@ -15,7 +15,7 @@ const JWT_SECRET = 'authz-test-secret-at-least-32-characters-long';
 const ADMIN_API_KEY = 'authz-test-admin-api-key';
 
 // Mutable role table consulted by the middleware DB re-check (getPrisma).
-const dbRoles: Record<number, string> = { 1: 'admin', 2: 'user', 3: 'developer' };
+const dbRoles: Record<number, string> = { 1: 'admin', 2: 'user', 3: 'developer', 4: 'user' };
 
 function makeUser(id: number, role: string) {
   return {
@@ -63,8 +63,56 @@ const mockApiTokenDelegate = {
   findMany: vi.fn(async () => []),
 };
 
+const apiAccessRequests: any[] = [];
+const mockExternalApiAccessRequestDelegate = {
+  findFirst: vi.fn(async ({ where }: { where: { userId?: number; status?: string } }) => {
+    return (
+      apiAccessRequests
+        .filter((r) => (where.userId ? r.userId === where.userId : true) && (where.status ? r.status === where.status : true))
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0] ?? null
+    );
+  }),
+  findMany: vi.fn(async ({ where }: { where?: { status?: string } } = {}) =>
+    apiAccessRequests.filter((r) => (where?.status ? r.status === where.status : true)),
+  ),
+  create: vi.fn(async ({ data }: { data: any }) => {
+    const row = {
+      id: apiAccessRequests.length + 1,
+      ...data,
+      adminNote: null,
+      reviewedById: null,
+      reviewedAt: null,
+      createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+    };
+    apiAccessRequests.push(row);
+    return row;
+  }),
+  update: vi.fn(async ({ where, data, include }: { where: { id: number }; data: any; include?: any }) => {
+    const row = apiAccessRequests.find((r) => r.id === where.id);
+    if (!row) {
+      const error: any = new Error('not found');
+      error.code = 'P2025';
+      throw error;
+    }
+    Object.assign(row, data, { updatedAt: new Date('2026-01-01T00:00:00.000Z') });
+    return {
+      ...row,
+      user: include?.user ? makeUser(row.userId, dbRoles[row.userId] ?? 'user') : undefined,
+      reviewedBy: include?.reviewedBy && row.reviewedById ? { id: row.reviewedById, username: `user${row.reviewedById}` } : null,
+    };
+  }),
+};
+
+const prismaMock = {
+  user: mockUserDelegate,
+  apiToken: mockApiTokenDelegate,
+  externalApiAccessRequest: mockExternalApiAccessRequestDelegate,
+  $transaction: (fn: any) => fn(prismaMock),
+};
+
 vi.mock('@starvis/db', () => ({
-  getPrisma: () => ({ user: mockUserDelegate, apiToken: mockApiTokenDelegate }),
+  getPrisma: () => prismaMock,
   initPrisma: vi.fn(),
   resolveEnv: (env: string | undefined) => (env === 'ptu' ? 'ptu' : 'live'),
   getGamePrisma: vi.fn(),
@@ -96,7 +144,7 @@ beforeAll(() => {
     res.json({ success: true, actor: req.jwtPayload?.username ?? null, role: req.jwtPayload?.role ?? null });
   });
   router.use('/api', requireJwt);
-  const deps = { prisma: { user: mockUserDelegate, apiToken: mockApiTokenDelegate }, getGamePrisma: vi.fn(), shipMatrixService: {} } as any;
+  const deps = { prisma: prismaMock, getGamePrisma: vi.fn(), shipMatrixService: {} } as any;
   mountAuthRoutes(router, deps);
   mountCorporationRoutes(router, deps);
   app.use('/', router);
@@ -234,6 +282,32 @@ describe('developer-gated routes authorization', () => {
       .post('/auth/api-token')
       .set('Authorization', `Bearer ${signToken(1, 'admin')}`);
     expect(res.status).toBe(200);
+  });
+});
+
+describe('external API access requests', () => {
+  it('allows a signed-in user to request developer API access', async () => {
+    const res = await request(app)
+      .post('/auth/developer-access-request')
+      .set('Authorization', `Bearer ${signToken(2, 'user')}`)
+      .send({ motivation: 'I am building a Discord bot and need Starvis external API data with authenticated access.' });
+    expect(res.status).toBe(201);
+    expect(res.body.data.status).toBe('pending');
+    expect(res.body.data.userId).toBe(2);
+  });
+
+  it('allows an admin to approve a pending request and promotes the user to developer', async () => {
+    const create = await request(app)
+      .post('/auth/developer-access-request')
+      .set('Authorization', `Bearer ${signToken(4, 'user')}`)
+      .send({ motivation: 'I am building an external dashboard and need Starvis API tokens for a community project.' });
+    const res = await request(app)
+      .patch(`/admin/developer-access-requests/${create.body.data.id}`)
+      .set('Authorization', `Bearer ${signToken(1, 'admin')}`)
+      .send({ status: 'approved' });
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe('approved');
+    expect(mockUserDelegate.update).toHaveBeenCalledWith({ where: { id: 4 }, data: { role: 'developer' } });
   });
 });
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { BookOpen, Bot, BrainCircuit, Check, Copy, Database, ExternalLink, Key, Lock, Radar, ShieldCheck, Terminal, UserRound, X } from 'lucide-react';
+import { BookOpen, Bot, BrainCircuit, Check, Copy, Database, ExternalLink, Key, Lock, Radar, Send, ShieldCheck, Terminal, UserRound, X } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -11,6 +11,14 @@ import { useAuth } from '@/contexts/AuthContext';
 import { ADMIN_ROLE, DEVELOPER_ROLE, hasDeveloperAccess } from '@/lib/app-constants';
 
 type Notice = { type: 'success' | 'error'; text: string } | null;
+type ApiAccessRequest = {
+  id: number;
+  motivation: string;
+  status: 'pending' | 'approved' | 'rejected' | string;
+  adminNote: string | null;
+  reviewedAt: string | null;
+  createdAt: string;
+};
 
 function Section({ title, icon: Icon, children }: { title: string; icon: React.ElementType; children: React.ReactNode }) {
   return (
@@ -54,6 +62,11 @@ const API_USE_CASES = [
 
 export default function DeveloperPage() {
   const { user, loading } = useAuth();
+  const [accessRequest, setAccessRequest] = useState<ApiAccessRequest | null>(null);
+  const [motivation, setMotivation] = useState('');
+  const [requestLoading, setRequestLoading] = useState(false);
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const [requestNotice, setRequestNotice] = useState<Notice>(null);
   const [apiToken, setApiToken] = useState<string | null>(null);
   const [apiTokenName, setApiTokenName] = useState('External project token');
   const [apiTokenDescription, setApiTokenDescription] = useState('');
@@ -71,6 +84,27 @@ export default function DeveloperPage() {
   useEffect(() => {
     setOrigin(window.location.origin);
   }, []);
+
+  useEffect(() => {
+    if (loading || !user || hasAccess) return;
+    let cancelled = false;
+    setRequestLoading(true);
+    fetch('/api/auth/developer-access-request')
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error ?? 'Failed to load request');
+        if (!cancelled) setAccessRequest(data.data ?? null);
+      })
+      .catch((error) => {
+        if (!cancelled) setRequestNotice({ type: 'error', text: error instanceof Error ? error.message : 'Failed to load request' });
+      })
+      .finally(() => {
+        if (!cancelled) setRequestLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasAccess, loading, user]);
 
   const swaggerLabel = useMemo(() => {
     if (!user) return 'Login required';
@@ -113,6 +147,42 @@ export default function DeveloperPage() {
     setTimeout(() => setCopied(false), 1800);
   };
 
+  const submitAccessRequest = async () => {
+    setRequestSubmitting(true);
+    setRequestNotice(null);
+    try {
+      const res = await fetch('/api/auth/developer-access-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ motivation }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? 'Failed to submit request');
+      setAccessRequest(data.data);
+      setMotivation('');
+      setRequestNotice({ type: 'success', text: 'Request sent. An admin can now review it from the admin panel.' });
+    } catch (err: any) {
+      setRequestNotice({ type: 'error', text: err.message ?? 'Failed to submit request' });
+    } finally {
+      setRequestSubmitting(false);
+    }
+  };
+
+  const requestStatusStyle =
+    accessRequest?.status === 'approved'
+      ? 'border-emerald-800/40 bg-emerald-950/20 text-emerald-400'
+      : accessRequest?.status === 'rejected'
+        ? 'border-red-800/40 bg-red-950/20 text-red-400'
+        : 'border-amber-800/40 bg-amber-950/20 text-amber-400';
+
+  if (loading) {
+    return (
+      <PageShell size="xl" className="p-4 md:p-6">
+        <div className="p-8 text-center font-mono-sc text-sm text-slate-600">LOADING SESSION...</div>
+      </PageShell>
+    );
+  }
+
   return (
     <PageShell size="xl" className="p-4 md:p-6">
       <PageHeader
@@ -138,6 +208,95 @@ export default function DeveloperPage() {
       <EarlyAccessNotice className="mb-4">
         External API schemas are stabilizing, but Starvis is still in early access. Use Swagger as the source of truth and expect some data fields to evolve with extraction improvements.
       </EarlyAccessNotice>
+
+      {!loading && user && !hasAccess && (
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)]">
+          <Section title="Restricted developer area" icon={Lock}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-sm border border-slate-800 bg-slate-950/40 px-3 py-3">
+                <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Session</p>
+                <p className="mt-1 truncate font-orbitron text-sm text-slate-200">{user.username}</p>
+              </div>
+              <div className="rounded-sm border border-slate-800 bg-slate-950/40 px-3 py-3">
+                <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Role</p>
+                <p className="mt-1 font-orbitron text-sm text-slate-500">{roleLabel}</p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 rounded-sm border border-amber-800/40 bg-amber-950/10 px-4 py-3">
+              <Lock size={14} className="mt-0.5 shrink-0 text-amber-500" />
+              <p className="font-rajdhani text-sm leading-relaxed text-slate-400">
+                Swagger, API token generation and developer tooling are reserved for <span className="font-semibold text-cyan-300">developer</span> and{' '}
+                <span className="font-semibold text-cyan-300">admin</span> accounts. Send an access request for external API usage.
+              </p>
+            </div>
+          </Section>
+
+          <Section title="External API access request" icon={Send}>
+            {requestLoading ? (
+              <p className="font-mono-sc text-xs text-slate-600">Loading current request...</p>
+            ) : accessRequest ? (
+              <div className="space-y-3">
+                <div className={`rounded-sm border px-3 py-2 text-xs font-mono-sc ${requestStatusStyle}`}>
+                  Status: {accessRequest.status.toUpperCase()} · sent {new Date(accessRequest.createdAt).toLocaleDateString()}
+                </div>
+                <div className="rounded-sm border border-slate-800 bg-slate-950/40 p-3">
+                  <p className="mb-2 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Motivation</p>
+                  <p className="whitespace-pre-wrap font-rajdhani text-sm leading-relaxed text-slate-400">{accessRequest.motivation}</p>
+                </div>
+                {accessRequest.adminNote && (
+                  <div className="rounded-sm border border-slate-800 bg-slate-950/40 p-3">
+                    <p className="mb-2 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Admin note</p>
+                    <p className="font-rajdhani text-sm leading-relaxed text-slate-400">{accessRequest.adminNote}</p>
+                  </div>
+                )}
+                {accessRequest.status === 'rejected' && (
+                  <p className="font-rajdhani text-sm text-slate-500">Contact an admin before submitting a new request.</p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <label className="block">
+                  <span className="mb-1 block font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Motivation</span>
+                  <textarea
+                    value={motivation}
+                    onChange={(event) => setMotivation(event.target.value)}
+                    minLength={40}
+                    maxLength={2000}
+                    rows={7}
+                    placeholder="Explain your project, expected API usage, Discord bot/tool name, data needs, and how you plan to respect Starvis rate limits and attribution."
+                    disabled={requestSubmitting}
+                    className="w-full resize-y rounded-sm border border-slate-800 bg-slate-950/70 px-3 py-2 font-rajdhani text-sm text-slate-200 outline-none transition-colors placeholder:text-slate-700 focus:border-cyan-700/70 disabled:opacity-50"
+                  />
+                </label>
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-mono-sc text-[10px] text-slate-600">{motivation.trim().length}/2000 · minimum 40 chars</p>
+                  <button
+                    type="button"
+                    onClick={submitAccessRequest}
+                    disabled={requestSubmitting || motivation.trim().length < 40}
+                    className="inline-flex items-center gap-2 rounded border border-cyan-700/50 bg-cyan-900/40 px-4 py-2 font-mono-sc text-sm text-cyan-300 transition-colors hover:border-cyan-500/70 hover:bg-cyan-900/60 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Send size={14} />
+                    {requestSubmitting ? 'Sending...' : 'Send request'}
+                  </button>
+                </div>
+              </div>
+            )}
+            {requestNotice && (
+              <p
+                className={`rounded-sm border px-3 py-2 text-xs font-mono-sc ${
+                  requestNotice.type === 'success' ? 'border-emerald-800/40 bg-emerald-950/20 text-emerald-400' : 'border-red-800/40 bg-red-950/20 text-red-400'
+                }`}
+              >
+                {requestNotice.text}
+              </p>
+            )}
+          </Section>
+        </div>
+      )}
+
+      {!loading && user && !hasAccess ? null : (
+        <>
 
       <section className="sci-panel p-5">
         <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,0.55fr)]">
@@ -314,6 +473,8 @@ ${apiBaseUrl}/chat/ask`}</CodeBlock>
           </Section>
         </div>
       </div>
+        </>
+      )}
     </PageShell>
   );
 }

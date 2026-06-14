@@ -51,7 +51,6 @@ const PUBLIC_PATHS = new Set([
   '/search',
   '/items',
   '/legal',
-  '/developer',
   '/discord',
 ]);
 

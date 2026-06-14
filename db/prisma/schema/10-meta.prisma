@@ -100,13 +100,36 @@ model User {
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
-  bugReports      BugReport[]
-  memberships     CorporationMembership[]
-  addedFleetItems CorporationFleetItem[]  @relation("AddedFleetItems")
-  apiTokens       ApiToken[]
+  bugReports                BugReport[]
+  memberships               CorporationMembership[]
+  addedFleetItems           CorporationFleetItem[]     @relation("AddedFleetItems")
+  apiTokens                 ApiToken[]
+  apiAccessRequests         ExternalApiAccessRequest[] @relation("ApiAccessRequestUser")
+  reviewedApiAccessRequests ExternalApiAccessRequest[] @relation("ApiAccessRequestReviewer")
 
   @@index([email])
   @@map("users")
+  @@schema("meta")
+}
+
+model ExternalApiAccessRequest {
+  id           Int       @id @default(autoincrement())
+  userId       Int       @map("user_id")
+  motivation   String    @db.Text
+  status       String    @default("pending") @db.VarChar(20)
+  adminNote    String?   @map("admin_note") @db.Text
+  reviewedById Int?      @map("reviewed_by_id")
+  reviewedAt   DateTime? @map("reviewed_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  user       User  @relation("ApiAccessRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("ApiAccessRequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([status, createdAt])
+  @@index([reviewedById])
+  @@map("external_api_access_requests")
   @@schema("meta")
 }
 
@@ -189,21 +212,21 @@ enum CorporationMembershipStatus {
 }
 
 model Corporation {
-  id                   Int      @id @default(autoincrement())
-  name                 String   @unique @db.VarChar(100)
-  tag                  String   @unique @db.VarChar(20)
-  description          String?  @db.Text
-  logoUrl              String?  @map("logo_url") @db.VarChar(500)
+  id             Int       @id @default(autoincrement())
+  name           String    @unique @db.VarChar(100)
+  tag            String    @unique @db.VarChar(20)
+  description    String?   @db.Text
+  logoUrl        String?   @map("logo_url") @db.VarChar(500)
   // RSI org data (cached from live API)
-  rsiArchetype         String?  @map("rsi_archetype") @db.VarChar(50)
-  rsiLanguage          String?  @map("rsi_language") @db.VarChar(50)
-  rsiCommitment        String?  @map("rsi_commitment") @db.VarChar(20)
-  rsiRecruiting        Boolean? @map("rsi_recruiting")
-  rsiRoleplay          Boolean? @map("rsi_roleplay")
-  rsiMemberCount       Int?     @map("rsi_member_count")
-  rsiSyncedAt          DateTime? @map("rsi_synced_at")
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  rsiArchetype   String?   @map("rsi_archetype") @db.VarChar(50)
+  rsiLanguage    String?   @map("rsi_language") @db.VarChar(50)
+  rsiCommitment  String?   @map("rsi_commitment") @db.VarChar(20)
+  rsiRecruiting  Boolean?  @map("rsi_recruiting")
+  rsiRoleplay    Boolean?  @map("rsi_roleplay")
+  rsiMemberCount Int?      @map("rsi_member_count")
+  rsiSyncedAt    DateTime? @map("rsi_synced_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   memberships CorporationMembership[]
   fleetItems  CorporationFleetItem[]
@@ -213,15 +236,15 @@ model Corporation {
 }
 
 model CorporationMembership {
-  id            Int      @id @default(autoincrement())
-  userId        Int      @map("user_id")
-  corporationId Int      @map("corporation_id")
-  rank          String?  @db.VarChar(50)
+  id            Int                         @id @default(autoincrement())
+  userId        Int                         @map("user_id")
+  corporationId Int                         @map("corporation_id")
+  rank          String?                     @db.VarChar(50)
   role          CorporationMembershipRole   @default(member)
   status        CorporationMembershipStatus @default(active)
-  reviewedById  Int?     @map("reviewed_by_id")
-  reviewedAt    DateTime? @map("reviewed_at")
-  declaredAt    DateTime @default(now()) @map("declared_at")
+  reviewedById  Int?                        @map("reviewed_by_id")
+  reviewedAt    DateTime?                   @map("reviewed_at")
+  declaredAt    DateTime                    @default(now()) @map("declared_at")
 
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   corporation Corporation @relation(fields: [corporationId], references: [id], onDelete: Cascade)
@@ -235,22 +258,22 @@ model CorporationMembership {
 }
 
 model CorporationFleetItem {
-  id            Int           @id @default(autoincrement())
-  corporationId Int?          @map("corporation_id")
-  itemType      FleetItemType @map("item_type")
-  itemClassName String        @map("item_class_name") @db.VarChar(255)
-  shipUuid      String?       @map("ship_uuid") @db.VarChar(64)
-  quantity      Int           @default(1)
-  notes         String?       @db.Text
-  gridX         Float?        @map("grid_x")
-  gridZ         Float?        @map("grid_z")
-  availableForTactics Boolean @default(false) @map("available_for_tactics")
-  addedById     Int?          @map("added_by_id")
-  addedAt       DateTime      @default(now()) @map("added_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
+  id                  Int           @id @default(autoincrement())
+  corporationId       Int?          @map("corporation_id")
+  itemType            FleetItemType @map("item_type")
+  itemClassName       String        @map("item_class_name") @db.VarChar(255)
+  shipUuid            String?       @map("ship_uuid") @db.VarChar(64)
+  quantity            Int           @default(1)
+  notes               String?       @db.Text
+  gridX               Float?        @map("grid_x")
+  gridZ               Float?        @map("grid_z")
+  availableForTactics Boolean       @default(false) @map("available_for_tactics")
+  addedById           Int?          @map("added_by_id")
+  addedAt             DateTime      @default(now()) @map("added_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
 
   corporation Corporation? @relation(fields: [corporationId], references: [id], onDelete: Cascade)
-  addedBy     User?       @relation("AddedFleetItems", fields: [addedById], references: [id], onDelete: SetNull)
+  addedBy     User?        @relation("AddedFleetItems", fields: [addedById], references: [id], onDelete: SetNull)
 
   @@index([corporationId])
   @@index([addedById, itemType])

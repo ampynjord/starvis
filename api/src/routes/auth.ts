@@ -6,6 +6,8 @@
  * POST /auth/reset-password   — reset password with token
  * GET  /auth/me               — current profile (Bearer)
  * PUT  /auth/me               — update own profile (Bearer)
+ * GET  /auth/developer-access-request — current external API access request (Bearer)
+ * POST /auth/developer-access-request — request developer/API access (Bearer)
  * POST /auth/api-token        — generate a long-lived token (Bearer, developer+ only)
  * POST /auth/2fa/setup        — generate TOTP secret + QR code (Bearer)
  * POST /auth/2fa/enable       — enable 2FA with TOTP code (Bearer)
@@ -17,7 +19,7 @@
  * PUT  /admin/users/:id/role  — update a user's role
  */
 import type { Router } from 'express';
-import { requireJwt, requireJwtAdmin, requireJwtBetaOrAdmin } from '../middleware/index.js';
+import { requireJwt, requireJwtAdmin, requireJwtDeveloperOrAdmin } from '../middleware/index.js';
 import { AuthService } from '../services/auth-service.js';
 import { sendPasswordResetEmail, sendVerificationEmail } from '../services/email-service.js';
 import { USER_ROLE, USER_ROLES } from '../utils/config.js';
@@ -172,8 +174,39 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     }
   });
 
+  router.get('/auth/developer-access-request', requireJwt, async (req, res) => {
+    const payload = req.jwtPayload;
+    try {
+      const request = await authService.getLatestApiAccessRequest(payload.sub);
+      res.json({ success: true, data: request });
+    } catch {
+      res.status(500).json({ success: false, error: 'Failed to fetch API access request' });
+    }
+  });
+
+  router.post('/auth/developer-access-request', requireJwt, async (req, res) => {
+    const payload = req.jwtPayload;
+    const { motivation } = req.body ?? {};
+    try {
+      const request = await authService.createApiAccessRequest(payload.sub, motivation);
+      res.status(201).json({ success: true, data: request });
+    } catch (e: any) {
+      if (e.message === 'INVALID_MOTIVATION') return void res.status(400).json({ success: false, error: 'motivation is required' });
+      if (e.message === 'MOTIVATION_TOO_SHORT')
+        return void res.status(400).json({ success: false, error: 'motivation must be at least 40 characters' });
+      if (e.message === 'MOTIVATION_TOO_LONG')
+        return void res.status(400).json({ success: false, error: 'motivation must be 2000 characters or less' });
+      if (e.message === 'ALREADY_HAS_ACCESS')
+        return void res.status(409).json({ success: false, error: 'Developer API access is already enabled for this account' });
+      if (e.message === 'PENDING_REQUEST_EXISTS')
+        return void res.status(409).json({ success: false, error: 'A pending API access request already exists' });
+      if (e.message === 'USER_NOT_FOUND') return void res.status(404).json({ success: false, error: 'User not found' });
+      res.status(500).json({ success: false, error: 'Failed to create API access request' });
+    }
+  });
+
   // ── API Token (external project access) ──────────────────────────────────
-  router.post('/auth/api-token', requireJwtBetaOrAdmin, async (req, res) => {
+  router.post('/auth/api-token', requireJwtDeveloperOrAdmin, async (req, res) => {
     const payload = req.jwtPayload;
     const { name, description } = req.body ?? {};
     const user = await authService.me(payload.sub);
@@ -287,6 +320,37 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
     } catch (e: any) {
       if (e?.code === 'P2025') return void res.status(404).json({ success: false, error: 'User not found' });
       res.status(500).json({ success: false, error: 'Failed to update role' });
+    }
+  });
+
+  router.get('/admin/developer-access-requests', requireJwtAdmin, async (req, res) => {
+    try {
+      const requests = await authService.listApiAccessRequests(String(req.query.status ?? ''));
+      res.json({ success: true, data: requests });
+    } catch {
+      res.status(500).json({ success: false, error: 'Failed to fetch API access requests' });
+    }
+  });
+
+  router.patch('/admin/developer-access-requests/:id', requireJwtAdmin, async (req, res) => {
+    const id = Number(req.params.id);
+    const reviewerId = req.jwtPayload?.sub;
+    if (!Number.isInteger(id) || id <= 0) {
+      return void res.status(400).json({ success: false, error: 'Invalid request id' });
+    }
+    if (!reviewerId) {
+      return void res.status(401).json({ success: false, error: 'Authentication required' });
+    }
+    const { status, adminNote } = req.body ?? {};
+    if (status !== 'approved' && status !== 'rejected') {
+      return void res.status(400).json({ success: false, error: 'status must be "approved" or "rejected"' });
+    }
+    try {
+      const request = await authService.reviewApiAccessRequest(id, reviewerId, status, adminNote);
+      res.json({ success: true, data: request });
+    } catch (e: any) {
+      if (e?.code === 'P2025') return void res.status(404).json({ success: false, error: 'API access request not found' });
+      res.status(500).json({ success: false, error: 'Failed to review API access request' });
     }
   });
 

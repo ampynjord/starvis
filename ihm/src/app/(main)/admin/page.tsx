@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Activity,
   Building2,
+  CheckCircle2,
+  ClipboardCheck,
   Eye,
   EyeOff,
   KeyRound,
@@ -16,6 +18,7 @@ import {
   Trash2,
   UserCheck,
   X,
+  XCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -40,6 +43,21 @@ interface AdminFleetItem {
   notes: string | null;
   addedAt: string;
   corporation?: { id: number; name: string; tag: string } | null;
+}
+
+interface DeveloperAccessRequest {
+  id: number;
+  userId: number;
+  motivation: string;
+  status: 'pending' | 'approved' | 'rejected' | string;
+  adminNote: string | null;
+  createdAt: string;
+  user?: {
+    id: number;
+    username: string;
+    email: string;
+    role: string;
+  };
 }
 
 const ROLES = [...USER_ROLES];
@@ -620,6 +638,9 @@ export default function AdminPage() {
   const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
   const [modal, setModal] = useState<ModalState>(null);
   const [toast, setToast] = useState('');
+  const [apiRequests, setApiRequests] = useState<DeveloperAccessRequest[]>([]);
+  const [apiRequestsLoading, setApiRequestsLoading] = useState(true);
+  const [apiRequestsError, setApiRequestsError] = useState('');
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -649,9 +670,33 @@ export default function AdminPage() {
     }
   }, [authLoading, me?.role]);
 
+  const loadApiRequests = useCallback(async () => {
+    if (authLoading) return;
+    if (me?.role !== ADMIN_ROLE) {
+      setApiRequestsLoading(false);
+      return;
+    }
+
+    setApiRequestsLoading(true);
+    setApiRequestsError('');
+    try {
+      const data = await apiFetch('/api/admin/developer-access-requests?status=pending');
+      setApiRequests(Array.isArray(data.data) ? data.data : []);
+    } catch (error) {
+      setApiRequests([]);
+      setApiRequestsError(error instanceof Error ? error.message : 'Failed to load API access requests');
+    } finally {
+      setApiRequestsLoading(false);
+    }
+  }, [authLoading, me?.role]);
+
   useEffect(() => {
     void loadUsers();
   }, [loadUsers]);
+
+  useEffect(() => {
+    void loadApiRequests();
+  }, [loadApiRequests]);
 
   const updateUser = useCallback((updated: AuthUser) => {
     setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
@@ -670,6 +715,20 @@ export default function AdminPage() {
     setModal(null);
     showToast(`${created.username} created.`);
   }, [showToast]);
+
+  const reviewApiRequest = useCallback(async (requestId: number, status: 'approved' | 'rejected') => {
+    try {
+      await apiFetch(`/api/admin/developer-access-requests/${requestId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      showToast(status === 'approved' ? 'Developer access approved.' : 'Developer access rejected.');
+      await Promise.all([loadApiRequests(), loadUsers()]);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Request review failed.');
+    }
+  }, [loadApiRequests, loadUsers, showToast]);
 
   if (authLoading) {
     return (
@@ -750,7 +809,64 @@ export default function AdminPage() {
               />
             );
           })}
+          <StatCard label="API requests" value={apiRequests.length} accent="cyan" />
         </StatGrid>
+
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="sci-panel overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-border/50 flex items-center justify-between">
+            <span className="inline-flex items-center gap-2 text-[10px] font-mono-sc text-cyan-700 uppercase tracking-wider">
+              <ClipboardCheck size={13} />
+              External API access requests
+            </span>
+            <span className="text-[10px] text-slate-600">{apiRequests.length} pending</span>
+          </div>
+
+          {apiRequestsLoading ? (
+            <div className="p-6 text-center text-slate-600 text-sm font-mono-sc">Loading requests...</div>
+          ) : apiRequestsError ? (
+            <div className="space-y-3 p-6 text-center">
+              <p className="font-mono-sc text-sm text-red-400">{apiRequestsError}</p>
+              <button type="button" onClick={() => void loadApiRequests()} className="sci-btn-ghost px-3 py-2 text-xs">
+                Retry
+              </button>
+            </div>
+          ) : apiRequests.length === 0 ? (
+            <div className="p-6 text-center text-slate-700 text-sm font-mono-sc">No pending API access requests</div>
+          ) : (
+            <div className="divide-y divide-border/30">
+              {apiRequests.map((request) => (
+                <div key={request.id} className="grid gap-3 px-4 py-3 lg:grid-cols-[minmax(180px,0.35fr)_minmax(0,1fr)_auto]">
+                  <div className="min-w-0">
+                    <p className="truncate font-rajdhani text-sm font-semibold text-slate-200">{request.user?.username ?? `User #${request.userId}`}</p>
+                    <p className="mt-0.5 truncate font-mono-sc text-[11px] text-slate-600">{request.user?.email ?? 'unknown email'}</p>
+                    <p className="mt-2 font-mono-sc text-[10px] text-slate-700">
+                      Sent {new Date(request.createdAt).toLocaleDateString('en-US', { day: '2-digit', month: '2-digit', year: '2-digit' })}
+                    </p>
+                  </div>
+                  <p className="whitespace-pre-wrap font-rajdhani text-sm leading-relaxed text-slate-400">{request.motivation}</p>
+                  <div className="flex items-start gap-2 lg:flex-col">
+                    <button
+                      type="button"
+                      onClick={() => void reviewApiRequest(request.id, 'approved')}
+                      className="inline-flex items-center gap-1.5 rounded-sm border border-emerald-800/50 bg-emerald-950/20 px-3 py-2 font-mono-sc text-xs text-emerald-400 transition-colors hover:border-emerald-600/70"
+                    >
+                      <CheckCircle2 size={13} />
+                      Approve
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void reviewApiRequest(request.id, 'rejected')}
+                      className="inline-flex items-center gap-1.5 rounded-sm border border-red-800/50 bg-red-950/20 px-3 py-2 font-mono-sc text-xs text-red-400 transition-colors hover:border-red-600/70"
+                    >
+                      <XCircle size={13} />
+                      Reject
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </motion.div>
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-2">
