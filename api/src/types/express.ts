@@ -5,6 +5,7 @@ declare global {
     interface Request {
       jwtPayload: JwtPayload;
       authMethod?: 'admin_key' | 'api_token' | 'session' | 'unknown';
+      internalClient?: string;
       apiToken?: {
         id: number;
         jti: string;

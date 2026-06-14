@@ -7,7 +7,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   try {
     const { id } = await params;
     const res = await fetch(`${SERVER_API_URL}/api/v1/galactapedia/${id}`, {
-      headers: SERVER_API_KEY ? { 'X-API-Key': SERVER_API_KEY } : undefined,
+      headers: SERVER_API_KEY ? { 'X-API-Key': SERVER_API_KEY, 'X-Starvis-Internal-Client': 'ihm-server-component' } : undefined,
       next: { revalidate: 3600 },
     });
     if (!res.ok) throw new Error();

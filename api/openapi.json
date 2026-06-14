@@ -7453,7 +7453,7 @@
                           },
                           "clientType": {
                             "type": "string",
-                            "enum": ["external_api", "web_session", "server_key", "anonymous_web", "unknown"]
+                            "enum": ["external_api", "web_session", "internal_web_proxy", "server_key", "anonymous_web", "unknown"]
                           },
                           "apiTokenId": {
                             "type": "integer",
@@ -7480,6 +7480,10 @@
                             "nullable": true
                           },
                           "userAgent": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "internalClient": {
                             "type": "string",
                             "nullable": true
                           }
@@ -12799,7 +12803,7 @@
                               },
                               "clientType": {
                                 "type": "string",
-                                "enum": ["external_api", "web_session", "server_key", "anonymous_web", "unknown"]
+                                "enum": ["external_api", "web_session", "internal_web_proxy", "server_key", "anonymous_web", "unknown"]
                               },
                               "apiTokenId": {
                                 "type": "integer",
@@ -12826,6 +12830,10 @@
                                 "nullable": true
                               },
                               "userAgent": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "internalClient": {
                                 "type": "string",
                                 "nullable": true
                               }

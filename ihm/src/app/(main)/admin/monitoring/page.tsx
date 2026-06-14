@@ -65,7 +65,8 @@ interface RequestLogEntry {
   durationMs: number;
   isExternalApi: boolean;
   authMethod: 'admin_key' | 'api_token' | 'session' | 'anonymous' | 'unknown';
-  clientType: 'external_api' | 'web_session' | 'server_key' | 'anonymous_web' | 'unknown';
+  clientType: 'external_api' | 'web_session' | 'internal_web_proxy' | 'server_key' | 'anonymous_web' | 'unknown';
+  internalClient: string | null;
   apiTokenId: number | null;
   apiTokenName: string | null;
   userId: number | null;
@@ -287,6 +288,7 @@ function actorLabel(log: RequestLogEntry) {
 
 function clientLabel(log: RequestLogEntry) {
   if (log.clientType === 'external_api') return 'External API token';
+  if (log.clientType === 'internal_web_proxy') return log.internalClient ? `Internal IHM · ${log.internalClient}` : 'Internal IHM proxy';
   if (log.clientType === 'server_key') return 'Server API key';
   if (log.clientType === 'web_session') return 'Web session';
   if (log.clientType === 'anonymous_web') return 'Public web';
