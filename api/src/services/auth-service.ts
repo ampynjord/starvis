@@ -29,6 +29,31 @@ export interface PublicUser {
   twoFactorEnabled: boolean;
 }
 
+export type ApiAccessRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface ApiAccessRequestPublic {
+  id: number;
+  userId: number;
+  motivation: string;
+  status: string;
+  adminNote: string | null;
+  reviewedById: number | null;
+  reviewedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  user?: {
+    id: number;
+    uuid: string;
+    username: string;
+    email: string;
+    role: string;
+  };
+  reviewedBy?: {
+    id: number;
+    username: string;
+  } | null;
+}
+
 const SALT_ROUNDS = 12;
 
 function getSecret(): string {
@@ -91,8 +116,8 @@ function toPublicUser(u: {
   };
 }
 
-/** Subset of the Prisma client required by the auth layer (typed `user` delegate). */
-export type AuthDb = Pick<PrismaClient, 'apiToken' | 'user'>;
+/** Subset of the Prisma client required by the auth layer. */
+export type AuthDb = Pick<PrismaClient, '$transaction' | 'apiToken' | 'externalApiAccessRequest' | 'user'>;
 
 /** Verify a Starvis JWT and return its payload. Throws on invalid/expired tokens. */
 export function verifyAuthToken(token: string): JwtPayload {
@@ -325,6 +350,83 @@ export class AuthService {
 
   async deleteUser(userId: number): Promise<void> {
     await this.prisma.user.delete({ where: { id: userId } });
+  }
+
+  async getLatestApiAccessRequest(userId: number): Promise<ApiAccessRequestPublic | null> {
+    return this.prisma.externalApiAccessRequest.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async createApiAccessRequest(userId: number, motivation: unknown): Promise<ApiAccessRequestPublic> {
+    if (typeof motivation !== 'string') throw new Error('INVALID_MOTIVATION');
+    const trimmed = motivation.trim().replace(/\r\n/g, '\n');
+    if (trimmed.length < 40) throw new Error('MOTIVATION_TOO_SHORT');
+    if (trimmed.length > 2000) throw new Error('MOTIVATION_TOO_LONG');
+
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    if (!user) throw new Error('USER_NOT_FOUND');
+    if (user.role === 'developer' || user.role === 'admin') throw new Error('ALREADY_HAS_ACCESS');
+
+    const pending = await this.prisma.externalApiAccessRequest.findFirst({
+      where: { userId, status: 'pending' },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (pending) throw new Error('PENDING_REQUEST_EXISTS');
+
+    return this.prisma.externalApiAccessRequest.create({
+      data: {
+        userId,
+        motivation: trimmed,
+        status: 'pending',
+      },
+    });
+  }
+
+  async listApiAccessRequests(status?: string): Promise<ApiAccessRequestPublic[]> {
+    const safeStatus = ['pending', 'approved', 'rejected'].includes(String(status)) ? String(status) : undefined;
+    return this.prisma.externalApiAccessRequest.findMany({
+      where: safeStatus ? { status: safeStatus } : undefined,
+      orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+      include: {
+        user: { select: { id: true, uuid: true, username: true, email: true, role: true } },
+        reviewedBy: { select: { id: true, username: true } },
+      },
+    });
+  }
+
+  async reviewApiAccessRequest(
+    id: number,
+    reviewerId: number,
+    status: ApiAccessRequestStatus,
+    adminNote?: unknown,
+  ): Promise<ApiAccessRequestPublic> {
+    if (!['approved', 'rejected'].includes(status)) throw new Error('INVALID_STATUS');
+    const note = typeof adminNote === 'string' ? adminNote.trim().slice(0, 2000) : null;
+
+    return this.prisma.$transaction(async (tx) => {
+      const request = await tx.externalApiAccessRequest.update({
+        where: { id },
+        data: {
+          status,
+          adminNote: note || null,
+          reviewedById: reviewerId,
+          reviewedAt: new Date(),
+        },
+        include: {
+          user: { select: { id: true, uuid: true, username: true, email: true, role: true } },
+          reviewedBy: { select: { id: true, username: true } },
+        },
+      });
+
+      if (status === 'approved' && request.user.role !== 'admin') {
+        await tx.user.update({ where: { id: request.userId }, data: { role: 'developer' } });
+        request.user.role = 'developer';
+      }
+
+      return request;
+    });
   }
 
   async adminCreateUser(email: string, username: string, password: string, role: UserRole = 'user'): Promise<PublicUser> {

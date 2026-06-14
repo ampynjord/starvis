@@ -248,6 +248,9 @@ Swagger is the source of truth:
 - Spec file: [`api/openapi.json`](api/openapi.json)
 
 External `/api/v1` requests require authentication. Use `Authorization: Bearer <token>` with a token generated from a Starvis user account; anonymous visitors should use the public web interface instead of calling `/api/v1` directly.
+The `/developer` page is restricted to signed-in accounts. Standard users can submit a motivated external API access
+request from that page; admins review pending requests in the Users admin screen, and approval promotes the account to
+the `developer` role so it can access Swagger and generate API tokens.
 
 The external API is a first-class platform surface. It is meant for external projects that need reliable Starvis data
 without rebuilding the extraction stack: Discord bots, overlays, corporation dashboards, public tools, quality audits,
@@ -346,7 +349,8 @@ Admin Monitoring combines service health, Prometheus traffic metrics, cache/runt
 | `developer` | API documentation, developer tools and API token generation. |
 | `admin` | Admin UI, user management, user/corporation fleet and bank management, corporation moderation, monitoring and full operational access. |
 
-Roles are managed through the admin UI or `PUT /admin/users/:id/role`.
+Roles are managed through the admin UI or `PUT /admin/users/:id/role`. Standard users can request developer/API access
+from `/developer`; admins approve or reject those requests from the Users admin screen.
 
 ---
 
