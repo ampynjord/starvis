@@ -345,13 +345,11 @@ export default function FleetManagerPage() {
     setLoading(true);
     setLoadError('');
     try {
-      const [fleetRes, membersRes] = await Promise.all([
-        fetch('/api/corp/fleet'),
-        fetch('/api/corp/members'),
-      ]);
+      const fleetRes = await fetch('/api/corp/fleet');
       const fleetData = await fleetRes.json().catch(() => ({}));
       if (!fleetRes.ok) throw new Error(fleetData.error ?? `Fleet request failed (${fleetRes.status})`);
-      setCorp(fleetData.corporation ?? null);
+      const nextCorp = fleetData.corporation ?? null;
+      setCorp(nextCorp);
       const items: FleetItem[] = fleetData.data ?? [];
       setFleetItems(items);
       const uuids = [...new Set(items.map((i: FleetItem) => getShipUuid(i)).filter(Boolean))] as string[];
@@ -359,14 +357,19 @@ export default function FleetManagerPage() {
       setLoading(false);
       void hydrateShips(uuids);
 
+      if (!nextCorp) {
+        setMembers([]);
+        return;
+      }
+
+      const membersRes = await fetch('/api/corp/members');
       const membersData = await membersRes.json().catch(() => ({}));
       if (!membersRes.ok) throw new Error(membersData.error ?? `Members request failed (${membersRes.status})`);
-      const memberList: Member[] = (membersData.data ?? []).map((m: any) => ({
+      setMembers((membersData.data ?? []).map((m: any) => ({
         id: Number(m.user.id),
         username: m.user.username,
         avatarUrl: m.user.avatarUrl,
-      }));
-      setMembers(memberList);
+      })));
     } catch (error) {
       setCorp(null);
       setFleetItems([]);
