@@ -81,6 +81,12 @@ export interface ExtractionOptions {
    * Increase (e.g. 3–4) to parallelise browser sessions and reduce total scrape time.
    */
   ctmConcurrency?: number;
+  /** Delay between official RSI ship gallery pages. */
+  shipGalleryDelayMs?: number;
+  /** Network retries per official RSI ship gallery page. */
+  shipGalleryRetries?: number;
+  /** Base retry backoff delay for official RSI ship gallery scraping. */
+  shipGalleryRetryBaseDelayMs?: number;
 }
 
 const DEFAULT_OPTIONS: ExtractionOptions = { modules: new Set(['all']), env: 'live' };
@@ -578,11 +584,16 @@ export class ExtractionService {
     if (run('ship-galleries')) {
       const force = options.ctmForce ?? false;
       const concurrency = options.ctmConcurrency ?? 1;
+      const interShipDelayMs = options.shipGalleryDelayMs;
+      const retries = options.shipGalleryRetries;
+      const retryBaseDelayMs = options.shipGalleryRetryBaseDelayMs;
       const galleryPool = options.rsiPool ?? this.pool;
       const galleryConn = await galleryPool.connect();
       try {
-        onProgress?.(`Scraping official RSI ship galleries… [${force ? 'force-all' : 'incremental'}, concurrency=${concurrency}]`);
-        await saveOfficialShipGalleries(galleryConn, { force, concurrency }, onProgress);
+        onProgress?.(
+          `Scraping official RSI ship galleries… [${force ? 'force-all' : 'incremental'}, concurrency=${concurrency}, delay=${interShipDelayMs ?? 'default'}ms]`,
+        );
+        await saveOfficialShipGalleries(galleryConn, { force, concurrency, interShipDelayMs, retries, retryBaseDelayMs }, onProgress);
       } catch (e) {
         stats.errors.push(`Ship galleries failed: ${(e as Error).message}`);
         throw e;

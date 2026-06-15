@@ -25,6 +25,9 @@ export interface RuntimeOptions {
   gameVersion?: string;
   ctmForce: boolean;
   ctmConcurrency: number;
+  galleryDelayMs: number;
+  galleryRetries: number;
+  galleryRetryDelayMs: number;
   requiresP4k: boolean;
   requiresDb: boolean;
   requiresGameDb: boolean;
@@ -121,6 +124,9 @@ export function resolveRuntimeOptions(options: ExtractorCliOptions, logger: Logg
     gameVersion: options.gameVersion,
     ctmForce: options.ctmForce,
     ctmConcurrency: options.ctmConcurrency,
+    galleryDelayMs: options.galleryDelayMs,
+    galleryRetries: options.galleryRetries,
+    galleryRetryDelayMs: options.galleryRetryDelayMs,
     requiresP4k,
     requiresDb,
     requiresGameDb,
