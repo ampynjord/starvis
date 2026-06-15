@@ -196,21 +196,21 @@ function OfficialGallerySections({ shipName, images }: { shipName: string; image
           shipName={shipName}
           images={mainImages}
           title="Pledge Store Gallery"
-          subtitle={`${mainImages.length} official pledge media`}
+          subtitle={`${mainImages.length} official images`}
         />
       )}
       {mediaImages.length > 0 && (
         <details className="group rounded-sm border border-cyan-900/40 bg-slate-950/60">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 font-mono-sc text-[10px] uppercase tracking-widest text-cyan-400">
-            <span>Other RSI media</span>
+            <span>Additional images</span>
             <span className="text-slate-600">{mediaImages.length} images</span>
           </summary>
           <div className="border-t border-slate-800/60 p-3">
             <GalleryCarousel
               shipName={shipName}
               images={mediaImages}
-              title="Other RSI Media"
-              subtitle={`${mediaImages.length} media.robertsspaceindustries.com images`}
+              title="Additional Images"
+              subtitle={`${mediaImages.length} extra official images`}
             />
           </div>
         </details>
