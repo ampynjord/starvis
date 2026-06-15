@@ -407,6 +407,53 @@ export class ShipQueryService {
     return rows[0] ? convertBigIntToNumber(rows[0]) : null;
   }
 
+  async getShipBuyLocations(ship: Row | string, env = 'live'): Promise<Row[]> {
+    const prisma = this.getClient(env);
+    const resolved = typeof ship === 'string' ? await this.getShipByUuid(ship, env) : ship;
+    if (!resolved) return [];
+    const uuid = String(resolved.uuid);
+    const className = String(resolved.class_name ?? '');
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT DISTINCT ON (s.id)
+              s.id as shop_id, s.name as shop_name, s.location, s.system, s.city, s.planet_moon, s.shop_type,
+              s.franchise_slug, s.location_slug, s.canonical_shop_key, s.canonical_location_key,
+              si.component_uuid, si.component_class_name, NULL::text as terminal,
+              CASE
+                WHEN si.component_uuid = ? THEN 'uuid'
+                WHEN si.component_class_name = ? THEN 'class_name'
+                ELSE 'class_name_ci'
+              END as match_type,
+              si.inventory_kind, si.base_price, si.sell_price, si.current_inventory, si.max_inventory,
+              si.rental_price_1d, si.rental_price_3d, si.rental_price_7d, si.rental_price_30d,
+              si.source, si.confidence
+       FROM game.shop_inventory si
+       JOIN game.shops s ON si.shop_id = s.id
+       WHERE s.env = ?
+         AND (
+           si.component_uuid = ?
+           OR si.component_class_name = ?
+           OR LOWER(si.component_class_name) = LOWER(?)
+         )
+       ORDER BY s.id,
+         CASE
+           WHEN si.component_uuid = ? THEN 0
+           WHEN si.component_class_name = ? THEN 1
+           ELSE 2
+         END,
+         si.base_price NULLS LAST,
+         si.rental_price_1d NULLS LAST`),
+      uuid,
+      className,
+      env,
+      uuid,
+      className,
+      className,
+      uuid,
+      className,
+    );
+    return convertBigIntToNumber(rows);
+  }
+
   async getShipFilters(env = 'live', category?: string): Promise<FiltersResult> {
     const prisma = this.getClient(env);
     const catWhere = category ? `AND s.vehicle_category = '${category.replace(/'/g, '')}'` : '';

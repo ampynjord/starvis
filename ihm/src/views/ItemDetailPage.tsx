@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import {
   Activity, ArrowLeft, ChevronDown, ChevronRight, ChevronUp,
-  FlaskConical, Heart, MapPin, Ruler, Shield, Swords, Weight, Zap,
+  FlaskConical, Heart, Ruler, Shield, Swords, Weight, Zap,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
@@ -15,7 +15,7 @@ import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { CanonicalMeta } from '@/components/ui/CanonicalMeta';
-import { fCredits } from '@/utils/formatters';
+import { PriceAvailabilityPanel } from '@/components/economy/PriceAvailabilityPanel';
 import type { Item } from '@/types/api';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -412,42 +412,7 @@ export default function ItemDetailPage() {
             </ScifiPanel>
           )}
 
-          {/* Buy locations */}
-          <ScifiPanel
-            title="Buy Locations"
-            subtitle={buyLocs ? `${buyLocs.length} location${buyLocs.length !== 1 ? 's' : ''}` : undefined}
-            actions={<MapPin size={14} className="text-slate-600" />}
-          >
-            {!buyLocs?.length ? (
-              <p className="text-xs text-slate-600 italic py-4 text-center">No known buy locations</p>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-72 overflow-y-auto">
-                {buyLocs.map((loc, i) => (
-                  // biome-ignore lint/suspicious/noArrayIndexKey: stable list
-                  <div key={i} className="sci-panel px-3 py-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm text-slate-300 truncate">{loc.shop_name}</p>
-                        <p className="text-xs text-slate-600 truncate">
-                          {loc.location ?? `${loc.city ?? '—'} · ${loc.system_name ?? '—'}`}
-                        </p>
-                        <CanonicalMeta
-                          compact
-                          className="mt-1"
-                          sourceType={loc.inventory_source_type ?? loc.shop_source_type}
-                          sourceName={loc.inventory_source_name ?? loc.shop_source_name}
-                          confidenceScore={loc.confidence_score}
-                        />
-                      </div>
-                      {loc.base_price != null && (
-                        <span className="text-xs font-mono-sc text-amber-400 shrink-0">{fCredits(loc.base_price)}</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </ScifiPanel>
+          <PriceAvailabilityPanel rows={buyLocs} />
         </div>
 
         {/* Right sidebar — class name & raw data */}

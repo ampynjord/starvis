@@ -7,7 +7,6 @@ import {
 	ChevronRight,
 	ChevronUp,
 	FlaskConical,
-	MapPin,
 	Rocket,
 	Zap,
 } from "lucide-react";
@@ -23,9 +22,9 @@ import { GlowBadge } from "@/components/ui/GlowBadge";
 import { LoadingGrid } from "@/components/ui/LoadingGrid";
 import { ErrorState } from "@/components/ui/ErrorState";
 import { CanonicalMeta } from "@/components/ui/CanonicalMeta";
+import { PriceAvailabilityPanel } from "@/components/economy/PriceAvailabilityPanel";
 import { COMPONENT_TYPE_COLORS } from "@/utils/constants";
 import { getComponentMetricGroups, type ComponentMetricGroup } from "@/utils/componentMetrics";
-import { fCredits } from "@/utils/formatters";
 import type { Component } from "@/types/api";
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
@@ -390,66 +389,7 @@ export default function ComponentDetailPage() {
 
 			<ComponentMetricPanels groups={componentMetricGroups} />
 
-			<ScifiPanel
-				title="Buy Locations"
-				subtitle={buyLocs?.length ? `${buyLocs.length} shop${buyLocs.length !== 1 ? "s" : ""}` : "Not purchasable"}
-				actions={<MapPin size={14} className="text-slate-600" />}
-			>
-				{!buyLocs?.length ? (
-					<div className="py-5 text-center">
-						<p className="text-sm font-rajdhani text-slate-400">Not purchasable in known shop inventories</p>
-						<p className="text-xs text-slate-600 mt-1">
-							This component may be stock-only, event-only, bespoke, or absent from the extracted shop data.
-						</p>
-					</div>
-				) : (
-					<div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-						{buyLocs.map((loc, i) => (
-							<div key={`${loc.shop_id}-${loc.component_class_name ?? i}`} className="sci-panel px-3 py-2">
-								<div className="flex items-start justify-between gap-2">
-									<div className="min-w-0">
-										<p className="text-sm text-slate-300 truncate">
-											{loc.shop_name}
-										</p>
-										<p className="text-xs text-slate-600 truncate">
-											{[loc.location, loc.city, loc.planet_moon, loc.system].filter(Boolean).join(" · ")}
-										</p>
-										<div className="flex flex-wrap gap-1 mt-1">
-											{loc.shop_type && <GlowBadge color="slate">{loc.shop_type}</GlowBadge>}
-											{loc.match_type && <GlowBadge color={loc.match_type === "uuid" ? "green" : "cyan"}>{loc.match_type}</GlowBadge>}
-										</div>
-										<CanonicalMeta
-											compact
-											className="mt-1"
-											sourceType={
-												loc.inventory_source_type ?? loc.shop_source_type
-											}
-											sourceName={
-												loc.inventory_source_name ?? loc.shop_source_name
-											}
-											confidenceScore={loc.confidence_score}
-										/>
-									</div>
-									<div className="text-right shrink-0">
-										{loc.base_price != null ? (
-											<span className="text-xs font-mono-sc text-amber-400">
-												{fCredits(loc.base_price)}
-											</span>
-										) : (
-											<span className="text-xs font-mono-sc text-slate-600">Price unknown</span>
-										)}
-										{loc.rental_price_1d != null && (
-											<p className="text-[10px] font-mono-sc text-slate-600 mt-0.5">
-												Rent {fCredits(loc.rental_price_1d)}/day
-											</p>
-										)}
-									</div>
-								</div>
-							</div>
-						))}
-					</div>
-				)}
-			</ScifiPanel>
+			<PriceAvailabilityPanel rows={buyLocs} />
 
 			{/* Blueprint & Crafting */}
 			{craftingData && craftingData.data.length > 0 && (

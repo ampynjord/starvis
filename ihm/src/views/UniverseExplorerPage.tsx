@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   Activity,
   Building2,
@@ -869,6 +870,81 @@ function Scene({
     const container = containerRef.current;
     if (!container || nodes.length === 0) return;
 
+    const renderFallbackCanvas = () => {
+      const canvas = document.createElement('canvas');
+      const ratio = Math.max(window.devicePixelRatio || 1, 1);
+      const width = Math.max(container.clientWidth, 640);
+      const height = Math.max(container.clientHeight, 420);
+      canvas.width = Math.floor(width * ratio);
+      canvas.height = Math.floor(height * ratio);
+      canvas.style.width = '100%';
+      canvas.style.height = '100%';
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return () => canvas.remove();
+      ctx.scale(ratio, ratio);
+      ctx.fillStyle = '#020914';
+      ctx.fillRect(0, 0, width, height);
+      for (let i = 0; i < 220; i++) {
+        const x = hash(`fallback-star-x-${i}`) * width;
+        const y = hash(`fallback-star-y-${i}`) * height;
+        const alpha = 0.25 + hash(`fallback-star-a-${i}`) * 0.45;
+        ctx.fillStyle = `rgba(103, 232, 249, ${alpha})`;
+        ctx.fillRect(x, y, 1, 1);
+      }
+      ctx.strokeStyle = 'rgba(8, 145, 178, 0.28)';
+      ctx.lineWidth = 1;
+      for (let x = 0; x < width; x += 48) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+      for (let y = 0; y < height; y += 48) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+      const minX = Math.min(...nodes.map((node) => node.position.x));
+      const maxX = Math.max(...nodes.map((node) => node.position.x));
+      const minZ = Math.min(...nodes.map((node) => node.position.z));
+      const maxZ = Math.max(...nodes.map((node) => node.position.z));
+      const project = (node: MapNode) => {
+        const x = ((node.position.x - minX) / Math.max(maxX - minX, 1)) * (width - 160) + 80;
+        const y = ((node.position.z - minZ) / Math.max(maxZ - minZ, 1)) * (height - 160) + 80;
+        return { x, y };
+      };
+      ctx.font = '10px monospace';
+      for (const link of jumpLinks) {
+        const a = nodes.find((node) => node.id === link.a);
+        const b = nodes.find((node) => node.id === link.b);
+        if (!a || !b) continue;
+        const pa = project(a);
+        const pb = project(b);
+        ctx.strokeStyle = 'rgba(34, 211, 238, 0.24)';
+        ctx.beginPath();
+        ctx.moveTo(pa.x, pa.y);
+        ctx.lineTo(pb.x, pb.y);
+        ctx.stroke();
+      }
+      for (const node of nodes) {
+        const point = project(node);
+        const active = node.id === selectedId || node.id === highlightId;
+        const radius = active ? 8 : Math.max(4, node.radius * 3);
+        ctx.fillStyle = `#${node.color.toString(16).padStart(6, '0')}`;
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.shadowBlur = active ? 16 : 8;
+        ctx.beginPath();
+        ctx.arc(point.x, point.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = active ? '#e0faff' : '#67e8f9';
+        ctx.fillText(node.label.toUpperCase(), point.x + radius + 5, point.y + 3);
+      }
+      container.appendChild(canvas);
+      return () => canvas.remove();
+    };
+
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x000204);
     scene.fog = new THREE.FogExp2(0x01060c, 0.0018);
@@ -877,7 +953,7 @@ function Scene({
     try {
       renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
     } catch {
-      return;
+      return renderFallbackCanvas();
     }
     renderer.setPixelRatio(getThreePixelRatio());
     renderer.setSize(container.clientWidth, container.clientHeight);
@@ -1287,11 +1363,19 @@ function inventoryKindLabel(kind?: string | null) {
   return kind.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function inventoryPriceLabel(item: ShopInventoryItem) {
-  if (item.base_price != null && Number(item.base_price) > 0) return fCredits(Number(item.base_price));
-  if (item.sell_price != null && Number(item.sell_price) > 0) return `Sell ${fCredits(Number(item.sell_price))}`;
-  if (item.rental_price_1d != null && Number(item.rental_price_1d) > 0) return `Rent ${fCredits(Number(item.rental_price_1d))}/day`;
-  return 'Price unknown';
+function inventoryPriceRows(item: ShopInventoryItem) {
+  const rows: { label: string; value: number; className: string }[] = [];
+  if (item.base_price != null && Number(item.base_price) > 0) rows.push({ label: 'Buy', value: Number(item.base_price), className: 'text-amber-400' });
+  if (item.sell_price != null && Number(item.sell_price) > 0) rows.push({ label: 'Sell', value: Number(item.sell_price), className: 'text-red-400' });
+  for (const [label, value] of [
+    ['1d', item.rental_price_1d],
+    ['3d', item.rental_price_3d],
+    ['7d', item.rental_price_7d],
+    ['30d', item.rental_price_30d],
+  ] as const) {
+    if (value != null && Number(value) > 0) rows.push({ label, value: Number(value), className: 'text-blue-300' });
+  }
+  return rows;
 }
 
 function inventoryTargetHref(item: ShopInventoryItem) {
@@ -1360,6 +1444,9 @@ function ShopInventoryPanel({
               <div className="max-h-52 space-y-1 overflow-y-auto pr-1">
                 {items.slice(0, 60).map((item) => {
                   const href = inventoryTargetHref(item);
+                  const priceRows = inventoryPriceRows(item);
+                  const sourceLabel = item.source_name ?? item.source_type ?? item.source ?? null;
+                  const confidence = item.confidence_score ?? item.confidence ?? null;
                   const content = (
                     <>
                       <div className="min-w-0 flex-1">
@@ -1369,9 +1456,25 @@ function ShopInventoryPanel({
                         <p className="truncate font-mono-sc text-[9px] uppercase tracking-wider text-slate-700">
                           {[item.item_type, item.item_size != null ? `S${item.item_size}` : null, item.terminal].filter(Boolean).join(' · ') || item.item_class_name}
                         </p>
+                        {sourceLabel && (
+                          <p className="mt-1 truncate font-mono-sc text-[9px] uppercase tracking-wider text-slate-700">
+                            {sourceLabel}
+                            {confidence != null ? ` · ${Math.round(Number(confidence) * 100)}%` : ''}
+                          </p>
+                        )}
                       </div>
                       <div className="shrink-0 text-right">
-                        <p className="font-mono-sc text-[10px] text-amber-400">{inventoryPriceLabel(item)}</p>
+                        {priceRows.length ? (
+                          <div className="space-y-0.5">
+                            {priceRows.map((row) => (
+                              <p key={row.label} className={`font-mono-sc text-[10px] ${row.className}`}>
+                                {row.label} {fCredits(row.value)}
+                              </p>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="font-mono-sc text-[10px] text-slate-700">Price unknown</p>
+                        )}
                         {item.current_inventory != null && (
                           <p className="font-mono-sc text-[9px] text-slate-700">
                             Stock {Number(item.current_inventory).toLocaleString('en-US')}
@@ -1405,6 +1508,8 @@ function ShopInventoryPanel({
 
 export default function UniverseExplorerPage() {
   const { env } = useEnv();
+  const searchParams = useSearchParams();
+  const shopParam = searchParams.get('shop');
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('galaxy');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -1622,11 +1727,39 @@ export default function UniverseExplorerPage() {
   ), [currentRoot, systemSummaries]);
 
   useEffect(() => {
-    if (!selectedId && allNodes.length > 0) {
-      const first = allNodes.find((node) => !node.parentId) ?? allNodes[0];
-      setSelectedId(first.id);
+    if (!shopParam || allNodes.length === 0) return;
+    const target = allNodes.find((node) => node.shop?.id != null && String(node.shop.id) === shopParam);
+    if (!target) return;
+
+    const ancestorIds = new Set<string>();
+    let cursor: MapNode | undefined = target;
+    let guard = 0;
+    while (cursor?.parentId && guard < 32) {
+      ancestorIds.add(cursor.parentId);
+      cursor = allNodes.find((node) => node.id === cursor?.parentId);
+      guard += 1;
     }
-  }, [allNodes, selectedId]);
+
+    setSelectedId(target.id);
+    setViewMode('system');
+    if (ancestorIds.size > 0) {
+      setExpanded((prev) => new Set([...prev, ...ancestorIds]));
+    }
+  }, [allNodes, shopParam]);
+
+  useEffect(() => {
+    if (!shopParam && !selectedId && allNodes.length > 0) {
+      const stanton = allNodes.find(
+        (node) => !node.parentId && (node.systemCode === 'STANTON' || node.systemCode === 'STAN' || node.label.toLowerCase().includes('stanton')),
+      );
+      const first = stanton ?? allNodes.find((node) => !node.parentId) ?? allNodes[0];
+      setSelectedId(first.id);
+      if (stanton) {
+        setExpanded((prev) => new Set(prev).add(stanton.id));
+        setViewMode('system');
+      }
+    }
+  }, [allNodes, selectedId, shopParam]);
 
   const toggleExpanded = (id: string) => {
     setExpanded((prev) => {
