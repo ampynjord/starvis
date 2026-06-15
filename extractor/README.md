@@ -118,7 +118,7 @@ P4K modules require `Data.p4k`:
 | `missions` | Contracts, rewards, factions, legality and blueprint rewards. |
 | `crafting` | Recipes, ingredients, modifiers and station requirements. |
 | `paints` | Ship liveries and paints. |
-| `shops` | Extracted in-game shop locations and franchises from Prefab XMLs and DataForge ShopFranchise records. Shop inventory is not populated yet; stale manual inventory rows are removed during extraction. |
+| `shops` | Extracted in-game shop locations and franchises from Prefab XMLs and DataForge ShopFranchise records. Shop inventory is populated as early-access inferred inventory by shop category, with `source` and `confidence` fields. Prices and rentals stay empty until a reliable extracted source is mapped. |
 | `locations` | Systems, planets, moons, cities, stations and child locations. |
 | `game-insights` | Extended discovery records plus normalized tables for factions, reputation standings/scopes, loot tables/archetypes, blueprint rewards, ammo and inventory containers. |
 
@@ -215,7 +215,7 @@ A full extraction runs in this order:
    - components, items and commodities
    - ships and loadout ports
    - mining, missions, crafting, locations and shops
-   - stale manual shop inventory cleanup for the selected env
+   - inferred shop inventory refresh for the selected env
    - Ship Matrix cross-reference
    - variant tagging and excluded variant cleanup
    - optional CTM scraping

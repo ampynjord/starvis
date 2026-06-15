@@ -401,6 +401,8 @@ model ShopInventory {
   rentalPrice3d      Decimal? @map("rental_price_3d") @db.Decimal(12, 2)
   rentalPrice7d      Decimal? @map("rental_price_7d") @db.Decimal(12, 2)
   rentalPrice30d     Decimal? @map("rental_price_30d") @db.Decimal(12, 2)
+  source             String   @default("unknown") @db.VarChar(80)
+  confidence         Decimal? @db.Decimal(4, 2)
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
 

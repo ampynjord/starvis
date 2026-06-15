@@ -5,6 +5,95 @@ import { buildLocationSlugIndex, extractShopsFromPrefabs } from '../shop-extract
 import { batchUpsert } from './batch.js';
 import type { PersistContext } from './context.js';
 
+type InventoryCandidate = {
+  uuid: string;
+  className: string;
+  source: string;
+  confidence: number;
+};
+
+const SHIP_PART_COMPONENT_TYPES = [
+  'Cooler',
+  'PowerPlant',
+  'QuantumDrive',
+  'Shield',
+  'WeaponGun',
+  'Missile',
+  'MissileRack',
+  'Gimbal',
+  'Radar',
+  'Countermeasure',
+  'MiningLaser',
+  'MiningModifier',
+  'TractorBeam',
+  'SalvageHead',
+  'FuelTank',
+  'FuelIntake',
+  'EMP',
+  'QuantumInterdictionGenerator',
+  'Turret',
+  'TurretUnmanned',
+  'RocketPod',
+];
+
+const SHOP_ITEM_TYPES: Record<string, string[]> = {
+  armor: ['Armor', 'Armor_Helmet', 'Armor_Torso', 'Armor_Arms', 'Armor_Legs', 'Armor_Backpack', 'Undersuit'],
+  clothing: ['Clothing'],
+  food_drink: ['Consumable'],
+  general: ['Gadget', 'Tool', 'Consumable'],
+  medical: ['Consumable'],
+  weapons: ['FPS_Weapon', 'Attachment', 'Magazine', 'Tool'],
+};
+
+function placeholders(values: readonly unknown[]): string {
+  return values.map((_, idx) => `$${idx + 2}`).join(', ');
+}
+
+async function loadInventoryCandidates(ctx: PersistContext, shopType: string | null): Promise<InventoryCandidate[]> {
+  const { conn, env } = ctx;
+  const normalizedType = (shopType ?? 'general').toLowerCase();
+  const candidates: InventoryCandidate[] = [];
+
+  const itemTypes = SHOP_ITEM_TYPES[normalizedType] ?? [];
+  if (itemTypes.length > 0) {
+    const { rows } = await conn.query<{ uuid: string; class_name: string }>(
+      `SELECT uuid, class_name
+       FROM game.items
+       WHERE env = $1 AND type IN (${placeholders(itemTypes)})
+       ORDER BY type, name, class_name`,
+      [env, ...itemTypes],
+    );
+    candidates.push(
+      ...rows.map((row) => ({
+        uuid: row.uuid,
+        className: row.class_name,
+        source: 'inferred_shop_type:item',
+        confidence: 0.35,
+      })),
+    );
+  }
+
+  if (normalizedType === 'ship_parts') {
+    const { rows } = await conn.query<{ uuid: string; class_name: string }>(
+      `SELECT uuid, class_name
+       FROM game.components
+       WHERE env = $1 AND type IN (${placeholders(SHIP_PART_COMPONENT_TYPES)})
+       ORDER BY type, name, class_name`,
+      [env, ...SHIP_PART_COMPONENT_TYPES],
+    );
+    candidates.push(
+      ...rows.map((row) => ({
+        uuid: row.uuid,
+        className: row.class_name,
+        source: 'inferred_shop_type:component',
+        confidence: 0.35,
+      })),
+    );
+  }
+
+  return candidates;
+}
+
 export async function saveShopsData(ctx: PersistContext): Promise<{ shops: number; inventory: number }> {
   const { conn, env, df, loc, onProgress } = ctx;
   const provider = df.getProvider();
@@ -140,8 +229,6 @@ export async function saveShopsData(ctx: PersistContext): Promise<{ shops: numbe
     );
   }
 
-  // shop_inventory is not populated from extracted game files yet. Remove stale
-  // manual/community rows for this environment so the API never exposes guessed inventory.
   const { rowCount: deletedInventoryRows } = await conn.query(
     `DELETE FROM game.shop_inventory si
       USING game.shops s
@@ -150,6 +237,61 @@ export async function saveShopsData(ctx: PersistContext): Promise<{ shops: numbe
     [env],
   );
 
-  onProgress?.(`Shops: ${savedShops}/${shops.length} saved; ${deletedInventoryRows ?? 0} manual inventory rows removed`);
-  return { shops: savedShops, inventory: 0 };
+  const { rows: savedShopRows } = await conn.query<{ id: number; shop_type: string | null }>(
+    `SELECT id, shop_type FROM game.shops WHERE env = $1 ORDER BY id`,
+    [env],
+  );
+  const candidatesByType = new Map<string, InventoryCandidate[]>();
+  const inventoryRows: (string | number | null | boolean)[][] = [];
+
+  for (const shop of savedShopRows) {
+    const shopType = (shop.shop_type ?? 'general').toLowerCase();
+    if (shopType === 'commodities' || shopType === 'service' || shopType === 'bounty') continue;
+    let candidates = candidatesByType.get(shopType);
+    if (!candidates) {
+      candidates = await loadInventoryCandidates(ctx, shopType);
+      candidatesByType.set(shopType, candidates);
+    }
+    for (const candidate of candidates) {
+      inventoryRows.push([
+        shop.id,
+        candidate.uuid,
+        candidate.className,
+        null,
+        null,
+        null,
+        null,
+        null,
+        candidate.source,
+        candidate.confidence,
+      ]);
+    }
+  }
+
+  const savedInventory =
+    inventoryRows.length > 0
+      ? await batchUpsert(
+          conn,
+          `INSERT INTO game.shop_inventory
+            (shop_id, component_uuid, component_class_name, base_price, rental_price_1d, rental_price_3d, rental_price_7d, rental_price_30d, source, confidence)`,
+          `(shop_id, component_class_name) DO UPDATE SET
+            component_uuid=EXCLUDED.component_uuid,
+            base_price=EXCLUDED.base_price,
+            rental_price_1d=EXCLUDED.rental_price_1d,
+            rental_price_3d=EXCLUDED.rental_price_3d,
+            rental_price_7d=EXCLUDED.rental_price_7d,
+            rental_price_30d=EXCLUDED.rental_price_30d,
+            source=EXCLUDED.source,
+            confidence=EXCLUDED.confidence,
+            updated_at=CURRENT_TIMESTAMP`,
+          10,
+          inventoryRows,
+          200,
+        )
+      : 0;
+
+  onProgress?.(
+    `Shops: ${savedShops}/${shops.length} saved; ${deletedInventoryRows ?? 0} old inventory rows removed; ${savedInventory} inferred inventory rows saved`,
+  );
+  return { shops: savedShops, inventory: savedInventory };
 }

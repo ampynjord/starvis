@@ -1,0 +1,3 @@
+ALTER TABLE game.shop_inventory
+  ADD COLUMN IF NOT EXISTS source VARCHAR(80) NOT NULL DEFAULT 'unknown',
+  ADD COLUMN IF NOT EXISTS confidence DECIMAL(4, 2);

@@ -84,11 +84,16 @@ export class ShopService {
   async getShopInventory(shopId: number, env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT si.*, c.name as component_name, c.type as component_type, c.size as component_size
+      toPostgres(`SELECT si.*,
+              COALESCE(c.name, i.name) as component_name,
+              COALESCE(c.type, i.type) as component_type,
+              COALESCE(c.size, i.size) as component_size,
+              CASE WHEN c.uuid IS NOT NULL THEN 'component' WHEN i.uuid IS NOT NULL THEN 'item' ELSE 'unknown' END as inventory_kind
        FROM game.shop_inventory si
        JOIN game.shops s ON s.id = si.shop_id
        LEFT JOIN game.components c ON si.component_uuid = c.uuid AND c.env = s.env
-       WHERE s.env = ? AND si.shop_id = ? ORDER BY c.type, c.name`),
+       LEFT JOIN game.items i ON si.component_uuid = i.uuid AND i.env = s.env
+       WHERE s.env = ? AND si.shop_id = ? ORDER BY COALESCE(c.type, i.type), COALESCE(c.name, i.name)`),
       env,
       shopId,
     );
