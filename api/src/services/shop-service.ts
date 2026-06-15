@@ -81,19 +81,45 @@ export class ShopService {
     };
   }
 
+  async getShopById(shopId: number, env = 'live'): Promise<Row | null> {
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT id, name, class_name, shop_type, location, planet_moon, city, system,
+              canonical_shop_key, canonical_location_key AS loc_key,
+              franchise_slug, location_slug, franchise_loc_key, p4k_path
+       FROM game.shops WHERE env = ? AND id = ? LIMIT 1`),
+      env,
+      shopId,
+    );
+    return rows[0] ? normalizeShopRow(rows[0]) : null;
+  }
+
   async getShopInventory(shopId: number, env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT si.*,
-              COALESCE(c.name, i.name) as component_name,
-              COALESCE(c.type, i.type) as component_type,
+              COALESCE(c.name, i.name, sh.name, co.name, si.component_class_name) as item_name,
+              COALESCE(c.class_name, i.class_name, sh.class_name, co.class_name, si.component_class_name) as item_class_name,
+              COALESCE(c.type, i.type, sh.vehicle_category, co.type, si.inventory_kind) as item_type,
+              COALESCE(c.size, i.size) as item_size,
+              COALESCE(c.name, i.name, sh.name, co.name, si.component_class_name) as component_name,
+              COALESCE(c.type, i.type, sh.vehicle_category, co.type, si.inventory_kind) as component_type,
               COALESCE(c.size, i.size) as component_size,
-              CASE WHEN c.uuid IS NOT NULL THEN 'component' WHEN i.uuid IS NOT NULL THEN 'item' ELSE 'unknown' END as inventory_kind
+              CASE
+                WHEN si.inventory_kind IS NOT NULL AND si.inventory_kind != 'unknown' THEN si.inventory_kind
+                WHEN c.uuid IS NOT NULL THEN 'component'
+                WHEN i.uuid IS NOT NULL THEN 'item'
+                WHEN sh.uuid IS NOT NULL THEN 'ship'
+                WHEN co.uuid IS NOT NULL THEN 'commodity'
+                ELSE 'unknown'
+              END as inventory_kind
        FROM game.shop_inventory si
        JOIN game.shops s ON s.id = si.shop_id
        LEFT JOIN game.components c ON si.component_uuid = c.uuid AND c.env = s.env
        LEFT JOIN game.items i ON si.component_uuid = i.uuid AND i.env = s.env
-       WHERE s.env = ? AND si.shop_id = ? ORDER BY COALESCE(c.type, i.type), COALESCE(c.name, i.name)`),
+       LEFT JOIN game.ships sh ON si.component_uuid = sh.uuid AND sh.env = s.env
+       LEFT JOIN game.commodities co ON si.component_uuid = co.uuid AND co.env = s.env
+       WHERE s.env = ? AND si.shop_id = ? ORDER BY si.inventory_kind, COALESCE(c.type, i.type, sh.vehicle_category, co.type), COALESCE(c.name, i.name, sh.name, co.name, si.component_class_name)`),
       env,
       shopId,
     );

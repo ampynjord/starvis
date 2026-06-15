@@ -396,13 +396,18 @@ model ShopInventory {
   shopId             Int      @map("shop_id")
   componentUuid      String?  @map("component_uuid") @db.Char(36)
   componentClassName String   @map("component_class_name") @db.VarChar(255)
+  inventoryKind      String   @default("unknown") @map("inventory_kind") @db.VarChar(30)
   basePrice          Decimal? @map("base_price") @db.Decimal(12, 2)
+  sellPrice          Decimal? @map("sell_price") @db.Decimal(12, 2)
+  currentInventory   Decimal? @map("current_inventory") @db.Decimal(14, 4)
+  maxInventory       Decimal? @map("max_inventory") @db.Decimal(14, 4)
   rentalPrice1d      Decimal? @map("rental_price_1d") @db.Decimal(12, 2)
   rentalPrice3d      Decimal? @map("rental_price_3d") @db.Decimal(12, 2)
   rentalPrice7d      Decimal? @map("rental_price_7d") @db.Decimal(12, 2)
   rentalPrice30d     Decimal? @map("rental_price_30d") @db.Decimal(12, 2)
   source             String   @default("unknown") @db.VarChar(80)
   confidence         Decimal? @db.Decimal(4, 2)
+  rawJson            Json?    @map("raw_json")
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at")
 
@@ -411,6 +416,7 @@ model ShopInventory {
   @@unique([shopId, componentClassName])
   @@index([shopId])
   @@index([componentUuid])
+  @@index([inventoryKind])
   @@map("shop_inventory")
   @@schema("game")
 }
@@ -648,6 +654,9 @@ model Location {
   systemCode           String?  @map("system_code") @db.VarChar(20)
   parentUuid           String?  @map("parent_uuid") @db.Char(36)
   rsiStarmapLocationId Int?     @map("rsi_starmap_location_id")
+  starmapMatchMethod   String?  @map("starmap_match_method") @db.VarChar(30)
+  starmapMatchScore    Int?     @map("starmap_match_score")
+  starmapMatchConfidence String? @map("starmap_match_confidence") @db.VarChar(20)
   locKey               String?  @map("loc_key") @db.VarChar(255)
   description          String?
   coordinates          Json?
@@ -665,8 +674,34 @@ model Location {
   @@index([systemCode])
   @@index([parentUuid])
   @@index([rsiStarmapLocationId])
+  @@index([starmapMatchConfidence])
   @@index([env])
   @@map("locations")
+  @@schema("game")
+}
+
+model StarmapLocationAlias {
+  id                   Int      @id @default(autoincrement())
+  env                  String?  @db.VarChar(10)
+  source               String   @default("manual") @db.VarChar(30)
+  gameUuid             String?  @map("game_uuid") @db.Char(36)
+  gameClassName        String?  @map("game_class_name") @db.VarChar(255)
+  gameName             String?  @map("game_name") @db.VarChar(255)
+  gameType             String?  @map("game_type") @db.VarChar(50)
+  systemCode           String?  @map("system_code") @db.VarChar(20)
+  rsiStarmapLocationId Int      @map("rsi_starmap_location_id")
+  confidence           String   @default("manual") @db.VarChar(20)
+  notes                String?
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  rsiStarmapLocation StarmapLocation @relation(fields: [rsiStarmapLocationId], references: [id], onDelete: Cascade)
+
+  @@unique([env, gameUuid])
+  @@index([gameClassName])
+  @@index([gameName, systemCode])
+  @@index([rsiStarmapLocationId])
+  @@map("starmap_location_aliases")
   @@schema("game")
 }
 

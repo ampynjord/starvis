@@ -92,7 +92,8 @@ export class LocationQueryService {
 
     const w = ` WHERE ${where.join(' AND ')}`;
 
-    const baseSql = `SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid, l.rsi_starmap_location_id, l.loc_key,
+    const baseSql = `SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid, l.rsi_starmap_location_id,
+      l.starmap_match_method, l.starmap_match_score, l.starmap_match_confidence, l.loc_key,
       l.coordinates, l.p4k_path, l.is_scannable, l.hide_in_starmap,
       CASE WHEN sl.id IS NULL THEN NULL ELSE json_build_object(
         'id', sl.id,
@@ -119,7 +120,8 @@ export class LocationQueryService {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid,
-              l.rsi_starmap_location_id, l.loc_key, l.description, l.coordinates, l.p4k_path, l.raw_json,
+              l.rsi_starmap_location_id, l.starmap_match_method, l.starmap_match_score, l.starmap_match_confidence,
+              l.loc_key, l.description, l.coordinates, l.p4k_path, l.raw_json,
               l.is_scannable, l.hide_in_starmap, l.extracted_at,
               CASE WHEN sl.id IS NULL THEN NULL ELSE json_build_object(
                 'id', sl.id,
@@ -160,6 +162,7 @@ export class LocationQueryService {
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(
         `SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid, l.rsi_starmap_location_id,
+          l.starmap_match_method, l.starmap_match_score, l.starmap_match_confidence,
           l.loc_key, l.coordinates, l.p4k_path, l.is_scannable, l.hide_in_starmap,
           CASE WHEN sl.id IS NULL THEN NULL ELSE json_build_object(
             'id', sl.id,
@@ -208,7 +211,8 @@ export class LocationQueryService {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT l.uuid, l.class_name, l.name, l.type, l.system_code, l.parent_uuid,
-              l.rsi_starmap_location_id, l.coordinates, l.p4k_path, l.is_scannable, l.hide_in_starmap,
+              l.rsi_starmap_location_id, l.starmap_match_method, l.starmap_match_score, l.starmap_match_confidence,
+              l.coordinates, l.p4k_path, l.is_scannable, l.hide_in_starmap,
               CASE WHEN sl.id IS NULL THEN NULL ELSE json_build_object(
                 'id', sl.id,
                 'rsi_id', sl.rsi_id,

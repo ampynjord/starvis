@@ -2523,7 +2523,7 @@
     },
     {
       "name": "Shops",
-      "description": "Extracted in-game shop locations and franchises. Shop inventory is early-access inferred by shop type with source/confidence metadata; prices and rentals remain empty until a reliable extracted source is mapped."
+      "description": "Extracted in-game shop locations, franchises and real ShopInventories data, including purchasable items, components, commodities, ships and rental metadata when exposed by the game files."
     },
     {
       "name": "Locations",
@@ -4649,7 +4649,7 @@
       "get": {
         "tags": ["Shops"],
         "summary": "Get shop inventory",
-        "description": "Returns early-access inferred inventory for an extracted shop. Rows include source and confidence metadata. Price and rental fields can be null until a reliable extracted source is mapped.",
+        "description": "Returns real inventory parsed from Data/Scripts/ShopInventories JSON files. Rows include item kind, prices, stock metadata, source and confidence. Rental fields are filled only when the game file exposes rental offering prices.",
         "operationId": "getShopInventory",
         "parameters": [
           {
@@ -4670,7 +4670,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Shop inventory items with source/confidence metadata",
+            "description": "Shop inventory items with prices, stock and source/confidence metadata",
             "content": {
               "application/json": {
                 "schema": {
@@ -4710,11 +4710,39 @@
                             "type": "number",
                             "nullable": true
                           },
+                          "item_name": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "item_class_name": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "item_type": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "item_size": {
+                            "type": "number",
+                            "nullable": true
+                          },
                           "inventory_kind": {
                             "type": "string",
-                            "enum": ["component", "item", "unknown"]
+                            "enum": ["ship", "component", "item", "commodity", "unknown"]
                           },
                           "base_price": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "sell_price": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "current_inventory": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "max_inventory": {
                             "type": "number",
                             "nullable": true
                           },
@@ -4736,13 +4764,18 @@
                           },
                           "source": {
                             "type": "string",
-                            "example": "inferred_shop_type:item"
+                            "example": "shop_inventory_json"
                           },
                           "confidence": {
                             "type": "number",
                             "nullable": true,
                             "minimum": 0,
                             "maximum": 1
+                          },
+                          "raw_json": {
+                            "type": "object",
+                            "nullable": true,
+                            "description": "Source metadata, including the original ShopInventories UUID and converted DataForge UUID when available."
                           }
                         }
                       }
@@ -13273,6 +13306,112 @@
             "$ref": "#/components/responses/NotFound"
           }
         }
+      }
+    },
+    "/api/v1/objects/{type}/{id}": {
+      "get": {
+        "tags": ["Objects"],
+        "summary": "Get one enriched object by type and identifier",
+        "description": "Returns a normalized detail payload for a ship, component, item, commodity, shop or location, with useful related data in one response. Use `include=none` to disable default relations or pass a comma-separated include list.",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "apiKey": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["ship", "component", "item", "commodity", "shop", "location"]
+            },
+            "description": "Object family to resolve. Common plural aliases are accepted by the API."
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Object UUID, class name or numeric shop id depending on the object type."
+          },
+          {
+            "$ref": "#/components/parameters/env"
+          },
+          {
+            "name": "include",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Comma-separated relations to include. Defaults: ship=manufacturer,loadout,paints,modules,hardpoints,variants,similar; component=buy_locations,ships; item=manufacturer,buy_locations; commodity=prices; shop=inventory,prices; location=children. Use `none` for only the object."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Enriched object detail",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "env": {
+                          "type": "string"
+                        },
+                        "data": {
+                          "type": "object",
+                          "additionalProperties": true
+                        },
+                        "related": {
+                          "type": "object",
+                          "additionalProperties": true
+                        },
+                        "meta": {
+                          "type": "object",
+                          "properties": {
+                            "includes": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "generated_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
+        },
+        "operationId": "getObjectDetail"
       }
     }
   }
