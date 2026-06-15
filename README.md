@@ -405,6 +405,8 @@ npm run typecheck --workspace=@starvis/db
 npm run test:e2e --workspace=starvis-ihm
 ```
 
+Playwright starts its own Next.js server on `http://127.0.0.1:5180` by default so it does not accidentally reuse the regular `5173` development server. Override with `PLAYWRIGHT_PORT` only when needed.
+
 ### Config validation
 
 ```bash

@@ -168,6 +168,19 @@ interface WeaponAttachmentModifier {
   effects: { key: string; label: string; value: number; unit: 'percent' }[];
 }
 
+function itemMarketAggregateSelect(): string {
+  const match = `(si.component_uuid = i.uuid OR si.component_class_name = i.class_name OR LOWER(si.component_class_name) = LOWER(i.class_name))`;
+  const baseWhere = `shop.env = i.env AND si.inventory_kind IN ('item', 'unknown') AND ${match}`;
+  return `
+    (SELECT MIN(si.base_price) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.base_price > 0) as min_purchase_price,
+    (SELECT MIN(si.rental_price_1d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.rental_price_1d > 0) as min_rental_price_1d,
+    (SELECT MIN(si.rental_price_3d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.rental_price_3d > 0) as min_rental_price_3d,
+    (SELECT MIN(si.rental_price_7d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.rental_price_7d > 0) as min_rental_price_7d,
+    (SELECT MIN(si.rental_price_30d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.rental_price_30d > 0) as min_rental_price_30d,
+    (SELECT COUNT(DISTINCT si.shop_id) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.base_price > 0) as purchase_location_count,
+    (SELECT COUNT(DISTINCT si.shop_id) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND (si.rental_price_1d > 0 OR si.rental_price_3d > 0 OR si.rental_price_7d > 0 OR si.rental_price_30d > 0)) as rental_location_count`;
+}
+
 function formatConsumableLabel(subType: string): string {
   const explicitLabels: Record<string, string> = {
     SystemAccess: 'System Access',
@@ -424,7 +437,7 @@ export class ItemQueryService {
     }
 
     const w = ` WHERE ${where.join(' AND ')}`;
-    const baseSql = `SELECT i.*, m.name as manufacturer_name FROM game.items i LEFT JOIN game.manufacturers m ON i.manufacturer_code = m.code${w}`;
+    const baseSql = `SELECT i.*, m.name as manufacturer_name, ${itemMarketAggregateSelect()} FROM game.items i LEFT JOIN game.manufacturers m ON i.manufacturer_code = m.code${w}`;
     const countSql = `SELECT COUNT(*) as total FROM game.items i${w}`;
 
     const result = await paginate(prisma, baseSql, countSql, params, filters || {}, ITEM_SORT, 'i', ITEM_JSON_SORT_MAP);

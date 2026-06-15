@@ -3,6 +3,7 @@ import { Users, Package, Zap, Gauge } from 'lucide-react';
 import Link from 'next/link';
 import type { ShipListItem } from '@/types/api';
 import { GlowBadge } from '@/components/ui/GlowBadge';
+import { MarketSummary } from '@/components/economy/MarketSummary';
 import { fSpeed } from '@/utils/formatters';
 import { VARIANT_TYPE_LABELS } from '@/utils/constants';
 
@@ -101,6 +102,8 @@ export function ShipCard({ ship, index = 0 }: Props) {
                 </>
               )}
             </div>
+
+            <MarketSummary item={ship} />
 
             {/* Badges */}
             <div className="flex gap-2 min-w-0 overflow-hidden">

@@ -36,12 +36,19 @@ export interface PriceAvailabilityRow {
   inventory_source_name?: string | null;
   source_type?: string | null;
   source_name?: string | null;
+  source?: string | null;
 }
 
 function toNumber(value: number | string | null | undefined) {
   if (value == null || value === '') return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+function confidencePercent(value: number | string | null | undefined) {
+  const n = toNumber(value);
+  if (n == null) return null;
+  return n > 0 && n <= 1 ? n * 100 : n;
 }
 
 function locationLabel(row: PriceAvailabilityRow) {
@@ -99,7 +106,7 @@ export function PriceAvailabilityPanel({
             const sell = toNumber(row.sell_price);
             const rentals = rentalRows(row);
             const stock = stockLabel(row);
-            const sourceType = row.inventory_source_type ?? row.source_type ?? row.shop_source_type;
+            const sourceType = row.inventory_source_type ?? row.source_type ?? row.source ?? row.shop_source_type;
             const sourceName = row.inventory_source_name ?? row.source_name ?? row.shop_source_name;
 
             return (
@@ -120,7 +127,7 @@ export function PriceAvailabilityPanel({
                       className="mt-1"
                       sourceType={sourceType}
                       sourceName={sourceName}
-                      confidenceScore={toNumber(row.confidence_score ?? row.confidence)}
+                      confidenceScore={confidencePercent(row.confidence_score ?? row.confidence)}
                     />
                   </div>
                   <div className="shrink-0 text-right">

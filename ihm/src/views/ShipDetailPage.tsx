@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowLeft, BarChart3, ChevronRight, Clock,
+  ArrowLeft, BarChart3, ChevronRight, Clock, Coins,
   Crosshair, ExternalLink, Layers, Package, Palette, Rocket, Ruler, Users, Zap,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -29,6 +29,12 @@ import { VARIANT_TYPE_LABELS } from '@/utils/constants';
 function fV(v: number | null | undefined, dec = 0) {
   if (v == null || Number.isNaN(Number(v))) return '—';
   return Number(v).toFixed(dec);
+}
+
+function n(v: number | string | null | undefined) {
+  if (v == null || v === '') return null;
+  const parsed = Number(v);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function crewLabel(min: number | null | undefined, max: number | null | undefined, size: number | null | undefined) {
@@ -201,6 +207,24 @@ export default function ShipDetailPage() {
     }),
     [moduleSlots, effectiveSelection],
   );
+  const buyLocations = shipObjectDetail?.related?.buy_locations ?? [];
+  const bestPurchase = useMemo(
+    () => {
+      const prices = buyLocations.map((row) => n(row.base_price)).filter((value): value is number => value != null && value > 0);
+      return prices.length ? Math.min(...prices) : null;
+    },
+    [buyLocations],
+  );
+  const bestRental = useMemo(
+    () => {
+      const prices = buyLocations
+        .flatMap((row) => [row.rental_price_1d, row.rental_price_3d, row.rental_price_7d, row.rental_price_30d])
+        .map(n)
+        .filter((value): value is number => value != null && value > 0);
+      return prices.length ? Math.min(...prices) : null;
+    },
+    [buyLocations],
+  );
 
   if (isLoading) return <LoadingGrid message="LOADING…" />;
   if (error) return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
@@ -331,6 +355,12 @@ export default function ShipDetailPage() {
         {hasCargo && (
           <QuickStat icon={<Package size={9} />} label="Cargo" value={`${ship.cargo_capacity} SCU`} />
         )}
+        {bestPurchase != null && (
+          <QuickStat icon={<Coins size={9} />} label="Buy" value={fCredits(bestPurchase)} />
+        )}
+        {bestRental != null && (
+          <QuickStat icon={<Clock size={9} />} label="Rent" value={`from ${fCredits(bestRental)}`} />
+        )}
         {ship.total_hp != null && Number(ship.total_hp) > 0 && (
           <QuickStat icon={<span className="text-[8px]">HP</span>} label="Hull" value={String(ship.total_hp)} />
         )}
@@ -417,7 +447,7 @@ export default function ShipDetailPage() {
           </ScifiPanel>
 
           <PriceAvailabilityPanel
-            rows={shipObjectDetail?.related.buy_locations}
+            rows={buyLocations}
             emptyMessage="No extracted purchase or rental offers for this vehicle."
           />
 

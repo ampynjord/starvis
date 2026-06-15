@@ -13,6 +13,7 @@ import { ListFilterBar, ListFilterResetButton, ListFilterSelect } from '@/compon
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
+import { MarketSummary } from '@/components/economy/MarketSummary';
 import { useListQueryState } from '@/hooks/useListQueryState';
 import type { PaintListItem, PaintManufacturerGroup } from '@/types/api';
 
@@ -70,6 +71,9 @@ function PaintCard({ p, index }: { p: PaintListItem; index: number }) {
             <p className="text-[10px] font-mono-sc text-slate-700 truncate mt-0.5">
               {p.paint_class_name}
             </p>
+            <div className="mt-1">
+              <MarketSummary item={p} compact />
+            </div>
           </div>
         </div>
       </div>
