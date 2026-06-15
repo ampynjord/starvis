@@ -169,17 +169,33 @@ interface WeaponAttachmentModifier {
 }
 
 function itemMarketAggregateSelect(): string {
-  const match = `(si.component_uuid = i.uuid OR si.component_class_name = i.class_name OR LOWER(si.component_class_name) = LOWER(i.class_name))`;
-  const baseWhere = `shop.env = i.env AND si.inventory_kind IN ('item', 'unknown') AND ${match}`;
   return `
-    (SELECT MIN(si.base_price) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.base_price > 0) as min_purchase_price,
-    (SELECT MIN(si.rental_price_1d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.rental_price_1d > 0) as min_rental_price_1d,
-    (SELECT MIN(si.rental_price_3d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.rental_price_3d > 0) as min_rental_price_3d,
-    (SELECT MIN(si.rental_price_7d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.rental_price_7d > 0) as min_rental_price_7d,
-    (SELECT MIN(si.rental_price_30d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.rental_price_30d > 0) as min_rental_price_30d,
-    (SELECT COUNT(DISTINCT si.shop_id) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.base_price > 0) as purchase_location_count,
-    (SELECT COUNT(DISTINCT si.shop_id) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND (si.rental_price_1d > 0 OR si.rental_price_3d > 0 OR si.rental_price_7d > 0 OR si.rental_price_30d > 0)) as rental_location_count`;
+    item_market.min_purchase_price,
+    item_market.min_rental_price_1d,
+    item_market.min_rental_price_3d,
+    item_market.min_rental_price_7d,
+    item_market.min_rental_price_30d,
+    COALESCE(item_market.purchase_location_count, 0)::integer as purchase_location_count,
+    COALESCE(item_market.rental_location_count, 0)::integer as rental_location_count`;
 }
+
+const ITEM_MARKET_JOIN = `LEFT JOIN (
+  SELECT
+    shop.env,
+    LOWER(si.component_class_name) as component_class_key,
+    MIN(si.base_price) FILTER (WHERE si.base_price > 0) as min_purchase_price,
+    MIN(si.rental_price_1d) FILTER (WHERE si.rental_price_1d > 0) as min_rental_price_1d,
+    MIN(si.rental_price_3d) FILTER (WHERE si.rental_price_3d > 0) as min_rental_price_3d,
+    MIN(si.rental_price_7d) FILTER (WHERE si.rental_price_7d > 0) as min_rental_price_7d,
+    MIN(si.rental_price_30d) FILTER (WHERE si.rental_price_30d > 0) as min_rental_price_30d,
+    COUNT(DISTINCT si.shop_id) FILTER (WHERE si.base_price > 0) as purchase_location_count,
+    COUNT(DISTINCT si.shop_id) FILTER (WHERE si.rental_price_1d > 0 OR si.rental_price_3d > 0 OR si.rental_price_7d > 0 OR si.rental_price_30d > 0) as rental_location_count
+  FROM game.shop_inventory si
+  JOIN game.shops shop ON shop.id = si.shop_id
+  WHERE si.inventory_kind IN ('item', 'unknown')
+  GROUP BY shop.env, LOWER(si.component_class_name)
+) item_market ON item_market.env = i.env
+  AND item_market.component_class_key = LOWER(i.class_name)`;
 
 function formatConsumableLabel(subType: string): string {
   const explicitLabels: Record<string, string> = {
@@ -437,7 +453,7 @@ export class ItemQueryService {
     }
 
     const w = ` WHERE ${where.join(' AND ')}`;
-    const baseSql = `SELECT i.*, m.name as manufacturer_name, ${itemMarketAggregateSelect()} FROM game.items i LEFT JOIN game.manufacturers m ON i.manufacturer_code = m.code${w}`;
+    const baseSql = `SELECT i.*, m.name as manufacturer_name, ${itemMarketAggregateSelect()} FROM game.items i LEFT JOIN game.manufacturers m ON i.manufacturer_code = m.code ${ITEM_MARKET_JOIN}${w}`;
     const countSql = `SELECT COUNT(*) as total FROM game.items i${w}`;
 
     const result = await paginate(prisma, baseSql, countSql, params, filters || {}, ITEM_SORT, 'i', ITEM_JSON_SORT_MAP);

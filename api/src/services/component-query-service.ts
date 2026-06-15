@@ -105,22 +105,40 @@ function isPaintQuery(filters: { type?: string; types?: string[] | string } | un
   return requested.has('paint') || requested.has('livery');
 }
 
-function marketAggregateSelect(
+function marketAggregateSelect(marketAlias: string): string {
+  return `
+    ${marketAlias}.min_purchase_price,
+    ${marketAlias}.min_rental_price_1d,
+    ${marketAlias}.min_rental_price_3d,
+    ${marketAlias}.min_rental_price_7d,
+    ${marketAlias}.min_rental_price_30d,
+    COALESCE(${marketAlias}.purchase_location_count, 0)::integer as purchase_location_count,
+    COALESCE(${marketAlias}.rental_location_count, 0)::integer as rental_location_count`;
+}
+
+function marketAggregateJoin(
+  marketAlias: string,
   entityAlias: string,
-  uuidColumn = 'uuid',
   classNameColumn = 'class_name',
   allowedKindSql = "si.inventory_kind IN ('component', 'unknown')",
 ): string {
-  const match = `(si.component_uuid = ${entityAlias}.${uuidColumn} OR si.component_class_name = ${entityAlias}.${classNameColumn} OR LOWER(si.component_class_name) = LOWER(${entityAlias}.${classNameColumn}))`;
-  const baseWhere = `shop.env = ${entityAlias}.env AND ${allowedKindSql} AND ${match}`;
-  return `
-    (SELECT MIN(si.base_price) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.base_price > 0) as min_purchase_price,
-    (SELECT MIN(si.rental_price_1d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.rental_price_1d > 0) as min_rental_price_1d,
-    (SELECT MIN(si.rental_price_3d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.rental_price_3d > 0) as min_rental_price_3d,
-    (SELECT MIN(si.rental_price_7d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.rental_price_7d > 0) as min_rental_price_7d,
-    (SELECT MIN(si.rental_price_30d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.rental_price_30d > 0) as min_rental_price_30d,
-    (SELECT COUNT(DISTINCT si.shop_id) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.base_price > 0) as purchase_location_count,
-    (SELECT COUNT(DISTINCT si.shop_id) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND (si.rental_price_1d > 0 OR si.rental_price_3d > 0 OR si.rental_price_7d > 0 OR si.rental_price_30d > 0)) as rental_location_count`;
+  return `LEFT JOIN (
+    SELECT
+      shop.env,
+      LOWER(si.component_class_name) as component_class_key,
+      MIN(si.base_price) FILTER (WHERE si.base_price > 0) as min_purchase_price,
+      MIN(si.rental_price_1d) FILTER (WHERE si.rental_price_1d > 0) as min_rental_price_1d,
+      MIN(si.rental_price_3d) FILTER (WHERE si.rental_price_3d > 0) as min_rental_price_3d,
+      MIN(si.rental_price_7d) FILTER (WHERE si.rental_price_7d > 0) as min_rental_price_7d,
+      MIN(si.rental_price_30d) FILTER (WHERE si.rental_price_30d > 0) as min_rental_price_30d,
+      COUNT(DISTINCT si.shop_id) FILTER (WHERE si.base_price > 0) as purchase_location_count,
+      COUNT(DISTINCT si.shop_id) FILTER (WHERE si.rental_price_1d > 0 OR si.rental_price_3d > 0 OR si.rental_price_7d > 0 OR si.rental_price_30d > 0) as rental_location_count
+    FROM game.shop_inventory si
+    JOIN game.shops shop ON shop.id = si.shop_id
+    WHERE ${allowedKindSql}
+    GROUP BY shop.env, LOWER(si.component_class_name)
+  ) ${marketAlias} ON ${marketAlias}.env = ${entityAlias}.env
+    AND ${marketAlias}.component_class_key = LOWER(${entityAlias}.${classNameColumn})`;
 }
 
 export class ComponentQueryService {
@@ -234,7 +252,7 @@ export class ComponentQueryService {
     }
 
     const w = ` WHERE ${where.join(' AND ')}`;
-    const baseSql = `SELECT c.*, ${COMPONENT_SUB_TYPE_EXPR} as sub_type, ${COMPONENT_GRADE_EXPR} as grade, ${COMPONENT_DAMAGE_TYPE_EXPR} as weapon_damage_type, ${COMPONENT_CLASS_EXPR} as component_class, ${IS_BESPOKE_EXPR} as is_bespoke, m.name as manufacturer_name, ${marketAggregateSelect('c')} FROM game.components c LEFT JOIN game.manufacturers m ON c.manufacturer_code = m.code${w}`;
+    const baseSql = `SELECT c.*, ${COMPONENT_SUB_TYPE_EXPR} as sub_type, ${COMPONENT_GRADE_EXPR} as grade, ${COMPONENT_DAMAGE_TYPE_EXPR} as weapon_damage_type, ${COMPONENT_CLASS_EXPR} as component_class, ${IS_BESPOKE_EXPR} as is_bespoke, m.name as manufacturer_name, ${marketAggregateSelect('component_market')} FROM game.components c LEFT JOIN game.manufacturers m ON c.manufacturer_code = m.code ${marketAggregateJoin('component_market', 'c')}${w}`;
     const countSql = `SELECT COUNT(*) as total FROM game.components c${w}`;
 
     const result = await paginate(prisma, baseSql, countSql, params, filters || {}, COMP_SORT, 'c');
@@ -307,10 +325,11 @@ export class ComponentQueryService {
         s.name as ship_name,
         sp.paint_uuid,
         sp.id as paint_id,
-        ${marketAggregateSelect('sp', 'paint_uuid', 'paint_class_name', "si.inventory_kind IN ('component', 'item', 'unknown')")}
+        ${marketAggregateSelect('paint_market')}
        FROM game.ship_paints sp
        LEFT JOIN game.ships s ON sp.ship_uuid = s.uuid AND s.env = sp.env
-       LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code${w}
+       LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code
+       ${marketAggregateJoin('paint_market', 'sp', 'paint_class_name', "si.inventory_kind IN ('component', 'item', 'unknown')")}${w}
        ORDER BY ${sort} ${order}
        LIMIT ${limit} OFFSET ${offset}`),
       ...params,

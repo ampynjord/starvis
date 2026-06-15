@@ -6,17 +6,33 @@ import type { FiltersResult, PaginatedResult, Row } from './shared.js';
 import { toPostgres } from './shared.js';
 
 function paintMarketAggregateSelect(): string {
-  const match = `(si.component_uuid = sp.paint_uuid OR si.component_class_name = sp.paint_class_name OR LOWER(si.component_class_name) = LOWER(sp.paint_class_name))`;
-  const baseWhere = `shop.env = sp.env AND si.inventory_kind IN ('component', 'item', 'unknown') AND ${match}`;
   return `
-      (SELECT MIN(si.base_price) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.base_price > 0) as min_purchase_price,
-      (SELECT MIN(si.rental_price_1d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.rental_price_1d > 0) as min_rental_price_1d,
-      (SELECT MIN(si.rental_price_3d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.rental_price_3d > 0) as min_rental_price_3d,
-      (SELECT MIN(si.rental_price_7d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.rental_price_7d > 0) as min_rental_price_7d,
-      (SELECT MIN(si.rental_price_30d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.rental_price_30d > 0) as min_rental_price_30d,
-      (SELECT COUNT(DISTINCT si.shop_id) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND si.base_price > 0) as purchase_location_count,
-      (SELECT COUNT(DISTINCT si.shop_id) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE ${baseWhere} AND (si.rental_price_1d > 0 OR si.rental_price_3d > 0 OR si.rental_price_7d > 0 OR si.rental_price_30d > 0)) as rental_location_count`;
+      paint_market.min_purchase_price,
+      paint_market.min_rental_price_1d,
+      paint_market.min_rental_price_3d,
+      paint_market.min_rental_price_7d,
+      paint_market.min_rental_price_30d,
+      COALESCE(paint_market.purchase_location_count, 0)::integer as purchase_location_count,
+      COALESCE(paint_market.rental_location_count, 0)::integer as rental_location_count`;
 }
+
+const PAINT_MARKET_JOIN = `LEFT JOIN (
+  SELECT
+    shop.env,
+    LOWER(si.component_class_name) as component_class_key,
+    MIN(si.base_price) FILTER (WHERE si.base_price > 0) as min_purchase_price,
+    MIN(si.rental_price_1d) FILTER (WHERE si.rental_price_1d > 0) as min_rental_price_1d,
+    MIN(si.rental_price_3d) FILTER (WHERE si.rental_price_3d > 0) as min_rental_price_3d,
+    MIN(si.rental_price_7d) FILTER (WHERE si.rental_price_7d > 0) as min_rental_price_7d,
+    MIN(si.rental_price_30d) FILTER (WHERE si.rental_price_30d > 0) as min_rental_price_30d,
+    COUNT(DISTINCT si.shop_id) FILTER (WHERE si.base_price > 0) as purchase_location_count,
+    COUNT(DISTINCT si.shop_id) FILTER (WHERE si.rental_price_1d > 0 OR si.rental_price_3d > 0 OR si.rental_price_7d > 0 OR si.rental_price_30d > 0) as rental_location_count
+  FROM game.shop_inventory si
+  JOIN game.shops shop ON shop.id = si.shop_id
+  WHERE si.inventory_kind IN ('component', 'item', 'unknown')
+  GROUP BY shop.env, LOWER(si.component_class_name)
+) paint_market ON paint_market.env = sp.env
+  AND paint_market.component_class_key = LOWER(sp.paint_class_name)`;
 
 export class PaintQueryService {
   constructor(private getClient: (env: string) => PrismaClient) {}
@@ -44,7 +60,8 @@ export class PaintQueryService {
       ${paintMarketAggregateSelect()}
       FROM game.ship_paints sp
       LEFT JOIN game.ships s ON sp.ship_uuid = s.uuid AND s.env = sp.env
-      LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code${w}`;
+      LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code
+      ${PAINT_MARKET_JOIN}${w}`;
     const countSql = `SELECT COUNT(*) as total FROM game.ship_paints sp LEFT JOIN game.ships s ON sp.ship_uuid = s.uuid AND s.env = sp.env${w}`;
 
     const countRows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(countSql), ...params);
@@ -102,6 +119,7 @@ export class PaintQueryService {
     const baseFrom = `FROM game.ship_paints sp
       LEFT JOIN game.ships s ON sp.ship_uuid = s.uuid AND s.env = sp.env
       LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code
+      ${PAINT_MARKET_JOIN}
       WHERE ${whereClause}`;
 
     const [groups, totalRows, manufacturerRows] = await Promise.all([
@@ -136,13 +154,13 @@ export class PaintQueryService {
                 'ship_class_name', s.class_name,
                 'manufacturer_name', m.name,
                 'manufacturer_code', m.code,
-                'min_purchase_price', (SELECT MIN(si.base_price) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE shop.env = sp.env AND si.inventory_kind IN ('component', 'item', 'unknown') AND (si.component_uuid = sp.paint_uuid OR si.component_class_name = sp.paint_class_name OR LOWER(si.component_class_name) = LOWER(sp.paint_class_name)) AND si.base_price > 0),
-                'min_rental_price_1d', (SELECT MIN(si.rental_price_1d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE shop.env = sp.env AND si.inventory_kind IN ('component', 'item', 'unknown') AND (si.component_uuid = sp.paint_uuid OR si.component_class_name = sp.paint_class_name OR LOWER(si.component_class_name) = LOWER(sp.paint_class_name)) AND si.rental_price_1d > 0),
-                'min_rental_price_3d', (SELECT MIN(si.rental_price_3d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE shop.env = sp.env AND si.inventory_kind IN ('component', 'item', 'unknown') AND (si.component_uuid = sp.paint_uuid OR si.component_class_name = sp.paint_class_name OR LOWER(si.component_class_name) = LOWER(sp.paint_class_name)) AND si.rental_price_3d > 0),
-                'min_rental_price_7d', (SELECT MIN(si.rental_price_7d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE shop.env = sp.env AND si.inventory_kind IN ('component', 'item', 'unknown') AND (si.component_uuid = sp.paint_uuid OR si.component_class_name = sp.paint_class_name OR LOWER(si.component_class_name) = LOWER(sp.paint_class_name)) AND si.rental_price_7d > 0),
-                'min_rental_price_30d', (SELECT MIN(si.rental_price_30d) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE shop.env = sp.env AND si.inventory_kind IN ('component', 'item', 'unknown') AND (si.component_uuid = sp.paint_uuid OR si.component_class_name = sp.paint_class_name OR LOWER(si.component_class_name) = LOWER(sp.paint_class_name)) AND si.rental_price_30d > 0),
-                'purchase_location_count', (SELECT COUNT(DISTINCT si.shop_id) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE shop.env = sp.env AND si.inventory_kind IN ('component', 'item', 'unknown') AND (si.component_uuid = sp.paint_uuid OR si.component_class_name = sp.paint_class_name OR LOWER(si.component_class_name) = LOWER(sp.paint_class_name)) AND si.base_price > 0),
-                'rental_location_count', (SELECT COUNT(DISTINCT si.shop_id) FROM game.shop_inventory si JOIN game.shops shop ON shop.id = si.shop_id WHERE shop.env = sp.env AND si.inventory_kind IN ('component', 'item', 'unknown') AND (si.component_uuid = sp.paint_uuid OR si.component_class_name = sp.paint_class_name OR LOWER(si.component_class_name) = LOWER(sp.paint_class_name)) AND (si.rental_price_1d > 0 OR si.rental_price_3d > 0 OR si.rental_price_7d > 0 OR si.rental_price_30d > 0))
+                'min_purchase_price', paint_market.min_purchase_price,
+                'min_rental_price_1d', paint_market.min_rental_price_1d,
+                'min_rental_price_3d', paint_market.min_rental_price_3d,
+                'min_rental_price_7d', paint_market.min_rental_price_7d,
+                'min_rental_price_30d', paint_market.min_rental_price_30d,
+                'purchase_location_count', COALESCE(paint_market.purchase_location_count, 0),
+                'rental_location_count', COALESCE(paint_market.rental_location_count, 0)
               )
               ORDER BY sp.paint_name
             ) as paints
