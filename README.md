@@ -95,8 +95,8 @@ Minimum values to set in `.env.dev`:
 | `DISCORD_TOKEN` | optional | Enables the Discord bot. |
 | `DISCORD_DEFAULT_MEMBER_ROLE_NAME` / `DISCORD_DEFAULT_MEMBER_ROLE_ID` | optional | Assigns a default Discord role to new server members. Defaults to the `Member` role by name. |
 | `SMTP_HOST` | optional | Enables email verification and password reset emails. |
-| `CONTACT_EMAIL` / `NEXT_PUBLIC_CONTACT_EMAIL` | yes in prod | Contact address displayed in legal/privacy notices and used for support emails. |
-| `LEGAL_*` | yes in prod | Publisher and hosting details displayed on `/legal`. |
+| `CONTACT_EMAIL` | optional | Admin notification recipient for server-side support emails. Not exposed by the IHM. |
+| `LEGAL_*` | yes in prod | Publisher, hosting, and public contact method displayed on `/legal`. |
 
 All supported variables and defaults are documented in `.env.dev.example`.
 
@@ -512,9 +512,9 @@ This code license covers only STARVIS source code owned by ampynjord. It does no
 
 ### GDPR / data protection
 
-The public legal and privacy policy is maintained at `/legal`. Production deployments expose `LEGAL_*`,
-`CONTACT_EMAIL`, and `NEXT_PUBLIC_CONTACT_EMAIL`; keep these values accurate in `.env.prod`. The production template
-uses the public STARVIS domain, the project contact email, and OVH SAS hosting details.
+The public legal and privacy policy is maintained at `/legal`. Production deployments expose `LEGAL_*`;
+keep these values accurate in `.env.prod`. The production template uses the public STARVIS domain,
+a public contact method, and OVH SAS hosting details.
 
 Personal data handled by the project may include:
 
@@ -530,6 +530,6 @@ The AI assistant is optional and requires `MISTRAL_API_KEY`. When enabled, promp
 provider (`CHAT_PROVIDER_BASE_URL`, Mistral by default). Users must not send passwords, API tokens, private keys,
 confidential information or third-party personal data in AI prompts or Discord bot commands.
 
-GDPR contact: configure `CONTACT_EMAIL` and `NEXT_PUBLIC_CONTACT_EMAIL` in the deployment environment.
+GDPR contact: configure `LEGAL_CONTACT_METHOD` in the deployment environment.
 
 Full policy: [starvis.ampynjord.bzh/legal](https://starvis.ampynjord.bzh/legal)
