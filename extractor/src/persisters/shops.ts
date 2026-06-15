@@ -6,6 +6,7 @@ import path from 'node:path';
 import { buildLocationSlugIndex, extractShopsFromPrefabs, type ShopExtractRecord } from '../shop-extractor.js';
 import { batchUpsert } from './batch.js';
 import type { PersistContext } from './context.js';
+import { updateShipMarketSummaries } from './ship-market-summaries.js';
 
 type InventoryKind = 'ship' | 'component' | 'item' | 'commodity' | 'unknown';
 
@@ -514,9 +515,10 @@ export async function saveShopsData(ctx: PersistContext): Promise<{ shops: numbe
           200,
         )
       : 0;
+  const marketSummary = await updateShipMarketSummaries(ctx);
 
   onProgress?.(
-    `Shops: ${savedShops}/${allShops.length} shops saved; ${deletedInventoryRows ?? 0} old inventory rows and ${deletedCommodityRows ?? 0} old commodity prices removed; ${savedInventory} real inventory rows, ${savedCommodityPrices} commodity prices saved (${unmatchedInventory} unmatched UUIDs)`,
+    `Shops: ${savedShops}/${allShops.length} P4K shops saved; ${deletedInventoryRows ?? 0} old inventory rows and ${deletedCommodityRows ?? 0} old commodity prices removed; ${savedInventory} P4K inventory rows, ${savedCommodityPrices} commodity prices saved (${unmatchedInventory} unmatched UUIDs); vehicle market summary updated for ${marketSummary.ships} ships (${marketSummary.purchasable} purchasable, ${marketSummary.rentable} rentable, ${marketSummary.noTerminalOffer} without extracted terminal offer)`,
   );
   return { shops: savedShops, inventory: savedInventory };
 }

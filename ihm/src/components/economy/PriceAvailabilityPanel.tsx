@@ -70,10 +70,12 @@ function rentalRows(row: PriceAvailabilityRow) {
 export function PriceAvailabilityPanel({
   title = 'Purchase & Rental',
   emptyMessage = 'No extracted purchase or rental locations.',
+  emptyDetail = 'This vehicle may be stock-only, event-only, not sold in-game, pledge-only, loot-only, collector-only, or absent from current official extracted shop data.',
   rows,
 }: {
   title?: string;
   emptyMessage?: string;
+  emptyDetail?: string;
   rows?: PriceAvailabilityRow[];
 }) {
   const purchasable = (rows ?? []).filter((row) => {
@@ -84,13 +86,13 @@ export function PriceAvailabilityPanel({
   return (
     <ScifiPanel
       title={title}
-      subtitle={purchasable.length ? `${purchasable.length} extracted location${purchasable.length !== 1 ? 's' : ''}` : 'Not found'}
+      subtitle={purchasable.length ? `${purchasable.length} extracted location${purchasable.length !== 1 ? 's' : ''}` : 'No terminal offer'}
       actions={<MapPin size={14} className="text-slate-600" />}
     >
       {!purchasable.length ? (
         <div className="py-5 text-center">
           <p className="text-sm font-rajdhani text-slate-400">{emptyMessage}</p>
-          <p className="mt-1 text-xs text-slate-600">This may be stock-only, event-only, not sold in-game, or absent from current extracted shop data.</p>
+          <p className="mt-1 text-xs text-slate-600">{emptyDetail}</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
