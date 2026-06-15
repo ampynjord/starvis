@@ -130,7 +130,7 @@ async function scrapeOneGalleryPage(ship: ShipGalleryToScrape): Promise<ShipGall
     page.on('response', async (response) => {
       const url = response.url();
       if (!looksRelevantResponse(url)) return;
-      collectImageUrl(url, candidates);
+      if (url.includes('media.robertsspaceindustries.com')) collectImageUrl(url, candidates);
       try {
         const contentType = response.headers()['content-type'] ?? '';
         if (contentType.includes('application/json')) {
@@ -164,27 +164,38 @@ async function scrapeOneGalleryPage(ship: ShipGalleryToScrape): Promise<ShipGall
     })()`);
     await sleep(2_000);
 
-    const domUrls = (await page.evaluate(`(() => {
-      const values = new Set();
-      document.querySelectorAll('img, source').forEach((el) => {
-        for (const attr of ['src', 'srcset', 'data-src', 'data-srcset']) {
-          const value = el.getAttribute(attr);
-          if (!value) continue;
-          value.split(',').forEach((part) => values.add(part.trim().split(/s+/)[0]));
-        }
-      });
+    const pledgeUrls = (await page.evaluate(() => {
+      const values = new Set<string>();
+      const doc = (globalThis as any).document;
+      doc
+        .querySelectorAll('.orion-c-slideShow img, .orion-c-slideShow source, [class*="slideShow"] img, [class*="slideShow"] source')
+        .forEach((el: any) => {
+          if (el.tagName === 'IMG' && el.currentSrc) values.add(el.currentSrc);
+          for (const attr of ['src', 'srcset', 'data-src', 'data-srcset']) {
+            const value = el.getAttribute(attr);
+            if (!value) continue;
+            value.split(',').forEach((part: string) => {
+              values.add(part.trim().split(/\s+/)[0]);
+            });
+          }
+        });
       return [...values];
-    })()`)) as string[];
-    for (const url of domUrls) collectImageUrl(url, candidates);
+    })) as string[];
+    for (const url of pledgeUrls) {
+      collectImageUrl(url, candidates, {
+        kind: 'pledge-gallery',
+        raw: { source: 'pledge_store_carousel' },
+      });
+    }
   } finally {
     await browser.close();
   }
 
-  if (candidates.size === 0 && ship.fallbackImageUrl) {
+  if (ship.fallbackImageUrl) {
     collectImageUrl(ship.fallbackImageUrl, candidates, {
       title: ship.name,
-      kind: 'ship-matrix-media',
-      raw: { source: 'ship_matrix', fallback: true },
+      kind: candidates.size === 0 ? 'ship-matrix-media' : 'rsi-media',
+      raw: { source: 'ship_matrix', fallback: candidates.size === 0 },
     });
   }
 
@@ -217,7 +228,7 @@ function collectFromUnknown(value: unknown, out: Map<string, ShipGalleryImage>):
   if (images && typeof images === 'object') {
     const imageRecord = images as Record<string, unknown>;
     const url = firstImageVariant(imageRecord, GALLERY_VARIANTS);
-    if (url) {
+    if (url && !url.includes('/i/')) {
       const thumbnailUrl = firstImageVariant(imageRecord, THUMB_VARIANTS);
       collectImageUrl(url, out, {
         thumbnailUrl,
@@ -233,7 +244,10 @@ function collectFromUnknown(value: unknown, out: Map<string, ShipGalleryImage>):
 
 function collectFromText(text: string, out: Map<string, ShipGalleryImage>): void {
   const matches = text.match(MEDIA_URL_RE) ?? [];
-  for (const url of matches) collectImageUrl(url, out);
+  for (const url of matches) {
+    if (url.includes('/i/')) continue;
+    collectImageUrl(url, out);
+  }
 }
 
 function collectImageUrl(url: string, out: Map<string, ShipGalleryImage>, meta?: Partial<ShipGalleryImage>): void {
@@ -261,10 +275,16 @@ function collectImageUrl(url: string, out: Map<string, ShipGalleryImage>, meta?:
     url: normalized,
     thumbnailUrl,
     title: meta?.title ?? null,
-    kind: meta?.kind ?? 'official-gallery',
+    kind: meta?.kind ?? inferImageKind(normalized),
     position: out.size,
     raw: meta?.raw ?? null,
   });
+}
+
+function inferImageKind(url: string): string {
+  if (url.includes('media.robertsspaceindustries.com')) return 'rsi-media';
+  if (url.includes('robertsspaceindustries.com/i/')) return 'pledge-gallery';
+  return 'official-gallery';
 }
 
 function normalizeMediaUrl(url: string | null | undefined): string | null {
@@ -278,7 +298,7 @@ function normalizeMediaUrl(url: string | null | undefined): string | null {
 function getMediaKey(url: string): string {
   return (
     url.match(/media\.robertsspaceindustries\.com\/([a-z0-9]+)\//i)?.[1] ??
-    url.match(/resize\([^)]*,([A-Za-z0-9]+)\)\/source\.webp/i)?.[1] ??
+    url.match(/resize\([^)]*,([A-Za-z0-9]+)\)\/(?:source|[^/]+)\.webp/i)?.[1] ??
     url.match(/robertsspaceindustries\.com\/i\/([a-f0-9]+)\//i)?.[1] ??
     url
   );
@@ -310,7 +330,7 @@ function isImageCandidate(url: string): boolean {
     return GALLERY_VARIANTS.some((variant) => lower.includes(`/${variant}.`)) || lower.includes('/store_slideshow_');
   }
 
-  return lower.includes('robertsspaceindustries.com/i/') && lower.endsWith('/source.webp');
+  return lower.includes('robertsspaceindustries.com/i/');
 }
 
 function isPresentableGalleryImage(url: string): boolean {

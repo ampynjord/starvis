@@ -61,8 +61,8 @@ const SHIP_SELECT = [
   's.cross_section_z',
   // Ship Matrix / media
   's.ship_matrix_id',
-  'sm.media_store_small as thumbnail',
-  'sm.media_store_large as thumbnail_large',
+  'COALESCE(ship_thumb.thumbnail_url, sm.media_store_small) as thumbnail',
+  'COALESCE(ship_thumb.url, sm.media_store_large) as thumbnail_large',
   'sm.production_status',
   'sm.description as sm_description',
   'sm.url as store_url',
@@ -183,6 +183,15 @@ const SHIP_MATRIX_UPCOMING_SQL = "sm2.production_status IN ('in-concept', 'in-pr
 const SHIP_JOINS = `FROM game.ships s
   LEFT JOIN game.manufacturers m ON s.manufacturer_code = m.code
   LEFT JOIN rsi.ship_matrix sm ON s.ship_matrix_id = sm.id
+  LEFT JOIN LATERAL (
+    SELECT g.url, COALESCE(g.thumbnail_url, g.url) as thumbnail_url
+    FROM rsi.ship_galleries g
+    WHERE g.ship_matrix_id = sm.id
+      AND g.url LIKE '%robertsspaceindustries.com/i/%'
+      AND g.url ~* '\\.(webp|png|jpe?g)(\\?.*)?$'
+    ORDER BY g.position ASC, g.id ASC
+    LIMIT 1
+  ) ship_thumb ON TRUE
   LEFT JOIN (
     SELECT
       shop.env,
@@ -209,10 +218,17 @@ const SHIP_JOINS = `FROM game.ships s
 function galleryMediaKey(url: string): string {
   return (
     url.match(/media\.robertsspaceindustries\.com\/([a-z0-9]+)\//i)?.[1] ??
-    url.match(/resize\([^)]*,([A-Za-z0-9]+)\)\/source\.webp/i)?.[1] ??
+    url.match(/resize\([^)]*,([A-Za-z0-9]+)\)\/(?:source|[^/]+)\.webp/i)?.[1] ??
     url.match(/robertsspaceindustries\.com\/i\/([a-f0-9]+)\//i)?.[1] ??
     url.replace(/\/(?:source|store_slideshow_small)\.(webp|png|jpe?g)$/i, '')
   );
+}
+
+function gallerySource(url: string, kind?: string | null): 'pledge' | 'media' | 'fallback' {
+  if (kind === 'ship-matrix-media') return 'fallback';
+  if (url.includes('media.robertsspaceindustries.com')) return 'media';
+  if (url.includes('robertsspaceindustries.com/i/')) return 'pledge';
+  return 'fallback';
 }
 
 function isGalleryImageUrl(url: string): boolean {
@@ -511,10 +527,15 @@ export class ShipQueryService {
       const key = galleryMediaKey(url);
       const existing = bestByMedia.get(key);
       if (!existing || galleryImageScore(url) > galleryImageScore(String(existing.url ?? ''))) {
-        bestByMedia.set(key, row);
+        bestByMedia.set(key, { ...row, source: gallerySource(url, String(row.kind ?? '')) });
       }
     }
-    return [...bestByMedia.values()].sort((left, right) => Number(left.position ?? 0) - Number(right.position ?? 0));
+    const sourceOrder = { pledge: 0, media: 1, fallback: 2 } as const;
+    return [...bestByMedia.values()].sort((left, right) => {
+      const leftSource = gallerySource(String(left.url ?? ''), String(left.kind ?? ''));
+      const rightSource = gallerySource(String(right.url ?? ''), String(right.kind ?? ''));
+      return sourceOrder[leftSource] - sourceOrder[rightSource] || Number(left.position ?? 0) - Number(right.position ?? 0);
+    });
   }
 
   async getShipBuyLocations(ship: Row | string, env = 'live'): Promise<Row[]> {
@@ -842,7 +863,9 @@ export class ShipQueryService {
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT * FROM (
         SELECT s.uuid, COALESCE(sm.name, s.name) as name, s.class_name, s.manufacturer_code,
-                m.name as manufacturer_name, sm.media_store_small as thumbnail, sm.media_store_large as thumbnail_large,
+                m.name as manufacturer_name,
+                COALESCE(ship_thumb.thumbnail_url, sm.media_store_small) as thumbnail,
+                COALESCE(ship_thumb.url, sm.media_store_large) as thumbnail_large,
                 s.vehicle_category, sm.production_status, FALSE as is_concept_only
          ${SHIP_JOINS}
          WHERE s.env = ? AND (s.name ILIKE ? OR s.class_name ILIKE ? OR s.short_name ILIKE ? OR sm.name ILIKE ?)
@@ -945,9 +968,18 @@ export class ShipQueryService {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT s.uuid, COALESCE(sm.name, s.name) as name, s.class_name,
-              sm.media_store_small as thumbnail, s.variant_type
+              COALESCE(ship_thumb.thumbnail_url, sm.media_store_small) as thumbnail, s.variant_type
        FROM game.ships s
        LEFT JOIN rsi.ship_matrix sm ON s.ship_matrix_id = sm.id
+       LEFT JOIN LATERAL (
+         SELECT g.url, COALESCE(g.thumbnail_url, g.url) as thumbnail_url
+         FROM rsi.ship_galleries g
+         WHERE g.ship_matrix_id = sm.id
+           AND g.url LIKE '%robertsspaceindustries.com/i/%'
+           AND g.url ~* '\\.(webp|png|jpe?g)(\\?.*)?$'
+         ORDER BY g.position ASC, g.id ASC
+         LIMIT 1
+       ) ship_thumb ON TRUE
        WHERE s.env = ? AND s.chassis_id = ? AND s.uuid != ?
        ORDER BY COALESCE(sm.name, s.name)`),
       env,
