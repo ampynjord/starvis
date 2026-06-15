@@ -397,8 +397,6 @@ export default function ShipDetailPage() {
         </p>
       )}
 
-      {gallery.length > 0 && <OfficialGalleryCarousel shipName={ship.name} images={gallery} />}
-
       {/* ── Quick stats bar ────────────────────────────────────────────────── */}
       <div className="flex gap-2 flex-wrap">
         {crew != null && (
@@ -507,6 +505,8 @@ export default function ShipDetailPage() {
               />
             </ScifiPanel>
           )}
+
+          {gallery.length > 0 && <OfficialGalleryCarousel shipName={ship.name} images={gallery} />}
         </div>
 
         {/* ════ RIGHT sidebar ════ */}

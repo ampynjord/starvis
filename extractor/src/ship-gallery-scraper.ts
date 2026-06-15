@@ -19,6 +19,7 @@ export interface ShipGalleryImage {
 
 export interface ShipGalleryToScrape extends ShipToScrape {
   shipMatrixId: number;
+  fallbackImageUrl?: string | null;
 }
 
 export interface ShipGalleryScrapeOptions {
@@ -177,6 +178,14 @@ async function scrapeOneGalleryPage(ship: ShipGalleryToScrape): Promise<ShipGall
     for (const url of domUrls) collectImageUrl(url, candidates);
   } finally {
     await browser.close();
+  }
+
+  if (candidates.size === 0 && ship.fallbackImageUrl) {
+    collectImageUrl(ship.fallbackImageUrl, candidates, {
+      title: ship.name,
+      kind: 'ship-matrix-media',
+      raw: { source: 'ship_matrix', fallback: true },
+    });
   }
 
   return [...candidates.values()].map((image, index) => ({ ...image, position: index })).slice(0, 80);

@@ -206,6 +206,14 @@ const SHIP_JOINS = `FROM game.ships s
   ) ship_market ON ship_market.env = s.env
     AND ship_market.component_class_key = LOWER(s.class_name)`;
 
+function galleryMediaKey(url: string): string {
+  return (
+    url.match(/media\.robertsspaceindustries\.com\/([a-z0-9]+)\//i)?.[1] ??
+    url.match(/robertsspaceindustries\.com\/i\/([a-f0-9]+)\//i)?.[1] ??
+    url.replace(/\/(?:source|store_slideshow_small)\.(webp|png|jpe?g)$/i, '')
+  );
+}
+
 /**
  * Dot-notation sort keys that map to JSONB path expressions on the game_data column.
  */
@@ -479,7 +487,15 @@ export class ShipQueryService {
        ORDER BY position ASC, id ASC`),
       shipMatrixId,
     );
-    return rows.map(convertBigIntToNumber);
+    const seen = new Set<string>();
+    const gallery: Row[] = [];
+    for (const row of rows.map(convertBigIntToNumber)) {
+      const key = galleryMediaKey(String(row.url ?? ''));
+      if (seen.has(key)) continue;
+      seen.add(key);
+      gallery.push(row);
+    }
+    return gallery;
   }
 
   async getShipBuyLocations(ship: Row | string, env = 'live'): Promise<Row[]> {

@@ -155,6 +155,17 @@ export function listRequestLogs(limit = 100): RequestLogEntry[] {
   return requestLogs.slice(0, safeLimit);
 }
 
+export function listRequestLogsByScope(scope: 'external' | 'web' | 'all', limit = 100): RequestLogEntry[] {
+  const safeLimit = Math.min(Math.max(Math.trunc(limit) || 100, 1), MAX_LIMIT);
+  const filtered =
+    scope === 'external'
+      ? requestLogs.filter((log) => log.isExternalApi)
+      : scope === 'web'
+        ? requestLogs.filter((log) => !log.isExternalApi && ['web_session', 'internal_web_proxy', 'anonymous_web'].includes(log.clientType))
+        : requestLogs;
+  return filtered.slice(0, safeLimit);
+}
+
 export function clearRequestLogsForTests(): void {
   requestLogs.length = 0;
   nextId = 1;

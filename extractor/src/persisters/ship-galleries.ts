@@ -23,6 +23,7 @@ export async function saveOfficialShipGalleries(
     class_name: string;
     name: string;
     rsi_url: string;
+    fallback_url: string | null;
     gallery_count: string | number;
   }>(
     `SELECT DISTINCT ON (sm.id)
@@ -30,6 +31,7 @@ export async function saveOfficialShipGalleries(
         COALESCE(s.class_name, 'concept-' || sm.id::text) as class_name,
         COALESCE(s.name, sm.name) as name,
         sm.url as rsi_url,
+        COALESCE(sm.media_source_url, sm.media_store_large, sm.media_store_small) as fallback_url,
         COALESCE(g.gallery_count, 0) as gallery_count
       FROM rsi.ship_matrix sm
       LEFT JOIN game.ships s ON s.ship_matrix_id = sm.id
@@ -53,6 +55,7 @@ export async function saveOfficialShipGalleries(
     className: row.class_name,
     name: row.name,
     rsiUrl: row.rsi_url,
+    fallbackImageUrl: row.fallback_url,
   }));
   onProgress?.(`Ship galleries: scraping ${ships.length} RSI pledge page${ships.length !== 1 ? 's' : ''}`);
 

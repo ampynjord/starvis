@@ -7957,6 +7957,16 @@
               "maximum": 500,
               "default": 100
             }
+          },
+          {
+            "name": "scope",
+            "in": "query",
+            "description": "Filter logs by audience: external API only, Starvis web UI only, or all request logs.",
+            "schema": {
+              "type": "string",
+              "enum": ["external", "web", "all"],
+              "default": "all"
+            }
           }
         ],
         "responses": {
