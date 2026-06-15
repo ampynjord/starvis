@@ -16,6 +16,7 @@ import { PageShell } from '@/components/ui/PageShell';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { PriceAvailabilityPanel, type PriceAvailabilityRow } from '@/components/economy/PriceAvailabilityPanel';
 import { ShipCard } from '@/components/ship/ShipCard';
 import { ShipLoadout } from '@/components/ship/ShipLoadout';
 import { ShipStatsBanner } from '@/components/ship/ShipStatsBanner';
@@ -164,6 +165,11 @@ export default function ShipDetailPage() {
   const { data: modules } = useQuery({
     queryKey: ['ships.modules', uuid, env],
     queryFn: () => api.ships.modules(uuid!, env),
+    enabled: !!uuid,
+  });
+  const { data: shipObjectDetail } = useQuery({
+    queryKey: ['objects.ship.prices', uuid, env],
+    queryFn: () => api.objects.detail<unknown, { buy_locations?: PriceAvailabilityRow[] }>('ship', uuid!, { env, include: 'buy_locations' }),
     enabled: !!uuid,
   });
 
@@ -409,6 +415,11 @@ export default function ShipDetailPage() {
           <ScifiPanel title={isGround ? 'Performance' : 'Combat & Speed'}>
             <ShipStatsBanner ship={ship} loadout={loadout ?? []} category={category} />
           </ScifiPanel>
+
+          <PriceAvailabilityPanel
+            rows={shipObjectDetail?.related.buy_locations}
+            emptyMessage="No extracted purchase or rental offers for this vehicle."
+          />
 
           {/* Crew widget */}
           {(() => {

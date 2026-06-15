@@ -167,7 +167,7 @@ export class GameDataService {
         }
       }
       const uuid = String(data.uuid);
-      const [manufacturer, loadout, paints, modules, hardpoints, variants, similar] = await Promise.all([
+      const [manufacturer, loadout, paints, modules, hardpoints, variants, similar, buyLocations] = await Promise.all([
         includes.has('manufacturer') && data.manufacturer_code
           ? this.ships.getManufacturerByCode(String(data.manufacturer_code), env)
           : null,
@@ -177,6 +177,7 @@ export class GameDataService {
         includes.has('hardpoints') ? this.loadouts.getShipHardpoints(uuid, env) : null,
         includes.has('variants') ? this.ships.getShipVariants(uuid, env) : null,
         includes.has('similar') ? this.ships.getSimilarShips(uuid, 5, env) : null,
+        includes.has('buy_locations') ? this.ships.getShipBuyLocations(data, env) : null,
       ]);
       if (manufacturer) related.manufacturer = manufacturer;
       if (loadout) related.loadout = loadout;
@@ -185,6 +186,7 @@ export class GameDataService {
       if (hardpoints) related.hardpoints = hardpoints;
       if (variants) related.variants = variants;
       if (similar) related.similar = similar;
+      if (buyLocations) related.buy_locations = buyLocations;
     } else if (normalizedType === 'component') {
       data = await this.components.resolveComponent(id, env);
       if (!data) return null;
@@ -258,7 +260,7 @@ export class GameDataService {
     const requested = parseIncludes(include);
     if (requested.size) return requested;
     const defaults: Record<ObjectDetailType, string[]> = {
-      ship: ['manufacturer', 'loadout', 'paints', 'modules', 'hardpoints', 'variants', 'similar'],
+      ship: ['manufacturer', 'loadout', 'paints', 'modules', 'hardpoints', 'variants', 'similar', 'buy_locations'],
       component: ['buy_locations', 'ships'],
       item: ['manufacturer', 'buy_locations'],
       commodity: ['prices'],

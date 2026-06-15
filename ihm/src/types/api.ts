@@ -409,10 +409,13 @@ export interface BuyLocation {
   canonical_location_key?: string | null;
   confidence_score?: number | null;
   base_price: number | null;
+  sell_price?: number | null;
   rental_price_1d?: number | null;
   rental_price_3d?: number | null;
   rental_price_7d?: number | null;
   rental_price_30d?: number | null;
+  current_inventory?: number | null;
+  max_inventory?: number | null;
   inventory: number | null;
 }
 
@@ -566,6 +569,8 @@ export interface ShopInventoryItem {
   source_name?: string | null;
   source_reference?: string | null;
   confidence_score?: number | null;
+  source?: string | null;
+  confidence?: number | null;
   raw_json?: Record<string, unknown> | null;
 }
 
@@ -1263,8 +1268,17 @@ export interface ItemBuyLocation {
   canonical_shop_key?: string | null;
   canonical_location_key?: string | null;
   confidence_score?: number | null;
+  planet_moon?: string | null;
+  terminal?: string | null;
+  inventory_kind?: string | null;
+  sell_price?: number | null;
+  current_inventory?: number | null;
+  max_inventory?: number | null;
   base_price: number | null;
   rental_price_1d: number | null;
+  rental_price_3d?: number | null;
+  rental_price_7d?: number | null;
+  rental_price_30d?: number | null;
 }
 
 // ─── Search ───────────────────────────────────────────────────────────────────
