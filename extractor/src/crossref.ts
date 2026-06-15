@@ -252,6 +252,13 @@ function starmapTypeSpecificityScore(p4kType: string, rsiType: string): number {
   return 0;
 }
 
+function starmapMatchConfidence(score: number, method: string): string {
+  if (method === 'alias') return 'manual';
+  if (score >= 95) return 'exact';
+  if (score >= 80) return 'high';
+  return 'probable';
+}
+
 function inferSystemCode(location: { name: string; type: string; system_code: string | null; class_name?: string | null }): string {
   if (location.system_code) return location.system_code.toUpperCase();
 
@@ -279,7 +286,15 @@ function inferSystemCode(location: { name: string; type: string; system_code: st
  * - rsi.starmap_locations is the RSI web/lore view (status, affiliations, descriptions, web URLs).
  */
 export async function crossReferenceStarmapLocations(conn: PoolClient, env: GameEnv): Promise<number> {
-  await conn.query('UPDATE game.locations SET rsi_starmap_location_id = NULL WHERE env = $1', [env]);
+  await conn.query(
+    `UPDATE game.locations
+     SET rsi_starmap_location_id = NULL,
+         starmap_match_method = NULL,
+         starmap_match_score = NULL,
+         starmap_match_confidence = NULL
+     WHERE env = $1`,
+    [env],
+  );
 
   const { rows: locations } = await conn.query<{
     uuid: string;
@@ -306,28 +321,90 @@ export async function crossReferenceStarmapLocations(conn: PoolClient, env: Game
     rsiBySystem.set(key, list);
   }
 
-  const links: Array<{ uuid: string; rsiId: number }> = [];
+  const { rows: aliases } = await conn.query<{
+    game_uuid: string | null;
+    game_class_name: string | null;
+    game_name: string | null;
+    game_type: string | null;
+    system_code: string | null;
+    rsi_starmap_location_id: number;
+    confidence: string;
+  }>(
+    `SELECT game_uuid, game_class_name, game_name, game_type, system_code, rsi_starmap_location_id, confidence
+     FROM game.starmap_location_aliases
+     WHERE env IS NULL OR env = $1`,
+    [env],
+  );
+
+  const aliasByUuid = new Map<string, (typeof aliases)[number]>();
+  const aliasByClass = new Map<string, (typeof aliases)[number]>();
+  const aliasByName = new Map<string, (typeof aliases)[number]>();
+  for (const alias of aliases) {
+    if (alias.game_uuid) aliasByUuid.set(alias.game_uuid, alias);
+    if (alias.game_class_name) aliasByClass.set(normalizeForMatch(alias.game_class_name), alias);
+    if (alias.game_name) {
+      const system = (alias.system_code ?? '').toUpperCase();
+      aliasByName.set(`${system}:${normalizeForMatch(alias.game_name)}:${normalizeStarmapType(alias.game_type)}`, alias);
+      aliasByName.set(`${system}:${normalizeForMatch(alias.game_name)}:`, alias);
+    }
+  }
+
+  const links: Array<{ uuid: string; rsiId: number; method: string; score: number; confidence: string }> = [];
 
   for (const location of locations) {
     const systemCode = inferSystemCode(location);
     if (!systemCode) continue;
+
+    const alias =
+      aliasByUuid.get(location.uuid) ??
+      aliasByClass.get(normalizeForMatch(location.class_name ?? '')) ??
+      aliasByName.get(`${systemCode}:${normalizeForMatch(location.name)}:${normalizeStarmapType(location.type)}`) ??
+      aliasByName.get(`${systemCode}:${normalizeForMatch(location.name)}:`);
+    if (alias) {
+      links.push({
+        uuid: location.uuid,
+        rsiId: alias.rsi_starmap_location_id,
+        method: 'alias',
+        score: 100,
+        confidence: alias.confidence || 'manual',
+      });
+      continue;
+    }
 
     const candidates = (rsiBySystem.get(systemCode) ?? []).filter((rsi) => areStarmapTypesCompatible(location.type, rsi.type));
     if (!candidates.length) continue;
 
     let best: { id: number; score: number } | null = null;
     for (const candidate of candidates) {
-      const score =
+      const score = Math.min(
+        100,
         locationMatchScore(location.name, candidate.name, candidate.system_name) +
-        starmapTypeSpecificityScore(location.type, candidate.type);
+          starmapTypeSpecificityScore(location.type, candidate.type),
+      );
       if (!best || score > best.score) best = { id: candidate.id, score };
     }
 
-    if (best && best.score >= 70) links.push({ uuid: location.uuid, rsiId: best.id });
+    if (best && best.score >= 70) {
+      links.push({
+        uuid: location.uuid,
+        rsiId: best.id,
+        method: best.score >= 95 ? 'exact-name' : 'heuristic',
+        score: best.score,
+        confidence: starmapMatchConfidence(best.score, 'heuristic'),
+      });
+    }
   }
 
   for (const link of links) {
-    await conn.query('UPDATE game.locations SET rsi_starmap_location_id = $1 WHERE uuid = $2 AND env = $3', [link.rsiId, link.uuid, env]);
+    await conn.query(
+      `UPDATE game.locations
+       SET rsi_starmap_location_id = $1,
+           starmap_match_method = $2,
+           starmap_match_score = $3,
+           starmap_match_confidence = $4
+       WHERE uuid = $5 AND env = $6`,
+      [link.rsiId, link.method, link.score, link.confidence, link.uuid, env],
+    );
   }
 
   if (links.length > 0) logger.info(`Linked ${links.length} P4K locations to RSI starmap entries`);

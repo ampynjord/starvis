@@ -118,8 +118,8 @@ P4K modules require `Data.p4k`:
 | `missions` | Contracts, rewards, factions, legality and blueprint rewards. |
 | `crafting` | Recipes, ingredients, modifiers and station requirements. |
 | `paints` | Ship liveries and paints. |
-| `shops` | Extracted in-game shop locations and franchises from Prefab XMLs and DataForge ShopFranchise records. Shop inventory is populated as early-access inferred inventory by shop category, with `source` and `confidence` fields. Prices and rentals stay empty until a reliable extracted source is mapped. |
-| `locations` | Systems, planets, moons, cities, stations and child locations. |
+| `shops` | Extracted in-game shop locations and franchises from Prefab XMLs and DataForge ShopFranchise records, plus real `Data/Scripts/ShopInventories/*.json` inventories. Purchasable ships, components, FPS items and commodities are matched to normalized tables where possible. Buy/sell prices, stock metadata, source and confidence are saved; rental prices are saved when the source file exposes rental offering prices. |
+| `locations` | Systems, planets, moons, cities, stations and child locations. When `starmap` is available in the same run, extracted P4K locations are linked to RSI Starmap rows with a match method, score and confidence. Manual/semi-automatic overrides can be stored in `game.starmap_location_aliases`. |
 | `game-insights` | Extended discovery records plus normalized tables for factions, reputation standings/scopes, loot tables/archetypes, blueprint rewards, ammo and inventory containers. |
 
 Network modules do not require `Data.p4k`:
@@ -205,8 +205,9 @@ LIVE and PTU share the same production database. Data is separated by the `env` 
 A full extraction runs in this order:
 
 ```text
-1. Ship Matrix pre-sync -> rsi schema
-   Used as reference data for cross-reference.
+1. Reference pre-sync -> rsi schema
+   Ship Matrix is synced before ship cross-reference. RSI Starmap is synced before location extraction when both
+   `starmap` and `locations` are selected, so P4K locations can be linked to fresh RSI rows.
 
 2. Atomic transaction for the selected env
    - snapshot previous data for changelog generation
@@ -214,15 +215,16 @@ A full extraction runs in this order:
    - manufacturers
    - components, items and commodities
    - ships and loadout ports
-   - mining, missions, crafting, locations and shops
-   - inferred shop inventory refresh for the selected env
+   - mining, missions, crafting and locations
+   - shops, real shop inventory rows and linked commodity prices for the selected env
    - Ship Matrix cross-reference
+   - RSI Starmap location cross-reference with alias/manual match support and confidence metadata
    - variant tagging and excluded variant cleanup
    - optional CTM scraping
    - changelog generation
    - commit
 
-3. Galactapedia, Comm-links and Starmap -> rsi schema
+3. Galactapedia, Comm-links and any non-pre-synced Starmap work -> rsi schema
    These network modules run outside the P4K transaction.
 ```
 

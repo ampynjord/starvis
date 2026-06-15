@@ -431,7 +431,9 @@ export class ComponentQueryService {
                 WHEN si.component_class_name = ? THEN 'class_name'
                 ELSE 'class_name_ci'
               END as match_type,
-              si.base_price, si.rental_price_1d, si.rental_price_3d, si.rental_price_7d, si.rental_price_30d
+              si.inventory_kind, si.base_price, si.sell_price, si.current_inventory, si.max_inventory,
+              si.rental_price_1d, si.rental_price_3d, si.rental_price_7d, si.rental_price_30d,
+              si.source, si.confidence
        FROM game.shop_inventory si JOIN game.shops s ON si.shop_id = s.id
        WHERE s.env = ?
          AND (

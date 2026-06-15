@@ -3,6 +3,8 @@
  * Tests all API routes against a mock GameDataService / ShipMatrixService
  */
 
+import { readdirSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import type { PrismaLike as PrismaClient } from '@starvis/db';
 import express, { type Express } from 'express';
 import request from 'supertest';
@@ -74,6 +76,7 @@ function makeGameDataService() {
     },
     shops: {
       getShops: fn(paginated),
+      getShopById: fn(null),
       getShopInventory: fn([]),
     },
     items: {
@@ -134,6 +137,7 @@ function makeGameDataService() {
       getLocationChildren: fn([]),
     },
     unifiedSearch: fn({ ships: [], components: [], items: [], commodities: [], missions: [], recipes: [] }),
+    getObjectDetail: fn(null),
     getChangelogSummary: fn([]),
     getChangelog: fn({ data: [], total: 0, page: 1, limit: 20, pages: 0 }),
     getPublicStats: fn({}),
@@ -937,5 +941,53 @@ describe('RSI website routes', () => {
     const res = await request(rsiApp).get('/api/v1/starmap/systems/UNKNOWN');
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);
+  });
+});
+
+describe('OpenAPI coverage', () => {
+  it('documents every mounted Express route', () => {
+    const routeDir = join(process.cwd(), 'src', 'routes');
+    const routeFiles = readdirSync(routeDir).filter((file) => file.endsWith('.ts'));
+    const routes: Array<{ method: string; path: string; file: string }> = [];
+    const routeRe = /router\.(get|post|put|patch|delete)\(\s*([`'"])(.*?)\2/gs;
+    const envDataRouteRe = /mountEnvDataRoute\(\s*router\s*,\s*([`'"])(.*?)\1/gs;
+
+    for (const file of routeFiles) {
+      const text = readFileSync(join(routeDir, file), 'utf8');
+      for (const match of text.matchAll(routeRe)) {
+        routes.push({ method: match[1], path: match[3], file });
+      }
+      for (const match of text.matchAll(envDataRouteRe)) {
+        routes.push({ method: 'get', path: match[2], file });
+      }
+    }
+
+    const openapi = JSON.parse(readFileSync(join(process.cwd(), 'openapi.json'), 'utf8')) as {
+      paths?: Record<string, Record<string, unknown>>;
+    };
+    const missing = routes
+      .map((route) => ({ ...route, openapiPath: route.path.replace(/:([A-Za-z0-9_]+)/g, '{$1}') }))
+      .filter((route) => !openapi.paths?.[route.openapiPath]?.[route.method]);
+
+    expect(missing).toEqual([]);
+  });
+});
+
+describe('GET /api/v1/objects/:type/:id', () => {
+  it('returns one enriched object payload', async () => {
+    gds.getObjectDetail.mockResolvedValueOnce({
+      type: 'ship',
+      id: 'ship-1',
+      env: 'live',
+      data: { uuid: 'ship-1', name: 'Aurora MR' },
+      related: { paints: [] },
+      meta: { includes: ['paints'], generated_at: '2026-06-15T00:00:00.000Z' },
+    });
+
+    const res = await request(app).get('/api/v1/objects/ship/ship-1?include=paints');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.type).toBe('ship');
+    expect(res.body.data.related.paints).toEqual([]);
   });
 });

@@ -19,12 +19,26 @@ import { MiningQueryService } from './mining-query-service.js';
 import { MissionService } from './mission-service.js';
 import { PaintQueryService } from './paint-query-service.js';
 import type { PaginatedResult, Row } from './shared.js';
-import { toPostgres } from './shared.js';
+import { parseIncludes, toPostgres } from './shared.js';
 import { ShipQueryService } from './ship-query-service.js';
 import { ShopService } from './shop-service.js';
 import { TradeService } from './trade-service.js';
 
 export type { PaginatedResult, Row };
+
+export type ObjectDetailType = 'ship' | 'component' | 'item' | 'commodity' | 'shop' | 'location';
+
+export interface ObjectDetailResult {
+  type: ObjectDetailType;
+  id: string;
+  env: string;
+  data: Row;
+  related: Record<string, unknown>;
+  meta: {
+    includes: string[];
+    generated_at: string;
+  };
+}
 
 class TtlCache<T> {
   private data: T | undefined;
@@ -133,6 +147,126 @@ export class GameDataService {
   }
 
   // ── Stats & system info ──────────────────────────────────────────────────
+
+  async getObjectDetail(type: string, id: string, opts: { env?: string; include?: string } = {}): Promise<ObjectDetailResult | null> {
+    const env = opts.env ?? 'live';
+    const normalizedType = this.normalizeObjectDetailType(type);
+    if (!normalizedType) return null;
+    const includes = this.resolveObjectIncludes(normalizedType, opts.include);
+    const related: Record<string, unknown> = {};
+    let data: Row | null = null;
+
+    if (normalizedType === 'ship') {
+      data = (await this.ships.getShipByUuid(id, env)) ?? (await this.ships.getShipByClassName(id, env));
+      if (!data) return null;
+      if (data.game_data && typeof data.game_data === 'string') {
+        try {
+          data.game_data = JSON.parse(data.game_data);
+        } catch {
+          /* keep raw */
+        }
+      }
+      const uuid = String(data.uuid);
+      const [manufacturer, loadout, paints, modules, hardpoints, variants, similar] = await Promise.all([
+        includes.has('manufacturer') && data.manufacturer_code
+          ? this.ships.getManufacturerByCode(String(data.manufacturer_code), env)
+          : null,
+        includes.has('loadout') ? this.loadouts.getShipLoadout(uuid, env) : null,
+        includes.has('paints') ? this.loadouts.getShipPaints(uuid, env) : null,
+        includes.has('modules') ? this.loadouts.getShipModules(uuid, env) : null,
+        includes.has('hardpoints') ? this.loadouts.getShipHardpoints(uuid, env) : null,
+        includes.has('variants') ? this.ships.getShipVariants(uuid, env) : null,
+        includes.has('similar') ? this.ships.getSimilarShips(uuid, 5, env) : null,
+      ]);
+      if (manufacturer) related.manufacturer = manufacturer;
+      if (loadout) related.loadout = loadout;
+      if (paints) related.paints = paints;
+      if (modules) related.modules = modules;
+      if (hardpoints) related.hardpoints = hardpoints;
+      if (variants) related.variants = variants;
+      if (similar) related.similar = similar;
+    } else if (normalizedType === 'component') {
+      data = await this.components.resolveComponent(id, env);
+      if (!data) return null;
+      const [buyLocations, ships] = await Promise.all([
+        includes.has('buy_locations') ? this.components.getComponentBuyLocations(data, env) : null,
+        includes.has('ships') ? this.components.getComponentShips(data, env) : null,
+      ]);
+      if (buyLocations) related.buy_locations = buyLocations;
+      if (ships) related.ships = ships;
+    } else if (normalizedType === 'item') {
+      data = await this.items.resolveItem(id, env);
+      if (!data) return null;
+      const [manufacturer, buyLocations] = await Promise.all([
+        includes.has('manufacturer') && data.manufacturer_code
+          ? this.ships.getManufacturerByCode(String(data.manufacturer_code), env)
+          : null,
+        includes.has('buy_locations') ? this.items.getItemBuyLocations(String(data.uuid), env) : null,
+      ]);
+      if (manufacturer) related.manufacturer = manufacturer;
+      if (buyLocations) related.buy_locations = buyLocations;
+    } else if (normalizedType === 'commodity') {
+      data = await this.commodities.getCommodityByUuid(id, env);
+      if (!data) return null;
+      const prices = includes.has('prices') ? await this.trade.getCommodityPrices(String(data.uuid), env) : null;
+      if (prices) related.prices = prices;
+    } else if (normalizedType === 'shop') {
+      const shopId = Number(id);
+      if (!Number.isInteger(shopId)) return null;
+      data = await this.shops.getShopById(shopId, env);
+      if (!data) return null;
+      const [inventory, prices] = await Promise.all([
+        includes.has('inventory') ? this.shops.getShopInventory(shopId, env) : null,
+        includes.has('prices') ? this.trade.getLocationPrices(shopId, env) : null,
+      ]);
+      if (inventory) related.inventory = inventory;
+      if (prices) related.prices = prices;
+    } else if (normalizedType === 'location') {
+      data = await this.locations.getLocation(id, env);
+      if (!data) return null;
+      const children = includes.has('children') ? await this.locations.getLocationChildren(String(data.uuid), env) : null;
+      if (children) related.children = children;
+    }
+    if (!data) return null;
+
+    return {
+      type: normalizedType,
+      id,
+      env,
+      data,
+      related,
+      meta: {
+        includes: [...includes].sort(),
+        generated_at: new Date().toISOString(),
+      },
+    };
+  }
+
+  private normalizeObjectDetailType(type: string): ObjectDetailType | null {
+    const normalized = type.toLowerCase().replace(/_/g, '-');
+    if (['ship', 'ships', 'vehicle', 'vehicles', 'ground-vehicle', 'gravlev'].includes(normalized)) return 'ship';
+    if (['component', 'components'].includes(normalized)) return 'component';
+    if (['item', 'items'].includes(normalized)) return 'item';
+    if (['commodity', 'commodities'].includes(normalized)) return 'commodity';
+    if (['shop', 'shops', 'store'].includes(normalized)) return 'shop';
+    if (['location', 'locations', 'place'].includes(normalized)) return 'location';
+    return null;
+  }
+
+  private resolveObjectIncludes(type: ObjectDetailType, include?: string): Set<string> {
+    if (include === 'none') return new Set();
+    const requested = parseIncludes(include);
+    if (requested.size) return requested;
+    const defaults: Record<ObjectDetailType, string[]> = {
+      ship: ['manufacturer', 'loadout', 'paints', 'modules', 'hardpoints', 'variants', 'similar'],
+      component: ['buy_locations', 'ships'],
+      item: ['manufacturer', 'buy_locations'],
+      commodity: ['prices'],
+      shop: ['inventory', 'prices'],
+      location: ['children'],
+    };
+    return new Set(defaults[type]);
+  }
 
   async getChangelog(params: {
     env?: string;

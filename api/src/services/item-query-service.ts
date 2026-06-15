@@ -694,7 +694,9 @@ export class ItemQueryService {
       toPostgres(`SELECT s.id as shop_id, s.name as shop_name, s.location, s.planet_moon,
               s.system as system_name, s.city, s.shop_type,
               s.canonical_shop_key, s.canonical_location_key,
-              si.base_price, si.rental_price_1d
+              si.inventory_kind, si.base_price, si.sell_price, si.current_inventory, si.max_inventory,
+              si.rental_price_1d, si.rental_price_3d, si.rental_price_7d, si.rental_price_30d,
+              si.source, si.confidence
        FROM game.shop_inventory si
        JOIN game.shops s ON si.shop_id = s.id
        WHERE s.env = ? AND si.component_uuid = ?

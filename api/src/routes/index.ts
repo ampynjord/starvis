@@ -13,6 +13,7 @@ import { mountLocationRoutes } from './locations.js';
 import { mountManufacturerRoutes } from './manufacturers.js';
 import { mountMiningRoutes } from './mining.js';
 import { mountMissionRoutes } from './missions.js';
+import { mountObjectRoutes } from './objects.js';
 import { mountPaintRoutes } from './paints.js';
 import { mountRsiWebsiteRoutes } from './rsi-website.js';
 import { mountSearchRoutes } from './search.js';
@@ -39,6 +40,7 @@ const routeMounts = [
   mountMiningRoutes,
   mountMissionRoutes,
   mountLocationRoutes,
+  mountObjectRoutes,
   mountSearchRoutes,
   mountCalculateRoutes,
   mountTradeRoutes,

@@ -122,7 +122,8 @@ model StarmapLocation {
   sourceUpdatedAt    DateTime? @map("source_updated_at")
   syncedAt           DateTime  @default(now()) @map("synced_at")
 
-  gameLocations Location[]
+  gameLocations        Location[]
+  gameLocationAliases  StarmapLocationAlias[]
 
   @@index([systemCode])
   @@index([parentId])
