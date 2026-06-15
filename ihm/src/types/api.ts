@@ -68,6 +68,13 @@ export interface ShipListItem {
   equipped_ports?: string[] | null;
   port_min_size?: number | null;
   port_max_size?: number | null;
+  min_purchase_price?: number | null;
+  min_rental_price_1d?: number | null;
+  min_rental_price_3d?: number | null;
+  min_rental_price_7d?: number | null;
+  min_rental_price_30d?: number | null;
+  purchase_location_count?: number | null;
+  rental_location_count?: number | null;
 }
 
 export interface Ship extends ShipListItem {
@@ -167,6 +174,13 @@ export interface PaintListItem extends ShipPaint {
   ship_class_name: string | null;
   manufacturer_name: string | null;
   manufacturer_code: string | null;
+  min_purchase_price?: number | null;
+  min_rental_price_1d?: number | null;
+  min_rental_price_3d?: number | null;
+  min_rental_price_7d?: number | null;
+  min_rental_price_30d?: number | null;
+  purchase_location_count?: number | null;
+  rental_location_count?: number | null;
 }
 
 export interface PaintShipGroup {
@@ -245,6 +259,13 @@ export interface ComponentListItem {
   source_name?: string | null;
   source_reference?: string | null;
   confidence_score?: number | null;
+  min_purchase_price?: number | null;
+  min_rental_price_1d?: number | null;
+  min_rental_price_3d?: number | null;
+  min_rental_price_7d?: number | null;
+  min_rental_price_30d?: number | null;
+  purchase_location_count?: number | null;
+  rental_location_count?: number | null;
   type: string;
   game_component_category?: string | null;
   sub_type: string | null;
@@ -432,6 +453,13 @@ export interface ItemListItem {
   source_name?: string | null;
   source_reference?: string | null;
   confidence_score?: number | null;
+  min_purchase_price?: number | null;
+  min_rental_price_1d?: number | null;
+  min_rental_price_3d?: number | null;
+  min_rental_price_7d?: number | null;
+  min_rental_price_30d?: number | null;
+  purchase_location_count?: number | null;
+  rental_location_count?: number | null;
   type: string;
   sub_type: string | null;
   size: number | null;

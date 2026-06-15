@@ -319,6 +319,41 @@
             "nullable": true,
             "description": "3D model URL (.ctm)"
           },
+          "min_purchase_price": {
+            "type": "number",
+            "nullable": true,
+            "description": "Lowest extracted in-game purchase price from linked ship shop inventories."
+          },
+          "min_rental_price_1d": {
+            "type": "number",
+            "nullable": true,
+            "description": "Lowest extracted 1-day rental price from linked ship shop inventories."
+          },
+          "min_rental_price_3d": {
+            "type": "number",
+            "nullable": true,
+            "description": "Lowest extracted 3-day rental price from linked ship shop inventories."
+          },
+          "min_rental_price_7d": {
+            "type": "number",
+            "nullable": true,
+            "description": "Lowest extracted 7-day rental price from linked ship shop inventories."
+          },
+          "min_rental_price_30d": {
+            "type": "number",
+            "nullable": true,
+            "description": "Lowest extracted 30-day rental price from linked ship shop inventories."
+          },
+          "purchase_location_count": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Number of extracted shop locations selling this ship."
+          },
+          "rental_location_count": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Number of extracted shop locations renting this ship."
+          },
           "game_data": {
             "type": "object",
             "nullable": true,
@@ -452,6 +487,38 @@
             "type": "string",
             "nullable": true,
             "example": "Klaus & Werner"
+          },
+          "min_purchase_price": {
+            "type": "number",
+            "nullable": true,
+            "description": "Lowest extracted in-game purchase price from linked shop inventories."
+          },
+          "min_rental_price_1d": {
+            "type": "number",
+            "nullable": true,
+            "description": "Lowest extracted 1-day rental price from linked shop inventories."
+          },
+          "min_rental_price_3d": {
+            "type": "number",
+            "nullable": true
+          },
+          "min_rental_price_7d": {
+            "type": "number",
+            "nullable": true
+          },
+          "min_rental_price_30d": {
+            "type": "number",
+            "nullable": true
+          },
+          "purchase_location_count": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Number of extracted shop locations selling this component."
+          },
+          "rental_location_count": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Number of extracted shop locations renting this component."
           },
           "description": {
             "type": "string",
@@ -873,6 +940,38 @@
             "type": "string",
             "nullable": true
           },
+          "min_purchase_price": {
+            "type": "number",
+            "nullable": true,
+            "description": "Lowest extracted in-game purchase price from linked shop inventories."
+          },
+          "min_rental_price_1d": {
+            "type": "number",
+            "nullable": true,
+            "description": "Lowest extracted 1-day rental price from linked shop inventories."
+          },
+          "min_rental_price_3d": {
+            "type": "number",
+            "nullable": true
+          },
+          "min_rental_price_7d": {
+            "type": "number",
+            "nullable": true
+          },
+          "min_rental_price_30d": {
+            "type": "number",
+            "nullable": true
+          },
+          "purchase_location_count": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Number of extracted shop locations selling this item."
+          },
+          "rental_location_count": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Number of extracted shop locations renting this item."
+          },
           "description": {
             "type": "string",
             "nullable": true
@@ -945,6 +1044,37 @@
           "ship_name": {
             "type": "string",
             "nullable": true
+          },
+          "min_purchase_price": {
+            "type": "number",
+            "nullable": true,
+            "description": "Lowest extracted in-game purchase price from linked shop inventories."
+          },
+          "min_rental_price_1d": {
+            "type": "number",
+            "nullable": true
+          },
+          "min_rental_price_3d": {
+            "type": "number",
+            "nullable": true
+          },
+          "min_rental_price_7d": {
+            "type": "number",
+            "nullable": true
+          },
+          "min_rental_price_30d": {
+            "type": "number",
+            "nullable": true
+          },
+          "purchase_location_count": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Number of extracted shop locations selling this paint."
+          },
+          "rental_location_count": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Number of extracted shop locations renting this paint."
           },
           "thumbnail_url": {
             "type": "string",

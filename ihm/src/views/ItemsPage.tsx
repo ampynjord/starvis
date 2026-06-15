@@ -17,6 +17,7 @@ import { useListQueryState } from "@/hooks/useListQueryState";
 import { ITEM_TYPE_LABELS } from "@/utils/constants";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PageShell } from "@/components/ui/PageShell";
+import { MarketSummary } from "@/components/economy/MarketSummary";
 import { ListFilterBar, ListFilterChips, ListFilterResetButton, ListFilterSelect } from "@/components/ui/ListFilters";
 import type { AmmoInsight, InventoryContainerInsight, ItemListItem } from "@/types/api";
 
@@ -457,6 +458,9 @@ export default function ItemsPage({ group }: ItemsPageProps = {}) {
 											{/* Stats */}
 											<div className="shrink-0 text-right">
 												<ItemStats item={item} />
+												<div className="mt-1 hidden sm:block">
+													<MarketSummary item={item} compact />
+												</div>
 											</div>
 
 											{/* Mission leads icon */}
@@ -467,6 +471,9 @@ export default function ItemsPage({ group }: ItemsPageProps = {}) {
 											>
 												<ExternalLink size={12} />
 											</Link>
+										</div>
+										<div className="mt-1 sm:hidden">
+											<MarketSummary item={item} />
 										</div>
 									</motion.div>
 						))}

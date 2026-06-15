@@ -76,6 +76,67 @@ const SHIP_SELECT = [
   's.insurance_expedite_cost',
   's.short_name',
   's.variant_type',
+  `(SELECT MIN(si.base_price)
+      FROM game.shop_inventory si
+      JOIN game.shops shop ON shop.id = si.shop_id
+      WHERE shop.env = s.env
+        AND si.inventory_kind = 'ship'
+        AND si.base_price > 0
+        AND (si.component_uuid = s.uuid OR si.component_class_name = s.class_name OR LOWER(si.component_class_name) = LOWER(s.class_name))
+    ) as min_purchase_price`,
+  `(SELECT MIN(si.rental_price_1d)
+      FROM game.shop_inventory si
+      JOIN game.shops shop ON shop.id = si.shop_id
+      WHERE shop.env = s.env
+        AND si.inventory_kind = 'ship'
+        AND si.rental_price_1d > 0
+        AND (si.component_uuid = s.uuid OR si.component_class_name = s.class_name OR LOWER(si.component_class_name) = LOWER(s.class_name))
+    ) as min_rental_price_1d`,
+  `(SELECT MIN(si.rental_price_3d)
+      FROM game.shop_inventory si
+      JOIN game.shops shop ON shop.id = si.shop_id
+      WHERE shop.env = s.env
+        AND si.inventory_kind = 'ship'
+        AND si.rental_price_3d > 0
+        AND (si.component_uuid = s.uuid OR si.component_class_name = s.class_name OR LOWER(si.component_class_name) = LOWER(s.class_name))
+    ) as min_rental_price_3d`,
+  `(SELECT MIN(si.rental_price_7d)
+      FROM game.shop_inventory si
+      JOIN game.shops shop ON shop.id = si.shop_id
+      WHERE shop.env = s.env
+        AND si.inventory_kind = 'ship'
+        AND si.rental_price_7d > 0
+        AND (si.component_uuid = s.uuid OR si.component_class_name = s.class_name OR LOWER(si.component_class_name) = LOWER(s.class_name))
+    ) as min_rental_price_7d`,
+  `(SELECT MIN(si.rental_price_30d)
+      FROM game.shop_inventory si
+      JOIN game.shops shop ON shop.id = si.shop_id
+      WHERE shop.env = s.env
+        AND si.inventory_kind = 'ship'
+        AND si.rental_price_30d > 0
+        AND (si.component_uuid = s.uuid OR si.component_class_name = s.class_name OR LOWER(si.component_class_name) = LOWER(s.class_name))
+    ) as min_rental_price_30d`,
+  `(SELECT COUNT(DISTINCT si.shop_id)
+      FROM game.shop_inventory si
+      JOIN game.shops shop ON shop.id = si.shop_id
+      WHERE shop.env = s.env
+        AND si.inventory_kind = 'ship'
+        AND si.base_price > 0
+        AND (si.component_uuid = s.uuid OR si.component_class_name = s.class_name OR LOWER(si.component_class_name) = LOWER(s.class_name))
+    ) as purchase_location_count`,
+  `(SELECT COUNT(DISTINCT si.shop_id)
+      FROM game.shop_inventory si
+      JOIN game.shops shop ON shop.id = si.shop_id
+      WHERE shop.env = s.env
+        AND si.inventory_kind = 'ship'
+        AND (
+          si.rental_price_1d > 0
+          OR si.rental_price_3d > 0
+          OR si.rental_price_7d > 0
+          OR si.rental_price_30d > 0
+        )
+        AND (si.component_uuid = s.uuid OR si.component_class_name = s.class_name OR LOWER(si.component_class_name) = LOWER(s.class_name))
+    ) as rental_location_count`,
 ].join(', ');
 
 const SHIP_MATRIX_CATEGORY_SQL = `CASE
@@ -161,6 +222,13 @@ const CONCEPT_SELECT = [
   'NULL as insurance_expedite_cost',
   'NULL as short_name',
   'NULL as variant_type',
+  'NULL::numeric as min_purchase_price',
+  'NULL::numeric as min_rental_price_1d',
+  'NULL::numeric as min_rental_price_3d',
+  'NULL::numeric as min_rental_price_7d',
+  'NULL::numeric as min_rental_price_30d',
+  '0::integer as purchase_location_count',
+  '0::integer as rental_location_count',
 ].join(', ');
 
 const SHIP_MATRIX_UPCOMING_STATUSES = new Set(['in-concept', 'in-production', 'in-development']);

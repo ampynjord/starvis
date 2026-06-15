@@ -22,6 +22,7 @@ import {
 import { PageHeader } from "@/components/ui/PageHeader";
 import { PageShell } from "@/components/ui/PageShell";
 import { PageTabs } from "@/components/ui/PageTabs";
+import { MarketSummary } from "@/components/economy/MarketSummary";
 import { ListFilterBar, ListFilterChips, ListFilterSelect } from "@/components/ui/ListFilters";
 import type { ComponentListItem } from "@/types/api";
 import { getComponentMetricGroups, getComponentPrimaryMetrics } from "@/utils/componentMetrics";
@@ -430,10 +431,16 @@ export default function ComponentsPage() {
                           {/* Key stats */}
                           <div className="hidden lg:block shrink-0 text-right">
                             <ComponentStats comp={comp} />
+                            <div className="mt-1">
+                              <MarketSummary item={comp} compact />
+                            </div>
                           </div>
                         </div>
 
                         <ComponentMetricStrip comp={comp} />
+                        <div className="mt-2 lg:hidden">
+                          <MarketSummary item={comp} />
+                        </div>
                       </div>
                     </div>
                   </Link>
