@@ -55,6 +55,48 @@ function statusLabel(status: string): string {
   return STATUS_LABELS[status] ?? status.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function shipMarketEmptyCopy(ship: {
+  is_concept_only?: boolean | null;
+  production_status?: string | null;
+  store_url?: string | null;
+  variant_type?: string | null;
+}) {
+  if (ship.variant_type === 'collector') {
+    return {
+      message: 'No official in-game purchase or rental terminal was extracted for this collector vehicle.',
+      detail: 'Collector and limited vehicles can exist in game data without being sold at a public terminal in the current build.',
+    };
+  }
+  if (ship.variant_type === 'wikelo' || ship.variant_type === 'pyam_exec') {
+    return {
+      message: 'No official in-game purchase or rental terminal was extracted for this special variant.',
+      detail: 'Special, reward, event, loot or program variants can be obtainable without a normal shop price in the extracted terminal data.',
+    };
+  }
+  if (ship.is_concept_only) {
+    return {
+      message: 'No official in-game purchase or rental terminal was extracted for this concept vehicle.',
+      detail: 'Concept vehicles can have RSI pledge metadata while not being available through in-game terminals yet.',
+    };
+  }
+  if (ship.production_status && !['flight-ready', 'flight_ready'].includes(ship.production_status)) {
+    return {
+      message: `No official in-game purchase or rental terminal was extracted for this ${statusLabel(ship.production_status).toLowerCase()} vehicle.`,
+      detail: 'The ship exists in official RSI or game metadata, but current P4K shop inventories do not expose a terminal offer for it.',
+    };
+  }
+  if (ship.store_url) {
+    return {
+      message: 'No official in-game purchase or rental terminal was extracted for this vehicle.',
+      detail: 'It has an official RSI page, but Starvis only shows in-game prices when they are present in the extracted game shop inventories.',
+    };
+  }
+  return {
+    message: 'No official in-game purchase or rental terminal was extracted for this vehicle.',
+    detail: 'It may be unavailable for purchase, loot-only, event-only, collector-only, stock-only, or missing from the current P4K shop inventory files.',
+  };
+}
+
 // ── Quick stat pill ───────────────────────────────────────────────────────────
 function QuickStat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
@@ -392,6 +434,7 @@ export default function ShipDetailPage() {
   const hasCargo = ship.cargo_capacity != null && Number(ship.cargo_capacity) > 0;
   const hasInsurance = ship.insurance_claim_time != null || ship.insurance_expedite_cost != null;
   const gallery = ship.gallery ?? [];
+  const marketEmptyCopy = shipMarketEmptyCopy(ship);
 
   return (
     <PageShell size="xl">
@@ -602,7 +645,8 @@ export default function ShipDetailPage() {
 
           <PriceAvailabilityPanel
             rows={buyLocations}
-            emptyMessage="No extracted purchase or rental offers for this vehicle."
+            emptyMessage={marketEmptyCopy.message}
+            emptyDetail={marketEmptyCopy.detail}
           />
 
           {/* Crew widget */}

@@ -56,7 +56,7 @@ const PUBLIC_PATHS = new Set([
   '/roadmap',
 ]);
 
-// Public path prefixes — detail pages and sub-routes
+// Public path prefixes: detail pages, sub-routes, Next.js internals and static assets.
 const PUBLIC_PREFIXES = [
   '/ships/',
   '/vehicles/',
@@ -82,25 +82,22 @@ const PUBLIC_PREFIXES = [
   '/starmap/',
   '/galactapedia/',
   '/comm-links/',
-  // Next.js internals & static assets
   '/api/',
   '/_next/',
   '/brand/',
   '/favicon',
   '/robots',
   '/sitemap',
-  // API documentation (Swagger UI proxied from backend)
   '/api-docs',
 ];
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (PUBLIC_PATHS.has(pathname)) return NextResponse.next();
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next();
 
-  // Only check cookie presence (JWT signature is validated by the API on each
-  // authenticated call — this middleware only handles UX redirection)
+  // JWT signature is validated by the API; this proxy only handles UX redirection.
   const token = req.cookies.get(AUTH_COOKIE_NAME)?.value;
   if (!token) {
     const loginUrl = new URL('/login', req.url);
