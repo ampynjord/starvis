@@ -540,6 +540,47 @@ export interface Shop {
   loc_key: string | null;
 }
 
+export interface ShopInventoryItem {
+  id: number;
+  shop_id: number;
+  component_uuid: string | null;
+  component_class_name: string | null;
+  terminal: string | null;
+  inventory_kind: 'component' | 'item' | 'ship' | 'commodity' | 'unknown' | string;
+  item_name: string | null;
+  item_class_name: string | null;
+  item_type: string | null;
+  item_size: number | null;
+  component_name?: string | null;
+  component_type?: string | null;
+  component_size?: number | null;
+  base_price: number | null;
+  sell_price: number | null;
+  current_inventory: number | null;
+  max_inventory: number | null;
+  rental_price_1d: number | null;
+  rental_price_3d: number | null;
+  rental_price_7d: number | null;
+  rental_price_30d: number | null;
+  source_type?: string | null;
+  source_name?: string | null;
+  source_reference?: string | null;
+  confidence_score?: number | null;
+  raw_json?: Record<string, unknown> | null;
+}
+
+export interface ObjectDetail<TData = Record<string, unknown>, TRelated = Record<string, unknown>> {
+  type: 'ship' | 'component' | 'item' | 'commodity' | 'shop' | 'location';
+  id: string;
+  env: string;
+  data: TData;
+  related: TRelated;
+  meta: {
+    includes: string[];
+    generated_at: string;
+  };
+}
+
 // ─── Changelog ────────────────────────────────────────────────────────────────
 // ─── Mining ───────────────────────────────────────────────────────────────────
 export interface MiningElement {
