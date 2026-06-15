@@ -20,7 +20,7 @@ export const DISCORD_BOT_COMMANDS: DiscordBotCommand[] = [
   { name: 'commodity', description: 'Search commodity data.', usage: '/commodity name: Laranite', category: 'Economy' },
   { name: 'paint', description: 'Search ship paints and liveries.', usage: '/paint search: Invictus', category: 'Items' },
   { name: 'trade', description: 'Find best trade routes for a cargo capacity.', usage: '/trade scu: 200', category: 'Economy' },
-  { name: 'shop', description: 'Search shops and inspect inventory.', usage: '/shop search: Area18 inventory: true', category: 'Economy' },
+  { name: 'shop', description: 'Search extracted shop locations and franchises.', usage: '/shop search: Area18', category: 'Economy' },
   {
     name: 'mining',
     description: 'Explore mining elements, rocks and laser heads.',

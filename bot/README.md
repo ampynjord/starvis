@@ -5,9 +5,12 @@ Discord slash-command bot for Starvis.
 ## Commands
 
 The bot registers commands for AI answers, ships, comparison, loadouts, components,
-items, commodities, paints, trade, shops, mining, crafting, missions, locations,
+items, commodities, paints, trade, shop locations, mining, crafting, missions, locations,
 factions, lore, global search, manufacturers, changelog, version, rankings, intel
 and status.
+
+The `/shop` command only exposes extracted shop locations and franchises. Shop
+inventory is disabled until reliable extracted inventory data is available.
 
 The web IHM exposes the same command help at `/discord`.
 

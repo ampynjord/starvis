@@ -274,8 +274,9 @@ export class ExtractionService {
 
       // 1c. Clean stale data before fresh extraction (order matters for FK constraints)
       onProgress?.('Cleaning stale data…');
-      // Shops are upserted below so community-sourced shop_inventory / commodity_prices keep their shop_id links.
-      // Deleting shops here would cascade those external records.
+      // Shops are upserted below so commodity_prices keep their shop_id links.
+      // shop_inventory is cleaned by the shops persister because reliable inventory extraction is not available yet.
+      // Deleting shops here would cascade external price records.
       if (run('ships')) {
         // Preserve ctm_url values before wiping ships — they won't be re-scraped
         const { rows: ctmRows } = await conn.query<any>(

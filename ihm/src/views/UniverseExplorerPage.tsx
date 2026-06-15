@@ -128,6 +128,7 @@ type MapNode = {
   color: number;
   label: string;
   shopCount: number;
+  shop?: Shop;
 };
 
 type JumpConnection = { from: MapNode; to: MapNode; status: string | null };
@@ -176,18 +177,49 @@ const FALLBACK_POSITIONS: RsiStarmapPosition[] = [
   { id: 9, rsi_id: 'stanton-pyro', name: 'Stanton - Pyro', type: 'jump_point', system_code: 'STAN', parent_id: 1, coordinates: { x: 34, y: 0, z: -33 } },
 ];
 
-const TYPE_ORDER = ['system', 'star', 'planet', 'moon', 'station', 'landing_zone', 'rest_stop', 'outpost', 'jump_point', 'comm_array'];
+const TYPE_ORDER = [
+  'system',
+  'star',
+  'planet',
+  'station',
+  'asteroid',
+  'jump_point',
+  'moon',
+  'orbital_station',
+  'rest_stop',
+  'landing_zone',
+  'zone',
+  'city',
+  'base',
+  'outpost',
+  'location',
+  'shop',
+  'hospital',
+  'rental',
+  'service',
+  'comm_array',
+];
 const MAP_TYPES = new Set(TYPE_ORDER);
 
 const TYPE_STYLE: Record<string, { label: string; color: number; radius: number; icon: React.ReactNode; text: string; accent: string }> = {
-  system: { label: 'System', color: 0x39e7ff, radius: 1.65, icon: <Sparkles size={12} />, text: 'text-cyan-300', accent: 'border-cyan-700/60 bg-cyan-950/25' },
+  system: { label: 'Star system', color: 0x39e7ff, radius: 1.65, icon: <Sparkles size={12} />, text: 'text-cyan-300', accent: 'border-cyan-700/60 bg-cyan-950/25' },
   star: { label: 'Star', color: 0xffcc66, radius: 1.25, icon: <Sparkles size={12} />, text: 'text-amber-300', accent: 'border-amber-700/60 bg-amber-950/25' },
   planet: { label: 'Planet', color: 0x2dd4bf, radius: 1.55, icon: <Globe2 size={12} />, text: 'text-teal-300', accent: 'border-teal-700/60 bg-teal-950/25' },
   moon: { label: 'Moon', color: 0x94a3b8, radius: 0.82, icon: <CircleDot size={11} />, text: 'text-slate-300', accent: 'border-slate-700/60 bg-slate-900/35' },
-  station: { label: 'Station', color: 0xa78bfa, radius: 0.76, icon: <Building2 size={11} />, text: 'text-violet-300', accent: 'border-violet-700/60 bg-violet-950/25' },
-  landing_zone: { label: 'Landing zone', color: 0x38bdf8, radius: 0.7, icon: <MapPin size={11} />, text: 'text-sky-300', accent: 'border-sky-700/60 bg-sky-950/25' },
+  station: { label: 'Space station', color: 0xa78bfa, radius: 0.76, icon: <Building2 size={11} />, text: 'text-violet-300', accent: 'border-violet-700/60 bg-violet-950/25' },
+  orbital_station: { label: 'Orbital station', color: 0x818cf8, radius: 0.68, icon: <Building2 size={11} />, text: 'text-indigo-300', accent: 'border-indigo-700/60 bg-indigo-950/25' },
+  asteroid: { label: 'Asteroid', color: 0x94a3b8, radius: 0.72, icon: <CircleDot size={11} />, text: 'text-slate-300', accent: 'border-slate-700/60 bg-slate-900/35' },
+  landing_zone: { label: 'City / zone', color: 0x38bdf8, radius: 0.7, icon: <MapPin size={11} />, text: 'text-sky-300', accent: 'border-sky-700/60 bg-sky-950/25' },
+  zone: { label: 'Zone', color: 0x38bdf8, radius: 0.52, icon: <MapPin size={10} />, text: 'text-sky-300', accent: 'border-sky-700/60 bg-sky-950/25' },
+  city: { label: 'City', color: 0x38bdf8, radius: 0.64, icon: <Building2 size={11} />, text: 'text-sky-300', accent: 'border-sky-700/60 bg-sky-950/25' },
+  base: { label: 'Base', color: 0x64748b, radius: 0.5, icon: <MapPin size={10} />, text: 'text-slate-400', accent: 'border-slate-800 bg-slate-950/35' },
   rest_stop: { label: 'Rest stop', color: 0xf59e0b, radius: 0.7, icon: <Store size={11} />, text: 'text-amber-300', accent: 'border-amber-700/60 bg-amber-950/25' },
   outpost: { label: 'Outpost', color: 0x64748b, radius: 0.5, icon: <MapPin size={10} />, text: 'text-slate-400', accent: 'border-slate-800 bg-slate-950/35' },
+  location: { label: 'Location', color: 0x64748b, radius: 0.42, icon: <MapPin size={10} />, text: 'text-slate-400', accent: 'border-slate-800 bg-slate-950/35' },
+  shop: { label: 'Shop', color: 0xfbbf24, radius: 0.34, icon: <Store size={10} />, text: 'text-amber-300', accent: 'border-amber-800/60 bg-amber-950/20' },
+  hospital: { label: 'Hospital', color: 0x22c55e, radius: 0.36, icon: <Activity size={10} />, text: 'text-emerald-300', accent: 'border-emerald-800/60 bg-emerald-950/20' },
+  rental: { label: 'Rental', color: 0x60a5fa, radius: 0.36, icon: <Store size={10} />, text: 'text-blue-300', accent: 'border-blue-800/60 bg-blue-950/20' },
+  service: { label: 'Service', color: 0x22d3ee, radius: 0.34, icon: <Store size={10} />, text: 'text-cyan-300', accent: 'border-cyan-800/60 bg-cyan-950/20' },
   jump_point: { label: 'Jump point', color: 0xc084fc, radius: 0.92, icon: <Route size={11} />, text: 'text-purple-300', accent: 'border-purple-700/60 bg-purple-950/25' },
   comm_array: { label: 'Comm array', color: 0x22d3ee, radius: 0.55, icon: <RadioTower size={10} />, text: 'text-cyan-300', accent: 'border-cyan-800/60 bg-cyan-950/20' },
 };
@@ -209,6 +241,48 @@ function typeStyle(type: string) {
     text: 'text-slate-400',
     accent: 'border-slate-800 bg-slate-950/35',
   };
+}
+
+function typeRank(type: string) {
+  const index = TYPE_ORDER.indexOf(normalizeType(type));
+  return index === -1 ? TYPE_ORDER.length : index;
+}
+
+function shopNodeType(shop: Shop) {
+  const type = `${shop.shop_type ?? shop.shopType ?? ''} ${shop.name ?? ''}`.toLowerCase();
+  if (type.includes('medical') || type.includes('hospital') || type.includes('clinic')) return 'hospital';
+  if (type.includes('rent')) return 'rental';
+  if (type.includes('service') || type.includes('repair') || type.includes('refuel') || type.includes('customs')) return 'service';
+  return 'shop';
+}
+
+function shopLocationLabel(shop?: Shop | null) {
+  if (!shop) return '';
+  return [shop.city, shop.planet_moon, shop.system].filter(Boolean).join(' / ') || shop.location || 'Unknown location';
+}
+
+function shopToLocation(shop: Shop, parent: LocationWithMap): LocationWithMap {
+  const type = shopNodeType(shop);
+  return {
+    uuid: `shop-${shop.id}`,
+    class_name: shop.class_name || `shop-${shop.id}`,
+    name: shop.name,
+    type,
+    system_code: parent.system_code ?? shop.system ?? null,
+    parent_uuid: parent.uuid,
+    loc_key: shop.loc_key ?? parent.loc_key ?? null,
+    description: `${typeStyle(type).label} located at ${shopLocationLabel(shop)}.`,
+    is_scannable: false,
+    hide_in_starmap: false,
+    coordinates: parent.coordinates ?? parent.rsi_starmap?.coordinates ?? null,
+    rsi_starmap: parent.rsi_starmap
+      ? {
+          system_code: parent.rsi_starmap.system_code,
+          system_name: parent.rsi_starmap.system_name,
+          faction_name: parent.rsi_starmap.faction_name,
+        }
+      : null,
+  } as LocationWithMap;
 }
 
 function toNumber(value: unknown) {
@@ -406,7 +480,7 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
 
   const children = visible
     .filter((loc) => !nodes.has(loc.uuid))
-    .sort((a, b) => TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type) || a.name.localeCompare(b.name));
+    .sort((a, b) => typeRank(a.type) - typeRank(b.type) || a.name.localeCompare(b.name));
 
   const rootIdFor = (loc: LocationWithMap) => {
     const root = rootByCode.get(systemCode(loc));
@@ -463,6 +537,47 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
       label: loc.name,
       shopCount: loc.loc_key ? shopsByLocKey.get(loc.loc_key) ?? 0 : 0,
     });
+  }
+
+  const locationNodeByLocKey = new Map<string, MapNode>();
+  for (const node of nodes.values()) {
+    if (node.loc.loc_key) locationNodeByLocKey.set(node.loc.loc_key, node);
+  }
+
+  const shopsByParent = new Map<string, Shop[]>();
+  for (const shop of shops) {
+    if (!shop.loc_key) continue;
+    const parent = locationNodeByLocKey.get(shop.loc_key);
+    if (!parent) continue;
+    const list = shopsByParent.get(parent.id);
+    if (list) list.push(shop);
+    else shopsByParent.set(parent.id, [shop]);
+  }
+
+  for (const [parentId, parentShops] of shopsByParent) {
+    const parent = nodes.get(parentId);
+    if (!parent) continue;
+    parentShops
+      .sort((a, b) => shopNodeType(a).localeCompare(shopNodeType(b)) || a.name.localeCompare(b.name))
+      .forEach((shop, index) => {
+        const loc = shopToLocation(shop, parent.loc);
+        const style = typeStyle(loc.type);
+        const angle = index * 2.399963229728653 + hash(`shop-${shop.id}`) * 0.35;
+        const ring = 1.6 + Math.floor(index / 8) * 0.85;
+        const position = parent.position.clone().add(new THREE.Vector3(Math.cos(angle) * ring, 0.2, Math.sin(angle) * ring));
+        nodes.set(loc.uuid, {
+          id: loc.uuid,
+          loc,
+          parentId,
+          systemCode: parent.systemCode,
+          position,
+          radius: style.radius,
+          color: style.color,
+          label: shop.name,
+          shopCount: 0,
+          shop,
+        });
+      });
   }
 
   return [...nodes.values()];
@@ -533,7 +648,7 @@ function layoutSystemNodes(nodes: MapNode[], currentRoot: MapNode | null) {
   for (const list of childrenByParent.values()) {
     list.sort(
       (a, b) =>
-        TYPE_ORDER.indexOf(normalizeType(a.loc.type)) - TYPE_ORDER.indexOf(normalizeType(b.loc.type)) ||
+        typeRank(a.loc.type) - typeRank(b.loc.type) ||
         a.label.localeCompare(b.label),
     );
   }
@@ -542,7 +657,7 @@ function layoutSystemNodes(nodes: MapNode[], currentRoot: MapNode | null) {
   const rootChildren = childrenByParent.get(currentRoot.id) ?? [];
   const starChildren = rootChildren.filter((node) => normalizeType(node.loc.type) === 'star');
   const planets = rootChildren.filter((node) => normalizeType(node.loc.type) === 'planet');
-  const rootPorts = rootChildren.filter((node) => ['station', 'landing_zone', 'rest_stop', 'outpost', 'comm_array'].includes(normalizeType(node.loc.type)));
+  const rootPorts = rootChildren.filter((node) => ['station', 'orbital_station', 'landing_zone', 'rest_stop', 'outpost', 'comm_array'].includes(normalizeType(node.loc.type)));
   const jumpPoints = rootChildren.filter((node) => normalizeType(node.loc.type) === 'jump_point');
   const otherRootChildren = rootChildren.filter(
     (node) => !starChildren.includes(node) && !planets.includes(node) && !rootPorts.includes(node) && !jumpPoints.includes(node),
@@ -580,6 +695,7 @@ function layoutSystemNodes(nodes: MapNode[], currentRoot: MapNode | null) {
       const distance =
         type === 'moon' ? 3.5 + index * 0.9 :
         type === 'station' || type === 'rest_stop' || type === 'landing_zone' ? 4.8 + index * 0.7 :
+        ['shop', 'hospital', 'rental', 'service', 'location'].includes(type) ? 1.8 + Math.floor(index / 8) * 0.75 :
         5.8 + index * 0.8;
       const angle = index * 2.399963229728653 + hash(child.id) * 0.5;
       positions.set(child.id, orbitalPosition(parentPosition, distance, angle, 0.35));
@@ -1109,7 +1225,9 @@ export default function UniverseExplorerPage() {
         !query ||
         node.label.toLowerCase().includes(query) ||
         node.systemCode.toLowerCase().includes(query) ||
-        (node.loc.class_name ?? '').toLowerCase().includes(query);
+        (node.loc.class_name ?? '').toLowerCase().includes(query) ||
+        (node.shop?.shop_type ?? node.shop?.shopType ?? '').toLowerCase().includes(query) ||
+        shopLocationLabel(node.shop).toLowerCase().includes(query);
       return typeMatch && textMatch;
     });
   }, [allNodes, query, roots, systemIds, typeFilter, viewMode]);
@@ -1138,7 +1256,7 @@ export default function UniverseExplorerPage() {
         objects: children.length + 1,
         planets: children.filter((node) => normalizeType(node.loc.type) === 'planet').length,
         moons: children.filter((node) => normalizeType(node.loc.type) === 'moon').length,
-        stations: children.filter((node) => ['station', 'rest_stop', 'landing_zone'].includes(normalizeType(node.loc.type))).length,
+        stations: children.filter((node) => ['station', 'orbital_station', 'rest_stop', 'landing_zone', 'shop', 'hospital', 'rental', 'service'].includes(normalizeType(node.loc.type))).length,
         danger: root.loc.aggregated?.danger,
         economy: root.loc.aggregated?.economy,
       };
@@ -1156,7 +1274,7 @@ export default function UniverseExplorerPage() {
     for (const list of map.values()) {
       list.sort(
         (a, b) =>
-          TYPE_ORDER.indexOf(normalizeType(a.loc.type)) - TYPE_ORDER.indexOf(normalizeType(b.loc.type)) || a.label.localeCompare(b.label),
+          typeRank(a.loc.type) - typeRank(b.loc.type) || a.label.localeCompare(b.label),
       );
     }
     return map;
@@ -1168,7 +1286,12 @@ export default function UniverseExplorerPage() {
     if (!query) return null;
     const ids = new Set<string>();
     const visit = (node: MapNode): boolean => {
-      let match = node.label.toLowerCase().includes(query) || node.systemCode.toLowerCase().includes(query);
+      let match =
+        node.label.toLowerCase().includes(query) ||
+        node.systemCode.toLowerCase().includes(query) ||
+        (node.loc.class_name ?? '').toLowerCase().includes(query) ||
+        (node.shop?.shop_type ?? node.shop?.shopType ?? '').toLowerCase().includes(query) ||
+        shopLocationLabel(node.shop).toLowerCase().includes(query);
       for (const child of childrenByParent.get(node.id) ?? []) {
         if (visit(child)) match = true;
       }
@@ -1223,7 +1346,7 @@ export default function UniverseExplorerPage() {
   const selectedChildren = useMemo(() => {
     if (!selectedNode) return [];
     const direct = allNodes.filter((node) => node.parentId === selectedNode.id);
-    return direct.sort((a, b) => TYPE_ORDER.indexOf(normalizeType(a.loc.type)) - TYPE_ORDER.indexOf(normalizeType(b.loc.type)) || a.label.localeCompare(b.label)).slice(0, 10);
+    return direct.sort((a, b) => typeRank(a.loc.type) - typeRank(b.loc.type) || a.label.localeCompare(b.label)).slice(0, 10);
   }, [allNodes, selectedNode]);
 
   const currentSystemSummary = useMemo(() => (
@@ -1269,6 +1392,7 @@ export default function UniverseExplorerPage() {
   const hzInner = selectedLoc?.habitable_zone_inner;
   const hzOuter = selectedLoc?.habitable_zone_outer;
   const aggregated = currentRoot?.loc.aggregated;
+  const selectedIsShop = Boolean(selectedNode?.shop);
 
   return (
     <div className="-m-3 flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden bg-black text-slate-200 sm:-m-6">
@@ -1328,7 +1452,7 @@ export default function UniverseExplorerPage() {
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search location..."
+              placeholder="Search system, place, shop..."
               className="sci-input w-full pl-9 pr-9"
             />
             {search && (
@@ -1422,11 +1546,12 @@ export default function UniverseExplorerPage() {
               onSelect={setSelectedId}
             />
           )}
-          <div className="pointer-events-none absolute bottom-4 left-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+          <div className="pointer-events-none absolute bottom-4 left-4 grid grid-cols-2 gap-2 md:grid-cols-5">
             <LegendSwatch type="system" />
             <LegendSwatch type="planet" />
             <LegendSwatch type="station" />
             <LegendSwatch type="jump_point" />
+            <LegendSwatch type="shop" />
           </div>
         </main>
 
@@ -1479,26 +1604,28 @@ export default function UniverseExplorerPage() {
                 </div>
               )}
 
-              <div className="sci-panel mb-4 p-3">
-                <StatBar
-                  icon={<Users size={10} />}
-                  label="Population"
-                  value={selectedLoc.population ?? toNumber(selectedLoc.aggregated?.population)}
-                  color="#22d3ee"
-                />
-                <StatBar
-                  icon={<Activity size={10} />}
-                  label="Economy"
-                  value={selectedLoc.economy ?? toNumber(selectedLoc.aggregated?.economy)}
-                  color="#34d399"
-                />
-                <StatBar
-                  icon={<ShieldAlert size={10} />}
-                  label="Danger"
-                  value={selectedLoc.danger ?? toNumber(selectedLoc.aggregated?.danger)}
-                  color="#f87171"
-                />
-              </div>
+              {!selectedIsShop && (
+                <div className="sci-panel mb-4 p-3">
+                  <StatBar
+                    icon={<Users size={10} />}
+                    label="Population"
+                    value={selectedLoc.population ?? toNumber(selectedLoc.aggregated?.population)}
+                    color="#22d3ee"
+                  />
+                  <StatBar
+                    icon={<Activity size={10} />}
+                    label="Economy"
+                    value={selectedLoc.economy ?? toNumber(selectedLoc.aggregated?.economy)}
+                    color="#34d399"
+                  />
+                  <StatBar
+                    icon={<ShieldAlert size={10} />}
+                    label="Danger"
+                    value={selectedLoc.danger ?? toNumber(selectedLoc.aggregated?.danger)}
+                    color="#f87171"
+                  />
+                </div>
+              )}
 
               {(selectedLoc.star_type || (hzInner != null && hzOuter != null)) && (
                 <div className="sci-panel mb-4 p-3">
@@ -1534,10 +1661,16 @@ export default function UniverseExplorerPage() {
               </div>
 
               <div className="sci-panel p-3">
+                {selectedNode.shop && (
+                  <>
+                    <DetailRow label="Shop type" value={selectedNode.shop.display_shop_type ?? selectedNode.shop.shop_type ?? selectedNode.shop.shopType} />
+                    <DetailRow label="Location" value={shopLocationLabel(selectedNode.shop)} />
+                  </>
+                )}
                 <DetailRow label="Class" value={selectedLoc.class_name} />
                 <DetailRow label="RSI status" value={selectedLoc.rsi_starmap?.status} />
                 <DetailRow label="Scannable" value={selectedLoc.is_scannable ? 'Yes' : 'No'} />
-                <DetailRow label="Shops" value={selectedNode.shopCount || null} />
+                {!selectedIsShop && <DetailRow label="Shops" value={selectedNode.shopCount || null} />}
               </div>
 
               {selectedJumpLinks.length > 0 && (

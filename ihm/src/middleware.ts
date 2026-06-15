@@ -5,6 +5,7 @@ import { AUTH_COOKIE_NAME } from '@/lib/server-config';
 // Exact public paths (no login required)
 const PUBLIC_PATHS = new Set([
   '/',
+  '/ai',
   '/about',
   '/login',
   '/register',
@@ -52,6 +53,7 @@ const PUBLIC_PATHS = new Set([
   '/items',
   '/legal',
   '/discord',
+  '/roadmap',
 ]);
 
 // Public path prefixes — detail pages and sub-routes

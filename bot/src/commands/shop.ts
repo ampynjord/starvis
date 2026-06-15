@@ -1,14 +1,14 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
 import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
-import { getShopInventory, getShops } from '../api.js';
+import { getShops } from '../api.js';
 import { SITE_URL } from '../config.js';
 import { errorEmbed } from '../embeds.js';
 
 export const data = new SlashCommandBuilder()
   .setName('shop')
-  .setDescription('Search shops and inspect shop inventory')
+  .setDescription('Search extracted shop locations')
   .addStringOption((opt) => opt.setName('search').setDescription('Shop or location name').setRequired(true))
-  .addBooleanOption((opt) => opt.setName('inventory').setDescription('Show inventory for the first matching shop').setRequired(false));
+  .addBooleanOption((opt) => opt.setName('inventory').setDescription('Explain current inventory availability').setRequired(false));
 
 export async function execute(interaction: ChatInputCommandInteraction): Promise<void> {
   const search = interaction.options.getString('search', true);
@@ -24,15 +24,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
 
     if (showInventory) {
       const shop = shops.data[0];
-      const inventory = await getShopInventory(shop.id);
-      const lines = (inventory.data ?? []).slice(0, 12).map((item, index) => {
-        const name = item.itemName ?? item.name ?? 'Unknown item';
-        const price = item.price ?? item.buyPrice ?? item.sellPrice ?? item.basePrice;
-        const details = [item.type, item.subType, price != null ? `${format(price)} aUEC` : null].filter(Boolean).join(' - ');
-        return `**${index + 1}. ${name}**${details ? `\n${details}` : ''}`;
-      });
       await interaction.editReply({
-        embeds: [embed(`${shop.name} inventory`, lines.join('\n\n') || 'No inventory item found.')],
+        embeds: [
+          embed(
+            `${shop.name} inventory`,
+            'Shop inventory is currently disabled in Starvis because reliable extracted inventory data is not available yet. The `/shop` command only exposes extracted shop locations and franchises for now.',
+          ),
+        ],
       });
       return;
     }
@@ -59,10 +57,6 @@ function embed(title: string, description: string): EmbedBuilder {
     .setURL(`${SITE_URL}/shops`)
     .setDescription(description.slice(0, 3900))
     .setFooter({ text: 'Starvis - Star Citizen Database & Toolset' });
-}
-
-function format(value: number): string {
-  return value.toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 
 function countLabel(value?: number): string | null {

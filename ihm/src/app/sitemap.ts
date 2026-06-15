@@ -4,6 +4,8 @@ import { PUBLIC_SITE_URL } from '@/lib/server-config';
 const STATIC_ROUTES: { path: string; priority: number; changefreq: MetadataRoute.Sitemap[number]['changeFrequency'] }[] = [
   { path: '/', priority: 1.0, changefreq: 'daily' },
   { path: '/about', priority: 0.8, changefreq: 'monthly' },
+  { path: '/ai', priority: 0.8, changefreq: 'weekly' },
+  { path: '/roadmap', priority: 0.7, changefreq: 'weekly' },
   { path: '/ships', priority: 0.9, changefreq: 'weekly' },
   { path: '/vehicles', priority: 0.8, changefreq: 'weekly' },
   { path: '/compare', priority: 0.7, changefreq: 'monthly' },
@@ -28,6 +30,7 @@ const STATIC_ROUTES: { path: string; priority: number; changefreq: MetadataRoute
   { path: '/galactapedia', priority: 0.6, changefreq: 'weekly' },
   { path: '/comm-links', priority: 0.6, changefreq: 'daily' },
   { path: '/changelog', priority: 0.8, changefreq: 'daily' },
+  { path: '/discord', priority: 0.7, changefreq: 'weekly' },
   { path: '/developer', priority: 0.5, changefreq: 'monthly' },
   { path: '/legal', priority: 0.3, changefreq: 'yearly' },
 ];
