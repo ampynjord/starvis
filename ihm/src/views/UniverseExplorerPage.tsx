@@ -3,7 +3,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
 import {
   Activity,
   Building2,
@@ -1508,8 +1507,7 @@ function ShopInventoryPanel({
 
 export default function UniverseExplorerPage() {
   const { env } = useEnv();
-  const searchParams = useSearchParams();
-  const shopParam = searchParams.get('shop');
+  const [shopParam, setShopParam] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('galaxy');
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -1725,6 +1723,10 @@ export default function UniverseExplorerPage() {
   const currentSystemSummary = useMemo(() => (
     currentRoot ? systemSummaries.find((summary) => summary.root.id === currentRoot.id) ?? null : null
   ), [currentRoot, systemSummaries]);
+
+  useEffect(() => {
+    setShopParam(new URLSearchParams(window.location.search).get('shop'));
+  }, []);
 
   useEffect(() => {
     if (!shopParam || allNodes.length === 0) return;
