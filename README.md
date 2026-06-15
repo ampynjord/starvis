@@ -148,7 +148,7 @@ Useful variants:
 npx tsx extractor/extract.ts --env live --game-version 4.7.2
 
 # Extract only network-backed RSI modules, no Data.p4k required
-npx tsx extractor/extract.ts --modules ship-matrix,galactapedia,comm-links,starmap
+npx tsx extractor/extract.ts --modules ship-matrix,ship-galleries,galactapedia,comm-links,starmap
 
 # Check configuration without extracting
 npx tsx extractor/extract.ts --check-config
@@ -166,7 +166,7 @@ STARVIS combines local game data and public RSI data.
 |---|---|---|
 | P4K / DataForge | Ships, components, FPS items, commodities, extracted shop locations/franchises, real `Data/Scripts/ShopInventories` inventory rows, missions, mining, crafting, locations, paints and extended game insights for loot, reputation, factions, navigation, environments, services, medical data, FPS details, ammo and inventory containers. Shop inventory rows expose item kind, buy/sell prices, stock metadata, `source` and `confidence`; rental prices are stored when the game files expose them. P4K locations are correlated with RSI Starmap records through `rsi_starmap_location_id` plus `starmap_match_method`, `starmap_match_score` and `starmap_match_confidence`; manual/semi-automatic overrides can be stored in `game.starmap_location_aliases`. The IHM consumes normalized insight data through page-named API routes such as factions, ammo, armor, utility and blueprints. | `extractor/` CLI. |
 | RSI Ship Matrix | RSI marketing ship data. | Extractor network module and API startup sync. |
-| RSI website | Galactapedia, Comm-links, Starmap, CTM metadata. | Extractor network modules. |
+| RSI website | Galactapedia, Comm-links, Starmap, CTM metadata and official ship galleries scraped from RSI pledge pages. | Extractor network modules. |
 
 LIVE and PTU data share the same PostgreSQL database and are separated by `env = 'live'` or `env = 'ptu'` in the `game` schema.
 
@@ -279,7 +279,7 @@ Main route families:
 | Health | `/health`, `/health/live`, `/health/ready`, `/health/metrics`, `/health/cache/stats` |
 
 Most list endpoints support pagination and filtering parameters such as `page`, `limit`, `search`, `sort`, `order`, and `env`.
-Use `/api/v1/objects/{type}/{id}` when a client needs one object with its most useful relations in a single request. It resolves ships, components, items, commodities, shops and locations, and returns a normalized `{ type, id, env, data, related, meta }` payload. The `include` query parameter can narrow or disable related data with `include=none`.
+Use `/api/v1/objects/{type}/{id}` when a client needs one object with its most useful relations in a single request. It resolves ships, components, items, commodities, shops and locations, and returns a normalized `{ type, id, env, data, related, meta }` payload. Ship details include manufacturer, stock loadout, modules, hardpoints, variants, similar ships, purchase/rental locations and official RSI gallery media by default. The `include` query parameter can narrow or disable related data with `include=none`.
 Use `/api/v1/locations/tree` to consume the full galactic hierarchy with shops already attached, and
 `/api/v1/locations/{uuid}/shops` when a client only needs the shops/inventories available at one city, station, outpost or
 other location. `/api/v1/shops/{id}` returns the shop metadata, while `/api/v1/shops/{id}/inventory` returns its priced
@@ -338,7 +338,7 @@ Manufacturers exposes a catalogue-first view with global ship/component/FPS item
 
 Calculators use normalized game data from the API: FPS combines real weapon stats with extracted attachment modifiers, mining computes per-composition yields with environment-scoped mineral data and normalized risk values, crafting exposes recipe ingredients/modifiers, and trade routes require populated commodity price reports.
 
-Corporation tools include the 3D Fleet Manager, Corp Bank and corporation-owned Tactics board. Fleet Manager lays spawned ships side by side by default, persists their grid positions from the first spawn, and lets each owner decide whether their corporation ship is available for tactical planning. Corp Bank lets members declare shared components, items, commodities and custom entries; owners and corporation leaders can edit or remove entries. Admins can delete a corporation without deleting users or their personal fleet managers; only corporation-scoped memberships, fleet and bank data are removed. Tactics reuses the same 3D holographic viewer to place only corporation ships made available by their owners, save corporation strategies, build reusable mixed-ship formations with availability warnings, add 3D objectives/obstacles/points of interest, and draw flat movement vectors directly from selected ships or squadrons.
+Corporation tools include the 3D Fleet Manager, Corp Bank and corporation-owned Tactics board. Fleet Manager lays spawned ships side by side by default, persists their grid positions from the first spawn, and lets each owner decide whether their corporation ship is available for tactical planning. Corp Bank lets members declare shared components, items, commodities and custom entries; API responses enrich declarations with `itemName` when the object exists in extracted game data, so the IHM can display human names instead of internal identifiers. Owners and corporation leaders can edit or remove entries. Admins can delete a corporation without deleting users or their personal fleet managers; only corporation-scoped memberships, fleet and bank data are removed. Tactics reuses the same 3D holographic viewer to place only corporation ships made available by their owners, save corporation strategies, build reusable mixed-ship formations with availability warnings, add 3D objectives/obstacles/points of interest, and draw flat movement vectors directly from selected ships or squadrons.
 
 The Discord Bot page exposes the Starvis community Discord server, the generated bot invitation link and slash-command help for AI, ships, loadouts, trade, shops, mining, crafting, missions, lore, status and changelog commands. The bot rotates a rich presence with useful prompts such as `/starvis`, `/intel`, API/data status and server count. Configure `NEXT_PUBLIC_DISCORD_CLIENT_ID` or `DISCORD_CLIENT_ID` to enable the bot invitation link. Configure `NEXT_PUBLIC_DISCORD_SERVER_INVITE_URL` or `DISCORD_SERVER_INVITE_URL` to show the community server invite. `NEXT_PUBLIC_DISCORD_GUILD_ID`/`DISCORD_GUILD_ID` identify the Starvis community server (`931662690101895198` by default). `DISCORD_DEFAULT_MEMBER_ROLE_NAME`/`DISCORD_DEFAULT_MEMBER_ROLE_ID` let the bot assign the default `Member` role to new arrivals.
 

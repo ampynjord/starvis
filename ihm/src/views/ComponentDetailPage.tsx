@@ -3,15 +3,12 @@
 import { useQuery } from "@tanstack/react-query";
 import {
 	ArrowLeft,
-	ChevronDown,
 	ChevronRight,
-	ChevronUp,
 	FlaskConical,
 	Rocket,
 	Zap,
 } from "lucide-react";
 import Image from "next/image";
-import { useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/services/api";
@@ -21,7 +18,6 @@ import { PageShell } from "@/components/ui/PageShell";
 import { GlowBadge } from "@/components/ui/GlowBadge";
 import { LoadingGrid } from "@/components/ui/LoadingGrid";
 import { ErrorState } from "@/components/ui/ErrorState";
-import { CanonicalMeta } from "@/components/ui/CanonicalMeta";
 import { PriceAvailabilityPanel } from "@/components/economy/PriceAvailabilityPanel";
 import { COMPONENT_TYPE_COLORS } from "@/utils/constants";
 import { getComponentMetricGroups, type ComponentMetricGroup } from "@/utils/componentMetrics";
@@ -272,7 +268,6 @@ export default function ComponentDetailPage() {
 	const uuid = params?.uuid;
 	const router = useRouter();
 	const { env } = useEnv();
-	const [rawOpen, setRawOpen] = useState(false);
 
 	const {
 		data: comp,
@@ -308,7 +303,6 @@ export default function ComponentDetailPage() {
 	const typeColor = COMPONENT_TYPE_COLORS[comp.type] ?? "text-slate-400";
 	const heroStats = getHeroStats(comp).filter((s) => s.value !== "—");
 	const componentMetricGroups = getComponentMetricGroups(comp);
-	const rawPayload = comp.game_data ?? comp.data_json ?? null;
 
 	return (
 		<PageShell size="xl">
@@ -355,7 +349,6 @@ export default function ComponentDetailPage() {
 								{comp.grade && <GlowBadge color="amber">{comp.grade}</GlowBadge>}
 								{comp.size != null && <GlowBadge color="slate">S{comp.size}</GlowBadge>}
 								{comp.manufacturer_name && <GlowBadge color="cyan">{comp.manufacturer_name}</GlowBadge>}
-								{comp.class_name && <GlowBadge color="slate">{comp.class_name}</GlowBadge>}
 							</div>
 						</div>
 					</div>
@@ -378,15 +371,6 @@ export default function ComponentDetailPage() {
 				</p>
 			)}
 
-			{/* Canonical meta */}
-			<CanonicalMeta
-				sourceType={comp.source_type}
-				sourceName={comp.source_name}
-				confidenceScore={comp.confidence_score}
-				canonicalKey={comp.canonical_component_key}
-				normalizedName={comp.normalized_name}
-			/>
-
 			<ComponentMetricPanels groups={componentMetricGroups} />
 
 			<PriceAvailabilityPanel rows={buyLocs} />
@@ -407,7 +391,7 @@ export default function ComponentDetailPage() {
 							>
 								<div className="flex items-start justify-between gap-2 mb-2">
 									<p className="text-xs font-orbitron text-slate-200 leading-tight">
-										{recipe.display_name ?? recipe.class_name}
+										{recipe.display_name ?? recipe.name ?? 'Crafting recipe'}
 									</p>
 									<div className="flex gap-1 shrink-0">
 										{recipe.station_type && (
@@ -470,7 +454,7 @@ export default function ComponentDetailPage() {
 								)}
 								<div className="min-w-0 flex-1">
 									<p className="text-xs font-orbitron text-slate-200 group-hover:text-cyan-400 transition-colors truncate">
-										{s.name ?? s.class_name}
+										{s.name ?? 'Unnamed ship'}
 									</p>
 									{s.manufacturer_code && (
 										<p className="text-[10px] font-mono-sc text-slate-600 mt-0.5">
@@ -490,25 +474,6 @@ export default function ComponentDetailPage() {
 					</div>
 				)}
 			</ScifiPanel>
-
-			{/* Raw Game Data — collapsible */}
-			{rawPayload && (
-				<div className="sci-panel overflow-hidden">
-					<button
-						type="button"
-						onClick={() => setRawOpen((v) => !v)}
-						className="w-full flex items-center justify-between px-4 py-3 text-xs font-mono-sc text-slate-500 hover:text-slate-300 transition-colors"
-					>
-						<span className="uppercase tracking-widest">Raw Game Data</span>
-						{rawOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-					</button>
-					{rawOpen && (
-						<pre className="border-t border-slate-800 px-4 py-3 max-h-96 overflow-auto text-xs text-slate-400 font-mono-sc leading-relaxed">
-							{JSON.stringify(rawPayload, null, 2)}
-						</pre>
-					)}
-				</div>
-			)}
 		</PageShell>
 	);
 }

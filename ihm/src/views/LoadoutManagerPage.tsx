@@ -18,7 +18,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { useDebounce } from '@/hooks/useDebounce';
-import { GAME_COMPONENT_CATEGORIES, GAME_COMPONENT_CATEGORY_ICONS, getGameComponentCategory } from '@/utils/constants';
+import { COMPONENT_TYPE_LABELS, GAME_COMPONENT_CATEGORIES, GAME_COMPONENT_CATEGORY_ICONS, getGameComponentCategory } from '@/utils/constants';
 import { fNumber } from '@/utils/formatters';
 import type { CompatibleComponent, HardpointEntry, HardpointComponent, LoadoutResult, ShipListItem } from '@/types/api';
 
@@ -116,6 +116,23 @@ function typeIcon(t?: string | null) {
   return TYPE_ICON[t ?? ''] ?? '⚙';
 }
 
+function humanPortName(portName: string | null | undefined): string {
+  if (!portName) return 'Slot';
+  return portName
+    .replace(/^hardpoint_/i, '')
+    .replace(/^itemport_/i, '')
+    .replace(/_/g, ' ')
+    .replace(/\b(scitem|base|controller|hardpoint)\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (char) => char.toUpperCase()) || 'Slot';
+}
+
+function humanType(type: string | null | undefined): string {
+  if (!type) return 'Component';
+  return COMPONENT_TYPE_LABELS[type] ?? type.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ');
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function StatChip({ icon: Icon, label, value, accent = 'cyan' }: {
@@ -168,7 +185,7 @@ function ComponentPicker({
     >
       <div className="flex items-center justify-between px-3 py-2 border-b border-slate-800">
         <span className="text-xs font-mono-sc text-slate-400 uppercase">
-          {typeIcon(port.port_type)} {port.port_type}
+          {typeIcon(port.port_type)} {humanType(port.port_type)}
           {port.port_min_size != null && <> · S{port.port_min_size}{port.port_max_size !== port.port_min_size ? `–${port.port_max_size}` : ''}</>}
         </span>
         <button onClick={onClose} className="text-slate-600 hover:text-slate-300 transition-colors">
@@ -376,12 +393,12 @@ function SlotButton({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className={`text-xs font-rajdhani font-semibold truncate ${isEmpty ? 'text-slate-700 italic' : 'text-slate-200'}`}>
-            {comp.display_name ?? comp.name ?? (isEmpty ? '(empty)' : comp.port_name)}
+            {comp.display_name ?? comp.name ?? (isEmpty ? '(empty)' : humanPortName(comp.port_name))}
           </span>
           {isSwapped && <span className="text-[9px] text-amber-500 font-mono-sc uppercase shrink-0">custom</span>}
         </div>
         <div className="text-[10px] text-slate-600 flex items-center gap-1.5 flex-wrap">
-          <span className="font-mono-sc truncate max-w-[120px]">{comp.port_name}</span>
+          <span className="font-mono-sc truncate max-w-[120px]">{humanPortName(comp.port_name)}</span>
           {comp.size != null && <span>· S{comp.size}</span>}
           {comp.grade && <span className="text-amber-700/70">{comp.grade}</span>}
           {comp.manufacturer_code && <span className="text-slate-700">{comp.manufacturer_code}</span>}
@@ -464,7 +481,7 @@ function HardpointRow({
         >
           <span className="text-sm shrink-0 text-slate-500">⚙</span>
           <div className="flex-1 min-w-0">
-            <div className="text-xs font-rajdhani font-semibold text-slate-400 truncate">{hp.display_name}</div>
+            <div className="text-xs font-rajdhani font-semibold text-slate-400 truncate">{hp.display_name || humanPortName(hp.port_name)}</div>
             <div className="text-[10px] text-slate-600 flex items-center gap-1.5">
               {mountLabel && <span className="font-mono-sc text-slate-700">{mountLabel}</span>}
               <span className="text-slate-700">{hp.items.length} slot{hp.items.length > 1 ? 's' : ''}</span>
@@ -504,7 +521,7 @@ function HardpointRow({
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 rounded-sm border border-dashed border-slate-800/30 text-slate-700">
       <span className="text-sm">⚙</span>
-      <span className="text-xs font-rajdhani truncate">{hp.display_name}</span>
+      <span className="text-xs font-rajdhani truncate">{hp.display_name || humanPortName(hp.port_name)}</span>
       {mountLabel && <span className="text-[10px] font-mono-sc ml-auto shrink-0">{mountLabel}</span>}
     </div>
   );

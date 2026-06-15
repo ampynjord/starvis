@@ -163,7 +163,7 @@ export function OreTable() {
                     }`}
                   >
                     <td className="p-2 text-slate-200 font-semibold">
-                      {el.name ?? el.class_name ?? el.uuid.slice(0, 8)}
+                      {el.name ?? 'Unknown ore'}
                     </td>
                     <td className="p-2 text-center">
                       <span className={el.avgProbabilityPct != null ? 'text-green-400' : 'text-slate-700'}>
@@ -233,7 +233,7 @@ function ElementDetail({ element }: { element: MiningElement }) {
 
   return (
     <ScifiPanel
-      title={element.name ?? element.class_name ?? 'Unknown Element'}
+      title={element.name ?? 'Unknown element'}
       subtitle="Element properties & power window"
     >
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 mb-3">

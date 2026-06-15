@@ -1,12 +1,11 @@
 'use client';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Activity, ArrowLeft, ChevronDown, ChevronRight, ChevronUp,
+  Activity, ArrowLeft, ChevronRight,
   FlaskConical, Heart, Ruler, Shield, Swords, Weight, Zap,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useState } from 'react';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
@@ -14,7 +13,6 @@ import { PageShell } from '@/components/ui/PageShell';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { CanonicalMeta } from '@/components/ui/CanonicalMeta';
 import { PriceAvailabilityPanel } from '@/components/economy/PriceAvailabilityPanel';
 import type { Item } from '@/types/api';
 
@@ -207,7 +205,6 @@ export default function ItemDetailPage() {
   const uuid = params?.uuid;
   const router = useRouter();
   const { env } = useEnv();
-  const [rawOpen, setRawOpen] = useState(false);
 
   const { data: item, isLoading, error, refetch } = useQuery({
     queryKey: ['items.get', uuid, env],
@@ -241,8 +238,6 @@ export default function ItemDetailPage() {
 
   const isWeapon = item.type === 'FPS_Weapon';
   const isArmor = item.type.startsWith('Armor_') || item.type === 'Undersuit';
-
-  const rawPayload = item.game_data ?? item.data_json ?? null;
 
   // Build QuickStat pills
   const quickStats: { icon: React.ReactNode; label: string; value: string }[] = [];
@@ -321,15 +316,6 @@ export default function ItemDetailPage() {
         <p className="text-sm text-slate-400 leading-relaxed border-l-2 border-cyan-900/40 pl-4">{item.description}</p>
       )}
 
-      {/* Canonical meta */}
-      <CanonicalMeta
-        sourceType={item.source_type}
-        sourceName={item.source_name}
-        confidenceScore={item.confidence_score}
-        canonicalKey={item.canonical_item_key}
-        normalizedName={item.normalized_name}
-      />
-
       {/* Main grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
@@ -337,27 +323,6 @@ export default function ItemDetailPage() {
         <div className="lg:col-span-2 space-y-6">
           {isWeapon && <WeaponStats item={item} />}
           {isArmor && <ArmorStats item={item} />}
-
-          {/* Generic properties for other item types */}
-          {!isWeapon && !isArmor && rawPayload && Object.keys(rawPayload).length > 0 && (
-            <ScifiPanel title="Properties">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {Object.entries(rawPayload).map(([key, val]) => {
-                  if (val == null) return null;
-                  const display = typeof val === 'number'
-                    ? Number.isInteger(val) ? val.toLocaleString('en-US') : val.toFixed(4).replace(/\.?0+$/, '')
-                    : String(val);
-                  const label = key.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
-                  return (
-                    <div key={key} className="sci-panel px-3 py-2 flex flex-col gap-0.5">
-                      <span className="text-[10px] font-mono-sc text-slate-600 uppercase tracking-widest truncate">{label}</span>
-                      <span className="text-xs font-mono-sc text-slate-300 font-semibold break-all">{display}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </ScifiPanel>
-          )}
 
           {/* Blueprint & Crafting */}
           {craftingData && craftingData.data.length > 0 && (
@@ -375,7 +340,7 @@ export default function ItemDetailPage() {
                   >
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <p className="text-xs font-orbitron text-slate-200 leading-tight">
-                        {recipe.display_name ?? recipe.class_name}
+                        {recipe.display_name ?? recipe.name ?? 'Crafting recipe'}
                       </p>
                       <div className="flex gap-1 shrink-0">
                         {recipe.station_type && (
@@ -414,35 +379,8 @@ export default function ItemDetailPage() {
 
           <PriceAvailabilityPanel rows={buyLocs} />
         </div>
-
-        {/* Right sidebar — class name & raw data */}
-        <div className="lg:col-span-1 space-y-4">
-          {item.class_name && (
-            <ScifiPanel title="Identification">
-              <p className="text-xs font-mono-sc text-slate-500 break-all">{item.class_name}</p>
-            </ScifiPanel>
-          )}
-
-          {/* Raw data (collapsible) */}
-          {rawPayload && Object.keys(rawPayload).length > 0 && (
-            <div className="sci-panel overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setRawOpen((o) => !o)}
-                className="w-full flex items-center justify-between px-4 py-3 text-xs font-mono-sc text-slate-500 hover:text-slate-300 transition-colors"
-              >
-                <span className="uppercase tracking-widest">Raw Game Data</span>
-                {rawOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-              </button>
-              {rawOpen && (
-                <pre className="px-4 pb-4 max-h-80 overflow-auto text-xs text-slate-500 font-mono leading-relaxed border-t border-border">
-                  {JSON.stringify(rawPayload, null, 2)}
-                </pre>
-              )}
-            </div>
-          )}
-        </div>
       </div>
     </PageShell>
   );
 }
+

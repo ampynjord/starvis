@@ -64,6 +64,13 @@ export interface ShipListItem {
   missile_damage_total: number | null;
   hydrogen_fuel_capacity: number | null;
   quantum_fuel_capacity: number | null;
+  armor_phys_resist?: number | null;
+  armor_energy_resist?: number | null;
+  armor_signal_ir?: number | null;
+  armor_signal_em?: number | null;
+  armor_signal_cs?: number | null;
+  insurance_claim_time?: number | null;
+  insurance_expedite_cost?: number | null;
   equipped_count?: number | null;
   equipped_ports?: string[] | null;
   port_min_size?: number | null;
@@ -75,6 +82,17 @@ export interface ShipListItem {
   min_rental_price_30d?: number | null;
   purchase_location_count?: number | null;
   rental_location_count?: number | null;
+}
+
+export interface ShipGalleryImage {
+  id: number;
+  ship_matrix_id: number;
+  url: string;
+  thumbnail_url: string | null;
+  title: string | null;
+  kind: string;
+  position: number;
+  synced_at: string;
 }
 
 export interface Ship extends ShipListItem {
@@ -105,6 +123,7 @@ export interface Ship extends ShipListItem {
   shield_regen: number | null;
   shield_regen_delay: number | null;
   shield_down_delay: number | null;
+  gallery?: ShipGalleryImage[];
 }
 
 export interface LoadoutNode {

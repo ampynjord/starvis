@@ -27,6 +27,7 @@ interface BankItem {
   id: number;
   itemType: string;
   itemClassName: string;
+  itemName?: string | null;
   quantity: number;
   notes: string | null;
   addedAt: string;
@@ -80,7 +81,7 @@ function AddItemModal({ onClose, onAdd }: {
       if (endpoint) {
         const res = await fetch(endpoint);
         const data = await res.json();
-        setSearchResults((data.data ?? []).map((c: any) => ({ class_name: c.class_name, name: c.display_name ?? c.name ?? c.class_name })));
+        setSearchResults((data.data ?? []).map((c: any) => ({ class_name: c.class_name, name: c.display_name ?? c.name ?? 'Unnamed item' })));
       }
     } finally {
       setSearching(false);
@@ -143,7 +144,7 @@ function AddItemModal({ onClose, onAdd }: {
           {/* Item search */}
           <div className="space-y-1 relative">
             <label className="text-[10px] font-orbitron text-slate-500 uppercase tracking-widest">
-              {itemType === 'other' ? 'Name / class' : 'Search'}
+              {itemType === 'other' ? 'Name' : 'Search'}
             </label>
             <div className="relative">
               <Search size={11} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
@@ -151,7 +152,7 @@ function AddItemModal({ onClose, onAdd }: {
                 value={searchQuery}
                 onChange={handleSearchChange}
                 onFocus={() => setShowSearch(true)}
-                placeholder={itemType === 'other' ? 'Enter class name…' : `Search ${itemType}s…`}
+                placeholder={itemType === 'other' ? 'Enter item name…' : `Search ${itemType}s…`}
                 className="sci-input w-full pl-8 text-sm"
                 autoComplete="off"
               />
@@ -167,16 +168,12 @@ function AddItemModal({ onClose, onAdd }: {
                     className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/5 transition-colors"
                   >
                     <span className="text-sm font-rajdhani text-slate-200 flex-1 truncate">{r.name}</span>
-                    <span className="text-[9px] text-slate-600 font-mono-sc truncate max-w-[100px]">{r.class_name}</span>
                   </button>
                 ))}
               </div>
             )}
             {itemType === 'other' && (
-              <p className="text-[10px] text-slate-600">Enter any class name manually.</p>
-            )}
-            {className && className !== searchQuery && (
-              <p className="text-[10px] text-cyan-600 font-mono-sc">{className}</p>
+              <p className="text-[10px] text-slate-600">Use this only when the item is not available in search yet.</p>
             )}
           </div>
 
@@ -240,7 +237,7 @@ function EditItemModal({ item, onClose, onSave }: {
           <select value={itemType} onChange={(event) => setItemType(event.target.value as ItemTypeValue)} className="sci-input w-full">
             {ITEM_TYPES.map((type) => <option key={type.value} value={type.value}>{type.label}</option>)}
           </select>
-          <input value={itemClassName} onChange={(event) => setItemClassName(event.target.value)} className="sci-input w-full font-mono-sc text-xs" />
+          <input value={itemClassName} onChange={(event) => setItemClassName(event.target.value)} className="sci-input w-full text-sm" placeholder="Item identifier" />
           <input type="number" min={1} value={quantity} onChange={(event) => setQuantity(Math.max(1, Number(event.target.value)))} className="sci-input w-full" />
           <input value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="Notes..." className="sci-input w-full text-sm" />
           <button
@@ -263,7 +260,7 @@ function ItemRow({ item, onRemove, onEdit, canManage }: { item: BankItem; onRemo
     <div className="flex items-center gap-3 px-4 py-3 hover:bg-white/[0.02] transition-colors">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-rajdhani font-semibold text-slate-200 truncate">{item.itemClassName}</span>
+          <span className="text-sm font-rajdhani font-semibold text-slate-200 truncate">{item.itemName ?? 'Declared item'}</span>
           <span className={`text-[9px] font-orbitron font-bold px-1.5 py-0.5 rounded-sm border ${typeStyle.color} ${typeStyle.bg}`}>
             {typeStyle.label.toUpperCase()}
           </span>
@@ -397,7 +394,7 @@ export default function CorpBankPage() {
   const filtered = items.filter((i) => {
     const matchType = filter === 'all' || i.itemType === filter;
     const q = search.toLowerCase();
-    const matchSearch = !q || i.itemClassName.toLowerCase().includes(q) || i.notes?.toLowerCase().includes(q);
+    const matchSearch = !q || (i.itemName ?? '').toLowerCase().includes(q) || i.notes?.toLowerCase().includes(q);
     return matchType && matchSearch;
   });
 

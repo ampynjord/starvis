@@ -2,7 +2,6 @@
 
 import { Clock, MapPin, Package, TrendingDown, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
-import { CanonicalMeta } from '@/components/ui/CanonicalMeta';
 import { GlowBadge } from '@/components/ui/GlowBadge';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { fCredits } from '@/utils/formatters';
@@ -43,12 +42,6 @@ function toNumber(value: number | string | null | undefined) {
   if (value == null || value === '') return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
-}
-
-function confidencePercent(value: number | string | null | undefined) {
-  const n = toNumber(value);
-  if (n == null) return null;
-  return n > 0 && n <= 1 ? n * 100 : n;
 }
 
 function locationLabel(row: PriceAvailabilityRow) {
@@ -106,9 +99,6 @@ export function PriceAvailabilityPanel({
             const sell = toNumber(row.sell_price);
             const rentals = rentalRows(row);
             const stock = stockLabel(row);
-            const sourceType = row.inventory_source_type ?? row.source_type ?? row.source ?? row.shop_source_type;
-            const sourceName = row.inventory_source_name ?? row.source_name ?? row.shop_source_name;
-
             return (
               <div key={`${row.shop_id}-${row.terminal ?? ''}-${index}`} className="sci-panel px-3 py-2">
                 <div className="flex items-start justify-between gap-3">
@@ -120,15 +110,7 @@ export function PriceAvailabilityPanel({
                     <div className="mt-1 flex flex-wrap gap-1">
                       {row.shop_type && <GlowBadge color="slate">{row.shop_type}</GlowBadge>}
                       {row.terminal && <GlowBadge color="cyan">{row.terminal}</GlowBadge>}
-                      {row.match_type && <GlowBadge color={row.match_type === 'uuid' ? 'green' : 'cyan'}>{row.match_type}</GlowBadge>}
                     </div>
-                    <CanonicalMeta
-                      compact
-                      className="mt-1"
-                      sourceType={sourceType}
-                      sourceName={sourceName}
-                      confidenceScore={confidencePercent(row.confidence_score ?? row.confidence)}
-                    />
                   </div>
                   <div className="shrink-0 text-right">
                     {base != null && base > 0 && (

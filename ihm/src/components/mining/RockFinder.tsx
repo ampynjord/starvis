@@ -85,7 +85,7 @@ export function RockFinder() {
               <option value="">— Select a mineral —</option>
               {(elements ?? []).map((el) => (
                 <option key={el.uuid} value={el.uuid}>
-                  {el.name ?? el.class_name}
+                  {el.name ?? 'Unknown deposit'}
                 </option>
               ))}
             </select>

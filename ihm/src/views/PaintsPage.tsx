@@ -60,7 +60,7 @@ function PaintCard({ p, index }: { p: PaintListItem; index: number }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap">
               <p className="text-sm font-rajdhani font-semibold text-slate-200 truncate flex-1">
-                {p.paint_name}
+                {p.paint_name ?? 'Unnamed livery'}
               </p>
               {event && (
                 <span className={`shrink-0 text-[9px] font-mono-sc px-1.5 py-0.5 rounded-sm border ${event.color}`}>
@@ -68,9 +68,6 @@ function PaintCard({ p, index }: { p: PaintListItem; index: number }) {
                 </span>
               )}
             </div>
-            <p className="text-[10px] font-mono-sc text-slate-700 truncate mt-0.5">
-              {p.paint_class_name}
-            </p>
             <div className="mt-1">
               <MarketSummary item={p} compact />
             </div>

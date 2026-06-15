@@ -83,8 +83,7 @@ function FactionRegistry({ factions }: { factions: GameFactionInsight[] }) {
           <div key={faction.uuid} className="sci-panel min-w-0 overflow-hidden border border-slate-800/60 p-3">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 overflow-hidden">
-                <p className="truncate font-orbitron text-sm font-bold text-slate-100">{faction.name ?? formatClassName(faction.class_name)}</p>
-                <p className="mt-0.5 truncate font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">{faction.class_name}</p>
+                <p className="truncate font-orbitron text-sm font-bold text-slate-100">{faction.name ?? 'Unknown faction'}</p>
               </div>
               {faction.faction_type && (
                 <GlowBadge color="slate" className="max-w-[96px] shrink-0 truncate">
@@ -113,7 +112,7 @@ function ReputationPanel({ standings }: { standings: ReputationStandingInsight[]
         {standings.slice(0, 8).map((standing) => (
           <div key={standing.uuid} className="rounded-sm border border-slate-800/70 bg-slate-950/40 p-3">
             <p className="truncate font-orbitron text-xs font-bold text-slate-100">
-              {standing.display_name ?? standing.name ?? formatClassName(standing.class_name)}
+              {standing.display_name ?? standing.name ?? 'Reputation standing'}
             </p>
             <p className="mt-1 font-mono-sc text-[10px] uppercase tracking-widest text-amber-500">
               Min rep {standing.min_reputation?.toLocaleString('en-US') ?? 'N/A'}

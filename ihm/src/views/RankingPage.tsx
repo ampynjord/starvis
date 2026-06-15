@@ -19,9 +19,9 @@ import { PageShell } from '@/components/ui/PageShell';
 import { useEnv } from '@/contexts/EnvContext';
 import { api } from '@/services/api';
 import type { RankingStat, ShipListItem } from '@/types/api';
-import { fDimension, fMass, fNumber, fSpeed } from '@/utils/formatters';
+import { fCredits, fDimension, fMass, fNumber, fSpeed } from '@/utils/formatters';
 
-const FALLBACK_STAT_CATEGORIES = ['All', 'Flight', 'Combat', 'Transport', 'Fuel', 'Dimensions'];
+const FALLBACK_STAT_CATEGORIES = ['All', 'Flight', 'Combat', 'Defense', 'Transport', 'Market', 'Fuel', 'Insurance', 'Dimensions', 'Signatures'];
 const FALLBACK_VEHICLE_CATEGORIES = [
   { label: 'Ships', value: 'ship' },
   { label: 'Ground', value: 'ground' },
@@ -58,6 +58,15 @@ function formatStatValue(stat: RankingStat, value: number | null): string {
       return fDimension(value);
     case 'weapon_damage_total':
       return fNumber(value, 1);
+    case 'min_purchase_price':
+    case 'min_rental_price_1d':
+    case 'insurance_expedite_cost':
+      return fCredits(value);
+    case 'insurance_claim_time':
+      return `${fNumber(value, 1)} min`;
+    case 'armor_phys_resist':
+    case 'armor_energy_resist':
+      return `${fNumber(value * 100, 0)}%`;
     default:
       return fNumber(value, 0);
   }
@@ -288,7 +297,9 @@ export default function RankingPage() {
                 </tr>
               </thead>
               <tbody>
-                {displayShips.map((ship, index) => (
+                {displayShips.map((ship, index) => {
+                  const shipName = ship.name || ship.short_name || 'Unnamed ship';
+                  return (
                   <motion.tr
                     key={ship.uuid}
                     initial={{ opacity: 0, x: -10 }}
@@ -312,7 +323,7 @@ export default function RankingPage() {
                         href={`/ships/${ship.uuid}`}
                         className="text-slate-200 hover:text-cyan-400 font-rajdhani font-semibold group-hover:underline transition-colors"
                       >
-                        {ship.name ?? ship.class_name}
+                        {shipName}
                       </Link>
                     </td>
                     <td className="px-3 py-1.5">
@@ -339,7 +350,8 @@ export default function RankingPage() {
                       );
                     })}
                   </motion.tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           )}

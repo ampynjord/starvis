@@ -3,14 +3,14 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ArrowLeft, BarChart3, ChevronRight, Clock, Coins,
+  ArrowLeft, BarChart3, ChevronLeft, ChevronRight, Clock, Coins,
   Crosshair, ExternalLink, Layers, Package, Palette, Rocket, Ruler, Users, Zap,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
-import type { ShipModule } from '@/types/api';
+import type { ShipGalleryImage, ShipModule } from '@/types/api';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { PageShell } from '@/components/ui/PageShell';
 import { GlowBadge } from '@/components/ui/GlowBadge';
@@ -65,6 +65,74 @@ function QuickStat({ icon, label, value }: { icon: React.ReactNode; label: strin
       </div>
       <span className="text-sm font-orbitron font-bold text-slate-200 tabular-nums">{value}</span>
     </div>
+  );
+}
+
+function OfficialGalleryCarousel({ shipName, images }: { shipName: string; images: ShipGalleryImage[] }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const active = images[Math.min(activeIndex, images.length - 1)] ?? images[0];
+  if (!active) return null;
+
+  const go = (direction: -1 | 1) => {
+    setActiveIndex((current) => (current + direction + images.length) % images.length);
+  };
+
+  return (
+    <ScifiPanel title="Official Gallery" subtitle={`${images.length} RSI media`}>
+      <div className="space-y-3">
+        <a
+          href={active.url}
+          target="_blank"
+          rel="noreferrer"
+          className="group relative block aspect-video overflow-hidden rounded-sm border border-slate-800 bg-slate-950"
+        >
+          <img
+            src={active.url}
+            alt={active.title ?? `${shipName} official media`}
+            className="h-full w-full object-cover opacity-90 transition duration-300 group-hover:scale-[1.02] group-hover:opacity-100"
+            loading="lazy"
+          />
+          <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-linear-to-t from-slate-950/95 via-slate-950/40 to-transparent p-3">
+            <span className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-400">
+              {active.title ?? `${shipName} media ${activeIndex + 1}`}
+            </span>
+            <span className="font-mono-sc text-[10px] text-cyan-500">
+              {activeIndex + 1}/{images.length}
+            </span>
+          </div>
+        </a>
+
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => go(-1)} className="sci-btn h-10 w-10 justify-center px-0" aria-label="Previous image">
+            <ChevronLeft size={16} />
+          </button>
+          <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1">
+            {images.map((image, index) => (
+              <button
+                key={image.id}
+                type="button"
+                onClick={() => setActiveIndex(index)}
+                className={[
+                  'relative h-14 w-24 shrink-0 overflow-hidden rounded-sm border bg-slate-950 transition-colors',
+                  index === activeIndex ? 'border-cyan-500' : 'border-slate-800 hover:border-cyan-900',
+                ].join(' ')}
+                aria-label={`Show gallery image ${index + 1}`}
+              >
+                <img
+                  src={image.thumbnail_url ?? image.url}
+                  alt=""
+                  className="h-full w-full object-cover opacity-75"
+                  loading="lazy"
+                />
+              </button>
+            ))}
+          </div>
+          <button type="button" onClick={() => go(1)} className="sci-btn h-10 w-10 justify-center px-0" aria-label="Next image">
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      </div>
+    </ScifiPanel>
   );
 }
 
@@ -240,6 +308,7 @@ export default function ShipDetailPage() {
   const hasDimensions = (ship.size_x || ship.size_y || ship.size_z);
   const hasCargo = ship.cargo_capacity != null && Number(ship.cargo_capacity) > 0;
   const hasInsurance = ship.insurance_claim_time != null || ship.insurance_expedite_cost != null;
+  const gallery = ship.gallery ?? [];
 
   return (
     <PageShell size="xl">
@@ -327,6 +396,8 @@ export default function ShipDetailPage() {
           {ship.sm_description}
         </p>
       )}
+
+      {gallery.length > 0 && <OfficialGalleryCarousel shipName={ship.name} images={gallery} />}
 
       {/* ── Quick stats bar ────────────────────────────────────────────────── */}
       <div className="flex gap-2 flex-wrap">
@@ -534,7 +605,6 @@ export default function ShipDetailPage() {
                 {paints.map(p => (
                   <div key={p.paint_uuid ?? p.paint_class_name} className="px-2.5 py-2 rounded-sm border border-slate-800/50 bg-slate-900/30 hover:bg-white/5">
                     <p className="text-xs font-rajdhani font-semibold text-slate-300 truncate">{p.paint_name ?? 'Unnamed livery'}</p>
-                    <p className="text-[9px] font-mono-sc text-slate-700 truncate mt-0.5">{p.paint_class_name}</p>
                   </div>
                 ))}
               </div>

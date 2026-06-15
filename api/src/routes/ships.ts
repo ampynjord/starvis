@@ -43,6 +43,10 @@ const RANKING_STATS = [
   },
   { key: 'cargo_capacity', label: 'Cargo', unit: 'SCU', higher_is_better: true, category: 'Transport' },
   { key: 'crew_size', label: 'Crew', unit: '', higher_is_better: true, category: 'Transport' },
+  { key: 'min_purchase_price', label: 'Buy Price', unit: 'aUEC', higher_is_better: false, category: 'Market' },
+  { key: 'min_rental_price_1d', label: 'Rent 1d', unit: 'aUEC', higher_is_better: false, category: 'Market' },
+  { key: 'purchase_location_count', label: 'Buy Locations', unit: '', higher_is_better: true, category: 'Market' },
+  { key: 'rental_location_count', label: 'Rental Locations', unit: '', higher_is_better: true, category: 'Market' },
   {
     key: 'hydrogen_fuel_capacity',
     label: 'H2 Fuel',
@@ -52,13 +56,66 @@ const RANKING_STATS = [
     vehicleCategories: ['ship', 'gravlev'],
   },
   { key: 'quantum_fuel_capacity', label: 'QT Fuel', unit: 'L', higher_is_better: true, category: 'Fuel', vehicleCategories: ['ship'] },
+  { key: 'insurance_claim_time', label: 'Claim Time', unit: 'min', higher_is_better: false, category: 'Insurance' },
+  { key: 'insurance_expedite_cost', label: 'Expedite', unit: 'aUEC', higher_is_better: false, category: 'Insurance' },
   { key: 'mass', label: 'Mass', unit: '', higher_is_better: false, category: 'Dimensions' },
   { key: 'cross_section_z', label: 'Length', unit: 'm', higher_is_better: false, category: 'Dimensions' },
   { key: 'cross_section_x', label: 'Width', unit: 'm', higher_is_better: false, category: 'Dimensions' },
   { key: 'cross_section_y', label: 'Height', unit: 'm', higher_is_better: false, category: 'Dimensions' },
+  {
+    key: 'armor_phys_resist',
+    label: 'Physical Resist',
+    unit: '%',
+    higher_is_better: true,
+    category: 'Defense',
+    vehicleCategories: ['ship', 'gravlev'],
+  },
+  {
+    key: 'armor_energy_resist',
+    label: 'Energy Resist',
+    unit: '%',
+    higher_is_better: true,
+    category: 'Defense',
+    vehicleCategories: ['ship', 'gravlev'],
+  },
+  {
+    key: 'armor_signal_ir',
+    label: 'IR Signal',
+    unit: '',
+    higher_is_better: false,
+    category: 'Signatures',
+    vehicleCategories: ['ship', 'gravlev'],
+  },
+  {
+    key: 'armor_signal_em',
+    label: 'EM Signal',
+    unit: '',
+    higher_is_better: false,
+    category: 'Signatures',
+    vehicleCategories: ['ship', 'gravlev'],
+  },
+  {
+    key: 'armor_signal_cs',
+    label: 'CS Signal',
+    unit: '',
+    higher_is_better: false,
+    category: 'Signatures',
+    vehicleCategories: ['ship', 'gravlev'],
+  },
 ] as const;
 
-const RANKING_STAT_CATEGORIES = ['All', 'Flight', 'Combat', 'Transport', 'Fuel', 'Dimensions'];
+const RANKING_STAT_CATEGORIES = [
+  'All',
+  'Flight',
+  'Combat',
+  'Defense',
+  'Transport',
+  'Market',
+  'Fuel',
+  'Insurance',
+  'Dimensions',
+  'Signatures',
+];
 const RANKING_VEHICLE_CATEGORIES = [
   { label: 'Ships', value: 'ship' },
   { label: 'Ground', value: 'ground' },
@@ -262,6 +319,11 @@ export function mountShipRoutes(router: Router, deps: RouteDependencies): void {
       // Attach lightweight variant list if ship belongs to a chassis family
       if (ship.chassis_id) {
         ship.variants = await gameDataService!.ships.getVariantSummary(Number(ship.chassis_id), String(ship.uuid), env);
+      }
+      if (ship.ship_matrix_id) {
+        ship.gallery = await gameDataService!.ships.getShipGallery(Number(ship.ship_matrix_id));
+      } else {
+        ship.gallery = [];
       }
       // Optional included relations
       const extras = await Promise.all([

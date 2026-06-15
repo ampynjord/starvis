@@ -35,8 +35,28 @@ model ShipMatrix {
   ctmUrl            String?  @map("ctm_url") @db.VarChar(500)
   compiled          Json?
   syncedAt          DateTime @default(now()) @map("synced_at")
+  galleries         ShipGallery[]
 
   @@map("ship_matrix")
+  @@schema("rsi")
+}
+
+model ShipGallery {
+  id           Int        @id @default(autoincrement())
+  shipMatrixId Int       @map("ship_matrix_id")
+  url          String
+  thumbnailUrl String?   @map("thumbnail_url")
+  title        String?   @db.VarChar(255)
+  kind         String    @default("official-gallery") @db.VarChar(50)
+  position     Int      @default(0)
+  rawJson      Json?    @map("raw_json")
+  syncedAt     DateTime @default(now()) @map("synced_at")
+
+  shipMatrix ShipMatrix @relation(fields: [shipMatrixId], references: [id], onDelete: Cascade)
+
+  @@unique([shipMatrixId, url])
+  @@index([shipMatrixId])
+  @@map("ship_galleries")
   @@schema("rsi")
 }
 

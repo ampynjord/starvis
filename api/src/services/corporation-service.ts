@@ -1,5 +1,6 @@
 import type { PrismaLike } from '@starvis/db';
 import type { RsiOrg } from './rsi-orgs-service.js';
+import { toPostgres } from './shared.js';
 
 export interface CorporationData {
   id: number;
@@ -45,6 +46,7 @@ export interface FleetItemData {
   corporationId: number | null;
   itemType: string;
   itemClassName: string;
+  itemName?: string | null;
   shipUuid?: string | null;
   quantity: number;
   notes: string | null;
@@ -109,6 +111,42 @@ export class CorporationService {
 
   private get db(): any {
     return this.prisma as any;
+  }
+
+  private async withFleetItemNames(items: FleetItemData[], env = 'live'): Promise<FleetItemData[]> {
+    if (!items.length) return items;
+    const keys = [...new Set(items.map((item) => item.itemClassName).filter(Boolean))];
+    if (!keys.length) return items;
+    const placeholders = keys.map(() => '?').join(',');
+    const rows = (await this.db.$queryRawUnsafe(
+      toPostgres(`
+        SELECT class_name, name
+        FROM game.ships
+        WHERE env = ? AND class_name IN (${placeholders})
+        UNION ALL
+        SELECT class_name, name
+        FROM game.components
+        WHERE env = ? AND class_name IN (${placeholders})
+        UNION ALL
+        SELECT class_name, COALESCE(name, class_name) AS name
+        FROM game.items
+        WHERE env = ? AND class_name IN (${placeholders})
+        UNION ALL
+        SELECT class_name, name
+        FROM game.commodities
+        WHERE env = ? AND class_name IN (${placeholders})
+      `),
+      env,
+      ...keys,
+      env,
+      ...keys,
+      env,
+      ...keys,
+      env,
+      ...keys,
+    )) as Array<{ class_name: string; name: string | null }>;
+    const nameByClass = new Map<string, string | null>(rows.map((row) => [String(row.class_name), row.name]));
+    return items.map((item) => ({ ...item, itemName: nameByClass.get(item.itemClassName) ?? null }));
   }
 
   // ── Corporations ────────────────────────────────────────────────────────────
@@ -401,15 +439,16 @@ export class CorporationService {
   // ── Fleet ────────────────────────────────────────────────────────────────────
 
   async getFleet(corporationId: number): Promise<FleetItemData[]> {
-    return this.db.corporationFleetItem.findMany({
+    const items = await this.db.corporationFleetItem.findMany({
       where: { corporationId },
       select: FLEET_SELECT,
       orderBy: [{ itemType: 'asc' }, { itemClassName: 'asc' }],
     });
+    return this.withFleetItemNames(items);
   }
 
   async getFleetItemsByUser(userId: number): Promise<FleetItemData[]> {
-    return this.db.corporationFleetItem.findMany({
+    const items = await this.db.corporationFleetItem.findMany({
       where: { addedById: userId },
       select: {
         ...FLEET_SELECT,
@@ -418,6 +457,7 @@ export class CorporationService {
       },
       orderBy: [{ itemType: 'asc' }, { addedAt: 'desc' }],
     });
+    return this.withFleetItemNames(items);
   }
 
   async addFleetItem(
@@ -488,11 +528,12 @@ export class CorporationService {
   async getFleetItems(corporationId: number | null, type: 'ship' | 'non-ship', userId?: number): Promise<FleetItemData[]> {
     const ownerWhere = corporationId == null ? { corporationId: null, addedById: userId } : { corporationId };
     const where = type === 'ship' ? { ...ownerWhere, itemType: 'ship' } : { ...ownerWhere, itemType: { not: 'ship' } };
-    return this.db.corporationFleetItem.findMany({
+    const items = await this.db.corporationFleetItem.findMany({
       where,
       select: { ...FLEET_SELECT, shipUuid: true } as typeof FLEET_SELECT,
       orderBy: [{ addedAt: 'desc' }],
     });
+    return this.withFleetItemNames(items);
   }
 
   async declareShip(

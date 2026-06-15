@@ -35,6 +35,7 @@ import { saveManufacturersFromData } from './persisters/manufacturers.js';
 import { saveMiningData } from './persisters/mining.js';
 import { saveMissionBlueprintLinks, saveMissions } from './persisters/missions.js';
 import { savePaints } from './persisters/paints.js';
+import { saveOfficialShipGalleries } from './persisters/ship-galleries.js';
 import { saveShips } from './persisters/ships.js';
 import { saveShopsData } from './persisters/shops.js';
 import { RsiSyncService } from './rsi-sync-service.js';
@@ -57,6 +58,7 @@ export type ExtractionModule =
   | 'comm-links'
   | 'starmap'
   | 'ship-matrix'
+  | 'ship-galleries'
   | 'organizations';
 
 export type GameEnv = 'live' | 'ptu' | 'custom';
@@ -194,7 +196,7 @@ export class ExtractionService {
 
     // ── Ship Matrix pre-sync (before main transaction so crossReferenceShipMatrix has data) ──
     // ship_matrix lives in rsi_website (separate DB/pool) — safe to populate before the P4K tx.
-    if (run('ship-matrix') && options.rsiPool) {
+    if ((run('ship-matrix') || run('ship-galleries')) && options.rsiPool) {
       onProgress?.('Pre-syncing Ship Matrix from RSI website (needed for cross-reference)…');
       try {
         const rsiSync = new RsiSyncService(options.rsiPool);
@@ -242,7 +244,7 @@ export class ExtractionService {
     }, 10_000);
     // Shared context for all domain persisters (df is null-asserted — persisters
     // that use it only run for P4K modules, never for ctm-only runs)
-    const ctx: PersistContext = { conn, env, df: this.df, loc: this.locService, onProgress };
+    const ctx: PersistContext = { conn, env, df: this.dfService as DataForgeService, loc: this.locService, onProgress };
     try {
       // 1b. Snapshot current data BEFORE cleaning — for changelog comparison
       onProgress?.('Snapshotting current data for changelog…');
@@ -570,6 +572,22 @@ export class ExtractionService {
             stats.errors.push(`Organizations sync failed: ${(e as Error).message}`);
           }
         }
+      }
+    }
+
+    if (run('ship-galleries')) {
+      const force = options.ctmForce ?? false;
+      const concurrency = options.ctmConcurrency ?? 1;
+      const galleryPool = options.rsiPool ?? this.pool;
+      const galleryConn = await galleryPool.connect();
+      try {
+        onProgress?.(`Scraping official RSI ship galleries… [${force ? 'force-all' : 'incremental'}, concurrency=${concurrency}]`);
+        await saveOfficialShipGalleries(galleryConn, { force, concurrency }, onProgress);
+      } catch (e) {
+        stats.errors.push(`Ship galleries failed: ${(e as Error).message}`);
+        throw e;
+      } finally {
+        galleryConn.release();
       }
     }
 
