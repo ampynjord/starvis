@@ -231,6 +231,8 @@ function gallerySource(url: string, kind?: string | null): 'pledge' | 'media' | 
   return 'fallback';
 }
 
+const GALLERY_SOURCE_ORDER = { pledge: 0, media: 1, fallback: 2 } as const;
+
 function isGalleryImageUrl(url: string): boolean {
   return /\.(?:webp|png|jpe?g)(?:[?#].*)?$/i.test(url);
 }
@@ -245,6 +247,12 @@ function galleryImageScore(url: string): number {
   if (lower.includes('/slideshow.')) return 2500;
   if (lower.includes('/source.')) return 2000 + (Number.isFinite(width) ? width : 0);
   return Number.isFinite(width) ? width : 0;
+}
+
+function galleryImageRank(row: Row): number {
+  const url = String(row.url ?? '');
+  const source = gallerySource(url, String(row.kind ?? ''));
+  return (3 - GALLERY_SOURCE_ORDER[source]) * 100_000 + galleryImageScore(url);
 }
 
 /**
@@ -526,15 +534,16 @@ export class ShipQueryService {
       if (!isGalleryImageUrl(url)) continue;
       const key = galleryMediaKey(url);
       const existing = bestByMedia.get(key);
-      if (!existing || galleryImageScore(url) > galleryImageScore(String(existing.url ?? ''))) {
+      if (!existing || galleryImageRank(row) > galleryImageRank(existing)) {
         bestByMedia.set(key, { ...row, source: gallerySource(url, String(row.kind ?? '')) });
       }
     }
-    const sourceOrder = { pledge: 0, media: 1, fallback: 2 } as const;
     return [...bestByMedia.values()].sort((left, right) => {
       const leftSource = gallerySource(String(left.url ?? ''), String(left.kind ?? ''));
       const rightSource = gallerySource(String(right.url ?? ''), String(right.kind ?? ''));
-      return sourceOrder[leftSource] - sourceOrder[rightSource] || Number(left.position ?? 0) - Number(right.position ?? 0);
+      return (
+        GALLERY_SOURCE_ORDER[leftSource] - GALLERY_SOURCE_ORDER[rightSource] || Number(left.position ?? 0) - Number(right.position ?? 0)
+      );
     });
   }
 
