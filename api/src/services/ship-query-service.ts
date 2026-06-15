@@ -188,7 +188,7 @@ const SHIP_JOINS = `FROM game.ships s
     FROM rsi.ship_galleries g
     WHERE g.ship_matrix_id = sm.id
       AND g.url LIKE '%robertsspaceindustries.com/i/%'
-      AND g.url ~* '\\.(webp|png|jpe?g)(\\?.*)?$'
+      AND g.url ~* '\\.(webp|png|jpg|jpeg)$'
     ORDER BY g.position ASC, g.id ASC
     LIMIT 1
   ) ship_thumb ON TRUE
