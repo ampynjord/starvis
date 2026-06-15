@@ -533,6 +533,10 @@ export interface Shop {
   source_type?: string | null;
   source_name?: string | null;
   confidence_score?: number | null;
+  location_uuid?: string | null;
+  locationUuid?: string | null;
+  inventory_count?: number | null;
+  inventoryCount?: number | null;
   location: string | null;
   parent_location: string | null;
   parentLocation?: string | null;
@@ -1438,4 +1442,9 @@ export interface Location {
   description?: string | null;
   is_scannable: boolean;
   hide_in_starmap: boolean;
+}
+
+export interface LocationTreeNode extends Location {
+  children: LocationTreeNode[];
+  shops: Shop[];
 }

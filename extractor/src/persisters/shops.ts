@@ -278,7 +278,7 @@ async function loadEntityIndexes(ctx: PersistContext): Promise<EntityIndexes> {
 function resolveLocMeta(
   shop: ShopExtractRecord,
   slugIndex: Map<string, string>,
-  locMetaByLocKey: Map<string, { location: string; system: string | null; planet_moon: string | null; city: string | null }>,
+  locMetaByLocKey: Map<string, { uuid: string; location: string; system: string | null; planet_moon: string | null; city: string | null }>,
 ) {
   const slug = normalizeLookupSlug(shop.locationSlug);
   const locKey = slugIndex.get(slug) ?? null;
@@ -317,7 +317,10 @@ export async function saveShopsData(ctx: PersistContext): Promise<{ shops: numbe
   );
   onProgress?.(`Shops: built location index with ${slugIndex.size} slug entries from ${locRows.length} locations`);
 
-  const locMetaByLocKey = new Map<string, { location: string; system: string | null; planet_moon: string | null; city: string | null }>();
+  const locMetaByLocKey = new Map<
+    string,
+    { uuid: string; location: string; system: string | null; planet_moon: string | null; city: string | null }
+  >();
   const { rows: allLocRows } = await conn.query<any>(
     `SELECT uuid, class_name, name, loc_key, type, system_code, parent_uuid FROM game.locations WHERE env = $1`,
     [env],
@@ -350,7 +353,7 @@ export async function saveShopsData(ctx: PersistContext): Promise<{ shops: numbe
       planet_moon = row.name;
     }
 
-    locMetaByLocKey.set(row.loc_key, { location, system, planet_moon, city });
+    locMetaByLocKey.set(row.loc_key, { uuid: row.uuid, location, system, planet_moon, city });
   }
 
   const allShops: ShopExtractRecord[] = [...prefabShops, ...inventoryShops];
@@ -366,6 +369,7 @@ export async function saveShopsData(ctx: PersistContext): Promise<{ shops: numbe
       normalizedName,
       canonicalShopKey,
       locKey,
+      meta?.uuid ?? null,
       meta?.location ?? null,
       meta?.system ?? null,
       meta?.planet_moon ?? null,
@@ -383,6 +387,7 @@ export async function saveShopsData(ctx: PersistContext): Promise<{ shops: numbe
   const SHOP_CONFLICT = `(class_name, env) DO UPDATE SET
     name=EXCLUDED.name, normalized_name=EXCLUDED.normalized_name,
     canonical_shop_key=EXCLUDED.canonical_shop_key, canonical_location_key=EXCLUDED.canonical_location_key,
+    location_uuid=EXCLUDED.location_uuid,
     location=EXCLUDED.location, system=EXCLUDED.system, planet_moon=EXCLUDED.planet_moon, city=EXCLUDED.city,
     shop_type=EXCLUDED.shop_type, franchise_slug=EXCLUDED.franchise_slug, location_slug=EXCLUDED.location_slug,
     franchise_loc_key=EXCLUDED.franchise_loc_key, p4k_path=EXCLUDED.p4k_path, raw_json=EXCLUDED.raw_json,
@@ -392,9 +397,9 @@ export async function saveShopsData(ctx: PersistContext): Promise<{ shops: numbe
     shopRows.length > 0
       ? await batchUpsert(
           conn,
-          `INSERT INTO game.shops (env, name, normalized_name, canonical_shop_key, canonical_location_key, location, system, planet_moon, city, shop_type, class_name, franchise_slug, location_slug, franchise_loc_key, p4k_path, raw_json)`,
+          `INSERT INTO game.shops (env, name, normalized_name, canonical_shop_key, canonical_location_key, location_uuid, location, system, planet_moon, city, shop_type, class_name, franchise_slug, location_slug, franchise_loc_key, p4k_path, raw_json)`,
           SHOP_CONFLICT,
-          16,
+          17,
           shopRows,
         )
       : 0;

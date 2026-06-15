@@ -56,6 +56,17 @@ export function mountLocationRoutes(router: Router, deps: RouteDependencies): vo
     }),
   );
 
+  /** GET /api/v1/locations/tree — nested locations with attached shops */
+  router.get(
+    '/api/v1/locations/tree',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = getQueryString(req, 'env') ?? 'live';
+      const data = await gameDataService!.locations.getTree(env);
+      sendDataWithETag(req, res, data, data.length);
+    }),
+  );
+
   /** GET /api/v1/locations */
   router.get(
     '/api/v1/locations',
@@ -97,6 +108,17 @@ export function mountLocationRoutes(router: Router, deps: RouteDependencies): vo
     asyncHandler(async (req, res) => {
       const env = getQueryString(req, 'env') ?? 'live';
       const data = await gameDataService!.locations.getLocationChildren(req.params.uuid, env);
+      sendDataWithETag(req, res, data, data.length);
+    }),
+  );
+
+  /** GET /api/v1/locations/:uuid/shops */
+  router.get(
+    '/api/v1/locations/:uuid/shops',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const env = getQueryString(req, 'env') ?? 'live';
+      const data = await gameDataService!.shops.getShopsByLocation(req.params.uuid, env);
       sendDataWithETag(req, res, data, data.length);
     }),
   );

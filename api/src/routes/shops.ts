@@ -30,6 +30,19 @@ export function mountShopRoutes(router: Router, deps: RouteDependencies): void {
   );
 
   router.get(
+    '/api/v1/shops/:id',
+    requireGameData,
+    asyncHandler(async (req, res) => {
+      const shopId = parseInt(req.params.id, 10);
+      if (Number.isNaN(shopId)) return void res.status(400).json({ success: false, error: 'Invalid shop ID' });
+      const env = getQueryString(req, 'env') ?? 'live';
+      const data = await gameDataService!.shops.getShopById(shopId, env);
+      if (!data) return void res.status(404).json({ success: false, error: 'Shop not found' });
+      sendWithETag(req, res, { success: true, data });
+    }),
+  );
+
+  router.get(
     '/api/v1/shops/:id/inventory',
     requireGameData,
     asyncHandler(async (req, res) => {

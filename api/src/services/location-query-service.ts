@@ -15,6 +15,14 @@ import {
 
 const LOCATION_SORT = new Set(['name', 'class_name', 'type', 'system_code', 'is_scannable']);
 
+function normalizeShopTreeRow(row: Row): Row {
+  return {
+    ...row,
+    type: 'shop',
+    inventory_count: Number(row.inventory_count ?? 0),
+  };
+}
+
 export class LocationQueryService {
   constructor(private getClient: (env: string) => PrismaClient) {}
 
@@ -183,6 +191,55 @@ export class LocationQueryService {
       env,
     );
     return rows.map(convertBigIntToNumber).map(stripInternal).map(annotateWithAffiliation);
+  }
+
+  async getTree(env = 'live'): Promise<Row[]> {
+    const locations = await this.getAll(env);
+    const prisma = this.getClient(env);
+    const shopRows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT id, name, class_name, shop_type, location_uuid, canonical_location_key AS loc_key,
+              location, planet_moon, city, system,
+              franchise_slug, location_slug, p4k_path,
+              (SELECT COUNT(*) FROM game.shop_inventory si WHERE si.shop_id = s.id) as inventory_count
+       FROM game.shops s
+       WHERE s.env = ?
+       ORDER BY shop_type, name`),
+      env,
+    );
+
+    const byUuid = new Map<string, Row>();
+    const byLocKey = new Map<string, Row>();
+    for (const location of locations) {
+      const node = { ...location, children: [] as Row[], shops: [] as Row[] };
+      byUuid.set(String(location.uuid), node);
+      if (location.loc_key) byLocKey.set(String(location.loc_key), node);
+    }
+
+    for (const shop of shopRows.map(convertBigIntToNumber).map(normalizeShopTreeRow)) {
+      const parent =
+        (shop.location_uuid ? byUuid.get(String(shop.location_uuid)) : null) ?? (shop.loc_key ? byLocKey.get(String(shop.loc_key)) : null);
+      if (parent) (parent.shops as Row[]).push(shop);
+    }
+
+    const roots: Row[] = [];
+    for (const node of byUuid.values()) {
+      const parentUuid = node.parent_uuid ? String(node.parent_uuid) : null;
+      const parent = parentUuid ? byUuid.get(parentUuid) : null;
+      if (parent) (parent.children as Row[]).push(node);
+      else roots.push(node);
+    }
+
+    const sortNodes = (nodes: Row[]) => {
+      nodes.sort((a, b) => String(a.type).localeCompare(String(b.type)) || String(a.name).localeCompare(String(b.name)));
+      for (const node of nodes) {
+        (node.shops as Row[]).sort(
+          (a, b) => String(a.shop_type ?? '').localeCompare(String(b.shop_type ?? '')) || String(a.name).localeCompare(String(b.name)),
+        );
+        sortNodes(node.children as Row[]);
+      }
+    };
+    sortNodes(roots);
+    return roots;
   }
 
   async getLocationFilters(env = 'live'): Promise<FiltersResult> {

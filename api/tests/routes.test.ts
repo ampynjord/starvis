@@ -77,6 +77,7 @@ function makeGameDataService() {
     shops: {
       getShops: fn(paginated),
       getShopById: fn(null),
+      getShopsByLocation: fn([]),
       getShopInventory: fn([]),
     },
     items: {
@@ -132,6 +133,7 @@ function makeGameDataService() {
       getLocationTypes: fn([]),
       getLocationSystems: fn([]),
       getAll: fn([]),
+      getTree: fn([]),
       getLocations: fn(paginated),
       getLocation: fn(null),
       getLocationChildren: fn([]),
@@ -496,6 +498,20 @@ describe('GET /api/v1/shops', () => {
   });
 });
 
+describe('GET /api/v1/shops/:id', () => {
+  it('returns 400 when id is not numeric', async () => {
+    const res = await request(app).get('/api/v1/shops/not-a-number');
+    expect(res.status).toBe(400);
+    expect(res.body.success).toBe(false);
+  });
+
+  it('returns 404 when shop is not found', async () => {
+    const res = await request(app).get('/api/v1/shops/999');
+    expect(res.status).toBe(404);
+    expect(res.body.success).toBe(false);
+  });
+});
+
 describe('GET /api/v1/shops/:id/inventory', () => {
   it('returns 400 when id is not numeric', async () => {
     const res = await request(app).get('/api/v1/shops/not-a-number/inventory');
@@ -612,6 +628,14 @@ describe('GET /api/v1/locations/all', () => {
   });
 });
 
+describe('GET /api/v1/locations/tree', () => {
+  it('returns 200', async () => {
+    const res = await request(app).get('/api/v1/locations/tree');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+});
+
 describe('GET /api/v1/locations', () => {
   it('returns 200', async () => {
     const res = await request(app).get('/api/v1/locations');
@@ -631,6 +655,14 @@ describe('GET /api/v1/locations/:uuid (not found)', () => {
 describe('GET /api/v1/locations/:uuid/children', () => {
   it('returns 200 even when parent not found', async () => {
     const res = await request(app).get('/api/v1/locations/00000000-0000-0000-0000-000000000000/children');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+});
+
+describe('GET /api/v1/locations/:uuid/shops', () => {
+  it('returns 200 with attached shops', async () => {
+    const res = await request(app).get('/api/v1/locations/00000000-0000-0000-0000-000000000000/shops');
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
   });

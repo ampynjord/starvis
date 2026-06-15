@@ -26,6 +26,7 @@ import type {
   LoadoutNode,
   LoadoutResult,
   Location,
+  LocationTreeNode,
   LootTableInsight,
   Manufacturer,
   MiningComposition,
@@ -189,7 +190,12 @@ function mapCraftingResource(item: CraftingResource): CraftingResource {
 }
 
 function mapShop(item: Shop): Shop {
-  return { ...item, display_shop_type: item.display_shop_type ?? item.shop_type?.replace(/_/g, ' ') ?? undefined };
+  return {
+    ...item,
+    display_shop_type: item.display_shop_type ?? item.shop_type?.replace(/_/g, ' ') ?? undefined,
+    locationUuid: item.locationUuid ?? item.location_uuid,
+    inventoryCount: item.inventoryCount ?? item.inventory_count,
+  };
 }
 
 function mapItem<T extends ItemListItem>(item: T): T {
@@ -458,6 +464,7 @@ export const api = {
   shops: {
     list: async (p?: { env?: string; search?: string; type?: string; page?: number; limit?: number }) =>
       mapPaginated(await get<PaginatedResponse<Shop>>('/shops', p as Record<string, string | number | undefined>), mapShop),
+    get: async (shopId: number, env?: string) => mapShop(await get<Shop>(`/shops/${shopId}`, { env })),
     inventory: (shopId: number, env?: string) => get<ShopInventoryItem[]>(`/shops/${shopId}/inventory`, { env }),
   },
 
@@ -621,8 +628,10 @@ export const api = {
       limit?: number;
     }) => get<PaginatedResponse<Location>>('/locations', filters as Record<string, string | number | undefined>),
     all: (env?: string) => get<Location[]>('/locations/all', { env }),
+    tree: (env?: string) => get<LocationTreeNode[]>('/locations/tree', { env }),
     get: (uuid: string, env?: string) => get<Location>(`/locations/${uuid}`, { env }),
     children: (uuid: string, env?: string) => get<Location[]>(`/locations/${uuid}/children`, { env }),
+    shops: (uuid: string, env?: string) => get<Shop[]>(`/locations/${uuid}/shops`, { env }),
   },
 
   starmap: {
