@@ -15,12 +15,19 @@ CREATE TABLE IF NOT EXISTS game.starmap_location_aliases (
   game_name VARCHAR(255),
   game_type VARCHAR(50),
   system_code VARCHAR(20),
-  rsi_starmap_location_id INTEGER NOT NULL REFERENCES rsi.starmap_locations(id) ON DELETE CASCADE,
+  rsi_starmap_location_id INTEGER NOT NULL,
   confidence VARCHAR(20) NOT NULL DEFAULT 'manual',
   notes TEXT,
   created_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+  updated_at TIMESTAMP(3) NOT NULL
 );
+
+ALTER TABLE game.starmap_location_aliases
+  ADD CONSTRAINT starmap_location_aliases_rsi_starmap_location_id_fkey
+  FOREIGN KEY (rsi_starmap_location_id)
+  REFERENCES rsi.starmap_locations(id)
+  ON DELETE CASCADE
+  ON UPDATE CASCADE;
 
 CREATE UNIQUE INDEX IF NOT EXISTS starmap_location_aliases_env_game_uuid_key
   ON game.starmap_location_aliases (env, game_uuid);
