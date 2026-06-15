@@ -34,6 +34,7 @@ import type {
   MiningYieldResult,
   Mission,
   MissionListResponse,
+  ObjectDetail,
   PaginatedResponse,
   PaintGroupsResponse,
   PaintListItem,
@@ -47,6 +48,7 @@ import type {
   ShipPaint,
   ShipRankingResponse,
   Shop,
+  ShopInventoryItem,
   StatsOverview,
   TradeRoute,
   Version,
@@ -456,6 +458,15 @@ export const api = {
   shops: {
     list: async (p?: { env?: string; search?: string; type?: string; page?: number; limit?: number }) =>
       mapPaginated(await get<PaginatedResponse<Shop>>('/shops', p as Record<string, string | number | undefined>), mapShop),
+    inventory: (shopId: number, env?: string) => get<ShopInventoryItem[]>(`/shops/${shopId}/inventory`, { env }),
+  },
+
+  objects: {
+    detail: <TData = Record<string, unknown>, TRelated = Record<string, unknown>>(
+      type: string,
+      id: string | number,
+      opts?: { env?: string; include?: string },
+    ) => get<ObjectDetail<TData, TRelated>>(`/objects/${encodeURIComponent(type)}/${encodeURIComponent(String(id))}`, opts),
   },
 
   // ─── Commodities ───────────────────────────────────────────────────

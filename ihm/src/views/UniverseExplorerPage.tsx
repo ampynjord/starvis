@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
+import Link from 'next/link';
 import {
   Activity,
   Building2,
@@ -11,6 +12,7 @@ import {
   Globe2,
   Loader2,
   MapPin,
+  Package,
   RadioTower,
   Route,
   Search,
@@ -29,7 +31,8 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { useEnv } from '@/contexts/EnvContext';
 import { createVisibilityTracker, disposeObject3D, getThreePixelRatio } from '@/lib/three-performance';
 import { api } from '@/services/api';
-import type { Location, Shop } from '@/types/api';
+import type { Location, PaginatedResponse, Shop, ShopInventoryItem } from '@/types/api';
+import { fCredits } from '@/utils/formatters';
 import { DetailRow, HudMetric, InfoTile, Metric, StatBar } from './universe-explorer-panels';
 
 type Coordinates = { x?: number | string | null; y?: number | string | null; z?: number | string | null };
@@ -261,6 +264,33 @@ function shopLocationLabel(shop?: Shop | null) {
   return [shop.city, shop.planet_moon, shop.system].filter(Boolean).join(' / ') || shop.location || 'Unknown location';
 }
 
+async function loadAllShops(env: string) {
+  const firstPage = await api.shops.list({ env, page: 1, limit: 100 });
+  const pages = Math.max(1, firstPage.pages ?? Math.ceil((firstPage.total ?? firstPage.data.length) / 100));
+  if (pages === 1) return firstPage;
+
+  const nextPages = await Promise.all(
+    Array.from({ length: pages - 1 }, (_, index) => api.shops.list({ env, page: index + 2, limit: 100 })),
+  );
+  const data = [firstPage, ...nextPages].flatMap((page) => page.data);
+  return {
+    ...firstPage,
+    data,
+    count: data.length,
+    page: 1,
+    limit: data.length,
+  } satisfies PaginatedResponse<Shop>;
+}
+
+function lookupKey(value?: string | null) {
+  return (value ?? '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '')
+    .trim();
+}
+
 function shopToLocation(shop: Shop, parent: LocationWithMap): LocationWithMap {
   const type = shopNodeType(shop);
   return {
@@ -431,17 +461,45 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
     : visible.filter((loc) => loc.type === 'star' && !loc.parent_uuid && loc.parent_id == null);
   const rootByCode = new Map(roots.map((loc) => [systemCode(loc), loc]));
   const visibleIds = new Set(visible.map((loc) => loc.uuid));
+  const visibleByUuid = new Map(visible.map((loc) => [loc.uuid, loc]));
   const byRsiId = new Map<number, LocationWithMap>();
   for (const loc of visible) {
     if (loc.rsi_starmap_location_id != null) byRsiId.set(loc.rsi_starmap_location_id, loc);
   }
+  const resolvedSystemCache = new Map<string, string>();
+  const resolvedSystemCode = (loc: LocationWithMap, seen = new Set<string>()): string => {
+    const cached = resolvedSystemCache.get(loc.uuid);
+    if (cached) return cached;
+    if (loc.type === 'system' || loc.system_code || loc.rsi_starmap?.system_code || loc.rsi_starmap?.system_name) {
+      const code = systemCode(loc);
+      resolvedSystemCache.set(loc.uuid, code);
+      return code;
+    }
+    if (!seen.has(loc.uuid)) {
+      seen.add(loc.uuid);
+      const parent =
+        loc.parent_id != null
+          ? byRsiId.get(loc.parent_id)
+          : loc.parent_uuid
+            ? visibleByUuid.get(loc.parent_uuid)
+            : null;
+      if (parent) {
+        const code = resolvedSystemCode(parent, seen);
+        resolvedSystemCache.set(loc.uuid, code);
+        return code;
+      }
+    }
+    const code = systemCode(loc);
+    resolvedSystemCache.set(loc.uuid, code);
+    return code;
+  };
   const parentIdFor = (loc: LocationWithMap) => {
     if (loc.parent_id != null) {
       const parent = byRsiId.get(loc.parent_id);
       if (parent?.uuid && parent.uuid !== loc.uuid) return parent.uuid;
     }
     if (loc.parent_uuid && visibleIds.has(loc.parent_uuid)) return loc.parent_uuid;
-    const root = rootByCode.get(systemCode(loc));
+    const root = rootByCode.get(resolvedSystemCode(loc));
     return root && root.uuid !== loc.uuid ? root.uuid : null;
   };
 
@@ -483,7 +541,7 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
     .sort((a, b) => typeRank(a.type) - typeRank(b.type) || a.name.localeCompare(b.name));
 
   const rootIdFor = (loc: LocationWithMap) => {
-    const root = rootByCode.get(systemCode(loc));
+    const root = rootByCode.get(resolvedSystemCode(loc));
     return root?.uuid ?? null;
   };
   const coordinateBoundsByRoot = new Map<string, THREE.Box3>();
@@ -530,7 +588,7 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
       id: loc.uuid,
       loc,
       parentId,
-      systemCode: systemCode(loc),
+      systemCode: resolvedSystemCode(loc),
       position,
       radius: style.radius,
       color: style.color,
@@ -540,15 +598,41 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
   }
 
   const locationNodeByLocKey = new Map<string, MapNode>();
+  const locationNodeByName = new Map<string, MapNode>();
   for (const node of nodes.values()) {
     if (node.loc.loc_key) locationNodeByLocKey.set(node.loc.loc_key, node);
+    for (const value of [node.loc.name, node.loc.class_name, node.loc.rsi_starmap?.name]) {
+      const key = lookupKey(value);
+      if (key && !locationNodeByName.has(key)) locationNodeByName.set(key, node);
+    }
   }
 
+  const findShopParent = (shop: Shop) => {
+    if (shop.loc_key) {
+      const exact = locationNodeByLocKey.get(shop.loc_key);
+      if (exact) return exact;
+    }
+    for (const value of [shop.location, shop.city, shop.planet_moon, shop.system]) {
+      const key = lookupKey(value);
+      if (!key) continue;
+      const direct = locationNodeByName.get(key);
+      if (direct) return direct;
+    }
+    const systemValue = lookupKey(shop.system);
+    if (systemValue) {
+      return [...nodes.values()].find((node) => node.loc.type === 'system' && lookupKey(node.label) === systemValue) ?? null;
+    }
+    return null;
+  };
+
   const shopsByParent = new Map<string, Shop[]>();
+  const orphanShops: Shop[] = [];
   for (const shop of shops) {
-    if (!shop.loc_key) continue;
-    const parent = locationNodeByLocKey.get(shop.loc_key);
-    if (!parent) continue;
+    const parent = findShopParent(shop);
+    if (!parent) {
+      orphanShops.push(shop);
+      continue;
+    }
     const list = shopsByParent.get(parent.id);
     if (list) list.push(shop);
     else shopsByParent.set(parent.id, [shop]);
@@ -578,6 +662,44 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
           shop,
         });
       });
+  }
+
+  orphanShops
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((shop, index) => {
+      const loc = {
+        uuid: `shop-${shop.id}`,
+        class_name: shop.class_name || `shop-${shop.id}`,
+        name: shop.name,
+        type: shopNodeType(shop),
+        system_code: shop.system ?? null,
+        parent_uuid: null,
+        loc_key: shop.loc_key ?? null,
+        description: `${typeStyle(shopNodeType(shop)).label} located at ${shopLocationLabel(shop)}.`,
+        is_scannable: false,
+        hide_in_starmap: false,
+      } as LocationWithMap;
+      const style = typeStyle(loc.type);
+      const angle = index * 2.399963229728653;
+      const ring = 90 + Math.sqrt(index + 1) * 2.2;
+      nodes.set(loc.uuid, {
+        id: loc.uuid,
+        loc,
+        parentId: null,
+        systemCode: shop.system || 'SHOP',
+        position: new THREE.Vector3(Math.cos(angle) * ring, -1.5, Math.sin(angle) * ring),
+        radius: style.radius,
+        color: style.color,
+        label: shop.name,
+        shopCount: 0,
+        shop,
+      });
+    });
+
+  for (const node of nodes.values()) {
+    if (node.parentId && !nodes.has(node.parentId)) {
+      node.parentId = null;
+    }
   }
 
   return [...nodes.values()];
@@ -1160,6 +1282,127 @@ function TreeRow({
   );
 }
 
+function inventoryKindLabel(kind?: string | null) {
+  if (!kind) return 'Unknown';
+  return kind.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function inventoryPriceLabel(item: ShopInventoryItem) {
+  if (item.base_price != null && Number(item.base_price) > 0) return fCredits(Number(item.base_price));
+  if (item.sell_price != null && Number(item.sell_price) > 0) return `Sell ${fCredits(Number(item.sell_price))}`;
+  if (item.rental_price_1d != null && Number(item.rental_price_1d) > 0) return `Rent ${fCredits(Number(item.rental_price_1d))}/day`;
+  return 'Price unknown';
+}
+
+function inventoryTargetHref(item: ShopInventoryItem) {
+  const uuid = item.component_uuid;
+  if (!uuid) return null;
+  if (item.inventory_kind === 'ship') return `/ships/${uuid}`;
+  if (item.inventory_kind === 'item') return `/items/${uuid}`;
+  if (item.inventory_kind === 'commodity') return `/commodities/${uuid}`;
+  if (item.inventory_kind === 'component') return `/components/${uuid}`;
+  return null;
+}
+
+function ShopInventoryPanel({
+  inventory,
+  loading,
+}: {
+  inventory?: ShopInventoryItem[];
+  loading: boolean;
+}) {
+  if (loading) {
+    return (
+      <div className="mt-4 sci-panel p-3">
+        <div className="flex items-center gap-2 font-mono-sc text-[10px] uppercase tracking-widest text-cyan-500">
+          <Loader2 size={12} className="animate-spin" />
+          Loading inventory
+        </div>
+      </div>
+    );
+  }
+
+  if (!inventory?.length) {
+    return (
+      <div className="mt-4 sci-panel p-3 text-center">
+        <p className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">No extracted inventory</p>
+        <p className="mt-1 text-xs text-slate-700">This location exists, but no purchasable or rentable content is currently linked to it.</p>
+      </div>
+    );
+  }
+
+  const grouped = inventory.reduce<Map<string, ShopInventoryItem[]>>((map, item) => {
+    const key = item.inventory_kind || 'unknown';
+    const list = map.get(key);
+    if (list) list.push(item);
+    else map.set(key, [item]);
+    return map;
+  }, new Map());
+
+  return (
+    <div className="mt-4">
+      <div className="mb-2 flex items-center justify-between">
+        <p className="flex items-center gap-1 font-orbitron text-[10px] uppercase tracking-widest text-slate-600">
+          <Package size={11} />
+          Inventory
+        </p>
+        <span className="font-mono-sc text-[10px] text-amber-400">{inventory.length.toLocaleString('en-US')} entries</span>
+      </div>
+      <div className="space-y-3">
+        {[...grouped.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([kind, items]) => (
+            <div key={kind} className="rounded-sm border border-slate-900 bg-slate-950/35 p-2">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="font-mono-sc text-[9px] uppercase tracking-widest text-cyan-700">{inventoryKindLabel(kind)}</span>
+                <span className="font-mono-sc text-[9px] text-slate-700">{items.length}</span>
+              </div>
+              <div className="max-h-52 space-y-1 overflow-y-auto pr-1">
+                {items.slice(0, 60).map((item) => {
+                  const href = inventoryTargetHref(item);
+                  const content = (
+                    <>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-rajdhani text-sm font-semibold text-slate-300">
+                          {item.item_name ?? item.component_name ?? item.component_class_name ?? 'Unknown item'}
+                        </p>
+                        <p className="truncate font-mono-sc text-[9px] uppercase tracking-wider text-slate-700">
+                          {[item.item_type, item.item_size != null ? `S${item.item_size}` : null, item.terminal].filter(Boolean).join(' · ') || item.item_class_name}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="font-mono-sc text-[10px] text-amber-400">{inventoryPriceLabel(item)}</p>
+                        {item.current_inventory != null && (
+                          <p className="font-mono-sc text-[9px] text-slate-700">
+                            Stock {Number(item.current_inventory).toLocaleString('en-US')}
+                            {item.max_inventory != null ? ` / ${Number(item.max_inventory).toLocaleString('en-US')}` : ''}
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  );
+                  const className = 'flex w-full items-start gap-2 rounded-sm border border-slate-900 bg-black/20 px-2 py-2 text-left transition-colors hover:border-cyan-900/70';
+                  return href ? (
+                    <Link key={item.id} href={href} className={className}>
+                      {content}
+                    </Link>
+                  ) : (
+                    <div key={item.id} className={className}>
+                      {content}
+                    </div>
+                  );
+                })}
+              </div>
+              {items.length > 60 && (
+                <p className="mt-2 font-mono-sc text-[9px] text-slate-700">Showing first 60 entries in this group.</p>
+              )}
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+}
+
 export default function UniverseExplorerPage() {
   const { env } = useEnv();
   const [search, setSearch] = useState('');
@@ -1191,7 +1434,7 @@ export default function UniverseExplorerPage() {
 
   const { data: shopsData } = useQuery({
     queryKey: ['shops-all', env],
-    queryFn: () => api.shops?.list?.({ env, limit: 500 }) ?? Promise.resolve({ data: [], total: 0, page: 1, limit: 0, pages: 0 }),
+    queryFn: () => loadAllShops(env),
     retry: false,
     staleTime: 5 * 60_000,
   });
@@ -1206,6 +1449,13 @@ export default function UniverseExplorerPage() {
     () => allNodes.find((node) => node.id === selectedId) ?? roots[0] ?? allNodes[0] ?? null,
     [allNodes, roots, selectedId],
   );
+  const selectedShopId = selectedNode?.shop?.id ?? null;
+  const { data: selectedShopInventory, isLoading: loadingSelectedShopInventory } = useQuery({
+    queryKey: ['shop-inventory', selectedShopId, env],
+    queryFn: () => api.shops.inventory(selectedShopId!, env),
+    enabled: selectedShopId != null,
+    staleTime: 5 * 60_000,
+  });
   const currentRoot = useMemo(() => {
     if (!selectedNode) return roots[0] ?? null;
     let cursor: MapNode | null = selectedNode;
@@ -1281,6 +1531,24 @@ export default function UniverseExplorerPage() {
   }, [allNodes]);
 
   const treeRoots = useMemo(() => [...roots].sort((a, b) => a.label.localeCompare(b.label)), [roots]);
+  const emptyChildrenByParent = useMemo(() => new Map<string, MapNode[]>(), []);
+
+  const searchResultNodes = useMemo(() => {
+    if (!query) return null;
+    return allNodes
+      .filter((node) => {
+        const typeMatch = typeFilter === 'all' || normalizeType(node.loc.type) === typeFilter;
+        const textMatch =
+          node.label.toLowerCase().includes(query) ||
+          node.systemCode.toLowerCase().includes(query) ||
+          (node.loc.class_name ?? '').toLowerCase().includes(query) ||
+          (node.shop?.shop_type ?? node.shop?.shopType ?? '').toLowerCase().includes(query) ||
+          shopLocationLabel(node.shop).toLowerCase().includes(query);
+        return typeMatch && textMatch;
+      })
+      .sort((a, b) => typeRank(a.loc.type) - typeRank(b.loc.type) || a.label.localeCompare(b.label))
+      .slice(0, 200);
+  }, [allNodes, query, typeFilter]);
 
   const treeVisibleIds = useMemo(() => {
     if (!query) return null;
@@ -1489,23 +1757,22 @@ export default function UniverseExplorerPage() {
           </div>
 
           <div className="mb-2 flex items-center justify-between">
-            <p className="font-orbitron text-[10px] uppercase tracking-widest text-slate-600">Known systems</p>
+            <p className="font-orbitron text-[10px] uppercase tracking-widest text-slate-600">{searchResultNodes ? 'Search results' : 'Known systems'}</p>
             <span className="font-mono-sc text-[10px] text-cyan-700">
-              {(treeVisibleIds ? treeRoots.filter((root) => treeVisibleIds.has(root.id)) : treeRoots).length}
+              {searchResultNodes?.length ?? (treeVisibleIds ? treeRoots.filter((root) => treeVisibleIds.has(root.id)) : treeRoots).length}
             </span>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-            {treeRoots
-              .filter((root) => !treeVisibleIds || treeVisibleIds.has(root.id))
+            {(searchResultNodes ?? treeRoots.filter((root) => !treeVisibleIds || treeVisibleIds.has(root.id)))
               .map((root) => (
                 <TreeRow
                   key={root.id}
                   node={root}
                   depth={0}
-                  childrenByParent={childrenByParent}
+                  childrenByParent={searchResultNodes ? emptyChildrenByParent : childrenByParent}
                   expanded={expanded}
-                  visibleIds={treeVisibleIds}
+                  visibleIds={searchResultNodes ? null : treeVisibleIds}
                   selectedId={selectedNode?.id ?? null}
                   onToggle={toggleExpanded}
                   onSelect={handleTreeSelect}
@@ -1672,6 +1939,10 @@ export default function UniverseExplorerPage() {
                 <DetailRow label="Scannable" value={selectedLoc.is_scannable ? 'Yes' : 'No'} />
                 {!selectedIsShop && <DetailRow label="Shops" value={selectedNode.shopCount || null} />}
               </div>
+
+              {selectedIsShop && (
+                <ShopInventoryPanel inventory={selectedShopInventory} loading={loadingSelectedShopInventory} />
+              )}
 
               {selectedJumpLinks.length > 0 && (
                 <div className="mt-4">
