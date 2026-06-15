@@ -2638,6 +2638,11 @@
           "kind": {
             "type": "string"
           },
+          "source": {
+            "type": "string",
+            "enum": ["pledge", "media", "fallback"],
+            "description": "Normalized media source: Pledge Store carousel, RSI media CDN, or Ship Matrix fallback."
+          },
           "position": {
             "type": "integer"
           },

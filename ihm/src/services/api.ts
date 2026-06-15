@@ -57,6 +57,36 @@ import type {
 } from '@/types/api';
 import { API_BASE } from '@/utils/constants';
 
+const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function retryDelay(attempt: number, res?: Response): number {
+  const retryAfter = res?.headers.get('retry-after');
+  if (retryAfter) {
+    const seconds = Number.parseInt(retryAfter, 10);
+    if (Number.isFinite(seconds) && seconds > 0) return Math.min(seconds * 1000, 8000);
+  }
+  return 350 * 2 ** attempt;
+}
+
+async function fetchWithRetry(url: string, init?: RequestInit): Promise<Response> {
+  const maxAttempts = 3;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    try {
+      const res = await fetch(url, init);
+      if (!RETRYABLE_STATUS.has(res.status) || attempt === maxAttempts - 1) return res;
+      await sleep(retryDelay(attempt, res));
+    } catch (error) {
+      if (attempt === maxAttempts - 1) throw error;
+      await sleep(retryDelay(attempt));
+    }
+  }
+  return fetch(url, init);
+}
+
 async function get<T>(path: string, params?: Record<string, string | number | boolean | undefined>): Promise<T> {
   const url = new URL(API_BASE + path, window.location.origin);
   if (params) {
@@ -64,7 +94,7 @@ async function get<T>(path: string, params?: Record<string, string | number | bo
       if (v !== undefined && v !== '') url.searchParams.set(k, String(v));
     }
   }
-  const res = await fetch(url.toString());
+  const res = await fetchWithRetry(url.toString());
   const json = ((await res.json().catch(() => null)) as Record<string, unknown> | null) ?? {};
   if (!res.ok) throw new Error(String(json.error ?? '') || `HTTP ${res.status}: ${res.statusText}`);
   // Paginated list: numeric 'total' AND array 'data' at top level → return full response

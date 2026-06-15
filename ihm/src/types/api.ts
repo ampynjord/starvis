@@ -91,6 +91,7 @@ export interface ShipGalleryImage {
   thumbnail_url: string | null;
   title: string | null;
   kind: string;
+  source?: 'pledge' | 'media' | 'fallback';
   position: number;
   synced_at: string;
 }

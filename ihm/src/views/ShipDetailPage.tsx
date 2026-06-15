@@ -68,10 +68,35 @@ function QuickStat({ icon, label, value }: { icon: React.ReactNode; label: strin
   );
 }
 
-function OfficialGalleryCarousel({ shipName, images }: { shipName: string; images: ShipGalleryImage[] }) {
+function galleryImageSource(image: ShipGalleryImage): 'pledge' | 'media' | 'fallback' {
+  if (image.source) return image.source;
+  if (image.kind === 'ship-matrix-media') return 'fallback';
+  if (image.url.includes('media.robertsspaceindustries.com')) return 'media';
+  if (image.url.includes('robertsspaceindustries.com/i/')) return 'pledge';
+  return 'fallback';
+}
+
+function GalleryCarousel({
+  shipName,
+  images,
+  title,
+  subtitle,
+}: {
+  shipName: string;
+  images: ShipGalleryImage[];
+  title: string;
+  subtitle: string;
+}) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const [failedUrls, setFailedUrls] = useState<Set<string>>(() => new Set());
   const thumbnailRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const active = images[Math.min(activeIndex, images.length - 1)] ?? images[0];
+  const displayImages = useMemo(() => images.filter((image) => !failedUrls.has(image.url)), [failedUrls, images]);
+  const active = displayImages[Math.min(activeIndex, displayImages.length - 1)] ?? displayImages[0];
+
+  useEffect(() => {
+    setActiveIndex(0);
+    setFailedUrls(new Set());
+  }, [images]);
 
   useEffect(() => {
     thumbnailRefs.current[activeIndex]?.scrollIntoView({
@@ -81,14 +106,21 @@ function OfficialGalleryCarousel({ shipName, images }: { shipName: string; image
     });
   }, [activeIndex]);
 
+  useEffect(() => {
+    if (activeIndex >= displayImages.length) setActiveIndex(Math.max(displayImages.length - 1, 0));
+  }, [activeIndex, displayImages.length]);
+
   if (!active) return null;
 
   const go = (direction: -1 | 1) => {
-    setActiveIndex((current) => (current + direction + images.length) % images.length);
+    setActiveIndex((current) => (current + direction + displayImages.length) % displayImages.length);
+  };
+  const markFailed = (url: string) => {
+    setFailedUrls((current) => new Set(current).add(url));
   };
 
   return (
-    <ScifiPanel title="Official Gallery" subtitle={`${images.length} RSI media`}>
+    <ScifiPanel title={title} subtitle={subtitle}>
       <div className="space-y-3">
         <a
           href={active.url}
@@ -101,13 +133,14 @@ function OfficialGalleryCarousel({ shipName, images }: { shipName: string; image
             alt={active.title ?? `${shipName} official media`}
             className="h-full w-full object-cover opacity-90 transition duration-300 group-hover:scale-[1.02] group-hover:opacity-100"
             loading="lazy"
+            onError={() => markFailed(active.url)}
           />
           <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-linear-to-t from-slate-950/95 via-slate-950/40 to-transparent p-3">
             <span className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-400">
               {active.title ?? `${shipName} media ${activeIndex + 1}`}
             </span>
             <span className="font-mono-sc text-[10px] text-cyan-500">
-              {activeIndex + 1}/{images.length}
+              {activeIndex + 1}/{displayImages.length}
             </span>
           </div>
         </a>
@@ -117,7 +150,7 @@ function OfficialGalleryCarousel({ shipName, images }: { shipName: string; image
             <ChevronLeft size={16} />
           </button>
           <div className="flex min-w-0 flex-1 gap-2 overflow-x-auto pb-1">
-            {images.map((image, index) => (
+            {displayImages.map((image, index) => (
               <button
                 key={image.id}
                 ref={(node) => {
@@ -136,6 +169,7 @@ function OfficialGalleryCarousel({ shipName, images }: { shipName: string; image
                   alt=""
                   className="h-full w-full object-cover opacity-75"
                   loading="lazy"
+                  onError={() => markFailed(image.url)}
                 />
               </button>
             ))}
@@ -146,6 +180,42 @@ function OfficialGalleryCarousel({ shipName, images }: { shipName: string; image
         </div>
       </div>
     </ScifiPanel>
+  );
+}
+
+function OfficialGallerySections({ shipName, images }: { shipName: string; images: ShipGalleryImage[] }) {
+  const pledgeImages = images.filter((image) => galleryImageSource(image) === 'pledge');
+  const mediaImages = images.filter((image) => galleryImageSource(image) === 'media');
+  const fallbackImages = images.filter((image) => galleryImageSource(image) === 'fallback');
+  const mainImages = pledgeImages.length > 0 ? pledgeImages : fallbackImages;
+
+  return (
+    <div className="space-y-3">
+      {mainImages.length > 0 && (
+        <GalleryCarousel
+          shipName={shipName}
+          images={mainImages}
+          title="Pledge Store Gallery"
+          subtitle={`${mainImages.length} official pledge media`}
+        />
+      )}
+      {mediaImages.length > 0 && (
+        <details className="group rounded-sm border border-cyan-900/40 bg-slate-950/60">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 font-mono-sc text-[10px] uppercase tracking-widest text-cyan-400">
+            <span>Other RSI media</span>
+            <span className="text-slate-600">{mediaImages.length} images</span>
+          </summary>
+          <div className="border-t border-slate-800/60 p-3">
+            <GalleryCarousel
+              shipName={shipName}
+              images={mediaImages}
+              title="Other RSI Media"
+              subtitle={`${mediaImages.length} media.robertsspaceindustries.com images`}
+            />
+          </div>
+        </details>
+      )}
+    </div>
   );
 }
 
@@ -519,7 +589,7 @@ export default function ShipDetailPage() {
             </ScifiPanel>
           )}
 
-          {gallery.length > 0 && <OfficialGalleryCarousel shipName={ship.name} images={gallery} />}
+          {gallery.length > 0 && <OfficialGallerySections shipName={ship.name} images={gallery} />}
         </div>
 
         {/* ════ RIGHT sidebar ════ */}

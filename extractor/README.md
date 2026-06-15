@@ -133,7 +133,7 @@ Network modules do not require `Data.p4k`:
 | Module | Content |
 |---|---|
 | `ship-matrix` | RSI Ship Matrix data. |
-| `ship-galleries` | Official ship gallery images scraped from RSI pledge pages. If a pledge variant has no presentable carousel media, the extractor stores the official Ship Matrix media as a fallback so every known ship keeps an API-visible image. This is separate from Ship Matrix thumbnails. Aliases: `gallery`, `galleries`, `ship-gallery`, `official-galleries`. |
+| `ship-galleries` | Official ship gallery images scraped from RSI pledge pages. Pledge Store carousel images are stored as `pledge-gallery`, RSI media CDN images are stored separately as `rsi-media`, and Ship Matrix media is kept as `ship-matrix-media` only when no pledge image is available. This keeps the main carousel and secondary media separate while ensuring every known ship keeps an API-visible image. Aliases: `gallery`, `galleries`, `ship-gallery`, `official-galleries`. |
 | `galactapedia` | RSI encyclopedia entries. |
 | `comm-links` | RSI Comm-Link articles and images. |
 | `starmap` | RSI Starmap systems, locations and jump points. |
