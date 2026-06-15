@@ -4691,46 +4691,56 @@
                             "type": "integer"
                           },
                           "component_uuid": {
-                            "type": ["string", "null"],
-                            "format": "uuid"
+                            "type": "string",
+                            "format": "uuid",
+                            "nullable": true
                           },
                           "component_class_name": {
                             "type": "string"
                           },
                           "component_name": {
-                            "type": ["string", "null"]
+                            "type": "string",
+                            "nullable": true
                           },
                           "component_type": {
-                            "type": ["string", "null"]
+                            "type": "string",
+                            "nullable": true
                           },
                           "component_size": {
-                            "type": ["number", "null"]
+                            "type": "number",
+                            "nullable": true
                           },
                           "inventory_kind": {
                             "type": "string",
                             "enum": ["component", "item", "unknown"]
                           },
                           "base_price": {
-                            "type": ["number", "null"]
+                            "type": "number",
+                            "nullable": true
                           },
                           "rental_price_1d": {
-                            "type": ["number", "null"]
+                            "type": "number",
+                            "nullable": true
                           },
                           "rental_price_3d": {
-                            "type": ["number", "null"]
+                            "type": "number",
+                            "nullable": true
                           },
                           "rental_price_7d": {
-                            "type": ["number", "null"]
+                            "type": "number",
+                            "nullable": true
                           },
                           "rental_price_30d": {
-                            "type": ["number", "null"]
+                            "type": "number",
+                            "nullable": true
                           },
                           "source": {
                             "type": "string",
                             "example": "inferred_shop_type:item"
                           },
                           "confidence": {
-                            "type": ["number", "null"],
+                            "type": "number",
+                            "nullable": true,
                             "minimum": 0,
                             "maximum": 1
                           }
