@@ -123,7 +123,6 @@ function TradeGoodsTab() {
                         </Link>
                         <div className="text-right shrink-0 space-y-1">
                           {c.occupancy_scu != null && <p className="text-xs font-mono-sc text-slate-600">{c.occupancy_scu} μSCU</p>}
-                          <Link href={`/missions?search=${encodeURIComponent(c.name)}`} className="text-[10px] text-amber-500 hover:text-amber-300">Mission leads</Link>
                         </div>
                       </div>
                     </div>
@@ -208,7 +207,7 @@ function MineralDetail({ element }: { element: MiningElement }) {
 
   return (
     <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-      <ScifiPanel title={element.name ?? element.class_name ?? 'Unknown'} subtitle="Mineral detail">
+      <ScifiPanel title={element.name ?? 'Unknown mineral'} subtitle="Mineral detail">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
           <div className="sci-panel p-2 text-center">
             <div className="text-[9px] uppercase tracking-wider text-slate-600 font-mono-sc mb-0.5">Rarity</div>
@@ -410,7 +409,7 @@ function MineralsTab() {
                       isSelected ? 'bg-cyan-950/30 border-cyan-800/40' : 'hover:bg-slate-800/20'
                     }`}
                   >
-                    <td className="p-2 text-slate-200 font-semibold">{el.name ?? el.class_name ?? el.uuid.slice(0, 8)}</td>
+                    <td className="p-2 text-slate-200 font-semibold">{el.name ?? 'Unknown mineral'}</td>
                     <td className="p-2 text-center">
                       <GlowBadge color={rarityCol} size="sm">{rarity}</GlowBadge>
                     </td>

@@ -375,6 +375,13 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "gallery": {
+            "type": "array",
+            "description": "Official RSI ship gallery images scraped from the ship pledge page.",
+            "items": {
+              "$ref": "#/components/schemas/ShipGalleryImage"
+            }
           }
         }
       },
@@ -2162,6 +2169,11 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "itemName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Human-readable item name resolved from extracted game data when available."
           }
         }
       },
@@ -2600,6 +2612,40 @@
             }
           }
         ]
+      },
+      "ShipGalleryImage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "ship_matrix_id": {
+            "type": "integer"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "thumbnail_url": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "kind": {
+            "type": "string"
+          },
+          "position": {
+            "type": "integer"
+          },
+          "synced_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       }
     },
     "responses": {
@@ -13673,7 +13719,7 @@
             "schema": {
               "type": "string"
             },
-            "description": "Comma-separated relations to include. Defaults: ship=manufacturer,loadout,paints,modules,hardpoints,variants,similar,buy_locations; component=buy_locations,ships; item=manufacturer,buy_locations; commodity=prices; shop=inventory,prices; location=children. Use `none` for only the object."
+            "description": "Comma-separated relations to include. Defaults: ship=manufacturer,loadout,paints,modules,hardpoints,variants,similar,buy_locations,gallery; component=buy_locations,ships; item=manufacturer,buy_locations; commodity=prices; shop=inventory,prices; location=children. Use `none` for only the object."
           }
         ],
         "responses": {

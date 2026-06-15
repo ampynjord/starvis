@@ -142,7 +142,7 @@ export default function SearchResultsPage() {
                   >
                     <div className="min-w-0">
                       <div className="text-sm font-rajdhani font-semibold text-slate-200 truncate">
-                        {item.name || item.title || item.class_name}
+                        {item.name || item.title || 'Untitled result'}
                       </div>
                       <div className="text-[10px] text-slate-600 flex items-center gap-2">
                         {item.type && <span>{item.type}</span>}

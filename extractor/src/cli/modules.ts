@@ -19,6 +19,7 @@ export const VALID_MODULES: ExtractionModule[] = [
   'comm-links',
   'starmap',
   'ship-matrix',
+  'ship-galleries',
   'organizations',
 ];
 
@@ -42,10 +43,31 @@ export const MODULE_ALIASES: Partial<Record<string, ExtractionModule>> = {
   medical: 'game-insights',
   'fps-details': 'game-insights',
   'shop-inventory': 'game-insights',
+  gallery: 'ship-galleries',
+  galleries: 'ship-galleries',
+  'ship-gallery': 'ship-galleries',
+  'ship-galleries': 'ship-galleries',
+  'official-gallery': 'ship-galleries',
+  'official-galleries': 'ship-galleries',
 };
 
-export const P4K_FREE_MODULES = new Set<ExtractionModule>(['ctm', 'galactapedia', 'comm-links', 'starmap', 'ship-matrix', 'organizations']);
-export const RSI_MODULES = new Set<ExtractionModule>(['galactapedia', 'comm-links', 'starmap', 'ship-matrix', 'organizations']);
+export const P4K_FREE_MODULES = new Set<ExtractionModule>([
+  'ctm',
+  'galactapedia',
+  'comm-links',
+  'starmap',
+  'ship-matrix',
+  'ship-galleries',
+  'organizations',
+]);
+export const RSI_MODULES = new Set<ExtractionModule>([
+  'galactapedia',
+  'comm-links',
+  'starmap',
+  'ship-matrix',
+  'ship-galleries',
+  'organizations',
+]);
 
 export type SelectedModules = Set<ExtractionModule | 'all'>;
 

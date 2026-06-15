@@ -127,6 +127,7 @@ Network modules do not require `Data.p4k`:
 | Module | Content |
 |---|---|
 | `ship-matrix` | RSI Ship Matrix data. |
+| `ship-galleries` | Official ship gallery images scraped from RSI pledge pages. This is separate from Ship Matrix thumbnails. Aliases: `gallery`, `galleries`, `ship-gallery`, `official-galleries`. |
 | `galactapedia` | RSI encyclopedia entries. |
 | `comm-links` | RSI Comm-Link articles and images. |
 | `starmap` | RSI Starmap systems, locations and jump points. |
@@ -147,7 +148,7 @@ npx tsx extractor/extract.ts --env live --game-version 4.7.2
 npx tsx extractor/extract.ts --env ptu
 
 # Network-only RSI sync, no P4K needed
-npx tsx extractor/extract.ts --modules ship-matrix,galactapedia,comm-links,starmap
+npx tsx extractor/extract.ts --modules ship-matrix,ship-galleries,galactapedia,comm-links,starmap
 
 # Fast P4K extraction without CTM
 npx tsx extractor/extract.ts --env live --modules ships,components,items,commodities,paints,mining,missions,crafting,locations,shops,game-insights

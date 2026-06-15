@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { Boxes, Crosshair, ExternalLink } from "lucide-react";
+import { Boxes, Crosshair } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -99,8 +99,7 @@ function AmmoInsightPanel({ rows, total }: { rows: AmmoInsight[]; total: number 
 			<div className="grid gap-2 lg:grid-cols-3">
 				{sorted.map((ammo) => (
 					<div key={ammo.uuid} className="rounded-sm border border-slate-800/70 bg-slate-950/50 p-3">
-						<p className="truncate font-orbitron text-xs font-bold text-slate-100">{ammo.name ?? ammo.class_name}</p>
-						<p className="mt-1 truncate font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">{ammo.class_name}</p>
+						<p className="truncate font-orbitron text-xs font-bold text-slate-100">{ammo.name ?? 'Ammunition'}</p>
 						<div className="mt-3 grid grid-cols-3 gap-2 font-mono-sc text-[10px] uppercase tracking-widest">
 							<span className="text-red-400">DMG {fNum(totalDamage(ammo), 0)}</span>
 							<span className="text-cyan-400">VEL {fNum(ammo.speed, 0)}</span>
@@ -135,7 +134,7 @@ function InventoryContainerPanel({ rows, total }: { rows: InventoryContainerInsi
 			<div className="grid gap-2 lg:grid-cols-3">
 				{sorted.map((container) => (
 					<div key={container.uuid} className="rounded-sm border border-slate-800/70 bg-slate-950/50 p-3">
-						<p className="truncate font-orbitron text-xs font-bold text-slate-100">{container.name ?? container.class_name}</p>
+						<p className="truncate font-orbitron text-xs font-bold text-slate-100">{container.name ?? 'Inventory container'}</p>
 						<p className="mt-1 truncate font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">{container.inventory_type ?? "Inventory"}</p>
 						<div className="mt-3 flex flex-wrap items-center gap-3 font-mono-sc text-[10px] uppercase tracking-widest">
 							<span className="text-amber-400">{fNum(container.capacity_scu, 3)} SCU</span>
@@ -463,14 +462,6 @@ export default function ItemsPage({ group }: ItemsPageProps = {}) {
 												</div>
 											</div>
 
-											{/* Mission leads icon */}
-											<Link
-												href={`/missions?search=${encodeURIComponent(getItemName(item))}`}
-												className="shrink-0 text-slate-700 hover:text-amber-400 transition-colors"
-												title="Mission leads"
-											>
-												<ExternalLink size={12} />
-											</Link>
 										</div>
 										<div className="mt-1 sm:hidden">
 											<MarketSummary item={item} />

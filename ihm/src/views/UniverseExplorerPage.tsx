@@ -203,6 +203,7 @@ const TYPE_ORDER = [
   'comm_array',
 ];
 const MAP_TYPES = new Set(TYPE_ORDER);
+const NON_SPATIAL_LOCATION_TYPES = new Set(['shop', 'hospital', 'rental', 'service']);
 
 const TYPE_STYLE: Record<string, { label: string; color: number; radius: number; icon: React.ReactNode; text: string; accent: string }> = {
   system: { label: 'Star system', color: 0x39e7ff, radius: 1.65, icon: <Sparkles size={12} />, text: 'text-cyan-300', accent: 'border-cyan-700/60 bg-cyan-950/25' },
@@ -249,6 +250,10 @@ function typeStyle(type: string) {
 function typeRank(type: string) {
   const index = TYPE_ORDER.indexOf(normalizeType(type));
   return index === -1 ? TYPE_ORDER.length : index;
+}
+
+function isSpatialNode(node: MapNode) {
+  return !NON_SPATIAL_LOCATION_TYPES.has(normalizeType(node.loc.type));
 }
 
 function shopNodeType(shop: Shop) {
@@ -601,7 +606,7 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
   const locationNodeByName = new Map<string, MapNode>();
   for (const node of nodes.values()) {
     if (node.loc.loc_key) locationNodeByLocKey.set(node.loc.loc_key, node);
-    for (const value of [node.loc.name, node.loc.class_name, node.loc.rsi_starmap?.name]) {
+    for (const value of [node.loc.name, node.loc.rsi_starmap?.name]) {
       const key = lookupKey(value);
       if (key && !locationNodeByName.has(key)) locationNodeByName.set(key, node);
     }
@@ -1444,23 +1449,15 @@ function ShopInventoryPanel({
                 {items.slice(0, 60).map((item) => {
                   const href = inventoryTargetHref(item);
                   const priceRows = inventoryPriceRows(item);
-                  const sourceLabel = item.source_name ?? item.source_type ?? item.source ?? null;
-                  const confidence = item.confidence_score ?? item.confidence ?? null;
                   const content = (
                     <>
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-rajdhani text-sm font-semibold text-slate-300">
-                          {item.item_name ?? item.component_name ?? item.component_class_name ?? 'Unknown item'}
+                          {item.item_name ?? item.component_name ?? 'Unknown item'}
                         </p>
                         <p className="truncate font-mono-sc text-[9px] uppercase tracking-wider text-slate-700">
-                          {[item.item_type, item.item_size != null ? `S${item.item_size}` : null, item.terminal].filter(Boolean).join(' · ') || item.item_class_name}
+                          {[item.item_type, item.item_size != null ? `S${item.item_size}` : null, item.terminal].filter(Boolean).join(' · ') || 'Inventory item'}
                         </p>
-                        {sourceLabel && (
-                          <p className="mt-1 truncate font-mono-sc text-[9px] uppercase tracking-wider text-slate-700">
-                            {sourceLabel}
-                            {confidence != null ? ` · ${Math.round(Number(confidence) * 100)}%` : ''}
-                          </p>
-                        )}
                       </div>
                       <div className="shrink-0 text-right">
                         {priceRows.length ? (
@@ -1578,7 +1575,6 @@ export default function UniverseExplorerPage() {
         !query ||
         node.label.toLowerCase().includes(query) ||
         node.systemCode.toLowerCase().includes(query) ||
-        (node.loc.class_name ?? '').toLowerCase().includes(query) ||
         (node.shop?.shop_type ?? node.shop?.shopType ?? '').toLowerCase().includes(query) ||
         shopLocationLabel(node.shop).toLowerCase().includes(query);
       return typeMatch && textMatch;
@@ -1589,8 +1585,9 @@ export default function UniverseExplorerPage() {
     const base =
       viewMode === 'galaxy'
         ? visibleNodes.length ? visibleNodes : roots
-        : allNodes.filter((node) => !systemIds || systemIds.has(node.id));
-    return viewMode === 'galaxy' ? relaxGalaxyNodes(base) : layoutSystemNodes(base, currentRoot);
+        : allNodes.filter((node) => (!systemIds || systemIds.has(node.id)) && isSpatialNode(node));
+    const spatialBase = base.filter(isSpatialNode);
+    return viewMode === 'galaxy' ? relaxGalaxyNodes(spatialBase) : layoutSystemNodes(spatialBase, currentRoot);
   }, [allNodes, currentRoot, roots, systemIds, viewMode, visibleNodes]);
 
   const countsByType = useMemo(() => {
@@ -1644,7 +1641,6 @@ export default function UniverseExplorerPage() {
         const textMatch =
           node.label.toLowerCase().includes(query) ||
           node.systemCode.toLowerCase().includes(query) ||
-          (node.loc.class_name ?? '').toLowerCase().includes(query) ||
           (node.shop?.shop_type ?? node.shop?.shopType ?? '').toLowerCase().includes(query) ||
           shopLocationLabel(node.shop).toLowerCase().includes(query);
         return typeMatch && textMatch;
@@ -1660,8 +1656,7 @@ export default function UniverseExplorerPage() {
       let match =
         node.label.toLowerCase().includes(query) ||
         node.systemCode.toLowerCase().includes(query) ||
-        (node.loc.class_name ?? '').toLowerCase().includes(query) ||
-        (node.shop?.shop_type ?? node.shop?.shopType ?? '').toLowerCase().includes(query) ||
+          (node.shop?.shop_type ?? node.shop?.shopType ?? '').toLowerCase().includes(query) ||
         shopLocationLabel(node.shop).toLowerCase().includes(query);
       for (const child of childrenByParent.get(node.id) ?? []) {
         if (visit(child)) match = true;
@@ -1758,7 +1753,7 @@ export default function UniverseExplorerPage() {
       setSelectedId(first.id);
       if (stanton) {
         setExpanded((prev) => new Set(prev).add(stanton.id));
-        setViewMode('system');
+        setViewMode('galaxy');
       }
     }
   }, [allNodes, selectedId, shopParam]);
@@ -1948,12 +1943,11 @@ export default function UniverseExplorerPage() {
               onSelect={setSelectedId}
             />
           )}
-          <div className="pointer-events-none absolute bottom-4 left-4 grid grid-cols-2 gap-2 md:grid-cols-5">
+          <div className="pointer-events-none absolute bottom-4 left-4 grid grid-cols-2 gap-2 md:grid-cols-4">
             <LegendSwatch type="system" />
             <LegendSwatch type="planet" />
             <LegendSwatch type="station" />
             <LegendSwatch type="jump_point" />
-            <LegendSwatch type="shop" />
           </div>
         </main>
 
@@ -1982,7 +1976,7 @@ export default function UniverseExplorerPage() {
                   <span className="font-mono-sc text-[10px] uppercase tracking-widest text-cyan-700">{selectedNode.systemCode}</span>
                 </div>
                 <h2 className="font-orbitron text-xl font-bold uppercase tracking-wider text-slate-100">{selectedNode.label}</h2>
-                {selectedLoc.rsi_starmap?.system_name && (
+                {selectedLoc.rsi_starmap?.system_name && selectedLoc.rsi_starmap.system_name !== selectedNode.label && (
                   <p className="mt-1 text-xs text-slate-600">{selectedLoc.rsi_starmap.system_name}</p>
                 )}
                 {selectedFaction && (
@@ -2069,7 +2063,6 @@ export default function UniverseExplorerPage() {
                     <DetailRow label="Location" value={shopLocationLabel(selectedNode.shop)} />
                   </>
                 )}
-                <DetailRow label="Class" value={selectedLoc.class_name} />
                 <DetailRow label="RSI status" value={selectedLoc.rsi_starmap?.status} />
                 <DetailRow label="Scannable" value={selectedLoc.is_scannable ? 'Yes' : 'No'} />
                 {!selectedIsShop && <DetailRow label="Shops" value={selectedNode.shopCount || null} />}

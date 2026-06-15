@@ -171,7 +171,7 @@ function MissionCard({
           )}
           {/* Title */}
           <p className={`font-rajdhani font-semibold text-sm leading-tight truncate ${isSelected ? 'text-cyan-100' : 'text-slate-200 group-hover:text-slate-100'}`}>
-            {m.title ?? m.class_name}
+            {m.title ?? 'Untitled mission'}
           </p>
 
           {/* Tags */}
@@ -239,7 +239,7 @@ function DetailPanel({ m, env }: { m: Mission; env: string }) {
   return (
     <ScifiPanel
       title="Mission Detail"
-      subtitle={mission.class_name}
+      subtitle={meta.label}
     >
       {/* Mission title + type */}
       <div className="mb-4">
@@ -387,7 +387,7 @@ function DetailPanel({ m, env }: { m: Mission; env: string }) {
                     href={`/crafting-calculator?recipe=${bp.uuid}`}
                     className="flex items-center justify-between gap-2 rounded-sm border border-purple-900/40 bg-slate-950/30 px-2 py-1.5 text-xs font-mono-sc text-purple-200 transition-colors hover:border-purple-500/60 hover:text-purple-100"
                   >
-                    <span className="truncate">{bp.output_item_name ?? bp.name ?? bp.class_name}</span>
+                    <span className="truncate">{bp.output_item_name ?? bp.name ?? 'Blueprint reward'}</span>
                     <LinkIcon size={9} className="shrink-0 text-purple-500" />
                   </Link>
                 ))}
@@ -414,10 +414,6 @@ function DetailPanel({ m, env }: { m: Mission; env: string }) {
           </div>
         )}
 
-        {/* Technical footer */}
-        <div className="sci-panel p-2 border-slate-800/40 bg-slate-900/30">
-          <p className="text-[10px] font-mono-sc text-slate-600 break-all">{mission.class_name}</p>
-        </div>
       </div>
     </ScifiPanel>
   );

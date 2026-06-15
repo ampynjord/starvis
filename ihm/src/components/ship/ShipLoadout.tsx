@@ -803,7 +803,7 @@ function ModuleCard({ entry, onModuleChange }: {
   const info     = entry.moduleInfo;
   const sub      = entry.subLoadout;
   const slotLabel  = cleanSlotDisplayName(info?.slot_display_name, entry.node.port_name);
-  const moduleName = info?.module_name ?? entry.node.component_class_name ?? 'Unknown Module';
+  const moduleName = info?.module_name ?? 'Unnamed module';
   const tier       = info?.module_tier;
   const slotType   = info?.slot_type?.toLowerCase();
   const slotStyle  = slotType ? (SLOT_TYPE_STYLE[slotType] ?? 'text-cyan-300 border-cyan-800/60 bg-cyan-950/40') : null;
@@ -814,10 +814,10 @@ function ModuleCard({ entry, onModuleChange }: {
     : entry.slotOptions;
 
   // Strip common word-prefix among all options for compact labels (e.g. "Retaliator Module Front Bomber" → "Bomber")
-  const allModuleNames = entry.slotOptions.map(m => m.module_name ?? m.module_class_name ?? '');
+  const allModuleNames = entry.slotOptions.map(m => m.module_name ?? 'Module option');
   function shortLabel(m: ShipModule): string {
     if (hasTiers) return `T${m.module_tier}`;
-    const name = m.module_name ?? m.module_class_name ?? '';
+    const name = m.module_name ?? 'Module option';
     if (allModuleNames.length <= 1) return name;
     const words = name.split(' ');
     const allWords = allModuleNames.map(n => n.split(' '));

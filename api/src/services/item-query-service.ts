@@ -762,7 +762,7 @@ export class ItemQueryService {
 
     const fpsCategories: NavCategory[] = [
       // ── Armor ────────────────────────────────────────────────────────────────
-      { slug: 'armor', label: 'All Armor', group: 'armor', count: c('armor') },
+      { slug: 'armor', label: 'Armor', group: 'armor', count: c('armor') },
       { slug: 'armor-suits', label: 'Suits', group: 'armor', count: c('armor-suits') },
       { slug: 'armor-undersuits', label: 'Undersuits', group: 'armor', count: c('armor-undersuits') },
       { slug: 'armor-helmets', label: 'Helmets', group: 'armor', count: c('armor-helmets') },
@@ -772,9 +772,9 @@ export class ItemQueryService {
       { slug: 'armor-backpacks', label: 'Backpacks', group: 'armor', count: c('armor-backpacks') },
       { slug: 'armor-flair', label: 'Flair', group: 'armor', count: c('armor-flair') },
       // ── Clothing ─────────────────────────────────────────────────────────────
-      { slug: 'clothing', label: 'All Clothing', group: 'clothing', count: c('clothing') },
+      { slug: 'clothing', label: 'Clothing', group: 'clothing', count: c('clothing') },
       // ── Weapons ──────────────────────────────────────────────────────────────
-      { slug: 'weapons', label: 'All Weapons', group: 'weapons', count: c('weapons') },
+      { slug: 'weapons', label: 'Weapons', group: 'weapons', count: c('weapons') },
       { slug: 'weapons-sidearms', label: 'Sidearms', group: 'weapons', count: c('weapons-sidearms') },
       { slug: 'weapons-primary', label: 'Primary', group: 'weapons', count: c('weapons-primary') },
       {
@@ -817,7 +817,7 @@ export class ItemQueryService {
       { slug: 'weapons-attachments', label: 'Attachments', group: 'weapons', count: c('weapons-attachments') },
       { slug: 'weapons-throwables', label: 'Throwables', group: 'weapons', count: c('weapons-throwables') },
       // ── Utility ──────────────────────────────────────────────────────────────
-      { slug: 'utility', label: 'All Utility', group: 'utility', count: c('utility') },
+      { slug: 'utility', label: 'Utility', group: 'utility', count: c('utility') },
       { slug: 'utility-gadgets', label: 'Gadgets', group: 'utility', count: c('utility-gadgets') },
       { slug: 'utility-medical', label: 'Medical', group: 'utility', count: c('utility-medical') },
       { slug: 'utility-cryptokeys', label: 'Cryptokeys', group: 'utility', count: c('utility-cryptokeys') },
@@ -825,7 +825,7 @@ export class ItemQueryService {
       // ── Ammo ─────────────────────────────────────────────────────────────────
       { slug: 'ammo', label: 'Ammo', group: 'ammo', count: c('ammo') },
       // ── Sustenance ───────────────────────────────────────────────────────────
-      { slug: 'sustenance', label: 'All Sustenance', group: 'sustenance', count: c('sustenance') },
+      { slug: 'sustenance', label: 'Sustenance', group: 'sustenance', count: c('sustenance') },
       { slug: 'sustenance-food', label: 'Food', group: 'sustenance', count: c('sustenance-food') },
       { slug: 'sustenance-drink', label: 'Drinks', group: 'sustenance', count: c('sustenance-drink') },
       { slug: 'sustenance-oxygen', label: 'Oxygen', group: 'sustenance', count: c('sustenance-oxygen') },

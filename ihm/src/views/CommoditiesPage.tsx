@@ -95,10 +95,9 @@ export default function CommoditiesPage() {
                         </div>
                         {c.symbol && <p className="text-xs font-mono-sc text-slate-600 mt-0.5">{c.symbol}</p>}
                       </Link>
-                      <div className="text-right shrink-0 space-y-1">
-                        {c.occupancy_scu != null && <p className="text-xs font-mono-sc text-slate-600">{c.occupancy_scu} μSCU</p>}
-                        <Link href={`/missions?search=${encodeURIComponent(c.name)}`} className="text-[10px] text-amber-500 hover:text-amber-300">Mission leads</Link>
-                      </div>
+                        <div className="text-right shrink-0 space-y-1">
+                          {c.occupancy_scu != null && <p className="text-xs font-mono-sc text-slate-600">{c.occupancy_scu} μSCU</p>}
+                        </div>
                     </div>
                   </div>
                 </motion.div>

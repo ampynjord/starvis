@@ -1,16 +1,14 @@
 ﻿'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { ArrowLeft, ChevronDown, ChevronRight, ChevronUp, MapPin, Package, TrendingDown, TrendingUp } from 'lucide-react';
+import { ArrowLeft, ChevronRight, MapPin, Package, TrendingDown, TrendingUp } from 'lucide-react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { useState } from 'react';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
 import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { PageShell } from '@/components/ui/PageShell';
 import { GlowBadge } from '@/components/ui/GlowBadge';
-import { CanonicalMeta } from '@/components/ui/CanonicalMeta';
 import { LoadingGrid } from '@/components/ui/LoadingGrid';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { fCredits } from '@/utils/formatters';
@@ -78,7 +76,6 @@ export default function CommodityDetailPage() {
   const uuid = params?.uuid;
   const router = useRouter();
   const { env } = useEnv();
-  const [rawOpen, setRawOpen] = useState(false);
 
   const { data: commodity, isLoading, error, refetch } = useQuery({
     queryKey: ['commodities.get', uuid, env],
@@ -197,15 +194,6 @@ export default function CommodityDetailPage() {
         </div>
       )}
 
-      {/* Canonical meta */}
-      <CanonicalMeta
-        sourceType={commodity.source_type}
-        sourceName={commodity.source_name}
-        confidenceScore={commodity.confidence_score}
-        canonicalKey={commodity.canonical_commodity_key}
-        normalizedName={commodity.normalized_name}
-      />
-
       {/* Locations grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
@@ -244,34 +232,6 @@ export default function CommodityDetailPage() {
         <ScifiPanel title="Trade Prices">
           <p className="text-xs text-slate-600 italic py-4 text-center">No price data available</p>
         </ScifiPanel>
-      )}
-
-      {/* Identification + raw data */}
-      {(commodity.class_name || commodity.data_json) && (
-        <div className="space-y-3">
-          {commodity.class_name && (
-            <ScifiPanel title="Identification">
-              <p className="text-xs font-mono-sc text-slate-500 break-all">{commodity.class_name}</p>
-            </ScifiPanel>
-          )}
-          {commodity.data_json && Object.keys(commodity.data_json).length > 0 && (
-            <div className="sci-panel overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setRawOpen((o) => !o)}
-                className="w-full flex items-center justify-between px-4 py-3 text-xs font-mono-sc text-slate-500 hover:text-slate-300 transition-colors"
-              >
-                <span className="uppercase tracking-widest">Raw Game Data</span>
-                {rawOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-              </button>
-              {rawOpen && (
-                <pre className="px-4 pb-4 max-h-80 overflow-auto text-xs text-slate-500 font-mono leading-relaxed border-t border-border">
-                  {JSON.stringify(commodity.data_json, null, 2)}
-                </pre>
-              )}
-            </div>
-          )}
-        </div>
       )}
     </PageShell>
   );

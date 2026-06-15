@@ -224,6 +224,13 @@ const SHIP_JSON_SORT_MAP: Record<string, string> = {
   'game_data.roll_max': "(s.game_data#>>'{ifcs,roll_max}')::numeric",
 };
 
+const SHIP_SORT_EXPRESSION_MAP: Record<string, string> = {
+  min_purchase_price: 'ship_market.min_purchase_price',
+  min_rental_price_1d: 'ship_market.min_rental_price_1d',
+  purchase_location_count: 'ship_market.purchase_location_count',
+  rental_location_count: 'ship_market.rental_location_count',
+};
+
 const SHIP_SORT = new Set([
   'name',
   'class_name',
@@ -245,10 +252,21 @@ const SHIP_SORT = new Set([
   'cross_section_z',
   'hydrogen_fuel_capacity',
   'quantum_fuel_capacity',
+  'min_purchase_price',
+  'min_rental_price_1d',
+  'purchase_location_count',
+  'rental_location_count',
+  'insurance_claim_time',
+  'insurance_expedite_cost',
   'boost_speed_forward',
   'pitch_max',
   'yaw_max',
   'roll_max',
+  'armor_phys_resist',
+  'armor_energy_resist',
+  'armor_signal_ir',
+  'armor_signal_em',
+  'armor_signal_cs',
 ]);
 
 export class ShipQueryService {
@@ -374,10 +392,19 @@ export class ShipQueryService {
 
     const sortKey = filters?.sort || '';
     const jsonExpr = SHIP_JSON_SORT_MAP[sortKey];
-    const sortCol = jsonExpr ? null : SHIP_SORT.has(sortKey) ? sortKey : 'name';
+    const sortExpr = SHIP_SORT_EXPRESSION_MAP[sortKey];
+    const sortCol = jsonExpr || sortExpr ? null : SHIP_SORT.has(sortKey) ? sortKey : 'name';
 
-    const nullSafeOrder = jsonExpr ? `${jsonExpr} IS NULL, ${jsonExpr} ${order}` : `${sortCol} IS NULL, ${sortCol} ${order}`;
-    const qualifiedOrder = jsonExpr ? `${jsonExpr} IS NULL, ${jsonExpr} ${order}` : `s.${sortCol} IS NULL, s.${sortCol} ${order}`;
+    const nullSafeOrder = jsonExpr
+      ? `${jsonExpr} IS NULL, ${jsonExpr} ${order}`
+      : sortExpr
+        ? `${sortKey} IS NULL, ${sortKey} ${order}`
+        : `${sortCol} IS NULL, ${sortCol} ${order}`;
+    const qualifiedOrder = jsonExpr
+      ? `${jsonExpr} IS NULL, ${jsonExpr} ${order}`
+      : sortExpr
+        ? `${sortExpr} IS NULL, ${sortExpr} ${order}`
+        : `s.${sortCol} IS NULL, s.${sortCol} ${order}`;
 
     let sql: string;
     let allParams: (string | number)[];
@@ -441,6 +468,18 @@ export class ShipQueryService {
       env,
     );
     return rows[0] ? convertBigIntToNumber(rows[0]) : null;
+  }
+
+  async getShipGallery(shipMatrixId: number): Promise<Row[]> {
+    const prisma = this.getClient('live');
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT id, ship_matrix_id, url, thumbnail_url, title, kind, position, synced_at
+       FROM rsi.ship_galleries
+       WHERE ship_matrix_id = ?
+       ORDER BY position ASC, id ASC`),
+      shipMatrixId,
+    );
+    return rows.map(convertBigIntToNumber);
   }
 
   async getShipBuyLocations(ship: Row | string, env = 'live'): Promise<Row[]> {

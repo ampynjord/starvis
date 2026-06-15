@@ -52,7 +52,7 @@ function fmtReward(min: number | null, max: number | null): string {
 }
 
 function fmtName(r: CraftingRecipe): string {
-  return r.display_name ?? r.name ?? r.class_name;
+  return r.display_name ?? r.name ?? 'Crafting recipe';
 }
 
 function cleanUnitFormat(raw: string | null | undefined): string {
@@ -154,9 +154,9 @@ function BlueprintInsightPanel({
         <div className="mt-3 grid gap-2 lg:grid-cols-2">
           {topPools.map((reward) => (
             <div key={`${reward.pool_uuid}-${reward.reward_index}`} className="rounded-sm border border-slate-800/70 bg-slate-950/40 p-3">
-              <p className="truncate font-orbitron text-xs font-bold text-slate-100">{reward.blueprint_class_name ?? 'Blueprint reward'}</p>
+              <p className="truncate font-orbitron text-xs font-bold text-slate-100">Blueprint reward</p>
               <div className="mt-1 flex flex-wrap items-center gap-2 font-mono-sc text-[10px] uppercase tracking-widest">
-                <span className="text-slate-600">{reward.pool_class_name ?? 'Pool'}</span>
+                <span className="text-slate-600">Reward pool</span>
                 {reward.weight != null && <span className="text-amber-400">Weight {Number(reward.weight).toLocaleString('en-US')}</span>}
               </div>
             </div>
@@ -550,7 +550,7 @@ function DetailPanel({ r, env }: { r: CraftingRecipe; env: string }) {
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-rajdhani font-semibold text-slate-200 group-hover:text-cyan-300 truncate">
-                      {m.title ?? m.class_name}
+                      {m.title ?? 'Mission reward'}
                     </p>
                     <div className="flex items-center gap-1.5 mt-0.5">
                       {m.faction && (
