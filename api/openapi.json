@@ -989,16 +989,35 @@
             "type": "string",
             "example": "WeaponShop"
           },
-          "location_id": {
+          "location_uuid": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Linked game.locations UUID when the shop can be attached to a physical or canonical location."
+          },
+          "location": {
+            "type": "string",
+            "nullable": true
+          },
+          "planet_moon": {
+            "type": "string",
+            "nullable": true
+          },
+          "city": {
+            "type": "string",
+            "nullable": true
+          },
+          "system": {
+            "type": "string",
+            "nullable": true
+          },
+          "loc_key": {
+            "type": "string",
+            "nullable": true,
+            "description": "Canonical location key used as a fallback attachment when location_uuid is unavailable."
+          },
+          "inventory_count": {
             "type": "integer",
-            "nullable": true
-          },
-          "location_name": {
-            "type": "string",
-            "nullable": true
-          },
-          "system_name": {
-            "type": "string",
             "nullable": true
           }
         }
@@ -2427,6 +2446,30 @@
           }
         },
         "required": ["id", "userId", "motivation", "status", "createdAt", "updatedAt"]
+      },
+      "LocationTreeNode": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Location"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "children": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/LocationTreeNode"
+                }
+              },
+              "shops": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Shop"
+                }
+              }
+            }
+          }
+        ]
       }
     },
     "responses": {
@@ -4581,11 +4624,20 @@
             "$ref": "#/components/parameters/search"
           },
           {
+            "name": "type",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Shop type filter, for example weapons, armor, clothing, vehicles, medical or food_drink."
+          },
+          {
             "name": "shop_type",
             "in": "query",
             "schema": {
               "type": "string"
-            }
+            },
+            "description": "Compatibility alias for type."
           },
           {
             "name": "system",
@@ -4641,6 +4693,54 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/shops/{id}": {
+      "get": {
+        "tags": ["Shops"],
+        "summary": "Get shop details",
+        "description": "Returns one extracted shop/franchise entry, including its linked location UUID when the extractor can attach it to the galactic location tree.",
+        "operationId": "getShopById",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Shop ID"
+          },
+          {
+            "$ref": "#/components/parameters/env"
+          },
+          {
+            "$ref": "#/components/parameters/format"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shop details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Shop"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           }
         }
       }
@@ -4944,6 +5044,57 @@
                       "type": "array",
                       "items": {
                         "$ref": "#/components/schemas/Location"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/locations/{uuid}/shops": {
+      "get": {
+        "tags": ["Locations", "Shops"],
+        "summary": "Get shops attached to a location",
+        "description": "Returns shops attached to a location by explicit location_uuid or by the canonical location key fallback.",
+        "operationId": "getLocationShops",
+        "parameters": [
+          {
+            "name": "uuid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Location UUID"
+          },
+          {
+            "$ref": "#/components/parameters/env"
+          },
+          {
+            "$ref": "#/components/parameters/format"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shops attached to this location",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Shop"
                       }
                     }
                   }
@@ -6773,6 +6924,48 @@
                       "type": "array",
                       "items": {
                         "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/locations/tree": {
+      "get": {
+        "tags": ["Locations"],
+        "summary": "Get the galactic location tree with attached shops",
+        "description": "Returns nested systems, planets, moons, stations, landing zones and child locations, with linked shops attached to the location node when the extractor can resolve them.",
+        "operationId": "getLocationTree",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/env"
+          },
+          {
+            "$ref": "#/components/parameters/format"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nested location tree with attached shops",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/LocationTreeNode"
                       }
                     }
                   }

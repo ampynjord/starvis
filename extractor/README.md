@@ -160,9 +160,17 @@ npx tsx extractor/extract.ts --check-config
 
 # Dry-run parse without DB writes
 npx tsx extractor/extract.ts --dry-run --env ptu
+
+# Audit location/shop hierarchy completeness after an extraction
+npm run audit:locations --workspace=@starvis/extractor -- --env live
+npm run audit:locations --workspace=@starvis/extractor -- --env live --prod-db
 ```
 
 `game-insights` writes the raw discovery layer to `game.game_insights` and the most useful normalized families to dedicated tables:
+
+`audit:locations` checks that imported locations have valid parents, reports shops that could not be attached to a
+location, summarizes real `ShopInventories` rows and highlights stations, landing zones, rest stops and outposts that do
+not yet expose attached shops. Use it after `locations,shops` extraction when validating the galactic tree.
 
 | Table family | Tables |
 |---|---|

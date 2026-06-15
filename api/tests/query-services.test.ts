@@ -643,6 +643,20 @@ describe('ShopService', () => {
       expect(callArgs[2]).toBe(42);
     });
   });
+
+  describe('getShopsByLocation', () => {
+    it('returns shops attached by location uuid or canonical location key', async () => {
+      const shops = [row({ id: 1, name: 'Cubby Blast', location_uuid: 'loc-1', inventory_count: BigInt(195) })];
+      const prisma = createMockPrisma([shops]);
+      const svc = new ShopService(createGetClient(prisma));
+      const result = await svc.getShopsByLocation('loc-1');
+      expect(result).toHaveLength(1);
+      expect(result[0].inventory_count).toBe(195);
+      const sql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
+      expect(sql).toContain('s.location_uuid');
+      expect(sql).toContain('canonical_location_key');
+    });
+  });
 });
 
 // ── ShipQueryService — Manufacturers ────────────────────
@@ -891,6 +905,23 @@ describe('LocationQueryService', () => {
       const svc = new LocationQueryService(createGetClient(prisma));
       const result = await svc.getLocation('nonexistent');
       expect(result).toBeNull();
+    });
+  });
+
+  describe('getTree', () => {
+    it('nests locations and attaches shops to their location', async () => {
+      const locationRows = [
+        row({ uuid: 'system-1', name: 'Stanton', type: 'system', loc_key: 'stanton', parent_uuid: null }),
+        row({ uuid: 'city-1', name: 'Area18', type: 'landing_zone', loc_key: 'area18', parent_uuid: 'system-1' }),
+      ];
+      const shopRows = [row({ id: 12, name: 'Cubby Blast', shop_type: 'weapons', location_uuid: 'city-1', inventory_count: BigInt(195) })];
+      const prisma = createMockPrisma([locationRows, shopRows]);
+      const svc = new LocationQueryService(createGetClient(prisma));
+      const tree = await svc.getTree();
+      expect(tree).toHaveLength(1);
+      expect((tree[0].children as any[])[0].name).toBe('Area18');
+      expect((tree[0].children as any[])[0].shops[0].name).toBe('Cubby Blast');
+      expect((tree[0].children as any[])[0].shops[0].inventory_count).toBe(195);
     });
   });
 });

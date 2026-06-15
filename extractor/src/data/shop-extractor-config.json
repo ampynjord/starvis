@@ -16,6 +16,8 @@
     "customs": "general"
   },
   "locationSlugOverrides": {
+    "a18": "@ui_pregame_port_Area18_name",
+    "area18": "@ui_pregame_port_Area18_name",
     "arccorp": "@ui_pregame_port_Area18_name"
   },
   "skipLocationSlugs": ["franchise", "prop", "intcomponent", "component", "vendor"]

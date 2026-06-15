@@ -81,6 +81,7 @@ export const ShopQuery = z
     search: qStr,
     location: qStr,
     type: qStr,
+    shop_type: qStr,
     page: qInt(1),
     limit: qInt(20, 100),
     format: qStr,

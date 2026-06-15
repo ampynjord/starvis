@@ -9,6 +9,7 @@ function normalizeShopRow(row: Row): Row {
   return {
     ...row,
     display_shop_type: formatEnumLabel(String(row.shop_type ?? '')),
+    inventory_count: row.inventory_count == null ? undefined : Number(row.inventory_count),
   };
 }
 
@@ -21,6 +22,7 @@ export class ShopService {
     limit?: number;
     location?: string;
     type?: string;
+    shop_type?: string;
     search?: string;
   }): Promise<PaginatedResult> {
     const env = opts.env ?? 'live';
@@ -38,9 +40,10 @@ export class ShopService {
       const t = `%${opts.location}%`;
       params.push(t, t, t);
     }
-    if (opts.type) {
+    const shopType = opts.type ?? opts.shop_type;
+    if (shopType) {
       where.push('shop_type = ?');
-      params.push(opts.type);
+      params.push(shopType);
     }
 
     const w = ` WHERE ${where.join(' AND ')}`;
@@ -51,10 +54,11 @@ export class ShopService {
     const countRows = await prisma.$queryRawUnsafe<Row[]>(toPostgres(`SELECT COUNT(*) as count FROM game.shops${w}`), ...params);
     const total = Number(countRows[0].count);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT id, name, class_name, shop_type, location, planet_moon, city, system,
+      toPostgres(`SELECT id, name, class_name, shop_type, location_uuid, location, planet_moon, city, system,
               canonical_shop_key, canonical_location_key AS loc_key,
-              franchise_slug, location_slug, franchise_loc_key, p4k_path
-       FROM game.shops${w} ORDER BY name LIMIT ${Number(limit)} OFFSET ${Number(offset)}`),
+              franchise_slug, location_slug, franchise_loc_key, p4k_path,
+              (SELECT COUNT(*) FROM game.shop_inventory si WHERE si.shop_id = s.id) as inventory_count
+       FROM game.shops s${w} ORDER BY name LIMIT ${Number(limit)} OFFSET ${Number(offset)}`),
       ...params,
     );
 
@@ -84,14 +88,39 @@ export class ShopService {
   async getShopById(shopId: number, env = 'live'): Promise<Row | null> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT id, name, class_name, shop_type, location, planet_moon, city, system,
+      toPostgres(`SELECT id, name, class_name, shop_type, location_uuid, location, planet_moon, city, system,
               canonical_shop_key, canonical_location_key AS loc_key,
-              franchise_slug, location_slug, franchise_loc_key, p4k_path
-       FROM game.shops WHERE env = ? AND id = ? LIMIT 1`),
+              franchise_slug, location_slug, franchise_loc_key, p4k_path,
+              (SELECT COUNT(*) FROM game.shop_inventory si WHERE si.shop_id = s.id) as inventory_count
+       FROM game.shops s WHERE env = ? AND id = ? LIMIT 1`),
       env,
       shopId,
     );
     return rows[0] ? normalizeShopRow(rows[0]) : null;
+  }
+
+  async getShopsByLocation(locationUuid: string, env = 'live'): Promise<Row[]> {
+    const prisma = this.getClient(env);
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT id, name, class_name, shop_type, location_uuid, location, planet_moon, city, system,
+              canonical_shop_key, canonical_location_key AS loc_key,
+              franchise_slug, location_slug, franchise_loc_key, p4k_path,
+              (SELECT COUNT(*) FROM game.shop_inventory si WHERE si.shop_id = s.id) as inventory_count
+       FROM game.shops s
+       WHERE s.env = ?
+         AND (
+           s.location_uuid = ?
+           OR s.canonical_location_key = (
+             SELECT loc_key FROM game.locations WHERE env = ? AND uuid = ? LIMIT 1
+           )
+         )
+       ORDER BY shop_type, name`),
+      env,
+      locationUuid,
+      env,
+      locationUuid,
+    );
+    return rows.map(normalizeShopRow);
   }
 
   async getShopInventory(shopId: number, env = 'live'): Promise<Row[]> {

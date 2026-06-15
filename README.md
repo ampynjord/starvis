@@ -170,6 +170,10 @@ STARVIS combines local game data and public RSI data.
 
 LIVE and PTU data share the same PostgreSQL database and are separated by `env = 'live'` or `env = 'ptu'` in the `game` schema.
 
+Location completeness can be audited with `npm run audit:locations --workspace=@starvis/extractor -- --env live`. The
+audit verifies parent links, attached shops, real shop inventory rows and locations that still have no imported shops, so
+missing stations, hospitals or city shops are visible instead of silently disappearing.
+
 ---
 
 ## Database
@@ -276,6 +280,10 @@ Main route families:
 
 Most list endpoints support pagination and filtering parameters such as `page`, `limit`, `search`, `sort`, `order`, and `env`.
 Use `/api/v1/objects/{type}/{id}` when a client needs one object with its most useful relations in a single request. It resolves ships, components, items, commodities, shops and locations, and returns a normalized `{ type, id, env, data, related, meta }` payload. The `include` query parameter can narrow or disable related data with `include=none`.
+Use `/api/v1/locations/tree` to consume the full galactic hierarchy with shops already attached, and
+`/api/v1/locations/{uuid}/shops` when a client only needs the shops/inventories available at one city, station, outpost or
+other location. `/api/v1/shops/{id}` returns the shop metadata, while `/api/v1/shops/{id}/inventory` returns its priced
+inventory rows.
 
 When adding, changing, or deleting an API route, update [`api/openapi.json`](api/openapi.json) in the same change. The API test suite compares mounted Express routes with the OpenAPI paths so undocumented routes are caught during CI.
 
