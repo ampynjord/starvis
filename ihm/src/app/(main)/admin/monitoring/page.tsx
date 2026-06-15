@@ -345,7 +345,8 @@ const REFRESH_INTERVAL_MS = 10_000;
 export default function AdminMonitoringPage() {
   const { user: me } = useAuth();
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
-  const [requestLogs, setRequestLogs] = useState<RequestLogEntry[]>([]);
+  const [externalRequestLogs, setExternalRequestLogs] = useState<RequestLogEntry[]>([]);
+  const [webRequestLogs, setWebRequestLogs] = useState<RequestLogEntry[]>([]);
   const [apiSupervision, setApiSupervision] = useState<ApiSupervisionSnapshot | null>(null);
   const [discordBot, setDiscordBot] = useState<DiscordBotStatus | null>(null);
   const [reqPerSec, setReqPerSec] = useState<number | null>(null);
@@ -361,7 +362,8 @@ export default function AdminMonitoringPage() {
         fetch('/health/metrics'),
         fetch('/api/admin/discord-bot'),
       ]);
-      const logsPromise = fetch('/api/admin/request-logs?limit=80');
+      const externalLogsPromise = fetch('/api/admin/request-logs?scope=external&limit=80');
+      const webLogsPromise = fetch('/api/admin/request-logs?scope=web&limit=80');
       const supervisionPromise = fetch('/api/admin/api-supervision');
 
       const ready: ReadyState | null = readyRes.status === 'fulfilled'
@@ -377,10 +379,15 @@ export default function AdminMonitoringPage() {
         const discordJson = await discordRes.value.json().catch(() => null);
         setDiscordBot(discordJson?.data ?? null);
       }
-      const logsRes = await logsPromise.catch(() => null);
-      if (logsRes?.ok) {
-        const logsJson = await logsRes.json().catch(() => null);
-        setRequestLogs(Array.isArray(logsJson?.data) ? logsJson.data : []);
+      const externalLogsRes = await externalLogsPromise.catch(() => null);
+      if (externalLogsRes?.ok) {
+        const logsJson = await externalLogsRes.json().catch(() => null);
+        setExternalRequestLogs(Array.isArray(logsJson?.data) ? logsJson.data : []);
+      }
+      const webLogsRes = await webLogsPromise.catch(() => null);
+      if (webLogsRes?.ok) {
+        const logsJson = await webLogsRes.json().catch(() => null);
+        setWebRequestLogs(Array.isArray(logsJson?.data) ? logsJson.data : []);
       }
       const supervisionRes = await supervisionPromise.catch(() => null);
       if (supervisionRes?.ok) {
@@ -675,72 +682,86 @@ export default function AdminMonitoringPage() {
         </div>
       )}
 
-      {apiSupervision && (
-        <div className="sci-panel border border-slate-800/60">
-          <div className="flex flex-col gap-1 border-b border-slate-800/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-            <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Recent external API requests</p>
-            <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-700">
-              {apiSupervision.summary.externalApiRequests24h.toLocaleString()} in current buffer
-            </span>
-          </div>
-          {apiSupervision.recentExternalRequests.length === 0 ? (
-            <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No external API request recorded yet.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-left">
-                <thead>
-                  <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-                    <th className="px-3 py-2 font-normal">Time</th>
-                    <th className="px-3 py-2 font-normal">Request</th>
-                    <th className="px-3 py-2 font-normal">Project</th>
-                    <th className="px-3 py-2 font-normal">Client</th>
-                    <th className="px-3 py-2 text-right font-normal">Status</th>
-                    <th className="px-3 py-2 text-right font-normal">Duration</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {apiSupervision.recentExternalRequests.slice(0, 25).map((log) => (
-                    <tr key={log.id} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
-                      <td className="whitespace-nowrap px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtTime(log.timestamp)}</td>
-                      <td className="px-3 py-2">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <span className="rounded-sm border border-cyan-900/60 bg-cyan-950/20 px-1.5 py-0.5 font-mono-sc text-[10px] font-bold text-cyan-400">
-                            {log.method}
-                          </span>
-                          <span className="max-w-[24rem] truncate font-mono-sc text-xs text-slate-300">{log.path}</span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{actorLabel(log)}</td>
-                      <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{clientLabel(log)}</td>
-                      <td className="px-3 py-2 text-right">
-                        <span className={`inline-flex rounded-sm border px-1.5 py-0.5 font-mono-sc text-[10px] font-bold ${statusStyle(log.statusCode)}`}>
-                          {log.statusCode}
-                        </span>
-                      </td>
-                      <td className="whitespace-nowrap px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{fmtMs(log.durationMs)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Recent request logs */}
       <div className="sci-panel border border-slate-800/60">
         <div className="flex flex-col gap-1 border-b border-slate-800/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
           <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-            Recent request logs
+            External API logs only
           </p>
           <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-700">
-            Last {requestLogs.length.toLocaleString()} API requests
+            Last {externalRequestLogs.length.toLocaleString()} external requests
           </span>
         </div>
-        {loading && requestLogs.length === 0 ? (
+        {loading && externalRequestLogs.length === 0 ? (
           <div className="flex items-center justify-center py-10 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
-        ) : requestLogs.length === 0 ? (
-          <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No recent request logs yet.</p>
+        ) : externalRequestLogs.length === 0 ? (
+          <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No external API logs yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[760px] text-left">
+              <thead>
+                <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                  <th className="px-3 py-2 font-normal">Time</th>
+                  <th className="px-3 py-2 font-normal">Request</th>
+                  <th className="px-3 py-2 text-right font-normal">Status</th>
+                  <th className="px-3 py-2 text-right font-normal">Duration</th>
+                  <th className="px-3 py-2 font-normal">Project / actor</th>
+                  <th className="px-3 py-2 font-normal">Client</th>
+                </tr>
+              </thead>
+              <tbody>
+                {externalRequestLogs.map((log) => (
+                  <tr key={log.id} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
+                    <td className="whitespace-nowrap px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtTime(log.timestamp)}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span className="rounded-sm border border-cyan-900/60 bg-cyan-950/20 px-1.5 py-0.5 font-mono-sc text-[10px] font-bold text-cyan-400">
+                          {log.method}
+                        </span>
+                        <span className="max-w-[24rem] truncate font-mono-sc text-xs text-slate-300">{log.path}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <span className={`inline-flex rounded-sm border px-1.5 py-0.5 font-mono-sc text-[10px] font-bold ${statusStyle(log.statusCode)}`}>
+                        {log.statusCode}
+                      </span>
+                    </td>
+                    <td className="whitespace-nowrap px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{fmtMs(log.durationMs)}</td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-1.5 font-mono-sc text-xs text-slate-500">
+                        <KeyRound size={11} className="text-slate-600" />
+                        {actorLabel(log)}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex min-w-0 items-center gap-1.5 font-mono-sc text-xs text-slate-500">
+                        <Globe size={11} className="shrink-0 text-slate-600" />
+                        <span className="max-w-[18rem] truncate" title={log.userAgent ?? undefined}>
+                          {clientLabel(log)} · {log.ip ?? 'unknown'}{log.userAgent ? ` · ${log.userAgent}` : ''}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Web request logs */}
+      <div className="sci-panel border border-slate-800/60">
+        <div className="flex flex-col gap-1 border-b border-slate-800/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+          <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+            Starvis IHM logs only
+          </p>
+          <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-700">
+            Last {webRequestLogs.length.toLocaleString()} web requests
+          </span>
+        </div>
+        {loading && webRequestLogs.length === 0 ? (
+          <div className="flex items-center justify-center py-10 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
+        ) : webRequestLogs.length === 0 ? (
+          <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No Starvis IHM request logs yet.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left">
@@ -755,7 +776,7 @@ export default function AdminMonitoringPage() {
                 </tr>
               </thead>
               <tbody>
-                {requestLogs.map((log) => (
+                {webRequestLogs.map((log) => (
                   <tr key={log.id} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
                     <td className="whitespace-nowrap px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtTime(log.timestamp)}</td>
                     <td className="px-3 py-2">
