@@ -278,6 +278,7 @@ function normalizeMediaUrl(url: string | null | undefined): string | null {
 function getMediaKey(url: string): string {
   return (
     url.match(/media\.robertsspaceindustries\.com\/([a-z0-9]+)\//i)?.[1] ??
+    url.match(/resize\([^)]*,([A-Za-z0-9]+)\)\/source\.webp/i)?.[1] ??
     url.match(/robertsspaceindustries\.com\/i\/([a-f0-9]+)\//i)?.[1] ??
     url
   );
@@ -293,6 +294,7 @@ function firstImageVariant(images: Record<string, unknown>, variants: string[]):
 
 function isImageCandidate(url: string): boolean {
   const lower = url.toLowerCase();
+  if (!/\.(?:webp|png|jpe?g)(?:[?#].*)?$/.test(lower)) return false;
   if (
     lower.startsWith('data:') ||
     lower.includes('empty-ship') ||

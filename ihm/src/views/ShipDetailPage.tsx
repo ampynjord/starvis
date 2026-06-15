@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   ArrowLeft, BarChart3, ChevronLeft, ChevronRight, Clock, Coins,
@@ -70,7 +70,17 @@ function QuickStat({ icon, label, value }: { icon: React.ReactNode; label: strin
 
 function OfficialGalleryCarousel({ shipName, images }: { shipName: string; images: ShipGalleryImage[] }) {
   const [activeIndex, setActiveIndex] = useState(0);
+  const thumbnailRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const active = images[Math.min(activeIndex, images.length - 1)] ?? images[0];
+
+  useEffect(() => {
+    thumbnailRefs.current[activeIndex]?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'nearest',
+      inline: 'center',
+    });
+  }, [activeIndex]);
+
   if (!active) return null;
 
   const go = (direction: -1 | 1) => {
@@ -110,6 +120,9 @@ function OfficialGalleryCarousel({ shipName, images }: { shipName: string; image
             {images.map((image, index) => (
               <button
                 key={image.id}
+                ref={(node) => {
+                  thumbnailRefs.current[index] = node;
+                }}
                 type="button"
                 onClick={() => setActiveIndex(index)}
                 className={[

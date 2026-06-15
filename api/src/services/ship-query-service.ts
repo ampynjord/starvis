@@ -209,9 +209,26 @@ const SHIP_JOINS = `FROM game.ships s
 function galleryMediaKey(url: string): string {
   return (
     url.match(/media\.robertsspaceindustries\.com\/([a-z0-9]+)\//i)?.[1] ??
+    url.match(/resize\([^)]*,([A-Za-z0-9]+)\)\/source\.webp/i)?.[1] ??
     url.match(/robertsspaceindustries\.com\/i\/([a-f0-9]+)\//i)?.[1] ??
     url.replace(/\/(?:source|store_slideshow_small)\.(webp|png|jpe?g)$/i, '')
   );
+}
+
+function isGalleryImageUrl(url: string): boolean {
+  return /\.(?:webp|png|jpe?g)(?:[?#].*)?$/i.test(url);
+}
+
+function galleryImageScore(url: string): number {
+  const lower = url.toLowerCase();
+  const width = Number.parseInt(url.match(/resize\((\d+),/)?.[1] ?? '0', 10);
+  if (lower.includes('/wallpaper_3840x2160.')) return 6000;
+  if (lower.includes('/store_slideshow_large_zoom.')) return 5000;
+  if (lower.includes('/store_slideshow_large.')) return 4000;
+  if (lower.includes('/slideshow_wide.')) return 3000;
+  if (lower.includes('/slideshow.')) return 2500;
+  if (lower.includes('/source.')) return 2000 + (Number.isFinite(width) ? width : 0);
+  return Number.isFinite(width) ? width : 0;
 }
 
 /**
@@ -487,15 +504,17 @@ export class ShipQueryService {
        ORDER BY position ASC, id ASC`),
       shipMatrixId,
     );
-    const seen = new Set<string>();
-    const gallery: Row[] = [];
+    const bestByMedia = new Map<string, Row>();
     for (const row of rows.map(convertBigIntToNumber)) {
-      const key = galleryMediaKey(String(row.url ?? ''));
-      if (seen.has(key)) continue;
-      seen.add(key);
-      gallery.push(row);
+      const url = String(row.url ?? '');
+      if (!isGalleryImageUrl(url)) continue;
+      const key = galleryMediaKey(url);
+      const existing = bestByMedia.get(key);
+      if (!existing || galleryImageScore(url) > galleryImageScore(String(existing.url ?? ''))) {
+        bestByMedia.set(key, row);
+      }
     }
-    return gallery;
+    return [...bestByMedia.values()].sort((left, right) => Number(left.position ?? 0) - Number(right.position ?? 0));
   }
 
   async getShipBuyLocations(ship: Row | string, env = 'live'): Promise<Row[]> {
