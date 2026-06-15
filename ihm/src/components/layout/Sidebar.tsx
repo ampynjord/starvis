@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import {
   Activity,
+  AlertTriangle,
   BookOpen,
   Bug,
   Building2,
@@ -26,7 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { NAV_GROUPS, type NavItemDef } from '@/components/layout/navigation';
 import { ADMIN_ROLE, hasDeveloperAccess, PUBLIC_RSI_URL } from '@/lib/app-constants';
 
-function NavItem({ to, icon: Icon, label, auth: requiresAuth, exact, onNavigate }: NavItemDef & { onNavigate?: () => void }) {
+function NavItem({ to, icon: Icon, label, earlyAccess, auth: requiresAuth, exact, onNavigate }: NavItemDef & { onNavigate?: () => void }) {
   const pathname = usePathname();
   const { user } = useAuth();
   const isActive = to === '/' ? pathname === '/' : exact ? pathname === to : pathname?.startsWith(to);
@@ -51,6 +52,15 @@ function NavItem({ to, icon: Icon, label, auth: requiresAuth, exact, onNavigate 
       <span className="font-rajdhani font-semibold text-sm uppercase tracking-wider truncate flex-1">
         {label}
       </span>
+      {earlyAccess && (
+        <span
+          title="Early access: this area is still being validated and can change."
+          className="inline-flex shrink-0 items-center gap-1 rounded-sm border border-amber-800/55 bg-amber-950/25 px-1 py-0.5 font-orbitron text-[7px] font-bold uppercase tracking-widest text-amber-300"
+        >
+          <AlertTriangle size={8} />
+          EA
+        </span>
+      )}
       {locked && <Lock size={10} className="shrink-0 text-slate-600" />}
       {isActive && !locked && (
         <motion.div
@@ -148,9 +158,9 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
             label="Corporation"
             items={[
               { to: '/corp',       icon: Building2, label: 'Corporation HQ', exact: true },
-              { to: '/corp/fleet', icon: Ship,    label: 'Fleet Manager' },
-              { to: '/corp/tactics', icon: Radar, label: 'Tactics' },
-              { to: '/corp/bank',  icon: Package, label: 'Corp Bank' },
+              { to: '/corp/fleet', icon: Ship,    label: 'Fleet Manager', earlyAccess: true },
+              { to: '/corp/tactics', icon: Radar, label: 'Tactics', earlyAccess: true },
+              { to: '/corp/bank',  icon: Package, label: 'Corp Bank', earlyAccess: true },
             ]}
             onNavigate={onClose}
           />
@@ -159,7 +169,7 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         {hasDeveloperAccess(user?.role) && (
           <NavGroup
             label="Developer"
-            items={[{ to: '/developer', icon: Code2, label: 'API Access' }]}
+            items={[{ to: '/developer', icon: Code2, label: 'API Access', earlyAccess: true }]}
             onNavigate={onClose}
           />
         )}

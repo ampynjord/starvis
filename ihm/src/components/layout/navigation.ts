@@ -24,6 +24,7 @@ export type NavItemDef = {
   to: string;
   icon: React.ElementType;
   label: string;
+  earlyAccess?: boolean;
   auth?: boolean;
   /** Use exact pathname match for active state (avoids prefix collision between sibling routes). */
   exact?: boolean;
@@ -40,7 +41,7 @@ const SHIPS_ITEMS: NavItemDef[] = [
   { to: '/vehicles', icon: Zap, label: 'Vehicle Equipment' },
   { to: '/compare', icon: BarChart3, label: 'Compare' },
   { to: '/ranking', icon: Trophy, label: 'Ranking' },
-  { to: '/loadout-manager', icon: SlidersHorizontal, label: 'Loadout Manager' },
+  { to: '/loadout-manager', icon: SlidersHorizontal, label: 'Loadout Manager', earlyAccess: true },
 ];
 
 const EQUIPMENT_ITEMS: NavItemDef[] = [
@@ -50,19 +51,19 @@ const EQUIPMENT_ITEMS: NavItemDef[] = [
   { to: '/utility', icon: Wrench, label: 'Utility' },
   { to: '/ammo', icon: Zap, label: 'Ammo', exact: true },
   { to: '/sustenance', icon: Utensils, label: 'Sustenance' },
-  { to: '/fps-calculator', icon: SlidersHorizontal, label: 'FPS Calculator' },
+  { to: '/fps-calculator', icon: SlidersHorizontal, label: 'FPS Calculator', earlyAccess: true },
 ];
 
 const ECONOMY_ITEMS: NavItemDef[] = [
   { to: '/commodities', icon: Factory, label: 'Commodities' },
-  { to: '/crafting-calculator', icon: Scroll, label: 'Crafting Calculator' },
-  { to: '/mining-calculator', icon: BarChart3, label: 'Mining Calculator' },
-  { to: '/trade-calculator', icon: TrendingUp, label: 'Trade Calculator' },
+  { to: '/crafting-calculator', icon: Scroll, label: 'Crafting Calculator', earlyAccess: true },
+  { to: '/mining-calculator', icon: BarChart3, label: 'Mining Calculator', earlyAccess: true },
+  { to: '/trade-calculator', icon: TrendingUp, label: 'Trade Calculator', earlyAccess: true },
 ];
 
 const UNIVERSE_ITEMS: NavItemDef[] = [
   { to: '/missions', icon: ClipboardList, label: 'Missions' },
-  { to: '/starmap', icon: MapPin, label: 'Starmap' },
+  { to: '/starmap', icon: MapPin, label: 'Starmap', earlyAccess: true },
   { to: '/factions', icon: Shield, label: 'Factions' },
   { to: '/manufacturers', icon: Wrench, label: 'Manufacturers' },
   { to: '/galactapedia', icon: Globe, label: 'Galactapedia' },
