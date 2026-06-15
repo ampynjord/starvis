@@ -13,6 +13,9 @@ export interface RawCliOptions {
   prodDb?: boolean;
   ctmForce?: boolean;
   ctmConcurrency: string;
+  galleryDelayMs: string;
+  galleryRetries: string;
+  galleryRetryDelayMs: string;
   logLevel?: string;
   verbose?: boolean;
   quiet?: boolean;
@@ -31,6 +34,9 @@ export interface ExtractorCliOptions {
   prodDb: boolean;
   ctmForce: boolean;
   ctmConcurrency: number;
+  galleryDelayMs: number;
+  galleryRetries: number;
+  galleryRetryDelayMs: number;
   logLevel: LogLevel;
   json: boolean;
   color: boolean;
@@ -86,6 +92,9 @@ export function buildProgram(version: string): Command {
     .option('--prod-db', 'use the production database configured via SSH tunnel')
     .option('--ctm-force', 'CTM: re-scrape all ships, even those that already have a URL')
     .option('--ctm-concurrency <n>', 'CTM: number of ships to scrape in parallel', '1')
+    .option('--gallery-delay-ms <n>', 'ship galleries: delay between RSI pledge pages', '6000')
+    .option('--gallery-retries <n>', 'ship galleries: network retries per ship page', '4')
+    .option('--gallery-retry-delay-ms <n>', 'ship galleries: base retry backoff delay', '8000')
     .option('--log-level <level>', 'debug | info | warn | error | silent', parseLogLevel)
     .option('--verbose', 'shortcut for --log-level debug')
     .option('--quiet', 'suppress all logs except explicit command output')
@@ -116,6 +125,7 @@ Examples:
   npx tsx extract.ts --env ptu --modules missions,ships
   npx tsx extract.ts --p4k /path/to/Data.p4k --env custom
   npx tsx extract.ts --modules ctm --ctm-force --ctm-concurrency 4
+  npx tsx extract.ts --modules ship-galleries --gallery-delay-ms 10000
   npx tsx extract.ts --list-modules
   npx tsx extract.ts --check-config --modules ctm
   npx tsx extract.ts --dry-run`,
@@ -139,6 +149,9 @@ export function parseCliOptions(argv: string[], version = '0.0.0'): ExtractorCli
     prodDb: !!raw.prodDb,
     ctmForce: !!raw.ctmForce,
     ctmConcurrency: parsePositiveInt(raw.ctmConcurrency, '--ctm-concurrency'),
+    galleryDelayMs: parsePositiveInt(raw.galleryDelayMs, '--gallery-delay-ms'),
+    galleryRetries: parsePositiveInt(raw.galleryRetries, '--gallery-retries'),
+    galleryRetryDelayMs: parsePositiveInt(raw.galleryRetryDelayMs, '--gallery-retry-delay-ms'),
     logLevel,
     json: !!raw.json,
     color: raw.color ?? true,

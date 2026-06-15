@@ -5,7 +5,7 @@
  * image media from rendered DOM and network responses instead of 3D assets.
  */
 import { chromium } from 'playwright';
-import { CTM_INTER_SHIP_DELAY_MS, RSI_BASE_URL } from './config.js';
+import { RSI_BASE_URL, SHIP_GALLERY_INTER_SHIP_DELAY_MS, SHIP_GALLERY_RETRIES, SHIP_GALLERY_RETRY_BASE_DELAY_MS } from './config.js';
 import type { ShipToScrape } from './ctm-scraper.js';
 
 export interface ShipGalleryImage {
@@ -23,6 +23,9 @@ export interface ShipGalleryToScrape extends ShipToScrape {
 
 export interface ShipGalleryScrapeOptions {
   concurrency?: number;
+  interShipDelayMs?: number;
+  retries?: number;
+  retryBaseDelayMs?: number;
   onProgress?: (msg: string) => void;
 }
 
@@ -34,7 +37,8 @@ const COOKIE_SELECTORS = [
   'button:text("Agree")',
 ];
 
-const MEDIA_URL_RE = /https:\/\/media\.robertsspaceindustries\.com\/[a-z0-9]+\/[A-Za-z0-9_./-]+\.(?:png|jpg|jpeg|webp)/gi;
+const MEDIA_URL_RE =
+  /(?:https:\/\/media\.robertsspaceindustries\.com\/[a-z0-9]+\/[A-Za-z0-9_./()-]+\.(?:png|jpg|jpeg|webp)|\/i\/[a-f0-9]+\/[A-Za-z0-9_./(),-]+\.(?:png|jpg|jpeg|webp))/gi;
 const GALLERY_VARIANTS = [
   'store_slideshow_large_zoom',
   'store_slideshow_large',
@@ -50,12 +54,23 @@ export async function scrapeShipGalleryImages(
   opts: ShipGalleryScrapeOptions = {},
 ): Promise<Map<number, ShipGalleryImage[]>> {
   const { concurrency = 1, onProgress } = opts;
+  const interShipDelayMs = Math.max(0, opts.interShipDelayMs ?? SHIP_GALLERY_INTER_SHIP_DELAY_MS);
+  const retries = Math.max(0, opts.retries ?? SHIP_GALLERY_RETRIES);
+  const retryBaseDelayMs = Math.max(0, opts.retryBaseDelayMs ?? SHIP_GALLERY_RETRY_BASE_DELAY_MS);
   const results = new Map<number, ShipGalleryImage[]>();
   const total = ships.length;
 
   for (let i = 0; i < total; i += Math.max(1, concurrency)) {
     const batch = ships.slice(i, i + Math.max(1, concurrency));
-    const settled = await Promise.allSettled(batch.map((ship) => scrapeOneGalleryPage(ship)));
+    const settled = await Promise.allSettled(
+      batch.map((ship) =>
+        scrapeOneGalleryPageWithRetry(ship, {
+          retries,
+          retryBaseDelayMs,
+          onProgress,
+        }),
+      ),
+    );
     settled.forEach((result, index) => {
       const ship = batch[index];
       const done = Math.min(i + index + 1, total);
@@ -66,14 +81,40 @@ export async function scrapeShipGalleryImages(
         onProgress?.(`[${done}/${total}] Gallery error for ${ship.name}: ${(result.reason as Error).message}`);
       }
     });
-    if (i + batch.length < total) await sleep(CTM_INTER_SHIP_DELAY_MS);
+    if (i + batch.length < total && interShipDelayMs > 0) await sleep(interShipDelayMs);
   }
 
   return results;
 }
 
+async function scrapeOneGalleryPageWithRetry(
+  ship: ShipGalleryToScrape,
+  opts: Pick<ShipGalleryScrapeOptions, 'onProgress' | 'retries' | 'retryBaseDelayMs'>,
+): Promise<ShipGalleryImage[]> {
+  const retries = opts.retries ?? SHIP_GALLERY_RETRIES;
+  const retryBaseDelayMs = opts.retryBaseDelayMs ?? SHIP_GALLERY_RETRY_BASE_DELAY_MS;
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await scrapeOneGalleryPage(ship);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      if (attempt >= retries) break;
+
+      const delay = retryBaseDelayMs * (attempt + 1);
+      opts.onProgress?.(
+        `Gallery retry ${attempt + 1}/${retries} for ${ship.name} after network error: ${lastError.message}. Waiting ${Math.round(delay / 1000)}s`,
+      );
+      await sleep(delay);
+    }
+  }
+
+  throw lastError ?? new Error(`Unknown gallery scraping error for ${ship.name}`);
+}
+
 async function scrapeOneGalleryPage(ship: ShipGalleryToScrape): Promise<ShipGalleryImage[]> {
-  const fullUrl = `${RSI_BASE_URL}${ship.rsiUrl}`;
+  const fullUrl = normalizePageUrl(ship.rsiUrl);
   const candidates = new Map<string, ShipGalleryImage>();
 
   const browser = await chromium.launch({ headless: true });
@@ -139,6 +180,11 @@ async function scrapeOneGalleryPage(ship: ShipGalleryToScrape): Promise<ShipGall
   return [...candidates.values()].map((image, index) => ({ ...image, position: index })).slice(0, 80);
 }
 
+function normalizePageUrl(url: string): string {
+  if (url.startsWith('http')) return url;
+  return `${RSI_BASE_URL}${url.startsWith('/') ? '' : '/'}${url}`;
+}
+
 function looksRelevantResponse(url: string): boolean {
   return url.includes('robertsspaceindustries.com') || url.includes('media.robertsspaceindustries.com') || url.includes('pledge-store');
 }
@@ -182,7 +228,7 @@ function collectFromText(text: string, out: Map<string, ShipGalleryImage>): void
 function collectImageUrl(url: string, out: Map<string, ShipGalleryImage>, meta?: Partial<ShipGalleryImage>): void {
   const normalized = normalizeMediaUrl(url);
   if (!normalized || !isGalleryCandidate(normalized)) return;
-  const mediaKey = normalized.match(/media\.robertsspaceindustries\.com\/([a-z0-9]+)\//i)?.[1] ?? normalized;
+  const mediaKey = getMediaKey(normalized);
   const existing = out.get(mediaKey);
   const score = galleryScore(normalized);
   if (existing && galleryScore(existing.url) >= score) return;
@@ -204,6 +250,14 @@ function normalizeMediaUrl(url: string | null | undefined): string | null {
   return clean.startsWith('http') ? clean : null;
 }
 
+function getMediaKey(url: string): string {
+  return (
+    url.match(/media\.robertsspaceindustries\.com\/([a-z0-9]+)\//i)?.[1] ??
+    url.match(/robertsspaceindustries\.com\/i\/([a-f0-9]+)\//i)?.[1] ??
+    url
+  );
+}
+
 function firstImageVariant(images: Record<string, unknown>, variants: string[]): string | null {
   for (const variant of variants) {
     const value = images[variant];
@@ -213,17 +267,31 @@ function firstImageVariant(images: Record<string, unknown>, variants: string[]):
 }
 
 function isGalleryCandidate(url: string): boolean {
-  if (!url.includes('media.robertsspaceindustries.com')) return false;
   const lower = url.toLowerCase();
-  if (lower.includes('manufacturer_logo') || lower.includes('/avatar.') || lower.includes('/icon.') || lower.includes('/logo.'))
+  if (
+    lower.startsWith('data:') ||
+    lower.includes('empty-ship') ||
+    lower.includes('manufacturer_logo') ||
+    lower.includes('/avatar.') ||
+    lower.includes('/icon.') ||
+    lower.includes('/logo.')
+  ) {
     return false;
-  return GALLERY_VARIANTS.some((variant) => lower.includes(`/${variant}.`)) || lower.includes('/store_slideshow_');
+  }
+
+  if (lower.includes('media.robertsspaceindustries.com')) {
+    return GALLERY_VARIANTS.some((variant) => lower.includes(`/${variant}.`)) || lower.includes('/store_slideshow_');
+  }
+
+  return lower.includes('robertsspaceindustries.com/i/') && lower.endsWith('/source.webp');
 }
 
 function galleryScore(url: string): number {
   const lower = url.toLowerCase();
   const index = GALLERY_VARIANTS.findIndex((variant) => lower.includes(`/${variant}.`));
-  return index === -1 ? 0 : GALLERY_VARIANTS.length - index;
+  if (index !== -1) return GALLERY_VARIANTS.length - index;
+  const width = Number.parseInt(lower.match(/resize\((\d+),/)?.[1] ?? '0', 10);
+  return width > 0 ? width / 100 : 0;
 }
 
 function thumbnailFromUrl(url: string): string | null {

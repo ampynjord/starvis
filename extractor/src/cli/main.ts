@@ -96,6 +96,9 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       rsiPool: pool,
       ctmForce: runtime.ctmForce,
       ctmConcurrency: runtime.ctmConcurrency,
+      shipGalleryDelayMs: runtime.galleryDelayMs,
+      shipGalleryRetries: runtime.galleryRetries,
+      shipGalleryRetryBaseDelayMs: runtime.galleryRetryDelayMs,
     });
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);

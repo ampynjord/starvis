@@ -55,6 +55,9 @@ Then use matching DB values in `extractor/.env.dev`.
 | `P4K_PTU_PATH` | Path to the PTU `Data.p4k`. Used with `--env ptu`. |
 | `P4K_PATH` | Generic fallback path when channel-specific paths are empty. |
 | `CTM_CACHE_DIR` | CTM model cache directory. Default: `./ctm-cache`. |
+| `SHIP_GALLERY_INTER_SHIP_DELAY_MS` | Delay between official RSI ship gallery page loads. Default: `6000`. |
+| `SHIP_GALLERY_RETRIES` | Network retries per official RSI ship gallery page. Default: `4`. |
+| `SHIP_GALLERY_RETRY_BASE_DELAY_MS` | Base retry backoff for gallery scraping. Default: `8000`. |
 | `LOG_LEVEL` | `debug`, `info`, `warn`, `error`, or `silent`. |
 
 Typical Windows paths:
@@ -92,6 +95,9 @@ npx tsx extractor/extract.ts [options]
 | `--game-version <ver>` | Manual public game version label, for example `4.7.2`. | auto-detected |
 | `--dry-run` | Parse and report without writing to DB. | false |
 | `--prod-db` | Load production DB settings and use the production tunnel port. | false |
+| `--gallery-delay-ms <n>` | Delay between official RSI ship gallery page loads. | `6000` |
+| `--gallery-retries <n>` | Network retries per official RSI ship gallery page. | `4` |
+| `--gallery-retry-delay-ms <n>` | Base retry backoff for gallery scraping. | `8000` |
 | `--log-level <level>` | `debug`, `info`, `warn`, `error`, or `silent`. | `info` |
 | `--verbose` | Shortcut for `--log-level debug`. | false |
 | `--quiet` | Disable normal CLI logs. | false |

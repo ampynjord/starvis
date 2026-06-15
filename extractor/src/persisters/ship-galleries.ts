@@ -6,7 +6,13 @@ import { type ShipGalleryToScrape, scrapeShipGalleryImages } from '../ship-galle
 
 export async function saveOfficialShipGalleries(
   conn: PoolClient,
-  opts: { force?: boolean; concurrency?: number },
+  opts: {
+    force?: boolean;
+    concurrency?: number;
+    interShipDelayMs?: number;
+    retries?: number;
+    retryBaseDelayMs?: number;
+  },
   onProgress?: (msg: string) => void,
 ): Promise<number> {
   const { force = false, concurrency = 1 } = opts;
@@ -50,7 +56,13 @@ export async function saveOfficialShipGalleries(
   }));
   onProgress?.(`Ship galleries: scraping ${ships.length} RSI pledge page${ships.length !== 1 ? 's' : ''}`);
 
-  const galleries = await scrapeShipGalleryImages(ships, { concurrency, onProgress });
+  const galleries = await scrapeShipGalleryImages(ships, {
+    concurrency,
+    interShipDelayMs: opts.interShipDelayMs,
+    retries: opts.retries,
+    retryBaseDelayMs: opts.retryBaseDelayMs,
+    onProgress,
+  });
   let saved = 0;
   for (const [shipMatrixId, images] of galleries) {
     await conn.query('DELETE FROM rsi.ship_galleries WHERE ship_matrix_id = $1', [shipMatrixId]);
@@ -87,15 +99,18 @@ export async function saveOfficialShipGalleries(
 async function ensureShipGalleryTable(conn: PoolClient): Promise<void> {
   await conn.query(`
     CREATE TABLE IF NOT EXISTS rsi.ship_galleries (
-      id SERIAL PRIMARY KEY,
-      ship_matrix_id INTEGER NOT NULL REFERENCES rsi.ship_matrix(id) ON DELETE CASCADE,
+      id SERIAL NOT NULL,
+      ship_matrix_id INTEGER NOT NULL,
       url TEXT NOT NULL,
       thumbnail_url TEXT,
       title VARCHAR(255),
       kind VARCHAR(50) NOT NULL DEFAULT 'official-gallery',
       position INTEGER NOT NULL DEFAULT 0,
       raw_json JSONB,
-      synced_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      synced_at TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      CONSTRAINT ship_galleries_pkey PRIMARY KEY (id),
+      CONSTRAINT ship_galleries_ship_matrix_id_fkey
+        FOREIGN KEY (ship_matrix_id) REFERENCES rsi.ship_matrix(id) ON DELETE CASCADE ON UPDATE CASCADE,
       UNIQUE (ship_matrix_id, url)
     )
   `);
