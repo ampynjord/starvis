@@ -48,6 +48,7 @@ const GALLERY_VARIANTS = [
   'source',
 ];
 const THUMB_VARIANTS = ['store_slideshow_small', 'slideshow_pager', 'product_thumb_large', 'store_small'];
+const MIN_PRESENTABLE_GALLERY_WIDTH = 700;
 
 export async function scrapeShipGalleryImages(
   ships: ShipGalleryToScrape[],
@@ -128,6 +129,7 @@ async function scrapeOneGalleryPage(ship: ShipGalleryToScrape): Promise<ShipGall
     page.on('response', async (response) => {
       const url = response.url();
       if (!looksRelevantResponse(url)) return;
+      collectImageUrl(url, candidates);
       try {
         const contentType = response.headers()['content-type'] ?? '';
         if (contentType.includes('application/json')) {
@@ -227,14 +229,28 @@ function collectFromText(text: string, out: Map<string, ShipGalleryImage>): void
 
 function collectImageUrl(url: string, out: Map<string, ShipGalleryImage>, meta?: Partial<ShipGalleryImage>): void {
   const normalized = normalizeMediaUrl(url);
-  if (!normalized || !isGalleryCandidate(normalized)) return;
+  if (!normalized || !isImageCandidate(normalized)) return;
   const mediaKey = getMediaKey(normalized);
   const existing = out.get(mediaKey);
+  const normalizedThumb = meta?.thumbnailUrl ? normalizeMediaUrl(meta.thumbnailUrl) : null;
+  const thumbnailUrl =
+    normalizedThumb && isImageCandidate(normalizedThumb) ? thumbnailFromUrl(normalizedThumb) : thumbnailFromUrl(normalized);
+
+  if (!isPresentableGalleryImage(normalized)) {
+    if (existing && !existing.thumbnailUrl) {
+      existing.thumbnailUrl = thumbnailUrl ?? normalized;
+    }
+    return;
+  }
+
   const score = galleryScore(normalized);
-  if (existing && galleryScore(existing.url) >= score) return;
+  if (existing && galleryScore(existing.url) >= score) {
+    if (!existing.thumbnailUrl && thumbnailUrl) existing.thumbnailUrl = thumbnailUrl;
+    return;
+  }
   out.set(mediaKey, {
     url: normalized,
-    thumbnailUrl: meta?.thumbnailUrl ? normalizeMediaUrl(meta.thumbnailUrl) : thumbnailFromUrl(normalized),
+    thumbnailUrl,
     title: meta?.title ?? null,
     kind: meta?.kind ?? 'official-gallery',
     position: out.size,
@@ -266,7 +282,7 @@ function firstImageVariant(images: Record<string, unknown>, variants: string[]):
   return null;
 }
 
-function isGalleryCandidate(url: string): boolean {
+function isImageCandidate(url: string): boolean {
   const lower = url.toLowerCase();
   if (
     lower.startsWith('data:') ||
@@ -286,15 +302,39 @@ function isGalleryCandidate(url: string): boolean {
   return lower.includes('robertsspaceindustries.com/i/') && lower.endsWith('/source.webp');
 }
 
+function isPresentableGalleryImage(url: string): boolean {
+  const lower = url.toLowerCase();
+  if (lower.includes('media.robertsspaceindustries.com')) {
+    return GALLERY_VARIANTS.some((variant) => lower.includes(`/${variant}.`)) || lower.includes('/store_slideshow_');
+  }
+
+  if (lower.includes('robertsspaceindustries.com/i/')) {
+    const width = getResizeWidth(lower);
+    return width === null || width >= MIN_PRESENTABLE_GALLERY_WIDTH;
+  }
+
+  return false;
+}
+
 function galleryScore(url: string): number {
   const lower = url.toLowerCase();
   const index = GALLERY_VARIANTS.findIndex((variant) => lower.includes(`/${variant}.`));
   if (index !== -1) return GALLERY_VARIANTS.length - index;
-  const width = Number.parseInt(lower.match(/resize\((\d+),/)?.[1] ?? '0', 10);
+  const width = getResizeWidth(lower) ?? 0;
   return width > 0 ? width / 100 : 0;
 }
 
+function getResizeWidth(url: string): number | null {
+  const match = url.match(/resize\((\d+),/);
+  if (!match) return null;
+  const width = Number.parseInt(match[1], 10);
+  return Number.isFinite(width) ? width : null;
+}
+
 function thumbnailFromUrl(url: string): string | null {
+  if (url.includes('robertsspaceindustries.com/i/')) {
+    return url.replace(/\/source\.webp$/, '/store_slideshow_small.webp');
+  }
   return url.replace(
     /\/(?:store_slideshow_large_zoom|store_slideshow_large|slideshow_wide|wallpaper_3840x2160|source)\./,
     '/store_slideshow_small.',
