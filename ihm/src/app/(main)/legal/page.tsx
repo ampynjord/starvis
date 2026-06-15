@@ -8,11 +8,11 @@ function env(name: string, fallback: string): string {
   return value || fallback;
 }
 
-const CONTACT_EMAIL = env('NEXT_PUBLIC_CONTACT_EMAIL', env('CONTACT_EMAIL', 'contact@example.com'));
+const CONTACT_METHOD = env('LEGAL_CONTACT_METHOD', 'Use the in-app support or legal request channel.');
 const PUBLISHER_NAME = env('LEGAL_PUBLISHER_NAME', 'ampynjord');
 const PUBLISHER_STATUS = env('LEGAL_PUBLISHER_STATUS', 'Individual publisher');
-const PUBLISHER_ADDRESS = env('LEGAL_PUBLISHER_ADDRESS', 'Available on legitimate legal request through the contact email.');
-const PUBLISHER_PHONE = env('LEGAL_PUBLISHER_PHONE', 'Available on legitimate legal request through the contact email.');
+const PUBLISHER_ADDRESS = env('LEGAL_PUBLISHER_ADDRESS', 'Available on legitimate legal request.');
+const PUBLISHER_PHONE = env('LEGAL_PUBLISHER_PHONE', 'Available on legitimate legal request.');
 const HOST_NAME = env('LEGAL_HOST_NAME', 'EU VPS hosting provider');
 const HOST_ADDRESS = env('LEGAL_HOST_ADDRESS', 'European Union');
 const HOST_PHONE = env('LEGAL_HOST_PHONE', 'Available from the hosting provider legal notice.');
@@ -80,14 +80,7 @@ export default function LegalPage() {
             { label: 'Publisher', value: PUBLISHER_NAME },
             { label: 'Status', value: PUBLISHER_STATUS },
             { label: 'Address', value: PUBLISHER_ADDRESS },
-            {
-              label: 'Contact',
-              value: (
-                <a href={`mailto:${CONTACT_EMAIL}`} className="text-cyan-500 underline underline-offset-2 hover:text-cyan-300">
-                  {CONTACT_EMAIL}
-                </a>
-              ),
-            },
+            { label: 'Contact', value: CONTACT_METHOD },
             { label: 'Phone', value: PUBLISHER_PHONE },
             { label: 'Hosting provider', value: HOST_NAME },
             { label: 'Host address', value: HOST_ADDRESS },
@@ -142,7 +135,7 @@ export default function LegalPage() {
           the RSI Ship Matrix, Galactapedia, Comm-links, Starmap and public RSI organization pages.
         </P>
         <P>
-          If a right holder requests removal or adjustment of specific content, contact {CONTACT_EMAIL}; the request
+          If a right holder requests removal or adjustment of specific content, use the legal contact channel; the request
           will be reviewed and handled promptly.
         </P>
       </Section>
@@ -163,11 +156,7 @@ export default function LegalPage() {
       <Section title="Privacy policy - GDPR">
         <h3 className="pt-1 text-xs font-semibold uppercase tracking-wider text-slate-300">Controller and contact</h3>
         <P>
-          The data controller is {PUBLISHER_NAME}. For privacy requests, contact{' '}
-          <a href={`mailto:${CONTACT_EMAIL}`} className="text-cyan-500 underline underline-offset-2 hover:text-cyan-300">
-            {CONTACT_EMAIL}
-          </a>
-          .
+          The data controller is {PUBLISHER_NAME}. For privacy requests, use the legal contact channel.
         </P>
 
         <h3 className="pt-2 text-xs font-semibold uppercase tracking-wider text-slate-300">Data categories</h3>
@@ -223,7 +212,7 @@ export default function LegalPage() {
         <h3 className="pt-2 text-xs font-semibold uppercase tracking-wider text-slate-300">Your rights</h3>
         <P>
           You may request access, rectification, erasure, portability, limitation or objection where applicable.
-          Account deletion is available from the profile page. For other requests, contact {CONTACT_EMAIL}. You may
+          Account deletion is available from the profile page. For other requests, use the legal contact channel. You may
           also lodge a complaint with the CNIL:{' '}
           <a href="https://www.cnil.fr" target="_blank" rel="noreferrer" className="text-cyan-500 underline underline-offset-2 hover:text-cyan-300">
             www.cnil.fr
