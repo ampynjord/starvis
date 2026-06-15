@@ -140,9 +140,16 @@ export async function saveShopsData(ctx: PersistContext): Promise<{ shops: numbe
     );
   }
 
-  // shop_inventory is not populated from P4K (server-managed data)
-  // Preserve existing community-contributed inventory data (no DELETE here)
+  // shop_inventory is not populated from extracted game files yet. Remove stale
+  // manual/community rows for this environment so the API never exposes guessed inventory.
+  const { rowCount: deletedInventoryRows } = await conn.query(
+    `DELETE FROM game.shop_inventory si
+      USING game.shops s
+      WHERE si.shop_id = s.id
+        AND s.env = $1`,
+    [env],
+  );
 
-  onProgress?.(`Shops: ${savedShops}/${shops.length} saved (inventory is community-sourced, not wiped)`);
+  onProgress?.(`Shops: ${savedShops}/${shops.length} saved; ${deletedInventoryRows ?? 0} manual inventory rows removed`);
   return { shops: savedShops, inventory: 0 };
 }

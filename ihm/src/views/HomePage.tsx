@@ -132,6 +132,13 @@ const PLATFORM_PILLARS = [
     accent: 'text-cyan-400',
   },
   {
+    to: '/ai',
+    icon: BrainCircuit,
+    label: 'AI Layer',
+    sub: 'Natural-language access to Starvis tools and data',
+    accent: 'text-violet-400',
+  },
+  {
     to: '/developer',
     icon: Code2,
     label: 'External API',
@@ -144,6 +151,13 @@ const PLATFORM_PILLARS = [
     label: 'Discord Bot',
     sub: 'Slash commands connected to Starvis data',
     accent: 'text-blue-400',
+  },
+  {
+    to: '/roadmap',
+    icon: Clock,
+    label: 'Roadmap',
+    sub: 'What is stable, early access and planned next',
+    accent: 'text-amber-400',
   },
 ];
 
@@ -388,7 +402,7 @@ export default function HomePage() {
             Starvis is built to reduce the need for countless disconnected Star Citizen tools. The same extracted data feeds the web interface, calculators, corporation workflows,
             Discord commands, external API and AI assistant.
           </p>
-          <div className="mt-4 grid gap-3 md:grid-cols-3">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             {PLATFORM_PILLARS.map(({ to, icon: Icon, label, sub, accent }) => (
               <Link key={to} href={to} className="rounded-sm border border-slate-800 bg-slate-950/35 p-3 transition-colors hover:border-cyan-800/70 hover:bg-slate-950/55">
                 <Icon size={16} className={accent} />
@@ -417,8 +431,8 @@ export default function HomePage() {
             >
               Ask Starvis AI
             </OpenAiButton>
-            <Link href="/developer" className="sci-btn-ghost px-3 py-2 text-xs">
-              API Access
+            <Link href="/ai" className="sci-btn-ghost px-3 py-2 text-xs">
+              AI Roadmap
             </Link>
           </div>
         </div>

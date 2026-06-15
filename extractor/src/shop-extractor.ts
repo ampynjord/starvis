@@ -21,10 +21,6 @@ import type { P4KProvider } from './p4k-provider.js';
 
 const CATEGORY_TO_SHOP_TYPE: Record<string, string> = shopExtractorConfig.categoryToShopType;
 
-// ── Franchise slug fallback names (when DataForge / localization fails) ──────
-
-const FRANCHISE_SLUG_FALLBACK: Record<string, string> = shopExtractorConfig.franchiseSlugFallback;
-
 // ── Location slug direct overrides (filename slug → exact game loc_key) ──────
 // Used when the filename slug doesn't match the location display name slug.
 // loc_keys are stable game constants (localization keys in global.ini).
@@ -114,12 +110,11 @@ export async function extractShopsFromPrefabs(
 
   // 1. Build franchise map from DataForge + resolve display names
   const franchiseMap = buildFranchiseMap(ctx);
-  for (const [slug, entry] of franchiseMap) {
+  for (const entry of franchiseMap.values()) {
     if (entry.locKey) {
       const resolved = locService.resolveKey(entry.locKey);
       if (resolved) entry.name = resolved;
     }
-    if (!entry.name) entry.name = FRANCHISE_SLUG_FALLBACK[slug] ?? null;
   }
 
   // 2. Find all Prefab shop XML files
@@ -160,7 +155,7 @@ export async function extractShopsFromPrefabs(
 
     for (let i = parts.length - 1; i >= 1; i--) {
       const candidate = parts.slice(0, i).join('');
-      if (franchiseMap.has(candidate) || FRANCHISE_SLUG_FALLBACK[candidate]) {
+      if (franchiseMap.has(candidate)) {
         franchiseSlug = candidate;
         locationSlug = parts.slice(i).join('');
         break;
@@ -182,9 +177,9 @@ export async function extractShopsFromPrefabs(
     // Resolve shop type from category folder
     const shopType = CATEGORY_TO_SHOP_TYPE[category] ?? 'general';
 
-    // Resolve display name: DataForge franchise → localization → fallback map → slugified
+    // Resolve display name: DataForge franchise → localization → filename-derived slug.
     const franchiseEntry = franchiseMap.get(franchiseSlug);
-    let name = franchiseEntry?.name ?? FRANCHISE_SLUG_FALLBACK[franchiseSlug] ?? null;
+    let name = franchiseEntry?.name ?? null;
     const franchiseLocKey = franchiseEntry?.locKey || null;
 
     if (!name) {
