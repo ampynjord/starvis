@@ -2,10 +2,14 @@
  * rsi-content-scraper.ts
  *
  * Fetches RSI comm-link and galactapedia pages and extracts the article HTML.
- * RSI pages are server-side rendered so a plain fetch() is sufficient.
  *
- * The extracted HTML is cleaned (scripts/styles removed, relative URLs made
- * absolute) and stored in the `content` column to replace the SC Wiki plain text.
+ * RSI comm-links use "Alexandria" content delivery: the page HTML contains an
+ * inline `const s3Url = '...'` that points to a JSON-like HTML fragment made of
+ * Vue web-components (<g-article body="...">, <g-illustration :simple-image="...">,
+ * <g-introduction :info="{...}">). This file parses those components to reassemble
+ * a clean HTML document suitable for display in Starvis.
+ *
+ * Galactapedia pages still use server-side rendered HTML with known div classes.
  */
 
 import logger from './logger.js';
@@ -14,67 +18,20 @@ const RSI_BASE = 'https://robertsspaceindustries.com';
 const USER_AGENT = 'Mozilla/5.0 (compatible; StarvisBot/1.0; +https://starvis.ampynjord.bzh)';
 const REQUEST_TIMEOUT_MS = 15_000;
 
-// ── HTML extraction ───────────────────────────────────────────────────────────
+// ── HTML helpers ──────────────────────────────────────────────────────────────
 
-/**
- * Extracts the inner HTML of the first `<div>` element whose `class` attribute
- * contains `className` as a whole word. Handles arbitrary nesting depth by
- * counting div open/close tokens.
- */
-function findDivInnerHtml(html: string, className: string): string | null {
-  let searchFrom = 0;
-
-  while (searchFrom < html.length) {
-    // Find next <div ...>
-    const divOpen = html.indexOf('<div', searchFrom);
-    if (divOpen === -1) return null;
-
-    const tagClose = html.indexOf('>', divOpen);
-    if (tagClose === -1) return null;
-
-    const fullTag = html.slice(divOpen, tagClose + 1);
-
-    const classMatch = /\bclass="([^"]*)"/i.exec(fullTag);
-    const hasClass = classMatch ? classMatch[1].split(/\s+/).includes(className) : false;
-
-    const contentStart = tagClose + 1;
-
-    if (!hasClass) {
-      searchFrom = divOpen + 4;
-      continue;
-    }
-
-    // Found the target div — now walk forward counting div depth
-    let pos = contentStart;
-    let depth = 1;
-
-    while (pos < html.length && depth > 0) {
-      const nextOpen = html.indexOf('<div', pos);
-      const nextClose = html.indexOf('</div>', pos);
-
-      if (nextOpen !== -1 && (nextClose === -1 || nextOpen < nextClose)) {
-        // Peek ahead to confirm it's not a self-closing <div/>
-        const peekClose = html.indexOf('>', nextOpen);
-        if (peekClose !== -1 && html[peekClose - 1] !== '/') {
-          depth++;
-        }
-        pos = nextOpen + 4;
-      } else if (nextClose !== -1) {
-        depth--;
-        if (depth === 0) {
-          return html.slice(contentStart, nextClose);
-        }
-        pos = nextClose + 6;
-      } else {
-        break;
-      }
-    }
-
-    // Didn't find matching close — try next occurrence
-    searchFrom = divOpen + 4;
-  }
-
-  return null;
+function htmlDecode(str: string): string {
+  return str
+    .replace(/&quot;/g, '"')
+    .replace(/&#34;/g, '"')
+    .replace(/&amp;/g, '&')
+    .replace(/&#38;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&#60;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#62;/g, '>')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'");
 }
 
 /** Rewrite relative /path → absolute RSI URL in src and href attributes. */
@@ -93,36 +50,132 @@ function removeNonContent(html: string): string {
     .replace(/<!--[\s\S]*?-->/g, '');
 }
 
-/**
- * Remove attributes that aren't needed for display (class, id, data-*, style…)
- * while keeping: src, href, alt, title, width, height.
- */
-function stripStylingAttributes(html: string): string {
-  const KEEP = /^(src|href|alt|title|width|height|target|rel)$/i;
-  return html.replace(/<([a-zA-Z][a-zA-Z0-9]*)((?:\s+[^>]*)?)\s*>/g, (_full, tag, attrs) => {
-    if (!attrs?.trim()) return `<${tag}>`;
-    const kept = (attrs as string).replace(/\s+([a-zA-Z:_-]+)(?:="[^"]*"|='[^']*'|=[^\s>]*)?/g, (attrFull, attrName) => {
-      return KEEP.test(attrName as string) ? attrFull : '';
-    });
-    return `<${tag}${kept}>`;
-  });
-}
-
 function cleanHtml(raw: string): string {
   let html = removeNonContent(raw);
   html = absolutifyUrls(html);
-  html = stripStylingAttributes(html);
-  // Collapse excessive blank lines
   html = html.replace(/(\s*\n){3,}/g, '\n\n').trim();
   return html;
 }
 
-// ── Fetch helpers ─────────────────────────────────────────────────────────────
+// ── Alexandria content parser ─────────────────────────────────────────────────
+
+/**
+ * Parses RSI Alexandria HTML fragments (Vue web-components) and reassembles
+ * them into clean displayable HTML.
+ *
+ * Component types handled:
+ *   <g-introduction :info="{title,subtitle,contents:[HTML]}">
+ *   <g-article body="<h4>...</h4><p>...">
+ *   <g-illustration :simple-image="{originalFormat:{desktop:'/i/...'}, alt:'...'}">
+ */
+function extractAlexandriaContent(html: string): string | null {
+  const parts: string[] = [];
+
+  // g-introduction: intro paragraph(s) from :info.contents
+  for (const m of html.matchAll(/:info="([^"]+)"/g)) {
+    try {
+      const info = JSON.parse(htmlDecode(m[1])) as { contents?: unknown[] };
+      if (Array.isArray(info.contents)) {
+        for (const c of info.contents) {
+          if (typeof c === 'string' && c.trim()) {
+            parts.push(htmlDecode(c));
+          }
+        }
+      }
+    } catch {
+      // malformed JSON — skip
+    }
+  }
+
+  // Build a combined list of articles + illustrations in document order
+  // Pattern: body="..." (≥20 chars so we skip empty/false attributes) OR :simple-image="..."
+  for (const m of html.matchAll(/\bbody="([^"]{20,})"|:simple-image="([^"]+)"/g)) {
+    if (m[1] !== undefined) {
+      // g-article body
+      const body = htmlDecode(m[1]);
+      if (body.trim()) parts.push(body);
+    } else if (m[2] !== undefined) {
+      // g-illustration image
+      try {
+        const img = JSON.parse(htmlDecode(m[2])) as {
+          originalFormat?: { desktop?: string };
+          webp?: { desktop?: string };
+          alt?: string;
+        };
+        const url = img.originalFormat?.desktop ?? img.webp?.desktop;
+        if (url) {
+          const absUrl = url.startsWith('/') ? `${RSI_BASE}${url}` : url;
+          parts.push(`<img src="${absUrl}" alt="${img.alt ?? ''}" />`);
+        }
+      } catch {
+        // malformed JSON — skip
+      }
+    }
+  }
+
+  if (parts.length === 0) return null;
+  return cleanHtml(parts.join('\n\n'));
+}
+
+// ── Legacy div-class extractor (for older pages / galactapedia) ───────────────
+
+/**
+ * Extracts the inner HTML of the first `<div>` element whose `class` attribute
+ * contains `className` as a whole word. Handles arbitrary nesting by counting
+ * div open/close tokens.
+ */
+function findDivInnerHtml(html: string, className: string): string | null {
+  let searchFrom = 0;
+
+  while (searchFrom < html.length) {
+    const divOpen = html.indexOf('<div', searchFrom);
+    if (divOpen === -1) return null;
+
+    const tagClose = html.indexOf('>', divOpen);
+    if (tagClose === -1) return null;
+
+    const fullTag = html.slice(divOpen, tagClose + 1);
+    const classMatch = /\bclass="([^"]*)"/i.exec(fullTag);
+    const hasClass = classMatch ? classMatch[1].split(/\s+/).includes(className) : false;
+    const contentStart = tagClose + 1;
+
+    if (!hasClass) {
+      searchFrom = divOpen + 4;
+      continue;
+    }
+
+    let pos = contentStart;
+    let depth = 1;
+
+    while (pos < html.length && depth > 0) {
+      const nextOpen = html.indexOf('<div', pos);
+      const nextClose = html.indexOf('</div>', pos);
+
+      if (nextOpen !== -1 && (nextClose === -1 || nextOpen < nextClose)) {
+        const peekClose = html.indexOf('>', nextOpen);
+        if (peekClose !== -1 && html[peekClose - 1] !== '/') depth++;
+        pos = nextOpen + 4;
+      } else if (nextClose !== -1) {
+        depth--;
+        if (depth === 0) return html.slice(contentStart, nextClose);
+        pos = nextClose + 6;
+      } else {
+        break;
+      }
+    }
+
+    searchFrom = divOpen + 4;
+  }
+
+  return null;
+}
+
+// ── Fetch helper ──────────────────────────────────────────────────────────────
 
 async function fetchHtml(url: string): Promise<string | null> {
   try {
     const res = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT, Accept: 'text/html' },
+      headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,*/*' },
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
     if (!res.ok) {
@@ -140,25 +193,34 @@ async function fetchHtml(url: string): Promise<string | null> {
 
 /**
  * Scrape the article body HTML from an RSI comm-link page.
- * Tries multiple known content container classes in order.
+ *
+ * Modern RSI comm-links load content via the Alexandria CDN (an S3-like URL
+ * embedded as `const s3Url = '...'` in an inline script). We fetch that URL
+ * first and parse the Vue web-component markup.  Older comm-links fall back
+ * to the legacy CSS-class approach.
  */
 export async function scrapeCommLinkContent(rsiUrl: string): Promise<string | null> {
-  const html = await fetchHtml(rsiUrl);
-  if (!html) return null;
+  const pageHtml = await fetchHtml(rsiUrl);
+  if (!pageHtml) return null;
 
-  // RSI comm-links use .body-copy for the article body.
-  // Fall back to .content-block → .article → <article> element.
-  const COMM_LINK_CLASSES = ['body-copy', 'content-block', 'article-content', 'article-body', 'content'];
-
-  for (const cls of COMM_LINK_CLASSES) {
-    const content = findDivInnerHtml(html, cls);
-    if (content && content.trim().length > 150) {
-      return cleanHtml(content);
+  // Modern path: Alexandria CDN
+  const s3Match = /const s3Url\s*=\s*'([^']+)'/.exec(pageHtml);
+  if (s3Match) {
+    const alexandriaHtml = await fetchHtml(s3Match[1]);
+    if (alexandriaHtml) {
+      const content = extractAlexandriaContent(alexandriaHtml);
+      if (content && content.trim().length > 100) return content;
     }
   }
 
-  // Last resort: try to grab the <article> element content
-  const articleMatch = /<article[^>]*>([\s\S]*?)<\/article>/i.exec(html);
+  // Legacy fallback: server-side rendered pages with known div classes
+  const COMM_LINK_CLASSES = ['body-copy', 'content-block', 'article-content', 'article-body', 'content'];
+  for (const cls of COMM_LINK_CLASSES) {
+    const content = findDivInnerHtml(pageHtml, cls);
+    if (content && content.trim().length > 150) return cleanHtml(content);
+  }
+
+  const articleMatch = /<article[^>]*>([\s\S]*?)<\/article>/i.exec(pageHtml);
   if (articleMatch && articleMatch[1].trim().length > 150) {
     return cleanHtml(articleMatch[1]);
   }
@@ -169,18 +231,26 @@ export async function scrapeCommLinkContent(rsiUrl: string): Promise<string | nu
 
 /**
  * Scrape the article body HTML from an RSI Galactapedia page.
+ * Galactapedia still uses server-side rendered HTML.
  */
 export async function scrapeGalactapediaContent(rsiUrl: string): Promise<string | null> {
   const html = await fetchHtml(rsiUrl);
   if (!html) return null;
 
-  const GALACTAPEDIA_CLASSES = ['rsi-article', 'article-content', 'text-content', 'article-body', 'content'];
+  // Try Alexandria first (in case galactapedia also migrated)
+  const s3Match = /const s3Url\s*=\s*'([^']+)'/.exec(html);
+  if (s3Match) {
+    const alexandriaHtml = await fetchHtml(s3Match[1]);
+    if (alexandriaHtml) {
+      const content = extractAlexandriaContent(alexandriaHtml);
+      if (content && content.trim().length > 100) return content;
+    }
+  }
 
+  const GALACTAPEDIA_CLASSES = ['rsi-article', 'article-content', 'text-content', 'article-body', 'content'];
   for (const cls of GALACTAPEDIA_CLASSES) {
     const content = findDivInnerHtml(html, cls);
-    if (content && content.trim().length > 150) {
-      return cleanHtml(content);
-    }
+    if (content && content.trim().length > 150) return cleanHtml(content);
   }
 
   const articleMatch = /<article[^>]*>([\s\S]*?)<\/article>/i.exec(html);
