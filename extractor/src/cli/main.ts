@@ -95,6 +95,7 @@ export async function main(argv = process.argv.slice(2)): Promise<void> {
       env: runtime.env,
       rsiPool: pool,
       ctmForce: runtime.ctmForce,
+      starmapAssetsForce: runtime.starmapAssetsForce,
       ctmConcurrency: runtime.ctmConcurrency,
       shipGalleryDelayMs: runtime.galleryDelayMs,
       shipGalleryRetries: runtime.galleryRetries,

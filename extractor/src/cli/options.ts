@@ -13,6 +13,7 @@ export interface RawCliOptions {
   dryRun?: boolean;
   prodDb?: boolean;
   ctmForce?: boolean;
+  starmapAssetsForce?: boolean;
   concurrency?: string;
   ctmConcurrency?: string;
   galleryDelayMs: string;
@@ -35,6 +36,7 @@ export interface ExtractorCliOptions {
   dryRun: boolean;
   prodDb: boolean;
   ctmForce: boolean;
+  starmapAssetsForce: boolean;
   ctmConcurrency: number;
   galleryDelayMs: number;
   galleryRetries: number;
@@ -93,6 +95,7 @@ export function buildProgram(version: string): Command {
     .option('--dry-run', 'parse P4K and log stats without writing to database')
     .option('--prod-db', 'use the production database configured via SSH tunnel')
     .option('--ctm-force', 'CTM: re-scrape all ships, even those that already have a URL')
+    .option('--starmap-assets-force', 'Starmap assets: rebuild assets for all starmap locations')
     .option('--concurrency <n>', 'shared network scraper concurrency', String(EXTRACTOR_DEFAULTS.ctmConcurrency))
     .option('--ctm-concurrency <n>', 'deprecated alias for --concurrency')
     .option('--gallery-delay-ms <n>', 'ship galleries: delay between RSI pledge pages', String(EXTRACTOR_DEFAULTS.galleryDelayMs))
@@ -157,6 +160,7 @@ export function parseCliOptions(argv: string[], version = '0.0.0'): ExtractorCli
     dryRun: !!raw.dryRun,
     prodDb: !!raw.prodDb,
     ctmForce: !!raw.ctmForce,
+    starmapAssetsForce: !!raw.starmapAssetsForce,
     ctmConcurrency: parsePositiveInt(sharedConcurrency, concurrencyOptionName),
     galleryDelayMs: parsePositiveInt(raw.galleryDelayMs, '--gallery-delay-ms'),
     galleryRetries: parsePositiveInt(raw.galleryRetries, '--gallery-retries'),

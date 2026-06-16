@@ -97,6 +97,7 @@ npx tsx extractor/extract.ts [options]
 | `--game-version <ver>` | Manual public game version label, for example `4.7.2`. | auto-detected |
 | `--dry-run` | Parse and report without writing to DB. | false |
 | `--prod-db` | Load production DB settings and use the production tunnel port. | false |
+| `--starmap-assets-force` | Rebuild `rsi.starmap_locations.assets` for all Starmap locations. | false |
 | `--gallery-delay-ms <n>` | Delay between official RSI ship gallery page loads. | `6000` |
 | `--gallery-retries <n>` | Network retries per official RSI ship gallery page. | `4` |
 | `--gallery-retry-delay-ms <n>` | Base retry backoff for gallery scraping. | `8000` |
@@ -141,6 +142,7 @@ Network modules do not require `Data.p4k`:
 | `galactapedia` | RSI encyclopedia entries. |
 | `comm-links` | RSI Comm-Link articles and images. |
 | `starmap` | RSI Starmap systems, locations and jump points. |
+| `starmap-assets` | Public RSI Starmap asset URL metadata for systems, stars, planets, moons, stations and other locations. Stores URLs/metadata only; it does not copy or redistribute RSI files. |
 | `ctm` | CTM model metadata and cache. This can take around one hour. |
 
 ---
@@ -159,6 +161,9 @@ npx tsx extractor/extract.ts --env ptu
 
 # Network-only RSI sync, no P4K needed
 npx tsx extractor/extract.ts --modules ship-matrix,ship-galleries,galactapedia,comm-links,starmap
+
+# Refresh RSI Starmap and rebuild public asset URL metadata
+npx tsx extractor/extract.ts --modules starmap,starmap-assets --starmap-assets-force
 
 # Network scraping with explicit concurrency
 npx tsx extractor/extract.ts --modules ctm,ship-galleries --concurrency 2

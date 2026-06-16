@@ -1,13 +1,18 @@
 /**
- * STARMAP ASSET SCRAPER → rsi.starmap_locations.assets
+ * STARMAP ASSET SCRAPER -> rsi.starmap_locations.assets
  *
- * Scrapes 3D asset URLs (textures, models, skybox) from the RSI ARK Starmap
- * WebGL application via Playwright response interception and persists them to
- * the assets JSONB column of each system-level starmap_locations row.
+ * Extracts public asset URLs from RSI Starmap API objects and persists them to
+ * rsi.starmap_locations.assets. System-level generic ARK assets are used only
+ * as a fallback; object-level textures/thumbnails stay attached to each body.
  */
 import type { PoolClient } from 'pg';
 import type { GameEnv } from '../module-registry.js';
-import { type StarmapSystem, scrapeStarmapSystemAssets } from '../starmap-asset-scraper.js';
+import {
+  assetCount,
+  extractPublicAssetsFromStarmapObject,
+  type StarmapSystem,
+  scrapeStarmapSystemAssets,
+} from '../starmap-asset-scraper.js';
 
 export async function saveStarmapAssets(
   conn: PoolClient,
@@ -18,7 +23,25 @@ export async function saveStarmapAssets(
   const { force = false, concurrency = 1, waitMs = 6000 } = opts;
   await conn.query('ALTER TABLE rsi.starmap_locations ADD COLUMN IF NOT EXISTS assets JSONB');
 
-  const { rows } = await conn.query<{ rsi_id: string; name: string; system_code: string }>(
+  const { rows: objectRows } = await conn.query<{ id: number; raw_json: unknown }>(
+    `SELECT id, raw_json
+     FROM rsi.starmap_locations
+     WHERE raw_json IS NOT NULL
+       ${force ? '' : 'AND assets IS NULL'}
+     ORDER BY name`,
+  );
+
+  let objectUpdated = 0;
+  for (const row of objectRows) {
+    const assets = extractPublicAssetsFromStarmapObject(row.raw_json);
+    if (assetCount(assets) === 0) continue;
+    await conn.query('UPDATE rsi.starmap_locations SET assets = $1 WHERE id = $2', [JSON.stringify(assets), row.id]);
+    objectUpdated++;
+  }
+
+  onProgress?.(`Starmap assets: updated ${objectUpdated}/${objectRows.length} object(s) from public RSI metadata`);
+
+  const { rows: systemRows } = await conn.query<{ rsi_id: string; name: string; system_code: string }>(
     `SELECT rsi_id, name, system_code
      FROM rsi.starmap_locations
      WHERE type = 'system'
@@ -27,16 +50,14 @@ export async function saveStarmapAssets(
      ORDER BY name`,
   );
 
-  if (!rows.length) {
-    onProgress?.(
-      force ? 'Starmap assets: no systems found' : 'Starmap assets: all systems already have scraped assets — nothing to scrape',
-    );
+  if (!systemRows.length) {
+    onProgress?.(force ? 'Starmap assets: no systems found for generic ARK fallback' : 'Starmap assets: all systems already have assets');
     return;
   }
 
-  onProgress?.(`Starmap assets: scraping ${rows.length} system(s) via Playwright…`);
+  onProgress?.(`Starmap assets: filling generic ARK fallback for ${systemRows.length} system(s)`);
 
-  const systems: StarmapSystem[] = rows.map((r) => ({
+  const systems: StarmapSystem[] = systemRows.map((r) => ({
     code: r.system_code,
     name: r.name,
     rsiId: r.rsi_id,
@@ -44,15 +65,15 @@ export async function saveStarmapAssets(
 
   const results = await scrapeStarmapSystemAssets(systems, { concurrency, waitMs, onProgress });
 
-  let updated = 0;
+  let systemUpdated = 0;
   for (const [code, assets] of results) {
-    const total = assets.textures.length + assets.models.length + assets.skybox.length;
-    if (total === 0) continue;
-    await conn.query(`UPDATE rsi.starmap_locations SET assets = $1 WHERE system_code = $2 AND type = 'system'`, [
+    if (assetCount(assets) === 0) continue;
+    await conn.query('UPDATE rsi.starmap_locations SET assets = $1 WHERE system_code = $2 AND type = $3', [
       JSON.stringify(assets),
       code,
+      'system',
     ]);
-    updated++;
+    systemUpdated++;
   }
-  onProgress?.(`Starmap assets: updated ${updated}/${rows.length} system(s)`);
+  onProgress?.(`Starmap assets: updated ${systemUpdated}/${systemRows.length} system(s) with generic ARK fallback`);
 }
