@@ -33,6 +33,15 @@ type EntityRef = {
 
 type EntityIndexes = {
   byUuid: Map<string, EntityRef>;
+  byClassName: Map<string, EntityRef>;
+  itemMarkClassByUuid: Map<string, string>;
+};
+
+const SHOP_ITEM_CLASS_ALIASES: Record<string, string> = {
+  RSI_Aurora_ES: 'RSI_Aurora_GS_ES',
+  RSI_Aurora_LN: 'RSI_Aurora_GS_LN',
+  RSI_Aurora_LX: 'RSI_Aurora_GS_LX',
+  RSI_Aurora_MR: 'RSI_Aurora_GS_MR',
 };
 
 const LOCATION_WORDS = [
@@ -136,6 +145,42 @@ function shopInventoryUuidToDataForgeUuid(uuid: string): string {
   return `${reordered.slice(0, 4).join('')}-${reordered.slice(4, 6).join('')}-${reordered.slice(6, 8).join('')}-${reordered.slice(8, 10).join('')}-${reordered.slice(10, 16).join('')}`;
 }
 
+const UUID_RE = /^[0-9a-f-]{36}$/i;
+
+export function parseItemMarksText(text: string): Map<string, string> {
+  const result = new Map<string, string>();
+  const tokens = text
+    .split(/\0+/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+
+  for (let i = 1; i < tokens.length; i++) {
+    const uuid = tokens[i];
+    if (!UUID_RE.test(uuid)) continue;
+
+    const rawClassName = tokens[i - 1];
+    const className = rawClassName.match(/[A-Za-z][A-Za-z0-9_]*$/)?.[0];
+    if (!className) continue;
+
+    result.set(uuid.toLowerCase(), className);
+  }
+
+  return result;
+}
+
+async function loadItemMarksIndex(provider: NonNullable<ReturnType<PersistContext['df']['getProvider']>>): Promise<Map<string, string>> {
+  const entries = await provider.findFiles(/Data[/\\]Libs[/\\]RoboTools[/\\]RoboTrucker[/\\]ItemMarks\.xml$/i, 5);
+  const entry = entries[0];
+  if (!entry) return new Map();
+
+  try {
+    const raw = await provider.readFileFromEntry(entry);
+    return parseItemMarksText(raw.toString('utf8'));
+  } catch {
+    return new Map();
+  }
+}
+
 function deriveLocationSlug(parts: string[]): string {
   const normalized = parts.map(normalizeLookupSlug);
   for (let size = 1; size <= Math.min(3, parts.length); size++) {
@@ -186,6 +231,39 @@ function extractRentalPrices(rentalOfferings: unknown[] | null): {
   }
 
   return result;
+}
+
+function minPositiveNumber(a: string | number | null | boolean, b: string | number | null | boolean): number | null {
+  const left = toNumber(a);
+  const right = toNumber(b);
+  const values = [left, right].filter((value): value is number => value !== null && value > 0);
+  if (values.length === 0) return left ?? right;
+  return Math.min(...values);
+}
+
+function maxNumber(a: string | number | null | boolean, b: string | number | null | boolean): number | null {
+  const left = toNumber(a);
+  const right = toNumber(b);
+  if (left === null) return right;
+  if (right === null) return left;
+  return Math.max(left, right);
+}
+
+function mergeInventoryRows(
+  existing: (string | number | null | boolean)[],
+  incoming: (string | number | null | boolean)[],
+): (string | number | null | boolean)[] {
+  const merged = [...existing];
+  merged[4] = minPositiveNumber(existing[4], incoming[4]);
+  merged[5] = minPositiveNumber(existing[5], incoming[5]);
+  merged[6] = maxNumber(existing[6], incoming[6]);
+  merged[7] = maxNumber(existing[7], incoming[7]);
+  merged[8] = minPositiveNumber(existing[8], incoming[8]);
+  merged[9] = minPositiveNumber(existing[9], incoming[9]);
+  merged[10] = minPositiveNumber(existing[10], incoming[10]);
+  merged[11] = minPositiveNumber(existing[11], incoming[11]);
+  merged[13] = maxNumber(existing[13], incoming[13]);
+  return merged;
 }
 
 async function extractShopInventoryFiles(ctx: PersistContext): Promise<ShopInventoryFile[]> {
@@ -260,11 +338,17 @@ async function extractShopInventoryFiles(ctx: PersistContext): Promise<ShopInven
 async function loadEntityIndexes(ctx: PersistContext): Promise<EntityIndexes> {
   const { conn, env } = ctx;
   const byUuid = new Map<string, EntityRef>();
+  const byClassName = new Map<string, EntityRef>();
+  const provider = ctx.df.getProvider();
+  const itemMarkClassByUuid = provider ? await loadItemMarksIndex(provider) : new Map<string, string>();
 
   const addRows = async (kind: InventoryKind, table: string) => {
     const { rows } = await conn.query<{ uuid: string; class_name: string }>(`SELECT uuid, class_name FROM ${table} WHERE env = $1`, [env]);
     for (const row of rows) {
-      if (!byUuid.has(row.uuid)) byUuid.set(row.uuid, { kind, uuid: row.uuid, className: row.class_name });
+      const ref = { kind, uuid: row.uuid, className: row.class_name };
+      if (!byUuid.has(row.uuid)) byUuid.set(row.uuid, ref);
+      const classKey = row.class_name.toLowerCase();
+      if (!byClassName.has(classKey)) byClassName.set(classKey, ref);
     }
   };
 
@@ -273,7 +357,15 @@ async function loadEntityIndexes(ctx: PersistContext): Promise<EntityIndexes> {
   await addRows('item', 'game.items');
   await addRows('commodity', 'game.commodities');
 
-  return { byUuid };
+  return { byUuid, byClassName, itemMarkClassByUuid };
+}
+
+function resolveClassNameEntity(className: string | null, indexes: EntityIndexes): EntityRef | undefined {
+  if (!className) return undefined;
+  const exact = indexes.byClassName.get(className.toLowerCase());
+  if (exact) return exact;
+  const alias = SHOP_ITEM_CLASS_ALIASES[className];
+  return alias ? indexes.byClassName.get(alias.toLowerCase()) : undefined;
 }
 
 function resolveLocMeta(
@@ -421,14 +513,15 @@ export async function saveShopsData(ctx: PersistContext): Promise<{ shops: numbe
   );
 
   const entityIndexes = await loadEntityIndexes(ctx);
+  onProgress?.(`Shops: loaded ${entityIndexes.itemMarkClassByUuid.size} RoboTrucker item marks for shop UUID resolution`);
   const { rows: savedShopRows } = await conn.query<{ id: number; class_name: string }>(
     `SELECT id, class_name FROM game.shops WHERE env = $1`,
     [env],
   );
   const shopIdByClass = new Map(savedShopRows.map((row) => [row.class_name, row.id]));
 
-  const inventoryRows: (string | number | null | boolean)[][] = [];
-  const commodityPriceRows: (string | number | null | boolean)[][] = [];
+  const inventoryRowsByKey = new Map<string, (string | number | null | boolean)[]>();
+  const commodityPriceRowsByKey = new Map<string, (string | number | null | boolean)[]>();
   let unmatchedInventory = 0;
 
   for (const shop of inventoryShops) {
@@ -437,20 +530,26 @@ export async function saveShopsData(ctx: PersistContext): Promise<{ shops: numbe
 
     for (const entry of shop.inventory) {
       const dataForgeUuid = shopInventoryUuidToDataForgeUuid(entry.uuid);
-      const entity = entityIndexes.byUuid.get(entry.uuid) ?? entityIndexes.byUuid.get(dataForgeUuid);
+      const itemMarkClassName =
+        entityIndexes.itemMarkClassByUuid.get(entry.uuid.toLowerCase()) ??
+        entityIndexes.itemMarkClassByUuid.get(dataForgeUuid.toLowerCase()) ??
+        null;
+      const itemMarkEntity = resolveClassNameEntity(itemMarkClassName, entityIndexes);
+      const entity = entityIndexes.byUuid.get(entry.uuid) ?? entityIndexes.byUuid.get(dataForgeUuid) ?? itemMarkEntity;
       const kind = entity?.kind ?? 'unknown';
       const entityUuid = entity?.uuid ?? dataForgeUuid;
-      const className = entity?.className ?? entry.uuid;
+      const className = entity?.className ?? itemMarkClassName ?? entry.uuid;
       const rentalPrices = extractRentalPrices(entry.rentalOfferings);
       const rawJson = JSON.stringify({
         shopInventoryUuid: entry.uuid,
         dataForgeUuid,
+        itemMarkClassName,
         rentalOfferings: entry.rentalOfferings ?? [],
       });
 
       if (!entity) unmatchedInventory += 1;
 
-      inventoryRows.push([
+      const inventoryRow = [
         shopId,
         entityUuid,
         className,
@@ -466,13 +565,22 @@ export async function saveShopsData(ctx: PersistContext): Promise<{ shops: numbe
         'shop_inventory_json',
         entity ? 1.0 : 0.85,
         rawJson,
-      ]);
+      ];
+      const inventoryKey = `${shopId}::${className.toLowerCase()}`;
+      const existingInventoryRow = inventoryRowsByKey.get(inventoryKey);
+      inventoryRowsByKey.set(inventoryKey, existingInventoryRow ? mergeInventoryRows(existingInventoryRow, inventoryRow) : inventoryRow);
 
       if (kind === 'commodity') {
-        commodityPriceRows.push([entityUuid, env, shopId, entry.buyPrice, entry.sellPrice]);
+        const commodityKey = `${entityUuid}::${shopId}`;
+        if (!commodityPriceRowsByKey.has(commodityKey)) {
+          commodityPriceRowsByKey.set(commodityKey, [entityUuid, env, shopId, entry.buyPrice, entry.sellPrice]);
+        }
       }
     }
   }
+
+  const inventoryRows = [...inventoryRowsByKey.values()];
+  const commodityPriceRows = [...commodityPriceRowsByKey.values()];
 
   const savedInventory =
     inventoryRows.length > 0
