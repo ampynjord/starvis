@@ -4,16 +4,16 @@ export function DetailRow({ label, value }: { label: string; value: ReactNode })
   if (value == null || value === '') return null;
   return (
     <div className="flex items-center justify-between gap-4 border-b border-slate-800/60 py-2">
-      <span className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">{label}</span>
-      <span className="text-right text-sm text-slate-300">{value}</span>
+      <span className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-400">{label}</span>
+      <span className="text-right text-sm text-slate-100">{value}</span>
     </div>
   );
 }
 
 export function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-sm border border-slate-800 bg-slate-950/70 px-2 py-2">
-      <p className="font-mono-sc text-[9px] uppercase text-slate-600">{label}</p>
+    <div className="rounded-sm border border-slate-700/80 bg-slate-950/85 px-2 py-2">
+      <p className="font-mono-sc text-[9px] uppercase text-slate-400">{label}</p>
       <p className="font-orbitron text-sm text-cyan-300">{value}</p>
     </div>
   );
@@ -21,24 +21,24 @@ export function Metric({ label, value }: { label: string; value: string }) {
 
 export function HudMetric({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
-    <div className="rounded-sm border border-slate-800 bg-slate-950/55 px-2 py-2">
-      <p className="flex items-center gap-1 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-        <span className="text-cyan-500">{icon}</span>
+    <div className="rounded-sm border border-slate-700/80 bg-slate-950/85 px-2 py-2">
+      <p className="flex items-center gap-1 font-mono-sc text-[9px] uppercase tracking-widest text-slate-400">
+        <span className="text-cyan-300">{icon}</span>
         {label}
       </p>
-      <p className="mt-0.5 font-orbitron text-sm text-slate-200">{value}</p>
+      <p className="mt-0.5 font-orbitron text-sm text-slate-50">{value}</p>
     </div>
   );
 }
 
 export function InfoTile({ icon, label, value }: { icon: ReactNode; label: string; value: ReactNode }) {
   return (
-    <div className="rounded-sm border border-slate-800 bg-slate-950/60 px-3 py-2">
-      <p className="flex items-center gap-1 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-        <span className="text-cyan-500">{icon}</span>
+    <div className="rounded-sm border border-slate-700/80 bg-slate-950/85 px-3 py-2">
+      <p className="flex items-center gap-1 font-mono-sc text-[9px] uppercase tracking-widest text-slate-400">
+        <span className="text-cyan-300">{icon}</span>
         {label}
       </p>
-      <p className="mt-1 font-orbitron text-sm text-slate-200">{value}</p>
+      <p className="mt-1 font-orbitron text-sm text-slate-50">{value}</p>
     </div>
   );
 }
@@ -52,11 +52,11 @@ export function StatBar({ icon, label, value, color }: { icon: ReactNode; label:
   return (
     <div className="py-1.5">
       <div className="mb-1 flex items-center justify-between">
-        <span className="flex items-center gap-1 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-          <span className="text-cyan-500">{icon}</span>
+        <span className="flex items-center gap-1 font-mono-sc text-[9px] uppercase tracking-widest text-slate-400">
+          <span className="text-cyan-300">{icon}</span>
           {label}
         </span>
-        <span className="font-orbitron text-[10px] text-slate-300">{clamped == null ? 'N/A' : clamped.toFixed(1)}</span>
+        <span className="font-orbitron text-[10px] text-slate-100">{clamped == null ? 'N/A' : clamped.toFixed(1)}</span>
       </div>
       <div className="flex h-1.5 gap-0.5">
         {segments.map((segment) => (

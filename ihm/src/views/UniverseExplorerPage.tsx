@@ -401,6 +401,18 @@ function nodeSearchText(node: StarmapNode) {
   return [node.name, node.systemCode, node.systemName, node.type, node.faction, node.p4kName].filter(Boolean).join(' ').toLowerCase();
 }
 
+function findBestSearchMatch(nodes: StarmapNode[], query: string) {
+  const q = query.trim().toLowerCase();
+  if (q.length < 2) return null;
+  const matches = nodes.filter((node) => nodeSearchText(node).includes(q));
+  return (
+    matches.find((node) => node.name.toLowerCase() === q || node.systemCode.toLowerCase() === q) ??
+    matches.find((node) => node.type === 'system') ??
+    matches[0] ??
+    null
+  );
+}
+
 function formatNumber(value: number | null) {
   return value == null ? 'N/A' : value.toFixed(1);
 }
@@ -444,8 +456,8 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
     if (!host) return;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x02050a);
-    scene.fog = new THREE.FogExp2(0x02050a, mode === 'galaxy' ? 0.008 : 0.025);
+    scene.background = new THREE.Color(0x030914);
+    scene.fog = new THREE.FogExp2(0x030914, mode === 'galaxy' ? 0.006 : 0.016);
 
     const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 1200);
     camera.position.set(mode === 'galaxy' ? 0 : 0, mode === 'galaxy' ? 95 : 26, mode === 'galaxy' ? 150 : 34);
@@ -461,8 +473,8 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
     controls.minDistance = mode === 'galaxy' ? 28 : 8;
     controls.maxDistance = mode === 'galaxy' ? 360 : 90;
 
-    const ambient = new THREE.AmbientLight(0x8fcfff, 0.35);
-    const key = new THREE.PointLight(0x9ee7ff, 2.4, 250);
+    const ambient = new THREE.AmbientLight(0xb8eaff, 0.58);
+    const key = new THREE.PointLight(0xbdf2ff, 3.1, 280);
     key.position.set(16, 20, 12);
     scene.add(ambient, key);
 
@@ -491,7 +503,7 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
         roughness: node.type === 'star' ? 0.38 : 0.9,
         metalness: node.type === 'station' ? 0.35 : 0.05,
         emissive: new THREE.Color(objectColor(node)),
-        emissiveIntensity: node.type === 'star' || node.type === 'system' ? 0.32 : 0.08,
+        emissiveIntensity: node.type === 'star' || node.type === 'system' ? 0.44 : 0.14,
       });
       const geometry =
         node.type === 'station'
@@ -534,7 +546,7 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
       if (mode === 'system' && root && node.parentId) {
         const parentObject = objectByNode.get(node.parentId);
         if (parentObject && node.type !== 'star') {
-          const orbit = createOrbitLine(parentObject.position, mesh.position, objectColor(node), selectedId === node.id ? 0.42 : 0.18);
+          const orbit = createOrbitLine(parentObject.position, mesh.position, objectColor(node), selectedId === node.id ? 0.58 : 0.28);
           scene.add(orbit);
           disposables.push(orbit);
         }
@@ -550,7 +562,7 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
         }
       }
 
-      const label = createLabel(node.name, selectedId === node.id ? '#e0f2fe' : '#8fb6c9');
+      const label = createLabel(node.name, selectedId === node.id ? '#f0fdff' : '#b7e7f6');
       label.position.copy(mesh.position).add(new THREE.Vector3(0, radius + 0.55, 0));
       label.scale.setScalar(mode === 'galaxy' ? 4.5 : 1.3);
       scene.add(label);
@@ -632,7 +644,7 @@ function createStarfield(count: number, radius: number) {
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  const material = new THREE.PointsMaterial({ color: 0x9bdcff, size: 0.12, transparent: true, opacity: 0.72, depthWrite: false });
+  const material = new THREE.PointsMaterial({ color: 0xb7edff, size: 0.13, transparent: true, opacity: 0.82, depthWrite: false });
   return new THREE.Points(geometry, material);
 }
 
@@ -692,7 +704,7 @@ function createOrbitLine(center: THREE.Vector3, point: THREE.Vector3, color: num
   const curve = new THREE.EllipseCurve(0, 0, radius, radius, 0, Math.PI * 2);
   const points = curve.getPoints(160).map((p) => new THREE.Vector3(center.x + p.x, center.y, center.z + p.y));
   const geometry = new THREE.BufferGeometry().setFromPoints(points);
-  return new THREE.LineLoop(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity }));
+  return new THREE.LineLoop(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: Math.min(0.78, opacity + 0.12) }));
 }
 
 function createFlatRing(radius: number, color: number, opacity: number) {
@@ -706,7 +718,7 @@ function createRouteLine(from: THREE.Vector3, to: THREE.Vector3, color: number) 
   const mid = from.clone().lerp(to, 0.5).add(new THREE.Vector3(0, from.distanceTo(to) * 0.12, 0));
   const curve = new THREE.QuadraticBezierCurve3(from, mid, to);
   const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(64));
-  return new THREE.Line(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.28 }));
+  return new THREE.Line(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.42 }));
 }
 
 function disposeObject(object: THREE.Object3D) {
@@ -797,19 +809,37 @@ export default function UniverseExplorerPage() {
       : null;
 
   useEffect(() => {
-    if (!selectedId && nodesModel.summaries.length) setSelectedId(nodesModel.summaries[0].root.id);
+    if (selectedId || !nodesModel.summaries.length) return;
+    const defaultRoot = nodesModel.summaries.find((summary) => summary.root.systemCode === DEFAULT_SYSTEM)?.root ?? nodesModel.summaries[0].root;
+    setSelectedId(defaultRoot.id);
   }, [nodesModel.summaries, selectedId]);
 
   const selectedNode = selected ?? nodesModel.summaries[0]?.root ?? null;
+  const normalizedSearch = search.trim().toLowerCase();
+  const searchMatch = useMemo(() => findBestSearchMatch(nodesModel.allNodes, search), [nodesModel.allNodes, search]);
+
+  useEffect(() => {
+    if (!searchMatch || selectedId === searchMatch.id || nodeSearchText(selected ?? searchMatch).includes(normalizedSearch)) return;
+    setSelectedId(searchMatch.id);
+    setMode('system');
+  }, [normalizedSearch, searchMatch, selected, selectedId]);
+
+  const filteredSummaries = useMemo(() => {
+    if (!normalizedSearch) return nodesModel.summaries;
+    return nodesModel.summaries.filter((summary) => {
+      if (nodeSearchText(summary.root).includes(normalizedSearch)) return true;
+      return collectDescendants(summary.root, nodesModel.children).some((node) => nodeSearchText(node).includes(normalizedSearch));
+    });
+  }, [nodesModel.children, nodesModel.summaries, normalizedSearch]);
+
   const visibleObjects = useMemo(() => {
-    const base = mode === 'system' && root ? [root, ...collectDescendants(root, nodesModel.children)] : nodesModel.allNodes;
-    const q = search.trim().toLowerCase();
+    const base = normalizedSearch ? nodesModel.allNodes : mode === 'system' && root ? [root, ...collectDescendants(root, nodesModel.children)] : nodesModel.allNodes;
     return base
       .filter((node) => typeFilter === 'all' || node.type === typeFilter)
-      .filter((node) => !q || nodeSearchText(node).includes(q))
+      .filter((node) => !normalizedSearch || nodeSearchText(node).includes(normalizedSearch))
       .sort((a, b) => typeRank(a.type) - typeRank(b.type) || a.name.localeCompare(b.name))
       .slice(0, 220);
-  }, [mode, nodesModel.allNodes, nodesModel.children, root, search, typeFilter]);
+  }, [mode, nodesModel.allNodes, nodesModel.children, normalizedSearch, root, typeFilter]);
 
   const counts = useMemo(() => {
     const map = new Map<string, number>();
@@ -821,6 +851,13 @@ export default function UniverseExplorerPage() {
     setSelectedId(node.id);
     setMode('system');
   }, []);
+
+  const submitSearch = useCallback(() => {
+    const match = findBestSearchMatch(nodesModel.allNodes, search);
+    if (!match) return;
+    setSelectedId(match.id);
+    setMode('system');
+  }, [nodesModel.allNodes, search]);
 
   return (
     <div className="flex h-[calc(100vh-64px)] min-h-[720px] flex-col overflow-hidden bg-[#02050a] text-slate-200">
@@ -870,22 +907,28 @@ export default function UniverseExplorerPage() {
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[280px_minmax(340px,1fr)_320px]">
-        <aside className="order-2 z-20 flex min-h-0 flex-col border-b border-cyan-950/70 bg-[#030912]/92 p-3 backdrop-blur lg:order-none lg:border-b-0 lg:border-r">
-          <div className="relative mb-3">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[300px_minmax(420px,1fr)_340px]">
+        <aside className="order-2 z-20 flex min-h-0 flex-col border-b border-cyan-900/70 bg-[#06101d]/96 p-3 shadow-[0_0_30px_rgba(0,0,0,0.45)] backdrop-blur lg:order-none lg:border-b-0 lg:border-r">
+          <form
+            className="relative mb-3"
+            onSubmit={(event) => {
+              event.preventDefault();
+              submitSearch();
+            }}
+          >
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-600" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search system, planet, moon..."
-              className="sci-input w-full pl-9 pr-9"
+              className="sci-input w-full border-cyan-800/70 bg-slate-950/90 pl-9 pr-9 text-slate-50 placeholder:text-slate-500"
             />
             {search && (
               <button type="button" onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-600 hover:text-slate-300">
                 <X size={14} />
               </button>
             )}
-          </div>
+          </form>
 
           <div className="mb-3 grid grid-cols-3 gap-2">
             <HudMetric icon={<Sparkles size={11} />} label="Systems" value={nodesModel.systems.length.toLocaleString('en-US')} />
@@ -894,9 +937,9 @@ export default function UniverseExplorerPage() {
           </div>
 
           <div className="mb-3 min-h-0 border-b border-slate-900 pb-3">
-            <p className="mb-2 font-orbitron text-[10px] uppercase tracking-widest text-slate-600">ARK systems</p>
+            <p className="mb-2 font-orbitron text-[10px] uppercase tracking-widest text-slate-400">ARK systems</p>
             <div className="grid max-h-48 gap-1 overflow-y-auto pr-1">
-              {nodesModel.summaries.map((summary) => (
+              {filteredSummaries.map((summary) => (
                 <SystemButton
                   key={summary.root.id}
                   summary={summary}
@@ -904,6 +947,7 @@ export default function UniverseExplorerPage() {
                   onClick={() => selectSystem(summary.root)}
                 />
               ))}
+              {!filteredSummaries.length && <p className="px-2 py-4 text-center font-mono-sc text-[10px] uppercase tracking-widest text-slate-500">No system match</p>}
             </div>
           </div>
 
@@ -928,26 +972,29 @@ export default function UniverseExplorerPage() {
           </div>
 
           <div className="mb-2 flex items-center justify-between">
-            <p className="font-orbitron text-[10px] uppercase tracking-widest text-slate-600">{mode === 'system' && root ? root.name : 'Objects'}</p>
-            <span className="font-mono-sc text-[10px] text-cyan-600">{visibleObjects.length}</span>
+            <p className="font-orbitron text-[10px] uppercase tracking-widest text-slate-400">
+              {normalizedSearch ? 'Search results' : mode === 'system' && root ? root.name : 'Objects'}
+            </p>
+            <span className="font-mono-sc text-[10px] text-cyan-300">{visibleObjects.length}</span>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
             <div className="space-y-1">
               {visibleObjects.map((node) => (
                 <ObjectRow key={node.id} node={node} active={selectedNode?.id === node.id} onClick={() => setSelectedId(node.id)} />
               ))}
+              {!visibleObjects.length && <p className="px-2 py-8 text-center font-mono-sc text-[10px] uppercase tracking-widest text-slate-500">No object match</p>}
             </div>
           </div>
         </aside>
 
         <main className="relative order-1 min-h-[460px] overflow-hidden bg-black lg:order-none">
-          <div className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(circle_at_50%_45%,rgba(8,145,178,0.18),transparent_32%)]" />
-          <div className="pointer-events-none absolute left-4 right-4 top-4 z-20 flex items-center justify-between border border-cyan-950/70 bg-black/35 px-3 py-2 backdrop-blur">
+          <div className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(circle_at_50%_45%,rgba(8,145,178,0.10),transparent_36%)]" />
+          <div className="pointer-events-none absolute left-4 right-4 top-4 z-20 flex items-center justify-between border border-cyan-800/70 bg-slate-950/70 px-3 py-2 backdrop-blur">
             <span className="flex items-center gap-2 font-mono-sc text-[10px] uppercase tracking-widest text-cyan-400">
               <Maximize2 size={12} />
               {mode === 'galaxy' ? 'Galaxy / jump network' : `${root?.name ?? 'System'} / orbital view`}
             </span>
-            <span className="hidden font-mono-sc text-[10px] uppercase tracking-widest text-slate-600 md:block">Drag rotate / scroll zoom / click object</span>
+            <span className="hidden font-mono-sc text-[10px] uppercase tracking-widest text-slate-400 md:block">Drag rotate / scroll zoom / click object</span>
           </div>
           {isLoading ? (
             <div className="absolute inset-0 grid place-items-center">
@@ -968,7 +1015,7 @@ export default function UniverseExplorerPage() {
           </div>
         </main>
 
-        <aside className="order-3 z-20 flex min-h-0 flex-col overflow-y-auto border-t border-cyan-950/70 bg-[#030912]/92 p-4 backdrop-blur lg:order-none lg:border-l lg:border-t-0">
+        <aside className="order-3 z-20 flex min-h-0 flex-col overflow-y-auto border-t border-cyan-900/70 bg-[#06101d]/96 p-4 shadow-[0_0_30px_rgba(0,0,0,0.45)] backdrop-blur lg:order-none lg:border-l lg:border-t-0">
           {selectedNode ? (
             <>
               {(assetTexture(selectedNode.assets, selectedNode.thumbnail) ?? selectedNode.thumbnail) && (
