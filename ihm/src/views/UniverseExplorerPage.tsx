@@ -437,6 +437,36 @@ function objectColor(node: StarmapNode) {
   return styleFor(node.type).color;
 }
 
+function systemSceneNodes(root: StarmapNode, children: Map<string, StarmapNode[]>, selectedId: string | null) {
+  const descendants = collectDescendants(root, children);
+  const selected = descendants.find((node) => node.id === selectedId) ?? (root.id === selectedId ? root : null);
+  const selectedParentId = selected?.parentId ?? null;
+  const selectedChildren = new Set((selected ? (children.get(selected.id) ?? []) : []).map((node) => node.id));
+  const selectedSiblings = new Set(
+    selectedParentId
+      ? (children.get(selectedParentId) ?? []).filter((node) => node.type === selected?.type).map((node) => node.id)
+      : [],
+  );
+
+  return descendants.filter((node) => {
+    if (node.type === 'star' || node.type === 'planet' || node.type === 'jump_point') return true;
+    if (node.id === selectedId || node.id === selectedParentId || selectedChildren.has(node.id) || selectedSiblings.has(node.id)) return true;
+    return node.type === 'station' && assetCount(node) > 0;
+  });
+}
+
+function shouldDrawOrbit(node: StarmapNode, selectedId: string | null) {
+  if (node.type === 'planet') return true;
+  if (node.type === 'jump_point') return false;
+  return node.id === selectedId || node.parentId === selectedId;
+}
+
+function shouldDrawLabel(node: StarmapNode, mode: ViewMode, selectedId: string | null) {
+  if (node.id === selectedId) return true;
+  if (mode === 'galaxy') return node.type === 'system';
+  return node.type === 'star' || node.type === 'planet';
+}
+
 type SceneProps = {
   nodes: StarmapNode[];
   children: Map<string, StarmapNode[]>;
@@ -457,10 +487,20 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x030914);
-    scene.fog = new THREE.FogExp2(0x030914, mode === 'galaxy' ? 0.006 : 0.016);
+    scene.fog = new THREE.FogExp2(0x030914, mode === 'galaxy' ? 0.006 : 0.011);
 
     const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 1200);
-    camera.position.set(mode === 'galaxy' ? 0 : 0, mode === 'galaxy' ? 95 : 26, mode === 'galaxy' ? 150 : 34);
+    camera.position.set(mode === 'galaxy' ? 0 : 0, mode === 'galaxy' ? 95 : 42, mode === 'galaxy' ? 150 : 48);
+
+    if (typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)) {
+      const fallback = document.createElement('div');
+      fallback.className = 'absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(34,211,238,0.16),transparent_34%)]';
+      fallback.setAttribute('data-testid', 'starmap-webgl-fallback');
+      host.appendChild(fallback);
+      return () => {
+        host.removeChild(fallback);
+      };
+    }
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -470,8 +510,8 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
-    controls.minDistance = mode === 'galaxy' ? 28 : 8;
-    controls.maxDistance = mode === 'galaxy' ? 360 : 90;
+    controls.minDistance = mode === 'galaxy' ? 28 : 14;
+    controls.maxDistance = mode === 'galaxy' ? 360 : 115;
 
     const ambient = new THREE.AmbientLight(0xb8eaff, 0.58);
     const key = new THREE.PointLight(0xbdf2ff, 3.1, 280);
@@ -490,14 +530,14 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
     scene.add(starfield);
     disposables.push(starfield);
 
-    const visible = mode === 'galaxy' || !root ? nodes.filter((node) => node.type === 'system') : [root, ...collectDescendants(root, children)];
+    const visible = mode === 'galaxy' || !root ? nodes.filter((node) => node.type === 'system') : systemSceneNodes(root, children, selectedId);
     const sceneRootPosition = mode === 'system' && root ? root.scenePosition.clone() : new THREE.Vector3();
 
     for (const node of visible) {
       const localPosition = mode === 'system' ? node.scenePosition.clone() : node.scenePosition.clone();
       if (mode === 'system' && node.id === root?.id) localPosition.set(0, 0, 0);
       const style = styleFor(node.type);
-      const radius = node.type === 'system' ? 1.45 : style.radius;
+      const radius = node.id === selectedId ? style.radius * 1.18 : style.radius;
       const material = new THREE.MeshStandardMaterial({
         color: objectColor(node),
         roughness: node.type === 'star' ? 0.38 : 0.9,
@@ -543,10 +583,10 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
         disposables.push(halo);
       }
 
-      if (mode === 'system' && root && node.parentId) {
+      if (mode === 'system' && root && node.parentId && shouldDrawOrbit(node, selectedId)) {
         const parentObject = objectByNode.get(node.parentId);
         if (parentObject && node.type !== 'star') {
-          const orbit = createOrbitLine(parentObject.position, mesh.position, objectColor(node), selectedId === node.id ? 0.58 : 0.28);
+          const orbit = createOrbitLine(parentObject.position, mesh.position, objectColor(node), selectedId === node.id ? 0.56 : 0.16);
           scene.add(orbit);
           disposables.push(orbit);
         }
@@ -562,11 +602,13 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
         }
       }
 
-      const label = createLabel(node.name, selectedId === node.id ? '#f0fdff' : '#b7e7f6');
-      label.position.copy(mesh.position).add(new THREE.Vector3(0, radius + 0.55, 0));
-      label.scale.setScalar(mode === 'galaxy' ? 4.5 : 1.3);
-      scene.add(label);
-      disposables.push(label);
+      if (shouldDrawLabel(node, mode, selectedId)) {
+        const label = createLabel(node.name, selectedId === node.id ? '#f0fdff' : '#9bd7eb');
+        label.position.copy(mesh.position).add(new THREE.Vector3(0, radius + 0.7, 0));
+        label.scale.setScalar(mode === 'galaxy' ? 4.5 : selectedId === node.id ? 1.75 : 1.18);
+        scene.add(label);
+        disposables.push(label);
+      }
     }
 
     if (mode === 'system' && root) {
@@ -996,12 +1038,12 @@ export default function UniverseExplorerPage() {
             </span>
             <span className="hidden font-mono-sc text-[10px] uppercase tracking-widest text-slate-400 md:block">Drag rotate / scroll zoom / click object</span>
           </div>
-          {isLoading ? (
-            <div className="absolute inset-0 grid place-items-center">
-              <Loader2 className="animate-spin text-cyan-300" size={34} />
+          <Scene nodes={nodesModel.allNodes} children={nodesModel.children} mode={mode} root={root} selectedId={selectedNode?.id ?? null} onSelect={setSelectedId} />
+          {isLoading && (
+            <div className="pointer-events-none absolute right-4 top-16 z-20 inline-flex items-center gap-2 border border-cyan-900/60 bg-slate-950/80 px-3 py-2 font-mono-sc text-[10px] uppercase tracking-widest text-cyan-400 backdrop-blur">
+              <Loader2 className="animate-spin" size={12} />
+              Syncing map data
             </div>
-          ) : (
-            <Scene nodes={nodesModel.allNodes} children={nodesModel.children} mode={mode} root={root} selectedId={selectedNode?.id ?? null} onSelect={setSelectedId} />
           )}
           <div className="pointer-events-none absolute bottom-4 left-4 z-20 grid grid-cols-2 gap-2 md:grid-cols-5">
             {['system', 'star', 'planet', 'moon', 'jump_point'].map((type) => (
