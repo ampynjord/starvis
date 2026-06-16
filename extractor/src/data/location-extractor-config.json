@@ -12,11 +12,7 @@
     "rr_pyro6_": "pyro6"
   },
   "deprecatedLocations": {
-    "classNames": [
-      "PortOlisar",
-      "Port_Olisar",
-      "Stanton2_PortOlisar"
-    ],
+    "classNames": ["PortOlisar", "Port_Olisar", "Stanton2_PortOlisar"],
     "classNamePatterns": [
       "scanhub",
       "scan_hub",
@@ -28,11 +24,6 @@
       "_jumptown_old",
       "_legacy_"
     ],
-    "filePathPatterns": [
-      "/portolisar/",
-      "/port_olisar/",
-      "/scanhub/",
-      "/scan_hub/"
-    ]
+    "filePathPatterns": ["/portolisar/", "/port_olisar/", "/scanhub/", "/scan_hub/"]
   }
 }
