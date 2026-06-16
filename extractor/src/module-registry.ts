@@ -22,6 +22,7 @@ export const EXTRACTION_MODULES = [
   'ship-matrix',
   'ship-galleries',
   'organizations',
+  'rsi-content',
 ] as const;
 
 export type ExtractionModule = (typeof EXTRACTION_MODULES)[number];
@@ -77,6 +78,7 @@ export const MODULE_REGISTRY: readonly ExtractionModuleDefinition[] = [
     aliases: ['gallery', 'galleries', 'ship-gallery', 'official-gallery', 'official-galleries'],
   },
   { id: 'organizations', runtime: 'network', aliases: ['organization', 'organisation', 'organisations', 'orgs'] },
+  { id: 'rsi-content', runtime: 'network', aliases: ['rsi-html', 'enrich-content', 'comm-link-html', 'galactapedia-html'] },
 ] as const;
 
 export const VALID_MODULES = [...EXTRACTION_MODULES];
