@@ -498,6 +498,26 @@ export class ExtractionService {
             stats.errors.push(`Organizations sync failed: ${(e as Error).message}`);
           }
         }
+
+        if (run('rsi-content')) {
+          onProgress?.('Enriching comm-link content from RSI (scraping HTML)…');
+          try {
+            const s = await rsiSync.enrichCommLinksContent({ delayMs: 400 }, onProgress);
+            onProgress?.(`✅ Comm-links HTML: enriched=${s.enriched}, skipped=${s.skipped}, errors=${s.errors}`);
+            if (s.errors) stats.errors.push(`Comm-links HTML: ${s.errors} errors`);
+          } catch (e) {
+            stats.errors.push(`Comm-links content enrichment failed: ${(e as Error).message}`);
+          }
+
+          onProgress?.('Enriching galactapedia content from RSI (scraping HTML)…');
+          try {
+            const s = await rsiSync.enrichGalactapediaContent({ delayMs: 400 }, onProgress);
+            onProgress?.(`✅ Galactapedia HTML: enriched=${s.enriched}, skipped=${s.skipped}, errors=${s.errors}`);
+            if (s.errors) stats.errors.push(`Galactapedia HTML: ${s.errors} errors`);
+          } catch (e) {
+            stats.errors.push(`Galactapedia content enrichment failed: ${(e as Error).message}`);
+          }
+        }
       }
     }
 

@@ -1,16 +1,17 @@
 /**
- * RsiSyncService — Synchronise les données RSI/SC Wiki vers rsi.*.
+ * RsiSyncService — Synchronise les données RSI vers rsi.*.
  *
  * Modules:
- *   galactapedia   → rsi.galactapedia
- *   comm-links     → rsi.comm_links
+ *   galactapedia   → rsi.galactapedia  (source: RSI officiel via Playwright)
+ *   comm-links     → rsi.comm_links    (source: RSI officiel API POST)
  *   starmap        → rsi.starmap_locations
  *
- * Source: https://api.star-citizen.wiki/api/
+ * Toutes les sources tierces (SC Wiki, etc.) ont été supprimées.
  */
 import type { Pool } from 'pg';
-import { RSI_BASE_URL, RSI_SHIP_MATRIX_URL, SC_WIKI_API_URL, SCRAPER_USER_AGENT } from './config.js';
+import { RSI_BASE_URL, RSI_SHIP_MATRIX_URL, SCRAPER_USER_AGENT } from './config.js';
 import logger from './logger.js';
+import { scrapeCommLinkContent, scrapeGalactapediaContent } from './rsi-content-scraper.js';
 
 const RSI_ORGS_API_URL = `${RSI_BASE_URL}/api/orgs/getOrgs`;
 
@@ -215,90 +216,126 @@ export class RsiSyncService {
     return stats;
   }
 
-  // ── Galactapedia ─────────────────────────────────────────────────────────────
+  // ── Galactapedia — source officielle RSI (Playwright + interception XHR) ────
 
   async syncGalactapedia(onProgress?: (msg: string) => void): Promise<SyncStats> {
+    const { chromium } = await import('playwright');
     const stats: SyncStats = { inserted: 0, updated: 0, errors: 0 };
+
+    onProgress?.('  [galactapedia] Launching browser to enumerate RSI galactapedia…');
+    const browser = await chromium.launch({ headless: true });
+
+    const articles: any[] = [];
+
+    try {
+      const context = await browser.newContext({
+        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      });
+      const page = await context.newPage();
+
+      // Intercept JSON responses from RSI's galactapedia data API
+      page.on('response', async (response) => {
+        const url = response.url();
+        if (!url.includes('galactapedia')) return;
+        const ct = response.headers()['content-type'] ?? '';
+        if (!ct.includes('application/json')) return;
+        try {
+          const body = await response.json();
+          const items: any[] = body?.data ?? body?.results ?? body?.articles ?? [];
+          if (items.length > 0) articles.push(...items);
+        } catch {
+          // not all JSON responses are article lists
+        }
+      });
+
+      await page.goto(`${RSI_BASE_URL}/galactapedia`, { waitUntil: 'networkidle', timeout: 30_000 });
+
+      // If the SPA didn't fire API calls, fall back to scraping article links from DOM
+      if (articles.length === 0) {
+        onProgress?.('  [galactapedia] No XHR data captured — extracting article links from DOM…');
+        const links = await page.$$eval('a[href*="/galactapedia/article/"]', (els) =>
+          [...new Set(els.map((a) => (a as { href: string }).href))],
+        );
+        onProgress?.(`  [galactapedia] Found ${links.length} article links in DOM`);
+
+        for (const link of links) {
+          const match = /\/galactapedia\/article\/([^-/]+)-(.+)$/.exec(link);
+          if (!match) continue;
+          const [, id, slug] = match;
+          articles.push({ id, slug, rsi_url: link });
+        }
+      }
+
+      // Handle RSI pagination if galactapedia has a paginated listing
+      // Look for next-page links / load-more buttons
+      try {
+        let hasMore = true;
+        while (hasMore) {
+          const loadMore = await page.$('button[data-testid="load-more"], .load-more, [aria-label*="next"], a[rel="next"]');
+          if (!loadMore) break;
+          const prevCount = articles.length;
+          await loadMore.click();
+          await page.waitForTimeout(2000);
+          if (articles.length === prevCount) hasMore = false;
+        }
+      } catch {
+        // pagination is optional
+      }
+    } finally {
+      await browser.close();
+    }
+
+    onProgress?.(`  [galactapedia] ${articles.length} articles found from RSI`);
+
     const conn = await this.pool.connect();
     try {
-      let page = 1;
-      while (true) {
-        const url = `${SC_WIKI_API_URL}/galactapedia?page[number]=${page}&limit=100&with=translations`;
-        onProgress?.(`  [galactapedia] page ${page}…`);
+      for (const item of articles) {
+        const id = String(item.id ?? item.rsi_id ?? '');
+        const slug = String(item.slug ?? item.url?.split('/').pop()?.replace(/^[^-]+-/, '') ?? '');
+        if (!id) continue;
 
-        let data: any;
+        const title = String(item.title ?? item.name ?? slug ?? id);
+        const thumbnailUrl: string | null = item.thumbnail?.url ?? item.thumbnail ?? item.image ?? null;
+        const rsiUrl = item.rsi_url ?? `${RSI_BASE_URL}/galactapedia/article/${id}-${slug}`;
+        const categories = json(sourceList(item.categories ?? item.category));
+        const tags = json(sourceList(item.tags ?? item.tag));
+
         try {
-          data = await fetchJson(url);
+          const result = await conn.query<any>(
+            `INSERT INTO rsi.galactapedia (
+               id, slug, title, content, excerpt, type, template, categories, tags,
+               categories_count, tags_count, related_articles_count,
+               thumbnail_url, rsi_url, api_url, web_url, source_created_at, raw_json
+             )
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+             ON CONFLICT (id) DO UPDATE SET
+               slug=EXCLUDED.slug, title=EXCLUDED.title,
+               content=CASE WHEN rsi.galactapedia.content LIKE '%<p%' OR rsi.galactapedia.content LIKE '%<img%'
+                            THEN rsi.galactapedia.content ELSE EXCLUDED.content END,
+               excerpt=COALESCE(rsi.galactapedia.excerpt, EXCLUDED.excerpt),
+               categories=COALESCE(EXCLUDED.categories, rsi.galactapedia.categories),
+               tags=COALESCE(EXCLUDED.tags, rsi.galactapedia.tags),
+               thumbnail_url=COALESCE(EXCLUDED.thumbnail_url, rsi.galactapedia.thumbnail_url),
+               rsi_url=EXCLUDED.rsi_url,
+               updated_at=NOW()`,
+            [
+              id, slug, title, null, null,
+              item.type ?? null, item.template ?? null,
+              categories, tags,
+              item.categories_count ?? null,
+              item.tags_count ?? null,
+              item.related_articles_count ?? null,
+              thumbnailUrl ? (thumbnailUrl.startsWith('http') ? thumbnailUrl : `${RSI_BASE_URL}${thumbnailUrl}`) : null,
+              rsiUrl.startsWith('http') ? rsiUrl : `${RSI_BASE_URL}${rsiUrl}`,
+              null, null, null, json(item),
+            ],
+          );
+          if (result.rowCount === 1) stats.inserted++;
+          else stats.updated++;
         } catch (err) {
-          logger.warn(`[galactapedia] fetch error page ${page}: ${(err as Error).message}`);
+          logger.warn(`[galactapedia] upsert error ${id}: ${(err as Error).message}`);
           stats.errors++;
-          break;
         }
-
-        const items: any[] = data.data ?? [];
-        if (items.length === 0) break;
-        if (page === 1) onProgress?.(`  [galactapedia] total: ${data.meta?.total ?? '?'} (${data.meta?.last_page ?? '?'} pages)`);
-
-        for (const item of items) {
-          const id = item.id ?? item.rsi_id ?? null;
-          const slug = item.slug ?? null;
-          if (!id || !slug) continue;
-
-          const content = item.translations?.en_EN ?? item.content ?? item.body ?? null;
-          const excerpt = content ? (content as string).slice(0, 400).replace(/\n/g, ' ') : null;
-          const categories = json(sourceList(item.categories ?? item.category));
-          const tags = json(sourceList(item.tags ?? item.tag));
-          const thumbnailUrl = item.thumbnail?.url ?? item.thumbnail ?? null;
-          const rsiUrl = `${RSI_BASE_URL}/galactapedia/article/${id}-${slug}`;
-
-          try {
-            const result = await conn.query<any>(
-              `INSERT INTO rsi.galactapedia (
-                 id, slug, title, content, excerpt, type, template, categories, tags,
-                 categories_count, tags_count, related_articles_count,
-                 thumbnail_url, rsi_url, api_url, web_url, source_created_at, raw_json
-               )
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-               ON CONFLICT (id) DO UPDATE SET
-                 slug=EXCLUDED.slug, title=EXCLUDED.title, content=EXCLUDED.content, excerpt=EXCLUDED.excerpt,
-                 type=EXCLUDED.type, template=EXCLUDED.template, categories=EXCLUDED.categories, tags=EXCLUDED.tags,
-                 categories_count=EXCLUDED.categories_count, tags_count=EXCLUDED.tags_count,
-                 related_articles_count=EXCLUDED.related_articles_count,
-                 thumbnail_url=EXCLUDED.thumbnail_url, rsi_url=EXCLUDED.rsi_url,
-                 api_url=EXCLUDED.api_url, web_url=EXCLUDED.web_url,
-                 source_created_at=EXCLUDED.source_created_at, raw_json=EXCLUDED.raw_json,
-                 updated_at=NOW()`,
-              [
-                String(id),
-                String(slug),
-                String(item.title ?? item.name ?? slug),
-                content,
-                excerpt,
-                item.type ?? null,
-                item.template ?? null,
-                categories,
-                tags,
-                item.categories_count ?? null,
-                item.tags_count ?? null,
-                item.related_articles_count ?? null,
-                thumbnailUrl,
-                item.rsi_url ? `${RSI_BASE_URL}${item.rsi_url}` : rsiUrl,
-                item.api_url ?? null,
-                item.web_url ?? null,
-                sqlDate(item.created_at),
-                json(item),
-              ],
-            );
-            if (result.rowCount === 1) stats.inserted++;
-            else stats.updated++;
-          } catch (err) {
-            logger.warn(`[galactapedia] upsert error ${id}: ${(err as Error).message}`);
-            stats.errors++;
-          }
-        }
-
-        if (!data.meta?.last_page || page >= data.meta.last_page) break;
-        page++;
       }
     } finally {
       conn.release();
@@ -306,43 +343,62 @@ export class RsiSyncService {
     return stats;
   }
 
-  // ── Comm-links ───────────────────────────────────────────────────────────────
+  // ── Comm-links — source officielle RSI (API POST) ────────────────────────────
 
   async syncCommLinks(onProgress?: (msg: string) => void): Promise<SyncStats> {
     const stats: SyncStats = { inserted: 0, updated: 0, errors: 0 };
+
+    // RSI official comm-link API — same endpoint used by robertsspaceindustries.com
+    const API_URL = `${RSI_BASE_URL}/api/comm-link/getCommunications`;
+    const PAGE_SIZE = 20;
+    let start = 0;
+    let total: number | null = null;
+
     const conn = await this.pool.connect();
     try {
-      let page = 1;
       while (true) {
-        const url = `${SC_WIKI_API_URL}/comm-links?page[number]=${page}&limit=100`;
-        onProgress?.(`  [comm-links] page ${page}…`);
+        onProgress?.(`  [comm-links] fetching RSI API start=${start}…`);
 
         let data: any;
         try {
-          data = await fetchJson(url);
+          const res = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Agent': SCRAPER_USER_AGENT,
+              Accept: 'application/json',
+            },
+            body: JSON.stringify({ start, end: start + PAGE_SIZE, id: 0, channel: 0, sort: 'publish_new', search: '' }),
+            signal: AbortSignal.timeout(30_000),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          data = await res.json();
         } catch (err) {
-          logger.warn(`[comm-links] fetch error page ${page}: ${(err as Error).message}`);
+          logger.warn(`[comm-links] RSI API error at start=${start}: ${(err as Error).message}`);
           stats.errors++;
           break;
         }
 
         const items: any[] = data.data ?? [];
         if (items.length === 0) break;
-        if (page === 1) onProgress?.(`  [comm-links] total: ~${data.meta?.total ?? '?'}`);
+
+        if (total === null) {
+          total = Number(data.totalrows ?? data.total ?? 0);
+          onProgress?.(`  [comm-links] RSI total: ${total}`);
+        }
 
         for (const item of items) {
-          const rsiId = String(item.id ?? item.rsi_id ?? '');
+          const rsiId = String(item.id ?? '');
           if (!rsiId) continue;
 
-          const rsiUrlPath: string = item.rsi_url ?? '';
-          const slug = rsiUrlPath.split('/').pop() ?? null;
-          const content = item.translations?.en_EN ?? item.content ?? null;
-          const channel = item.channel && item.channel !== 'Undefined' ? item.channel : null;
-          const sourceCategory = item.category && item.category !== 'Undefined' ? item.category : null;
-          const category = channel ?? sourceCategory;
-          const excerpt = content ? (content as string).slice(0, 400).replace(/\n/g, ' ') : null;
-          const publishedAt = item.published_at ?? item.created_at ?? item.time ?? null;
-          const publishedAtSql = sqlDate(publishedAt);
+          const urlPath: string = item.url ?? '';
+          const rsiUrl = urlPath.startsWith('http') ? urlPath : `${RSI_BASE_URL}${urlPath}`;
+          const slug = urlPath.split('/').pop() ?? null;
+          const channel = item.channel_name ?? item.channel ?? null;
+          const category = channel && channel !== 'Undefined' ? channel : null;
+          const publishedAtSql = sqlDate(item.time ?? item.published_at ?? null);
+          const thumbRaw: string | null = item.background ?? item.thumb ?? item.thumbnail ?? null;
+          const thumbnailUrl = thumbRaw ? (thumbRaw.startsWith('http') ? thumbRaw : `${RSI_BASE_URL}${thumbRaw}`) : null;
 
           try {
             const result = await conn.query<any>(
@@ -353,33 +409,24 @@ export class RsiSyncService {
                )
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
                ON CONFLICT (rsi_id) DO UPDATE SET
-                 slug=EXCLUDED.slug, title=EXCLUDED.title, content=EXCLUDED.content,
-                 excerpt=EXCLUDED.excerpt, category=EXCLUDED.category, source_category=EXCLUDED.source_category,
-                 channel=EXCLUDED.channel, series=EXCLUDED.series,
-                 thumbnail_url=EXCLUDED.thumbnail_url, rsi_url=EXCLUDED.rsi_url,
-                 api_url=EXCLUDED.api_url, api_public_url=EXCLUDED.api_public_url,
-                 images_count=EXCLUDED.images_count, links_count=EXCLUDED.links_count,
-                 comment_count=EXCLUDED.comment_count, raw_json=EXCLUDED.raw_json,
+                 slug=EXCLUDED.slug, title=EXCLUDED.title,
+                 content=CASE WHEN rsi.comm_links.content LIKE '%<p%' OR rsi.comm_links.content LIKE '%<img%'
+                              THEN rsi.comm_links.content ELSE EXCLUDED.content END,
+                 excerpt=COALESCE(rsi.comm_links.excerpt, EXCLUDED.excerpt),
+                 category=EXCLUDED.category, source_category=EXCLUDED.source_category,
+                 channel=EXCLUDED.channel,
+                 thumbnail_url=COALESCE(EXCLUDED.thumbnail_url, rsi.comm_links.thumbnail_url),
+                 rsi_url=EXCLUDED.rsi_url, raw_json=EXCLUDED.raw_json,
                  published_at=EXCLUDED.published_at`,
               [
-                rsiId,
-                slug,
+                rsiId, slug,
                 String(item.title ?? item.name ?? rsiId),
-                content,
-                excerpt,
-                category,
-                sourceCategory,
-                channel,
-                item.series && item.series !== 'None' ? item.series : null,
-                item.thumbnail?.url ?? item.image ?? null,
-                item.rsi_url ?? `${RSI_BASE_URL}/comm-link/${rsiId}`,
-                item.api_url ?? null,
-                item.api_public_url ?? null,
-                item.images_count ?? null,
-                item.links_count ?? null,
-                item.comment_count ?? null,
-                json(item),
-                publishedAtSql,
+                null, null,
+                category, category, channel, null,
+                thumbnailUrl, rsiUrl, null, null,
+                null, null,
+                item.post_count ? Number(item.post_count) : null,
+                json(item), publishedAtSql,
               ],
             );
             if (result.rowCount === 1) stats.inserted++;
@@ -390,8 +437,11 @@ export class RsiSyncService {
           }
         }
 
-        if (!data.meta?.last_page || page >= data.meta.last_page) break;
-        page++;
+        start += PAGE_SIZE;
+        if (total !== null && start >= total) break;
+        if (items.length < PAGE_SIZE) break;
+
+        await new Promise((r) => setTimeout(r, 200));
       }
     } finally {
       conn.release();
@@ -768,5 +818,114 @@ export class RsiSyncService {
       conn.release();
     }
     return { upserted, errors };
+  }
+
+  // ── RSI rich-content enrichment ───────────────────────────────────────────
+
+  /**
+   * Fetch the real RSI HTML for comm-links that still have SC Wiki plain text.
+   * Entries with HTML content (detected by presence of '<p') are skipped.
+   */
+  async enrichCommLinksContent(
+    opts: { delayMs?: number; limit?: number } = {},
+    onProgress?: (msg: string) => void,
+  ): Promise<{ enriched: number; skipped: number; errors: number }> {
+    const { delayMs = 400, limit = 0 } = opts;
+    const conn = await this.pool.connect();
+    const stats = { enriched: 0, skipped: 0, errors: 0 };
+
+    try {
+      const limitClause = limit > 0 ? `LIMIT ${limit}` : '';
+      const rows = await conn.query<{ rsi_id: string; rsi_url: string }>(
+        `SELECT rsi_id, rsi_url FROM rsi.comm_links
+         WHERE rsi_url IS NOT NULL
+           AND (content IS NULL OR (content NOT LIKE '%<p%' AND content NOT LIKE '%<img%'))
+         ORDER BY published_at DESC ${limitClause}`,
+      );
+
+      const total = rows.rows.length;
+      onProgress?.(`  [rsi-content] comm-links to enrich: ${total}`);
+
+      for (let i = 0; i < rows.rows.length; i++) {
+        const { rsi_id, rsi_url } = rows.rows[i];
+        onProgress?.(`  [rsi-content] comm-link ${i + 1}/${total}: ${rsi_url}`);
+
+        try {
+          const html = await scrapeCommLinkContent(rsi_url);
+          if (html) {
+            await conn.query(
+              `UPDATE rsi.comm_links SET content = $1 WHERE rsi_id = $2`,
+              [html, rsi_id],
+            );
+            stats.enriched++;
+          } else {
+            stats.skipped++;
+          }
+        } catch (err) {
+          logger.warn(`[rsi-content] comm-link ${rsi_id}: ${(err as Error).message}`);
+          stats.errors++;
+        }
+
+        if (delayMs > 0 && i < rows.rows.length - 1) {
+          await new Promise((r) => setTimeout(r, delayMs));
+        }
+      }
+    } finally {
+      conn.release();
+    }
+    return stats;
+  }
+
+  /**
+   * Fetch the real RSI HTML for galactapedia entries that still have plain text.
+   */
+  async enrichGalactapediaContent(
+    opts: { delayMs?: number; limit?: number } = {},
+    onProgress?: (msg: string) => void,
+  ): Promise<{ enriched: number; skipped: number; errors: number }> {
+    const { delayMs = 400, limit = 0 } = opts;
+    const conn = await this.pool.connect();
+    const stats = { enriched: 0, skipped: 0, errors: 0 };
+
+    try {
+      const limitClause = limit > 0 ? `LIMIT ${limit}` : '';
+      const rows = await conn.query<{ id: string; rsi_url: string }>(
+        `SELECT id, rsi_url FROM rsi.galactapedia
+         WHERE rsi_url IS NOT NULL
+           AND (content IS NULL OR (content NOT LIKE '%<p%' AND content NOT LIKE '%<img%'))
+         ORDER BY updated_at DESC ${limitClause}`,
+      );
+
+      const total = rows.rows.length;
+      onProgress?.(`  [rsi-content] galactapedia to enrich: ${total}`);
+
+      for (let i = 0; i < rows.rows.length; i++) {
+        const { id, rsi_url } = rows.rows[i];
+        onProgress?.(`  [rsi-content] galactapedia ${i + 1}/${total}: ${rsi_url}`);
+
+        try {
+          const html = await scrapeGalactapediaContent(rsi_url);
+          if (html) {
+            await conn.query(
+              `UPDATE rsi.galactapedia SET content = $1 WHERE id = $2`,
+              [html, id],
+            );
+            stats.enriched++;
+          } else {
+            stats.skipped++;
+          }
+        } catch (err) {
+          logger.warn(`[rsi-content] galactapedia ${id}: ${(err as Error).message}`);
+          stats.errors++;
+        }
+
+        if (delayMs > 0 && i < rows.rows.length - 1) {
+          await new Promise((r) => setTimeout(r, delayMs));
+        }
+      }
+    } finally {
+      conn.release();
+    }
+    return stats;
   }
 }

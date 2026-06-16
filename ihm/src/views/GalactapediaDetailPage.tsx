@@ -33,11 +33,8 @@ function formatDate(iso: string | null): string {
   }
 }
 
-function contentBlocks(content: string): string[] {
-  return content
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter(Boolean);
+function isRichHtml(content: string): boolean {
+  return /<p[\s>]|<img[\s>]|<h[1-6][\s>]/i.test(content);
 }
 
 export default function GalactapediaDetailPage() {
@@ -56,7 +53,6 @@ export default function GalactapediaDetailPage() {
 
   const cats = parseArray(entry.categories);
   const tags = parseArray(entry.tags);
-  const paragraphs = entry.content ? contentBlocks(entry.content) : [];
 
   return (
     <PageShell size="xl">
@@ -114,12 +110,23 @@ export default function GalactapediaDetailPage() {
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_280px]">
         <ScifiPanel title="Article" className="p-6">
-          {paragraphs.length > 0 ? (
-            <div className="lore-entry-content max-w-3xl">
-              {paragraphs.map((paragraph) => (
-                <p key={paragraph}>{paragraph}</p>
-              ))}
-            </div>
+          {entry.content ? (
+            isRichHtml(entry.content) ? (
+              <div
+                className="lore-entry-content max-w-3xl"
+                dangerouslySetInnerHTML={{ __html: entry.content }}
+              />
+            ) : (
+              <div className="lore-entry-content max-w-3xl">
+                {entry.content
+                  .split(/\n{2,}/)
+                  .map((block) => block.trim())
+                  .filter(Boolean)
+                  .map((paragraph) => (
+                    <p key={paragraph}>{paragraph}</p>
+                  ))}
+              </div>
+            )
           ) : (
             <p className="text-xs text-slate-600">No content available for this entry.</p>
           )}
