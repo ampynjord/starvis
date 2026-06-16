@@ -292,11 +292,9 @@ async function audit() {
 
   // ── Missions ────────────────────────────────────────────────────────────
 
-  validateList(
-    'missions',
-    await requestJson('missions', '/api/v1/missions', { env, limit: 10 }, { allowEmpty: true }),
-    { requiredFields: ['uuid'] },
-  );
+  validateList('missions', await requestJson('missions', '/api/v1/missions', { env, limit: 10 }, { allowEmpty: true }), {
+    requiredFields: ['uuid'],
+  });
 
   const missionFilters = await requestJson('missions/filters', '/api/v1/missions/filters', { env }, { allowEmpty: true });
   if (missionFilters && (!isObject(missionFilters) || missionFilters.success !== true)) {
@@ -320,33 +318,19 @@ async function audit() {
 
   validateList(
     'factions/reputation-standings',
-    await requestJson(
-      'factions/reputation-standings',
-      '/api/v1/factions/reputation-standings',
-      { env, limit: 10 },
-      { allowEmpty: true },
-    ),
+    await requestJson('factions/reputation-standings', '/api/v1/factions/reputation-standings', { env, limit: 10 }, { allowEmpty: true }),
     {},
   );
 
   validateList(
     'factions/reputation-scopes',
-    await requestJson(
-      'factions/reputation-scopes',
-      '/api/v1/factions/reputation-scopes',
-      { env, limit: 10 },
-      { allowEmpty: true },
-    ),
+    await requestJson('factions/reputation-scopes', '/api/v1/factions/reputation-scopes', { env, limit: 10 }, { allowEmpty: true }),
     {},
   );
 
   // ── Paints ────────────────────────────────────────────────────────────────
 
-  validateList(
-    'paints',
-    await requestJson('paints', '/api/v1/paints', { env: undefined, limit: 10 }, { allowEmpty: true }),
-    {},
-  );
+  validateList('paints', await requestJson('paints', '/api/v1/paints', { env: undefined, limit: 10 }, { allowEmpty: true }), {});
 
   // ── Shops ─────────────────────────────────────────────────────────────────
 
@@ -362,11 +346,9 @@ async function audit() {
 
   // ── Locations ─────────────────────────────────────────────────────────────
 
-  validateList(
-    'locations',
-    await requestJson('locations', '/api/v1/locations', { env, limit: 10 }, { allowEmpty: true }),
-    { requiredFields: ['uuid'] },
-  );
+  validateList('locations', await requestJson('locations', '/api/v1/locations', { env, limit: 10 }, { allowEmpty: true }), {
+    requiredFields: ['uuid'],
+  });
 
   // ── Mining ────────────────────────────────────────────────────────────────
 
