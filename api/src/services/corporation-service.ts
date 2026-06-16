@@ -526,8 +526,16 @@ export class CorporationService {
   // ── User-facing fleet (ships only) ──────────────────────────────────────────
 
   async getFleetItems(corporationId: number | null, type: 'ship' | 'non-ship', userId?: number): Promise<FleetItemData[]> {
-    const ownerWhere = corporationId == null ? { corporationId: null, addedById: userId } : { corporationId };
-    const where = type === 'ship' ? { ...ownerWhere, itemType: 'ship' } : { ...ownerWhere, itemType: { not: 'ship' } };
+    // In corp mode: include both corp items AND personal items the user declared before joining
+    // so that ships declared without a corp don't vanish after the user joins one.
+    const ownerWhere =
+      corporationId == null
+        ? { corporationId: null, addedById: userId }
+        : userId != null
+          ? { OR: [{ corporationId }, { corporationId: null, addedById: userId }] }
+          : { corporationId };
+    const typeFilter = type === 'ship' ? { itemType: 'ship' } : { itemType: { not: 'ship' as const } };
+    const where = { ...ownerWhere, ...typeFilter };
     const items = await this.db.corporationFleetItem.findMany({
       where,
       select: { ...FLEET_SELECT, shipUuid: true } as typeof FLEET_SELECT,
