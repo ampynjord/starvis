@@ -348,13 +348,13 @@ function buildNodes(positions: RsiStarmapPosition[]) {
   const children = new Map<string, StarmapNode[]>();
   for (const node of rawNodes) {
     if (!node.parentId || !byId.has(node.parentId)) {
-      // For moons/stations without valid parent: look for a planet in the same system before falling back to system
       const system = systemByCode.get(node.systemCode);
       if (node.type === 'moon' || node.type === 'station') {
         const planets = rawNodes.filter((n) => n.type === 'planet' && n.systemCode === node.systemCode);
-        const closestPlanet = planets[0];
-        if (closestPlanet) {
-          node.parentId = closestPlanet.id;
+        if (planets.length > 0) {
+          // Distribute across planets using a stable hash so siblings stay together
+          const slot = Math.floor(hash01(node.id + node.type) * planets.length);
+          node.parentId = planets[slot].id;
         } else if (system && system.id !== node.id) {
           node.parentId = system.id;
         }
@@ -469,30 +469,13 @@ function objectColor(node: StarmapNode) {
   return styleFor(node.type).color;
 }
 
-function systemSceneNodes(root: StarmapNode, children: Map<string, StarmapNode[]>, selectedId: string | null) {
-  const descendants = collectDescendants(root, children);
-  const selected = descendants.find((node) => node.id === selectedId) ?? (root.id === selectedId ? root : null);
-  const selectedParentId = selected?.parentId ?? null;
-  const selectedChildren = new Set((selected ? (children.get(selected.id) ?? []) : []).map((node) => node.id));
-  const selectedSiblings = new Set(
-    selectedParentId
-      ? (children.get(selectedParentId) ?? []).filter((node) => node.type === selected?.type).map((node) => node.id)
-      : [],
-  );
 
-  return descendants.filter((node) => {
-    if (node.type === 'star' || node.type === 'planet' || node.type === 'jump_point') return true;
-    if (node.id === selectedId || node.id === selectedParentId || selectedChildren.has(node.id) || selectedSiblings.has(node.id)) return true;
-    return node.type === 'station' && assetCount(node) > 0;
-  });
-}
-
+// Only planet-around-star orbits are always drawn; moon orbits are managed imperatively
 function shouldDrawOrbit(node: StarmapNode) {
-  return node.type === 'planet' || node.type === 'moon';
+  return node.type === 'planet';
 }
 
-function shouldDrawLabel(node: StarmapNode, mode: ViewMode, selectedId: string | null) {
-  if (node.id === selectedId) return true;
+function shouldDrawLabel(node: StarmapNode, mode: ViewMode) {
   if (mode === 'galaxy') return node.type === 'system';
   return node.type === 'star' || node.type === 'planet';
 }
@@ -651,6 +634,23 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
 
+  // Refs for imperative selection — keep camera stable when user picks an object
+  const moonOrbitLinesRef = useRef(new Map<string, THREE.Object3D[]>());
+  const objectByNodeRef   = useRef(new Map<string, THREE.Object3D>());
+  const controlsRef       = useRef<OrbitControls | null>(null);
+  const cameraTargetRef   = useRef<THREE.Vector3 | null>(null);
+
+  // Selection effect: show/hide moon orbits + animate camera — NO scene rebuild
+  useEffect(() => {
+    for (const [, lines] of moonOrbitLinesRef.current)
+      for (const line of lines) line.visible = false;
+    if (!selectedId) return;
+    const moonOrbits = moonOrbitLinesRef.current.get(selectedId);
+    if (moonOrbits) for (const line of moonOrbits) line.visible = true;
+    const target = objectByNodeRef.current.get(selectedId);
+    if (target) cameraTargetRef.current = target.position.clone();
+  }, [selectedId]);
+
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -734,24 +734,32 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
       disposables.push(nebula);
     }
 
-    const visible = mode === 'galaxy' || !root ? nodes.filter((node) => node.type === 'system') : systemSceneNodes(root, children, selectedId);
+    // Show ALL objects in system mode (no selectedId filtering — avoids camera reset)
+    const visible = mode === 'galaxy' || !root
+      ? nodes.filter((n) => n.type === 'system')
+      : [root, ...collectDescendants(root, children)];
     const sceneRootPosition = mode === 'system' && root ? root.scenePosition.clone() : new THREE.Vector3();
+
+    // Moon orbit lines tracked here, exposed via ref for the selection effect
+    const moonOrbitLines = new Map<string, THREE.Object3D[]>();
 
     // Async model loading — track separately for cleanup
     let sceneDisposed = false;
     const asyncDisposables: THREE.Object3D[] = [];
 
     for (const node of visible) {
-      const localPosition = mode === 'system' ? node.scenePosition.clone() : node.scenePosition.clone();
+      const localPosition = node.scenePosition.clone();
       if (mode === 'system' && node.id === root?.id) localPosition.set(0, 0, 0);
       const style = styleFor(node.type);
-      const radius = node.id === selectedId ? style.radius * 1.18 : style.radius;
+      const radius = style.radius;
+      // Planets start grey/dark — texture replaces color; star is warm amber
+      const baseColor = node.type === 'star' ? objectColor(node) : node.type === 'planet' || node.type === 'moon' ? 0x444455 : objectColor(node);
       const material = new THREE.MeshStandardMaterial({
-        color: objectColor(node),
-        roughness: node.type === 'star' ? 0.38 : 0.9,
-        metalness: node.type === 'station' ? 0.35 : 0.05,
-        emissive: new THREE.Color(objectColor(node)),
-        emissiveIntensity: node.type === 'star' || node.type === 'system' ? 0.75 : 0.45,
+        color: baseColor,
+        roughness: node.type === 'star' ? 0.45 : node.type === 'planet' ? 0.72 : 0.85,
+        metalness: node.type === 'station' ? 0.5 : 0.0,
+        emissive: new THREE.Color(node.type === 'star' ? objectColor(node) : 0x000000),
+        emissiveIntensity: node.type === 'star' ? 0.85 : 0.0,
       });
       const geometry =
         node.type === 'station'
@@ -833,8 +841,9 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
           (texture) => {
             texture.colorSpace = THREE.SRGBColorSpace;
             material.map = texture;
-            material.color.set(0xffffff);
-            material.emissiveIntensity = node.type === 'star' ? 0.42 : 0.12;
+            material.color.set(0xffffff); // let texture define colour
+            material.roughness = node.type === 'star' ? 0.5 : 0.65;
+            material.emissiveIntensity = node.type === 'star' ? 0.55 : 0.0;
             material.needsUpdate = true;
           },
           undefined,
@@ -842,33 +851,54 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
         );
       }
 
-      if (node.type === 'jump_point') {
-        // petit anneau cyan autour du diamant, comme l'ARK map
-        const ring = createFlatRing(radius * 2.2, 0x22d3ee, 0.45);
-        ring.position.copy(mesh.position);
-        ring.rotation.x = Math.PI * 0.3;
-        scene.add(ring);
-        disposables.push(ring);
-      }
-
-      if (node.type === 'star' || node.type === 'system' || node.type === 'planet' || selectedId === node.id) {
-        const baseOpacity = node.type === 'star' || node.type === 'system' ? 0.42 : 0.22;
-        const halo = createHalo(
-          radius * (selectedId === node.id ? 3.6 : node.type === 'star' ? 3.2 : 2.2),
-          objectColor(node),
-          selectedId === node.id ? 0.6 : baseOpacity,
-        );
+      // Star: layered corona glow + point-light at star position for realistic illumination
+      if (node.type === 'star') {
+        const sc = objectColor(node);
+        for (const [r, op] of [[4.5, 0.85], [8, 0.45], [15, 0.18], [6, 0.28]] as [number, number][]) {
+          const h = createHalo(radius * r, r > 10 ? sc : r > 5 ? sc : 0xffffff, op);
+          h.position.copy(mesh.position);
+          scene.add(h); disposables.push(h);
+        }
+        const starLight = new THREE.PointLight(sc, 9, 220);
+        starLight.position.copy(mesh.position);
+        scene.add(starLight); disposables.push(starLight);
+      } else if (node.type === 'system') {
+        const halo = createHalo(radius * 2.5, objectColor(node), 0.45);
         halo.position.copy(mesh.position);
-        scene.add(halo);
-        disposables.push(halo);
+        scene.add(halo); disposables.push(halo);
+      } else if (node.type === 'planet') {
+        const halo = createHalo(radius * 1.8, objectColor(node), 0.18);
+        halo.position.copy(mesh.position);
+        scene.add(halo); disposables.push(halo);
       }
 
-      if (mode === 'system' && root && node.parentId && shouldDrawOrbit(node)) {
+      if (node.type === 'jump_point') {
+        // Glowing ring placeholder (displayed until DAE assembly loads)
+        const ring = createFlatRing(radius * 2.8, 0x22d3ee, 0.55);
+        ring.position.copy(mesh.position);
+        scene.add(ring); disposables.push(ring);
+        const ring2 = createFlatRing(radius * 1.6, 0x7dd3fc, 0.35);
+        ring2.position.copy(mesh.position);
+        ring2.rotation.x = Math.PI / 3;
+        scene.add(ring2); disposables.push(ring2);
+      }
+
+      if (mode === 'system' && root && node.parentId) {
         const parentObject = objectByNode.get(node.parentId);
-        if (parentObject && node.type !== 'star') {
-          const orbit = createOrbitLine(parentObject.position, mesh.position, objectColor(node));
-          scene.add(orbit);
-          disposables.push(orbit);
+        if (parentObject) {
+          if (shouldDrawOrbit(node)) {
+            // Planet orbit around star: always visible
+            const orbit = createOrbitLine(parentObject.position, mesh.position, objectColor(node));
+            scene.add(orbit); disposables.push(orbit);
+          } else if (node.type === 'moon') {
+            // Moon orbit: hidden by default, shown when parent planet is selected
+            const orbit = createOrbitLine(parentObject.position, mesh.position, 0x334155);
+            orbit.visible = false;
+            scene.add(orbit); disposables.push(orbit);
+            const existing = moonOrbitLines.get(node.parentId) ?? [];
+            existing.push(orbit);
+            moonOrbitLines.set(node.parentId, existing);
+          }
         }
       }
 
@@ -882,14 +912,20 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
         }
       }
 
-      if (shouldDrawLabel(node, mode, selectedId)) {
-        const label = createLabel(node.name, selectedId === node.id ? '#f0fdff' : '#9bd7eb');
+      if (shouldDrawLabel(node, mode)) {
+        const label = createLabel(node.name, '#9bd7eb');
         label.position.copy(mesh.position).add(new THREE.Vector3(0, radius + 0.7, 0));
-        label.scale.setScalar(mode === 'galaxy' ? 4.5 : selectedId === node.id ? 1.75 : 1.18);
+        label.scale.setScalar(mode === 'galaxy' ? 4.5 : 1.35);
         scene.add(label);
         disposables.push(label);
       }
     }
+
+    // Expose scene state for imperative selection updates
+    moonOrbitLinesRef.current = moonOrbitLines;
+    objectByNodeRef.current   = objectByNode;
+    controlsRef.current       = controls;
+    cameraTargetRef.current   = null;
 
     if (mode === 'system' && root) {
       // Disque écliptique translucide visible depuis dessous (ARK map style)
@@ -959,6 +995,11 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
         }
         else if (node.type === 'asteroid_field') object.rotation.y += 0.003;
       }
+      // Smooth camera zoom to selected object (driven by selection effect via ref)
+      if (cameraTargetRef.current) {
+        controls.target.lerp(cameraTargetRef.current, 0.05);
+        if (controls.target.distanceTo(cameraTargetRef.current) < 0.05) cameraTargetRef.current = null;
+      }
       controls.update();
       renderer.render(scene, camera);
     };
@@ -979,7 +1020,7 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
       renderer.dispose();
       host.removeChild(renderer.domElement);
     };
-  }, [nodes, children, mode, root, selectedId]);
+  }, [nodes, children, mode, root]);
 
   return <div ref={hostRef} className="absolute inset-0" />;
 }
@@ -1080,25 +1121,27 @@ function createGlowTexture(color: number) {
 }
 
 function createLabel(text: string, color: string) {
+  const W = 2048, H = 256;
   const canvas = document.createElement('canvas');
-  canvas.width = 1024;
-  canvas.height = 192;
+  canvas.width = W; canvas.height = H;
   const ctx = canvas.getContext('2d');
   if (ctx) {
-    ctx.font = '700 72px "Orbitron", "Rajdhani", Arial, sans-serif';
+    ctx.clearRect(0, 0, W, H);
+    ctx.font = `700 ${H * 0.55}px "Orbitron", "Rajdhani", Arial, sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    // outer glow pass
-    ctx.shadowColor = 'rgba(34,211,238,0.95)';
-    ctx.shadowBlur = 32;
+    ctx.shadowColor = 'rgba(34,211,238,0.9)';
+    ctx.shadowBlur = 22;
     ctx.fillStyle = color;
-    ctx.fillText(text.toUpperCase(), 512, 96, 980);
-    // inner sharpen pass
-    ctx.shadowBlur = 8;
-    ctx.fillText(text.toUpperCase(), 512, 96, 980);
+    ctx.fillText(text.toUpperCase(), W / 2, H / 2, W - 60);
+    // sharpen pass — lower blur, same position
+    ctx.shadowBlur = 4;
+    ctx.fillText(text.toUpperCase(), W / 2, H / 2, W - 60);
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.LinearFilter;
   return new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }));
 }
 
@@ -1336,20 +1379,41 @@ export default function UniverseExplorerPage() {
             <HudMetric icon={<Database size={11} />} label="Assets" value={nodesModel.allNodes.filter((node) => assetCount(node) > 0).length.toLocaleString('en-US')} />
           </div>
 
-          <div className="mb-3 min-h-0 border-b border-slate-900 pb-3">
-            <p className="mb-2 font-orbitron text-[10px] uppercase tracking-widest text-slate-400">ARK systems</p>
-            <div className="grid max-h-48 gap-1 overflow-y-auto pr-1">
-              {filteredSummaries.map((summary) => (
-                <SystemButton
-                  key={summary.root.id}
-                  summary={summary}
-                  active={root?.id === summary.root.id || selectedNode?.id === summary.root.id}
-                  onClick={() => selectSystem(summary.root)}
-                />
-              ))}
-              {!filteredSummaries.length && <p className="px-2 py-4 text-center font-mono-sc text-[10px] uppercase tracking-widest text-slate-500">No system match</p>}
+          {mode === 'galaxy' && (
+            <div className="mb-3 min-h-0 border-b border-slate-900 pb-3">
+              <p className="mb-2 font-orbitron text-[10px] uppercase tracking-widest text-slate-400">ARK systems</p>
+              <div className="grid max-h-48 gap-1 overflow-y-auto pr-1">
+                {filteredSummaries.map((summary) => (
+                  <SystemButton
+                    key={summary.root.id}
+                    summary={summary}
+                    active={root?.id === summary.root.id || selectedNode?.id === summary.root.id}
+                    onClick={() => selectSystem(summary.root)}
+                  />
+                ))}
+                {!filteredSummaries.length && <p className="px-2 py-4 text-center font-mono-sc text-[10px] uppercase tracking-widest text-slate-500">No system match</p>}
+              </div>
             </div>
-          </div>
+          )}
+          {mode === 'system' && root && (
+            <div className="mb-3 border-b border-slate-900 pb-3">
+              <p className="mb-1 font-orbitron text-[10px] uppercase tracking-widest text-slate-400">System</p>
+              <div className="grid grid-cols-2 gap-1">
+                {filteredSummaries.slice(0, 8).map((summary) => (
+                  <button
+                    key={summary.root.id}
+                    type="button"
+                    onClick={() => selectSystem(summary.root)}
+                    className={`truncate border px-2 py-1.5 text-left font-mono-sc text-[10px] uppercase tracking-widest transition-colors ${
+                      root?.id === summary.root.id ? 'border-cyan-600/70 bg-cyan-950/30 text-cyan-200' : 'border-slate-800 text-slate-500 hover:text-slate-200'
+                    }`}
+                  >
+                    {summary.root.systemCode}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="mb-3 flex gap-1 overflow-x-auto border-b border-slate-900 pb-3 lg:flex-wrap">
             <button
