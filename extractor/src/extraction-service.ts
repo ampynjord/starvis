@@ -40,8 +40,8 @@ import { saveMissionBlueprintLinks, saveMissions } from './persisters/missions.j
 import { savePaints } from './persisters/paints.js';
 import { saveOfficialShipGalleries } from './persisters/ship-galleries.js';
 import { saveShips } from './persisters/ships.js';
-import { saveStarmapAssets } from './persisters/starmap-assets.js';
 import { saveShopsData } from './persisters/shops.js';
+import { saveStarmapAssets } from './persisters/starmap-assets.js';
 import { RsiSyncService } from './rsi-sync-service.js';
 
 export type { ExtractionModule, GameEnv };

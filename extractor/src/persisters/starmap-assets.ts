@@ -28,7 +28,9 @@ export async function saveStarmapAssets(
   );
 
   if (!rows.length) {
-    onProgress?.(force ? 'Starmap assets: no systems found' : 'Starmap assets: all systems already have scraped assets — nothing to scrape');
+    onProgress?.(
+      force ? 'Starmap assets: no systems found' : 'Starmap assets: all systems already have scraped assets — nothing to scrape',
+    );
     return;
   }
 
@@ -46,10 +48,10 @@ export async function saveStarmapAssets(
   for (const [code, assets] of results) {
     const total = assets.textures.length + assets.models.length + assets.skybox.length;
     if (total === 0) continue;
-    await conn.query(
-      `UPDATE rsi.starmap_locations SET assets = $1 WHERE system_code = $2 AND type = 'system'`,
-      [JSON.stringify(assets), code],
-    );
+    await conn.query(`UPDATE rsi.starmap_locations SET assets = $1 WHERE system_code = $2 AND type = 'system'`, [
+      JSON.stringify(assets),
+      code,
+    ]);
     updated++;
   }
   onProgress?.(`Starmap assets: updated ${updated}/${rows.length} system(s)`);

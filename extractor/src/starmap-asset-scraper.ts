@@ -92,7 +92,9 @@ export async function scrapeStarmapSystemAssets(
         const assets = await scrapeSystemPage(sys, waitMs);
         results.set(sys.code, assets);
         const total = assets.textures.length + assets.models.length + assets.skybox.length;
-        onProgress?.(`  ✅ ${total} assets (${assets.textures.length} textures, ${assets.models.length} models, ${assets.skybox.length} skybox)`);
+        onProgress?.(
+          `  ✅ ${total} assets (${assets.textures.length} textures, ${assets.models.length} models, ${assets.skybox.length} skybox)`,
+        );
       } catch (err) {
         onProgress?.(`  ❌ Error scraping ${sys.name}: ${(err as Error).message}`);
         logger.warn(`[starmap-assets] error scraping ${sys.code}: ${(err as Error).message}`);
@@ -170,7 +172,6 @@ async function scrapeSystemPage(sys: StarmapSystem, waitMs: number): Promise<Scr
     // Try to trigger body-specific assets by clicking on planets/moons
     await triggerBodyAssets(page, sys.code);
     await sleep(Math.round(waitMs / 2));
-
   } finally {
     await browser.close();
   }
@@ -181,12 +182,7 @@ async function scrapeSystemPage(sys: StarmapSystem, waitMs: number): Promise<Scr
 
 // ── Interaction helpers ────────────────────────────────────────────────────────
 
-const COOKIE_SELECTORS = [
-  'button:text("Accept")',
-  'button:text("Accepter")',
-  'button:text-is("Accept All")',
-  'button:text("I Agree")',
-];
+const COOKIE_SELECTORS = ['button:text("Accept")', 'button:text("Accepter")', 'button:text-is("Accept All")', 'button:text("I Agree")'];
 
 async function dismissCookieBanner(page: Page): Promise<void> {
   for (const selector of COOKIE_SELECTORS) {
