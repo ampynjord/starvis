@@ -13,6 +13,7 @@ export interface RuntimeOptions {
   dryRun: boolean;
   gameVersion?: string;
   ctmForce: boolean;
+  starmapAssetsForce: boolean;
   ctmConcurrency: number;
   galleryDelayMs: number;
   galleryRetries: number;
@@ -112,6 +113,7 @@ export function resolveRuntimeOptions(options: ExtractorCliOptions, logger: Logg
     dryRun: options.dryRun,
     gameVersion: options.gameVersion,
     ctmForce: options.ctmForce,
+    starmapAssetsForce: options.starmapAssetsForce,
     ctmConcurrency: options.ctmConcurrency,
     galleryDelayMs: options.galleryDelayMs,
     galleryRetries: options.galleryRetries,

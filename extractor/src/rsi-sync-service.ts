@@ -88,6 +88,23 @@ function starmapObjectParentId(body: any, systemRsiId: string): string {
   return body.parent_id ? String(body.parent_id) : systemRsiId;
 }
 
+function detailedStarmapSystem(data: any): any | null {
+  return data?.data?.resultset?.[0] ?? data?.data?.systems?.resultset?.[0] ?? data?.data ?? null;
+}
+
+function mergeStarmapBodies(primary: any[], fallback: any[]): any[] {
+  const merged = new Map<string, any>();
+  for (const body of fallback) {
+    const key = String(body.id ?? body.code ?? '');
+    if (key) merged.set(key, body);
+  }
+  for (const body of primary) {
+    const key = String(body.id ?? body.code ?? '');
+    if (key) merged.set(key, { ...(merged.get(key) ?? {}), ...body });
+  }
+  return [...merged.values()];
+}
+
 function resolveRsiUrl(src: string | null | undefined): string | null {
   if (!src) return null;
   if (src.startsWith('http')) return src;
@@ -683,16 +700,18 @@ export class RsiSyncService {
         // ── Step 3: fetch ARK map objects for this system ─────────────────────────
         if (systemCode) {
           try {
+            const sysUrl = `${RSI_BASE_URL}/api/starmap/star-systems/${systemCode}`;
+            const sysData = await postJson(sysUrl);
+            const detailedSystem = detailedStarmapSystem(sysData);
+            const detailedBodies: any[] = detailedSystem?.celestial_objects ?? [];
+
             const findUrl = `${RSI_BASE_URL}/api/starmap/find`;
             const findData = await postJson(findUrl, { query: sys.name ?? systemCode });
-            const foundBodies: any[] = findData.data?.objects?.resultset ?? [];
-            const bodies = foundBodies.filter((body) => String(body.star_system?.code ?? '').toUpperCase() === systemCode.toUpperCase());
+            const foundBodies: any[] = (findData.data?.objects?.resultset ?? []).filter(
+              (body: any) => String(body.star_system?.code ?? '').toUpperCase() === systemCode.toUpperCase(),
+            );
 
-            if (bodies.length === 0) {
-              const sysUrl = `${RSI_BASE_URL}/api/starmap/star-systems/${systemCode}`;
-              const sysData = await postJson(sysUrl);
-              bodies.push(...(sysData.data?.celestial_objects ?? []));
-            }
+            const bodies = mergeStarmapBodies(detailedBodies, foundBodies);
 
             for (const body of bodies) {
               const bodyId = String(body.id ?? '');

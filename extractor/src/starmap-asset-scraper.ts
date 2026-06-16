@@ -53,7 +53,7 @@ export interface AssetScrapeOptions {
 
 const TEXTURE_EXTS = /\.(png|jpg|jpeg|webp|dds|ktx|ktx2|basis|exr|hdr)(\?|$)/i;
 const MODEL_EXTS = /\.(glb|gltf|obj|bin|ctm|fbx|dae)(\?|$)/i;
-const SKYBOX_HINTS = /sky(?:box)?|nebula|background|space|environ|hdri|ibl/i;
+const SKYBOX_HINTS = /sky(?:box)?|nebula|background|spacecube|environ|hdri|ibl/i;
 
 // RSI CDN domains that host 3D assets
 const RSI_ASSET_DOMAINS = [
@@ -72,11 +72,22 @@ function isRsiAssetUrl(url: string): boolean {
 function categorizeUrl(url: string): 'texture' | 'model' | 'skybox' | null {
   if (!isRsiAssetUrl(url)) return null;
   if (MODEL_EXTS.test(url)) return 'model';
-  if (TEXTURE_EXTS.test(url)) return SKYBOX_HINTS.test(url) ? 'skybox' : 'texture';
+  if (TEXTURE_EXTS.test(url)) {
+    const path = new URL(url).pathname;
+    return SKYBOX_HINTS.test(path) ? 'skybox' : 'texture';
+  }
   return null;
 }
 
-function addAsset(assets: ScrapedAssets, url: string): void {
+export function emptyScrapedAssets(): ScrapedAssets {
+  return { textures: [], models: [], skybox: [], raw: [] };
+}
+
+export function assetCount(assets: ScrapedAssets): number {
+  return assets.textures.length + assets.models.length + assets.skybox.length;
+}
+
+export function addAsset(assets: ScrapedAssets, url: string): void {
   const cat = categorizeUrl(url);
   if (!cat) return;
   if (!assets.raw.includes(url)) assets.raw.push(url);
@@ -84,11 +95,68 @@ function addAsset(assets: ScrapedAssets, url: string): void {
   if (!bucket.includes(url)) bucket.push(url);
 }
 
-function mergeAssets(target: ScrapedAssets, source: ScrapedAssets): void {
+export function mergeAssets(target: ScrapedAssets, source: ScrapedAssets): void {
   for (const url of source.raw) addAsset(target, url);
   for (const url of source.textures) addAsset(target, url);
   for (const url of source.models) addAsset(target, url);
   for (const url of source.skybox) addAsset(target, url);
+}
+
+function addMediaObjectAssets(assets: ScrapedAssets, value: unknown): void {
+  if (!value || typeof value !== 'object') return;
+  const media = value as { source?: unknown; url?: unknown; images?: Record<string, unknown> };
+  if (typeof media.source === 'string') addAsset(assets, media.source);
+  if (typeof media.url === 'string') addAsset(assets, media.url);
+  if (media.images && typeof media.images === 'object') {
+    for (const imageUrl of Object.values(media.images)) {
+      if (typeof imageUrl === 'string') addAsset(assets, imageUrl);
+    }
+  }
+}
+
+function addSunTextureAsset(assets: ScrapedAssets, value: unknown): void {
+  const raw = typeof value === 'number' || typeof value === 'string' ? String(value) : '';
+  const index = Number.parseInt(raw, 10);
+  if (!Number.isFinite(index) || index < 1 || index > 99) return;
+  addAsset(assets, `${RSI_CDN_BASE_URL}/static/starmap/suns/${String(index).padStart(2, '0')}_Texture.jpg`);
+}
+
+function starmapSunShader(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object') return null;
+  const shaderData = value as Record<string, unknown>;
+  return shaderData.sun && typeof shaderData.sun === 'object' ? (shaderData.sun as Record<string, unknown>) : null;
+}
+
+function collectPublicAssetUrls(assets: ScrapedAssets, value: unknown, depth = 0): void {
+  if (depth > 8 || value == null) return;
+  if (typeof value === 'string') {
+    addAsset(assets, value);
+    return;
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) collectPublicAssetUrls(assets, item, depth + 1);
+    return;
+  }
+  if (typeof value !== 'object') return;
+
+  const record = value as Record<string, unknown>;
+  addMediaObjectAssets(assets, record.texture);
+  addMediaObjectAssets(assets, record.thumbnail);
+  addMediaObjectAssets(assets, record.media);
+  const sun = starmapSunShader(record.shader_data);
+  addSunTextureAsset(assets, sun?.map);
+  addSunTextureAsset(assets, sun?.texture);
+
+  for (const [key, child] of Object.entries(record)) {
+    if (key === 'info_url' || key === 'web_url' || key === 'description') continue;
+    collectPublicAssetUrls(assets, child, depth + 1);
+  }
+}
+
+export function extractPublicAssetsFromStarmapObject(value: unknown): ScrapedAssets {
+  const assets = emptyScrapedAssets();
+  collectPublicAssetUrls(assets, value);
+  return assets;
 }
 
 let staticBundleAssetsCache: Promise<ScrapedAssets> | null = null;
@@ -100,7 +168,7 @@ async function scrapeStaticBundleAssets(): Promise<ScrapedAssets> {
     if (!response.ok) throw new Error(`ARK bundle fetch failed: ${response.status}`);
     const bundle = await response.text();
     const resourcePath = bundle.match(/resourcePath:"([^"]+)"/)?.[1] ?? `${RSI_CDN_BASE_URL}/static/starmap`;
-    const assets: ScrapedAssets = { textures: [], models: [], skybox: [], raw: [] };
+    const assets = emptyScrapedAssets();
     const pathPattern =
       /(?:["']|\/)([A-Za-z0-9_./-]+\.(?:png|jpg|jpeg|webp|dds|ktx|ktx2|basis|exr|hdr|glb|gltf|obj|bin|ctm|fbx|dae))(?:["']|\b)/gi;
     const seen = new Set<string>();
@@ -199,7 +267,7 @@ export async function scrapeStarmapSystemAssets(
 async function scrapeSystemPage(sys: StarmapSystem, waitMs: number): Promise<ScrapedAssets> {
   const url = `${RSI_BASE_URL}/starmap/systems/${sys.code}`;
   const captured = new Set<string>();
-  const assets: ScrapedAssets = { textures: [], models: [], skybox: [], raw: [] };
+  const assets = emptyScrapedAssets();
 
   const browser = await chromium.launch({ headless: false });
   try {
@@ -243,7 +311,7 @@ async function scrapeSystemPage(sys: StarmapSystem, waitMs: number): Promise<Scr
     await browser.close();
   }
 
-  if (assets.textures.length + assets.models.length + assets.skybox.length === 0) {
+  if (assetCount(assets) === 0) {
     try {
       mergeAssets(assets, await scrapeStaticBundleAssets());
     } catch (err) {
