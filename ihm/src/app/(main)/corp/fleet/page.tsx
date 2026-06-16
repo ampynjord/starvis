@@ -514,12 +514,12 @@ export default function FleetManagerPage() {
             <h1 className="text-sm font-orbitron font-bold text-white tracking-wider uppercase truncate">
               Fleet Manager
             </h1>
-            {corp && (
+            {corp && viewMode !== 'mine' && (
               <span className="text-[10px] font-orbitron text-slate-500 border border-slate-800 px-1.5 py-0.5 rounded-sm shrink-0">
                 [{corp.tag}] {corp.name}
               </span>
             )}
-            {!loading && !corp && (
+            {!loading && (!corp || viewMode === 'mine') && (
               <span className="text-[10px] font-orbitron text-slate-500 border border-slate-800 px-1.5 py-0.5 rounded-sm shrink-0">
                 Personal Fleet
               </span>
