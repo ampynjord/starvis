@@ -48,20 +48,6 @@ function sqlDate(value: unknown): string | null {
   return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 19).replace('T', ' ');
 }
 
-function sourceList(value: unknown): string[] | null {
-  if (Array.isArray(value))
-    return value
-      .map((item: any) => item.name ?? item.code ?? item)
-      .filter(Boolean)
-      .map(String);
-  if (typeof value === 'string' && value.trim())
-    return value
-      .split(',')
-      .map((part) => part.trim())
-      .filter(Boolean);
-  return null;
-}
-
 function normalizeStarmapObjectType(type: unknown): string {
   const normalized = String(type ?? 'unknown')
     .toLowerCase()
@@ -96,6 +82,30 @@ function mergeStarmapBodies(primary: any[], fallback: any[]): any[] {
     if (key) merged.set(key, { ...(merged.get(key) ?? {}), ...body });
   }
   return [...merged.values()];
+}
+
+function markdownToHtml(md: string): string {
+  let html = md
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    .replace(/_(.+?)_/g, '<em>$1</em>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+
+  html = html
+    .split(/\n{2,}/)
+    .map((p) => {
+      p = p.trim();
+      if (!p) return '';
+      if (/^<h[1-6]|^<ul|^<ol|^<table|^<blockquote/.test(p)) return p;
+      return `<p>${p.replace(/\n/g, '<br />')}</p>`;
+    })
+    .filter(Boolean)
+    .join('\n');
+
+  return html;
 }
 
 function resolveRsiUrl(src: string | null | undefined): string | null {
@@ -208,96 +218,89 @@ export class RsiSyncService {
     return stats;
   }
 
-  // ── Galactapedia — source officielle RSI (Playwright + interception XHR) ────
+  // ── Galactapedia — source officielle RSI (GraphQL API) ──────────────────────
 
   async syncGalactapedia(onProgress?: (msg: string) => void): Promise<SyncStats> {
-    const { chromium } = await import('playwright');
     const stats: SyncStats = { inserted: 0, updated: 0, errors: 0 };
+    const GRAPHQL_URL = `${RSI_BASE_URL}/galactapedia/graphql`;
+    const PAGE_SIZE = 100;
+    let skip = 0;
+    let totalCount: number | null = null;
+    const allArticles: any[] = [];
 
-    onProgress?.('  [galactapedia] Launching browser to enumerate RSI galactapedia…');
-    const browser = await chromium.launch({ headless: true });
-
-    const articles: any[] = [];
-
-    try {
-      const context = await browser.newContext({
-        userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      });
-      const page = await context.newPage();
-
-      // Intercept JSON responses from RSI's galactapedia data API
-      page.on('response', async (response) => {
-        const url = response.url();
-        if (!url.includes('galactapedia')) return;
-        const ct = response.headers()['content-type'] ?? '';
-        if (!ct.includes('application/json')) return;
-        try {
-          const body = await response.json();
-          const items: any[] = body?.data ?? body?.results ?? body?.articles ?? [];
-          if (items.length > 0) articles.push(...items);
-        } catch {
-          // not all JSON responses are article lists
-        }
-      });
-
-      await page.goto(`${RSI_BASE_URL}/galactapedia`, { waitUntil: 'networkidle', timeout: 30_000 });
-
-      // If the SPA didn't fire API calls, fall back to scraping article links from DOM
-      if (articles.length === 0) {
-        onProgress?.('  [galactapedia] No XHR data captured — extracting article links from DOM…');
-        const links = await page.$$eval('a[href*="/galactapedia/article/"]', (els) => [
-          ...new Set(els.map((a) => (a as { href: string }).href)),
-        ]);
-        onProgress?.(`  [galactapedia] Found ${links.length} article links in DOM`);
-
-        for (const link of links) {
-          const match = /\/galactapedia\/article\/([^-/]+)-(.+)$/.exec(link);
-          if (!match) continue;
-          const [, id, slug] = match;
-          articles.push({ id, slug, rsi_url: link });
-        }
-      }
-
-      // Handle RSI pagination if galactapedia has a paginated listing
-      // Look for next-page links / load-more buttons
+    while (true) {
+      let data: any;
       try {
-        let hasMore = true;
-        while (hasMore) {
-          const loadMore = await page.$('button[data-testid="load-more"], .load-more, [aria-label*="next"], a[rel="next"]');
-          if (!loadMore) break;
-          const prevCount = articles.length;
-          await loadMore.click();
-          await page.waitForTimeout(2000);
-          if (articles.length === prevCount) hasMore = false;
-        }
-      } catch {
-        // pagination is optional
+        const res = await fetch(GRAPHQL_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'User-Agent': SCRAPER_USER_AGENT,
+          },
+          body: JSON.stringify({
+            query: `{
+              allArticle(first: ${PAGE_SIZE}, skip: ${skip}) {
+                totalCount
+                pageInfo { hasNextPage }
+                edges {
+                  node {
+                    id title slug body template
+                    categories { ... on Category { title } }
+                    tags { ... on Tag { title } }
+                  }
+                }
+              }
+            }`,
+          }),
+          signal: AbortSignal.timeout(30_000),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        data = await res.json();
+      } catch (err) {
+        logger.warn(`[galactapedia] GraphQL fetch error at skip=${skip}: ${(err as Error).message}`);
+        stats.errors++;
+        break;
       }
-    } finally {
-      await browser.close();
+
+      const page = data?.data?.allArticle;
+      if (!page) {
+        logger.warn('[galactapedia] Unexpected GraphQL response shape');
+        stats.errors++;
+        break;
+      }
+
+      if (totalCount === null) {
+        totalCount = page.totalCount ?? 0;
+        onProgress?.(`  [galactapedia] ${totalCount} articles from RSI GraphQL`);
+      }
+
+      const edges: any[] = page.edges ?? [];
+      for (const edge of edges) {
+        if (edge?.node) allArticles.push(edge.node);
+      }
+
+      if (!page.pageInfo?.hasNextPage || edges.length === 0) break;
+      skip += PAGE_SIZE;
+      await new Promise((r) => setTimeout(r, 150));
     }
 
-    onProgress?.(`  [galactapedia] ${articles.length} articles found from RSI`);
+    onProgress?.(`  [galactapedia] ${allArticles.length} articles fetched`);
 
     const conn = await this.pool.connect();
     try {
-      for (const item of articles) {
-        const id = String(item.id ?? item.rsi_id ?? '');
-        const slug = String(
-          item.slug ??
-            item.url
-              ?.split('/')
-              .pop()
-              ?.replace(/^[^-]+-/, '') ??
-            '',
-        );
+      for (const article of allArticles) {
+        const id = String(article.id ?? '');
+        const slug = String(article.slug ?? '');
         if (!id) continue;
 
-        const title = String(item.title ?? item.name ?? slug ?? id);
-        const thumbnailUrl: string | null = item.thumbnail?.url ?? item.thumbnail ?? item.image ?? null;
-        const rsiUrl = item.rsi_url ?? `${RSI_BASE_URL}/galactapedia/article/${id}-${slug}`;
-        const categories = json(sourceList(item.categories ?? item.category));
-        const tags = json(sourceList(item.tags ?? item.tag));
+        const title = String(article.title ?? slug ?? id);
+        const rsiUrl = `${RSI_BASE_URL}/galactapedia/article/${id}-${slug}`;
+
+        const cats = Array.isArray(article.categories) ? article.categories.map((c: any) => c?.title).filter(Boolean) : [];
+        const tagList = Array.isArray(article.tags) ? article.tags.map((t: any) => t?.title).filter(Boolean) : [];
+
+        const content = article.body ? markdownToHtml(String(article.body)) : null;
 
         try {
           const result = await conn.query<any>(
@@ -309,33 +312,30 @@ export class RsiSyncService {
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
              ON CONFLICT (id) DO UPDATE SET
                slug=EXCLUDED.slug, title=EXCLUDED.title,
-               content=CASE WHEN rsi.galactapedia.content LIKE '%<p%' OR rsi.galactapedia.content LIKE '%<img%'
-                            THEN rsi.galactapedia.content ELSE EXCLUDED.content END,
-               excerpt=COALESCE(rsi.galactapedia.excerpt, EXCLUDED.excerpt),
+               content=COALESCE(EXCLUDED.content, rsi.galactapedia.content),
                categories=COALESCE(EXCLUDED.categories, rsi.galactapedia.categories),
                tags=COALESCE(EXCLUDED.tags, rsi.galactapedia.tags),
-               thumbnail_url=COALESCE(EXCLUDED.thumbnail_url, rsi.galactapedia.thumbnail_url),
                rsi_url=EXCLUDED.rsi_url,
                updated_at=NOW()`,
             [
               id,
               slug,
               title,
+              content,
               null,
               null,
-              item.type ?? null,
-              item.template ?? null,
-              categories,
-              tags,
-              item.categories_count ?? null,
-              item.tags_count ?? null,
-              item.related_articles_count ?? null,
-              thumbnailUrl ? (thumbnailUrl.startsWith('http') ? thumbnailUrl : `${RSI_BASE_URL}${thumbnailUrl}`) : null,
-              rsiUrl.startsWith('http') ? rsiUrl : `${RSI_BASE_URL}${rsiUrl}`,
+              article.template ?? null,
+              cats.length > 0 ? json(cats) : null,
+              tagList.length > 0 ? json(tagList) : null,
+              cats.length || null,
+              tagList.length || null,
+              null,
+              null,
+              rsiUrl,
               null,
               null,
               null,
-              json(item),
+              json(article),
             ],
           );
           if (result.rowCount === 1) stats.inserted++;
