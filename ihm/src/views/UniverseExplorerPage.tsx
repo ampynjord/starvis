@@ -26,6 +26,9 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { EarlyAccessNotice } from '@/components/ui/EarlyAccessNotice';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useEnv } from '@/contexts/EnvContext';
@@ -964,6 +967,16 @@ function Scene({
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
 
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(container.clientWidth, container.clientHeight),
+      0.4,  // strength — subtle, preserves readability
+      0.35, // radius
+      0.22, // threshold — only bright emissive elements bloom
+    );
+    composer.addPass(bloomPass);
+
     const camera = new THREE.PerspectiveCamera(46, container.clientWidth / container.clientHeight, 0.1, 1400);
     camera.position.set(0, 118, 148);
 
@@ -1251,7 +1264,7 @@ function Scene({
       if (selected) controls.target.lerp(selected.position, 0.04);
       if (!selected) controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.02);
       controls.update();
-      renderer.render(scene, camera);
+      composer.render();
     };
     animate();
 
@@ -1262,6 +1275,7 @@ function Scene({
       camera.updateProjectionMatrix();
       renderer.setPixelRatio(getThreePixelRatio());
       renderer.setSize(width, height);
+      composer.setSize(width, height);
     });
     resize.observe(container);
 
@@ -1273,6 +1287,7 @@ function Scene({
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       controls.dispose();
       disposeObject3D(scene);
+      composer.dispose();
       renderer.dispose();
       if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
     };
