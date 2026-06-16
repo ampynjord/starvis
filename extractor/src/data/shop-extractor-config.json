@@ -18,7 +18,12 @@
   "locationSlugOverrides": {
     "a18": "@ui_pregame_port_Area18_name",
     "area18": "@ui_pregame_port_Area18_name",
-    "arccorp": "@ui_pregame_port_Area18_name"
+    "arccorp": "@ui_pregame_port_Area18_name",
+    "nb": "@ui_pregame_port_NewBabbage_name",
+    "newbab": "@ui_pregame_port_NewBabbage_name",
+    "lv": "@ui_pregame_port_Lorville_name",
+    "grm": "@ui_pregame_port_GrimHex_name",
+    "hex": "@ui_pregame_port_GrimHex_name"
   },
   "skipLocationSlugs": ["franchise", "prop", "intcomponent", "component", "vendor"]
 }

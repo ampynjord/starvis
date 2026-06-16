@@ -355,7 +355,11 @@ export class RsiWebsiteService {
       `SELECT sl.id, sl.rsi_id, sl.name, sl.type, sl.system_code, sl.system_name,
               sl.status, sl.faction_name, sl.parent_id, parent.id as parent_db_id,
               sl.coordinates, sl.aggregated,
-              sl.thumbnail, sl.description, sl.star_type,
+              sl.thumbnail,
+              sl.raw_json -> 'thumbnail' as thumbnail_data,
+              sl.affiliations,
+              sl.assets,
+              sl.description, sl.star_type,
               sl.habitable_zone_inner, sl.habitable_zone_outer,
               sl.population, sl.economy, sl.danger, sl.jump_points,
               (

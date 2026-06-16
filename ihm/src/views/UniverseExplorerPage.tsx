@@ -26,6 +26,9 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { EarlyAccessNotice } from '@/components/ui/EarlyAccessNotice';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { useEnv } from '@/contexts/EnvContext';
@@ -58,6 +61,17 @@ type RsiStarmapPosition = {
   faction_name?: string | null;
   coordinates?: Coordinates | null;
   thumbnail?: string | null;
+  thumbnail_data?: {
+    url?: string | null;
+    images?: {
+      product_thumb_large?: string | null;
+      post?: string | null;
+      source?: string | null;
+      [key: string]: string | null | undefined;
+    } | null;
+  } | null;
+  affiliations?: string[] | null;
+  assets?: { textures?: string[]; models?: string[]; skybox?: string[]; raw?: string[] } | null;
   description?: string | null;
   star_type?: string | null;
   habitable_zone_inner?: number | string | null;
@@ -110,6 +124,7 @@ type LocationWithMap = Location & {
   economy?: number | null;
   danger?: number | null;
   jump_points?: JumpPointLink[] | null;
+  scraped_assets?: { textures?: string[]; models?: string[]; skybox?: string[] } | null;
   rsi_starmap?: {
     name?: string | null;
     type?: string | null;
@@ -368,7 +383,8 @@ function posToLocation(pos: RsiStarmapPosition): LocationWithMap {
     p4k_path: p4k?.p4k_path ?? null,
     rsi_starmap_location_id: pos.id,
     aggregated: pos.aggregated ?? null,
-    thumbnail: pos.thumbnail ?? null,
+    thumbnail: pos.thumbnail_data?.images?.product_thumb_large ?? pos.thumbnail_data?.images?.post ?? pos.thumbnail_data?.url ?? pos.thumbnail ?? null,
+    scraped_assets: pos.assets ? { textures: pos.assets.textures ?? [], models: pos.assets.models ?? [], skybox: pos.assets.skybox ?? [] } : null,
     star_type: pos.star_type ?? null,
     habitable_zone_inner: toNumber(pos.habitable_zone_inner),
     habitable_zone_outer: toNumber(pos.habitable_zone_outer),
@@ -967,6 +983,16 @@ function Scene({
     const camera = new THREE.PerspectiveCamera(46, container.clientWidth / container.clientHeight, 0.1, 1400);
     camera.position.set(0, 118, 148);
 
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(container.clientWidth, container.clientHeight),
+      0.4,  // strength — subtle, preserves readability
+      0.35, // radius
+      0.22, // threshold — only bright emissive elements bloom
+    );
+    composer.addPass(bloomPass);
+
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.07;
@@ -1068,6 +1094,8 @@ function Scene({
     const halos = new Map<string, THREE.Sprite>();
     const labels: THREE.Sprite[] = [];
     const denseScene = nodes.filter((node) => !node.parentId).length > 45;
+    const textureLoader = new THREE.TextureLoader();
+    textureLoader.crossOrigin = 'anonymous';
 
     function glowSprite(color: number) {
       const canvas = document.createElement('canvas');
@@ -1128,6 +1156,26 @@ function Scene({
       mesh.userData.nodeId = node.id;
       group.add(mesh);
       meshes.set(node.id, mesh);
+
+      const thumbnailUrl = rsiImageUrl(node.loc.thumbnail);
+      const scrapedTextureUrl = node.loc.scraped_assets?.textures?.find((u) =>
+        /\.(png|jpg|jpeg|webp)(\?|$)/i.test(u) && !/ui|icon|button|hud|font/i.test(u),
+      ) ?? null;
+      const textureUrl = thumbnailUrl ?? scrapedTextureUrl;
+      if (textureUrl && (type === 'planet' || type === 'moon' || type === 'station' || type === 'rest_stop')) {
+        textureLoader.load(
+          textureUrl,
+          (tex) => {
+            tex.colorSpace = THREE.SRGBColorSpace;
+            material.map = tex;
+            material.emissive.set(node.color);
+            material.emissiveIntensity = 0.06;
+            material.needsUpdate = true;
+          },
+          undefined,
+          () => {},
+        );
+      }
 
       const halo = glowSprite(node.color);
       if (halo) {
@@ -1251,7 +1299,7 @@ function Scene({
       if (selected) controls.target.lerp(selected.position, 0.04);
       if (!selected) controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.02);
       controls.update();
-      renderer.render(scene, camera);
+      composer.render();
     };
     animate();
 
@@ -1262,6 +1310,7 @@ function Scene({
       camera.updateProjectionMatrix();
       renderer.setPixelRatio(getThreePixelRatio());
       renderer.setSize(width, height);
+      composer.setSize(width, height);
     });
     resize.observe(container);
 
@@ -1273,6 +1322,7 @@ function Scene({
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
       controls.dispose();
       disposeObject3D(scene);
+      composer.dispose();
       renderer.dispose();
       if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
     };

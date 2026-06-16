@@ -18,6 +18,7 @@ export const EXTRACTION_MODULES = [
   'galactapedia',
   'comm-links',
   'starmap',
+  'starmap-assets',
   'ship-matrix',
   'ship-galleries',
   'organizations',
@@ -68,6 +69,7 @@ export const MODULE_REGISTRY: readonly ExtractionModuleDefinition[] = [
   { id: 'galactapedia', runtime: 'network' },
   { id: 'comm-links', runtime: 'network' },
   { id: 'starmap', runtime: 'network' },
+  { id: 'starmap-assets', runtime: 'network', aliases: ['starmap-asset', 'ark-assets', 'ark-textures'] },
   { id: 'ship-matrix', runtime: 'network' },
   {
     id: 'ship-galleries',
