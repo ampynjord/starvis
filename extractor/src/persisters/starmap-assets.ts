@@ -6,8 +6,8 @@
  * the assets JSONB column of each system-level starmap_locations row.
  */
 import type { PoolClient } from 'pg';
-import { type StarmapSystem, scrapeStarmapSystemAssets } from '../starmap-asset-scraper.js';
 import type { GameEnv } from '../module-registry.js';
+import { type StarmapSystem, scrapeStarmapSystemAssets } from '../starmap-asset-scraper.js';
 
 export async function saveStarmapAssets(
   conn: PoolClient,
