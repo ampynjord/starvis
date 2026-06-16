@@ -194,6 +194,24 @@ function extractSystemCode(filePath: string, className?: string): string | null 
 
 const ZERO_GUID = '00000000-0000-0000-0000-000000000000';
 
+const { deprecatedLocations } = locationExtractorConfig;
+
+/**
+ * Returns true if a location should be excluded from extraction entirely.
+ * Matches against a configurable blocklist of deprecated/removed in-game locations
+ * (e.g. Port Olisar, Scan Hubs, event-only structures).
+ */
+function isDeprecatedLocation(className: string, filePath: string): boolean {
+  const cn = className.toLowerCase();
+  const fp = filePath.replace(/\\/g, '/').toLowerCase();
+
+  if (deprecatedLocations.classNames.some((name) => name.toLowerCase() === cn)) return true;
+  if (deprecatedLocations.classNamePatterns.some((pattern) => cn.includes(pattern.toLowerCase()))) return true;
+  if (deprecatedLocations.filePathPatterns.some((pattern) => fp.includes(pattern.toLowerCase()))) return true;
+
+  return false;
+}
+
 /**
  * Build a human-readable fallback name from a class name when LOC key fails.
  * E.g. "Stanton1_Lorville" → "Lorville", "RR_HUR_L1_CLINIC" → "RR HUR L1 Clinic"
@@ -258,6 +276,12 @@ export function extractLocations(df: DataForgeContext, loc: LocationLocAdapter, 
     const filePath = record.fileName ?? '';
     const type = classifyByPath(filePath);
     if (!type) {
+      skipped++;
+      continue;
+    }
+
+    const rawClassName = (record.name ?? '').replace(/^StarMapObject\./i, '');
+    if (isDeprecatedLocation(rawClassName, filePath)) {
       skipped++;
       continue;
     }

@@ -138,6 +138,7 @@ model StarmapLocation {
   habitableZoneInner Decimal?  @map("habitable_zone_inner") @db.Decimal(12, 2)
   habitableZoneOuter Decimal?  @map("habitable_zone_outer") @db.Decimal(12, 2)
   jumpPoints         Json?     @map("jump_points")
+  assets             Json?
   rawJson            Json?     @map("raw_json")
   sourceUpdatedAt    DateTime? @map("source_updated_at")
   syncedAt           DateTime  @default(now()) @map("synced_at")

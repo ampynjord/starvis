@@ -41,6 +41,7 @@ import { savePaints } from './persisters/paints.js';
 import { saveOfficialShipGalleries } from './persisters/ship-galleries.js';
 import { saveShips } from './persisters/ships.js';
 import { saveShopsData } from './persisters/shops.js';
+import { saveStarmapAssets } from './persisters/starmap-assets.js';
 import { RsiSyncService } from './rsi-sync-service.js';
 
 export type { ExtractionModule, GameEnv };
@@ -69,6 +70,12 @@ export interface ExtractionOptions {
   shipGalleryRetries?: number;
   /** Base retry backoff delay for official RSI ship gallery scraping. */
   shipGalleryRetryBaseDelayMs?: number;
+  /** When true, re-scrape all systems even if assets already captured. */
+  starmapAssetsForce?: boolean;
+  /** Number of systems to scrape concurrently for ARK Starmap assets (default: 1). */
+  starmapAssetsConcurrency?: number;
+  /** Milliseconds to wait for WebGL scene to stream assets per system (default: 6000). */
+  starmapAssetsWaitMs?: number;
 }
 
 const DEFAULT_OPTIONS: ExtractionOptions = {
@@ -512,6 +519,22 @@ export class ExtractionService {
         throw e;
       } finally {
         galleryConn.release();
+      }
+    }
+
+    if (run('starmap-assets')) {
+      const aForce = options.starmapAssetsForce ?? false;
+      const aConcurrency = options.starmapAssetsConcurrency ?? 1;
+      const aWaitMs = options.starmapAssetsWaitMs ?? 6000;
+      const aPool = options.rsiPool ?? this.pool;
+      const aConn = await aPool.connect();
+      try {
+        onProgress?.(`Scraping ARK Starmap 3D assets… [${aForce ? 'force-all' : 'incremental'}, concurrency=${aConcurrency}]`);
+        await saveStarmapAssets(aConn, env, { force: aForce, concurrency: aConcurrency, waitMs: aWaitMs }, onProgress);
+      } catch (e) {
+        stats.errors.push(`Starmap assets failed: ${(e as Error).message}`);
+      } finally {
+        aConn.release();
       }
     }
 

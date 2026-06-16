@@ -69,6 +69,22 @@ const LOCATION_WORDS = [
   'covalex',
   'fairoaks',
   'klescher',
+  // Pyro system locations
+  'checkmate',
+  'ruin',
+  'bloom',
+  'monitor',
+  'vigil',
+  'goldenrule',
+  'pyro1',
+  'pyro2',
+  'pyro3',
+  'pyro4',
+  'pyro5',
+  'pyro6',
+  'reyger',
+  'starfall',
+  'orinthcrest',
 ];
 
 const SHOP_TYPE_RULES: Array<{ type: string; pattern: RegExp }> = [
@@ -374,7 +390,19 @@ function resolveLocMeta(
   locMetaByLocKey: Map<string, { uuid: string; location: string; system: string | null; planet_moon: string | null; city: string | null }>,
 ) {
   const slug = normalizeLookupSlug(shop.locationSlug);
-  const locKey = slugIndex.get(slug) ?? null;
+  let locKey = slugIndex.get(slug) ?? null;
+
+  // Fallback: prefix match — handles cases where the slug is a shortened form of
+  // the indexed key (e.g. "seraphim" matches "seraphimstation"). Only accepted
+  // when exactly one key starts with the slug to avoid ambiguous matches.
+  if (!locKey && slug.length >= 4) {
+    const hits: string[] = [];
+    for (const [key, val] of slugIndex) {
+      if (key !== slug && key.startsWith(slug)) hits.push(val);
+    }
+    if (hits.length === 1) locKey = hits[0];
+  }
+
   const meta = locKey ? locMetaByLocKey.get(locKey) : null;
   return { locKey, meta };
 }
