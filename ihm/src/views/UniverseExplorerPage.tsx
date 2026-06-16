@@ -10,6 +10,7 @@ import {
   CircleDot,
   Eye,
   Globe2,
+  LocateFixed,
   Loader2,
   MapPin,
   Package,
@@ -111,7 +112,8 @@ type JumpPointRow = {
 };
 
 type LocationWithMap = Location & {
-  parent_id?: number | null;
+  parent_id?: number | string | null;
+  parent_db_id?: number | null;
   aggregated?: RsiStarmapPosition['aggregated'];
   coordinates?: Coordinates | null;
   rsi_starmap_location_id?: number | null;
@@ -127,6 +129,7 @@ type LocationWithMap = Location & {
   scraped_assets?: { textures?: string[]; models?: string[]; skybox?: string[] } | null;
   rsi_starmap?: {
     name?: string | null;
+    rsi_id?: string | null;
     type?: string | null;
     status?: string | null;
     system_code?: string | null;
@@ -363,6 +366,16 @@ function rsiImageUrl(url?: string | null) {
   return `https://robertsspaceindustries.com${url.startsWith('/') ? '' : '/'}${url}`;
 }
 
+function usableArkTexture(url?: string | null) {
+  if (!url) return false;
+  return /\.(png|jpg|jpeg|webp)(\?|$)/i.test(url) && !/ui|icon|button|hud|font|logo|sprite/i.test(url);
+}
+
+function preferredArkTextures(loc?: LocationWithMap | null) {
+  const assets = loc?.scraped_assets;
+  return [...(assets?.skybox ?? []), ...(assets?.textures ?? [])].filter(usableArkTexture).map((url) => rsiImageUrl(url)).filter(Boolean) as string[];
+}
+
 function posToLocation(pos: RsiStarmapPosition): LocationWithMap {
   const stableId = pos.rsi_id ?? String(pos.id);
   const parentStableId = pos.parent_id != null ? String(pos.parent_id) : null;
@@ -393,6 +406,7 @@ function posToLocation(pos: RsiStarmapPosition): LocationWithMap {
     danger: toNumber(pos.danger),
     jump_points: Array.isArray(pos.jump_points) ? pos.jump_points : null,
     rsi_starmap: {
+      rsi_id: pos.rsi_id ?? null,
       name: pos.name,
       type: pos.type,
       status: pos.status ?? null,
@@ -483,10 +497,29 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
   const rootByCode = new Map(roots.map((loc) => [systemCode(loc), loc]));
   const visibleIds = new Set(visible.map((loc) => loc.uuid));
   const visibleByUuid = new Map(visible.map((loc) => [loc.uuid, loc]));
+  const visibleByRsiKey = new Map<string, LocationWithMap>();
   const byRsiId = new Map<number, LocationWithMap>();
   for (const loc of visible) {
     if (loc.rsi_starmap_location_id != null) byRsiId.set(loc.rsi_starmap_location_id, loc);
+    for (const value of [loc.rsi_starmap?.rsi_id, loc.rsi_starmap_location_id, loc.parent_db_id]) {
+      if (value != null && String(value)) visibleByRsiKey.set(String(value), loc);
+    }
   }
+  const parentFor = (loc: LocationWithMap) => {
+    if (loc.parent_uuid && visibleIds.has(loc.parent_uuid)) return visibleByUuid.get(loc.parent_uuid) ?? null;
+    if (loc.parent_id != null) {
+      const key = String(loc.parent_id);
+      const direct = visibleByRsiKey.get(key);
+      if (direct && direct.uuid !== loc.uuid) return direct;
+      const generated = visibleByUuid.get(`starmap-${key}`);
+      if (generated && generated.uuid !== loc.uuid) return generated;
+    }
+    if (loc.parent_db_id != null) {
+      const direct = byRsiId.get(loc.parent_db_id) ?? visibleByRsiKey.get(String(loc.parent_db_id));
+      if (direct && direct.uuid !== loc.uuid) return direct;
+    }
+    return null;
+  };
   const resolvedSystemCache = new Map<string, string>();
   const resolvedSystemCode = (loc: LocationWithMap, seen = new Set<string>()): string => {
     const cached = resolvedSystemCache.get(loc.uuid);
@@ -498,12 +531,7 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
     }
     if (!seen.has(loc.uuid)) {
       seen.add(loc.uuid);
-      const parent =
-        loc.parent_id != null
-          ? byRsiId.get(loc.parent_id)
-          : loc.parent_uuid
-            ? visibleByUuid.get(loc.parent_uuid)
-            : null;
+      const parent = parentFor(loc);
       if (parent) {
         const code = resolvedSystemCode(parent, seen);
         resolvedSystemCache.set(loc.uuid, code);
@@ -515,11 +543,8 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
     return code;
   };
   const parentIdFor = (loc: LocationWithMap) => {
-    if (loc.parent_id != null) {
-      const parent = byRsiId.get(loc.parent_id);
-      if (parent?.uuid && parent.uuid !== loc.uuid) return parent.uuid;
-    }
-    if (loc.parent_uuid && visibleIds.has(loc.parent_uuid)) return loc.parent_uuid;
+    const parent = parentFor(loc);
+    if (parent?.uuid && parent.uuid !== loc.uuid) return parent.uuid;
     const root = rootByCode.get(resolvedSystemCode(loc));
     return root && root.uuid !== loc.uuid ? root.uuid : null;
   };
@@ -620,8 +645,15 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
 
   const locationNodeByLocKey = new Map<string, MapNode>();
   const locationNodeByName = new Map<string, MapNode>();
+  const rootNodeBySystemKey = new Map<string, MapNode>();
   for (const node of nodes.values()) {
     if (node.loc.loc_key) locationNodeByLocKey.set(node.loc.loc_key, node);
+    if (!node.parentId || normalizeType(node.loc.type) === 'system') {
+      for (const value of [node.systemCode, node.label, node.loc.rsi_starmap?.system_code, node.loc.rsi_starmap?.system_name]) {
+        const key = lookupKey(value);
+        if (key && !rootNodeBySystemKey.has(key)) rootNodeBySystemKey.set(key, node);
+      }
+    }
     for (const value of [node.loc.name, node.loc.rsi_starmap?.name]) {
       const key = lookupKey(value);
       if (key && !locationNodeByName.has(key)) locationNodeByName.set(key, node);
@@ -641,7 +673,7 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
     }
     const systemValue = lookupKey(shop.system);
     if (systemValue) {
-      return [...nodes.values()].find((node) => node.loc.type === 'system' && lookupKey(node.label) === systemValue) ?? null;
+      return rootNodeBySystemKey.get(systemValue) ?? null;
     }
     return null;
   };
@@ -688,27 +720,30 @@ function buildNodes(locations: LocationWithMap[], shops: Shop[]) {
   orphanShops
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach((shop, index) => {
-      const loc = {
-        uuid: `shop-${shop.id}`,
-        class_name: shop.class_name || `shop-${shop.id}`,
-        name: shop.name,
-        type: shopNodeType(shop),
-        system_code: shop.system ?? null,
-        parent_uuid: null,
-        loc_key: shop.loc_key ?? null,
-        description: `${typeStyle(shopNodeType(shop)).label} located at ${shopLocationLabel(shop)}.`,
-        is_scannable: false,
+      const fallbackParent =
+        rootNodeBySystemKey.get(lookupKey(shop.system)) ??
+        [...roots]
+          .map((loc) => nodes.get(loc.uuid))
+          .find((node): node is MapNode => Boolean(node));
+      const loc = shopToLocation(shop, fallbackParent?.loc ?? ({
+        uuid: `shop-root-${shop.system ?? 'unknown'}`,
+        class_name: `shop-root-${shop.system ?? 'unknown'}`,
+        name: shop.system || 'Unresolved shops',
+        type: 'system',
+        system_code: shop.system ?? 'SHOP',
         hide_in_starmap: false,
-      } as LocationWithMap;
+      } as LocationWithMap));
       const style = typeStyle(loc.type);
+      const parentId = fallbackParent?.id ?? null;
+      const base = fallbackParent?.position ?? new THREE.Vector3();
       const angle = index * 2.399963229728653;
-      const ring = 90 + Math.sqrt(index + 1) * 2.2;
+      const ring = fallbackParent ? 7 + Math.floor(index / 10) * 1.1 : 90 + Math.sqrt(index + 1) * 2.2;
       nodes.set(loc.uuid, {
         id: loc.uuid,
         loc,
-        parentId: null,
-        systemCode: shop.system || 'SHOP',
-        position: new THREE.Vector3(Math.cos(angle) * ring, -1.5, Math.sin(angle) * ring),
+        parentId,
+        systemCode: fallbackParent?.systemCode ?? shop.system ?? 'SHOP',
+        position: base.clone().add(new THREE.Vector3(Math.cos(angle) * ring, -1.2, Math.sin(angle) * ring)),
         radius: style.radius,
         color: style.color,
         label: shop.name,
@@ -865,6 +900,7 @@ function Scene({
   jumpLinks,
   selectedId,
   highlightId,
+  arkBackdropUrls,
   focusSelected,
   onSelect,
 }: {
@@ -872,6 +908,7 @@ function Scene({
   jumpLinks: { a: string; b: string }[];
   selectedId: string | null;
   highlightId: string | null;
+  arkBackdropUrls: string[];
   focusSelected: boolean;
   onSelect: (id: string) => void;
 }) {
@@ -968,6 +1005,8 @@ function Scene({
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x000204);
     scene.fog = new THREE.FogExp2(0x01060c, 0.0018);
+    const textureLoader = new THREE.TextureLoader();
+    textureLoader.crossOrigin = 'anonymous';
 
     let renderer: THREE.WebGLRenderer;
     try {
@@ -1038,6 +1077,30 @@ function Scene({
     const group = new THREE.Group();
     scene.add(group);
 
+    const backdropUrl = arkBackdropUrls[0];
+    if (backdropUrl) {
+      textureLoader.load(
+        backdropUrl,
+        (texture) => {
+          texture.colorSpace = THREE.SRGBColorSpace;
+          const sphere = new THREE.Mesh(
+            new THREE.SphereGeometry(620, 48, 24),
+            new THREE.MeshBasicMaterial({
+              map: texture,
+              side: THREE.BackSide,
+              transparent: true,
+              opacity: 0.34,
+              depthWrite: false,
+            }),
+          );
+          sphere.rotation.y = Math.PI * (hash(backdropUrl) - 0.5);
+          scene.add(sphere);
+        },
+        undefined,
+        () => {},
+      );
+    }
+
     const grid = new THREE.GridHelper(360, 24, 0x0e7490, 0x052536);
     const gridMaterial = grid.material as THREE.Material;
     gridMaterial.transparent = true;
@@ -1094,8 +1157,6 @@ function Scene({
     const halos = new Map<string, THREE.Sprite>();
     const labels: THREE.Sprite[] = [];
     const denseScene = nodes.filter((node) => !node.parentId).length > 45;
-    const textureLoader = new THREE.TextureLoader();
-    textureLoader.crossOrigin = 'anonymous';
 
     function glowSprite(color: number) {
       const canvas = document.createElement('canvas');
@@ -1158,11 +1219,9 @@ function Scene({
       meshes.set(node.id, mesh);
 
       const thumbnailUrl = rsiImageUrl(node.loc.thumbnail);
-      const scrapedTextureUrl = node.loc.scraped_assets?.textures?.find((u) =>
-        /\.(png|jpg|jpeg|webp)(\?|$)/i.test(u) && !/ui|icon|button|hud|font/i.test(u),
-      ) ?? null;
+      const scrapedTextureUrl = preferredArkTextures(node.loc)[0] ?? null;
       const textureUrl = thumbnailUrl ?? scrapedTextureUrl;
-      if (textureUrl && (type === 'planet' || type === 'moon' || type === 'station' || type === 'rest_stop')) {
+      if (textureUrl && (type === 'planet' || type === 'moon' || type === 'station' || type === 'rest_stop' || type === 'system')) {
         textureLoader.load(
           textureUrl,
           (tex) => {
@@ -1225,6 +1284,20 @@ function Scene({
           );
           group.add(orbit);
         }
+      }
+
+      if ((type === 'system' || type === 'star') && node.loc.scraped_assets) {
+        const assetRing = new THREE.LineLoop(
+          new THREE.BufferGeometry().setFromPoints(
+            Array.from({ length: 96 }, (_, i) => {
+              const a = (i / 96) * Math.PI * 2;
+              return new THREE.Vector3(Math.cos(a) * node.radius * 4.3, 0, Math.sin(a) * node.radius * 4.3).add(node.position);
+            }),
+          ),
+          new THREE.LineBasicMaterial({ color: 0x67e8f9, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending }),
+        );
+        assetRing.rotation.x = Math.PI * 0.5;
+        group.add(assetRing);
       }
 
       if (type === 'jump_point') {
@@ -1326,7 +1399,7 @@ function Scene({
       renderer.dispose();
       if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
     };
-  }, [nodes, jumpLinks, focusSelected]);
+  }, [nodes, jumpLinks, arkBackdropUrls, focusSelected]);
 
   return <div ref={containerRef} className="absolute inset-0" />;
 }
@@ -1768,6 +1841,7 @@ export default function UniverseExplorerPage() {
   const currentSystemSummary = useMemo(() => (
     currentRoot ? systemSummaries.find((summary) => summary.root.id === currentRoot.id) ?? null : null
   ), [currentRoot, systemSummaries]);
+  const arkBackdropUrls = useMemo(() => preferredArkTextures(currentRoot?.loc).slice(0, 3), [currentRoot]);
 
   useEffect(() => {
     setShopParam(new URLSearchParams(window.location.search).get('shop'));
@@ -1841,6 +1915,9 @@ export default function UniverseExplorerPage() {
   const hzOuter = selectedLoc?.habitable_zone_outer;
   const aggregated = currentRoot?.loc.aggregated;
   const selectedIsShop = Boolean(selectedNode?.shop);
+  const selectedArkAssets = selectedLoc?.scraped_assets;
+  const selectedArkAssetCount =
+    (selectedArkAssets?.textures?.length ?? 0) + (selectedArkAssets?.models?.length ?? 0) + (selectedArkAssets?.skybox?.length ?? 0);
 
   return (
     <div className="-m-3 flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden bg-black text-slate-200 sm:-m-6">
@@ -1884,8 +1961,9 @@ export default function UniverseExplorerPage() {
                   setSelectedId(currentRoot.id);
                   setViewMode('system');
                 }}
-                className="rounded-sm border border-purple-800/50 bg-purple-950/20 px-3 py-2 font-mono-sc text-[10px] uppercase tracking-widest text-purple-300 transition-colors hover:border-purple-500/60"
+                className="inline-flex items-center gap-2 rounded-sm border border-purple-800/50 bg-purple-950/20 px-3 py-2 font-mono-sc text-[10px] uppercase tracking-widest text-purple-300 transition-colors hover:border-purple-500/60"
               >
+                <LocateFixed size={12} />
                 Focus {currentRoot.label}
               </button>
             )}
@@ -1914,6 +1992,44 @@ export default function UniverseExplorerPage() {
             <HudMetric icon={<Sparkles size={11} />} label="Systems" value={roots.length.toLocaleString('en-US')} />
             <HudMetric icon={<Globe2 size={11} />} label="Objects" value={allNodes.length.toLocaleString('en-US')} />
             <HudMetric icon={<Route size={11} />} label="Routes" value={jumpConnections.length.toLocaleString('en-US')} />
+          </div>
+
+          <div className="mb-3 border-b border-slate-900 pb-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="font-orbitron text-[10px] uppercase tracking-widest text-slate-600">ARK systems</p>
+              <button
+                type="button"
+                onClick={() => setViewMode('galaxy')}
+                className="font-mono-sc text-[10px] uppercase tracking-widest text-cyan-700 hover:text-cyan-300"
+              >
+                Galaxy
+              </button>
+            </div>
+            <div className="grid max-h-36 grid-cols-1 gap-1 overflow-y-auto pr-1">
+              {systemSummaries.slice(0, 80).map((summary) => {
+                const active = currentRoot?.id === summary.root.id;
+                const hasArkAssets = Boolean(summary.root.loc.scraped_assets);
+                return (
+                  <button
+                    key={summary.root.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedId(summary.root.id);
+                      setExpanded((prev) => new Set(prev).add(summary.root.id));
+                      setViewMode('system');
+                    }}
+                    className={`flex items-center gap-2 rounded-sm border px-2 py-1.5 text-left transition-colors ${
+                      active ? 'border-cyan-600/70 bg-cyan-950/30 text-cyan-100' : 'border-slate-900 bg-slate-950/35 text-slate-500 hover:border-cyan-900/60 hover:text-slate-200'
+                    }`}
+                  >
+                    <span className="size-1.5 shrink-0 rounded-full" style={{ backgroundColor: factionHex(summary.root.loc.rsi_starmap?.faction_name) }} />
+                    <span className="min-w-0 flex-1 truncate font-rajdhani text-sm font-semibold">{summary.root.label}</span>
+                    {hasArkAssets && <span className="font-mono-sc text-[8px] uppercase text-cyan-600">ARK</span>}
+                    <span className="font-mono-sc text-[9px] text-slate-700">{summary.objects}</span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="mb-3 flex gap-1 overflow-x-auto border-b border-slate-900 pb-3 lg:flex-wrap">
@@ -1989,6 +2105,7 @@ export default function UniverseExplorerPage() {
               jumpLinks={sceneJumpLinkPairs}
               selectedId={selectedNode?.id ?? null}
               highlightId={currentRoot?.id ?? null}
+              arkBackdropUrls={arkBackdropUrls}
               focusSelected
               onSelect={setSelectedId}
             />
@@ -2115,6 +2232,7 @@ export default function UniverseExplorerPage() {
                 )}
                 <DetailRow label="RSI status" value={selectedLoc.rsi_starmap?.status} />
                 <DetailRow label="Scannable" value={selectedLoc.is_scannable ? 'Yes' : 'No'} />
+                <DetailRow label="ARK assets" value={selectedArkAssetCount > 0 ? `${selectedArkAssetCount} captured` : null} />
                 {!selectedIsShop && <DetailRow label="Shops" value={selectedNode.shopCount || null} />}
               </div>
 
