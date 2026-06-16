@@ -6,7 +6,7 @@
  *
  * Asset categories captured:
  *   - textures: .png .jpg .webp .dds .ktx .ktx2 .basis .exr .hdr
- *   - models:   .glb .gltf .obj .bin .ctm
+ *   - models:   .glb .gltf .obj .bin .ctm .dae
  *   - skybox:   equirectangular or cubemap textures (by URL heuristic)
  *
  * Requires headful Chromium (same as CTM scraper) because WebGL is often
@@ -52,7 +52,7 @@ export interface AssetScrapeOptions {
 // ── URL matchers ───────────────────────────────────────────────────────────────
 
 const TEXTURE_EXTS = /\.(png|jpg|jpeg|webp|dds|ktx|ktx2|basis|exr|hdr)(\?|$)/i;
-const MODEL_EXTS = /\.(glb|gltf|obj|bin|ctm|fbx)(\?|$)/i;
+const MODEL_EXTS = /\.(glb|gltf|obj|bin|ctm|fbx|dae)(\?|$)/i;
 const SKYBOX_HINTS = /sky(?:box)?|nebula|background|space|environ|hdri|ibl/i;
 
 // RSI CDN domains that host 3D assets
@@ -61,7 +61,9 @@ const RSI_ASSET_DOMAINS = [
   'robertsspaceindustries.com',
   'cdn.robertsspaceindustries.com',
   'assets.robertsspaceindustries.com',
+  'static.robertsspaceindustries.com',
 ];
+const RSI_CDN_BASE_URL = 'https://cdn.robertsspaceindustries.com';
 
 function isRsiAssetUrl(url: string): boolean {
   return RSI_ASSET_DOMAINS.some((d) => url.includes(d));
@@ -74,6 +76,52 @@ function categorizeUrl(url: string): 'texture' | 'model' | 'skybox' | null {
   return null;
 }
 
+function addAsset(assets: ScrapedAssets, url: string): void {
+  const cat = categorizeUrl(url);
+  if (!cat) return;
+  if (!assets.raw.includes(url)) assets.raw.push(url);
+  const bucket = cat === 'model' ? assets.models : cat === 'skybox' ? assets.skybox : assets.textures;
+  if (!bucket.includes(url)) bucket.push(url);
+}
+
+function mergeAssets(target: ScrapedAssets, source: ScrapedAssets): void {
+  for (const url of source.raw) addAsset(target, url);
+  for (const url of source.textures) addAsset(target, url);
+  for (const url of source.models) addAsset(target, url);
+  for (const url of source.skybox) addAsset(target, url);
+}
+
+let staticBundleAssetsCache: Promise<ScrapedAssets> | null = null;
+
+async function scrapeStaticBundleAssets(): Promise<ScrapedAssets> {
+  staticBundleAssetsCache ??= (async () => {
+    const bundleUrl = `${RSI_CDN_BASE_URL}/static/starmap/starmap.bundle.js`;
+    const response = await fetch(bundleUrl);
+    if (!response.ok) throw new Error(`ARK bundle fetch failed: ${response.status}`);
+    const bundle = await response.text();
+    const resourcePath = bundle.match(/resourcePath:"([^"]+)"/)?.[1] ?? `${RSI_CDN_BASE_URL}/static/starmap`;
+    const assets: ScrapedAssets = { textures: [], models: [], skybox: [], raw: [] };
+    const pathPattern =
+      /(?:["']|\/)([A-Za-z0-9_./-]+\.(?:png|jpg|jpeg|webp|dds|ktx|ktx2|basis|exr|hdr|glb|gltf|obj|bin|ctm|fbx|dae))(?:["']|\b)/gi;
+    const seen = new Set<string>();
+    for (const match of bundle.matchAll(pathPattern)) {
+      const rawPath = match[1];
+      if (!rawPath || seen.has(rawPath)) continue;
+      if (!rawPath.includes('/') && MODEL_EXTS.test(rawPath)) continue;
+      seen.add(rawPath);
+      const url = rawPath.startsWith('http')
+        ? rawPath
+        : rawPath.startsWith('static/starmap/')
+          ? `${RSI_CDN_BASE_URL}/${rawPath}`
+          : `${resourcePath.replace(/\/$/, '')}/${rawPath.replace(/^\//, '')}`;
+      addAsset(assets, url);
+    }
+    logger.info(`[starmap-assets] static ARK bundle: ${assets.textures.length}T ${assets.models.length}M ${assets.skybox.length}Sky`);
+    return assets;
+  })();
+  return staticBundleAssetsCache;
+}
+
 // ── Main scrape function ───────────────────────────────────────────────────────
 
 export async function scrapeStarmapSystemAssets(
@@ -83,6 +131,28 @@ export async function scrapeStarmapSystemAssets(
   const { concurrency = 1, waitMs = 6000, onProgress } = opts;
   const results = new Map<string, ScrapedAssets>();
   const total = systems.length;
+  let staticFallback: ScrapedAssets | null = null;
+
+  try {
+    staticFallback = await scrapeStaticBundleAssets();
+  } catch (err) {
+    logger.warn(`[starmap-assets] static ARK bundle unavailable: ${(err as Error).message}`);
+  }
+
+  if (staticFallback && staticFallback.textures.length + staticFallback.models.length + staticFallback.skybox.length > 0) {
+    for (const sys of systems) {
+      results.set(sys.code, {
+        textures: [...staticFallback.textures],
+        models: [...staticFallback.models],
+        skybox: [...staticFallback.skybox],
+        raw: [...staticFallback.raw],
+      });
+    }
+    onProgress?.(
+      `Starmap assets: using static ARK bundle fallback for ${systems.length} system(s) (${staticFallback.textures.length} textures, ${staticFallback.models.length} models, ${staticFallback.skybox.length} skybox)`,
+    );
+    return results;
+  }
 
   if (concurrency <= 1) {
     for (let i = 0; i < total; i++) {
@@ -148,10 +218,7 @@ async function scrapeSystemPage(sys: StarmapSystem, waitMs: number): Promise<Scr
       const cat = categorizeUrl(respUrl);
       if (!cat) return;
 
-      assets.raw.push(respUrl);
-      if (cat === 'model') assets.models.push(respUrl);
-      else if (cat === 'skybox') assets.skybox.push(respUrl);
-      else assets.textures.push(respUrl);
+      addAsset(assets, respUrl);
     });
 
     // Navigate and wait for the 3D scene to initialise
@@ -174,6 +241,14 @@ async function scrapeSystemPage(sys: StarmapSystem, waitMs: number): Promise<Scr
     await sleep(Math.round(waitMs / 2));
   } finally {
     await browser.close();
+  }
+
+  if (assets.textures.length + assets.models.length + assets.skybox.length === 0) {
+    try {
+      mergeAssets(assets, await scrapeStaticBundleAssets());
+    } catch (err) {
+      logger.warn(`[starmap-assets] static bundle fallback failed for ${sys.code}: ${(err as Error).message}`);
+    }
   }
 
   logger.info(`[starmap-assets] ${sys.code}: ${assets.textures.length}T ${assets.models.length}M ${assets.skybox.length}Sky`);
