@@ -77,11 +77,15 @@ describe('request-log-service', () => {
         method: 'GET',
         originalUrl: '/api/v1/ships/ship-id',
         url: '/api/v1/ships/ship-id',
-        headers: {},
+        headers: { 'x-starvis-forwarded-for': '198.51.100.24, 172.19.0.4' },
         internalClient: 'ihm-public-proxy',
         authMethod: 'admin_key',
         ip: '172.19.0.4',
-        get: (name: string) => (name === 'user-agent' ? 'node' : undefined),
+        get: (name: string) => {
+          if (name === 'user-agent') return 'Mozilla/5.0';
+          if (name === 'x-starvis-forwarded-for') return '198.51.100.24, 172.19.0.4';
+          return undefined;
+        },
       } as any,
       200,
       9,
@@ -94,6 +98,8 @@ describe('request-log-service', () => {
       clientType: 'internal_web_proxy',
       internalClient: 'ihm-public-proxy',
       username: null,
+      ip: '198.51.100.0',
+      userAgent: 'Mozilla/5.0',
     });
   });
 

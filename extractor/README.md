@@ -18,11 +18,13 @@ From the monorepo root:
 ```bash
 npm install
 
-cp extractor/.env.extractor.example extractor/.env.dev
+cp extractor/.env.extractor.example extractor/.env.extractor.dev
 # Fill DB_PASSWORD and P4K paths as needed.
 ```
 
 The stable command entrypoint is `extractor/extract.ts`. CLI orchestration lives in `extractor/src/cli/main.ts`, option parsing in `extractor/src/cli/options.ts`, module selection in `extractor/src/cli/modules.ts`, and runtime resolution in `extractor/src/cli/resolve.ts`.
+
+Shared extractor defaults live in `extractor/src/extractor-config.ts`. Module names, aliases and P4K/network grouping live in `extractor/src/module-registry.ts`; keep that registry as the single source of truth when adding or renaming modules. Data-driven configuration that used to be hard-coded is stored under `extractor/src/data/`, including default P4K lookup paths and modular ship slot rules.
 
 ---
 
@@ -43,7 +45,7 @@ For local dev, start the full stack first:
 docker compose -f docker-compose.dev.yml --env-file .env.dev up -d postgres redis api
 ```
 
-Then use matching DB values in `extractor/.env.dev`.
+Then use matching DB values in `extractor/.env.extractor.dev`.
 
 ---
 
@@ -98,6 +100,8 @@ npx tsx extractor/extract.ts [options]
 | `--gallery-delay-ms <n>` | Delay between official RSI ship gallery page loads. | `6000` |
 | `--gallery-retries <n>` | Network retries per official RSI ship gallery page. | `4` |
 | `--gallery-retry-delay-ms <n>` | Base retry backoff for gallery scraping. | `8000` |
+| `--concurrency <n>` | Shared network scraper concurrency for slow external modules. | `1` |
+| `--ctm-concurrency <n>` | Deprecated alias for `--concurrency`. | `1` |
 | `--log-level <level>` | `debug`, `info`, `warn`, `error`, or `silent`. | `info` |
 | `--verbose` | Shortcut for `--log-level debug`. | false |
 | `--quiet` | Disable normal CLI logs. | false |
@@ -155,6 +159,9 @@ npx tsx extractor/extract.ts --env ptu
 
 # Network-only RSI sync, no P4K needed
 npx tsx extractor/extract.ts --modules ship-matrix,ship-galleries,galactapedia,comm-links,starmap
+
+# Network scraping with explicit concurrency
+npx tsx extractor/extract.ts --modules ctm,ship-galleries --concurrency 2
 
 # Fast P4K extraction without CTM
 npx tsx extractor/extract.ts --env live --modules ships,components,items,commodities,paints,mining,missions,crafting,locations,shops,game-insights

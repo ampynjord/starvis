@@ -4,7 +4,7 @@
  * Transmet le cookie de session comme Bearer token vers l'API.
  */
 import type { NextRequest } from 'next/server';
-import { getAuthToken, upstreamUrl } from '../../_utils/proxy';
+import { forwardedClientHeadersFromHeaders, getAuthToken, upstreamUrl } from '../../_utils/proxy';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
 
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = { ...forwardedClientHeadersFromHeaders(req.headers), 'Content-Type': 'application/json' };
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const upstream = await fetch(upstreamUrl('/api/v1/chat'), {

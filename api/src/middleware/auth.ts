@@ -4,6 +4,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { ApiTokenService } from '../services/api-token-service.js';
 import { type JwtPayload, verifyAuthToken } from '../services/auth-service.js';
 import { ADMIN_ROLE, AUTH_COOKIE_NAME, DEVELOPER_ACCESS_ROLES } from '../utils/config.js';
+import { resolveClientIp } from '../utils/request-ip.js';
 
 // ── Admin API Key ─────────────────────────────────────────────────────────────
 
@@ -58,7 +59,7 @@ async function applyApiTokenState(req: Request, payload: JwtPayload, token: stri
   if (!tokenRow) throw new Error('INVALID_API_TOKEN');
   req.apiToken = { id: tokenRow.id, jti: tokenRow.jti, name: tokenRow.name, userId: tokenRow.userId };
   req.authMethod = 'api_token';
-  await tokenService.touch(payload.jti, { ip: req.ip, userAgent: requestUserAgent(req) });
+  await tokenService.touch(payload.jti, { ip: resolveClientIp(req) ?? req.ip, userAgent: requestUserAgent(req) });
 }
 
 function requestUserAgent(req: Request): string | null {

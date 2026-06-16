@@ -4,8 +4,8 @@
  * Extracted from ExtractionService to keep the main pipeline lean.
  */
 import type { PoolClient } from 'pg';
-import type { GameEnv } from './extraction-service.js';
 import logger from './logger.js';
+import type { GameEnv } from './module-registry.js';
 
 /** Ship Matrix name → P4K ship name mapping for non-obvious matches */
 export const SM_TO_P4K_ALIASES: Record<string, string> = {

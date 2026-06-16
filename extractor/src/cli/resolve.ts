@@ -1,21 +1,10 @@
 import { existsSync } from 'node:fs';
 import type { PoolConfig } from 'pg';
-import type { ExtractionModule, GameEnv } from '../extraction-service.js';
+import { DEFAULT_P4K_PATHS, EXTRACTOR_DEFAULTS } from '../extractor-config.js';
 import type { Logger } from '../logger.js';
+import type { ExtractionModule, GameEnv } from '../module-registry.js';
 import { formatModules, isP4kFree, needsGameDb, needsRsiDb, type SelectedModules } from './modules.js';
 import type { ExtractorCliOptions } from './options.js';
-
-const AUTO_P4K: Record<GameEnv, string[]> = {
-  live: [
-    'C:/Program Files/Roberts Space Industries/StarCitizen/LIVE/Data.p4k',
-    '/mnt/c/Program Files/Roberts Space Industries/StarCitizen/LIVE/Data.p4k',
-  ],
-  ptu: [
-    'C:/Program Files/Roberts Space Industries/StarCitizen/PTU/Data.p4k',
-    '/mnt/c/Program Files/Roberts Space Industries/StarCitizen/PTU/Data.p4k',
-  ],
-  custom: [],
-};
 
 export interface RuntimeOptions {
   p4kPath: string;
@@ -38,7 +27,7 @@ export interface RuntimeOptions {
 
 function autoDetectP4K(env: GameEnv): string | null {
   if (env === 'custom') return null;
-  return AUTO_P4K[env].find((path) => existsSync(path)) ?? null;
+  return DEFAULT_P4K_PATHS[env].find((path) => existsSync(path)) ?? null;
 }
 
 function getEnvSpecificP4KPath(env: GameEnv): string {
@@ -67,22 +56,22 @@ function resolveP4KPath(options: ExtractorCliOptions, logger: Logger): string {
 function resolvePgConfig(): { pgConfig: PoolConfig; dbLabel: string } {
   if (process.env.DATABASE_URL) {
     return {
-      pgConfig: { connectionString: process.env.DATABASE_URL, max: 5 },
+      pgConfig: { connectionString: process.env.DATABASE_URL, max: EXTRACTOR_DEFAULTS.pgPoolMax },
       dbLabel: 'DATABASE_URL',
     };
   }
 
   return {
     pgConfig: {
-      host: process.env.DB_HOST || 'localhost',
-      port: Number.parseInt(process.env.DB_PORT || '5432', 10),
+      host: process.env.DB_HOST || EXTRACTOR_DEFAULTS.databaseHost,
+      port: Number.parseInt(process.env.DB_PORT || String(EXTRACTOR_DEFAULTS.databasePort), 10),
       user: process.env.DB_USER || '',
       password: process.env.DB_PASSWORD || '',
-      database: process.env.DB_NAME || 'starvis',
-      max: 5,
+      database: process.env.DB_NAME || EXTRACTOR_DEFAULTS.databaseName,
+      max: EXTRACTOR_DEFAULTS.pgPoolMax,
       options: '--idle_in_transaction_session_timeout=0 --statement_timeout=0',
     },
-    dbLabel: `${process.env.DB_HOST || 'localhost'}:${process.env.DB_PORT || '5432'}/${process.env.DB_NAME || 'starvis'}`,
+    dbLabel: `${process.env.DB_HOST || EXTRACTOR_DEFAULTS.databaseHost}:${process.env.DB_PORT || EXTRACTOR_DEFAULTS.databasePort}/${process.env.DB_NAME || EXTRACTOR_DEFAULTS.databaseName}`,
   };
 }
 

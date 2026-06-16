@@ -21,8 +21,11 @@ import {
   tagVariantTypes,
 } from './crossref.js';
 import type { DataForgeService } from './dataforge-service.js';
+import { captureExtractionSnapshot, cleanStaleGameData, restoreCtmUrls } from './extraction-state.js';
+import { EXTRACTOR_DEFAULTS } from './extractor-config.js';
 import { LocalizationService } from './localization-service.js';
 import logger from './logger.js';
+import { type ExtractionModule, type GameEnv, NETWORK_MODULES } from './module-registry.js';
 import { generateChangelog } from './persisters/changelog.js';
 import { saveComponents } from './persisters/components.js';
 import type { PersistContext } from './persisters/context.js';
@@ -40,28 +43,7 @@ import { saveShips } from './persisters/ships.js';
 import { saveShopsData } from './persisters/shops.js';
 import { RsiSyncService } from './rsi-sync-service.js';
 
-export type ExtractionModule =
-  | 'ships'
-  | 'components'
-  | 'items'
-  | 'commodities'
-  | 'mining'
-  | 'missions'
-  | 'crafting'
-  | 'paints'
-  | 'shops'
-  | 'ctm'
-  | 'locations'
-  | 'game-insights'
-  // RSI/SC Wiki sync modules (no P4K required, uses rsi_website DB)
-  | 'galactapedia'
-  | 'comm-links'
-  | 'starmap'
-  | 'ship-matrix'
-  | 'ship-galleries'
-  | 'organizations';
-
-export type GameEnv = 'live' | 'ptu' | 'custom';
+export type { ExtractionModule, GameEnv };
 
 export interface ExtractionOptions {
   /** Which modules to run. Use `new Set(['all'])` for everything. */
@@ -89,7 +71,10 @@ export interface ExtractionOptions {
   shipGalleryRetryBaseDelayMs?: number;
 }
 
-const DEFAULT_OPTIONS: ExtractionOptions = { modules: new Set(['all']), env: 'live' };
+const DEFAULT_OPTIONS: ExtractionOptions = {
+  modules: new Set([EXTRACTOR_DEFAULTS.modules]),
+  env: EXTRACTOR_DEFAULTS.env,
+};
 
 export interface ExtractionStats {
   manufacturers: number;
@@ -237,7 +222,7 @@ export class ExtractionService {
     conn.on('error', (err) => {
       logger.error('PostgreSQL connection terminated unexpectedly during extraction', { error: err.message });
     });
-    // Keepalive: send a harmless SELECT every 30 s to prevent the server
+    // Keepalive: send a harmless SELECT periodically to prevent the server
     // (or an SSH tunnel in front of it) from closing the connection during the
     // CPU-intensive ship-extraction phase (which can run for 15+ minutes without
     // sending any SQL).
@@ -247,96 +232,22 @@ export class ExtractionService {
       } catch {
         /* ignore — if the connection is broken we'll find out on the next real query */
       }
-    }, 10_000);
+    }, EXTRACTOR_DEFAULTS.keepaliveIntervalMs);
     // Shared context for all domain persisters (df is null-asserted — persisters
     // that use it only run for P4K modules, never for ctm-only runs)
     const ctx: PersistContext = { conn, env, df: this.dfService as DataForgeService, loc: this.locService, onProgress };
     try {
       // 1b. Snapshot current data BEFORE cleaning — for changelog comparison
       onProgress?.('Snapshotting current data for changelog…');
-      const { rows: oldShipsRaw } = await conn.query<any>(
-        'SELECT uuid, class_name, name, manufacturer_code, role, career, mass, scm_speed, max_speed, total_hp, shield_hp, cargo_capacity, missile_damage_total, weapon_damage_total, crew_size FROM game.ships WHERE env = $1',
-        [env],
-      );
-      const { rows: oldCompsRaw } = await conn.query<any>(
-        'SELECT uuid, class_name, name, type, sub_type, size, grade, component_class, manufacturer_code FROM game.components WHERE env = $1',
-        [env],
-      );
-      const oldShips = new Map(oldShipsRaw.map((s: any) => [s.class_name, s]));
-      const oldComps = new Map(oldCompsRaw.map((c: any) => [c.class_name, c]));
-
-      const { rows: oldItemsRaw } = await conn.query<any>(
-        'SELECT uuid, class_name, name, type, sub_type, manufacturer_code FROM game.items WHERE env = $1',
-        [env],
-      );
-      const { rows: oldCommoditiesRaw } = await conn.query<any>(
-        'SELECT uuid, class_name, name, type FROM game.commodities WHERE env = $1',
-        [env],
-      );
-      const oldItems = new Map(oldItemsRaw.map((i: any) => [i.class_name, i]));
-      const oldCommodities = new Map(oldCommoditiesRaw.map((c: any) => [c.class_name, c]));
+      const snapshot = await captureExtractionSnapshot(conn, env);
 
       // Wrap the entire extraction in a transaction — if anything fails,
       // the old data remains intact (no downtime with empty tables)
       await conn.query('BEGIN');
 
       // 1c. Clean stale data before fresh extraction (order matters for FK constraints)
-      onProgress?.('Cleaning stale data…');
-      // Shops are upserted below; shop_inventory and commodity_prices are refreshed
-      // by the shops persister after real ShopInventories JSON files are parsed.
-      // Deleting shops here would cascade shop-linked price records too early.
-      if (run('ships')) {
-        // Preserve ctm_url values before wiping ships — they won't be re-scraped
-        const { rows: ctmRows } = await conn.query<any>(
-          'SELECT class_name, ctm_url FROM game.ships WHERE ctm_url IS NOT NULL AND env = $1',
-          [env],
-        );
-        const savedCtmUrls: Array<{ className: string; ctmUrl: string }> = ctmRows.map((r: any) => ({
-          className: r.class_name,
-          ctmUrl: r.ctm_url,
-        }));
-        await conn.query('DELETE FROM game.ship_modules WHERE env = $1', [env]);
-        await conn.query('DELETE FROM game.ship_loadouts WHERE env = $1', [env]);
-        // ship_paints FK has ON DELETE CASCADE — deleted automatically with ships
-        await conn.query('DELETE FROM game.ships WHERE env = $1', [env]);
-        // Immediately store for later restore (after re-insert)
-        (this as any)._savedCtmUrls = savedCtmUrls;
-      }
-      if (run('components')) await conn.query('DELETE FROM game.components WHERE env = $1', [env]);
-      if (run('items') || run('commodities')) {
-        await conn.query('DELETE FROM game.items WHERE env = $1', [env]);
-        await conn.query('DELETE FROM game.commodities WHERE env = $1', [env]);
-      }
-      if (run('mining')) {
-        await conn.query('DELETE FROM game.mining_composition_parts WHERE composition_env = $1', [env]);
-        await conn.query('DELETE FROM game.mining_compositions WHERE env = $1', [env]);
-        await conn.query('DELETE FROM game.mining_elements WHERE env = $1', [env]);
-      }
-      if (run('missions')) {
-        await conn.query('DELETE FROM game.mission_blueprint_rewards WHERE mission_env = $1', [env]);
-        await conn.query('DELETE FROM game.missions WHERE env = $1', [env]);
-      }
-      if (run('crafting')) {
-        await conn.query('DELETE FROM game.crafting_ingredients WHERE recipe_env = $1', [env]);
-        await conn.query('DELETE FROM game.crafting_slot_modifiers WHERE recipe_env = $1', [env]);
-        await conn.query('DELETE FROM game.crafting_recipes WHERE env = $1', [env]);
-      }
-      if (run('locations')) {
-        await conn.query('DELETE FROM game.locations WHERE env = $1', [env]);
-      }
-      if (run('game-insights')) {
-        await conn.query('DELETE FROM game.blueprint_rewards WHERE env = $1', [env]);
-        await conn.query('DELETE FROM game.loot_table_entries WHERE env = $1', [env]);
-        await conn.query('DELETE FROM game.loot_tables WHERE env = $1', [env]);
-        await conn.query('DELETE FROM game.loot_archetypes WHERE env = $1', [env]);
-        await conn.query('DELETE FROM game.reputation_scopes WHERE env = $1', [env]);
-        await conn.query('DELETE FROM game.reputation_standings WHERE env = $1', [env]);
-        await conn.query('DELETE FROM game.factions WHERE env = $1', [env]);
-        await conn.query('DELETE FROM game.ammo WHERE env = $1', [env]);
-        await conn.query('DELETE FROM game.inventory_containers WHERE env = $1', [env]);
-        await conn.query('DELETE FROM game.game_insights WHERE env = $1', [env]);
-      }
-
+      onProgress?.('Cleaning stale data...');
+      const savedCtmUrls = await cleanStaleGameData(conn, env, run);
       // 2. Collect & save manufacturers FIRST (before ships, due to FK constraint)
       // Skip for P4K-free modules (e.g. ctm) that don't need DataForge data
       if (this.dfService) {
@@ -365,14 +276,8 @@ export class ExtractionService {
         stats.ships = shipResult.ships;
         stats.loadoutPorts = shipResult.loadoutPorts;
         // Restore preserved ctm_url values
-        const savedCtmUrls: Array<{ className: string; ctmUrl: string }> = (this as any)._savedCtmUrls ?? [];
-        if (savedCtmUrls.length > 0) {
-          for (const { className, ctmUrl } of savedCtmUrls) {
-            await conn.query('UPDATE game.ships SET ctm_url = $1 WHERE class_name = $2 AND env = $3', [ctmUrl, className, env]);
-          }
-          onProgress?.(`CTM: restored ${savedCtmUrls.length} cached URLs`);
-          delete (this as any)._savedCtmUrls;
-        }
+        const restoredCtmUrls = await restoreCtmUrls(conn, env, savedCtmUrls);
+        if (restoredCtmUrls > 0) onProgress?.(`CTM: restored ${restoredCtmUrls} cached URLs`);
       }
 
       // 5b. Extract & save paints/liveries (always when ships are re-extracted, since CASCADE clears them)
@@ -442,7 +347,7 @@ export class ExtractionService {
       // 6b. Scrape CTM (3D model) URLs — after cross-reference so ship_matrix_id is populated
       if (run('ctm')) {
         const force = options.ctmForce ?? false;
-        const concurrency = options.ctmConcurrency ?? 1;
+        const concurrency = options.ctmConcurrency ?? EXTRACTOR_DEFAULTS.ctmConcurrency;
         onProgress?.(`Scraping 3D model URLs (CTM) from RSI… [${force ? 'force-all' : 'incremental'}, concurrency=${concurrency}]`);
         await saveShipCtmModels(conn, env, { force, concurrency }, onProgress);
       }
@@ -479,7 +384,15 @@ export class ExtractionService {
       if (extractionId) {
         try {
           onProgress?.('Generating changelog…');
-          await generateChangelog(conn, env, extractionId, oldShips, oldComps, oldItems, oldCommodities);
+          await generateChangelog(
+            conn,
+            env,
+            extractionId,
+            snapshot.oldShips,
+            snapshot.oldComps,
+            snapshot.oldItems,
+            snapshot.oldCommodities,
+          );
         } catch (e) {
           logger.warn('Changelog generation failed', { error: String(e) });
         }
@@ -490,8 +403,8 @@ export class ExtractionService {
       );
 
       // ── Sanity check — abort if data dropped by >50% (only for extracted modules) ──
-      const oldCounts = { ships: oldShipsRaw.length, components: oldCompsRaw.length };
-      const threshold = 0.5;
+      const oldCounts = { ships: snapshot.oldShipsRaw.length, components: snapshot.oldCompsRaw.length };
+      const threshold = EXTRACTOR_DEFAULTS.sanityDropThreshold;
       const sanityErrors: string[] = [];
       if (run('ships') && oldCounts.ships > 20 && stats.ships < oldCounts.ships * threshold) {
         sanityErrors.push(`Ships dropped from ${oldCounts.ships} to ${stats.ships}`);
@@ -524,7 +437,7 @@ export class ExtractionService {
     }
 
     // ── RSI/SC Wiki sync modules (outside main transaction — separate rsi_website DB) ──
-    const rsiModules: ExtractionModule[] = ['galactapedia', 'comm-links', 'starmap', 'ship-matrix', 'organizations'];
+    const rsiModules = [...NETWORK_MODULES].filter((moduleName) => moduleName !== 'ctm' && moduleName !== 'ship-galleries');
     const hasRsiModules = rsiModules.some((m) => run(m));
 
     if (hasRsiModules) {
@@ -583,7 +496,7 @@ export class ExtractionService {
 
     if (run('ship-galleries')) {
       const force = options.ctmForce ?? false;
-      const concurrency = options.ctmConcurrency ?? 1;
+      const concurrency = options.ctmConcurrency ?? EXTRACTOR_DEFAULTS.ctmConcurrency;
       const interShipDelayMs = options.shipGalleryDelayMs;
       const retries = options.shipGalleryRetries;
       const retryBaseDelayMs = options.shipGalleryRetryBaseDelayMs;

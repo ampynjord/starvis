@@ -4,10 +4,22 @@
  * modular ship slot detection (ship_modules table).
  */
 import type { PoolClient } from 'pg';
+import modularShipConfig from '../data/modular-ship-config.json' with { type: 'json' };
 import { classifyPort, type DataForgeService } from '../dataforge-service.js';
-import type { GameEnv } from '../extraction-service.js';
 import logger from '../logger.js';
+import type { GameEnv } from '../module-registry.js';
 import type { PersistContext } from './context.js';
+
+type ModularShipSlotConfig = {
+  slotName: string;
+  slotType: string;
+  modulePrefix?: string;
+  moduleNames?: string[];
+  defaultContains: string;
+  tierExtract?: boolean;
+};
+
+const MODULAR_SHIP_CONFIGS = modularShipConfig as Record<string, ModularShipSlotConfig[]>;
 
 export async function saveShips(ctx: PersistContext): Promise<{ ships: number; loadoutPorts: number }> {
   const { conn, env, df, loc, onProgress } = ctx;
@@ -377,104 +389,6 @@ async function computeAndStoreWeaponDamage(conn: PoolClient, env: GameEnv, shipU
     /* Non-critical */
   }
 }
-
-// Config-driven modular ship slot definitions.
-// Each key is the ship's DataForge class_name.
-// Each slot entry defines the port, display, prefix to search for all module options,
-// the substring identifying the default module, and optional tier extraction.
-const MODULAR_SHIP_CONFIGS: Record<
-  string,
-  Array<{
-    slotName: string;
-    slotType: string;
-    modulePrefix?: string;
-    moduleNames?: string[];
-    defaultContains: string;
-    tierExtract?: boolean;
-  }>
-> = {
-  AEGS_Retaliator: [
-    { slotName: 'hardpoint_front_module', slotType: 'front', modulePrefix: 'AEGS_Retaliator_Module_Front_', defaultContains: 'Base' },
-    { slotName: 'hardpoint_rear_module', slotType: 'rear', modulePrefix: 'AEGS_Retaliator_Module_Rear_', defaultContains: 'Base' },
-  ],
-  RSI_Aurora_Mk2: [
-    {
-      slotName: 'hardpoint_module',
-      slotType: 'module',
-      moduleNames: ['RSI_Aurora_Mk2_Module_Cargo', 'RSI_Aurora_Mk2_Module_Missile'],
-      defaultContains: 'Cargo',
-    },
-  ],
-  RSI_Apollo_Medivac: [
-    {
-      slotName: 'hardpoint_modular_room_left',
-      slotType: 'left',
-      modulePrefix: 'RSI_Apollo_Module_Left_Tier_',
-      defaultContains: 'Tier_3',
-      tierExtract: true,
-    },
-    {
-      slotName: 'hardpoint_modular_room_right',
-      slotType: 'right',
-      modulePrefix: 'RSI_Apollo_Module_Right_Tier_',
-      defaultContains: 'Tier_3',
-      tierExtract: true,
-    },
-  ],
-  RSI_Apollo_Triage: [
-    {
-      slotName: 'hardpoint_modular_room_left',
-      slotType: 'left',
-      modulePrefix: 'RSI_Apollo_Module_Left_Tier_',
-      defaultContains: 'Tier_1',
-      tierExtract: true,
-    },
-    {
-      slotName: 'hardpoint_modular_room_right',
-      slotType: 'right',
-      modulePrefix: 'RSI_Apollo_Module_Right_Tier_',
-      defaultContains: 'Tier_1',
-      tierExtract: true,
-    },
-  ],
-  // Caterpillar: front command module + 4 cargo/module bays
-  DRAK_Caterpillar: [
-    {
-      slotName: 'hardpoint_module_command',
-      slotType: 'command',
-      modulePrefix: 'DRAK_Caterpillar_Module_Command_',
-      defaultContains: 'Command',
-    },
-    { slotName: 'hardpoint_module_01', slotType: 'cargo', modulePrefix: 'DRAK_Caterpillar_Module_', defaultContains: 'Cargo' },
-    { slotName: 'hardpoint_module_02', slotType: 'cargo', modulePrefix: 'DRAK_Caterpillar_Module_', defaultContains: 'Cargo' },
-    { slotName: 'hardpoint_module_03', slotType: 'cargo', modulePrefix: 'DRAK_Caterpillar_Module_', defaultContains: 'Cargo' },
-    { slotName: 'hardpoint_module_04', slotType: 'cargo', modulePrefix: 'DRAK_Caterpillar_Module_', defaultContains: 'Cargo' },
-  ],
-  // Galaxy: modular mission bay
-  RSI_Galaxy: [{ slotName: 'hardpoint_module_bay', slotType: 'bay', modulePrefix: 'RSI_Galaxy_Module_', defaultContains: 'Cargo' }],
-  // Ironclad: modular cargo bays
-  CNOU_Ironclad: [
-    { slotName: 'hardpoint_module_front', slotType: 'front', modulePrefix: 'CNOU_Ironclad_Module_', defaultContains: 'Cargo' },
-    { slotName: 'hardpoint_module_mid', slotType: 'mid', modulePrefix: 'CNOU_Ironclad_Module_', defaultContains: 'Cargo' },
-  ],
-  CNOU_Ironclad_Assault: [
-    { slotName: 'hardpoint_module_front', slotType: 'front', modulePrefix: 'CNOU_Ironclad_Module_', defaultContains: 'Cargo' },
-    { slotName: 'hardpoint_module_mid', slotType: 'mid', modulePrefix: 'CNOU_Ironclad_Module_', defaultContains: 'Cargo' },
-  ],
-  // Hull C: detachable cargo pods
-  MISC_Hull_C: [{ slotName: 'hardpoint_cargo_01', slotType: 'cargo', modulePrefix: 'MISC_HullC_Module_', defaultContains: 'Cargo' }],
-  // Pioneer: modular fabrication bays
-  MISC_Pioneer: [
-    { slotName: 'hardpoint_module_01', slotType: 'fabrication', modulePrefix: 'MISC_Pioneer_Module_', defaultContains: 'Fabrication' },
-  ],
-  // 600i: cabin/exploration/touring modules
-  ORIG_600i_Explorer: [
-    { slotName: 'hardpoint_module_cabin', slotType: 'cabin', modulePrefix: 'ORIG_600i_Module_', defaultContains: 'Cabin' },
-  ],
-  ORIG_600i_Touring: [
-    { slotName: 'hardpoint_module_cabin', slotType: 'cabin', modulePrefix: 'ORIG_600i_Module_', defaultContains: 'Cabin' },
-  ],
-};
 
 function formatModuleName(className: string): string {
   // e.g. "AEGS_Retaliator_Module_Front_Base" → "Front Base"

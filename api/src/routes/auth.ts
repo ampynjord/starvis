@@ -20,6 +20,7 @@
  */
 import type { Router } from 'express';
 import { requireJwt, requireJwtAdmin, requireJwtDeveloperOrAdmin } from '../middleware/index.js';
+import { ApiTokenService } from '../services/api-token-service.js';
 import { AuthService } from '../services/auth-service.js';
 import { sendPasswordResetEmail, sendVerificationEmail } from '../services/email-service.js';
 import { USER_ROLE, USER_ROLES } from '../utils/config.js';
@@ -206,6 +207,14 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
   });
 
   // ── API Token (external project access) ──────────────────────────────────
+  router.get('/auth/api-tokens', requireJwtDeveloperOrAdmin, async (req, res) => {
+    const payload = req.jwtPayload;
+    const includeRevoked = String(req.query.includeRevoked ?? '') === 'true';
+    const limit = Number.parseInt(String(req.query.limit ?? '100'), 10);
+    const tokens = await new ApiTokenService(deps.prisma).listForUser(payload.sub, { limit, includeRevoked });
+    res.json({ success: true, data: tokens });
+  });
+
   router.post('/auth/api-token', requireJwtDeveloperOrAdmin, async (req, res) => {
     const payload = req.jwtPayload;
     const { name, description } = req.body ?? {};
@@ -224,6 +233,16 @@ export function mountAuthRoutes(router: Router, deps: RouteDependencies): void {
       expiresIn: '1y',
       note: 'Store this token securely - it will not be shown again.',
     });
+  });
+
+  router.delete('/auth/api-tokens/:id', requireJwtDeveloperOrAdmin, async (req, res) => {
+    const tokenId = Number(req.params.id);
+    if (!Number.isInteger(tokenId) || tokenId <= 0) {
+      return void res.status(400).json({ success: false, error: 'Invalid token id' });
+    }
+    const revoked = await new ApiTokenService(deps.prisma).revokeForUser(tokenId, req.jwtPayload.sub);
+    if (!revoked) return void res.status(404).json({ success: false, error: 'API token not found or already revoked' });
+    res.json({ success: true, data: revoked });
   });
 
   // ---- 2FA endpoints ─────────────────────────────────────────────────────────

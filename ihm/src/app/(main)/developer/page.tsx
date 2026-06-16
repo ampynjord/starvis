@@ -1,6 +1,24 @@
 'use client';
 
-import { BookOpen, Bot, BrainCircuit, Check, Copy, Database, ExternalLink, Key, Lock, Radar, Send, ShieldCheck, Terminal, UserRound, X } from 'lucide-react';
+import {
+  BookOpen,
+  Bot,
+  BrainCircuit,
+  Check,
+  Copy,
+  Database,
+  ExternalLink,
+  Key,
+  Lock,
+  Radar,
+  RefreshCw,
+  Send,
+  ShieldCheck,
+  Terminal,
+  Trash2,
+  UserRound,
+  X,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '@/components/ui/PageHeader';
@@ -17,6 +35,19 @@ type ApiAccessRequest = {
   status: 'pending' | 'approved' | 'rejected' | string;
   adminNote: string | null;
   reviewedAt: string | null;
+  createdAt: string;
+};
+type ApiTokenSummary = {
+  id: number;
+  name: string;
+  description: string | null;
+  roleSnapshot: string;
+  expiresAt: string;
+  revokedAt: string | null;
+  lastUsedAt: string | null;
+  lastUsedIp: string | null;
+  lastUserAgent: string | null;
+  usageCount: number;
   createdAt: string;
 };
 
@@ -53,6 +84,23 @@ function StatusRow({ ok, label }: { ok: boolean; label: string }) {
   );
 }
 
+function tokenStatus(token: ApiTokenSummary): 'active' | 'expired' | 'revoked' {
+  if (token.revokedAt) return 'revoked';
+  if (new Date(token.expiresAt).getTime() <= Date.now()) return 'expired';
+  return 'active';
+}
+
+function tokenStatusStyle(status: ReturnType<typeof tokenStatus>) {
+  if (status === 'active') return 'border-emerald-800/50 bg-emerald-950/20 text-emerald-300';
+  if (status === 'revoked') return 'border-rose-800/50 bg-rose-950/20 text-rose-300';
+  return 'border-amber-800/50 bg-amber-950/20 text-amber-300';
+}
+
+function fmtDateTime(value: string | null) {
+  if (!value) return 'Never';
+  return new Date(value).toLocaleString([], { month: 'short', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+}
+
 const API_USE_CASES = [
   { icon: Bot, title: 'Bots and overlays', text: 'Power Discord commands, widgets, companion tools or public utilities with normalized Starvis data.' },
   { icon: Database, title: 'Data products', text: 'Query ships, loadouts, economy, items, missions, lore and changelog data without rebuilding an extractor.' },
@@ -71,6 +119,9 @@ export default function DeveloperPage() {
   const [apiTokenName, setApiTokenName] = useState('External project token');
   const [apiTokenDescription, setApiTokenDescription] = useState('');
   const [apiTokenMeta, setApiTokenMeta] = useState<{ name: string; expiresAt: string } | null>(null);
+  const [apiTokens, setApiTokens] = useState<ApiTokenSummary[]>([]);
+  const [apiTokensLoading, setApiTokensLoading] = useState(false);
+  const [revokingTokenId, setRevokingTokenId] = useState<number | null>(null);
   const [generating, setGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
@@ -106,6 +157,25 @@ export default function DeveloperPage() {
     };
   }, [hasAccess, loading, user]);
 
+  const loadApiTokens = async () => {
+    if (!hasAccess) return;
+    setApiTokensLoading(true);
+    try {
+      const res = await fetch('/api/auth/api-tokens?includeRevoked=true&limit=100');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? 'Failed to load API tokens');
+      setApiTokens(Array.isArray(data.data) ? data.data : []);
+    } catch (err: any) {
+      setNotice({ type: 'error', text: err.message ?? 'Failed to load API tokens' });
+    } finally {
+      setApiTokensLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!loading && hasAccess) void loadApiTokens();
+  }, [hasAccess, loading]);
+
   const swaggerLabel = useMemo(() => {
     if (!user) return 'Login required';
     if (!hasAccess) return 'Developer role required';
@@ -133,10 +203,27 @@ export default function DeveloperPage() {
       setApiToken(data.token);
       setApiTokenMeta({ name: data.name ?? apiTokenName, expiresAt: data.expiresAt });
       setNotice({ type: 'success', text: 'Token generated. Copy it now, it will not be shown again.' });
+      void loadApiTokens();
     } catch (err: any) {
       setNotice({ type: 'error', text: err.message ?? 'Token generation failed' });
     } finally {
       setGenerating(false);
+    }
+  };
+
+  const revokeToken = async (tokenId: number) => {
+    setRevokingTokenId(tokenId);
+    setNotice(null);
+    try {
+      const res = await fetch(`/api/auth/api-tokens/${tokenId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? 'Token revocation failed');
+      setNotice({ type: 'success', text: 'API token revoked.' });
+      await loadApiTokens();
+    } catch (err: any) {
+      setNotice({ type: 'error', text: err.message ?? 'Token revocation failed' });
+    } finally {
+      setRevokingTokenId(null);
     }
   };
 
@@ -448,6 +535,82 @@ export default function DeveloperPage() {
                 {generating ? 'Generating...' : 'Generate API token'}
               </button>
             </div>
+          </Section>
+
+          <Section title="Generated tokens" icon={Key}>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <p className="font-rajdhani text-sm text-slate-400">Supervise and revoke the API tokens created by your account. Secrets are never shown again after generation.</p>
+              <button
+                type="button"
+                onClick={() => void loadApiTokens()}
+                disabled={apiTokensLoading}
+                className="inline-flex w-fit items-center gap-2 rounded border border-slate-800 px-3 py-2 font-mono-sc text-xs text-slate-400 transition-colors hover:border-cyan-800/70 hover:text-cyan-300 disabled:opacity-50"
+              >
+                <RefreshCw size={13} className={apiTokensLoading ? 'animate-spin' : ''} />
+                Refresh
+              </button>
+            </div>
+
+            {apiTokensLoading && apiTokens.length === 0 ? (
+              <p className="rounded-sm border border-slate-800 bg-slate-950/40 px-3 py-6 text-center font-mono-sc text-xs text-slate-600">
+                Loading API tokens...
+              </p>
+            ) : apiTokens.length === 0 ? (
+              <p className="rounded-sm border border-slate-800 bg-slate-950/40 px-3 py-6 text-center font-mono-sc text-xs text-slate-600">
+                No API token generated yet.
+              </p>
+            ) : (
+              <div className="overflow-x-auto rounded-sm border border-slate-800/80">
+                <table className="w-full min-w-[760px] text-left">
+                  <thead>
+                    <tr className="border-b border-slate-800/70 bg-slate-950/40 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                      <th className="px-3 py-2 font-normal">Project</th>
+                      <th className="px-3 py-2 font-normal">Status</th>
+                      <th className="px-3 py-2 text-right font-normal">Usage</th>
+                      <th className="px-3 py-2 font-normal">Last used</th>
+                      <th className="px-3 py-2 font-normal">Client</th>
+                      <th className="px-3 py-2 text-right font-normal">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {apiTokens.map((token) => {
+                      const status = tokenStatus(token);
+                      return (
+                        <tr key={token.id} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
+                          <td className="px-3 py-2">
+                            <p className="truncate font-mono-sc text-xs text-slate-300">{token.name}</p>
+                            {token.description && <p className="truncate font-rajdhani text-xs text-slate-600">{token.description}</p>}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className={`inline-flex rounded-sm border px-1.5 py-0.5 font-mono-sc text-[10px] font-bold uppercase ${tokenStatusStyle(status)}`}>
+                              {status}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono-sc text-xs text-cyan-400">{token.usageCount.toLocaleString()}</td>
+                          <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtDateTime(token.lastUsedAt)}</td>
+                          <td className="px-3 py-2">
+                            <p className="max-w-[18rem] truncate font-mono-sc text-xs text-slate-500" title={token.lastUserAgent ?? undefined}>
+                              {token.lastUsedIp ?? 'unknown'}{token.lastUserAgent ? ` · ${token.lastUserAgent}` : ''}
+                            </p>
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <button
+                              type="button"
+                              onClick={() => void revokeToken(token.id)}
+                              disabled={status !== 'active' || revokingTokenId === token.id}
+                              className="inline-flex items-center gap-1.5 rounded-sm border border-rose-900/60 px-2 py-1 font-mono-sc text-[10px] text-rose-300 transition-colors hover:border-rose-600 hover:bg-rose-950/30 disabled:cursor-not-allowed disabled:opacity-35"
+                            >
+                              <Trash2 size={11} />
+                              {revokingTokenId === token.id ? 'Revoking' : 'Revoke'}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </Section>
         </div>
 

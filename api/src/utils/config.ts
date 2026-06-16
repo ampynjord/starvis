@@ -27,8 +27,9 @@ export const RATE_LIMITS = {
   windowMs: 15 * 60 * 1000,
   // Hard limit: requests per window per IP (then 429)
   max: parseInt(process.env.RATE_LIMIT_MAX || '1000', 10),
-  // Strict limit for admin endpoints
-  adminMax: parseInt(process.env.RATE_LIMIT_ADMIN_MAX || '100', 10),
+  // Admin screens poll several supervision endpoints; keep this protective but
+  // high enough for normal dashboard usage.
+  adminMax: parseInt(process.env.RATE_LIMIT_ADMIN_MAX || '1000', 10),
   // Strict limit for failed authentication attempts (login, reset, 2FA)
   authMax: parseInt(process.env.RATE_LIMIT_AUTH_MAX || '10', 10),
   // Burst: max requests per minute per IP

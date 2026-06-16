@@ -1,5 +1,6 @@
 import type { Request } from 'express';
 import { AUTH_COOKIE_NAME } from '../utils/config.js';
+import { anonymizeIp, resolveClientIp } from '../utils/request-ip.js';
 import { type JwtPayload, verifyAuthToken } from './auth-service.js';
 
 export interface RequestLogEntry {
@@ -31,16 +32,6 @@ function bufferSize(): number {
   const parsed = Number.parseInt(process.env.REQUEST_LOG_BUFFER_SIZE ?? '', 10);
   if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_BUFFER_SIZE;
   return Math.min(Math.max(parsed, 50), 5_000);
-}
-
-function anonymizeIp(ip: string | undefined): string | null {
-  if (!ip) return null;
-  const normalized = ip.replace(/^::ffff:/, '');
-  const ipv4Parts = normalized.split('.');
-  if (ipv4Parts.length === 4) return `${ipv4Parts[0]}.${ipv4Parts[1]}.${ipv4Parts[2]}.0`;
-  const ipv6Parts = normalized.split(':');
-  if (ipv6Parts.length > 2) return `${ipv6Parts.slice(0, 4).join(':')}::`;
-  return normalized;
 }
 
 function requestPath(req: Request): string {
@@ -142,7 +133,7 @@ export function recordRequestLog(req: Request, statusCode: number, durationMs: n
     userId: typeof payload?.sub === 'number' ? payload.sub : null,
     username: payload?.username ?? null,
     role: payload?.role ?? null,
-    ip: anonymizeIp(req.ip),
+    ip: anonymizeIp(resolveClientIp(req)),
     userAgent: requestUserAgent(req),
   });
 

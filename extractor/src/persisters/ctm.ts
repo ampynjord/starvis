@@ -3,7 +3,7 @@
  */
 import type { PoolClient } from 'pg';
 import { type ShipToScrape, scrapeShipCtmUrls } from '../ctm-scraper.js';
-import type { GameEnv } from '../extraction-service.js';
+import type { GameEnv } from '../module-registry.js';
 
 /**
  * Scrape 3D model (.ctm) URLs from the RSI website and persist them to ships.ctm_url.

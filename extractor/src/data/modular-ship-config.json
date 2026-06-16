@@ -1,0 +1,91 @@
+{
+  "AEGS_Retaliator": [
+    {
+      "slotName": "hardpoint_front_module",
+      "slotType": "front",
+      "modulePrefix": "AEGS_Retaliator_Module_Front_",
+      "defaultContains": "Base"
+    },
+    { "slotName": "hardpoint_rear_module", "slotType": "rear", "modulePrefix": "AEGS_Retaliator_Module_Rear_", "defaultContains": "Base" }
+  ],
+  "RSI_Aurora_Mk2": [
+    {
+      "slotName": "hardpoint_module",
+      "slotType": "module",
+      "moduleNames": ["RSI_Aurora_Mk2_Module_Cargo", "RSI_Aurora_Mk2_Module_Missile"],
+      "defaultContains": "Cargo"
+    }
+  ],
+  "RSI_Apollo_Medivac": [
+    {
+      "slotName": "hardpoint_modular_room_left",
+      "slotType": "left",
+      "modulePrefix": "RSI_Apollo_Module_Left_Tier_",
+      "defaultContains": "Tier_3",
+      "tierExtract": true
+    },
+    {
+      "slotName": "hardpoint_modular_room_right",
+      "slotType": "right",
+      "modulePrefix": "RSI_Apollo_Module_Right_Tier_",
+      "defaultContains": "Tier_3",
+      "tierExtract": true
+    }
+  ],
+  "RSI_Apollo_Triage": [
+    {
+      "slotName": "hardpoint_modular_room_left",
+      "slotType": "left",
+      "modulePrefix": "RSI_Apollo_Module_Left_Tier_",
+      "defaultContains": "Tier_1",
+      "tierExtract": true
+    },
+    {
+      "slotName": "hardpoint_modular_room_right",
+      "slotType": "right",
+      "modulePrefix": "RSI_Apollo_Module_Right_Tier_",
+      "defaultContains": "Tier_1",
+      "tierExtract": true
+    }
+  ],
+  "DRAK_Caterpillar": [
+    {
+      "slotName": "hardpoint_module_command",
+      "slotType": "command",
+      "modulePrefix": "DRAK_Caterpillar_Module_Command_",
+      "defaultContains": "Command"
+    },
+    { "slotName": "hardpoint_module_01", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo" },
+    { "slotName": "hardpoint_module_02", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo" },
+    { "slotName": "hardpoint_module_03", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo" },
+    { "slotName": "hardpoint_module_04", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo" }
+  ],
+  "RSI_Galaxy": [
+    { "slotName": "hardpoint_module_bay", "slotType": "bay", "modulePrefix": "RSI_Galaxy_Module_", "defaultContains": "Cargo" }
+  ],
+  "CNOU_Ironclad": [
+    { "slotName": "hardpoint_module_front", "slotType": "front", "modulePrefix": "CNOU_Ironclad_Module_", "defaultContains": "Cargo" },
+    { "slotName": "hardpoint_module_mid", "slotType": "mid", "modulePrefix": "CNOU_Ironclad_Module_", "defaultContains": "Cargo" }
+  ],
+  "CNOU_Ironclad_Assault": [
+    { "slotName": "hardpoint_module_front", "slotType": "front", "modulePrefix": "CNOU_Ironclad_Module_", "defaultContains": "Cargo" },
+    { "slotName": "hardpoint_module_mid", "slotType": "mid", "modulePrefix": "CNOU_Ironclad_Module_", "defaultContains": "Cargo" }
+  ],
+  "MISC_Hull_C": [
+    { "slotName": "hardpoint_cargo_01", "slotType": "cargo", "modulePrefix": "MISC_HullC_Module_", "defaultContains": "Cargo" }
+  ],
+  "MISC_Pioneer": [
+    {
+      "slotName": "hardpoint_module_01",
+      "slotType": "fabrication",
+      "modulePrefix": "MISC_Pioneer_Module_",
+      "defaultContains": "Fabrication"
+    }
+  ],
+  "ORIG_600i_Explorer": [
+    { "slotName": "hardpoint_module_cabin", "slotType": "cabin", "modulePrefix": "ORIG_600i_Module_", "defaultContains": "Cabin" }
+  ],
+  "ORIG_600i_Touring": [
+    { "slotName": "hardpoint_module_cabin", "slotType": "cabin", "modulePrefix": "ORIG_600i_Module_", "defaultContains": "Cabin" }
+  ]
+}
