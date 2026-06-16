@@ -16,6 +16,11 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "JWT"
+      },
+      "cookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "starvis_token"
       }
     },
     "parameters": {
@@ -80,7 +85,7 @@
         "in": "query",
         "schema": {
           "type": "string",
-          "enum": ["live", "ptu", "eptu", "custom"],
+          "enum": ["live", "ptu", "eptu", "tech-preview", "custom"],
           "default": "live"
         },
         "description": "Game environment"
@@ -2898,12 +2903,40 @@
       "description": "User bug reports and admin management"
     },
     {
-      "name": "Health",
-      "description": "Liveness, readiness probes and Prometheus metrics"
+      "name": "Corporations",
+      "description": "Corporation, fleet, membership and corporation admin endpoints"
     },
     {
-      "name": "Game Insights",
-      "description": "Extended P4K/DataForge discovery data for loot, reputation, navigation, services and related game systems."
+      "name": "Factions",
+      "description": "Faction registry and reputation data"
+    },
+    {
+      "name": "Ammo",
+      "description": "Ammo ballistic, energy and explosive data displayed by Starvis"
+    },
+    {
+      "name": "Armor",
+      "description": "Armor and inventory container data displayed by Starvis"
+    },
+    {
+      "name": "Utility",
+      "description": "Utility item and inventory container data displayed by Starvis"
+    },
+    {
+      "name": "Blueprints",
+      "description": "Blueprint rewards and loot-table discovery data"
+    },
+    {
+      "name": "Objects",
+      "description": "Generic Star Citizen object lookup endpoints"
+    },
+    {
+      "name": "Stats",
+      "description": "Latest public Starvis data statistics"
+    },
+    {
+      "name": "Health",
+      "description": "Liveness, readiness probes and Prometheus metrics"
     }
   ],
   "paths": {
@@ -13639,7 +13672,7 @@
             "bearerAuth": []
           },
           {
-            "apiKeyAuth": []
+            "apiKey": []
           },
           {
             "cookieAuth": []
@@ -13697,7 +13730,7 @@
             "bearerAuth": []
           },
           {
-            "apiKeyAuth": []
+            "apiKey": []
           },
           {
             "cookieAuth": []
