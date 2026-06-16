@@ -2,9 +2,10 @@
  * Batch INSERT helper shared by all persisters.
  */
 import type { PoolClient } from 'pg';
+import { EXTRACTOR_DEFAULTS } from '../extractor-config.js';
 
 /** Default batch size for multi-row INSERT statements */
-export const BATCH_SIZE = 50;
+export const BATCH_SIZE: number = EXTRACTOR_DEFAULTS.batchSize;
 
 /**
  * Execute a multi-row INSERT … ON CONFLICT DO UPDATE in batches (PostgreSQL).

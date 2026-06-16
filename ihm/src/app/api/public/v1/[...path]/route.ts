@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { SERVER_API_KEY } from '@/lib/server-config';
-import { getAuthToken, upstreamUrl } from '../../../_utils/proxy';
+import { forwardedClientHeadersFromHeaders, getAuthToken, upstreamUrl } from '../../../_utils/proxy';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,6 +40,7 @@ async function proxyPublicApi(req: NextRequest, context: { params: Promise<{ pat
   const { path = [] } = await context.params;
   const upstreamPath = `/api/v1/${path.map(encodeURIComponent).join('/')}${req.nextUrl.search}`;
   const headers: Record<string, string> = {
+    ...forwardedClientHeadersFromHeaders(req.headers),
     Accept: req.headers.get('accept') ?? 'application/json',
     'X-API-Key': SERVER_API_KEY,
     'X-Starvis-Internal-Client': 'ihm-public-proxy',

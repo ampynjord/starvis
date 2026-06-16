@@ -10,6 +10,7 @@ describe('extractor CLI options', () => {
 
   it('parses module aliases and comma-separated modules', () => {
     expect([...parseModules('ships,orgs,comm-links')]).toEqual(['ships', 'organizations', 'comm-links']);
+    expect([...parseModules('shop-inventory')]).toEqual(['shops']);
   });
 
   it('rejects unknown modules', () => {
@@ -22,7 +23,8 @@ describe('extractor CLI options', () => {
   });
 
   it('validates integer options', () => {
-    expect(parseCliOptions(['--ctm-concurrency', '4']).ctmConcurrency).toBe(4);
-    expect(() => parseCliOptions(['--ctm-concurrency', '0'])).toThrow(/positive integer/);
+    expect(parseCliOptions(['--concurrency', '4']).ctmConcurrency).toBe(4);
+    expect(parseCliOptions(['--ctm-concurrency', '3']).ctmConcurrency).toBe(3);
+    expect(() => parseCliOptions(['--concurrency', '0'])).toThrow(/positive integer/);
   });
 });

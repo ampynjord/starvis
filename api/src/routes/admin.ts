@@ -1,6 +1,7 @@
 import type { Router } from 'express';
 import { requireJwtAdmin } from '../middleware/index.js';
 import { buildApiSupervisionSnapshot } from '../services/api-supervision-service.js';
+import { ApiTokenService } from '../services/api-token-service.js';
 import { listRequestLogsByScope } from '../services/request-log-service.js';
 import { asyncHandler, makeGameDataGuard } from './helpers.js';
 import type { RouteDependencies } from './types.js';
@@ -44,6 +45,27 @@ export function mountAdminRoutes(router: Router, deps: RouteDependencies): void 
     '/admin/api-supervision',
     asyncHandler(async (_req, res) => {
       res.json({ success: true, data: await buildApiSupervisionSnapshot(prisma) });
+    }),
+  );
+
+  router.get(
+    '/admin/api-tokens',
+    asyncHandler(async (req, res) => {
+      const limit = Number.parseInt(String(req.query.limit ?? '200'), 10);
+      res.json({ success: true, data: await new ApiTokenService(prisma).listForAdmin(limit) });
+    }),
+  );
+
+  router.delete(
+    '/admin/api-tokens/:id',
+    asyncHandler(async (req, res) => {
+      const tokenId = Number(req.params.id);
+      if (!Number.isInteger(tokenId) || tokenId <= 0) {
+        return void res.status(400).json({ success: false, error: 'Invalid token id' });
+      }
+      const revoked = await new ApiTokenService(prisma).revokeForAdmin(tokenId);
+      if (!revoked) return void res.status(404).json({ success: false, error: 'API token not found or already revoked' });
+      res.json({ success: true, data: revoked });
     }),
   );
 

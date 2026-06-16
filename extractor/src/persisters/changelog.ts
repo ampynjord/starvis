@@ -3,8 +3,8 @@
  * Compares the pre-extraction snapshot with freshly extracted data.
  */
 import type { PoolClient } from 'pg';
-import type { GameEnv } from '../extraction-service.js';
 import logger from '../logger.js';
+import type { GameEnv } from '../module-registry.js';
 
 export async function generateChangelog(
   conn: PoolClient,

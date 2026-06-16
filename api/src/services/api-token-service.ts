@@ -26,6 +26,11 @@ export interface ApiTokenPublic {
   };
 }
 
+export interface ApiTokenListOptions {
+  limit?: number;
+  includeRevoked?: boolean;
+}
+
 export function hashApiToken(token: string): string {
   return createHash('sha256').update(token, 'utf8').digest('hex');
 }
@@ -111,11 +116,46 @@ export class ApiTokenService {
     });
   }
 
-  async listForAdmin(limit = 200): Promise<ApiTokenPublic[]> {
-    const safeLimit = Math.min(Math.max(Math.trunc(limit) || 200, 1), 500);
+  private normalizeLimit(limit = 200): number {
+    return Math.min(Math.max(Math.trunc(limit) || 200, 1), 500);
+  }
+
+  async listForUser(userId: number, options: ApiTokenListOptions = {}): Promise<ApiTokenPublic[]> {
     return this.prisma.apiToken.findMany({
-      take: safeLimit,
+      where: {
+        userId,
+        ...(options.includeRevoked ? {} : { revokedAt: null }),
+      },
+      take: this.normalizeLimit(options.limit),
       orderBy: [{ lastUsedAt: 'desc' }, { createdAt: 'desc' }],
+    });
+  }
+
+  async listForAdmin(limit = 200): Promise<ApiTokenPublic[]> {
+    return this.prisma.apiToken.findMany({
+      take: this.normalizeLimit(limit),
+      orderBy: [{ lastUsedAt: 'desc' }, { createdAt: 'desc' }],
+      include: { user: { select: { id: true, username: true, email: true, role: true } } },
+    });
+  }
+
+  async revokeForUser(tokenId: number, userId: number): Promise<ApiTokenPublic | null> {
+    const result = await this.prisma.apiToken.updateMany({
+      where: { id: tokenId, userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    if (!result.count) return null;
+    return this.prisma.apiToken.findUnique({ where: { id: tokenId } });
+  }
+
+  async revokeForAdmin(tokenId: number): Promise<ApiTokenPublic | null> {
+    const result = await this.prisma.apiToken.updateMany({
+      where: { id: tokenId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    });
+    if (!result.count) return null;
+    return this.prisma.apiToken.findUnique({
+      where: { id: tokenId },
       include: { user: { select: { id: true, username: true, email: true, role: true } } },
     });
   }

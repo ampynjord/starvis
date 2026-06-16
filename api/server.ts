@@ -18,7 +18,7 @@ import compression from 'compression';
 import cors from 'cors';
 import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import slowDown from 'express-slow-down';
 import helmet from 'helmet';
 import swaggerUi from 'swagger-ui-express';
@@ -34,6 +34,7 @@ import { RsiWebsiteService } from './src/services/rsi-website-service.js';
 import { ShipMatrixService } from './src/services/ship-matrix-service.js';
 import { AUTH_COOKIE_NAME, DEVELOPER_ACCESS_ROLES } from './src/utils/config.js';
 import { buildDatabaseUrl, logger, RATE_LIMITS } from './src/utils/index.js';
+import { resolveClientIp } from './src/utils/request-ip.js';
 
 const PORT = process.env.PORT || 3000;
 
@@ -43,7 +44,7 @@ let httpServer: ReturnType<typeof app.listen> | null = null;
 
 // ===== MIDDLEWARE =====
 
-app.set('trust proxy', 1);
+app.set('trust proxy', process.env.TRUST_PROXY ?? 'loopback, linklocal, uniquelocal');
 
 app.use(
   helmet({
@@ -87,9 +88,25 @@ const apiLimiter = rateLimit({
   skip: () => isTest,
 });
 
+function adminRateLimitKey(req: Request): string {
+  const token = getBearerToken(req) ?? getCookieToken(req);
+  if (token) {
+    try {
+      const payload = verifyAuthToken(token);
+      if (payload?.sub) return `admin:user:${payload.sub}`;
+    } catch {
+      // Invalid tokens fall back to the client IP bucket.
+    }
+  }
+
+  const clientIp = resolveClientIp(req) ?? req.ip ?? req.socket.remoteAddress;
+  return clientIp ? `admin:ip:${ipKeyGenerator(clientIp)}` : 'admin:ip:unknown';
+}
+
 const adminLimiter = rateLimit({
   windowMs: RATE_LIMITS.windowMs,
   max: RATE_LIMITS.adminMax,
+  keyGenerator: adminRateLimitKey,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, error: 'Admin rate limit exceeded' },

@@ -1,4 +1,5 @@
 import { Command, InvalidArgumentError } from 'commander';
+import { EXTRACTOR_DEFAULTS, EXTRACTOR_ENV_FILES } from '../extractor-config.js';
 import type { LogLevel } from '../logger.js';
 import { GAME_ENVS, parseModules, type SelectedModules, VALID_MODULES } from './modules.js';
 
@@ -12,7 +13,8 @@ export interface RawCliOptions {
   dryRun?: boolean;
   prodDb?: boolean;
   ctmForce?: boolean;
-  ctmConcurrency: string;
+  concurrency?: string;
+  ctmConcurrency?: string;
   galleryDelayMs: string;
   galleryRetries: string;
   galleryRetryDelayMs: string;
@@ -67,7 +69,7 @@ function parsePositiveInt(value: string, optionName: string): number {
 }
 
 export function getEnvFileFromArgv(argv: string[]): string {
-  return argv.includes('--prod-db') ? '.env.extractor.prod' : '.env.extractor.dev';
+  return argv.includes('--prod-db') ? EXTRACTOR_ENV_FILES.prod : EXTRACTOR_ENV_FILES.dev;
 }
 
 function getEnvLogLevel(): LogLevel | undefined {
@@ -85,16 +87,17 @@ export function buildProgram(version: string): Command {
     .description('Star Citizen P4K -> PostgreSQL game data extractor')
     .version(version)
     .option('-p, --p4k <path>', 'path to Data.p4k (overrides auto-detection)')
-    .option('-e, --env <env>', 'game environment: live | ptu | custom', parseEnv, 'live')
-    .option('-m, --modules <list>', 'comma-separated modules to extract (default: all)', 'all')
+    .option('-e, --env <env>', 'game environment: live | ptu | custom', parseEnv, EXTRACTOR_DEFAULTS.env)
+    .option('-m, --modules <list>', 'comma-separated modules to extract (default: all)', EXTRACTOR_DEFAULTS.modules)
     .option('--game-version <version>', 'override detected game version (e.g. 4.7.2)')
     .option('--dry-run', 'parse P4K and log stats without writing to database')
     .option('--prod-db', 'use the production database configured via SSH tunnel')
     .option('--ctm-force', 'CTM: re-scrape all ships, even those that already have a URL')
-    .option('--ctm-concurrency <n>', 'CTM: number of ships to scrape in parallel', '1')
-    .option('--gallery-delay-ms <n>', 'ship galleries: delay between RSI pledge pages', '6000')
-    .option('--gallery-retries <n>', 'ship galleries: network retries per ship page', '4')
-    .option('--gallery-retry-delay-ms <n>', 'ship galleries: base retry backoff delay', '8000')
+    .option('--concurrency <n>', 'shared network scraper concurrency', String(EXTRACTOR_DEFAULTS.ctmConcurrency))
+    .option('--ctm-concurrency <n>', 'deprecated alias for --concurrency')
+    .option('--gallery-delay-ms <n>', 'ship galleries: delay between RSI pledge pages', String(EXTRACTOR_DEFAULTS.galleryDelayMs))
+    .option('--gallery-retries <n>', 'ship galleries: network retries per ship page', String(EXTRACTOR_DEFAULTS.galleryRetries))
+    .option('--gallery-retry-delay-ms <n>', 'ship galleries: base retry backoff delay', String(EXTRACTOR_DEFAULTS.galleryRetryDelayMs))
     .option('--log-level <level>', 'debug | info | warn | error | silent', parseLogLevel)
     .option('--verbose', 'shortcut for --log-level debug')
     .option('--quiet', 'suppress all logs except explicit command output')
@@ -107,15 +110,15 @@ export function buildProgram(version: string): Command {
       `
 Environment variables:
   DATABASE_URL  PostgreSQL connection string (overrides individual params)
-  DB_HOST       PostgreSQL host (default: localhost)
-  DB_PORT       PostgreSQL port (default: 5432)
+  DB_HOST       PostgreSQL host (default: ${EXTRACTOR_DEFAULTS.databaseHost})
+  DB_PORT       PostgreSQL port (default: ${EXTRACTOR_DEFAULTS.databasePort})
   DB_USER       PostgreSQL user
   DB_PASSWORD   PostgreSQL password
   DB_NAME       PostgreSQL database name (default: starvis)
   P4K_PATH      Generic fallback path (alternative to --p4k flag)
   P4K_LIVE_PATH Path used when --env live
   P4K_PTU_PATH  Path used when --env ptu
-  LOG_LEVEL     debug | info | warn | error | silent (default: info)
+  LOG_LEVEL     debug | info | warn | error | silent (default: ${EXTRACTOR_DEFAULTS.logLevel})
 
 Available modules:
   ${VALID_MODULES.join(', ')}
@@ -124,7 +127,7 @@ Examples:
   npx tsx extract.ts --env live
   npx tsx extract.ts --env ptu --modules missions,ships
   npx tsx extract.ts --p4k /path/to/Data.p4k --env custom
-  npx tsx extract.ts --modules ctm --ctm-force --ctm-concurrency 4
+  npx tsx extract.ts --modules ctm --ctm-force --concurrency 4
   npx tsx extract.ts --modules ship-galleries --gallery-delay-ms 10000
   npx tsx extract.ts --list-modules
   npx tsx extract.ts --check-config --modules ctm
@@ -138,7 +141,13 @@ export function parseCliOptions(argv: string[], version = '0.0.0'): ExtractorCli
   program.parse(argv, { from: 'user' });
   const raw = program.opts<RawCliOptions>();
   const quiet = !!raw.quiet;
-  const logLevel = quiet ? 'silent' : raw.verbose ? 'debug' : ((raw.logLevel as LogLevel | undefined) ?? getEnvLogLevel() ?? 'info');
+  const logLevel = quiet
+    ? 'silent'
+    : raw.verbose
+      ? 'debug'
+      : ((raw.logLevel as LogLevel | undefined) ?? getEnvLogLevel() ?? EXTRACTOR_DEFAULTS.logLevel);
+  const concurrencyOptionName = raw.ctmConcurrency ? '--ctm-concurrency' : '--concurrency';
+  const sharedConcurrency = raw.ctmConcurrency ?? raw.concurrency ?? String(EXTRACTOR_DEFAULTS.ctmConcurrency);
 
   return {
     p4k: raw.p4k,
@@ -148,7 +157,7 @@ export function parseCliOptions(argv: string[], version = '0.0.0'): ExtractorCli
     dryRun: !!raw.dryRun,
     prodDb: !!raw.prodDb,
     ctmForce: !!raw.ctmForce,
-    ctmConcurrency: parsePositiveInt(raw.ctmConcurrency, '--ctm-concurrency'),
+    ctmConcurrency: parsePositiveInt(sharedConcurrency, concurrencyOptionName),
     galleryDelayMs: parsePositiveInt(raw.galleryDelayMs, '--gallery-delay-ms'),
     galleryRetries: parsePositiveInt(raw.galleryRetries, '--gallery-retries'),
     galleryRetryDelayMs: parsePositiveInt(raw.galleryRetryDelayMs, '--gallery-retry-delay-ms'),

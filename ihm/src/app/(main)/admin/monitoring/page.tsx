@@ -18,6 +18,7 @@ import {
   RefreshCw,
   Server,
   ShieldCheck,
+  Trash2,
   User,
   Zap,
 } from 'lucide-react';
@@ -349,6 +350,7 @@ export default function AdminMonitoringPage() {
   const [webRequestLogs, setWebRequestLogs] = useState<RequestLogEntry[]>([]);
   const [apiSupervision, setApiSupervision] = useState<ApiSupervisionSnapshot | null>(null);
   const [discordBot, setDiscordBot] = useState<DiscordBotStatus | null>(null);
+  const [revokingTokenId, setRevokingTokenId] = useState<number | null>(null);
   const [reqPerSec, setReqPerSec] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -415,6 +417,20 @@ export default function AdminMonitoringPage() {
       setLoading(false);
     }
   }, []);
+
+  const revokeApiToken = async (tokenId: number) => {
+    setRevokingTokenId(tokenId);
+    try {
+      const res = await fetch(`/api/admin/api-tokens/${tokenId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error ?? 'Failed to revoke API token');
+      await refresh();
+    } catch (err: any) {
+      setError(err.message ?? 'Failed to revoke API token.');
+    } finally {
+      setRevokingTokenId(null);
+    }
+  };
 
   useEffect(() => {
     if (me?.role !== ADMIN_ROLE) return;
@@ -615,7 +631,7 @@ export default function AdminMonitoringPage() {
               <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No generated API tokens yet.</p>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[820px] text-left">
+                <table className="w-full min-w-[920px] text-left">
                   <thead>
                     <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
                       <th className="px-3 py-2 font-normal">Project</th>
@@ -624,6 +640,7 @@ export default function AdminMonitoringPage() {
                       <th className="px-3 py-2 text-right font-normal">Recent</th>
                       <th className="px-3 py-2 text-right font-normal">Total</th>
                       <th className="px-3 py-2 font-normal">Last used</th>
+                      <th className="px-3 py-2 text-right font-normal">Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -646,6 +663,17 @@ export default function AdminMonitoringPage() {
                         <td className="px-3 py-2 text-right font-mono-sc text-xs text-cyan-400">{project.recentRequests.toLocaleString()}</td>
                         <td className="px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{project.usageCount.toLocaleString()}</td>
                         <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtDateTime(project.lastUsedAt)}</td>
+                        <td className="px-3 py-2 text-right">
+                          <button
+                            type="button"
+                            onClick={() => void revokeApiToken(project.tokenId)}
+                            disabled={project.status !== 'active' || revokingTokenId === project.tokenId}
+                            className="inline-flex items-center gap-1.5 rounded-sm border border-rose-900/60 px-2 py-1 font-mono-sc text-[10px] text-rose-300 transition-colors hover:border-rose-600 hover:bg-rose-950/30 disabled:cursor-not-allowed disabled:opacity-35"
+                          >
+                            <Trash2 size={11} />
+                            {revokingTokenId === project.tokenId ? 'Revoking' : 'Revoke'}
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
