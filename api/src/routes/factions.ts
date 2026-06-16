@@ -1,13 +1,5 @@
 import type { Router } from 'express';
-import {
-  asyncHandler,
-  getQueryEnv,
-  getQueryNumber,
-  getQueryString,
-  makeGameDataGuard,
-  sendDataWithETag,
-  sendWithETag,
-} from './helpers.js';
+import { asyncHandler, getQueryEnv, getQueryNumber, getQueryString, makeGameDataGuard, sendDataWithETag, sendWithETag } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
 export function mountFactionRoutes(router: Router, deps: RouteDependencies): void {

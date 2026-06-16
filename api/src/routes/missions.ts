@@ -1,7 +1,6 @@
 import type { Router } from 'express';
 import {
   asyncHandler,
-  getQueryEnv,
   getQueryNumber,
   getQueryString,
   makeGameDataGuard,

@@ -2418,19 +2418,27 @@
           },
           "mission_givers": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           },
           "systems": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           },
           "categories": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           },
           "mission_types": {
             "type": "array",
-            "items": { "type": "string" }
+            "items": {
+              "type": "string"
+            }
           },
           "game_faction_uuid": {
             "type": "string",
@@ -2495,55 +2503,168 @@
         "type": "object",
         "description": "Game faction record from the DataForge registry (game.factions table). Use /factions/registry for a paginated list.",
         "properties": {
-          "uuid": { "type": "string", "format": "uuid" },
-          "env": { "type": "string", "example": "live" },
-          "class_name": { "type": "string" },
-          "name": { "type": "string", "nullable": true },
-          "description": { "type": "string", "nullable": true },
-          "faction_type": { "type": "string", "nullable": true },
-          "default_reaction": { "type": "string", "nullable": true, "description": "Default player reaction (e.g. Neutral, Hostile, Friendly)" },
-          "able_to_arrest": { "type": "boolean", "nullable": true },
-          "no_legal_rights": { "type": "boolean", "nullable": true },
-          "polices_criminality": { "type": "boolean", "nullable": true },
-          "polices_lawful_trespass": { "type": "boolean", "nullable": true },
-          "faction_reputation_uuid": { "type": "string", "nullable": true },
-          "allies": { "nullable": true, "description": "JSON array of allied faction class names" },
-          "enemies": { "nullable": true, "description": "JSON array of enemy faction class names" },
-          "organization_tags": { "nullable": true }
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "env": {
+            "type": "string",
+            "example": "live"
+          },
+          "class_name": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "faction_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "default_reaction": {
+            "type": "string",
+            "nullable": true,
+            "description": "Default player reaction (e.g. Neutral, Hostile, Friendly)"
+          },
+          "able_to_arrest": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "no_legal_rights": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "polices_criminality": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "polices_lawful_trespass": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "faction_reputation_uuid": {
+            "type": "string",
+            "nullable": true
+          },
+          "allies": {
+            "nullable": true,
+            "description": "JSON array of allied faction class names"
+          },
+          "enemies": {
+            "nullable": true,
+            "description": "JSON array of enemy faction class names"
+          },
+          "organization_tags": {
+            "nullable": true
+          }
         }
       },
       "ReputationStanding": {
         "type": "object",
         "description": "Reputation standing tier (e.g. Hostile, Neutral, Friendly, Ally) with thresholds and drift settings.",
         "properties": {
-          "uuid": { "type": "string", "format": "uuid" },
-          "env": { "type": "string", "example": "live" },
-          "class_name": { "type": "string" },
-          "name": { "type": "string", "nullable": true },
-          "display_name": { "type": "string", "nullable": true },
-          "description": { "type": "string", "nullable": true },
-          "icon": { "type": "string", "nullable": true },
-          "min_reputation": { "type": "integer", "nullable": true, "description": "Minimum reputation score required to reach this standing" },
-          "drift_time_hours": { "type": "number", "nullable": true, "description": "Hours before reputation drifts toward neutral" },
-          "drift_reputation": { "type": "integer", "nullable": true, "description": "Points drifted per drift cycle" },
-          "gated": { "type": "boolean", "description": "Whether this standing gates access to certain content" },
-          "perk_description": { "type": "string", "nullable": true }
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "env": {
+            "type": "string",
+            "example": "live"
+          },
+          "class_name": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "display_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "icon": {
+            "type": "string",
+            "nullable": true
+          },
+          "min_reputation": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Minimum reputation score required to reach this standing"
+          },
+          "drift_time_hours": {
+            "type": "number",
+            "nullable": true,
+            "description": "Hours before reputation drifts toward neutral"
+          },
+          "drift_reputation": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Points drifted per drift cycle"
+          },
+          "gated": {
+            "type": "boolean",
+            "description": "Whether this standing gates access to certain content"
+          },
+          "perk_description": {
+            "type": "string",
+            "nullable": true
+          }
         }
       },
       "ReputationScope": {
         "type": "object",
         "description": "Reputation scope — a faction-specific reputation track with its own ceiling and standings list.",
         "properties": {
-          "uuid": { "type": "string", "format": "uuid" },
-          "env": { "type": "string", "example": "live" },
-          "class_name": { "type": "string" },
-          "scope_name": { "type": "string", "nullable": true },
-          "display_name": { "type": "string", "nullable": true },
-          "description": { "type": "string", "nullable": true },
-          "icon": { "type": "string", "nullable": true },
-          "initial_reputation": { "type": "integer", "nullable": true, "description": "Starting reputation value for new players" },
-          "reputation_ceiling": { "type": "integer", "nullable": true, "description": "Maximum achievable reputation in this scope" },
-          "standings": { "nullable": true, "description": "JSON array of standing references for this scope" }
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "env": {
+            "type": "string",
+            "example": "live"
+          },
+          "class_name": {
+            "type": "string"
+          },
+          "scope_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "display_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "icon": {
+            "type": "string",
+            "nullable": true
+          },
+          "initial_reputation": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Starting reputation value for new players"
+          },
+          "reputation_ceiling": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Maximum achievable reputation in this scope"
+          },
+          "standings": {
+            "nullable": true,
+            "description": "JSON array of standing references for this scope"
+          }
         }
       },
       "LatestStats": {
@@ -12200,7 +12321,9 @@
         "description": "Returns all factions that appear in extracted missions, merged with matching game registry data (faction type, default reaction, allies/enemies, policing flags). Each entry combines mission counts, reward ranges and list breakdowns with DataForge faction attributes when available.",
         "operationId": "getFactions",
         "parameters": [
-          { "$ref": "#/components/parameters/env" }
+          {
+            "$ref": "#/components/parameters/env"
+          }
         ],
         "responses": {
           "200": {
@@ -12210,11 +12333,17 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": { "type": "boolean" },
-                    "count": { "type": "integer" },
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
                     "data": {
                       "type": "array",
-                      "items": { "$ref": "#/components/schemas/Faction" }
+                      "items": {
+                        "$ref": "#/components/schemas/Faction"
+                      }
                     }
                   }
                 }
@@ -12227,118 +12356,262 @@
     "/api/v1/factions/registry": {
       "get": {
         "tags": ["Factions"],
-        "summary": "Paginated game faction registry",
-        "description": "Paginated list of all GameFaction records extracted from the DataForge (game.factions table). Includes faction type, default reaction, policing flags, allies/enemies and organization tags. Searchable by name, class name, faction type or default reaction.",
-        "operationId": "getFactionRegistry",
+        "summary": "List faction registry entries",
+        "description": "Faction registry data displayed on the Factions page.",
         "parameters": [
-          { "$ref": "#/components/parameters/env" },
-          { "$ref": "#/components/parameters/search" },
-          { "$ref": "#/components/parameters/page" },
-          { "$ref": "#/components/parameters/limit" }
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
         ],
         "responses": {
           "200": {
-            "description": "Paginated list of game factions",
+            "description": "Paginated response",
             "content": {
               "application/json": {
                 "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/Pagination" },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "success": { "type": "boolean" },
-                        "count": { "type": "integer" },
-                        "data": {
-                          "type": "array",
-                          "items": { "$ref": "#/components/schemas/GameFaction" }
-                        }
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "pages": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
                       }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": true
                     }
-                  ]
+                  }
                 }
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicFactionsRegistry"
       }
     },
     "/api/v1/factions/reputation-standings": {
       "get": {
         "tags": ["Factions"],
-        "summary": "Paginated reputation standing tiers",
-        "description": "Returns all reputation standing tiers extracted from the DataForge (e.g. Hostile, Neutral, Friendly, Ally). Each standing defines a minimum reputation threshold, drift settings, a gating flag and an optional perk description. Sorted by `min_reputation` ascending (most hostile first).",
-        "operationId": "getReputationStandings",
+        "summary": "List reputation standings",
+        "description": "Reputation levels displayed on the Factions page.",
         "parameters": [
-          { "$ref": "#/components/parameters/env" },
-          { "$ref": "#/components/parameters/search" },
-          { "$ref": "#/components/parameters/page" },
-          { "$ref": "#/components/parameters/limit" }
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
         ],
         "responses": {
           "200": {
-            "description": "Paginated list of reputation standings",
+            "description": "Paginated response",
             "content": {
               "application/json": {
                 "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/Pagination" },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "success": { "type": "boolean" },
-                        "count": { "type": "integer" },
-                        "data": {
-                          "type": "array",
-                          "items": { "$ref": "#/components/schemas/ReputationStanding" }
-                        }
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "pages": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
                       }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": true
                     }
-                  ]
+                  }
                 }
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicFactionsReputationStandings"
       }
     },
     "/api/v1/factions/reputation-scopes": {
       "get": {
         "tags": ["Factions"],
-        "summary": "Paginated reputation scopes",
-        "description": "Returns all reputation scopes extracted from the DataForge (game.reputation_scopes table). Each scope represents a faction-specific reputation track with its own ceiling, initial value and list of applicable standings. Searchable by scope name, display name, class name or description.",
-        "operationId": "getReputationScopes",
+        "summary": "List reputation scopes",
+        "description": "Reputation scopes available for the Factions page.",
         "parameters": [
-          { "$ref": "#/components/parameters/env" },
-          { "$ref": "#/components/parameters/search" },
-          { "$ref": "#/components/parameters/page" },
-          { "$ref": "#/components/parameters/limit" }
+          {
+            "name": "env",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "default": "live"
+            }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50
+            }
+          }
         ],
         "responses": {
           "200": {
-            "description": "Paginated list of reputation scopes",
+            "description": "Paginated response",
             "content": {
               "application/json": {
                 "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/Pagination" },
-                    {
-                      "type": "object",
-                      "properties": {
-                        "success": { "type": "boolean" },
-                        "count": { "type": "integer" },
-                        "data": {
-                          "type": "array",
-                          "items": { "$ref": "#/components/schemas/ReputationScope" }
-                        }
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    },
+                    "page": {
+                      "type": "integer"
+                    },
+                    "limit": {
+                      "type": "integer"
+                    },
+                    "pages": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true
                       }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": true
                     }
-                  ]
+                  }
                 }
               }
             }
           }
-        }
+        },
+        "operationId": "getPublicFactionsReputationScopes"
       }
     },
     "/api/v1/factions/{faction}": {
@@ -12352,10 +12625,14 @@
             "name": "faction",
             "in": "path",
             "required": true,
-            "schema": { "type": "string" },
+            "schema": {
+              "type": "string"
+            },
             "description": "Faction name (e.g. `UEE`, `Vanduul`, `Xenothreat`)"
           },
-          { "$ref": "#/components/parameters/env" }
+          {
+            "$ref": "#/components/parameters/env"
+          }
         ],
         "responses": {
           "200": {
@@ -12365,14 +12642,20 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": { "type": "boolean" },
-                    "data": { "$ref": "#/components/schemas/Faction" }
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/Faction"
+                    }
                   }
                 }
               }
             }
           },
-          "404": { "$ref": "#/components/responses/NotFound" }
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          }
         }
       }
     },
@@ -12764,267 +13047,6 @@
           }
         },
         "operationId": "getPublicCommLinkImagesId"
-      }
-    },
-    "/api/v1/factions/registry": {
-      "get": {
-        "tags": ["Factions"],
-        "summary": "List faction registry entries",
-        "description": "Faction registry data displayed on the Factions page.",
-        "parameters": [
-          {
-            "name": "env",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "live"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paginated response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "count": {
-                      "type": "integer"
-                    },
-                    "total": {
-                      "type": "integer"
-                    },
-                    "page": {
-                      "type": "integer"
-                    },
-                    "limit": {
-                      "type": "integer"
-                    },
-                    "pages": {
-                      "type": "integer"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "additionalProperties": true
-                      }
-                    },
-                    "meta": {
-                      "type": "object",
-                      "additionalProperties": true
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "operationId": "getPublicFactionsRegistry"
-      }
-    },
-    "/api/v1/factions/reputation-standings": {
-      "get": {
-        "tags": ["Factions"],
-        "summary": "List reputation standings",
-        "description": "Reputation levels displayed on the Factions page.",
-        "parameters": [
-          {
-            "name": "env",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "live"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paginated response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "count": {
-                      "type": "integer"
-                    },
-                    "total": {
-                      "type": "integer"
-                    },
-                    "page": {
-                      "type": "integer"
-                    },
-                    "limit": {
-                      "type": "integer"
-                    },
-                    "pages": {
-                      "type": "integer"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "additionalProperties": true
-                      }
-                    },
-                    "meta": {
-                      "type": "object",
-                      "additionalProperties": true
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "operationId": "getPublicFactionsReputationStandings"
-      }
-    },
-    "/api/v1/factions/reputation-scopes": {
-      "get": {
-        "tags": ["Factions"],
-        "summary": "List reputation scopes",
-        "description": "Reputation scopes available for the Factions page.",
-        "parameters": [
-          {
-            "name": "env",
-            "in": "query",
-            "schema": {
-              "type": "string",
-              "default": "live"
-            }
-          },
-          {
-            "name": "search",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "page",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "default": 1
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Paginated response",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "count": {
-                      "type": "integer"
-                    },
-                    "total": {
-                      "type": "integer"
-                    },
-                    "page": {
-                      "type": "integer"
-                    },
-                    "limit": {
-                      "type": "integer"
-                    },
-                    "pages": {
-                      "type": "integer"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "additionalProperties": true
-                      }
-                    },
-                    "meta": {
-                      "type": "object",
-                      "additionalProperties": true
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "operationId": "getPublicFactionsReputationScopes"
       }
     },
     "/api/v1/ammo/stats": {
