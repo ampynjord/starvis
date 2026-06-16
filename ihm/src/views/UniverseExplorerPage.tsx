@@ -967,6 +967,9 @@ function Scene({
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
 
+    const camera = new THREE.PerspectiveCamera(46, container.clientWidth / container.clientHeight, 0.1, 1400);
+    camera.position.set(0, 118, 148);
+
     const composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
     const bloomPass = new UnrealBloomPass(
@@ -976,9 +979,6 @@ function Scene({
       0.22, // threshold — only bright emissive elements bloom
     );
     composer.addPass(bloomPass);
-
-    const camera = new THREE.PerspectiveCamera(46, container.clientWidth / container.clientHeight, 0.1, 1400);
-    camera.position.set(0, 118, 148);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
