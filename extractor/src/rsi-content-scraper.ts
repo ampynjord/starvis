@@ -87,15 +87,12 @@ function extractAlexandriaContent(html: string): string | null {
     }
   }
 
-  // Build a combined list of articles + illustrations in document order
-  // Pattern: body="..." (≥20 chars so we skip empty/false attributes) OR :simple-image="..."
+  // g-article body + g-illustration images in document order
   for (const m of html.matchAll(/\bbody="([^"]{20,})"|:simple-image="([^"]+)"/g)) {
     if (m[1] !== undefined) {
-      // g-article body
       const body = htmlDecode(m[1]);
       if (body.trim()) parts.push(body);
     } else if (m[2] !== undefined) {
-      // g-illustration image
       try {
         const img = JSON.parse(htmlDecode(m[2])) as {
           originalFormat?: { desktop?: string };
@@ -113,8 +110,33 @@ function extractAlexandriaContent(html: string): string | null {
     }
   }
 
+  // g-header: section headings + body text (used in design-heavy / lore comm-links)
+  for (const hm of html.matchAll(/<g-header[\s\S]*?<\/g-header>/g)) {
+    const headerHtml = hm[0];
+    const titleM = /<template\s[^>]*slot="title"[^>]*>([\s\S]+?)<\/template>/i.exec(headerHtml);
+    const contentM = /<template\s[^>]*slot="content"[^>]*>([\s\S]+?)<\/template>/i.exec(headerHtml);
+    if (titleM) {
+      const titleText = titleM[1].replace(/<[^>]+>/g, '').trim();
+      if (titleText) parts.push(`<h2>${titleText}</h2>`);
+    }
+    if (contentM?.[1].trim()) parts.push(contentM[1].trim());
+  }
+
+  // plugin_trblt_rawmarkup: raw HTML tables / structured blocks
+  for (const rm of html.matchAll(/data-plugin_key="plugin_trblt_rawmarkup"[^>]*><\/div>([\s\S]+?)(?=<div class="turbo-anchor"|$)/g)) {
+    const rawHtml = rm[1].trim();
+    if (rawHtml) parts.push(rawHtml);
+  }
+
   if (parts.length === 0) return null;
-  return cleanHtml(parts.join('\n\n'));
+
+  const cleaned = cleanHtml(parts.join('\n\n'));
+  // Reject result if it contains no substantial text (only CSS / markup)
+  const textOnly = cleaned
+    .replace(/<[^>]+>/g, '')
+    .replace(/&[a-z#0-9]+;/gi, ' ')
+    .trim();
+  return textOnly.length >= 80 ? cleaned : null;
 }
 
 // ── Legacy div-class extractor (for older pages / galactapedia) ───────────────
