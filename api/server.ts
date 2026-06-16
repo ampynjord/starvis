@@ -32,8 +32,8 @@ import { redis } from './src/services/redis.js';
 import { recordRequestLog } from './src/services/request-log-service.js';
 import { RsiWebsiteService } from './src/services/rsi-website-service.js';
 import { ShipMatrixService } from './src/services/ship-matrix-service.js';
-import { AUTH_COOKIE_NAME, DEVELOPER_ACCESS_ROLES } from './src/utils/config.js';
-import { buildDatabaseUrl, logger, RATE_LIMITS } from './src/utils/index.js';
+import { AUTH_COOKIE_NAME, buildDatabaseUrl, DEVELOPER_ACCESS_ROLES, RATE_LIMITS } from './src/utils/config.js';
+import logger from './src/utils/logger.js';
 import { resolveClientIp } from './src/utils/request-ip.js';
 
 const PORT = process.env.PORT || 3000;

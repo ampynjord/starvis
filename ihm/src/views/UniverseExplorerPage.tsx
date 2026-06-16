@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
+import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { api } from '@/services/api';
 import { DetailRow, HudMetric, InfoTile, StatBar } from './universe-explorer-panels';
@@ -136,15 +137,15 @@ const RENDERABLE_TYPES = new Set(['system', 'star', 'planet', 'moon', 'station',
 const TYPE_ORDER = ['system', 'star', 'planet', 'moon', 'station', 'jump_point', 'asteroid_field', 'blackhole', 'poi'];
 
 const TYPE_STYLE: Record<string, { label: string; color: number; radius: number; icon: ReactNode; glow: string }> = {
-  system: { label: 'System', color: 0x39e7ff, radius: 1.7, icon: <Sparkles size={12} />, glow: 'text-cyan-300' },
-  star: { label: 'Star', color: 0xffc766, radius: 1.3, icon: <Star size={12} />, glow: 'text-amber-300' },
-  planet: { label: 'Planet', color: 0x38bdf8, radius: 1.05, icon: <Globe2 size={12} />, glow: 'text-sky-300' },
-  moon: { label: 'Moon', color: 0x94a3b8, radius: 0.48, icon: <CircleDot size={12} />, glow: 'text-slate-300' },
-  station: { label: 'Station', color: 0xa78bfa, radius: 0.42, icon: <Building2 size={12} />, glow: 'text-violet-300' },
-  asteroid_field: { label: 'Asteroids', color: 0x64748b, radius: 0.5, icon: <Aperture size={12} />, glow: 'text-slate-300' },
-  jump_point: { label: 'Jump', color: 0xc084fc, radius: 0.58, icon: <Route size={12} />, glow: 'text-purple-300' },
-  blackhole: { label: 'Blackhole', color: 0xf472b6, radius: 1.1, icon: <Orbit size={12} />, glow: 'text-pink-300' },
-  poi: { label: 'POI', color: 0x22d3ee, radius: 0.36, icon: <MapPin size={12} />, glow: 'text-cyan-300' },
+  system: { label: 'System',   color: 0x39e7ff, radius: 2.0,  icon: <Sparkles size={12} />, glow: 'text-cyan-300' },
+  star:   { label: 'Star',     color: 0xffc45a, radius: 2.8,  icon: <Star size={12} />,     glow: 'text-amber-300' },
+  planet: { label: 'Planet',   color: 0x38bdf8, radius: 1.55, icon: <Globe2 size={12} />,   glow: 'text-sky-300' },
+  moon:   { label: 'Moon',     color: 0x94a3b8, radius: 0.52, icon: <CircleDot size={12} />,glow: 'text-slate-300' },
+  station:{ label: 'Station',  color: 0xa78bfa, radius: 0.38, icon: <Building2 size={12} />,glow: 'text-violet-300' },
+  asteroid_field: { label: 'Asteroids', color: 0x64748b, radius: 0.45, icon: <Aperture size={12} />, glow: 'text-slate-300' },
+  jump_point: { label: 'Jump', color: 0x22d3ee, radius: 0.52, icon: <Route size={12} />,   glow: 'text-cyan-400' },
+  blackhole:  { label: 'Blackhole', color: 0xf472b6, radius: 1.4, icon: <Orbit size={12} />, glow: 'text-pink-300' },
+  poi: { label: 'POI',         color: 0x22d3ee, radius: 0.32, icon: <MapPin size={12} />,  glow: 'text-cyan-300' },
 };
 
 const FALLBACK_POSITIONS: RsiStarmapPosition[] = [
@@ -280,9 +281,17 @@ function hash01(input: string) {
 function orbitPosition(node: Pick<StarmapNode, 'id' | 'type' | 'dbId'>, siblingIndex: number, siblingCount: number) {
   const type = normalizeType(node.type);
   const baseRadius =
-    type === 'planet' ? 7.5 + siblingIndex * 3.5 : type === 'moon' ? 1.35 + siblingIndex * 0.72 : type === 'jump_point' ? 30 : 11 + siblingIndex * 1.6;
+    type === 'planet'
+      ? 9 + siblingIndex * 5.5
+      : type === 'moon'
+        ? 2.2 + siblingIndex * 0.9
+        : type === 'station'
+          ? 2.8 + siblingIndex * 0.6
+          : type === 'jump_point'
+            ? 38
+            : 14 + siblingIndex * 2.2;
   const angle = siblingCount > 0 ? (Math.PI * 2 * siblingIndex) / siblingCount + hash01(node.id) * 0.45 : hash01(node.id) * Math.PI * 2;
-  const y = type === 'jump_point' ? (hash01(`${node.id}:y`) - 0.5) * 5 : (hash01(`${node.id}:inclination`) - 0.5) * 0.55;
+  const y = type === 'jump_point' ? (hash01(`${node.id}:y`) - 0.5) * 6 : type === 'planet' ? (hash01(`${node.id}:inclination`) - 0.5) * 0.18 : (hash01(`${node.id}:inclination`) - 0.5) * 0.35;
   return new THREE.Vector3(Math.cos(angle) * baseRadius, y, Math.sin(angle) * baseRadius);
 }
 
@@ -339,8 +348,19 @@ function buildNodes(positions: RsiStarmapPosition[]) {
   const children = new Map<string, StarmapNode[]>();
   for (const node of rawNodes) {
     if (!node.parentId || !byId.has(node.parentId)) {
+      // For moons/stations without valid parent: look for a planet in the same system before falling back to system
       const system = systemByCode.get(node.systemCode);
-      if (system && system.id !== node.id && node.type !== 'system') node.parentId = system.id;
+      if (node.type === 'moon' || node.type === 'station') {
+        const planets = rawNodes.filter((n) => n.type === 'planet' && n.systemCode === node.systemCode);
+        const closestPlanet = planets[0];
+        if (closestPlanet) {
+          node.parentId = closestPlanet.id;
+        } else if (system && system.id !== node.id) {
+          node.parentId = system.id;
+        }
+      } else if (system && system.id !== node.id && node.type !== 'system') {
+        node.parentId = system.id;
+      }
     }
     if (node.parentId) {
       const list = children.get(node.parentId) ?? [];
@@ -361,7 +381,11 @@ function buildNodes(positions: RsiStarmapPosition[]) {
   }
 
   for (const parent of rawNodes) {
-    const childNodes = (children.get(parent.id) ?? []).sort((a, b) => typeRank(a.type) - typeRank(b.type) || a.name.localeCompare(b.name));
+    const childNodes = (children.get(parent.id) ?? []).sort(
+      (a, b) =>
+        typeRank(a.type) - typeRank(b.type) ||
+        (a.rsiId && b.rsiId ? parseInt(a.rsiId) - parseInt(b.rsiId) : a.name.localeCompare(b.name)),
+    );
     for (const [index, child] of childNodes.entries()) {
       if (child.type === 'star') child.scenePosition = new THREE.Vector3(0, 0, 0);
       else child.scenePosition = orbitPosition(child, index, childNodes.length);
@@ -428,12 +452,20 @@ function publicAssetLabel(node: StarmapNode) {
 }
 
 function objectColor(node: StarmapNode) {
-  if (node.type !== 'system' && node.type !== 'star') return styleFor(node.type).color;
-  const faction = (node.faction ?? '').toLowerCase();
-  if (faction.includes('uee')) return 0x22d3ee;
-  if (faction.includes("xi'an") || faction.includes('xian')) return 0xa78bfa;
-  if (faction.includes('banu')) return 0x34d399;
-  if (faction.includes('vanduul')) return 0xf87171;
+  if (node.type === 'star') {
+    const t = (node.starType ?? '').toLowerCase();
+    if (t.includes('b') || t.includes('o')) return 0x9bd4ff; // étoile bleue
+    if (t.includes('k') || t.includes('m')) return 0xff8844; // étoile orange/rouge
+    return 0xffc45a; // G (soleil type) — ambré chaud comme ARK map
+  }
+  if (node.type === 'system') {
+    const faction = (node.faction ?? '').toLowerCase();
+    if (faction.includes('uee')) return 0x22d3ee;
+    if (faction.includes("xi'an") || faction.includes('xian')) return 0xa78bfa;
+    if (faction.includes('banu')) return 0x34d399;
+    if (faction.includes('vanduul')) return 0xf87171;
+    return styleFor(node.type).color;
+  }
   return styleFor(node.type).color;
 }
 
@@ -455,16 +487,154 @@ function systemSceneNodes(root: StarmapNode, children: Map<string, StarmapNode[]
   });
 }
 
-function shouldDrawOrbit(node: StarmapNode, selectedId: string | null) {
-  if (node.type === 'planet') return true;
-  if (node.type === 'jump_point') return false;
-  return node.id === selectedId || node.parentId === selectedId;
+function shouldDrawOrbit(node: StarmapNode) {
+  return node.type === 'planet' || node.type === 'moon';
 }
 
 function shouldDrawLabel(node: StarmapNode, mode: ViewMode, selectedId: string | null) {
   if (node.id === selectedId) return true;
   if (mode === 'galaxy') return node.type === 'system';
   return node.type === 'star' || node.type === 'planet';
+}
+
+// ── ARK Starmap 3D model loader ───────────────────────────────────────────────
+
+const RSI_MODEL_BASE = 'https://cdn.robertsspaceindustries.com/static/starmap/models';
+const RSI_SRC_BASE = 'https://cdn.robertsspaceindustries.com/static/starmap/sourceimages';
+
+// Module-scope cache: filename → cloneable group (loaded once across re-renders)
+const arkModelCache = new Map<string, THREE.Group>();
+
+function rsiProxy(url: string) {
+  return `/api/rsi-assets?url=${encodeURIComponent(url)}`;
+}
+
+function makeColladaLoader() {
+  const manager = new THREE.LoadingManager();
+  manager.setURLModifier((url) => {
+    // Rewrite relative texture paths from inside DAE files
+    if (!url.startsWith('http') || url.includes('sourceimages/')) {
+      const filename = url.split('/').pop() ?? '';
+      return rsiProxy(`${RSI_SRC_BASE}/${filename}`);
+    }
+    if (url.includes('robertsspaceindustries.com')) return rsiProxy(url);
+    return url;
+  });
+  return new ColladaLoader(manager);
+}
+
+function normalizeModelScale(group: THREE.Group, targetSize: number): void {
+  const box = new THREE.Box3().setFromObject(group);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const maxDim = Math.max(size.x, size.y, size.z);
+  if (maxDim > 0) group.scale.setScalar(targetSize / maxDim);
+  // Center on origin
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+  group.position.sub(center.multiplyScalar(group.scale.x));
+}
+
+function loadArkModel(filename: string, targetSize: number): Promise<THREE.Group> {
+  if (arkModelCache.has(filename)) {
+    return Promise.resolve(arkModelCache.get(filename)!.clone());
+  }
+  return new Promise((resolve, reject) => {
+    const loader = makeColladaLoader();
+    loader.load(
+      rsiProxy(`${RSI_MODEL_BASE}/${filename}`),
+      (collada) => {
+        if (!collada) { reject(new Error('Collada load returned null')); return; }
+        // Wrap Scene in a Group so we can reuse clone/scale/position API
+        const wrapper = new THREE.Group();
+        wrapper.add(collada.scene);
+        normalizeModelScale(wrapper, targetSize);
+        arkModelCache.set(filename, wrapper);
+        resolve(wrapper.clone());
+      },
+      undefined,
+      reject,
+    );
+  });
+}
+
+function applyHolographicMaterial(group: THREE.Group, color: number, emissiveIntensity = 0.45): void {
+  group.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      child.material = new THREE.MeshStandardMaterial({
+        color,
+        emissive: new THREE.Color(color),
+        emissiveIntensity,
+        metalness: 0.55,
+        roughness: 0.35,
+        transparent: true,
+        opacity: 0.88,
+      });
+    }
+  });
+}
+
+// Single-model types; jump_point uses its own multi-component assembly below
+function arkSingleModelFile(type: string): string | null {
+  switch (type) {
+    case 'station':        return 'SpaceStation.dae';
+    case 'asteroid_field': return 'AsteroidsFRONT.dae';
+    case 'blackhole':      return 'Blackhole.dae';
+    default:               return null;
+  }
+}
+
+// Loads all 4 jump-point DAEs as one group.
+// Each child is tagged userData.animRole: 'head' | 'tail' | 'tube' | 'dust'
+// JumpHead (58 KB) and JumpTail (125 KB) arrive first; the heavier
+// JumpGoTrhu (3.9 MB) and DustGoTrhu (2.6 MB) fill in once ready.
+function loadJumpPointAssembly(targetSize: number): Promise<THREE.Group> {
+  const CACHE_KEY = '__jump_assembly__';
+  if (arkModelCache.has(CACHE_KEY)) {
+    const cached = arkModelCache.get(CACHE_KEY)!.clone();
+    normalizeModelScale(cached, targetSize);
+    return Promise.resolve(cached);
+  }
+
+  const parts: { file: string; role: string }[] = [
+    { file: 'JumpHead.dae',   role: 'head' },
+    { file: 'JumpTail.dae',   role: 'tail' },
+    { file: 'JumpGoTrhu.dae', role: 'tube' },
+    { file: 'DustGoTrhu.dae', role: 'dust' },
+  ];
+
+  return Promise.allSettled(
+    parts.map(({ file }) =>
+      new Promise<THREE.Group>((resolve, reject) => {
+        makeColladaLoader().load(
+          rsiProxy(`${RSI_MODEL_BASE}/${file}`),
+          (collada) => {
+            if (!collada) { reject(new Error('null')); return; }
+            const g = new THREE.Group();
+            g.add(collada.scene);
+            resolve(g);
+          },
+          undefined,
+          reject,
+        );
+      }),
+    ),
+  ).then((results) => {
+    const assembly = new THREE.Group();
+    assembly.userData.isJumpAssembly = true;
+    for (let i = 0; i < parts.length; i++) {
+      if (results[i].status === 'fulfilled') {
+        const part = (results[i] as PromiseFulfilledResult<THREE.Group>).value;
+        // Propagate role to every descendant so mesh-level traversal can read it
+        part.traverse((child) => { child.userData.animRole = parts[i].role; });
+        assembly.add(part);
+      }
+    }
+    // Cache the raw un-normalized assembly; future jump points clone & rescale it
+    arkModelCache.set(CACHE_KEY, assembly.clone());
+    normalizeModelScale(assembly, targetSize);
+    return assembly;
+  });
 }
 
 type SceneProps = {
@@ -486,11 +656,21 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
     if (!host) return;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x030914);
-    scene.fog = new THREE.FogExp2(0x030914, mode === 'galaxy' ? 0.006 : 0.011);
+    const bgColor = mode === 'galaxy' ? 0x04060e : 0x060408;
+    scene.background = new THREE.Color(bgColor);
+    scene.fog = new THREE.FogExp2(bgColor, mode === 'galaxy' ? 0.005 : 0.006);
 
     const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 1200);
-    camera.position.set(mode === 'galaxy' ? 0 : 0, mode === 'galaxy' ? 95 : 42, mode === 'galaxy' ? 150 : 48);
+    if (mode === 'galaxy') {
+      camera.position.set(0, 90, 155);
+    } else {
+      // Reproduit le point de vue ARK map : camera=46.84,156.82
+      // phi=156.82° depuis le pôle Y → caméra SOUS le plan écliptique
+      const r = 78;
+      const phi = (156.82 * Math.PI) / 180;
+      const theta = (46.84 * Math.PI) / 180;
+      camera.position.set(r * Math.sin(phi) * Math.cos(theta), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(theta));
+    }
 
     if (typeof navigator !== 'undefined' && /jsdom/i.test(navigator.userAgent)) {
       const fallback = document.createElement('div');
@@ -511,12 +691,17 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.minDistance = mode === 'galaxy' ? 28 : 14;
-    controls.maxDistance = mode === 'galaxy' ? 360 : 115;
+    controls.maxDistance = mode === 'galaxy' ? 360 : 130;
+    // Autoriser la vue depuis sous le plan écliptique (comme ARK map)
+    controls.minPolarAngle = 0;
+    controls.maxPolarAngle = Math.PI * 0.97;
 
-    const ambient = new THREE.AmbientLight(0xb8eaff, 0.58);
-    const key = new THREE.PointLight(0xbdf2ff, 3.1, 280);
+    const ambient = new THREE.AmbientLight(0xb8eaff, 1.4);
+    const key = new THREE.PointLight(0xffffff, 6.0, 400);
     key.position.set(16, 20, 12);
-    scene.add(ambient, key);
+    const fill = new THREE.PointLight(0x3ecfff, 2.2, 350);
+    fill.position.set(-20, -8, -18);
+    scene.add(ambient, key, fill);
 
     const textureLoader = new THREE.TextureLoader();
     textureLoader.crossOrigin = 'anonymous';
@@ -526,12 +711,35 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
     const objectByNode = new Map<string, THREE.Object3D>();
     const disposables: THREE.Object3D[] = [];
 
-    const starfield = createStarfield(mode === 'galaxy' ? 1600 : 900, mode === 'galaxy' ? 260 : 95);
+    const starfield = createStarfield(mode === 'galaxy' ? 3200 : 1400, mode === 'galaxy' ? 280 : 105);
     scene.add(starfield);
     disposables.push(starfield);
 
+    if (mode === 'galaxy') {
+      // warm nebula clouds à la ARK map
+      const nebula1 = createNebula(1200, 110, 0x7a2800, 0.055); // orange profond
+      const nebula2 = createNebula(700,  75, 0xc84010, 0.038); // orange vif
+      const nebula3 = createNebula(500,  55, 0x1a5c18, 0.045); // vert émeraude
+      const nebula4 = createNebula(400,  40, 0x4a1800, 0.065); // brun sombre
+      nebula2.rotation.y = Math.PI * 0.4;
+      nebula3.rotation.y = Math.PI * 1.1;
+      nebula4.rotation.y = Math.PI * 1.7;
+      const grid = createGalaxyGrid(130);
+      scene.add(nebula1, nebula2, nebula3, nebula4, grid);
+      disposables.push(nebula1, nebula2, nebula3, nebula4, grid);
+    } else {
+      // vue système : légère teinte ambrée
+      const nebula = createNebula(400, 55, 0x7a3000, 0.04);
+      scene.add(nebula);
+      disposables.push(nebula);
+    }
+
     const visible = mode === 'galaxy' || !root ? nodes.filter((node) => node.type === 'system') : systemSceneNodes(root, children, selectedId);
     const sceneRootPosition = mode === 'system' && root ? root.scenePosition.clone() : new THREE.Vector3();
+
+    // Async model loading — track separately for cleanup
+    let sceneDisposed = false;
+    const asyncDisposables: THREE.Object3D[] = [];
 
     for (const node of visible) {
       const localPosition = mode === 'system' ? node.scenePosition.clone() : node.scenePosition.clone();
@@ -543,14 +751,16 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
         roughness: node.type === 'star' ? 0.38 : 0.9,
         metalness: node.type === 'station' ? 0.35 : 0.05,
         emissive: new THREE.Color(objectColor(node)),
-        emissiveIntensity: node.type === 'star' || node.type === 'system' ? 0.44 : 0.14,
+        emissiveIntensity: node.type === 'star' || node.type === 'system' ? 0.75 : 0.45,
       });
       const geometry =
         node.type === 'station'
           ? new THREE.OctahedronGeometry(radius, 1)
           : node.type === 'jump_point'
-            ? new THREE.TorusGeometry(radius * 0.9, radius * 0.08, 12, 48)
-            : new THREE.SphereGeometry(radius, 42, 28);
+            ? new THREE.OctahedronGeometry(radius * 1.2, 0) // diamant ARK map
+            : node.type === 'asteroid_field'
+              ? new THREE.IcosahedronGeometry(radius, 1)
+              : new THREE.SphereGeometry(radius, 42, 28);
       const mesh = new THREE.Mesh(geometry, material);
       mesh.position.copy(localPosition);
       mesh.userData.nodeId = node.id;
@@ -558,6 +768,62 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
       nodeByObject.set(mesh, node);
       objectByNode.set(node.id, mesh);
       disposables.push(mesh);
+
+      // Load ARK Starmap 3D model async (system view only, not worth it for galaxy dots)
+      if (mode === 'system') {
+        if (node.type === 'jump_point') {
+          // All 4 components assembled; lighter files (Head, Tail) arrive first via Promise.allSettled
+          loadJumpPointAssembly(radius * 1.8)
+            .then((group) => {
+              if (sceneDisposed) { disposeObject(group); return; }
+              group.traverse((child) => {
+                if (child instanceof THREE.Mesh) {
+                  const role = child.userData.animRole as string;
+                  const isHead = role === 'head';
+                  const isTube = role === 'tube';
+                  const isDust = role === 'dust';
+                  child.material = new THREE.MeshStandardMaterial({
+                    color:             isHead ? 0x22d3ee : isTube ? 0x0ea5e9 : isDust ? 0x7dd3fc : 0x3b82f6,
+                    emissive:          new THREE.Color(isHead ? 0x22d3ee : isTube ? 0x0ea5e9 : isDust ? 0x7dd3fc : 0x3b82f6),
+                    emissiveIntensity: isHead ? 0.80 : isTube ? 0.55 : isDust ? 0.35 : 0.45,
+                    metalness: 0.45,
+                    roughness: 0.35,
+                    transparent: true,
+                    opacity: isHead ? 0.92 : isTube ? 0.60 : isDust ? 0.50 : 0.70,
+                    side: THREE.DoubleSide,
+                    depthWrite: false,
+                  });
+                  nodeByObject.set(child, node);
+                }
+              });
+              group.position.copy(localPosition);
+              scene.add(group);
+              objectByNode.set(node.id, group);
+              scene.remove(mesh);
+              nodeByObject.delete(mesh);
+              asyncDisposables.push(group);
+            })
+            .catch(() => undefined);
+        } else {
+          const modelFile = arkSingleModelFile(node.type);
+          if (modelFile) {
+            const targetSize = radius * (node.type === 'station' ? 1.6 : 2.0);
+            loadArkModel(modelFile, targetSize)
+              .then((group) => {
+                if (sceneDisposed) { disposeObject(group); return; }
+                applyHolographicMaterial(group, objectColor(node), 0.4);
+                group.position.copy(localPosition);
+                scene.add(group);
+                group.traverse((child) => { if (child instanceof THREE.Mesh) nodeByObject.set(child, node); });
+                objectByNode.set(node.id, group);
+                scene.remove(mesh);
+                nodeByObject.delete(mesh);
+                asyncDisposables.push(group);
+              })
+              .catch(() => undefined);
+          }
+        }
+      }
 
       const textureUrl = assetTexture(node.assets, node.thumbnail);
       const webglUrl = webglTextureUrl(textureUrl);
@@ -568,7 +834,7 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
             texture.colorSpace = THREE.SRGBColorSpace;
             material.map = texture;
             material.color.set(0xffffff);
-            material.emissiveIntensity = node.type === 'star' ? 0.24 : 0.02;
+            material.emissiveIntensity = node.type === 'star' ? 0.42 : 0.12;
             material.needsUpdate = true;
           },
           undefined,
@@ -576,17 +842,31 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
         );
       }
 
-      if (node.type === 'star' || node.type === 'system' || selectedId === node.id) {
-        const halo = createHalo(radius * (selectedId === node.id ? 3.2 : 2.4), objectColor(node), selectedId === node.id ? 0.44 : 0.24);
+      if (node.type === 'jump_point') {
+        // petit anneau cyan autour du diamant, comme l'ARK map
+        const ring = createFlatRing(radius * 2.2, 0x22d3ee, 0.45);
+        ring.position.copy(mesh.position);
+        ring.rotation.x = Math.PI * 0.3;
+        scene.add(ring);
+        disposables.push(ring);
+      }
+
+      if (node.type === 'star' || node.type === 'system' || node.type === 'planet' || selectedId === node.id) {
+        const baseOpacity = node.type === 'star' || node.type === 'system' ? 0.42 : 0.22;
+        const halo = createHalo(
+          radius * (selectedId === node.id ? 3.6 : node.type === 'star' ? 3.2 : 2.2),
+          objectColor(node),
+          selectedId === node.id ? 0.6 : baseOpacity,
+        );
         halo.position.copy(mesh.position);
         scene.add(halo);
         disposables.push(halo);
       }
 
-      if (mode === 'system' && root && node.parentId && shouldDrawOrbit(node, selectedId)) {
+      if (mode === 'system' && root && node.parentId && shouldDrawOrbit(node)) {
         const parentObject = objectByNode.get(node.parentId);
         if (parentObject && node.type !== 'star') {
-          const orbit = createOrbitLine(parentObject.position, mesh.position, objectColor(node), selectedId === node.id ? 0.56 : 0.16);
+          const orbit = createOrbitLine(parentObject.position, mesh.position, objectColor(node));
           scene.add(orbit);
           disposables.push(orbit);
         }
@@ -612,6 +892,14 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
     }
 
     if (mode === 'system' && root) {
+      // Disque écliptique translucide visible depuis dessous (ARK map style)
+      const diskGeo = new THREE.CircleGeometry(58, 128);
+      const diskMat = new THREE.MeshBasicMaterial({ color: 0x0a3a20, transparent: true, opacity: 0.07, side: THREE.DoubleSide, depthWrite: false });
+      const disk = new THREE.Mesh(diskGeo, diskMat);
+      disk.rotation.x = Math.PI / 2;
+      scene.add(disk);
+      disposables.push(disk);
+
       const inner = root.habitableInner;
       const outer = root.habitableOuter;
       if (inner != null || outer != null) {
@@ -649,7 +937,27 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
       frame = requestAnimationFrame(animate);
       for (const [id, object] of objectByNode) {
         const node = nodes.find((candidate) => candidate.id === id);
-        if (node?.type === 'planet' || node?.type === 'moon' || node?.type === 'star') object.rotation.y += node.type === 'moon' ? 0.006 : 0.0025;
+        if (!node) continue;
+        if (node.type === 'star') object.rotation.y += 0.0018;
+        else if (node.type === 'planet') object.rotation.y += 0.0028;
+        else if (node.type === 'moon') object.rotation.y += 0.006;
+        else if (node.type === 'jump_point') {
+          if (object.userData.isJumpAssembly) {
+            // Animate each component at its own speed/axis
+            object.children.forEach((part) => {
+              const role = part.userData.animRole as string;
+              if (role === 'tube') part.rotation.y += 0.022;                              // tunnel qui tourne vite
+              else if (role === 'head') part.rotation.z += 0.005;                         // bouche, lente
+              else if (role === 'tail') { part.rotation.y += 0.01; part.rotation.z += 0.004; } // queue spirale
+              else if (role === 'dust') { part.rotation.y += 0.018; part.rotation.x += 0.006; } // poussière
+            });
+          } else {
+            // Placeholder en attente de chargement
+            object.rotation.z += 0.012;
+            object.rotation.x += 0.004;
+          }
+        }
+        else if (node.type === 'asteroid_field') object.rotation.y += 0.003;
       }
       controls.update();
       renderer.render(scene, camera);
@@ -661,11 +969,13 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
     renderer.domElement.addEventListener('click', click);
 
     return () => {
+      sceneDisposed = true;
       cancelAnimationFrame(frame);
       window.removeEventListener('resize', resize);
       renderer.domElement.removeEventListener('click', click);
       controls.dispose();
       for (const object of disposables) disposeObject(object);
+      for (const object of asyncDisposables) disposeObject(object);
       renderer.dispose();
       host.removeChild(renderer.domElement);
     };
@@ -676,18 +986,65 @@ function Scene({ nodes, children, mode, root, selectedId, onSelect }: SceneProps
 
 function createStarfield(count: number, radius: number) {
   const positions = new Float32Array(count * 3);
-  for (let index = 0; index < count; index++) {
+  const colors = new Float32Array(count * 3);
+  const starColors = [
+    new THREE.Color(0xffffff),
+    new THREE.Color(0xb7edff),
+    new THREE.Color(0xffe8c0),
+    new THREE.Color(0xc0d8ff),
+    new THREE.Color(0xffd0d0),
+  ];
+  for (let i = 0; i < count; i++) {
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(Math.random() * 2 - 1);
-    const distance = radius * (0.35 + Math.random() * 0.65);
-    positions[index * 3] = Math.sin(phi) * Math.cos(theta) * distance;
-    positions[index * 3 + 1] = Math.cos(phi) * distance;
-    positions[index * 3 + 2] = Math.sin(phi) * Math.sin(theta) * distance;
+    const dist = radius * (0.3 + Math.random() * 0.7);
+    positions[i * 3] = Math.sin(phi) * Math.cos(theta) * dist;
+    positions[i * 3 + 1] = Math.cos(phi) * dist;
+    positions[i * 3 + 2] = Math.sin(phi) * Math.sin(theta) * dist;
+    const c = starColors[Math.floor(Math.random() * starColors.length)];
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
   }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-  const material = new THREE.PointsMaterial({ color: 0xb7edff, size: 0.13, transparent: true, opacity: 0.82, depthWrite: false });
-  return new THREE.Points(geometry, material);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const mat = new THREE.PointsMaterial({ size: 0.18, vertexColors: true, transparent: true, opacity: 0.88, depthWrite: false, sizeAttenuation: true });
+  return new THREE.Points(geo, mat);
+}
+
+function createNebula(count: number, spreadRadius: number, color: number, opacity: number) {
+  const positions = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const theta = Math.random() * Math.PI * 2;
+    const r = spreadRadius * Math.sqrt(Math.random());
+    positions[i * 3] = Math.cos(theta) * r * (0.8 + Math.random() * 0.4);
+    positions[i * 3 + 1] = (Math.random() - 0.5) * spreadRadius * 0.18;
+    positions[i * 3 + 2] = Math.sin(theta) * r * (0.8 + Math.random() * 0.4);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  const mat = new THREE.PointsMaterial({ color, size: 1.1, transparent: true, opacity, depthWrite: false, blending: THREE.AdditiveBlending });
+  return new THREE.Points(geo, mat);
+}
+
+function createGalaxyGrid(size: number) {
+  const group = new THREE.Group();
+  const rings = 8;
+  const spokes = 12;
+  const mat = new THREE.LineBasicMaterial({ color: 0x0d4a6e, transparent: true, opacity: 0.12 });
+  for (let i = 1; i <= rings; i++) {
+    const r = (size / rings) * i;
+    const curve = new THREE.EllipseCurve(0, 0, r, r, 0, Math.PI * 2);
+    const pts = curve.getPoints(80).map((p) => new THREE.Vector3(p.x, 0, p.y));
+    group.add(new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), mat));
+  }
+  for (let i = 0; i < spokes; i++) {
+    const angle = (Math.PI * 2 * i) / spokes;
+    const pts = [new THREE.Vector3(0, 0, 0), new THREE.Vector3(Math.cos(angle) * size, 0, Math.sin(angle) * size)];
+    group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), mat));
+  }
+  return group;
 }
 
 function createHalo(radius: number, color: number, opacity: number) {
@@ -724,29 +1081,33 @@ function createGlowTexture(color: number) {
 
 function createLabel(text: string, color: string) {
   const canvas = document.createElement('canvas');
-  canvas.width = 512;
-  canvas.height = 128;
-  const context = canvas.getContext('2d');
-  if (context) {
-    context.font = '600 34px Rajdhani, Arial, sans-serif';
-    context.textAlign = 'center';
-    context.textBaseline = 'middle';
-    context.shadowColor = 'rgba(34, 211, 238, 0.75)';
-    context.shadowBlur = 12;
-    context.fillStyle = color;
-    context.fillText(text.toUpperCase(), 256, 64, 480);
+  canvas.width = 1024;
+  canvas.height = 192;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.font = '700 72px "Orbitron", "Rajdhani", Arial, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // outer glow pass
+    ctx.shadowColor = 'rgba(34,211,238,0.95)';
+    ctx.shadowBlur = 32;
+    ctx.fillStyle = color;
+    ctx.fillText(text.toUpperCase(), 512, 96, 980);
+    // inner sharpen pass
+    ctx.shadowBlur = 8;
+    ctx.fillText(text.toUpperCase(), 512, 96, 980);
   }
   const texture = new THREE.CanvasTexture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
   return new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false }));
 }
 
-function createOrbitLine(center: THREE.Vector3, point: THREE.Vector3, color: number, opacity: number) {
+function createOrbitLine(center: THREE.Vector3, point: THREE.Vector3, color: number) {
   const radius = center.distanceTo(point);
   const curve = new THREE.EllipseCurve(0, 0, radius, radius, 0, Math.PI * 2);
-  const points = curve.getPoints(160).map((p) => new THREE.Vector3(center.x + p.x, center.y, center.z + p.y));
+  const points = curve.getPoints(200).map((p) => new THREE.Vector3(center.x + p.x, center.y, center.z + p.y));
   const geometry = new THREE.BufferGeometry().setFromPoints(points);
-  return new THREE.LineLoop(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: Math.min(0.78, opacity + 0.12) }));
+  return new THREE.LineLoop(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending }));
 }
 
 function createFlatRing(radius: number, color: number, opacity: number) {
@@ -757,10 +1118,10 @@ function createFlatRing(radius: number, color: number, opacity: number) {
 }
 
 function createRouteLine(from: THREE.Vector3, to: THREE.Vector3, color: number) {
-  const mid = from.clone().lerp(to, 0.5).add(new THREE.Vector3(0, from.distanceTo(to) * 0.12, 0));
+  const mid = from.clone().lerp(to, 0.5).add(new THREE.Vector3(0, from.distanceTo(to) * 0.08, 0));
   const curve = new THREE.QuadraticBezierCurve3(from, mid, to);
-  const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(64));
-  return new THREE.Line(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.42 }));
+  const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(80));
+  return new THREE.Line(geometry, new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending }));
 }
 
 function disposeObject(object: THREE.Object3D) {
@@ -912,9 +1273,6 @@ export default function UniverseExplorerPage() {
               </span>
               <h1 className="font-orbitron text-lg font-bold uppercase tracking-[0.22em] text-cyan-100">Starvis Starmap</h1>
             </div>
-            <p className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">
-              Legal public RSI asset URLs / custom Starvis navigation / game data overlay
-            </p>
             {error && !data?.length && (
               <p className="mt-1 font-mono-sc text-[9px] uppercase tracking-widest text-amber-500">
                 API unavailable / fallback local map

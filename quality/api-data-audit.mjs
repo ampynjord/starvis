@@ -91,7 +91,13 @@ function endpoint(path, params = {}) {
   return url;
 }
 
-async function requestJson(name, path, params = {}) {
+/**
+ * Request JSON from the API.
+ * opts.allowEmpty: if true, a 503 (game data not loaded) is treated as a
+ * warning instead of a failure. Useful in environments without imported game
+ * data (CI without extraction step, staging).
+ */
+async function requestJson(name, path, params = {}, opts = {}) {
   const url = endpoint(path, params);
   const started = performance.now();
   let response;
@@ -121,6 +127,11 @@ async function requestJson(name, path, params = {}) {
   } else {
     const text = await response.text();
     fail(`${name}: expected JSON`, { url: String(url), status: response.status, contentType, text: text.slice(0, 160) });
+    return null;
+  }
+
+  if (response.status === 503 && opts.allowEmpty) {
+    warn(`${name}: 503 game data not loaded — skipped`, { url: String(url) });
     return null;
   }
 
@@ -278,6 +289,123 @@ async function audit() {
     .reduce((a, b) => a + b, 0);
   if (strict && searchTotal === 0) fail('search aurora: no result in strict mode', search);
   if (!strict && searchTotal === 0) warn('search aurora: no result', search);
+
+  // ── Missions ────────────────────────────────────────────────────────────
+
+  validateList(
+    'missions',
+    await requestJson('missions', '/api/v1/missions', { env, limit: 10 }, { allowEmpty: true }),
+    { requiredFields: ['uuid'] },
+  );
+
+  const missionFilters = await requestJson('missions/filters', '/api/v1/missions/filters', { env }, { allowEmpty: true });
+  if (missionFilters && (!isObject(missionFilters) || missionFilters.success !== true)) {
+    fail('missions/filters: unexpected shape', missionFilters);
+  }
+
+  // ── Factions ─────────────────────────────────────────────────────────────
+
+  const factions = await requestJson('factions', '/api/v1/factions', { env }, { allowEmpty: true });
+  if (factions) {
+    const data = asArray(factions);
+    if (strict && data.length === 0) fail('factions: no data in strict mode');
+    if (!strict && data.length === 0) warn('factions: no faction data returned');
+  }
+
+  validateList(
+    'factions/registry',
+    await requestJson('factions/registry', '/api/v1/factions/registry', { env, limit: 10 }, { allowEmpty: true }),
+    {},
+  );
+
+  validateList(
+    'factions/reputation-standings',
+    await requestJson(
+      'factions/reputation-standings',
+      '/api/v1/factions/reputation-standings',
+      { env, limit: 10 },
+      { allowEmpty: true },
+    ),
+    {},
+  );
+
+  validateList(
+    'factions/reputation-scopes',
+    await requestJson(
+      'factions/reputation-scopes',
+      '/api/v1/factions/reputation-scopes',
+      { env, limit: 10 },
+      { allowEmpty: true },
+    ),
+    {},
+  );
+
+  // ── Paints ────────────────────────────────────────────────────────────────
+
+  validateList(
+    'paints',
+    await requestJson('paints', '/api/v1/paints', { env: undefined, limit: 10 }, { allowEmpty: true }),
+    {},
+  );
+
+  // ── Shops ─────────────────────────────────────────────────────────────────
+
+  const shops = await requestJson('shops', '/api/v1/shops', { env, limit: 10 }, { allowEmpty: true });
+  if (shops) {
+    const data = asArray(shops);
+    if (strict && data.length === 0) fail('shops: no data in strict mode');
+    const shop = data[0];
+    if (shop) {
+      if (!shop.id && !shop.name) warn('shops first item: missing id and name', shop);
+    }
+  }
+
+  // ── Locations ─────────────────────────────────────────────────────────────
+
+  validateList(
+    'locations',
+    await requestJson('locations', '/api/v1/locations', { env, limit: 10 }, { allowEmpty: true }),
+    { requiredFields: ['uuid'] },
+  );
+
+  // ── Mining ────────────────────────────────────────────────────────────────
+
+  const miningElements = await requestJson('mining/elements', '/api/v1/mining/elements', { env }, { allowEmpty: true });
+  if (miningElements) {
+    const data = asArray(miningElements);
+    if (strict && data.length === 0) fail('mining/elements: no data in strict mode');
+    const el = data[0];
+    if (el) validateNonNegativeNumbers('mining first element', el, ['percentage', 'threshold', 'resistance']);
+  }
+
+  await requestJson('mining/compositions', '/api/v1/mining/compositions', { env }, { allowEmpty: true });
+
+  // ── Crafting ──────────────────────────────────────────────────────────────
+
+  validateList(
+    'crafting/recipes',
+    await requestJson('crafting/recipes', '/api/v1/crafting/recipes', { env, limit: 10 }, { allowEmpty: true }),
+    {},
+  );
+
+  await requestJson('crafting/resources', '/api/v1/crafting/resources', { env }, { allowEmpty: true });
+
+  // ── Trade ─────────────────────────────────────────────────────────────────
+
+  const tradeLocations = await requestJson('trade/locations', '/api/v1/trade/locations', { env }, { allowEmpty: true });
+  if (tradeLocations) {
+    const data = asArray(tradeLocations);
+    if (strict && data.length === 0) fail('trade/locations: no data in strict mode');
+  }
+
+  // ── Changelog & version ───────────────────────────────────────────────────
+
+  const changelog = await requestJson('changelog/summary', '/api/v1/changelog/summary', { env }, { allowEmpty: true });
+  if (changelog && !Array.isArray(asArray(changelog))) {
+    warn('changelog/summary: unexpected shape', changelog);
+  }
+
+  await requestJson('game-versions', '/api/v1/game-versions', { env }, { allowEmpty: true });
 
   const report = {
     baseUrl,

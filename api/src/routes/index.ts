@@ -8,6 +8,7 @@ import { mountCommodityRoutes } from './commodities.js';
 import { mountComponentRoutes } from './components.js';
 import { mountCorporationRoutes } from './corporations.js';
 import { mountCraftingRoutes } from './crafting.js';
+import { mountFactionRoutes } from './factions.js';
 import { mountItemRoutes } from './items.js';
 import { mountLocationRoutes } from './locations.js';
 import { mountManufacturerRoutes } from './manufacturers.js';
@@ -39,6 +40,7 @@ const routeMounts = [
   mountCraftingRoutes,
   mountMiningRoutes,
   mountMissionRoutes,
+  mountFactionRoutes,
   mountLocationRoutes,
   mountObjectRoutes,
   mountSearchRoutes,

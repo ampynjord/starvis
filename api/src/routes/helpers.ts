@@ -4,7 +4,7 @@ import { ZodError } from 'zod';
 import { arrayToCsv } from '../schemas.js';
 import type { GameDataService } from '../services/game-data-service.js';
 import type { ShipQueryService } from '../services/ship-query-service.js';
-import { logger } from '../utils/index.js';
+import logger from '../utils/logger.js';
 
 /** Wrap async route handler — catches errors (including ZodErrors → 400) */
 export function asyncHandler(fn: (req: Request, res: Response) => Promise<void>) {

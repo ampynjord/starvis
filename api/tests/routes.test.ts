@@ -106,10 +106,14 @@ function makeGameDataService() {
       getMissionTypes: fn([]),
       getFactions: fn([]),
       getFactionDetails: fn([]),
+      getFactionRegistry: fn(paginated),
+      getReputationStandings: fn(paginated),
+      getReputationScopes: fn(paginated),
       getFactionDetail: fn(null),
       getSystems: fn([]),
       getCategories: fn([]),
       getMissions: fn(paginated),
+      getMissionFilters: fn({ filters: {} }),
       getMissionByUuid: fn(null),
     },
     trade: {
@@ -583,6 +587,38 @@ describe('GET /api/v1/factions/:faction (not found)', () => {
     const res = await request(app).get('/api/v1/factions/unknown');
     expect(res.status).toBe(404);
     expect(res.body.success).toBe(false);
+  });
+});
+
+describe('GET /api/v1/factions/registry', () => {
+  it('returns 200 with paginated data', async () => {
+    const res = await request(app).get('/api/v1/factions/registry');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+});
+
+describe('GET /api/v1/factions/reputation-standings', () => {
+  it('returns 200 with paginated data', async () => {
+    const res = await request(app).get('/api/v1/factions/reputation-standings');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+});
+
+describe('GET /api/v1/factions/reputation-scopes', () => {
+  it('returns 200 with paginated data', async () => {
+    const res = await request(app).get('/api/v1/factions/reputation-scopes');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+});
+
+describe('GET /api/v1/missions/filters', () => {
+  it('returns 200', async () => {
+    const res = await request(app).get('/api/v1/missions/filters');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
   });
 });
 

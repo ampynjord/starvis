@@ -156,6 +156,56 @@ export async function requireJwtDeveloperOrAdmin(req: Request, res: Response, ne
 export const requireJwtBetaOrAdmin = requireJwtDeveloperOrAdmin;
 
 /**
+ * requireInternalOrAdmin — protects cost-sensitive routes (AI chat).
+ *
+ * Accepted callers:
+ *  - X-API-Key: SERVER_API_KEY  → IHM server-side proxy (all logged-in users)
+ *  - X-API-Key: ADMIN_API_KEY   → Discord bot
+ *  - Bearer JWT with admin role  → admin direct access
+ *
+ * Rejected: developer JWT, user JWT, external API tokens.
+ */
+export async function requireInternalOrAdmin(req: Request, res: Response, next: NextFunction) {
+  const apiKey = String(req.headers['x-api-key'] || '');
+
+  if (apiKey) {
+    const matchesKey = (envKey: string | undefined) => {
+      if (!envKey) return false;
+      const a = Buffer.from(apiKey);
+      const b = Buffer.from(envKey);
+      return a.length === b.length && timingSafeEqual(a, b);
+    };
+
+    if (matchesKey(process.env.SERVER_API_KEY) || matchesKey(process.env.ADMIN_API_KEY)) {
+      applyInternalClientMarker(req);
+      return next();
+    }
+
+    return res.status(403).json({ success: false, error: 'Forbidden' });
+  }
+
+  if (!process.env.JWT_SECRET) {
+    return res.status(500).json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' });
+  }
+
+  const token = extractBearer(req) ?? extractCookieToken(req);
+  if (!token) {
+    return res.status(401).json({ success: false, error: 'Authentication required' });
+  }
+
+  try {
+    const payload = await resolveCurrentPayload(token);
+    if (payload.role !== ADMIN_ROLE) {
+      return res.status(403).json({ success: false, error: 'Admin role required' });
+    }
+    req.jwtPayload = payload;
+    return next();
+  } catch {
+    res.status(401).json({ success: false, error: 'Invalid or expired token' });
+  }
+}
+
+/**
  * requireJwtAdmin — verifies Bearer JWT AND that role === 'admin'.
  * Also accepts ADMIN_API_KEY (X-Api-Key) for server-to-server compatibility.
  */

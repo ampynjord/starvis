@@ -22,7 +22,7 @@
 import type { PrismaLike } from '@starvis/db';
 import OpenAI from 'openai';
 import { CHAT_MAX_ITER, CHAT_PROVIDER_BASE_URL, CHAT_RESPONSE_MODEL, CHAT_TOOL_MODEL } from '../utils/config.js';
-import { logger } from '../utils/index.js';
+import logger from '../utils/logger.js';
 import { validateQueryDatabaseSql } from './chat/sql-guard.js';
 import type { GameDataService } from './game-data-service.js';
 import type { RsiWebsiteService } from './rsi-website-service.js';

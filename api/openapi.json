@@ -2383,9 +2383,11 @@
       },
       "Faction": {
         "type": "object",
+        "description": "Merged faction view: mission aggregate stats (from extracted missions) combined with game registry fields when the faction name matches a GameFaction record.",
         "properties": {
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "Faction name as it appears in mission data"
           },
           "mission_count": {
             "type": "integer"
@@ -2416,28 +2418,132 @@
           },
           "mission_givers": {
             "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "items": { "type": "string" }
           },
           "systems": {
             "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "items": { "type": "string" }
           },
           "categories": {
             "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "items": { "type": "string" }
           },
           "mission_types": {
             "type": "array",
-            "items": {
-              "type": "string"
-            }
+            "items": { "type": "string" }
+          },
+          "game_faction_uuid": {
+            "type": "string",
+            "nullable": true,
+            "description": "UUID from the game faction registry (null when no registry match)"
+          },
+          "game_faction_class_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "game_faction_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "game_faction_description": {
+            "type": "string",
+            "nullable": true
+          },
+          "faction_type": {
+            "type": "string",
+            "nullable": true
+          },
+          "default_reaction": {
+            "type": "string",
+            "nullable": true,
+            "description": "Default reaction to the player (e.g. Neutral, Hostile)"
+          },
+          "able_to_arrest": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "no_legal_rights": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "polices_criminality": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "polices_lawful_trespass": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "faction_reputation_uuid": {
+            "type": "string",
+            "nullable": true
+          },
+          "allies": {
+            "nullable": true,
+            "description": "Array of allied faction class names"
+          },
+          "enemies": {
+            "nullable": true,
+            "description": "Array of enemy faction class names"
+          },
+          "organization_tags": {
+            "nullable": true
           }
+        }
+      },
+      "GameFaction": {
+        "type": "object",
+        "description": "Game faction record from the DataForge registry (game.factions table). Use /factions/registry for a paginated list.",
+        "properties": {
+          "uuid": { "type": "string", "format": "uuid" },
+          "env": { "type": "string", "example": "live" },
+          "class_name": { "type": "string" },
+          "name": { "type": "string", "nullable": true },
+          "description": { "type": "string", "nullable": true },
+          "faction_type": { "type": "string", "nullable": true },
+          "default_reaction": { "type": "string", "nullable": true, "description": "Default player reaction (e.g. Neutral, Hostile, Friendly)" },
+          "able_to_arrest": { "type": "boolean", "nullable": true },
+          "no_legal_rights": { "type": "boolean", "nullable": true },
+          "polices_criminality": { "type": "boolean", "nullable": true },
+          "polices_lawful_trespass": { "type": "boolean", "nullable": true },
+          "faction_reputation_uuid": { "type": "string", "nullable": true },
+          "allies": { "nullable": true, "description": "JSON array of allied faction class names" },
+          "enemies": { "nullable": true, "description": "JSON array of enemy faction class names" },
+          "organization_tags": { "nullable": true }
+        }
+      },
+      "ReputationStanding": {
+        "type": "object",
+        "description": "Reputation standing tier (e.g. Hostile, Neutral, Friendly, Ally) with thresholds and drift settings.",
+        "properties": {
+          "uuid": { "type": "string", "format": "uuid" },
+          "env": { "type": "string", "example": "live" },
+          "class_name": { "type": "string" },
+          "name": { "type": "string", "nullable": true },
+          "display_name": { "type": "string", "nullable": true },
+          "description": { "type": "string", "nullable": true },
+          "icon": { "type": "string", "nullable": true },
+          "min_reputation": { "type": "integer", "nullable": true, "description": "Minimum reputation score required to reach this standing" },
+          "drift_time_hours": { "type": "number", "nullable": true, "description": "Hours before reputation drifts toward neutral" },
+          "drift_reputation": { "type": "integer", "nullable": true, "description": "Points drifted per drift cycle" },
+          "gated": { "type": "boolean", "description": "Whether this standing gates access to certain content" },
+          "perk_description": { "type": "string", "nullable": true }
+        }
+      },
+      "ReputationScope": {
+        "type": "object",
+        "description": "Reputation scope — a faction-specific reputation track with its own ceiling and standings list.",
+        "properties": {
+          "uuid": { "type": "string", "format": "uuid" },
+          "env": { "type": "string", "example": "live" },
+          "class_name": { "type": "string" },
+          "scope_name": { "type": "string", "nullable": true },
+          "display_name": { "type": "string", "nullable": true },
+          "description": { "type": "string", "nullable": true },
+          "icon": { "type": "string", "nullable": true },
+          "initial_reputation": { "type": "integer", "nullable": true, "description": "Starting reputation value for new players" },
+          "reputation_ceiling": { "type": "integer", "nullable": true, "description": "Maximum achievable reputation in this scope" },
+          "standings": { "nullable": true, "description": "JSON array of standing references for this scope" }
         }
       },
       "LatestStats": {
@@ -12090,109 +12196,184 @@
     "/api/v1/factions": {
       "get": {
         "tags": ["Factions"],
-        "summary": "List mission factions with aggregate mission statistics",
+        "summary": "List all factions with mission aggregate statistics",
+        "description": "Returns all factions that appear in extracted missions, merged with matching game registry data (faction type, default reaction, allies/enemies, policing flags). Each entry combines mission counts, reward ranges and list breakdowns with DataForge faction attributes when available.",
+        "operationId": "getFactions",
         "parameters": [
-          {
-            "name": "env",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "version",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            },
-            "description": "Environment alias; Starvis currently resolves live/ptu style datasets"
-          }
+          { "$ref": "#/components/parameters/env" }
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Array of merged faction summaries",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "count": {
-                      "type": "integer"
-                    },
+                    "success": { "type": "boolean" },
+                    "count": { "type": "integer" },
                     "data": {
                       "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/Faction"
-                      }
+                      "items": { "$ref": "#/components/schemas/Faction" }
                     }
                   }
                 }
               }
             }
           }
-        },
-        "operationId": "getPublicFactions"
+        }
+      }
+    },
+    "/api/v1/factions/registry": {
+      "get": {
+        "tags": ["Factions"],
+        "summary": "Paginated game faction registry",
+        "description": "Paginated list of all GameFaction records extracted from the DataForge (game.factions table). Includes faction type, default reaction, policing flags, allies/enemies and organization tags. Searchable by name, class name, faction type or default reaction.",
+        "operationId": "getFactionRegistry",
+        "parameters": [
+          { "$ref": "#/components/parameters/env" },
+          { "$ref": "#/components/parameters/search" },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of game factions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/Pagination" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": { "type": "boolean" },
+                        "count": { "type": "integer" },
+                        "data": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/GameFaction" }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/factions/reputation-standings": {
+      "get": {
+        "tags": ["Factions"],
+        "summary": "Paginated reputation standing tiers",
+        "description": "Returns all reputation standing tiers extracted from the DataForge (e.g. Hostile, Neutral, Friendly, Ally). Each standing defines a minimum reputation threshold, drift settings, a gating flag and an optional perk description. Sorted by `min_reputation` ascending (most hostile first).",
+        "operationId": "getReputationStandings",
+        "parameters": [
+          { "$ref": "#/components/parameters/env" },
+          { "$ref": "#/components/parameters/search" },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of reputation standings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/Pagination" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": { "type": "boolean" },
+                        "count": { "type": "integer" },
+                        "data": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/ReputationStanding" }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/factions/reputation-scopes": {
+      "get": {
+        "tags": ["Factions"],
+        "summary": "Paginated reputation scopes",
+        "description": "Returns all reputation scopes extracted from the DataForge (game.reputation_scopes table). Each scope represents a faction-specific reputation track with its own ceiling, initial value and list of applicable standings. Searchable by scope name, display name, class name or description.",
+        "operationId": "getReputationScopes",
+        "parameters": [
+          { "$ref": "#/components/parameters/env" },
+          { "$ref": "#/components/parameters/search" },
+          { "$ref": "#/components/parameters/page" },
+          { "$ref": "#/components/parameters/limit" }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of reputation scopes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/Pagination" },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "success": { "type": "boolean" },
+                        "count": { "type": "integer" },
+                        "data": {
+                          "type": "array",
+                          "items": { "$ref": "#/components/schemas/ReputationScope" }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/factions/{faction}": {
       "get": {
         "tags": ["Factions"],
-        "summary": "Get a mission faction summary and sample missions",
+        "summary": "Single faction detail with sample missions",
+        "description": "Returns the merged faction summary for the given faction name (case-insensitive) plus up to 20 missions belonging to that faction sorted by reward descending. Includes `missions_total` for the full mission count.",
+        "operationId": "getFactionDetail",
         "parameters": [
           {
             "name": "faction",
             "in": "path",
             "required": true,
-            "schema": {
-              "type": "string"
-            }
+            "schema": { "type": "string" },
+            "description": "Faction name (e.g. `UEE`, `Vanduul`, `Xenothreat`)"
           },
-          {
-            "name": "env",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "version",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
-            }
-          }
+          { "$ref": "#/components/parameters/env" }
         ],
         "responses": {
           "200": {
-            "description": "OK",
+            "description": "Faction detail with sample missions",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/Faction"
-                    }
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/Faction" }
                   }
                 }
               }
             }
           },
-          "404": {
-            "description": "Not found"
-          }
-        },
-        "operationId": "getPublicFactionsFaction"
+          "404": { "$ref": "#/components/responses/NotFound" }
+        }
       }
     },
     "/api/v1/search/{query}": {
