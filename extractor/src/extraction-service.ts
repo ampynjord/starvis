@@ -454,7 +454,7 @@ export class ExtractionService {
         const rsiSync = new RsiSyncService(options.rsiPool);
 
         if (run('galactapedia')) {
-          onProgress?.('Syncing galactapedia from SC Wiki…');
+          onProgress?.('Syncing galactapedia from RSI GraphQL API…');
           try {
             const s = await rsiSync.syncGalactapedia(onProgress);
             onProgress?.(`✅ Galactapedia: inserted=${s.inserted}, updated=${s.updated}, errors=${s.errors}`);

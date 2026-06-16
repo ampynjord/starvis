@@ -11,15 +11,15 @@ import {
 } from 'discord.js';
 
 const DEFAULT_GUILD_ID = '931662690101895198';
-const OLD_CHANGELOG_MARKER = '<!-- starvis-changelog-addendum-2026-06-15 -->';
+const OLD_CHANGELOG_MARKER = '<!-- starvis-changelog-addendum-2026-06-17 -->';
 const ADDENDUM_HEADING = '**Latest addendum**';
 
 const ADDENDUM = `${ADDENDUM_HEADING}
-- The \`/developer\` page is now reserved for accounts with Developer or Admin access.
-- Standard users can request external API access with a motivation message.
-- Admins can review external API access requests and approve them to grant Developer access.
-- OpenAPI/Swagger, local checks, production deployment and CI validation were updated for this flow.
-- Discord \`Developer\` is for external API users only. It is not a project staff or project contributor role.`;
+- 🗺️ **Starmap** : refonte visuelle complète — modèles 3D depuis les assets ARK publics, jump points en 4 composants (JumpHead, JumpTail, JumpGoTrhu, DustGoTrhu), caméra fluide, labels lisibles.
+- 🪐 **Starmap** : les orbites planétaires sont toujours visibles. Cliquer sur une planète zoom dessus et affiche les orbites de ses lunes.
+- 🚀 **Fleet Manager** : correction — les vaisseaux personnels ne disparaissent plus après avoir rejoint une corporation.
+- 🚀 **Fleet Manager** : la vue « MY FLEET » n'affiche plus le nom de la corporation dans le header.
+- 🤖 **ARIA (chat IA)** : l'endpoint \`/api/v1/chat\` est désormais restreint aux accès internes et administrateurs.`;
 
 function getArg(name: string): string | undefined {
   const prefix = `--${name}=`;
@@ -94,16 +94,8 @@ function pickChangelogChannel(guild: Guild): GuildTextBasedChannel | null {
   return channels.find((channel) => preferredNames.some((name) => normalizeName(channel.name).includes(name))) ?? null;
 }
 
-function mergeAddendum(content: string): string {
-  const cleanedContent = content.replace(`${OLD_CHANGELOG_MARKER}\n`, '').trim();
-
-  if (cleanedContent.includes(ADDENDUM_HEADING)) {
-    return cleanedContent.replace(new RegExp(`${escapeRegExp(ADDENDUM_HEADING)}[\\s\\S]*$`), ADDENDUM);
-  }
-
-  const separator = cleanedContent ? '\n\n' : '';
-  const merged = `${cleanedContent}${separator}${ADDENDUM}`;
-  return merged.length <= 2000 ? merged : ADDENDUM;
+function mergeAddendum(_content: string): string {
+  return ADDENDUM;
 }
 
 async function updateStaffPermissions(guild: Guild, developerRole: Role): Promise<number> {
