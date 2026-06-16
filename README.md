@@ -287,6 +287,29 @@ inventory rows.
 
 When adding, changing, or deleting an API route, update [`api/openapi.json`](api/openapi.json) in the same change. The API test suite compares mounted Express routes with the OpenAPI paths so undocumented routes are caught during CI.
 
+### HTTP error conventions
+
+All error responses use `{ "success": false, "error": "Human-readable message" }`.
+
+| Code | Meaning |
+|---|---|
+| 400 | Bad request — missing or invalid query/body parameter |
+| 401 | Unauthorized — missing or invalid auth token |
+| 403 | Forbidden — account lacks the required role |
+| 404 | Not found — requested resource does not exist |
+| 409 | Conflict — duplicate resource or incompatible state |
+| 503 | Service unavailable — game data not yet loaded |
+| 500 | Internal server error — unexpected server failure |
+
+503 is used specifically when a route requires game data and the in-memory dataset has not been populated yet (e.g. API starts before the extractor has run). The response body still follows the `{ success, error }` format.
+
+### Adding a new route
+
+1. Create `api/src/routes/<domain>.ts` and export `mount<Domain>Routes(router: Router, deps: RouteDependencies): void`.
+2. Import the mount function in `api/src/routes/index.ts` and add it to the `routeMounts` array.
+3. Document all new paths in `api/openapi.json`.
+4. Run `npm run openapi:lint --workspace=@starvis/api` to validate the spec locally.
+
 ---
 
 ## Discord Bot

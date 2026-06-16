@@ -1,3 +1,4 @@
+import type { Metadata } from 'next';
 import {
   Bot,
   CheckCircle2,
@@ -21,6 +22,17 @@ import {
 } from '@/lib/discordBot';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Discord Bot',
+  description:
+    'The Starvis Discord bot: query ships, trade routes, missions, lore and get AI answers from Star Citizen slash commands. Invite the bot or join the community server.',
+  keywords: ['star citizen discord bot', 'starvis bot', 'sc discord commands', 'star citizen discord'],
+  openGraph: {
+    title: 'Discord Bot — STARVIS',
+    description: 'Star Citizen data slash commands for your Discord server.',
+  },
+};
 
 const categoryStyle: Record<string, string> = {
   AI: 'border-violet-800/60 bg-violet-950/25 text-violet-300',

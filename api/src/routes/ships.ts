@@ -7,131 +7,14 @@ import { SearchQuery, ShipQuery } from '../schemas.js';
 import { parseIncludes } from '../services/shared.js';
 import { CTM_CACHE_DIR } from '../utils/config.js';
 import { asyncHandler, makeGameDataGuard, makeShipResolver, sendCsvOrJson, sendWithETag } from './helpers.js';
+import {
+  DEFAULT_RANKING_SORT,
+  RANKING_STAT_CATEGORIES,
+  RANKING_STATS,
+  RANKING_TOP_OPTIONS,
+  RANKING_VEHICLE_CATEGORIES,
+} from './rankings-config.js';
 import type { RouteDependencies } from './types.js';
-
-const RANKING_STATS = [
-  { key: 'scm_speed', label: 'SCM Speed', unit: 'm/s', higher_is_better: true, category: 'Flight', vehicleCategories: ['ship', 'gravlev'] },
-  { key: 'max_speed', label: 'Max Speed', unit: 'm/s', higher_is_better: true, category: 'Flight' },
-  {
-    key: 'boost_speed_forward',
-    label: 'AB Forward',
-    unit: 'm/s',
-    higher_is_better: true,
-    category: 'Flight',
-    vehicleCategories: ['ship', 'gravlev'],
-  },
-  { key: 'pitch_max', label: 'Pitch', unit: 'deg/s', higher_is_better: true, category: 'Flight', vehicleCategories: ['ship', 'gravlev'] },
-  { key: 'yaw_max', label: 'Yaw', unit: 'deg/s', higher_is_better: true, category: 'Flight', vehicleCategories: ['ship', 'gravlev'] },
-  { key: 'roll_max', label: 'Roll', unit: 'deg/s', higher_is_better: true, category: 'Flight', vehicleCategories: ['ship', 'gravlev'] },
-  { key: 'total_hp', label: 'Hull HP', unit: 'HP', higher_is_better: true, category: 'Combat' },
-  { key: 'shield_hp', label: 'Shield HP', unit: 'HP', higher_is_better: true, category: 'Combat', vehicleCategories: ['ship', 'gravlev'] },
-  {
-    key: 'weapon_damage_total',
-    label: 'Weapon DPS',
-    unit: 'DPS',
-    higher_is_better: true,
-    category: 'Combat',
-    vehicleCategories: ['ship', 'gravlev'],
-  },
-  {
-    key: 'missile_damage_total',
-    label: 'Missile Dmg',
-    unit: '',
-    higher_is_better: true,
-    category: 'Combat',
-    vehicleCategories: ['ship', 'gravlev'],
-  },
-  { key: 'cargo_capacity', label: 'Cargo', unit: 'SCU', higher_is_better: true, category: 'Transport' },
-  { key: 'crew_size', label: 'Crew', unit: '', higher_is_better: true, category: 'Transport' },
-  { key: 'min_purchase_price', label: 'Buy Price', unit: 'aUEC', higher_is_better: false, category: 'Market' },
-  { key: 'min_rental_price_1d', label: 'Rent 1d', unit: 'aUEC', higher_is_better: false, category: 'Market' },
-  { key: 'purchase_location_count', label: 'Buy Locations', unit: '', higher_is_better: true, category: 'Market' },
-  { key: 'rental_location_count', label: 'Rental Locations', unit: '', higher_is_better: true, category: 'Market' },
-  {
-    key: 'hydrogen_fuel_capacity',
-    label: 'H2 Fuel',
-    unit: 'L',
-    higher_is_better: true,
-    category: 'Fuel',
-    vehicleCategories: ['ship', 'gravlev'],
-  },
-  { key: 'quantum_fuel_capacity', label: 'QT Fuel', unit: 'L', higher_is_better: true, category: 'Fuel', vehicleCategories: ['ship'] },
-  { key: 'insurance_claim_time', label: 'Claim Time', unit: 'min', higher_is_better: false, category: 'Insurance' },
-  { key: 'insurance_expedite_cost', label: 'Expedite', unit: 'aUEC', higher_is_better: false, category: 'Insurance' },
-  { key: 'mass', label: 'Mass', unit: '', higher_is_better: false, category: 'Dimensions' },
-  { key: 'cross_section_z', label: 'Length', unit: 'm', higher_is_better: false, category: 'Dimensions' },
-  { key: 'cross_section_x', label: 'Width', unit: 'm', higher_is_better: false, category: 'Dimensions' },
-  { key: 'cross_section_y', label: 'Height', unit: 'm', higher_is_better: false, category: 'Dimensions' },
-  {
-    key: 'armor_phys_resist',
-    label: 'Physical Resist',
-    unit: '%',
-    higher_is_better: true,
-    category: 'Defense',
-    vehicleCategories: ['ship', 'gravlev'],
-  },
-  {
-    key: 'armor_energy_resist',
-    label: 'Energy Resist',
-    unit: '%',
-    higher_is_better: true,
-    category: 'Defense',
-    vehicleCategories: ['ship', 'gravlev'],
-  },
-  {
-    key: 'armor_signal_ir',
-    label: 'IR Signal',
-    unit: '',
-    higher_is_better: false,
-    category: 'Signatures',
-    vehicleCategories: ['ship', 'gravlev'],
-  },
-  {
-    key: 'armor_signal_em',
-    label: 'EM Signal',
-    unit: '',
-    higher_is_better: false,
-    category: 'Signatures',
-    vehicleCategories: ['ship', 'gravlev'],
-  },
-  {
-    key: 'armor_signal_cs',
-    label: 'CS Signal',
-    unit: '',
-    higher_is_better: false,
-    category: 'Signatures',
-    vehicleCategories: ['ship', 'gravlev'],
-  },
-] as const;
-
-const RANKING_STAT_CATEGORIES = [
-  'All',
-  'Flight',
-  'Combat',
-  'Defense',
-  'Transport',
-  'Market',
-  'Fuel',
-  'Insurance',
-  'Dimensions',
-  'Signatures',
-];
-const RANKING_VEHICLE_CATEGORIES = [
-  { label: 'Ships', value: 'ship' },
-  { label: 'Ground', value: 'ground' },
-  { label: 'Grav-lev', value: 'gravlev' },
-];
-const RANKING_TOP_OPTIONS = [
-  { label: 'Top 25', value: 25 },
-  { label: 'Top 50', value: 50 },
-  { label: 'Top 100', value: 100 },
-  { label: 'All', value: 0 },
-];
-const DEFAULT_RANKING_SORT: Record<string, string> = {
-  ship: 'scm_speed',
-  ground: 'max_speed',
-  gravlev: 'scm_speed',
-};
 
 function numericStat(row: Record<string, unknown>, key: string): number {
   const value = Number(row[key] ?? 0);

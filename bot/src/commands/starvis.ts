@@ -1,8 +1,8 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
 import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 import { chatAsk } from '../api.js';
+import { ADMIN_API_KEY } from '../config.js';
 
-const API_TOKEN = process.env.API_TOKEN ?? '';
 const DISCORD_REPLY_HINT =
   'Answer for Discord embeds. Be concise, structured and data-driven. Never use markdown tables or code-block tables because Discord wraps them badly. Use short headings and bullet lists. For multiple records, use one bullet per record with the name in bold and only the most useful stats. Mention uncertainty when data is missing. When a specialized command would be better, suggest it explicitly: /ship, /compare, /loadout, /component, /item, /commodity, /paint, /trade, /shop, /mining, /crafting, /mission, /location, /faction, /lore, /manufacturers, /search, /top, /version, /changelog or /status.';
 
@@ -15,13 +15,13 @@ export async function execute(interaction: ChatInputCommandInteraction): Promise
   const question = interaction.options.getString('question', true);
   await interaction.deferReply();
 
-  if (!API_TOKEN) {
-    await interaction.editReply({ embeds: [errorEmbed('API_TOKEN is not configured on the bot.')] });
+  if (!ADMIN_API_KEY) {
+    await interaction.editReply({ embeds: [errorEmbed('ADMIN_API_KEY is not configured on the bot.')] });
     return;
   }
 
   try {
-    const rawReply = await chatAsk([{ role: 'user', content: `${DISCORD_REPLY_HINT}\n\nQuestion: ${question}` }], API_TOKEN);
+    const rawReply = await chatAsk([{ role: 'user', content: `${DISCORD_REPLY_HINT}\n\nQuestion: ${question}` }]);
     const reply = formatDiscordAnswer(rawReply);
     const chunks = splitDiscordText(reply, 3900);
 

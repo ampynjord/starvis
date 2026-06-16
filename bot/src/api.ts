@@ -1,4 +1,4 @@
-import { API_BASE_URL, API_TIMEOUT_MS, API_TOKEN } from './config.js';
+import { ADMIN_API_KEY, API_BASE_URL, API_TIMEOUT_MS, API_TOKEN } from './config.js';
 
 export async function apiFetch<T>(path: string): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
@@ -471,13 +471,13 @@ export async function getShipsAutocomplete(query: string): Promise<Array<{ name:
   }
 }
 
-export async function chatAsk(messages: { role: 'user' | 'assistant'; content: string }[], apiToken: string): Promise<string> {
+export async function chatAsk(messages: { role: 'user' | 'assistant'; content: string }[]): Promise<string> {
   const url = `${API_BASE_URL}/api/v1/chat/ask`;
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiToken}`,
+      'X-API-Key': ADMIN_API_KEY,
     },
     body: JSON.stringify({ messages }),
     signal: AbortSignal.timeout(60_000),
