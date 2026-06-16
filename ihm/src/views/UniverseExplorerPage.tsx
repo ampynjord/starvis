@@ -71,6 +71,7 @@ type RsiStarmapPosition = {
     } | null;
   } | null;
   affiliations?: string[] | null;
+  assets?: { textures?: string[]; models?: string[]; skybox?: string[]; raw?: string[] } | null;
   description?: string | null;
   star_type?: string | null;
   habitable_zone_inner?: number | string | null;
@@ -123,6 +124,7 @@ type LocationWithMap = Location & {
   economy?: number | null;
   danger?: number | null;
   jump_points?: JumpPointLink[] | null;
+  scraped_assets?: { textures?: string[]; models?: string[]; skybox?: string[] } | null;
   rsi_starmap?: {
     name?: string | null;
     type?: string | null;
@@ -382,6 +384,7 @@ function posToLocation(pos: RsiStarmapPosition): LocationWithMap {
     rsi_starmap_location_id: pos.id,
     aggregated: pos.aggregated ?? null,
     thumbnail: pos.thumbnail_data?.images?.product_thumb_large ?? pos.thumbnail_data?.images?.post ?? pos.thumbnail_data?.url ?? pos.thumbnail ?? null,
+    scraped_assets: pos.assets ? { textures: pos.assets.textures ?? [], models: pos.assets.models ?? [], skybox: pos.assets.skybox ?? [] } : null,
     star_type: pos.star_type ?? null,
     habitable_zone_inner: toNumber(pos.habitable_zone_inner),
     habitable_zone_outer: toNumber(pos.habitable_zone_outer),
@@ -1155,9 +1158,13 @@ function Scene({
       meshes.set(node.id, mesh);
 
       const thumbnailUrl = rsiImageUrl(node.loc.thumbnail);
-      if (thumbnailUrl && (type === 'planet' || type === 'moon' || type === 'station' || type === 'rest_stop')) {
+      const scrapedTextureUrl = node.loc.scraped_assets?.textures?.find((u) =>
+        /\.(png|jpg|jpeg|webp)(\?|$)/i.test(u) && !/ui|icon|button|hud|font/i.test(u),
+      ) ?? null;
+      const textureUrl = thumbnailUrl ?? scrapedTextureUrl;
+      if (textureUrl && (type === 'planet' || type === 'moon' || type === 'station' || type === 'rest_stop')) {
         textureLoader.load(
-          thumbnailUrl,
+          textureUrl,
           (tex) => {
             tex.colorSpace = THREE.SRGBColorSpace;
             material.map = tex;

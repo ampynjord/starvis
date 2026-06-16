@@ -358,6 +358,7 @@ export class RsiWebsiteService {
               sl.thumbnail,
               sl.raw_json -> 'thumbnail' as thumbnail_data,
               sl.affiliations,
+              sl.assets,
               sl.description, sl.star_type,
               sl.habitable_zone_inner, sl.habitable_zone_outer,
               sl.population, sl.economy, sl.danger, sl.jump_points,
