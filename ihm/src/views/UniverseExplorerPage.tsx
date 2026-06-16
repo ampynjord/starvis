@@ -61,6 +61,16 @@ type RsiStarmapPosition = {
   faction_name?: string | null;
   coordinates?: Coordinates | null;
   thumbnail?: string | null;
+  thumbnail_data?: {
+    url?: string | null;
+    images?: {
+      product_thumb_large?: string | null;
+      post?: string | null;
+      source?: string | null;
+      [key: string]: string | null | undefined;
+    } | null;
+  } | null;
+  affiliations?: string[] | null;
   description?: string | null;
   star_type?: string | null;
   habitable_zone_inner?: number | string | null;
@@ -371,7 +381,7 @@ function posToLocation(pos: RsiStarmapPosition): LocationWithMap {
     p4k_path: p4k?.p4k_path ?? null,
     rsi_starmap_location_id: pos.id,
     aggregated: pos.aggregated ?? null,
-    thumbnail: pos.thumbnail ?? null,
+    thumbnail: pos.thumbnail_data?.images?.product_thumb_large ?? pos.thumbnail_data?.images?.post ?? pos.thumbnail_data?.url ?? pos.thumbnail ?? null,
     star_type: pos.star_type ?? null,
     habitable_zone_inner: toNumber(pos.habitable_zone_inner),
     habitable_zone_outer: toNumber(pos.habitable_zone_outer),
@@ -1081,6 +1091,8 @@ function Scene({
     const halos = new Map<string, THREE.Sprite>();
     const labels: THREE.Sprite[] = [];
     const denseScene = nodes.filter((node) => !node.parentId).length > 45;
+    const textureLoader = new THREE.TextureLoader();
+    textureLoader.crossOrigin = 'anonymous';
 
     function glowSprite(color: number) {
       const canvas = document.createElement('canvas');
@@ -1141,6 +1153,22 @@ function Scene({
       mesh.userData.nodeId = node.id;
       group.add(mesh);
       meshes.set(node.id, mesh);
+
+      const thumbnailUrl = rsiImageUrl(node.loc.thumbnail);
+      if (thumbnailUrl && (type === 'planet' || type === 'moon' || type === 'station' || type === 'rest_stop')) {
+        textureLoader.load(
+          thumbnailUrl,
+          (tex) => {
+            tex.colorSpace = THREE.SRGBColorSpace;
+            material.map = tex;
+            material.emissive.set(node.color);
+            material.emissiveIntensity = 0.06;
+            material.needsUpdate = true;
+          },
+          undefined,
+          () => {},
+        );
+      }
 
       const halo = glowSprite(node.color);
       if (halo) {

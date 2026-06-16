@@ -715,7 +715,7 @@ export class RsiSyncService {
                   parent_id: starmapObjectParentId(body, rsiId),
                   faction_name: body.affiliation?.[0]?.name ?? null,
                   affiliations: json((body.affiliation ?? []).map((a: any) => a.name).filter(Boolean)),
-                  thumbnail: body.thumbnail?.url ?? null,
+                  thumbnail: body.thumbnail?.images?.product_thumb_large ?? body.thumbnail?.images?.post ?? body.thumbnail?.url ?? null,
                   description: typeof bodyDesc === 'string' ? bodyDesc : null,
                   web_url: null,
                   coordinates: json(
