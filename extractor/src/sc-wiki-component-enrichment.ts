@@ -11,8 +11,6 @@ export type ComponentWikiEnrichment = {
   componentClass: string | null;
 };
 
-export async function fetchComponentWikiEnrichment(
-  _componentTypes: Iterable<string>,
-): Promise<Map<string, ComponentWikiEnrichment>> {
+export async function fetchComponentWikiEnrichment(_componentTypes: Iterable<string>): Promise<Map<string, ComponentWikiEnrichment>> {
   return new Map();
 }

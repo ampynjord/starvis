@@ -3,6 +3,24 @@
  */
 import { describe, expect, it, vi } from 'vitest';
 
+// ── Playwright mock (no real browser in CI) ─────────────────────────────────
+vi.mock('playwright', () => ({
+  chromium: {
+    launch: vi.fn().mockResolvedValue({
+      newContext: vi.fn().mockResolvedValue({
+        newPage: vi.fn().mockResolvedValue({
+          on: vi.fn(),
+          goto: vi.fn().mockResolvedValue(null),
+          $$eval: vi.fn().mockResolvedValue([]),
+          $: vi.fn().mockResolvedValue(null),
+          waitForTimeout: vi.fn().mockResolvedValue(null),
+        }),
+      }),
+      close: vi.fn(),
+    }),
+  },
+}));
+
 // ── DB pool mock ────────────────────────────────────────────────────────────
 
 function makePoolMock() {
