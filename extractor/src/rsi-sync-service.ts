@@ -27,14 +27,6 @@ interface RsiOrgSummary {
   memberCount: number | null;
 }
 
-async function fetchJson(url: string): Promise<any> {
-  const res = await fetch(url, {
-    headers: { Accept: 'application/json', 'User-Agent': SCRAPER_USER_AGENT },
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status} — ${url}`);
-  return res.json();
-}
-
 async function postJson(url: string, body: unknown = {}): Promise<any> {
   const res = await fetch(url, {
     method: 'POST',
@@ -253,9 +245,9 @@ export class RsiSyncService {
       // If the SPA didn't fire API calls, fall back to scraping article links from DOM
       if (articles.length === 0) {
         onProgress?.('  [galactapedia] No XHR data captured — extracting article links from DOM…');
-        const links = await page.$$eval('a[href*="/galactapedia/article/"]', (els) =>
-          [...new Set(els.map((a) => (a as { href: string }).href))],
-        );
+        const links = await page.$$eval('a[href*="/galactapedia/article/"]', (els) => [
+          ...new Set(els.map((a) => (a as { href: string }).href)),
+        ]);
         onProgress?.(`  [galactapedia] Found ${links.length} article links in DOM`);
 
         for (const link of links) {
@@ -291,7 +283,14 @@ export class RsiSyncService {
     try {
       for (const item of articles) {
         const id = String(item.id ?? item.rsi_id ?? '');
-        const slug = String(item.slug ?? item.url?.split('/').pop()?.replace(/^[^-]+-/, '') ?? '');
+        const slug = String(
+          item.slug ??
+            item.url
+              ?.split('/')
+              .pop()
+              ?.replace(/^[^-]+-/, '') ??
+            '',
+        );
         if (!id) continue;
 
         const title = String(item.title ?? item.name ?? slug ?? id);
@@ -319,15 +318,24 @@ export class RsiSyncService {
                rsi_url=EXCLUDED.rsi_url,
                updated_at=NOW()`,
             [
-              id, slug, title, null, null,
-              item.type ?? null, item.template ?? null,
-              categories, tags,
+              id,
+              slug,
+              title,
+              null,
+              null,
+              item.type ?? null,
+              item.template ?? null,
+              categories,
+              tags,
               item.categories_count ?? null,
               item.tags_count ?? null,
               item.related_articles_count ?? null,
               thumbnailUrl ? (thumbnailUrl.startsWith('http') ? thumbnailUrl : `${RSI_BASE_URL}${thumbnailUrl}`) : null,
               rsiUrl.startsWith('http') ? rsiUrl : `${RSI_BASE_URL}${rsiUrl}`,
-              null, null, null, json(item),
+              null,
+              null,
+              null,
+              json(item),
             ],
           );
           if (result.rowCount === 1) stats.inserted++;
@@ -419,14 +427,24 @@ export class RsiSyncService {
                  rsi_url=EXCLUDED.rsi_url, raw_json=EXCLUDED.raw_json,
                  published_at=EXCLUDED.published_at`,
               [
-                rsiId, slug,
+                rsiId,
+                slug,
                 String(item.title ?? item.name ?? rsiId),
-                null, null,
-                category, category, channel, null,
-                thumbnailUrl, rsiUrl, null, null,
-                null, null,
+                null,
+                null,
+                category,
+                category,
+                channel,
+                null,
+                thumbnailUrl,
+                rsiUrl,
+                null,
+                null,
+                null,
+                null,
                 item.post_count ? Number(item.post_count) : null,
-                json(item), publishedAtSql,
+                json(item),
+                publishedAtSql,
               ],
             );
             if (result.rowCount === 1) stats.inserted++;
@@ -853,10 +871,7 @@ export class RsiSyncService {
         try {
           const html = await scrapeCommLinkContent(rsi_url);
           if (html) {
-            await conn.query(
-              `UPDATE rsi.comm_links SET content = $1 WHERE rsi_id = $2`,
-              [html, rsi_id],
-            );
+            await conn.query(`UPDATE rsi.comm_links SET content = $1 WHERE rsi_id = $2`, [html, rsi_id]);
             stats.enriched++;
           } else {
             stats.skipped++;
@@ -906,10 +921,7 @@ export class RsiSyncService {
         try {
           const html = await scrapeGalactapediaContent(rsi_url);
           if (html) {
-            await conn.query(
-              `UPDATE rsi.galactapedia SET content = $1 WHERE id = $2`,
-              [html, id],
-            );
+            await conn.query(`UPDATE rsi.galactapedia SET content = $1 WHERE id = $2`, [html, id]);
             stats.enriched++;
           } else {
             stats.skipped++;
