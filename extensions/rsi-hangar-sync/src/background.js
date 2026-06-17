@@ -1,5 +1,16 @@
 const runtimeApi = globalThis.browser ?? globalThis.chrome;
+const usesPromiseApi = runtimeApi === globalThis.browser;
 const RSI_HANGAR_URL = 'https://robertsspaceindustries.com/account/pledges';
+
+function queryTabs(query) {
+  if (usesPromiseApi) return runtimeApi.tabs.query(query);
+  return new Promise((resolve) => runtimeApi.tabs.query(query, resolve));
+}
+
+function createTab(createProperties) {
+  if (usesPromiseApi) return runtimeApi.tabs.create(createProperties);
+  return new Promise((resolve) => runtimeApi.tabs.create(createProperties, resolve));
+}
 
 function waitForTabComplete(tabId) {
   return new Promise((resolve) => {
@@ -20,14 +31,16 @@ function waitForTabComplete(tabId) {
 }
 
 async function findOrOpenHangarTab() {
-  const tabs = await runtimeApi.tabs.query({ url: 'https://robertsspaceindustries.com/account/pledges*' });
-  const tab = tabs[0] ?? (await runtimeApi.tabs.create({ url: RSI_HANGAR_URL, active: false }));
+  const tabs = await queryTabs({ url: 'https://robertsspaceindustries.com/account/pledges*' });
+  const tab = tabs[0] ?? (await createTab({ url: RSI_HANGAR_URL, active: false }));
   if (!tab.id) throw new Error('Unable to open RSI hangar tab');
   if (tab.status !== 'complete') await waitForTabComplete(tab.id);
   return tab.id;
 }
 
 function sendTabMessage(tabId, message) {
+  if (usesPromiseApi) return runtimeApi.tabs.sendMessage(tabId, message);
+
   return new Promise((resolve, reject) => {
     runtimeApi.tabs.sendMessage(tabId, message, (response) => {
       if (runtimeApi.runtime.lastError) {
@@ -54,24 +67,35 @@ async function postToStarvis({ starvisOrigin, callbackPath, token, entries }) {
   return payload;
 }
 
+async function handleSyncRequest(message) {
+  if (!message.token || !message.starvisOrigin || !message.callbackPath) throw new Error('Invalid Starvis sync request');
+  const tabId = await findOrOpenHangarTab();
+  const scrape = await sendTabMessage(tabId, { type: 'STARVIS_SCRAPE_RSI_HANGAR' });
+  if (!scrape?.success) throw new Error(scrape?.error || 'Unable to read RSI hangar');
+  const payload = await postToStarvis({
+    starvisOrigin: message.starvisOrigin,
+    callbackPath: message.callbackPath,
+    token: message.token,
+    entries: scrape.entries ?? [],
+  });
+  return { success: true, payload };
+}
+
 runtimeApi.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type !== 'STARVIS_RSI_HANGAR_SYNC_REQUEST') return false;
 
-  (async () => {
-    if (!message.token || !message.starvisOrigin || !message.callbackPath) throw new Error('Invalid Starvis sync request');
-    const tabId = await findOrOpenHangarTab();
-    const scrape = await sendTabMessage(tabId, { type: 'STARVIS_SCRAPE_RSI_HANGAR' });
-    if (!scrape?.success) throw new Error(scrape?.error || 'Unable to read RSI hangar');
-    const payload = await postToStarvis({
-      starvisOrigin: message.starvisOrigin,
-      callbackPath: message.callbackPath,
-      token: message.token,
-      entries: scrape.entries ?? [],
+  if (usesPromiseApi) {
+    return handleSyncRequest(message).catch((error) => ({
+      success: false,
+      error: error instanceof Error ? error.message : 'RSI hangar sync failed',
+    }));
+  }
+
+  handleSyncRequest(message)
+    .then(sendResponse)
+    .catch((error) => {
+      sendResponse({ success: false, error: error instanceof Error ? error.message : 'RSI hangar sync failed' });
     });
-    sendResponse({ success: true, payload });
-  })().catch((error) => {
-    sendResponse({ success: false, error: error instanceof Error ? error.message : 'RSI hangar sync failed' });
-  });
 
   return true;
 });
