@@ -7,7 +7,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AlertTriangle, ChevronDown, ChevronRight, Copy, Cpu, ExternalLink, RefreshCw, Search, Shield, Wind, X, Zap } from 'lucide-react';
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { api } from '@/services/api';
@@ -20,7 +20,7 @@ import { ScifiPanel } from '@/components/ui/ScifiPanel';
 import { useDebounce } from '@/hooks/useDebounce';
 import { COMPONENT_TYPE_LABELS, GAME_COMPONENT_CATEGORIES, GAME_COMPONENT_CATEGORY_ICONS, getGameComponentCategory } from '@/utils/constants';
 import { fNumber } from '@/utils/formatters';
-import type { CompatibleComponent, HardpointEntry, HardpointComponent, LoadoutResult, ShipListItem } from '@/types/api';
+import type { CompatibleComponent, HardpointEntry, HardpointComponent, LoadoutResult, ShipListItem, ShipModule } from '@/types/api';
 
 // ── Active port context ───────────────────────────────────────────────────────
 
@@ -534,11 +534,13 @@ export default function LoadoutManagerPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
-  const [shipSearch, setShipSearch]     = useState('');
-  const [selectedShip, setSelectedShip] = useState<ShipListItem | null>(null);
+  const [shipSearch, setShipSearch]         = useState('');
+  const [selectedShip, setSelectedShip]     = useState<ShipListItem | null>(null);
   // swaps: portId (number) → componentUuid
-  const [swaps, setSwaps]               = useState<Record<number, string>>({});
-  const [activePort, setActivePort]     = useState<ActivePort | null>(null);
+  const [swaps, setSwaps]                   = useState<Record<number, string>>({});
+  // selectedModules: slotName → moduleClassName (user overrides; defaults come from loadout.modules)
+  const [selectedModules, setSelectedModules] = useState<Record<string, string>>({});
+  const [activePort, setActivePort]         = useState<ActivePort | null>(null);
   const dShipSearch = useDebounce(shipSearch, 300);
   const restoredRef = useRef(false);
 
@@ -551,10 +553,34 @@ export default function LoadoutManagerPage() {
   const { mutate: calculate, data: loadout, isPending } = useMutation<
     LoadoutResult,
     Error,
-    { uuid: string; swaps: { portId: number; componentUuid: string }[] }
+    { uuid: string; swaps: { portId: number; componentUuid: string }[]; modules?: { slotName: string; moduleClassName: string }[] }
   >({
-    mutationFn: (args) => api.loadout.calculate(args.uuid, args.swaps),
+    mutationFn: (args) => api.loadout.calculate(args.uuid, args.swaps, args.modules),
   });
+
+  // Group loadout.modules by slot_name and compute effective selections
+  const moduleSlots = useMemo<ShipModule[][]>(() => {
+    if (!loadout?.modules?.length) return [];
+    const map = new Map<string, ShipModule[]>();
+    for (const m of loadout.modules) {
+      if (!map.has(m.slot_name)) map.set(m.slot_name, []);
+      map.get(m.slot_name)!.push(m);
+    }
+    return Array.from(map.values());
+  }, [loadout?.modules]);
+
+  const effectiveModules = useMemo<ShipModule[]>(
+    () => moduleSlots.map(slot => {
+      const sel = selectedModules[slot[0].slot_name];
+      return slot.find(m => m.module_class_name === sel) ?? slot.find(m => Boolean(m.is_default)) ?? slot[0];
+    }),
+    [moduleSlots, selectedModules],
+  );
+
+  const activeModuleArgs = useMemo(
+    () => effectiveModules.map(m => ({ slotName: m.slot_name, moduleClassName: m.module_class_name })),
+    [effectiveModules],
+  );
 
   // Restore state from URL params on mount (?ship=UUID&swaps=portId:compUuid,...)
   // Falls back to Aurora Mk2 when no ?ship= param is present
@@ -593,6 +619,7 @@ export default function LoadoutManagerPage() {
     setSelectedShip(ship);
     setShipSearch('');
     setSwaps({});
+    setSelectedModules({});
     setActivePort(null);
     calculate({ uuid: ship.uuid, swaps: [] });
   }, [calculate]);
@@ -604,19 +631,32 @@ export default function LoadoutManagerPage() {
     setActivePort(null);
     calculate({
       uuid: selectedShip.uuid,
-      swaps: Object.entries(newSwaps).map(([portId, componentUuid]) => ({
-        portId: Number(portId),
-        componentUuid,
-      })),
+      swaps: Object.entries(newSwaps).map(([portId, componentUuid]) => ({ portId: Number(portId), componentUuid })),
+      modules: activeModuleArgs,
     });
-  }, [activePort, selectedShip, swaps, calculate]);
+  }, [activePort, selectedShip, swaps, calculate, activeModuleArgs]);
 
   const handleReset = useCallback(() => {
     if (!selectedShip) return;
     setSwaps({});
+    setSelectedModules({});
     setActivePort(null);
     calculate({ uuid: selectedShip.uuid, swaps: [] });
   }, [selectedShip, calculate]);
+
+  const handleModuleChange = useCallback((slotName: string, moduleClassName: string) => {
+    const newSelected = { ...selectedModules, [slotName]: moduleClassName };
+    setSelectedModules(newSelected);
+    const newEffective = moduleSlots.map(slot => {
+      const sel = newSelected[slot[0].slot_name];
+      return slot.find(m => m.module_class_name === sel) ?? slot.find(m => Boolean(m.is_default)) ?? slot[0];
+    });
+    calculate({
+      uuid: selectedShip!.uuid,
+      swaps: Object.entries(swaps).map(([portId, componentUuid]) => ({ portId: Number(portId), componentUuid })),
+      modules: newEffective.map(m => ({ slotName: m.slot_name, moduleClassName: m.module_class_name })),
+    });
+  }, [selectedModules, moduleSlots, selectedShip, swaps, calculate]);
 
   const copyLoadoutUrl = () => {
     if (!selectedShip) return;
@@ -645,7 +685,7 @@ export default function LoadoutManagerPage() {
   const qdSpoolTime = stats?.quantum?.spool_time || null;
   const ehp         = stats?.hull?.ehp || null;
   const missileDmg  = stats?.missiles?.total_damage ?? 0;
-  const hasSwaps    = Object.keys(swaps).length > 0;
+  const hasSwaps    = Object.keys(swaps).length > 0 || Object.keys(selectedModules).length > 0;
   const powerOverload = powerBalance < 0;
   const thermalOverload = thermalBalance < 0;
 
@@ -699,7 +739,7 @@ export default function LoadoutManagerPage() {
               </div>
               <p className="text-xs text-slate-500">{selectedShip.role} • {selectedShip.career}</p>
             </div>
-            <button onClick={() => { setSelectedShip(null); setSwaps({}); setActivePort(null); }} className="text-slate-600 hover:text-slate-300 transition-colors">
+            <button onClick={() => { setSelectedShip(null); setSwaps({}); setSelectedModules({}); setActivePort(null); }} className="text-slate-600 hover:text-slate-300 transition-colors">
               <X size={16} />
             </button>
           </div>
@@ -748,6 +788,46 @@ export default function LoadoutManagerPage() {
 
       {selectedShip && (
         <>
+          {/* Module slots (modular ships: Retaliator, Apollo, etc.) */}
+          {moduleSlots.length > 0 && (
+            <ScifiPanel title="Ship Modules" subtitle="Configure modular bays">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {moduleSlots.map(slot => {
+                  const active = effectiveModules.find(m => m.slot_name === slot[0].slot_name);
+                  const hasTiers = slot.some(m => m.module_tier !== null);
+                  const slotLabel = slot[0].slot_display_name
+                    ?? slot[0].slot_name.replace(/hardpoint_/i, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                  const sorted = [...slot].sort((a, b) => (a.module_tier ?? 0) - (b.module_tier ?? 0));
+                  return (
+                    <div key={slot[0].slot_name} className="space-y-2">
+                      <p className="text-[9px] font-mono-sc text-slate-500 uppercase tracking-wider">{slotLabel}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {sorted.map(m => (
+                          <button
+                            key={m.module_class_name}
+                            type="button"
+                            onClick={() => handleModuleChange(m.slot_name, m.module_class_name)}
+                            className={[
+                              'px-2 py-0.5 text-[9px] font-mono-sc rounded-sm border transition-colors',
+                              active?.module_class_name === m.module_class_name
+                                ? 'bg-purple-900/50 border-purple-500 text-purple-200'
+                                : 'bg-slate-900/40 border-slate-700 text-slate-400 hover:border-purple-700 hover:text-purple-300',
+                            ].join(' ')}
+                          >
+                            {hasTiers ? `T${m.module_tier}` : (m.module_name ?? m.module_class_name)}
+                          </button>
+                        ))}
+                      </div>
+                      {active && (
+                        <p className="text-[10px] font-semibold text-slate-300 leading-tight">{active.module_name ?? active.module_class_name}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </ScifiPanel>
+          )}
+
           {/* Stats summary */}
           {isPending ? (
             <LoadingGrid message="COMPUTING LOADOUT…" />

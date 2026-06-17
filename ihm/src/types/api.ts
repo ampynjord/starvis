@@ -1281,7 +1281,7 @@ export interface LoadoutResult {
   };
   hardpoints: HardpointEntry[];
   loadout: LoadoutPortEntry[];
-  modules: unknown[];
+  modules: ShipModule[];
   paints: unknown[];
 }
 

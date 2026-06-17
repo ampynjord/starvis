@@ -48,10 +48,10 @@ export function mountSearchRoutes(router: Router, deps: RouteDependencies): void
     '/api/v1/loadout/calculate',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const { shipUuid, swaps } = LoadoutBody.parse(req.body);
+      const { shipUuid, swaps, modules } = LoadoutBody.parse(req.body);
       const uuid = await resolveShipUuid(shipUuid);
       if (!uuid) return void res.status(404).json({ success: false, error: 'Ship not found' });
-      const result = await gameDataService!.loadouts.calculateLoadout(uuid, swaps);
+      const result = await gameDataService!.loadouts.calculateLoadout(uuid, swaps, modules);
       res.json({ success: true, data: result });
     }),
   );

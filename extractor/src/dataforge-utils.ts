@@ -177,7 +177,7 @@ export function classifyPort(portName: string, compClassName: string): string {
     )
       return 'WeaponGun';
     if (cc.includes('mount_gimbal_') || cc.includes('mount_fixed_')) return 'Gimbal';
-    if (cc.includes('turret_') || cc.startsWith('vtol_')) return 'Turret';
+    if (cc.includes('turret') || cc.startsWith('vtol_')) return 'Turret';
     if (cc.includes('mrck_') || cc.includes('missilerack')) return 'MissileRack';
   }
 

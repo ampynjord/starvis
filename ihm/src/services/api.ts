@@ -527,8 +527,11 @@ export const api = {
 
   // ─── Loadout simulator ─────────────────────────────────────────────
   loadout: {
-    calculate: (shipUuid: string, swaps: { portId?: number; portName?: string; componentUuid: string }[]) =>
-      post<LoadoutResult>('/loadout/calculate', { shipUuid, swaps }),
+    calculate: (
+      shipUuid: string,
+      swaps: { portId?: number; portName?: string; componentUuid: string }[],
+      modules?: { slotName: string; moduleClassName: string }[],
+    ) => post<LoadoutResult>('/loadout/calculate', { shipUuid, swaps, modules }),
   },
 
   // ─── Calculators ───────────────────────────────────────────────────
