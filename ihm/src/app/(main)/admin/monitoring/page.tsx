@@ -284,6 +284,8 @@ function actorLabel(log: RequestLogEntry) {
   if (log.apiTokenName) return `${log.apiTokenName}${log.username ? ` · ${log.username}` : ''}`;
   if (log.username) return `${log.username}${log.role ? ` · ${log.role}` : ''}`;
   if (log.userId) return `${log.role ?? 'user'} #${log.userId}`;
+  if (log.internalClient) return log.internalClient;
+  if (log.authMethod === 'admin_key') return 'Starvis IHM';
   return 'anonymous';
 }
 
