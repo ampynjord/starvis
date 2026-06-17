@@ -53,39 +53,41 @@
       "slotName": "hardpoint_module_command",
       "slotType": "command",
       "modulePrefix": "DRAK_Caterpillar_Module_Command_",
-      "defaultContains": "Command"
+      "defaultContains": "Command",
+      "silent": true
     },
-    { "slotName": "hardpoint_module_01", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo" },
-    { "slotName": "hardpoint_module_02", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo" },
-    { "slotName": "hardpoint_module_03", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo" },
-    { "slotName": "hardpoint_module_04", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo" }
+    { "slotName": "hardpoint_module_01", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo", "silent": true },
+    { "slotName": "hardpoint_module_02", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo", "silent": true },
+    { "slotName": "hardpoint_module_03", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo", "silent": true },
+    { "slotName": "hardpoint_module_04", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo", "silent": true }
   ],
   "RSI_Galaxy": [
-    { "slotName": "hardpoint_module_bay", "slotType": "bay", "modulePrefix": "RSI_Galaxy_Module_", "defaultContains": "Cargo" }
+    { "slotName": "hardpoint_module_bay", "slotType": "bay", "modulePrefix": "RSI_Galaxy_Module_", "defaultContains": "Cargo", "silent": true }
   ],
   "CNOU_Ironclad": [
-    { "slotName": "hardpoint_module_front", "slotType": "front", "modulePrefix": "CNOU_Ironclad_Module_", "defaultContains": "Cargo" },
-    { "slotName": "hardpoint_module_mid", "slotType": "mid", "modulePrefix": "CNOU_Ironclad_Module_", "defaultContains": "Cargo" }
+    { "slotName": "hardpoint_module_front", "slotType": "front", "modulePrefix": "CNOU_Ironclad_Module_", "defaultContains": "Cargo", "silent": true },
+    { "slotName": "hardpoint_module_mid", "slotType": "mid", "modulePrefix": "CNOU_Ironclad_Module_", "defaultContains": "Cargo", "silent": true }
   ],
   "CNOU_Ironclad_Assault": [
-    { "slotName": "hardpoint_module_front", "slotType": "front", "modulePrefix": "CNOU_Ironclad_Module_", "defaultContains": "Cargo" },
-    { "slotName": "hardpoint_module_mid", "slotType": "mid", "modulePrefix": "CNOU_Ironclad_Module_", "defaultContains": "Cargo" }
+    { "slotName": "hardpoint_module_front", "slotType": "front", "modulePrefix": "CNOU_Ironclad_Module_", "defaultContains": "Cargo", "silent": true },
+    { "slotName": "hardpoint_module_mid", "slotType": "mid", "modulePrefix": "CNOU_Ironclad_Module_", "defaultContains": "Cargo", "silent": true }
   ],
   "MISC_Hull_C": [
-    { "slotName": "hardpoint_cargo_01", "slotType": "cargo", "modulePrefix": "MISC_HullC_Module_", "defaultContains": "Cargo" }
+    { "slotName": "hardpoint_cargo_01", "slotType": "cargo", "modulePrefix": "MISC_HullC_Module_", "defaultContains": "Cargo", "silent": true }
   ],
   "MISC_Pioneer": [
     {
       "slotName": "hardpoint_module_01",
       "slotType": "fabrication",
       "modulePrefix": "MISC_Pioneer_Module_",
-      "defaultContains": "Fabrication"
+      "defaultContains": "Fabrication",
+      "silent": true
     }
   ],
   "ORIG_600i_Explorer": [
-    { "slotName": "hardpoint_module_cabin", "slotType": "cabin", "modulePrefix": "ORIG_600i_Module_", "defaultContains": "Cabin" }
+    { "slotName": "hardpoint_module_cabin", "slotType": "cabin", "modulePrefix": "ORIG_600i_Module_", "defaultContains": "Cabin", "silent": true }
   ],
   "ORIG_600i_Touring": [
-    { "slotName": "hardpoint_module_cabin", "slotType": "cabin", "modulePrefix": "ORIG_600i_Module_", "defaultContains": "Cabin" }
+    { "slotName": "hardpoint_module_cabin", "slotType": "cabin", "modulePrefix": "ORIG_600i_Module_", "defaultContains": "Cabin", "silent": true }
   ]
 }
