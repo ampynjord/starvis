@@ -2179,6 +2179,26 @@
             "type": "string",
             "nullable": true,
             "description": "Human-readable item name resolved from extracted game data when available."
+          },
+          "source": {
+            "type": "string",
+            "nullable": true,
+            "description": "Optional fleet item source, e.g. rsi_hangar for browser-extension synchronized entries."
+          },
+          "sourceExternalId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Stable external id from the source system."
+          },
+          "sourceLabel": {
+            "type": "string",
+            "nullable": true,
+            "description": "Human-readable label captured from the source."
+          },
+          "sourceSyncedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
@@ -2956,6 +2976,105 @@
               "role": {
                 "$ref": "#/components/schemas/UserRole"
               }
+            }
+          }
+        }
+      },
+      "RsiHangarSyncSession": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Short-lived token scoped to RSI hangar sync."
+          },
+          "expiresInSeconds": {
+            "type": "integer",
+            "example": 600
+          }
+        }
+      },
+      "RsiHangarSyncEntry": {
+        "type": "object",
+        "properties": {
+          "externalId": {
+            "type": "string",
+            "description": "Stable RSI hangar item id or extension-generated id."
+          },
+          "name": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "className": {
+            "type": "string",
+            "description": "Known Star Citizen ship class name when the extension can read it."
+          },
+          "shipUuid": {
+            "type": "string",
+            "nullable": true
+          },
+          "packageName": {
+            "type": "string",
+            "nullable": true
+          },
+          "imageUrl": {
+            "type": "string",
+            "nullable": true
+          },
+          "url": {
+            "type": "string",
+            "nullable": true
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1
+          },
+          "raw": {
+            "type": "object",
+            "additionalProperties": true,
+            "nullable": true
+          }
+        }
+      },
+      "RsiHangarSyncResult": {
+        "type": "object",
+        "properties": {
+          "syncedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "imported": {
+            "type": "integer"
+          },
+          "updated": {
+            "type": "integer"
+          },
+          "removed": {
+            "type": "integer"
+          },
+          "unmatched": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "externalId": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CorporationFleetItem"
             }
           }
         }
@@ -14335,6 +14454,111 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/corp/fleet/rsi-sync/session": {
+      "post": {
+        "tags": ["Corporations"],
+        "summary": "Create a short-lived RSI hangar sync token",
+        "operationId": "createRsiHangarSyncSession",
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {
+            "cookieAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sync session token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/RsiHangarSyncSession"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/corp/fleet/rsi-sync": {
+      "post": {
+        "tags": ["Corporations"],
+        "summary": "Mirror RSI hangar entries into the current user fleet",
+        "description": "Called by the Starvis browser extension. The token is created by /corp/fleet/rsi-sync/session and expires quickly. Only entries with source rsi_hangar are upserted or removed; manual fleet declarations are preserved.",
+        "operationId": "syncRsiHangarFleet",
+        "parameters": [
+          {
+            "name": "X-Starvis-RSI-Sync-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["entries"],
+                "properties": {
+                  "syncToken": {
+                    "type": "string"
+                  },
+                  "entries": {
+                    "type": "array",
+                    "maxItems": 500,
+                    "items": {
+                      "$ref": "#/components/schemas/RsiHangarSyncEntry"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sync result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/RsiHangarSyncResult"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
           }
         }
       }

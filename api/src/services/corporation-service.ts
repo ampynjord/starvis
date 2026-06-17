@@ -51,11 +51,38 @@ export interface FleetItemData {
   quantity: number;
   notes: string | null;
   availableForTactics: boolean;
+  source?: string | null;
+  sourceExternalId?: string | null;
+  sourceLabel?: string | null;
+  sourceSyncedAt?: Date | null;
   addedById: number | null;
   addedAt: Date;
   updatedAt: Date;
   addedBy?: { id: number; username: string } | null;
   corporation?: { id: number; name: string; tag: string } | null;
+}
+
+export interface RsiHangarSyncEntry {
+  externalId?: unknown;
+  name?: unknown;
+  label?: unknown;
+  title?: unknown;
+  className?: unknown;
+  shipUuid?: unknown;
+  packageName?: unknown;
+  imageUrl?: unknown;
+  url?: unknown;
+  quantity?: unknown;
+  raw?: unknown;
+}
+
+export interface RsiHangarSyncResult {
+  syncedAt: Date;
+  imported: number;
+  updated: number;
+  removed: number;
+  unmatched: Array<{ externalId: string; label: string }>;
+  items: FleetItemData[];
 }
 
 const CORP_SELECT = {
@@ -100,11 +127,55 @@ const FLEET_SELECT = {
   gridX: true,
   gridZ: true,
   availableForTactics: true,
+  source: true,
+  sourceExternalId: true,
+  sourceLabel: true,
+  sourceSyncedAt: true,
   addedById: true,
   addedAt: true,
   updatedAt: true,
   addedBy: { select: { id: true, username: true } },
 };
+
+function cleanString(value: unknown, maxLength = 255): string | null {
+  if (typeof value !== 'string') return null;
+  const clean = value.replace(/\s+/g, ' ').trim();
+  return clean ? clean.slice(0, maxLength) : null;
+}
+
+function normalizeSearchText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function stableExternalId(entry: RsiHangarSyncEntry, index: number): string {
+  const explicit = cleanString(entry.externalId, 160);
+  if (explicit) return explicit;
+  const basis = [entry.shipUuid, entry.className, entry.name, entry.label, entry.title, entry.packageName, entry.url]
+    .map((value) => cleanString(value, 80))
+    .filter(Boolean)
+    .join('|');
+  return (basis || `rsi-hangar-item-${index}`).slice(0, 160);
+}
+
+function safePayload(entry: RsiHangarSyncEntry): Record<string, unknown> {
+  return {
+    externalId: cleanString(entry.externalId, 160),
+    name: cleanString(entry.name),
+    label: cleanString(entry.label),
+    title: cleanString(entry.title),
+    className: cleanString(entry.className),
+    shipUuid: cleanString(entry.shipUuid, 64),
+    packageName: cleanString(entry.packageName),
+    imageUrl: cleanString(entry.imageUrl, 500),
+    url: cleanString(entry.url, 500),
+    quantity: Number.isInteger(Number(entry.quantity)) ? Math.max(1, Number(entry.quantity)) : 1,
+    raw: typeof entry.raw === 'object' && entry.raw !== null ? entry.raw : undefined,
+  };
+}
 
 export class CorporationService {
   constructor(private readonly prisma: PrismaLike) {}
@@ -147,6 +218,51 @@ export class CorporationService {
     )) as Array<{ class_name: string; name: string | null }>;
     const nameByClass = new Map<string, string | null>(rows.map((row) => [String(row.class_name), row.name]));
     return items.map((item) => ({ ...item, itemName: nameByClass.get(item.itemClassName) ?? null }));
+  }
+
+  private async findShipMatch(entry: RsiHangarSyncEntry, env = 'live'): Promise<{ uuid: string | null; className: string; name: string }> {
+    const explicitUuid = cleanString(entry.shipUuid, 64);
+    const explicitClass = cleanString(entry.className);
+    const label =
+      cleanString(entry.name) ?? cleanString(entry.label) ?? cleanString(entry.title) ?? explicitClass ?? 'Unknown RSI hangar item';
+
+    if (explicitUuid) {
+      const rows = (await this.db.$queryRawUnsafe(
+        toPostgres('SELECT uuid, class_name, name FROM game.ships WHERE env = ? AND uuid = ? LIMIT 1'),
+        env,
+        explicitUuid,
+      )) as Array<{ uuid: string; class_name: string; name: string }>;
+      if (rows[0]) return { uuid: rows[0].uuid, className: rows[0].class_name, name: rows[0].name };
+    }
+
+    if (explicitClass) {
+      const rows = (await this.db.$queryRawUnsafe(
+        toPostgres('SELECT uuid, class_name, name FROM game.ships WHERE env = ? AND lower(class_name) = lower(?) LIMIT 1'),
+        env,
+        explicitClass,
+      )) as Array<{ uuid: string; class_name: string; name: string }>;
+      if (rows[0]) return { uuid: rows[0].uuid, className: rows[0].class_name, name: rows[0].name };
+    }
+
+    const searchLabels = [entry.name, entry.label, entry.title]
+      .map((value) => cleanString(value))
+      .filter((value): value is string => !!value);
+    if (searchLabels.length) {
+      const rows = (await this.db.$queryRawUnsafe(
+        toPostgres('SELECT uuid, class_name, name FROM game.ships WHERE env = ?'),
+        env,
+      )) as Array<{ uuid: string; class_name: string; name: string }>;
+      const normalizedLabels = searchLabels.map(normalizeSearchText).filter(Boolean);
+      const match = rows.find((row) => normalizedLabels.includes(normalizeSearchText(row.name)));
+      if (match) return { uuid: match.uuid, className: match.class_name, name: match.name };
+      const contained = rows.find((row) => {
+        const rowName = normalizeSearchText(row.name);
+        return normalizedLabels.some((candidate) => candidate.includes(rowName) || rowName.includes(candidate));
+      });
+      if (contained) return { uuid: contained.uuid, className: contained.class_name, name: contained.name };
+    }
+
+    return { uuid: null, className: explicitClass ?? label.slice(0, 255), name: label };
   }
 
   // ── Corporations ────────────────────────────────────────────────────────────
@@ -563,6 +679,89 @@ export class CorporationService {
       },
       select: { ...FLEET_SELECT, shipUuid: true } as typeof FLEET_SELECT,
     });
+  }
+
+  async syncRsiHangarFleet(userId: number, corporationId: number | null, entries: RsiHangarSyncEntry[]): Promise<RsiHangarSyncResult> {
+    const syncedAt = new Date();
+    const normalized = entries.slice(0, 500).map((entry, index) => ({
+      entry,
+      externalId: stableExternalId(entry, index),
+    }));
+    const existing = await this.db.corporationFleetItem.findMany({
+      where: {
+        addedById: userId,
+        corporationId,
+        itemType: 'ship',
+        source: 'rsi_hangar',
+      },
+      select: { id: true, sourceExternalId: true },
+    });
+
+    const existingIds = new Set(existing.map((item: any) => item.sourceExternalId).filter(Boolean));
+    const touchedIds = new Set<string>();
+    const unmatched: Array<{ externalId: string; label: string }> = [];
+    let imported = 0;
+    let updated = 0;
+
+    const run = async (tx: any) => {
+      for (const item of normalized) {
+        touchedIds.add(item.externalId);
+        const match = await this.findShipMatch(item.entry);
+        const label =
+          match.name || cleanString(item.entry.name) || cleanString(item.entry.label) || cleanString(item.entry.title) || match.className;
+        if (!match.uuid) unmatched.push({ externalId: item.externalId, label });
+        const payload = safePayload(item.entry);
+        const quantity = Number.isInteger(Number(item.entry.quantity)) ? Math.max(1, Number(item.entry.quantity)) : 1;
+
+        await tx.corporationFleetItem.upsert({
+          where: {
+            addedById_source_sourceExternalId: {
+              addedById: userId,
+              source: 'rsi_hangar',
+              sourceExternalId: item.externalId,
+            },
+          },
+          create: {
+            corporationId,
+            itemType: 'ship',
+            itemClassName: match.className,
+            shipUuid: match.uuid,
+            quantity,
+            notes: null,
+            source: 'rsi_hangar',
+            sourceExternalId: item.externalId,
+            sourceLabel: label,
+            sourcePayload: payload,
+            sourceSyncedAt: syncedAt,
+            addedById: userId,
+          },
+          update: {
+            corporationId,
+            itemClassName: match.className,
+            shipUuid: match.uuid,
+            quantity,
+            sourceLabel: label,
+            sourcePayload: payload,
+            sourceSyncedAt: syncedAt,
+          },
+        });
+
+        if (existingIds.has(item.externalId)) updated += 1;
+        else imported += 1;
+      }
+
+      const staleIds = existing
+        .filter((item: any) => item.sourceExternalId && !touchedIds.has(item.sourceExternalId))
+        .map((item: any) => Number(item.id));
+      if (staleIds.length) {
+        await tx.corporationFleetItem.deleteMany({ where: { id: { in: staleIds } } });
+      }
+      return staleIds.length;
+    };
+
+    const removed = typeof this.db.$transaction === 'function' ? await this.db.$transaction(run) : await run(this.db);
+    const items = await this.getFleetItems(corporationId, 'ship', userId);
+    return { syncedAt, imported, updated, removed, unmatched, items };
   }
 
   async removeOwnFleetItem(itemId: number, userId: number, isAdmin = false): Promise<void> {

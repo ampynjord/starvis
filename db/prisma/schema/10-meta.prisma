@@ -268,6 +268,11 @@ model CorporationFleetItem {
   gridX               Float?        @map("grid_x")
   gridZ               Float?        @map("grid_z")
   availableForTactics Boolean       @default(false) @map("available_for_tactics")
+  source              String?       @db.VarChar(40)
+  sourceExternalId    String?       @map("source_external_id") @db.VarChar(160)
+  sourceLabel         String?       @map("source_label") @db.VarChar(255)
+  sourcePayload       Json?         @map("source_payload")
+  sourceSyncedAt      DateTime?     @map("source_synced_at")
   addedById           Int?          @map("added_by_id")
   addedAt             DateTime      @default(now()) @map("added_at")
   updatedAt           DateTime      @updatedAt @map("updated_at")
@@ -275,8 +280,10 @@ model CorporationFleetItem {
   corporation Corporation? @relation(fields: [corporationId], references: [id], onDelete: Cascade)
   addedBy     User?        @relation("AddedFleetItems", fields: [addedById], references: [id], onDelete: SetNull)
 
+  @@unique([addedById, source, sourceExternalId], map: "corporation_fleet_items_added_by_id_source_source_external__key")
   @@index([corporationId])
   @@index([addedById, itemType])
+  @@index([source, sourceSyncedAt])
   @@map("corporation_fleet_items")
   @@schema("meta")
 }
