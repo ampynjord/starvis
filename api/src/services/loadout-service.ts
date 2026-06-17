@@ -737,6 +737,7 @@ export class LoadoutService {
   async calculateLoadout(
     shipUuid: string,
     swaps: { portId?: number; portName?: string; componentUuid: string }[],
+    modules: { slotName: string; moduleClassName: string }[] = [],
   ): Promise<Record<string, unknown>> {
     // 1. Load ship
     const ship = await this.getShipRow(shipUuid);
@@ -748,6 +749,92 @@ export class LoadoutService {
     // 3. Load ALL loadout ports
     const loadoutRows = await this.getLoadoutRows(shipUuid);
     const loadout: Row[] = loadoutRows.map((row) => ({ ...row }) as Row);
+
+    // 3b. Apply module selections (replaces children of module slots with chosen module ports)
+    if (modules.length > 0) {
+      const prisma = this.getClient('live');
+      const classPh = modules.map(() => '?').join(',');
+      const moduleDbRows = await prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT * FROM game.ship_modules WHERE ship_uuid = ? AND env = ? AND module_class_name IN (${classPh})`),
+        shipUuid,
+        'live',
+        ...modules.map((m) => m.moduleClassName),
+      );
+      const modulesByClassName = new Map<string, Row>(moduleDbRows.map((r) => [String(r.module_class_name), r]));
+
+      type PortEntry = { portName: string; portType?: string; componentClassName?: string | null; children?: PortEntry[] };
+      let nextSyntheticId = -10000;
+
+      for (const { slotName, moduleClassName } of modules) {
+        const slotRow = loadout.find((r) => r.port_name === slotName);
+        if (!slotRow) continue;
+        const moduleDbRow = modulesByClassName.get(moduleClassName);
+        if (!moduleDbRow?.loadout_json) continue;
+
+        const modulePorts: PortEntry[] = JSON.parse(String(moduleDbRow.loadout_json));
+
+        // Collect all component class names from the module ports (recursive)
+        const classNames: string[] = [];
+        const collectClassNames = (ports: PortEntry[]) => {
+          for (const p of ports) {
+            if (p.componentClassName) classNames.push(p.componentClassName);
+            if (p.children?.length) collectClassNames(p.children);
+          }
+        };
+        collectClassNames(modulePorts);
+
+        // Look up components by class_name
+        const compByClassName = new Map<string, Row>();
+        if (classNames.length > 0) {
+          const cph = classNames.map(() => '?').join(',');
+          const compRows = await prisma.$queryRawUnsafe<Row[]>(
+            toPostgres(`SELECT * FROM game.components WHERE class_name IN (${cph}) AND env = ?`),
+            ...classNames,
+            'live',
+          );
+          for (const c of compRows) compByClassName.set(String(c.class_name), c);
+        }
+
+        // Remove all existing descendants of this slot from loadout
+        const slotId = Number(slotRow.id);
+        const toRemove = new Set<number>();
+        const descQueue = [slotId];
+        while (descQueue.length) {
+          const pid = descQueue.shift()!;
+          for (const r of loadout) {
+            if (Number(r.parent_id) === pid) {
+              toRemove.add(Number(r.id));
+              descQueue.push(Number(r.id));
+            }
+          }
+        }
+        for (let i = loadout.length - 1; i >= 0; i--) {
+          if (toRemove.has(Number(loadout[i].id))) loadout.splice(i, 1);
+        }
+
+        // Inject synthetic rows for the selected module's ports
+        const injectPorts = (ports: PortEntry[], parentId: number) => {
+          for (const p of ports) {
+            const myId = nextSyntheticId--;
+            const comp = p.componentClassName ? compByClassName.get(p.componentClassName) : null;
+            loadout.push({
+              id: myId,
+              port_name: p.portName,
+              port_type: p.portType ?? 'Other',
+              port_min_size: null,
+              port_max_size: null,
+              parent_id: parentId,
+              component_uuid: comp?.uuid ?? null,
+              component_class_name: p.componentClassName ?? null,
+              port_editable: 0,
+              ...(comp ?? {}),
+            });
+            if (p.children?.length) injectPorts(p.children, myId);
+          }
+        };
+        injectPorts(modulePorts, slotId);
+      }
+    }
 
     // 4. Apply swaps
     if (swaps.length) {
@@ -835,7 +922,7 @@ export class LoadoutService {
       });
 
     // 8. Load modules & paints
-    const modules = await this.getShipModules(shipUuid);
+    const shipModules = await this.getShipModules(shipUuid);
     const paints = await this.getShipPaints(shipUuid);
 
     return {
@@ -844,7 +931,7 @@ export class LoadoutService {
       stats,
       hardpoints,
       loadout: filteredLoadout,
-      modules,
+      modules: shipModules,
       paints,
     };
   }

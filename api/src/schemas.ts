@@ -112,6 +112,10 @@ export const LoadoutBody = z.object({
         .refine((s) => s.portId || s.portName, { message: 'portId or portName required' }),
     )
     .default([]),
+  modules: z
+    .array(z.object({ slotName: z.string().min(1), moduleClassName: z.string().min(1) }))
+    .optional()
+    .default([]),
 });
 
 export const SearchQuery = z.object({ env: qEnv, search: qStr, format: qStr }).passthrough();
