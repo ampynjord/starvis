@@ -45,7 +45,7 @@ export async function serverApiHeaders(includeJson = false): Promise<Record<stri
   const token = await getAuthToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   if (SERVER_API_KEY) headers['X-API-Key'] = SERVER_API_KEY;
-  if (SERVER_API_KEY) headers['X-Starvis-Internal-Client'] = 'ihm-route-handler';
+  if (SERVER_API_KEY) headers['X-Starvis-Internal-Client'] = 'Starvis-IHM';
   if (includeJson) headers['Content-Type'] = 'application/json';
   return { ...(await forwardedClientHeaders()), ...headers };
 }
