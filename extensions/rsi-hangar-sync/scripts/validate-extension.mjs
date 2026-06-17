@@ -11,8 +11,17 @@ const required = [
   'src/rsi-hangar-content.js',
 ];
 
+const matchPattern = /^(https?|wss?|file|ftp|\*):\/\/(\*|\*\.[^*/]+|[^*/]+)\/.*$/;
+
 for (const file of required) {
   await readFile(join(root, file), 'utf8');
+}
+
+function assertValidPattern(manifestFile, pattern) {
+  if (pattern === '<all_urls>') return;
+  if (!matchPattern.test(pattern)) {
+    throw new Error(`${manifestFile}: invalid extension match pattern "${pattern}"`);
+  }
 }
 
 for (const manifestFile of ['manifest.chrome.json', 'manifest.firefox.json']) {
@@ -27,5 +36,13 @@ for (const manifestFile of ['manifest.chrome.json', 'manifest.firefox.json']) {
   if (!manifest.permissions?.includes('tabs')) throw new Error(`${manifestFile}: tabs permission missing`);
   if (!manifest.host_permissions?.some((host) => host.includes('robertsspaceindustries.com'))) {
     throw new Error(`${manifestFile}: RSI host permission missing`);
+  }
+  for (const pattern of manifest.host_permissions ?? []) {
+    assertValidPattern(manifestFile, pattern);
+  }
+  for (const script of manifest.content_scripts ?? []) {
+    for (const pattern of script.matches ?? []) {
+      assertValidPattern(manifestFile, pattern);
+    }
   }
 }

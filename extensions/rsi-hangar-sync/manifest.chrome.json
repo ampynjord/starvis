@@ -7,15 +7,15 @@
   "host_permissions": [
     "https://robertsspaceindustries.com/*",
     "https://starvis.ampynjord.bzh/*",
-    "http://localhost:*/*",
-    "http://127.0.0.1:*/*"
+    "http://localhost/*",
+    "http://127.0.0.1/*"
   ],
   "background": {
     "service_worker": "src/background.js"
   },
   "content_scripts": [
     {
-      "matches": ["https://starvis.ampynjord.bzh/*", "http://localhost:*/*", "http://127.0.0.1:*/*"],
+      "matches": ["https://starvis.ampynjord.bzh/*", "http://localhost/*", "http://127.0.0.1/*"],
       "js": ["src/starvis-content.js"],
       "run_at": "document_start"
     },
