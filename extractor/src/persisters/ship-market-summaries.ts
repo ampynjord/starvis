@@ -7,7 +7,7 @@ export type ShipMarketSummaryStats = {
   noTerminalOffer: number;
 };
 
-export async function updateShipMarketSummaries(ctx: PersistContext): Promise<ShipMarketSummaryStats> {
+export async function updateShipMarketSummaries(ctx: Pick<PersistContext, 'conn' | 'env'>): Promise<ShipMarketSummaryStats> {
   const { rows } = await ctx.conn.query<{
     ships: string;
     purchasable: string;
