@@ -39,6 +39,7 @@ import { saveMiningData } from './persisters/mining.js';
 import { saveMissionBlueprintLinks, saveMissions } from './persisters/missions.js';
 import { savePaints } from './persisters/paints.js';
 import { saveOfficialShipGalleries } from './persisters/ship-galleries.js';
+import { updateShipMarketSummaries } from './persisters/ship-market-summaries.js';
 import { saveShips } from './persisters/ships.js';
 import { saveShopsData } from './persisters/shops.js';
 import { saveStarmapAssets } from './persisters/starmap-assets.js';
@@ -349,6 +350,12 @@ export class ExtractionService {
         const pruned = await pruneExcludedVariants(conn, env);
         if (pruned > 0) onProgress?.(`Pruned ${pruned} excluded variant ships`);
         await applyHullSeriesCargoFallback(conn, env);
+        // Recompute ship market summaries from existing shop inventory data whenever
+        // ships are re-extracted, even when the shops module is not in this run.
+        if (!run('shops')) {
+          const mkt = await updateShipMarketSummaries({ conn, env });
+          onProgress?.(`Market summaries: ${mkt.purchasable} purchasable, ${mkt.rentable} rentable`);
+        }
       }
 
       // 6b. Scrape CTM (3D model) URLs — after cross-reference so ship_matrix_id is populated
