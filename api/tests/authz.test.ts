@@ -286,10 +286,9 @@ describe('external API authorization', () => {
     expect(res.body.role).toBe('developer');
   });
 
-  it('allows trusted server-to-server /api/v1 calls with X-Api-Key', async () => {
+  it('rejects server-to-server /api/v1 calls with X-Api-Key (JWT only)', async () => {
     const res = await request(app).get('/api/v1/protected-data').set('X-Api-Key', ADMIN_API_KEY);
-    expect(res.status).toBe(200);
-    expect(res.body.actor).toBeNull();
+    expect(res.status).toBe(401);
   });
 });
 
