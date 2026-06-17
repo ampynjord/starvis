@@ -96,12 +96,25 @@ export async function requireJwt(req: Request, res: Response, next: NextFunction
 
 /**
  * requireExternalApiAccess — protects the documented external /api/v1 surface.
- * Only accepts a signed-in web session JWT or a generated Bearer API token.
- * ADMIN_API_KEY is intentionally NOT accepted here — use requireInternalOrAdmin
- * for server-to-server routes (IHM proxy, bot, audit scripts).
+ * Accepted callers:
+ *  - Bearer JWT (web session or generated API token)
+ *  - X-API-Key: SERVER_API_KEY — trusted internal callers (IHM proxy, CI audit)
+ * ADMIN_API_KEY is intentionally NOT accepted here.
  */
 export async function requireExternalApiAccess(req: Request, res: Response, next: NextFunction) {
   applyInternalClientMarker(req);
+
+  // Allow trusted internal callers that already share SERVER_API_KEY (IHM, CI audit).
+  const apiKey = String(req.headers['x-api-key'] || '');
+  if (apiKey && process.env.SERVER_API_KEY) {
+    const a = Buffer.from(apiKey);
+    const b = Buffer.from(process.env.SERVER_API_KEY);
+    if (a.length === b.length && timingSafeEqual(a, b)) {
+      req.authMethod = 'admin_key';
+      return next();
+    }
+  }
+
   if (!process.env.JWT_SECRET) {
     return res.status(500).json({ success: false, error: 'Server misconfiguration: JWT_SECRET not set' });
   }
