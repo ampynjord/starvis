@@ -78,9 +78,20 @@ async function scrapeHangar() {
 }
 
 const runtimeApi = globalThis.browser ?? globalThis.chrome;
+const usesPromiseApi = runtimeApi === globalThis.browser;
 
 runtimeApi.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type !== 'STARVIS_SCRAPE_RSI_HANGAR') return false;
+
+  if (usesPromiseApi) {
+    return scrapeHangar()
+      .then((entries) => ({ success: true, entries }))
+      .catch((error) => ({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unable to scrape RSI hangar',
+      }));
+  }
+
   scrapeHangar()
     .then((entries) => sendResponse({ success: true, entries }))
     .catch((error) => sendResponse({ success: false, error: error instanceof Error ? error.message : 'Unable to scrape RSI hangar' }));
