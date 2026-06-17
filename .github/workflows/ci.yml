@@ -530,5 +530,5 @@ jobs:
 
       - name: Audit production API data
         env:
-          STARVIS_AUDIT_API_KEY: ${{ secrets.SERVER_API_KEY }}
+          STARVIS_AUDIT_API_KEY: ${{ secrets.STARVIS_AUDIT_API_KEY }}
         run: npm run quality:audit:data:prod
