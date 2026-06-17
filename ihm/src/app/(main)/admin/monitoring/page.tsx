@@ -639,6 +639,8 @@ export default function AdminMonitoringPage() {
                       <th className="px-3 py-2 font-normal">Project</th>
                       <th className="px-3 py-2 font-normal">Owner</th>
                       <th className="px-3 py-2 font-normal">Status</th>
+                      <th className="px-3 py-2 font-normal">Created</th>
+                      <th className="px-3 py-2 font-normal">Expires</th>
                       <th className="px-3 py-2 text-right font-normal">Recent</th>
                       <th className="px-3 py-2 text-right font-normal">Total</th>
                       <th className="px-3 py-2 font-normal">Last used</th>
@@ -662,6 +664,8 @@ export default function AdminMonitoringPage() {
                             {project.connected ? 'connected' : project.status}
                           </span>
                         </td>
+                        <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtDateTime(project.createdAt)}</td>
+                        <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtDateTime(project.expiresAt)}</td>
                         <td className="px-3 py-2 text-right font-mono-sc text-xs text-cyan-400">{project.recentRequests.toLocaleString()}</td>
                         <td className="px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{project.usageCount.toLocaleString()}</td>
                         <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtDateTime(project.lastUsedAt)}</td>

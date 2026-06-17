@@ -566,6 +566,8 @@ export default function DeveloperPage() {
                     <tr className="border-b border-slate-800/70 bg-slate-950/40 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
                       <th className="px-3 py-2 font-normal">Project</th>
                       <th className="px-3 py-2 font-normal">Status</th>
+                      <th className="px-3 py-2 font-normal">Created</th>
+                      <th className="px-3 py-2 font-normal">Expires</th>
                       <th className="px-3 py-2 text-right font-normal">Usage</th>
                       <th className="px-3 py-2 font-normal">Last used</th>
                       <th className="px-3 py-2 font-normal">Client</th>
@@ -586,6 +588,8 @@ export default function DeveloperPage() {
                               {status}
                             </span>
                           </td>
+                          <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtDateTime(token.createdAt)}</td>
+                          <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtDateTime(token.expiresAt)}</td>
                           <td className="px-3 py-2 text-right font-mono-sc text-xs text-cyan-400">{token.usageCount.toLocaleString()}</td>
                           <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtDateTime(token.lastUsedAt)}</td>
                           <td className="px-3 py-2">
