@@ -7,13 +7,14 @@
     "ihm",
     "extractor",
     "bot",
-    "db"
+    "db",
+    "extensions/rsi-hangar-sync"
   ],
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "lint:ci": "npm exec -- biome ci .github README.md LICENSE package.json package-lock.json biome.json api bot db extractor ihm quality",
+    "lint:ci": "npm exec -- biome ci .github README.md LICENSE package.json package-lock.json biome.json api bot db extractor ihm extensions quality",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "db:generate": "npm run generate --workspace=@starvis/db",

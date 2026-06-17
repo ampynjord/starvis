@@ -9,6 +9,8 @@ The schema folder is split by ownership boundary:
 
 Keep new models in the domain that owns the source of truth. Prefer explicit cross-source IDs over duplicated data, such as `game.ships.ship_matrix_id` and `game.locations.rsi_starmap_location_id`.
 
+Fleet declarations can carry optional provenance fields (`source`, `sourceExternalId`, `sourcePayload`, `sourceSyncedAt`). RSI hangar sync uses `source = rsi_hangar` plus a stable external id so sync jobs can upsert or remove only extension-managed entries while leaving manual fleet declarations untouched.
+
 After schema or extractor changes, run:
 
 ```bash
