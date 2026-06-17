@@ -280,7 +280,7 @@ model CorporationFleetItem {
   corporation Corporation? @relation(fields: [corporationId], references: [id], onDelete: Cascade)
   addedBy     User?        @relation("AddedFleetItems", fields: [addedById], references: [id], onDelete: SetNull)
 
-  @@unique([addedById, source, sourceExternalId])
+  @@unique([addedById, source, sourceExternalId], map: "corporation_fleet_items_added_by_id_source_source_external__key")
   @@index([corporationId])
   @@index([addedById, itemType])
   @@index([source, sourceSyncedAt])
