@@ -6,8 +6,14 @@ The extension does not receive or store RSI credentials. It runs inside the user
 
 ## Browser Builds
 
-- Chrome / Chromium: load `manifest.chrome.json`.
-- Firefox: load `manifest.firefox.json`.
+Build installable folders first:
+
+```bash
+npm run build --workspace=@starvis/rsi-hangar-sync-extension
+```
+
+- Chrome / Chromium: load `extensions/rsi-hangar-sync/dist/chrome`.
+- Firefox: load `extensions/rsi-hangar-sync/dist/firefox/manifest.json` from `about:debugging#/runtime/this-firefox`.
 
 Both manifests share the same `src/` files.
 

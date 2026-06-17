@@ -18,6 +18,12 @@ for (const file of required) {
 for (const manifestFile of ['manifest.chrome.json', 'manifest.firefox.json']) {
   const manifest = JSON.parse(await readFile(join(root, manifestFile), 'utf8'));
   if (manifest.manifest_version !== 3) throw new Error(`${manifestFile}: manifest_version must be 3`);
+  if (manifestFile.includes('firefox') && !manifest.background?.scripts?.includes('src/background.js')) {
+    throw new Error(`${manifestFile}: Firefox requires background.scripts`);
+  }
+  if (manifestFile.includes('chrome') && manifest.background?.service_worker !== 'src/background.js') {
+    throw new Error(`${manifestFile}: Chrome requires background.service_worker`);
+  }
   if (!manifest.permissions?.includes('tabs')) throw new Error(`${manifestFile}: tabs permission missing`);
   if (!manifest.host_permissions?.some((host) => host.includes('robertsspaceindustries.com'))) {
     throw new Error(`${manifestFile}: RSI host permission missing`);
