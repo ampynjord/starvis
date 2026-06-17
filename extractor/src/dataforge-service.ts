@@ -422,6 +422,36 @@ export class DataForgeService implements DataForgeContext {
     return this.dfData.structDefs.map((s) => s.name);
   }
 
+  getStructRecordSummary(exampleLimit = 3): Array<{
+    structName: string;
+    structIndex: number;
+    records: number;
+    examples: Array<{ name: string; fileName: string; uuid: string }>;
+  }> {
+    if (!this.dfData) throw new Error('DataForge not loaded');
+    const summary = this.dfData.structDefs.map((struct, structIndex) => ({
+      structName: struct.name,
+      structIndex,
+      records: 0,
+      examples: [] as Array<{ name: string; fileName: string; uuid: string }>,
+    }));
+
+    for (const record of this.dfData.records) {
+      const item = summary[record.structIndex];
+      if (!item) continue;
+      item.records++;
+      if (item.examples.length < exampleLimit) {
+        item.examples.push({
+          name: record.name ?? '',
+          fileName: record.fileName ?? '',
+          uuid: record.id ?? '',
+        });
+      }
+    }
+
+    return summary.sort((a, b) => b.records - a.records || a.structName.localeCompare(b.structName));
+  }
+
   /** Debug: inspect struct property definitions with data types */
   debugStructProperties(structName: string): any[] {
     if (!this.dfData) throw new Error('DataForge not loaded');

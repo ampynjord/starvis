@@ -31,6 +31,13 @@ export interface PublicUser {
 
 export type ApiAccessRequestStatus = 'pending' | 'approved' | 'rejected';
 
+export interface RsiHangarSyncPayload {
+  sub: number;
+  type: 'rsi_hangar_sync';
+  iat?: number;
+  exp?: number;
+}
+
 export interface ApiAccessRequestPublic {
   id: number;
   userId: number;
@@ -122,6 +129,16 @@ export type AuthDb = Pick<PrismaClient, '$transaction' | 'apiToken' | 'externalA
 /** Verify a Starvis JWT and return its payload. Throws on invalid/expired tokens. */
 export function verifyAuthToken(token: string): JwtPayload {
   return jwt.verify(token, getSecret()) as unknown as JwtPayload;
+}
+
+export function signRsiHangarSyncToken(userId: number): string {
+  return jwt.sign({ sub: userId, type: 'rsi_hangar_sync' }, getSecret(), { expiresIn: '10m' });
+}
+
+export function verifyRsiHangarSyncToken(token: string): RsiHangarSyncPayload {
+  const payload = jwt.verify(token, getSecret()) as unknown as RsiHangarSyncPayload;
+  if (payload.type !== 'rsi_hangar_sync' || !Number.isInteger(payload.sub)) throw new Error('INVALID_RSI_HANGAR_SYNC_TOKEN');
+  return payload;
 }
 
 export class AuthService {

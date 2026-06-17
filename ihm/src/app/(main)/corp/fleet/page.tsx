@@ -11,6 +11,7 @@ import {
   Loader2,
   Package,
   Plus,
+  RefreshCw,
   Search,
   Ship,
   Trash2,
@@ -314,6 +315,8 @@ export default function FleetManagerPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState('');
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncStatus, setSyncStatus] = useState('');
 
   // View mode
   const [viewMode, setViewMode] = useState<ViewMode>('mine');
@@ -432,6 +435,52 @@ export default function FleetManagerPage() {
       setAddError(e?.message || 'Failed to declare ship');
     } finally {
       setAddLoading(false);
+    }
+  };
+
+  const handleRsiHangarSync = async () => {
+    setSyncLoading(true);
+    setSyncStatus('');
+    try {
+      const sessionRes = await fetch('/api/corp/fleet/rsi-sync/session', { method: 'POST' });
+      const sessionPayload = await sessionRes.json().catch(() => ({}));
+      if (!sessionRes.ok) throw new Error(sessionPayload?.error || `Sync session failed (${sessionRes.status})`);
+      const token = sessionPayload?.data?.token;
+      if (!token) throw new Error('Sync session did not return a token');
+
+      const result = await new Promise<any>((resolve, reject) => {
+        const timeout = window.setTimeout(() => {
+          window.removeEventListener('message', onMessage);
+          reject(new Error('Starvis RSI Sync extension not detected'));
+        }, 90_000);
+
+        function onMessage(event: MessageEvent) {
+          if (event.source !== window) return;
+          if (event.data?.source !== 'starvis-rsi-hangar-extension') return;
+          if (event.data?.type !== 'STARVIS_RSI_HANGAR_SYNC_RESULT') return;
+          window.clearTimeout(timeout);
+          window.removeEventListener('message', onMessage);
+          if (event.data.success) resolve(event.data.payload);
+          else reject(new Error(event.data.error || 'RSI hangar sync failed'));
+        }
+
+        window.addEventListener('message', onMessage);
+        window.postMessage({
+          source: 'starvis',
+          type: 'STARVIS_RSI_HANGAR_SYNC_REQUEST',
+          token,
+          starvisOrigin: window.location.origin,
+          callbackPath: '/api/corp/fleet/rsi-sync',
+        }, window.location.origin);
+      });
+
+      const summary = result?.data ?? result;
+      setSyncStatus(`RSI sync: +${summary?.imported ?? 0} / ~${summary?.updated ?? 0} / -${summary?.removed ?? 0}`);
+      await loadFleet();
+    } catch (e: any) {
+      setSyncStatus(e?.message || 'RSI hangar sync failed');
+    } finally {
+      setSyncLoading(false);
     }
   };
 
@@ -614,6 +663,16 @@ export default function FleetManagerPage() {
             </span>
             <button
               type="button"
+              onClick={() => void handleRsiHangarSync()}
+              disabled={syncLoading}
+              className="sci-btn-ghost py-1.5 px-3 text-xs gap-1.5 flex items-center disabled:opacity-40"
+              title="Sync RSI Hangar"
+            >
+              {syncLoading ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+              Sync
+            </button>
+            <button
+              type="button"
               onClick={() => { setAddError(''); setShowAddModal(true); }}
               disabled={addLoading}
               className="sci-btn-primary py-1.5 px-3 text-xs gap-1.5 flex items-center disabled:opacity-40"
@@ -621,6 +680,11 @@ export default function FleetManagerPage() {
               <Plus size={12} /> Declare ship
             </button>
           </div>
+          {syncStatus && (
+            <div className="basis-full text-right text-[10px] font-mono-sc text-slate-500">
+              {syncStatus}
+            </div>
+          )}
         </div>
 
         {/* Main layout: viewer + info panel */}

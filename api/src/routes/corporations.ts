@@ -26,6 +26,7 @@
  */
 import type { Router } from 'express';
 import { requireJwt, requireJwtAdmin } from '../middleware/index.js';
+import { signRsiHangarSyncToken, verifyRsiHangarSyncToken } from '../services/auth-service.js';
 import { CorporationService } from '../services/corporation-service.js';
 import { getRsiOrgBySymbol, searchRsiOrgs } from '../services/rsi-orgs-service.js';
 import type { RouteDependencies } from './types.js';
@@ -194,6 +195,44 @@ export function mountCorporationRoutes(router: Router, deps: RouteDependencies):
       res.status(201).json({ success: true, data: item });
     } catch {
       res.status(500).json({ success: false, error: 'Failed to declare ship' });
+    }
+  });
+
+  router.post('/corp/fleet/rsi-sync/session', requireJwt, async (req, res) => {
+    const { sub } = req.jwtPayload;
+    try {
+      res.json({
+        success: true,
+        data: {
+          token: signRsiHangarSyncToken(sub),
+          expiresInSeconds: 600,
+        },
+      });
+    } catch {
+      res.status(500).json({ success: false, error: 'Failed to create RSI hangar sync session' });
+    }
+  });
+
+  router.post('/corp/fleet/rsi-sync', async (req, res) => {
+    const token = String(req.headers['x-starvis-rsi-sync-token'] || req.body?.syncToken || '');
+    if (!token) return void res.status(401).json({ success: false, error: 'RSI hangar sync token required' });
+    const entries = Array.isArray(req.body?.entries) ? req.body.entries : null;
+    if (!entries) return void res.status(400).json({ success: false, error: 'entries array required' });
+    if (entries.length === 0) {
+      return void res.status(400).json({ success: false, error: 'No RSI hangar entries detected; sync was not applied' });
+    }
+    if (entries.length > 500) return void res.status(400).json({ success: false, error: 'entries limit is 500' });
+
+    try {
+      const payload = verifyRsiHangarSyncToken(token);
+      const membership = await svc.getMyActiveMembership(payload.sub);
+      const result = await svc.syncRsiHangarFleet(payload.sub, membership?.corporationId ?? null, entries);
+      res.json({ success: true, data: result, corporation: membership?.corporation ?? null });
+    } catch (e: any) {
+      if (e.message === 'INVALID_RSI_HANGAR_SYNC_TOKEN') {
+        return void res.status(401).json({ success: false, error: 'Invalid or expired RSI hangar sync token' });
+      }
+      res.status(500).json({ success: false, error: 'Failed to sync RSI hangar' });
     }
   });
 

@@ -66,6 +66,48 @@ describe('CorporationService', () => {
     });
   });
 
+  describe('syncRsiHangarFleet', () => {
+    it('mirrors RSI hangar ships by source id without touching manual fleet entries', async () => {
+      const upserts: any[] = [];
+      const db: any = {
+        $queryRawUnsafe: vi.fn().mockResolvedValue([{ uuid: 'ship-uuid-1', class_name: 'AEGS_Gladius', name: 'Gladius' }]),
+        $transaction: vi.fn((run) => run(db)),
+        corporationFleetItem: {
+          findMany: vi
+            .fn()
+            .mockResolvedValueOnce([
+              { id: 10, sourceExternalId: 'pledge-1' },
+              { id: 11, sourceExternalId: 'stale-pledge' },
+            ])
+            .mockResolvedValueOnce([{ id: 10, itemClassName: 'AEGS_Gladius', shipUuid: 'ship-uuid-1' }]),
+          upsert: vi.fn((args) => {
+            upserts.push(args);
+            return Promise.resolve({ id: 10 });
+          }),
+          deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+      };
+
+      const result = await new CorporationService(db).syncRsiHangarFleet(7, null, [
+        { externalId: 'pledge-1', className: 'AEGS_Gladius', name: 'Gladius' },
+        { externalId: 'pledge-2', className: 'AEGS_Gladius', name: 'Gladius' },
+      ]);
+
+      expect(result.imported).toBe(1);
+      expect(result.updated).toBe(1);
+      expect(result.removed).toBe(1);
+      expect(upserts).toHaveLength(2);
+      expect(upserts[0].where).toEqual({
+        addedById_source_sourceExternalId: {
+          addedById: 7,
+          source: 'rsi_hangar',
+          sourceExternalId: 'pledge-1',
+        },
+      });
+      expect(db.corporationFleetItem.deleteMany).toHaveBeenCalledWith({ where: { id: { in: [11] } } });
+    });
+  });
+
   describe('updateOwnFleetItemPosition', () => {
     it('persists a user fleet item position', async () => {
       const db: any = {
