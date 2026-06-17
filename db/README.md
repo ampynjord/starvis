@@ -36,6 +36,30 @@ npm run studio --workspace=@starvis/db
 
 The schema is a folder. Keep new models in the domain file that owns the table, and keep datasource URLs in `prisma.config.ts`.
 
+## Domain boundaries
+
+The schema is split to keep extraction, application and public-source data from blending together:
+
+| Schema file | Owns | Does not own |
+|---|---|---|
+| `10-meta.prisma` | Starvis application state: users, roles, API tokens, corporations, bug reports, extraction logs, changelog. | P4K game facts or RSI website rows. |
+| `20-rsi.prisma` | Public/network source data: Ship Matrix, official galleries, Galactapedia, Comm-links, Starmap objects and assets. | Normalized in-game objects extracted from `Data.p4k`. |
+| `30-game.prisma` | P4K/DataForge facts separated by `env`: ships, components, items, commodities, shops, inventory, missions, crafting, mining, locations and insight tables. | User state or raw RSI article/starmap source documents. |
+
+Cross-source links should be explicit fields, not duplicated data. Current examples:
+
+- `game.ships.ship_matrix_id` links extracted ships to `rsi.ship_matrix`.
+- `game.locations.rsi_starmap_location_id` links P4K locations to `rsi.starmap_locations`.
+- `game.starmap_location_aliases` stores manual/semi-automatic correlation help.
+
+Run the static data audit after extractor or schema changes:
+
+```bash
+npm run quality:audit:static-data -- --db-only
+```
+
+Use `--p4k <path>` when you want the audit to compare the database against raw P4K/DataForge coverage.
+
 ## Migrations
 
 Production and CI apply the schema exclusively through versioned migrations in `prisma/migrations/` — never `db push --accept-data-loss`.

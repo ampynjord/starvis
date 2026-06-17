@@ -19,6 +19,14 @@ export interface P4KEntry {
   localHeaderOffset: number;
 }
 
+export interface P4KFamilyStat {
+  family: string;
+  pattern: string;
+  count: number;
+  totalUncompressedSize: number;
+  examples: string[];
+}
+
 // CIG P4K AES-128-CBC encryption key (known/public from unp4k)
 const P4K_AES_KEY = Buffer.from([0x5e, 0x7a, 0x20, 0x02, 0x30, 0x2e, 0xeb, 0x1a, 0x3b, 0xb6, 0x17, 0xc3, 0x0f, 0xde, 0x1e, 0x47]);
 const P4K_AES_IV = Buffer.alloc(16, 0x00);
@@ -268,5 +276,27 @@ export class P4KProvider {
         .slice(0, 20)
         .map(([ext, count]) => ({ ext, count })),
     };
+  }
+
+  async getFamilyStats(families: readonly { family: string; pattern: RegExp }[], exampleLimit = 5): Promise<P4KFamilyStat[]> {
+    await this.loadAllEntries();
+    return families.map(({ family, pattern }) => {
+      let count = 0;
+      let totalUncompressedSize = 0;
+      const examples: string[] = [];
+      for (const entry of this.entries.values()) {
+        if (entry.isDirectory || !pattern.test(entry.fileName)) continue;
+        count++;
+        totalUncompressedSize += entry.uncompressedSize;
+        if (examples.length < exampleLimit) examples.push(entry.fileName);
+      }
+      return {
+        family,
+        pattern: pattern.source,
+        count,
+        totalUncompressedSize,
+        examples,
+      };
+    });
   }
 }

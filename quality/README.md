@@ -30,6 +30,27 @@ The audit checks:
 - placeholder-like text values;
 - a representative global search.
 
+## Static data coverage audit
+
+The static data audit checks the extracted database directly and can optionally inspect the local P4K/DataForge source.
+Use it before trusting a new extraction or when expanding the static dataset.
+
+```bash
+npm run quality:audit:static-data -- --db-only
+npm run quality:audit:static-data -- --p4k "C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Data.p4k"
+npm run quality:audit:static-data -- --env live --output quality/static-data-report.json
+```
+
+Modes:
+
+- default: database audit plus P4K audit when a P4K path is discoverable;
+- `--db-only`: skip P4K inspection, useful for CI and remote databases;
+- `--p4k-only`: inspect the local P4K/DataForge without connecting to PostgreSQL;
+- `--strict`: turn missing required static sources into failures.
+
+The audit reports table counts, unresolved links, missing Ship Matrix/Starmap correlations, shop inventory resolution,
+DataForge struct coverage, and P4K file families that may contain exploitable static data.
+
 ## API contract audit
 
 The API contract audit checks the OpenAPI document, operation identifiers, the public API proxy, and the broad IHM type surface.
