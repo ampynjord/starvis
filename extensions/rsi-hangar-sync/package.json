@@ -5,6 +5,7 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
+    "build": "node scripts/build-extension.mjs",
     "lint:ci": "biome check .",
     "typecheck": "node scripts/validate-extension.mjs"
   }
