@@ -230,35 +230,49 @@ export class RsiSyncService {
 
     while (true) {
       let data: any;
-      try {
-        const res = await fetch(GRAPHQL_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-            'User-Agent': SCRAPER_USER_AGENT,
-          },
-          body: JSON.stringify({
-            query: `{
-              allArticle(first: ${PAGE_SIZE}, skip: ${skip}) {
-                totalCount
-                pageInfo { hasNextPage }
-                edges {
-                  node {
-                    id title slug body template
-                    categories { ... on Category { title } }
-                    tags { ... on Tag { title } }
+      let fetchErr: Error | null = null;
+      const BACKOFFS = [0, 10_000, 30_000];
+      for (let attempt = 0; attempt < BACKOFFS.length; attempt++) {
+        try {
+          if (BACKOFFS[attempt]) await new Promise((r) => setTimeout(r, BACKOFFS[attempt]));
+          const res = await fetch(GRAPHQL_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'application/json',
+              'User-Agent':
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+              Origin: RSI_BASE_URL,
+              Referer: `${RSI_BASE_URL}/galactapedia`,
+            },
+            body: JSON.stringify({
+              query: `{
+                allArticle(first: ${PAGE_SIZE}, skip: ${skip}) {
+                  totalCount
+                  pageInfo { hasNextPage }
+                  edges {
+                    node {
+                      id title slug body template
+                      categories { ... on Category { title } }
+                      tags { ... on Tag { title } }
+                    }
                   }
                 }
-              }
-            }`,
-          }),
-          signal: AbortSignal.timeout(30_000),
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        data = await res.json();
-      } catch (err) {
-        logger.warn(`[galactapedia] GraphQL fetch error at skip=${skip}: ${(err as Error).message}`);
+              }`,
+            }),
+            signal: AbortSignal.timeout(30_000),
+          });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          data = await res.json();
+          fetchErr = null;
+          break;
+        } catch (err) {
+          fetchErr = err as Error;
+          logger.warn(`[galactapedia] GraphQL fetch attempt ${attempt + 1} at skip=${skip}: ${fetchErr.message}`);
+          if (!fetchErr.message.startsWith('HTTP ')) break; // network error — no point retrying
+        }
+      }
+      if (fetchErr) {
         stats.errors++;
         break;
       }
