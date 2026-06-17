@@ -40,6 +40,7 @@ the extractor, validation rules, quality audits and UI flows improve.
 | `bot/` | Discord bot with slash commands. |
 | `extractor/` | Local CLI that extracts P4K/DataForge and RSI website data into PostgreSQL. |
 | `db/` | Prisma 7 schema modules, shared Prisma client, PostgreSQL init and backup scripts. |
+| `extensions/rsi-hangar-sync/` | Chrome/Firefox extension used by the Fleet Manager to sync the user's RSI hangar from their own browser session. |
 | `quality/` | Fast contract, API/data and UI flow audits. |
 
 Notable internal modules:
@@ -363,6 +364,8 @@ Calculators use normalized game data from the API: FPS combines real weapon stat
 
 Corporation tools include the 3D Fleet Manager, Corp Bank and corporation-owned Tactics board. Fleet Manager lays spawned ships side by side by default, persists their grid positions from the first spawn, and lets each owner decide whether their corporation ship is available for tactical planning. Corp Bank lets members declare shared components, items, commodities and custom entries; API responses enrich declarations with `itemName` when the object exists in extracted game data, so the IHM can display human names instead of internal identifiers. Owners and corporation leaders can edit or remove entries. Admins can delete a corporation without deleting users or their personal fleet managers; only corporation-scoped memberships, fleet and bank data are removed. Tactics reuses the same 3D holographic viewer to place only corporation ships made available by their owners, save corporation strategies, build reusable mixed-ship formations with availability warnings, add 3D objectives/obstacles/points of interest, and draw flat movement vectors directly from selected ships or squadrons.
 
+Fleet Manager also supports RSI hangar synchronization through the browser extension in `extensions/rsi-hangar-sync/`. The web UI creates a short-lived sync token, the extension reads `robertsspaceindustries.com/account/pledges` in the user's own logged-in browser session, and the API mirrors only `source = rsi_hangar` fleet entries. Manually declared ships are preserved.
+
 The Discord Bot page exposes the Starvis community Discord server, the generated bot invitation link and slash-command help for AI, ships, loadouts, trade, shops, mining, crafting, missions, lore, status and changelog commands. The bot rotates a rich presence with useful prompts such as `/starvis`, `/intel`, API/data status and server count. Configure `NEXT_PUBLIC_DISCORD_CLIENT_ID` or `DISCORD_CLIENT_ID` to enable the bot invitation link. Configure `NEXT_PUBLIC_DISCORD_SERVER_INVITE_URL` or `DISCORD_SERVER_INVITE_URL` to show the community server invite. `NEXT_PUBLIC_DISCORD_GUILD_ID`/`DISCORD_GUILD_ID` identify the Starvis community server (`931662690101895198` by default). `DISCORD_DEFAULT_MEMBER_ROLE_NAME`/`DISCORD_DEFAULT_MEMBER_ROLE_ID` let the bot assign the default `Member` role to new arrivals.
 
 Discord role intent: `Member` is the default community role. `Developer` means access to Starvis developer tools and external API capabilities, not project contribution status. Use `Contributor` or `Core Team` for people contributing to the project itself.
@@ -425,6 +428,7 @@ npm run typecheck --workspace=starvis-ihm
 npm run typecheck --workspace=@starvis/extractor
 npm run typecheck --workspace=@starvis/bot
 npm run typecheck --workspace=@starvis/db
+npm run typecheck --workspace=@starvis/rsi-hangar-sync-extension
 
 npm run test:e2e --workspace=starvis-ihm
 ```

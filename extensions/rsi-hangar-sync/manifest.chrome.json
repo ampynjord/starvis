@@ -1,0 +1,31 @@
+{
+  "manifest_version": 3,
+  "name": "Starvis RSI Hangar Sync",
+  "version": "0.1.0",
+  "description": "Synchronizes the logged-in RSI hangar with the Starvis Fleet Manager.",
+  "permissions": ["tabs", "scripting"],
+  "host_permissions": [
+    "https://robertsspaceindustries.com/*",
+    "https://starvis.ampynjord.bzh/*",
+    "http://localhost:*/*",
+    "http://127.0.0.1:*/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://starvis.ampynjord.bzh/*", "http://localhost:*/*", "http://127.0.0.1:*/*"],
+      "js": ["src/starvis-content.js"],
+      "run_at": "document_start"
+    },
+    {
+      "matches": ["https://robertsspaceindustries.com/*"],
+      "js": ["src/rsi-hangar-content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Starvis RSI Hangar Sync"
+  }
+}
