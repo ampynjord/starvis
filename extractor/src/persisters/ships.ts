@@ -17,6 +17,7 @@ type ModularShipSlotConfig = {
   moduleNames?: string[];
   defaultContains: string;
   tierExtract?: boolean;
+  silent?: boolean;
 };
 
 const MODULAR_SHIP_CONFIGS = modularShipConfig as Record<string, ModularShipSlotConfig[]>;
@@ -423,7 +424,9 @@ async function detectAndSaveModules(
     for (const slotDef of config) {
       const allModuleNames = slotDef.moduleNames ?? (slotDef.modulePrefix ? df.findEntityClassNamesByPrefix(slotDef.modulePrefix) : []);
       if (allModuleNames.length === 0) {
-        logger.warn(`No modules found for prefix "${slotDef.modulePrefix ?? '(explicit list)'}" on ${shipClassName}`);
+        if (!slotDef.silent) {
+          logger.warn(`No modules found for prefix "${slotDef.modulePrefix ?? '(explicit list)'}" on ${shipClassName}`);
+        }
         continue;
       }
 
