@@ -19,6 +19,7 @@ export function mountRsiWebsiteRoutes(router: Router, deps: RouteDependencies): 
       const result = await rsiWebsiteService.getGalactapediaEntries({
         search: getQueryString(req, 'search'),
         category: getQueryString(req, 'category'),
+        letter: getQueryString(req, 'letter'),
         page: getQueryNumber(req, 'page'),
         limit: getQueryNumber(req, 'limit'),
       });

@@ -15,7 +15,9 @@ export class RsiWebsiteService {
 
   // ── Galactapedia ───────────────────────────────────────────────────────────
 
-  async getGalactapediaEntries(opts: { search?: string; category?: string; page?: number; limit?: number } = {}): Promise<PaginatedResult> {
+  async getGalactapediaEntries(
+    opts: { search?: string; category?: string; letter?: string; page?: number; limit?: number } = {},
+  ): Promise<PaginatedResult> {
     const where: string[] = [];
     const params: (string | number)[] = [];
 
@@ -28,6 +30,10 @@ export class RsiWebsiteService {
       // PostgreSQL jsonb containment: check if categories array contains the value
       where.push('g.categories::jsonb @> jsonb_build_array(?::text)');
       params.push(opts.category);
+    }
+    if (opts.letter) {
+      where.push('g.title ILIKE ?');
+      params.push(`${opts.letter}%`);
     }
 
     const w = where.length ? ` WHERE ${where.join(' AND ')}` : '';

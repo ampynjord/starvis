@@ -674,7 +674,7 @@ export const api = {
 
   // ─── Galactapedia ────────────────────────────────────────────────────
   galactapedia: {
-    list: (filters?: { search?: string; category?: string; page?: number; limit?: number }) =>
+    list: (filters?: { search?: string; category?: string; letter?: string; page?: number; limit?: number }) =>
       get<PaginatedResponse<GalactapediaEntry>>('/galactapedia', filters as Record<string, string | number | undefined>),
     get: (id: string) => get<GalactapediaEntry>(`/galactapedia/${id}`),
   },
