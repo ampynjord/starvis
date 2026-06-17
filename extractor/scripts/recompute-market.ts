@@ -8,11 +8,11 @@
 import { resolve } from 'node:path';
 import { config } from 'dotenv';
 import { Pool } from 'pg';
-import { updateShipMarketSummaries } from '../src/persisters/ship-market-summaries.js';
-import type { PersistContext } from '../src/persisters/context.js';
 import { getEnvFileFromArgv, parseCliOptions } from '../src/cli/options.js';
 import { resolveRuntimeOptions } from '../src/cli/resolve.js';
 import logger from '../src/logger.js';
+import type { PersistContext } from '../src/persisters/context.js';
+import { updateShipMarketSummaries } from '../src/persisters/ship-market-summaries.js';
 
 const argv = process.argv.slice(2);
 config({ path: resolve(import.meta.dirname, '..', getEnvFileFromArgv(argv)) });
