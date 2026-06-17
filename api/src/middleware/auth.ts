@@ -96,9 +96,9 @@ export async function requireJwt(req: Request, res: Response, next: NextFunction
 
 /**
  * requireExternalApiAccess — protects the documented external /api/v1 surface.
- * A signed-in web session or generated Bearer token is preferred so request logs
- * keep the real user. ADMIN_API_KEY is accepted only for server-side Starvis
- * services such as the public IHM proxy, bot and audits.
+ * Only accepts a signed-in web session JWT or a generated Bearer API token.
+ * ADMIN_API_KEY is intentionally NOT accepted here — use requireInternalOrAdmin
+ * for server-to-server routes (IHM proxy, bot, audit scripts).
  */
 export async function requireExternalApiAccess(req: Request, res: Response, next: NextFunction) {
   applyInternalClientMarker(req);
@@ -118,12 +118,7 @@ export async function requireExternalApiAccess(req: Request, res: Response, next
     }
   }
 
-  if (hasValidAdminApiKey(req)) {
-    req.authMethod = 'admin_key';
-    return next();
-  }
-
-  return res.status(401).json({ success: false, error: 'API token or signed-in session required' });
+  return res.status(401).json({ success: false, error: 'Starvis account session or API token required' });
 }
 
 /**
