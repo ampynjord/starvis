@@ -528,6 +528,8 @@ async function detectAndSaveModules(
     /power_plant_commandmodule/i,
     /cargo_module/i,
     /modular_bed/i,
+    /command_module_docking/i,
+    /docking_module/i,
   ];
   const loadout = df.extractVehicleLoadout(shipClassName);
   if (!loadout) return;
