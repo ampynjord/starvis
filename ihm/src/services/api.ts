@@ -664,11 +664,6 @@ export const api = {
     shops: (uuid: string, env?: string) => get<Shop[]>(`/locations/${uuid}/shops`, { env }),
   },
 
-  starmap: {
-    positions: () => get<any[]>('/starmap/positions'),
-    jumpPoints: () => get<any[]>('/starmap/jump-points'),
-  },
-
   // ─── CommLinks ──────────────────────────────────────────────────────
   commLinks: {
     categories: () => get<string[]>('/comm-links/categories'),
