@@ -427,6 +427,43 @@ async function detectAndSaveModules(
         if (!slotDef.silent) {
           logger.warn(`No modules found for prefix "${slotDef.modulePrefix ?? '(explicit list)'}" on ${shipClassName}`);
         }
+        // Fallback: capture the currently installed module from the ship's base loadout
+        // (for ships like Caterpillar/Ironclad where module variants have no DataForge entities)
+        if (slotDef.silent) {
+          const vehicleLoadout = df.extractVehicleLoadout(shipClassName);
+          const slotPort = vehicleLoadout?.find((p) => p.portName === slotDef.slotName);
+          if (slotPort?.componentClassName) {
+            const installedClass = slotPort.componentClassName;
+            const slotDisplay = slotDef.slotName
+              .replace(/hardpoint_/i, '')
+              .replace(/_/g, ' ')
+              .replace(/\b\w/g, (c) => c.toUpperCase())
+              .trim();
+            try {
+              await conn.query(
+                `INSERT INTO game.ship_modules
+                   (env, ship_uuid, slot_name, slot_display_name, slot_type, module_class_name, module_name, module_tier, is_default, loadout_json)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+                [
+                  env,
+                  fullData.ref,
+                  slotDef.slotName,
+                  slotDisplay,
+                  slotDef.slotType,
+                  installedClass,
+                  formatModuleName(installedClass),
+                  null,
+                  1,
+                  null,
+                ],
+              );
+            } catch (e: unknown) {
+              logger.error(
+                `Module fallback ${installedClass} (slot ${slotDef.slotName}) on ${shipClassName}: ${e instanceof Error ? e.message : String(e)}`,
+              );
+            }
+          }
+        }
         continue;
       }
 
