@@ -151,8 +151,11 @@ vi.mock('@starvis/db', () => ({
   initAllPrisma: vi.fn(),
 }));
 
+const SERVER_API_KEY = 'authz-test-server-api-key';
+
 process.env.JWT_SECRET = JWT_SECRET;
 process.env.ADMIN_API_KEY = ADMIN_API_KEY;
+process.env.SERVER_API_KEY = SERVER_API_KEY;
 
 const { mountAuthRoutes } = await import('../src/routes/auth.js');
 const { mountAdminRoutes } = await import('../src/routes/admin.js');
@@ -286,9 +289,15 @@ describe('external API authorization', () => {
     expect(res.body.role).toBe('developer');
   });
 
-  it('rejects server-to-server /api/v1 calls with X-Api-Key (JWT only)', async () => {
+  it('rejects /api/v1 calls with ADMIN_API_KEY (not accepted on external surface)', async () => {
     const res = await request(app).get('/api/v1/protected-data').set('X-Api-Key', ADMIN_API_KEY);
     expect(res.status).toBe(401);
+  });
+
+  it('allows trusted server-to-server /api/v1 calls with SERVER_API_KEY', async () => {
+    const res = await request(app).get('/api/v1/protected-data').set('X-Api-Key', SERVER_API_KEY);
+    expect(res.status).toBe(200);
+    expect(res.body.actor).toBeNull();
   });
 });
 
