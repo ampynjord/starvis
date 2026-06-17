@@ -252,9 +252,7 @@ export class RsiSyncService {
                   pageInfo { hasNextPage }
                   edges {
                     node {
-                      id title slug body template
-                      categories { ... on Category { title } }
-                      tags { ... on Tag { title } }
+                      id title slug body
                     }
                   }
                 }
@@ -311,9 +309,6 @@ export class RsiSyncService {
         const title = String(article.title ?? slug ?? id);
         const rsiUrl = `${RSI_BASE_URL}/galactapedia/article/${id}-${slug}`;
 
-        const cats = Array.isArray(article.categories) ? article.categories.map((c: any) => c?.title).filter(Boolean) : [];
-        const tagList = Array.isArray(article.tags) ? article.tags.map((t: any) => t?.title).filter(Boolean) : [];
-
         const content = article.body ? markdownToHtml(String(article.body)) : null;
 
         try {
@@ -327,30 +322,9 @@ export class RsiSyncService {
              ON CONFLICT (id) DO UPDATE SET
                slug=EXCLUDED.slug, title=EXCLUDED.title,
                content=COALESCE(EXCLUDED.content, rsi.galactapedia.content),
-               categories=COALESCE(EXCLUDED.categories, rsi.galactapedia.categories),
-               tags=COALESCE(EXCLUDED.tags, rsi.galactapedia.tags),
                rsi_url=EXCLUDED.rsi_url,
                updated_at=NOW()`,
-            [
-              id,
-              slug,
-              title,
-              content,
-              null,
-              null,
-              article.template ?? null,
-              cats.length > 0 ? json(cats) : null,
-              tagList.length > 0 ? json(tagList) : null,
-              cats.length || null,
-              tagList.length || null,
-              null,
-              null,
-              rsiUrl,
-              null,
-              null,
-              null,
-              json(article),
-            ],
+            [id, slug, title, content, null, null, null, null, null, null, null, null, null, rsiUrl, null, null, null, json(article)],
           );
           if (result.rowCount === 1) stats.inserted++;
           else stats.updated++;
