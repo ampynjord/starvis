@@ -49,28 +49,31 @@
     }
   ],
   "DRAK_Caterpillar": [
-    {
-      "slotName": "hardpoint_module_command",
-      "slotType": "command",
-      "modulePrefix": "DRAK_Caterpillar_Module_Command_",
-      "defaultContains": "Command",
-      "silent": true
-    },
-    { "slotName": "hardpoint_module_01", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo", "silent": true },
-    { "slotName": "hardpoint_module_02", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo", "silent": true },
-    { "slotName": "hardpoint_module_03", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo", "silent": true },
-    { "slotName": "hardpoint_module_04", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo", "silent": true }
+    { "slotName": "hardpoint_cargogrid_module_01", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo", "silent": true },
+    { "slotName": "hardpoint_cargogrid_module_02", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo", "silent": true },
+    { "slotName": "hardpoint_cargogrid_module_03", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo", "silent": true },
+    { "slotName": "hardpoint_cargogrid_module_04", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo", "silent": true }
+  ],
+  "DRAK_Caterpillar_Pirate": [
+    { "slotName": "hardpoint_cargogrid_module_01", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo", "silent": true },
+    { "slotName": "hardpoint_cargogrid_module_02", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo", "silent": true },
+    { "slotName": "hardpoint_cargogrid_module_03", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo", "silent": true },
+    { "slotName": "hardpoint_cargogrid_module_04", "slotType": "cargo", "modulePrefix": "DRAK_Caterpillar_Module_", "defaultContains": "Cargo", "silent": true }
   ],
   "RSI_Galaxy": [
     { "slotName": "hardpoint_module_bay", "slotType": "bay", "modulePrefix": "RSI_Galaxy_Module_", "defaultContains": "Cargo", "silent": true }
   ],
-  "CNOU_Ironclad": [
-    { "slotName": "hardpoint_module_front", "slotType": "front", "modulePrefix": "CNOU_Ironclad_Module_", "defaultContains": "Cargo", "silent": true },
-    { "slotName": "hardpoint_module_mid", "slotType": "mid", "modulePrefix": "CNOU_Ironclad_Module_", "defaultContains": "Cargo", "silent": true }
+  "DRAK_Ironclad": [
+    { "slotName": "hardpoint_cargogrid_front_left", "slotType": "front", "modulePrefix": "DRAK_Ironclad_Module_", "defaultContains": "Cargo", "silent": true },
+    { "slotName": "hardpoint_cargogrid_front_right", "slotType": "front", "modulePrefix": "DRAK_Ironclad_Module_", "defaultContains": "Cargo", "silent": true },
+    { "slotName": "hardpoint_cargogrid_rear_left", "slotType": "rear", "modulePrefix": "DRAK_Ironclad_Module_", "defaultContains": "Cargo", "silent": true },
+    { "slotName": "hardpoint_cargogrid_rear_right", "slotType": "rear", "modulePrefix": "DRAK_Ironclad_Module_", "defaultContains": "Cargo", "silent": true }
   ],
-  "CNOU_Ironclad_Assault": [
-    { "slotName": "hardpoint_module_front", "slotType": "front", "modulePrefix": "CNOU_Ironclad_Module_", "defaultContains": "Cargo", "silent": true },
-    { "slotName": "hardpoint_module_mid", "slotType": "mid", "modulePrefix": "CNOU_Ironclad_Module_", "defaultContains": "Cargo", "silent": true }
+  "DRAK_Ironclad_Assault": [
+    { "slotName": "hardpoint_cargogrid_front_left", "slotType": "front", "modulePrefix": "DRAK_Ironclad_Module_", "defaultContains": "Cargo", "silent": true },
+    { "slotName": "hardpoint_cargogrid_front_right", "slotType": "front", "modulePrefix": "DRAK_Ironclad_Module_", "defaultContains": "Cargo", "silent": true },
+    { "slotName": "hardpoint_cargogrid_rear_left", "slotType": "rear", "modulePrefix": "DRAK_Ironclad_Module_", "defaultContains": "Cargo", "silent": true },
+    { "slotName": "hardpoint_cargogrid_rear_right", "slotType": "rear", "modulePrefix": "DRAK_Ironclad_Module_", "defaultContains": "Cargo", "silent": true }
   ],
   "MISC_Hull_C": [
     { "slotName": "hardpoint_cargo_01", "slotType": "cargo", "modulePrefix": "MISC_HullC_Module_", "defaultContains": "Cargo", "silent": true }
