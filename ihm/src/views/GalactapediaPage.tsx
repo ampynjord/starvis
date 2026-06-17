@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { BookOpen, Globe, Layers, Tag } from 'lucide-react';
+import { BookOpen, Globe, Layers } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
@@ -20,6 +20,7 @@ import { api } from '@/services/api';
 import type { GalactapediaEntry } from '@/types/api';
 
 const LIMIT = 30;
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 function parseArray(v: GalactapediaEntry['categories']): string[] {
   if (!v) return [];
@@ -103,33 +104,37 @@ function GalactapediaCard({ entry }: { entry: GalactapediaEntry }) {
   return (
     <Link
       href={`/galactapedia/${entry.id}`}
-      className="group flex h-full flex-col rounded-sm border border-slate-800 bg-panel/55 p-4 transition-colors hover:border-purple-600/50 hover:bg-white/[0.025]"
+      className="group flex h-full flex-col overflow-hidden rounded-sm border border-slate-800 bg-panel/55 transition-colors hover:border-purple-600/50 hover:bg-white/[0.025]"
     >
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-sm border border-purple-900/40 bg-purple-950/15">
-            <BookOpen size={16} className="text-purple-400" />
+      <div className="relative h-36 shrink-0 overflow-hidden bg-slate-950">
+        {entry.thumbnail_url ? (
+          <Image
+            src={entry.thumbnail_url}
+            alt={entry.title}
+            fill
+            className="object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+            unoptimized
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center bg-gradient-to-br from-slate-950 to-purple-950/10">
+            <BookOpen size={28} className="text-purple-900/60" />
           </div>
-          <div className="min-w-0">
-            <p className="font-rajdhani text-base font-semibold leading-tight text-slate-200 transition-colors group-hover:text-white">
-              {entry.title}
-            </p>
-            <p className="mt-0.5 font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">
-              {primaryCategory(entry)}
-            </p>
-          </div>
-        </div>
-        <Tag size={13} className="mt-1 shrink-0 text-slate-700 transition-colors group-hover:text-purple-400" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent" />
+        {cats[0] && (
+          <span className="absolute bottom-2 left-2 rounded-sm border border-purple-900/60 bg-slate-950/80 px-1.5 py-0.5 font-mono-sc text-[9px] uppercase tracking-widest text-purple-300 backdrop-blur-sm">
+            {cats[0]}
+          </span>
+        )}
       </div>
 
-      {entry.excerpt && (
-        <p className="min-h-10 flex-1 text-xs leading-relaxed text-slate-500 line-clamp-3">{entry.excerpt}</p>
-      )}
-
-      <div className="mt-4 flex flex-wrap gap-1.5">
-        {cats.slice(0, 4).map((cat) => (
-          <CategoryPill key={cat}>{cat}</CategoryPill>
-        ))}
+      <div className="flex flex-1 flex-col p-3">
+        <p className="font-rajdhani text-sm font-semibold leading-tight text-slate-200 line-clamp-2 transition-colors group-hover:text-white">
+          {entry.title}
+        </p>
+        {entry.excerpt && (
+          <p className="mt-1.5 flex-1 text-[11px] leading-relaxed text-slate-500 line-clamp-2">{entry.excerpt}</p>
+        )}
       </div>
     </Link>
   );
@@ -141,12 +146,13 @@ export default function GalactapediaPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState(searchParams?.get('search') ?? '');
   const [category, setCategory] = useState(searchParams?.get('category') ?? '');
+  const [letter, setLetter] = useState('');
   const debouncedSearch = useDebounce(search, 350);
 
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['galactapedia.list', { page, search: debouncedSearch, category }],
+    queryKey: ['galactapedia.list', { page, search: debouncedSearch, category, letter }],
     queryFn: () =>
-      api.galactapedia.list({ search: debouncedSearch || undefined, category: category || undefined, page, limit: LIMIT }),
+      api.galactapedia.list({ search: debouncedSearch || undefined, category: category || undefined, letter: letter || undefined, page, limit: LIMIT }),
   });
 
   const entries = data?.data ?? [];
@@ -169,7 +175,14 @@ export default function GalactapediaPage() {
     return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).slice(0, 10);
   }, [entries]);
 
-  const hasFilters = !!(debouncedSearch || category);
+  const hasFilters = !!(debouncedSearch || category || letter);
+
+  function resetAll() {
+    setSearch('');
+    setCategory('');
+    setLetter('');
+    setPage(1);
+  }
 
   return (
     <PageShell>
@@ -185,6 +198,27 @@ export default function GalactapediaPage() {
         }}
       />
 
+      {/* Alphabetical navigation */}
+      <div className="flex flex-wrap items-center gap-0.5 border-b border-slate-800/60 pb-3">
+        <button
+          type="button"
+          onClick={() => { setLetter(''); setPage(1); }}
+          className={`rounded-sm px-2 py-1 font-mono-sc text-[10px] uppercase tracking-widest transition-colors ${!letter ? 'bg-purple-950/40 text-purple-300 border border-purple-700/50' : 'text-slate-600 hover:text-slate-300'}`}
+        >
+          All
+        </button>
+        {ALPHABET.map((l) => (
+          <button
+            key={l}
+            type="button"
+            onClick={() => { setLetter(l === letter ? '' : l); setPage(1); }}
+            className={`rounded-sm px-1.5 py-1 font-mono-sc text-[10px] uppercase tracking-widest transition-colors ${l === letter ? 'bg-purple-950/40 text-purple-300 border border-purple-700/50' : 'text-slate-600 hover:text-purple-400'}`}
+          >
+            {l}
+          </button>
+        ))}
+      </div>
+
       <ListFilterBar>
         {allCategories.length > 0 && (
           <ListFilterChips
@@ -198,13 +232,7 @@ export default function GalactapediaPage() {
           />
         )}
         {hasFilters && (
-          <ListFilterResetButton
-            onClick={() => {
-              setSearch('');
-              setCategory('');
-              setPage(1);
-            }}
-          />
+          <ListFilterResetButton onClick={resetAll} />
         )}
       </ListFilterBar>
 
@@ -218,15 +246,22 @@ export default function GalactapediaPage() {
         <>
           <div className="grid gap-4 xl:grid-cols-[1fr_280px]">
             <div className="space-y-4">
-              {featured && <FeaturedEntry entry={featured} />}
+              {featured && !letter && !category && !debouncedSearch && (
+                <FeaturedEntry entry={featured} />
+              )}
 
               <div>
                 <div className="mb-3 flex items-center gap-2 border-b border-slate-800 pb-2">
                   <Layers size={14} className="text-purple-400" />
-                  <h2 className="font-orbitron text-sm uppercase tracking-widest text-slate-300">Lore index</h2>
+                  <h2 className="font-orbitron text-sm uppercase tracking-widest text-slate-300">
+                    {letter ? `Entries — ${letter}` : category ? category : 'Lore index'}
+                  </h2>
+                  {data?.total != null && (
+                    <span className="ml-auto font-mono-sc text-[10px] text-slate-600">{data.total} entries</span>
+                  )}
                 </div>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  {library.map((entry, i) => (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {(letter || category || debouncedSearch ? entries : library).map((entry, i) => (
                     <motion.div
                       key={entry.id}
                       initial={{ opacity: 0, y: 8 }}
@@ -244,18 +279,18 @@ export default function GalactapediaPage() {
               <ScifiPanel title="Archive">
                 <div className="space-y-3">
                   <div className="rounded-sm border border-slate-800 bg-slate-950/30 p-3">
-                    <p className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">Entries in view</p>
-                    <p className="mt-1 font-orbitron text-2xl text-purple-300">{entries.length}</p>
+                    <p className="font-mono-sc text-[10px] uppercase tracking-widest text-slate-600">Total entries</p>
+                    <p className="mt-1 font-orbitron text-2xl text-purple-300">{data?.total ?? entries.length}</p>
                   </div>
                   {categoryIndex.map(([name, count]) => (
                     <button
                       key={name}
                       type="button"
                       onClick={() => {
-                        setCategory(name);
+                        setCategory(name === category ? '' : name);
                         setPage(1);
                       }}
-                      className="flex w-full items-center justify-between rounded-sm border border-slate-800 bg-slate-950/20 px-3 py-2 text-left transition-colors hover:border-purple-700/60"
+                      className={`flex w-full items-center justify-between rounded-sm border px-3 py-2 text-left transition-colors ${name === category ? 'border-purple-700/60 bg-purple-950/20' : 'border-slate-800 bg-slate-950/20 hover:border-purple-700/60'}`}
                     >
                       <span className="truncate font-rajdhani text-sm font-semibold text-slate-300">{name}</span>
                       <span className="font-mono-sc text-[10px] text-purple-400">{count}</span>

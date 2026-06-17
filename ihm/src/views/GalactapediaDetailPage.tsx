@@ -5,6 +5,7 @@ import { ArrowLeft, BookOpen, Calendar, ExternalLink, Globe, Hash, Tag } from 'l
 import Image from 'next/image';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
+import { useMemo } from 'react';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { GlowBadge } from '@/components/ui/GlowBadge';
@@ -46,6 +47,19 @@ export default function GalactapediaDetailPage() {
     queryFn: () => api.galactapedia.get(id!),
     enabled: !!id,
   });
+
+  const primaryCat = entry ? parseArray(entry.categories)[0] : undefined;
+
+  const { data: relatedData } = useQuery({
+    queryKey: ['galactapedia.related', primaryCat],
+    queryFn: () => api.galactapedia.list({ category: primaryCat!, limit: 6 }),
+    enabled: !!primaryCat,
+  });
+
+  const related = useMemo(
+    () => (relatedData?.data ?? []).filter((r) => r.id !== entry?.id).slice(0, 5),
+    [relatedData, entry?.id],
+  );
 
   if (isLoading) return <LoadingGrid message="LOADING ENTRY..." />;
   if (error) return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
@@ -168,6 +182,38 @@ export default function GalactapediaDetailPage() {
                     <Hash size={8} />
                     {tag}
                   </span>
+                ))}
+              </div>
+            </ScifiPanel>
+          )}
+
+          {related.length > 0 && (
+            <ScifiPanel title="Related Articles">
+              <div className="space-y-1">
+                {related.map((r) => (
+                  <Link
+                    key={r.id}
+                    href={`/galactapedia/${r.id}`}
+                    className="group flex items-start gap-2.5 rounded-sm p-1.5 transition-colors hover:bg-purple-950/10"
+                  >
+                    {r.thumbnail_url ? (
+                      <div className="relative size-10 shrink-0 overflow-hidden rounded-sm border border-slate-800 bg-slate-950">
+                        <Image src={r.thumbnail_url} alt={r.title} fill className="object-cover" unoptimized />
+                      </div>
+                    ) : (
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-sm border border-slate-800 bg-slate-950">
+                        <BookOpen size={12} className="text-purple-900" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="font-rajdhani text-sm font-semibold leading-tight text-slate-300 line-clamp-2 transition-colors group-hover:text-white">
+                        {r.title}
+                      </p>
+                      {r.excerpt && (
+                        <p className="mt-0.5 text-[10px] leading-relaxed text-slate-600 line-clamp-1">{r.excerpt}</p>
+                      )}
+                    </div>
+                  </Link>
                 ))}
               </div>
             </ScifiPanel>
