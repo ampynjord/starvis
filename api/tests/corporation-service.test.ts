@@ -215,9 +215,9 @@ describe('CorporationService', () => {
       const upserts: any[] = [];
       const db: any = {
         $queryRawUnsafe: vi.fn().mockResolvedValue([
-          { uuid: 'retaliator', class_name: 'AEGS_Retaliator', name: 'Retaliator' },
-          { uuid: 'concept-901', class_name: 'mirai_tiburon', name: 'Tiburon' },
-          { uuid: 'concept-902', class_name: 'rsi_galaxy', name: 'Galaxy' },
+          { uuid: 'retaliator', class_name: 'AEGS_Retaliator', name: 'Aegis Retaliator' },
+          { uuid: 'concept-901', class_name: 'mirai_tiburon', name: 'Mirai Tiburon' },
+          { uuid: 'concept-902', class_name: 'rsi_galaxy', name: 'RSI Galaxy' },
         ]),
         $transaction: vi.fn((run) => run(db)),
         corporationFleetItem: {

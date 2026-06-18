@@ -19,10 +19,18 @@ import {
   X,
   Zap,
 } from 'lucide-react';
+import createDynamic from 'next/dynamic';
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import type { FleetShip } from '@/components/holo/fleet-tactics-types';
 import { api } from '@/services/api';
+import { API_BASE } from '@/utils/constants';
+
+const FleetTacticsHoloViewer = createDynamic(
+  () => import('@/components/holo/FleetTacticsHoloViewer').then((m) => m.FleetTacticsHoloViewer),
+  { ssr: false },
+);
 import type { ShipListItem } from '@/types/api';
 
 interface FleetItem {
@@ -33,7 +41,6 @@ interface FleetItem {
   gridX: number | null;
   gridZ: number | null;
   availableForTactics: boolean;
-  sourceLabel?: string | null;
   addedAt: string;
   addedBy: { id: number; username: string } | null;
 }
@@ -270,71 +277,6 @@ function ShipInfoPanel({ ship, item, onRemove, canRemove, onAvailabilityChange, 
 
 // ── View mode selector ────────────────────────────────────────────────────────
 
-function FleetShipGrid({
-  items,
-  shipData,
-  selectedItemId,
-  onSelect,
-}: {
-  items: FleetItem[];
-  shipData: Map<string, ShipListItem>;
-  selectedItemId: number | null;
-  onSelect: (id: number | null) => void;
-}) {
-  return (
-    <div className="absolute inset-0 overflow-y-auto px-4 py-5 md:px-6">
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 pb-6">
-        {items.map((item) => {
-          const uuid = getShipUuid(item);
-          const ship = uuid ? shipData.get(uuid) : null;
-          const isSelected = item.id === selectedItemId;
-          const title = ship?.name ?? item.sourceLabel ?? item.itemClassName;
-          const subtitle = [ship?.manufacturer_name, ship?.role].filter(Boolean).join(' - ');
-          const imageUrl = (ship as any)?.thumbnail_large ?? ship?.thumbnail ?? null;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onSelect(isSelected ? null : item.id)}
-              className={`group relative min-h-[180px] overflow-hidden rounded-sm border bg-slate-950/55 text-left transition-all ${
-                isSelected
-                  ? 'border-cyan-500/80 shadow-[0_0_24px_rgba(34,211,238,0.16)]'
-                  : 'border-slate-800/70 hover:border-cyan-800/70 hover:bg-slate-900/60'
-              }`}
-            >
-              <div className="h-28 border-b border-slate-800/60 bg-slate-950/70">
-                {imageUrl ? (
-                  <img src={imageUrl} alt={title} className="h-full w-full object-contain p-3 opacity-85 transition-opacity group-hover:opacity-100" />
-                ) : (
-                  <div className="flex h-full items-center justify-center">
-                    <Ship size={34} className="text-slate-700" />
-                  </div>
-                )}
-              </div>
-              <div className="space-y-2 px-3 py-2.5">
-                <div className="min-w-0">
-                  <p className="truncate font-orbitron text-xs font-bold uppercase tracking-wider text-slate-100">{title}</p>
-                  <p className="mt-0.5 truncate font-mono-sc text-[10px] text-slate-500">{subtitle || item.itemClassName}</p>
-                </div>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate font-mono-sc text-[9px] text-slate-600">
-                    {item.addedBy ? `by ${item.addedBy.username}` : 'fleet item'}
-                  </span>
-                  {item.availableForTactics && (
-                    <span className="rounded-sm border border-cyan-800/50 bg-cyan-950/30 px-1.5 py-0.5 font-mono-sc text-[8px] uppercase tracking-wider text-cyan-400">
-                      Tactics
-                    </span>
-                  )}
-                </div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 type ViewMode = 'mine' | 'member' | 'all';
 
 interface Member { id: number; username: string; avatarUrl: string | null }
@@ -547,6 +489,15 @@ export default function FleetManagerPage() {
     }
   };
 
+  const handlePositionChange = useCallback((itemId: number, position: { gridX: number; gridZ: number }) => {
+    setFleetItems((prev) => prev.map((item) => (item.id === itemId ? { ...item, ...position } : item)));
+    void fetch(`/api/corp/fleet/${itemId}/position`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(position),
+    }).catch(() => {});
+  }, []);
+
   const handleRemove = async (itemId: number) => {
     try {
       await fetch(`/api/corp/fleet/${itemId}`, { method: 'DELETE' });
@@ -573,6 +524,31 @@ export default function FleetManagerPage() {
     if (viewMode === 'member') return addedById === selectedMemberId;
     return true; // 'all'
   });
+  const visibleItemSignature = visibleItems
+    .map((i) => `${i.id}:${getShipUuid(i) ?? ''}:${i.itemClassName}:${i.gridX ?? ''}:${i.gridZ ?? ''}`)
+    .join('|');
+
+  // Memoize fleetShips — prevents scene rebuild on selection change
+  const fleetShips: FleetShip[] = useMemo(() => visibleItems
+    .filter((i) => getShipUuid(i))
+    .map((i) => {
+      const uuid = getShipUuid(i)!;
+      const s = shipData.get(uuid);
+      return {
+        id: i.id, shipUuid: uuid, name: s?.name ?? i.itemClassName, className: s?.class_name ?? i.itemClassName,
+        manufacturerCode: s?.manufacturer_code ?? null, role: s?.role ?? null, career: s?.career ?? null,
+        crewSize: s?.crew_size ?? null, scmSpeed: s?.scm_speed ?? null,
+        sizeX: (s as any)?.size_x ?? null, sizeY: (s as any)?.size_y ?? null, sizeZ: (s as any)?.size_z ?? null,
+        isConceptOnly: (s as any)?.is_concept_only ?? false,
+        thumbnailUrl: (s as any)?.thumbnail_large ?? (s as any)?.thumbnail ?? null,
+        ctmUrl: (s as any)?.ctm_url ? `${API_BASE}/ships/${uuid}/model/file` : null,
+        declaredBy: i.addedBy?.username ?? null,
+        gridX: i.gridX,
+        gridZ: i.gridZ,
+      } satisfies FleetShip;
+    }),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [visibleItemSignature, shipData.size]);
 
   const selectedItem = visibleItems.find((i) => i.id === selectedItemId) ?? null;
   const selectedShipUuid = selectedItem ? getShipUuid(selectedItem) : null;
@@ -718,10 +694,10 @@ export default function FleetManagerPage() {
           )}
         </div>
 
-        {/* Main layout: fleet grid + info panel */}
+        {/* Main layout: viewer + info panel */}
         <div className="flex flex-1 overflow-hidden">
 
-          {/* Fleet grid */}
+          {/* 3D Viewer */}
           <div className="flex-1 relative bg-[#06101a]">
             {loading ? (
               <div className="absolute inset-0 flex items-center justify-center">
@@ -734,7 +710,7 @@ export default function FleetManagerPage() {
                   Retry
                 </button>
               </div>
-            ) : visibleItems.length === 0 ? (
+            ) : fleetShips.length === 0 ? (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
                 <Ship size={40} className="text-slate-800" />
                 <p className="text-slate-600 font-mono-sc text-sm text-center px-4">
@@ -745,7 +721,58 @@ export default function FleetManagerPage() {
                 </p>
               </div>
             ) : (
-              <FleetShipGrid items={visibleItems} shipData={shipData} selectedItemId={selectedItemId} onSelect={setSelectedItemId} />
+              <FleetTacticsHoloViewer
+                ships={fleetShips}
+                selectedId={selectedItemId}
+                onSelect={setSelectedItemId}
+                layoutMode="row"
+                onPositionChange={handlePositionChange}
+              />
+            )}
+
+            {/* Ship list overlay — bottom strip */}
+            {!loading && visibleItems.length > 0 && (
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-slate-950/95 to-transparent pt-6 pb-2 px-3">
+                <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                  {visibleItems.map((item) => {
+                    const uuid = getShipUuid(item);
+                    const s = uuid ? shipData.get(uuid) : null;
+                    const isSelected = item.id === selectedItemId;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setSelectedItemId(isSelected ? null : item.id)}
+                        className={`shrink-0 flex items-center gap-2 px-3 py-1.5 rounded-sm border transition-all ${
+                          isSelected
+                            ? 'border-cyan-600 bg-cyan-950/60 text-cyan-300'
+                            : 'border-slate-800/60 bg-slate-900/60 text-slate-400 hover:border-slate-700 hover:text-slate-200'
+                        }`}
+                      >
+                        <Ship size={11} className={isSelected ? 'text-cyan-400' : 'text-slate-600'} />
+                        <span className="text-[11px] font-rajdhani font-semibold truncate max-w-[120px]">
+                          {s?.name ?? item.itemClassName}
+                        </span>
+                        {item.addedBy && (
+                          <span className="text-[9px] text-slate-600 font-mono-sc">by {item.addedBy.username}</span>
+                        )}
+                        {item.availableForTactics && (
+                          <span className="rounded-sm border border-cyan-800/50 bg-cyan-950/30 px-1 py-0.5 font-mono-sc text-[8px] uppercase tracking-wider text-cyan-400">
+                            Tactics
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Hint bottom-right */}
+            {!loading && fleetShips.length > 0 && (
+              <div className="absolute bottom-12 right-3 text-[9px] text-slate-700 font-mono-sc">
+                Drag: rotate · Scroll: zoom · Click ship: select
+              </div>
             )}
           </div>
 

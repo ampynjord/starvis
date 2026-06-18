@@ -209,6 +209,11 @@ function scoreShipMatch(label: string, row: { class_name: string; name: string }
   if (labelTokens.has('f7cm') && !rowTokens.has('f7cm')) return 0;
 
   const common = [...labelTokens].filter((token) => rowTokens.has(token));
+  const singleTokenContained =
+    labelTokens.size === 1 &&
+    common.length === 1 &&
+    (rowNameNormalized.includes(labelNormalized) || rowClassNormalized.includes(labelNormalized));
+  if (singleTokenContained) return 500;
   const labelRatio = common.length / Math.max(labelTokens.size, 1);
   const rowRatio = common.length / Math.max(rowTokens.size, 1);
   let score = common.length * 10 + labelRatio * 20 + rowRatio * 20;
