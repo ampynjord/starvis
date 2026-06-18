@@ -211,6 +211,51 @@ describe('CorporationService', () => {
       expect(upserts[0].create.shipUuid).toBe('galaxy');
     });
 
+    it('imports upgraded standalone pledges from RSI ship matrix names', async () => {
+      const upserts: any[] = [];
+      const db: any = {
+        $queryRawUnsafe: vi.fn().mockResolvedValue([
+          { uuid: 'retaliator', class_name: 'AEGS_Retaliator', name: 'Retaliator' },
+          { uuid: 'concept-901', class_name: 'mirai_tiburon', name: 'Tiburon' },
+          { uuid: 'concept-902', class_name: 'rsi_galaxy', name: 'Galaxy' },
+        ]),
+        $transaction: vi.fn((run) => run(db)),
+        corporationFleetItem: {
+          findMany: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]),
+          upsert: vi.fn((args) => {
+            upserts.push(args);
+            return Promise.resolve({ id: upserts.length });
+          }),
+          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+      };
+
+      const result = await new CorporationService(db).syncRsiHangarFleet(7, null, [
+        {
+          externalId: 'atls-geo-1',
+          name: 'Retaliator',
+          title: 'Standalone Ships - ATLS GEO Plus Thunderhead Paint',
+          raw: { rsiKind: 'ship_candidate', shipCandidates: ['Retaliator'] },
+        },
+        {
+          externalId: 'atls-geo-2',
+          name: 'Tiburon',
+          title: 'Standalone Ships - ATLS GEO Plus Thunderhead Paint',
+          raw: { rsiKind: 'ship_candidate', shipCandidates: ['Tiburon'] },
+        },
+        {
+          externalId: 'pulse-lx',
+          name: 'Galaxy',
+          title: 'Standalone Ship - Pulse LX Plus Dominion Paint',
+          raw: { rsiKind: 'ship_candidate', shipCandidates: ['Galaxy'] },
+        },
+      ]);
+
+      expect(result.imported).toBe(3);
+      expect(result.unmatched).toEqual([]);
+      expect(upserts.map((call) => call.create.shipUuid)).toEqual(['retaliator', 'concept-901', 'concept-902']);
+    });
+
     it('prefers the exact Hornet Mk II candidate over older Hornet variants', async () => {
       const upserts: any[] = [];
       const db: any = {
