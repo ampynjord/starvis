@@ -495,6 +495,14 @@ export default function MissionsPage() {
   const shareableCount = data?.summary?.shareableMissions ?? 0;
   const uniqueCount = data?.summary?.uniqueMissions ?? 0;
   const avgDanger = data?.summary?.averageDanger ?? null;
+  const dataChecks = [
+    { label: 'Rows', ok: (data?.total ?? 0) > 0, value: (data?.total ?? 0).toLocaleString('en-US') },
+    { label: 'Types', ok: (types?.length ?? 0) > 0, value: (types?.length ?? 0).toLocaleString('en-US') },
+    { label: 'Factions', ok: (factions?.length ?? 0) > 0, value: (factions?.length ?? 0).toLocaleString('en-US') },
+    { label: 'Categories', ok: (categories?.length ?? 0) > 0, value: (categories?.length ?? 0).toLocaleString('en-US') },
+    { label: 'Rewards', ok: avgReward != null || (data?.total ?? 0) === 0, value: avgReward == null ? 'N/A' : `${avgReward.toLocaleString('en-US')} avg` },
+    { label: 'Blueprints', ok: blueprintCount >= 0, value: blueprintCount.toLocaleString('en-US') },
+  ];
 
   useEffect(() => {
     if (displayedMissions.length && !selectedUuid) setSelectedUuid(displayedMissions[0].uuid);
@@ -515,6 +523,27 @@ export default function MissionsPage() {
         searchPlaceholder="Search mission, giver, class name…"
         onSearch={(v) => { setSearch(v); setPage(1); }}
       />
+
+      {data && (
+        <div className="sci-panel mb-4 border border-slate-800/60 p-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="font-orbitron text-sm font-bold uppercase tracking-widest text-slate-200">Data verification</p>
+              <p className="mt-1 font-mono-sc text-xs text-slate-600">
+                LIVE/PTU mission extraction health from rows, filters and reward metadata.
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+              {dataChecks.map((check) => (
+                <div key={check.label} className="rounded-sm border border-slate-800/70 bg-slate-950/40 px-2.5 py-2">
+                  <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">{check.label}</p>
+                  <p className={`mt-1 font-mono-sc text-xs ${check.ok ? 'text-cyan-300' : 'text-red-400'}`}>{check.value}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Stats bar + quick actions */}
       {data && (

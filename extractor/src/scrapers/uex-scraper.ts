@@ -69,6 +69,31 @@ export interface UexMarketSnapshot {
   rentals: UexVehicleRentalPrice[];
 }
 
+export interface UexGenericMarketPrice {
+  id: number;
+  id_commodity?: number | null;
+  id_item?: number | null;
+  id_component?: number | null;
+  id_terminal?: number | null;
+  commodity_name?: string | null;
+  item_name?: string | null;
+  component_name?: string | null;
+  terminal_name?: string | null;
+  price?: number | null;
+  price_buy?: number | null;
+  price_sell?: number | null;
+  price_average?: number | null;
+  date_modified?: number | null;
+  is_available?: number | boolean | null;
+  [key: string]: unknown;
+}
+
+export interface UexEconomyMarketSnapshot {
+  commodities: UexGenericMarketPrice[];
+  items: UexGenericMarketPrice[];
+  components: UexGenericMarketPrice[];
+}
+
 async function fetchUex<T>(resource: string): Promise<T[]> {
   const url = `${UEX_API_BASE}/${resource}`;
   const res = await fetch(url, {
@@ -112,4 +137,16 @@ export async function fetchUexVehicleMarket(onProgress?: (msg: string) => void):
   );
 
   return { vehicles, terminals: [...terminalById.values()], purchases, rentals };
+}
+
+export async function fetchUexEconomyMarket(onProgress?: (msg: string) => void): Promise<UexEconomyMarketSnapshot> {
+  onProgress?.('UEX: fetching commodity/item/component prices...');
+  const [commodities, items, components] = await Promise.all([
+    fetchUex<UexGenericMarketPrice>('commodities_prices_all').catch(() => []),
+    fetchUex<UexGenericMarketPrice>('items_prices_all').catch(() => []),
+    fetchUex<UexGenericMarketPrice>('components').catch(() => []),
+  ]);
+
+  onProgress?.(`UEX: ${commodities.length} commodity, ${items.length} item, ${components.length} component price rows`);
+  return { commodities, items, components };
 }

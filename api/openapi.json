@@ -8397,7 +8397,7 @@
       "get": {
         "tags": ["Admin"],
         "summary": "Recent API request logs",
-        "description": "Returns the latest in-memory request log entries since the last API restart. Request bodies and query values are not stored.",
+        "description": "Returns persisted admin-only request history when the database migration is applied, with an in-memory fallback during tests/startup. Request bodies and query values are not stored.",
         "operationId": "adminRequestLogs",
         "security": [
           {
@@ -8426,6 +8426,24 @@
               "type": "string",
               "enum": ["external", "web", "all"],
               "default": "all"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "description": "Filter request history for one actor user id.",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "description": "Filter request history by actor role snapshot.",
+            "schema": {
+              "type": "string",
+              "enum": ["user", "developer", "admin"]
             }
           }
         ],

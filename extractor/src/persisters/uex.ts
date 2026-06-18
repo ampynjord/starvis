@@ -9,7 +9,7 @@
 import type { PoolClient } from 'pg';
 import { scUuidToDataForgeUuid } from '../dataforge/dataforge-utils.js';
 import type { GameEnv } from '../module-registry.js';
-import { fetchUexVehicleMarket, type UexTerminal } from '../scrapers/uex-scraper.js';
+import { fetchUexEconomyMarket, fetchUexVehicleMarket, type UexGenericMarketPrice, type UexTerminal } from '../scrapers/uex-scraper.js';
 import { batchUpsert } from './batch.js';
 import { updateShipMarketSummaries } from './ship-market-summaries.js';
 
@@ -17,14 +17,80 @@ export interface UexPersistStats {
   terminals: number;
   buyPrices: number;
   rentPrices: number;
+  economyPrices: number;
   mappedByUuid: number;
   mappedByName: number;
+  mappedEconomy: number;
   unmapped: number;
 }
 
 function unixToIso(ts: number | null | undefined): string | null {
   if (!ts || !Number.isFinite(ts) || ts <= 0) return null;
   return new Date(ts * 1000).toISOString();
+}
+
+function firstText(row: UexGenericMarketPrice, keys: string[]): string | null {
+  for (const key of keys) {
+    const value = row[key];
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function firstNumber(row: UexGenericMarketPrice, keys: string[]): number | null {
+  for (const key of keys) {
+    const value = row[key];
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+  }
+  return null;
+}
+
+async function buildNameMap(conn: PoolClient, table: string, env: GameEnv): Promise<Map<string, string>> {
+  const { rows } = await conn.query<{ uuid: string; name: string | null }>(`SELECT uuid, name FROM game.${table} WHERE env = $1`, [env]);
+  const map = new Map<string, string>();
+  for (const row of rows) {
+    const key = normalizeName(row.name);
+    if (key && !map.has(key)) map.set(key, row.uuid);
+  }
+  return map;
+}
+
+function economyRow(
+  env: GameEnv,
+  resource: string,
+  kind: 'commodity' | 'item' | 'component',
+  row: UexGenericMarketPrice,
+  uuidByName: Map<string, string>,
+): (string | number | null | boolean)[] {
+  const entityName = firstText(row, [`${kind}_name`, 'name', 'name_full', 'item_name', 'commodity_name', 'component_name']);
+  const entityUuid = entityName ? (uuidByName.get(normalizeName(entityName)) ?? null) : null;
+  const buy = firstNumber(row, ['price_buy', 'price_buy_avg', 'price_min']);
+  const sell = firstNumber(row, ['price_sell', 'price_sell_avg', 'price_max']);
+  const avg = firstNumber(row, ['price_average', 'price_avg']);
+  const price = firstNumber(row, ['price']) ?? buy ?? sell ?? avg;
+  const terminalId = firstNumber(row, ['id_terminal', 'terminal_id']);
+  const entityId = firstNumber(row, [`id_${kind}`, 'id_item', 'id_commodity', 'id_component']);
+  const priceKind = buy != null && sell != null ? 'spread' : buy != null ? 'buy' : sell != null ? 'sell' : 'price';
+
+  return [
+    env,
+    resource,
+    row.id,
+    kind,
+    entityId,
+    entityUuid,
+    entityName,
+    terminalId,
+    firstText(row, ['terminal_name', 'terminal']),
+    priceKind,
+    price,
+    buy,
+    sell,
+    avg,
+    row.is_available == null ? true : row.is_available !== 0 && row.is_available !== false,
+    unixToIso(row.date_modified),
+    JSON.stringify(row),
+  ];
 }
 
 function normalizeName(value: string | null | undefined): string {
@@ -63,7 +129,7 @@ function terminalRow(env: GameEnv, t: UexTerminal): (string | number | null | bo
  * Existing rows for the env are replaced (full refresh).
  */
 export async function saveUexMarket(conn: PoolClient, env: GameEnv, onProgress?: (msg: string) => void): Promise<UexPersistStats> {
-  const snapshot = await fetchUexVehicleMarket(onProgress);
+  const [snapshot, economy] = await Promise.all([fetchUexVehicleMarket(onProgress), fetchUexEconomyMarket(onProgress)]);
 
   // ── Build the vehicle → ship mapping ──────────────────────────────────────
   // Primary key: UEX uuid → byte-reordered DataForge uuid → game.ships.uuid.
@@ -171,14 +237,39 @@ export async function saveUexMarket(conn: PoolClient, env: GameEnv, onProgress?:
     priceRows,
   );
 
+  const [commodityByName, itemByName, componentByName] = await Promise.all([
+    buildNameMap(conn, 'commodities', env),
+    buildNameMap(conn, 'items', env),
+    buildNameMap(conn, 'components', env),
+  ]);
+
+  await conn.query('DELETE FROM game.uex_market_prices WHERE env = $1', [env]);
+  const economyRows = [
+    ...economy.commodities.map((row) => economyRow(env, 'commodities_prices_all', 'commodity', row, commodityByName)),
+    ...economy.items.map((row) => economyRow(env, 'items_prices_all', 'item', row, itemByName)),
+    ...economy.components.map((row) => economyRow(env, 'components', 'component', row, componentByName)),
+  ];
+  const economyPrices = await batchUpsert(
+    conn,
+    `INSERT INTO game.uex_market_prices
+       (env, resource, uex_id, entity_kind, entity_uex_id, entity_uuid, entity_name,
+        terminal_uex_id, terminal_name, price_kind, price, price_buy, price_sell,
+        price_average, is_available, date_modified, raw_json)`,
+    '(env, resource, uex_id) DO NOTHING',
+    17,
+    economyRows,
+  );
+  const mappedEconomy = economyRows.filter((row) => row[5]).length;
+
   // Refresh ship market summaries (game.ships.game_data.market) from the new UEX data.
   const mkt = await updateShipMarketSummaries({ conn, env });
   onProgress?.(`UEX: market summaries — ${mkt.purchasable} purchasable, ${mkt.rentable} rentable`);
 
   onProgress?.(
     `UEX: persisted ${terminals} terminals, ${buyPrices} buy + ${rentPrices} rent prices ` +
-      `(mapped: ${mappedByUuid} by uuid, ${mappedByName} by name, ${unmapped} unmapped)`,
+      `(mapped: ${mappedByUuid} by uuid, ${mappedByName} by name, ${unmapped} unmapped; ` +
+      `${economyPrices} economy rows, ${mappedEconomy} mapped)`,
   );
 
-  return { terminals, buyPrices, rentPrices, mappedByUuid, mappedByName, unmapped };
+  return { terminals, buyPrices, rentPrices, economyPrices, mappedByUuid, mappedByName, mappedEconomy, unmapped };
 }

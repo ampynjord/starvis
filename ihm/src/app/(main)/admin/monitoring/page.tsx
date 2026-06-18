@@ -354,6 +354,8 @@ export default function AdminMonitoringPage() {
   const [discordBot, setDiscordBot] = useState<DiscordBotStatus | null>(null);
   const [revokingTokenId, setRevokingTokenId] = useState<number | null>(null);
   const [reqPerSec, setReqPerSec] = useState<number | null>(null);
+  const [historyRole, setHistoryRole] = useState('');
+  const [historyUserId, setHistoryUserId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const prevRef = useRef<{ total: number; at: number } | null>(null);
@@ -366,8 +368,11 @@ export default function AdminMonitoringPage() {
         fetch('/health/metrics'),
         fetch('/api/admin/discord-bot'),
       ]);
-      const externalLogsPromise = fetch('/api/admin/request-logs?scope=external&limit=80');
-      const webLogsPromise = fetch('/api/admin/request-logs?scope=web&limit=80');
+      const historyParams = new URLSearchParams({ limit: '80' });
+      if (historyRole) historyParams.set('role', historyRole);
+      if (historyUserId.trim()) historyParams.set('userId', historyUserId.trim());
+      const externalLogsPromise = fetch(`/api/admin/request-logs?scope=external&${historyParams.toString()}`);
+      const webLogsPromise = fetch(`/api/admin/request-logs?scope=web&${historyParams.toString()}`);
       const supervisionPromise = fetch('/api/admin/api-supervision');
 
       const ready: ReadyState | null = readyRes.status === 'fulfilled'
@@ -418,7 +423,7 @@ export default function AdminMonitoringPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [historyRole, historyUserId]);
 
   const revokeApiToken = async (tokenId: number) => {
     setRevokingTokenId(tokenId);
@@ -715,6 +720,35 @@ export default function AdminMonitoringPage() {
           </div>
         </div>
       )}
+
+      <div className="sci-panel border border-slate-800/60 p-3">
+        <div className="grid gap-3 md:grid-cols-[1fr_180px_160px] md:items-end">
+          <div>
+            <p className="font-orbitron text-sm font-bold uppercase tracking-widest text-slate-200">User request history</p>
+            <p className="mt-1 font-mono-sc text-xs text-slate-600">
+              Persistent API and IHM activity, restricted to admins.
+            </p>
+          </div>
+          <label className="block">
+            <span className="mb-1 block font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Role</span>
+            <select value={historyRole} onChange={(event) => setHistoryRole(event.target.value)} className="sci-input h-9 w-full text-xs">
+              <option value="">All roles</option>
+              <option value="user">User</option>
+              <option value="developer">Developer</option>
+              <option value="admin">Admin</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="mb-1 block font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">User ID</span>
+            <input
+              value={historyUserId}
+              onChange={(event) => setHistoryUserId(event.target.value.replace(/\D/g, ''))}
+              placeholder="Any"
+              className="sci-input h-9 w-full text-xs"
+            />
+          </label>
+        </div>
+      </div>
 
       <div className="sci-panel border border-slate-800/60">
         <div className="flex flex-col gap-1 border-b border-slate-800/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">

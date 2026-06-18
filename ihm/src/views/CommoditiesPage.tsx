@@ -13,6 +13,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { ListFilterBar, ListFilterResetButton, ListFilterSelect } from '@/components/ui/ListFilters';
 import { GlowBadge } from '@/components/ui/GlowBadge';
+import { EconomyNav } from '@/components/economy/EconomyNav';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { PageShell } from '@/components/ui/PageShell';
 import { useListQueryState } from '@/hooks/useListQueryState';
@@ -55,6 +56,7 @@ export default function CommoditiesPage() {
         searchPlaceholder="Search…"
         onSearch={updateSearch}
       />
+      <EconomyNav />
 
       {isIndustrial && (
         <div className="sci-panel p-3 mb-4 flex items-center justify-between gap-3">

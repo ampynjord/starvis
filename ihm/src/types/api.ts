@@ -1472,16 +1472,22 @@ export interface StarmapPosition {
   type: string;
   system_code: string | null;
   system_name: string | null;
+  parent_id?: string | null;
+  parent_db_id?: number | null;
   status: string | null;
   faction_name: string | null;
   affiliations: unknown;
   coordinates: { x: number; y: number; z: number } | null;
+  aggregated?: { x?: number; y?: number; z?: number } | null;
   thumbnail: string | null;
+  thumbnail_data?: unknown;
+  assets?: unknown;
   description: string | null;
   star_type: string | null;
   population: string | null;
   economy: string | null;
   danger: string | null;
+  jump_points?: unknown;
 }
 
 // ─── Galactapedia ─────────────────────────────────────────────────────────────

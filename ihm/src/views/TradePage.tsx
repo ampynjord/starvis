@@ -3,9 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { ArrowRight, DollarSign, Filter, MapPin, Package, Plus, Search, SortDesc, TrendingUp, Truck } from 'lucide-react';
+import { usePathname } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { api } from '@/services/api';
 import { useEnv } from '@/contexts/EnvContext';
+import { EconomyNav } from '@/components/economy/EconomyNav';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { EarlyAccessNotice } from '@/components/ui/EarlyAccessNotice';
 import { ErrorState } from '@/components/ui/ErrorState';
@@ -31,6 +33,7 @@ function fmt(n: number | null | undefined): string {
 
 export default function TradePage() {
   const { env } = useEnv();
+  const pathname = usePathname();
   const queryClient = useQueryClient();
 
   // Route calculator state
@@ -124,9 +127,13 @@ export default function TradePage() {
 
   return (
     <PageShell>
-      <PageHeader title="Trade Calculator" subtitle="Find the most profitable trade routes" />
+      <PageHeader
+        title={pathname === '/trade' ? 'Trade Routes' : 'Trade Calculator'}
+        subtitle="Find profitable UEX-backed commodity routes and compare market locations"
+      />
+      <EconomyNav />
       <EarlyAccessNotice className="mb-4">
-        Trade prices and route profitability depend on available reports and extracted shop data. Check live terminals before large cargo runs.
+        Trade prices and route profitability use the latest persisted UEX snapshot when available, then local reports as fallback. Check live terminals before large cargo runs.
       </EarlyAccessNotice>
 
       <div className="grid gap-2 sm:grid-cols-3">

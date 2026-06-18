@@ -104,11 +104,42 @@ model User {
   memberships               CorporationMembership[]
   addedFleetItems           CorporationFleetItem[]     @relation("AddedFleetItems")
   apiTokens                 ApiToken[]
+  requestHistory            UserRequestHistory[]
   apiAccessRequests         ExternalApiAccessRequest[] @relation("ApiAccessRequestUser")
   reviewedApiAccessRequests ExternalApiAccessRequest[] @relation("ApiAccessRequestReviewer")
 
   @@index([email])
   @@map("users")
+  @@schema("meta")
+}
+
+model UserRequestHistory {
+  id             Int       @id @default(autoincrement())
+  timestamp      DateTime  @default(now())
+  method         String    @db.VarChar(12)
+  path           String    @db.VarChar(600)
+  statusCode     Int       @map("status_code")
+  durationMs     Int       @map("duration_ms")
+  isExternalApi  Boolean   @default(false) @map("is_external_api")
+  authMethod     String    @map("auth_method") @db.VarChar(32)
+  clientType     String    @map("client_type") @db.VarChar(40)
+  internalClient String?   @map("internal_client") @db.VarChar(80)
+  apiTokenId     Int?      @map("api_token_id")
+  apiTokenName   String?   @map("api_token_name") @db.VarChar(120)
+  userId         Int?      @map("user_id")
+  username       String?   @db.VarChar(80)
+  role           UserRole?
+  ip             String?   @db.VarChar(80)
+  userAgent      String?   @map("user_agent") @db.VarChar(180)
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([timestamp])
+  @@index([userId, timestamp])
+  @@index([role, timestamp])
+  @@index([isExternalApi, timestamp])
+  @@index([clientType, timestamp])
+  @@map("user_request_history")
   @@schema("meta")
 }
 

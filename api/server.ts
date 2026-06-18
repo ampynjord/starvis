@@ -29,7 +29,7 @@ import { createRoutes } from './src/routes/index.js';
 import { verifyAuthToken } from './src/services/auth-service.js';
 import { GameDataService } from './src/services/game-data-service.js';
 import { redis } from './src/services/redis.js';
-import { recordRequestLog } from './src/services/request-log-service.js';
+import { configureRequestLogPersistence, recordRequestLog } from './src/services/request-log-service.js';
 import { RsiWebsiteService } from './src/services/rsi-website-service.js';
 import { ShipMatrixService } from './src/services/ship-matrix-service.js';
 import { AUTH_COOKIE_NAME, buildDatabaseUrl, DEVELOPER_ACCESS_ROLES, RATE_LIMITS } from './src/utils/config.js';
@@ -389,6 +389,7 @@ async function start() {
   }
 
   // 4. Services — all use the same single Prisma client
+  configureRequestLogPersistence(prisma);
   const shipMatrixService = new ShipMatrixService(prisma);
   const rsiWebsiteService = new RsiWebsiteService(prisma);
   gameDataService = new GameDataService(() => prisma, prisma);

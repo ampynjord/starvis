@@ -507,6 +507,37 @@ model UexVehiclePrice {
   @@schema("game")
 }
 
+model UexMarketPrice {
+  id            Int       @id @default(autoincrement())
+  env           String    @default("live") @db.VarChar(10)
+  resource      String    @db.VarChar(40)
+  uexId         Int       @map("uex_id")
+  entityKind    String    @map("entity_kind") @db.VarChar(24)
+  entityUexId   Int?      @map("entity_uex_id")
+  entityUuid    String?   @map("entity_uuid") @db.Char(36)
+  entityName    String?   @map("entity_name") @db.VarChar(255)
+  terminalUexId Int?      @map("terminal_uex_id")
+  terminalName  String?   @map("terminal_name") @db.VarChar(255)
+  priceKind     String    @map("price_kind") @db.VarChar(16)
+  price         Decimal?  @db.Decimal(14, 2)
+  priceBuy      Decimal?  @map("price_buy") @db.Decimal(14, 2)
+  priceSell     Decimal?  @map("price_sell") @db.Decimal(14, 2)
+  priceAverage  Decimal?  @map("price_average") @db.Decimal(14, 2)
+  isAvailable   Boolean   @default(true) @map("is_available")
+  dateModified  DateTime? @map("date_modified")
+  rawJson       Json?     @map("raw_json")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([env, resource, uexId])
+  @@index([env, entityKind])
+  @@index([entityUuid, env])
+  @@index([terminalUexId, env])
+  @@index([priceKind])
+  @@map("uex_market_prices")
+  @@schema("game")
+}
+
 // ─── Mining ───────────────────────────────────────────────────────────────────
 
 model MiningElement {

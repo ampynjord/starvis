@@ -45,10 +45,13 @@ import {
   boundsOfPositions,
   defaultStrategy,
   estimateFormationGap,
+  formationPresetStorageKey,
   getShipUuid,
+  legacyTacticsStrategyStorageKey,
   makeId,
   nowIso,
   presetShipCount,
+  tacticsStrategyStorageKey,
 } from './tactics-model';
 
 const FleetTacticsHoloViewer = createDynamic(
@@ -78,10 +81,8 @@ export default function CorporationTacticsPage() {
   const [formationQuantity, setFormationQuantity] = useState(4);
   const [formationSpacing, setFormationSpacing] = useState(28);
   const [formationComposition, setFormationComposition] = useState<Record<string, number>>({});
-  const [savedPresets, setSavedPresets] = useState<FormationPreset[]>(() => {
-    if (typeof window === 'undefined') return [];
-    try { return JSON.parse(localStorage.getItem(PRESETS_STORAGE_KEY) ?? '[]') as FormationPreset[]; } catch { return []; }
-  });
+  const [presetsStorageKey, setPresetsStorageKey] = useState(PRESETS_STORAGE_KEY);
+  const [savedPresets, setSavedPresets] = useState<FormationPreset[]>([]);
   const nextShipIdRef = useRef(1);
   const focusNonceRef = useRef(0);
   const [focusRequest, setFocusRequest] = useState<{ kind: 'ship' | 'group' | 'marker'; id: number | string; nonce: number } | null>(null);
@@ -101,6 +102,22 @@ export default function CorporationTacticsPage() {
 
   useEffect(() => {
     if (!user) return;
+    const key = formationPresetStorageKey(user.id);
+    setPresetsStorageKey(key);
+    try {
+      const saved = localStorage.getItem(key) ?? localStorage.getItem(PRESETS_STORAGE_KEY);
+      if (!localStorage.getItem(key) && saved) {
+        localStorage.setItem(key, saved);
+      }
+      setSavedPresets(saved ? JSON.parse(saved) as FormationPreset[] : []);
+    } catch {
+      setSavedPresets([]);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const currentUser = user;
     let cancelled = false;
     async function load() {
       setLoading(true);
@@ -125,9 +142,13 @@ export default function CorporationTacticsPage() {
           return;
         }
 
-        const key = `starvis-corp-tactics-3d-${nextCorp.id}`;
+        const key = tacticsStrategyStorageKey(nextCorp.id, currentUser.id);
+        const legacyKey = legacyTacticsStrategyStorageKey(nextCorp.id);
         setStorageKey(key);
-        const saved = localStorage.getItem(key);
+        const saved = localStorage.getItem(key) ?? localStorage.getItem(legacyKey);
+        if (!localStorage.getItem(key) && saved) {
+          localStorage.setItem(key, saved);
+        }
         const parsed = saved ? JSON.parse(saved) as { activeStrategyId?: string; strategies?: Strategy[] } : null;
         const loadedStrategies = (parsed?.strategies?.length ? parsed.strategies : [defaultStrategy()])
           .map((strategy) => ({ ...strategy, vectors: strategy.vectors ?? [] }));
@@ -423,13 +444,13 @@ export default function CorporationTacticsPage() {
     };
     const next = [...savedPresets, preset];
     setSavedPresets(next);
-    localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(next));
+    localStorage.setItem(presetsStorageKey, JSON.stringify(next));
   };
 
   const deletePreset = (id: string) => {
     const next = savedPresets.filter((p) => p.id !== id);
     setSavedPresets(next);
-    localStorage.setItem(PRESETS_STORAGE_KEY, JSON.stringify(next));
+    localStorage.setItem(presetsStorageKey, JSON.stringify(next));
   };
 
   const loadPreset = (preset: FormationPreset) => {
