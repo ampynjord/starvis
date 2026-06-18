@@ -169,6 +169,12 @@ const runtimeApi = globalThis.browser ?? globalThis.chrome;
 const usesPromiseApi = runtimeApi === globalThis.browser;
 
 runtimeApi.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === 'STARVIS_RSI_HANGAR_PING') {
+    if (usesPromiseApi) return Promise.resolve({ success: true });
+    sendResponse({ success: true });
+    return false;
+  }
+
   if (message?.type !== 'STARVIS_SCRAPE_RSI_HANGAR') return false;
 
   if (usesPromiseApi) {

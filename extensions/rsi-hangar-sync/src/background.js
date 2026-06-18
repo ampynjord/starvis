@@ -12,6 +12,24 @@ function createTab(createProperties) {
   return new Promise((resolve) => runtimeApi.tabs.create(createProperties, resolve));
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function executeScript(injection) {
+  if (!runtimeApi.scripting?.executeScript) return Promise.reject(new Error('Script injection is unavailable'));
+  if (usesPromiseApi) return runtimeApi.scripting.executeScript(injection);
+  return new Promise((resolve, reject) => {
+    runtimeApi.scripting.executeScript(injection, (result) => {
+      if (runtimeApi.runtime.lastError) {
+        reject(new Error(runtimeApi.runtime.lastError.message));
+        return;
+      }
+      resolve(result);
+    });
+  });
+}
+
 function waitForTabComplete(tabId) {
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
@@ -71,15 +89,52 @@ function sendTabMessage(tabId, message) {
   });
 }
 
-async function scrapeHangarTab(tabId) {
+async function canReachHangarContentScript(tabId) {
   try {
-    return await sendTabMessage(tabId, { type: 'STARVIS_SCRAPE_RSI_HANGAR' });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (!/Receiving end does not exist|Could not establish connection/i.test(message)) throw error;
-    await reloadTab(tabId);
-    return sendTabMessage(tabId, { type: 'STARVIS_SCRAPE_RSI_HANGAR' });
+    const response = await sendTabMessage(tabId, { type: 'STARVIS_RSI_HANGAR_PING' });
+    return !!response?.success;
+  } catch {
+    return false;
   }
+}
+
+async function injectHangarContentScript(tabId) {
+  await executeScript({
+    target: { tabId },
+    files: ['src/rsi-hangar-content.js'],
+  });
+  await sleep(250);
+}
+
+async function ensureHangarContentScript(tabId) {
+  if (await canReachHangarContentScript(tabId)) return;
+
+  try {
+    await injectHangarContentScript(tabId);
+    if (await canReachHangarContentScript(tabId)) return;
+  } catch {
+    // Firefox can refuse dynamic injection on some freshly restored tabs; reload falls back to manifest injection.
+  }
+
+  await reloadTab(tabId);
+  await sleep(500);
+  if (await canReachHangarContentScript(tabId)) return;
+
+  try {
+    await injectHangarContentScript(tabId);
+    if (await canReachHangarContentScript(tabId)) return;
+  } catch {
+    // Surface a clearer error below.
+  }
+
+  throw new Error(
+    'RSI hangar tab is open, but the Starvis extension content script did not load. Refresh the RSI Hangar tab and retry Sync.',
+  );
+}
+
+async function scrapeHangarTab(tabId) {
+  await ensureHangarContentScript(tabId);
+  return sendTabMessage(tabId, { type: 'STARVIS_SCRAPE_RSI_HANGAR' });
 }
 
 async function postToStarvis({ starvisOrigin, callbackPath, token, entries }) {
