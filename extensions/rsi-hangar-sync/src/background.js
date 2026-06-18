@@ -121,19 +121,21 @@ async function findOrOpenHangarTab() {
 async function scrapeHangarTab(tabId) {
   await navigateTab(tabId, RSI_HANGAR_URL);
   await waitForHangarReady(tabId);
-  const firstPage = await scrapeVisibleHangarPage(tabId);
+  const firstPage = await waitForScrapedHangarPage(tabId, 1, null);
   if (!firstPage?.success) return firstPage;
 
   const entries = [...(firstPage.entries ?? [])];
+  let previousSignature = firstPage.signature ?? null;
   const pages = Math.min(Math.max(1, Number(firstPage.pages) || 1), 50);
   for (let page = 2; page <= pages; page += 1) {
     const url = new URL(RSI_HANGAR_URL);
     url.searchParams.set('page', String(page));
     await navigateTab(tabId, url.toString());
     await waitForHangarReady(tabId);
-    const pageResult = await scrapeVisibleHangarPage(tabId);
+    const pageResult = await waitForScrapedHangarPage(tabId, page, previousSignature);
     if (!pageResult?.success) return pageResult;
     entries.push(...(pageResult.entries ?? []));
+    previousSignature = pageResult.signature ?? previousSignature;
   }
 
   const unique = new Map();
@@ -141,6 +143,30 @@ async function scrapeHangarTab(tabId) {
     if (!unique.has(entry.externalId)) unique.set(entry.externalId, entry);
   }
   return { success: true, entries: [...unique.values()] };
+}
+
+async function waitForScrapedHangarPage(tabId, expectedPage, previousSignature) {
+  let lastResult = null;
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    lastResult = await scrapeVisibleHangarPage(tabId).catch((error) => ({
+      success: false,
+      error: error instanceof Error ? error.message : 'Unable to scrape RSI hangar',
+    }));
+    if (lastResult?.success) {
+      const pageMatches = Number(lastResult.currentPage || 1) === expectedPage;
+      const contentReady = (lastResult.pledgeCount ?? 0) > 0;
+      const contentChanged = !previousSignature || lastResult.signature !== previousSignature;
+      if (pageMatches && contentReady && contentChanged) return lastResult;
+    }
+    await sleep(750);
+  }
+
+  return lastResult?.success
+    ? {
+        success: false,
+        error: `RSI hangar page ${expectedPage} did not finish rendering distinct pledge content`,
+      }
+    : lastResult;
 }
 
 async function scrapeVisibleHangarPage(tabId) {
@@ -235,11 +261,22 @@ function scrapeHangarInPage() {
     );
   }
 
-  function findCards(root) {
+  function looksLikePledgeCard(card) {
+    const text = textOf(card);
+    if (text.length < 8 || text.length > 5000) return false;
+    if (!/\b(attributed|created:|contains:|standalone|upgrade)\b/i.test(text)) return false;
+    return (text.match(/\bcreated:/gi)?.length ?? 0) <= 1;
+  }
+
+  function findPledgeCards(root) {
     const selectors = ['[class*="pledge"]', '[class*="hangar"] article', 'article', '.row', '[class*="item"]'];
     const candidates = selectors.flatMap((selector) => [...root.querySelectorAll(selector)]);
-    const shipCandidates = [...new Set(candidates)].filter((node, index) => looksLikeShipPledge(node, index));
-    return shipCandidates.filter((node) => !shipCandidates.some((other) => other !== node && other.contains(node)));
+    const pledgeCandidates = [...new Set(candidates)].filter((node) => looksLikePledgeCard(node));
+    return pledgeCandidates.filter((node) => !pledgeCandidates.some((other) => other !== node && other.contains(node)));
+  }
+
+  function findCards(root) {
+    return findPledgeCards(root).filter((node, index) => looksLikeShipPledge(node, index));
   }
 
   function extractCard(card, index, sourceUrl) {
@@ -279,15 +316,25 @@ function scrapeHangarInPage() {
     return Math.max(1, ...pageNumbers(root));
   }
 
+  function currentPage() {
+    const page = Number(new URL(window.location.href).searchParams.get('page') || '1');
+    return Number.isInteger(page) && page > 0 ? page : 1;
+  }
+
   try {
     if (!/robertsspaceindustries\.com/.test(window.location.hostname)) {
       throw new Error('Not on Roberts Space Industries');
     }
 
+    const pledgeCards = findPledgeCards(document);
     const cards = findCards(document);
+    const signature = pledgeCards.map((card, index) => `${titleOfCard(card, index)}:${textOf(card).slice(0, 180)}`).join('|');
     return {
       success: true,
+      currentPage: currentPage(),
       pages: maxPage(document),
+      pledgeCount: pledgeCards.length,
+      signature,
       entries: cards.map((card, index) => extractCard(card, index, window.location.href)),
     };
   } catch (error) {
