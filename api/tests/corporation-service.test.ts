@@ -152,6 +152,65 @@ describe('CorporationService', () => {
       expect(db.corporationFleetItem.upsert).not.toHaveBeenCalled();
     });
 
+    it('does not fallback to package names when RSI extraction found no ship candidates', async () => {
+      const db: any = {
+        $queryRawUnsafe: vi.fn().mockResolvedValue([
+          { uuid: 'polaris', class_name: 'RSI_Polaris', name: 'Polaris' },
+          { uuid: 'pulse-lx', class_name: 'CNOU_Pulse_LX', name: 'Pulse LX' },
+        ]),
+        $transaction: vi.fn((run) => run(db)),
+        corporationFleetItem: {
+          findMany: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]),
+          upsert: vi.fn(),
+          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+      };
+
+      const result = await new CorporationService(db).syncRsiHangarFleet(7, null, [
+        {
+          externalId: 'package-1',
+          name: 'Standalone Ship - Pulse LX Plus Dominion Paint',
+          title: 'Standalone Ship - Pulse LX Plus Dominion Paint',
+          raw: { rsiKind: 'pledge', shipCandidates: [] },
+        },
+      ]);
+
+      expect(result.imported).toBe(0);
+      expect(result.unmatched).toEqual([{ externalId: 'package-1', label: 'Standalone Ship - Pulse LX Plus Dominion Paint' }]);
+      expect(db.corporationFleetItem.upsert).not.toHaveBeenCalled();
+    });
+
+    it('uses explicit RSI ship candidates from package contents', async () => {
+      const upserts: any[] = [];
+      const db: any = {
+        $queryRawUnsafe: vi.fn().mockResolvedValue([
+          { uuid: 'galaxy', class_name: 'RSI_Galaxy', name: 'Galaxy' },
+          { uuid: 'pulse-lx', class_name: 'CNOU_Pulse_LX', name: 'Pulse LX' },
+        ]),
+        $transaction: vi.fn((run) => run(db)),
+        corporationFleetItem: {
+          findMany: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]),
+          upsert: vi.fn((args) => {
+            upserts.push(args);
+            return Promise.resolve({ id: 10 });
+          }),
+          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+      };
+
+      const result = await new CorporationService(db).syncRsiHangarFleet(7, null, [
+        {
+          externalId: 'package-1',
+          name: 'Galaxy',
+          title: 'Standalone Ship - Pulse LX Plus Dominion Paint',
+          raw: { rsiKind: 'ship_candidate', shipCandidates: ['Galaxy'] },
+        },
+      ]);
+
+      expect(result.imported).toBe(1);
+      expect(upserts[0].create.shipUuid).toBe('galaxy');
+    });
+
     it('matches RSI hangar pledge names to Starvis ship names', async () => {
       const upserts: any[] = [];
       const db: any = {
@@ -206,8 +265,8 @@ describe('CorporationService', () => {
         { externalId: 'pledge-1', className: 'AEGS_Gladius', name: 'Gladius' },
       ]);
 
-      expect(upserts[0].create).toMatchObject({ gridX: 232, gridZ: 0 });
-      expect(upserts[0].update).toMatchObject({ gridX: 232, gridZ: 0 });
+      expect(upserts[0].create).toMatchObject({ gridX: 432, gridZ: 0 });
+      expect(upserts[0].update).toMatchObject({ gridX: 432, gridZ: 0 });
     });
 
     it('repairs overlapping RSI ship positions on sync', async () => {
@@ -237,7 +296,7 @@ describe('CorporationService', () => {
       ]);
 
       expect(upserts[0].update).not.toHaveProperty('gridX');
-      expect(upserts[1].update).toMatchObject({ gridX: 160, gridZ: 0 });
+      expect(upserts[1].update).toMatchObject({ gridX: 360, gridZ: 0 });
     });
   });
 
