@@ -2,6 +2,13 @@ function textOf(node) {
   return node?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 }
 
+function linesOf(node) {
+  return (node?.textContent ?? '')
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, ' ').trim())
+    .filter(Boolean);
+}
+
 function cleanUrl(value) {
   if (!value) return null;
   try {
@@ -22,29 +29,34 @@ async function clickLoadMoreButtons() {
   }
 }
 
+function titleOfCard(card, index) {
+  const titleNode = card.querySelector('h1, h2, h3, h4, [class*="title"], [class*="name"]');
+  return textOf(titleNode) || linesOf(card)[0] || `RSI hangar item ${index + 1}`;
+}
+
+function looksLikeShipPledge(card, index) {
+  const title = titleOfCard(card, index);
+  const text = textOf(card);
+  if (title.length < 3 || text.length < 8) return false;
+
+  if (/^\s*(paint|paints|skin|livery|upgrade|upgrades|insurance|gear|item|items|poster|armor|weapon|ticket|coupon)\b/i.test(title)) {
+    return false;
+  }
+
+  return /\bstandalone\s+(ships?|vehicles?)\b/i.test(title) || /^\s*(ships?|vehicles?)\s*[-:]/i.test(title);
+}
+
 function findCards() {
   const selectors = ['[class*="pledge"]', '[class*="hangar"] article', 'article', '.row'];
   const candidates = selectors.flatMap((selector) => [...document.querySelectorAll(selector)]);
-  return [...new Set(candidates)].filter((node) => {
-    const text = textOf(node);
-    if (text.length < 8) return false;
-    if (
-      /\b(paint|paints|skin|livery|poster|armor|weapon|subscriber|flair|gear|item|items|upgrade|upgrades|insurance|ticket|coupon)\b/i.test(
-        text,
-      )
-    ) {
-      return false;
-    }
-    return /\b(standalone ships?|standalone vehicles?|ship|ships|vehicle|vehicles)\b/i.test(text);
-  });
+  return [...new Set(candidates)].filter((node, index) => looksLikeShipPledge(node, index));
 }
 
 function extractCard(card, index) {
-  const titleNode = card.querySelector('h1, h2, h3, h4, [class*="title"], [class*="name"]');
   const image = card.querySelector('img');
   const link = card.querySelector('a[href]');
   const dataId = card.getAttribute('data-id') || card.getAttribute('data-pledge-id') || card.getAttribute('data-item-id');
-  const title = textOf(titleNode) || textOf(card).split(/\s{2,}|\n/)[0] || `RSI hangar item ${index + 1}`;
+  const title = titleOfCard(card, index);
   const text = textOf(card);
   const className = card.getAttribute('data-class-name') || card.getAttribute('data-ship-code') || null;
   const shipName = title.replace(/^\s*standalone\s+(ships?|vehicles?)\s*[-:]\s*/i, '').trim() || title;
