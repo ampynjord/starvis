@@ -128,6 +128,38 @@ describe('CorporationService', () => {
       expect(db.corporationFleetItem.upsert).not.toHaveBeenCalled();
     });
 
+    it('matches RSI hangar pledge names to Starvis ship names', async () => {
+      const upserts: any[] = [];
+      const db: any = {
+        $queryRawUnsafe: vi.fn().mockResolvedValue([
+          { uuid: 'retaliator', class_name: 'AEGS_Retaliator', name: 'Retaliator' },
+          { uuid: 'galaxy', class_name: 'RSI_Galaxy', name: 'Galaxy' },
+          { uuid: 'super-hornet-mk2', class_name: 'ANVL_Hornet_F7CM_Mk2', name: 'Hornet F7CM Mk2' },
+          { uuid: 'tiburon', class_name: 'MRAI_Tiburon', name: 'Tiburon' },
+        ]),
+        $transaction: vi.fn((run) => run(db)),
+        corporationFleetItem: {
+          findMany: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]),
+          upsert: vi.fn((args) => {
+            upserts.push(args);
+            return Promise.resolve({ id: upserts.length });
+          }),
+          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+      };
+
+      const result = await new CorporationService(db).syncRsiHangarFleet(7, null, [
+        { externalId: 'retaliator', name: 'Standalone Ships - Retaliator' },
+        { externalId: 'galaxy', name: 'Standalone Ships - Galaxy' },
+        { externalId: 'super-hornet', name: 'Standalone Ships - F7C-M Super Hornet Mk II' },
+        { externalId: 'tiburon', name: 'Standalone Ships - Tiburon' },
+      ]);
+
+      expect(result.imported).toBe(4);
+      expect(result.unmatched).toEqual([]);
+      expect(upserts.map((call) => call.create.shipUuid)).toEqual(['retaliator', 'galaxy', 'super-hornet-mk2', 'tiburon']);
+    });
+
     it('assigns a side-by-side position to new RSI ships', async () => {
       const upserts: any[] = [];
       const db: any = {

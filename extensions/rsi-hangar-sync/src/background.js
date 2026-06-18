@@ -83,16 +83,36 @@ async function findOrOpenHangarTab() {
 }
 
 async function scrapeHangarTab(tabId) {
-  const result = await executeScriptResult({
+  await navigateTab(tabId, RSI_HANGAR_URL);
+  const firstPage = await scrapeVisibleHangarPage(tabId);
+  if (!firstPage?.success) return firstPage;
+
+  const entries = [...(firstPage.entries ?? [])];
+  const pages = Math.min(Math.max(1, Number(firstPage.pages) || 1), 50);
+  for (let page = 2; page <= pages; page += 1) {
+    const url = new URL(RSI_HANGAR_URL);
+    url.searchParams.set('page', String(page));
+    await navigateTab(tabId, url.toString());
+    const pageResult = await scrapeVisibleHangarPage(tabId);
+    if (!pageResult?.success) return pageResult;
+    entries.push(...(pageResult.entries ?? []));
+  }
+
+  const unique = new Map();
+  for (const entry of entries) {
+    if (!unique.has(entry.externalId)) unique.set(entry.externalId, entry);
+  }
+  return { success: true, entries: [...unique.values()] };
+}
+
+async function scrapeVisibleHangarPage(tabId) {
+  return executeScriptResult({
     target: { tabId },
     func: scrapeHangarInPage,
   });
-  return result;
 }
 
-async function scrapeHangarInPage() {
-  const HANGAR_PATH = '/en/account/pledges';
-
+function scrapeHangarInPage() {
   function textOf(node) {
     return node?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
   }
@@ -117,15 +137,26 @@ async function scrapeHangarInPage() {
     return (textOf(node) || node.getAttribute('aria-label') || node.getAttribute('title') || node.getAttribute('rel') || '').trim();
   }
 
-  function pageUrl(page) {
-    const url = new URL(HANGAR_PATH, window.location.origin);
-    if (page > 1) url.searchParams.set('page', String(page));
-    return url.toString();
-  }
-
   function titleOfCard(card, index) {
     const titleNode = card.querySelector('h1, h2, h3, h4, [class*="title"], [class*="name"]');
     return textOf(titleNode) || linesOf(card)[0] || `RSI hangar item ${index + 1}`;
+  }
+
+  function targetShipNameFromUpgradeText(value) {
+    const clean = value.replace(/\s+/g, ' ').trim();
+    const match = clean.match(/\bto\s+(.+?)\s+upgrade\b/i) || clean.match(/\bupgrade\s*[-:]\s*.+?\s+to\s+(.+?)$/i);
+    return match?.[1]
+      ?.replace(/\b(warbond|standard edition|edition|ccu)\b/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function shipNameFromPledge(card, index) {
+    const title = titleOfCard(card, index);
+    const text = textOf(card);
+    const upgradeTarget = targetShipNameFromUpgradeText(title) || targetShipNameFromUpgradeText(text);
+    if (upgradeTarget) return upgradeTarget;
+    return title.replace(/^\s*standalone\s+(ships?|vehicles?)\s*[-:]\s*/i, '').trim() || title;
   }
 
   function looksLikeShipPledge(card, index) {
@@ -133,8 +164,12 @@ async function scrapeHangarInPage() {
     const text = textOf(card);
     if (title.length < 3 || text.length < 8) return false;
 
-    if (/^\s*(paint|paints|skin|livery|upgrade|upgrades|insurance|gear|item|items|poster|armor|weapon|ticket|coupon)\b/i.test(title)) {
+    if (/^\s*(paint|paints|skin|livery|insurance|gear|item|items|poster|armor|weapon|ticket|coupon)\b/i.test(title)) {
       return false;
+    }
+
+    if (/\b(upgrade|upgrades)\b/i.test(title) || /\bto\s+.+\bupgrade\b/i.test(text) || /\bship\s+upgrades?\b/i.test(text)) {
+      return !!(targetShipNameFromUpgradeText(title) || targetShipNameFromUpgradeText(text));
     }
 
     return /\bstandalone\s+(ships?|vehicles?)\b/i.test(title) || /^\s*(ships?|vehicles?)\s*[-:]/i.test(title);
@@ -153,7 +188,7 @@ async function scrapeHangarInPage() {
     const title = titleOfCard(card, index);
     const text = textOf(card);
     const className = card.getAttribute('data-class-name') || card.getAttribute('data-ship-code') || null;
-    const shipName = title.replace(/^\s*standalone\s+(ships?|vehicles?)\s*[-:]\s*/i, '').trim() || title;
+    const shipName = shipNameFromPledge(card, index);
 
     return {
       externalId: dataId || cleanUrl(link?.getAttribute('href')) || `${title}-${index}`,
@@ -172,13 +207,6 @@ async function scrapeHangarInPage() {
     };
   }
 
-  async function fetchDocument(url) {
-    const response = await fetch(url, { credentials: 'include' });
-    if (!response.ok) throw new Error(`RSI hangar page request failed (${response.status})`);
-    const html = await response.text();
-    return new DOMParser().parseFromString(html, 'text/html');
-  }
-
   function pageNumbers(root) {
     return [...root.querySelectorAll('button, a')]
       .map((node) => Number(controlLabel(node)))
@@ -194,23 +222,12 @@ async function scrapeHangarInPage() {
       throw new Error('Not on Roberts Space Industries');
     }
 
-    const firstUrl = pageUrl(1);
-    const firstDocument = await fetchDocument(firstUrl);
-    const pages = maxPage(firstDocument);
-    const entries = [];
-
-    for (let page = 1; page <= pages; page += 1) {
-      const url = pageUrl(page);
-      const pageDocument = page === 1 ? firstDocument : await fetchDocument(url);
-      const cards = findCards(pageDocument);
-      entries.push(...cards.map((card, index) => extractCard(card, index, url)));
-    }
-
-    const unique = new Map();
-    for (const entry of entries) {
-      if (!unique.has(entry.externalId)) unique.set(entry.externalId, entry);
-    }
-    return { success: true, entries: [...unique.values()] };
+    const cards = findCards(document);
+    return {
+      success: true,
+      pages: maxPage(document),
+      entries: cards.map((card, index) => extractCard(card, index, window.location.href)),
+    };
   } catch (error) {
     return {
       success: false,
