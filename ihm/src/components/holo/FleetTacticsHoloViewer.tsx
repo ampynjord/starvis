@@ -25,6 +25,7 @@ interface Props {
   ships: FleetShip[];
   selectedId: number | null;
   onSelect: (id: number) => void;
+  layoutMode?: 'positions' | 'row';
   onPositionChange?: (id: number, position: { gridX: number; gridZ: number }) => void;
   onGroupPositionChange?: (updates: Array<{ id: number; gridX: number; gridZ: number }>) => void;
   tacticalMarkers?: TacticalMarker[];
@@ -49,6 +50,7 @@ export function FleetTacticsHoloViewer({
   ships,
   selectedId,
   onSelect,
+  layoutMode = 'positions',
   onPositionChange,
   onGroupPositionChange,
   tacticalMarkers = [],
@@ -671,6 +673,7 @@ export function FleetTacticsHoloViewer({
       const gap = getGap();
       const widestShip = Math.max(...entries.map((entry) => entry.halfWidth * 2), 0);
       const forcedGap = Math.max(gap, widestShip * 1.35, 360);
+      const forceRowLayout = layoutMode === 'row';
       let x = -totalSpan / 2;
       const explicitPositions = entries
         .map((entry) => ({
@@ -688,10 +691,10 @@ export function FleetTacticsHoloViewer({
       );
       const forcedStartX = -((entries.length - 1) * forcedGap) / 2;
       entries.forEach((e, index) => {
-        const autoX = hasOverlappingExplicitPositions ? forcedStartX + index * forcedGap : x + e.halfWidth;
+        const autoX = forceRowLayout || hasOverlappingExplicitPositions ? forcedStartX + index * forcedGap : x + e.halfWidth;
         const hasExplicitPosition = Number.isFinite(e.ship.gridX ?? NaN) && Number.isFinite(e.ship.gridZ ?? NaN);
-        e.root.position.x = hasExplicitPosition && !hasOverlappingExplicitPositions ? Number(e.ship.gridX) : autoX;
-        e.root.position.z = hasExplicitPosition && !hasOverlappingExplicitPositions ? Number(e.ship.gridZ) : (hasOverlappingExplicitPositions ? (index % 2) * forcedGap * 0.25 : 0);
+        e.root.position.x = hasExplicitPosition && !forceRowLayout && !hasOverlappingExplicitPositions ? Number(e.ship.gridX) : autoX;
+        e.root.position.z = hasExplicitPosition && !forceRowLayout && !hasOverlappingExplicitPositions ? Number(e.ship.gridZ) : 0;
         x += e.halfWidth * 2 + gap;
       });
     };
