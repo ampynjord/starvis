@@ -121,6 +121,8 @@ async function findOrOpenHangarTab() {
 async function scrapeHangarTab(tabId) {
   await navigateTab(tabId, RSI_HANGAR_URL);
   await waitForHangarReady(tabId);
+  await applyStandaloneShipsFilter(tabId);
+  await waitForHangarReady(tabId);
   const firstPage = await waitForScrapedHangarPage(tabId, 1, null);
   if (!firstPage?.success) return firstPage;
 
@@ -143,6 +145,57 @@ async function scrapeHangarTab(tabId) {
     if (!unique.has(entry.externalId)) unique.set(entry.externalId, entry);
   }
   return { success: true, entries: [...unique.values()] };
+}
+
+async function applyStandaloneShipsFilter(tabId) {
+  await executeScriptResult({
+    target: { tabId },
+    func: applyStandaloneShipsFilterInPage,
+  }).catch(() => null);
+}
+
+async function applyStandaloneShipsFilterInPage() {
+  const sleepInPage = (ms) =>
+    new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    });
+  const labelText = (node) =>
+    (node?.textContent || node?.getAttribute?.('aria-label') || node?.getAttribute?.('title') || '').replace(/\s+/g, ' ').trim();
+  const standalonePattern = /\bstandalone\s+ships?\b/i;
+
+  const beforeSignature = document.body?.innerText?.slice(0, 2000) ?? '';
+  for (const select of [...document.querySelectorAll('select')]) {
+    const option = [...select.options].find((candidate) => standalonePattern.test(labelText(candidate)));
+    if (!option) continue;
+    if (select.value !== option.value) {
+      select.value = option.value;
+      select.dispatchEvent(new Event('input', { bubbles: true }));
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+      await sleepInPage(1600);
+    }
+    return { applied: true, mode: 'select' };
+  }
+
+  const controls = [...document.querySelectorAll('button, [role="button"], [aria-haspopup], .select, [class*="select"]')];
+  const filterControl = controls.find((node) => /(^|\b)(all|game packages|upgrades|standalone ships)(\b|$)/i.test(labelText(node)));
+  if (filterControl instanceof HTMLElement) {
+    filterControl.click();
+    await sleepInPage(500);
+    const option = [...document.querySelectorAll('button, a, li, option, [role="option"], [class*="option"]')].find((node) =>
+      standalonePattern.test(labelText(node)),
+    );
+    if (option instanceof HTMLElement) {
+      option.click();
+      await sleepInPage(1800);
+      return {
+        applied: true,
+        mode: 'custom',
+        changed: (document.body?.innerText?.slice(0, 2000) ?? '') !== beforeSignature,
+      };
+    }
+  }
+
+  return { applied: false };
 }
 
 async function waitForScrapedHangarPage(tabId, expectedPage, previousSignature) {
