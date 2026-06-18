@@ -76,8 +76,8 @@ describe('CorporationService', () => {
           findMany: vi
             .fn()
             .mockResolvedValueOnce([
-              { id: 10, sourceExternalId: 'pledge-1' },
-              { id: 11, sourceExternalId: 'stale-pledge' },
+              { id: 10, gridX: 0, gridZ: 0, source: 'rsi_hangar', sourceExternalId: 'pledge-1' },
+              { id: 11, gridX: 36, gridZ: 0, source: 'rsi_hangar', sourceExternalId: 'stale-pledge' },
             ])
             .mockResolvedValueOnce([{ id: 10, itemClassName: 'AEGS_Gladius', shipUuid: 'ship-uuid-1' }]),
           upsert: vi.fn((args) => {
@@ -105,6 +105,53 @@ describe('CorporationService', () => {
         },
       });
       expect(db.corporationFleetItem.deleteMany).toHaveBeenCalledWith({ where: { id: { in: [11] } } });
+    });
+
+    it('does not import RSI hangar entries that do not match a known ship', async () => {
+      const db: any = {
+        $queryRawUnsafe: vi.fn().mockResolvedValue([]),
+        $transaction: vi.fn((run) => run(db)),
+        corporationFleetItem: {
+          findMany: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]),
+          upsert: vi.fn(),
+          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+      };
+
+      const result = await new CorporationService(db).syncRsiHangarFleet(7, null, [
+        { externalId: 'paint-1', name: 'Paints - Tiburon - Vermillion Paint' },
+      ]);
+
+      expect(result.imported).toBe(0);
+      expect(result.updated).toBe(0);
+      expect(result.unmatched).toEqual([{ externalId: 'paint-1', label: 'Paints - Tiburon - Vermillion Paint' }]);
+      expect(db.corporationFleetItem.upsert).not.toHaveBeenCalled();
+    });
+
+    it('assigns a side-by-side position to new RSI ships', async () => {
+      const upserts: any[] = [];
+      const db: any = {
+        $queryRawUnsafe: vi.fn().mockResolvedValue([{ uuid: 'ship-uuid-1', class_name: 'AEGS_Gladius', name: 'Gladius' }]),
+        $transaction: vi.fn((run) => run(db)),
+        corporationFleetItem: {
+          findMany: vi
+            .fn()
+            .mockResolvedValueOnce([{ id: 9, gridX: 72, gridZ: 0, source: null, sourceExternalId: null }])
+            .mockResolvedValueOnce([]),
+          upsert: vi.fn((args) => {
+            upserts.push(args);
+            return Promise.resolve({ id: 10 });
+          }),
+          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+      };
+
+      await new CorporationService(db).syncRsiHangarFleet(7, null, [
+        { externalId: 'pledge-1', className: 'AEGS_Gladius', name: 'Gladius' },
+      ]);
+
+      expect(upserts[0].create).toMatchObject({ gridX: 108, gridZ: 0 });
+      expect(upserts[0].update).toMatchObject({ gridX: 108, gridZ: 0 });
     });
   });
 

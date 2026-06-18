@@ -85,6 +85,14 @@ export interface RsiHangarSyncResult {
   items: FleetItemData[];
 }
 
+type ExistingRsiFleetItem = {
+  id: number;
+  gridX: number | null;
+  gridZ: number | null;
+  source: string | null;
+  sourceExternalId: string | null;
+};
+
 const CORP_SELECT = {
   id: true,
   name: true,
@@ -174,6 +182,18 @@ function safePayload(entry: RsiHangarSyncEntry): Record<string, unknown> {
     url: cleanString(entry.url, 500),
     quantity: Number.isInteger(Number(entry.quantity)) ? Math.max(1, Number(entry.quantity)) : 1,
     raw: typeof entry.raw === 'object' && entry.raw !== null ? entry.raw : undefined,
+  };
+}
+
+function nextFleetGridPosition(occupied: Array<{ gridX?: number | null }>, index: number): { gridX: number; gridZ: number } {
+  const fallbackGap = 36;
+  const rightEdge = occupied.reduce((max, item, itemIndex) => {
+    const x = typeof item.gridX === 'number' && Number.isFinite(item.gridX) ? item.gridX : itemIndex * fallbackGap;
+    return Math.max(max, x);
+  }, Number.NEGATIVE_INFINITY);
+  return {
+    gridX: Number.isFinite(rightEdge) ? rightEdge + fallbackGap : index * fallbackGap,
+    gridZ: 0,
   };
 }
 
@@ -687,17 +707,21 @@ export class CorporationService {
       entry,
       externalId: stableExternalId(entry, index),
     }));
-    const existing = await this.db.corporationFleetItem.findMany({
+    const existingFleet = (await this.db.corporationFleetItem.findMany({
       where: {
         addedById: userId,
         corporationId,
         itemType: 'ship',
-        source: 'rsi_hangar',
       },
-      select: { id: true, sourceExternalId: true },
-    });
+      select: { id: true, gridX: true, gridZ: true, source: true, sourceExternalId: true },
+    })) as ExistingRsiFleetItem[];
+    const existing = existingFleet.filter((item) => item.source === 'rsi_hangar');
 
-    const existingIds = new Set(existing.map((item: any) => item.sourceExternalId).filter(Boolean));
+    const existingIds = new Set(existing.map((item) => item.sourceExternalId).filter(Boolean));
+    const existingByExternalId = new Map(
+      existing.filter((item) => item.sourceExternalId).map((item) => [String(item.sourceExternalId), item]),
+    );
+    const occupiedPositions: Array<{ gridX?: number | null }> = [...existingFleet];
     const touchedIds = new Set<string>();
     const unmatched: Array<{ externalId: string; label: string }> = [];
     let imported = 0;
@@ -705,13 +729,21 @@ export class CorporationService {
 
     const run = async (tx: any) => {
       for (const item of normalized) {
-        touchedIds.add(item.externalId);
         const match = await this.findShipMatch(item.entry);
         const label =
           match.name || cleanString(item.entry.name) || cleanString(item.entry.label) || cleanString(item.entry.title) || match.className;
-        if (!match.uuid) unmatched.push({ externalId: item.externalId, label });
+        if (!match.uuid) {
+          unmatched.push({ externalId: item.externalId, label });
+          continue;
+        }
+
+        touchedIds.add(item.externalId);
         const payload = safePayload(item.entry);
         const quantity = Number.isInteger(Number(item.entry.quantity)) ? Math.max(1, Number(item.entry.quantity)) : 1;
+        const existingItem = existingByExternalId.get(item.externalId);
+        const needsPosition = !existingItem || typeof existingItem.gridX !== 'number' || typeof existingItem.gridZ !== 'number';
+        const position = needsPosition ? nextFleetGridPosition(occupiedPositions, occupiedPositions.length) : null;
+        if (position) occupiedPositions.push(position);
 
         await tx.corporationFleetItem.upsert({
           where: {
@@ -734,6 +766,7 @@ export class CorporationService {
             sourcePayload: payload,
             sourceSyncedAt: syncedAt,
             addedById: userId,
+            ...(position ? position : {}),
           },
           update: {
             corporationId,
@@ -743,6 +776,7 @@ export class CorporationService {
             sourceLabel: label,
             sourcePayload: payload,
             sourceSyncedAt: syncedAt,
+            ...(position ? position : {}),
           },
         });
 
