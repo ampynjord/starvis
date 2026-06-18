@@ -366,36 +366,42 @@ function RackCard({ rack, missiles }: { rack: LoadoutNode; missiles: LoadoutNode
     : null;
   const sig = missileNode?.missile_signal_type;
 
+  const capacity = missiles.length || (rack.rack_count != null ? Number(rack.rack_count) : 0);
+
   return (
-    <div className="flex flex-col rounded-md border border-orange-900/40 bg-orange-950/10 hover:brightness-110 transition-all overflow-hidden">
-      <div className="flex items-center justify-between px-2 pt-1.5 pb-1 border-b border-orange-900/30">
-        <span className="text-[9px] font-mono-sc text-slate-600 truncate flex-1">
+    <div className="flex flex-col rounded-md border border-rose-900/40 bg-rose-950/10 hover:brightness-110 transition-all overflow-hidden">
+      <div className="flex items-center justify-between gap-1 px-2 pt-1.5 pb-1 border-b border-rose-900/30">
+        <span className="text-[9px] font-mono-sc text-slate-600 truncate flex-1 min-w-0">
           {cleanPortName(rack.port_name)}
         </span>
-        <SizeBadge size={rack.component_size ?? rack.port_max_size} />
+        <div className="flex items-center gap-1 shrink-0">
+          <span className="text-[8px] font-mono-sc text-rose-300 bg-rose-950/40 border border-rose-900/60 rounded-sm px-1 py-0.5 leading-none">
+            Rack
+          </span>
+          <SizeBadge size={rack.component_size ?? rack.port_max_size} />
+        </div>
       </div>
       <div className="flex-1 px-2 py-1.5 space-y-1">
-        <p className="text-[9px] font-mono-sc text-orange-400/70 truncate">
+        <p className="text-[11px] font-semibold text-rose-200 leading-tight wrap-break-word">
           {rack.component_uuid
-            ? <Link href={`/components/${rack.component_uuid}`} className="hover:text-orange-300 transition-colors">{rackName}</Link>
+            ? <Link href={`/components/${rack.component_uuid}`} className="hover:text-rose-100 transition-colors">{rackName}</Link>
             : rackName}
         </p>
         {missileName ? (
-          <p className="text-[11px] font-semibold text-slate-200 leading-tight wrap-break-word">
+          <p className="text-[10px] font-mono-sc text-slate-400 truncate">
+            <span className="text-slate-600">loads </span>
             {missileNode?.component_uuid
               ? <Link href={`/components/${missileNode.component_uuid}`} className="hover:text-cyan-400 transition-colors">{missileName}</Link>
               : missileName}
           </p>
         ) : (
-          <p className="text-[10px] font-mono-sc text-slate-700 italic">— no missile —</p>
+          <p className="text-[10px] font-mono-sc text-slate-700 italic">— no munition —</p>
         )}
-        {(dmg || sig || missiles.length > 0) && (
-          <div className="flex flex-wrap gap-x-2 gap-y-0.5 pt-0.5">
-            {dmg && <StatPill label="dmg" value={dmg} color="text-orange-400" />}
-            {sig && <StatPill label="sig" value={sig} color="text-violet-400" />}
-            {missiles.length > 0 && <StatPill label="x" value={missiles.length} />}
-          </div>
-        )}
+        <div className="flex flex-wrap gap-x-2 gap-y-0.5 pt-0.5">
+          {capacity > 0 && <StatPill label="capacity" value={`${capacity}×`} color="text-rose-300" />}
+          {dmg && <StatPill label="dmg/ea" value={dmg} color="text-orange-400" />}
+          {sig && <StatPill label="sig" value={sig} color="text-violet-400" />}
+        </div>
       </div>
     </div>
   );
@@ -911,7 +917,7 @@ function ModuleCard({ entry, onModuleChange }: {
           )}
           {hasRacks && (
             <div>
-              <p className="text-[8px] font-mono-sc text-orange-400/60 uppercase tracking-wider mb-1.5">Ordnance</p>
+              <p className="text-[8px] font-mono-sc text-rose-400/60 uppercase tracking-wider mb-1.5">Ordnance Racks</p>
               <div className="grid grid-cols-2 gap-1.5">
                 {sub.racks.map((r, i) => <RackCard key={i} rack={r.rack} missiles={r.missiles} />)}
               </div>
@@ -963,7 +969,7 @@ function OrdnanceCard({ node }: { node: LoadoutNode }) {
         </span>
         <div className="flex items-center gap-1 shrink-0">
           <span className="text-[8px] font-mono-sc text-orange-300 bg-orange-950/40 border border-orange-900/60 rounded-sm px-1 py-0.5 leading-none">
-            Ordnance
+            Munition
           </span>
           <SizeBadge size={node.component_size} />
         </div>

@@ -7,8 +7,8 @@
  *   - mining_compositions    (~185 entries) — rock types (asteroid, surface, etc.)
  *   - mining_composition_parts              — mineral percentages per rock type
  */
-import type { DataForgeContext } from './dataforge-utils.js';
-import logger from './logger.js';
+import type { DataForgeContext } from '../dataforge/dataforge-utils.js';
+import logger from '../logger.js';
 
 export interface MiningElement {
   uuid: string;

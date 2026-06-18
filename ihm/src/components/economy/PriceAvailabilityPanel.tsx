@@ -36,6 +36,7 @@ export interface PriceAvailabilityRow {
   source_type?: string | null;
   source_name?: string | null;
   source?: string | null;
+  updated_at?: string | null;
 }
 
 function toNumber(value: number | string | null | undefined) {

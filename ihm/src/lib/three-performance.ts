@@ -3,7 +3,7 @@ import * as THREE from 'three';
 export function getThreePixelRatio() {
   if (typeof window === 'undefined') return 1;
   const isSmallScreen = window.matchMedia('(max-width: 768px)').matches;
-  return Math.min(window.devicePixelRatio || 1, isSmallScreen ? 1.25 : 1.5);
+  return Math.min(window.devicePixelRatio || 1, isSmallScreen ? 1.5 : 2);
 }
 
 export function createVisibilityTracker(element: HTMLElement, onChange?: (visible: boolean) => void) {

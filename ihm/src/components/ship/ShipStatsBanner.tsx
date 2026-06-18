@@ -239,25 +239,42 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
           ))}
         </div>
 
-        {/* Agility — ships only */}
+        {/* Agility — ships only (default gauge + boost overgauge) */}
         {!isGroundOrGravlev && (
           <div className="grid grid-cols-3 gap-1.5">
             {[
-              { label: 'Pitch', val: ship.pitch_max, max: 130, color: 'bg-emerald-600' },
-              { label: 'Yaw',   val: ship.yaw_max,   max: 130, color: 'bg-emerald-600' },
-              { label: 'Roll',  val: ship.roll_max,  max: 260, color: 'bg-teal-600' },
-            ].map(({ label, val, max, color }) => (
-              <div key={label} className="flex flex-col items-center gap-1 rounded-md border border-slate-800 bg-slate-900/40 py-2 px-1">
-                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest">{label}</span>
-                <div className="w-3 h-10 bg-slate-800 rounded-full overflow-hidden flex flex-col-reverse">
-                  <div
-                    className={`w-full rounded-full ${color}`}
-                    style={{ height: `${Math.min(100, (n(val) / max) * 100)}%` }}
-                  />
+              { label: 'Pitch', val: ship.pitch_max, boost: boostedPitch, staticMax: 130, color: 'bg-emerald-600' },
+              { label: 'Yaw',   val: ship.yaw_max,   boost: boostedYaw,   staticMax: 130, color: 'bg-emerald-600' },
+              { label: 'Roll',  val: ship.roll_max,  boost: boostedRoll,  staticMax: 260, color: 'bg-teal-600' },
+            ].map(({ label, val, boost, staticMax, color }) => {
+              const base = n(val);
+              const boostVal = boost != null ? n(boost) : null;
+              const hasBoost = boostVal != null && boostVal > base;
+              const gaugeMax = Math.max(staticMax, boostVal ?? 0, base);
+              const basePct = gaugeMax > 0 ? Math.min(100, (base / gaugeMax) * 100) : 0;
+              const boostPct = boostVal != null && gaugeMax > 0 ? Math.min(100, (boostVal / gaugeMax) * 100) : 0;
+              return (
+                <div key={label} className="flex flex-col items-center gap-1 rounded-md border border-slate-800 bg-slate-900/40 py-2 px-1">
+                  <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest">{label}</span>
+                  <div className="relative w-3 h-10 bg-slate-800 rounded-full overflow-hidden">
+                    {hasBoost && (
+                      <div
+                        className="absolute inset-x-0 bottom-0 rounded-full bg-amber-500/40"
+                        style={{ height: `${boostPct}%` }}
+                      />
+                    )}
+                    <div
+                      className={`absolute inset-x-0 bottom-0 rounded-full ${color}`}
+                      style={{ height: `${basePct}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] font-mono-sc text-slate-300 tabular-nums">{fV(val)}°</span>
+                  {hasBoost && (
+                    <span className="text-[9px] font-mono-sc text-amber-400 tabular-nums">↑{boostVal.toFixed(0)}°</span>
+                  )}
                 </div>
-                <span className="text-[10px] font-mono-sc text-slate-300 tabular-nums">{fV(val)}°</span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -274,27 +291,16 @@ export function ShipStatsBanner({ ship, loadout, category = 'ship' }: Props) {
           </div>
         )}
 
-        {/* Boosted angles + ramp — ships only */}
-        {!isGroundOrGravlev && (boostedPitch != null || rampUp != null) && (
-          <div className="grid grid-cols-2 gap-1.5 mt-2">
-            {boostedPitch != null && (
-              <div className="flex flex-col items-center rounded-md border border-amber-900/30 bg-amber-950/10 py-1.5 px-1">
-                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Boost °/s</span>
-                <span className="text-[11px] font-orbitron font-bold text-amber-400 tabular-nums">
-                  {boostedPitch?.toFixed(1)}° / {boostedYaw?.toFixed(1)}° / {boostedRoll?.toFixed(1)}°
-                </span>
-                <span className="text-[9px] font-mono-sc text-slate-700">P / Y / R</span>
-              </div>
-            )}
-            {rampUp != null && (
-              <div className="flex flex-col items-center rounded-md border border-amber-900/30 bg-amber-950/10 py-1.5 px-1">
-                <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Boost Ramp</span>
-                <span className="text-[11px] font-orbitron font-bold text-amber-400 tabular-nums">
-                  ↑{n(rampUp).toFixed(1)}s ↓{n(rampDown).toFixed(1)}s
-                </span>
-                <span className="text-[9px] font-mono-sc text-slate-700">Up / Down</span>
-              </div>
-            )}
+        {/* Boost ramp — ships only */}
+        {!isGroundOrGravlev && rampUp != null && (
+          <div className="mt-2">
+            <div className="flex flex-col items-center rounded-md border border-amber-900/30 bg-amber-950/10 py-1.5 px-1">
+              <span className="text-[9px] font-mono-sc text-slate-600 uppercase tracking-widest mb-0.5">Boost Ramp</span>
+              <span className="text-[11px] font-orbitron font-bold text-amber-400 tabular-nums">
+                ↑{n(rampUp).toFixed(1)}s ↓{n(rampDown).toFixed(1)}s
+              </span>
+              <span className="text-[9px] font-mono-sc text-slate-700">Up / Down</span>
+            </div>
           </div>
         )}
       </div>

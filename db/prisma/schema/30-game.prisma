@@ -442,6 +442,71 @@ model CommodityPrice {
   @@schema("game")
 }
 
+// ─── UEX market data (external, crowd-sourced live prices) ──────────────────────
+//
+//  Sourced from https://api.uexcorp.uk (UEX Corp). The in-game economy (buy/rent
+//  prices, modern dealer locations) is server-authoritative and NOT present in the
+//  P4K, so these tables hold the canonical pricing surfaced by the API/IHM.
+//  Vehicles are mapped to game.ships via a byte-reordered Star Citizen UUID.
+
+model UexTerminal {
+  id           Int       @id @default(autoincrement())
+  env          String    @default("live") @db.VarChar(10)
+  uexId        Int       @map("uex_id")
+  type         String    @db.VarChar(40)
+  name         String    @db.VarChar(255)
+  nickname     String?   @db.VarChar(255)
+  code         String?   @db.VarChar(40)
+  starSystem   String?   @map("star_system") @db.VarChar(100)
+  planet       String?   @db.VarChar(100)
+  orbit        String?   @db.VarChar(100)
+  moon         String?   @db.VarChar(100)
+  city         String?   @db.VarChar(100)
+  spaceStation String?   @map("space_station") @db.VarChar(150)
+  outpost      String?   @db.VarChar(150)
+  companyName  String?   @map("company_name") @db.VarChar(150)
+  isAvailable  Boolean   @default(true) @map("is_available")
+  gameVersion  String?   @map("game_version") @db.VarChar(20)
+  screenshot   String?   @db.VarChar(500)
+  dateModified DateTime? @map("date_modified")
+  rawJson      Json?     @map("raw_json")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([uexId, env])
+  @@index([type, env])
+  @@index([env])
+  @@map("uex_terminals")
+  @@schema("game")
+}
+
+model UexVehiclePrice {
+  id            Int       @id @default(autoincrement())
+  env           String    @default("live") @db.VarChar(10)
+  uexId         Int       @map("uex_id")
+  priceKind     String    @map("price_kind") @db.VarChar(10)
+  uexVehicleId  Int       @map("uex_vehicle_id")
+  shipUuid      String?   @map("ship_uuid") @db.Char(36)
+  vehicleName   String?   @map("vehicle_name") @db.VarChar(255)
+  terminalUexId Int       @map("terminal_uex_id")
+  price         Decimal?  @db.Decimal(14, 2)
+  priceMin      Decimal?  @map("price_min") @db.Decimal(14, 2)
+  priceMinWeek  Decimal?  @map("price_min_week") @db.Decimal(14, 2)
+  dateModified  DateTime? @map("date_modified")
+  rawJson       Json?     @map("raw_json")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([uexId, priceKind, env])
+  @@index([shipUuid, env])
+  @@index([uexVehicleId, env])
+  @@index([terminalUexId, env])
+  @@index([priceKind])
+  @@index([env])
+  @@map("uex_vehicle_prices")
+  @@schema("game")
+}
+
 // ─── Mining ───────────────────────────────────────────────────────────────────
 
 model MiningElement {

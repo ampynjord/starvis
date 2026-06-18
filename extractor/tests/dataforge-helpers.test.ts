@@ -2,7 +2,7 @@
  * Tests for DataForge utility helpers
  */
 import { describe, expect, it } from 'vitest';
-import { resolveComponentName, resolveLocKey } from '../src/dataforge-utils.js';
+import { resolveComponentName, resolveLocKey, scUuidToDataForgeUuid } from '../src/dataforge/dataforge-utils.js';
 
 // ── resolveLocKey ──
 describe('resolveLocKey', () => {
@@ -64,6 +64,24 @@ describe('resolveComponentName', () => {
   it('inserts spaces between camelCase', () => {
     const result = resolveComponentName('BEHR_LaserRepeater');
     expect(result).toContain('Laser Repeater');
+  });
+});
+
+// ── scUuidToDataForgeUuid ──
+// UEX exposes vehicle UUIDs in the byte-reordered "SC" form. They must be re-ordered
+// to match game.ships.uuid (DataForge form) before joining UEX prices to our ships.
+describe('scUuidToDataForgeUuid', () => {
+  it('reorders a UEX ship uuid to its DataForge form (Origin 100i)', () => {
+    expect(scUuidToDataForgeUuid('6135a874-4cb1-4f49-9f29-5781e5991f2b')).toBe('4cb14f49-a874-6135-2b1f-99e58157299f');
+  });
+
+  it('is case-insensitive on input and lowercases output', () => {
+    expect(scUuidToDataForgeUuid('6135A874-4CB1-4F49-9F29-5781E5991F2B')).toBe('4cb14f49-a874-6135-2b1f-99e58157299f');
+  });
+
+  it('returns the input unchanged for malformed uuids', () => {
+    expect(scUuidToDataForgeUuid('not-a-uuid')).toBe('not-a-uuid');
+    expect(scUuidToDataForgeUuid('')).toBe('');
   });
 });
 

@@ -1,4 +1,4 @@
-import type { GameInsightRecord } from './game-insight-extractor.js';
+import type { GameInsightRecord } from '../extractors/game-insight-extractor.js';
 
 type RawObject = Record<string, unknown>;
 

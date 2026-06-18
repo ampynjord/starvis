@@ -1,0 +1,42 @@
+name: Setup workspace
+description: Checkout-aware Node.js setup with dependency and Prisma client caching for the STARVIS monorepo.
+
+inputs:
+  node-version:
+    description: Node.js version to install.
+    default: '22'
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v5
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+
+    - name: Restore dependencies and Prisma client
+      id: deps-cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          node_modules
+          api/node_modules
+          ihm/node_modules
+          extractor/node_modules
+          bot/node_modules
+          db/node_modules
+          extensions/rsi-hangar-sync/node_modules
+          db/generated
+        key: deps-${{ runner.os }}-node${{ inputs.node-version }}-${{ hashFiles('package-lock.json', 'db/prisma/schema/**') }}
+        restore-keys: |
+          deps-${{ runner.os }}-node${{ inputs.node-version }}-
+
+    # On an exact cache hit, node_modules and the gitignored Prisma client
+    # (db/generated, rebuilt by the db postinstall) are restored, so the slow
+    # `npm ci` + `prisma generate` is skipped entirely. On a miss, npm ci runs
+    # and its postinstall regenerates the Prisma client.
+    - name: Install dependencies
+      if: steps.deps-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm ci --prefer-offline --no-audit

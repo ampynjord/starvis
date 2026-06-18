@@ -26,6 +26,40 @@ The stable command entrypoint is `extractor/extract.ts`. CLI orchestration lives
 
 Shared extractor defaults live in `extractor/src/extractor-config.ts`. Module names, aliases and P4K/network grouping live in `extractor/src/module-registry.ts`; keep that registry as the single source of truth when adding or renaming modules. Data-driven configuration that used to be hard-coded is stored under `extractor/src/data/`, including default P4K lookup paths and modular ship slot rules.
 
+### Source layout
+
+`extractor/src/` is organized by responsibility:
+
+| Folder | Responsibility |
+|---|---|
+| `cli/` | Command-line surface: entrypoint, option parsing, module selection, runtime resolution and the interactive `wizard`. |
+| `dataforge/` | DataForge access layer: P4K provider, CryXML and DataForge parsers, shared DataForge helpers and loadout parsing. |
+| `extractors/` | Per-domain extractors that turn DataForge records into structured rows (ships/components/items/commodities/mining/missions/crafting/paints/shops/locations/game-insights). |
+| `scrapers/` | Network scrapers for external sources (CTM, RSI content, ship galleries, starmap assets). |
+| `services/` | Orchestration and cross-cutting services: extraction service/state, RSI sync, localization, wiki enrichment and starmap cross-referencing. |
+| `normalizers/` | Canonical-source normalization, component taxonomy and game-insight normalization. |
+| `persisters/` | Database writers, one module per domain table family. |
+| `audits/` | Read-only data-quality audits (e.g. static-data correlation). |
+| `data/` | Static, data-driven configuration (default P4K paths, modular ship rules, extractor configs). |
+
+Foundational shared modules (`config.ts`, `extractor-config.ts`, `logger.ts`, `module-registry.ts`) stay at the `src/` root.
+
+### Game file organization & extraction coverage
+
+For a reference schematic of how Star Citizen's `Data.p4k` is organized, and a
+data-by-data truth table of what is genuinely extractable from the P4K versus what
+lives server-side (modern shop prices, rentals), see
+[docs/sc-file-organization.md](docs/sc-file-organization.md).
+
+### Interactive wizard
+
+If you do not want to memorize flags, run the guided wizard. It asks for the environment, modules and safety/network options, prints the exact equivalent `extract.ts` command, then runs it on confirmation:
+
+```bash
+npm run wizard --workspace=@starvis/extractor
+```
+
+
 ---
 
 ## Database Configuration
@@ -60,6 +94,7 @@ Then use matching DB values in `extractor/.env.extractor.dev`.
 | `SHIP_GALLERY_INTER_SHIP_DELAY_MS` | Delay between official RSI ship gallery page loads. Default: `6000`. |
 | `SHIP_GALLERY_RETRIES` | Network retries per official RSI ship gallery page. Default: `4`. |
 | `SHIP_GALLERY_RETRY_BASE_DELAY_MS` | Base retry backoff for gallery scraping. Default: `8000`. |
+| `UEX_API_BASE` | Base URL for the UEX API used by the `uex` module. Default: `https://api.uexcorp.uk/2.0`. |
 | `LOG_LEVEL` | `debug`, `info`, `warn`, `error`, or `silent`. |
 
 Typical Windows paths:
@@ -129,7 +164,7 @@ P4K modules require `Data.p4k`:
 | `missions` | Contracts, rewards, factions, legality and blueprint rewards. |
 | `crafting` | Recipes, ingredients, modifiers and station requirements. |
 | `paints` | Ship liveries and paints. |
-| `shops` | Extracted in-game shop locations and franchises from Prefab XMLs and DataForge ShopFranchise records, plus real `Data/Scripts/ShopInventories/*.json` inventories. Shop UUIDs are resolved through DataForge and the official `Data/Libs/RoboTools/RoboTrucker/ItemMarks.xml` index, which maps many vehicle shop entries to their real class names. Purchasable ships, components, FPS items and commodities are matched to normalized tables where possible. Buy/sell prices, stock metadata, source and confidence are saved; rental prices are saved when the source file exposes rental offering prices. After every shop import, the extractor also refreshes `game.ships.game_data.market` from official P4K shop inventory data (`in_game_purchase`, `in_game_rental`, `in_game_purchase_and_rental`, or `no_official_terminal_offer`) so new/changed vehicle prices are picked up automatically on game updates. |
+| `shops` | Extracted in-game shop locations and franchises from Prefab XMLs and DataForge ShopFranchise records, plus real `Data/Scripts/ShopInventories/*.json` inventories. Shop UUIDs are resolved through DataForge and the official `Data/Libs/RoboTools/RoboTrucker/ItemMarks.xml` index, which maps many vehicle shop entries to their real class names. Purchasable ships, components, FPS items and commodities are matched to normalized tables where possible. Buy/sell prices, stock metadata, source and confidence are saved; rental prices are saved when the source file exposes rental offering prices. Vehicle market summaries (`game.ships.game_data.market`) are no longer driven by P4K shop inventories — they are refreshed from UEX by the `uex` module (see below). |
 | `locations` | Systems, planets, moons, cities, stations and child locations. When `starmap` is available in the same run, extracted P4K locations are linked to RSI Starmap rows with a match method, score and confidence. Manual/semi-automatic overrides can be stored in `game.starmap_location_aliases`. |
 | `game-insights` | Extended discovery records plus normalized tables for factions, reputation standings/scopes, loot tables/archetypes, blueprint rewards, ammo and inventory containers. |
 
@@ -143,6 +178,7 @@ Network modules do not require `Data.p4k`:
 | `comm-links` | RSI Comm-Link articles and images. |
 | `starmap` | RSI Starmap systems, locations and jump points. |
 | `starmap-assets` | Public RSI Starmap asset URL metadata for systems, stars, planets, moons, stations and other locations. Stores URLs/metadata only; it does not copy or redistribute RSI files. |
+| `uex` | Crowd-sourced ship market data from the [UEX](https://uexcorp.space) API (`api.uexcorp.uk/2.0`). Fetches vehicles, dealer terminals (`vehicle_buy` / `vehicle_rent`) and purchase/rental prices, mapping each UEX vehicle to our `game.ships` via the byte-reordered ship UUID (`scUuidToDataForgeUuid`, normalized-name fallback). Writes `game.uex_terminals` and `game.uex_vehicle_prices`, then refreshes `game.ships.game_data.market` (`source: "uex"`, min purchase/rental price, dealer counts, availability status). This is the canonical in-game price source served to the IHM via the Starvis API — the IHM never calls UEX directly. Aliases: `uex-market`, `uexcorp`, `prices`, `market`. |
 | `ctm` | CTM model metadata and cache. This can take around one hour. |
 
 ---

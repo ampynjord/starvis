@@ -5,7 +5,7 @@
  */
 import type { PoolClient } from 'pg';
 import modularShipConfig from '../data/modular-ship-config.json' with { type: 'json' };
-import { classifyPort, type DataForgeService } from '../dataforge-service.js';
+import { classifyPort, type DataForgeService } from '../dataforge/dataforge-service.js';
 import logger from '../logger.js';
 import type { GameEnv } from '../module-registry.js';
 import type { PersistContext } from './context.js';

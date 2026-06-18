@@ -1,7 +1,7 @@
 /**
  * LOCATIONS (StarMapObject) → locations table
  */
-import { extractLocations } from '../location-extractor.js';
+import { extractLocations } from '../extractors/location-extractor.js';
 import { batchUpsert } from './batch.js';
 import type { PersistContext } from './context.js';
 

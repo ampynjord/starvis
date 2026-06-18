@@ -5,6 +5,7 @@ on:
     branches: ['**']
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -17,20 +18,77 @@ env:
   NEXT_TELEMETRY_DISABLED: '1'
 
 jobs:
+  # ---------------------------------------------------------------------------
+  # Change detection: scopes the expensive jobs to what actually changed.
+  # Pushes to main and manual runs always force the full matrix (run_all).
+  # ---------------------------------------------------------------------------
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      run_all: ${{ steps.decide.outputs.run_all }}
+      api: ${{ steps.filter.outputs.api }}
+      ihm: ${{ steps.filter.outputs.ihm }}
+      extractor: ${{ steps.filter.outputs.extractor }}
+      bot: ${{ steps.filter.outputs.bot }}
+      extension: ${{ steps.filter.outputs.extension }}
+      e2e: ${{ steps.filter.outputs.e2e }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Filter changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            shared: &shared
+              - '.github/workflows/ci.yml'
+              - '.github/actions/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'biome.json'
+            api:
+              - *shared
+              - 'api/**'
+              - 'db/**'
+            ihm:
+              - *shared
+              - 'ihm/**'
+            extractor:
+              - *shared
+              - 'extractor/**'
+              - 'db/**'
+            bot:
+              - *shared
+              - 'bot/**'
+            extension:
+              - *shared
+              - 'extensions/**'
+            e2e:
+              - *shared
+              - 'ihm/**'
+              - 'api/**'
+
+      - name: Decide full run
+        id: decide
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] \
+            || [ "${{ github.ref }}" = "refs/heads/main" ] \
+            || [ "${{ steps.filter.outputs.shared }}" = "true" ]; then
+            echo "run_all=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_all=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Fast lane: cheap, always-on checks that validate the whole repo.
+  # ---------------------------------------------------------------------------
   dependency-audit:
     name: Dependency Audit
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci --prefer-offline --no-audit
-
+      - uses: ./.github/actions/setup
       - name: Critical dependency audit
         run: npm audit --omit=dev --audit-level=critical
 
@@ -49,25 +107,25 @@ jobs:
             file: bot/Dockerfile
     steps:
       - uses: actions/checkout@v6
-
       - uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: ${{ matrix.file }}
           failure-threshold: error
+
+  lint:
+    name: Lint (Biome)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
+      - run: npm run lint:ci
 
   config:
     name: Config, Schema & Docs
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci --prefer-offline --no-audit
+      - uses: ./.github/actions/setup
 
       - name: Validate OpenAPI
         run: npm run openapi:lint --workspace=@starvis/api
@@ -161,22 +219,6 @@ jobs:
           if (failed) process.exit(1);
           NODE
 
-  lint:
-    name: Lint (Biome)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci --prefer-offline --no-audit
-
-      - run: npm run lint:ci
-
   typecheck:
     name: Typecheck (${{ matrix.name }})
     runs-on: ubuntu-latest
@@ -195,16 +237,11 @@ jobs:
             cmd: npm run typecheck --workspace=@starvis/bot
           - name: db
             cmd: npm run typecheck --workspace=@starvis/db
+          - name: extension
+            cmd: npm run typecheck --workspace=@starvis/rsi-hangar-sync-extension
     steps:
       - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci --prefer-offline --no-audit
+      - uses: ./.github/actions/setup
 
       - name: Setup IHM generated Next types
         if: matrix.setupNextTypes == true
@@ -214,9 +251,14 @@ jobs:
 
       - run: ${{ matrix.cmd }}
 
+  # ---------------------------------------------------------------------------
+  # Scoped lane: heavier jobs that only run when their area (or run_all) changed.
+  # ---------------------------------------------------------------------------
   test-api:
     name: Tests API
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.run_all == 'true' || needs.changes.outputs.api == 'true'
     services:
       postgres:
         image: postgres:16-alpine
@@ -240,14 +282,7 @@ jobs:
           --health-retries=10
     steps:
       - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci --prefer-offline --no-audit
+      - uses: ./.github/actions/setup
 
       - name: Apply DB migrations
         run: npm run migrate:deploy --workspace=@starvis/db
@@ -275,72 +310,71 @@ jobs:
           JWT_SECRET: ci_test_secret_at_least_32_chars_long
           ADMIN_API_KEY: ci_admin_key
 
-  test-workspace:
-    name: Tests (${{ matrix.name }})
+  test-extractor:
+    name: Tests Extractor
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: ihm
-            cmd: npm run test --workspace=starvis-ihm -- --reporter=verbose
-          - name: extractor
-            cmd: npm run test --workspace=@starvis/extractor -- --reporter=verbose
+    needs: changes
+    if: needs.changes.outputs.run_all == 'true' || needs.changes.outputs.extractor == 'true'
     steps:
       - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci --prefer-offline --no-audit
-
-      - run: ${{ matrix.cmd }}
+      - uses: ./.github/actions/setup
+      - run: npm run test --workspace=@starvis/extractor -- --reporter=verbose
         env:
           NODE_ENV: test
 
-  build-app:
-    name: Build App (${{ matrix.name }})
+  test-ihm:
+    name: Tests IHM
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: ihm
-            cmd: npm run build --workspace=starvis-ihm
-          - name: bot
-            cmd: npm run build --workspace=@starvis/bot
+    needs: changes
+    if: needs.changes.outputs.run_all == 'true' || needs.changes.outputs.ihm == 'true'
     steps:
       - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
+      - run: npm run test --workspace=starvis-ihm -- --reporter=verbose
+        env:
+          NODE_ENV: test
 
-      - uses: actions/setup-node@v5
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
+  build-ihm:
+    name: Build IHM
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.run_all == 'true' || needs.changes.outputs.ihm == 'true'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
+      - run: npm run build --workspace=starvis-ihm
 
-      - name: Install dependencies
-        run: npm ci --prefer-offline --no-audit
+  build-bot:
+    name: Build Bot
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.run_all == 'true' || needs.changes.outputs.bot == 'true'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
+      - run: npm run build --workspace=@starvis/bot
 
-      - run: ${{ matrix.cmd }}
+  build-extension:
+    name: Build Extension
+    runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.run_all == 'true' || needs.changes.outputs.extension == 'true'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./.github/actions/setup
+      - run: npm run build --workspace=@starvis/rsi-hangar-sync-extension
 
   test-e2e:
     name: Tests E2E (Playwright)
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.run_all == 'true' || needs.changes.outputs.e2e == 'true'
     steps:
       - uses: actions/checkout@v6
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci --prefer-offline --no-audit
+      - uses: ./.github/actions/setup
 
       - name: Cache Playwright browsers
-        uses: actions/cache@v5
+        uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
@@ -351,23 +385,42 @@ jobs:
       - name: Run Playwright tests
         run: npm run test:e2e --workspace=starvis-ihm
 
+  # ---------------------------------------------------------------------------
+  # Aggregation gate. Always runs; fails only if an executed job failed.
+  # Use THIS job as the single required status check in branch protection.
+  # ---------------------------------------------------------------------------
   quality-gate:
     name: Quality Gate
     runs-on: ubuntu-latest
+    if: always()
     needs:
+      - changes
       - dependency-audit
       - dockerfile-lint
       - config
       - lint
       - typecheck
       - test-api
-      - test-workspace
-      - build-app
+      - test-extractor
+      - test-ihm
+      - build-ihm
+      - build-bot
+      - build-extension
       - test-e2e
     steps:
-      - name: All checks passed
-        run: echo "All verification jobs completed successfully."
+      - name: Verify all executed jobs passed
+        run: |
+          results="${{ join(needs.*.result, ',') }}"
+          echo "Job results: $results"
+          if echo "$results" | grep -qE 'failure|cancelled'; then
+            echo "::error::At least one verification job failed."
+            exit 1
+          fi
+          echo "All executed verification jobs passed."
 
+  # ---------------------------------------------------------------------------
+  # Release: build images and deploy, only on main.
+  # ---------------------------------------------------------------------------
   build:
     name: Build Image (${{ matrix.image.name }})
     runs-on: ubuntu-latest

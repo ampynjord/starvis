@@ -10,7 +10,7 @@
  */
 
 import { chromium } from 'playwright';
-import { CTM_INTER_SHIP_DELAY_MS, CTM_WAIT_MS, RSI_BASE_URL } from './config.js';
+import { CTM_INTER_SHIP_DELAY_MS, CTM_WAIT_MS, RSI_BASE_URL } from '../config.js';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 

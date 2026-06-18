@@ -9,9 +9,9 @@
  * Names are resolved via the localization service (global.ini LOC keys).
  */
 
-import locationExtractorConfig from './data/location-extractor-config.json' with { type: 'json' };
-import type { DataForgeContext } from './dataforge-utils.js';
-import logger from './logger.js';
+import locationExtractorConfig from '../data/location-extractor-config.json' with { type: 'json' };
+import type { DataForgeContext } from '../dataforge/dataforge-utils.js';
+import logger from '../logger.js';
 
 export interface LocationRecord {
   uuid: string;

@@ -5,7 +5,7 @@
  * image media from rendered DOM and network responses instead of 3D assets.
  */
 import { chromium } from 'playwright';
-import { RSI_BASE_URL, SHIP_GALLERY_INTER_SHIP_DELAY_MS, SHIP_GALLERY_RETRIES, SHIP_GALLERY_RETRY_BASE_DELAY_MS } from './config.js';
+import { RSI_BASE_URL, SHIP_GALLERY_INTER_SHIP_DELAY_MS, SHIP_GALLERY_RETRIES, SHIP_GALLERY_RETRY_BASE_DELAY_MS } from '../config.js';
 import type { ShipToScrape } from './ctm-scraper.js';
 
 export interface ShipGalleryImage {

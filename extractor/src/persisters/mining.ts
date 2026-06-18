@@ -1,7 +1,7 @@
 /**
  * MINING DATA → mining_elements + mining_compositions + mining_composition_parts tables
  */
-import { extractMiningCompositions, extractMiningElements } from '../mining-extractor.js';
+import { extractMiningCompositions, extractMiningElements } from '../extractors/mining-extractor.js';
 import { batchUpsert } from './batch.js';
 import type { PersistContext } from './context.js';
 

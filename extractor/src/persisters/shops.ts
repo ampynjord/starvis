@@ -3,10 +3,10 @@
  */
 import path from 'node:path';
 
-import { buildLocationSlugIndex, extractShopsFromPrefabs, type ShopExtractRecord } from '../shop-extractor.js';
+import { scUuidToDataForgeUuid } from '../dataforge/dataforge-utils.js';
+import { buildLocationSlugIndex, extractShopsFromPrefabs, type ShopExtractRecord } from '../extractors/shop-extractor.js';
 import { batchUpsert } from './batch.js';
 import type { PersistContext } from './context.js';
-import { updateShipMarketSummaries } from './ship-market-summaries.js';
 
 type InventoryKind = 'ship' | 'component' | 'item' | 'commodity' | 'unknown';
 
@@ -144,21 +144,6 @@ function extractUuid(value: unknown): string | null {
   }
   if (typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)) return id;
   return null;
-}
-
-function shopInventoryUuidToDataForgeUuid(uuid: string): string {
-  const hex = uuid.replace(/-/g, '').toLowerCase();
-  if (!/^[0-9a-f]{32}$/.test(hex)) return uuid;
-  const bytes = hex.match(/../g);
-  if (!bytes || bytes.length !== 16) return uuid;
-  const reordered = [
-    ...bytes.slice(4, 8),
-    ...bytes.slice(2, 4),
-    ...bytes.slice(0, 2),
-    ...bytes.slice(14, 16).reverse(),
-    ...bytes.slice(8, 14).reverse(),
-  ];
-  return `${reordered.slice(0, 4).join('')}-${reordered.slice(4, 6).join('')}-${reordered.slice(6, 8).join('')}-${reordered.slice(8, 10).join('')}-${reordered.slice(10, 16).join('')}`;
 }
 
 const UUID_RE = /^[0-9a-f-]{36}$/i;
@@ -557,7 +542,7 @@ export async function saveShopsData(ctx: PersistContext): Promise<{ shops: numbe
     if (!shopId) continue;
 
     for (const entry of shop.inventory) {
-      const dataForgeUuid = shopInventoryUuidToDataForgeUuid(entry.uuid);
+      const dataForgeUuid = scUuidToDataForgeUuid(entry.uuid);
       const itemMarkClassName =
         entityIndexes.itemMarkClassByUuid.get(entry.uuid.toLowerCase()) ??
         entityIndexes.itemMarkClassByUuid.get(dataForgeUuid.toLowerCase()) ??
@@ -651,10 +636,9 @@ export async function saveShopsData(ctx: PersistContext): Promise<{ shops: numbe
           200,
         )
       : 0;
-  const marketSummary = await updateShipMarketSummaries(ctx);
 
   onProgress?.(
-    `Shops: ${savedShops}/${allShops.length} P4K shops saved; ${deletedInventoryRows ?? 0} old inventory rows and ${deletedCommodityRows ?? 0} old commodity prices removed; ${savedInventory} P4K inventory rows, ${savedCommodityPrices} commodity prices saved (${unmatchedInventory} unmatched UUIDs); vehicle market summary updated for ${marketSummary.ships} ships (${marketSummary.purchasable} purchasable, ${marketSummary.rentable} rentable, ${marketSummary.noTerminalOffer} without extracted terminal offer)`,
+    `Shops: ${savedShops}/${allShops.length} P4K shops saved; ${deletedInventoryRows ?? 0} old inventory rows and ${deletedCommodityRows ?? 0} old commodity prices removed; ${savedInventory} P4K inventory rows, ${savedCommodityPrices} commodity prices saved (${unmatchedInventory} unmatched UUIDs)`,
   );
   return { shops: savedShops, inventory: savedInventory };
 }

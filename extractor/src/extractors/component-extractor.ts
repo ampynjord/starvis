@@ -4,9 +4,9 @@
  * Extracted from DataForgeService.extractAllComponents() to reduce god-class size.
  * Depends on DataForgeContext interface (no circular dependency with DataForgeService).
  */
-import type { DataForgeContext } from './dataforge-utils.js';
-import { resolveComponentName } from './dataforge-utils.js';
-import logger from './logger.js';
+import type { DataForgeContext } from '../dataforge/dataforge-utils.js';
+import { resolveComponentName } from '../dataforge/dataforge-utils.js';
+import logger from '../logger.js';
 
 function mapAttachDefGrade(grade: unknown): string | null {
   if (typeof grade !== 'number' || grade < 1) return null;

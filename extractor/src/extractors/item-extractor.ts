@@ -6,9 +6,9 @@
  *   - items[]      → FPS weapons, armor, clothing, attachments, gadgets, consumables
  *   - commodities[] → Tradeable goods (metals, minerals, gas, food, etc.)
  */
-import type { DataForgeContext } from './dataforge-utils.js';
-import { resolveComponentName } from './dataforge-utils.js';
-import logger from './logger.js';
+import type { DataForgeContext } from '../dataforge/dataforge-utils.js';
+import { resolveComponentName } from '../dataforge/dataforge-utils.js';
+import logger from '../logger.js';
 
 function mapAttachDefGrade(grade: unknown): string | null {
   if (typeof grade !== 'number' || grade < 1) return null;

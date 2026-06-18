@@ -2,7 +2,7 @@
  * Tests for classifyPort — port type classification from loadout data
  */
 import { describe, expect, it } from 'vitest';
-import { classifyPort } from '../src/dataforge-service.js';
+import { classifyPort } from '../src/dataforge/dataforge-service.js';
 
 describe('classifyPort', () => {
   // ── WeaponGun ──

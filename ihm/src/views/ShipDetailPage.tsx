@@ -22,7 +22,7 @@ import { ShipLoadout } from '@/components/ship/ShipLoadout';
 import { ShipStatsBanner } from '@/components/ship/ShipStatsBanner';
 import { CargoGrid } from '@/components/ship/CargoGrid';
 import { ShipHoloViewer } from '@/components/ship/ShipHoloViewer';
-import { fCredits, fMass } from '@/utils/formatters';
+import { fCredits, fDate, fMass } from '@/utils/formatters';
 import { VARIANT_TYPE_LABELS } from '@/utils/constants';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -63,37 +63,37 @@ function shipMarketEmptyCopy(ship: {
 }) {
   if (ship.variant_type === 'collector') {
     return {
-      message: 'No official in-game purchase or rental terminal was extracted for this collector vehicle.',
+      message: 'No in-game purchase or rental terminal is listed on UEX for this collector vehicle.',
       detail: 'Collector and limited vehicles can exist in game data without being sold at a public terminal in the current build.',
     };
   }
   if (ship.variant_type === 'wikelo' || ship.variant_type === 'pyam_exec') {
     return {
-      message: 'No official in-game purchase or rental terminal was extracted for this special variant.',
-      detail: 'Special, reward, event, loot or program variants can be obtainable without a normal shop price in the extracted terminal data.',
+      message: 'No in-game purchase or rental terminal is listed on UEX for this special variant.',
+      detail: 'Special, reward, event, loot or program variants can be obtainable without a normal shop price in the UEX market data.',
     };
   }
   if (ship.is_concept_only) {
     return {
-      message: 'No official in-game purchase or rental terminal was extracted for this concept vehicle.',
+      message: 'No in-game purchase or rental terminal is listed on UEX for this concept vehicle.',
       detail: 'Concept vehicles can have RSI pledge metadata while not being available through in-game terminals yet.',
     };
   }
   if (ship.production_status && !['flight-ready', 'flight_ready'].includes(ship.production_status)) {
     return {
-      message: `No official in-game purchase or rental terminal was extracted for this ${statusLabel(ship.production_status).toLowerCase()} vehicle.`,
-      detail: 'The ship exists in official RSI or game metadata, but current P4K shop inventories do not expose a terminal offer for it.',
+      message: `No in-game purchase or rental terminal is listed on UEX for this ${statusLabel(ship.production_status).toLowerCase()} vehicle.`,
+      detail: 'The ship exists in official RSI or game metadata, but UEX crowd-sourced market data does not list a terminal offer for it.',
     };
   }
   if (ship.store_url) {
     return {
-      message: 'No official in-game purchase or rental terminal was extracted for this vehicle.',
-      detail: 'It has an official RSI page, but Starvis only shows in-game prices when they are present in the extracted game shop inventories.',
+      message: 'No in-game purchase or rental terminal is listed on UEX for this vehicle.',
+      detail: 'It has an official RSI page, but Starvis only shows in-game prices when UEX lists a dealer terminal offer for it.',
     };
   }
   return {
-    message: 'No official in-game purchase or rental terminal was extracted for this vehicle.',
-    detail: 'It may be unavailable for purchase, loot-only, event-only, collector-only, stock-only, or missing from the current P4K shop inventory files.',
+    message: 'No in-game purchase or rental terminal is listed on UEX for this vehicle.',
+    detail: 'It may be unavailable for purchase, loot-only, event-only, collector-only, stock-only, or simply not yet listed in UEX market data.',
   };
 }
 
@@ -227,36 +227,19 @@ function GalleryCarousel({
 
 function OfficialGallerySections({ shipName, images }: { shipName: string; images: ShipGalleryImage[] }) {
   const pledgeImages = images.filter((image) => galleryImageSource(image) === 'pledge');
-  const mediaImages = images.filter((image) => galleryImageSource(image) === 'media');
   const fallbackImages = images.filter((image) => galleryImageSource(image) === 'fallback');
   const mainImages = pledgeImages.length > 0 ? pledgeImages : fallbackImages;
 
+  if (mainImages.length === 0) return null;
+
   return (
     <div className="space-y-3">
-      {mainImages.length > 0 && (
-        <GalleryCarousel
-          shipName={shipName}
-          images={mainImages}
-          title="Pledge Store Gallery"
-          subtitle={`${mainImages.length} official images`}
-        />
-      )}
-      {mediaImages.length > 0 && (
-        <details className="group rounded-sm border border-cyan-900/40 bg-slate-950/60">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 font-mono-sc text-[10px] uppercase tracking-widest text-cyan-400">
-            <span>Additional images</span>
-            <span className="text-slate-600">{mediaImages.length} images</span>
-          </summary>
-          <div className="border-t border-slate-800/60 p-3">
-            <GalleryCarousel
-              shipName={shipName}
-              images={mediaImages}
-              title="Additional Images"
-              subtitle={`${mediaImages.length} extra official images`}
-            />
-          </div>
-        </details>
-      )}
+      <GalleryCarousel
+        shipName={shipName}
+        images={mainImages}
+        title="Pledge Store Gallery"
+        subtitle={`${mainImages.length} official images`}
+      />
     </div>
   );
 }
@@ -418,6 +401,12 @@ export default function ShipDetailPage() {
     },
     [buyLocations],
   );
+  const pricesUpdatedAt = useMemo(() => {
+    const times = buyLocations
+      .map((row) => (row.updated_at ? new Date(row.updated_at).getTime() : Number.NaN))
+      .filter((value) => Number.isFinite(value));
+    return times.length ? new Date(Math.max(...times)) : null;
+  }, [buyLocations]);
 
   if (isLoading) return <LoadingGrid message="LOADING…" />;
   if (error) return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
@@ -593,21 +582,6 @@ export default function ShipDetailPage() {
                 H={Number(ship.size_z) || 0}
                 mass={ship.mass}
               />
-              {(ship.cross_section_x || ship.cross_section_y || ship.cross_section_z) && (
-                <div className="mt-2 pt-2 border-t border-slate-800/60 flex flex-wrap gap-x-4 gap-y-1 items-end">
-                  {[
-                    { k: 'Length', v: ship.cross_section_z },
-                    { k: 'Width',  v: ship.cross_section_x },
-                    { k: 'Height', v: ship.cross_section_y },
-                  ].filter(d => d.v != null).map(({ k, v }) => (
-                    <div key={k} className="flex items-baseline gap-1">
-                      <span className="text-[9px] font-mono-sc text-slate-600 uppercase">{k}</span>
-                      <span className="text-[10px] font-orbitron text-slate-400 tabular-nums">{Number(v).toFixed(1)} m</span>
-                    </div>
-                  ))}
-                  <span className="text-[8px] font-mono-sc text-slate-700 ml-auto">Ship Matrix</span>
-                </div>
-              )}
             </ScifiPanel>
           )}
 
@@ -641,6 +615,75 @@ export default function ShipDetailPage() {
           {/* Stats */}
           <ScifiPanel title={isGround ? 'Performance' : 'Combat & Speed'}>
             <ShipStatsBanner ship={ship} loadout={loadout ?? []} category={category} />
+          </ScifiPanel>
+
+          {/* Pricing — in-game (aUEC) vs pledge (USD, official RSI store) */}
+          <ScifiPanel title="Pricing" actions={<Coins size={13} className="text-slate-600" />}>
+            <div className="space-y-3">
+              <div>
+                <p className="mb-1.5 flex items-center gap-1 font-mono-sc text-[10px] uppercase tracking-widest text-cyan-700">
+                  <Coins size={10} /> In-game · aUEC
+                </p>
+                {bestPurchase != null || bestRental != null ? (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                    {bestPurchase != null && (
+                      <span className="flex items-baseline gap-1.5">
+                        <span className="font-mono-sc text-[10px] uppercase text-slate-600">Buy</span>
+                        <span className="font-orbitron text-sm font-bold tabular-nums text-amber-400">{fCredits(bestPurchase)}</span>
+                      </span>
+                    )}
+                    {bestRental != null && (
+                      <span className="flex items-baseline gap-1.5">
+                        <span className="font-mono-sc text-[10px] uppercase text-slate-600">Rent</span>
+                        <span className="font-orbitron text-sm font-bold tabular-nums text-blue-300">from {fCredits(bestRental)}</span>
+                      </span>
+                    )}
+                  </div>
+                ) : (
+                  <p className="font-mono-sc text-[11px] text-slate-600">Not sold at in-game terminals.</p>
+                )}
+                {(bestPurchase != null || bestRental != null) && (
+                  <p className="mt-1.5 flex flex-wrap items-center gap-1 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                    <span>
+                      Source ·{' '}
+                      <a
+                        href="https://uexcorp.space"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-cyan-700 transition-colors hover:text-cyan-400"
+                      >
+                        UEX
+                      </a>
+                    </span>
+                    {pricesUpdatedAt && (
+                      <>
+                        <span className="text-slate-700">·</span>
+                        <span>Updated {fDate(pricesUpdatedAt.toISOString())}</span>
+                      </>
+                    )}
+                  </p>
+                )}
+              </div>
+
+              <div className="border-t border-slate-800/60 pt-3">
+                <p className="mb-1.5 flex items-center gap-1 font-mono-sc text-[10px] uppercase tracking-widest text-emerald-700">
+                  <span className="text-[8px]">$</span> Pledge · USD
+                </p>
+                {ship.store_url ? (
+                  <a
+                    href={ship.store_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-sm border border-emerald-900/40 bg-emerald-950/15 px-2.5 py-1.5 font-mono-sc text-[11px] text-emerald-300 transition-colors hover:border-emerald-600/50 hover:text-emerald-200"
+                  >
+                    <ExternalLink size={11} />
+                    View pledge price on RSI
+                  </a>
+                ) : (
+                  <p className="font-mono-sc text-[11px] text-slate-600">No RSI pledge store listing.</p>
+                )}
+              </div>
+            </div>
           </ScifiPanel>
 
           <PriceAvailabilityPanel

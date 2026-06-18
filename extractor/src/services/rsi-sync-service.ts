@@ -9,9 +9,9 @@
  * Toutes les sources tierces (SC Wiki, etc.) ont été supprimées.
  */
 import type { Pool } from 'pg';
-import { RSI_BASE_URL, RSI_SHIP_MATRIX_URL, SCRAPER_USER_AGENT } from './config.js';
-import logger from './logger.js';
-import { scrapeCommLinkContent, scrapeGalactapediaContent } from './rsi-content-scraper.js';
+import { RSI_BASE_URL, RSI_SHIP_MATRIX_URL, SCRAPER_USER_AGENT } from '../config.js';
+import logger from '../logger.js';
+import { scrapeCommLinkContent, scrapeGalactapediaContent } from '../scrapers/rsi-content-scraper.js';
 
 const RSI_ORGS_API_URL = `${RSI_BASE_URL}/api/orgs/getOrgs`;
 

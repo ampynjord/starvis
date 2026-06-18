@@ -9,8 +9,9 @@
  *
  * This service builds an index of these keys for fast lookup.
  */
-import logger from './logger.js';
-import type { P4KProvider } from './p4k-provider.js';
+
+import type { P4KProvider } from '../dataforge/p4k-provider.js';
+import logger from '../logger.js';
 
 export class LocalizationService {
   /** LOC key → display name */

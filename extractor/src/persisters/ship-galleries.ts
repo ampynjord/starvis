@@ -2,7 +2,7 @@
  * Official RSI ship galleries -> rsi.ship_galleries.
  */
 import type { PoolClient } from 'pg';
-import { type ShipGalleryToScrape, scrapeShipGalleryImages } from '../ship-gallery-scraper.js';
+import { type ShipGalleryToScrape, scrapeShipGalleryImages } from '../scrapers/ship-gallery-scraper.js';
 
 export async function saveOfficialShipGalleries(
   conn: PoolClient,

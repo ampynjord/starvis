@@ -194,26 +194,20 @@ const SHIP_JOINS = `FROM game.ships s
   ) ship_thumb ON TRUE
   LEFT JOIN (
     SELECT
-      shop.env,
-      LOWER(si.component_class_name) as component_class_key,
-      MIN(si.base_price) FILTER (WHERE si.base_price > 0) as min_purchase_price,
-      MIN(si.rental_price_1d) FILTER (WHERE si.rental_price_1d > 0) as min_rental_price_1d,
-      MIN(si.rental_price_3d) FILTER (WHERE si.rental_price_3d > 0) as min_rental_price_3d,
-      MIN(si.rental_price_7d) FILTER (WHERE si.rental_price_7d > 0) as min_rental_price_7d,
-      MIN(si.rental_price_30d) FILTER (WHERE si.rental_price_30d > 0) as min_rental_price_30d,
-      COUNT(DISTINCT si.shop_id) FILTER (WHERE si.base_price > 0) as purchase_location_count,
-      COUNT(DISTINCT si.shop_id) FILTER (
-        WHERE si.rental_price_1d > 0
-           OR si.rental_price_3d > 0
-           OR si.rental_price_7d > 0
-           OR si.rental_price_30d > 0
-      ) as rental_location_count
-    FROM game.shop_inventory si
-    JOIN game.shops shop ON shop.id = si.shop_id
-    WHERE si.inventory_kind = 'ship'
-    GROUP BY shop.env, LOWER(si.component_class_name)
+      p.env,
+      p.ship_uuid,
+      MIN(p.price) FILTER (WHERE p.price_kind = 'buy' AND p.price > 0) as min_purchase_price,
+      MIN(p.price) FILTER (WHERE p.price_kind = 'rent' AND p.price > 0) as min_rental_price_1d,
+      NULL::numeric as min_rental_price_3d,
+      NULL::numeric as min_rental_price_7d,
+      NULL::numeric as min_rental_price_30d,
+      COUNT(DISTINCT p.terminal_uex_id) FILTER (WHERE p.price_kind = 'buy' AND p.price > 0) as purchase_location_count,
+      COUNT(DISTINCT p.terminal_uex_id) FILTER (WHERE p.price_kind = 'rent' AND p.price > 0) as rental_location_count
+    FROM game.uex_vehicle_prices p
+    WHERE p.ship_uuid IS NOT NULL
+    GROUP BY p.env, p.ship_uuid
   ) ship_market ON ship_market.env = s.env
-    AND ship_market.component_class_key = LOWER(s.class_name)`;
+    AND ship_market.ship_uuid = s.uuid`;
 
 function galleryMediaKey(url: string): string {
   return (
@@ -552,44 +546,39 @@ export class ShipQueryService {
     const resolved = typeof ship === 'string' ? await this.getShipByUuid(ship, env) : ship;
     if (!resolved) return [];
     const uuid = String(resolved.uuid);
-    const className = String(resolved.class_name ?? '');
+    // Ship buy/rent prices come from UEX (game.uex_*), not the P4K shop inventory:
+    // the in-game economy is server-authoritative and absent from the game files.
+    // One row per dealer terminal, combining its buy + rent offer for this ship.
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT DISTINCT ON (s.id)
-              s.id as shop_id, s.name as shop_name, s.location, s.system, s.city, s.planet_moon, s.shop_type,
-              s.franchise_slug, s.location_slug, s.canonical_shop_key, s.canonical_location_key,
-              si.component_uuid, si.component_class_name, NULL::text as terminal,
-              CASE
-                WHEN si.component_uuid = ? THEN 'uuid'
-                WHEN si.component_class_name = ? THEN 'class_name'
-                ELSE 'class_name_ci'
-              END as match_type,
-              si.inventory_kind, si.base_price, si.sell_price, si.current_inventory, si.max_inventory,
-              si.rental_price_1d, si.rental_price_3d, si.rental_price_7d, si.rental_price_30d,
-              si.source, si.confidence
-       FROM game.shop_inventory si
-       JOIN game.shops s ON si.shop_id = s.id
-       WHERE s.env = ?
-         AND (
-           si.component_uuid = ?
-           OR si.component_class_name = ?
-           OR LOWER(si.component_class_name) = LOWER(?)
-         )
-       ORDER BY s.id,
-         CASE
-           WHEN si.component_uuid = ? THEN 0
-           WHEN si.component_class_name = ? THEN 1
-           ELSE 2
-         END,
-         si.base_price NULLS LAST,
-         si.rental_price_1d NULLS LAST`),
-      uuid,
-      className,
+      toPostgres(`SELECT
+              t.uex_id AS shop_id,
+              t.name AS shop_name,
+              t.city AS location,
+              t.star_system AS system,
+              t.city,
+              COALESCE(t.moon, t.planet) AS planet_moon,
+              t.company_name AS shop_type,
+              t.code AS terminal,
+              'uex'::text AS source,
+              'uex'::text AS match_type,
+              'ship'::text AS inventory_kind,
+              MAX(CASE WHEN p.price_kind = 'buy' THEN p.price END) AS base_price,
+              NULL::numeric AS sell_price,
+              NULL::numeric AS current_inventory,
+              NULL::numeric AS max_inventory,
+              MAX(CASE WHEN p.price_kind = 'rent' THEN p.price END) AS rental_price_1d,
+              NULL::numeric AS rental_price_3d,
+              NULL::numeric AS rental_price_7d,
+              NULL::numeric AS rental_price_30d,
+              NULL::numeric AS confidence,
+              MAX(p.date_modified) AS updated_at
+       FROM game.uex_vehicle_prices p
+       JOIN game.uex_terminals t ON t.uex_id = p.terminal_uex_id AND t.env = p.env
+       WHERE p.env = ? AND p.ship_uuid = ?
+       GROUP BY t.uex_id, t.name, t.city, t.star_system, COALESCE(t.moon, t.planet), t.company_name, t.code
+       ORDER BY base_price NULLS LAST, rental_price_1d NULLS LAST`),
       env,
       uuid,
-      className,
-      className,
-      uuid,
-      className,
     );
     return convertBigIntToNumber(rows);
   }

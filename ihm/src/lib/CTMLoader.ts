@@ -884,10 +884,12 @@ export class CTMLoader extends THREE.Loader {
     const geo = new THREE.BufferGeometry();
     geo.setIndex(new THREE.BufferAttribute(body.indices, 1));
     geo.setAttribute('position', new THREE.BufferAttribute(body.vertices, 3));
-    if (body.normals) geo.setAttribute('normal', new THREE.BufferAttribute(body.normals, 3));
     if (body.uvMaps?.length) geo.setAttribute('uv', new THREE.BufferAttribute(body.uvMaps[0].uv, 2));
 
-    geo.computeVertexNormals();
+    // Prefer the normals authored in the file (highest fidelity, preserves hard
+    // edges). Only compute smooth normals when the mesh ships without them.
+    if (body.normals) geo.setAttribute('normal', new THREE.BufferAttribute(body.normals, 3));
+    else geo.computeVertexNormals();
 
     // Centre la gÃ©omÃ©trie
     geo.computeBoundingBox();

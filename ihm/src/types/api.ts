@@ -1464,6 +1464,26 @@ export interface CommLink {
   published_at: string | null;
 }
 
+// ─── Starmap ───
+export interface StarmapPosition {
+  id: number;
+  rsi_id: string | null;
+  name: string;
+  type: string;
+  system_code: string | null;
+  system_name: string | null;
+  status: string | null;
+  faction_name: string | null;
+  affiliations: unknown;
+  coordinates: { x: number; y: number; z: number } | null;
+  thumbnail: string | null;
+  description: string | null;
+  star_type: string | null;
+  population: string | null;
+  economy: string | null;
+  danger: string | null;
+}
+
 // ─── Galactapedia ─────────────────────────────────────────────────────────────
 export interface GalactapediaEntry {
   id: string;

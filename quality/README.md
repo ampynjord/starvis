@@ -51,6 +51,15 @@ Modes:
 The audit reports table counts, unresolved links, missing Ship Matrix/Starmap correlations, shop inventory resolution,
 DataForge struct coverage, and P4K file families that may contain exploitable static data.
 
+Correlation completeness is reported in two distinct buckets so expected source asymmetry is not mistaken for a defect:
+
+- **Warnings** count only *genuinely actionable* gaps — a record whose matching counterpart exists in the other source
+  but is not linked (`shipsWithoutMatrixLinkable`, `shopsWithoutLocationLinkable`, `locationsLinkableUnlinked`,
+  `rsiStarmapLinkableUnlinked`).
+- **Info** lines (`*TotalInfo`) report the raw unlinked totals. These are large by nature and **not** defects: the RSI
+  starmap covers the full lore universe (~90 systems) while the game ships only a few; many in-game POIs (asteroid
+  fields, bunkers, outposts), NPC/variant ships and virtual event shops simply have no counterpart in the other source.
+
 ## API contract audit
 
 The API contract audit checks the OpenAPI document, operation identifiers, the public API proxy, and the broad IHM type surface.

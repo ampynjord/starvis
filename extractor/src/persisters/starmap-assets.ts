@@ -12,7 +12,7 @@ import {
   extractPublicAssetsFromStarmapObject,
   type StarmapSystem,
   scrapeStarmapSystemAssets,
-} from '../starmap-asset-scraper.js';
+} from '../scrapers/starmap-asset-scraper.js';
 
 export async function saveStarmapAssets(
   conn: PoolClient,

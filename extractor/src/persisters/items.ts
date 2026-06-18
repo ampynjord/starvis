@@ -1,7 +1,7 @@
 /**
  * ITEMS + COMMODITIES → items + commodities tables
  */
-import { canonicalizeCommodityRecord, canonicalizeItemRecord } from '../canonical-source.js';
+import { canonicalizeCommodityRecord, canonicalizeItemRecord } from '../normalizers/canonical-source.js';
 import type { PersistContext } from './context.js';
 
 /**

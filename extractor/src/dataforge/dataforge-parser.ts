@@ -4,7 +4,7 @@
  * Extracted from DataForgeService for modularity.
  * Pure functions: no side effects, no state — only buffer parsing.
  */
-import logger from './logger.js';
+import logger from '../logger.js';
 
 // ── Data type constants ──────────────────────────────────
 
