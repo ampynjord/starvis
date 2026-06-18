@@ -400,6 +400,19 @@ export class CorporationService {
 
     const searchLabels = rsiHangarShipLabels(entry);
     if (searchLabels.length) {
+      const rsiMatrixRows = (await this.db.$queryRawUnsafe(
+        toPostgres(
+          `SELECT COALESCE(s.uuid, 'concept-' || sm.id::text) as uuid,
+                  COALESCE(s.class_name, LOWER(REPLACE(REPLACE(sm.name, ' ', '_'), '''', ''))) as class_name,
+                  sm.name
+           FROM rsi.ship_matrix sm
+           LEFT JOIN game.ships s ON s.ship_matrix_id = sm.id AND s.env = ?`,
+        ),
+        env,
+      )) as Array<{ uuid: string; class_name: string; name: string }>;
+      const rsiMatrixMatch = bestShipMatch(searchLabels, rsiMatrixRows);
+      if (rsiMatrixMatch) return { uuid: rsiMatrixMatch.uuid, className: rsiMatrixMatch.class_name, name: rsiMatrixMatch.name };
+
       const rows = (await this.db.$queryRawUnsafe(
         toPostgres('SELECT uuid, class_name, name FROM game.ships WHERE env = ?'),
         env,
@@ -409,15 +422,6 @@ export class CorporationService {
       if (match) return { uuid: match.uuid, className: match.class_name, name: match.name };
       const tokenMatch = bestShipMatch(searchLabels, rows);
       if (tokenMatch) return { uuid: tokenMatch.uuid, className: tokenMatch.class_name, name: tokenMatch.name };
-
-      const conceptRows = (await this.db.$queryRawUnsafe(
-        toPostgres(
-          `SELECT 'concept-' || id::text as uuid, LOWER(REPLACE(REPLACE(name, ' ', '_'), '''', '')) as class_name, name FROM rsi.ship_matrix WHERE id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)`,
-        ),
-        env,
-      )) as Array<{ uuid: string; class_name: string; name: string }>;
-      const conceptMatch = bestShipMatch(searchLabels, conceptRows);
-      if (conceptMatch) return { uuid: conceptMatch.uuid, className: conceptMatch.class_name, name: conceptMatch.name };
     }
 
     return { uuid: null, className: explicitClass ?? label.slice(0, 255), name: label };
