@@ -451,8 +451,8 @@ export default function FleetManagerPage() {
       const result = await new Promise<any>((resolve, reject) => {
         const timeout = window.setTimeout(() => {
           window.removeEventListener('message', onMessage);
-          reject(new Error('Starvis RSI Sync extension not detected'));
-        }, 90_000);
+          reject(new Error('RSI sync timed out. Refresh the Starvis RSI Hangar Sync extension, then retry.'));
+        }, 45_000);
 
         function onMessage(event: MessageEvent) {
           if (event.source !== window) return;

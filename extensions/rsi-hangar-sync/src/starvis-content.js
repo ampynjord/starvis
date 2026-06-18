@@ -43,9 +43,12 @@ window.addEventListener('message', (event) => {
   })
     .then(postResult)
     .catch((error) => {
+      const message = error instanceof Error ? error.message : '';
       postResult({
         success: false,
-        error: error instanceof Error ? error.message : 'Unable to contact Starvis RSI Sync extension',
+        error: /receiving end does not exist|could not establish connection/i.test(message)
+          ? 'Starvis RSI Sync extension background is not ready. Refresh the temporary extension in Firefox, reload Starvis, then retry Sync.'
+          : message || 'Unable to contact Starvis RSI Sync extension',
       });
     });
 });

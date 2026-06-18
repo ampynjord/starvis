@@ -91,6 +91,8 @@ async function scrapeHangarTab(tabId) {
 }
 
 async function scrapeHangarInPage() {
+  const HANGAR_PATH = '/en/account/pledges';
+
   function textOf(node) {
     return node?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
   }
@@ -111,73 +113,14 @@ async function scrapeHangarInPage() {
     }
   }
 
-  function isDisabled(node) {
-    return (
-      !!node.disabled || node.getAttribute('aria-disabled') === 'true' || /\b(disabled|inactive)\b/i.test(String(node.className || ''))
-    );
-  }
-
-  function isVisible(node) {
-    const rect = node.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0 && rect.bottom >= 0 && rect.top <= window.innerHeight;
-  }
-
-  async function clickLoadMoreButtons() {
-    for (let i = 0; i < 20; i += 1) {
-      const button = [...document.querySelectorAll('button, a')].find(
-        (node) => /load more|show more|voir plus/i.test(textOf(node)) && !isDisabled(node) && isVisible(node),
-      );
-      if (!button) break;
-      button.click();
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-    }
-  }
-
   function controlLabel(node) {
     return (textOf(node) || node.getAttribute('aria-label') || node.getAttribute('title') || node.getAttribute('rel') || '').trim();
   }
 
-  function numericControls() {
-    return [...document.querySelectorAll('button, a')]
-      .filter((node) => isVisible(node) && !isDisabled(node))
-      .filter((node) => /^\d+$/.test(controlLabel(node)));
-  }
-
-  function paginationRoot() {
-    for (const numeric of numericControls()) {
-      let node = numeric.parentElement;
-      for (let depth = 0; node && depth < 5; depth += 1, node = node.parentElement) {
-        const controls = [...node.querySelectorAll('button, a')].filter((candidate) => isVisible(candidate));
-        const pageNumbers = controls.filter((candidate) => /^\d+$/.test(controlLabel(candidate)));
-        if (pageNumbers.length >= 2 && pageNumbers.length <= 20) return node;
-      }
-    }
-    return null;
-  }
-
-  function findNextPageControl(visitedPages) {
-    const root = paginationRoot();
-    if (!root) return null;
-
-    const controls = [...root.querySelectorAll('button, a')].filter((node) => isVisible(node) && !isDisabled(node));
-    const numbered = controls
-      .map((node) => ({ node, page: Number(controlLabel(node)) }))
-      .filter((entry) => Number.isInteger(entry.page) && entry.page > 0)
-      .sort((a, b) => a.page - b.page);
-    const unvisitedNumber = numbered.find((entry) => !visitedPages.has(entry.page));
-    if (unvisitedNumber) return { node: unvisitedNumber.node, page: unvisitedNumber.page };
-
-    const next = controls.find((node) => /^(next|suivant|\u203a|\u00bb|>)+$/i.test(controlLabel(node)));
-    return next ? { node: next, page: null } : null;
-  }
-
-  async function clickNextPage(visitedPages) {
-    const next = findNextPageControl(visitedPages);
-    if (!next) return false;
-    next.node.click();
-    if (next.page) visitedPages.add(next.page);
-    await new Promise((resolve) => setTimeout(resolve, 1400));
-    return true;
+  function pageUrl(page) {
+    const url = new URL(HANGAR_PATH, window.location.origin);
+    if (page > 1) url.searchParams.set('page', String(page));
+    return url.toString();
   }
 
   function titleOfCard(card, index) {
@@ -197,13 +140,13 @@ async function scrapeHangarInPage() {
     return /\bstandalone\s+(ships?|vehicles?)\b/i.test(title) || /^\s*(ships?|vehicles?)\s*[-:]/i.test(title);
   }
 
-  function findCards() {
+  function findCards(root) {
     const selectors = ['[class*="pledge"]', '[class*="hangar"] article', 'article', '.row'];
-    const candidates = selectors.flatMap((selector) => [...document.querySelectorAll(selector)]);
+    const candidates = selectors.flatMap((selector) => [...root.querySelectorAll(selector)]);
     return [...new Set(candidates)].filter((node, index) => looksLikeShipPledge(node, index));
   }
 
-  function extractCard(card, index) {
+  function extractCard(card, index, sourceUrl) {
     const image = card.querySelector('img');
     const link = card.querySelector('a[href]');
     const dataId = card.getAttribute('data-id') || card.getAttribute('data-pledge-id') || card.getAttribute('data-item-id');
@@ -224,9 +167,26 @@ async function scrapeHangarInPage() {
       quantity: 1,
       raw: {
         text: text.slice(0, 2000),
-        sourceUrl: window.location.href,
+        sourceUrl,
       },
     };
+  }
+
+  async function fetchDocument(url) {
+    const response = await fetch(url, { credentials: 'include' });
+    if (!response.ok) throw new Error(`RSI hangar page request failed (${response.status})`);
+    const html = await response.text();
+    return new DOMParser().parseFromString(html, 'text/html');
+  }
+
+  function pageNumbers(root) {
+    return [...root.querySelectorAll('button, a')]
+      .map((node) => Number(controlLabel(node)))
+      .filter((page) => Number.isInteger(page) && page > 0 && page <= 50);
+  }
+
+  function maxPage(root) {
+    return Math.max(1, ...pageNumbers(root));
   }
 
   try {
@@ -234,19 +194,16 @@ async function scrapeHangarInPage() {
       throw new Error('Not on Roberts Space Industries');
     }
 
-    await clickLoadMoreButtons();
+    const firstUrl = pageUrl(1);
+    const firstDocument = await fetchDocument(firstUrl);
+    const pages = maxPage(firstDocument);
     const entries = [];
-    const visitedSignatures = new Set();
-    const visitedPages = new Set([1]);
 
-    for (let pageIndex = 0; pageIndex < 25; pageIndex += 1) {
-      await clickLoadMoreButtons();
-      const cards = findCards();
-      const signature = cards.map((card, index) => titleOfCard(card, index)).join('|') || `${window.location.href}:${pageIndex}`;
-      if (visitedSignatures.has(signature)) break;
-      visitedSignatures.add(signature);
-      entries.push(...cards.map(extractCard));
-      if (!(await clickNextPage(visitedPages))) break;
+    for (let page = 1; page <= pages; page += 1) {
+      const url = pageUrl(page);
+      const pageDocument = page === 1 ? firstDocument : await fetchDocument(url);
+      const cards = findCards(pageDocument);
+      entries.push(...cards.map((card, index) => extractCard(card, index, url)));
     }
 
     const unique = new Map();
