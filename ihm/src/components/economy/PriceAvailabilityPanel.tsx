@@ -70,86 +70,92 @@ function rentalRows(row: PriceAvailabilityRow) {
 
 export function PriceAvailabilityPanel({
   title = 'Purchase & Rental',
-  emptyMessage = 'No extracted purchase or rental locations.',
-  emptyDetail = 'This vehicle may be stock-only, event-only, not sold in-game, pledge-only, loot-only, collector-only, or absent from current official extracted shop data.',
+  emptyMessage = 'No in-game purchase or rental terminal listed.',
+  emptyDetail = 'This vehicle may be stock-only, event-only, not sold in-game, pledge-only, loot-only, collector-only, or absent from current UEX market data.',
   rows,
+  bare = false,
 }: {
   title?: string;
   emptyMessage?: string;
   emptyDetail?: string;
   rows?: PriceAvailabilityRow[];
+  bare?: boolean;
 }) {
   const purchasable = (rows ?? []).filter((row) => {
     const hasPrice = toNumber(row.base_price) != null || toNumber(row.sell_price) != null;
     return hasPrice || rentalRows(row).length > 0 || stockLabel(row) != null;
   });
 
+  const body = !purchasable.length ? (
+    <div className="py-5 text-center">
+      <p className="text-sm font-rajdhani text-slate-400">{emptyMessage}</p>
+      <p className="mt-1 text-xs text-slate-600">{emptyDetail}</p>
+    </div>
+  ) : (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+      {purchasable.map((row, index) => {
+        const base = toNumber(row.base_price);
+        const sell = toNumber(row.sell_price);
+        const rentals = rentalRows(row);
+        const stock = stockLabel(row);
+        return (
+          <div key={`${row.shop_id}-${row.terminal ?? ''}-${index}`} className="sci-panel px-3 py-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <Link href={`/starmap?shop=${row.shop_id}`} className="text-sm text-slate-300 hover:text-cyan-300 transition-colors truncate block">
+                  {row.shop_name}
+                </Link>
+                <p className="text-xs text-slate-600 truncate">{locationLabel(row)}</p>
+                <div className="mt-1 flex flex-wrap gap-1">
+                  {row.shop_type && <GlowBadge color="slate">{row.shop_type}</GlowBadge>}
+                  {row.terminal && <GlowBadge color="cyan">{row.terminal}</GlowBadge>}
+                </div>
+              </div>
+              <div className="shrink-0 text-right">
+                {base != null && base > 0 && (
+                  <p className="flex items-center justify-end gap-1 text-xs font-mono-sc text-amber-400">
+                    <TrendingUp size={9} /> {fCredits(base)}
+                  </p>
+                )}
+                {sell != null && sell > 0 && (
+                  <p className="mt-1 flex items-center justify-end gap-1 text-[10px] font-mono-sc text-red-400">
+                    <TrendingDown size={9} /> Sell {fCredits(sell)}
+                  </p>
+                )}
+                {rentals.length > 0 && (
+                  <div className="mt-1 space-y-0.5">
+                    {rentals.map(([label, value]) => (
+                      <p key={label} className="flex items-center justify-end gap-1 text-[10px] font-mono-sc text-blue-300">
+                        <Clock size={9} /> {label} {fCredits(value)}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                {base == null && sell == null && rentals.length === 0 && (
+                  <p className="text-xs font-mono-sc text-slate-600">Price unknown</p>
+                )}
+              </div>
+            </div>
+            {stock && (
+              <p className="mt-2 flex items-center gap-1 border-t border-slate-900 pt-1.5 font-mono-sc text-[10px] text-slate-600">
+                <Package size={10} /> Stock {stock}
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+
+  if (bare) return body;
+
   return (
     <ScifiPanel
       title={title}
-      subtitle={purchasable.length ? `${purchasable.length} extracted location${purchasable.length !== 1 ? 's' : ''}` : 'No terminal offer'}
+      subtitle={purchasable.length ? `${purchasable.length} terminal${purchasable.length !== 1 ? 's' : ''}` : 'No terminal offer'}
       actions={<MapPin size={14} className="text-slate-600" />}
     >
-      {!purchasable.length ? (
-        <div className="py-5 text-center">
-          <p className="text-sm font-rajdhani text-slate-400">{emptyMessage}</p>
-          <p className="mt-1 text-xs text-slate-600">{emptyDetail}</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
-          {purchasable.map((row, index) => {
-            const base = toNumber(row.base_price);
-            const sell = toNumber(row.sell_price);
-            const rentals = rentalRows(row);
-            const stock = stockLabel(row);
-            return (
-              <div key={`${row.shop_id}-${row.terminal ?? ''}-${index}`} className="sci-panel px-3 py-2">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <Link href={`/starmap?shop=${row.shop_id}`} className="text-sm text-slate-300 hover:text-cyan-300 transition-colors truncate block">
-                      {row.shop_name}
-                    </Link>
-                    <p className="text-xs text-slate-600 truncate">{locationLabel(row)}</p>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {row.shop_type && <GlowBadge color="slate">{row.shop_type}</GlowBadge>}
-                      {row.terminal && <GlowBadge color="cyan">{row.terminal}</GlowBadge>}
-                    </div>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    {base != null && base > 0 && (
-                      <p className="flex items-center justify-end gap-1 text-xs font-mono-sc text-amber-400">
-                        <TrendingUp size={9} /> {fCredits(base)}
-                      </p>
-                    )}
-                    {sell != null && sell > 0 && (
-                      <p className="mt-1 flex items-center justify-end gap-1 text-[10px] font-mono-sc text-red-400">
-                        <TrendingDown size={9} /> Sell {fCredits(sell)}
-                      </p>
-                    )}
-                    {rentals.length > 0 && (
-                      <div className="mt-1 space-y-0.5">
-                        {rentals.map(([label, value]) => (
-                          <p key={label} className="flex items-center justify-end gap-1 text-[10px] font-mono-sc text-blue-300">
-                            <Clock size={9} /> {label} {fCredits(value)}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                    {base == null && sell == null && rentals.length === 0 && (
-                      <p className="text-xs font-mono-sc text-slate-600">Price unknown</p>
-                    )}
-                  </div>
-                </div>
-                {stock && (
-                  <p className="mt-2 flex items-center gap-1 border-t border-slate-900 pt-1.5 font-mono-sc text-[10px] text-slate-600">
-                    <Package size={10} /> Stock {stock}
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {body}
     </ScifiPanel>
   );
 }

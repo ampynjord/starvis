@@ -91,7 +91,7 @@ function AmmoInsightPanel({ rows, total }: { rows: AmmoInsight[]; total: number 
 		<div className="sci-panel p-4">
 			<div className="mb-3 flex items-start justify-between gap-4">
 				<div>
-					<h2 className="font-orbitron text-sm font-bold uppercase tracking-widest text-cyan-400">Ammo DataForge</h2>
+					<h2 className="font-orbitron text-sm font-bold uppercase tracking-widest text-cyan-400">Ammunition</h2>
 					<p className="mt-0.5 font-mono-sc text-xs text-slate-500">{total.toLocaleString("en-US")} ammo records with ballistic, energy and explosive stats.</p>
 				</div>
 				<Crosshair size={16} className="shrink-0 text-red-400" />
@@ -127,7 +127,7 @@ function InventoryContainerPanel({ rows, total }: { rows: InventoryContainerInsi
 			<div className="mb-3 flex items-start justify-between gap-4">
 				<div>
 					<h2 className="font-orbitron text-sm font-bold uppercase tracking-widest text-cyan-400">Inventory Containers</h2>
-					<p className="mt-0.5 font-mono-sc text-xs text-slate-500">{total.toLocaleString("en-US")} container definitions extracted from DataForge.</p>
+					<p className="mt-0.5 font-mono-sc text-xs text-slate-500">{total.toLocaleString("en-US")} container definitions.</p>
 				</div>
 				<Boxes size={16} className="shrink-0 text-amber-400" />
 			</div>

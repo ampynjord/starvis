@@ -496,6 +496,14 @@ export class RsiSyncService {
               ? images.store_large
               : `${RSI_BASE_URL}${images.store_large}`
             : null;
+          // The ship-matrix pledge URL is a relative path (e.g.
+          // "/pledge/ships/aurora/Aurora-MR"); store it absolute so IHM links
+          // resolve to the real RSI store instead of 404ing on our host.
+          const storeUrl = ship.url
+            ? ship.url.startsWith('http')
+              ? ship.url
+              : `${RSI_BASE_URL}${ship.url.startsWith('/') ? '' : '/'}${ship.url}`
+            : null;
 
           await conn.query(
             `INSERT INTO rsi.ship_matrix (
@@ -535,7 +543,7 @@ export class RsiSyncService {
               ship.production_status || null,
               ship.production_note || null,
               ship.size || null,
-              ship.url || null,
+              storeUrl,
               ship.length || null,
               ship.beam || null,
               ship.height || null,

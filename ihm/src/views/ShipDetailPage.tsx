@@ -55,6 +55,13 @@ function statusLabel(status: string): string {
   return STATUS_LABELS[status] ?? status.replace(/[_-]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+function toAbsoluteRsiUrl(url?: string | null): string | null {
+  const value = url?.trim();
+  if (!value) return null;
+  if (/^https?:\/\//i.test(value)) return value;
+  return `https://robertsspaceindustries.com/${value.replace(/^\/+/, '')}`;
+}
+
 function shipMarketEmptyCopy(ship: {
   is_concept_only?: boolean | null;
   production_status?: string | null;
@@ -408,6 +415,11 @@ export default function ShipDetailPage() {
     return times.length ? new Date(Math.max(...times)) : null;
   }, [buyLocations]);
 
+  // RSI ship-matrix URLs are stored as a relative pledge path (e.g.
+  // "/pledge/ships/aurora/Aurora-MR"); resolve them against the official RSI
+  // host so the "RSI Store" links open the real store page instead of 404ing.
+  const rsiStoreUrl = useMemo(() => toAbsoluteRsiUrl(ship?.store_url), [ship?.store_url]);
+
   if (isLoading) return <LoadingGrid message="LOADING…" />;
   if (error) return <ErrorState error={error as Error} onRetry={() => void refetch()} />;
   if (!ship) return null;
@@ -494,8 +506,8 @@ export default function ShipDetailPage() {
               <Link href={`/compare?a=${uuid}`} className="sci-btn-amber text-sm">
                 <BarChart3 size={13} /> Compare
               </Link>
-              {ship.store_url && (
-                <a href={ship.store_url} target="_blank" rel="noreferrer"
+              {rsiStoreUrl && (
+                <a href={rsiStoreUrl} target="_blank" rel="noreferrer"
                   className="inline-flex items-center gap-1.5 text-xs font-mono-sc text-slate-500 hover:text-cyan-400 transition-colors">
                   <ExternalLink size={11} /> RSI Store
                 </a>
@@ -617,80 +629,91 @@ export default function ShipDetailPage() {
             <ShipStatsBanner ship={ship} loadout={loadout ?? []} category={category} />
           </ScifiPanel>
 
-          {/* Pricing — in-game (aUEC) vs pledge (USD, official RSI store) */}
-          <ScifiPanel title="Pricing" actions={<Coins size={13} className="text-slate-600" />}>
+          {/* Pricing — one unified panel: in-game (aUEC, UEX), pledge (RSI store)
+              and the per-terminal breakdown, instead of two separate zones. */}
+          <ScifiPanel
+            title="Pricing"
+            subtitle={buyLocations.length ? `${buyLocations.length} terminal${buyLocations.length !== 1 ? 's' : ''}` : undefined}
+            actions={<Coins size={13} className="text-slate-600" />}
+          >
             <div className="space-y-3">
-              <div>
-                <p className="mb-1.5 flex items-center gap-1 font-mono-sc text-[10px] uppercase tracking-widest text-cyan-700">
-                  <Coins size={10} /> In-game · aUEC
-                </p>
-                {bestPurchase != null || bestRental != null ? (
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                    {bestPurchase != null && (
-                      <span className="flex items-baseline gap-1.5">
-                        <span className="font-mono-sc text-[10px] uppercase text-slate-600">Buy</span>
-                        <span className="font-orbitron text-sm font-bold tabular-nums text-amber-400">{fCredits(bestPurchase)}</span>
-                      </span>
-                    )}
-                    {bestRental != null && (
-                      <span className="flex items-baseline gap-1.5">
-                        <span className="font-mono-sc text-[10px] uppercase text-slate-600">Rent</span>
-                        <span className="font-orbitron text-sm font-bold tabular-nums text-blue-300">from {fCredits(bestRental)}</span>
-                      </span>
-                    )}
-                  </div>
-                ) : (
-                  <p className="font-mono-sc text-[11px] text-slate-600">Not sold at in-game terminals.</p>
-                )}
-                {(bestPurchase != null || bestRental != null) && (
-                  <p className="mt-1.5 flex flex-wrap items-center gap-1 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-                    <span>
-                      Source ·{' '}
-                      <a
-                        href="https://uexcorp.space"
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-cyan-700 transition-colors hover:text-cyan-400"
-                      >
-                        UEX
-                      </a>
-                    </span>
-                    {pricesUpdatedAt && (
-                      <>
-                        <span className="text-slate-700">·</span>
-                        <span>Updated {fDate(pricesUpdatedAt.toISOString())}</span>
-                      </>
-                    )}
+              <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+                <div>
+                  <p className="mb-1.5 flex items-center gap-1 font-mono-sc text-[10px] uppercase tracking-widest text-cyan-700">
+                    <Coins size={10} /> In-game · aUEC
                   </p>
-                )}
+                  {bestPurchase != null || bestRental != null ? (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                      {bestPurchase != null && (
+                        <span className="flex items-baseline gap-1.5">
+                          <span className="font-mono-sc text-[10px] uppercase text-slate-600">Buy</span>
+                          <span className="font-orbitron text-sm font-bold tabular-nums text-amber-400">{fCredits(bestPurchase)}</span>
+                        </span>
+                      )}
+                      {bestRental != null && (
+                        <span className="flex items-baseline gap-1.5">
+                          <span className="font-mono-sc text-[10px] uppercase text-slate-600">Rent</span>
+                          <span className="font-orbitron text-sm font-bold tabular-nums text-blue-300">from {fCredits(bestRental)}</span>
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="font-mono-sc text-[11px] text-slate-600">Not sold at in-game terminals.</p>
+                  )}
+                  {(bestPurchase != null || bestRental != null) && (
+                    <p className="mt-1.5 flex flex-wrap items-center gap-1 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                      <span>
+                        Source ·{' '}
+                        <a
+                          href="https://uexcorp.space"
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-cyan-700 transition-colors hover:text-cyan-400"
+                        >
+                          UEX
+                        </a>
+                      </span>
+                      {pricesUpdatedAt && (
+                        <>
+                          <span className="text-slate-700">·</span>
+                          <span>Updated {fDate(pricesUpdatedAt.toISOString())}</span>
+                        </>
+                      )}
+                    </p>
+                  )}
+                </div>
+
+                <div className="text-right">
+                  <p className="mb-1.5 flex items-center justify-end gap-1 font-mono-sc text-[10px] uppercase tracking-widest text-emerald-700">
+                    <span className="text-[8px]">$</span> Pledge · RSI
+                  </p>
+                  {rsiStoreUrl ? (
+                    <a
+                      href={rsiStoreUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-sm border border-emerald-900/40 bg-emerald-950/15 px-2.5 py-1.5 font-mono-sc text-[11px] text-emerald-300 transition-colors hover:border-emerald-600/50 hover:text-emerald-200"
+                    >
+                      <ExternalLink size={11} />
+                      Pledge store
+                    </a>
+                  ) : (
+                    <p className="font-mono-sc text-[11px] text-slate-600">No RSI pledge listing.</p>
+                  )}
+                </div>
               </div>
 
+              {/* Per-terminal breakdown folded into the same panel. */}
               <div className="border-t border-slate-800/60 pt-3">
-                <p className="mb-1.5 flex items-center gap-1 font-mono-sc text-[10px] uppercase tracking-widest text-emerald-700">
-                  <span className="text-[8px]">$</span> Pledge · USD
-                </p>
-                {ship.store_url ? (
-                  <a
-                    href={ship.store_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-sm border border-emerald-900/40 bg-emerald-950/15 px-2.5 py-1.5 font-mono-sc text-[11px] text-emerald-300 transition-colors hover:border-emerald-600/50 hover:text-emerald-200"
-                  >
-                    <ExternalLink size={11} />
-                    View pledge price on RSI
-                  </a>
-                ) : (
-                  <p className="font-mono-sc text-[11px] text-slate-600">No RSI pledge store listing.</p>
-                )}
+                <PriceAvailabilityPanel
+                  bare
+                  rows={buyLocations}
+                  emptyMessage={marketEmptyCopy.message}
+                  emptyDetail={marketEmptyCopy.detail}
+                />
               </div>
             </div>
           </ScifiPanel>
-
-          <PriceAvailabilityPanel
-            rows={buyLocations}
-            emptyMessage={marketEmptyCopy.message}
-            emptyDetail={marketEmptyCopy.detail}
-          />
 
           {/* Crew widget */}
           {(() => {
