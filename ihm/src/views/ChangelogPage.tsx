@@ -384,7 +384,7 @@ export default function ChangelogPage() {
     <PageShell>
       <PageHeader
         title="Changelog"
-        subtitle={summary ? `${summary.total.toLocaleString('en-US')} total entries${summary.last_extraction ? ` · Last extraction: ${fDateTime(summary.last_extraction)}` : ''}` : undefined}
+        subtitle={summary ? `${summary.total.toLocaleString('en-US')} total entries${summary.last_extraction ? ` · Last update: ${fDateTime(summary.last_extraction)}` : ''}` : undefined}
         actions={
           <div className="flex items-center gap-1 bg-slate-900/60 border border-slate-800 rounded-sm p-1">
             <button

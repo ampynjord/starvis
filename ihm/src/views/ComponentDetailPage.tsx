@@ -436,7 +436,7 @@ export default function ComponentDetailPage() {
 					<div className="py-5 text-center">
 						<p className="text-sm font-rajdhani text-slate-400">No default ship loadout uses this component</p>
 						<p className="text-xs text-slate-600 mt-1">
-							It can still be compatible or buyable, but it is not present in the extracted stock loadouts.
+							It can still be compatible or buyable, but it is not present in any stock loadout.
 						</p>
 					</div>
 				) : (
