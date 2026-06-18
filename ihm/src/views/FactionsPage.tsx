@@ -56,7 +56,7 @@ function FactionCard({ faction, insight }: { faction: FactionSummary; insight?: 
       <div className="mt-4 space-y-2">
         {insight && (
           <Chips
-            label="DataForge"
+            label="Behavior"
             values={[
               insight.default_reaction ? `Reaction: ${formatClassName(insight.default_reaction)}` : '',
               insight.able_to_arrest ? 'Can arrest' : '',
@@ -77,7 +77,7 @@ function FactionCard({ faction, insight }: { faction: FactionSummary; insight?: 
 function FactionRegistry({ factions }: { factions: GameFactionInsight[] }) {
   if (!factions.length) return null;
   return (
-    <ScifiPanel title="DataForge Faction Registry" subtitle={`${factions.length} loaded`} className="overflow-hidden p-4">
+    <ScifiPanel title="Faction Registry" subtitle={`${factions.length} loaded`} className="overflow-hidden p-4">
       <div className="grid min-w-0 gap-2 md:grid-cols-2 xl:grid-cols-3">
         {factions.slice(0, 12).map((faction) => (
           <div key={faction.uuid} className="sci-panel min-w-0 overflow-hidden border border-slate-800/60 p-3">
@@ -241,7 +241,7 @@ export default function FactionsPage() {
         <StatCard icon={ClipboardList} label="Missions" value={totals.missions} accent="cyan" />
         <StatCard icon={Scale} label="Legal" value={totals.legal} accent="emerald" />
         <StatCard icon={Skull} label="Illegal" value={totals.illegal} accent={totals.illegal ? 'rose' : 'slate'} />
-        <StatCard icon={ShieldAlert} label="DF Factions" value={totals.dataForgeFactions} accent="purple" />
+        <StatCard icon={ShieldAlert} label="Profiled" value={totals.dataForgeFactions} accent="purple" />
         <StatCard icon={Star} label="Rep Levels" value={totals.reputationLevels} accent="amber" />
       </StatGrid>
 

@@ -144,7 +144,7 @@ function BlueprintInsightPanel({
   if (!rewards.length && !lootTables.length) return null;
   const topPools = rewards.slice(0, 6);
   return (
-    <ScifiPanel title="DataForge Rewards" subtitle="Blueprint and loot sources extracted from the game data">
+    <ScifiPanel title="Blueprint Rewards" subtitle="Blueprint and loot sources">
       <div className="grid gap-2 sm:grid-cols-3">
         <InsightStat icon={<Trophy size={10} />} label="Blueprint Rewards" value={rewards.length} />
         <InsightStat icon={<Package size={10} />} label="Loot Tables" value={lootTables.length} />
