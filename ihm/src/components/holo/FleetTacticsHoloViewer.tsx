@@ -234,6 +234,7 @@ export function FleetTacticsHoloViewer({
       endHandle: THREE.Mesh;
       lastSourceX: number;
       lastSourceZ: number;
+      lastBaseY: number;
     };
 
     type VectorLauncherEntry = {
@@ -459,8 +460,20 @@ export function FleetTacticsHoloViewer({
       });
     };
 
-    const makeFlatVectorRibbon = (curve: THREE.QuadraticBezierCurve3, width: number) => {
-      const points = curve.getPoints(64);
+    // Tactical vectors sit at the source ship's selection-ring height (its base
+    // "socle"), not floating at the model centre. Falls back to the floor when no
+    // model is loaded yet.
+    const vectorBaseY = (srcEntries: ShipEntry[]) => {
+      const ys = srcEntries
+        .map((e) => (e.ring ? e.ring.position.y : null))
+        .filter((value): value is number => value !== null);
+      return ys.length ? Math.min(...ys) + 0.4 : 0.55;
+    };
+
+    const makeFlatVectorRibbon = (curve: THREE.QuadraticBezierCurve3, width: number, y: number, tEnd = 1) => {
+      const segments = 64;
+      const points: THREE.Vector3[] = [];
+      for (let i = 0; i <= segments; i++) points.push(curve.getPointAt((i / segments) * tEnd));
       const vertices: number[] = [];
       const indices: number[] = [];
       for (let i = 0; i < points.length; i++) {
@@ -472,7 +485,7 @@ export function FleetTacticsHoloViewer({
         const normal = new THREE.Vector3(-tangent.z, 0, tangent.x).multiplyScalar(width / 2);
         const left = points[i].clone().add(normal);
         const right = points[i].clone().sub(normal);
-        vertices.push(left.x, 0.72, left.z, right.x, 0.72, right.z);
+        vertices.push(left.x, y, left.z, right.x, y, right.z);
         if (i < points.length - 1) {
           const a = i * 2;
           indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
@@ -485,20 +498,20 @@ export function FleetTacticsHoloViewer({
       return geometry;
     };
 
-    const makeFlatArrowHead = (end: THREE.Vector3, direction: THREE.Vector3, width: number) => {
+    const makeFlatArrowHead = (tip: THREE.Vector3, direction: THREE.Vector3, halfWidth: number, length: number, y: number) => {
       const forward = direction.clone();
+      forward.y = 0;
       if (forward.lengthSq() < 0.001) forward.copy(TACTICAL_FRONT_DIRECTION);
       forward.normalize();
       const side = new THREE.Vector3(-forward.z, 0, forward.x);
-      const length = width * 2.2;
-      const back = end.clone().sub(forward.multiplyScalar(length));
-      const left = back.clone().add(side.clone().multiplyScalar(width * 0.95));
-      const right = back.clone().sub(side.clone().multiplyScalar(width * 0.95));
+      const back = tip.clone().addScaledVector(forward, -length);
+      const left = back.clone().addScaledVector(side, halfWidth);
+      const right = back.clone().addScaledVector(side, -halfWidth);
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-        end.x, 0.76, end.z,
-        left.x, 0.76, left.z,
-        right.x, 0.76, right.z,
+        tip.x, y, tip.z,
+        left.x, y, left.z,
+        right.x, y, right.z,
       ], 3));
       geometry.setIndex([0, 1, 2]);
       geometry.computeVertexNormals();
@@ -512,41 +525,49 @@ export function FleetTacticsHoloViewer({
         : entries.filter((e) => e.ship.id === vector.sourceId);
       const srcX = srcEntries.length ? srcEntries.reduce((sum, e) => sum + e.root.position.x, 0) / srcEntries.length : 0;
       const srcZ = srcEntries.length ? srcEntries.reduce((sum, e) => sum + e.root.position.z, 0) / srcEntries.length : 0;
+      const baseY = vectorBaseY(srcEntries);
       const ex = vector.endX, ez = vector.endZ;
       const dx = ex - srcX, dz = ez - srcZ;
       const len = Math.hypot(dx, dz);
       const ctrlX = len > 1 ? (srcX + ex) / 2 - (dz / len) * len * 0.1 : (srcX + ex) / 2;
       const ctrlZ = len > 1 ? (srcZ + ez) / 2 + (dx / len) * len * 0.1 : (srcZ + ez) / 2;
-      const start = new THREE.Vector3(srcX, 0.55, srcZ);
-      const control = new THREE.Vector3(ctrlX, 0.55, ctrlZ);
-      const end = new THREE.Vector3(ex, 0.55, ez);
+      const start = new THREE.Vector3(srcX, baseY, srcZ);
+      const control = new THREE.Vector3(ctrlX, baseY, ctrlZ);
+      const end = new THREE.Vector3(ex, baseY, ez);
       const curve = new THREE.QuadraticBezierCurve3(start, control, end);
-      const direction = end.clone().sub(control);
       const dist = Math.max(start.distanceTo(end), 1);
-      const width = Math.max(10, Math.min(32, dist * 0.05));
+      const width = Math.max(4, Math.min(14, dist * 0.025));
+      const headLength = width * 3.4;
+      const headHalfWidth = width * 1.5;
+      const tEnd = Math.max(0, 1 - headLength / curve.getLength());
+      const tip = curve.getPointAt(1);
+      const headDir = tip.clone().sub(curve.getPointAt(tEnd));
       const mat = new THREE.MeshBasicMaterial({ color: 0x22f5df, transparent: true, opacity: 0.56, side: THREE.DoubleSide, depthTest: false });
       const glowMat = new THREE.MeshBasicMaterial({ color: 0x67fff2, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthTest: false });
-      const ribbon = new THREE.Mesh(makeFlatVectorRibbon(curve, width), mat);
+      const ribbon = new THREE.Mesh(makeFlatVectorRibbon(curve, width, baseY, tEnd), mat);
       ribbon.userData.tacticalVectorId = vector.id;
-      const ribbonGlow = new THREE.Mesh(makeFlatVectorRibbon(curve, width * 1.55), glowMat);
+      const ribbonGlow = new THREE.Mesh(makeFlatVectorRibbon(curve, width * 1.55, baseY, tEnd), glowMat);
       ribbonGlow.userData.tacticalVectorId = vector.id;
-      const head = new THREE.Mesh(makeFlatArrowHead(end, direction, width * 1.3), mat.clone());
+      const head = new THREE.Mesh(makeFlatArrowHead(tip, headDir, headHalfWidth, headLength, baseY), mat.clone());
       head.userData.tacticalVectorId = vector.id;
-      const headGlow = new THREE.Mesh(makeFlatArrowHead(end, direction, width * 1.9), glowMat.clone());
+      const headGlow = new THREE.Mesh(makeFlatArrowHead(tip, headDir, headHalfWidth * 1.4, headLength * 1.1, baseY), glowMat.clone());
       headGlow.userData.tacticalVectorId = vector.id;
       const endHandle = new THREE.Mesh(
-        new THREE.SphereGeometry(Math.max(14, width * 0.55), 20, 14),
+        new THREE.SphereGeometry(Math.max(8, width * 0.7), 20, 14),
         new THREE.MeshBasicMaterial({ color: 0xa7f3d0, transparent: true, opacity: 0.92, depthTest: false }),
       );
-      endHandle.position.set(ex, 2, ez);
+      endHandle.position.set(ex, baseY, ez);
       endHandle.userData.tacticalVectorId = vector.id;
       endHandle.userData.vectorHandle = 'end';
       root.add(ribbonGlow, ribbon, headGlow, head, endHandle);
       scene.add(root);
-      return { vector, root, meshes: [ribbonGlow, ribbon, headGlow, head, endHandle], ribbon, ribbonGlow, head, headGlow, endHandle, lastSourceX: srcX, lastSourceZ: srcZ };
+      return { vector, root, meshes: [ribbonGlow, ribbon, headGlow, head, endHandle], ribbon, ribbonGlow, head, headGlow, endHandle, lastSourceX: srcX, lastSourceZ: srcZ, lastBaseY: baseY };
     };
 
     const vectorEntries = tacticalVectors.map(makeVectorEntry);
+    // Sources (ship or group) that already own a vector. A ship/group may carry
+    // only one vector, so its creation launcher is hidden once a vector exists.
+    const vectorSourceKeys = new Set(vectorEntries.map((e) => `${e.vector.sourceType}:${e.vector.sourceId}`));
 
     const rebuildVectorGeometry = (entry: VectorEntry, overrideEndX?: number, overrideEndZ?: number) => {
       const srcEntries = entry.vector.sourceType === 'group'
@@ -554,35 +575,41 @@ export function FleetTacticsHoloViewer({
         : entries.filter((e) => e.ship.id === entry.vector.sourceId);
       const srcX = srcEntries.length ? srcEntries.reduce((s, e) => s + e.root.position.x, 0) / srcEntries.length : 0;
       const srcZ = srcEntries.length ? srcEntries.reduce((s, e) => s + e.root.position.z, 0) / srcEntries.length : 0;
+      const baseY = vectorBaseY(srcEntries);
       const ex = overrideEndX ?? entry.vector.endX;
       const ez = overrideEndZ ?? entry.vector.endZ;
       const dx = ex - srcX, dz = ez - srcZ;
       const len = Math.hypot(dx, dz);
       const ctrlX = len > 1 ? (srcX + ex) / 2 - (dz / len) * len * 0.1 : (srcX + ex) / 2;
       const ctrlZ = len > 1 ? (srcZ + ez) / 2 + (dx / len) * len * 0.1 : (srcZ + ez) / 2;
-      const start = new THREE.Vector3(srcX, 0.55, srcZ);
-      const control = new THREE.Vector3(ctrlX, 0.55, ctrlZ);
-      const end = new THREE.Vector3(ex, 0.55, ez);
+      const start = new THREE.Vector3(srcX, baseY, srcZ);
+      const control = new THREE.Vector3(ctrlX, baseY, ctrlZ);
+      const end = new THREE.Vector3(ex, baseY, ez);
       const curve = new THREE.QuadraticBezierCurve3(start, control, end);
-      const direction = end.clone().sub(control);
       const dist = Math.max(start.distanceTo(end), 1);
-      const width = Math.max(10, Math.min(32, dist * 0.05));
+      const width = Math.max(4, Math.min(14, dist * 0.025));
+      const headLength = width * 3.4;
+      const headHalfWidth = width * 1.5;
+      const tEnd = Math.max(0, 1 - headLength / curve.getLength());
+      const tip = curve.getPointAt(1);
+      const headDir = tip.clone().sub(curve.getPointAt(tEnd));
       entry.ribbon.geometry.dispose();
-      entry.ribbon.geometry = makeFlatVectorRibbon(curve, width);
+      entry.ribbon.geometry = makeFlatVectorRibbon(curve, width, baseY, tEnd);
       entry.ribbonGlow.geometry.dispose();
-      entry.ribbonGlow.geometry = makeFlatVectorRibbon(curve, width * 1.55);
+      entry.ribbonGlow.geometry = makeFlatVectorRibbon(curve, width * 1.55, baseY, tEnd);
       entry.head.geometry.dispose();
-      entry.head.geometry = makeFlatArrowHead(end, direction, width * 1.3);
+      entry.head.geometry = makeFlatArrowHead(tip, headDir, headHalfWidth, headLength, baseY);
       entry.headGlow.geometry.dispose();
-      entry.headGlow.geometry = makeFlatArrowHead(end, direction, width * 1.9);
-      const handleRadius = Math.max(14, width * 0.55);
+      entry.headGlow.geometry = makeFlatArrowHead(tip, headDir, headHalfWidth * 1.4, headLength * 1.1, baseY);
+      const handleRadius = Math.max(8, width * 0.7);
       if ((entry.endHandle.geometry as THREE.SphereGeometry).parameters?.radius !== handleRadius) {
         entry.endHandle.geometry.dispose();
         entry.endHandle.geometry = new THREE.SphereGeometry(handleRadius, 20, 14);
       }
-      entry.endHandle.position.set(ex, 2, ez);
+      entry.endHandle.position.set(ex, baseY, ez);
       entry.lastSourceX = srcX;
       entry.lastSourceZ = srcZ;
+      entry.lastBaseY = baseY;
     };
 
     const sourceEntriesForLauncher = (launcher: VectorLauncherEntry) =>
@@ -978,19 +1005,24 @@ export function FleetTacticsHoloViewer({
       const payload = vectorPayloadFromLauncher(launcher, endX, endZ);
       const sourceEntries = sourceEntriesForLauncher(launcher);
       const startPoint = sourceCenter(sourceEntries);
-      const start = new THREE.Vector3(startPoint.x, 0.55, startPoint.z);
-      const control = new THREE.Vector3(payload.controlX, 0.55, payload.controlZ);
-      const end = new THREE.Vector3(payload.endX, 0.55, payload.endZ);
+      const baseY = vectorBaseY(sourceEntries);
+      const start = new THREE.Vector3(startPoint.x, baseY, startPoint.z);
+      const control = new THREE.Vector3(payload.controlX, baseY, payload.controlZ);
+      const end = new THREE.Vector3(payload.endX, baseY, payload.endZ);
       const curve = new THREE.QuadraticBezierCurve3(start, control, end);
-      const direction = end.clone().sub(control);
       const length = Math.max(start.distanceTo(end), 1);
-      const width = Math.max(8, Math.min(24, length * 0.04));
+      const width = Math.max(4, Math.min(14, length * 0.025));
+      const headLength = width * 3.4;
+      const headHalfWidth = width * 1.5;
+      const tEnd = Math.max(0, 1 - headLength / curve.getLength());
+      const tip = curve.getPointAt(1);
+      const headDir = tip.clone().sub(curve.getPointAt(tEnd));
       const mat = new THREE.MeshBasicMaterial({ color: 0x7dfff4, transparent: true, opacity: 0.68, side: THREE.DoubleSide, depthTest: false });
       const glowMat = new THREE.MeshBasicMaterial({ color: 0x7dfff4, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthTest: false });
-      const ribbon = new THREE.Mesh(makeFlatVectorRibbon(curve, width), mat);
-      const glow = new THREE.Mesh(makeFlatVectorRibbon(curve, width * 1.75), glowMat);
-      const head = new THREE.Mesh(makeFlatArrowHead(end, direction, width * 1.3), mat.clone());
-      const headGlow = new THREE.Mesh(makeFlatArrowHead(end, direction, width * 2), glowMat.clone());
+      const ribbon = new THREE.Mesh(makeFlatVectorRibbon(curve, width, baseY, tEnd), mat);
+      const glow = new THREE.Mesh(makeFlatVectorRibbon(curve, width * 1.75, baseY, tEnd), glowMat);
+      const head = new THREE.Mesh(makeFlatArrowHead(tip, headDir, headHalfWidth, headLength, baseY), mat.clone());
+      const headGlow = new THREE.Mesh(makeFlatArrowHead(tip, headDir, headHalfWidth * 1.4, headLength * 1.1, baseY), glowMat.clone());
       launcherDragPreview.add(glow, ribbon, headGlow, head);
       launcherDragPreview.visible = true;
     };
@@ -1269,7 +1301,7 @@ export function FleetTacticsHoloViewer({
           launcherScale * 1.2,
           centerZ + tacticalFrontDirection.z * (radius + launcherScale * 3.5),
         );
-        ring.vectorLauncher.root.visible = selected && vectorsEnabled;
+        ring.vectorLauncher.root.visible = selected && vectorsEnabled && !vectorSourceKeys.has(`group:${ring.group}`);
         const isDraggingThisLauncher = dragTarget?.kind === 'vector-launcher' && dragTarget.entry === ring.vectorLauncher;
         const grabPulse = isDraggingThisLauncher ? 1.5 + Math.sin(t * 14) * 0.2 : 0.85 + Math.sin(t * 3.5) * 0.15;
         ring.vectorLauncher.root.scale.setScalar(launcherScale * grabPulse);
@@ -1304,7 +1336,8 @@ export function FleetTacticsHoloViewer({
           : entries.filter((e) => e.ship.id === entry.vector.sourceId);
         const srcX = srcEs.length ? srcEs.reduce((s, e) => s + e.root.position.x, 0) / srcEs.length : 0;
         const srcZ = srcEs.length ? srcEs.reduce((s, e) => s + e.root.position.z, 0) / srcEs.length : 0;
-        if (Math.abs(srcX - entry.lastSourceX) > 1 || Math.abs(srcZ - entry.lastSourceZ) > 1) {
+        const baseY = vectorBaseY(srcEs);
+        if (Math.abs(srcX - entry.lastSourceX) > 1 || Math.abs(srcZ - entry.lastSourceZ) > 1 || Math.abs(baseY - entry.lastBaseY) > 0.5) {
           rebuildVectorGeometry(entry);
         }
         const isSelected = entry.vector.id === selectedVectorIdRef.current;
@@ -1329,7 +1362,9 @@ export function FleetTacticsHoloViewer({
           launcherScale * 1.2,
           entry.root.position.z + tacticalFrontDirection.z * distance,
         );
-        launcher.root.visible = isSelected && !isPartOfSelectedGroup && vectorsEnabled;
+        const shipHasVector = vectorSourceKeys.has(`ship:${entry.ship.id}`)
+          || (!!entry.ship.group && vectorSourceKeys.has(`group:${entry.ship.group}`));
+        launcher.root.visible = isSelected && !isPartOfSelectedGroup && vectorsEnabled && !shipHasVector;
         const isDraggingThisLauncher = dragTarget?.kind === 'vector-launcher' && dragTarget.entry === launcher;
         const pulse = isDraggingThisLauncher ? 1.5 + Math.sin(t * 14) * 0.2 : 0.85 + Math.sin(t * 3.5) * 0.15;
         launcher.root.scale.setScalar(launcherScale * pulse);
