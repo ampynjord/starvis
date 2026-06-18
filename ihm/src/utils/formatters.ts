@@ -68,3 +68,26 @@ export const fDimension = (v: number | null | undefined): string => {
   if (v == null) return '—';
   return `${fNumber(v, 1)} m`;
 };
+
+// Humanize raw game identifiers (class names, localization keys) into readable
+// labels so the IHM never shows things like "AEGS_Gladius", "mnrl_gold" or
+// "@LOC_PLACEHOLDER" to end users. Use only as a display fallback when a clean
+// `name` is missing.
+export const prettyName = (raw: string | null | undefined): string => {
+  if (!raw) return 'Unknown';
+  let value = raw.trim();
+  // Drop localization-key prefixes like "@LOC_…" / "@UI_…".
+  value = value.replace(/^@+/, '').replace(/^(LOC|UI|MISC|ITEM|MNRL|COMM)_/i, '');
+  // Split CamelCase and underscores/dashes into words.
+  value = value
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!value) return 'Unknown';
+  // Title-case, preserving short all-caps tokens (e.g. "MK2", "S4").
+  return value
+    .split(' ')
+    .map((word) => (word.length <= 2 || /\d/.test(word) ? word.toUpperCase() : word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()))
+    .join(' ');
+};

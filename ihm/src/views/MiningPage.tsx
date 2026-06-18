@@ -187,7 +187,7 @@ export default function MiningPage() {
                     ) : compositionsError ? (
                       <ErrorState error={compositionsError as Error} />
                     ) : !compositions?.length ? (
-                      <EmptyState icon="??" title="No data" message="Run extraction to populate mining deposits." />
+                      <EmptyState icon="??" title="No data" message="No mining deposit data available yet." />
                     ) : (
                       <CompositionSelector
                         compositions={compositions}

@@ -1,4 +1,5 @@
 import type { MiningComposition, MiningCompositionPart } from '@/types/api';
+import { prettyName } from '@/utils/formatters';
 
 export interface MiningCompositionElementView {
   elementUuid: string;
@@ -27,7 +28,7 @@ function toNumber(value: unknown): number | undefined {
 }
 
 export function getCompositionDisplayName(composition: Pick<MiningComposition, 'deposit_name' | 'class_name'>): string {
-  return composition.deposit_name || composition.class_name || 'Unknown';
+  return composition.deposit_name || prettyName(composition.class_name) || 'Unknown';
 }
 
 export function mapCompositionPartToView(part: MiningCompositionPart): MiningCompositionElementView {
