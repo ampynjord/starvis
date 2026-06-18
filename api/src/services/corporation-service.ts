@@ -199,6 +199,11 @@ function rsiRawShipCandidates(entry: RsiHangarSyncEntry): string[] {
   return raw.shipCandidates.map((value) => cleanString(value)).filter((value): value is string => !!value);
 }
 
+function hasExplicitRsiShipCandidates(entry: RsiHangarSyncEntry): boolean {
+  const raw = rsiRawRecord(entry);
+  return Array.isArray(raw?.shipCandidates);
+}
+
 function looksLikeNonShipRsiLabel(value: string): boolean {
   return /\b(paint|paints|skin|livery|gear|weapon|armor|poster|display|envelope|rifle|pistol|helmet|undersuit|ticket|coupon)\b/i.test(
     value,
@@ -208,6 +213,7 @@ function looksLikeNonShipRsiLabel(value: string): boolean {
 function rsiHangarShipLabels(entry: RsiHangarSyncEntry): string[] {
   const explicitCandidates = rsiRawShipCandidates(entry);
   if (explicitCandidates.length > 0) return explicitCandidates;
+  if (hasExplicitRsiShipCandidates(entry)) return [];
 
   return [entry.name, entry.label, entry.title]
     .map((value) => cleanString(value))
@@ -250,7 +256,7 @@ function safePayload(entry: RsiHangarSyncEntry): Record<string, unknown> {
   };
 }
 
-const FLEET_GRID_GAP = 160;
+const FLEET_GRID_GAP = 360;
 
 function isFiniteGridValue(value: number | null | undefined): value is number {
   return typeof value === 'number' && Number.isFinite(value);

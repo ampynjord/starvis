@@ -669,6 +669,8 @@ export function FleetTacticsHoloViewer({
     const placeShipsOnce = () => {
       const totalSpan = getTotalSpan();
       const gap = getGap();
+      const widestShip = Math.max(...entries.map((entry) => entry.halfWidth * 2), 0);
+      const forcedGap = Math.max(gap, widestShip * 1.35, 360);
       let x = -totalSpan / 2;
       const explicitPositions = entries
         .map((entry) => ({
@@ -684,11 +686,12 @@ export function FleetTacticsHoloViewer({
           return Math.hypot(pos.x - other.x, pos.z - other.z) < minDistance;
         }),
       );
-      entries.forEach((e) => {
-        const autoX = x + e.halfWidth;
+      const forcedStartX = -((entries.length - 1) * forcedGap) / 2;
+      entries.forEach((e, index) => {
+        const autoX = hasOverlappingExplicitPositions ? forcedStartX + index * forcedGap : x + e.halfWidth;
         const hasExplicitPosition = Number.isFinite(e.ship.gridX ?? NaN) && Number.isFinite(e.ship.gridZ ?? NaN);
         e.root.position.x = hasExplicitPosition && !hasOverlappingExplicitPositions ? Number(e.ship.gridX) : autoX;
-        e.root.position.z = hasExplicitPosition && !hasOverlappingExplicitPositions ? Number(e.ship.gridZ) : 0;
+        e.root.position.z = hasExplicitPosition && !hasOverlappingExplicitPositions ? Number(e.ship.gridZ) : (hasOverlappingExplicitPositions ? (index % 2) * forcedGap * 0.25 : 0);
         x += e.halfWidth * 2 + gap;
       });
     };
