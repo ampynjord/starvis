@@ -27,6 +27,20 @@ const DEFAULT_BUFFER_SIZE = 500;
 const MAX_LIMIT = 500;
 const requestLogs: RequestLogEntry[] = [];
 let nextId = 1;
+let persistenceClient: {
+  $executeRawUnsafe: (query: string, ...values: unknown[]) => Promise<unknown>;
+  $queryRawUnsafe: <T = unknown>(query: string, ...values: unknown[]) => Promise<T>;
+} | null = null;
+let persistenceWarningPrinted = false;
+
+export function configureRequestLogPersistence(
+  client: {
+    $executeRawUnsafe: (query: string, ...values: unknown[]) => Promise<unknown>;
+    $queryRawUnsafe: <T = unknown>(query: string, ...values: unknown[]) => Promise<T>;
+  } | null,
+): void {
+  persistenceClient = client;
+}
 
 function bufferSize(): number {
   const parsed = Number.parseInt(process.env.REQUEST_LOG_BUFFER_SIZE ?? '', 10);
@@ -117,7 +131,7 @@ export function recordRequestLog(req: Request, statusCode: number, durationMs: n
   const authMethod = resolveAuthMethod(req, payload);
   const internalClient = requestInternalClient(req);
   const clientType = resolveClientType(path, authMethod, payload, internalClient);
-  requestLogs.unshift({
+  const entry: RequestLogEntry = {
     id: nextId++,
     timestamp: new Date().toISOString(),
     method: req.method,
@@ -135,10 +149,45 @@ export function recordRequestLog(req: Request, statusCode: number, durationMs: n
     role: payload?.role ?? null,
     ip: anonymizeIp(resolveClientIp(req)),
     userAgent: requestUserAgent(req),
-  });
+  };
+  requestLogs.unshift(entry);
+  void persistRequestLog(entry);
 
   const max = bufferSize();
   if (requestLogs.length > max) requestLogs.length = max;
+}
+
+async function persistRequestLog(entry: RequestLogEntry): Promise<void> {
+  if (!persistenceClient) return;
+  try {
+    await persistenceClient.$executeRawUnsafe(
+      `INSERT INTO meta.user_request_history
+        (timestamp, method, path, status_code, duration_ms, is_external_api, auth_method, client_type,
+         internal_client, api_token_id, api_token_name, user_id, username, role, ip, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::meta."UserRole", $15, $16)`,
+      new Date(entry.timestamp),
+      entry.method,
+      entry.path,
+      entry.statusCode,
+      entry.durationMs,
+      entry.isExternalApi,
+      entry.authMethod,
+      entry.clientType,
+      entry.internalClient,
+      entry.apiTokenId,
+      entry.apiTokenName,
+      entry.userId,
+      entry.username,
+      entry.role,
+      entry.ip,
+      entry.userAgent,
+    );
+  } catch (error) {
+    if (!persistenceWarningPrinted) {
+      persistenceWarningPrinted = true;
+      console.warn(`Request history persistence disabled: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
 }
 
 export function listRequestLogs(limit = 100): RequestLogEntry[] {
@@ -155,6 +204,90 @@ export function listRequestLogsByScope(scope: 'external' | 'web' | 'all', limit 
         ? requestLogs.filter((log) => !log.isExternalApi && ['web_session', 'internal_web_proxy', 'anonymous_web'].includes(log.clientType))
         : requestLogs;
   return filtered.slice(0, safeLimit);
+}
+
+interface RequestHistoryFilters {
+  scope?: 'external' | 'web' | 'all';
+  limit?: number;
+  userId?: number;
+  role?: string;
+}
+
+interface RequestHistoryRow {
+  id: number;
+  timestamp: Date | string;
+  method: string;
+  path: string;
+  status_code: number;
+  duration_ms: number;
+  is_external_api: boolean;
+  auth_method: RequestLogEntry['authMethod'];
+  client_type: RequestLogEntry['clientType'];
+  internal_client: string | null;
+  api_token_id: number | null;
+  api_token_name: string | null;
+  user_id: number | null;
+  username: string | null;
+  role: string | null;
+  ip: string | null;
+  user_agent: string | null;
+}
+
+export async function listPersistedRequestHistory(filters: RequestHistoryFilters = {}): Promise<RequestLogEntry[]> {
+  const scope = filters.scope ?? 'all';
+  const limit = Math.min(Math.max(Math.trunc(filters.limit ?? 100) || 100, 1), MAX_LIMIT);
+
+  if (!persistenceClient) {
+    return listRequestLogsByScope(scope, limit);
+  }
+
+  const where: string[] = [];
+  const values: unknown[] = [];
+  const add = (sql: string, value: unknown) => {
+    where.push(sql.replace('?', `$${values.length + 1}`));
+    values.push(value);
+  };
+
+  if (scope === 'external') {
+    where.push('is_external_api = true');
+  } else if (scope === 'web') {
+    where.push("is_external_api = false AND client_type IN ('web_session', 'internal_web_proxy', 'anonymous_web')");
+  }
+  if (filters.userId) add('user_id = ?', filters.userId);
+  if (filters.role) add('role = ?::meta."UserRole"', filters.role);
+
+  values.push(limit);
+  const limitRef = `$${values.length}`;
+  const rows = await persistenceClient.$queryRawUnsafe<RequestHistoryRow[]>(
+    `SELECT id, timestamp, method, path, status_code, duration_ms, is_external_api,
+            auth_method, client_type, internal_client, api_token_id, api_token_name,
+            user_id, username, role, ip, user_agent
+     FROM meta.user_request_history
+     ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+     ORDER BY timestamp DESC
+     LIMIT ${limitRef}`,
+    ...values,
+  );
+
+  return rows.map((row) => ({
+    id: Number(row.id),
+    timestamp: new Date(row.timestamp).toISOString(),
+    method: row.method,
+    path: row.path,
+    statusCode: Number(row.status_code),
+    durationMs: Number(row.duration_ms),
+    isExternalApi: Boolean(row.is_external_api),
+    authMethod: row.auth_method,
+    clientType: row.client_type,
+    internalClient: row.internal_client,
+    apiTokenId: row.api_token_id == null ? null : Number(row.api_token_id),
+    apiTokenName: row.api_token_name,
+    userId: row.user_id == null ? null : Number(row.user_id),
+    username: row.username,
+    role: row.role,
+    ip: row.ip,
+    userAgent: row.user_agent,
+  }));
 }
 
 export function clearRequestLogsForTests(): void {

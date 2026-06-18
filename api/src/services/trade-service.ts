@@ -26,6 +26,19 @@ export class TradeService {
 
   async getTradeSystems(env = 'live'): Promise<string[]> {
     const prisma = this.getClient(env);
+    try {
+      const uexRows = await prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT DISTINCT t.star_system as system
+         FROM game.uex_market_prices p
+         LEFT JOIN game.uex_terminals t ON t.uex_id = p.terminal_uex_id AND t.env = p.env
+         WHERE p.env = ? AND p.entity_kind = 'commodity' AND t.star_system IS NOT NULL AND t.star_system != ''
+         ORDER BY t.star_system`),
+        env,
+      );
+      if (uexRows.length) return uexRows.map((r) => String(r.system));
+    } catch {
+      // Older deployments without UEX generic prices fall back to local reports.
+    }
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT DISTINCT s.system
        FROM game.shops s
@@ -39,6 +52,27 @@ export class TradeService {
 
   async getTradeLocations(env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
+    try {
+      const uexRows = await prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT DISTINCT
+              t.uex_id as id,
+              t.name,
+              COALESCE(t.city, t.outpost, t.space_station, t.moon, t.planet, t.star_system) as location,
+              t.star_system as system,
+              COALESCE(t.moon, t.planet, t.orbit) as planet_moon,
+              t.city,
+              t.type as shop_type,
+              'uex' as source
+         FROM game.uex_market_prices p
+         LEFT JOIN game.uex_terminals t ON t.uex_id = p.terminal_uex_id AND t.env = p.env
+         WHERE p.env = ? AND p.entity_kind = 'commodity' AND t.uex_id IS NOT NULL
+         ORDER BY t.star_system, t.city, t.name`),
+        env,
+      );
+      if (uexRows.length) return convertBigIntToNumber(uexRows);
+    } catch {
+      // Fallback below.
+    }
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT DISTINCT s.id, s.name, s.location, s.system, s.planet_moon, s.city, s.shop_type
        FROM game.shops s
@@ -52,6 +86,23 @@ export class TradeService {
 
   async getCommodityPrices(commodityUuid: string, env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
+    try {
+      const uexRows = await prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT p.id, p.price_buy as buy_price, p.price_sell as sell_price, p.date_modified as reported_at,
+              t.uex_id as shop_id, COALESCE(t.name, p.terminal_name) as shop_name,
+              t.star_system as system, COALESCE(t.moon, t.planet, t.orbit) as planet_moon, t.city,
+              'uex' as source
+       FROM game.uex_market_prices p
+       LEFT JOIN game.uex_terminals t ON t.uex_id = p.terminal_uex_id AND t.env = p.env
+       WHERE p.env = ? AND p.entity_kind = 'commodity' AND p.entity_uuid = ?
+       ORDER BY t.star_system, t.city, t.name`),
+        env,
+        commodityUuid,
+      );
+      if (uexRows.length) return convertBigIntToNumber(uexRows);
+    } catch {
+      // Fallback below.
+    }
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT cp.id, cp.buy_price, cp.sell_price, cp.reported_at,
               s.id as shop_id, s.name as shop_name, s.system, s.planet_moon, s.city
@@ -143,6 +194,10 @@ export class TradeService {
     const { scu, budget, env = 'live', limit = 20, commodity, buySystem, sellSystem, sort = 'totalProfit' } = opts;
     const prisma = this.getClient(env);
     const safeLimit = Math.min(Math.max(1, limit), 100);
+    const uexRoutes = await this.findBestUexRoutes({ scu, budget, env, limit: safeLimit, commodity, buySystem, sellSystem, sort }).catch(
+      () => [],
+    );
+    if (uexRoutes.length) return uexRoutes;
 
     const where: string[] = [
       'buy_cp.commodity_env = ?',
@@ -224,5 +279,97 @@ export class TradeService {
     const sortKey = sort === 'profitPerScu' ? 'profitPerScu' : sort === 'profitPerUnit' ? 'profitPerUnit' : 'totalProfit';
     routes.sort((a, b) => b[sortKey] - a[sortKey]);
     return routes.slice(0, safeLimit);
+  }
+
+  private async findBestUexRoutes(opts: {
+    scu: number;
+    budget?: number;
+    env: string;
+    limit: number;
+    commodity?: string;
+    buySystem?: string;
+    sellSystem?: string;
+    sort?: 'totalProfit' | 'profitPerScu' | 'profitPerUnit';
+  }): Promise<TradeRoute[]> {
+    const { scu, budget, env, limit, commodity, buySystem, sellSystem, sort = 'totalProfit' } = opts;
+    const prisma = this.getClient(env);
+    const where = [
+      'buy_p.env = ?',
+      "buy_p.entity_kind = 'commodity'",
+      'buy_p.entity_uuid IS NOT NULL',
+      'buy_p.price_buy IS NOT NULL',
+      'buy_p.price_buy > 0',
+      'sell_p.price_sell IS NOT NULL',
+      'sell_p.price_sell > buy_p.price_buy',
+    ];
+    const params: (string | number)[] = [env];
+    if (commodity) {
+      where.push('buy_p.entity_name ILIKE ?');
+      params.push(`%${commodity}%`);
+    }
+    if (buySystem) {
+      where.push('buy_t.star_system = ?');
+      params.push(buySystem);
+    }
+    if (sellSystem) {
+      where.push('sell_t.star_system = ?');
+      params.push(sellSystem);
+    }
+    params.push(limit * 3);
+
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`SELECT
+        buy_p.entity_name as commodity_name,
+        c.occupancy_scu,
+        buy_p.price_buy as buy_price,
+        COALESCE(buy_t.name, buy_p.terminal_name) as buy_shop,
+        buy_t.star_system as buy_system,
+        buy_t.city as buy_city,
+        sell_p.price_sell as sell_price,
+        COALESCE(sell_t.name, sell_p.terminal_name) as sell_shop,
+        sell_t.star_system as sell_system,
+        sell_t.city as sell_city
+       FROM game.uex_market_prices buy_p
+       INNER JOIN game.uex_market_prices sell_p ON sell_p.entity_uuid = buy_p.entity_uuid
+         AND sell_p.env = buy_p.env
+         AND COALESCE(sell_p.terminal_uex_id, -1) != COALESCE(buy_p.terminal_uex_id, -1)
+       LEFT JOIN game.uex_terminals buy_t ON buy_t.uex_id = buy_p.terminal_uex_id AND buy_t.env = buy_p.env
+       LEFT JOIN game.uex_terminals sell_t ON sell_t.uex_id = sell_p.terminal_uex_id AND sell_t.env = sell_p.env
+       LEFT JOIN game.commodities c ON c.uuid = buy_p.entity_uuid AND c.env = buy_p.env
+       WHERE ${where.join(' AND ')}
+       ORDER BY (sell_p.price_sell - buy_p.price_buy) DESC
+       LIMIT ?`),
+      ...params,
+    );
+
+    const routes: TradeRoute[] = [];
+    for (const r of convertBigIntToNumber(rows)) {
+      const buyPrice = Number(r.buy_price);
+      const sellPrice = Number(r.sell_price);
+      const occupancy = Number(r.occupancy_scu) || 1;
+      const units = Math.floor(scu / occupancy);
+      if (units <= 0) continue;
+      const totalCost = units * buyPrice;
+      if (budget && totalCost > budget) continue;
+      const profitPerUnit = sellPrice - buyPrice;
+      routes.push({
+        buyCommodity: r.commodity_name,
+        buyShop: r.buy_shop,
+        buyLocation: [r.buy_city, r.buy_system].filter(Boolean).join(', '),
+        buySystem: r.buy_system ?? null,
+        buyPrice,
+        sellShop: r.sell_shop,
+        sellLocation: [r.sell_city, r.sell_system].filter(Boolean).join(', '),
+        sellSystem: r.sell_system ?? null,
+        sellPrice,
+        profitPerUnit,
+        profitPerScu: profitPerUnit / occupancy,
+        totalProfit: units * profitPerUnit,
+        totalInvestment: totalCost,
+        scu,
+      });
+    }
+    const sortKey = sort === 'profitPerScu' ? 'profitPerScu' : sort === 'profitPerUnit' ? 'profitPerUnit' : 'totalProfit';
+    return routes.sort((a, b) => b[sortKey] - a[sortKey]).slice(0, limit);
   }
 }

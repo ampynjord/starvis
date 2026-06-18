@@ -9,7 +9,7 @@ Database workspace for Prisma, PostgreSQL bootstrap scripts, and the shared Pris
 | `prisma/schema/00-base.prisma` | Prisma generator and datasource. |
 | `prisma/schema/10-meta.prisma` | Users, generated API tokens, corporations, fleet/tactical metadata, bug reports, extraction logs and changelog. |
 | `prisma/schema/20-rsi.prisma` | RSI website data: ship matrix, Galactapedia, comm-links, starmap. |
-| `prisma/schema/30-game.prisma` | P4K/DataForge game data: ships, components, items, commodities, shops, missions, crafting, plus UEX crowd-sourced ship market data (`uex_terminals`, `uex_vehicle_prices`). |
+| `prisma/schema/30-game.prisma` | P4K/DataForge game data: ships, components, items, commodities, shops, missions, crafting, plus UEX crowd-sourced market data (`uex_terminals`, `uex_vehicle_prices`, `uex_market_prices`). |
 | `src/client/` | Prisma singleton client. |
 | `src/env/` | Shared database environment helpers. |
 | `src/types/` | Public Prisma helper types. |
@@ -51,7 +51,8 @@ Cross-source links should be explicit fields, not duplicated data. Current examp
 - `game.ships.ship_matrix_id` links extracted ships to `rsi.ship_matrix`.
 - `game.locations.rsi_starmap_location_id` links P4K locations to `rsi.starmap_locations`.
 - `game.starmap_location_aliases` stores manual/semi-automatic correlation help.
-- `game.uex_vehicle_prices.ship_uuid` links UEX vehicle prices to `game.ships.uuid` (resolved by the extractor `uex` module). No DB-level foreign key is declared so externally-sourced rows survive even when a ship is missing or renamed.
+- `game.uex_vehicle_prices.ship_uuid` links UEX vehicle prices to `game.ships.uuid` (resolved by the extractor `uex` module).
+- `game.uex_market_prices.entity_uuid` links UEX commodity/item/component prices to extracted entities when a name match is available. No DB-level foreign key is declared so externally-sourced rows survive even when a game item is missing or renamed.
 
 Run the static data audit after extractor or schema changes:
 
@@ -71,4 +72,4 @@ Workflow when changing the schema:
 2. Run `npm run migrate --workspace=@starvis/db` against your dev database and commit the generated migration folder.
 3. CI fails on drift: the "Check schema/migrations drift" step compares `prisma/migrations` to `prisma/schema` and rejects schema changes that ship without a migration.
 
-`migrate:deploy` runs `scripts/migrate-deploy.mjs`, which baselines databases originally created with `db push` (marks `0_init` as applied on Prisma error P3005) before applying pending migrations. This makes the first deployment on the existing production database safe and automatic.
+`migrate:deploy` runs `scripts/migrate-deploy.mjs`, which now delegates strictly to `prisma migrate deploy`. It does not auto-baseline a non-empty database; any legacy database without `_prisma_migrations` must be baselined explicitly and reviewed before deployment.

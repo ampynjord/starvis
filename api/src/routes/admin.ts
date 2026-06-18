@@ -2,7 +2,7 @@ import type { Router } from 'express';
 import { requireJwtAdmin } from '../middleware/index.js';
 import { buildApiSupervisionSnapshot } from '../services/api-supervision-service.js';
 import { ApiTokenService } from '../services/api-token-service.js';
-import { listRequestLogsByScope } from '../services/request-log-service.js';
+import { listPersistedRequestHistory } from '../services/request-log-service.js';
 import { asyncHandler, makeGameDataGuard } from './helpers.js';
 import type { RouteDependencies } from './types.js';
 
@@ -37,7 +37,17 @@ export function mountAdminRoutes(router: Router, deps: RouteDependencies): void 
       const limit = Number.parseInt(String(req.query.limit ?? '100'), 10);
       const requestedScope = String(req.query.scope ?? 'all');
       const scope = requestedScope === 'external' || requestedScope === 'web' ? requestedScope : 'all';
-      res.json({ success: true, data: listRequestLogsByScope(scope, limit) });
+      const role = String(req.query.role ?? '');
+      const userId = Number.parseInt(String(req.query.userId ?? ''), 10);
+      res.json({
+        success: true,
+        data: await listPersistedRequestHistory({
+          scope,
+          limit,
+          userId: Number.isInteger(userId) && userId > 0 ? userId : undefined,
+          role: role === 'user' || role === 'developer' || role === 'admin' ? role : undefined,
+        }),
+      });
     }),
   );
 

@@ -26,6 +26,85 @@ const FACTIONS: FactionStyle[] = [
   { key: 'unclaimed', label: 'Unclaimed', color: 0x94a3b8, css: '#94a3b8' },
 ];
 
+const TYPE_STYLE: Record<string, { color: number; css: string; size: number; label: string }> = {
+  system: { color: 0x38bdf8, css: '#38bdf8', size: 2.1, label: 'System' },
+  star: { color: 0xfacc15, css: '#facc15', size: 2.5, label: 'Star' },
+  planet: { color: 0x60a5fa, css: '#60a5fa', size: 1.35, label: 'Planet' },
+  moon: { color: 0xcbd5e1, css: '#cbd5e1', size: 0.82, label: 'Moon' },
+  station: { color: 0xa78bfa, css: '#a78bfa', size: 0.95, label: 'Station' },
+  landingzone: { color: 0x34d399, css: '#34d399', size: 0.72, label: 'Landing zone' },
+  asteroid: { color: 0xf97316, css: '#f97316', size: 0.68, label: 'Asteroid' },
+  jumppoint: { color: 0x22d3ee, css: '#22d3ee', size: 0.9, label: 'Jump point' },
+};
+
+function typeKey(type: string | null | undefined) {
+  return String(type ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+}
+
+function objectStyle(type: string | null | undefined) {
+  const key = typeKey(type);
+  if (key.includes('landing')) return TYPE_STYLE.landingzone;
+  if (key.includes('jump')) return TYPE_STYLE.jumppoint;
+  if (key.includes('station')) return TYPE_STYLE.station;
+  if (key.includes('asteroid')) return TYPE_STYLE.asteroid;
+  return TYPE_STYLE[key] ?? { color: 0x94a3b8, css: '#94a3b8', size: 0.7, label: type ?? 'Object' };
+}
+
+function proxiedAssetUrl(url: string | null | undefined) {
+  if (!url) return null;
+  const normalized = url.startsWith('//') ? `https:${url}` : url;
+  if (!/^https?:\/\//i.test(normalized)) return normalized;
+  return `/api/rsi-assets?url=${encodeURIComponent(normalized)}`;
+}
+
+function findAssetUrl(value: unknown): string | null {
+  if (!value) return null;
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findAssetUrl(item);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    for (const key of ['thumbnail', 'image', 'url', 'source', 'src', 'medium', 'large']) {
+      const found = findAssetUrl(record[key]);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function starmapImage(system: StarmapPosition) {
+  return proxiedAssetUrl(system.thumbnail) ?? proxiedAssetUrl(findAssetUrl(system.assets)) ?? proxiedAssetUrl(findAssetUrl(system.thumbnail_data));
+}
+
+function jumpPointTargets(system: StarmapPosition): string[] {
+  const raw = system.jump_points;
+  let parsed = raw;
+  if (typeof raw === 'string' && raw.trim().startsWith('{')) {
+    try {
+      parsed = JSON.parse(raw) as unknown;
+    } catch {
+      parsed = null;
+    }
+  }
+  const values = Array.isArray(parsed) ? parsed : parsed && typeof parsed === 'object' ? Object.values(parsed as Record<string, unknown>) : [];
+  return values
+    .flatMap((value) => {
+      if (typeof value === 'string') return [value];
+      if (!value || typeof value !== 'object') return [];
+      const row = value as Record<string, unknown>;
+      return [row.destination, row.destination_name, row.system, row.system_name, row.name, row.code]
+        .filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+    })
+    .map((value) => value.toLowerCase());
+}
+
 function factionStyle(faction: string | null): FactionStyle {
   const f = (faction ?? '').toLowerCase();
   if (f.includes('uee') || f.includes('united empire') || f.includes('earth')) return FACTIONS[0];
@@ -162,13 +241,20 @@ function StarmapScene({ systems }: { systems: StarmapPosition[] }) {
 
     // ── System nodes ─────────────────────────────────────────────────────────
     const glowTexture = makeGlowTexture();
-    const sphereGeo = new THREE.SphereGeometry(1.6, 20, 20);
+    const sphereGeo = new THREE.SphereGeometry(1, 20, 20);
     const pickables: THREE.Mesh[] = [];
     const nodeGroup = new THREE.Group();
+    const animatedNodes: Array<{ mesh: THREE.Mesh; glow: THREE.Sprite; base: number; phase: number }> = [];
+    const byName = new Map<string, THREE.Vector3>();
 
     for (const s of valid) {
-      const style = factionStyle(s.faction_name);
+      const key = typeKey(s.type);
+      const typeStyle = objectStyle(s.type);
+      const style = key === 'system' || key === 'star' ? factionStyle(s.faction_name) : typeStyle;
       const p = posOf(s);
+      for (const name of [s.name, s.system_name, s.system_code, s.rsi_id].filter(Boolean) as string[]) {
+        byName.set(name.toLowerCase(), p);
+      }
 
       const mat = new THREE.MeshStandardMaterial({
         color: style.color,
@@ -179,6 +265,7 @@ function StarmapScene({ systems }: { systems: StarmapPosition[] }) {
       });
       const mesh = new THREE.Mesh(sphereGeo, mat);
       mesh.position.copy(p);
+      mesh.scale.setScalar(typeStyle.size);
       mesh.userData.system = s;
       pickables.push(mesh);
       nodeGroup.add(mesh);
@@ -192,15 +279,36 @@ function StarmapScene({ systems }: { systems: StarmapPosition[] }) {
           blending: THREE.AdditiveBlending,
         }),
       );
-      glow.scale.set(12, 12, 1);
+      glow.scale.set(7 + typeStyle.size * 3, 7 + typeStyle.size * 3, 1);
       glow.position.copy(p);
       nodeGroup.add(glow);
+      animatedNodes.push({ mesh, glow, base: typeStyle.size, phase: Math.random() * Math.PI * 2 });
 
-      const label = makeLabelSprite(s.name, style.css);
-      label.position.copy(p).add(new THREE.Vector3(0, 4.5, 0));
-      nodeGroup.add(label);
+      if (['system', 'star', 'planet', 'station', 'landingzone', 'jumppoint'].includes(key)) {
+        const label = makeLabelSprite(s.name, style.css);
+        label.position.copy(p).add(new THREE.Vector3(0, 3.2 + typeStyle.size, 0));
+        nodeGroup.add(label);
+      }
     }
     scene.add(nodeGroup);
+
+    const jumpGroup = new THREE.Group();
+    for (const s of valid) {
+      const from = posOf(s);
+      for (const target of jumpPointTargets(s)) {
+        const to = byName.get(target);
+        if (!to || from.distanceTo(to) < 0.1) continue;
+        const curve = new THREE.QuadraticBezierCurve3(
+          from,
+          from.clone().add(to).multiplyScalar(0.5).add(new THREE.Vector3(0, 18, 0)),
+          to,
+        );
+        const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(36));
+        const material = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.22 });
+        jumpGroup.add(new THREE.Line(geometry, material));
+      }
+    }
+    scene.add(jumpGroup);
 
     // ── Camera framing ───────────────────────────────────────────────────────
     camera.position.set(120, 90, 200);
@@ -261,6 +369,15 @@ function StarmapScene({ systems }: { systems: StarmapPosition[] }) {
     const animate = () => {
       frame = requestAnimationFrame(animate);
       if (!visibility.isVisible()) return;
+      const t = performance.now() * 0.001;
+      nodeGroup.rotation.y = Math.sin(t * 0.08) * 0.015;
+      jumpGroup.rotation.y = nodeGroup.rotation.y;
+      for (const node of animatedNodes) {
+        const pulse = 1 + Math.sin(t * 1.8 + node.phase) * 0.06;
+        node.mesh.scale.setScalar(node.base * pulse);
+        const glowPulse = 1 + Math.sin(t * 1.5 + node.phase) * 0.09;
+        node.glow.scale.setScalar((7 + node.base * 3) * glowPulse);
+      }
       controls.update();
       renderer.render(scene, camera);
     };
@@ -302,7 +419,7 @@ function StarmapScene({ systems }: { systems: StarmapPosition[] }) {
       <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-sm border border-cyan-900/40 bg-slate-950/70 px-3 py-1.5 backdrop-blur">
         <Compass size={14} className="text-cyan-400" />
         <span className="font-orbitron text-xs uppercase tracking-widest text-slate-200">Galactic Map</span>
-        <span className="font-mono-sc text-[10px] text-cyan-500">{systems.length} systems</span>
+        <span className="font-mono-sc text-[10px] text-cyan-500">{systems.length} objects</span>
       </div>
 
       {/* Faction legend */}
@@ -317,7 +434,7 @@ function StarmapScene({ systems }: { systems: StarmapPosition[] }) {
 
       {/* Controls hint */}
       <div className="pointer-events-none absolute bottom-3 right-3 hidden rounded-sm border border-slate-800/60 bg-slate-950/70 px-3 py-1.5 font-mono-sc text-[10px] text-slate-500 backdrop-blur sm:block">
-        Drag: rotate · Scroll: zoom · Click a star
+        Drag: rotate · Scroll: zoom · Click an object
       </div>
 
       {/* Selected system panel */}
@@ -327,7 +444,7 @@ function StarmapScene({ systems }: { systems: StarmapPosition[] }) {
             <div className="min-w-0">
               <p className="flex items-center gap-1.5 font-mono-sc text-[9px] uppercase tracking-widest text-cyan-400">
                 <Globe2 size={11} />
-                {selected.type === 'system' ? 'Star system' : selected.type}
+                {objectStyle(selected.type).label}
               </p>
               <h3 className="truncate font-orbitron text-base text-slate-100">{selected.name}</h3>
             </div>
@@ -341,6 +458,13 @@ function StarmapScene({ systems }: { systems: StarmapPosition[] }) {
             </button>
           </div>
           <div className="space-y-2 px-3 py-3">
+            {starmapImage(selected) && (
+              <img
+                src={starmapImage(selected)!}
+                alt=""
+                className="h-32 w-full rounded-sm border border-slate-800/60 object-cover"
+              />
+            )}
             <div className="flex flex-wrap items-center gap-2">
               <span
                 className="rounded-sm border px-1.5 py-0.5 font-mono-sc text-[9px] uppercase tracking-widest"
@@ -395,10 +519,10 @@ export function StarmapGalaxy() {
     staleTime: 1000 * 60 * 30,
   });
 
-  const systems = useMemo(
+  const starmapObjects = useMemo(
     () =>
       (data ?? []).filter(
-        (s) => s.type === 'system' && s.coordinates != null && Number.isFinite(s.coordinates.x),
+        (s) => s.coordinates != null && Number.isFinite(s.coordinates.x),
       ),
     [data],
   );
@@ -408,22 +532,22 @@ export function StarmapGalaxy() {
       <div className="flex h-full w-full items-center justify-center bg-[#030712]">
         <div className="flex items-center gap-2 font-mono-sc text-xs uppercase tracking-widest text-cyan-600">
           <Loader2 size={16} className="animate-spin" />
-          Loading star systems…
+          Loading RSI starmap objects…
         </div>
       </div>
     );
   }
 
-  if (error || systems.length === 0) {
+  if (error || starmapObjects.length === 0) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-[#030712]">
         <div className="flex flex-col items-center gap-2 text-center font-mono-sc text-xs text-slate-500">
           <Compass size={28} className="text-slate-700" />
-          {error ? 'Unable to load the galactic map.' : 'No star systems with coordinates available.'}
+          {error ? 'Unable to load the galactic map.' : 'No RSI starmap objects with coordinates available.'}
         </div>
       </div>
     );
   }
 
-  return <StarmapScene systems={systems} />;
+  return <StarmapScene systems={starmapObjects} />;
 }

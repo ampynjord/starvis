@@ -49,6 +49,9 @@ export interface FormationPreset {
 }
 
 export const PRESETS_STORAGE_KEY = 'starvis-formation-presets';
+export const formationPresetStorageKey = (userId: number | string) => `${PRESETS_STORAGE_KEY}-user-${userId}`;
+export const tacticsStrategyStorageKey = (corpId: number, userId: number | string) => `starvis-corp-tactics-3d-${corpId}-user-${userId}`;
+export const legacyTacticsStrategyStorageKey = (corpId: number) => `starvis-corp-tactics-3d-${corpId}`;
 
 // ── Teams / camps ────────────────────────────────────────────────────────────
 // A ship can be assigned to a colored team (camp) independently from its

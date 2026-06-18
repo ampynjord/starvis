@@ -9,8 +9,8 @@ vi.mock('@/services/api', () => ({
 import { StarmapGalaxy } from '@/components/starmap/StarmapGalaxy';
 
 describe('StarmapGalaxy', () => {
-  it('renders an empty state when no star systems have coordinates', async () => {
+  it('renders an empty state when no RSI starmap objects have coordinates', async () => {
     renderWithProviders(<StarmapGalaxy />);
-    expect(await screen.findByText(/No star systems/i)).toBeInTheDocument();
+    expect(await screen.findByText(/No RSI starmap objects/i)).toBeInTheDocument();
   });
 });

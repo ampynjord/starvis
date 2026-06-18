@@ -106,6 +106,9 @@ test('corporation tactics board adds ships and tactical markers', async ({ conte
 
   await expect(page.getByRole('heading', { name: 'Tactics' })).toBeVisible();
   await expect(page.getByText('[DNR] Dawnstar')).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => Object.keys(localStorage).some((key) => key === 'starvis-corp-tactics-3d-42-user-7')))
+    .toBe(true);
   await expect(page.getByLabel('Formation ship')).toContainText('Aurora MR');
   await expect(page.getByLabel('Formation ship')).not.toContainText('aegis_private');
   await page.getByLabel('Qty').fill('5');
@@ -113,6 +116,10 @@ test('corporation tactics board adds ships and tactical markers', async ({ conte
   await page.getByRole('button', { name: /Use only corp ships/i }).click();
   await expect(page.getByText(/Not enough available ships/i)).toBeHidden();
   await page.getByLabel('Qty').fill('4');
+  await page.getByRole('button', { name: /Save as preset/i }).click();
+  await expect
+    .poll(() => page.evaluate(() => Object.keys(localStorage).some((key) => key === 'starvis-formation-presets-user-7')))
+    .toBe(true);
   const board = page.getByTestId('tactics-board');
   await page.getByRole('button', { name: /Add formation/i }).click();
   await expect(board.locator('canvas')).toBeVisible();
