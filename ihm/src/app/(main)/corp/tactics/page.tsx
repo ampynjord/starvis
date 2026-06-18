@@ -12,13 +12,17 @@ import {
   Flag,
   Layers3,
   Loader2,
+  MoveVertical,
   Plus,
   Radar,
+  RotateCcw,
+  RotateCw,
   Save,
   Shield,
   Ship,
   Square,
   Trash2,
+  Users,
   X,
 } from 'lucide-react';
 import createDynamic from 'next/dynamic';
@@ -36,6 +40,7 @@ import {
   PRESETS_STORAGE_KEY,
   type Strategy,
   type TacticalShip,
+  TEAMS,
   boundsOfPositions,
   defaultStrategy,
   estimateFormationGap,
@@ -63,6 +68,7 @@ export default function CorporationTacticsPage() {
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const [selectedVectorId, setSelectedVectorId] = useState<string | null>(null);
   const [shipQuery, setShipQuery] = useState('');
+  const [corpShipsOnly, setCorpShipsOnly] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [storageKey, setStorageKey] = useState('');
@@ -156,26 +162,26 @@ export default function CorporationTacticsPage() {
     const q = shipQuery.trim().toLowerCase();
     return fleetItems
       .filter((item) => getShipUuid(item))
-      .filter((item) => item.availableForTactics)
+      .filter((item) => !corpShipsOnly || item.availableForTactics)
       .filter((item) => {
         if (!q) return true;
         const uuid = getShipUuid(item);
         const ship = uuid ? shipData.get(uuid) : null;
         return `${ship?.name ?? item.itemClassName} ${ship?.role ?? ''} ${item.addedBy?.username ?? ''}`.toLowerCase().includes(q);
       });
-  }, [fleetItems, shipData, shipQuery]);
+  }, [fleetItems, shipData, shipQuery, corpShipsOnly]);
 
   const availableFleetByUuid = useMemo(() => {
     const map = new Map<string, FleetItem[]>();
     for (const item of fleetItems) {
       const uuid = getShipUuid(item);
-      if (!uuid || !item.availableForTactics) continue;
+      if (!uuid || (corpShipsOnly && !item.availableForTactics)) continue;
       const list = map.get(uuid) ?? [];
       list.push(item);
       map.set(uuid, list);
     }
     return map;
-  }, [fleetItems]);
+  }, [fleetItems, corpShipsOnly]);
 
   const availableShipTypes = useMemo(
     () =>
@@ -247,8 +253,11 @@ export default function CorporationTacticsPage() {
       ctmUrl: ship?.ctm_url ? `${API_BASE}/ships/${node.shipUuid}/model/file` : null,
       declaredBy: node.owner,
       group: node.group,
+      team: node.team ?? null,
       gridX: node.gridX,
       gridZ: node.gridZ,
+      rotationY: node.rotationY ?? 0,
+      elevation: node.elevation ?? 0,
     } satisfies FleetShip;
   }), [activeStrategy.ships, shipData]);
 
@@ -422,6 +431,48 @@ export default function CorporationTacticsPage() {
     updateActiveStrategy((strategy) => ({
       ...strategy,
       vectors: strategy.vectors.map((item) => (item.id === id ? { ...item, ...vector } : item)),
+    }));
+  };
+
+  // Apply a change to the selected ship, or to every ship of its squadron when
+  // it belongs to a group (so a squadron pivots / climbs together).
+  const updateSelectedShips = useCallback((updater: (ship: TacticalShip) => TacticalShip) => {
+    if (!selectedShip) return;
+    const group = selectedShip.group.trim();
+    const sameGroup = (ship: TacticalShip) => group && ship.group.trim() === group;
+    updateActiveStrategy((strategy) => ({
+      ...strategy,
+      ships: strategy.ships.map((ship) =>
+        ship.id === selectedShip.id || sameGroup(ship) ? updater(ship) : ship,
+      ),
+    }));
+  }, [selectedShip, updateActiveStrategy]);
+
+  const assignTeam = (team: string | null) => {
+    updateSelectedShips((ship) => ({ ...ship, team }));
+  };
+
+  const rotateSelected = (deltaRad: number) => {
+    updateSelectedShips((ship) => ({ ...ship, rotationY: (ship.rotationY ?? 0) + deltaRad }));
+  };
+
+  const elevateSelected = (delta: number) => {
+    updateSelectedShips((ship) => ({ ...ship, elevation: (ship.elevation ?? 0) + delta }));
+  };
+
+  // Vector carried by the selected ship (or its squadron), if any.
+  const selectedShipVector = selectedShip
+    ? activeStrategy.vectors.find((vector) =>
+        (vector.sourceType === 'ship' && vector.sourceId === selectedShip.id) ||
+        (vector.sourceType === 'group' && !!selectedShip.group && vector.sourceId === selectedShip.group),
+      ) ?? null
+    : null;
+
+  const deleteSelectedVector = () => {
+    if (!selectedShipVector) return;
+    updateActiveStrategy((strategy) => ({
+      ...strategy,
+      vectors: strategy.vectors.filter((vector) => vector.id !== selectedShipVector.id),
     }));
   };
 
@@ -706,6 +757,19 @@ export default function CorporationTacticsPage() {
           </div>
 
           <div className="p-3">
+            <button
+              type="button"
+              onClick={() => setCorpShipsOnly((prev) => !prev)}
+              className="mb-2 flex w-full items-center justify-between gap-2 rounded-sm border border-slate-800/70 bg-slate-950/35 px-2.5 py-2 text-left transition-colors hover:border-cyan-800/70"
+            >
+              <span className="min-w-0">
+                <span className="block font-rajdhani text-xs font-semibold text-slate-200">Use only corp ships</span>
+                <span className="block font-mono-sc text-[9px] text-slate-600">{corpShipsOnly ? 'Tactics-ready fleet only' : 'Whole corp fleet (simulation)'}</span>
+              </span>
+              <span className={`relative h-4 w-8 shrink-0 rounded-full transition-colors ${corpShipsOnly ? 'bg-cyan-600/70' : 'bg-slate-700/70'}`}>
+                <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${corpShipsOnly ? 'left-4' : 'left-0.5'}`} />
+              </span>
+            </button>
             <input value={shipQuery} onChange={(event) => setShipQuery(event.target.value)} placeholder="Filter fleet..." className="sci-input mb-2 w-full" />
             {loading ? (
               <div className="flex items-center justify-center py-8 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
@@ -823,6 +887,58 @@ export default function CorporationTacticsPage() {
                     className="sci-input mt-1 w-full"
                   />
                 </label>
+              )}
+              {selectedShip && (
+                <div className="space-y-1">
+                  <span className="flex items-center gap-1.5 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                    <Users size={10} /> Team {selectedFormationSize > 1 ? '(squadron)' : ''}
+                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => assignTeam(null)}
+                      title="No team"
+                      className={`h-6 w-6 rounded-full border-2 transition-all ${!selectedShip.team ? 'border-white' : 'border-slate-700 hover:border-slate-500'}`}
+                      style={{ background: 'repeating-linear-gradient(45deg,#1e293b,#1e293b 3px,#0f172a 3px,#0f172a 6px)' }}
+                    />
+                    {TEAMS.map((team) => (
+                      <button
+                        key={team.key}
+                        type="button"
+                        onClick={() => assignTeam(team.key)}
+                        title={team.label}
+                        className={`h-6 w-6 rounded-full border-2 transition-all ${selectedShip.team === team.key ? 'border-white scale-110' : 'border-transparent hover:border-slate-400'}`}
+                        style={{ background: team.css }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {selectedShip && (
+                <div className="space-y-1.5">
+                  <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Orientation</span>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button type="button" onClick={() => rotateSelected(-Math.PI / 12)} className="flex items-center justify-center gap-1.5 rounded-sm border border-slate-800 px-2 py-1.5 font-mono-sc text-[10px] text-slate-300 hover:border-cyan-800/70 hover:text-cyan-300">
+                      <RotateCcw size={12} /> Left
+                    </button>
+                    <button type="button" onClick={() => rotateSelected(Math.PI / 12)} className="flex items-center justify-center gap-1.5 rounded-sm border border-slate-800 px-2 py-1.5 font-mono-sc text-[10px] text-slate-300 hover:border-cyan-800/70 hover:text-cyan-300">
+                      <RotateCw size={12} /> Right
+                    </button>
+                  </div>
+                  <span className="flex items-center gap-1.5 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                    <MoveVertical size={10} /> Altitude {((selectedShip.elevation ?? 0)).toFixed(0)}
+                  </span>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button type="button" onClick={() => elevateSelected(20)} className="flex items-center justify-center rounded-sm border border-slate-800 px-2 py-1.5 font-mono-sc text-[10px] text-slate-300 hover:border-cyan-800/70 hover:text-cyan-300">Up</button>
+                    <button type="button" onClick={() => elevateSelected(-20)} className="flex items-center justify-center rounded-sm border border-slate-800 px-2 py-1.5 font-mono-sc text-[10px] text-slate-300 hover:border-cyan-800/70 hover:text-cyan-300">Down</button>
+                    <button type="button" onClick={() => updateSelectedShips((ship) => ({ ...ship, rotationY: 0, elevation: 0 }))} className="flex items-center justify-center rounded-sm border border-slate-800 px-2 py-1.5 font-mono-sc text-[10px] text-slate-500 hover:border-slate-600 hover:text-slate-300">Reset</button>
+                  </div>
+                </div>
+              )}
+              {selectedShip && selectedShipVector && (
+                <button type="button" onClick={deleteSelectedVector} className="flex w-full items-center justify-center gap-2 rounded-sm border border-amber-900/60 bg-amber-950/15 px-3 py-2 font-mono-sc text-xs text-amber-300 hover:border-amber-600/70">
+                  <Trash2 size={13} /> Remove vector
+                </button>
               )}
               {selectedVector && <p className="text-xs text-slate-500">Drag the arrow tip to move the vector destination.</p>}
               {selectedShip && (() => {

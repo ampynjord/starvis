@@ -23,8 +23,11 @@ export interface TacticalShip {
   label: string;
   owner: string | null;
   group: string;
+  team?: string | null;
   gridX: number;
   gridZ: number;
+  rotationY?: number;
+  elevation?: number;
 }
 
 export interface Strategy {
@@ -46,6 +49,28 @@ export interface FormationPreset {
 }
 
 export const PRESETS_STORAGE_KEY = 'starvis-formation-presets';
+
+// ── Teams / camps ────────────────────────────────────────────────────────────
+// A ship can be assigned to a colored team (camp) independently from its
+// squadron (group). The selection ring and movement vector take the team color.
+export interface TeamStyle {
+  key: string;
+  label: string;
+  color: number; // THREE hex
+  css: string; // CSS color for the UI swatch
+}
+
+export const TEAMS: TeamStyle[] = [
+  { key: 'blue', label: 'Blue', color: 0x2f9bff, css: '#2f9bff' },
+  { key: 'red', label: 'Red', color: 0xff4d4d, css: '#ff4d4d' },
+  { key: 'green', label: 'Green', color: 0x3ddc84, css: '#3ddc84' },
+  { key: 'yellow', label: 'Yellow', color: 0xfacc15, css: '#facc15' },
+  { key: 'purple', label: 'Purple', color: 0xb46bff, css: '#b46bff' },
+  { key: 'orange', label: 'Orange', color: 0xff9d3d, css: '#ff9d3d' },
+];
+
+export const teamStyle = (key: string | null | undefined): TeamStyle | null =>
+  key ? (TEAMS.find((team) => team.key === key) ?? null) : null;
 
 export const getShipUuid = (item: FleetItem) => item.shipUuid?.trim() || null;
 export const makeId = () =>
