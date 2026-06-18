@@ -17,6 +17,12 @@ function updateTab(tabId, updateProperties) {
   return new Promise((resolve) => runtimeApi.tabs.update(tabId, updateProperties, resolve));
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
+
 function executeScript(injection) {
   if (!runtimeApi.scripting?.executeScript) return Promise.reject(new Error('Script injection is unavailable'));
   if (usesPromiseApi) return runtimeApi.scripting.executeScript(injection);
@@ -60,6 +66,36 @@ async function navigateTab(tabId, url) {
   await waitForComplete;
 }
 
+async function waitForHangarReady(tabId) {
+  let lastState = null;
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    try {
+      lastState = await executeScriptResult({
+        target: { tabId },
+        func: inspectHangarReadiness,
+      });
+      if (lastState?.ready) return;
+    } catch {
+      // The tab can briefly reject script injection while RSI is swapping documents.
+    }
+    await sleep(750);
+  }
+
+  const detail = lastState?.markerCount != null ? ` (${lastState.markerCount} pledge markers detected)` : '';
+  throw new Error(`RSI hangar did not finish loading${detail}`);
+}
+
+function inspectHangarReadiness() {
+  const text = document.body?.innerText ?? '';
+  const markerCount = [...document.querySelectorAll('[class*="pledge"], [class*="hangar"], article, .row, [class*="item"]')].filter(
+    (node) => /\b(attributed|created:|contains:|standalone)\b/i.test(node.textContent ?? ''),
+  ).length;
+  return {
+    ready: document.readyState === 'complete' && /my hangar/i.test(text) && markerCount > 0,
+    markerCount,
+  };
+}
+
 function isHangarTab(tab) {
   if (!tab.url) return false;
   try {
@@ -84,6 +120,7 @@ async function findOrOpenHangarTab() {
 
 async function scrapeHangarTab(tabId) {
   await navigateTab(tabId, RSI_HANGAR_URL);
+  await waitForHangarReady(tabId);
   const firstPage = await scrapeVisibleHangarPage(tabId);
   if (!firstPage?.success) return firstPage;
 
@@ -93,6 +130,7 @@ async function scrapeHangarTab(tabId) {
     const url = new URL(RSI_HANGAR_URL);
     url.searchParams.set('page', String(page));
     await navigateTab(tabId, url.toString());
+    await waitForHangarReady(tabId);
     const pageResult = await scrapeVisibleHangarPage(tabId);
     if (!pageResult?.success) return pageResult;
     entries.push(...(pageResult.entries ?? []));
@@ -143,18 +181,33 @@ function scrapeHangarInPage() {
   }
 
   function targetShipNameFromUpgradeText(value) {
+    if (!value) return null;
     const clean = value.replace(/\s+/g, ' ').trim();
-    const match = clean.match(/\bto\s+(.+?)\s+upgrade\b/i) || clean.match(/\bupgrade\s*[-:]\s*.+?\s+to\s+(.+?)$/i);
+    const match =
+      clean.match(/\bto\s+(.+?)\s+upgrade\b/i) ||
+      clean.match(/\bupgrade\s*[-:]\s*.+?\s+to\s+(.+?)(?:\s+(?:attributed|created:|contains:)|$)/i) ||
+      clean.match(/\bcontains:\s*(.+?)\s+upgrade\b/i);
     return match?.[1]
       ?.replace(/\b(warbond|standard edition|edition|ccu)\b/gi, ' ')
       .replace(/\s+/g, ' ')
       .trim();
   }
 
+  function containsLineShipName(card) {
+    const containsLine = linesOf(card).find((line) => /^contains:/i.test(line));
+    if (!containsLine) return null;
+    const value = containsLine
+      .replace(/^contains:\s*/i, '')
+      .replace(/\s+and\s+\d+\s+items?$/i, '')
+      .trim();
+    if (!value || /\b(paint|paints|skin|livery|gear|item|items|weapon|armor|poster|display|envelope)\b/i.test(value)) return null;
+    return targetShipNameFromUpgradeText(value) || value;
+  }
+
   function shipNameFromPledge(card, index) {
     const title = titleOfCard(card, index);
     const text = textOf(card);
-    const upgradeTarget = targetShipNameFromUpgradeText(title) || targetShipNameFromUpgradeText(text);
+    const upgradeTarget = targetShipNameFromUpgradeText(title) || targetShipNameFromUpgradeText(text) || containsLineShipName(card);
     if (upgradeTarget) return upgradeTarget;
     return title.replace(/^\s*standalone\s+(ships?|vehicles?)\s*[-:]\s*/i, '').trim() || title;
   }
@@ -163,22 +216,30 @@ function scrapeHangarInPage() {
     const title = titleOfCard(card, index);
     const text = textOf(card);
     if (title.length < 3 || text.length < 8) return false;
+    if (text.length > 5000) return false;
+    if (!/\b(attributed|created:|contains:|standalone|upgrade)\b/i.test(text)) return false;
+    if ((text.match(/\bcreated:/gi)?.length ?? 0) > 1) return false;
 
     if (/^\s*(paint|paints|skin|livery|insurance|gear|item|items|poster|armor|weapon|ticket|coupon)\b/i.test(title)) {
       return false;
     }
 
     if (/\b(upgrade|upgrades)\b/i.test(title) || /\bto\s+.+\bupgrade\b/i.test(text) || /\bship\s+upgrades?\b/i.test(text)) {
-      return !!(targetShipNameFromUpgradeText(title) || targetShipNameFromUpgradeText(text));
+      return !!(targetShipNameFromUpgradeText(title) || targetShipNameFromUpgradeText(text) || containsLineShipName(card));
     }
 
-    return /\bstandalone\s+(ships?|vehicles?)\b/i.test(title) || /^\s*(ships?|vehicles?)\s*[-:]/i.test(title);
+    return (
+      /\bstandalone\s+(ships?|vehicles?)\b/i.test(title) ||
+      /\bstandalone\s+(ships?|vehicles?)\b/i.test(text) ||
+      /^\s*(ships?|vehicles?)\s*[-:]/i.test(title)
+    );
   }
 
   function findCards(root) {
-    const selectors = ['[class*="pledge"]', '[class*="hangar"] article', 'article', '.row'];
+    const selectors = ['[class*="pledge"]', '[class*="hangar"] article', 'article', '.row', '[class*="item"]'];
     const candidates = selectors.flatMap((selector) => [...root.querySelectorAll(selector)]);
-    return [...new Set(candidates)].filter((node, index) => looksLikeShipPledge(node, index));
+    const shipCandidates = [...new Set(candidates)].filter((node, index) => looksLikeShipPledge(node, index));
+    return shipCandidates.filter((node) => !shipCandidates.some((other) => other !== node && other.contains(node)));
   }
 
   function extractCard(card, index, sourceUrl) {
@@ -202,6 +263,7 @@ function scrapeHangarInPage() {
       quantity: 1,
       raw: {
         text: text.slice(0, 2000),
+        detectedShipName: shipName,
         sourceUrl,
       },
     };

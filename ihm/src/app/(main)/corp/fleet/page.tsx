@@ -440,7 +440,7 @@ export default function FleetManagerPage() {
 
   const handleRsiHangarSync = async () => {
     setSyncLoading(true);
-    setSyncStatus('');
+    setSyncStatus('Opening RSI hangar and reading pledges...');
     try {
       const sessionRes = await fetch('/api/corp/fleet/rsi-sync/session', { method: 'POST' });
       const sessionPayload = await sessionRes.json().catch(() => ({}));
@@ -451,8 +451,8 @@ export default function FleetManagerPage() {
       const result = await new Promise<any>((resolve, reject) => {
         const timeout = window.setTimeout(() => {
           window.removeEventListener('message', onMessage);
-          reject(new Error('RSI sync timed out. Refresh the Starvis RSI Hangar Sync extension, then retry.'));
-        }, 45_000);
+          reject(new Error('RSI sync timed out. Keep RSI logged in, refresh the Starvis RSI Hangar Sync extension, then retry.'));
+        }, 120_000);
 
         function onMessage(event: MessageEvent) {
           if (event.source !== window) return;
@@ -475,7 +475,12 @@ export default function FleetManagerPage() {
       });
 
       const summary = result?.data ?? result;
-      setSyncStatus(`RSI sync: +${summary?.imported ?? 0} / ~${summary?.updated ?? 0} / -${summary?.removed ?? 0}`);
+      const unmatchedCount = Array.isArray(summary?.unmatched) ? summary.unmatched.length : 0;
+      setSyncStatus(
+        `RSI sync: +${summary?.imported ?? 0} / ~${summary?.updated ?? 0} / -${summary?.removed ?? 0}${
+          unmatchedCount ? ` / ?${unmatchedCount}` : ''
+        }`,
+      );
       await loadFleet();
     } catch (e: any) {
       setSyncStatus(e?.message || 'RSI hangar sync failed');
