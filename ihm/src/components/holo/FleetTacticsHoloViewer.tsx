@@ -743,6 +743,7 @@ export function FleetTacticsHoloViewer({
       entry.loaded = true;
       loadedSoFar++;
       setLoadedCount(loadedSoFar);
+      placeShipsOnce();
       refreshLayout();
     };
 
@@ -826,6 +827,7 @@ export function FleetTacticsHoloViewer({
               entry.loaded = true;
               loadedSoFar++;
               setLoadedCount(loadedSoFar);
+              placeShipsOnce();
               refreshLayout();
             },
             undefined,
@@ -838,6 +840,7 @@ export function FleetTacticsHoloViewer({
               entry.loaded = true;
               loadedSoFar++;
               setLoadedCount(loadedSoFar);
+              placeShipsOnce();
               refreshLayout();
             },
           );
@@ -850,6 +853,7 @@ export function FleetTacticsHoloViewer({
           entry.loaded = true;
           loadedSoFar++;
           setLoadedCount(loadedSoFar);
+          placeShipsOnce();
           refreshLayout();
         }
         return;
@@ -910,6 +914,7 @@ export function FleetTacticsHoloViewer({
           entry.loaded = true;
           loadedSoFar++;
           setLoadedCount(loadedSoFar);
+          placeShipsOnce();
           refreshLayout();
         })
         .catch(() => {
