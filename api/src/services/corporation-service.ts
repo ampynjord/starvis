@@ -230,10 +230,29 @@ function safePayload(entry: RsiHangarSyncEntry): Record<string, unknown> {
   };
 }
 
+const FLEET_GRID_GAP = 160;
+
+function isFiniteGridValue(value: number | null | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function hasNearbyFleetPosition(
+  occupied: Array<{ gridX?: number | null; gridZ?: number | null }>,
+  position: { gridX?: number | null; gridZ?: number | null },
+): boolean {
+  if (!isFiniteGridValue(position.gridX) || !isFiniteGridValue(position.gridZ)) return true;
+  const gridX = position.gridX;
+  const gridZ = position.gridZ;
+  return occupied.some((item) => {
+    if (!isFiniteGridValue(item.gridX) || !isFiniteGridValue(item.gridZ)) return false;
+    return Math.abs(item.gridX - gridX) < FLEET_GRID_GAP * 0.75 && Math.abs(item.gridZ - gridZ) < FLEET_GRID_GAP * 0.5;
+  });
+}
+
 function nextFleetGridPosition(occupied: Array<{ gridX?: number | null }>, index: number): { gridX: number; gridZ: number } {
-  const fallbackGap = 36;
+  const fallbackGap = FLEET_GRID_GAP;
   const rightEdge = occupied.reduce((max, item, itemIndex) => {
-    const x = typeof item.gridX === 'number' && Number.isFinite(item.gridX) ? item.gridX : itemIndex * fallbackGap;
+    const x = isFiniteGridValue(item.gridX) ? item.gridX : itemIndex * fallbackGap;
     return Math.max(max, x);
   }, Number.NEGATIVE_INFINITY);
   return {
@@ -770,7 +789,9 @@ export class CorporationService {
     const existingByExternalId = new Map(
       existing.filter((item) => item.sourceExternalId).map((item) => [String(item.sourceExternalId), item]),
     );
-    const occupiedPositions: Array<{ gridX?: number | null }> = [...existingFleet];
+    const occupiedPositions: Array<{ gridX?: number | null; gridZ?: number | null }> = existingFleet.filter(
+      (item) => item.source !== 'rsi_hangar',
+    );
     const touchedIds = new Set<string>();
     const unmatched: Array<{ externalId: string; label: string }> = [];
     let imported = 0;
@@ -790,7 +811,9 @@ export class CorporationService {
         const payload = safePayload(item.entry);
         const quantity = Number.isInteger(Number(item.entry.quantity)) ? Math.max(1, Number(item.entry.quantity)) : 1;
         const existingItem = existingByExternalId.get(item.externalId);
-        const needsPosition = !existingItem || typeof existingItem.gridX !== 'number' || typeof existingItem.gridZ !== 'number';
+        const canReusePosition = !!existingItem && !hasNearbyFleetPosition(occupiedPositions, existingItem);
+        if (canReusePosition) occupiedPositions.push(existingItem);
+        const needsPosition = !canReusePosition;
         const position = needsPosition ? nextFleetGridPosition(occupiedPositions, occupiedPositions.length) : null;
         if (position) occupiedPositions.push(position);
 

@@ -182,8 +182,38 @@ describe('CorporationService', () => {
         { externalId: 'pledge-1', className: 'AEGS_Gladius', name: 'Gladius' },
       ]);
 
-      expect(upserts[0].create).toMatchObject({ gridX: 108, gridZ: 0 });
-      expect(upserts[0].update).toMatchObject({ gridX: 108, gridZ: 0 });
+      expect(upserts[0].create).toMatchObject({ gridX: 232, gridZ: 0 });
+      expect(upserts[0].update).toMatchObject({ gridX: 232, gridZ: 0 });
+    });
+
+    it('repairs overlapping RSI ship positions on sync', async () => {
+      const upserts: any[] = [];
+      const db: any = {
+        $queryRawUnsafe: vi.fn().mockResolvedValue([{ uuid: 'ship-uuid-1', class_name: 'AEGS_Gladius', name: 'Gladius' }]),
+        $transaction: vi.fn((run) => run(db)),
+        corporationFleetItem: {
+          findMany: vi
+            .fn()
+            .mockResolvedValueOnce([
+              { id: 10, gridX: 0, gridZ: 0, source: 'rsi_hangar', sourceExternalId: 'pledge-1' },
+              { id: 11, gridX: 36, gridZ: 0, source: 'rsi_hangar', sourceExternalId: 'pledge-2' },
+            ])
+            .mockResolvedValueOnce([]),
+          upsert: vi.fn((args) => {
+            upserts.push(args);
+            return Promise.resolve({ id: upserts.length });
+          }),
+          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+      };
+
+      await new CorporationService(db).syncRsiHangarFleet(7, null, [
+        { externalId: 'pledge-1', className: 'AEGS_Gladius', name: 'Gladius' },
+        { externalId: 'pledge-2', className: 'AEGS_Gladius', name: 'Gladius' },
+      ]);
+
+      expect(upserts[0].update).not.toHaveProperty('gridX');
+      expect(upserts[1].update).toMatchObject({ gridX: 160, gridZ: 0 });
     });
   });
 
