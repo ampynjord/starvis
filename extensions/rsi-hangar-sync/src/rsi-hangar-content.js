@@ -21,12 +21,68 @@ function cleanUrl(value) {
 async function clickLoadMoreButtons() {
   for (let i = 0; i < 20; i += 1) {
     const button = [...document.querySelectorAll('button, a')].find(
-      (node) => /load more|show more|next|voir plus|suivant/i.test(textOf(node)) && !node.disabled,
+      (node) => /load more|show more|voir plus/i.test(textOf(node)) && !isDisabled(node) && isVisible(node),
     );
     if (!button) break;
     button.click();
     await new Promise((resolve) => setTimeout(resolve, 1200));
   }
+}
+
+function isDisabled(node) {
+  return !!node.disabled || node.getAttribute('aria-disabled') === 'true' || /\b(disabled|inactive)\b/i.test(String(node.className || ''));
+}
+
+function isVisible(node) {
+  const rect = node.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0 && rect.bottom >= 0 && rect.top <= window.innerHeight;
+}
+
+function controlLabel(node) {
+  return (textOf(node) || node.getAttribute('aria-label') || node.getAttribute('title') || node.getAttribute('rel') || '').trim();
+}
+
+function numericControls() {
+  return [...document.querySelectorAll('button, a')]
+    .filter((node) => isVisible(node) && !isDisabled(node))
+    .filter((node) => /^\d+$/.test(controlLabel(node)));
+}
+
+function paginationRoot() {
+  for (const numeric of numericControls()) {
+    let node = numeric.parentElement;
+    for (let depth = 0; node && depth < 5; depth += 1, node = node.parentElement) {
+      const controls = [...node.querySelectorAll('button, a')].filter((candidate) => isVisible(candidate));
+      const pageNumbers = controls.filter((candidate) => /^\d+$/.test(controlLabel(candidate)));
+      if (pageNumbers.length >= 2 && pageNumbers.length <= 20) return node;
+    }
+  }
+  return null;
+}
+
+function findNextPageControl(visitedPages) {
+  const root = paginationRoot();
+  if (!root) return null;
+
+  const controls = [...root.querySelectorAll('button, a')].filter((node) => isVisible(node) && !isDisabled(node));
+  const numbered = controls
+    .map((node) => ({ node, page: Number(controlLabel(node)) }))
+    .filter((entry) => Number.isInteger(entry.page) && entry.page > 0)
+    .sort((a, b) => a.page - b.page);
+  const unvisitedNumber = numbered.find((entry) => !visitedPages.has(entry.page));
+  if (unvisitedNumber) return { node: unvisitedNumber.node, page: unvisitedNumber.page };
+
+  const next = controls.find((node) => /^(next|suivant|›|»|>)+$/i.test(controlLabel(node)));
+  return next ? { node: next, page: null } : null;
+}
+
+async function clickNextPage(visitedPages) {
+  const next = findNextPageControl(visitedPages);
+  if (!next) return false;
+  next.node.click();
+  if (next.page) visitedPages.add(next.page);
+  await new Promise((resolve) => setTimeout(resolve, 1400));
+  return true;
 }
 
 function titleOfCard(card, index) {
@@ -88,8 +144,20 @@ async function scrapeHangar() {
   }
 
   await clickLoadMoreButtons();
-  const cards = findCards();
-  const entries = cards.map(extractCard);
+  const entries = [];
+  const visitedSignatures = new Set();
+  const visitedPages = new Set([1]);
+
+  for (let pageIndex = 0; pageIndex < 25; pageIndex += 1) {
+    await clickLoadMoreButtons();
+    const cards = findCards();
+    const signature = cards.map((card, index) => titleOfCard(card, index)).join('|') || `${window.location.href}:${pageIndex}`;
+    if (visitedSignatures.has(signature)) break;
+    visitedSignatures.add(signature);
+    entries.push(...cards.map(extractCard));
+    if (!(await clickNextPage(visitedPages))) break;
+  }
+
   const unique = new Map();
   for (const entry of entries) {
     if (!unique.has(entry.externalId)) unique.set(entry.externalId, entry);
