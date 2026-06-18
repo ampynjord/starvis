@@ -189,10 +189,30 @@ function includesAllTokens(candidate: Set<string>, required: Set<string>): boole
   return true;
 }
 
+function rsiRawRecord(entry: RsiHangarSyncEntry): Record<string, unknown> | null {
+  return typeof entry.raw === 'object' && entry.raw !== null ? (entry.raw as Record<string, unknown>) : null;
+}
+
+function rsiRawShipCandidates(entry: RsiHangarSyncEntry): string[] {
+  const raw = rsiRawRecord(entry);
+  if (!Array.isArray(raw?.shipCandidates)) return [];
+  return raw.shipCandidates.map((value) => cleanString(value)).filter((value): value is string => !!value);
+}
+
+function looksLikeNonShipRsiLabel(value: string): boolean {
+  return /\b(paint|paints|skin|livery|gear|weapon|armor|poster|display|envelope|rifle|pistol|helmet|undersuit|ticket|coupon)\b/i.test(
+    value,
+  );
+}
+
 function rsiHangarShipLabels(entry: RsiHangarSyncEntry): string[] {
+  const explicitCandidates = rsiRawShipCandidates(entry);
+  if (explicitCandidates.length > 0) return explicitCandidates;
+
   return [entry.name, entry.label, entry.title]
     .map((value) => cleanString(value))
     .filter((value): value is string => !!value)
+    .filter((value) => !looksLikeNonShipRsiLabel(value))
     .flatMap((value) => [
       value,
       value

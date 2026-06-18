@@ -128,6 +128,30 @@ describe('CorporationService', () => {
       expect(db.corporationFleetItem.upsert).not.toHaveBeenCalled();
     });
 
+    it('does not match non-ship RSI pledges just because their title contains a ship name', async () => {
+      const db: any = {
+        $queryRawUnsafe: vi.fn().mockResolvedValue([{ uuid: 'tiburon', class_name: 'MRAI_Tiburon', name: 'Tiburon' }]),
+        $transaction: vi.fn((run) => run(db)),
+        corporationFleetItem: {
+          findMany: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]),
+          upsert: vi.fn(),
+          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+      };
+
+      const result = await new CorporationService(db).syncRsiHangarFleet(7, null, [
+        {
+          externalId: 'paint-1',
+          name: 'Paints - Tiburon - Vermillion Paint',
+          raw: { rsiKind: 'pledge', shipCandidates: [] },
+        },
+      ]);
+
+      expect(result.imported).toBe(0);
+      expect(result.unmatched).toEqual([{ externalId: 'paint-1', label: 'Paints - Tiburon - Vermillion Paint' }]);
+      expect(db.corporationFleetItem.upsert).not.toHaveBeenCalled();
+    });
+
     it('matches RSI hangar pledge names to Starvis ship names', async () => {
       const upserts: any[] = [];
       const db: any = {
