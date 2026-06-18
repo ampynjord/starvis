@@ -10,6 +10,13 @@
  */
 
 import * as THREE from 'three';
+import { mergeVertices, toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
+
+// RSI holo meshes are exported as a soup of disconnected triangle islands with
+// split vertices. Welding them and recomputing crease-aware normals removes the
+// faceted/cracked look while keeping structural panel edges crisp. Edges sharper
+// than this angle stay hard; flatter regions are smoothed.
+const CTM_CREASE_ANGLE = Math.PI / 6; // 30°
 
 // â”€â”€â”€ LZMA decoder (ported from Three.js r92 lzma.js) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -881,17 +888,31 @@ export class CTMLoader extends THREE.Loader {
   parse(buffer: ArrayBuffer): THREE.BufferGeometry {
     const body = parseCTM(new Uint8Array(buffer));
 
-    const geo = new THREE.BufferGeometry();
-    geo.setIndex(new THREE.BufferAttribute(body.indices, 1));
-    geo.setAttribute('position', new THREE.BufferAttribute(body.vertices, 3));
-    if (body.uvMaps?.length) geo.setAttribute('uv', new THREE.BufferAttribute(body.uvMaps[0].uv, 2));
+    const raw = new THREE.BufferGeometry();
+    raw.setIndex(new THREE.BufferAttribute(body.indices, 1));
+    raw.setAttribute('position', new THREE.BufferAttribute(body.vertices, 3));
 
-    // Prefer the normals authored in the file (highest fidelity, preserves hard
-    // edges). Only compute smooth normals when the mesh ships without them.
-    if (body.normals) geo.setAttribute('normal', new THREE.BufferAttribute(body.normals, 3));
-    else geo.computeVertexNormals();
+    // Clean up the fragmented RSI export: weld coincident (duplicated) vertices
+    // to close the seams that make the surface look cracked/faceted, then
+    // recompute crease-aware normals so flat panels read smooth while sharp
+    // structural edges stay crisp. The holo material is untextured, so UVs and
+    // authored per-triangle normals are intentionally dropped here — keeping
+    // them would prevent the duplicated vertices from merging.
+    let geo: THREE.BufferGeometry;
+    try {
+      const welded = mergeVertices(raw, 1e-4);
+      geo = toCreasedNormals(welded, CTM_CREASE_ANGLE);
+      if (welded !== raw) welded.dispose();
+      raw.dispose();
+    } catch {
+      // Fall back to the raw geometry if cleanup fails for any reason.
+      geo = raw;
+      if (body.uvMaps?.length) geo.setAttribute('uv', new THREE.BufferAttribute(body.uvMaps[0].uv, 2));
+      if (body.normals) geo.setAttribute('normal', new THREE.BufferAttribute(body.normals, 3));
+      else geo.computeVertexNormals();
+    }
 
-    // Centre la gÃ©omÃ©trie
+    // Centre la géométrie
     geo.computeBoundingBox();
     const center = new THREE.Vector3();
     geo.boundingBox!.getCenter(center);
