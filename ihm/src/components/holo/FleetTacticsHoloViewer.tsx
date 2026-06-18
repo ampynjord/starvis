@@ -242,7 +242,7 @@ export function FleetTacticsHoloViewer({
       ribbonGlow: THREE.Mesh;
       head: THREE.Mesh;
       headGlow: THREE.Mesh;
-      endHandle: THREE.Mesh;
+      endHandle: THREE.Group;
       lastSourceX: number;
       lastSourceZ: number;
       lastBaseY: number;
@@ -265,33 +265,66 @@ export function FleetTacticsHoloViewer({
       vectorLauncher: VectorLauncherEntry;
     };
 
+    // Shared visual for the grab handle, used both by the creation launcher and
+    // by the selected-vector end handle so they look identical.
+    const buildHandleMeshes = (withChevron: boolean): THREE.Mesh[] => {
+      const glowColor = 0x7dfff4;
+      const makeMat = (opacity: number) =>
+        new THREE.MeshBasicMaterial({
+          color: glowColor,
+          transparent: true,
+          opacity,
+          depthTest: false,
+          blending: THREE.AdditiveBlending,
+        });
+      // Soft halo lying flat on the aim plane.
+      const glowDisc = new THREE.Mesh(new THREE.CircleGeometry(2.5, 48), makeMat(0.12));
+      glowDisc.rotation.x = -Math.PI / 2;
+      glowDisc.userData.launcherBaseOpacity = 0.12;
+      // Faint outer ring.
+      const outerRing = new THREE.Mesh(new THREE.TorusGeometry(1.95, 0.06, 10, 64), makeMat(0.4));
+      outerRing.rotation.x = -Math.PI / 2;
+      outerRing.userData.launcherBaseOpacity = 0.4;
+      // Main bright ring.
+      const innerRing = new THREE.Mesh(new THREE.TorusGeometry(1.4, 0.14, 12, 56), makeMat(0.9));
+      innerRing.rotation.x = -Math.PI / 2;
+      innerRing.userData.launcherBaseOpacity = 0.9;
+      // Bright core.
+      const core = new THREE.Mesh(new THREE.SphereGeometry(0.5, 20, 16), makeMat(1));
+      core.userData.launcherBaseOpacity = 1;
+      const meshes = [glowDisc, outerRing, innerRing, core] as THREE.Mesh[];
+      if (withChevron) {
+        // Forward chevron hinting the drag-to-aim direction (+Z front, flat).
+        const chevron = new THREE.Mesh(new THREE.ConeGeometry(0.42, 1, 4), makeMat(0.85));
+        chevron.rotation.x = Math.PI / 2;
+        chevron.position.set(0, 0, 1.95);
+        chevron.userData.launcherBaseOpacity = 0.85;
+        meshes.push(chevron);
+      }
+      return meshes;
+    };
+
     const makeVectorLauncher = (sourceType: 'ship' | 'group', sourceId: number | string, anchorShip?: FleetShip): VectorLauncherEntry => {
       const root = new THREE.Group();
       root.visible = false;
       root.renderOrder = 80;
-      const mat = new THREE.MeshBasicMaterial({ color: 0x7dfff4, transparent: true, opacity: 0.9, depthTest: false });
-      const sphere = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), mat.clone());
-      sphere.renderOrder = 80;
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(1.65, 0.16, 8, 48), mat.clone());
-      ring.rotation.x = -Math.PI / 2;
-      ring.renderOrder = 80;
-      const crossH = new THREE.Mesh(new THREE.BoxGeometry(3.5, 0.18, 0.18), mat.clone());
-      crossH.renderOrder = 80;
-      const crossV = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 3.5), mat.clone());
-      crossV.renderOrder = 80;
+      const handleMeshes = buildHandleMeshes(true);
+      // Invisible, generous pick volume.
       const hitDisc = new THREE.Mesh(
         new THREE.SphereGeometry(3, 16, 12),
         new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthTest: false }),
       );
-      hitDisc.renderOrder = 80;
       hitDisc.userData.keepInvisible = true;
-      for (const mesh of [sphere, ring, crossH, crossV, hitDisc]) {
+
+      const meshes = [...handleMeshes, hitDisc];
+      for (const mesh of meshes) {
+        mesh.renderOrder = 80;
         mesh.userData.vectorLauncherSourceType = sourceType;
         mesh.userData.vectorLauncherSourceId = sourceId;
       }
-      root.add(sphere, ring, crossH, crossV, hitDisc);
+      root.add(...meshes);
       scene.add(root);
-      return { root, meshes: [sphere, ring, crossH, crossV, hitDisc], sourceType, sourceId, anchorShip, group: sourceType === 'group' ? String(sourceId) : undefined };
+      return { root, meshes, sourceType, sourceId, anchorShip, group: sourceType === 'group' ? String(sourceId) : undefined };
     };
 
     const groupRings: GroupRingEntry[] = [...new Set(entries.map((entry) => entry.ship.group).filter((group): group is string => !!group))]
@@ -502,6 +535,34 @@ export function FleetTacticsHoloViewer({
       return geometry;
     };
 
+    const sourceCenterOf = (srcEntries: ShipEntry[]) => ({
+      x: srcEntries.length ? srcEntries.reduce((s, e) => s + e.root.position.x, 0) / srcEntries.length : 0,
+      z: srcEntries.length ? srcEntries.reduce((s, e) => s + e.root.position.z, 0) / srcEntries.length : 0,
+    });
+    // Radius of the source selection ring, so vectors start at the ring edge
+    // instead of the ship/group center ("ctm").
+    const sourceRingRadius = (srcEntries: ShipEntry[]) => {
+      if (srcEntries.length === 0) return 0;
+      if (srcEntries.length === 1) return Math.max(srcEntries[0].radius * 0.85, 8);
+      const c = sourceCenterOf(srcEntries);
+      let maxD = 22;
+      for (const e of srcEntries) {
+        const d = Math.hypot(e.root.position.x - c.x, e.root.position.z - c.z) + Math.max(e.halfWidth, e.radius * 0.4);
+        if (d > maxD) maxD = d;
+      }
+      return maxD + 8;
+    };
+    const ringEdgeStart = (srcEntries: ShipEntry[], endX: number, endZ: number) => {
+      const c = sourceCenterOf(srcEntries);
+      const ringR = sourceRingRadius(srcEntries);
+      const dx = endX - c.x, dz = endZ - c.z;
+      const len = Math.hypot(dx, dz) || 1;
+      return { x: c.x + (dx / len) * ringR, z: c.z + (dz / len) * ringR };
+    };
+    // Grab-handle size scaled to the source ship/group footprint.
+    const vectorHandleSize = (srcEntries: ShipEntry[]) =>
+      Math.max(10, Math.min(46, (srcEntries.length ? Math.max(...srcEntries.map((e) => e.radius)) : 20) * 0.5));
+
     const makeVectorEntry = (vector: TacticalVector): VectorEntry => {
       const root = new THREE.Group();
       const srcEntries = vector.sourceType === 'group'
@@ -511,11 +572,13 @@ export function FleetTacticsHoloViewer({
       const srcZ = srcEntries.length ? srcEntries.reduce((sum, e) => sum + e.root.position.z, 0) / srcEntries.length : 0;
       const baseY = vectorBaseY(srcEntries);
       const ex = vector.endX, ez = vector.endZ;
-      const dx = ex - srcX, dz = ez - srcZ;
+      const edge = ringEdgeStart(srcEntries, ex, ez);
+      const sx = edge.x, sz = edge.z;
+      const dx = ex - sx, dz = ez - sz;
       const len = Math.hypot(dx, dz);
-      const ctrlX = len > 1 ? (srcX + ex) / 2 - (dz / len) * len * 0.1 : (srcX + ex) / 2;
-      const ctrlZ = len > 1 ? (srcZ + ez) / 2 + (dx / len) * len * 0.1 : (srcZ + ez) / 2;
-      const start = new THREE.Vector3(srcX, baseY, srcZ);
+      const ctrlX = len > 1 ? (sx + ex) / 2 - (dz / len) * len * 0.1 : (sx + ex) / 2;
+      const ctrlZ = len > 1 ? (sz + ez) / 2 + (dx / len) * len * 0.1 : (sz + ez) / 2;
+      const start = new THREE.Vector3(sx, baseY, sz);
       const control = new THREE.Vector3(ctrlX, baseY, ctrlZ);
       const end = new THREE.Vector3(ex, baseY, ez);
       const curve = new THREE.QuadraticBezierCurve3(start, control, end);
@@ -536,13 +599,25 @@ export function FleetTacticsHoloViewer({
       head.userData.tacticalVectorId = vector.id;
       const headGlow = new THREE.Mesh(makeFlatArrowHead(tip, headDir, headHalfWidth * 1.4, headLength * 1.1, baseY), glowMat.clone());
       headGlow.userData.tacticalVectorId = vector.id;
-      const endHandle = new THREE.Mesh(
-        new THREE.SphereGeometry(Math.max(8, width * 0.7), 20, 14),
-        new THREE.MeshBasicMaterial({ color: 0xa7f3d0, transparent: true, opacity: 0.92, depthTest: false }),
-      );
+      // Grab handle — identical visual to the creation launcher, shown only
+      // when the vector is selected.
+      const endHandle = new THREE.Group();
       endHandle.position.set(ex, baseY, ez);
-      endHandle.userData.tacticalVectorId = vector.id;
-      endHandle.userData.vectorHandle = 'end';
+      endHandle.visible = false;
+      endHandle.renderOrder = 80;
+      const endHandleMeshes = buildHandleMeshes(false);
+      const endHitDisc = new THREE.Mesh(
+        new THREE.SphereGeometry(3, 16, 12),
+        new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthTest: false }),
+      );
+      endHitDisc.userData.keepInvisible = true;
+      for (const mesh of [...endHandleMeshes, endHitDisc]) {
+        mesh.renderOrder = 80;
+        mesh.userData.tacticalVectorId = vector.id;
+        mesh.userData.vectorHandle = 'end';
+      }
+      endHandle.add(...endHandleMeshes, endHitDisc);
+      endHandle.scale.setScalar(vectorHandleSize(srcEntries));
       root.add(ribbonGlow, ribbon, headGlow, head, endHandle);
       scene.add(root);
       return { vector, root, meshes: [ribbonGlow, ribbon, headGlow, head, endHandle], ribbon, ribbonGlow, head, headGlow, endHandle, lastSourceX: srcX, lastSourceZ: srcZ, lastBaseY: baseY };
@@ -562,11 +637,13 @@ export function FleetTacticsHoloViewer({
       const baseY = vectorBaseY(srcEntries);
       const ex = overrideEndX ?? entry.vector.endX;
       const ez = overrideEndZ ?? entry.vector.endZ;
-      const dx = ex - srcX, dz = ez - srcZ;
+      const edge = ringEdgeStart(srcEntries, ex, ez);
+      const sx = edge.x, sz = edge.z;
+      const dx = ex - sx, dz = ez - sz;
       const len = Math.hypot(dx, dz);
-      const ctrlX = len > 1 ? (srcX + ex) / 2 - (dz / len) * len * 0.1 : (srcX + ex) / 2;
-      const ctrlZ = len > 1 ? (srcZ + ez) / 2 + (dx / len) * len * 0.1 : (srcZ + ez) / 2;
-      const start = new THREE.Vector3(srcX, baseY, srcZ);
+      const ctrlX = len > 1 ? (sx + ex) / 2 - (dz / len) * len * 0.1 : (sx + ex) / 2;
+      const ctrlZ = len > 1 ? (sz + ez) / 2 + (dx / len) * len * 0.1 : (sz + ez) / 2;
+      const start = new THREE.Vector3(sx, baseY, sz);
       const control = new THREE.Vector3(ctrlX, baseY, ctrlZ);
       const end = new THREE.Vector3(ex, baseY, ez);
       const curve = new THREE.QuadraticBezierCurve3(start, control, end);
@@ -585,11 +662,7 @@ export function FleetTacticsHoloViewer({
       entry.head.geometry = makeFlatArrowHead(tip, headDir, headHalfWidth, headLength, baseY);
       entry.headGlow.geometry.dispose();
       entry.headGlow.geometry = makeFlatArrowHead(tip, headDir, headHalfWidth * 1.4, headLength * 1.1, baseY);
-      const handleRadius = Math.max(8, width * 0.7);
-      if ((entry.endHandle.geometry as THREE.SphereGeometry).parameters?.radius !== handleRadius) {
-        entry.endHandle.geometry.dispose();
-        entry.endHandle.geometry = new THREE.SphereGeometry(handleRadius, 20, 14);
-      }
+      entry.endHandle.scale.setScalar(vectorHandleSize(srcEntries));
       entry.endHandle.position.set(ex, baseY, ez);
       entry.lastSourceX = srcX;
       entry.lastSourceZ = srcZ;
@@ -608,20 +681,22 @@ export function FleetTacticsHoloViewer({
 
     const vectorPayloadFromLauncher = (launcher: VectorLauncherEntry, endX: number, endZ: number): Omit<TacticalVector, 'id'> => {
       const sourceEntries = sourceEntriesForLauncher(launcher);
-      const start = sourceCenter(sourceEntries);
-      const forward = TACTICAL_FRONT_DIRECTION;
+      const start = ringEdgeStart(sourceEntries, endX, endZ);
       const dx = endX - start.x;
       const dz = endZ - start.z;
       const length = Math.max(Math.hypot(dx, dz), 1);
-      const lateral = dx * forward.z - dz * forward.x;
-      const curveBias = Math.max(-140, Math.min(140, lateral * 0.42));
+      // Bend the ribbon gently and symmetrically, perpendicular to the aim
+      // direction, so the arrow always points exactly at the drop point.
+      const perpX = -dz / length;
+      const perpZ = dx / length;
+      const curveBias = Math.min(length * 0.08, 40);
       return {
         sourceType: launcher.sourceType,
         sourceId: launcher.sourceId,
         endX,
         endZ,
-        controlX: (start.x + endX) / 2 + forward.z * curveBias,
-        controlZ: (start.z + endZ) / 2 - forward.x * curveBias + length * 0.08,
+        controlX: (start.x + endX) / 2 + perpX * curveBias,
+        controlZ: (start.z + endZ) / 2 + perpZ * curveBias,
       };
     };
 
@@ -1017,7 +1092,7 @@ export function FleetTacticsHoloViewer({
       clearLauncherDragPreview();
       const payload = vectorPayloadFromLauncher(launcher, endX, endZ);
       const sourceEntries = sourceEntriesForLauncher(launcher);
-      const startPoint = sourceCenter(sourceEntries);
+      const startPoint = ringEdgeStart(sourceEntries, endX, endZ);
       const baseY = vectorBaseY(sourceEntries);
       const start = new THREE.Vector3(startPoint.x, baseY, startPoint.z);
       const control = new THREE.Vector3(payload.controlX, baseY, payload.controlZ);
@@ -1064,7 +1139,11 @@ export function FleetTacticsHoloViewer({
       const meshes: THREE.Object3D[] = [];
       entries.forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
       markerEntries.forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
-      vectorEntries.forEach((entry) => entry.meshes.forEach((mesh) => meshes.push(mesh)));
+      vectorEntries.forEach((entry) => entry.meshes.forEach((mesh) => {
+        // Hidden end handles must not block clicks on objects behind them.
+        if (mesh === entry.endHandle && !entry.endHandle.visible) return;
+        meshes.push(mesh);
+      }));
       groupRings.forEach((ring) => meshes.push(ring.hitDisc));
       const hits = raycaster.intersectObjects(meshes, true);
       if (!hits.length) return null;
@@ -1146,8 +1225,9 @@ export function FleetTacticsHoloViewer({
           dragTarget.entry.endHandle.position.set(dragPoint.x, 2, dragPoint.z);
           rebuildVectorGeometry(dragTarget.entry, dragPoint.x, dragPoint.z);
         } else if (dragTarget.kind === 'vector-launcher') {
-          dragTarget.root.position.x = dragPoint.x;
-          dragTarget.root.position.z = dragPoint.z;
+          // Handle rides the cursor on the arrow plane so it follows the arrow tip.
+          const launcherBaseY = vectorBaseY(sourceEntriesForLauncher(dragTarget.entry));
+          dragTarget.root.position.set(dragPoint.x, launcherBaseY, dragPoint.z);
           updateLauncherDragPreview(dragTarget.entry, dragPoint.x, dragPoint.z);
         } else if (dragTarget.kind === 'group') {
           const groupTarget = dragTarget;
@@ -1313,19 +1393,22 @@ export function FleetTacticsHoloViewer({
           ring.mesh.material.opacity = selected ? 0.68 + Math.sin(t * 5) * 0.18 : 0.18;
         }
         ring.mesh.rotation.z = t * 0.45;
-        const launcherScale = Math.max(8, Math.min(22, radius * 0.22));
-        ring.vectorLauncher.root.position.set(
-          centerX + tacticalFrontDirection.x * (radius + launcherScale * 3.5),
-          launcherScale * 1.2,
-          centerZ + tacticalFrontDirection.z * (radius + launcherScale * 3.5),
-        );
-        ring.vectorLauncher.root.visible = selected && vectorsEnabled && !vectorSourceKeys.has(`group:${ring.group}`);
+        const launcherScale = Math.max(10, Math.min(46, radius * 0.28));
         const isDraggingThisLauncher = dragTarget?.kind === 'vector-launcher' && dragTarget.entry === ring.vectorLauncher;
+        if (!isDraggingThisLauncher) {
+          ring.vectorLauncher.root.position.set(
+            centerX + tacticalFrontDirection.x * (radius + launcherScale * 3.5),
+            launcherScale * 1.2,
+            centerZ + tacticalFrontDirection.z * (radius + launcherScale * 3.5),
+          );
+        }
+        ring.vectorLauncher.root.visible = selected && vectorsEnabled && !vectorSourceKeys.has(`group:${ring.group}`);
         const grabPulse = isDraggingThisLauncher ? 1.5 + Math.sin(t * 14) * 0.2 : 0.85 + Math.sin(t * 3.5) * 0.15;
         ring.vectorLauncher.root.scale.setScalar(launcherScale * grabPulse);
         ring.vectorLauncher.meshes.forEach((mesh) => {
           if (mesh.material instanceof THREE.MeshBasicMaterial && !mesh.userData.keepInvisible) {
-            mesh.material.opacity = isDraggingThisLauncher ? 0.55 : 0.82 + Math.sin(t * 3.5) * 0.15;
+            const base = (mesh.userData.launcherBaseOpacity as number | undefined) ?? 0.82;
+            mesh.material.opacity = base * (isDraggingThisLauncher ? 0.7 : 0.85 + Math.sin(t * 3.5) * 0.15);
           }
         });
       });
@@ -1371,19 +1454,34 @@ export function FleetTacticsHoloViewer({
         const glowCol = teamCol ?? 0x67fff2;
         const handleCol = teamCol !== null
           ? new THREE.Color(teamCol).lerp(new THREE.Color(0xffffff), 0.55).getHex()
-          : 0xa7f3d0;
-        (entry.ribbon.material as THREE.MeshBasicMaterial).color.setHex(baseCol);
-        (entry.head.material as THREE.MeshBasicMaterial).color.setHex(baseCol);
+          : 0x7dfff4;
+        // Selection highlight: brighten the ribbon toward white when selected.
+        const ribbonCol = isSelected
+          ? new THREE.Color(baseCol).lerp(new THREE.Color(0xffffff), 0.4).getHex()
+          : baseCol;
+        (entry.ribbon.material as THREE.MeshBasicMaterial).color.setHex(ribbonCol);
+        (entry.head.material as THREE.MeshBasicMaterial).color.setHex(ribbonCol);
         (entry.ribbonGlow.material as THREE.MeshBasicMaterial).color.setHex(glowCol);
         (entry.headGlow.material as THREE.MeshBasicMaterial).color.setHex(glowCol);
-        (entry.endHandle.material as THREE.MeshBasicMaterial).color.setHex(handleCol);
-        entry.root.traverse((child) => {
-          if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial) {
-            child.material.opacity = isSelected ? 0.95 : 0.7;
-          }
-        });
-        const handleScale = isSelected ? 1.15 + Math.sin(t * 4) * 0.08 : 1;
-        entry.endHandle.scale.setScalar(handleScale);
+        const ribbonOpacity = isSelected ? 0.95 + Math.sin(t * 4) * 0.05 : 0.7;
+        const glowOpacity = isSelected ? 0.34 : 0.18;
+        (entry.ribbon.material as THREE.MeshBasicMaterial).opacity = ribbonOpacity;
+        (entry.head.material as THREE.MeshBasicMaterial).opacity = ribbonOpacity;
+        (entry.ribbonGlow.material as THREE.MeshBasicMaterial).opacity = glowOpacity;
+        (entry.headGlow.material as THREE.MeshBasicMaterial).opacity = glowOpacity;
+        // Grab handle: same visual as the creation launcher, only while selected.
+        entry.endHandle.visible = isSelected;
+        if (isSelected) {
+          const pulse = 0.9 + Math.sin(t * 4) * 0.12;
+          entry.endHandle.scale.setScalar(vectorHandleSize(srcEs) * (1 + Math.sin(t * 4) * 0.06));
+          entry.endHandle.children.forEach((mesh) => {
+            if (mesh instanceof THREE.Mesh && mesh.material instanceof THREE.MeshBasicMaterial && !mesh.userData.keepInvisible) {
+              mesh.material.color.setHex(handleCol);
+              const base = (mesh.userData.launcherBaseOpacity as number | undefined) ?? 0.9;
+              mesh.material.opacity = base * pulse;
+            }
+          });
+        }
       });
 
       vectorLaunchers.forEach((launcher) => {
@@ -1391,22 +1489,25 @@ export function FleetTacticsHoloViewer({
         if (!entry) return;
         const isSelected = entry.ship.id === selectedIdRef.current;
         const isPartOfSelectedGroup = showGroupSelection && entry.ship.group === selectedGroup;
-        const launcherScale = Math.max(8, Math.min(22, entry.radius * 0.45));
-        const distance = Math.max(entry.radius * 1.6, 60);
-        launcher.root.position.set(
-          entry.root.position.x + tacticalFrontDirection.x * distance,
-          launcherScale * 1.2,
-          entry.root.position.z + tacticalFrontDirection.z * distance,
-        );
+        const launcherScale = Math.max(10, Math.min(46, entry.radius * 0.5));
+        const distance = Math.max(entry.radius * 1.8, 64);
+        const isDraggingThisLauncher = dragTarget?.kind === 'vector-launcher' && dragTarget.entry === launcher;
+        if (!isDraggingThisLauncher) {
+          launcher.root.position.set(
+            entry.root.position.x + tacticalFrontDirection.x * distance,
+            launcherScale * 1.2,
+            entry.root.position.z + tacticalFrontDirection.z * distance,
+          );
+        }
         const shipHasVector = vectorSourceKeys.has(`ship:${entry.ship.id}`)
           || (!!entry.ship.group && vectorSourceKeys.has(`group:${entry.ship.group}`));
         launcher.root.visible = isSelected && !isPartOfSelectedGroup && vectorsEnabled && !shipHasVector;
-        const isDraggingThisLauncher = dragTarget?.kind === 'vector-launcher' && dragTarget.entry === launcher;
         const pulse = isDraggingThisLauncher ? 1.5 + Math.sin(t * 14) * 0.2 : 0.85 + Math.sin(t * 3.5) * 0.15;
         launcher.root.scale.setScalar(launcherScale * pulse);
         launcher.meshes.forEach((mesh) => {
           if (mesh.material instanceof THREE.MeshBasicMaterial && !mesh.userData.keepInvisible) {
-            mesh.material.opacity = isDraggingThisLauncher ? 0.55 : 0.82 + Math.sin(t * 3.5) * 0.15;
+            const base = (mesh.userData.launcherBaseOpacity as number | undefined) ?? 0.82;
+            mesh.material.opacity = base * (isDraggingThisLauncher ? 0.7 : 0.85 + Math.sin(t * 3.5) * 0.15);
           }
         });
       });
