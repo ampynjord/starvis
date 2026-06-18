@@ -156,7 +156,52 @@ function normalizeSearchText(value: string): string {
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\bmk\s*ii\b/g, 'mk2')
+    .replace(/\bmk\s*i\b/g, 'mk1')
     .replace(/[^a-z0-9]+/g, '');
+}
+
+function tokenizeShipLabel(value: string): Set<string> {
+  const normalized = value
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\bmk\s*ii\b/g, 'mk 2')
+    .replace(/\bmk\s*i\b/g, 'mk 1')
+    .replace(/\b(standalone|ships?|vehicles?|contains?|with|and|the|an|a)\b/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ');
+  const baseTokens = normalized.trim().split(/\s+/).filter(Boolean);
+  const tokens = new Set(baseTokens);
+  for (let index = 0; index < baseTokens.length - 1; index += 1) {
+    const current = baseTokens[index];
+    const next = baseTokens[index + 1];
+    if (/^[a-z]+\d+[a-z0-9]*$/.test(current) && /^[a-z]$/.test(next)) tokens.add(`${current}${next}`);
+    if (current === 'mk' && /^\d+$/.test(next)) tokens.add(`mk${next}`);
+  }
+  return tokens;
+}
+
+function includesAllTokens(candidate: Set<string>, required: Set<string>): boolean {
+  if (required.size === 0) return false;
+  for (const token of required) {
+    if (!candidate.has(token)) return false;
+  }
+  return true;
+}
+
+function rsiHangarShipLabels(entry: RsiHangarSyncEntry): string[] {
+  return [entry.name, entry.label, entry.title]
+    .map((value) => cleanString(value))
+    .filter((value): value is string => !!value)
+    .flatMap((value) => [
+      value,
+      value
+        .replace(/^\s*standalone\s+(ships?|vehicles?)\s*[-:]\s*/i, '')
+        .replace(/^\s*(ships?|vehicles?)\s*[-:]\s*/i, '')
+        .replace(/\s+/g, ' ')
+        .trim(),
+    ])
+    .filter(Boolean);
 }
 
 function stableExternalId(entry: RsiHangarSyncEntry, index: number): string {
@@ -264,9 +309,7 @@ export class CorporationService {
       if (rows[0]) return { uuid: rows[0].uuid, className: rows[0].class_name, name: rows[0].name };
     }
 
-    const searchLabels = [entry.name, entry.label, entry.title]
-      .map((value) => cleanString(value))
-      .filter((value): value is string => !!value);
+    const searchLabels = rsiHangarShipLabels(entry);
     if (searchLabels.length) {
       const rows = (await this.db.$queryRawUnsafe(
         toPostgres('SELECT uuid, class_name, name FROM game.ships WHERE env = ?'),
@@ -280,6 +323,12 @@ export class CorporationService {
         return normalizedLabels.some((candidate) => candidate.includes(rowName) || rowName.includes(candidate));
       });
       if (contained) return { uuid: contained.uuid, className: contained.class_name, name: contained.name };
+      const tokenLabelSets = searchLabels.map(tokenizeShipLabel);
+      const tokenMatch = rows.find((row) => {
+        const rowTokens = tokenizeShipLabel(row.name);
+        return tokenLabelSets.some((candidateTokens) => includesAllTokens(candidateTokens, rowTokens));
+      });
+      if (tokenMatch) return { uuid: tokenMatch.uuid, className: tokenMatch.class_name, name: tokenMatch.name };
     }
 
     return { uuid: null, className: explicitClass ?? label.slice(0, 255), name: label };
