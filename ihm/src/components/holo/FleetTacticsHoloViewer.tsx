@@ -108,6 +108,11 @@ export function FleetTacticsHoloViewer({
     const W = container.clientWidth;
     const H = container.clientHeight;
 
+    // Tactical vectors (and their launcher handles) are a Tactics-only feature.
+    // The Fleet Manager does not wire up onVectorCreate, so launchers stay hidden
+    // there and never appear next to a selected ship.
+    const vectorsEnabled = !!onVectorCreate;
+
     // ── Scene ──────────────────────────────────────────────────────────────────
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x06101a);
@@ -518,7 +523,7 @@ export function FleetTacticsHoloViewer({
       const curve = new THREE.QuadraticBezierCurve3(start, control, end);
       const direction = end.clone().sub(control);
       const dist = Math.max(start.distanceTo(end), 1);
-      const width = Math.max(28, Math.min(80, dist * 0.12));
+      const width = Math.max(10, Math.min(32, dist * 0.05));
       const mat = new THREE.MeshBasicMaterial({ color: 0x22f5df, transparent: true, opacity: 0.56, side: THREE.DoubleSide, depthTest: false });
       const glowMat = new THREE.MeshBasicMaterial({ color: 0x67fff2, transparent: true, opacity: 0.18, side: THREE.DoubleSide, depthTest: false });
       const ribbon = new THREE.Mesh(makeFlatVectorRibbon(curve, width), mat);
@@ -561,7 +566,7 @@ export function FleetTacticsHoloViewer({
       const curve = new THREE.QuadraticBezierCurve3(start, control, end);
       const direction = end.clone().sub(control);
       const dist = Math.max(start.distanceTo(end), 1);
-      const width = Math.max(28, Math.min(80, dist * 0.12));
+      const width = Math.max(10, Math.min(32, dist * 0.05));
       entry.ribbon.geometry.dispose();
       entry.ribbon.geometry = makeFlatVectorRibbon(curve, width);
       entry.ribbonGlow.geometry.dispose();
@@ -979,7 +984,7 @@ export function FleetTacticsHoloViewer({
       const curve = new THREE.QuadraticBezierCurve3(start, control, end);
       const direction = end.clone().sub(control);
       const length = Math.max(start.distanceTo(end), 1);
-      const width = Math.max(22, Math.min(58, length * 0.09));
+      const width = Math.max(8, Math.min(24, length * 0.04));
       const mat = new THREE.MeshBasicMaterial({ color: 0x7dfff4, transparent: true, opacity: 0.68, side: THREE.DoubleSide, depthTest: false });
       const glowMat = new THREE.MeshBasicMaterial({ color: 0x7dfff4, transparent: true, opacity: 0.2, side: THREE.DoubleSide, depthTest: false });
       const ribbon = new THREE.Mesh(makeFlatVectorRibbon(curve, width), mat);
@@ -1264,7 +1269,7 @@ export function FleetTacticsHoloViewer({
           launcherScale * 1.2,
           centerZ + tacticalFrontDirection.z * (radius + launcherScale * 3.5),
         );
-        ring.vectorLauncher.root.visible = selected;
+        ring.vectorLauncher.root.visible = selected && vectorsEnabled;
         const isDraggingThisLauncher = dragTarget?.kind === 'vector-launcher' && dragTarget.entry === ring.vectorLauncher;
         const grabPulse = isDraggingThisLauncher ? 1.5 + Math.sin(t * 14) * 0.2 : 0.85 + Math.sin(t * 3.5) * 0.15;
         ring.vectorLauncher.root.scale.setScalar(launcherScale * grabPulse);
@@ -1324,7 +1329,7 @@ export function FleetTacticsHoloViewer({
           launcherScale * 1.2,
           entry.root.position.z + tacticalFrontDirection.z * distance,
         );
-        launcher.root.visible = isSelected && !isPartOfSelectedGroup;
+        launcher.root.visible = isSelected && !isPartOfSelectedGroup && vectorsEnabled;
         const isDraggingThisLauncher = dragTarget?.kind === 'vector-launcher' && dragTarget.entry === launcher;
         const pulse = isDraggingThisLauncher ? 1.5 + Math.sin(t * 14) * 0.2 : 0.85 + Math.sin(t * 3.5) * 0.15;
         launcher.root.scale.setScalar(launcherScale * pulse);
