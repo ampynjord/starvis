@@ -40,6 +40,9 @@ interface Props {
   onVectorSelect?: (id: string) => void;
   onVectorChange?: (id: string, vector: Pick<TacticalVector, 'endX' | 'endZ' | 'controlX' | 'controlZ'>) => void;
   onVectorCreate?: (vector: Omit<TacticalVector, 'id'>) => void;
+  // Imperative request to recenter the camera on a placed entity. A new `nonce`
+  // re-triggers the focus even when targeting the same entity twice in a row.
+  focusRequest?: { kind: 'ship' | 'group' | 'marker'; id: number | string; nonce: number } | null;
 }
 
 // ── Materials ──────────────────────────────────────────────────────────────────
@@ -65,6 +68,7 @@ export function FleetTacticsHoloViewer({
   onVectorSelect,
   onVectorChange,
   onVectorCreate,
+  focusRequest = null,
 }: Props) {
   const containerRef  = useRef<HTMLDivElement>(null);
   const rendererRef   = useRef<THREE.WebGLRenderer | null>(null);
@@ -84,6 +88,7 @@ export function FleetTacticsHoloViewer({
   const syncMarkersRef = useRef<((markers: TacticalMarker[]) => void) | null>(null);
   const syncShipPositionsRef = useRef<((ships: FleetShip[]) => void) | null>(null);
   const cameraViewRef = useRef<CameraViewState | null>(null);
+  const focusOnEntityRef = useRef<((kind: 'ship' | 'group' | 'marker', id: number | string) => void) | null>(null);
   const [loadedCount, setLoadedCount] = useState(0);
   // Ship position changes must NOT rebuild the scene (that re-fetches every CTM
   // model, and a fresh/added ship can get stuck on its flat fallback card when a
@@ -110,6 +115,10 @@ export function FleetTacticsHoloViewer({
   useEffect(() => { syncMarkersRef.current?.(tacticalMarkers); }, [tacticalMarkers]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { syncShipPositionsRef.current?.(ships); }, [shipPositionsKey]);
+  useEffect(() => {
+    if (!focusRequest) return;
+    focusOnEntityRef.current?.(focusRequest.kind, focusRequest.id);
+  }, [focusRequest]);
 
   useEffect(() => {
     if (!containerRef.current || (ships.length === 0 && tacticalMarkers.length === 0 && tacticalVectors.length === 0)) return;
@@ -1326,6 +1335,44 @@ export function FleetTacticsHoloViewer({
     renderer.domElement.addEventListener('wheel', preventPageWheel, { passive: false });
 
     // ── Render loop ────────────────────────────────────────────────────────────
+    // ── Focus / recenter on a placed entity (ship, squadron, marker) ───────────
+    let focusAnim: { fromT: THREE.Vector3; toT: THREE.Vector3; fromC: THREE.Vector3; toC: THREE.Vector3; start: number; dur: number } | null = null;
+    const focusOnEntity = (kind: 'ship' | 'group' | 'marker', id: number | string) => {
+      let target: THREE.Vector3 | null = null;
+      let focusRadius = 40;
+      if (kind === 'ship') {
+        const e = entries.find((x) => x.ship.id === id);
+        if (e) { target = e.root.position.clone(); focusRadius = Math.max(e.radius, 20); }
+      } else if (kind === 'group') {
+        const g = entries.filter((x) => x.ship.group === id);
+        if (g.length) {
+          target = g.reduce((acc, e) => acc.add(e.root.position), new THREE.Vector3()).multiplyScalar(1 / g.length);
+          const cx = target.x, cz = target.z;
+          focusRadius = Math.max(...g.map((e) => Math.hypot(e.root.position.x - cx, e.root.position.z - cz) + e.radius), 40);
+        }
+      } else {
+        const m = markerEntries.find((x) => x.marker.id === id);
+        if (m) { target = m.root.position.clone(); focusRadius = 60; }
+      }
+      if (!target) return;
+      target.y = 0;
+      const offset = camera.position.clone().sub(controls.target);
+      let dist = offset.length();
+      const desired = Math.max(focusRadius * 4, 120);
+      if (dist > desired * 2.5 || dist < desired * 0.4) dist = desired;
+      const dir = offset.lengthSq() > 0.0001 ? offset.normalize() : new THREE.Vector3(0, 0.45, 1).normalize();
+      focusAnim = {
+        fromT: controls.target.clone(),
+        toT: target.clone(),
+        fromC: camera.position.clone(),
+        toC: target.clone().add(dir.multiplyScalar(dist)),
+        start: clockRef.current.getElapsedTime(),
+        dur: 0.55,
+      };
+      userHasMovedView = true;
+    };
+    focusOnEntityRef.current = focusOnEntity;
+
     const animate = () => {
       frameRef.current = requestAnimationFrame(animate);
       if (!visibility.isVisible()) return;
@@ -1511,6 +1558,14 @@ export function FleetTacticsHoloViewer({
           }
         });
       });
+
+      if (focusAnim) {
+        const ft = Math.min(1, (t - focusAnim.start) / focusAnim.dur);
+        const e = ft * ft * (3 - 2 * ft);
+        controls.target.lerpVectors(focusAnim.fromT, focusAnim.toT, e);
+        camera.position.lerpVectors(focusAnim.fromC, focusAnim.toC, e);
+        if (ft >= 1) { focusAnim = null; saveCameraView(); }
+      }
 
       controls.update();
       renderer.render(scene, camera);
