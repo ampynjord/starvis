@@ -405,7 +405,15 @@ export default function CorporationTacticsPage() {
       ? { sourceType: 'group' as const, sourceId: sourceShip.group }
       : { sourceType: vector.sourceType, sourceId: vector.sourceId };
     const nextVector = { ...vector, ...source, id: makeId() };
-    updateActiveStrategy((strategy) => ({ ...strategy, vectors: [...strategy.vectors, nextVector] }));
+    // A ship (or group) may carry only one vector: drop any existing vector from
+    // the same source before adding the new one.
+    updateActiveStrategy((strategy) => ({
+      ...strategy,
+      vectors: [
+        ...strategy.vectors.filter((item) => !(item.sourceType === nextVector.sourceType && item.sourceId === nextVector.sourceId)),
+        nextVector,
+      ],
+    }));
     setSelectedVectorId(nextVector.id);
     setSelectedMarkerId(null);
   };
