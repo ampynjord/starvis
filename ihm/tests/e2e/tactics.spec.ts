@@ -108,6 +108,11 @@ test('corporation tactics board adds ships and tactical markers', async ({ conte
   await expect(page.getByText('[DNR] Dawnstar')).toBeVisible();
   await expect(page.getByLabel('Formation ship')).toContainText('Aurora MR');
   await expect(page.getByLabel('Formation ship')).not.toContainText('aegis_private');
+  await page.getByLabel('Qty').fill('5');
+  await expect(page.getByText(/Not enough available ships/i)).toBeVisible();
+  await page.getByRole('button', { name: /Use only corp ships/i }).click();
+  await expect(page.getByText(/Not enough available ships/i)).toBeHidden();
+  await page.getByLabel('Qty').fill('4');
   const board = page.getByTestId('tactics-board');
   await page.getByRole('button', { name: /Add formation/i }).click();
   await expect(board.locator('canvas')).toBeVisible();
