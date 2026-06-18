@@ -217,15 +217,17 @@ export default function CorporationTacticsPage() {
   }, [filteredFleet, formationComposition, formationQuantity, formationShipId]);
 
   const formationAvailabilityWarnings = useMemo(
-    () =>
-      Object.entries(formationDraftComposition)
+    () => {
+      if (!corpShipsOnly) return [];
+      return Object.entries(formationDraftComposition)
         .map(([uuid, requested]) => {
           const available = availableFleetByUuid.get(uuid)?.length ?? 0;
           const label = shipData.get(uuid)?.name ?? uuid;
           return requested > available ? `${label}: ${requested} requested / ${available} available` : null;
         })
-        .filter(Boolean) as string[],
-    [availableFleetByUuid, formationDraftComposition, shipData],
+        .filter(Boolean) as string[];
+    },
+    [availableFleetByUuid, corpShipsOnly, formationDraftComposition, shipData],
   );
 
   const formationTotalQuantity = useMemo(
@@ -727,7 +729,7 @@ export default function CorporationTacticsPage() {
                 ) : null}
                 {availableShipTypes.map((type) => (
                   <option key={type.uuid} value={type.items[0]?.id ?? ''}>
-                    {type.label} ({type.items.length} available)
+                    {type.label} ({type.items.length} {corpShipsOnly ? 'available' : 'in fleet'})
                   </option>
                 ))}
               </select>
@@ -755,13 +757,16 @@ export default function CorporationTacticsPage() {
                   </div>
                   {Object.entries(formationDraftComposition).map(([uuid, qty]) => {
                     const available = availableFleetByUuid.get(uuid)?.length ?? 0;
+                    const overLimit = corpShipsOnly && qty > available;
                     const label = shipData.get(uuid)?.name ?? uuid;
                     const thumb = shipData.get(uuid)?.thumbnail;
                     return (
                       <div key={uuid} className="flex items-center gap-2">
                         {thumb ? <img src={thumb} alt={label} className="h-6 w-9 shrink-0 rounded-sm object-contain opacity-80" /> : <Ship size={13} className="shrink-0 text-slate-600" />}
                         <span className="min-w-0 flex-1 truncate text-xs text-slate-300">{label}</span>
-                        <span className={qty > available ? 'font-mono-sc text-[10px] text-amber-400' : 'font-mono-sc text-[10px] text-slate-600'}>{available} avail.</span>
+                        <span className={overLimit ? 'font-mono-sc text-[10px] text-amber-400' : 'font-mono-sc text-[10px] text-slate-600'}>
+                          {corpShipsOnly ? `${available} avail.` : 'simulation'}
+                        </span>
                         <input
                           aria-label={`${label} quantity`}
                           type="number"
