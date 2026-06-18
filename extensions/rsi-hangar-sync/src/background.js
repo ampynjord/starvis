@@ -12,6 +12,11 @@ function createTab(createProperties) {
   return new Promise((resolve) => runtimeApi.tabs.create(createProperties, resolve));
 }
 
+function updateTab(tabId, updateProperties) {
+  if (usesPromiseApi) return runtimeApi.tabs.update(tabId, updateProperties);
+  return new Promise((resolve) => runtimeApi.tabs.update(tabId, updateProperties, resolve));
+}
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -57,6 +62,12 @@ async function reloadTab(tabId) {
   await waitForTabComplete(tabId);
 }
 
+async function navigateTab(tabId, url) {
+  const waitForComplete = waitForTabComplete(tabId);
+  await updateTab(tabId, { url, active: false });
+  await waitForComplete;
+}
+
 function isHangarTab(tab) {
   if (!tab.url) return false;
   try {
@@ -71,7 +82,11 @@ async function findOrOpenHangarTab() {
   const tabs = await queryTabs({ url: 'https://robertsspaceindustries.com/*' });
   const tab = tabs.find(isHangarTab) ?? (await createTab({ url: RSI_HANGAR_URL, active: false }));
   if (!tab.id) throw new Error('Unable to open RSI hangar tab');
-  if (tab.status !== 'complete') await waitForTabComplete(tab.id);
+  if (tab.url !== RSI_HANGAR_URL) {
+    await navigateTab(tab.id, RSI_HANGAR_URL);
+  } else if (tab.status !== 'complete') {
+    await waitForTabComplete(tab.id);
+  }
   return tab.id;
 }
 

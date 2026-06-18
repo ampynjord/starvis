@@ -138,7 +138,7 @@ async function scrapeHangar() {
   if (!/robertsspaceindustries\.com/.test(window.location.hostname)) {
     throw new Error('Not on Roberts Space Industries');
   }
-  if (!/\/account\/pledges/.test(window.location.pathname)) {
+  if (!/\/account\/pledges/.test(window.location.pathname) || window.location.search) {
     window.location.href = 'https://robertsspaceindustries.com/account/pledges';
     await new Promise((resolve) => setTimeout(resolve, 3000));
   }
