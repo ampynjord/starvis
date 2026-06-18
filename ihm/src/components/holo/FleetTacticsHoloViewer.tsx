@@ -17,6 +17,7 @@ import {
   MIN_SHIP_GAP,
   SHIP_GAP_RATIO,
   TACTICAL_FRONT_DIRECTION,
+  teamColor,
   WORLD_UNITS_PER_METER,
 } from '@/components/holo/fleet-tactics-constants';
 import type { FleetShip, TacticalMarker, TacticalVector } from '@/components/holo/fleet-tactics-types';
@@ -92,7 +93,7 @@ export function FleetTacticsHoloViewer({
     .map((ship) => [ship.id, ship.shipUuid, ship.ctmUrl ?? '', ship.group ?? ''].join(':'))
     .join('|')
     + `::${tacticalVectors.map((v) => [v.id, v.sourceType, v.sourceId, v.endX.toFixed(1), v.endZ.toFixed(1), v.controlX.toFixed(1), v.controlZ.toFixed(1)].join(':')).join('|')}`;
-  const shipPositionsKey = ships.map((ship) => `${ship.id}:${ship.gridX ?? ''}:${ship.gridZ ?? ''}`).join('|');
+  const shipPositionsKey = ships.map((ship) => `${ship.id}:${ship.gridX ?? ''}:${ship.gridZ ?? ''}:${ship.rotationY ?? ''}:${ship.elevation ?? ''}:${ship.team ?? ''}`).join('|');
 
   // Keep onSelect ref current without rebuilding the scene
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
@@ -206,6 +207,8 @@ export function FleetTacticsHoloViewer({
 
     entries.forEach((e) => {
       e.root.userData.fleetItemId = e.ship.id;
+      e.root.rotation.y = Number(e.ship.rotationY) || 0;
+      e.root.position.y = Number(e.ship.elevation) || 0;
       scene.add(e.root);
     });
 
@@ -228,7 +231,7 @@ export function FleetTacticsHoloViewer({
       marker: TacticalMarker;
       root: THREE.Group;
       meshes: THREE.Object3D[];
-      pulse: THREE.Mesh | null;
+      pulse: THREE.Object3D | null;
     };
 
     type VectorEntry = {
@@ -316,6 +319,10 @@ export function FleetTacticsHoloViewer({
       root.rotation.y = marker.rotation ?? 0;
       root.userData.tacticalMarkerId = marker.id;
 
+      // Three distinct, color-coded holographic 3D volumes:
+      //   objective -> golden diamond pylon pointing down at its target
+      //   poi       -> cyan crystal with an orbiting ring
+      //   obstacle  -> red spiky hazard cluster
       const colorByType = {
         objective: 0xfacc15,
         poi: 0x22d3ee,
@@ -323,126 +330,87 @@ export function FleetTacticsHoloViewer({
       } satisfies Record<TacticalMarker['type'], number>;
       const color = colorByType[marker.type];
       const meshes: THREE.Object3D[] = [];
+      const tag = (obj: THREE.Object3D) => { obj.userData.tacticalMarkerId = marker.id; };
 
-      const markerSize = marker.type === 'obstacle' ? 108 : 100;
-      const lineMat = new THREE.MeshBasicMaterial({
-        color,
-        transparent: true,
-        opacity: 0.82,
-        side: THREE.DoubleSide,
-        depthWrite: false,
-        depthTest: false,
-        blending: THREE.AdditiveBlending,
+      const solidMat = (opacity: number) => new THREE.MeshBasicMaterial({
+        color, transparent: true, opacity, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending,
       });
-      const fillMat = lineMat.clone();
-      fillMat.opacity = 0.24;
+      const addWire = (geo: THREE.BufferGeometry, target: THREE.Object3D) => {
+        const wire = new THREE.LineSegments(
+          new THREE.EdgesGeometry(geo),
+          new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.92, depthWrite: false }),
+        );
+        tag(wire);
+        target.add(wire);
+      };
+      const addMesh = (mesh: THREE.Mesh, baseOpacity: number, target: THREE.Object3D) => {
+        mesh.userData.baseOpacity = baseOpacity;
+        tag(mesh);
+        target.add(mesh);
+        meshes.push(mesh);
+        return mesh;
+      };
 
+      // Raycast target spanning ground to floating volume.
       const hitDisc = new THREE.Mesh(
-        new THREE.CylinderGeometry(markerSize * 0.62, markerSize * 0.62, 1.2, 48),
+        new THREE.CylinderGeometry(64, 64, 150, 20, 1, true),
         new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false }),
       );
-      hitDisc.position.y = 2;
+      hitDisc.position.y = 64;
       hitDisc.userData.tacticalMarkerId = marker.id;
       hitDisc.userData.keepInvisible = true;
       root.add(hitDisc);
       meshes.push(hitDisc);
 
-      const glyphCanvas = document.createElement('canvas');
-      glyphCanvas.width = 512;
-      glyphCanvas.height = 512;
-      const ctx = glyphCanvas.getContext('2d');
-      if (ctx) {
-        const colorValue = new THREE.Color(color);
-        const rgb = `${Math.round(colorValue.r * 255)},${Math.round(colorValue.g * 255)},${Math.round(colorValue.b * 255)}`;
-        ctx.clearRect(0, 0, 512, 512);
-        ctx.shadowColor = `rgba(${rgb},0.95)`;
-        ctx.shadowBlur = 30;
-        ctx.strokeStyle = `rgba(${rgb},0.92)`;
-        ctx.fillStyle = `rgba(${rgb},0.18)`;
-        ctx.lineWidth = 10;
-        ctx.beginPath();
-        ctx.roundRect(66, 66, 380, 380, 38);
-        ctx.stroke();
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(256, 256, 178, 0, Math.PI * 2);
-        ctx.lineWidth = 6;
-        ctx.stroke();
-        ctx.font = marker.type === 'objective' ? '900 250px Orbitron, Rajdhani, Arial' : '900 285px Orbitron, Rajdhani, Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = `rgba(${rgb},0.96)`;
-        ctx.strokeStyle = `rgba(255,255,255,0.22)`;
-        ctx.lineWidth = 4;
-        const glyph = marker.type === 'objective' ? '↓' : marker.type === 'poi' ? '?' : '!';
-        ctx.strokeText(glyph, 256, marker.type === 'objective' ? 248 : 260);
-        ctx.fillText(glyph, 256, marker.type === 'objective' ? 248 : 260);
-      }
-      const glyphTexture = new THREE.CanvasTexture(glyphCanvas);
-      glyphTexture.colorSpace = THREE.SRGBColorSpace;
-      const glyph = new THREE.Mesh(
-        new THREE.PlaneGeometry(markerSize, markerSize),
-        new THREE.MeshBasicMaterial({
-          map: glyphTexture,
-          transparent: true,
-          opacity: 0.96,
-          depthWrite: false,
-          depthTest: false,
-          side: THREE.DoubleSide,
-          blending: THREE.AdditiveBlending,
-        }),
-      );
-      glyph.rotation.x = -Math.PI / 2;
-      glyph.position.y = 3.2;
-      glyph.renderOrder = 92;
-      glyph.userData.tacticalMarkerId = marker.id;
-      root.add(glyph);
-      meshes.push(glyph);
+      // Ground socle rings.
+      const baseRing = new THREE.Mesh(new THREE.TorusGeometry(46, 1.7, 8, 96), solidMat(0.6));
+      baseRing.rotation.x = -Math.PI / 2;
+      baseRing.position.y = 2;
+      addMesh(baseRing, 0.6, root);
+      const baseRing2 = new THREE.Mesh(new THREE.TorusGeometry(58, 0.8, 8, 96), solidMat(0.32));
+      baseRing2.rotation.x = -Math.PI / 2;
+      baseRing2.position.y = 2;
+      addMesh(baseRing2, 0.32, root);
 
-      const shape = new THREE.Shape();
+      // Vertical beam to draw the eye up to the floating volume.
+      const beamHeight = marker.type === 'obstacle' ? 48 : 72;
+      const beam = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.4, beamHeight, 8), solidMat(0.28));
+      beam.position.y = beamHeight / 2;
+      addMesh(beam, 0.28, root);
+
+      // Floating volume (spins + bobs in the animate loop).
+      const volume = new THREE.Group();
+      volume.position.y = beamHeight + 16;
+      volume.userData.baseY = beamHeight + 16;
+      volume.userData.markerSpin = true;
+      root.add(volume);
+
       if (marker.type === 'objective') {
-        shape.moveTo(0, -markerSize * 0.36);
-        shape.lineTo(markerSize * 0.28, markerSize * 0.02);
-        shape.lineTo(markerSize * 0.11, markerSize * 0.02);
-        shape.lineTo(markerSize * 0.11, markerSize * 0.34);
-        shape.lineTo(-markerSize * 0.11, markerSize * 0.34);
-        shape.lineTo(-markerSize * 0.11, markerSize * 0.02);
-        shape.lineTo(-markerSize * 0.28, markerSize * 0.02);
+        const geo = new THREE.OctahedronGeometry(20, 0);
+        const core = addMesh(new THREE.Mesh(geo, solidMat(0.5)), 0.5, volume);
+        core.scale.set(1, 1.7, 1);
+        addWire(geo, core);
+        const cone = addMesh(new THREE.Mesh(new THREE.ConeGeometry(13, 22, 4), solidMat(0.45)), 0.5, volume);
+        cone.position.y = -28;
+        cone.rotation.y = Math.PI / 4;
       } else if (marker.type === 'poi') {
-        shape.absarc(0, 0, markerSize * 0.3, 0, Math.PI * 2, false);
+        const geo = new THREE.IcosahedronGeometry(20, 0);
+        const core = addMesh(new THREE.Mesh(geo, solidMat(0.45)), 0.5, volume);
+        addWire(geo, core);
+        const orbit = addMesh(new THREE.Mesh(new THREE.TorusGeometry(31, 1.2, 8, 64), solidMat(0.55)), 0.6, volume);
+        orbit.rotation.x = Math.PI / 2.4;
       } else {
-        shape.moveTo(0, -markerSize * 0.34);
-        shape.lineTo(markerSize * 0.34, 0);
-        shape.lineTo(0, markerSize * 0.34);
-        shape.lineTo(-markerSize * 0.34, 0);
+        const geo = new THREE.TetrahedronGeometry(25, 0);
+        const core = addMesh(new THREE.Mesh(geo, solidMat(0.42)), 0.48, volume);
+        addWire(geo, core);
+        const geo2 = new THREE.TetrahedronGeometry(25, 0);
+        const core2 = addMesh(new THREE.Mesh(geo2, solidMat(0.3)), 0.36, volume);
+        core2.rotation.set(Math.PI, Math.PI / 3, 0);
+        addWire(geo2, core2);
       }
-      shape.closePath();
-      const fill = new THREE.Mesh(new THREE.ShapeGeometry(shape), fillMat);
-      fill.rotation.x = -Math.PI / 2;
-      fill.position.y = 2.7;
-      fill.renderOrder = 90;
-      fill.userData.tacticalMarkerId = marker.id;
-      root.add(fill);
-      meshes.push(fill);
-
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(markerSize * 0.58, 1.9, 8, 128), lineMat.clone());
-      ring.rotation.x = -Math.PI / 2;
-      ring.position.y = 3.8;
-      ring.renderOrder = 91;
-      ring.userData.tacticalMarkerId = marker.id;
-      root.add(ring);
-      meshes.push(ring);
-
-      const outerRing = new THREE.Mesh(new THREE.TorusGeometry(markerSize * 0.72, 0.85, 8, 128), lineMat.clone());
-      outerRing.rotation.x = -Math.PI / 2;
-      outerRing.position.y = 3.6;
-      outerRing.renderOrder = 91;
-      outerRing.userData.tacticalMarkerId = marker.id;
-      root.add(outerRing);
-      meshes.push(outerRing);
 
       scene.add(root);
-      return { marker, root, meshes, pulse: ring };
+      return { marker, root, meshes, pulse: volume };
     };
 
     let markerEntries = tacticalMarkers.map(makeMarkerEntry);
@@ -473,9 +441,17 @@ export function FleetTacticsHoloViewer({
     // model is loaded yet.
     const vectorBaseY = (srcEntries: ShipEntry[]) => {
       const ys = srcEntries
-        .map((e) => (e.ring ? e.ring.position.y : null))
-        .filter((value): value is number => value !== null);
+        .map((e) => e.root.position.y + (e.ring ? e.ring.position.y : 0));
       return ys.length ? Math.min(...ys) + 0.4 : 0.55;
+    };
+
+    // Team color of a vector's source (first source ship that has a team).
+    const vectorTeamColor = (srcEntries: ShipEntry[]): number | null => {
+      for (const e of srcEntries) {
+        const col = teamColor(e.ship.team);
+        if (col !== null) return col;
+      }
+      return null;
     };
 
     const makeFlatVectorRibbon = (curve: THREE.QuadraticBezierCurve3, width: number, y: number, tEnd = 1) => {
@@ -774,6 +750,15 @@ export function FleetTacticsHoloViewer({
           entry.root.position.z = gz;
           moved = true;
         }
+        const ry = Number(nextShip.rotationY) || 0;
+        if (entry.root.rotation.y !== ry) {
+          entry.root.rotation.y = ry;
+        }
+        const ev = Number(nextShip.elevation) || 0;
+        if (entry.root.position.y !== ev) {
+          entry.root.position.y = ev;
+          moved = true; // vectors follow the source height, so trigger a refresh
+        }
       });
       if (moved) refreshLayout(false);
     };
@@ -979,10 +964,10 @@ export function FleetTacticsHoloViewer({
           entry.halfWidth = Math.max(width / 2, r * 0.35);
           entry.root.add(inner);
 
-          // Selection ring (torus)
+          // Selection ring (torus) — takes the ship's team color (socle).
           const ringGeo = new THREE.TorusGeometry(r * 0.85, r * 0.015, 8, 64);
           const ringMat = new THREE.MeshBasicMaterial({
-            color: COLOR_RING, transparent: true, opacity: 0,
+            color: teamColor(entry.ship.team) ?? COLOR_RING, transparent: true, opacity: 0,
           });
           const ring = new THREE.Mesh(ringGeo, ringMat);
           ring.rotation.x = -Math.PI / 2;
@@ -1293,14 +1278,17 @@ export function FleetTacticsHoloViewer({
           }
         });
 
-        // Ring
+        // Ring (selection socle — colored by team, faintly visible when the
+        // ship belongs to a team so camps are readable at a glance).
         if (entry.ring && entry.ring.material instanceof THREE.MeshBasicMaterial) {
-          entry.ring.material.opacity = isSelected && !showGroupSelection ? 0.6 + Math.sin(t * 5) * 0.25 : 0;
+          const teamCol = teamColor(entry.ship.team);
+          entry.ring.material.color.setHex(teamCol ?? COLOR_RING);
+          const selectedRing = isSelected && !showGroupSelection;
+          const baseOpacity = teamCol !== null ? 0.34 : 0;
+          entry.ring.material.opacity = selectedRing ? 0.6 + Math.sin(t * 5) * 0.25 : baseOpacity;
           entry.ring.rotation.z = t * 1.2;
-          if (isSelected && !showGroupSelection) {
-            const pulse = 1 + Math.sin(t * 3) * 0.06;
-            entry.ring.scale.set(pulse, 1, pulse);
-          }
+          const pulse = selectedRing ? 1 + Math.sin(t * 3) * 0.06 : 1;
+          entry.ring.scale.set(pulse, 1, pulse);
         }
       });
 
@@ -1320,6 +1308,8 @@ export function FleetTacticsHoloViewer({
         ring.hitDisc.scale.set(radius, 1, radius);
         const selected = showGroupSelection && ring.group === selectedGroup;
         if (ring.mesh.material instanceof THREE.MeshBasicMaterial) {
+          const groupTeam = groupEntries.reduce<number | null>((acc, e) => acc ?? teamColor(e.ship.team), null);
+          ring.mesh.material.color.setHex(groupTeam ?? COLOR_RING);
           ring.mesh.material.opacity = selected ? 0.68 + Math.sin(t * 5) * 0.18 : 0.18;
         }
         ring.mesh.rotation.z = t * 0.45;
@@ -1348,10 +1338,17 @@ export function FleetTacticsHoloViewer({
               child.material.opacity = 0;
               return;
             }
-            child.material.opacity = isSelected ? 0.9 : 0.62 + Math.sin(t * 2.5) * 0.08;
+            const base = (child.userData.baseOpacity as number | undefined) ?? 0.5;
+            const flick = 0.06 * Math.sin(t * 2.5 + (child.position.y || 0) * 0.05);
+            child.material.opacity = Math.min(1, (isSelected ? base * 1.4 + 0.18 : base) + flick);
+          }
+          if (child instanceof THREE.Group && child.userData.markerSpin) {
+            child.rotation.y = t * 0.6;
           }
         });
         if (entry.pulse) {
+          const baseY = (entry.pulse.userData.baseY as number | undefined) ?? entry.pulse.position.y;
+          entry.pulse.position.y = baseY + Math.sin(t * 1.6) * 3;
           const scale = isSelected ? 1.18 + Math.sin(t * 4) * 0.08 : 1;
           entry.pulse.scale.set(scale, scale, scale);
         }
@@ -1369,6 +1366,17 @@ export function FleetTacticsHoloViewer({
           rebuildVectorGeometry(entry);
         }
         const isSelected = entry.vector.id === selectedVectorIdRef.current;
+        const teamCol = vectorTeamColor(srcEs);
+        const baseCol = teamCol ?? 0x22f5df;
+        const glowCol = teamCol ?? 0x67fff2;
+        const handleCol = teamCol !== null
+          ? new THREE.Color(teamCol).lerp(new THREE.Color(0xffffff), 0.55).getHex()
+          : 0xa7f3d0;
+        (entry.ribbon.material as THREE.MeshBasicMaterial).color.setHex(baseCol);
+        (entry.head.material as THREE.MeshBasicMaterial).color.setHex(baseCol);
+        (entry.ribbonGlow.material as THREE.MeshBasicMaterial).color.setHex(glowCol);
+        (entry.headGlow.material as THREE.MeshBasicMaterial).color.setHex(glowCol);
+        (entry.endHandle.material as THREE.MeshBasicMaterial).color.setHex(handleCol);
         entry.root.traverse((child) => {
           if (child instanceof THREE.Mesh && child.material instanceof THREE.MeshBasicMaterial) {
             child.material.opacity = isSelected ? 0.95 : 0.7;

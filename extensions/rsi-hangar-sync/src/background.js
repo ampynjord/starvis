@@ -121,7 +121,7 @@ async function findOrOpenHangarTab() {
 async function scrapeHangarTab(tabId) {
   await navigateTab(tabId, RSI_HANGAR_URL);
   await waitForHangarReady(tabId);
-  await applyStandaloneShipsFilter(tabId);
+  await applyAllPledgesFilter(tabId);
   await waitForHangarReady(tabId);
   const firstPage = await waitForScrapedHangarPage(tabId, 1, null);
   if (!firstPage?.success) return firstPage;
@@ -147,25 +147,36 @@ async function scrapeHangarTab(tabId) {
   return { success: true, entries: [...unique.values()] };
 }
 
-async function applyStandaloneShipsFilter(tabId) {
+async function applyAllPledgesFilter(tabId) {
   await executeScriptResult({
     target: { tabId },
-    func: applyStandaloneShipsFilterInPage,
+    func: applyAllPledgesFilterInPage,
   }).catch(() => null);
 }
 
-async function applyStandaloneShipsFilterInPage() {
+// Force the hangar "Filter by" control onto "All" so the scrape captures every
+// pledge type: standalone ships, game packages (which contain a ship) and CCU
+// upgrades (whose target ship is the one we own). Restricting to "Standalone
+// Ships" used to silently drop packages and upgrades from the import.
+async function applyAllPledgesFilterInPage() {
   const sleepInPage = (ms) =>
     new Promise((resolve) => {
       setTimeout(resolve, ms);
     });
   const labelText = (node) =>
     (node?.textContent || node?.getAttribute?.('aria-label') || node?.getAttribute?.('title') || '').replace(/\s+/g, ' ').trim();
-  const standalonePattern = /\bstandalone\s+ships?\b/i;
+  // Match an explicit "All" / "All pledges" / "Show all" option only (avoid
+  // matching "All ships of a kind" style labels by anchoring to the start).
+  const isAllLabel = (text) => /^all($|\b)/i.test(text) || /\ball\s+pledges\b/i.test(text) || /\bshow\s+all\b/i.test(text);
 
   const beforeSignature = document.body?.innerText?.slice(0, 2000) ?? '';
   for (const select of [...document.querySelectorAll('select')]) {
-    const option = [...select.options].find((candidate) => standalonePattern.test(labelText(candidate)));
+    const options = [...select.options];
+    // Only treat this select as the pledge filter when it actually offers the
+    // standalone/packages/upgrades vocabulary, then switch it to "All".
+    const looksLikePledgeFilter = options.some((candidate) => /(standalone|game packages?|upgrades?)/i.test(labelText(candidate)));
+    if (!looksLikePledgeFilter) continue;
+    const option = options.find((candidate) => isAllLabel(labelText(candidate)));
     if (!option) continue;
     if (select.value !== option.value) {
       select.value = option.value;
@@ -182,7 +193,7 @@ async function applyStandaloneShipsFilterInPage() {
     filterControl.click();
     await sleepInPage(500);
     const option = [...document.querySelectorAll('button, a, li, option, [role="option"], [class*="option"]')].find((node) =>
-      standalonePattern.test(labelText(node)),
+      isAllLabel(labelText(node)),
     );
     if (option instanceof HTMLElement) {
       option.click();

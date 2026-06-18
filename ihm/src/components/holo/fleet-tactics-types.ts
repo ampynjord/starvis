@@ -16,8 +16,11 @@ export interface FleetShip {
   ctmUrl: string | null;
   declaredBy?: string | null;
   group?: string | null;
+  team?: string | null;
   gridX?: number | null;
   gridZ?: number | null;
+  rotationY?: number | null;
+  elevation?: number | null;
 }
 
 export interface TacticalMarker {
