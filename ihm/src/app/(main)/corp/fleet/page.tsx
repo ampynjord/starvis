@@ -725,6 +725,7 @@ export default function FleetManagerPage() {
                 ships={fleetShips}
                 selectedId={selectedItemId}
                 onSelect={setSelectedItemId}
+                layoutMode="row"
                 onPositionChange={handlePositionChange}
               />
             )}

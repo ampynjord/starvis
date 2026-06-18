@@ -211,6 +211,37 @@ describe('CorporationService', () => {
       expect(upserts[0].create.shipUuid).toBe('galaxy');
     });
 
+    it('prefers the exact Hornet Mk II candidate over older Hornet variants', async () => {
+      const upserts: any[] = [];
+      const db: any = {
+        $queryRawUnsafe: vi.fn().mockResolvedValue([
+          { uuid: 'hornet-mk1', class_name: 'ANVL_Hornet_F7C_Mk1', name: 'F7C Hornet Mk I' },
+          { uuid: 'super-hornet-mk2', class_name: 'ANVL_Hornet_F7CM_Mk2', name: 'Hornet F7CM Mk2' },
+        ]),
+        $transaction: vi.fn((run) => run(db)),
+        corporationFleetItem: {
+          findMany: vi.fn().mockResolvedValueOnce([]).mockResolvedValueOnce([]),
+          upsert: vi.fn((args) => {
+            upserts.push(args);
+            return Promise.resolve({ id: 10 });
+          }),
+          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+      };
+
+      const result = await new CorporationService(db).syncRsiHangarFleet(7, null, [
+        {
+          externalId: 'hornet-upgrade',
+          name: 'F7C-M Super Hornet Mk II',
+          title: 'Standalone Ships - MTC Plus Moonstone Paint',
+          raw: { rsiKind: 'ship_candidate', shipCandidates: ['F7C-M Super Hornet Mk II'] },
+        },
+      ]);
+
+      expect(result.imported).toBe(1);
+      expect(upserts[0].create.shipUuid).toBe('super-hornet-mk2');
+    });
+
     it('matches RSI hangar pledge names to Starvis ship names', async () => {
       const upserts: any[] = [];
       const db: any = {

@@ -178,15 +178,55 @@ function tokenizeShipLabel(value: string): Set<string> {
     if (/^[a-z]+\d+[a-z0-9]*$/.test(current) && /^[a-z]$/.test(next)) tokens.add(`${current}${next}`);
     if (current === 'mk' && /^\d+$/.test(next)) tokens.add(`mk${next}`);
   }
+  for (const token of baseTokens) {
+    const mk = token.match(/^mk(\d+)$/);
+    if (mk) {
+      tokens.add('mk');
+      tokens.add(mk[1]);
+    }
+  }
   return tokens;
 }
 
-function includesAllTokens(candidate: Set<string>, required: Set<string>): boolean {
-  if (required.size === 0) return false;
-  for (const token of required) {
-    if (!candidate.has(token)) return false;
+function mkToken(tokens: Set<string>): string | null {
+  for (const token of tokens) {
+    if (/^mk\d+$/.test(token)) return token;
   }
-  return true;
+  return null;
+}
+
+function scoreShipMatch(label: string, row: { class_name: string; name: string }): number {
+  const labelNormalized = normalizeSearchText(label);
+  const rowNameNormalized = normalizeSearchText(row.name);
+  const rowClassNormalized = normalizeSearchText(row.class_name);
+  if (labelNormalized === rowNameNormalized || labelNormalized === rowClassNormalized) return 1000;
+
+  const labelTokens = tokenizeShipLabel(label);
+  const rowTokens = tokenizeShipLabel(`${row.name} ${row.class_name}`);
+  const labelMk = mkToken(labelTokens);
+  const rowMk = mkToken(rowTokens);
+  if (labelMk && rowMk && labelMk !== rowMk) return 0;
+  if (labelTokens.has('f7cm') && !rowTokens.has('f7cm')) return 0;
+
+  const common = [...labelTokens].filter((token) => rowTokens.has(token));
+  const labelRatio = common.length / Math.max(labelTokens.size, 1);
+  const rowRatio = common.length / Math.max(rowTokens.size, 1);
+  let score = common.length * 10 + labelRatio * 20 + rowRatio * 20;
+  if (rowNameNormalized.includes(labelNormalized) || labelNormalized.includes(rowNameNormalized)) score += 30;
+  if (rowClassNormalized.includes(labelNormalized) || labelNormalized.includes(rowClassNormalized)) score += 25;
+  if (labelMk && rowMk === labelMk) score += 25;
+  if (labelTokens.has('super') && rowTokens.has('super')) score += 15;
+  if (labelTokens.has('f7cm') && rowTokens.has('f7cm')) score += 25;
+  return common.length >= 2 && Math.max(labelRatio, rowRatio) >= 0.35 ? score : 0;
+}
+
+function bestShipMatch<T extends { class_name: string; name: string }>(labels: string[], rows: T[]): T | null {
+  let best: { row: T; score: number } | null = null;
+  for (const row of rows) {
+    const score = Math.max(...labels.map((label) => scoreShipMatch(label, row)));
+    if (score > 0 && (!best || score > best.score)) best = { row, score };
+  }
+  return best?.row ?? null;
 }
 
 function rsiRawRecord(entry: RsiHangarSyncEntry): Record<string, unknown> | null {
@@ -232,7 +272,11 @@ function rsiHangarShipLabels(entry: RsiHangarSyncEntry): string[] {
 
 function stableExternalId(entry: RsiHangarSyncEntry, index: number): string {
   const explicit = cleanString(entry.externalId, 160);
-  if (explicit) return explicit;
+  const candidateSuffix = rsiRawShipCandidates(entry)[0]
+    ?.toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  if (explicit) return candidateSuffix ? `${explicit}|${candidateSuffix}`.slice(0, 160) : explicit;
   const basis = [entry.shipUuid, entry.className, entry.name, entry.label, entry.title, entry.packageName, entry.url]
     .map((value) => cleanString(value, 80))
     .filter(Boolean)
@@ -363,17 +407,17 @@ export class CorporationService {
       const normalizedLabels = searchLabels.map(normalizeSearchText).filter(Boolean);
       const match = rows.find((row) => normalizedLabels.includes(normalizeSearchText(row.name)));
       if (match) return { uuid: match.uuid, className: match.class_name, name: match.name };
-      const contained = rows.find((row) => {
-        const rowName = normalizeSearchText(row.name);
-        return normalizedLabels.some((candidate) => candidate.includes(rowName) || rowName.includes(candidate));
-      });
-      if (contained) return { uuid: contained.uuid, className: contained.class_name, name: contained.name };
-      const tokenLabelSets = searchLabels.map(tokenizeShipLabel);
-      const tokenMatch = rows.find((row) => {
-        const rowTokens = tokenizeShipLabel(row.name);
-        return tokenLabelSets.some((candidateTokens) => includesAllTokens(candidateTokens, rowTokens));
-      });
+      const tokenMatch = bestShipMatch(searchLabels, rows);
       if (tokenMatch) return { uuid: tokenMatch.uuid, className: tokenMatch.class_name, name: tokenMatch.name };
+
+      const conceptRows = (await this.db.$queryRawUnsafe(
+        toPostgres(
+          `SELECT 'concept-' || id::text as uuid, LOWER(REPLACE(REPLACE(name, ' ', '_'), '''', '')) as class_name, name FROM rsi.ship_matrix WHERE id NOT IN (SELECT ship_matrix_id FROM game.ships WHERE ship_matrix_id IS NOT NULL AND env = ?)`,
+        ),
+        env,
+      )) as Array<{ uuid: string; class_name: string; name: string }>;
+      const conceptMatch = bestShipMatch(searchLabels, conceptRows);
+      if (conceptMatch) return { uuid: conceptMatch.uuid, className: conceptMatch.class_name, name: conceptMatch.name };
     }
 
     return { uuid: null, className: explicitClass ?? label.slice(0, 255), name: label };
