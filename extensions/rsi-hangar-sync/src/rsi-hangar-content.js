@@ -23,12 +23,19 @@ async function clickLoadMoreButtons() {
 }
 
 function findCards() {
-  const selectors = ['[class*="pledge"]', '[class*="hangar"] article', '[class*="item"]', 'article', '.row'];
+  const selectors = ['[class*="pledge"]', '[class*="hangar"] article', 'article', '.row'];
   const candidates = selectors.flatMap((selector) => [...document.querySelectorAll(selector)]);
   return [...new Set(candidates)].filter((node) => {
     const text = textOf(node);
     if (text.length < 8) return false;
-    return /ship|vehicle|standalone|upgrade|package|pledge|paint|insurance|aegis|anvil|origin|drake|misc|rsi|crusader|roberts/i.test(text);
+    if (
+      /\b(paint|paints|skin|livery|poster|armor|weapon|subscriber|flair|gear|item|items|upgrade|upgrades|insurance|ticket|coupon)\b/i.test(
+        text,
+      )
+    ) {
+      return false;
+    }
+    return /\b(standalone ships?|standalone vehicles?|ship|ships|vehicle|vehicles)\b/i.test(text);
   });
 }
 
@@ -40,14 +47,15 @@ function extractCard(card, index) {
   const title = textOf(titleNode) || textOf(card).split(/\s{2,}|\n/)[0] || `RSI hangar item ${index + 1}`;
   const text = textOf(card);
   const className = card.getAttribute('data-class-name') || card.getAttribute('data-ship-code') || null;
+  const shipName = title.replace(/^\s*standalone\s+(ships?|vehicles?)\s*[-:]\s*/i, '').trim() || title;
 
   return {
     externalId: dataId || cleanUrl(link?.getAttribute('href')) || `${title}-${index}`,
-    name: title,
-    label: title,
+    name: shipName,
+    label: shipName,
     title,
     className,
-    packageName: /package/i.test(text) ? title : null,
+    packageName: null,
     imageUrl: cleanUrl(image?.getAttribute('src')),
     url: cleanUrl(link?.getAttribute('href')),
     quantity: 1,

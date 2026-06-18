@@ -11,7 +11,6 @@ import {
 } from 'discord.js';
 
 const DEFAULT_GUILD_ID = '931662690101895198';
-const OLD_CHANGELOG_MARKER = '<!-- starvis-changelog-addendum-2026-06-17 -->';
 const ADDENDUM_HEADING = '**Latest addendum**';
 
 const ADDENDUM = `${ADDENDUM_HEADING}
@@ -60,10 +59,6 @@ function normalizeName(value: string): string {
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function findRole(guild: Guild, candidates: string[]): Role | null {
