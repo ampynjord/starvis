@@ -230,35 +230,25 @@ function scrapeHangarInPage() {
     return targetShipNameFromUpgradeText(value) || value;
   }
 
-  function shipNameFromPledge(card, index) {
-    const title = titleOfCard(card, index);
-    const text = textOf(card);
-    const upgradeTarget = targetShipNameFromUpgradeText(title) || targetShipNameFromUpgradeText(text) || containsLineShipName(card);
-    if (upgradeTarget) return upgradeTarget;
-    return title.replace(/^\s*standalone\s+(ships?|vehicles?)\s*[-:]\s*/i, '').trim() || title;
+  function forbiddenPledgeLabel(value) {
+    return /^\s*(paint|paints|skin|livery|insurance|gear|item|items|poster|armor|weapon|ticket|coupon)\b/i.test(value);
   }
 
-  function looksLikeShipPledge(card, index) {
+  function shipCandidateLabels(card, index) {
     const title = titleOfCard(card, index);
     const text = textOf(card);
-    if (title.length < 3 || text.length < 8) return false;
-    if (text.length > 5000) return false;
-    if (!/\b(attributed|created:|contains:|standalone|upgrade)\b/i.test(text)) return false;
-    if ((text.match(/\bcreated:/gi)?.length ?? 0) > 1) return false;
-
-    if (/^\s*(paint|paints|skin|livery|insurance|gear|item|items|poster|armor|weapon|ticket|coupon)\b/i.test(title)) {
-      return false;
-    }
-
-    if (/\b(upgrade|upgrades)\b/i.test(title) || /\bto\s+.+\bupgrade\b/i.test(text) || /\bship\s+upgrades?\b/i.test(text)) {
-      return !!(targetShipNameFromUpgradeText(title) || targetShipNameFromUpgradeText(text) || containsLineShipName(card));
-    }
-
-    return (
-      /\bstandalone\s+(ships?|vehicles?)\b/i.test(title) ||
-      /\bstandalone\s+(ships?|vehicles?)\b/i.test(text) ||
-      /^\s*(ships?|vehicles?)\s*[-:]/i.test(title)
-    );
+    const labels = [
+      targetShipNameFromUpgradeText(title),
+      targetShipNameFromUpgradeText(text),
+      containsLineShipName(card),
+      /\bstandalone\s+(ships?|vehicles?)\b/i.test(title) || /\bstandalone\s+(ships?|vehicles?)\b/i.test(text)
+        ? title.replace(/^\s*standalone\s+(ships?|vehicles?)\s*[-:]\s*/i, '').trim()
+        : null,
+      /^\s*(ships?|vehicles?)\s*[-:]/i.test(title) ? title.replace(/^\s*(ships?|vehicles?)\s*[-:]\s*/i, '').trim() : null,
+    ]
+      .map((value) => value?.replace(/\s+/g, ' ').trim())
+      .filter((value) => value && value.length >= 3 && !forbiddenPledgeLabel(value));
+    return [...new Set(labels)];
   }
 
   function looksLikePledgeCard(card) {
@@ -275,10 +265,6 @@ function scrapeHangarInPage() {
     return pledgeCandidates.filter((node) => !pledgeCandidates.some((other) => other !== node && other.contains(node)));
   }
 
-  function findCards(root) {
-    return findPledgeCards(root).filter((node, index) => looksLikeShipPledge(node, index));
-  }
-
   function extractCard(card, index, sourceUrl) {
     const image = card.querySelector('img');
     const link = card.querySelector('a[href]');
@@ -286,7 +272,8 @@ function scrapeHangarInPage() {
     const title = titleOfCard(card, index);
     const text = textOf(card);
     const className = card.getAttribute('data-class-name') || card.getAttribute('data-ship-code') || null;
-    const shipName = shipNameFromPledge(card, index);
+    const shipCandidates = shipCandidateLabels(card, index);
+    const shipName = shipCandidates[0] || title;
 
     return {
       externalId: dataId || cleanUrl(link?.getAttribute('href')) || `${title}-${index}`,
@@ -301,6 +288,8 @@ function scrapeHangarInPage() {
       raw: {
         text: text.slice(0, 2000),
         detectedShipName: shipName,
+        rsiKind: shipCandidates.length > 0 ? 'ship_candidate' : 'pledge',
+        shipCandidates,
         sourceUrl,
       },
     };
@@ -327,7 +316,7 @@ function scrapeHangarInPage() {
     }
 
     const pledgeCards = findPledgeCards(document);
-    const cards = findCards(document);
+    const cards = findPledgeCards(document);
     const signature = pledgeCards.map((card, index) => `${titleOfCard(card, index)}:${textOf(card).slice(0, 180)}`).join('|');
     return {
       success: true,

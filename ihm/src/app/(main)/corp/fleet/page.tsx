@@ -524,7 +524,9 @@ export default function FleetManagerPage() {
     if (viewMode === 'member') return addedById === selectedMemberId;
     return true; // 'all'
   });
-  const visibleItemIds = visibleItems.map((i) => i.id).join(',');
+  const visibleItemSignature = visibleItems
+    .map((i) => `${i.id}:${getShipUuid(i) ?? ''}:${i.itemClassName}:${i.gridX ?? ''}:${i.gridZ ?? ''}`)
+    .join('|');
 
   // Memoize fleetShips — prevents scene rebuild on selection change
   const fleetShips: FleetShip[] = useMemo(() => visibleItems
@@ -546,7 +548,7 @@ export default function FleetManagerPage() {
       } satisfies FleetShip;
     }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  [visibleItemIds, shipData.size]);
+  [visibleItemSignature, shipData.size]);
 
   const selectedItem = visibleItems.find((i) => i.id === selectedItemId) ?? null;
   const selectedShipUuid = selectedItem ? getShipUuid(selectedItem) : null;
