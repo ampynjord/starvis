@@ -12,19 +12,6 @@ function createTab(createProperties) {
   return new Promise((resolve) => runtimeApi.tabs.create(createProperties, resolve));
 }
 
-function executeScript(injection) {
-  if (usesPromiseApi) return runtimeApi.scripting.executeScript(injection);
-  return new Promise((resolve, reject) => {
-    runtimeApi.scripting.executeScript(injection, (result) => {
-      if (runtimeApi.runtime.lastError) {
-        reject(new Error(runtimeApi.runtime.lastError.message));
-        return;
-      }
-      resolve(result);
-    });
-  });
-}
-
 function waitForTabComplete(tabId) {
   return new Promise((resolve) => {
     const timer = setTimeout(() => {
@@ -43,19 +30,31 @@ function waitForTabComplete(tabId) {
   });
 }
 
+async function reloadTab(tabId) {
+  if (usesPromiseApi) {
+    await runtimeApi.tabs.reload(tabId);
+  } else {
+    await new Promise((resolve) => runtimeApi.tabs.reload(tabId, resolve));
+  }
+  await waitForTabComplete(tabId);
+}
+
+function isHangarTab(tab) {
+  if (!tab.url) return false;
+  try {
+    const url = new URL(tab.url);
+    return url.hostname === 'robertsspaceindustries.com' && /\/account\/pledges\/?$/.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
 async function findOrOpenHangarTab() {
-  const tabs = await queryTabs({ url: 'https://robertsspaceindustries.com/account/pledges*' });
-  const tab = tabs[0] ?? (await createTab({ url: RSI_HANGAR_URL, active: false }));
+  const tabs = await queryTabs({ url: 'https://robertsspaceindustries.com/*' });
+  const tab = tabs.find(isHangarTab) ?? (await createTab({ url: RSI_HANGAR_URL, active: false }));
   if (!tab.id) throw new Error('Unable to open RSI hangar tab');
   if (tab.status !== 'complete') await waitForTabComplete(tab.id);
   return tab.id;
-}
-
-async function injectHangarContentScript(tabId) {
-  await executeScript({
-    target: { tabId },
-    files: ['src/rsi-hangar-content.js'],
-  });
 }
 
 function sendTabMessage(tabId, message) {
@@ -78,7 +77,7 @@ async function scrapeHangarTab(tabId) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (!/Receiving end does not exist|Could not establish connection/i.test(message)) throw error;
-    await injectHangarContentScript(tabId);
+    await reloadTab(tabId);
     return sendTabMessage(tabId, { type: 'STARVIS_SCRAPE_RSI_HANGAR' });
   }
 }
