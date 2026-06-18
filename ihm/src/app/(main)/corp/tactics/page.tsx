@@ -12,6 +12,7 @@ import {
   Flag,
   Layers3,
   Loader2,
+  type LucideIcon,
   MoveVertical,
   Plus,
   Radar,
@@ -67,7 +68,6 @@ export default function CorporationTacticsPage() {
   const [selectedShipId, setSelectedShipId] = useState<number | null>(null);
   const [selectedMarkerId, setSelectedMarkerId] = useState<string | null>(null);
   const [selectedVectorId, setSelectedVectorId] = useState<string | null>(null);
-  const [shipQuery, setShipQuery] = useState('');
   const [corpShipsOnly, setCorpShipsOnly] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -83,6 +83,8 @@ export default function CorporationTacticsPage() {
     try { return JSON.parse(localStorage.getItem(PRESETS_STORAGE_KEY) ?? '[]') as FormationPreset[]; } catch { return []; }
   });
   const nextShipIdRef = useRef(1);
+  const focusNonceRef = useRef(0);
+  const [focusRequest, setFocusRequest] = useState<{ kind: 'ship' | 'group' | 'marker'; id: number | string; nonce: number } | null>(null);
 
   const activeStrategy = strategies.find((strategy) => strategy.id === activeStrategyId) ?? strategies[0] ?? defaultStrategy();
 
@@ -91,6 +93,11 @@ export default function CorporationTacticsPage() {
       strategy.id === activeStrategy.id ? { ...updater(strategy), updatedAt: nowIso() } : strategy
     )));
   }, [activeStrategy.id]);
+
+  const focusOn = useCallback((kind: 'ship' | 'group' | 'marker', id: number | string) => {
+    focusNonceRef.current += 1;
+    setFocusRequest({ kind, id, nonce: focusNonceRef.current });
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -158,18 +165,11 @@ export default function CorporationTacticsPage() {
     localStorage.setItem(storageKey, JSON.stringify({ activeStrategyId, strategies }));
   }, [activeStrategyId, storageKey, strategies, user]);
 
-  const filteredFleet = useMemo(() => {
-    const q = shipQuery.trim().toLowerCase();
-    return fleetItems
+  const filteredFleet = useMemo(() =>
+    fleetItems
       .filter((item) => getShipUuid(item))
-      .filter((item) => !corpShipsOnly || item.availableForTactics)
-      .filter((item) => {
-        if (!q) return true;
-        const uuid = getShipUuid(item);
-        const ship = uuid ? shipData.get(uuid) : null;
-        return `${ship?.name ?? item.itemClassName} ${ship?.role ?? ''} ${item.addedBy?.username ?? ''}`.toLowerCase().includes(q);
-      });
-  }, [fleetItems, shipData, shipQuery, corpShipsOnly]);
+      .filter((item) => !corpShipsOnly || item.availableForTactics),
+  [fleetItems, corpShipsOnly]);
 
   const availableFleetByUuid = useMemo(() => {
     const map = new Map<string, FleetItem[]>();
@@ -267,6 +267,72 @@ export default function CorporationTacticsPage() {
   const selectedFormationSize = selectedShip?.group
     ? activeStrategy.ships.filter((ship) => ship.group === selectedShip.group).length
     : 0;
+
+  // Flat list of everything placed on the current strategy (squadrons, lone
+  // ships and tactical objects). Selecting an entry selects it AND recenters the
+  // 3D camera on it.
+  const strategyObjects = useMemo(() => {
+    type StrategyObject = { key: string; name: string; subtitle: string; thumbnail?: string | null; Icon: LucideIcon; iconClass: string; active: boolean; onSelect: () => void };
+    const groups = new Map<string, TacticalShip[]>();
+    for (const ship of activeStrategy.ships) {
+      const groupKey = ship.group || `__solo_${ship.id}`;
+      const list = groups.get(groupKey) ?? [];
+      list.push(ship);
+      groups.set(groupKey, list);
+    }
+    const items: StrategyObject[] = [];
+    for (const [groupKey, groupShips] of groups) {
+      if (groupShips.length > 1) {
+        const first = groupShips[0];
+        items.push({
+          key: `group:${groupKey}`,
+          name: first.group || groupKey,
+          subtitle: `Squadron · ${groupShips.length} ships`,
+          thumbnail: shipData.get(first.shipUuid)?.thumbnail,
+          Icon: Users,
+          iconClass: 'text-cyan-500',
+          active: !!selectedShip?.group && selectedShip.group === first.group,
+          onSelect: () => {
+            setSelectedShipId(first.id); setSelectedMarkerId(null); setSelectedVectorId(null);
+            focusOn('group', first.group ?? groupKey);
+          },
+        });
+      } else {
+        const ship = groupShips[0];
+        const data = shipData.get(ship.shipUuid);
+        items.push({
+          key: `ship:${ship.id}`,
+          name: ship.label || data?.name || ship.shipUuid,
+          subtitle: data?.role ?? 'Ship',
+          thumbnail: data?.thumbnail,
+          Icon: Ship,
+          iconClass: 'text-slate-500',
+          active: selectedShipId === ship.id,
+          onSelect: () => {
+            setSelectedShipId(ship.id); setSelectedMarkerId(null); setSelectedVectorId(null);
+            focusOn('ship', ship.id);
+          },
+        });
+      }
+    }
+    for (const marker of activeStrategy.markers) {
+      const Icon = marker.type === 'objective' ? Flag : marker.type === 'poi' ? Crosshair : Square;
+      items.push({
+        key: `marker:${marker.id}`,
+        name: marker.label || marker.type,
+        subtitle: marker.type.toUpperCase(),
+        thumbnail: null,
+        Icon,
+        iconClass: marker.type === 'obstacle' ? 'text-red-400' : marker.type === 'objective' ? 'text-amber-400' : 'text-cyan-400',
+        active: selectedMarkerId === marker.id,
+        onSelect: () => {
+          setSelectedMarkerId(marker.id); setSelectedShipId(null); setSelectedVectorId(null);
+          focusOn('marker', marker.id);
+        },
+      });
+    }
+    return items;
+  }, [activeStrategy.ships, activeStrategy.markers, shipData, selectedShip, selectedShipId, selectedMarkerId, focusOn]);
 
   const setCompositionQty = (uuid: string, quantity: number) => {
     setFormationComposition((prev) => {
@@ -629,6 +695,19 @@ export default function CorporationTacticsPage() {
               onChange={(event) => updateActiveStrategy((strategy) => ({ ...strategy, name: event.target.value }))}
               className="sci-input w-full"
             />
+            <button
+              type="button"
+              onClick={() => setCorpShipsOnly((prev) => !prev)}
+              className="flex w-full items-center justify-between gap-2 rounded-sm border border-slate-800/70 bg-slate-950/35 px-2.5 py-2 text-left transition-colors hover:border-cyan-800/70"
+            >
+              <span className="min-w-0">
+                <span className="block font-rajdhani text-xs font-semibold text-slate-200">Use only corp ships</span>
+                <span className="block font-mono-sc text-[9px] text-slate-600">{corpShipsOnly ? 'Tactics-ready fleet only' : 'Whole corp fleet (simulation)'}</span>
+              </span>
+              <span className={`relative h-4 w-8 shrink-0 rounded-full transition-colors ${corpShipsOnly ? 'bg-cyan-600/70' : 'bg-slate-700/70'}`}>
+                <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${corpShipsOnly ? 'left-4' : 'left-0.5'}`} />
+              </span>
+            </button>
             <div className="grid grid-cols-2 gap-2">
               <input
                 value={formationName}
@@ -677,8 +756,10 @@ export default function CorporationTacticsPage() {
                   {Object.entries(formationDraftComposition).map(([uuid, qty]) => {
                     const available = availableFleetByUuid.get(uuid)?.length ?? 0;
                     const label = shipData.get(uuid)?.name ?? uuid;
+                    const thumb = shipData.get(uuid)?.thumbnail;
                     return (
                       <div key={uuid} className="flex items-center gap-2">
+                        {thumb ? <img src={thumb} alt={label} className="h-6 w-9 shrink-0 rounded-sm object-contain opacity-80" /> : <Ship size={13} className="shrink-0 text-slate-600" />}
                         <span className="min-w-0 flex-1 truncate text-xs text-slate-300">{label}</span>
                         <span className={qty > available ? 'font-mono-sc text-[10px] text-amber-400' : 'font-mono-sc text-[10px] text-slate-600'}>{available} avail.</span>
                         <input
@@ -756,53 +837,34 @@ export default function CorporationTacticsPage() {
             </div>
           </div>
 
-          <div className="p-3">
-            <button
-              type="button"
-              onClick={() => setCorpShipsOnly((prev) => !prev)}
-              className="mb-2 flex w-full items-center justify-between gap-2 rounded-sm border border-slate-800/70 bg-slate-950/35 px-2.5 py-2 text-left transition-colors hover:border-cyan-800/70"
-            >
-              <span className="min-w-0">
-                <span className="block font-rajdhani text-xs font-semibold text-slate-200">Use only corp ships</span>
-                <span className="block font-mono-sc text-[9px] text-slate-600">{corpShipsOnly ? 'Tactics-ready fleet only' : 'Whole corp fleet (simulation)'}</span>
-              </span>
-              <span className={`relative h-4 w-8 shrink-0 rounded-full transition-colors ${corpShipsOnly ? 'bg-cyan-600/70' : 'bg-slate-700/70'}`}>
-                <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${corpShipsOnly ? 'left-4' : 'left-0.5'}`} />
-              </span>
-            </button>
-            <input value={shipQuery} onChange={(event) => setShipQuery(event.target.value)} placeholder="Filter fleet..." className="sci-input mb-2 w-full" />
+          <div className="space-y-2 p-3">
+            <div className="flex items-center gap-2">
+              <Radar size={13} className="text-cyan-500" />
+              <span className="font-orbitron text-[10px] font-bold uppercase tracking-widest text-slate-400">On this strategy</span>
+            </div>
             {loading ? (
               <div className="flex items-center justify-center py-8 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
-            ) : loadError ? (
-              <div className="px-2 py-6 text-center">
-                <p className="font-mono-sc text-xs text-red-400">{loadError}</p>
-              </div>
-            ) : filteredFleet.length === 0 ? (
-              <p className="px-2 py-6 text-center font-mono-sc text-xs text-slate-700">
-                {fleetItems.length === 0 ? 'No corporation ships available.' : 'No available tactics ship matches this filter.'}
-              </p>
-            ) : filteredFleet.slice(0, 30).map((item) => {
-              const uuid = getShipUuid(item);
-              const ship = uuid ? shipData.get(uuid) : null;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    if (!uuid) return;
-                    setCompositionQty(uuid, (formationDraftComposition[uuid] ?? 0) + 1);
-                  }}
-                  className="mb-1.5 flex w-full items-center gap-2 rounded-sm border border-slate-800/60 bg-slate-950/35 px-2 py-2 text-left transition-colors hover:border-cyan-800/70 hover:bg-cyan-950/20"
-                >
-                  {ship?.thumbnail ? <img src={ship.thumbnail} alt={ship.name} className="h-7 w-11 shrink-0 object-contain opacity-80" /> : <Ship size={15} className="text-slate-600" />}
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-rajdhani text-sm font-semibold text-slate-200">{ship?.name ?? item.itemClassName}</span>
-                    <span className="block truncate font-mono-sc text-[9px] text-slate-600">{ship?.role ?? item.addedBy?.username ?? 'Fleet item'}</span>
-                  </span>
-                  <Plus size={12} className="shrink-0 text-cyan-600" />
-                </button>
-              );
-            })}
+            ) : strategyObjects.length === 0 ? (
+              <p className="px-2 py-6 text-center font-mono-sc text-xs text-slate-700">No squadron, ship or object placed yet.</p>
+            ) : strategyObjects.map((obj) => (
+              <button
+                key={obj.key}
+                type="button"
+                onClick={obj.onSelect}
+                className={`mb-1.5 flex w-full items-center gap-2 rounded-sm border px-2 py-2 text-left transition-colors ${obj.active ? 'border-cyan-600/70 bg-cyan-950/25' : 'border-slate-800/60 bg-slate-950/35 hover:border-cyan-800/70 hover:bg-cyan-950/20'}`}
+              >
+                {obj.thumbnail ? (
+                  <img src={obj.thumbnail} alt={obj.name} className="h-7 w-11 shrink-0 object-contain opacity-80" />
+                ) : (
+                  <obj.Icon size={15} className={`shrink-0 ${obj.iconClass}`} />
+                )}
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-rajdhani text-sm font-semibold text-slate-200">{obj.name}</span>
+                  <span className="block truncate font-mono-sc text-[9px] text-slate-600">{obj.subtitle}</span>
+                </span>
+                <Crosshair size={12} className="shrink-0 text-cyan-600/70" />
+              </button>
+            ))}
           </div>
         </aside>
 
@@ -830,6 +892,7 @@ export default function CorporationTacticsPage() {
               onVectorCreate={createVector}
               onVectorChange={updateVector}
               onGroupPositionChange={updateGroupPositions}
+              focusRequest={focusRequest}
             />
           )}
           <div className="pointer-events-none absolute left-3 top-3 rounded-sm border border-cyan-900/40 bg-slate-950/70 px-3 py-2 font-mono-sc text-[10px] text-cyan-500">
