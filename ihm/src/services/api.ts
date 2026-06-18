@@ -50,6 +50,7 @@ import type {
   ShipRankingResponse,
   Shop,
   ShopInventoryItem,
+  StarmapPosition,
   StatsOverview,
   TradeRoute,
   Version,
@@ -673,6 +674,11 @@ export const api = {
     list: (filters?: { search?: string; category?: string; page?: number; limit?: number }) =>
       get<PaginatedResponse<CommLink>>('/comm-links', filters as Record<string, string | number | undefined>),
     get: (id: string) => get<CommLink>(`/comm-links/${id}`),
+  },
+
+  // ─── Starmap ───
+  starmap: {
+    positions: () => get<StarmapPosition[]>('/starmap/positions'),
   },
 
   // ─── Galactapedia ────────────────────────────────────────────────────

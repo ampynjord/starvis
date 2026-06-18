@@ -8,8 +8,8 @@
  *
  * Both are merged into a single CraftingRecipeRecord[] output.
  */
-import type { DataForgeService } from './dataforge-service.js';
-import logger from './logger.js';
+import type { DataForgeService } from '../dataforge/dataforge-service.js';
+import logger from '../logger.js';
 
 interface CraftingLocalizationAdapter {
   resolveKey(key: string): string | null;

@@ -6,9 +6,9 @@
  * transaction.
  */
 import type { PoolClient } from 'pg';
-import type { DataForgeService } from '../dataforge-service.js';
-import type { LocalizationService } from '../localization-service.js';
+import type { DataForgeService } from '../dataforge/dataforge-service.js';
 import type { GameEnv } from '../module-registry.js';
+import type { LocalizationService } from '../services/localization-service.js';
 
 export interface PersistContext {
   /** Transaction-bound PostgreSQL client */

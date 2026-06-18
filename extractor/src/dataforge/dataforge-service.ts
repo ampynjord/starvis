@@ -7,7 +7,10 @@
 
 import { readdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { extractAllComponents as _extractAllComponents } from './component-extractor.js';
+import { extractAllComponents as _extractAllComponents } from '../extractors/component-extractor.js';
+import { extractItems as _extractItems } from '../extractors/item-extractor.js';
+import { extractPaints as _extractPaints } from '../extractors/shop-paint-extractor.js';
+import logger from '../logger.js';
 import { type CryXmlNode, isCryXmlB, parseCryXml } from './cryxml-parser.js';
 import {
   type DataForgeData,
@@ -18,11 +21,8 @@ import {
   readInstance as readInstancePure,
 } from './dataforge-parser.js';
 import { type DataForgeContext, type ManufacturerInfo, resolveLocKey } from './dataforge-utils.js';
-import { extractItems as _extractItems } from './item-extractor.js';
 import { LoadoutParser, type LoadoutPortEntry } from './loadout-parser.js';
-import logger from './logger.js';
 import { P4KProvider } from './p4k-provider.js';
-import { extractPaints as _extractPaints } from './shop-paint-extractor.js';
 
 // Re-export for backward compatibility (extraction-service.ts imports these from here)
 export { classifyPort, MANUFACTURER_CODES } from './dataforge-utils.js';

@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import type { DataForgeService } from './dataforge-service.js';
-import type { DataForgeContext } from './dataforge-utils.js';
+import type { DataForgeService } from '../dataforge/dataforge-service.js';
+import type { DataForgeContext } from '../dataforge/dataforge-utils.js';
 
 export interface GameInsightRecord {
   uuid: string;

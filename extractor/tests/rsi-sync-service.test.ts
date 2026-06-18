@@ -38,7 +38,7 @@ vi.stubGlobal('fetch', async (_url: string) => {
 
 describe('RsiSyncService.syncGalactapedia', () => {
   it('calls connect and query for each item', async () => {
-    const { RsiSyncService } = await import('../src/rsi-sync-service.js');
+    const { RsiSyncService } = await import('../src/services/rsi-sync-service.js');
     const { pool } = makePoolMock();
 
     // We cannot easily change the base URL without refactoring the module,
@@ -56,7 +56,7 @@ describe('RsiSyncService.syncGalactapedia', () => {
 
 describe('RsiSyncService stats shape', () => {
   it('syncGalactapedia returns SyncStats object', async () => {
-    const { RsiSyncService } = await import('../src/rsi-sync-service.js');
+    const { RsiSyncService } = await import('../src/services/rsi-sync-service.js');
     const { pool } = makePoolMock();
     const svc = new RsiSyncService(pool);
     const result = await svc.syncGalactapedia();
@@ -64,7 +64,7 @@ describe('RsiSyncService stats shape', () => {
   });
 
   it('syncCommLinks returns SyncStats object', async () => {
-    const { RsiSyncService } = await import('../src/rsi-sync-service.js');
+    const { RsiSyncService } = await import('../src/services/rsi-sync-service.js');
     const { pool } = makePoolMock();
     const svc = new RsiSyncService(pool);
     const result = await svc.syncCommLinks();
@@ -72,7 +72,7 @@ describe('RsiSyncService stats shape', () => {
   });
 
   it('syncStarmap returns upserted+errors object', async () => {
-    const { RsiSyncService } = await import('../src/rsi-sync-service.js');
+    const { RsiSyncService } = await import('../src/services/rsi-sync-service.js');
     const { pool } = makePoolMock();
     const svc = new RsiSyncService(pool);
     const result = await svc.syncStarmap();
@@ -108,7 +108,7 @@ describe('RsiSyncService.syncStarmap', () => {
       }),
     }));
 
-    const { RsiSyncService } = await import('../src/rsi-sync-service.js');
+    const { RsiSyncService } = await import('../src/services/rsi-sync-service.js');
     const { pool, query } = makePoolMock();
     const svc = new RsiSyncService(pool);
 

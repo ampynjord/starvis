@@ -4,8 +4,8 @@
  * Note: Shop extraction has been moved to shop-extractor.ts which reads from
  * Prefab XMLs (Data/Prefabs/shops/**) instead of SCItemManufacturer records.
  */
-import type { DataForgeContext } from './dataforge-utils.js';
-import logger from './logger.js';
+import type { DataForgeContext } from '../dataforge/dataforge-utils.js';
+import logger from '../logger.js';
 
 // ============ Paint / livery extraction ============
 

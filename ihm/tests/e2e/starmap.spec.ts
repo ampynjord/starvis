@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { gotoApp } from './helpers';
 
-test('starmap embeds the RSI Ark Starmap iframe', async ({ page }) => {
+test('starmap renders the native 3D galactic map (no RSI iframe)', async ({ page }) => {
   await gotoApp(page, '/starmap');
 
-  await expect(page.locator('iframe[title="RSI Ark Starmap"]')).toBeVisible();
-  await expect(page.locator('iframe[src="https://robertsspaceindustries.com/starmap"]')).toBeVisible();
+  await expect(page.locator('iframe[title="RSI Ark Starmap"]')).toHaveCount(0);
+  await expect(page.getByText(/Galactic Map|Loading star systems|No star systems/i).first()).toBeVisible({ timeout: 15000 });
 });

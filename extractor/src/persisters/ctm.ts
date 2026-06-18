@@ -2,8 +2,8 @@
  * CTM SCRAPER → ships.ctm_url
  */
 import type { PoolClient } from 'pg';
-import { type ShipToScrape, scrapeShipCtmUrls } from '../ctm-scraper.js';
 import type { GameEnv } from '../module-registry.js';
+import { type ShipToScrape, scrapeShipCtmUrls } from '../scrapers/ctm-scraper.js';
 
 /**
  * Scrape 3D model (.ctm) URLs from the RSI website and persist them to ships.ctm_url.

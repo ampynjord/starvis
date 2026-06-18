@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg';
-import type { ExtractionModule, GameEnv } from './module-registry.js';
+import type { ExtractionModule, GameEnv } from '../module-registry.js';
 
 export type ModuleRunner = (moduleName: ExtractionModule) => boolean;
 

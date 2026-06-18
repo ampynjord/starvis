@@ -11,11 +11,11 @@
  * only yielded ~18 generic franchise templates with no location data.
  */
 
-import shopExtractorConfig from './data/shop-extractor-config.json' with { type: 'json' };
-import type { DataForgeContext } from './dataforge-utils.js';
-import type { LocalizationService } from './localization-service.js';
-import logger from './logger.js';
-import type { P4KProvider } from './p4k-provider.js';
+import shopExtractorConfig from '../data/shop-extractor-config.json' with { type: 'json' };
+import type { DataForgeContext } from '../dataforge/dataforge-utils.js';
+import type { P4KProvider } from '../dataforge/p4k-provider.js';
+import logger from '../logger.js';
+import type { LocalizationService } from '../services/localization-service.js';
 
 // ── Category folder → shop_type mapping ─────────────────────────────────────
 

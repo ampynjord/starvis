@@ -8,8 +8,8 @@
  *   - Completion time limit
  *   - Title / description from LOC keys
  */
-import type { DataForgeService } from './dataforge-service.js';
-import logger from './logger.js';
+import type { DataForgeService } from '../dataforge/dataforge-service.js';
+import logger from '../logger.js';
 
 interface MissionLocalizationAdapter {
   resolveKey(key: string): string | null;

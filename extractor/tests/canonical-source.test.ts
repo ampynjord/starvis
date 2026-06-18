@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { canonicalizeCommodityRecord, canonicalizeComponentRecord, canonicalizeItemRecord } from '../src/canonical-source.js';
+import { canonicalizeCommodityRecord, canonicalizeComponentRecord, canonicalizeItemRecord } from '../src/normalizers/canonical-source.js';
 
 describe('canonicalizeItemRecord', () => {
   it('normalizes name and generates a canonical key', () => {

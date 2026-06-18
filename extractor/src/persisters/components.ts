@@ -1,9 +1,9 @@
 /**
  * COMPONENTS → components table
  */
-import { canonicalizeComponentRecord } from '../canonical-source.js';
-import { getGameComponentCategory } from '../component-taxonomy.js';
-import { fetchComponentWikiEnrichment } from '../sc-wiki-component-enrichment.js';
+import { canonicalizeComponentRecord } from '../normalizers/canonical-source.js';
+import { getGameComponentCategory } from '../normalizers/component-taxonomy.js';
+import { fetchComponentWikiEnrichment } from '../services/sc-wiki-component-enrichment.js';
 import { batchUpsert } from './batch.js';
 import type { PersistContext } from './context.js';
 

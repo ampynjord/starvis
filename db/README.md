@@ -9,7 +9,7 @@ Database workspace for Prisma, PostgreSQL bootstrap scripts, and the shared Pris
 | `prisma/schema/00-base.prisma` | Prisma generator and datasource. |
 | `prisma/schema/10-meta.prisma` | Users, generated API tokens, corporations, fleet/tactical metadata, bug reports, extraction logs and changelog. |
 | `prisma/schema/20-rsi.prisma` | RSI website data: ship matrix, Galactapedia, comm-links, starmap. |
-| `prisma/schema/30-game.prisma` | P4K/DataForge game data: ships, components, items, commodities, shops, missions, crafting. |
+| `prisma/schema/30-game.prisma` | P4K/DataForge game data: ships, components, items, commodities, shops, missions, crafting, plus UEX crowd-sourced ship market data (`uex_terminals`, `uex_vehicle_prices`). |
 | `src/client/` | Prisma singleton client. |
 | `src/env/` | Shared database environment helpers. |
 | `src/types/` | Public Prisma helper types. |
@@ -51,6 +51,7 @@ Cross-source links should be explicit fields, not duplicated data. Current examp
 - `game.ships.ship_matrix_id` links extracted ships to `rsi.ship_matrix`.
 - `game.locations.rsi_starmap_location_id` links P4K locations to `rsi.starmap_locations`.
 - `game.starmap_location_aliases` stores manual/semi-automatic correlation help.
+- `game.uex_vehicle_prices.ship_uuid` links UEX vehicle prices to `game.ships.uuid` (resolved by the extractor `uex` module). No DB-level foreign key is declared so externally-sourced rows survive even when a ship is missing or renamed.
 
 Run the static data audit after extractor or schema changes:
 

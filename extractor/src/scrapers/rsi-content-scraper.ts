@@ -12,7 +12,7 @@
  * Galactapedia pages still use server-side rendered HTML with known div classes.
  */
 
-import logger from './logger.js';
+import logger from '../logger.js';
 
 const RSI_BASE = 'https://robertsspaceindustries.com';
 const USER_AGENT = 'Mozilla/5.0 (compatible; StarvisBot/1.0; +https://starvis.ampynjord.bzh)';

@@ -23,6 +23,7 @@ export const EXTRACTION_MODULES = [
   'ship-galleries',
   'organizations',
   'rsi-content',
+  'uex',
 ] as const;
 
 export type ExtractionModule = (typeof EXTRACTION_MODULES)[number];
@@ -79,6 +80,7 @@ export const MODULE_REGISTRY: readonly ExtractionModuleDefinition[] = [
   },
   { id: 'organizations', runtime: 'network', aliases: ['organization', 'organisation', 'organisations', 'orgs'] },
   { id: 'rsi-content', runtime: 'network', aliases: ['rsi-html', 'enrich-content', 'comm-link-html', 'galactapedia-html'] },
+  { id: 'uex', runtime: 'network', aliases: ['uex-market', 'uexcorp', 'prices', 'market'] },
 ] as const;
 
 export const VALID_MODULES = [...EXTRACTION_MODULES];

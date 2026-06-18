@@ -6,7 +6,7 @@ import { createDecipheriv } from 'node:crypto';
 import { statSync } from 'node:fs';
 import { type FileHandle, open } from 'node:fs/promises';
 import { inflateRawSync } from 'node:zlib';
-import logger from './logger.js';
+import logger from '../logger.js';
 
 export interface P4KEntry {
   fileName: string;

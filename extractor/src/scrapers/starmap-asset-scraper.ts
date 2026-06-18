@@ -14,8 +14,8 @@
  */
 
 import { chromium, type Page } from 'playwright';
-import { RSI_BASE_URL } from './config.js';
-import logger from './logger.js';
+import { RSI_BASE_URL } from '../config.js';
+import logger from '../logger.js';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

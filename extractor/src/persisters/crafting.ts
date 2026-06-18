@@ -1,7 +1,7 @@
 /**
  * CRAFTING RECIPES → crafting_recipes + crafting_ingredients + crafting_slot_modifiers tables
  */
-import { extractCraftingRecipes } from '../crafting-extractor.js';
+import { extractCraftingRecipes } from '../extractors/crafting-extractor.js';
 import { batchUpsert } from './batch.js';
 import type { PersistContext } from './context.js';
 

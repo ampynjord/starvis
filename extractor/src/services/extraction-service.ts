@@ -11,6 +11,28 @@
  */
 import { createHash } from 'node:crypto';
 import type { Pool } from 'pg';
+import type { DataForgeService } from '../dataforge/dataforge-service.js';
+import { EXTRACTOR_DEFAULTS } from '../extractor-config.js';
+import logger from '../logger.js';
+import { type ExtractionModule, type GameEnv, NETWORK_MODULES } from '../module-registry.js';
+import { generateChangelog } from '../persisters/changelog.js';
+import { saveComponents } from '../persisters/components.js';
+import type { PersistContext } from '../persisters/context.js';
+import { saveCraftingRecipes } from '../persisters/crafting.js';
+import { saveShipCtmModels } from '../persisters/ctm.js';
+import { saveGameInsights } from '../persisters/game-insights.js';
+import { saveItems } from '../persisters/items.js';
+import { saveLocations } from '../persisters/locations.js';
+import { saveManufacturersFromData } from '../persisters/manufacturers.js';
+import { saveMiningData } from '../persisters/mining.js';
+import { saveMissionBlueprintLinks, saveMissions } from '../persisters/missions.js';
+import { savePaints } from '../persisters/paints.js';
+import { saveOfficialShipGalleries } from '../persisters/ship-galleries.js';
+import { updateShipMarketSummaries } from '../persisters/ship-market-summaries.js';
+import { saveShips } from '../persisters/ships.js';
+import { saveShopsData } from '../persisters/shops.js';
+import { saveStarmapAssets } from '../persisters/starmap-assets.js';
+import { saveUexMarket } from '../persisters/uex.js';
 import {
   applyDimensionsFallback,
   applyHullSeriesCargoFallback,
@@ -20,29 +42,8 @@ import {
   pruneExcludedVariants,
   tagVariantTypes,
 } from './crossref.js';
-import type { DataForgeService } from './dataforge-service.js';
 import { captureExtractionSnapshot, cleanStaleGameData, restoreCtmUrls } from './extraction-state.js';
-import { EXTRACTOR_DEFAULTS } from './extractor-config.js';
 import { LocalizationService } from './localization-service.js';
-import logger from './logger.js';
-import { type ExtractionModule, type GameEnv, NETWORK_MODULES } from './module-registry.js';
-import { generateChangelog } from './persisters/changelog.js';
-import { saveComponents } from './persisters/components.js';
-import type { PersistContext } from './persisters/context.js';
-import { saveCraftingRecipes } from './persisters/crafting.js';
-import { saveShipCtmModels } from './persisters/ctm.js';
-import { saveGameInsights } from './persisters/game-insights.js';
-import { saveItems } from './persisters/items.js';
-import { saveLocations } from './persisters/locations.js';
-import { saveManufacturersFromData } from './persisters/manufacturers.js';
-import { saveMiningData } from './persisters/mining.js';
-import { saveMissionBlueprintLinks, saveMissions } from './persisters/missions.js';
-import { savePaints } from './persisters/paints.js';
-import { saveOfficialShipGalleries } from './persisters/ship-galleries.js';
-import { updateShipMarketSummaries } from './persisters/ship-market-summaries.js';
-import { saveShips } from './persisters/ships.js';
-import { saveShopsData } from './persisters/shops.js';
-import { saveStarmapAssets } from './persisters/starmap-assets.js';
 import { RsiSyncService } from './rsi-sync-service.js';
 
 export type { ExtractionModule, GameEnv };
@@ -366,6 +367,21 @@ export class ExtractionService {
         await saveShipCtmModels(conn, env, { force, concurrency }, onProgress);
       }
 
+      // 6b-bis. Sync UEX market (vehicle buy/rent prices + dealer locations).
+      // Runs inside the transaction so it shares the snapshot; maps to ships by UUID.
+      if (run('uex')) {
+        onProgress?.('Syncing UEX vehicle market (buy/rent prices)…');
+        try {
+          const s = await saveUexMarket(conn, env, onProgress);
+          onProgress?.(
+            `✅ UEX: ${s.terminals} terminals, ${s.buyPrices} buy + ${s.rentPrices} rent prices, ${s.unmapped} unmapped vehicles`,
+          );
+        } catch (e) {
+          stats.errors.push(`UEX market sync failed: ${(e as Error).message}`);
+          onProgress?.(`⚠️ UEX market sync failed: ${(e as Error).message}`);
+        }
+      }
+
       // 6c. Log extraction to extraction_log
       stats.durationMs = Date.now() - startTime;
       let extractionId: number | null = null;
@@ -451,7 +467,9 @@ export class ExtractionService {
     }
 
     // ── RSI/SC Wiki sync modules (outside main transaction — separate rsi_website DB) ──
-    const rsiModules = [...NETWORK_MODULES].filter((moduleName) => moduleName !== 'ctm' && moduleName !== 'ship-galleries');
+    const rsiModules = [...NETWORK_MODULES].filter(
+      (moduleName) => moduleName !== 'ctm' && moduleName !== 'ship-galleries' && moduleName !== 'uex',
+    );
     const hasRsiModules = rsiModules.some((m) => run(m));
 
     if (hasRsiModules) {

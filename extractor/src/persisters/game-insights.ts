@@ -2,8 +2,8 @@
  * GAME INSIGHTS → game_insights + derived tables
  * (factions, reputation, loot tables, blueprint rewards, ammo, inventory containers)
  */
-import { extractGameInsights } from '../game-insight-extractor.js';
-import { buildDerivedGameInsightData, type DerivedGameInsightData } from '../game-insight-normalizer.js';
+import { extractGameInsights } from '../extractors/game-insight-extractor.js';
+import { buildDerivedGameInsightData, type DerivedGameInsightData } from '../normalizers/game-insight-normalizer.js';
 import { batchUpsert } from './batch.js';
 import type { PersistContext } from './context.js';
 

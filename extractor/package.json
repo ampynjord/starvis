@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "extract": "tsx extract.ts",
+    "wizard": "tsx src/cli/wizard.ts",
     "audit:locations": "tsx scripts/audit-locations.ts",
     "audit:static-data": "tsx scripts/audit-static-data.ts",
     "dev": "tsx watch extract.ts",

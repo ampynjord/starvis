@@ -6,7 +6,7 @@ import {
   extractMissionFactionData,
   extractMissionMbeEnrichment,
   extractMissions,
-} from '../mission-extractor.js';
+} from '../extractors/mission-extractor.js';
 import { batchUpsert } from './batch.js';
 import type { PersistContext } from './context.js';
 

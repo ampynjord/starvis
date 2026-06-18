@@ -18,31 +18,14 @@ export async function updateShipMarketSummaries(ctx: Pick<PersistContext, 'conn'
        SELECT
          sh.uuid,
          sh.env,
-         MIN(si.base_price) FILTER (WHERE si.base_price > 0) AS min_purchase_price,
-         MIN(si.rental_price_1d) FILTER (WHERE si.rental_price_1d > 0) AS min_rental_price_1d,
-         MIN(si.rental_price_3d) FILTER (WHERE si.rental_price_3d > 0) AS min_rental_price_3d,
-         MIN(si.rental_price_7d) FILTER (WHERE si.rental_price_7d > 0) AS min_rental_price_7d,
-         MIN(si.rental_price_30d) FILTER (WHERE si.rental_price_30d > 0) AS min_rental_price_30d,
-         COUNT(DISTINCT si.shop_id) FILTER (WHERE si.base_price > 0) AS purchase_location_count,
-         COUNT(DISTINCT si.shop_id) FILTER (
-           WHERE si.rental_price_1d > 0
-              OR si.rental_price_3d > 0
-              OR si.rental_price_7d > 0
-              OR si.rental_price_30d > 0
-         ) AS rental_location_count,
-         COUNT(si.id) FILTER (WHERE si.inventory_kind = 'ship') AS extracted_ship_inventory_rows,
-         COUNT(DISTINCT shops.id) FILTER (WHERE shops.shop_type = 'vehicle_rental') AS extracted_rental_terminal_rows
+         MIN(p.price) FILTER (WHERE p.price_kind = 'buy' AND p.price > 0) AS min_purchase_price,
+         MIN(p.price) FILTER (WHERE p.price_kind = 'rent' AND p.price > 0) AS min_rental_price_1d,
+         COUNT(DISTINCT p.terminal_uex_id) FILTER (WHERE p.price_kind = 'buy' AND p.price > 0) AS purchase_location_count,
+         COUNT(DISTINCT p.terminal_uex_id) FILTER (WHERE p.price_kind = 'rent' AND p.price > 0) AS rental_location_count
        FROM game.ships sh
-       LEFT JOIN game.shop_inventory si
-         ON si.inventory_kind = 'ship'
-        AND (
-          si.component_uuid = sh.uuid
-          OR si.component_class_name = sh.class_name
-          OR LOWER(si.component_class_name) = LOWER(sh.class_name)
-        )
-       LEFT JOIN game.shops shops
-         ON shops.id = si.shop_id
-        AND shops.env = sh.env
+       LEFT JOIN game.uex_vehicle_prices p
+         ON p.ship_uuid = sh.uuid
+        AND p.env = sh.env
        WHERE sh.env = $1
        GROUP BY sh.uuid, sh.env
      ),
@@ -52,7 +35,7 @@ export async function updateShipMarketSummaries(ctx: Pick<PersistContext, 'conn'
          COALESCE(sh.game_data, '{}'::jsonb),
          '{market}',
          jsonb_build_object(
-           'source', 'p4k_shop_inventory',
+           'source', 'uex',
            'availability_status',
              CASE
                WHEN market.purchase_location_count > 0 AND market.rental_location_count > 0 THEN 'in_game_purchase_and_rental'
@@ -62,19 +45,14 @@ export async function updateShipMarketSummaries(ctx: Pick<PersistContext, 'conn'
              END,
            'min_purchase_price', market.min_purchase_price,
            'min_rental_price_1d', market.min_rental_price_1d,
-           'min_rental_price_3d', market.min_rental_price_3d,
-           'min_rental_price_7d', market.min_rental_price_7d,
-           'min_rental_price_30d', market.min_rental_price_30d,
            'purchase_location_count', market.purchase_location_count,
            'rental_location_count', market.rental_location_count,
-           'extracted_ship_inventory_rows', market.extracted_ship_inventory_rows,
-           'extracted_rental_terminal_rows', market.extracted_rental_terminal_rows,
            'notes',
              CASE
                WHEN market.purchase_location_count > 0 OR market.rental_location_count > 0 THEN
-                 'Official P4K shop inventory data contains at least one terminal offer for this vehicle.'
+                 'UEX crowd-sourced market data lists at least one dealer terminal offer for this vehicle.'
                ELSE
-                 'No purchase or rental terminal offer was exposed for this vehicle in the current official P4K shop inventory files.'
+                 'No purchase or rental terminal offer is currently listed for this vehicle in UEX market data.'
              END
          ),
          true

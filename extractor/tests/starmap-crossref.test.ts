@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { crossReferenceStarmapLocations } from '../src/crossref.js';
+import { crossReferenceStarmapLocations } from '../src/services/crossref.js';
 
 describe('crossReferenceStarmapLocations', () => {
   it('links P4K locations to matching RSI starmap records', async () => {

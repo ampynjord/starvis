@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import dotenv from 'dotenv';
 import { Client } from 'pg';
-import { DataForgeService } from '../dataforge-service.js';
+import { DataForgeService } from '../dataforge/dataforge-service.js';
 import { DEFAULT_P4K_PATHS } from '../extractor-config.js';
 import type { GameEnv } from '../module-registry.js';
 
@@ -225,9 +225,19 @@ async function collectDatabaseAudit(client: Client, envName: string, checks: Aud
   }
 
   const completeness = {
-    shipsWithoutMatrix: await scalar<number>(client, `SELECT COUNT(*)::int FROM game.ships WHERE env = $1 AND ship_matrix_id IS NULL`, [
-      envName,
-    ]),
+    // Genuinely actionable gap: a game ship with no Ship Matrix link, for which a same-name
+    // Ship Matrix entry exists but is not linked. NPC/variant ships (Collector, Exec, promo
+    // editions) legitimately have no public Ship Matrix entry, so the raw total is info-only.
+    shipsWithoutMatrixLinkable: await scalar<number>(
+      client,
+      `SELECT COUNT(*)::int FROM game.ships s
+       WHERE s.env = $1 AND s.ship_matrix_id IS NULL
+         AND EXISTS (
+           SELECT 1 FROM rsi.ship_matrix m
+           WHERE lower(regexp_replace(m.name, '\\s+', '', 'g')) = lower(regexp_replace(s.name, '\\s+', '', 'g'))
+         )`,
+      [envName],
+    ),
     shipsWithoutLoadout: await scalar<number>(
       client,
       `SELECT COUNT(*)::int
@@ -248,10 +258,16 @@ async function collectDatabaseAudit(client: Client, envName: string, checks: Aud
       `SELECT COUNT(*)::int FROM game.items WHERE env = $1 AND (sub_type IS NULL OR sub_type = '')`,
       [envName],
     ),
-    shopsWithoutLocation: await scalar<number>(
+    // Genuinely actionable gap: a shop with no location, for which a same-name in-game location
+    // exists. Virtual/event shops (Anniversary Sale, Admin booths) have no physical location, so
+    // the raw total is info-only.
+    shopsWithoutLocationLinkable: await scalar<number>(
       client,
-      `SELECT COUNT(*)::int FROM game.shops
-       WHERE env = $1 AND location_uuid IS NULL AND canonical_location_key IS NULL`,
+      `SELECT COUNT(*)::int FROM game.shops s
+       WHERE s.env = $1 AND s.location_uuid IS NULL AND s.canonical_location_key IS NULL
+         AND EXISTS (
+           SELECT 1 FROM game.locations l WHERE l.env = $1 AND lower(l.name) = lower(s.name)
+         )`,
       [envName],
     ),
     inventoryWithoutResolvedTarget: await scalar<number>(
@@ -264,12 +280,63 @@ async function collectDatabaseAudit(client: Client, envName: string, checks: Aud
       `SELECT COUNT(*)::int FROM game.commodity_prices
        WHERE buy_price IS NULL AND sell_price IS NULL`,
     ),
-    locationsWithoutRsiLink: await scalar<number>(
+    // Genuinely actionable gap: a game location with no RSI link, for which a same-system,
+    // same-name RSI starmap record exists and is not already linked to another game location.
+    // Most unlinked locations (POIs, asteroid fields, bunkers) have no RSI equivalent at all,
+    // and most unlinked RSI records belong to lore systems not yet shipped in-game; those are
+    // expected source asymmetries, not data-quality defects, so they are reported as info below.
+    locationsLinkableUnlinked: await scalar<number>(
+      client,
+      `SELECT COUNT(*)::int FROM game.locations l
+       WHERE l.env = $1 AND l.rsi_starmap_location_id IS NULL
+         AND l.system_code IS NOT NULL AND l.system_code <> ''
+         AND EXISTS (
+           SELECT 1 FROM rsi.starmap_locations r
+           WHERE UPPER(r.system_code) = UPPER(l.system_code)
+             AND lower(r.name) = lower(l.name)
+             AND NOT EXISTS (
+               SELECT 1 FROM game.locations l3
+               WHERE l3.env = $1 AND l3.rsi_starmap_location_id = r.id
+             )
+         )`,
+      [envName],
+    ),
+    rsiStarmapLinkableUnlinked: await scalar<number>(
+      client,
+      `SELECT COUNT(*)::int FROM rsi.starmap_locations r
+       WHERE NOT EXISTS (
+         SELECT 1 FROM game.locations l WHERE l.env = $1 AND l.rsi_starmap_location_id = r.id
+       )
+       AND EXISTS (
+         SELECT 1 FROM game.locations l2
+         WHERE l2.env = $1 AND UPPER(l2.system_code) = UPPER(r.system_code)
+           AND lower(l2.name) = lower(r.name)
+           AND l2.rsi_starmap_location_id IS NULL
+       )`,
+      [envName],
+    ),
+  };
+
+  // Informational totals (not warnings): expected source asymmetry between the in-game universe
+  // and the broader RSI lore/marketing sources. Suffixed with `Info` so they are surfaced
+  // without alarming.
+  const infoMetrics = {
+    shipsWithoutMatrixTotalInfo: await scalar<number>(
+      client,
+      `SELECT COUNT(*)::int FROM game.ships WHERE env = $1 AND ship_matrix_id IS NULL`,
+      [envName],
+    ),
+    shopsWithoutLocationTotalInfo: await scalar<number>(
+      client,
+      `SELECT COUNT(*)::int FROM game.shops WHERE env = $1 AND location_uuid IS NULL AND canonical_location_key IS NULL`,
+      [envName],
+    ),
+    locationsUnlinkedTotalInfo: await scalar<number>(
       client,
       `SELECT COUNT(*)::int FROM game.locations WHERE env = $1 AND rsi_starmap_location_id IS NULL`,
       [envName],
     ),
-    rsiStarmapUnlinked: await scalar<number>(
+    rsiStarmapUnlinkedTotalInfo: await scalar<number>(
       client,
       `SELECT COUNT(*)::int
        FROM rsi.starmap_locations r
@@ -286,7 +353,11 @@ async function collectDatabaseAudit(client: Client, envName: string, checks: Aud
     }
   }
 
-  return { counts, completeness };
+  for (const [key, value] of Object.entries(infoMetrics)) {
+    addCheck(checks, `info.${key}`, 'ok', `${key}: ${value}`, value);
+  }
+
+  return { counts, completeness: { ...completeness, ...infoMetrics } };
 }
 
 function resolveP4KPath(argv: string[], envName: GameEnv): string | null {
@@ -409,6 +480,11 @@ export function printStaticDataAudit(report: StaticAuditReport) {
   }
   if (report.p4k?.loaded) {
     console.log(`P4K: loaded ${report.p4k.path}`);
+  }
+  const infos = report.checks.filter((check) => check.status === 'ok' && check.id.startsWith('info.'));
+  if (infos.length > 0) {
+    console.log(`Info (expected source asymmetry, not a defect):`);
+    for (const info of infos) console.log(`  - ${info.message}`);
   }
   console.log(`Warnings: ${warnings.length}`);
   for (const warning of warnings.slice(0, 30)) console.warn(`WARN ${warning.message}`);

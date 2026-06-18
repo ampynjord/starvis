@@ -12,10 +12,12 @@ import {
   COLOR_RING,
   COLOR_SELECTED,
   EMISS_DEFAULT,
+  FALLBACK_SHIP_LENGTH_M,
   FLEET_MODEL_FRONT_ROTATION_Y,
   MIN_SHIP_GAP,
   SHIP_GAP_RATIO,
   TACTICAL_FRONT_DIRECTION,
+  WORLD_UNITS_PER_METER,
 } from '@/components/holo/fleet-tactics-constants';
 import type { FleetShip, TacticalMarker, TacticalVector } from '@/components/holo/fleet-tactics-types';
 import { API_BASE } from '@/utils/constants';
@@ -171,6 +173,14 @@ export function FleetTacticsHoloViewer({
       const radius = Math.max(width / 2, 10);
       return { radius, halfWidth: radius };
     };
+
+    // Real longest dimension (meters) of a ship, used to scale every model to a
+    // consistent size relative to the others (reference: Constellation Andromeda).
+    const shipRealLengthMeters = (ship: FleetShip) => {
+      const dims = [Number(ship.sizeX), Number(ship.sizeY), Number(ship.sizeZ)].filter((d) => Number.isFinite(d) && d > 0);
+      return dims.length ? Math.max(...dims) : FALLBACK_SHIP_LENGTH_M;
+    };
+    const shipRenderLengthWorld = (ship: FleetShip) => shipRealLengthMeters(ship) * WORLD_UNITS_PER_METER;
 
     const entries: ShipEntry[] = ships.map((ship) => {
       const footprint = estimateShipFootprint(ship);
@@ -674,27 +684,28 @@ export function FleetTacticsHoloViewer({
       const widestShip = Math.max(...entries.map((entry) => entry.halfWidth * 2), 0);
       const forcedGap = Math.max(gap, widestShip * 1.35, 360);
       const forceRowLayout = layoutMode === 'row';
-      let x = -totalSpan / 2;
-      const explicitPositions = entries
-        .map((entry) => ({
-          entry,
-          x: Number(entry.ship.gridX),
-          z: Number(entry.ship.gridZ),
-        }))
-        .filter((pos) => Number.isFinite(pos.x) && Number.isFinite(pos.z));
-      const hasOverlappingExplicitPositions = explicitPositions.some((pos, index) =>
-        explicitPositions.some((other, otherIndex) => {
-          if (index >= otherIndex) return false;
-          const minDistance = Math.max(pos.entry.halfWidth + other.entry.halfWidth + gap * 0.5, MIN_SHIP_GAP);
-          return Math.hypot(pos.x - other.x, pos.z - other.z) < minDistance;
-        }),
+
+      // Ships with an explicit, finite grid position keep it exactly — this is
+      // what the user dragged them to, so it must always be honored. Only ships
+      // without a saved position (or when an explicit row layout is requested)
+      // are auto-arranged in a centered row. Previously an "overlap" heuristic
+      // forced every ship into a row, which silently snapped dragged ships back.
+      const autoEntries = entries.filter(
+        (e) => forceRowLayout || !(Number.isFinite(e.ship.gridX ?? NaN) && Number.isFinite(e.ship.gridZ ?? NaN)),
       );
-      const forcedStartX = -((entries.length - 1) * forcedGap) / 2;
-      entries.forEach((e, index) => {
-        const autoX = forceRowLayout || hasOverlappingExplicitPositions ? forcedStartX + index * forcedGap : x + e.halfWidth;
+      const forcedStartX = -((Math.max(autoEntries.length, 1) - 1) * forcedGap) / 2;
+      let x = -totalSpan / 2;
+      let autoIndex = 0;
+      entries.forEach((e) => {
         const hasExplicitPosition = Number.isFinite(e.ship.gridX ?? NaN) && Number.isFinite(e.ship.gridZ ?? NaN);
-        e.root.position.x = hasExplicitPosition && !forceRowLayout && !hasOverlappingExplicitPositions ? Number(e.ship.gridX) : autoX;
-        e.root.position.z = hasExplicitPosition && !forceRowLayout && !hasOverlappingExplicitPositions ? Number(e.ship.gridZ) : 0;
+        if (!forceRowLayout && hasExplicitPosition) {
+          e.root.position.x = Number(e.ship.gridX);
+          e.root.position.z = Number(e.ship.gridZ);
+        } else {
+          e.root.position.x = autoEntries.length > 1 ? forcedStartX + autoIndex * forcedGap : x + e.halfWidth;
+          e.root.position.z = 0;
+          autoIndex++;
+        }
         x += e.halfWidth * 2 + gap;
       });
     };
@@ -731,8 +742,6 @@ export function FleetTacticsHoloViewer({
 
     const loader = new CTMLoader();
     let loadedSoFar = 0;
-    const CARD_H = 14;
-    const CARD_W = CARD_H * 1.78;
 
     placeShipsOnce();
     refreshLayout();
@@ -748,7 +757,9 @@ export function FleetTacticsHoloViewer({
     };
 
     const addFallbackCard = (entry: ShipEntry, texture: THREE.Texture | null) => {
-      const geo = new THREE.PlaneGeometry(CARD_W, CARD_H);
+      const cardW = Math.max(shipRenderLengthWorld(entry.ship), 12);
+      const cardH = cardW / 1.78;
+      const geo = new THREE.PlaneGeometry(cardW, cardH);
       const frontMat = texture
         ? new THREE.MeshBasicMaterial({ map: texture, transparent: true, opacity: 0.85, side: THREE.FrontSide })
         : new THREE.MeshBasicMaterial({ color: 0x0d3040, transparent: true, opacity: 0.7 });
@@ -758,7 +769,7 @@ export function FleetTacticsHoloViewer({
       const backMat = new THREE.MeshBasicMaterial({ color: 0x071820, transparent: true, opacity: 0.4, side: THREE.BackSide });
       const back = new THREE.Mesh(geo, backMat);
 
-      const borderGeo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(CARD_W + 0.3, CARD_H + 0.3));
+      const borderGeo = new THREE.EdgesGeometry(new THREE.PlaneGeometry(cardW + 0.3, cardH + 0.3));
       const borderMat = new THREE.LineBasicMaterial({ color: 0x1aa8c0, transparent: true, opacity: 0.7 });
       const border = new THREE.LineSegments(borderGeo, borderMat);
 
@@ -767,7 +778,7 @@ export function FleetTacticsHoloViewer({
       card.userData.fleetItemId = entry.ship.id;
       entry.root.add(card);
       entry.meshes.push(front);
-      markLoaded(entry, CARD_W / 2, CARD_W / 2);
+      markLoaded(entry, cardW / 2, cardW / 2);
     };
 
     const loadFallbackCard = (entry: ShipEntry) => {
@@ -786,8 +797,8 @@ export function FleetTacticsHoloViewer({
     entries.forEach((entry) => {
       if (!entry.ship.ctmUrl) {
         // Concept / no-model ship — holographic card with thumbnail texture
-        const CARD_H = 14;
-        const CARD_W = CARD_H * 1.78; // 16:9-ish
+        const CARD_W = Math.max(shipRenderLengthWorld(entry.ship), 12);
+        const CARD_H = CARD_W / 1.78; // 16:9-ish
 
         const buildCard = (texture: THREE.Texture | null) => {
           const geo = new THREE.PlaneGeometry(CARD_W, CARD_H);
@@ -876,6 +887,15 @@ export function FleetTacticsHoloViewer({
           inner.rotation.set(0, FLEET_MODEL_FRONT_ROTATION_Y, 0);
           inner.add(mesh);
           inner.add(outlineMesh);
+
+          // Rescale the model to its real-world size so every ship is consistent
+          // in scale relative to the others (reference: Constellation Andromeda).
+          inner.updateMatrixWorld(true);
+          const nativeBox = new THREE.Box3().setFromObject(inner);
+          const nativeSize = new THREE.Vector3();
+          nativeBox.getSize(nativeSize);
+          const nativeLongest = Math.max(nativeSize.x, nativeSize.y, nativeSize.z) || 1;
+          inner.scale.setScalar(shipRenderLengthWorld(entry.ship) / nativeLongest);
 
           // Center on origin
           inner.updateMatrixWorld(true);
