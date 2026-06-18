@@ -81,12 +81,18 @@ export function FleetTacticsHoloViewer({
   const onVectorCreateRef = useRef(onVectorCreate);
   const onGroupPositionChangeRef = useRef(onGroupPositionChange);
   const syncMarkersRef = useRef<((markers: TacticalMarker[]) => void) | null>(null);
+  const syncShipPositionsRef = useRef<((ships: FleetShip[]) => void) | null>(null);
   const cameraViewRef = useRef<CameraViewState | null>(null);
   const [loadedCount, setLoadedCount] = useState(0);
+  // Ship position changes must NOT rebuild the scene (that re-fetches every CTM
+  // model, and a fresh/added ship can get stuck on its flat fallback card when a
+  // burst trips the API rate limiter). Positions are synced in place instead, so
+  // they are deliberately kept out of `shipsKey`.
   const shipsKey = ships
-    .map((ship) => [ship.id, ship.shipUuid, ship.ctmUrl ?? '', ship.group ?? '', ship.gridX ?? '', ship.gridZ ?? ''].join(':'))
+    .map((ship) => [ship.id, ship.shipUuid, ship.ctmUrl ?? '', ship.group ?? ''].join(':'))
     .join('|')
     + `::${tacticalVectors.map((v) => [v.id, v.sourceType, v.sourceId, v.endX.toFixed(1), v.endZ.toFixed(1), v.controlX.toFixed(1), v.controlZ.toFixed(1)].join(':')).join('|')}`;
+  const shipPositionsKey = ships.map((ship) => `${ship.id}:${ship.gridX ?? ''}:${ship.gridZ ?? ''}`).join('|');
 
   // Keep onSelect ref current without rebuilding the scene
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
@@ -101,6 +107,8 @@ export function FleetTacticsHoloViewer({
   useEffect(() => { onVectorCreateRef.current = onVectorCreate; }, [onVectorCreate]);
   useEffect(() => { onGroupPositionChangeRef.current = onGroupPositionChange; }, [onGroupPositionChange]);
   useEffect(() => { syncMarkersRef.current?.(tacticalMarkers); }, [tacticalMarkers]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { syncShipPositionsRef.current?.(ships); }, [shipPositionsKey]);
 
   useEffect(() => {
     if (!containerRef.current || (ships.length === 0 && tacticalMarkers.length === 0 && tacticalVectors.length === 0)) return;
@@ -748,6 +756,26 @@ export function FleetTacticsHoloViewer({
     const refreshLayout = (fitView = !userHasMovedView) => {
       updateGrid();
       if (fitView) fitCamera();
+    };
+
+    // Apply external position changes (drag persistence, formations, group moves)
+    // in place, without tearing down and rebuilding the whole scene — a rebuild
+    // re-requests every CTM model and can leave a ship stuck on its flat card.
+    syncShipPositionsRef.current = (nextShips: FleetShip[]) => {
+      let moved = false;
+      nextShips.forEach((nextShip) => {
+        const entry = entries.find((e) => e.ship.id === nextShip.id);
+        if (!entry) return;
+        entry.ship = nextShip;
+        const gx = Number(nextShip.gridX);
+        const gz = Number(nextShip.gridZ);
+        if (Number.isFinite(gx) && Number.isFinite(gz) && (entry.root.position.x !== gx || entry.root.position.z !== gz)) {
+          entry.root.position.x = gx;
+          entry.root.position.z = gz;
+          moved = true;
+        }
+      });
+      if (moved) refreshLayout(false);
     };
 
     const fitCamera = () => {
@@ -1405,6 +1433,7 @@ export function FleetTacticsHoloViewer({
       controls.dispose();
       holoMat.dispose();
       syncMarkersRef.current = null;
+      syncShipPositionsRef.current = null;
       disposeObject3D(scene);
       renderer.dispose();
       if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
