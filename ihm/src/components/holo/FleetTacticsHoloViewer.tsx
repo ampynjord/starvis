@@ -80,7 +80,7 @@ export function FleetTacticsHoloViewer({
   const cameraViewRef = useRef<CameraViewState | null>(null);
   const [loadedCount, setLoadedCount] = useState(0);
   const shipsKey = ships
-    .map((ship) => [ship.id, ship.shipUuid, ship.ctmUrl ?? '', ship.group ?? ''].join(':'))
+    .map((ship) => [ship.id, ship.shipUuid, ship.ctmUrl ?? '', ship.group ?? '', ship.gridX ?? '', ship.gridZ ?? ''].join(':'))
     .join('|')
     + `::${tacticalVectors.map((v) => [v.id, v.sourceType, v.sourceId, v.endX.toFixed(1), v.endZ.toFixed(1), v.controlX.toFixed(1), v.controlZ.toFixed(1)].join(':')).join('|')}`;
 
@@ -670,9 +670,25 @@ export function FleetTacticsHoloViewer({
       const totalSpan = getTotalSpan();
       const gap = getGap();
       let x = -totalSpan / 2;
+      const explicitPositions = entries
+        .map((entry) => ({
+          entry,
+          x: Number(entry.ship.gridX),
+          z: Number(entry.ship.gridZ),
+        }))
+        .filter((pos) => Number.isFinite(pos.x) && Number.isFinite(pos.z));
+      const hasOverlappingExplicitPositions = explicitPositions.some((pos, index) =>
+        explicitPositions.some((other, otherIndex) => {
+          if (index >= otherIndex) return false;
+          const minDistance = Math.max(pos.entry.halfWidth + other.entry.halfWidth + gap * 0.5, MIN_SHIP_GAP);
+          return Math.hypot(pos.x - other.x, pos.z - other.z) < minDistance;
+        }),
+      );
       entries.forEach((e) => {
-        e.root.position.x = Number.isFinite(e.ship.gridX ?? NaN) ? Number(e.ship.gridX) : x + e.halfWidth;
-        e.root.position.z = Number.isFinite(e.ship.gridZ ?? NaN) ? Number(e.ship.gridZ) : 0;
+        const autoX = x + e.halfWidth;
+        const hasExplicitPosition = Number.isFinite(e.ship.gridX ?? NaN) && Number.isFinite(e.ship.gridZ ?? NaN);
+        e.root.position.x = hasExplicitPosition && !hasOverlappingExplicitPositions ? Number(e.ship.gridX) : autoX;
+        e.root.position.z = hasExplicitPosition && !hasOverlappingExplicitPositions ? Number(e.ship.gridZ) : 0;
         x += e.halfWidth * 2 + gap;
       });
     };
