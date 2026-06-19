@@ -672,7 +672,7 @@ export default function CorporationTacticsPage() {
   }
 
   return (
-    <div className="-m-3 flex h-[calc(100dvh-3.5rem)] flex-col overflow-hidden sm:-m-6">
+    <div className="-m-3 flex min-h-[calc(100dvh-3.5rem)] flex-col overflow-y-auto sm:-m-6 lg:h-[calc(100dvh-3.5rem)] lg:overflow-hidden">
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border/50 px-4 py-3 md:px-6">
         <div className="flex min-w-0 items-center gap-3">
           <Radar size={16} className="shrink-0 text-cyan-400" />
@@ -706,8 +706,8 @@ export default function CorporationTacticsPage() {
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[19rem_minmax(0,1fr)_17rem]">
-        <aside className="min-h-0 overflow-y-auto border-b border-border/50 bg-panel/80 lg:border-b-0 lg:border-r">
+      <div className="grid flex-1 grid-cols-1 lg:min-h-0 lg:grid-cols-[19rem_minmax(0,1fr)_17rem]">
+        <aside className="max-h-[42dvh] min-h-[16rem] overflow-y-auto border-b border-border/50 bg-panel/80 lg:max-h-none lg:min-h-0 lg:border-b-0 lg:border-r">
           <div className="space-y-3 border-b border-border/50 p-3">
             <div className="flex items-center gap-2">
               <Layers3 size={13} className="text-cyan-500" />
@@ -894,7 +894,7 @@ export default function CorporationTacticsPage() {
           </div>
         </aside>
 
-        <main data-testid="tactics-board" className="relative min-h-[30rem] overflow-hidden bg-[#06101a]">
+        <main data-testid="tactics-board" className="relative min-h-[32rem] overflow-hidden bg-[#06101a] lg:min-h-0">
           {tacticShips.length === 0 && activeStrategy.markers.length === 0 ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-center">
               <Radar size={42} className="text-slate-800" />
@@ -928,7 +928,7 @@ export default function CorporationTacticsPage() {
           </div>
         </main>
 
-        <aside className="min-h-0 overflow-y-auto border-t border-border/50 bg-panel/85 p-3 lg:border-l lg:border-t-0">
+        <aside className="max-h-[22rem] min-h-[12rem] overflow-y-auto border-t border-border/50 bg-panel/85 p-3 lg:max-h-none lg:min-h-0 lg:border-l lg:border-t-0">
           <div className="flex items-center justify-between border-b border-border/50 pb-2">
             <span className="font-orbitron text-[10px] font-bold uppercase tracking-widest text-slate-400">Control</span>
             {(selectedShip || selectedMarker || selectedVector) && (
