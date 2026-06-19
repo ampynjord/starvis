@@ -1,7 +1,7 @@
-import { expect, test } from '@playwright/test';
+import { type BrowserContext, expect, type Page, test } from '@playwright/test';
 import { gotoApp } from './helpers';
 
-test('corporation tactics board adds ships and tactical markers', async ({ context, page }) => {
+async function installTacticsFixtures(context: BrowserContext, page: Page) {
   await page.addInitScript(() => {
     window.__STARVIS_E2E_USER__ = {
       id: 7,
@@ -101,7 +101,10 @@ test('corporation tactics board adds ships and tactical markers', async ({ conte
       },
     });
   });
+}
 
+test('corporation tactics board adds ships and tactical markers', async ({ context, page }) => {
+  await installTacticsFixtures(context, page);
   await gotoApp(page, '/corp/tactics');
 
   await expect(page.getByRole('heading', { name: 'Tactics' })).toBeVisible();
@@ -126,4 +129,27 @@ test('corporation tactics board adds ships and tactical markers', async ({ conte
   await expect(board.getByText(/4 ships/i)).toBeVisible();
   await page.getByRole('button', { name: /Objective/i }).click();
   await expect(board.getByText(/1 objects/i)).toBeVisible();
+});
+
+test('corporation tactics exposes builder and app menu on phone viewport', async ({ context, page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await installTacticsFixtures(context, page);
+  await gotoApp(page, '/corp/tactics');
+
+  await expect(page.getByRole('heading', { name: 'Tactics' })).toBeVisible();
+  await expect(page.getByText(/3D Fleet Builder/i)).toBeVisible();
+  await expect(page.getByLabel('Formation ship')).toBeVisible();
+
+  await expect(page.getByLabel('Open menu')).toBeVisible();
+  await page.getByLabel('Open menu').click();
+  await expect(page.getByRole('navigation').getByRole('link', { name: /Tactics/i })).toBeVisible();
+  await page.getByLabel('Close menu').click();
+
+  const overflow = await page.evaluate(() => ({
+    viewport: document.documentElement.clientWidth,
+    documentScrollWidth: document.documentElement.scrollWidth,
+    bodyScrollWidth: document.body.scrollWidth,
+  }));
+  expect(overflow.documentScrollWidth, JSON.stringify(overflow)).toBeLessThanOrEqual(overflow.viewport + 2);
+  expect(overflow.bodyScrollWidth, JSON.stringify(overflow)).toBeLessThanOrEqual(overflow.viewport + 2);
 });

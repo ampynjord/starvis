@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { Compass, Globe2, Loader2, X } from 'lucide-react';
+import { ChevronLeft, Compass, Globe2, Loader2, MapPin, Orbit, Satellite, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -9,13 +9,39 @@ import { createVisibilityTracker, disposeObject3D, getThreePixelRatio } from '@/
 import { api } from '@/services/api';
 import type { StarmapPosition } from '@/types/api';
 
-// ── Faction palette (hex for THREE, tailwind-ish tones) ─────────────────────────
 interface FactionStyle {
   key: string;
   label: string;
   color: number;
   css: string;
 }
+
+interface SceneNode {
+  object: StarmapPosition;
+  position: THREE.Vector3;
+  radius: number;
+  css: string;
+  color: number;
+  surface?: boolean;
+}
+
+interface OrbitRing {
+  center: THREE.Vector3;
+  radius: number;
+  color: number;
+  opacity: number;
+}
+
+interface SceneModel {
+  nodes: SceneNode[];
+  rings: OrbitRing[];
+  jumpLines: Array<{ from: THREE.Vector3; to: THREE.Vector3 }>;
+  camera: THREE.Vector3;
+  target: THREE.Vector3;
+}
+
+type StarmapLevel = 'galaxy' | 'system' | 'body';
+type StarmapPositionsResponse = StarmapPosition[] | { data?: unknown };
 
 const FACTIONS: FactionStyle[] = [
   { key: 'uee', label: 'UEE', color: 0x38bdf8, css: '#38bdf8' },
@@ -28,14 +54,38 @@ const FACTIONS: FactionStyle[] = [
 
 const TYPE_STYLE: Record<string, { color: number; css: string; size: number; label: string }> = {
   system: { color: 0x38bdf8, css: '#38bdf8', size: 2.1, label: 'System' },
-  star: { color: 0xfacc15, css: '#facc15', size: 2.5, label: 'Star' },
-  planet: { color: 0x60a5fa, css: '#60a5fa', size: 1.35, label: 'Planet' },
+  star: { color: 0xfacc15, css: '#facc15', size: 2.9, label: 'Star' },
+  planet: { color: 0x60a5fa, css: '#60a5fa', size: 1.7, label: 'Planet' },
+  dwarfplanet: { color: 0x93c5fd, css: '#93c5fd', size: 1.35, label: 'Dwarf planet' },
   moon: { color: 0xcbd5e1, css: '#cbd5e1', size: 0.82, label: 'Moon' },
-  station: { color: 0xa78bfa, css: '#a78bfa', size: 0.95, label: 'Station' },
-  landingzone: { color: 0x34d399, css: '#34d399', size: 0.72, label: 'Landing zone' },
+  satellite: { color: 0xcbd5e1, css: '#cbd5e1', size: 0.78, label: 'Moon' },
+  station: { color: 0xa78bfa, css: '#a78bfa', size: 0.92, label: 'Station' },
+  reststop: { color: 0xa78bfa, css: '#a78bfa', size: 0.92, label: 'Station' },
+  landingzone: { color: 0x34d399, css: '#34d399', size: 0.58, label: 'Landing zone' },
+  landing_zone: { color: 0x34d399, css: '#34d399', size: 0.58, label: 'Landing zone' },
   asteroid: { color: 0xf97316, css: '#f97316', size: 0.68, label: 'Asteroid' },
+  asteroidbelt: { color: 0xf97316, css: '#f97316', size: 0.68, label: 'Asteroid belt' },
   jumppoint: { color: 0x22d3ee, css: '#22d3ee', size: 0.9, label: 'Jump point' },
+  jump_point: { color: 0x22d3ee, css: '#22d3ee', size: 0.9, label: 'Jump point' },
 };
+
+const TYPE_ORDER = new Map<string, number>([
+  ['star', 0],
+  ['system', 0],
+  ['planet', 1],
+  ['dwarfplanet', 1],
+  ['moon', 2],
+  ['satellite', 2],
+  ['station', 3],
+  ['reststop', 3],
+  ['landingzone', 4],
+  ['asteroid', 5],
+  ['asteroidbelt', 5],
+  ['jumppoint', 6],
+]);
+
+const IMAGE_EXT = /\.(png|jpe?g|webp|avif)(\?|$)/i;
+const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
 function typeKey(type: string | null | undefined) {
   return String(type ?? '')
@@ -48,6 +98,7 @@ function objectStyle(type: string | null | undefined) {
   if (key.includes('landing')) return TYPE_STYLE.landingzone;
   if (key.includes('jump')) return TYPE_STYLE.jumppoint;
   if (key.includes('station')) return TYPE_STYLE.station;
+  if (key.includes('reststop')) return TYPE_STYLE.reststop;
   if (key.includes('asteroid')) return TYPE_STYLE.asteroid;
   return TYPE_STYLE[key] ?? { color: 0x94a3b8, css: '#94a3b8', size: 0.7, label: type ?? 'Object' };
 }
@@ -59,28 +110,134 @@ function proxiedAssetUrl(url: string | null | undefined) {
   return `/api/rsi-assets?url=${encodeURIComponent(normalized)}`;
 }
 
-function findAssetUrl(value: unknown): string | null {
+function isImageUrl(value: string) {
+  return IMAGE_EXT.test(value) || value.includes('/media/') || value.includes('/starmap/');
+}
+
+function findImageUrl(value: unknown): string | null {
   if (!value) return null;
-  if (typeof value === 'string') return value;
+  if (typeof value === 'string') return isImageUrl(value) ? value : null;
   if (Array.isArray(value)) {
     for (const item of value) {
-      const found = findAssetUrl(item);
+      const found = findImageUrl(item);
       if (found) return found;
     }
     return null;
   }
   if (typeof value === 'object') {
     const record = value as Record<string, unknown>;
-    for (const key of ['thumbnail', 'image', 'url', 'source', 'src', 'medium', 'large']) {
-      const found = findAssetUrl(record[key]);
+    for (const key of ['texture', 'thumbnail', 'image', 'url', 'source', 'src', 'medium', 'large']) {
+      const found = findImageUrl(record[key]);
+      if (found) return found;
+    }
+    for (const child of Object.values(record)) {
+      const found = findImageUrl(child);
       if (found) return found;
     }
   }
   return null;
 }
 
-function starmapImage(system: StarmapPosition) {
-  return proxiedAssetUrl(system.thumbnail) ?? proxiedAssetUrl(findAssetUrl(system.assets)) ?? proxiedAssetUrl(findAssetUrl(system.thumbnail_data));
+function starmapImage(object: StarmapPosition) {
+  return (
+    proxiedAssetUrl(object.thumbnail) ??
+    proxiedAssetUrl(findImageUrl(object.assets)) ??
+    proxiedAssetUrl(findImageUrl(object.thumbnail_data))
+  );
+}
+
+function coordinateOf(object: StarmapPosition): THREE.Vector3 | null {
+  const anyObject = object as StarmapPosition & { position_x?: number; position_y?: number; position_z?: number };
+  const coordinates = object.coordinates ?? (
+    Number.isFinite(anyObject.position_x)
+      ? { x: Number(anyObject.position_x), y: Number(anyObject.position_y ?? 0), z: Number(anyObject.position_z ?? 0) }
+      : null
+  );
+  if (!coordinates || !Number.isFinite(coordinates.x)) return null;
+  return new THREE.Vector3(Number(coordinates.x), Number(coordinates.y ?? 0), Number(coordinates.z ?? 0));
+}
+
+function objectId(object: StarmapPosition) {
+  return String(object.rsi_id ?? object.id);
+}
+
+function hasSameId(a: string | number | null | undefined, b: string | number | null | undefined) {
+  if (a == null || b == null) return false;
+  return String(a).toLowerCase() === String(b).toLowerCase();
+}
+
+function isSystemObject(object: StarmapPosition) {
+  const key = typeKey(object.type);
+  return key === 'system' || (key === 'star' && !object.parent_id && object.parent_db_id == null);
+}
+
+function isPlanetLike(object: StarmapPosition) {
+  const key = typeKey(object.type);
+  return key === 'planet' || key === 'dwarfplanet';
+}
+
+function isMoonLike(object: StarmapPosition) {
+  const key = typeKey(object.type);
+  return key === 'moon' || key === 'satellite';
+}
+
+function isLandingZone(object: StarmapPosition) {
+  return typeKey(object.type).includes('landing');
+}
+
+function sortObjects(a: StarmapPosition, b: StarmapPosition) {
+  const orderA = TYPE_ORDER.get(typeKey(a.type)) ?? 20;
+  const orderB = TYPE_ORDER.get(typeKey(b.type)) ?? 20;
+  return orderA === orderB ? a.name.localeCompare(b.name) : orderA - orderB;
+}
+
+function factionStyle(faction: string | null): FactionStyle {
+  const f = (faction ?? '').toLowerCase();
+  if (f.includes('uee') || f.includes('united empire') || f.includes('earth')) return FACTIONS[0];
+  if (f.includes('banu')) return FACTIONS[1];
+  if (f.includes('xi') || f.includes('xian')) return FACTIONS[2];
+  if (f.includes('vanduul')) return FACTIONS[3];
+  if (f.includes('tevarin')) return FACTIONS[4];
+  return FACTIONS[5];
+}
+
+function sameSystem(object: StarmapPosition, system: StarmapPosition) {
+  if (object.id === system.id) return true;
+  if (object.system_code && system.system_code && object.system_code === system.system_code) return true;
+  if (object.system_name && system.system_name && object.system_name === system.system_name) return true;
+  if (object.system_name && object.system_name === system.name) return true;
+  return false;
+}
+
+function parentMatches(child: StarmapPosition, parent: StarmapPosition) {
+  return (
+    child.parent_db_id === parent.id ||
+    hasSameId(child.parent_id, parent.rsi_id) ||
+    hasSameId(child.parent_id, parent.id)
+  );
+}
+
+function childrenOf(parent: StarmapPosition, objects: StarmapPosition[]) {
+  return objects.filter((object) => object.id !== parent.id && parentMatches(object, parent)).sort(sortObjects);
+}
+
+function hasChildren(parent: StarmapPosition, objects: StarmapPosition[]) {
+  return childrenOf(parent, objects).length > 0;
+}
+
+function directSystemChild(object: StarmapPosition, system: StarmapPosition, peers: StarmapPosition[]) {
+  if (parentMatches(object, system)) return true;
+  if (!object.parent_id && object.parent_db_id == null) return true;
+  return !peers.some((candidate) => candidate.id !== object.id && parentMatches(object, candidate));
+}
+
+function systemObjects(system: StarmapPosition, objects: StarmapPosition[]) {
+  return objects.filter((object) => object.id !== system.id && sameSystem(object, system) && !isSystemObject(object)).sort(sortObjects);
+}
+
+function systemChildren(system: StarmapPosition, objects: StarmapPosition[]) {
+  const peers = systemObjects(system, objects);
+  return peers.filter((object) => directSystemChild(object, system, peers)).sort(sortObjects);
 }
 
 function jumpPointTargets(system: StarmapPosition): string[] {
@@ -105,17 +262,6 @@ function jumpPointTargets(system: StarmapPosition): string[] {
     .map((value) => value.toLowerCase());
 }
 
-function factionStyle(faction: string | null): FactionStyle {
-  const f = (faction ?? '').toLowerCase();
-  if (f.includes('uee') || f.includes('united empire') || f.includes('earth')) return FACTIONS[0];
-  if (f.includes('banu')) return FACTIONS[1];
-  if (f.includes('xi') || f.includes('xian')) return FACTIONS[2];
-  if (f.includes('vanduul')) return FACTIONS[3];
-  if (f.includes('tevarin')) return FACTIONS[4];
-  return FACTIONS[5];
-}
-
-// ── Sprite textures (cached) ────────────────────────────────────────────────────
 function makeGlowTexture(): THREE.Texture {
   const size = 128;
   const canvas = document.createElement('canvas');
@@ -150,7 +296,7 @@ function makeLabelSprite(text: string, css: string): THREE.Sprite {
   if (ctx) {
     ctx.font = font;
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(2,6,23,0.55)';
+    ctx.fillStyle = 'rgba(2,6,23,0.58)';
     ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = css;
     ctx.fillText(text, padding, h / 2 + 1);
@@ -163,28 +309,241 @@ function makeLabelSprite(text: string, css: string): THREE.Sprite {
   return sprite;
 }
 
-function StarmapScene({ systems }: { systems: StarmapPosition[] }) {
+function makeCircle(radius: number, color: number, opacity: number, center: THREE.Vector3) {
+  const points: THREE.Vector3[] = [];
+  for (let i = 0; i <= 128; i++) {
+    const a = (i / 128) * Math.PI * 2;
+    points.push(new THREE.Vector3(center.x + Math.cos(a) * radius, center.y, center.z + Math.sin(a) * radius));
+  }
+  const geometry = new THREE.BufferGeometry().setFromPoints(points);
+  const material = new THREE.LineBasicMaterial({ color, transparent: true, opacity });
+  return new THREE.Line(geometry, material);
+}
+
+function radialPosition(center: THREE.Vector3, radius: number, index: number, y = 0) {
+  const angle = index * GOLDEN_ANGLE;
+  return new THREE.Vector3(center.x + Math.cos(angle) * radius, center.y + y, center.z + Math.sin(angle) * radius);
+}
+
+function buildGalaxyModel(objects: StarmapPosition[]): SceneModel {
+  const systems = objects.filter((object) => isSystemObject(object)).sort((a, b) => a.name.localeCompare(b.name));
+  const rawCenter = new THREE.Vector3();
+  const rawPositions = new Map<number, THREE.Vector3>();
+  systems.forEach((system, index) => {
+    const fallback = radialPosition(new THREE.Vector3(0, 0, 0), 40 + Math.floor(index / 18) * 22, index, (index % 4) * 4);
+    const position = coordinateOf(system) ?? fallback;
+    rawPositions.set(system.id, position);
+    rawCenter.add(position);
+  });
+  rawCenter.divideScalar(Math.max(1, systems.length));
+
+  let maxDist = 1;
+  for (const system of systems) {
+    maxDist = Math.max(maxDist, rawPositions.get(system.id)!.clone().sub(rawCenter).length());
+  }
+
+  const scale = 140 / maxDist;
+  const nodes = systems.map((system) => {
+    const faction = factionStyle(system.faction_name);
+    const style = objectStyle(system.type);
+    return {
+      object: system,
+      position: rawPositions.get(system.id)!.clone().sub(rawCenter).multiplyScalar(scale),
+      radius: style.size,
+      css: faction.css,
+      color: faction.color,
+    };
+  });
+
+  const byName = new Map<string, THREE.Vector3>();
+  for (const node of nodes) {
+    for (const value of [node.object.name, node.object.system_name, node.object.system_code, node.object.rsi_id].filter(Boolean) as string[]) {
+      byName.set(value.toLowerCase(), node.position);
+    }
+  }
+
+  const jumpLines: SceneModel['jumpLines'] = [];
+  for (const node of nodes) {
+    for (const target of jumpPointTargets(node.object)) {
+      const to = byName.get(target);
+      if (to && node.position.distanceTo(to) > 0.1) jumpLines.push({ from: node.position, to });
+    }
+  }
+
+  return {
+    nodes,
+    rings: [],
+    jumpLines,
+    camera: new THREE.Vector3(120, 90, 200),
+    target: new THREE.Vector3(0, 0, 0),
+  };
+}
+
+function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], allObjects: StarmapPosition[], level: 'system' | 'body'): SceneModel {
+  const rootStyle = objectStyle(root.type);
+  const rootColor = isSystemObject(root) ? factionStyle(root.faction_name) : rootStyle;
+  const rootRadius = isSystemObject(root) ? 3.5 : Math.max(2.2, rootStyle.size * 1.35);
+  const rootNode: SceneNode = {
+    object: root,
+    position: new THREE.Vector3(0, 0, 0),
+    radius: rootRadius,
+    css: rootColor.css,
+    color: rootColor.color,
+  };
+
+  const nodes: SceneNode[] = [rootNode];
+  const rings: OrbitRing[] = [];
+  const placed = new Set<number>([root.id]);
+  const rootChildren = level === 'system'
+    ? systemChildren(root, allObjects)
+    : childrenOf(root, objects);
+
+  const placeChildren = (parent: StarmapPosition, parentPosition: THREE.Vector3, parentRadius: number, depth: number) => {
+    const children = childrenOf(parent, objects).filter((child) => !placed.has(child.id));
+    children.forEach((child, index) => {
+      const style = objectStyle(child.type);
+      const landing = isLandingZone(child);
+      const orbitRadius = landing ? parentRadius + 0.9 : parentRadius + 4.2 + index * 2.9 + depth * 1.2;
+      const position = radialPosition(parentPosition, orbitRadius, index + depth * 3, landing ? 0.25 : (index % 2) * 0.35);
+      const node: SceneNode = {
+        object: child,
+        position,
+        radius: landing ? Math.min(style.size, 0.5) : style.size,
+        css: style.css,
+        color: style.color,
+        surface: landing,
+      };
+      nodes.push(node);
+      placed.add(child.id);
+      if (!landing) rings.push({ center: parentPosition, radius: orbitRadius, color: style.color, opacity: 0.16 });
+      placeChildren(child, position, Math.max(1, node.radius), depth + 1);
+    });
+  };
+
+  rootChildren.forEach((child, index) => {
+    if (placed.has(child.id)) return;
+    const style = objectStyle(child.type);
+    const orbitRadius = level === 'system' ? 16 + index * 7.2 : 8 + index * 4.4;
+    const landing = isLandingZone(child);
+    const position = landing
+      ? radialPosition(rootNode.position, rootNode.radius + 1, index, 0.2)
+      : radialPosition(rootNode.position, orbitRadius, index);
+    const node: SceneNode = {
+      object: child,
+      position,
+      radius: landing ? Math.min(style.size, 0.5) : style.size,
+      css: style.css,
+      color: style.color,
+      surface: landing,
+    };
+    nodes.push(node);
+    placed.add(child.id);
+    if (!landing) rings.push({ center: rootNode.position, radius: orbitRadius, color: style.color, opacity: 0.16 });
+    placeChildren(child, position, Math.max(1, node.radius), 1);
+  });
+
+  const leftovers = objects.filter((object) => object.id !== root.id && !placed.has(object.id)).sort(sortObjects);
+  leftovers.forEach((child, index) => {
+    const style = objectStyle(child.type);
+    const orbitRadius = level === 'system' ? 22 + (nodes.length + index) * 3.8 : 12 + index * 3.4;
+    const position = radialPosition(rootNode.position, orbitRadius, index + 11, (index % 3) * 0.25);
+    nodes.push({ object: child, position, radius: style.size, css: style.css, color: style.color });
+    placed.add(child.id);
+    rings.push({ center: rootNode.position, radius: orbitRadius, color: style.color, opacity: 0.08 });
+  });
+
+  const jumpLines: SceneModel['jumpLines'] = [];
+  if (isSystemObject(root)) {
+    const jumpNodes = nodes.filter((node) => typeKey(node.object.type).includes('jump'));
+    for (const node of jumpNodes) jumpLines.push({ from: rootNode.position, to: node.position });
+  }
+
+  return {
+    nodes,
+    rings,
+    jumpLines,
+    camera: level === 'system' ? new THREE.Vector3(0, 70, 88) : new THREE.Vector3(0, 38, 44),
+    target: new THREE.Vector3(0, 0, 0),
+  };
+}
+
+function levelTitle(level: StarmapLevel) {
+  if (level === 'galaxy') return 'Galactic Map';
+  if (level === 'system') return 'System Map';
+  return 'Local Map';
+}
+
+function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<StarmapPosition | null>(null);
+  const [level, setLevel] = useState<StarmapLevel>('galaxy');
+  const [activeSystem, setActiveSystem] = useState<StarmapPosition | null>(null);
+  const [activeBody, setActiveBody] = useState<StarmapPosition | null>(null);
+
+  const systems = useMemo(
+    () => objects.filter((object) => isSystemObject(object)).sort((a, b) => a.name.localeCompare(b.name)),
+    [objects],
+  );
+
+  const currentObjects = useMemo(() => {
+    if (level === 'galaxy') return systems;
+    if (activeSystem) return systemObjects(activeSystem, objects);
+    return [];
+  }, [activeSystem, level, objects, systems]);
+
+  const sceneModel = useMemo(() => {
+    if (level === 'system' && activeSystem) {
+      return buildNestedModel(activeSystem, systemObjects(activeSystem, objects), objects, 'system');
+    }
+    if (level === 'body' && activeSystem && activeBody) {
+      return buildNestedModel(activeBody, systemObjects(activeSystem, objects), objects, 'body');
+    }
+    return buildGalaxyModel(objects);
+  }, [activeBody, activeSystem, level, objects]);
+
+  const enterSystem = (system: StarmapPosition) => {
+    setActiveSystem(system);
+    setActiveBody(null);
+    setSelected(null);
+    setLevel('system');
+  };
+
+  const inspectBody = (body: StarmapPosition) => {
+    if (!activeSystem) return;
+    setActiveBody(body);
+    setSelected(null);
+    setLevel('body');
+  };
+
+  const backToGalaxy = () => {
+    setLevel('galaxy');
+    setActiveSystem(null);
+    setActiveBody(null);
+    setSelected(null);
+  };
+
+  const backToSystem = () => {
+    setLevel('system');
+    setActiveBody(null);
+    setSelected(null);
+  };
 
   useEffect(() => {
     const container = containerRef.current;
-    if (!container || systems.length === 0) return;
+    if (!container || sceneModel.nodes.length === 0) return;
 
     const width = container.clientWidth;
     const height = container.clientHeight;
 
-    // ── Scene ────────────────────────────────────────────────────────────────
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x030712);
-    scene.fog = new THREE.FogExp2(0x030712, 0.0016);
-
+    scene.fog = new THREE.FogExp2(0x030712, level === 'galaxy' ? 0.0016 : 0.006);
     scene.add(new THREE.AmbientLight(0x4060a0, 1.4));
+
     const key = new THREE.PointLight(0x66d8ff, 1.2, 0, 0);
     key.position.set(80, 120, 80);
     scene.add(key);
 
-    // ── Renderer ─────────────────────────────────────────────────────────────
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(getThreePixelRatio());
     renderer.setSize(width, height);
@@ -192,40 +551,35 @@ function StarmapScene({ systems }: { systems: StarmapPosition[] }) {
     container.appendChild(renderer.domElement);
 
     const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 6000);
+    camera.position.copy(sceneModel.camera);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.08;
     controls.rotateSpeed = 0.6;
     controls.zoomSpeed = 0.9;
-    controls.autoRotate = true;
+    controls.autoRotate = level === 'galaxy';
     controls.autoRotateSpeed = 0.25;
+    controls.target.copy(sceneModel.target);
+    controls.minDistance = level === 'galaxy' ? 30 : 8;
+    controls.maxDistance = level === 'galaxy' ? 900 : 180;
+    controls.update();
 
     const visibility = createVisibilityTracker(container);
+    const glowTexture = makeGlowTexture();
+    const sphereGeo = new THREE.SphereGeometry(1, 32, 32);
+    const textureLoader = new THREE.TextureLoader();
+    textureLoader.setCrossOrigin('anonymous');
+    const loadedTextures: THREE.Texture[] = [];
+    const pickables: THREE.Mesh[] = [];
+    const nodeGroup = new THREE.Group();
+    const animatedNodes: Array<{ mesh: THREE.Mesh; glow: THREE.Sprite; base: number; phase: number }> = [];
 
-    // ── Compute scaled positions ─────────────────────────────────────────────
-    const valid = systems.filter((s) => s.coordinates && Number.isFinite(s.coordinates.x));
-    const center = new THREE.Vector3();
-    for (const s of valid) {
-      center.add(new THREE.Vector3(s.coordinates!.x, s.coordinates!.y, s.coordinates!.z));
-    }
-    center.divideScalar(Math.max(1, valid.length));
-
-    let maxDist = 1;
-    for (const s of valid) {
-      const d = new THREE.Vector3(s.coordinates!.x, s.coordinates!.y, s.coordinates!.z).sub(center).length();
-      if (d > maxDist) maxDist = d;
-    }
-    const SCALE = 140 / maxDist;
-    const posOf = (s: StarmapPosition) =>
-      new THREE.Vector3(s.coordinates!.x, s.coordinates!.y, s.coordinates!.z).sub(center).multiplyScalar(SCALE);
-
-    // ── Background starfield ─────────────────────────────────────────────────
-    const starCount = 2200;
+    const starCount = level === 'galaxy' ? 2200 : 900;
     const starGeo = new THREE.BufferGeometry();
     const starPos = new Float32Array(starCount * 3);
     for (let i = 0; i < starCount; i++) {
-      const r = 600 + Math.random() * 1400;
+      const r = (level === 'galaxy' ? 600 : 110) + Math.random() * (level === 'galaxy' ? 1400 : 280);
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
       starPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
@@ -233,91 +587,77 @@ function StarmapScene({ systems }: { systems: StarmapPosition[] }) {
       starPos[i * 3 + 2] = r * Math.cos(phi);
     }
     starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-    const starField = new THREE.Points(
-      starGeo,
-      new THREE.PointsMaterial({ color: 0x8aa0c0, size: 2, sizeAttenuation: true, transparent: true, opacity: 0.55 }),
+    scene.add(
+      new THREE.Points(
+        starGeo,
+        new THREE.PointsMaterial({ color: 0x8aa0c0, size: level === 'galaxy' ? 2 : 0.65, sizeAttenuation: true, transparent: true, opacity: 0.48 }),
+      ),
     );
-    scene.add(starField);
 
-    // ── System nodes ─────────────────────────────────────────────────────────
-    const glowTexture = makeGlowTexture();
-    const sphereGeo = new THREE.SphereGeometry(1, 20, 20);
-    const pickables: THREE.Mesh[] = [];
-    const nodeGroup = new THREE.Group();
-    const animatedNodes: Array<{ mesh: THREE.Mesh; glow: THREE.Sprite; base: number; phase: number }> = [];
-    const byName = new Map<string, THREE.Vector3>();
+    for (const ring of sceneModel.rings) {
+      nodeGroup.add(makeCircle(ring.radius, ring.color, ring.opacity, ring.center));
+    }
 
-    for (const s of valid) {
-      const key = typeKey(s.type);
-      const typeStyle = objectStyle(s.type);
-      const style = key === 'system' || key === 'star' ? factionStyle(s.faction_name) : typeStyle;
-      const p = posOf(s);
-      for (const name of [s.name, s.system_name, s.system_code, s.rsi_id].filter(Boolean) as string[]) {
-        byName.set(name.toLowerCase(), p);
+    for (const node of sceneModel.nodes) {
+      const materialOptions: THREE.MeshStandardMaterialParameters = {
+        color: node.color,
+        emissive: node.color,
+        emissiveIntensity: isSystemObject(node.object) ? 1.2 : 0.55,
+        roughness: 0.42,
+        metalness: 0.08,
+      };
+      const image = starmapImage(node.object);
+      if (image) {
+        const tex = textureLoader.load(image, () => {
+          tex.colorSpace = THREE.SRGBColorSpace;
+        });
+        loadedTextures.push(tex);
+        materialOptions.map = tex;
+        materialOptions.roughness = 0.72;
       }
 
-      const mat = new THREE.MeshStandardMaterial({
-        color: style.color,
-        emissive: style.color,
-        emissiveIntensity: 0.9,
-        roughness: 0.35,
-        metalness: 0.1,
-      });
-      const mesh = new THREE.Mesh(sphereGeo, mat);
-      mesh.position.copy(p);
-      mesh.scale.setScalar(typeStyle.size);
-      mesh.userData.system = s;
+      const mesh = new THREE.Mesh(sphereGeo, new THREE.MeshStandardMaterial(materialOptions));
+      mesh.position.copy(node.position);
+      mesh.scale.setScalar(node.radius);
+      mesh.userData.system = node.object;
       pickables.push(mesh);
       nodeGroup.add(mesh);
 
       const glow = new THREE.Sprite(
         new THREE.SpriteMaterial({
           map: glowTexture,
-          color: style.color,
+          color: node.color,
           transparent: true,
           depthWrite: false,
           blending: THREE.AdditiveBlending,
         }),
       );
-      glow.scale.set(7 + typeStyle.size * 3, 7 + typeStyle.size * 3, 1);
-      glow.position.copy(p);
+      glow.scale.set((node.surface ? 3 : 7) + node.radius * 3, (node.surface ? 3 : 7) + node.radius * 3, 1);
+      glow.position.copy(node.position);
       nodeGroup.add(glow);
-      animatedNodes.push({ mesh, glow, base: typeStyle.size, phase: Math.random() * Math.PI * 2 });
+      animatedNodes.push({ mesh, glow, base: node.radius, phase: Math.random() * Math.PI * 2 });
 
-      if (['system', 'star', 'planet', 'station', 'landingzone', 'jumppoint'].includes(key)) {
-        const label = makeLabelSprite(s.name, style.css);
-        label.position.copy(p).add(new THREE.Vector3(0, 3.2 + typeStyle.size, 0));
+      const shouldLabel = level !== 'galaxy' || ['system', 'star', 'planet', 'station', 'landingzone', 'jumppoint'].includes(typeKey(node.object.type));
+      if (shouldLabel) {
+        const label = makeLabelSprite(node.object.name, node.css);
+        label.position.copy(node.position).add(new THREE.Vector3(0, 2.4 + node.radius, 0));
         nodeGroup.add(label);
       }
     }
+
+    for (const line of sceneModel.jumpLines) {
+      const curve = new THREE.QuadraticBezierCurve3(
+        line.from,
+        line.from.clone().add(line.to).multiplyScalar(0.5).add(new THREE.Vector3(0, level === 'galaxy' ? 18 : 5, 0)),
+        line.to,
+      );
+      const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(36));
+      const material = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.22 });
+      nodeGroup.add(new THREE.Line(geometry, material));
+    }
+
     scene.add(nodeGroup);
 
-    const jumpGroup = new THREE.Group();
-    for (const s of valid) {
-      const from = posOf(s);
-      for (const target of jumpPointTargets(s)) {
-        const to = byName.get(target);
-        if (!to || from.distanceTo(to) < 0.1) continue;
-        const curve = new THREE.QuadraticBezierCurve3(
-          from,
-          from.clone().add(to).multiplyScalar(0.5).add(new THREE.Vector3(0, 18, 0)),
-          to,
-        );
-        const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(36));
-        const material = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.22 });
-        jumpGroup.add(new THREE.Line(geometry, material));
-      }
-    }
-    scene.add(jumpGroup);
-
-    // ── Camera framing ───────────────────────────────────────────────────────
-    camera.position.set(120, 90, 200);
-    controls.minDistance = 30;
-    controls.maxDistance = 900;
-    controls.target.set(0, 0, 0);
-    controls.update();
-
-    // ── Picking ──────────────────────────────────────────────────────────────
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
     let hovered: THREE.Mesh | null = null;
@@ -336,7 +676,7 @@ function StarmapScene({ systems }: { systems: StarmapPosition[] }) {
       const hit = raycaster.intersectObjects(pickables, false)[0];
       const mesh = (hit?.object as THREE.Mesh) ?? null;
       if (mesh !== hovered) {
-        if (hovered) (hovered.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.9;
+        if (hovered) (hovered.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.55;
         hovered = mesh;
         if (hovered) (hovered.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.8;
         renderer.domElement.style.cursor = hovered ? 'pointer' : 'grab';
@@ -354,8 +694,8 @@ function StarmapScene({ systems }: { systems: StarmapPosition[] }) {
       raycaster.setFromCamera(pointer, camera);
       const hit = raycaster.intersectObjects(pickables, false)[0];
       if (hit) {
-        const s = (hit.object as THREE.Mesh).userData.system as StarmapPosition;
-        setSelected(s);
+        const object = (hit.object as THREE.Mesh).userData.system as StarmapPosition;
+        setSelected(object);
         controls.autoRotate = false;
       }
     };
@@ -364,26 +704,23 @@ function StarmapScene({ systems }: { systems: StarmapPosition[] }) {
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
     renderer.domElement.addEventListener('pointerup', onPointerUp);
 
-    // ── Render loop ──────────────────────────────────────────────────────────
     let frame = 0;
     const animate = () => {
       frame = requestAnimationFrame(animate);
       if (!visibility.isVisible()) return;
       const t = performance.now() * 0.001;
-      nodeGroup.rotation.y = Math.sin(t * 0.08) * 0.015;
-      jumpGroup.rotation.y = nodeGroup.rotation.y;
+      if (level === 'galaxy') nodeGroup.rotation.y = Math.sin(t * 0.08) * 0.015;
       for (const node of animatedNodes) {
-        const pulse = 1 + Math.sin(t * 1.8 + node.phase) * 0.06;
+        const pulse = 1 + Math.sin(t * 1.8 + node.phase) * 0.045;
         node.mesh.scale.setScalar(node.base * pulse);
-        const glowPulse = 1 + Math.sin(t * 1.5 + node.phase) * 0.09;
-        node.glow.scale.setScalar((7 + node.base * 3) * glowPulse);
+        const glowPulse = 1 + Math.sin(t * 1.5 + node.phase) * 0.08;
+        node.glow.scale.setScalar(((node.base < 0.7 ? 3 : 7) + node.base * 3) * glowPulse);
       }
       controls.update();
       renderer.render(scene, camera);
     };
     animate();
 
-    // ── Resize ───────────────────────────────────────────────────────────────
     const onResize = () => {
       const w = container.clientWidth;
       const h = container.clientHeight;
@@ -405,46 +742,133 @@ function StarmapScene({ systems }: { systems: StarmapPosition[] }) {
       renderer.domElement.removeEventListener('pointerup', onPointerUp);
       controls.dispose();
       disposeObject3D(scene);
+      sphereGeo.dispose();
       glowTexture.dispose();
+      loadedTextures.forEach((texture) => texture.dispose());
       renderer.dispose();
       if (renderer.domElement.parentNode === container) container.removeChild(renderer.domElement);
     };
-  }, [systems]);
+  }, [level, sceneModel]);
+
+  const selectedStyle = selected ? objectStyle(selected.type) : null;
+  const selectedHasChildren = selected ? hasChildren(selected, currentObjects.length > 0 ? currentObjects : objects) : false;
+  const selectedSystem = selected && isSystemObject(selected) ? selected : null;
+  const selectedCanInspect = selected && !isSystemObject(selected) && (selectedHasChildren || isPlanetLike(selected) || isMoonLike(selected));
+  const browserObjects = level === 'galaxy'
+    ? systems
+    : level === 'system' && activeSystem
+      ? systemChildren(activeSystem, objects)
+      : activeBody
+        ? childrenOf(activeBody, currentObjects.length > 0 ? currentObjects : objects)
+        : [];
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#030712]">
       <div ref={containerRef} className="absolute inset-0" style={{ cursor: 'grab' }} />
 
-      {/* Title + count */}
-      <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-2 rounded-sm border border-cyan-900/40 bg-slate-950/70 px-3 py-1.5 backdrop-blur">
+      <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[calc(100vw-1.5rem)] flex-wrap items-center gap-2 rounded-sm border border-cyan-900/40 bg-slate-950/70 px-3 py-1.5 backdrop-blur">
         <Compass size={14} className="text-cyan-400" />
-        <span className="font-orbitron text-xs uppercase tracking-widest text-slate-200">Galactic Map</span>
-        <span className="font-mono-sc text-[10px] text-cyan-500">{systems.length} objects</span>
-      </div>
-
-      {/* Faction legend */}
-      <div className="absolute bottom-3 left-3 flex flex-wrap gap-x-3 gap-y-1 rounded-sm border border-slate-800/60 bg-slate-950/70 px-3 py-2 backdrop-blur">
-        {FACTIONS.map((f) => (
-          <span key={f.key} className="flex items-center gap-1.5 font-mono-sc text-[10px] uppercase tracking-wider text-slate-400">
-            <span className="size-2 rounded-full" style={{ backgroundColor: f.css }} />
-            {f.label}
+        <span className="font-orbitron text-xs uppercase tracking-widest text-slate-200">{levelTitle(level)}</span>
+        <span className="font-mono-sc text-[10px] text-cyan-500">{sceneModel.nodes.length} objects</span>
+        {activeSystem && (
+          <span className="font-mono-sc text-[10px] text-slate-500">
+            / {activeSystem.name}{activeBody ? ` / ${activeBody.name}` : ''}
           </span>
-        ))}
+        )}
       </div>
 
-      {/* Controls hint */}
-      <div className="pointer-events-none absolute bottom-3 right-3 hidden rounded-sm border border-slate-800/60 bg-slate-950/70 px-3 py-1.5 font-mono-sc text-[10px] text-slate-500 backdrop-blur sm:block">
-        Drag: rotate · Scroll: zoom · Click an object
+      <div className="absolute left-3 top-14 z-10 flex flex-wrap gap-2">
+        {level !== 'galaxy' && (
+          <button type="button" onClick={level === 'body' ? backToSystem : backToGalaxy} className="sci-btn-ghost flex items-center gap-1.5 px-2.5 py-1.5 text-[10px]">
+            <ChevronLeft size={12} />
+            {level === 'body' ? 'System' : 'Galaxy'}
+          </button>
+        )}
+        {level !== 'galaxy' && (
+          <button type="button" onClick={backToGalaxy} className="sci-btn-ghost px-2.5 py-1.5 text-[10px]">
+            Galaxy
+          </button>
+        )}
       </div>
 
-      {/* Selected system panel */}
-      {selected && (
-        <div className="absolute right-3 top-3 w-[min(88vw,320px)] overflow-hidden rounded-sm border border-cyan-900/50 bg-slate-950/90 backdrop-blur">
+      <div className="absolute bottom-3 left-3 z-10 w-[min(92vw,360px)] rounded-sm border border-slate-800/60 bg-slate-950/78 p-2 backdrop-blur">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <p className="flex items-center gap-1.5 font-mono-sc text-[10px] uppercase tracking-widest text-slate-400">
+            {level === 'galaxy' ? <Orbit size={11} /> : <Satellite size={11} />}
+            {level === 'galaxy' ? 'Systems' : level === 'system' ? 'System contents' : 'Local objects'}
+          </p>
+          <span className="font-mono-sc text-[10px] text-cyan-600">{browserObjects.length}</span>
+        </div>
+        {level === 'galaxy' ? (
+          <select
+            aria-label="Open system"
+            className="sci-input h-8 w-full text-xs"
+            value=""
+            onChange={(event) => {
+              const system = systems.find((item) => objectId(item) === event.target.value);
+              if (system) enterSystem(system);
+            }}
+          >
+            <option value="">Enter a system...</option>
+            {systems.map((system) => (
+              <option key={objectId(system)} value={objectId(system)}>
+                {system.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="max-h-36 space-y-1 overflow-y-auto pr-1 sm:max-h-48">
+            {browserObjects.length === 0 ? (
+              <p className="py-2 text-xs text-slate-600">No child objects in this level.</p>
+            ) : (
+              browserObjects.map((object) => {
+                const style = objectStyle(object.type);
+                return (
+                  <button
+                    type="button"
+                    key={objectId(object)}
+                    onClick={() => setSelected(object)}
+                    className="flex w-full items-center justify-between gap-2 rounded-sm border border-transparent px-2 py-1.5 text-left transition-colors hover:border-cyan-900/60 hover:bg-cyan-950/20"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-mono-sc text-xs text-slate-300">{object.name}</span>
+                      <span className="font-mono-sc text-[9px] uppercase tracking-widest" style={{ color: style.css }}>
+                        {style.label}
+                      </span>
+                    </span>
+                    {(hasChildren(object, currentObjects) || isPlanetLike(object) || isMoonLike(object)) && (
+                      <span className="shrink-0 font-mono-sc text-[9px] text-cyan-600">inspect</span>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        )}
+      </div>
+
+      {level === 'galaxy' && (
+        <div className="absolute bottom-3 right-3 hidden flex-wrap gap-x-3 gap-y-1 rounded-sm border border-slate-800/60 bg-slate-950/70 px-3 py-2 backdrop-blur md:flex">
+          {FACTIONS.map((f) => (
+            <span key={f.key} className="flex items-center gap-1.5 font-mono-sc text-[10px] uppercase tracking-wider text-slate-400">
+              <span className="size-2 rounded-full" style={{ backgroundColor: f.css }} />
+              {f.label}
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="pointer-events-none absolute right-3 top-3 hidden rounded-sm border border-slate-800/60 bg-slate-950/70 px-3 py-1.5 font-mono-sc text-[10px] text-slate-500 backdrop-blur sm:block">
+        Drag: rotate · Scroll: zoom · Click object
+      </div>
+
+      {selected && selectedStyle && (
+        <div className="absolute right-3 top-14 z-20 w-[min(92vw,340px)] overflow-hidden rounded-sm border border-cyan-900/50 bg-slate-950/92 backdrop-blur sm:top-12">
           <div className="flex items-start justify-between gap-2 border-b border-slate-800/70 bg-slate-900/50 px-3 py-2">
             <div className="min-w-0">
-              <p className="flex items-center gap-1.5 font-mono-sc text-[9px] uppercase tracking-widest text-cyan-400">
+              <p className="flex items-center gap-1.5 font-mono-sc text-[9px] uppercase tracking-widest" style={{ color: selectedStyle.css }}>
                 <Globe2 size={11} />
-                {objectStyle(selected.type).label}
+                {selectedStyle.label}
               </p>
               <h3 className="truncate font-orbitron text-base text-slate-100">{selected.name}</h3>
             </div>
@@ -462,7 +886,7 @@ function StarmapScene({ systems }: { systems: StarmapPosition[] }) {
               <img
                 src={starmapImage(selected)!}
                 alt=""
-                className="h-32 w-full rounded-sm border border-slate-800/60 object-cover"
+                className="h-28 w-full rounded-sm border border-slate-800/60 object-cover sm:h-32"
               />
             )}
             <div className="flex flex-wrap items-center gap-2">
@@ -472,12 +896,11 @@ function StarmapScene({ systems }: { systems: StarmapPosition[] }) {
               >
                 {selected.faction_name ?? 'Unclaimed'}
               </span>
-              {selected.system_code && (
-                <span className="font-mono-sc text-[10px] text-slate-500">{selected.system_code}</span>
-              )}
+              {selected.system_code && <span className="font-mono-sc text-[10px] text-slate-500">{selected.system_code}</span>}
+              {selected.parent_id && <span className="font-mono-sc text-[10px] text-slate-600">parent {selected.parent_id}</span>}
             </div>
             {selected.description && (
-              <p className="max-h-40 overflow-y-auto text-xs leading-relaxed text-slate-400">{selected.description}</p>
+              <p className="max-h-28 overflow-y-auto text-xs leading-relaxed text-slate-400 sm:max-h-40">{selected.description}</p>
             )}
             <dl className="grid grid-cols-2 gap-2 pt-1">
               {selected.star_type && (
@@ -505,6 +928,20 @@ function StarmapScene({ systems }: { systems: StarmapPosition[] }) {
                 </div>
               )}
             </dl>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {selectedSystem && (
+                <button type="button" onClick={() => enterSystem(selectedSystem)} className="sci-btn-primary flex items-center gap-1.5 px-3 py-2 text-xs">
+                  <Orbit size={13} />
+                  Enter system
+                </button>
+              )}
+              {selectedCanInspect && (
+                <button type="button" onClick={() => inspectBody(selected)} className="sci-btn-primary flex items-center gap-1.5 px-3 py-2 text-xs">
+                  <MapPin size={13} />
+                  Inspect body
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -519,20 +956,18 @@ export function StarmapGalaxy() {
     staleTime: 1000 * 60 * 30,
   });
 
-  const starmapObjects = useMemo(
-    () =>
-      (data ?? []).filter(
-        (s) => s.coordinates != null && Number.isFinite(s.coordinates.x),
-      ),
-    [data],
-  );
-
+  const starmapObjects = useMemo(() => {
+    const response = data as StarmapPositionsResponse | undefined;
+    if (Array.isArray(response)) return response;
+    if (response && Array.isArray(response.data)) return response.data as StarmapPosition[];
+    return [];
+  }, [data]);
   if (isLoading) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-[#030712]">
         <div className="flex items-center gap-2 font-mono-sc text-xs uppercase tracking-widest text-cyan-600">
           <Loader2 size={16} className="animate-spin" />
-          Loading RSI starmap objects…
+          Loading RSI starmap objects...
         </div>
       </div>
     );
@@ -543,11 +978,11 @@ export function StarmapGalaxy() {
       <div className="flex h-full w-full items-center justify-center bg-[#030712]">
         <div className="flex flex-col items-center gap-2 text-center font-mono-sc text-xs text-slate-500">
           <Compass size={28} className="text-slate-700" />
-          {error ? 'Unable to load the galactic map.' : 'No RSI starmap objects with coordinates available.'}
+          {error ? 'Unable to load the galactic map.' : 'No RSI starmap objects available.'}
         </div>
       </div>
     );
   }
 
-  return <StarmapScene systems={starmapObjects} />;
+  return <StarmapScene objects={starmapObjects} />;
 }
