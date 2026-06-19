@@ -13,6 +13,10 @@ const starmapFixture = [
     coordinates: { x: 0, y: 0, z: 0 },
     faction_name: 'UEE',
     jump_points: [{ name: 'Pyro' }],
+    assets: {
+      textures: ['https://cdn.robertsspaceindustries.com/static/starmap/suns/01_Texture.jpg'],
+      raw: ['https://cdn.robertsspaceindustries.com/static/starmap/suns/01_Texture.jpg'],
+    },
   },
   {
     id: 7,
@@ -91,14 +95,24 @@ async function mockStarmap(page: import('@playwright/test').Page) {
   await page.route('**/api/public/v1/starmap/positions', async (route) => {
     await route.fulfill({ json: { success: true, data: starmapFixture, total: starmapFixture.length } });
   });
+  await page.route('**/api/rsi-assets?**', async (route) => {
+    await route.fulfill({
+      contentType: 'image/png',
+      body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=', 'base64'),
+    });
+  });
 }
 
 test('starmap renders the native 3D galactic map (no RSI iframe)', async ({ page }) => {
   await mockStarmap(page);
+  const assetRequest = page.waitForRequest(
+    (request) => request.url().includes('/api/rsi-assets') && request.url().includes('static%2Fstarmap'),
+  );
   await gotoApp(page, '/starmap');
 
   await expect(page.locator('iframe[title="RSI Ark Starmap"]')).toHaveCount(0);
   await expect(page.getByText(/Galactic Map|Loading RSI starmap objects|No RSI starmap objects/i).first()).toBeVisible({ timeout: 15000 });
+  await assetRequest;
 });
 
 test('starmap drills from galaxy to system and planet levels', async ({ page }) => {
