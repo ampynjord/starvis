@@ -15,7 +15,7 @@ const SIZE_CLASS: Record<NonNullable<PageShellProps['size']>, string> = {
 
 export function PageShell({ children, className = '', size = '2xl' }: PageShellProps) {
   return (
-    <div className={`${SIZE_CLASS[size]} mx-auto space-y-4 ${className}`}>
+    <div className={`${SIZE_CLASS[size]} mx-auto w-full min-w-0 space-y-4 ${className}`}>
       {children}
     </div>
   );

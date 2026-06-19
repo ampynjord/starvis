@@ -42,7 +42,11 @@ export function ListFilterSelect({ value, onChange, options, allLabel, showAllOp
 }
 
 export function ListFilterBar({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <div className={`flex gap-2 mb-4 flex-wrap ${className}`}>{children}</div>;
+  return (
+    <div className={`mb-4 min-w-0 overflow-x-auto pb-1 ${className}`}>
+      <div className="flex w-max min-w-full gap-2 sm:flex-wrap">{children}</div>
+    </div>
+  );
 }
 
 export function ListFilterResetButton({ onClick }: { onClick: () => void }) {
@@ -59,37 +63,39 @@ export function ListFilterResetButton({ onClick }: { onClick: () => void }) {
 
 export function ListFilterChips({ items, selected, onSelect, allLabel = 'All', className = '' }: ListFilterChipsProps) {
   return (
-    <div className={`flex flex-wrap gap-1.5 mb-4 ${className}`}>
-      <button
-        type="button"
-        onClick={() => onSelect('')}
-        className={`px-3 py-1 rounded-sm text-xs font-mono-sc uppercase tracking-wide border transition-colors ${
-          !selected
-            ? 'bg-cyan-950/40 border-cyan-700 text-cyan-300'
-            : 'border-border text-slate-500 hover:text-slate-300 hover:border-slate-600'
-        }`}
-      >
-        {allLabel}
-      </button>
-      {items.map((item) => (
+    <div className={`mb-4 min-w-0 overflow-x-auto pb-1 ${className}`}>
+      <div className="flex w-max min-w-full gap-1.5 sm:flex-wrap">
         <button
           type="button"
-          key={item.key}
-          onClick={() => onSelect(selected === item.key ? '' : item.key)}
+          onClick={() => onSelect('')}
           className={`px-3 py-1 rounded-sm text-xs font-mono-sc uppercase tracking-wide border transition-colors ${
-            selected === item.key
+            !selected
               ? 'bg-cyan-950/40 border-cyan-700 text-cyan-300'
               : 'border-border text-slate-500 hover:text-slate-300 hover:border-slate-600'
           }`}
         >
-          {item.label}
-          {typeof item.count === 'number' && (
-            <span className={selected === item.key ? 'ml-1 text-cyan-600' : 'ml-1 text-slate-700'}>
-              {item.count.toLocaleString('en-US')}
-            </span>
-          )}
+          {allLabel}
         </button>
-      ))}
+        {items.map((item) => (
+          <button
+            type="button"
+            key={item.key}
+            onClick={() => onSelect(selected === item.key ? '' : item.key)}
+            className={`px-3 py-1 rounded-sm text-xs font-mono-sc uppercase tracking-wide border transition-colors ${
+              selected === item.key
+                ? 'bg-cyan-950/40 border-cyan-700 text-cyan-300'
+                : 'border-border text-slate-500 hover:text-slate-300 hover:border-slate-600'
+            }`}
+          >
+            {item.label}
+            {typeof item.count === 'number' && (
+              <span className={selected === item.key ? 'ml-1 text-cyan-600' : 'ml-1 text-slate-700'}>
+                {item.count.toLocaleString('en-US')}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
