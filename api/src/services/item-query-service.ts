@@ -719,6 +719,40 @@ export class ItemQueryService {
 
   async getItemBuyLocations(uuid: string, env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
+    try {
+      const uexRows = await prisma.$queryRawUnsafe<Row[]>(
+        toPostgres(`SELECT
+              COALESCE(p.terminal_uex_id, -p.id) as shop_id,
+              COALESCE(t.name, p.terminal_name, 'UEX market') as shop_name,
+              COALESCE(t.city, t.outpost, t.space_station, t.moon, t.planet, t.star_system, p.terminal_name) as location,
+              t.star_system as system_name,
+              t.city,
+              COALESCE(t.moon, t.planet, t.orbit) as planet_moon,
+              t.type as shop_type,
+              p.resource as terminal,
+              'uex' as inventory_kind,
+              COALESCE(p.price_buy, p.price, p.price_average) as base_price,
+              p.price_sell as sell_price,
+              NULL::numeric as current_inventory,
+              NULL::numeric as max_inventory,
+              NULL::numeric as rental_price_1d,
+              NULL::numeric as rental_price_3d,
+              NULL::numeric as rental_price_7d,
+              NULL::numeric as rental_price_30d,
+              'uex' as source,
+              1::numeric as confidence,
+              p.date_modified as updated_at
+       FROM game.uex_market_prices p
+       LEFT JOIN game.uex_terminals t ON t.uex_id = p.terminal_uex_id AND t.env = p.env
+       WHERE p.env = ? AND p.entity_kind = 'item' AND p.entity_uuid = ? AND p.is_available = TRUE
+       ORDER BY COALESCE(p.price_buy, p.price, p.price_average) NULLS LAST, t.star_system, t.city, t.name`),
+        env,
+        uuid,
+      );
+      if (uexRows.length) return convertBigIntToNumber(uexRows);
+    } catch {
+      // Older deployments without generic UEX market rows fall back to P4K shop inventory.
+    }
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT s.id as shop_id, s.name as shop_name, s.location, s.planet_moon,
               s.system as system_name, s.city, s.shop_type,

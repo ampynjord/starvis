@@ -218,13 +218,26 @@ describe('ComponentQueryService', () => {
   });
 
   describe('getComponentBuyLocations', () => {
-    it('matches shop inventory by uuid and class name', async () => {
-      const prisma = createMockPrisma([[row({ shop_id: 1, shop_name: 'CenterMass', base_price: 1200 })]]);
+    it('prefers generic UEX component market rows when available', async () => {
+      const prisma = createMockPrisma([[row({ shop_id: 99, shop_name: 'UEX terminal', base_price: 900, source: 'uex' })]]);
       const svc = new ComponentQueryService(createGetClient(prisma));
       const result = await svc.getComponentBuyLocations({ uuid: 'component-uuid', class_name: 'KLWE_LaserRepeater_S1' });
 
       expect(result).toHaveLength(1);
+      expect(result[0].source).toBe('uex');
       const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[0];
+      expect(callArgs[0]).toContain("p.entity_kind = 'component'");
+      expect(callArgs[0]).toContain('game.uex_market_prices');
+      expect(callArgs).toContain('component-uuid');
+    });
+
+    it('matches shop inventory by uuid and class name', async () => {
+      const prisma = createMockPrisma([[], [row({ shop_id: 1, shop_name: 'CenterMass', base_price: 1200 })]]);
+      const svc = new ComponentQueryService(createGetClient(prisma));
+      const result = await svc.getComponentBuyLocations({ uuid: 'component-uuid', class_name: 'KLWE_LaserRepeater_S1' });
+
+      expect(result).toHaveLength(1);
+      const callArgs = ((prisma as any).$queryRawUnsafe as any).mock.calls[1];
       expect(callArgs[0]).toContain('si.component_uuid = $');
       expect(callArgs[0]).toContain('si.component_class_name = $');
       expect(callArgs[0]).toContain('LOWER(si.component_class_name) = LOWER');
