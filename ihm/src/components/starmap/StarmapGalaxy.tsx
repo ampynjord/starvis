@@ -23,6 +23,8 @@ interface SceneNode {
   css: string;
   color: number;
   surface?: boolean;
+  visible?: boolean;
+  label?: boolean;
 }
 
 interface OrbitRing {
@@ -86,6 +88,8 @@ const TYPE_ORDER = new Map<string, number>([
 
 const IMAGE_EXT = /\.(png|jpe?g|webp|avif)(\?|$)/i;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+const SYSTEM_SCENE_RADIUS = 210;
+const BODY_SCENE_RADIUS = 82;
 
 function typeKey(type: string | null | undefined) {
   return String(type ?? '')
@@ -143,6 +147,21 @@ function starmapImage(object: StarmapPosition) {
     proxiedAssetUrl(object.thumbnail) ??
     proxiedAssetUrl(findImageUrl(object.assets)) ??
     proxiedAssetUrl(findImageUrl(object.thumbnail_data))
+  );
+}
+
+function findAssetTextureUrl(value: unknown): string | null {
+  if (!value || typeof value !== 'object') return findImageUrl(value);
+  const record = value as Record<string, unknown>;
+  const texture = findImageUrl(record.textures) ?? findImageUrl(record.texture) ?? findImageUrl(record.raw);
+  return texture ?? findImageUrl(value);
+}
+
+function starmapTexture(object: StarmapPosition) {
+  return (
+    proxiedAssetUrl(findAssetTextureUrl(object.assets)) ??
+    proxiedAssetUrl(findImageUrl(object.thumbnail_data)) ??
+    proxiedAssetUrl(object.thumbnail)
   );
 }
 
@@ -325,6 +344,43 @@ function radialPosition(center: THREE.Vector3, radius: number, index: number, y 
   return new THREE.Vector3(center.x + Math.cos(angle) * radius, center.y + y, center.z + Math.sin(angle) * radius);
 }
 
+function clamp(value: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function scaledCoordinates(
+  root: StarmapPosition,
+  objects: StarmapPosition[],
+  targetRadius: number,
+) {
+  const rootCoordinate = coordinateOf(root) ?? new THREE.Vector3(0, 0, 0);
+  const rawPositions = new Map<number, THREE.Vector3>();
+  let maxDistance = 0;
+
+  for (const object of objects) {
+    const coordinate = coordinateOf(object);
+    if (!coordinate) continue;
+    const relative = coordinate.sub(rootCoordinate);
+    rawPositions.set(object.id, relative);
+    maxDistance = Math.max(maxDistance, relative.length());
+  }
+
+  const scale = maxDistance > 0 ? clamp(targetRadius / maxDistance, 0.04, 42) : 1;
+  const scenePositions = new Map<number, THREE.Vector3>();
+  rawPositions.forEach((position, id) => {
+    scenePositions.set(id, position.clone().multiplyScalar(scale));
+  });
+
+  return { scenePositions, scale };
+}
+
+function nodeLabelEnabled(object: StarmapPosition, level: 'system' | 'body', depth: number) {
+  const key = typeKey(object.type);
+  if (depth === 0) return true;
+  if (level === 'body') return depth <= 1 && !isLandingZone(object);
+  return depth <= 1 && ['star', 'planet', 'dwarfplanet', 'jumppoint', 'jump_point'].includes(key);
+}
+
 function buildGalaxyModel(objects: StarmapPosition[]): SceneModel {
   const systems = objects.filter((object) => isSystemObject(object)).sort((a, b) => a.name.localeCompare(b.name));
   const rawCenter = new THREE.Vector3();
@@ -382,29 +438,47 @@ function buildGalaxyModel(objects: StarmapPosition[]): SceneModel {
 function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], allObjects: StarmapPosition[], level: 'system' | 'body'): SceneModel {
   const rootStyle = objectStyle(root.type);
   const rootColor = isSystemObject(root) ? factionStyle(root.faction_name) : rootStyle;
-  const rootRadius = isSystemObject(root) ? 3.5 : Math.max(2.2, rootStyle.size * 1.35);
+  const physicalRoot = !(level === 'system' && typeKey(root.type) === 'system');
+  const rootRadius = physicalRoot ? (isSystemObject(root) ? 3.5 : Math.max(2.2, rootStyle.size * 1.35)) : 0.01;
   const rootNode: SceneNode = {
     object: root,
     position: new THREE.Vector3(0, 0, 0),
     radius: rootRadius,
     css: rootColor.css,
     color: rootColor.color,
+    visible: physicalRoot,
+    label: physicalRoot,
   };
 
   const nodes: SceneNode[] = [rootNode];
   const rings: OrbitRing[] = [];
   const placed = new Set<number>([root.id]);
+  const sceneCoordinates = scaledCoordinates(root, objects, level === 'system' ? SYSTEM_SCENE_RADIUS : BODY_SCENE_RADIUS);
   const rootChildren = level === 'system'
     ? systemChildren(root, allObjects)
     : childrenOf(root, objects);
+
+  const positionFor = (
+    child: StarmapPosition,
+    parentPosition: THREE.Vector3,
+    parentRadius: number,
+    index: number,
+    depth: number,
+  ) => {
+    const exact = sceneCoordinates.scenePositions.get(child.id);
+    if (exact) return exact.clone();
+    if (isLandingZone(child)) return radialPosition(parentPosition, parentRadius + 0.9, index + depth * 2, 0.25);
+    const fallbackRadius = level === 'system' ? 28 + index * 12 + depth * 7 : 10 + index * 5 + depth * 2.5;
+    return radialPosition(parentPosition, fallbackRadius, index + depth * 4, (index % 2) * 0.35);
+  };
 
   const placeChildren = (parent: StarmapPosition, parentPosition: THREE.Vector3, parentRadius: number, depth: number) => {
     const children = childrenOf(parent, objects).filter((child) => !placed.has(child.id));
     children.forEach((child, index) => {
       const style = objectStyle(child.type);
       const landing = isLandingZone(child);
-      const orbitRadius = landing ? parentRadius + 0.9 : parentRadius + 4.2 + index * 2.9 + depth * 1.2;
-      const position = radialPosition(parentPosition, orbitRadius, index + depth * 3, landing ? 0.25 : (index % 2) * 0.35);
+      const position = positionFor(child, parentPosition, parentRadius, index, depth);
+      const orbitRadius = position.clone().setY(parentPosition.y).distanceTo(parentPosition);
       const node: SceneNode = {
         object: child,
         position,
@@ -412,10 +486,11 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
         css: style.css,
         color: style.color,
         surface: landing,
+        label: nodeLabelEnabled(child, level, depth),
       };
       nodes.push(node);
       placed.add(child.id);
-      if (!landing) rings.push({ center: parentPosition, radius: orbitRadius, color: style.color, opacity: 0.16 });
+      if (!landing && orbitRadius > 1) rings.push({ center: parentPosition, radius: orbitRadius, color: style.color, opacity: depth === 1 ? 0.14 : 0.08 });
       placeChildren(child, position, Math.max(1, node.radius), depth + 1);
     });
   };
@@ -423,11 +498,9 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
   rootChildren.forEach((child, index) => {
     if (placed.has(child.id)) return;
     const style = objectStyle(child.type);
-    const orbitRadius = level === 'system' ? 16 + index * 7.2 : 8 + index * 4.4;
     const landing = isLandingZone(child);
-    const position = landing
-      ? radialPosition(rootNode.position, rootNode.radius + 1, index, 0.2)
-      : radialPosition(rootNode.position, orbitRadius, index);
+    const position = positionFor(child, rootNode.position, Math.max(1, rootNode.radius), index, 1);
+    const orbitRadius = position.clone().setY(rootNode.position.y).distanceTo(rootNode.position);
     const node: SceneNode = {
       object: child,
       position,
@@ -435,21 +508,22 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
       css: style.css,
       color: style.color,
       surface: landing,
+      label: nodeLabelEnabled(child, level, 1),
     };
     nodes.push(node);
     placed.add(child.id);
-    if (!landing) rings.push({ center: rootNode.position, radius: orbitRadius, color: style.color, opacity: 0.16 });
+    if (!landing && orbitRadius > 1) rings.push({ center: rootNode.position, radius: orbitRadius, color: style.color, opacity: 0.16 });
     placeChildren(child, position, Math.max(1, node.radius), 1);
   });
 
   const leftovers = objects.filter((object) => object.id !== root.id && !placed.has(object.id)).sort(sortObjects);
   leftovers.forEach((child, index) => {
     const style = objectStyle(child.type);
-    const orbitRadius = level === 'system' ? 22 + (nodes.length + index) * 3.8 : 12 + index * 3.4;
-    const position = radialPosition(rootNode.position, orbitRadius, index + 11, (index % 3) * 0.25);
-    nodes.push({ object: child, position, radius: style.size, css: style.css, color: style.color });
+    const position = positionFor(child, rootNode.position, Math.max(1, rootNode.radius), index + nodes.length, 1);
+    const orbitRadius = position.clone().setY(rootNode.position.y).distanceTo(rootNode.position);
+    nodes.push({ object: child, position, radius: style.size, css: style.css, color: style.color, label: false });
     placed.add(child.id);
-    rings.push({ center: rootNode.position, radius: orbitRadius, color: style.color, opacity: 0.08 });
+    if (orbitRadius > 1) rings.push({ center: rootNode.position, radius: orbitRadius, color: style.color, opacity: 0.08 });
   });
 
   const jumpLines: SceneModel['jumpLines'] = [];
@@ -462,7 +536,7 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
     nodes,
     rings,
     jumpLines,
-    camera: level === 'system' ? new THREE.Vector3(0, 70, 88) : new THREE.Vector3(0, 38, 44),
+    camera: level === 'system' ? new THREE.Vector3(0, 190, 255) : new THREE.Vector3(0, 68, 98),
     target: new THREE.Vector3(0, 0, 0),
   };
 }
@@ -561,8 +635,8 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
     controls.autoRotate = level === 'galaxy';
     controls.autoRotateSpeed = 0.25;
     controls.target.copy(sceneModel.target);
-    controls.minDistance = level === 'galaxy' ? 30 : 8;
-    controls.maxDistance = level === 'galaxy' ? 900 : 180;
+    controls.minDistance = level === 'galaxy' ? 30 : 14;
+    controls.maxDistance = level === 'galaxy' ? 900 : 520;
     controls.update();
 
     const visibility = createVisibilityTracker(container);
@@ -599,6 +673,7 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
     }
 
     for (const node of sceneModel.nodes) {
+      if (node.visible === false) continue;
       const materialOptions: THREE.MeshStandardMaterialParameters = {
         color: node.color,
         emissive: node.color,
@@ -606,7 +681,7 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
         roughness: 0.42,
         metalness: 0.08,
       };
-      const image = starmapImage(node.object);
+      const image = starmapTexture(node.object);
       if (image) {
         const tex = textureLoader.load(image, () => {
           tex.colorSpace = THREE.SRGBColorSpace;
@@ -637,7 +712,9 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
       nodeGroup.add(glow);
       animatedNodes.push({ mesh, glow, base: node.radius, phase: Math.random() * Math.PI * 2 });
 
-      const shouldLabel = level !== 'galaxy' || ['system', 'star', 'planet', 'station', 'landingzone', 'jumppoint'].includes(typeKey(node.object.type));
+      const shouldLabel = node.label ?? (
+        level === 'galaxy' && ['system', 'star'].includes(typeKey(node.object.type))
+      );
       if (shouldLabel) {
         const label = makeLabelSprite(node.object.name, node.css);
         label.position.copy(node.position).add(new THREE.Vector3(0, 2.4 + node.radius, 0));
@@ -769,7 +846,7 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
       <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[calc(100vw-1.5rem)] flex-wrap items-center gap-2 rounded-sm border border-cyan-900/40 bg-slate-950/70 px-3 py-1.5 backdrop-blur">
         <Compass size={14} className="text-cyan-400" />
         <span className="font-orbitron text-xs uppercase tracking-widest text-slate-200">{levelTitle(level)}</span>
-        <span className="font-mono-sc text-[10px] text-cyan-500">{sceneModel.nodes.length} objects</span>
+        <span className="font-mono-sc text-[10px] text-cyan-500">{sceneModel.nodes.filter((node) => node.visible !== false).length} objects</span>
         {activeSystem && (
           <span className="font-mono-sc text-[10px] text-slate-500">
             / {activeSystem.name}{activeBody ? ` / ${activeBody.name}` : ''}
