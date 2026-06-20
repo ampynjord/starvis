@@ -17,6 +17,13 @@ npm run build --workspace=@starvis/rsi-hangar-sync-extension
 
 Both manifests share the same `src/` files.
 
+The build also publishes user-downloadable archives for the web app:
+
+- `ihm/public/downloads/extensions/starvis-rsi-hangar-sync-chrome.zip`
+- `ihm/public/downloads/extensions/starvis-rsi-hangar-sync-firefox.zip`
+
+Users can download these from the Fleet Manager `Install` menu, unzip the archive, then load the unpacked extension folder in Chrome or the `manifest.json` file in Firefox.
+
 ## Flow
 
 1. Starvis Fleet Manager calls `POST /api/corp/fleet/rsi-sync/session`.
