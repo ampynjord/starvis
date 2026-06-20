@@ -1,8 +1,13 @@
 {
   "manifest_version": 3,
-  "name": "Starvis RSI Hangar Sync",
+  "name": "Starvis - Star Citizen Database & Toolset",
   "version": "0.1.0",
-  "description": "Synchronizes the logged-in RSI hangar with the Starvis Fleet Manager.",
+  "description": "Connects Starvis browser features, starting with RSI hangar synchronization for the Fleet Manager.",
+  "icons": {
+    "16": "assets/icon-16.png",
+    "48": "assets/icon-48.png",
+    "128": "assets/icon-128.png"
+  },
   "permissions": ["tabs", "scripting"],
   "host_permissions": [
     "https://robertsspaceindustries.com/*",
@@ -27,10 +32,15 @@
   ],
   "browser_specific_settings": {
     "gecko": {
-      "id": "rsi-hangar-sync@starvis.local"
+      "id": "extension@starvis.ampynjord.bzh"
     }
   },
   "action": {
-    "default_title": "Starvis RSI Hangar Sync"
+    "default_title": "Starvis",
+    "default_icon": {
+      "16": "assets/icon-16.png",
+      "48": "assets/icon-48.png",
+      "128": "assets/icon-128.png"
+    }
   }
 }

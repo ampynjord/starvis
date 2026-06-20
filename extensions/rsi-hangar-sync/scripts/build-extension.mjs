@@ -4,12 +4,14 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const dist = join(root, 'dist');
-const webDownloads = fileURLToPath(new URL('../../../ihm/public/downloads/extensions/', import.meta.url));
+const storePackages = join(dist, 'store');
 
 const targets = [
   { name: 'chrome', manifest: 'manifest.chrome.json' },
   { name: 'firefox', manifest: 'manifest.firefox.json' },
 ];
+
+const developmentPatterns = new Set(['http://localhost/*', 'http://127.0.0.1/*']);
 
 const crcTable = new Uint32Array(256);
 for (let n = 0; n < 256; n += 1) {
@@ -111,17 +113,33 @@ async function writeZip(sourceDir, zipPath) {
   await writeFile(zipPath, Buffer.concat([...chunks, ...central, end]));
 }
 
+async function writeStoreManifest(manifestPath, targetPath) {
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
+  manifest.host_permissions = (manifest.host_permissions ?? []).filter((pattern) => !developmentPatterns.has(pattern));
+  manifest.content_scripts = (manifest.content_scripts ?? []).map((script) => ({
+    ...script,
+    matches: (script.matches ?? []).filter((pattern) => !developmentPatterns.has(pattern)),
+  }));
+  await writeFile(targetPath, `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
 await rm(dist, { recursive: true, force: true });
-await rm(webDownloads, { recursive: true, force: true });
-await mkdir(webDownloads, { recursive: true });
+await mkdir(storePackages, { recursive: true });
 
 for (const target of targets) {
   const targetDir = join(dist, target.name);
   await mkdir(targetDir, { recursive: true });
   await cp(join(root, 'src'), join(targetDir, 'src'), { recursive: true });
+  await cp(join(root, 'assets'), join(targetDir, 'assets'), { recursive: true });
   await copyFile(join(root, target.manifest), join(targetDir, 'manifest.json'));
-  await writeZip(targetDir, join(webDownloads, `starvis-rsi-hangar-sync-${target.name}.zip`));
+
+  const storeDir = join(dist, `${target.name}-store`);
+  await mkdir(storeDir, { recursive: true });
+  await cp(join(root, 'src'), join(storeDir, 'src'), { recursive: true });
+  await cp(join(root, 'assets'), join(storeDir, 'assets'), { recursive: true });
+  await writeStoreManifest(join(root, target.manifest), join(storeDir, 'manifest.json'));
+  await writeZip(storeDir, join(storePackages, `starvis-browser-extension-${target.name}.zip`));
 }
 
 console.log(`Built extension bundles in ${dist}`);
-console.log(`Built browser downloads in ${webDownloads}`);
+console.log(`Built browser store packages in ${storePackages}`);

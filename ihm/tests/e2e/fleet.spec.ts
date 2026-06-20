@@ -96,12 +96,7 @@ test('personal fleet does not require corporation membership', async ({ context,
   await expect(page.getByText('Aurora MR').first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Install' }).click();
-  await expect(page.getByRole('link', { name: 'Chrome' })).toHaveAttribute(
-    'href',
-    '/downloads/extensions/starvis-rsi-hangar-sync-chrome.zip',
-  );
-  await expect(page.getByRole('link', { name: 'Firefox' })).toHaveAttribute(
-    'href',
-    '/downloads/extensions/starvis-rsi-hangar-sync-firefox.zip',
-  );
+  await expect(page.getByText('Chrome Web Store')).toBeVisible();
+  await expect(page.getByText('Firefox Add-ons')).toBeVisible();
+  await expect(page.getByText('Publication pending')).toHaveCount(2);
 });

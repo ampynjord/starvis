@@ -1,28 +1,34 @@
-# Starvis RSI Hangar Sync Extension
+# Starvis Browser Extension
 
-Browser extension used by the Fleet Manager `Sync` button.
+Browser extension for Starvis web features. The first capability is the Fleet Manager RSI hangar `Sync` button.
 
 The extension does not receive or store RSI credentials. It runs inside the user's browser session, opens the RSI hangar page, extracts hangar entries, then posts normalized data back to Starvis with a short-lived sync token created by the web app.
 
-## Browser Builds
+## Browser Builds And Store Packages
 
-Build installable folders first:
+Build the browser extension folders and store upload archives:
 
 ```bash
 npm run build --workspace=@starvis/rsi-hangar-sync-extension
 ```
 
-- Chrome / Chromium: load `extensions/rsi-hangar-sync/dist/chrome`.
-- Firefox: load `extensions/rsi-hangar-sync/dist/firefox/manifest.json` from `about:debugging#/runtime/this-firefox`.
+- Local Chrome / Chromium development: load `extensions/rsi-hangar-sync/dist/chrome`.
+- Local Firefox development: load `extensions/rsi-hangar-sync/dist/firefox/manifest.json` from `about:debugging#/runtime/this-firefox`.
+- Chrome Web Store submission: upload `extensions/rsi-hangar-sync/dist/store/starvis-browser-extension-chrome.zip`.
+- Firefox Add-ons submission: upload `extensions/rsi-hangar-sync/dist/store/starvis-browser-extension-firefox.zip`.
 
-Both manifests share the same `src/` files.
+Both manifests share the same `src/` files and Starvis logo assets from `assets/`.
 
-The build also publishes user-downloadable archives for the web app:
+The store submission archives are generated from `dist/chrome-store` and `dist/firefox-store`; they only include production host permissions for `https://starvis.ampynjord.bzh/*` and `https://robertsspaceindustries.com/*`. The local development folders keep `localhost` and `127.0.0.1` permissions.
 
-- `ihm/public/downloads/extensions/starvis-rsi-hangar-sync-chrome.zip`
-- `ihm/public/downloads/extensions/starvis-rsi-hangar-sync-firefox.zip`
+In CI/CD, the `Build Extension` GitHub Actions job uploads those store packages as the `starvis-browser-extension-store-packages` artifact. Download that artifact from the run summary when submitting a new version to Chrome Web Store or Firefox Add-ons.
 
-Users can download these from the Fleet Manager `Install` menu, unzip the archive, then load the unpacked extension folder in Chrome or the `manifest.json` file in Firefox.
+After both store listings are approved, configure the public install links:
+
+- `NEXT_PUBLIC_STARVIS_EXTENSION_CHROME_STORE_URL`
+- `NEXT_PUBLIC_STARVIS_EXTENSION_FIREFOX_STORE_URL`
+
+The Fleet Manager `Install` menu uses those store URLs as the user installation path. Until both URLs are configured, it shows the store listings as pending instead of offering direct zip downloads.
 
 ## Flow
 

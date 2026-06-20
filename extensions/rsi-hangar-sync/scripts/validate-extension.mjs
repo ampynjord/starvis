@@ -9,6 +9,9 @@ const required = [
   'src/background.js',
   'src/starvis-content.js',
   'src/rsi-hangar-content.js',
+  'assets/icon-16.png',
+  'assets/icon-48.png',
+  'assets/icon-128.png',
 ];
 
 const matchPattern = /^(https?|wss?|file|ftp|\*):\/\/(\*|\*\.[^*/]+|[^*/]+)\/.*$/;
@@ -27,6 +30,13 @@ function assertValidPattern(manifestFile, pattern) {
 for (const manifestFile of ['manifest.chrome.json', 'manifest.firefox.json']) {
   const manifest = JSON.parse(await readFile(join(root, manifestFile), 'utf8'));
   if (manifest.manifest_version !== 3) throw new Error(`${manifestFile}: manifest_version must be 3`);
+  if (!manifest.name?.startsWith('Starvis')) throw new Error(`${manifestFile}: Starvis extension name missing`);
+  for (const size of ['16', '48', '128']) {
+    if (manifest.icons?.[size] !== `assets/icon-${size}.png`) throw new Error(`${manifestFile}: icon ${size} missing`);
+    if (manifest.action?.default_icon?.[size] !== `assets/icon-${size}.png`) {
+      throw new Error(`${manifestFile}: action icon ${size} missing`);
+    }
+  }
   if (manifestFile.includes('firefox') && !manifest.background?.scripts?.includes('src/background.js')) {
     throw new Error(`${manifestFile}: Firefox requires background.scripts`);
   }
