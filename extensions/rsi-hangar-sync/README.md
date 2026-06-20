@@ -22,5 +22,8 @@ Both manifests share the same `src/` files.
 1. Starvis Fleet Manager calls `POST /api/corp/fleet/rsi-sync/session`.
 2. The page sends the returned sync token to the extension with `window.postMessage`.
 3. The extension opens `https://robertsspaceindustries.com/account/pledges`.
-4. The RSI content script extracts hangar cards and sends them to `POST /api/corp/fleet/rsi-sync`.
-5. The API mirrors entries whose source is `rsi_hangar`; manually declared ships are not removed.
+4. From the RSI page context, the extension verifies the logged-in session and fetches `/en/account/pledges?page=N&pagesize=10` with the user's existing browser cookies.
+5. It parses pledge item titles and kinds from every page, keeps only RSI `Ship`, `Spaceship`, and `Vehicle` entries, then sends them to `POST /api/corp/fleet/rsi-sync`.
+6. The API mirrors entries whose source is `rsi_hangar`; manually declared ships are not removed.
+
+Paints, gear, weapons, flair, subscriptions, and other non-ship hangar items are ignored before API matching. Upgraded pledges are imported from the RSI pledge item title, which is the ship currently owned after the upgrade.
