@@ -363,6 +363,13 @@ jobs:
       - uses: actions/checkout@v6
       - uses: ./.github/actions/setup
       - run: npm run build --workspace=@starvis/rsi-hangar-sync-extension
+      - name: Upload browser extension store packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: starvis-browser-extension-store-packages
+          path: extensions/rsi-hangar-sync/dist/store/*.zip
+          if-no-files-found: error
+          retention-days: 30
 
   test-e2e:
     name: Tests E2E (Playwright)
@@ -473,6 +480,9 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           target: ${{ matrix.image.target }}
+          build-args: |
+            NEXT_PUBLIC_STARVIS_EXTENSION_CHROME_STORE_URL=${{ vars.NEXT_PUBLIC_STARVIS_EXTENSION_CHROME_STORE_URL }}
+            NEXT_PUBLIC_STARVIS_EXTENSION_FIREFOX_STORE_URL=${{ vars.NEXT_PUBLIC_STARVIS_EXTENSION_FIREFOX_STORE_URL }}
           cache-from: type=registry,ref=${{ env.IMAGE_PREFIX }}-${{ matrix.image.name }}:buildcache
           cache-to: type=registry,ref=${{ env.IMAGE_PREFIX }}-${{ matrix.image.name }}:buildcache,mode=max
           provenance: false

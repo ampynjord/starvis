@@ -7,7 +7,6 @@ import {
   ArrowRight,
   Building2,
   ChevronDown,
-  Download,
   ExternalLink,
   Loader2,
   Package,
@@ -282,6 +281,11 @@ function ShipInfoPanel({ ship, item, onRemove, canRemove, onAvailabilityChange, 
 type ViewMode = 'mine' | 'member' | 'all';
 
 interface Member { id: number; username: string; avatarUrl: string | null }
+
+const STARVIS_EXTENSION_CHROME_STORE_URL =
+  process.env.NEXT_PUBLIC_STARVIS_EXTENSION_CHROME_STORE_URL?.trim() ?? process.env.NEXT_PUBLIC_RSI_SYNC_CHROME_STORE_URL?.trim() ?? '';
+const STARVIS_EXTENSION_FIREFOX_STORE_URL =
+  process.env.NEXT_PUBLIC_STARVIS_EXTENSION_FIREFOX_STORE_URL?.trim() ?? process.env.NEXT_PUBLIC_RSI_SYNC_FIREFOX_STORE_URL?.trim() ?? '';
 
 const getAddedById = (item: FleetItem) => item.addedBy?.id != null ? Number(item.addedBy.id) : null;
 const getShipUuid = (item: FleetItem) => item.shipUuid?.trim() || null;
@@ -687,7 +691,7 @@ export default function FleetManagerPage() {
                 type="button"
                 onClick={() => setExtensionMenuOpen((open) => !open)}
                 className="sci-btn-ghost py-1.5 px-3 text-xs gap-1.5 flex items-center"
-                title="Install RSI sync extension"
+                title="Install Starvis extension"
               >
                 <Puzzle size={12} />
                 Install
@@ -699,31 +703,50 @@ export default function FleetManagerPage() {
                 >
                   <div className="border-b border-slate-800/70 px-3 py-2">
                     <p className="font-orbitron text-[10px] font-bold uppercase tracking-widest text-slate-300">
-                      RSI sync extension
+                      Starvis extension
                     </p>
                     <p className="mt-1 font-mono-sc text-[10px] leading-relaxed text-slate-600">
-                      Download, unzip, then load the manifest in your browser extension page.
+                      Install it from your browser store, then return here and press Sync.
                     </p>
                   </div>
                   <div className="grid gap-2 p-3 sm:grid-cols-2">
-                    <a
-                      href="/downloads/extensions/starvis-rsi-hangar-sync-chrome.zip"
-                      download
-                      className="flex items-center justify-center gap-2 rounded-sm border border-cyan-800/60 bg-cyan-950/35 px-3 py-2 font-mono-sc text-xs text-cyan-300 transition-colors hover:border-cyan-500/80 hover:bg-cyan-950/55"
-                    >
-                      <Download size={12} /> Chrome
-                    </a>
-                    <a
-                      href="/downloads/extensions/starvis-rsi-hangar-sync-firefox.zip"
-                      download
-                      className="flex items-center justify-center gap-2 rounded-sm border border-cyan-800/60 bg-cyan-950/35 px-3 py-2 font-mono-sc text-xs text-cyan-300 transition-colors hover:border-cyan-500/80 hover:bg-cyan-950/55"
-                    >
-                      <Download size={12} /> Firefox
-                    </a>
+                    {STARVIS_EXTENSION_CHROME_STORE_URL ? (
+                      <a
+                        href={STARVIS_EXTENSION_CHROME_STORE_URL}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-center gap-2 rounded-sm border border-cyan-800/60 bg-cyan-950/35 px-3 py-2 font-mono-sc text-xs text-cyan-300 transition-colors hover:border-cyan-500/80 hover:bg-cyan-950/55"
+                      >
+                        <ExternalLink size={12} /> Chrome Web Store
+                      </a>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center gap-0.5 rounded-sm border border-slate-800/70 bg-slate-900/45 px-3 py-2 text-center">
+                        <span className="font-mono-sc text-xs text-slate-500">Chrome Web Store</span>
+                        <span className="font-mono-sc text-[9px] uppercase tracking-wider text-amber-600">Publication pending</span>
+                      </div>
+                    )}
+                    {STARVIS_EXTENSION_FIREFOX_STORE_URL ? (
+                      <a
+                        href={STARVIS_EXTENSION_FIREFOX_STORE_URL}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-center gap-2 rounded-sm border border-cyan-800/60 bg-cyan-950/35 px-3 py-2 font-mono-sc text-xs text-cyan-300 transition-colors hover:border-cyan-500/80 hover:bg-cyan-950/55"
+                      >
+                        <ExternalLink size={12} /> Firefox Add-ons
+                      </a>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center gap-0.5 rounded-sm border border-slate-800/70 bg-slate-900/45 px-3 py-2 text-center">
+                        <span className="font-mono-sc text-xs text-slate-500">Firefox Add-ons</span>
+                        <span className="font-mono-sc text-[9px] uppercase tracking-wider text-amber-600">Publication pending</span>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-1 border-t border-slate-800/70 px-3 py-2 font-mono-sc text-[10px] leading-relaxed text-slate-500">
-                    <p>Chrome: open extensions, enable developer mode, load unpacked folder.</p>
-                    <p>Firefox: open about:debugging, load temporary add-on, select manifest.json.</p>
+                    {!STARVIS_EXTENSION_CHROME_STORE_URL || !STARVIS_EXTENSION_FIREFOX_STORE_URL ? (
+                      <p>Store links are configured after the extension is approved by Chrome and Firefox.</p>
+                    ) : (
+                      <p>The extension never receives your RSI password; it only reads your logged-in browser session.</p>
+                    )}
                   </div>
                 </div>
               )}
