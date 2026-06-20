@@ -7,10 +7,12 @@ import {
   ArrowRight,
   Building2,
   ChevronDown,
+  Download,
   ExternalLink,
   Loader2,
   Package,
   Plus,
+  Puzzle,
   RefreshCw,
   Search,
   Ship,
@@ -317,6 +319,7 @@ export default function FleetManagerPage() {
   const [addError, setAddError] = useState('');
   const [syncLoading, setSyncLoading] = useState(false);
   const [syncStatus, setSyncStatus] = useState('');
+  const [extensionMenuOpen, setExtensionMenuOpen] = useState(false);
 
   // View mode
   const [viewMode, setViewMode] = useState<ViewMode>('mine');
@@ -324,6 +327,7 @@ export default function FleetManagerPage() {
   const [selectedMemberId, setSelectedMemberId] = useState<number | null>(null);
   const [memberDropdownOpen, setMemberDropdownOpen] = useState(false);
   const memberDropdownRef = useRef<HTMLDivElement | null>(null);
+  const extensionMenuRef = useRef<HTMLDivElement | null>(null);
   const shipCacheRef = useRef<Map<string, ShipListItem>>(new Map());
 
   const hydrateShips = useCallback(async (uuids: string[]) => {
@@ -409,6 +413,16 @@ export default function FleetManagerPage() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [memberDropdownOpen]);
+
+  useEffect(() => {
+    if (!extensionMenuOpen) return;
+    const handler = (event: MouseEvent) => {
+      if (extensionMenuRef.current?.contains(event.target as Node)) return;
+      setExtensionMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [extensionMenuOpen]);
 
   const handleAddShip = async (ship: ShipListItem) => {
     setAddLoading(true);
@@ -668,6 +682,52 @@ export default function FleetManagerPage() {
             <span className="text-[10px] text-slate-600 font-mono-sc">
               {visibleItems.length}/{fleetItems.length}
             </span>
+            <div className="relative" ref={extensionMenuRef}>
+              <button
+                type="button"
+                onClick={() => setExtensionMenuOpen((open) => !open)}
+                className="sci-btn-ghost py-1.5 px-3 text-xs gap-1.5 flex items-center"
+                title="Install RSI sync extension"
+              >
+                <Puzzle size={12} />
+                Install
+              </button>
+              {extensionMenuOpen && (
+                <div
+                  className="absolute right-0 top-full z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] border border-slate-800 bg-slate-950/[0.98] shadow-2xl shadow-black/50"
+                  onMouseDown={(event) => event.stopPropagation()}
+                >
+                  <div className="border-b border-slate-800/70 px-3 py-2">
+                    <p className="font-orbitron text-[10px] font-bold uppercase tracking-widest text-slate-300">
+                      RSI sync extension
+                    </p>
+                    <p className="mt-1 font-mono-sc text-[10px] leading-relaxed text-slate-600">
+                      Download, unzip, then load the manifest in your browser extension page.
+                    </p>
+                  </div>
+                  <div className="grid gap-2 p-3 sm:grid-cols-2">
+                    <a
+                      href="/downloads/extensions/starvis-rsi-hangar-sync-chrome.zip"
+                      download
+                      className="flex items-center justify-center gap-2 rounded-sm border border-cyan-800/60 bg-cyan-950/35 px-3 py-2 font-mono-sc text-xs text-cyan-300 transition-colors hover:border-cyan-500/80 hover:bg-cyan-950/55"
+                    >
+                      <Download size={12} /> Chrome
+                    </a>
+                    <a
+                      href="/downloads/extensions/starvis-rsi-hangar-sync-firefox.zip"
+                      download
+                      className="flex items-center justify-center gap-2 rounded-sm border border-cyan-800/60 bg-cyan-950/35 px-3 py-2 font-mono-sc text-xs text-cyan-300 transition-colors hover:border-cyan-500/80 hover:bg-cyan-950/55"
+                    >
+                      <Download size={12} /> Firefox
+                    </a>
+                  </div>
+                  <div className="space-y-1 border-t border-slate-800/70 px-3 py-2 font-mono-sc text-[10px] leading-relaxed text-slate-500">
+                    <p>Chrome: open extensions, enable developer mode, load unpacked folder.</p>
+                    <p>Firefox: open about:debugging, load temporary add-on, select manifest.json.</p>
+                  </div>
+                </div>
+              )}
+            </div>
             <button
               type="button"
               onClick={() => void handleRsiHangarSync()}
