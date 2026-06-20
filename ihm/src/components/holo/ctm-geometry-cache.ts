@@ -1,6 +1,10 @@
 import type * as THREE from 'three';
 import type { CTMLoader } from '@/lib/CTMLoader';
 
+interface LoadOptions {
+  optimizeGeometry?: boolean;
+}
+
 // Cache of in-flight / resolved geometry loads, keyed by model URL.
 // Only successful loads stay cached: a rejected promise is evicted so a later
 // scene rebuild can retry instead of leaving the ship permanently stuck on its
@@ -45,19 +49,31 @@ function isPermanentFailure(error: unknown): boolean {
   return /\b404\b/.test(message);
 }
 
-function loadOnce(loader: CTMLoader, url: string): Promise<THREE.BufferGeometry> {
+function makeScopedLoader(loader: CTMLoader, optimizeGeometry: boolean): CTMLoader {
+  const scoped = new (loader.constructor as new (manager: THREE.LoadingManager) => CTMLoader)(loader.manager);
+  scoped.setOptimizeGeometry(optimizeGeometry);
+  scoped.setPath(loader.path);
+  scoped.setResourcePath(loader.resourcePath);
+  scoped.setRequestHeader(loader.requestHeader);
+  scoped.setWithCredentials(loader.withCredentials);
+  scoped.setCrossOrigin(loader.crossOrigin);
+  return scoped;
+}
+
+function loadOnce(loader: CTMLoader, url: string, optimizeGeometry: boolean): Promise<THREE.BufferGeometry> {
+  const scoped = makeScopedLoader(loader, optimizeGeometry);
   return new Promise((resolve, reject) => {
-    loader.load(url, resolve, undefined, reject);
+    scoped.load(url, resolve, undefined, reject);
   });
 }
 
-async function loadWithRetry(loader: CTMLoader, url: string): Promise<THREE.BufferGeometry> {
+async function loadWithRetry(loader: CTMLoader, url: string, optimizeGeometry: boolean): Promise<THREE.BufferGeometry> {
   await acquire();
   try {
     let lastError: unknown;
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
-        return await loadOnce(loader, url);
+        return await loadOnce(loader, url, optimizeGeometry);
       } catch (error) {
         lastError = error;
         if (isPermanentFailure(error) || attempt === MAX_ATTEMPTS - 1) break;
@@ -71,18 +87,20 @@ async function loadWithRetry(loader: CTMLoader, url: string): Promise<THREE.Buff
   }
 }
 
-export function loadCachedGeometry(loader: CTMLoader, url: string): Promise<THREE.BufferGeometry> {
-  let cached = geometryCache.get(url);
+export function loadCachedGeometry(loader: CTMLoader, url: string, options: LoadOptions = {}): Promise<THREE.BufferGeometry> {
+  const optimizeGeometry = options.optimizeGeometry ?? true;
+  const cacheKey = `${optimizeGeometry ? 'smooth' : 'fast'}:${url}`;
+  let cached = geometryCache.get(cacheKey);
   if (!cached) {
-    cached = loadWithRetry(loader, url).then((geometry) => {
+    cached = loadWithRetry(loader, url, optimizeGeometry).then((geometry) => {
       geometry.userData.starvisSharedGeometry = true;
       return geometry;
     });
     // Evict failed loads so a later rebuild can retry rather than staying stuck.
     cached.catch(() => {
-      if (geometryCache.get(url) === cached) geometryCache.delete(url);
+      if (geometryCache.get(cacheKey) === cached) geometryCache.delete(cacheKey);
     });
-    geometryCache.set(url, cached);
+    geometryCache.set(cacheKey, cached);
   }
   return cached;
 }

@@ -1025,7 +1025,7 @@ export function FleetTacticsHoloViewer({
       }
 
       const modelUrl = `${API_BASE}/ships/${entry.ship.shipUuid}/model/file`;
-      void loadCachedGeometry(loader, modelUrl)
+      void loadCachedGeometry(loader, modelUrl, { optimizeGeometry: false })
         .then((geometry) => {
           if (disposed) return;
           const mat = makeMat(COLOR_DEFAULT, EMISS_DEFAULT);

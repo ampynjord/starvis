@@ -859,6 +859,13 @@ function readMG2(stream: CTMStream, body: CTMBody, vertexCount: number) {
 // â”€â”€â”€ Three.js Loader wrapper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export class CTMLoader extends THREE.Loader {
+  optimizeGeometry = true;
+
+  setOptimizeGeometry(value: boolean): this {
+    this.optimizeGeometry = value;
+    return this;
+  }
+
   load(
     url: string,
     onLoad: (geometry: THREE.BufferGeometry) => void,
@@ -892,20 +899,23 @@ export class CTMLoader extends THREE.Loader {
     raw.setIndex(new THREE.BufferAttribute(body.indices, 1));
     raw.setAttribute('position', new THREE.BufferAttribute(body.vertices, 3));
 
-    // Clean up the fragmented RSI export: weld coincident (duplicated) vertices
-    // to close the seams that make the surface look cracked/faceted, then
-    // recompute crease-aware normals so flat panels read smooth while sharp
-    // structural edges stay crisp. The holo material is untextured, so UVs and
-    // authored per-triangle normals are intentionally dropped here — keeping
-    // them would prevent the duplicated vertices from merging.
     let geo: THREE.BufferGeometry;
-    try {
-      const welded = mergeVertices(raw, 1e-4);
-      geo = toCreasedNormals(welded, CTM_CREASE_ANGLE);
-      if (welded !== raw) welded.dispose();
-      raw.dispose();
-    } catch {
-      // Fall back to the raw geometry if cleanup fails for any reason.
+    if (this.optimizeGeometry) {
+      // Clean up the fragmented RSI export: weld coincident duplicated vertices
+      // and recompute crease-aware normals. This looks best, but is expensive on
+      // large fleets, so multi-ship viewers can opt into the faster raw path.
+      try {
+        const welded = mergeVertices(raw, 1e-4);
+        geo = toCreasedNormals(welded, CTM_CREASE_ANGLE);
+        if (welded !== raw) welded.dispose();
+        raw.dispose();
+      } catch {
+        geo = raw;
+        if (body.uvMaps?.length) geo.setAttribute('uv', new THREE.BufferAttribute(body.uvMaps[0].uv, 2));
+        if (body.normals) geo.setAttribute('normal', new THREE.BufferAttribute(body.normals, 3));
+        else geo.computeVertexNormals();
+      }
+    } else {
       geo = raw;
       if (body.uvMaps?.length) geo.setAttribute('uv', new THREE.BufferAttribute(body.uvMaps[0].uv, 2));
       if (body.normals) geo.setAttribute('normal', new THREE.BufferAttribute(body.normals, 3));
