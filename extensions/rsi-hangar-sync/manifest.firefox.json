@@ -32,7 +32,10 @@
   ],
   "browser_specific_settings": {
     "gecko": {
-      "id": "extension@starvis.ampynjord.bzh"
+      "id": "extension@starvis.ampynjord.bzh",
+      "data_collection_permissions": {
+        "required": ["websiteContent"]
+      }
     }
   },
   "action": {
