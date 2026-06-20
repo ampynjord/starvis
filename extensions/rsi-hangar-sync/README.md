@@ -21,6 +21,8 @@ Both manifests share the same `src/` files and Starvis logo assets from `assets/
 
 The store submission archives are generated from `dist/chrome-store` and `dist/firefox-store`; they only include production host permissions for `https://starvis.ampynjord.bzh/*` and `https://robertsspaceindustries.com/*`. The local development folders keep `localhost` and `127.0.0.1` permissions.
 
+Firefox AMO requires a data collection declaration in the manifest. The Firefox package declares `websiteContent` because the extension reads RSI hangar page content in the user's authenticated browser session and transmits normalized hangar entries to Starvis for fleet synchronization. It does not receive or store RSI credentials.
+
 In CI/CD, the `Build Extension` GitHub Actions job uploads those store packages as the `starvis-browser-extension-store-packages` artifact. Download that artifact from the run summary when submitting a new version to Chrome Web Store or Firefox Add-ons.
 
 After both store listings are approved, configure the public install links:
