@@ -74,12 +74,15 @@ async function loadWithRetry(loader: CTMLoader, url: string): Promise<THREE.Buff
 export function loadCachedGeometry(loader: CTMLoader, url: string): Promise<THREE.BufferGeometry> {
   let cached = geometryCache.get(url);
   if (!cached) {
-    cached = loadWithRetry(loader, url);
+    cached = loadWithRetry(loader, url).then((geometry) => {
+      geometry.userData.starvisSharedGeometry = true;
+      return geometry;
+    });
     // Evict failed loads so a later rebuild can retry rather than staying stuck.
     cached.catch(() => {
       if (geometryCache.get(url) === cached) geometryCache.delete(url);
     });
     geometryCache.set(url, cached);
   }
-  return cached.then((geometry) => geometry.clone());
+  return cached;
 }
