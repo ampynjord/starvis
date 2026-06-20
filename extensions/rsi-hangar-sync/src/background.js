@@ -72,28 +72,49 @@ async function waitForHangarReady(tabId) {
     try {
       lastState = await executeScriptResult({
         target: { tabId },
-        func: inspectHangarReadiness,
+        func: inspectHangarSession,
       });
-      if (lastState?.ready) return;
     } catch {
       // The tab can briefly reject script injection while RSI is swapping documents.
+      await sleep(750);
+      continue;
     }
+    if (lastState?.blocked) throw new Error(lastState.error || 'RSI blocked hangar access');
+    if (lastState?.ready) return;
     await sleep(750);
   }
 
-  const detail = lastState?.markerCount != null ? ` (${lastState.markerCount} pledge markers detected)` : '';
-  throw new Error(`RSI hangar did not finish loading${detail}`);
+  const detail = lastState?.status ? ` (last status: ${lastState.status})` : '';
+  throw new Error(`RSI hangar session was not detected${detail}. Log in to RSI, let the pledges page finish loading, then retry Sync.`);
 }
 
-function inspectHangarReadiness() {
-  const text = document.body?.innerText ?? '';
-  const markerCount = [...document.querySelectorAll('[class*="pledge"], [class*="hangar"], article, .row, [class*="item"]')].filter(
-    (node) => /\b(attributed|created:|contains:|standalone)\b/i.test(node.textContent ?? ''),
-  ).length;
-  return {
-    ready: document.readyState === 'complete' && /my hangar/i.test(text) && markerCount > 0,
-    markerCount,
-  };
+async function inspectHangarSession() {
+  function looksLikeCloudflare(html) {
+    return /\b(just a moment|attention required|cf-browser-verification|cloudflare)\b/i.test(html);
+  }
+
+  function looksLikeLoggedInHangar(html) {
+    return /\b(my hangar|pledges|contains:|standalone ships?|js-pledge-name|list-items)\b/i.test(html);
+  }
+
+  try {
+    if (!/robertsspaceindustries\.com$/i.test(window.location.hostname)) {
+      return { ready: false, status: 'wrong-host' };
+    }
+
+    const response = await fetch('/en/account/pledges?page=1&pagesize=10', {
+      credentials: 'include',
+      headers: {
+        Accept: 'text/html,application/xhtml+xml,*/*',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    });
+    const html = await response.text();
+    if (looksLikeCloudflare(html)) return { ready: false, blocked: true, error: 'Cloudflare blocked RSI hangar access' };
+    return { ready: response.ok && looksLikeLoggedInHangar(html), status: response.status };
+  } catch (error) {
+    return { ready: false, status: 'fetch-error', error: error instanceof Error ? error.message : 'RSI hangar session probe failed' };
+  }
 }
 
 function isHangarTab(tab) {
@@ -121,116 +142,7 @@ async function findOrOpenHangarTab() {
 async function scrapeHangarTab(tabId) {
   await navigateTab(tabId, RSI_HANGAR_URL);
   await waitForHangarReady(tabId);
-  await applyAllPledgesFilter(tabId);
-  await waitForHangarReady(tabId);
-  const firstPage = await waitForScrapedHangarPage(tabId, 1, null);
-  if (!firstPage?.success) return firstPage;
-
-  const entries = [...(firstPage.entries ?? [])];
-  let previousSignature = firstPage.signature ?? null;
-  const pages = Math.min(Math.max(1, Number(firstPage.pages) || 1), 50);
-  for (let page = 2; page <= pages; page += 1) {
-    const url = new URL(RSI_HANGAR_URL);
-    url.searchParams.set('page', String(page));
-    await navigateTab(tabId, url.toString());
-    await waitForHangarReady(tabId);
-    const pageResult = await waitForScrapedHangarPage(tabId, page, previousSignature);
-    if (!pageResult?.success) return pageResult;
-    entries.push(...(pageResult.entries ?? []));
-    previousSignature = pageResult.signature ?? previousSignature;
-  }
-
-  const unique = new Map();
-  for (const entry of entries) {
-    if (!unique.has(entry.externalId)) unique.set(entry.externalId, entry);
-  }
-  return { success: true, entries: [...unique.values()] };
-}
-
-async function applyAllPledgesFilter(tabId) {
-  await executeScriptResult({
-    target: { tabId },
-    func: applyAllPledgesFilterInPage,
-  }).catch(() => null);
-}
-
-// Force the hangar "Filter by" control onto "All" so the scrape captures every
-// pledge type: standalone ships, game packages (which contain a ship) and CCU
-// upgrades (whose target ship is the one we own). Restricting to "Standalone
-// Ships" used to silently drop packages and upgrades from the import.
-async function applyAllPledgesFilterInPage() {
-  const sleepInPage = (ms) =>
-    new Promise((resolve) => {
-      setTimeout(resolve, ms);
-    });
-  const labelText = (node) =>
-    (node?.textContent || node?.getAttribute?.('aria-label') || node?.getAttribute?.('title') || '').replace(/\s+/g, ' ').trim();
-  // Match an explicit "All" / "All pledges" / "Show all" option only (avoid
-  // matching "All ships of a kind" style labels by anchoring to the start).
-  const isAllLabel = (text) => /^all($|\b)/i.test(text) || /\ball\s+pledges\b/i.test(text) || /\bshow\s+all\b/i.test(text);
-
-  const beforeSignature = document.body?.innerText?.slice(0, 2000) ?? '';
-  for (const select of [...document.querySelectorAll('select')]) {
-    const options = [...select.options];
-    // Only treat this select as the pledge filter when it actually offers the
-    // standalone/packages/upgrades vocabulary, then switch it to "All".
-    const looksLikePledgeFilter = options.some((candidate) => /(standalone|game packages?|upgrades?)/i.test(labelText(candidate)));
-    if (!looksLikePledgeFilter) continue;
-    const option = options.find((candidate) => isAllLabel(labelText(candidate)));
-    if (!option) continue;
-    if (select.value !== option.value) {
-      select.value = option.value;
-      select.dispatchEvent(new Event('input', { bubbles: true }));
-      select.dispatchEvent(new Event('change', { bubbles: true }));
-      await sleepInPage(1600);
-    }
-    return { applied: true, mode: 'select' };
-  }
-
-  const controls = [...document.querySelectorAll('button, [role="button"], [aria-haspopup], .select, [class*="select"]')];
-  const filterControl = controls.find((node) => /(^|\b)(all|game packages|upgrades|standalone ships)(\b|$)/i.test(labelText(node)));
-  if (filterControl instanceof HTMLElement) {
-    filterControl.click();
-    await sleepInPage(500);
-    const option = [...document.querySelectorAll('button, a, li, option, [role="option"], [class*="option"]')].find((node) =>
-      isAllLabel(labelText(node)),
-    );
-    if (option instanceof HTMLElement) {
-      option.click();
-      await sleepInPage(1800);
-      return {
-        applied: true,
-        mode: 'custom',
-        changed: (document.body?.innerText?.slice(0, 2000) ?? '') !== beforeSignature,
-      };
-    }
-  }
-
-  return { applied: false };
-}
-
-async function waitForScrapedHangarPage(tabId, expectedPage, previousSignature) {
-  let lastResult = null;
-  for (let attempt = 0; attempt < 60; attempt += 1) {
-    lastResult = await scrapeVisibleHangarPage(tabId).catch((error) => ({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unable to scrape RSI hangar',
-    }));
-    if (lastResult?.success) {
-      const pageMatches = Number(lastResult.currentPage || 1) === expectedPage;
-      const contentReady = (lastResult.pledgeCount ?? 0) > 0;
-      const contentChanged = !previousSignature || lastResult.signature !== previousSignature;
-      if (pageMatches && contentReady && contentChanged) return lastResult;
-    }
-    await sleep(750);
-  }
-
-  return lastResult?.success
-    ? {
-        success: false,
-        error: `RSI hangar page ${expectedPage} did not finish rendering distinct pledge content`,
-      }
-    : lastResult;
+  return scrapeVisibleHangarPage(tabId);
 }
 
 async function scrapeVisibleHangarPage(tabId) {
@@ -240,16 +152,11 @@ async function scrapeVisibleHangarPage(tabId) {
   });
 }
 
-function scrapeHangarInPage() {
+async function scrapeHangarInPage() {
+  const MAX_PAGES = 50;
+
   function textOf(node) {
     return node?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
-  }
-
-  function linesOf(node) {
-    return (node?.textContent ?? '')
-      .split(/\r?\n/)
-      .map((line) => line.replace(/\s+/g, ' ').trim())
-      .filter(Boolean);
   }
 
   function cleanUrl(value) {
@@ -261,142 +168,141 @@ function scrapeHangarInPage() {
     }
   }
 
-  function controlLabel(node) {
-    return (textOf(node) || node.getAttribute('aria-label') || node.getAttribute('title') || node.getAttribute('rel') || '').trim();
-  }
-
-  function titleOfCard(card, index) {
-    const titleNode = card.querySelector('h1, h2, h3, h4, [class*="title"], [class*="name"]');
-    return textOf(titleNode) || linesOf(card)[0] || `RSI hangar item ${index + 1}`;
-  }
-
-  function targetShipNameFromUpgradeText(value) {
-    if (!value) return null;
-    const clean = value.replace(/\s+/g, ' ').trim();
-    const match =
-      clean.match(/\bto\s+(.+?)\s+upgrade\b/i) ||
-      clean.match(/\bupgrade\s*[-:]\s*.+?\s+to\s+(.+?)(?:\s+(?:attributed|created:|contains:)|$)/i) ||
-      clean.match(/\bcontains:\s*(.+?)\s+upgrade\b/i);
-    return match?.[1]
-      ?.replace(/\b(warbond|standard edition|edition|ccu)\b/gi, ' ')
+  function normalizeText(value) {
+    return String(value ?? '')
       .replace(/\s+/g, ' ')
       .trim();
   }
 
-  function cleanShipCandidateName(value) {
-    const clean = value
-      ?.replace(/\s+/g, ' ')
-      .replace(/\s+and\s+\d+\s+items?.*$/i, '')
-      .replace(/\s+(created:|attributed|standalone\s+ships?|standalone\s+vehicles?).*$/i, '')
-      .replace(/\s*[|>].*$/i, '')
-      .trim();
-    if (!clean || /\b(paint|paints|skin|livery|gear|item|items|weapon|armor|poster|display|envelope|rifle|pistol)\b/i.test(clean)) {
-      return null;
+  function compactId(value) {
+    return normalizeText(value)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 80);
+  }
+
+  function looksLikeCloudflare(html) {
+    return /\b(just a moment|attention required|cf-browser-verification|cloudflare)\b/i.test(html);
+  }
+
+  function looksLikeLoggedInHangar(html) {
+    return /\b(my hangar|pledges|contains:|standalone ships?|js-pledge-name|list-items)\b/i.test(html);
+  }
+
+  function isShipKind(kind) {
+    const clean = normalizeText(kind).toLowerCase();
+    if (!clean) return false;
+    if (/\b(paint|skin|livery|decal|gear|weapon|armor|flair|poster|display|envelope|subscription)\b/i.test(clean)) return false;
+    return clean === 'ship' || clean === 'spaceship' || clean.includes('vehicle');
+  }
+
+  function pageUrl(page) {
+    const url = new URL('/en/account/pledges', window.location.origin);
+    url.searchParams.set('page', String(page));
+    url.searchParams.set('pagesize', '10');
+    return url;
+  }
+
+  async function fetchPledgesPage(page) {
+    const url = pageUrl(page);
+    const response = await fetch(url.toString(), {
+      credentials: 'include',
+      headers: {
+        Accept: 'text/html,application/xhtml+xml,*/*',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+    });
+    const html = await response.text();
+    if (looksLikeCloudflare(html)) throw new Error('Cloudflare blocked RSI hangar access. Refresh RSI in the browser, then retry Sync.');
+    if (!response.ok) throw new Error(`RSI hangar page ${page} returned ${response.status}`);
+    if (page === 1 && !looksLikeLoggedInHangar(html)) throw new Error('RSI session was not detected. Log in to RSI, then retry Sync.');
+    return { html, url: url.toString() };
+  }
+
+  function titleNodeOf(item) {
+    return item.querySelector('.title, [class~="title"], [class*="title"], h1, h2, h3, h4, [class*="name"]');
+  }
+
+  function kindNodeOf(item) {
+    return item.querySelector('.kind, [class~="kind"], [class*="kind"], [data-kind], [data-type]');
+  }
+
+  function pledgeContainerOf(item) {
+    return (
+      item.closest('[data-pledge-id], [data-id], [class*="pledge"], article, .row, [class*="list-item"]') ?? item.parentElement ?? item
+    );
+  }
+
+  function packageTitleOf(container) {
+    const title = container.querySelector('.js-pledge-name, [class*="pledge-name"], h1, h2, h3, h4, [class*="title"], [class*="name"]');
+    return normalizeText(textOf(title));
+  }
+
+  function directDataValue(node, names) {
+    for (const name of names) {
+      const value = node?.getAttribute?.(name);
+      if (value) return normalizeText(value);
     }
-    return targetShipNameFromUpgradeText(clean) || clean;
+    return null;
   }
 
-  function containsShipName(card) {
-    const lineCandidate = linesOf(card)
-      .map((line) => line.match(/\bcontains:\s*(.+)$/i)?.[1])
-      .map(cleanShipCandidateName)
-      .find(Boolean);
-    if (lineCandidate) return lineCandidate;
+  function extractHangarItem(item, index, page, sourceUrl) {
+    const title = normalizeText(textOf(titleNodeOf(item)) || directDataValue(item, ['data-title', 'data-name']));
+    const kind = normalizeText(textOf(kindNodeOf(item)) || directDataValue(item, ['data-kind', 'data-type']));
+    if (!title || !isShipKind(kind)) return null;
 
-    const flatText = textOf(card).replace(/\s+/g, ' ');
-    const containsMatch = flatText.match(/\bcontains:\s*(.+?)(?:\s+and\s+\d+\s+items?\b|$)/i);
-    return cleanShipCandidateName(containsMatch?.[1] ?? null);
-  }
-
-  function cleanStandaloneTitle(value) {
-    const clean = value
-      ?.replace(/^\s*standalone\s+(ships?|vehicles?)\s*[-:]\s*/i, '')
-      .replace(/^\s*(ships?|vehicles?)\s*[-:]\s*/i, '')
-      .replace(/\s*[-:]\s*(\d+\s*year|lti|warbond|standard edition|edition)\s*$/i, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (!clean || /\b(plus|pack|package|paint|paints|skin|livery|gear|item|items|weapon|armor|poster|display|envelope)\b/i.test(clean)) {
-      return null;
-    }
-    return clean;
-  }
-
-  function forbiddenPledgeLabel(value) {
-    return /^\s*(paint|paints|skin|livery|insurance|gear|item|items|poster|armor|weapon|ticket|coupon)\b/i.test(value);
-  }
-
-  function shipCandidateLabels(card, index) {
-    const title = titleOfCard(card, index);
-    const text = textOf(card);
-    const titleLooksStandalone = /\bstandalone\s+(ships?|vehicles?)\b/i.test(title) || /\bstandalone\s+(ships?|vehicles?)\b/i.test(text);
-    const labels = [
-      containsShipName(card),
-      targetShipNameFromUpgradeText(title),
-      targetShipNameFromUpgradeText(text),
-      titleLooksStandalone || /^\s*(ships?|vehicles?)\s*[-:]/i.test(title) ? cleanStandaloneTitle(title) : null,
-    ]
-      .map((value) => value?.replace(/\s+/g, ' ').trim())
-      .filter((value) => value && value.length >= 3 && !forbiddenPledgeLabel(value));
-    return [...new Set(labels)];
-  }
-
-  function looksLikePledgeCard(card) {
-    const text = textOf(card);
-    if (text.length < 8 || text.length > 5000) return false;
-    if (!/\b(attributed|created:|contains:|standalone|upgrade)\b/i.test(text)) return false;
-    return (text.match(/\bcreated:/gi)?.length ?? 0) <= 1;
-  }
-
-  function findPledgeCards(root) {
-    const selectors = ['[class*="pledge"]', '[class*="hangar"] article', 'article', '.row', '[class*="item"]'];
-    const candidates = selectors.flatMap((selector) => [...root.querySelectorAll(selector)]);
-    const pledgeCandidates = [...new Set(candidates)].filter((node) => looksLikePledgeCard(node));
-    return pledgeCandidates.filter((node) => !pledgeCandidates.some((other) => other !== node && other.contains(node)));
-  }
-
-  function extractCard(card, index, sourceUrl) {
-    const image = card.querySelector('img');
-    const link = card.querySelector('a[href]');
-    const dataId = card.getAttribute('data-id') || card.getAttribute('data-pledge-id') || card.getAttribute('data-item-id');
-    const title = titleOfCard(card, index);
-    const text = textOf(card);
-    const className = card.getAttribute('data-class-name') || card.getAttribute('data-ship-code') || null;
-    const shipCandidates = shipCandidateLabels(card, index);
-    const shipName = shipCandidates[0] || title;
+    const container = pledgeContainerOf(item);
+    const link = item.querySelector('a[href]') ?? container.querySelector('a[href]');
+    const image = item.querySelector('img') ?? container.querySelector('img');
+    const packageTitle = packageTitleOf(container);
+    const itemId = directDataValue(item, ['data-id', 'data-item-id', 'data-pledge-id', 'data-sku']);
+    const pledgeId = directDataValue(container, ['data-id', 'data-pledge-id', 'data-item-id', 'data-sku']);
+    const linkUrl = cleanUrl(link?.getAttribute('href'));
+    const externalId = [pledgeId || linkUrl || `page-${page}`, itemId || `item-${index}`, compactId(title)]
+      .filter(Boolean)
+      .join('|')
+      .slice(0, 160);
 
     return {
-      externalId: dataId || cleanUrl(link?.getAttribute('href')) || `${title}-${index}`,
-      name: shipName,
-      label: shipName,
+      externalId,
+      name: title,
+      label: title,
       title,
-      className,
-      packageName: null,
-      imageUrl: cleanUrl(image?.getAttribute('src')),
-      url: cleanUrl(link?.getAttribute('href')),
+      className:
+        directDataValue(item, ['data-class-name', 'data-ship-code']) ?? directDataValue(container, ['data-class-name', 'data-ship-code']),
+      packageName: packageTitle || null,
+      imageUrl: cleanUrl(image?.getAttribute('src') || image?.getAttribute('data-src')),
+      url: linkUrl,
       quantity: 1,
       raw: {
-        text: text.slice(0, 2000),
-        detectedShipName: shipName,
-        rsiKind: shipCandidates.length > 0 ? 'ship_candidate' : 'pledge',
-        shipCandidates,
+        rsiKind: kind,
+        rsiImportMethod: 'same_origin_pledge_items',
+        packageTitle: packageTitle || null,
         sourceUrl,
+        page,
+        text: textOf(item).slice(0, 1200),
+        shipCandidates: [title],
       },
     };
   }
 
-  function pageNumbers(root) {
-    return [...root.querySelectorAll('button, a')]
-      .map((node) => Number(controlLabel(node)))
-      .filter((page) => Number.isInteger(page) && page > 0 && page <= 50);
+  function parseTotalPages(html) {
+    const numbers = [...html.matchAll(/[?&]page=(\d+)/gi)].map((match) => Number(match[1])).filter((page) => page > 0 && page <= MAX_PAGES);
+    return Math.max(1, ...numbers);
   }
 
-  function maxPage(root) {
-    return Math.max(1, ...pageNumbers(root));
-  }
-
-  function currentPage() {
-    const page = Number(new URL(window.location.href).searchParams.get('page') || '1');
-    return Number.isInteger(page) && page > 0 ? page : 1;
+  function parsePledgesPage(html, page, sourceUrl) {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const candidates = [...doc.querySelectorAll('.list-items .item, [class*="pledge"] .item, article .item, .row .item, .item')];
+    const itemNodes = [...new Set(candidates)].filter((node) => titleNodeOf(node) && kindNodeOf(node));
+    const entries = itemNodes.map((item, index) => extractHangarItem(item, index, page, sourceUrl)).filter(Boolean);
+    return {
+      entries,
+      totalPages: parseTotalPages(html),
+      itemCount: itemNodes.length,
+      signature: entries.map((entry) => `${entry.externalId}:${entry.name}`).join('|'),
+    };
   }
 
   try {
@@ -404,16 +310,32 @@ function scrapeHangarInPage() {
       throw new Error('Not on Roberts Space Industries');
     }
 
-    const pledgeCards = findPledgeCards(document);
-    const cards = findPledgeCards(document);
-    const signature = pledgeCards.map((card, index) => `${titleOfCard(card, index)}:${textOf(card).slice(0, 180)}`).join('|');
+    const entries = [];
+    const signatures = [];
+    let totalPages = 1;
+    let parsedItems = 0;
+
+    for (let page = 1; page <= Math.min(totalPages, MAX_PAGES); page += 1) {
+      const fetched = await fetchPledgesPage(page);
+      const parsed = parsePledgesPage(fetched.html, page, fetched.url);
+      entries.push(...parsed.entries);
+      signatures.push(parsed.signature);
+      parsedItems += parsed.itemCount;
+      totalPages = Math.max(totalPages, parsed.totalPages);
+    }
+
+    const unique = new Map();
+    for (const entry of entries) {
+      if (!unique.has(entry.externalId)) unique.set(entry.externalId, entry);
+    }
+
     return {
       success: true,
-      currentPage: currentPage(),
-      pages: maxPage(document),
-      pledgeCount: pledgeCards.length,
-      signature,
-      entries: cards.map((card, index) => extractCard(card, index, window.location.href)),
+      currentPage: 1,
+      pages: totalPages,
+      pledgeCount: parsedItems,
+      signature: signatures.join('||'),
+      entries: [...unique.values()],
     };
   } catch (error) {
     return {
