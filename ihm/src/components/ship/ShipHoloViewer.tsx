@@ -4,6 +4,7 @@ import { Box } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { loadCachedGeometry } from '@/components/holo/ctm-geometry-cache';
 import { CTMLoader } from '@/lib/CTMLoader';
 import { createVisibilityTracker, disposeObject3D, getThreePixelRatio } from '@/lib/three-performance';
 import { API_BASE } from '@/utils/constants';
@@ -24,6 +25,7 @@ export function ShipHoloViewer({ shipUuid, shipName }: Props) {
 
   useEffect(() => {
     if (!ctmUrl || !canvasRef.current) return;
+    let disposed = false;
 
     const container = canvasRef.current;
     const width = container.clientWidth;
@@ -80,9 +82,9 @@ export function ShipHoloViewer({ shipUuid, shipName }: Props) {
     // ── Load CTM ───────────────────────────────────────────────────────
     setLoadState('loading');
     const loader = new CTMLoader();
-    loader.load(
-      ctmUrl,
-      (geometry) => {
+    void loadCachedGeometry(loader, ctmUrl)
+      .then((geometry) => {
+        if (disposed) return;
         const pivot = new THREE.Group();
         pivot.rotation.set(0, Math.PI / 2, 0);
 
@@ -123,10 +125,10 @@ export function ShipHoloViewer({ shipUuid, shipName }: Props) {
         scene.add(grid);
 
         setLoadState('ready');
-      },
-      undefined,
-      () => setLoadState('error'),
-    );
+      })
+      .catch(() => {
+        if (!disposed) setLoadState('error');
+      });
 
     // ── Render loop ────────────────────────────────────────────────────
     const animate = () => {
@@ -150,6 +152,7 @@ export function ShipHoloViewer({ shipUuid, shipName }: Props) {
     ro.observe(container);
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(frameRef.current);
       ro.disconnect();
       visibility.dispose();

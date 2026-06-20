@@ -33,7 +33,9 @@ export function createVisibilityTracker(element: HTMLElement, onChange?: (visibl
 export function disposeObject3D(root: THREE.Object3D) {
   root.traverse((obj) => {
     const mesh = obj as THREE.Mesh;
-    mesh.geometry?.dispose();
+    if (mesh.geometry && !mesh.geometry.userData.starvisSharedGeometry) {
+      mesh.geometry.dispose();
+    }
 
     const materials = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
     for (const material of materials) {

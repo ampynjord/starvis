@@ -122,6 +122,10 @@ export function FleetTacticsHoloViewer({
 
   useEffect(() => {
     if (!containerRef.current || (ships.length === 0 && tacticalMarkers.length === 0 && tacticalVectors.length === 0)) return;
+    let disposed = false;
+    let layoutFrame = 0;
+    let pendingFitView = false;
+    let loadedCountFrame = 0;
     const container = containerRef.current;
     const W = container.clientWidth;
     const H = container.clientHeight;
@@ -813,9 +817,29 @@ export function FleetTacticsHoloViewer({
     const vectorLaunchers: VectorLauncherEntry[] = entries.map((entry) => makeVectorLauncher('ship', entry.ship.id, entry.ship));
     const allVectorLaunchers = [...vectorLaunchers, ...groupRings.map((ring) => ring.vectorLauncher)];
 
-    const refreshLayout = (fitView = !userHasMovedView) => {
+    const refreshLayoutNow = (fitView = !userHasMovedView) => {
       updateGrid();
       if (fitView) fitCamera();
+    };
+
+    const scheduleLayout = (fitView = !userHasMovedView) => {
+      if (disposed) return;
+      pendingFitView = pendingFitView || fitView;
+      if (layoutFrame) return;
+      layoutFrame = requestAnimationFrame(() => {
+        layoutFrame = 0;
+        const shouldFit = pendingFitView;
+        pendingFitView = false;
+        refreshLayoutNow(shouldFit);
+      });
+    };
+
+    const publishLoadedCount = () => {
+      if (disposed || loadedCountFrame) return;
+      loadedCountFrame = requestAnimationFrame(() => {
+        loadedCountFrame = 0;
+        if (!disposed) setLoadedCount(loadedSoFar);
+      });
     };
 
     // Apply external position changes (drag persistence, formations, group moves)
@@ -844,7 +868,7 @@ export function FleetTacticsHoloViewer({
           moved = true; // vectors follow the source height, so trigger a refresh
         }
       });
-      if (moved) refreshLayout(false);
+      if (moved) scheduleLayout(false);
     };
 
     const fitCamera = () => {
@@ -873,19 +897,24 @@ export function FleetTacticsHoloViewer({
     let loadedSoFar = 0;
 
     placeShipsOnce();
-    refreshLayout();
+    refreshLayoutNow();
 
     const markLoaded = (entry: ShipEntry, radius: number, halfWidth: number) => {
+      if (entry.loaded || disposed) return;
       entry.radius = radius;
       entry.halfWidth = halfWidth;
       entry.loaded = true;
       loadedSoFar++;
-      setLoadedCount(loadedSoFar);
+      publishLoadedCount();
       placeShipsOnce();
-      refreshLayout();
+      scheduleLayout();
     };
 
     const addFallbackCard = (entry: ShipEntry, texture: THREE.Texture | null) => {
+      if (disposed) {
+        texture?.dispose();
+        return;
+      }
       const cardW = Math.max(shipRenderLengthWorld(entry.ship), 12);
       const cardH = cardW / 1.78;
       const geo = new THREE.PlaneGeometry(cardW, cardH);
@@ -917,9 +946,17 @@ export function FleetTacticsHoloViewer({
       }
       new THREE.TextureLoader().load(
         entry.ship.thumbnailUrl,
-        (tex) => addFallbackCard(entry, tex),
+        (tex) => {
+          if (disposed) {
+            tex.dispose();
+            return;
+          }
+          addFallbackCard(entry, tex);
+        },
         undefined,
-        () => addFallbackCard(entry, null),
+        () => {
+          if (!disposed) addFallbackCard(entry, null);
+        },
       );
     };
 
@@ -959,42 +996,30 @@ export function FleetTacticsHoloViewer({
           texLoader.load(
             entry.ship.thumbnailUrl,
             (tex) => {
+              if (disposed) {
+                tex.dispose();
+                return;
+              }
               const { card, meshes } = buildCard(tex);
               entry.root.add(card);
               entry.meshes.push(...meshes);
-              entry.radius = CARD_W / 2;
-              entry.halfWidth = CARD_W / 2;
-              entry.loaded = true;
-              loadedSoFar++;
-              setLoadedCount(loadedSoFar);
-              placeShipsOnce();
-              refreshLayout();
+              markLoaded(entry, CARD_W / 2, CARD_W / 2);
             },
             undefined,
             () => {
+              if (disposed) return;
               const { card, meshes } = buildCard(null);
               entry.root.add(card);
               entry.meshes.push(...meshes);
-              entry.radius = CARD_W / 2;
-              entry.halfWidth = CARD_W / 2;
-              entry.loaded = true;
-              loadedSoFar++;
-              setLoadedCount(loadedSoFar);
-              placeShipsOnce();
-              refreshLayout();
+              markLoaded(entry, CARD_W / 2, CARD_W / 2);
             },
           );
         } else {
+          if (disposed) return;
           const { card, meshes } = buildCard(null);
           entry.root.add(card);
           entry.meshes.push(...meshes);
-          entry.radius = CARD_W / 2;
-          entry.halfWidth = CARD_W / 2;
-          entry.loaded = true;
-          loadedSoFar++;
-          setLoadedCount(loadedSoFar);
-          placeShipsOnce();
-          refreshLayout();
+          markLoaded(entry, CARD_W / 2, CARD_W / 2);
         }
         return;
       }
@@ -1002,6 +1027,7 @@ export function FleetTacticsHoloViewer({
       const modelUrl = `${API_BASE}/ships/${entry.ship.shipUuid}/model/file`;
       void loadCachedGeometry(loader, modelUrl)
         .then((geometry) => {
+          if (disposed) return;
           const mat = makeMat(COLOR_DEFAULT, EMISS_DEFAULT);
           const mesh = new THREE.Mesh(geometry, mat);
           mesh.userData.fleetItemId = entry.ship.id;
@@ -1060,14 +1086,10 @@ export function FleetTacticsHoloViewer({
           entry.ring = ring;
           entry.root.add(ring);
 
-          entry.loaded = true;
-          loadedSoFar++;
-          setLoadedCount(loadedSoFar);
-          placeShipsOnce();
-          refreshLayout();
+          markLoaded(entry, r, Math.max(width / 2, r * 0.35));
         })
         .catch(() => {
-          loadFallbackCard(entry);
+          if (!disposed) loadFallbackCard(entry);
         });
     });
 
@@ -1585,7 +1607,10 @@ export function FleetTacticsHoloViewer({
     ro.observe(container);
 
     return () => {
+      disposed = true;
       cancelAnimationFrame(frameRef.current);
+      if (layoutFrame) cancelAnimationFrame(layoutFrame);
+      if (loadedCountFrame) cancelAnimationFrame(loadedCountFrame);
       ro.disconnect();
       visibility.dispose();
       renderer.domElement.removeEventListener('pointerdown', onPointerDown);
