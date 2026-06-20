@@ -341,15 +341,18 @@ export default function FleetManagerPage() {
       return;
     }
 
-    await Promise.allSettled(
+    const settled = await Promise.allSettled(
       missing.map(async (uuid) => {
         const ship = await api.ships.get(uuid);
-        if (ship) {
-          shipCacheRef.current.set(uuid, ship as unknown as ShipListItem);
-          setShipData(new Map(shipCacheRef.current));
-        }
+        return ship ? ([uuid, ship as unknown as ShipListItem] as const) : null;
       }),
     );
+    for (const result of settled) {
+      if (result.status === 'fulfilled' && result.value) {
+        shipCacheRef.current.set(result.value[0], result.value[1]);
+      }
+    }
+    setShipData(new Map(shipCacheRef.current));
   }, []);
 
   const loadFleet = useCallback(async () => {
