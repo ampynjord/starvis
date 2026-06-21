@@ -34,7 +34,7 @@ jobs:
       extension: ${{ steps.filter.outputs.extension }}
       e2e: ${{ steps.filter.outputs.e2e }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Filter changed paths
         id: filter
@@ -87,7 +87,7 @@ jobs:
     name: Dependency Audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - name: Critical dependency audit
         run: npm audit --omit=dev --audit-level=critical
@@ -106,7 +106,7 @@ jobs:
           - name: bot
             file: bot/Dockerfile
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: ${{ matrix.file }}
@@ -116,7 +116,7 @@ jobs:
     name: Lint (Biome)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: npm run lint:ci
 
@@ -124,7 +124,7 @@ jobs:
     name: Config, Schema & Docs
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
 
       - name: Validate OpenAPI
@@ -240,7 +240,7 @@ jobs:
           - name: extension
             cmd: npm run typecheck --workspace=@starvis/rsi-hangar-sync-extension
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
 
       - name: Setup IHM generated Next types
@@ -281,7 +281,7 @@ jobs:
           --health-timeout=3s
           --health-retries=10
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
 
       - name: Apply DB migrations
@@ -316,7 +316,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.run_all == 'true' || needs.changes.outputs.extractor == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: npm run test --workspace=@starvis/extractor -- --reporter=verbose
         env:
@@ -328,7 +328,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.run_all == 'true' || needs.changes.outputs.ihm == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: npm run test --workspace=starvis-ihm -- --reporter=verbose
         env:
@@ -340,7 +340,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.run_all == 'true' || needs.changes.outputs.ihm == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: npm run build --workspace=starvis-ihm
 
@@ -350,7 +350,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.run_all == 'true' || needs.changes.outputs.bot == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: npm run build --workspace=@starvis/bot
 
@@ -360,7 +360,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.run_all == 'true' || needs.changes.outputs.extension == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
       - run: npm run build --workspace=@starvis/rsi-hangar-sync-extension
       - name: Upload browser extension store packages
@@ -377,7 +377,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.run_all == 'true' || needs.changes.outputs.e2e == 'true'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/setup
 
       - name: Cache Playwright browsers
@@ -450,7 +450,7 @@ jobs:
             file: bot/Dockerfile
             target: production
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -585,7 +585,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: deploy
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-node@v5
         with:
