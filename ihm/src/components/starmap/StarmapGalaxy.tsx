@@ -40,6 +40,7 @@ interface SceneModel {
   jumpLines: Array<{ from: THREE.Vector3; to: THREE.Vector3 }>;
   camera: THREE.Vector3;
   target: THREE.Vector3;
+  radius: number;
 }
 
 type StarmapLevel = 'galaxy' | 'system' | 'body';
@@ -88,8 +89,9 @@ const TYPE_ORDER = new Map<string, number>([
 
 const IMAGE_EXT = /\.(png|jpe?g|webp|avif)(\?|$)/i;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-const SYSTEM_SCENE_RADIUS = 210;
-const BODY_SCENE_RADIUS = 82;
+const SYSTEM_SCENE_RADIUS = 170;
+const BODY_SCENE_RADIUS = 64;
+const ORBITABLE_TYPES = new Set(['planet', 'dwarfplanet', 'moon', 'satellite']);
 
 function typeKey(type: string | null | undefined) {
   return String(type ?? '')
@@ -300,14 +302,65 @@ function makeGlowTexture(): THREE.Texture {
   return tex;
 }
 
-function makeLabelSprite(text: string, css: string): THREE.Sprite {
+function makeProceduralBodyTexture(object: StarmapPosition, color: number): THREE.CanvasTexture {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  const base = new THREE.Color(color);
+  const key = typeKey(object.type);
+  const center = size / 2;
+
+  if (ctx) {
+    const dark = base.clone().multiplyScalar(key.includes('asteroid') ? 0.42 : 0.58).getStyle();
+    const light = base.clone().lerp(new THREE.Color(0xffffff), key === 'star' ? 0.42 : 0.28).getStyle();
+    const grad = ctx.createRadialGradient(center * 0.68, center * 0.58, 12, center, center, center);
+    grad.addColorStop(0, light);
+    grad.addColorStop(0.58, base.getStyle());
+    grad.addColorStop(1, dark);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+
+    const seed = object.id * 9973;
+    ctx.globalAlpha = key === 'star' ? 0.18 : 0.28;
+    for (let i = 0; i < 34; i += 1) {
+      const y = (i / 34) * size + Math.sin(seed + i * 1.7) * 7;
+      const bandHeight = 2 + ((seed + i * 13) % 9);
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(255,255,255,0.22)' : 'rgba(2,6,23,0.34)';
+      ctx.fillRect(0, y, size, bandHeight);
+    }
+
+    if (key.includes('asteroid')) {
+      ctx.globalAlpha = 0.42;
+      for (let i = 0; i < 40; i += 1) {
+        const x = (Math.sin(seed + i * 4.1) * 0.5 + 0.5) * size;
+        const y = (Math.cos(seed + i * 2.3) * 0.5 + 0.5) * size;
+        ctx.fillStyle = 'rgba(2,6,23,0.45)';
+        ctx.beginPath();
+        ctx.arc(x, y, 2 + (i % 5), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    ctx.globalAlpha = 1;
+  }
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+function makeLabelSprite(text: string, css: string, worldHeight: number): THREE.Sprite {
   const padding = 8;
-  const font = '600 30px "Rajdhani", system-ui, sans-serif';
+  const label = text.length > 28 ? `${text.slice(0, 25)}...` : text;
+  const font = '700 26px "Rajdhani", system-ui, sans-serif';
   const measure = document.createElement('canvas').getContext('2d');
   if (measure) measure.font = font;
-  const textWidth = measure ? measure.measureText(text).width : text.length * 16;
+  const textWidth = measure ? measure.measureText(label).width : label.length * 14;
   const w = Math.ceil(textWidth + padding * 2);
-  const h = 44;
+  const h = 40;
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
@@ -315,16 +368,16 @@ function makeLabelSprite(text: string, css: string): THREE.Sprite {
   if (ctx) {
     ctx.font = font;
     ctx.textBaseline = 'middle';
-    ctx.fillStyle = 'rgba(2,6,23,0.58)';
+    ctx.fillStyle = 'rgba(2,6,23,0.72)';
     ctx.fillRect(0, 0, w, h);
     ctx.fillStyle = css;
-    ctx.fillText(text, padding, h / 2 + 1);
+    ctx.fillText(label, padding, h / 2 + 1);
   }
   const tex = new THREE.CanvasTexture(canvas);
   tex.needsUpdate = true;
-  const material = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+  const material = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false });
   const sprite = new THREE.Sprite(material);
-  sprite.scale.set((w / h) * 4, 4, 1);
+  sprite.scale.set((w / h) * worldHeight, worldHeight, 1);
   return sprite;
 }
 
@@ -348,6 +401,23 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
+function shouldDrawOrbit(object: StarmapPosition, level: 'system' | 'body', depth: number) {
+  const key = typeKey(object.type);
+  if (!ORBITABLE_TYPES.has(key)) return false;
+  if (level === 'body') return depth <= 1;
+  return depth <= 2;
+}
+
+function modelRadius(nodes: SceneNode[]) {
+  return Math.max(24, ...nodes.filter((node) => node.visible !== false).map((node) => node.position.length() + node.radius * 6));
+}
+
+function cameraFor(level: StarmapLevel, radius: number) {
+  if (level === 'galaxy') return new THREE.Vector3(120, 90, 200);
+  if (level === 'system') return new THREE.Vector3(0, radius * 0.62, radius * 1.18);
+  return new THREE.Vector3(0, radius * 0.78, radius * 1.35);
+}
+
 function scaledCoordinates(
   root: StarmapPosition,
   objects: StarmapPosition[],
@@ -368,7 +438,14 @@ function scaledCoordinates(
   const scale = maxDistance > 0 ? clamp(targetRadius / maxDistance, 0.04, 42) : 1;
   const scenePositions = new Map<number, THREE.Vector3>();
   rawPositions.forEach((position, id) => {
-    scenePositions.set(id, position.clone().multiplyScalar(scale));
+    const distance = position.length();
+    if (distance <= 0.0001) {
+      scenePositions.set(id, new THREE.Vector3(0, 0, 0));
+      return;
+    }
+
+    const easedDistance = Math.pow(distance / maxDistance, 0.74) * targetRadius;
+    scenePositions.set(id, position.clone().normalize().multiplyScalar(easedDistance).setY(position.y * scale * 0.42));
   });
 
   return { scenePositions, scale };
@@ -377,7 +454,7 @@ function scaledCoordinates(
 function nodeLabelEnabled(object: StarmapPosition, level: 'system' | 'body', depth: number) {
   const key = typeKey(object.type);
   if (depth === 0) return true;
-  if (level === 'body') return depth <= 1 && !isLandingZone(object);
+  if (level === 'body') return depth <= 1 && ORBITABLE_TYPES.has(key);
   return depth <= 1 && ['star', 'planet', 'dwarfplanet', 'jumppoint', 'jump_point'].includes(key);
 }
 
@@ -426,12 +503,14 @@ function buildGalaxyModel(objects: StarmapPosition[]): SceneModel {
     }
   }
 
+  const radius = modelRadius(nodes);
   return {
     nodes,
     rings: [],
     jumpLines,
-    camera: new THREE.Vector3(120, 90, 200),
+    camera: cameraFor('galaxy', radius),
     target: new THREE.Vector3(0, 0, 0),
+    radius,
   };
 }
 
@@ -490,7 +569,9 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
       };
       nodes.push(node);
       placed.add(child.id);
-      if (!landing && orbitRadius > 1) rings.push({ center: parentPosition, radius: orbitRadius, color: style.color, opacity: depth === 1 ? 0.14 : 0.08 });
+      if (shouldDrawOrbit(child, level, depth) && orbitRadius > 1) {
+        rings.push({ center: parentPosition, radius: orbitRadius, color: style.color, opacity: depth === 1 ? 0.09 : 0.045 });
+      }
       placeChildren(child, position, Math.max(1, node.radius), depth + 1);
     });
   };
@@ -512,7 +593,9 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
     };
     nodes.push(node);
     placed.add(child.id);
-    if (!landing && orbitRadius > 1) rings.push({ center: rootNode.position, radius: orbitRadius, color: style.color, opacity: 0.16 });
+    if (shouldDrawOrbit(child, level, 1) && orbitRadius > 1) {
+      rings.push({ center: rootNode.position, radius: orbitRadius, color: style.color, opacity: 0.09 });
+    }
     placeChildren(child, position, Math.max(1, node.radius), 1);
   });
 
@@ -520,10 +603,8 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
   leftovers.forEach((child, index) => {
     const style = objectStyle(child.type);
     const position = positionFor(child, rootNode.position, Math.max(1, rootNode.radius), index + nodes.length, 1);
-    const orbitRadius = position.clone().setY(rootNode.position.y).distanceTo(rootNode.position);
     nodes.push({ object: child, position, radius: style.size, css: style.css, color: style.color, label: false });
     placed.add(child.id);
-    if (orbitRadius > 1) rings.push({ center: rootNode.position, radius: orbitRadius, color: style.color, opacity: 0.08 });
   });
 
   const jumpLines: SceneModel['jumpLines'] = [];
@@ -532,12 +613,14 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
     for (const node of jumpNodes) jumpLines.push({ from: rootNode.position, to: node.position });
   }
 
+  const radius = modelRadius(nodes);
   return {
     nodes,
     rings,
     jumpLines,
-    camera: level === 'system' ? new THREE.Vector3(0, 190, 255) : new THREE.Vector3(0, 68, 98),
+    camera: cameraFor(level, radius),
     target: new THREE.Vector3(0, 0, 0),
+    radius,
   };
 }
 
@@ -611,10 +694,11 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x030712);
-    scene.fog = new THREE.FogExp2(0x030712, level === 'galaxy' ? 0.0016 : 0.006);
-    scene.add(new THREE.AmbientLight(0x4060a0, 1.4));
+    scene.fog = new THREE.FogExp2(0x030712, level === 'galaxy' ? 0.0014 : level === 'system' ? 0.0018 : 0.0032);
+    scene.add(new THREE.AmbientLight(0x7aa7ff, level === 'galaxy' ? 1.35 : 2.15));
+    scene.add(new THREE.HemisphereLight(0x8edcff, 0x070b1f, level === 'galaxy' ? 0.7 : 1.15));
 
-    const key = new THREE.PointLight(0x66d8ff, 1.2, 0, 0);
+    const key = new THREE.PointLight(0x66d8ff, level === 'galaxy' ? 1.2 : 2.35, 0, 0);
     key.position.set(80, 120, 80);
     scene.add(key);
 
@@ -625,7 +709,8 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
     container.appendChild(renderer.domElement);
 
     const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 6000);
-    camera.position.copy(sceneModel.camera);
+    const portraitFit = width < 640 && level !== 'galaxy' ? 1.72 : 1;
+    camera.position.copy(sceneModel.camera.clone().multiplyScalar(portraitFit));
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -635,8 +720,8 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
     controls.autoRotate = level === 'galaxy';
     controls.autoRotateSpeed = 0.25;
     controls.target.copy(sceneModel.target);
-    controls.minDistance = level === 'galaxy' ? 30 : 14;
-    controls.maxDistance = level === 'galaxy' ? 900 : 520;
+    controls.minDistance = level === 'galaxy' ? 30 : Math.max(10, sceneModel.radius * 0.16);
+    controls.maxDistance = level === 'galaxy' ? 900 : Math.max(160, sceneModel.radius * 2.8);
     controls.update();
 
     const visibility = createVisibilityTracker(container);
@@ -647,13 +732,14 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
     const loadedTextures: THREE.Texture[] = [];
     const pickables: THREE.Mesh[] = [];
     const nodeGroup = new THREE.Group();
-    const animatedNodes: Array<{ mesh: THREE.Mesh; glow: THREE.Sprite; base: number; phase: number }> = [];
+    const animatedNodes: Array<{ mesh: THREE.Mesh; glow: THREE.Sprite; base: number; glowBase: number; phase: number }> = [];
+    const labels: Array<{ sprite: THREE.Sprite; baseWidth: number; baseHeight: number }> = [];
 
-    const starCount = level === 'galaxy' ? 2200 : 900;
+    const starCount = level === 'galaxy' ? 2200 : 760;
     const starGeo = new THREE.BufferGeometry();
     const starPos = new Float32Array(starCount * 3);
     for (let i = 0; i < starCount; i++) {
-      const r = (level === 'galaxy' ? 600 : 110) + Math.random() * (level === 'galaxy' ? 1400 : 280);
+      const r = (level === 'galaxy' ? 600 : sceneModel.radius * 1.15) + Math.random() * (level === 'galaxy' ? 1400 : sceneModel.radius * 1.9);
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.acos(2 * Math.random() - 1);
       starPos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
@@ -664,7 +750,7 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
     scene.add(
       new THREE.Points(
         starGeo,
-        new THREE.PointsMaterial({ color: 0x8aa0c0, size: level === 'galaxy' ? 2 : 0.65, sizeAttenuation: true, transparent: true, opacity: 0.48 }),
+        new THREE.PointsMaterial({ color: 0x8aa0c0, size: level === 'galaxy' ? 2 : 0.52, sizeAttenuation: true, transparent: true, opacity: level === 'galaxy' ? 0.48 : 0.34 }),
       ),
     );
 
@@ -677,7 +763,7 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
       const materialOptions: THREE.MeshStandardMaterialParameters = {
         color: node.color,
         emissive: node.color,
-        emissiveIntensity: isSystemObject(node.object) ? 1.2 : 0.55,
+        emissiveIntensity: isSystemObject(node.object) ? 1.05 : 0.28,
         roughness: 0.42,
         metalness: 0.08,
       };
@@ -688,13 +774,23 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
         });
         loadedTextures.push(tex);
         materialOptions.map = tex;
+        materialOptions.color = 0xffffff;
+        materialOptions.emissiveIntensity = typeKey(node.object.type) === 'star' ? 0.5 : 0.05;
         materialOptions.roughness = 0.72;
+      } else if (isPlanetLike(node.object) || isMoonLike(node.object) || typeKey(node.object.type) === 'star' || typeKey(node.object.type).includes('asteroid')) {
+        const tex = makeProceduralBodyTexture(node.object, node.color);
+        loadedTextures.push(tex);
+        materialOptions.map = tex;
+        materialOptions.color = 0xffffff;
+        materialOptions.emissiveIntensity = typeKey(node.object.type) === 'star' ? 0.75 : 0.08;
+        materialOptions.roughness = typeKey(node.object.type).includes('asteroid') ? 0.9 : 0.68;
       }
 
       const mesh = new THREE.Mesh(sphereGeo, new THREE.MeshStandardMaterial(materialOptions));
       mesh.position.copy(node.position);
       mesh.scale.setScalar(node.radius);
       mesh.userData.system = node.object;
+      mesh.userData.baseEmissiveIntensity = materialOptions.emissiveIntensity ?? 0.28;
       pickables.push(mesh);
       nodeGroup.add(mesh);
 
@@ -707,17 +803,20 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
           blending: THREE.AdditiveBlending,
         }),
       );
-      glow.scale.set((node.surface ? 3 : 7) + node.radius * 3, (node.surface ? 3 : 7) + node.radius * 3, 1);
+      const glowBase = node.surface ? 2.1 : level === 'galaxy' ? 7 : 4.2;
+      glow.scale.set(glowBase + node.radius * 2.2, glowBase + node.radius * 2.2, 1);
       glow.position.copy(node.position);
       nodeGroup.add(glow);
-      animatedNodes.push({ mesh, glow, base: node.radius, phase: Math.random() * Math.PI * 2 });
+      animatedNodes.push({ mesh, glow, base: node.radius, glowBase, phase: Math.random() * Math.PI * 2 });
 
       const shouldLabel = node.label ?? (
         level === 'galaxy' && ['system', 'star'].includes(typeKey(node.object.type))
       );
       if (shouldLabel) {
-        const label = makeLabelSprite(node.object.name, node.css);
-        label.position.copy(node.position).add(new THREE.Vector3(0, 2.4 + node.radius, 0));
+        const labelHeight = level === 'galaxy' ? 4 : level === 'system' ? 2.35 : 1.45;
+        const label = makeLabelSprite(node.object.name, node.css, labelHeight);
+        label.position.copy(node.position).add(new THREE.Vector3(0, labelHeight * 0.65 + node.radius, 0));
+        labels.push({ sprite: label, baseWidth: label.scale.x, baseHeight: label.scale.y });
         nodeGroup.add(label);
       }
     }
@@ -729,7 +828,7 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
         line.to,
       );
       const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(36));
-      const material = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.22 });
+      const material = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: level === 'galaxy' ? 0.22 : 0.08 });
       nodeGroup.add(new THREE.Line(geometry, material));
     }
 
@@ -753,7 +852,9 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
       const hit = raycaster.intersectObjects(pickables, false)[0];
       const mesh = (hit?.object as THREE.Mesh) ?? null;
       if (mesh !== hovered) {
-        if (hovered) (hovered.material as THREE.MeshStandardMaterial).emissiveIntensity = 0.55;
+        if (hovered) {
+          (hovered.material as THREE.MeshStandardMaterial).emissiveIntensity = Number(hovered.userData.baseEmissiveIntensity ?? 0.28);
+        }
         hovered = mesh;
         if (hovered) (hovered.material as THREE.MeshStandardMaterial).emissiveIntensity = 1.8;
         renderer.domElement.style.cursor = hovered ? 'pointer' : 'grab';
@@ -791,7 +892,13 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
         const pulse = 1 + Math.sin(t * 1.8 + node.phase) * 0.045;
         node.mesh.scale.setScalar(node.base * pulse);
         const glowPulse = 1 + Math.sin(t * 1.5 + node.phase) * 0.08;
-        node.glow.scale.setScalar(((node.base < 0.7 ? 3 : 7) + node.base * 3) * glowPulse);
+        node.glow.scale.setScalar((node.glowBase + node.base * 2.2) * glowPulse);
+      }
+      const labelReferenceDistance = level === 'galaxy' ? 260 : level === 'system' ? 210 : 120;
+      for (const label of labels) {
+        const distance = camera.position.distanceTo(label.sprite.position);
+        const factor = clamp(distance / labelReferenceDistance, 0.42, 1.05);
+        label.sprite.scale.set(label.baseWidth * factor, label.baseHeight * factor, 1);
       }
       controls.update();
       renderer.render(scene, camera);
