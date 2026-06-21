@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, Compass, Eye, EyeOff, Globe2, Layers, Loader2, MapPin, Orbit, Satellite, Search, X } from 'lucide-react';
+import { ChevronLeft, Compass, Eye, EyeOff, Globe2, Layers, Loader2, MapPin, Orbit, Route, Satellite, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -362,6 +362,61 @@ function jumpPointTargets(system: StarmapPosition): string[] {
         .filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
     })
     .map((value) => value.toLowerCase());
+}
+
+function normSys(value: string | null | undefined) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+// Build a system jump-network from jump-point objects, whose names encode an
+// "Origin - Destination" pair (e.g. "Odin - Kellog"). Keyed by lowercased name.
+function buildJumpGraph(objects: StarmapPosition[]): Map<string, Set<string>> {
+  const graph = new Map<string, Set<string>>();
+  const link = (a: string, b: string) => {
+    if (!a || !b || a === b) return;
+    if (!graph.has(a)) graph.set(a, new Set());
+    if (!graph.has(b)) graph.set(b, new Set());
+    graph.get(a)?.add(b);
+    graph.get(b)?.add(a);
+  };
+  for (const obj of objects) {
+    if (!typeKey(obj.type).includes('jump')) continue;
+    const origin = normSys(obj.system_name) || normSys(obj.system_code);
+    const parts = String(obj.name ?? '')
+      .split(/\s[-–—]\s/)
+      .map(normSys)
+      .filter(Boolean);
+    if (parts.length < 2) continue;
+    const dest = parts.find((part) => part !== origin) ?? parts[1];
+    link(origin, dest);
+  }
+  return graph;
+}
+
+// Breadth-first shortest jump path between two system keys.
+function findJumpRoute(graph: Map<string, Set<string>>, from: string, to: string): string[] | null {
+  if (from === to) return [from];
+  if (!graph.has(from) || !graph.has(to)) return null;
+  const queue: string[] = [from];
+  const prev = new Map<string, string | null>([[from, null]]);
+  while (queue.length) {
+    const node = queue.shift() as string;
+    if (node === to) break;
+    for (const next of graph.get(node) ?? []) {
+      if (!prev.has(next)) {
+        prev.set(next, node);
+        queue.push(next);
+      }
+    }
+  }
+  if (!prev.has(to)) return null;
+  const path: string[] = [];
+  let cursor: string | null = to;
+  while (cursor) {
+    path.unshift(cursor);
+    cursor = prev.get(cursor) ?? null;
+  }
+  return path;
 }
 
 function makeGlowTexture(): THREE.Texture {
@@ -812,6 +867,9 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
   const [activeBody, setActiveBody] = useState<StarmapPosition | null>(null);
   const [hiddenLayers, setHiddenLayers] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
+  const [routeOpen, setRouteOpen] = useState(false);
+  const [routeFrom, setRouteFrom] = useState('');
+  const [routeTo, setRouteTo] = useState('');
   const cameraParamRef = useRef<CameraParam | null>(readCameraParam());
 
   const toggleLayer = (key: string) =>
@@ -832,6 +890,17 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
     if (activeSystem) return systemObjects(activeSystem, objects);
     return [];
   }, [activeSystem, level, objects, systems]);
+
+  const jumpGraph = useMemo(() => buildJumpGraph(objects), [objects]);
+  // Only systems that participate in the jump network can be route endpoints.
+  const routableSystems = useMemo(
+    () => systems.filter((system) => jumpGraph.has(normSys(system.name))),
+    [systems, jumpGraph],
+  );
+  const route = useMemo(() => {
+    if (!routeFrom || !routeTo) return null;
+    return findJumpRoute(jumpGraph, routeFrom, routeTo);
+  }, [jumpGraph, routeFrom, routeTo]);
 
   const sceneModel = useMemo(() => {
     if (level === 'system' && activeSystem) {
@@ -1111,6 +1180,33 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
       jumpComets.push({ sprite: comet, curve, offset: Math.random(), speed: 0.16 + Math.random() * 0.12 });
     }
 
+    // Highlight a planned jump route across the galaxy in gold.
+    if (level === 'galaxy' && route && route.length > 1) {
+      const posByName = new Map<string, THREE.Vector3>();
+      for (const node of sceneModel.nodes) {
+        for (const key of [node.object.name, node.object.system_name, node.object.system_code]) {
+          const norm = normSys(key);
+          if (norm) posByName.set(norm, node.position);
+        }
+      }
+      for (let i = 0; i < route.length - 1; i += 1) {
+        const a = posByName.get(route[i]);
+        const b = posByName.get(route[i + 1]);
+        if (!a || !b) continue;
+        const mid = a.clone().add(b).multiplyScalar(0.5).add(new THREE.Vector3(0, 24, 0));
+        const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
+        const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(44));
+        const material = new THREE.LineBasicMaterial({
+          color: 0xfacc15,
+          transparent: true,
+          opacity: 0.92,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        });
+        nodeGroup.add(new THREE.Line(geometry, material));
+      }
+    }
+
     scene.add(nodeGroup);
 
     const raycaster = new THREE.Raycaster();
@@ -1239,7 +1335,7 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
       renderer.dispose();
       if (renderer.domElement.parentNode === container) container.removeChild(renderer.domElement);
     };
-  }, [level, sceneModel, hiddenLayers]);
+  }, [level, sceneModel, hiddenLayers, route]);
 
   const selectedStyle = selected ? objectStyle(selected.type) : null;
   const selectedHasChildren = selected ? hasChildren(selected, currentObjects.length > 0 ? currentObjects : objects) : false;
@@ -1292,7 +1388,84 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
             Galaxy
           </button>
         )}
+        {routableSystems.length > 1 && (
+          <button
+            type="button"
+            onClick={() => {
+              setRouteOpen((open) => !open);
+              if (!routeFrom) setRouteFrom(normSys(activeSystem?.name) || normSys(routableSystems[0]?.name));
+              if (!routeTo) setRouteTo(normSys(routableSystems[routableSystems.length - 1]?.name));
+            }}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-[10px] ${routeOpen ? 'sci-btn-primary' : 'sci-btn-ghost'}`}
+          >
+            <Route size={12} />
+            Route
+          </button>
+        )}
       </div>
+
+      {routeOpen && routableSystems.length > 1 && (
+        <div className="absolute left-3 top-[6.25rem] z-20 w-[min(92vw,300px)] rounded-sm border border-cyan-900/50 bg-slate-950/92 p-2 backdrop-blur">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="flex items-center gap-1.5 font-mono-sc text-[10px] uppercase tracking-widest text-slate-300">
+              <Route size={11} className="text-cyan-400" /> Jump route
+            </p>
+            <button type="button" onClick={() => setRouteOpen(false)} aria-label="Close route planner" className="rounded-sm p-0.5 text-slate-500 hover:text-slate-200">
+              <X size={13} />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="flex flex-col gap-1">
+              <span className="font-mono-sc text-[9px] uppercase text-slate-600">From</span>
+              <select aria-label="Route origin" className="sci-input h-8 text-xs" value={routeFrom} onChange={(event) => setRouteFrom(event.target.value)}>
+                {routableSystems.map((system) => (
+                  <option key={`from-${objectId(system)}`} value={normSys(system.name)}>
+                    {system.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="font-mono-sc text-[9px] uppercase text-slate-600">To</span>
+              <select aria-label="Route destination" className="sci-input h-8 text-xs" value={routeTo} onChange={(event) => setRouteTo(event.target.value)}>
+                {routableSystems.map((system) => (
+                  <option key={`to-${objectId(system)}`} value={normSys(system.name)}>
+                    {system.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          <div className="mt-2">
+            {route && route.length > 1 ? (
+              <>
+                <p className="mb-1 font-mono-sc text-[10px] text-cyan-500">{route.length - 1} jump{route.length > 2 ? 's' : ''}</p>
+                <div className="flex flex-wrap items-center gap-1">
+                  {route.map((key, index) => {
+                    const system = routableSystems.find((item) => normSys(item.name) === key);
+                    return (
+                      <span key={key} className="flex items-center gap-1">
+                        {index > 0 && <ChevronLeft size={10} className="rotate-180 text-slate-600" />}
+                        <button
+                          type="button"
+                          onClick={() => system && enterSystem(system)}
+                          className="rounded-sm border border-cyan-900/50 bg-cyan-950/20 px-1.5 py-0.5 font-mono-sc text-[9px] uppercase tracking-wider text-cyan-300 hover:bg-cyan-900/30"
+                        >
+                          {system?.name ?? key}
+                        </button>
+                      </span>
+                    );
+                  })}
+                </div>
+              </>
+            ) : routeFrom && routeTo && routeFrom !== routeTo ? (
+              <p className="font-mono-sc text-[10px] text-amber-500">No known jump route.</p>
+            ) : (
+              <p className="font-mono-sc text-[10px] text-slate-600">Pick two different systems.</p>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="absolute bottom-3 left-3 z-10 flex w-[min(92vw,340px)] flex-col rounded-sm border border-slate-800/60 bg-slate-950/82 p-2 backdrop-blur">
         <div className="mb-2 flex items-center justify-between gap-2">
