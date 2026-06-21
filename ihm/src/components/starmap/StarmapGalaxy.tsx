@@ -556,7 +556,13 @@ function makeCircle(radius: number, color: number, opacity: number, center: THRE
     points.push(new THREE.Vector3(center.x + Math.cos(a) * radius, center.y, center.z + Math.sin(a) * radius));
   }
   const geometry = new THREE.BufferGeometry().setFromPoints(points);
-  const material = new THREE.LineBasicMaterial({ color, transparent: true, opacity });
+  const material = new THREE.LineBasicMaterial({
+    color,
+    transparent: true,
+    opacity,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
   return new THREE.Line(geometry, material);
 }
 
@@ -738,7 +744,7 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
       nodes.push(node);
       placed.add(child.id);
       if (shouldDrawOrbit(child, level, depth) && orbitRadius > 1) {
-        rings.push({ center: parentPosition, radius: orbitRadius, color: style.color, opacity: depth === 1 ? 0.09 : 0.045 });
+        rings.push({ center: parentPosition, radius: orbitRadius, color: style.color, opacity: depth === 1 ? 0.22 : 0.11 });
       }
       placeChildren(child, position, Math.max(1, node.radius), depth + 1);
     });
@@ -762,7 +768,7 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
     nodes.push(node);
     placed.add(child.id);
     if (shouldDrawOrbit(child, level, 1) && orbitRadius > 1) {
-      rings.push({ center: rootNode.position, radius: orbitRadius, color: style.color, opacity: 0.09 });
+      rings.push({ center: rootNode.position, radius: orbitRadius, color: style.color, opacity: 0.22 });
     }
     placeChildren(child, position, Math.max(1, node.radius), 1);
   });
@@ -1455,7 +1461,45 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
                   <dd className="text-xs text-slate-300">{selected.population}</dd>
                 </div>
               )}
+              {(() => {
+                const count = childrenOf(selected, currentObjects.length > 0 ? currentObjects : objects).length;
+                return count > 0 ? (
+                  <div>
+                    <dt className="font-mono-sc text-[9px] uppercase text-slate-600">Sub-objects</dt>
+                    <dd className="text-xs text-slate-300">{count}</dd>
+                  </div>
+                ) : null;
+              })()}
+              {(() => {
+                const coord = coordinateOf(selected);
+                return coord ? (
+                  <div className="col-span-2">
+                    <dt className="font-mono-sc text-[9px] uppercase text-slate-600">Coordinates</dt>
+                    <dd className="font-mono-sc text-[10px] text-slate-400">
+                      {coord.x.toFixed(2)}, {coord.y.toFixed(2)}, {coord.z.toFixed(2)}
+                    </dd>
+                  </div>
+                ) : null;
+              })()}
             </dl>
+            {(() => {
+              const jumps = jumpPointTargets(selected);
+              return jumps.length > 0 ? (
+                <div className="pt-1">
+                  <p className="mb-1 font-mono-sc text-[9px] uppercase text-slate-600">Jump destinations</p>
+                  <div className="flex flex-wrap gap-1">
+                    {jumps.map((dest) => (
+                      <span
+                        key={dest}
+                        className="rounded-sm border border-cyan-900/50 bg-cyan-950/20 px-1.5 py-0.5 font-mono-sc text-[9px] uppercase tracking-wider text-cyan-400"
+                      >
+                        {dest}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null;
+            })()}
             <div className="flex flex-wrap gap-2 pt-1">
               {selectedSystem && (
                 <button type="button" onClick={() => enterSystem(selectedSystem)} className="sci-btn-primary flex items-center gap-1.5 px-3 py-2 text-xs">
