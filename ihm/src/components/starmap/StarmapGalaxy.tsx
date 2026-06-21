@@ -1,10 +1,15 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft, Compass, Globe2, Loader2, MapPin, Orbit, Satellite, X } from 'lucide-react';
+import { ChevronLeft, Compass, Eye, EyeOff, Globe2, Layers, Loader2, MapPin, Orbit, Satellite, Search, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { Lensflare, LensflareElement } from 'three/addons/objects/Lensflare.js';
 import { createVisibilityTracker, disposeObject3D, getThreePixelRatio } from '@/lib/three-performance';
 import { api } from '@/services/api';
 import type { StarmapPosition } from '@/types/api';
@@ -109,11 +114,87 @@ function objectStyle(type: string | null | undefined) {
   return TYPE_STYLE[key] ?? { color: 0x94a3b8, css: '#94a3b8', size: 0.7, label: type ?? 'Object' };
 }
 
+// Toggleable map layers, echoing the official ARK Starmap filter rail.
+interface MapLayer {
+  key: string;
+  label: string;
+  css: string;
+}
+
+const MAP_LAYERS: MapLayer[] = [
+  { key: 'planet', label: 'Planets', css: '#60a5fa' },
+  { key: 'moon', label: 'Moons', css: '#cbd5e1' },
+  { key: 'station', label: 'Stations', css: '#a78bfa' },
+  { key: 'landing', label: 'Landing zones', css: '#34d399' },
+  { key: 'asteroid', label: 'Asteroid fields', css: '#f97316' },
+  { key: 'jump', label: 'Jump points', css: '#22d3ee' },
+];
+
+// Map an object type to a toggleable layer key (stars/systems are never hidden).
+function layerKeyOf(type: string | null | undefined): string | null {
+  const key = typeKey(type);
+  if (key.includes('jump')) return 'jump';
+  if (key.includes('landing')) return 'landing';
+  if (key.includes('station') || key.includes('reststop')) return 'station';
+  if (key.includes('asteroid')) return 'asteroid';
+  if (key === 'moon' || key === 'satellite') return 'moon';
+  if (key === 'planet' || key === 'dwarfplanet') return 'planet';
+  return null;
+}
+
 function proxiedAssetUrl(url: string | null | undefined) {
   if (!url) return null;
   const normalized = url.startsWith('//') ? `https:${url}` : url;
   if (!/^https?:\/\//i.test(normalized)) return normalized;
   return `/api/rsi-assets?url=${encodeURIComponent(normalized)}`;
+}
+
+// Shareable camera state in the URL (?camera=azimuth,polar,distance), like the
+// official ARK Starmap's deep-linkable camera.
+interface CameraParam {
+  az: number;
+  polar: number;
+  dist: number;
+}
+
+function readCameraParam(): CameraParam | null {
+  if (typeof window === 'undefined') return null;
+  const raw = new URLSearchParams(window.location.search).get('camera');
+  if (!raw) return null;
+  const parts = raw.split(',').map(Number);
+  if (parts.length < 3 || parts.some((n) => !Number.isFinite(n))) return null;
+  return { az: parts[0], polar: parts[1], dist: parts[2] };
+}
+
+function writeCameraParam(param: CameraParam) {
+  if (typeof window === 'undefined') return;
+  const params = new URLSearchParams(window.location.search);
+  params.set('camera', `${param.az.toFixed(2)},${param.polar.toFixed(2)},${param.dist.toFixed(1)}`);
+  window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
+}
+
+// Real RSI ARK Starmap sun surface textures (sourceimages/suns/NN_Texture.jpg, 01..09).
+const SUN_TEXTURE_BASE = 'https://cdn.robertsspaceindustries.com/static/starmap/sourceimages/suns';
+const SUN_TEXTURE_COUNT = 9;
+
+function hashString(value: string) {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+// Deterministically map a star to one of the official RSI sun textures, biased by
+// spectral class so hotter/cooler stars get visually distinct surfaces.
+function sunTextureUrl(object: StarmapPosition): string | null {
+  const spectral = String(object.star_type ?? '').trim().toUpperCase()[0] ?? '';
+  const spectralBias: Record<string, number> = { O: 7, B: 6, A: 5, F: 4, G: 3, K: 2, M: 1 };
+  const seed = hashString(`${object.rsi_id ?? object.id}:${object.name}`);
+  const index = spectralBias[spectral] ?? (seed % SUN_TEXTURE_COUNT) + 1;
+  const clamped = Math.max(1, Math.min(SUN_TEXTURE_COUNT, index));
+  return proxiedAssetUrl(`${SUN_TEXTURE_BASE}/${String(clamped).padStart(2, '0')}_Texture.jpg`);
 }
 
 function isImageUrl(value: string) {
@@ -298,6 +379,93 @@ function makeGlowTexture(): THREE.Texture {
     ctx.fillRect(0, 0, size, size);
   }
   const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// Soft radial flare texture used for star lens flares.
+function makeFlareTexture(inner: string, outer: string): THREE.Texture {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    const grad = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    grad.addColorStop(0, inner);
+    grad.addColorStop(0.2, outer);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+// Procedural deep-space nebula painted onto an inward-facing background sphere,
+// echoing the official ARK Starmap's coloured galactic haze. DDS skyboxes that the
+// real renderer uses are no longer publicly served, so we approximate them.
+function makeNebulaTexture(level: StarmapLevel): THREE.CanvasTexture {
+  const w = 2048;
+  const h = 1024;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    ctx.fillStyle = '#03050d';
+    ctx.fillRect(0, 0, w, h);
+
+    const clouds: Array<{ hue: number; alpha: number }> = level === 'galaxy'
+      ? [
+          { hue: 205, alpha: 0.22 },
+          { hue: 230, alpha: 0.18 },
+          { hue: 275, alpha: 0.14 },
+          { hue: 190, alpha: 0.12 },
+          { hue: 320, alpha: 0.08 },
+        ]
+      : [
+          { hue: 210, alpha: 0.14 },
+          { hue: 245, alpha: 0.1 },
+          { hue: 190, alpha: 0.08 },
+        ];
+
+    let seed = 99173;
+    const rand = () => {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    };
+
+    for (const cloud of clouds) {
+      const blobs = 22;
+      for (let i = 0; i < blobs; i += 1) {
+        const cx = rand() * w;
+        const cy = h * (0.25 + rand() * 0.5);
+        const radius = 120 + rand() * 420;
+        const light = 38 + rand() * 22;
+        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+        grad.addColorStop(0, `hsla(${cloud.hue}, 70%, ${light}%, ${cloud.alpha})`);
+        grad.addColorStop(1, 'hsla(0,0%,0%,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // Sprinkle faint distant stars directly into the backdrop for depth.
+    for (let i = 0; i < 1400; i += 1) {
+      const x = rand() * w;
+      const y = rand() * h;
+      const a = 0.25 + rand() * 0.6;
+      const s = rand() < 0.96 ? 1 : 2;
+      ctx.fillStyle = `rgba(${200 + Math.floor(rand() * 55)},${210 + Math.floor(rand() * 45)},255,${a})`;
+      ctx.fillRect(x, y, s, s);
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
   tex.needsUpdate = true;
   return tex;
 }
@@ -636,6 +804,17 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
   const [level, setLevel] = useState<StarmapLevel>('galaxy');
   const [activeSystem, setActiveSystem] = useState<StarmapPosition | null>(null);
   const [activeBody, setActiveBody] = useState<StarmapPosition | null>(null);
+  const [hiddenLayers, setHiddenLayers] = useState<Set<string>>(new Set());
+  const [search, setSearch] = useState('');
+  const cameraParamRef = useRef<CameraParam | null>(readCameraParam());
+
+  const toggleLayer = (key: string) =>
+    setHiddenLayers((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   const systems = useMemo(
     () => objects.filter((object) => isSystemObject(object)).sort((a, b) => a.name.localeCompare(b.name)),
@@ -693,19 +872,30 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
     const height = container.clientHeight;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x030712);
-    scene.fog = new THREE.FogExp2(0x030712, level === 'galaxy' ? 0.0014 : level === 'system' ? 0.0018 : 0.0032);
-    scene.add(new THREE.AmbientLight(0x7aa7ff, level === 'galaxy' ? 1.35 : 2.15));
-    scene.add(new THREE.HemisphereLight(0x8edcff, 0x070b1f, level === 'galaxy' ? 0.7 : 1.15));
+    scene.background = new THREE.Color(0x03050d);
+    scene.fog = new THREE.FogExp2(0x03050d, level === 'galaxy' ? 0.0011 : level === 'system' ? 0.0016 : 0.0028);
+    scene.add(new THREE.AmbientLight(0x7aa7ff, level === 'galaxy' ? 1.1 : 1.85));
+    scene.add(new THREE.HemisphereLight(0x8edcff, 0x05070f, level === 'galaxy' ? 0.6 : 1.0));
 
     const key = new THREE.PointLight(0x66d8ff, level === 'galaxy' ? 1.2 : 2.35, 0, 0);
     key.position.set(80, 120, 80);
     scene.add(key);
 
+    // Deep-space nebula backdrop (inward-facing sphere) for the official ARK feel.
+    const nebulaTexture = makeNebulaTexture(level);
+    const nebulaRadius = level === 'galaxy' ? 2600 : Math.max(900, sceneModel.radius * 9);
+    const nebula = new THREE.Mesh(
+      new THREE.SphereGeometry(nebulaRadius, 48, 32),
+      new THREE.MeshBasicMaterial({ map: nebulaTexture, side: THREE.BackSide, depthWrite: false, fog: false }),
+    );
+    scene.add(nebula);
+
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(getThreePixelRatio());
     renderer.setSize(width, height);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
     container.appendChild(renderer.domElement);
 
     const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 6000);
@@ -717,23 +907,57 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
     controls.dampingFactor = 0.08;
     controls.rotateSpeed = 0.6;
     controls.zoomSpeed = 0.9;
-    controls.autoRotate = level === 'galaxy';
+    controls.autoRotate = level === 'galaxy' && !cameraParamRef.current;
     controls.autoRotateSpeed = 0.25;
     controls.target.copy(sceneModel.target);
     controls.minDistance = level === 'galaxy' ? 30 : Math.max(10, sceneModel.radius * 0.16);
     controls.maxDistance = level === 'galaxy' ? 900 : Math.max(160, sceneModel.radius * 2.8);
     controls.update();
 
+    // Restore a shared/deep-linked camera at the galaxy level.
+    if (level === 'galaxy' && cameraParamRef.current) {
+      const { az, polar, dist } = cameraParamRef.current;
+      const radius = clamp(dist, controls.minDistance, controls.maxDistance);
+      camera.position.setFromSpherical(new THREE.Spherical(radius, clamp(polar, 0.05, Math.PI - 0.05), az)).add(controls.target);
+      controls.update();
+    }
+
+    // Persist camera moves to the URL so views are shareable.
+    const onControlEnd = () => {
+      const offset = camera.position.clone().sub(controls.target);
+      const sph = new THREE.Spherical().setFromVector3(offset);
+      cameraParamRef.current = { az: sph.theta, polar: sph.phi, dist: sph.radius };
+      if (level === 'galaxy') writeCameraParam(cameraParamRef.current);
+    };
+    controls.addEventListener('end', onControlEnd);
+
+    // Post-processing: bloom gives the official ARK Starmap its signature glow.
+    const composer = new EffectComposer(renderer);
+    composer.setPixelRatio(getThreePixelRatio());
+    composer.setSize(width, height);
+    composer.addPass(new RenderPass(scene, camera));
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(width, height),
+      level === 'galaxy' ? 0.9 : 0.7, // strength
+      0.7, // radius
+      level === 'galaxy' ? 0.04 : 0.12, // threshold
+    );
+    composer.addPass(bloomPass);
+    composer.addPass(new OutputPass());
+
     const visibility = createVisibilityTracker(container);
     const glowTexture = makeGlowTexture();
+    const flareMainTexture = makeFlareTexture('rgba(255,252,240,0.95)', 'rgba(255,196,120,0.55)');
+    const flareGhostTexture = makeFlareTexture('rgba(180,210,255,0.55)', 'rgba(120,160,255,0.18)');
     const sphereGeo = new THREE.SphereGeometry(1, 32, 32);
     const textureLoader = new THREE.TextureLoader();
     textureLoader.setCrossOrigin('anonymous');
     const loadedTextures: THREE.Texture[] = [];
     const pickables: THREE.Mesh[] = [];
     const nodeGroup = new THREE.Group();
-    const animatedNodes: Array<{ mesh: THREE.Mesh; glow: THREE.Sprite; base: number; glowBase: number; phase: number }> = [];
+    const animatedNodes: Array<{ mesh: THREE.Mesh; glow: THREE.Sprite; base: number; glowBase: number; phase: number; spin: number }> = [];
     const labels: Array<{ sprite: THREE.Sprite; baseWidth: number; baseHeight: number }> = [];
+    const jumpComets: Array<{ sprite: THREE.Sprite; curve: THREE.QuadraticBezierCurve3; offset: number; speed: number }> = [];
 
     const starCount = level === 'galaxy' ? 2200 : 760;
     const starGeo = new THREE.BufferGeometry();
@@ -760,6 +984,8 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
 
     for (const node of sceneModel.nodes) {
       if (node.visible === false) continue;
+      const layerKey = layerKeyOf(node.object.type);
+      if (layerKey && hiddenLayers.has(layerKey)) continue;
       const materialOptions: THREE.MeshStandardMaterialParameters = {
         color: node.color,
         emissive: node.color,
@@ -767,23 +993,39 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
         roughness: 0.42,
         metalness: 0.08,
       };
-      const image = starmapTexture(node.object);
-      if (image) {
+      const tkey = typeKey(node.object.type);
+      const isStar = tkey === 'star';
+      const sunUrl = isStar ? sunTextureUrl(node.object) : null;
+      const image = isStar ? null : starmapTexture(node.object);
+      if (sunUrl) {
+        // Real RSI sun surface texture, self-lit so it reads as a light source.
+        const tex = textureLoader.load(sunUrl, () => {
+          tex.colorSpace = THREE.SRGBColorSpace;
+        });
+        loadedTextures.push(tex);
+        materialOptions.map = tex;
+        materialOptions.emissiveMap = tex;
+        materialOptions.color = 0xffffff;
+        materialOptions.emissive = 0xffffff;
+        materialOptions.emissiveIntensity = 1.7;
+        materialOptions.roughness = 1;
+        materialOptions.metalness = 0;
+      } else if (image) {
         const tex = textureLoader.load(image, () => {
           tex.colorSpace = THREE.SRGBColorSpace;
         });
         loadedTextures.push(tex);
         materialOptions.map = tex;
         materialOptions.color = 0xffffff;
-        materialOptions.emissiveIntensity = typeKey(node.object.type) === 'star' ? 0.5 : 0.05;
+        materialOptions.emissiveIntensity = isStar ? 0.5 : 0.05;
         materialOptions.roughness = 0.72;
-      } else if (isPlanetLike(node.object) || isMoonLike(node.object) || typeKey(node.object.type) === 'star' || typeKey(node.object.type).includes('asteroid')) {
+      } else if (isPlanetLike(node.object) || isMoonLike(node.object) || isStar || tkey.includes('asteroid')) {
         const tex = makeProceduralBodyTexture(node.object, node.color);
         loadedTextures.push(tex);
         materialOptions.map = tex;
         materialOptions.color = 0xffffff;
-        materialOptions.emissiveIntensity = typeKey(node.object.type) === 'star' ? 0.75 : 0.08;
-        materialOptions.roughness = typeKey(node.object.type).includes('asteroid') ? 0.9 : 0.68;
+        materialOptions.emissiveIntensity = isStar ? 0.75 : 0.08;
+        materialOptions.roughness = tkey.includes('asteroid') ? 0.9 : 0.68;
       }
 
       const mesh = new THREE.Mesh(sphereGeo, new THREE.MeshStandardMaterial(materialOptions));
@@ -793,6 +1035,19 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
       mesh.userData.baseEmissiveIntensity = materialOptions.emissiveIntensity ?? 0.28;
       pickables.push(mesh);
       nodeGroup.add(mesh);
+
+      // Stars cast light and carry a lens flare, like the official ARK suns.
+      if (isStar) {
+        const sunColor = new THREE.Color(node.color).lerp(new THREE.Color(0xffffff), 0.45);
+        const sunLight = new THREE.PointLight(sunColor.getHex(), level === 'galaxy' ? 1.4 : 3.4, 0, 1.4);
+        sunLight.position.copy(node.position);
+        const flare = new Lensflare();
+        flare.addElement(new LensflareElement(flareMainTexture, level === 'galaxy' ? 140 : 320, 0, sunColor));
+        flare.addElement(new LensflareElement(flareGhostTexture, 60, 0.6));
+        flare.addElement(new LensflareElement(flareGhostTexture, 90, 0.9));
+        sunLight.add(flare);
+        nodeGroup.add(sunLight);
+      }
 
       const glow = new THREE.Sprite(
         new THREE.SpriteMaterial({
@@ -807,7 +1062,16 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
       glow.scale.set(glowBase + node.radius * 2.2, glowBase + node.radius * 2.2, 1);
       glow.position.copy(node.position);
       nodeGroup.add(glow);
-      animatedNodes.push({ mesh, glow, base: node.radius, glowBase, phase: Math.random() * Math.PI * 2 });
+      // Subtle axial rotation so bodies feel alive, like the official map.
+      const spin = isStar
+        ? 0.012
+        : tkey.includes('asteroid')
+          ? 0.06
+          : isPlanetLike(node.object) || isMoonLike(node.object)
+            ? 0.05 + (hashString(node.object.name) % 30) / 1000
+            : 0;
+      mesh.rotation.y = (hashString(node.object.name) % 628) / 100;
+      animatedNodes.push({ mesh, glow, base: node.radius, glowBase, phase: Math.random() * Math.PI * 2, spin });
 
       const shouldLabel = node.label ?? (
         level === 'galaxy' && ['system', 'star'].includes(typeKey(node.object.type))
@@ -821,15 +1085,24 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
       }
     }
 
-    for (const line of sceneModel.jumpLines) {
+    for (const line of hiddenLayers.has('jump') ? [] : sceneModel.jumpLines) {
       const curve = new THREE.QuadraticBezierCurve3(
         line.from,
         line.from.clone().add(line.to).multiplyScalar(0.5).add(new THREE.Vector3(0, level === 'galaxy' ? 18 : 5, 0)),
         line.to,
       );
-      const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(36));
-      const material = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: level === 'galaxy' ? 0.22 : 0.08 });
+      const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(48));
+      const material = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: level === 'galaxy' ? 0.26 : 0.1 });
       nodeGroup.add(new THREE.Line(geometry, material));
+
+      // Pulse of light travelling along the jump tunnel.
+      const comet = new THREE.Sprite(
+        new THREE.SpriteMaterial({ map: glowTexture, color: 0x67e8f9, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }),
+      );
+      const cometScale = level === 'galaxy' ? 5.5 : 2.6;
+      comet.scale.set(cometScale, cometScale, 1);
+      nodeGroup.add(comet);
+      jumpComets.push({ sprite: comet, curve, offset: Math.random(), speed: 0.16 + Math.random() * 0.12 });
     }
 
     scene.add(nodeGroup);
@@ -882,17 +1155,38 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
     renderer.domElement.addEventListener('pointerdown', onPointerDown);
     renderer.domElement.addEventListener('pointerup', onPointerUp);
 
+    // Cinematic fly-in: start pulled back along the view axis and ease to the
+    // framing position, mimicking the official map's arrival animation.
+    const destCam = camera.position.clone();
+    const flyStart = destCam.clone().sub(sceneModel.target).multiplyScalar(2.1).add(sceneModel.target);
+    camera.position.copy(flyStart);
+    const introStart = performance.now();
+    const introDuration = 1100;
+
     let frame = 0;
     const animate = () => {
       frame = requestAnimationFrame(animate);
       if (!visibility.isVisible()) return;
       const t = performance.now() * 0.001;
+
+      const introElapsed = performance.now() - introStart;
+      if (introElapsed < introDuration) {
+        const k = introElapsed / introDuration;
+        const eased = 1 - (1 - k) ** 3; // easeOutCubic
+        camera.position.lerpVectors(flyStart, destCam, eased);
+      }
+
       if (level === 'galaxy') nodeGroup.rotation.y = Math.sin(t * 0.08) * 0.015;
       for (const node of animatedNodes) {
         const pulse = 1 + Math.sin(t * 1.8 + node.phase) * 0.045;
         node.mesh.scale.setScalar(node.base * pulse);
+        if (node.spin) node.mesh.rotation.y += node.spin * 0.016;
         const glowPulse = 1 + Math.sin(t * 1.5 + node.phase) * 0.08;
         node.glow.scale.setScalar((node.glowBase + node.base * 2.2) * glowPulse);
+      }
+      for (const comet of jumpComets) {
+        const progress = (t * comet.speed + comet.offset) % 1;
+        comet.curve.getPointAt(progress, comet.sprite.position);
       }
       const labelReferenceDistance = level === 'galaxy' ? 260 : level === 'system' ? 210 : 120;
       for (const label of labels) {
@@ -901,7 +1195,7 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
         label.sprite.scale.set(label.baseWidth * factor, label.baseHeight * factor, 1);
       }
       controls.update();
-      renderer.render(scene, camera);
+      composer.render();
     };
     animate();
 
@@ -913,6 +1207,9 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
       camera.updateProjectionMatrix();
       renderer.setPixelRatio(getThreePixelRatio());
       renderer.setSize(w, h);
+      composer.setPixelRatio(getThreePixelRatio());
+      composer.setSize(w, h);
+      bloomPass.setSize(w, h);
     };
     const ro = new ResizeObserver(onResize);
     ro.observe(container);
@@ -928,11 +1225,15 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
       disposeObject3D(scene);
       sphereGeo.dispose();
       glowTexture.dispose();
+      flareMainTexture.dispose();
+      flareGhostTexture.dispose();
+      nebulaTexture.dispose();
       loadedTextures.forEach((texture) => texture.dispose());
+      composer.dispose();
       renderer.dispose();
       if (renderer.domElement.parentNode === container) container.removeChild(renderer.domElement);
     };
-  }, [level, sceneModel]);
+  }, [level, sceneModel, hiddenLayers]);
 
   const selectedStyle = selected ? objectStyle(selected.type) : null;
   const selectedHasChildren = selected ? hasChildren(selected, currentObjects.length > 0 ? currentObjects : objects) : false;
@@ -945,6 +1246,18 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
       : activeBody
         ? childrenOf(activeBody, currentObjects.length > 0 ? currentObjects : objects)
         : [];
+
+  const searchTerm = search.trim().toLowerCase();
+  const listObjects = browserObjects.filter((object) => {
+    const layerKey = layerKeyOf(object.type);
+    if (layerKey && hiddenLayers.has(layerKey)) return false;
+    if (!searchTerm) return true;
+    return (
+      object.name.toLowerCase().includes(searchTerm) ||
+      (object.system_name ?? '').toLowerCase().includes(searchTerm) ||
+      (object.type ?? '').toLowerCase().includes(searchTerm)
+    );
+  });
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#030712]">
@@ -975,64 +1288,95 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
         )}
       </div>
 
-      <div className="absolute bottom-3 left-3 z-10 w-[min(92vw,360px)] rounded-sm border border-slate-800/60 bg-slate-950/78 p-2 backdrop-blur">
+      <div className="absolute bottom-3 left-3 z-10 flex w-[min(92vw,340px)] flex-col rounded-sm border border-slate-800/60 bg-slate-950/82 p-2 backdrop-blur">
         <div className="mb-2 flex items-center justify-between gap-2">
           <p className="flex items-center gap-1.5 font-mono-sc text-[10px] uppercase tracking-widest text-slate-400">
             {level === 'galaxy' ? <Orbit size={11} /> : <Satellite size={11} />}
             {level === 'galaxy' ? 'Systems' : level === 'system' ? 'System contents' : 'Local objects'}
           </p>
-          <span className="font-mono-sc text-[10px] text-cyan-600">{browserObjects.length}</span>
+          <span className="font-mono-sc text-[10px] text-cyan-600">{listObjects.length}</span>
         </div>
-        {level === 'galaxy' ? (
-          <select
-            aria-label="Open system"
-            className="sci-input h-8 w-full text-xs"
-            value=""
-            onChange={(event) => {
-              const system = systems.find((item) => objectId(item) === event.target.value);
-              if (system) enterSystem(system);
-            }}
-          >
-            <option value="">Enter a system...</option>
-            {systems.map((system) => (
-              <option key={objectId(system)} value={objectId(system)}>
-                {system.name}
-              </option>
-            ))}
-          </select>
-        ) : (
-          <div className="max-h-36 space-y-1 overflow-y-auto pr-1 sm:max-h-48">
-            {browserObjects.length === 0 ? (
-              <p className="py-2 text-xs text-slate-600">No child objects in this level.</p>
-            ) : (
-              browserObjects.map((object) => {
-                const style = objectStyle(object.type);
-                return (
-                  <button
-                    type="button"
-                    key={objectId(object)}
-                    onClick={() => setSelected(object)}
-                    className="flex w-full items-center justify-between gap-2 rounded-sm border border-transparent px-2 py-1.5 text-left transition-colors hover:border-cyan-900/60 hover:bg-cyan-950/20"
-                  >
+        <div className="relative mb-2">
+          <Search size={12} className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-slate-500" />
+          <input
+            type="text"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={level === 'galaxy' ? 'Search systems…' : 'Search objects…'}
+            aria-label="Search starmap"
+            className="sci-input h-8 w-full pl-7 pr-7 text-xs"
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              aria-label="Clear search"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-slate-500 hover:text-slate-200"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+        <div className="max-h-40 space-y-1 overflow-y-auto pr-1 sm:max-h-56">
+          {listObjects.length === 0 ? (
+            <p className="py-2 text-xs text-slate-600">{searchTerm ? 'No matching objects.' : 'No objects at this level.'}</p>
+          ) : (
+            listObjects.map((object) => {
+              const style = objectStyle(object.type);
+              const canInspect = isSystemObject(object) || hasChildren(object, currentObjects) || isPlanetLike(object) || isMoonLike(object);
+              return (
+                <button
+                  type="button"
+                  key={objectId(object)}
+                  onClick={() => (isSystemObject(object) && level === 'galaxy' ? enterSystem(object) : setSelected(object))}
+                  className="flex w-full items-center justify-between gap-2 rounded-sm border border-transparent px-2 py-1.5 text-left transition-colors hover:border-cyan-900/60 hover:bg-cyan-950/20"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: style.css }} />
                     <span className="min-w-0">
                       <span className="block truncate font-mono-sc text-xs text-slate-300">{object.name}</span>
                       <span className="font-mono-sc text-[9px] uppercase tracking-widest" style={{ color: style.css }}>
                         {style.label}
                       </span>
                     </span>
-                    {(hasChildren(object, currentObjects) || isPlanetLike(object) || isMoonLike(object)) && (
-                      <span className="shrink-0 font-mono-sc text-[9px] text-cyan-600">inspect</span>
-                    )}
-                  </button>
-                );
-              })
-            )}
-          </div>
-        )}
+                  </span>
+                  {canInspect && (
+                    <span className="shrink-0 font-mono-sc text-[9px] text-cyan-600">
+                      {isSystemObject(object) && level === 'galaxy' ? 'enter' : 'inspect'}
+                    </span>
+                  )}
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      <div className="pointer-events-auto absolute right-3 bottom-3 z-10 flex w-[min(48vw,180px)] flex-col gap-1 rounded-sm border border-slate-800/60 bg-slate-950/82 p-2 backdrop-blur sm:w-44">
+        <p className="mb-0.5 flex items-center gap-1.5 font-mono-sc text-[10px] uppercase tracking-widest text-slate-400">
+          <Layers size={11} /> Layers
+        </p>
+        {MAP_LAYERS.map((layer) => {
+          const active = !hiddenLayers.has(layer.key);
+          return (
+            <button
+              type="button"
+              key={layer.key}
+              onClick={() => toggleLayer(layer.key)}
+              className={`flex items-center justify-between gap-2 rounded-sm px-1.5 py-1 text-left font-mono-sc text-[10px] uppercase tracking-wider transition-colors ${active ? 'text-slate-300 hover:bg-cyan-950/20' : 'text-slate-600 hover:bg-slate-900/40'}`}
+            >
+              <span className="flex items-center gap-1.5">
+                <span className="size-2 rounded-full" style={{ backgroundColor: active ? layer.css : '#334155' }} />
+                {layer.label}
+              </span>
+              {active ? <Eye size={11} /> : <EyeOff size={11} />}
+            </button>
+          );
+        })}
       </div>
 
       {level === 'galaxy' && (
-        <div className="absolute bottom-3 right-3 hidden flex-wrap gap-x-3 gap-y-1 rounded-sm border border-slate-800/60 bg-slate-950/70 px-3 py-2 backdrop-blur md:flex">
+        <div className="pointer-events-none absolute bottom-3 left-1/2 hidden -translate-x-1/2 flex-wrap justify-center gap-x-3 gap-y-1 rounded-sm border border-slate-800/60 bg-slate-950/70 px-3 py-2 backdrop-blur lg:flex">
           {FACTIONS.map((f) => (
             <span key={f.key} className="flex items-center gap-1.5 font-mono-sc text-[10px] uppercase tracking-wider text-slate-400">
               <span className="size-2 rounded-full" style={{ backgroundColor: f.css }} />

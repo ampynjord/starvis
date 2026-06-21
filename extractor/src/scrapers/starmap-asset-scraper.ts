@@ -118,7 +118,7 @@ function addSunTextureAsset(assets: ScrapedAssets, value: unknown): void {
   const raw = typeof value === 'number' || typeof value === 'string' ? String(value) : '';
   const index = Number.parseInt(raw, 10);
   if (!Number.isFinite(index) || index < 1 || index > 99) return;
-  addAsset(assets, `${RSI_CDN_BASE_URL}/static/starmap/suns/${String(index).padStart(2, '0')}_Texture.jpg`);
+  addAsset(assets, `${RSI_CDN_BASE_URL}/static/starmap/sourceimages/suns/${String(index).padStart(2, '0')}_Texture.jpg`);
 }
 
 function starmapSunShader(value: unknown): Record<string, unknown> | null {
@@ -177,11 +177,17 @@ async function scrapeStaticBundleAssets(): Promise<ScrapedAssets> {
       if (!rawPath || seen.has(rawPath)) continue;
       if (!rawPath.includes('/') && MODEL_EXTS.test(rawPath)) continue;
       seen.add(rawPath);
+      const base = resourcePath.replace(/\/$/, '');
+      const rel = rawPath.replace(/^\//, '');
+      // ARK source images (suns, sprites, faction icons) live under sourceimages/.
+      // Bare relative paths in the bundle omit that prefix, so add it unless present.
       const url = rawPath.startsWith('http')
         ? rawPath
         : rawPath.startsWith('static/starmap/')
           ? `${RSI_CDN_BASE_URL}/${rawPath}`
-          : `${resourcePath.replace(/\/$/, '')}/${rawPath.replace(/^\//, '')}`;
+          : rel.startsWith('sourceimages/')
+            ? `${base}/${rel}`
+            : `${base}/sourceimages/${rel}`;
       addAsset(assets, url);
     }
     logger.info(`[starmap-assets] static ARK bundle: ${assets.textures.length}T ${assets.models.length}M ${assets.skybox.length}Sky`);

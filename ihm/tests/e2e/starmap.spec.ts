@@ -119,7 +119,7 @@ test('starmap drills from galaxy to system and planet levels', async ({ page }) 
   await mockStarmap(page);
   await gotoApp(page, '/starmap');
 
-  await page.getByLabel('Open system').selectOption('STANTON');
+  await page.getByRole('button', { name: /Stanton/i }).first().click();
   await expect(page.getByText('System Map')).toBeVisible();
   await expect(page.getByText('System contents')).toBeVisible();
 
