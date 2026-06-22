@@ -67,6 +67,24 @@ function starmapObjectParentId(body: any, systemRsiId: string): string {
   return body.parent_id ? String(body.parent_id) : systemRsiId;
 }
 
+/**
+ * RSI starmap positions are polar relative to the parent body: `distance`
+ * (orbital radius), `latitude` and `longitude` (degrees). Convert to a
+ * cartesian offset relative to the parent so the client can place each body
+ * around its parent.
+ */
+function starmapBodyCoordinates(body: any): { x: number; y: number; z: number } | null {
+  const distance = Number(body.distance);
+  if (!Number.isFinite(distance)) return null;
+  const lat = (Number(body.latitude) || 0) * (Math.PI / 180);
+  const lon = (Number(body.longitude) || 0) * (Math.PI / 180);
+  return {
+    x: distance * Math.cos(lat) * Math.cos(lon),
+    y: distance * Math.sin(lat),
+    z: distance * Math.cos(lat) * Math.sin(lon),
+  };
+}
+
 function detailedStarmapSystem(data: any): any | null {
   return data?.data?.resultset?.[0] ?? data?.data?.systems?.resultset?.[0] ?? data?.data ?? null;
 }
@@ -801,9 +819,7 @@ export class RsiSyncService {
                   thumbnail: body.thumbnail?.images?.product_thumb_large ?? body.thumbnail?.images?.post ?? body.thumbnail?.url ?? null,
                   description: typeof bodyDesc === 'string' ? bodyDesc : null,
                   web_url: null,
-                  coordinates: json(
-                    body.position ? { x: Number(body.position.x), y: Number(body.position.y), z: Number(body.position.z) } : null,
-                  ),
+                  coordinates: json(starmapBodyCoordinates(body)),
                   aggregated: null,
                   size: body.size ?? null,
                   population: null,

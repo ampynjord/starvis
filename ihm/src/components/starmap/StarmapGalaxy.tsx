@@ -97,7 +97,6 @@ const TYPE_ORDER = new Map<string, number>([
 const IMAGE_EXT = /\.(png|jpe?g|webp|avif)(\?|$)/i;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const SYSTEM_SCENE_RADIUS = 170;
-const BODY_SCENE_RADIUS = 64;
 const ORBITABLE_TYPES = new Set(['planet', 'dwarfplanet', 'moon', 'satellite']);
 
 function typeKey(type: string | null | undefined) {
@@ -206,10 +205,15 @@ function sunTextureUrl(object: StarmapPosition): string | null {
   return proxiedAssetUrl(`${SUN_TEXTURE_BASE}/${String(clamped).padStart(2, '0')}_Texture.jpg`);
 }
 
-// Pick a real ARK planet texture deterministically; gas variant gets a ring.
+// Pick a real ARK planet texture; honour the RSI subtype (Gas Giant -> gas
+// texture + ring) and otherwise vary deterministically by name.
 function planetTexture(object: StarmapPosition): { url: string | null; isGas: boolean } {
-  const index = hashString(`${object.rsi_id ?? object.id}:${object.name}`) % PLANET_TEXTURES.length;
-  return { url: proxiedAssetUrl(`${RSI_SOURCEIMAGES}/${PLANET_TEXTURES[index]}`), isGas: index === 2 };
+  const subtype = String(object.subtype ?? '').toLowerCase();
+  const isGas = subtype.includes('gas');
+  let index = hashString(`${object.rsi_id ?? object.id}:${object.name}`) % PLANET_TEXTURES.length;
+  if (isGas) index = 2;
+  else if (index === 2) index = 0;
+  return { url: proxiedAssetUrl(`${RSI_SOURCEIMAGES}/${PLANET_TEXTURES[index]}`), isGas };
 }
 
 function romanToInt(roman: string): number {
@@ -739,39 +743,6 @@ function cameraFor(level: StarmapLevel, radius: number) {
   return new THREE.Vector3(0, radius * 0.78, radius * 1.35);
 }
 
-function scaledCoordinates(
-  root: StarmapPosition,
-  objects: StarmapPosition[],
-  targetRadius: number,
-) {
-  const rootCoordinate = coordinateOf(root) ?? new THREE.Vector3(0, 0, 0);
-  const rawPositions = new Map<number, THREE.Vector3>();
-  let maxDistance = 0;
-
-  for (const object of objects) {
-    const coordinate = coordinateOf(object);
-    if (!coordinate) continue;
-    const relative = coordinate.sub(rootCoordinate);
-    rawPositions.set(object.id, relative);
-    maxDistance = Math.max(maxDistance, relative.length());
-  }
-
-  const scale = maxDistance > 0 ? clamp(targetRadius / maxDistance, 0.04, 42) : 1;
-  const scenePositions = new Map<number, THREE.Vector3>();
-  rawPositions.forEach((position, id) => {
-    const distance = position.length();
-    if (distance <= 0.0001) {
-      scenePositions.set(id, new THREE.Vector3(0, 0, 0));
-      return;
-    }
-
-    const easedDistance = Math.pow(distance / maxDistance, 0.74) * targetRadius;
-    scenePositions.set(id, position.clone().normalize().multiplyScalar(easedDistance).setY(position.y * scale * 0.42));
-  });
-
-  return { scenePositions, scale };
-}
-
 function nodeLabelEnabled(object: StarmapPosition, level: 'system' | 'body', depth: number) {
   const key = typeKey(object.type);
   if (depth === 0) return true;
@@ -853,12 +824,30 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
   const nodes: SceneNode[] = [rootNode];
   const rings: OrbitRing[] = [];
   const placed = new Set<number>([root.id]);
-  const sceneCoordinates = scaledCoordinates(root, objects, level === 'system' ? SYSTEM_SCENE_RADIUS : BODY_SCENE_RADIUS);
   const rootChildren = level === 'system'
     ? systemChildren(root, allObjects)
     : childrenOf(root, objects);
 
-  // Per-category counters so each kind of object lands on its own clean ring.
+  // Real RSI coordinates are polar offsets relative to each parent. Derive two
+  // scales — one for primary bodies (around the star), one for satellites
+  // (around a planet) — so real angular positions are preserved while distances
+  // stay readable.
+  // Bodies orbiting the star sit far out (AU scale); satellites orbiting a planet
+  // sit very close (< ~0.05 AU). Scale each tier independently.
+  const SATELLITE_THRESHOLD = 0.05;
+  let maxPrimary = 0;
+  let maxSecondary = 0;
+  for (const object of objects) {
+    const coordinate = coordinateOf(object);
+    if (!coordinate) continue;
+    const distance = coordinate.length();
+    if (distance > 0 && distance < SATELLITE_THRESHOLD) maxSecondary = Math.max(maxSecondary, distance);
+    else maxPrimary = Math.max(maxPrimary, distance);
+  }
+  const primaryScale = maxPrimary > 0 ? (SYSTEM_SCENE_RADIUS * 0.8) / maxPrimary : 0;
+  const secondaryScale = maxSecondary > 0 ? 16 / maxSecondary : 0;
+
+  // Per-category counters for the radial fallback (objects without real coords).
   const categoryCounts: Record<string, number> = {};
   const nextIndex = (category: string) => {
     categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
@@ -872,12 +861,26 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
     index: number,
     depth: number,
   ) => {
-    const exact = sceneCoordinates.scenePositions.get(child.id);
-    if (exact) return exact.clone();
     const key = typeKey(child.type);
+    const isMoon = isMoonLike(child);
+    // Real position: scale the parent-relative offset by its tier and keep the
+    // true direction (latitude/longitude) from the RSI data.
+    const relative = coordinateOf(child);
+    if (relative && relative.length() > 1e-9) {
+      const isSatellite = relative.length() < SATELLITE_THRESHOLD;
+      const scale = isSatellite ? secondaryScale : primaryScale;
+      if (scale > 0) {
+        const scaled = relative.clone().multiplyScalar(scale);
+        if (isSatellite) {
+          const minRadius = parentRadius * 1.8 + 2.5;
+          if (scaled.length() < minRadius) scaled.setLength(minRadius);
+        }
+        return parentPosition.clone().add(scaled);
+      }
+    }
     if (isLandingZone(child)) return radialPosition(parentPosition, parentRadius + 0.9, index + depth * 2, 0.25);
     // Moons hug their parent planet in a tight orbit.
-    if (isMoonLike(child)) {
+    if (isMoon) {
       const radius = parentRadius * 1.9 + 3.4 + index * 2.1;
       return radialPosition(parentPosition, radius, index * 2 + 1, (index % 2) * 0.5 - 0.25);
     }
@@ -975,11 +978,8 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
     placed.add(child.id);
   });
 
+  // No star→jump-point lines: jump points sit at their real orbital position.
   const jumpLines: SceneModel['jumpLines'] = [];
-  if (isSystemObject(root)) {
-    const jumpNodes = nodes.filter((node) => typeKey(node.object.type).includes('jump'));
-    for (const node of jumpNodes) jumpLines.push({ from: rootNode.position, to: node.position });
-  }
 
   const radius = modelRadius(nodes);
   return {
@@ -1114,7 +1114,7 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
     renderer.setSize(width, height);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.1;
+    renderer.toneMappingExposure = 0.85;
     container.appendChild(renderer.domElement);
 
     const camera = new THREE.PerspectiveCamera(50, width / height, 0.1, 6000);
@@ -1157,9 +1157,9 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
     composer.addPass(new RenderPass(scene, camera));
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(width, height),
-      level === 'galaxy' ? 0.9 : 0.7, // strength
-      0.7, // radius
-      level === 'galaxy' ? 0.04 : 0.12, // threshold
+      level === 'galaxy' ? 0.45 : 0.4, // strength
+      0.6, // radius
+      level === 'galaxy' ? 0.2 : 0.28, // threshold
     );
     composer.addPass(bloomPass);
     composer.addPass(new OutputPass());
@@ -1176,7 +1176,6 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
     const nodeGroup = new THREE.Group();
     const animatedNodes: Array<{ mesh: THREE.Mesh; glow: THREE.Sprite; base: number; glowBase: number; phase: number; spin: number }> = [];
     const labels: Array<{ sprite: THREE.Sprite; baseWidth: number; baseHeight: number }> = [];
-    const jumpComets: Array<{ sprite: THREE.Sprite; curve: THREE.QuadraticBezierCurve3; offset: number; speed: number }> = [];
     const nodePositions = new Map<string, { pos: THREE.Vector3; radius: number }>();
 
     // Reusable selection reticle, repositioned imperatively when the selection
@@ -1252,7 +1251,7 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
         }
         materialOptions.color = 0x000000;
         materialOptions.emissive = 0xffffff;
-        materialOptions.emissiveIntensity = 2.2;
+        materialOptions.emissiveIntensity = 1.15;
         materialOptions.roughness = 1;
         materialOptions.metalness = 0;
       } else {
@@ -1271,7 +1270,7 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
           materialOptions.emissiveMap = tex;
           materialOptions.color = 0xffffff;
           materialOptions.emissive = 0xffffff;
-          materialOptions.emissiveIntensity = 1.7;
+          materialOptions.emissiveIntensity = 1.0;
           materialOptions.roughness = 1;
           materialOptions.metalness = 0;
         } else if (realUrl) {
@@ -1306,12 +1305,12 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
       // Stars cast light and carry a lens flare, like the official ARK suns.
       if (isStar) {
         const sunColor = new THREE.Color(node.color).lerp(new THREE.Color(0xffffff), 0.45);
-        const sunLight = new THREE.PointLight(sunColor.getHex(), level === 'galaxy' ? 1.4 : 3.4, 0, 1.4);
+        const sunLight = new THREE.PointLight(sunColor.getHex(), level === 'galaxy' ? 1.0 : 2.4, 0, 1.6);
         sunLight.position.copy(node.position);
         const flare = new Lensflare();
-        flare.addElement(new LensflareElement(flareMainTexture, level === 'galaxy' ? 140 : 320, 0, sunColor));
-        flare.addElement(new LensflareElement(flareGhostTexture, 60, 0.6));
-        flare.addElement(new LensflareElement(flareGhostTexture, 90, 0.9));
+        flare.addElement(new LensflareElement(flareMainTexture, level === 'galaxy' ? 90 : 200, 0, sunColor));
+        flare.addElement(new LensflareElement(flareGhostTexture, 40, 0.6));
+        flare.addElement(new LensflareElement(flareGhostTexture, 60, 0.9));
         sunLight.add(flare);
         nodeGroup.add(sunLight);
       }
@@ -1345,11 +1344,12 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
           map: isJump && jumpEnvTexture ? jumpEnvTexture : glowTexture,
           color: isJump ? 0x67e8f9 : node.color,
           transparent: true,
+          opacity: isGalaxySystem ? 0.55 : 0.7,
           depthWrite: false,
           blending: THREE.AdditiveBlending,
         }),
       );
-      const glowBase = node.surface ? 2.1 : isJump ? (level === 'galaxy' ? 9 : 6) : level === 'galaxy' ? 7 : 4.2;
+      const glowBase = node.surface ? 1.6 : isJump ? (level === 'galaxy' ? 6 : 4) : level === 'galaxy' ? 4.4 : 3;
       glow.scale.set(glowBase + node.radius * 2.2, glowBase + node.radius * 2.2, 1);
       glow.position.copy(node.position);
       nodeGroup.add(glow);
@@ -1376,24 +1376,16 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
       }
     }
 
+    // Galaxy-level jump network: faint static links between connected systems.
     for (const line of hiddenLayers.has('jump') ? [] : sceneModel.jumpLines) {
       const curve = new THREE.QuadraticBezierCurve3(
         line.from,
-        line.from.clone().add(line.to).multiplyScalar(0.5).add(new THREE.Vector3(0, level === 'galaxy' ? 18 : 5, 0)),
+        line.from.clone().add(line.to).multiplyScalar(0.5).add(new THREE.Vector3(0, 18, 0)),
         line.to,
       );
       const geometry = new THREE.BufferGeometry().setFromPoints(curve.getPoints(48));
-      const material = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: level === 'galaxy' ? 0.26 : 0.1 });
+      const material = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.22 });
       nodeGroup.add(new THREE.Line(geometry, material));
-
-      // Pulse of light travelling along the jump tunnel.
-      const comet = new THREE.Sprite(
-        new THREE.SpriteMaterial({ map: glowTexture, color: 0x67e8f9, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }),
-      );
-      const cometScale = level === 'galaxy' ? 5.5 : 2.6;
-      comet.scale.set(cometScale, cometScale, 1);
-      nodeGroup.add(comet);
-      jumpComets.push({ sprite: comet, curve, offset: Math.random(), speed: 0.08 + Math.random() * 0.06 });
     }
 
     // Highlight a planned jump route across the galaxy in gold.
@@ -1502,10 +1494,6 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
         if (node.spin) node.mesh.rotation.y += node.spin * 0.016;
         const glowPulse = 1 + Math.sin(t * 1.5 + node.phase) * 0.08;
         node.glow.scale.setScalar((node.glowBase + node.base * 2.2) * glowPulse);
-      }
-      for (const comet of jumpComets) {
-        const progress = (t * comet.speed + comet.offset) % 1;
-        comet.curve.getPointAt(progress, comet.sprite.position);
       }
       if (reticle.visible) {
         reticle.quaternion.copy(camera.quaternion);
