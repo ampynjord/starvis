@@ -1862,29 +1862,83 @@
       "TradeRoute": {
         "type": "object",
         "properties": {
-          "commodity_name": {
-            "type": "string"
-          },
-          "commodity_uuid": {
+          "entityUuid": {
             "type": "string",
-            "format": "uuid"
+            "nullable": true,
+            "description": "Stable Starvis/DataForge UUID for the traded entity when available."
           },
-          "buy_location": {
+          "entityKind": {
+            "type": "string",
+            "nullable": true,
+            "enum": ["commodity", "item", "component"]
+          },
+          "buyCommodity": {
             "type": "string"
           },
-          "sell_location": {
+          "commodityUuid": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "buyShop": {
             "type": "string"
           },
-          "buy_price": {
+          "buyShopId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "P4K shop id when the route comes from P4K fallback data."
+          },
+          "buyTerminalUexId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "UEX terminal id when the route comes from UEX data."
+          },
+          "buyLocation": {
+            "type": "string"
+          },
+          "buySystem": {
+            "type": "string",
+            "nullable": true
+          },
+          "buyPrice": {
             "type": "number"
           },
-          "sell_price": {
+          "sellShop": {
+            "type": "string"
+          },
+          "sellShopId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "P4K shop id when the route comes from P4K fallback data."
+          },
+          "sellTerminalUexId": {
+            "type": "integer",
+            "nullable": true,
+            "description": "UEX terminal id when the route comes from UEX data."
+          },
+          "sellLocation": {
+            "type": "string"
+          },
+          "sellSystem": {
+            "type": "string",
+            "nullable": true
+          },
+          "sellPrice": {
             "type": "number"
           },
-          "profit_per_unit": {
+          "profitPerUnit": {
             "type": "number"
           },
-          "profit_per_scu": {
+          "profitPerScu": {
+            "type": "number"
+          },
+          "totalProfit": {
+            "type": "number"
+          },
+          "totalInvestment": {
+            "type": "number"
+          },
+          "scu": {
             "type": "number"
           }
         }
@@ -6300,15 +6354,59 @@
               "type": "integer",
               "default": 1
             },
-            "description": "Cargo capacity in SCU"
+            "description": "Cargo capacity in SCU. Alias of `scu`; kept for external clients and OpenAPI compatibility."
           },
           {
-            "name": "start_location",
+            "name": "scu",
+            "in": "query",
+            "schema": {
+              "type": "integer"
+            },
+            "description": "Cargo capacity in SCU. Either `scu` or `cargo` is required."
+          },
+          {
+            "$ref": "#/components/parameters/env"
+          },
+          {
+            "name": "budget",
+            "in": "query",
+            "schema": {
+              "type": "number"
+            },
+            "description": "Optional maximum total investment budget."
+          },
+          {
+            "name": "commodity",
             "in": "query",
             "schema": {
               "type": "string"
             },
-            "description": "Starting location name or ID"
+            "description": "Optional commodity name filter."
+          },
+          {
+            "name": "buySystem",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional buy system filter."
+          },
+          {
+            "name": "sellSystem",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Optional sell system filter."
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["totalProfit", "profitPerScu", "profitPerUnit"]
+            },
+            "description": "Route ranking field."
           },
           {
             "$ref": "#/components/parameters/limit"
@@ -6439,6 +6537,21 @@
                             "type": "string",
                             "nullable": true
                           },
+                          "entity_uuid": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Stable Starvis/DataForge UUID for commodity, item, or component."
+                          },
+                          "entity_uex_id": {
+                            "type": "integer",
+                            "nullable": true,
+                            "description": "UEX entity id when source is UEX."
+                          },
+                          "terminal_uex_id": {
+                            "type": "integer",
+                            "nullable": true,
+                            "description": "UEX terminal id when source is UEX."
+                          },
                           "reported_at": {
                             "type": "string",
                             "format": "date-time",
@@ -6454,6 +6567,16 @@
                               }
                             ],
                             "nullable": true
+                          },
+                          "uex_id": {
+                            "type": "integer",
+                            "nullable": true,
+                            "description": "Same UEX terminal id as shop_id when source is UEX."
+                          },
+                          "source_id": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "Namespaced stable source identifier, e.g. `uex:123` or `p4k:456`."
                           },
                           "shop_name": {
                             "type": "string",

@@ -102,16 +102,19 @@ export function mountTradeRoutes(router: Router, deps: RouteDependencies): void 
   /**
    * GET /api/v1/trade/routes
    * Calculate best trade routes for given cargo capacity
-   * Query: scu (required), budget?, env?, limit?, commodity?, buySystem?, sellSystem?, sort?
+   * Query: scu or cargo (required), budget?, env?, limit?, commodity?, buySystem?, sellSystem?, sort?
    */
   router.get(
     '/api/v1/trade/routes',
     requireGameData,
     asyncHandler(async (req, res) => {
-      const scu = getQueryNumber(req, 'scu');
+      const scu = getQueryNumber(req, 'scu') ?? getQueryNumber(req, 'cargo');
       const sortParam = getQueryString(req, 'sort');
       if (!scu || scu <= 0) {
-        return void res.status(400).json({ success: false, error: 'scu query parameter is required (positive number)' });
+        return void res.status(400).json({
+          success: false,
+          error: 'scu or cargo query parameter is required (positive number)',
+        });
       }
       const t = Date.now();
       const routes = await gameDataService!.trade.findBestRoutes({
@@ -130,7 +133,7 @@ export function mountTradeRoutes(router: Router, deps: RouteDependencies): void 
         success: true,
         count: routes.length,
         data: routes,
-        meta: { responseTime: `${Date.now() - t}ms` },
+        meta: { responseTime: `${Date.now() - t}ms`, cargoScu: scu },
       });
     }),
   );

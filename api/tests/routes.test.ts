@@ -786,6 +786,25 @@ describe('GET /api/v1/trade/prices/:commodityUuid', () => {
   });
 });
 
+describe('GET /api/v1/trade/routes', () => {
+  it('accepts cargo as an alias for scu', async () => {
+    const res = await request(app).get('/api/v1/trade/routes?cargo=1&limit=20');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.meta.cargoScu).toBe(1);
+    expect(gds.trade.findBestRoutes).toHaveBeenCalledWith(expect.objectContaining({ scu: 1, limit: 20 }));
+  });
+
+  it('returns a clear error when cargo capacity is missing', async () => {
+    const res = await request(app).get('/api/v1/trade/routes');
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchObject({
+      success: false,
+      error: 'scu or cargo query parameter is required (positive number)',
+    });
+  });
+});
+
 // ── Crafting ──────────────────────────────────────────────
 
 describe('GET /api/v1/crafting/categories', () => {
