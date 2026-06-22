@@ -115,7 +115,7 @@ test('starmap renders the native 3D galactic map (no RSI iframe)', async ({ page
   await assetRequest;
 });
 
-test('starmap drills from galaxy to system and planet levels', async ({ page }) => {
+test('starmap enters a system and focuses a body (merged view)', async ({ page }) => {
   await mockStarmap(page);
   await gotoApp(page, '/starmap');
 
@@ -126,12 +126,11 @@ test('starmap drills from galaxy to system and planet levels', async ({ page }) 
   await expect(page.getByText('System Map')).toBeVisible();
   await expect(page.getByText('System contents')).toBeVisible();
 
-  await page.getByRole('button', { name: /Hurston/i }).click();
-  await expect(page.getByRole('heading', { name: 'Hurston' })).toBeVisible();
-  await page.getByRole('button', { name: /Inspect body/i }).click();
-
-  await expect(page.getByText('Local Map')).toBeVisible();
-  await expect(page.getByText('Local objects')).toBeVisible();
+  // The merged system view lists every body, including a planet's satellites.
   await expect(page.getByRole('button', { name: /Lorville/i })).toBeVisible();
   await expect(page.getByRole('button', { name: /Everus Harbor/i })).toBeVisible();
+
+  await page.getByRole('button', { name: /Hurston/i }).click();
+  await expect(page.getByRole('heading', { name: 'Hurston' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Focus$/i })).toBeVisible();
 });
