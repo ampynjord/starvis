@@ -85,6 +85,17 @@ function makeGameDataService() {
       getItemFilters: fn({}),
       getAllItems: fn(paginated),
       resolveItem: fn(null),
+      getItemBuyLocationResult: fn({
+        data: [],
+        source: 'none',
+        sourcePriority: ['uex', 'p4k'],
+        fallbackUsed: false,
+        reason: 'no_uex_or_p4k_location_found',
+        sources: {
+          uex: { status: 'not_checked', count: null },
+          p4k: { status: 'empty', count: 0 },
+        },
+      }),
       getItemBuyLocations: fn([]),
     },
     commodities: {
@@ -468,6 +479,36 @@ describe('GET /api/v1/items/:uuid (not found)', () => {
 });
 
 // ── Commodities ───────────────────────────────────────────
+
+describe('GET /api/v1/items/:uuid/buy-locations', () => {
+  it('returns source metadata with item buy locations', async () => {
+    gds.items.resolveItem.mockResolvedValueOnce({ uuid: 'item-1', name: 'ReadyMeal (Vegetarian)' });
+    gds.items.getItemBuyLocationResult.mockResolvedValueOnce({
+      data: [{ shop_name: 'Cubby Area 18', base_price: 18 }],
+      source: 'uex',
+      sourcePriority: ['uex', 'p4k'],
+      fallbackUsed: false,
+      reason: 'uex_available',
+      sources: {
+        uex: { status: 'available', count: 1 },
+        p4k: { status: 'not_checked', count: null },
+      },
+    });
+
+    const res = await request(app).get('/api/v1/items/item-1/buy-locations');
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({
+      success: true,
+      count: 1,
+      source: 'uex',
+      fallbackUsed: false,
+      reason: 'uex_available',
+    });
+    expect(res.body.data[0]).toMatchObject({ shop_name: 'Cubby Area 18', base_price: 18 });
+    expect(res.body.sources.uex).toMatchObject({ status: 'available', count: 1 });
+  });
+});
 
 describe('GET /api/v1/commodities', () => {
   it('returns 200', async () => {

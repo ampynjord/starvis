@@ -89,6 +89,7 @@ Minimum values to set in `.env.dev`:
 | `JWT_SECRET` | yes | JWT signing secret, at least 32 characters. |
 | `TWO_FACTOR_ENCRYPTION_KEY` | recommended | Dedicated key for encrypting TOTP 2FA secrets. Falls back to `JWT_SECRET` if omitted. |
 | `ADMIN_API_KEY` | yes | API key used by server-side admin operations. |
+| `SERVER_API_KEY` | yes | Internal server-to-server key used by the IHM proxy and CI audits for `/api/v1`; keep it distinct from `ADMIN_API_KEY`. |
 | `MISTRAL_API_KEY` | optional | Enables the AI chat assistant. |
 | `CHAT_TOOL_MODEL` | optional | Model used for AI tool selection. Defaults to `mistral-small-latest`. |
 | `CHAT_RESPONSE_MODEL` | optional | Model used for final AI answers. Defaults to `mistral-large-latest`. |

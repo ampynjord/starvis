@@ -9962,7 +9962,131 @@
         ],
         "responses": {
           "200": {
-            "description": "Shop locations where the item can be purchased"
+            "description": "Shop locations where the item can be purchased, preferring UEX market data and falling back to P4K shop inventory",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "count", "data", "source", "sourcePriority", "fallbackUsed", "sources"],
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "properties": {
+                          "shop_id": {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "shop_name": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "location": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "system_name": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "city": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "planet_moon": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "base_price": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "sell_price": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": ["uex", "p4k"]
+                          }
+                        }
+                      }
+                    },
+                    "source": {
+                      "type": "string",
+                      "enum": ["uex", "p4k", "none"]
+                    },
+                    "sourcePriority": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": ["uex", "p4k"]
+                      }
+                    },
+                    "fallbackUsed": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "enum": ["uex_available", "uex_empty_p4k_available", "uex_unavailable_p4k_available", "no_uex_or_p4k_location_found"]
+                    },
+                    "sources": {
+                      "type": "object",
+                      "properties": {
+                        "uex": {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": ["available", "empty", "unavailable", "not_checked"]
+                            },
+                            "count": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "error": {
+                              "type": "string",
+                              "enum": ["query_failed"]
+                            }
+                          }
+                        },
+                        "p4k": {
+                          "type": "object",
+                          "properties": {
+                            "status": {
+                              "type": "string",
+                              "enum": ["available", "empty", "unavailable", "not_checked"]
+                            },
+                            "count": {
+                              "type": "integer",
+                              "nullable": true
+                            },
+                            "error": {
+                              "type": "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "404": {
             "$ref": "#/components/responses/NotFound"

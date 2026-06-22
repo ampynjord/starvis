@@ -168,6 +168,26 @@ interface WeaponAttachmentModifier {
   effects: { key: string; label: string; value: number; unit: 'percent' }[];
 }
 
+type ItemBuyLocationSourceStatus = 'available' | 'empty' | 'unavailable' | 'not_checked';
+
+interface ItemBuyLocationSourceMeta {
+  status: ItemBuyLocationSourceStatus;
+  count: number | null;
+  error?: string;
+}
+
+export interface ItemBuyLocationResult {
+  data: Row[];
+  source: 'uex' | 'p4k' | 'none';
+  sourcePriority: ['uex', 'p4k'];
+  fallbackUsed: boolean;
+  reason?: 'uex_available' | 'uex_empty_p4k_available' | 'uex_unavailable_p4k_available' | 'no_uex_or_p4k_location_found';
+  sources: {
+    uex: ItemBuyLocationSourceMeta;
+    p4k: ItemBuyLocationSourceMeta;
+  };
+}
+
 function itemMarketAggregateSelect(): string {
   return `
     item_market.min_purchase_price,
@@ -717,8 +737,9 @@ export class ItemQueryService {
     return { manufacturers: rows.map((r) => ({ code: String(r.code), name: String(r.name), count: Number(r.count) })) };
   }
 
-  async getItemBuyLocations(uuid: string, env = 'live'): Promise<Row[]> {
+  async getItemBuyLocationResult(uuid: string, env = 'live'): Promise<ItemBuyLocationResult> {
     const prisma = this.getClient(env);
+    let uexStatus: ItemBuyLocationSourceMeta = { status: 'not_checked', count: null };
     try {
       const uexRows = await prisma.$queryRawUnsafe<Row[]>(
         toPostgres(`SELECT
@@ -749,9 +770,24 @@ export class ItemQueryService {
         env,
         uuid,
       );
-      if (uexRows.length) return convertBigIntToNumber(uexRows);
+      if (uexRows.length) {
+        const data = convertBigIntToNumber(uexRows);
+        return {
+          data,
+          source: 'uex',
+          sourcePriority: ['uex', 'p4k'],
+          fallbackUsed: false,
+          reason: 'uex_available',
+          sources: {
+            uex: { status: 'available', count: data.length },
+            p4k: { status: 'not_checked', count: null },
+          },
+        };
+      }
+      uexStatus = { status: 'empty', count: 0 };
     } catch {
       // Older deployments without generic UEX market rows fall back to P4K shop inventory.
+      uexStatus = { status: 'unavailable', count: null, error: 'query_failed' };
     }
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT s.id as shop_id, s.name as shop_name, s.location, s.planet_moon,
@@ -767,7 +803,35 @@ export class ItemQueryService {
       env,
       uuid,
     );
-    return rows;
+    const p4kRows = convertBigIntToNumber(rows);
+    if (p4kRows.length) {
+      return {
+        data: p4kRows,
+        source: 'p4k',
+        sourcePriority: ['uex', 'p4k'],
+        fallbackUsed: true,
+        reason: uexStatus.status === 'unavailable' ? 'uex_unavailable_p4k_available' : 'uex_empty_p4k_available',
+        sources: {
+          uex: uexStatus,
+          p4k: { status: 'available', count: p4kRows.length },
+        },
+      };
+    }
+    return {
+      data: [],
+      source: 'none',
+      sourcePriority: ['uex', 'p4k'],
+      fallbackUsed: uexStatus.status !== 'not_checked',
+      reason: 'no_uex_or_p4k_location_found',
+      sources: {
+        uex: uexStatus,
+        p4k: { status: 'empty', count: 0 },
+      },
+    };
+  }
+
+  async getItemBuyLocations(uuid: string, env = 'live'): Promise<Row[]> {
+    return (await this.getItemBuyLocationResult(uuid, env)).data;
   }
 
   async getItemNavigation(env = 'live'): Promise<{
