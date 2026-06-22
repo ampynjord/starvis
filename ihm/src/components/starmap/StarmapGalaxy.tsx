@@ -175,9 +175,16 @@ function writeCameraParam(param: CameraParam) {
   window.history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
 }
 
-// Real RSI ARK Starmap sun surface textures (sourceimages/suns/NN_Texture.jpg, 01..09).
-const SUN_TEXTURE_BASE = 'https://cdn.robertsspaceindustries.com/static/starmap/sourceimages/suns';
+// Real RSI ARK Starmap source images.
+const RSI_SOURCEIMAGES = 'https://cdn.robertsspaceindustries.com/static/starmap/sourceimages';
+const SUN_TEXTURE_BASE = `${RSI_SOURCEIMAGES}/suns`;
 const SUN_TEXTURE_COUNT = 9;
+
+// Official ARK planet surface textures (referenced by the bundle's planet models).
+const PLANET_TEXTURES = ['Planet_Blue512.jpg', 'Planet_Brown.jpg', 'Planet_Gas.jpg', 'Planet_Green512.jpg'];
+const RING_TEXTURE_URL = proxiedAssetUrl(`${RSI_SOURCEIMAGES}/SaturnRing.png`);
+const JUMP_TEXTURE_URL = proxiedAssetUrl(`${RSI_SOURCEIMAGES}/JumpPointEnv.png`);
+const STATION_TEXTURE_URL = proxiedAssetUrl(`${RSI_SOURCEIMAGES}/SpaceStation.png`);
 
 function hashString(value: string) {
   let hash = 2166136261;
@@ -197,6 +204,64 @@ function sunTextureUrl(object: StarmapPosition): string | null {
   const index = spectralBias[spectral] ?? (seed % SUN_TEXTURE_COUNT) + 1;
   const clamped = Math.max(1, Math.min(SUN_TEXTURE_COUNT, index));
   return proxiedAssetUrl(`${SUN_TEXTURE_BASE}/${String(clamped).padStart(2, '0')}_Texture.jpg`);
+}
+
+// Pick a real ARK planet texture deterministically; gas variant gets a ring.
+function planetTexture(object: StarmapPosition): { url: string | null; isGas: boolean } {
+  const index = hashString(`${object.rsi_id ?? object.id}:${object.name}`) % PLANET_TEXTURES.length;
+  return { url: proxiedAssetUrl(`${RSI_SOURCEIMAGES}/${PLANET_TEXTURES[index]}`), isGas: index === 2 };
+}
+
+function romanToInt(roman: string): number {
+  const map: Record<string, number> = { i: 1, v: 5, x: 10, l: 50, c: 100, d: 500, m: 1000 };
+  let total = 0;
+  const lower = roman.toLowerCase();
+  for (let i = 0; i < lower.length; i += 1) {
+    const cur = map[lower[i]] ?? 0;
+    const next = map[lower[i + 1]] ?? 0;
+    total += cur < next ? -cur : cur;
+  }
+  return total;
+}
+
+function designationOf(object: StarmapPosition): string {
+  return String(object.designation ?? '');
+}
+
+// Planet designation like "Stanton II" -> ordinal 2.
+function planetOrdinal(object: StarmapPosition): number | null {
+  const match = designationOf(object).match(/\s([ivxlcdm]+)\s*$/i);
+  return match ? romanToInt(match[1]) || null : null;
+}
+
+// Moon designation like "Stanton 2a" -> parent planet ordinal 2.
+function moonOrdinal(object: StarmapPosition): number | null {
+  const match = designationOf(object).match(/\s(\d+)\s*[a-z]+\s*$/i);
+  return match ? Number.parseInt(match[1], 10) : null;
+}
+
+// The source data parents every body to the system. Reconstruct moon -> planet
+// links from designations so moons orbit their planet instead of the star.
+function reparentBodies(objects: StarmapPosition[]): StarmapPosition[] {
+  const planetByOrdinal = new Map<string, Map<number, StarmapPosition>>();
+  for (const obj of objects) {
+    if (!isPlanetLike(obj)) continue;
+    const ordinal = planetOrdinal(obj);
+    if (ordinal == null) continue;
+    const system = String(obj.system_code ?? obj.system_name ?? '');
+    if (!planetByOrdinal.has(system)) planetByOrdinal.set(system, new Map());
+    planetByOrdinal.get(system)?.set(ordinal, obj);
+  }
+  if (planetByOrdinal.size === 0) return objects;
+  return objects.map((obj) => {
+    if (!isMoonLike(obj)) return obj;
+    const ordinal = moonOrdinal(obj);
+    if (ordinal == null) return obj;
+    const system = String(obj.system_code ?? obj.system_name ?? '');
+    const planet = planetByOrdinal.get(system)?.get(ordinal);
+    if (!planet) return obj;
+    return { ...obj, parent_db_id: planet.id, parent_id: planet.rsi_id ?? String(planet.id) };
+  });
 }
 
 function isImageUrl(value: string) {
@@ -644,9 +709,9 @@ function clamp(value: number, min: number, max: number) {
 
 function shouldDrawOrbit(object: StarmapPosition, level: 'system' | 'body', depth: number) {
   const key = typeKey(object.type);
-  if (!ORBITABLE_TYPES.has(key)) return false;
-  if (level === 'body') return depth <= 1;
-  return depth <= 2;
+  // System view: only planetary orbits. Body (planet) view: only moon orbits.
+  if (level === 'system') return depth === 1 && (key === 'planet' || key === 'dwarfplanet');
+  return depth === 1 && (key === 'moon' || key === 'satellite');
 }
 
 // Derive an orbit ring that actually passes through the body: a circle of radius
@@ -793,6 +858,13 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
     ? systemChildren(root, allObjects)
     : childrenOf(root, objects);
 
+  // Per-category counters so each kind of object lands on its own clean ring.
+  const categoryCounts: Record<string, number> = {};
+  const nextIndex = (category: string) => {
+    categoryCounts[category] = (categoryCounts[category] ?? 0) + 1;
+    return categoryCounts[category] - 1;
+  };
+
   const positionFor = (
     child: StarmapPosition,
     parentPosition: THREE.Vector3,
@@ -802,9 +874,35 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
   ) => {
     const exact = sceneCoordinates.scenePositions.get(child.id);
     if (exact) return exact.clone();
+    const key = typeKey(child.type);
     if (isLandingZone(child)) return radialPosition(parentPosition, parentRadius + 0.9, index + depth * 2, 0.25);
-    const fallbackRadius = level === 'system' ? 28 + index * 12 + depth * 7 : 10 + index * 5 + depth * 2.5;
-    return radialPosition(parentPosition, fallbackRadius, index + depth * 4, (index % 2) * 0.35);
+    // Moons hug their parent planet in a tight orbit.
+    if (isMoonLike(child)) {
+      const radius = parentRadius * 1.9 + 3.4 + index * 2.1;
+      return radialPosition(parentPosition, radius, index * 2 + 1, (index % 2) * 0.5 - 0.25);
+    }
+    if (level === 'body') {
+      return radialPosition(parentPosition, 10 + index * 5 + depth * 2.5, index + depth * 4, (index % 2) * 0.35);
+    }
+    // System view: concentric category rings around the star.
+    if (isPlanetLike(child)) {
+      const i = nextIndex('planet');
+      return radialPosition(parentPosition, 32 + i * 16, i * 2 + 1, (i % 2) * 1.0 - 0.5);
+    }
+    if (key.includes('station') || key.includes('reststop')) {
+      const i = nextIndex('station');
+      return radialPosition(parentPosition, SYSTEM_SCENE_RADIUS * 0.5, i * 6 + 3, (i % 2) * 0.6 - 0.3);
+    }
+    if (key.includes('asteroid')) {
+      const i = nextIndex('asteroid');
+      return radialPosition(parentPosition, SYSTEM_SCENE_RADIUS * 0.68, i * 4 + 2, (i % 2) * 0.7 - 0.35);
+    }
+    if (key.includes('jump')) {
+      const i = nextIndex('jump');
+      return radialPosition(parentPosition, SYSTEM_SCENE_RADIUS * 0.92, i * 5 + 1, (i % 3) * 0.9 - 0.9);
+    }
+    const i = nextIndex('other');
+    return radialPosition(parentPosition, 40 + i * 12, i + depth * 4, (i % 2) * 0.35);
   };
 
   const placeChildren = (parent: StarmapPosition, parentPosition: THREE.Vector3, parentRadius: number, depth: number) => {
@@ -900,7 +998,8 @@ function levelTitle(level: StarmapLevel) {
   return 'Local Map';
 }
 
-function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
+function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
+  const objects = useMemo(() => reparentBodies(rawObjects), [rawObjects]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<StarmapPosition | null>(null);
   const [level, setLevel] = useState<StarmapLevel>('galaxy');
@@ -1121,10 +1220,15 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
       nodeGroup.add(makeCircle(ring.radius, ring.color, ring.opacity, ring.center, ring.tiltAxis, ring.tiltAngle));
     }
 
+    let jumpEnvTexture: THREE.Texture | null = null;
+
     for (const node of sceneModel.nodes) {
       if (node.visible === false) continue;
       const layerKey = layerKeyOf(node.object.type);
       if (layerKey && hiddenLayers.has(layerKey)) continue;
+      const tkey = typeKey(node.object.type);
+      const isStar = tkey === 'star';
+      const isGalaxySystem = level === 'galaxy' && isSystemObject(node.object);
       const materialOptions: THREE.MeshStandardMaterialParameters = {
         color: node.color,
         emissive: node.color,
@@ -1132,39 +1236,62 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
         roughness: 0.42,
         metalness: 0.08,
       };
-      const tkey = typeKey(node.object.type);
-      const isStar = tkey === 'star';
-      const sunUrl = isStar ? sunTextureUrl(node.object) : null;
-      const image = isStar ? null : starmapTexture(node.object);
-      if (sunUrl) {
-        // Real RSI sun surface texture, self-lit so it reads as a light source.
-        const tex = textureLoader.load(sunUrl, () => {
-          tex.colorSpace = THREE.SRGBColorSpace;
-        });
-        loadedTextures.push(tex);
-        materialOptions.map = tex;
-        materialOptions.emissiveMap = tex;
-        materialOptions.color = 0xffffff;
+      let ringTexUrl: string | null = null;
+
+      if (isGalaxySystem) {
+        // Self-lit star marker using the real RSI sun texture: uniformly bright,
+        // so no directional shading and no "eclipse" look. Faction tint comes from
+        // the surrounding glow sprite.
+        const sunUrl = sunTextureUrl(node.object);
+        if (sunUrl) {
+          const tex = textureLoader.load(sunUrl, () => {
+            tex.colorSpace = THREE.SRGBColorSpace;
+          });
+          loadedTextures.push(tex);
+          materialOptions.emissiveMap = tex;
+        }
+        materialOptions.color = 0x000000;
         materialOptions.emissive = 0xffffff;
-        materialOptions.emissiveIntensity = 1.7;
+        materialOptions.emissiveIntensity = 2.2;
         materialOptions.roughness = 1;
         materialOptions.metalness = 0;
-      } else if (image) {
-        const tex = textureLoader.load(image, () => {
-          tex.colorSpace = THREE.SRGBColorSpace;
-        });
-        loadedTextures.push(tex);
-        materialOptions.map = tex;
-        materialOptions.color = 0xffffff;
-        materialOptions.emissiveIntensity = isStar ? 0.5 : 0.05;
-        materialOptions.roughness = 0.72;
-      } else if (isPlanetLike(node.object) || isMoonLike(node.object) || isStar || tkey.includes('asteroid')) {
-        const tex = makeProceduralBodyTexture(node.object, node.color);
-        loadedTextures.push(tex);
-        materialOptions.map = tex;
-        materialOptions.color = 0xffffff;
-        materialOptions.emissiveIntensity = isStar ? 0.75 : 0.08;
-        materialOptions.roughness = tkey.includes('asteroid') ? 0.9 : 0.68;
+      } else {
+        const sunUrl = isStar ? sunTextureUrl(node.object) : null;
+        const planet = isPlanetLike(node.object) ? planetTexture(node.object) : null;
+        if (planet?.isGas) ringTexUrl = RING_TEXTURE_URL;
+        const stationUrl = tkey.includes('station') || tkey.includes('reststop') ? STATION_TEXTURE_URL : null;
+        const realUrl = sunUrl ?? planet?.url ?? stationUrl ?? (isStar ? null : starmapTexture(node.object));
+        if (sunUrl) {
+          // Real RSI sun surface texture, self-lit so it reads as a light source.
+          const tex = textureLoader.load(sunUrl, () => {
+            tex.colorSpace = THREE.SRGBColorSpace;
+          });
+          loadedTextures.push(tex);
+          materialOptions.map = tex;
+          materialOptions.emissiveMap = tex;
+          materialOptions.color = 0xffffff;
+          materialOptions.emissive = 0xffffff;
+          materialOptions.emissiveIntensity = 1.7;
+          materialOptions.roughness = 1;
+          materialOptions.metalness = 0;
+        } else if (realUrl) {
+          // Real RSI planet/station surface texture.
+          const tex = textureLoader.load(realUrl, () => {
+            tex.colorSpace = THREE.SRGBColorSpace;
+          });
+          loadedTextures.push(tex);
+          materialOptions.map = tex;
+          materialOptions.color = 0xffffff;
+          materialOptions.emissiveIntensity = 0.06;
+          materialOptions.roughness = 0.72;
+        } else if (isMoonLike(node.object) || tkey.includes('asteroid')) {
+          const tex = makeProceduralBodyTexture(node.object, node.color);
+          loadedTextures.push(tex);
+          materialOptions.map = tex;
+          materialOptions.color = 0xffffff;
+          materialOptions.emissiveIntensity = 0.08;
+          materialOptions.roughness = tkey.includes('asteroid') ? 0.9 : 0.68;
+        }
       }
 
       const mesh = new THREE.Mesh(sphereGeo, new THREE.MeshStandardMaterial(materialOptions));
@@ -1189,26 +1316,50 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
         nodeGroup.add(sunLight);
       }
 
+      // Gas giants carry the real ARK Saturn-style ring.
+      if (ringTexUrl) {
+        const ringTex = textureLoader.load(ringTexUrl, () => {
+          ringTex.colorSpace = THREE.SRGBColorSpace;
+        });
+        loadedTextures.push(ringTex);
+        const ringMesh = new THREE.Mesh(
+          new THREE.RingGeometry(node.radius * 1.5, node.radius * 2.7, 64),
+          new THREE.MeshBasicMaterial({ map: ringTex, transparent: true, side: THREE.DoubleSide, depthWrite: false, opacity: 0.9 }),
+        );
+        ringMesh.position.copy(node.position);
+        ringMesh.rotation.set(Math.PI / 2 - 0.35, 0, hashString(node.object.name) % 6);
+        ringMesh.scale.setScalar(node.radius);
+        nodeGroup.add(ringMesh);
+      }
+
+      // Jump points use the real RSI JumpPointEnv sprite.
+      const isJump = tkey.includes('jump');
+      if (isJump && !jumpEnvTexture && JUMP_TEXTURE_URL) {
+        jumpEnvTexture = textureLoader.load(JUMP_TEXTURE_URL, (loaded) => {
+          loaded.colorSpace = THREE.SRGBColorSpace;
+        });
+        loadedTextures.push(jumpEnvTexture);
+      }
       const glow = new THREE.Sprite(
         new THREE.SpriteMaterial({
-          map: glowTexture,
-          color: node.color,
+          map: isJump && jumpEnvTexture ? jumpEnvTexture : glowTexture,
+          color: isJump ? 0x67e8f9 : node.color,
           transparent: true,
           depthWrite: false,
           blending: THREE.AdditiveBlending,
         }),
       );
-      const glowBase = node.surface ? 2.1 : level === 'galaxy' ? 7 : 4.2;
+      const glowBase = node.surface ? 2.1 : isJump ? (level === 'galaxy' ? 9 : 6) : level === 'galaxy' ? 7 : 4.2;
       glow.scale.set(glowBase + node.radius * 2.2, glowBase + node.radius * 2.2, 1);
       glow.position.copy(node.position);
       nodeGroup.add(glow);
-      // Subtle axial rotation so bodies feel alive, like the official map.
+      // Gentle axial rotation — kept slow so it never looks like it's spinning fast.
       const spin = isStar
-        ? 0.012
+        ? 0.004
         : tkey.includes('asteroid')
-          ? 0.06
+          ? 0.02
           : isPlanetLike(node.object) || isMoonLike(node.object)
-            ? 0.05 + (hashString(node.object.name) % 30) / 1000
+            ? 0.014 + (hashString(node.object.name) % 30) / 2200
             : 0;
       mesh.rotation.y = (hashString(node.object.name) % 628) / 100;
       animatedNodes.push({ mesh, glow, base: node.radius, glowBase, phase: Math.random() * Math.PI * 2, spin });
@@ -1242,7 +1393,7 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
       const cometScale = level === 'galaxy' ? 5.5 : 2.6;
       comet.scale.set(cometScale, cometScale, 1);
       nodeGroup.add(comet);
-      jumpComets.push({ sprite: comet, curve, offset: Math.random(), speed: 0.16 + Math.random() * 0.12 });
+      jumpComets.push({ sprite: comet, curve, offset: Math.random(), speed: 0.08 + Math.random() * 0.06 });
     }
 
     // Highlight a planned jump route across the galaxy in gold.

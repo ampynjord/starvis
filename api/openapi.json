@@ -2303,6 +2303,10 @@
           "type": {
             "type": "string"
           },
+          "designation": {
+            "type": "string",
+            "nullable": true
+          },
           "status": {
             "type": "string",
             "nullable": true

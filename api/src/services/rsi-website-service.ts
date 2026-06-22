@@ -360,6 +360,7 @@ export class RsiWebsiteService {
     return this.prisma.$queryRawUnsafe<Row[]>(
       `SELECT sl.id, sl.rsi_id, sl.name, sl.type, sl.system_code, sl.system_name,
               sl.status, sl.faction_name, sl.parent_id, parent.id as parent_db_id,
+              sl.raw_json->>'designation' as designation,
               sl.coordinates, sl.aggregated,
               sl.thumbnail,
               sl.raw_json -> 'thumbnail' as thumbnail_data,
