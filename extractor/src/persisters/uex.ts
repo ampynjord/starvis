@@ -116,9 +116,56 @@ function economyRow(
 
 function normalizeName(value: string | null | undefined): string {
   return String(value ?? '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
+}
+
+function normalizedNameKeys(value: string | null | undefined): string[] {
+  const normalized = normalizeName(value);
+  if (!normalized) return [];
+  const compact = normalized.replace(/\s+/g, '');
+  return compact === normalized ? [normalized] : [normalized, compact];
+}
+
+function vehicleNameKeys(value: string | null | undefined): string[] {
+  const normalized = normalizeName(value);
+  if (!normalized) return [];
+
+  const variants = new Set<string>([normalized]);
+  const starlifter = normalized.match(/^([acm]\d) hercules starlifter$/);
+  if (starlifter) variants.add(`starlifter ${starlifter[1]}`);
+
+  const ares = normalized.match(/^ares (inferno|ion) starfighter$/);
+  if (ares) variants.add(`starfighter ${ares[1]}`);
+
+  variants.add(normalized.replace(/^aurora mk i /, 'aurora gs '));
+  variants.add(normalized.replace(/ rescue$/, ''));
+  variants.add(normalized.replace(/ tank$/, ''));
+  variants.add(normalized.replace(/^mercury star runner$/, 'star runner'));
+  variants.add(normalized.replace(/^mpuv tractor$/, 'mpuv 1t'));
+  variants.add(normalized.replace(/^mpuv personnel$/, 'mpuv transport'));
+  variants.add(normalized.replace(/^mpuv cargo$/, 'mpuv'));
+
+  return [...variants].flatMap((variant) => normalizedNameKeys(variant));
+}
+
+function addNameMapping(map: Map<string, string>, name: string | null | undefined, uuid: string): void {
+  for (const key of normalizedNameKeys(name)) {
+    if (!map.has(key)) map.set(key, uuid);
+  }
+}
+
+function resolveVehicleByName(map: Map<string, string>, ...names: (string | null | undefined)[]): string | null {
+  for (const name of names) {
+    for (const key of vehicleNameKeys(name)) {
+      const uuid = map.get(key);
+      if (uuid) return uuid;
+    }
+  }
+  return null;
 }
 
 function terminalRow(env: GameEnv, t: UexTerminal): (string | number | null | boolean)[] {
@@ -161,8 +208,7 @@ export async function saveUexMarket(conn: PoolClient, env: GameEnv, onProgress?:
   const shipUuids = new Set(shipRows.map((r) => r.uuid.toLowerCase()));
   const shipByName = new Map<string, string>();
   for (const r of shipRows) {
-    const key = normalizeName(r.name);
-    if (key && !shipByName.has(key)) shipByName.set(key, r.uuid);
+    addNameMapping(shipByName, r.name, r.uuid);
   }
 
   let mappedByUuid = 0;
@@ -179,7 +225,7 @@ export async function saveUexMarket(conn: PoolClient, env: GameEnv, onProgress?:
       }
     }
     if (!shipUuid) {
-      const byName = shipByName.get(normalizeName(v.name_full)) ?? shipByName.get(normalizeName(v.name));
+      const byName = resolveVehicleByName(shipByName, v.name_full, v.name);
       if (byName) {
         shipUuid = byName;
         mappedByName++;
