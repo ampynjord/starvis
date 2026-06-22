@@ -114,14 +114,18 @@ export class TradeService {
     let uexStatus: CommodityPriceSourceMeta = { status: 'not_checked', count: null };
     try {
       const uexRows = await prisma.$queryRawUnsafe<Row[]>(
-        toPostgres(`SELECT p.id, p.price_buy as buy_price, p.price_sell as sell_price, p.date_modified as reported_at,
+        toPostgres(`SELECT p.id, p.entity_kind, p.entity_name,
+              p.price_buy as buy_price, p.price_sell as sell_price, p.date_modified as reported_at,
               t.uex_id as shop_id, COALESCE(t.name, p.terminal_name) as shop_name,
               t.star_system as system, COALESCE(t.moon, t.planet, t.orbit) as planet_moon, t.city,
               'uex' as source
        FROM game.uex_market_prices p
        LEFT JOIN game.uex_terminals t ON t.uex_id = p.terminal_uex_id AND t.env = p.env
-       WHERE p.env = ? AND p.entity_kind = 'commodity' AND p.entity_uuid = ?
-       ORDER BY t.star_system, t.city, t.name`),
+       WHERE p.env = ?
+         AND p.entity_kind IN ('commodity', 'item', 'component')
+         AND p.entity_uuid = ?
+         AND p.is_available = TRUE
+       ORDER BY p.entity_kind, t.star_system, t.city, t.name`),
         env,
         commodityUuid,
       );

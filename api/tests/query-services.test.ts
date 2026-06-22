@@ -934,6 +934,7 @@ describe('TradeService', () => {
         [
           row({
             id: 10,
+            entity_kind: 'commodity',
             buy_price: 42,
             sell_price: 55,
             shop_id: 99,
@@ -951,6 +952,37 @@ describe('TradeService', () => {
       expect(result.sources.uex).toMatchObject({ status: 'available', count: 1 });
       expect(result.sources.p4k).toMatchObject({ status: 'not_checked', count: null });
       expect(result.data[0]).toMatchObject({ shop_name: 'UEX Terminal', buy_price: 42 });
+      expect((prisma as any).$queryRawUnsafe).toHaveBeenCalledTimes(1);
+    });
+
+    it('also returns UEX item prices for non-commodity UUIDs', async () => {
+      const prisma = createMockPrisma([
+        [
+          row({
+            id: 564,
+            entity_kind: 'item',
+            entity_name: 'ReadyMeal (Vegetarian)',
+            buy_price: 18,
+            sell_price: 0,
+            shop_id: 113,
+            shop_name: 'Cubby Area 18',
+            source: 'uex',
+          }),
+        ],
+      ]);
+      const svc = new TradeService(createGetClient(prisma));
+
+      const result = await svc.getCommodityPriceResult('item-uuid');
+
+      expect(result.source).toBe('uex');
+      expect(result.fallbackUsed).toBe(false);
+      expect(result.sources.uex).toMatchObject({ status: 'available', count: 1 });
+      expect(result.data[0]).toMatchObject({
+        entity_kind: 'item',
+        entity_name: 'ReadyMeal (Vegetarian)',
+        shop_name: 'Cubby Area 18',
+        buy_price: 18,
+      });
       expect((prisma as any).$queryRawUnsafe).toHaveBeenCalledTimes(1);
     });
 
