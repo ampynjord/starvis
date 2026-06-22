@@ -805,6 +805,62 @@ model StarmapLocationAlias {
 
 // ─── Game insights ────────────────────────────────────────────────────────────
 
+// Canonical source correlation
+//
+// Stable, non-breaking identity layer for records that exist in multiple
+// sources (P4K/DataForge, RSI and UEX). Existing catalog tables keep their
+// current primary keys; these tables record how source records collapse into
+// one Starvis canonical entity.
+
+model CanonicalEntity {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  env             String   @default("live") @db.VarChar(10)
+  domain          String   @db.VarChar(40)
+  canonicalKey    String   @map("canonical_key") @db.VarChar(255)
+  name            String   @db.VarChar(255)
+  primarySource   String?  @map("primary_source") @db.VarChar(30)
+  primarySourceId String?  @map("primary_source_id") @db.VarChar(160)
+  confidence      String   @default("computed") @db.VarChar(30)
+  metadata        Json?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  links CanonicalEntityLink[]
+
+  @@unique([env, domain, canonicalKey])
+  @@index([domain, env])
+  @@index([primarySource, primarySourceId])
+  @@map("canonical_entities")
+  @@schema("game")
+}
+
+model CanonicalEntityLink {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  canonicalId String   @map("canonical_id") @db.Uuid
+  env         String   @default("live") @db.VarChar(10)
+  domain      String   @db.VarChar(40)
+  source      String   @db.VarChar(30)
+  sourceTable String   @map("source_table") @db.VarChar(120)
+  sourceId    String?  @map("source_id") @db.VarChar(160)
+  sourceUuid  String?  @map("source_uuid") @db.VarChar(80)
+  sourceName  String?  @map("source_name") @db.VarChar(255)
+  matchMethod String   @default("computed") @map("match_method") @db.VarChar(40)
+  matchScore  Int      @default(0) @map("match_score")
+  isPrimary   Boolean  @default(false) @map("is_primary")
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  canonical CanonicalEntity @relation(fields: [canonicalId], references: [id], onDelete: Cascade)
+
+  @@unique([env, domain, source, sourceTable, sourceId, sourceUuid])
+  @@index([canonicalId])
+  @@index([source, sourceTable])
+  @@index([sourceUuid])
+  @@map("canonical_entity_links")
+  @@schema("game")
+}
+
 model GameInsight {
   uuid          String   @db.Char(36)
   env           String   @default("live") @db.VarChar(10)

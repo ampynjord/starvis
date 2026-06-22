@@ -9,7 +9,7 @@ Database workspace for Prisma, PostgreSQL bootstrap scripts, and the shared Pris
 | `prisma/schema/00-base.prisma` | Prisma generator and datasource. |
 | `prisma/schema/10-meta.prisma` | Users, generated API tokens, corporations, fleet/tactical metadata, bug reports, extraction logs and changelog. |
 | `prisma/schema/20-rsi.prisma` | RSI website data: ship matrix, Galactapedia, comm-links, starmap. |
-| `prisma/schema/30-game.prisma` | P4K/DataForge game data: ships, components, items, commodities, shops, missions, crafting, plus UEX crowd-sourced market data (`uex_terminals`, `uex_vehicle_prices`, `uex_market_prices`). |
+| `prisma/schema/30-game.prisma` | P4K/DataForge game data: ships, components, items, commodities, shops, missions, crafting, plus UEX crowd-sourced market data (`uex_terminals`, `uex_vehicle_prices`, `uex_market_prices`) and cross-source canonical correlation tables. |
 | `src/client/` | Prisma singleton client. |
 | `src/env/` | Shared database environment helpers. |
 | `src/types/` | Public Prisma helper types. |
@@ -53,6 +53,10 @@ Cross-source links should be explicit fields, not duplicated data. Current examp
 - `game.starmap_location_aliases` stores manual/semi-automatic correlation help.
 - `game.uex_vehicle_prices.ship_uuid` links UEX vehicle prices to `game.ships.uuid` (resolved by the extractor `uex` module).
 - `game.uex_market_prices.entity_uuid` links UEX commodity/item/component prices to extracted entities when a name match is available. No DB-level foreign key is declared so externally-sourced rows survive even when a game item is missing or renamed.
+- `game.canonical_entities` and `game.canonical_entity_links` provide the
+  non-breaking identity layer for records that exist in P4K, RSI and UEX. They
+  do not replace source primary keys; they let API clients see one Starvis
+  canonical entity plus explicit source links.
 
 Run the static data audit after extractor or schema changes:
 
