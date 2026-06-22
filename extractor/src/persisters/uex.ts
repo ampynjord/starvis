@@ -45,14 +45,35 @@ function firstNumber(row: UexGenericMarketPrice, keys: string[]): number | null 
   return null;
 }
 
-async function buildNameMap(conn: PoolClient, table: string, env: GameEnv): Promise<Map<string, string>> {
+async function buildEntityMap(
+  conn: PoolClient,
+  table: 'commodities' | 'items' | 'components',
+  env: GameEnv,
+): Promise<{ byName: Map<string, string>; dataForgeUuids: Set<string> }> {
   const { rows } = await conn.query<{ uuid: string; name: string | null }>(`SELECT uuid, name FROM game.${table} WHERE env = $1`, [env]);
-  const map = new Map<string, string>();
+  const byName = new Map<string, string>();
+  const dataForgeUuids = new Set<string>();
   for (const row of rows) {
+    const uuid = row.uuid.toLowerCase();
+    dataForgeUuids.add(uuid);
     const key = normalizeName(row.name);
-    if (key && !map.has(key)) map.set(key, row.uuid);
+    if (key && !byName.has(key)) byName.set(key, uuid);
   }
-  return map;
+  return { byName, dataForgeUuids };
+}
+
+function resolveEntityUuid(
+  row: UexGenericMarketPrice,
+  kind: 'commodity' | 'item' | 'component',
+  entityName: string | null,
+  map: { byName: Map<string, string>; dataForgeUuids: Set<string> },
+): string | null {
+  const uexUuid = firstText(row, [`${kind}_uuid`, 'uuid']);
+  if (uexUuid) {
+    const candidate = scUuidToDataForgeUuid(uexUuid).toLowerCase();
+    if (map.dataForgeUuids.has(candidate)) return candidate;
+  }
+  return entityName ? (map.byName.get(normalizeName(entityName)) ?? null) : null;
 }
 
 function economyRow(
@@ -60,10 +81,10 @@ function economyRow(
   resource: string,
   kind: 'commodity' | 'item' | 'component',
   row: UexGenericMarketPrice,
-  uuidByName: Map<string, string>,
+  entityMap: { byName: Map<string, string>; dataForgeUuids: Set<string> },
 ): (string | number | null | boolean)[] {
   const entityName = firstText(row, [`${kind}_name`, 'name', 'name_full', 'item_name', 'commodity_name', 'component_name']);
-  const entityUuid = entityName ? (uuidByName.get(normalizeName(entityName)) ?? null) : null;
+  const entityUuid = resolveEntityUuid(row, kind, entityName, entityMap);
   const buy = firstNumber(row, ['price_buy', 'price_buy_avg', 'price_min']);
   const sell = firstNumber(row, ['price_sell', 'price_sell_avg', 'price_max']);
   const avg = firstNumber(row, ['price_average', 'price_avg']);
@@ -237,17 +258,17 @@ export async function saveUexMarket(conn: PoolClient, env: GameEnv, onProgress?:
     priceRows,
   );
 
-  const [commodityByName, itemByName, componentByName] = await Promise.all([
-    buildNameMap(conn, 'commodities', env),
-    buildNameMap(conn, 'items', env),
-    buildNameMap(conn, 'components', env),
+  const [commodityMap, itemMap, componentMap] = await Promise.all([
+    buildEntityMap(conn, 'commodities', env),
+    buildEntityMap(conn, 'items', env),
+    buildEntityMap(conn, 'components', env),
   ]);
 
   await conn.query('DELETE FROM game.uex_market_prices WHERE env = $1', [env]);
   const economyRows = [
-    ...economy.commodities.map((row) => economyRow(env, 'commodities_prices_all', 'commodity', row, commodityByName)),
-    ...economy.items.map((row) => economyRow(env, 'items_prices_all', 'item', row, itemByName)),
-    ...economy.components.map((row) => economyRow(env, 'components', 'component', row, componentByName)),
+    ...economy.commodities.map((row) => economyRow(env, 'commodities_prices_all', 'commodity', row, commodityMap)),
+    ...economy.items.map((row) => economyRow(env, 'items_prices_all', 'item', row, itemMap)),
+    ...economy.components.map((row) => economyRow(env, 'components', 'component', row, componentMap)),
   ];
   const economyPrices = await batchUpsert(
     conn,

@@ -291,8 +291,17 @@ export function mountItemRoutes(router: Router, deps: RouteDependencies): void {
       const env = String(req.query.env ?? 'live');
       const item = await gameDataService!.items.resolveItem(req.params.uuid, env);
       if (!item) return void res.status(404).json({ success: false, error: 'Item not found' });
-      const data = await gameDataService!.items.getItemBuyLocations(String(item.uuid), env);
-      sendWithETag(req, res, { success: true, count: data.length, data });
+      const result = await gameDataService!.items.getItemBuyLocationResult(String(item.uuid), env);
+      sendWithETag(req, res, {
+        success: true,
+        count: result.data.length,
+        data: result.data,
+        source: result.source,
+        sourcePriority: result.sourcePriority,
+        fallbackUsed: result.fallbackUsed,
+        reason: result.reason,
+        sources: result.sources,
+      });
     }),
   );
 }

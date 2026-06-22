@@ -305,6 +305,69 @@ describe('ItemQueryService', () => {
     });
   });
 
+  describe('getItemBuyLocationResult', () => {
+    it('uses UEX item market rows when available', async () => {
+      const prisma = createMockPrisma([
+        [
+          row({
+            shop_id: 113,
+            shop_name: 'Cubby Area 18',
+            location: 'Area 18',
+            base_price: 18,
+            source: 'uex',
+          }),
+        ],
+      ]);
+      const svc = new ItemQueryService(createGetClient(prisma));
+
+      const result = await svc.getItemBuyLocationResult('item-uuid');
+
+      expect(result.source).toBe('uex');
+      expect(result.fallbackUsed).toBe(false);
+      expect(result.sources.uex).toMatchObject({ status: 'available', count: 1 });
+      expect(result.sources.p4k).toMatchObject({ status: 'not_checked', count: null });
+      expect(result.data[0]).toMatchObject({ shop_name: 'Cubby Area 18', base_price: 18 });
+      expect((prisma as any).$queryRawUnsafe).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to P4K shop inventory when UEX has no row', async () => {
+      const prisma = createMockPrisma([
+        [],
+        [
+          row({
+            shop_id: 7,
+            shop_name: 'Legacy Shop',
+            base_price: 20,
+            source: 'p4k',
+          }),
+        ],
+      ]);
+      const svc = new ItemQueryService(createGetClient(prisma));
+
+      const result = await svc.getItemBuyLocationResult('item-uuid');
+
+      expect(result.source).toBe('p4k');
+      expect(result.fallbackUsed).toBe(true);
+      expect(result.reason).toBe('uex_empty_p4k_available');
+      expect(result.sources.uex).toMatchObject({ status: 'empty', count: 0 });
+      expect(result.sources.p4k).toMatchObject({ status: 'available', count: 1 });
+      expect(result.data[0]).toMatchObject({ shop_name: 'Legacy Shop', base_price: 20 });
+    });
+
+    it('reports UEX as unavailable when generic market rows are not deployed', async () => {
+      const prisma = createMockPrisma([new Error('relation "game.uex_market_prices" does not exist'), []]);
+      const svc = new ItemQueryService(createGetClient(prisma));
+
+      const result = await svc.getItemBuyLocationResult('item-uuid');
+
+      expect(result.source).toBe('none');
+      expect(result.reason).toBe('no_uex_or_p4k_location_found');
+      expect(result.sources.uex).toMatchObject({ status: 'unavailable', count: null, error: 'query_failed' });
+      expect(result.sources.p4k).toMatchObject({ status: 'empty', count: 0 });
+      expect(result.data).toEqual([]);
+    });
+  });
+
   describe('getWeaponAttachmentModifiers', () => {
     it('extracts real weapon modifier multipliers from attachment data_json', async () => {
       const prisma = createMockPrisma([
