@@ -6376,13 +6376,14 @@
     "/api/v1/trade/prices/{commodityUuid}": {
       "get": {
         "tags": ["Trade"],
-        "summary": "Get prices for a commodity across all locations",
+        "summary": "Get UEX/P4K prices for an economic entity across all locations",
         "operationId": "getCommodityPrices",
         "parameters": [
           {
             "name": "commodityUuid",
             "in": "path",
             "required": true,
+            "description": "Starvis UUID for a commodity, item, or component. P4K fallback is currently available for legacy commodity prices; UEX prices support commodities, items, and components.",
             "schema": {
               "type": "string"
             }
@@ -6393,7 +6394,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Buy/sell prices per location. UEX is the primary source; P4K ShopInventories are used as fallback when UEX has no price rows or is unavailable.",
+            "description": "Buy/sell prices per location. UEX is the primary source for commodities, items, and components; P4K commodity prices are used as fallback when UEX has no price rows or is unavailable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6427,6 +6428,15 @@
                           },
                           "sell_price": {
                             "type": "number",
+                            "nullable": true
+                          },
+                          "entity_kind": {
+                            "type": "string",
+                            "enum": ["commodity", "item", "component"],
+                            "nullable": true
+                          },
+                          "entity_name": {
+                            "type": "string",
                             "nullable": true
                           },
                           "reported_at": {
