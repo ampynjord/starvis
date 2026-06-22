@@ -197,29 +197,36 @@ const NEBULA_TEXTURES = [
 // The RSI station 3D model (Collada), loaded once and normalised to unit size.
 let stationModelPromise: Promise<THREE.Object3D> | null = null;
 function loadStationModel(): Promise<THREE.Object3D> {
-  stationModelPromise ??= new Promise((resolve, reject) => {
-    new ColladaLoader().load(
-      `${RSI_MODELS}/SpaceStation.dae`,
-      (collada) => {
-        if (!collada?.scene) {
-          reject(new Error('RSI station model did not include a scene'));
-          return;
-        }
-        const model = collada.scene;
-        const box = new THREE.Box3().setFromObject(model);
-        const size = box.getSize(new THREE.Vector3());
-        const center = box.getCenter(new THREE.Vector3());
-        const maxDim = Math.max(size.x, size.y, size.z) || 1;
-        model.position.sub(center);
-        const wrapper = new THREE.Group();
-        wrapper.add(model);
-        wrapper.scale.setScalar(1 / maxDim);
-        resolve(wrapper);
-      },
-      undefined,
-      reject,
-    );
-  });
+  if (!stationModelPromise) {
+    stationModelPromise = new Promise((resolve, reject) => {
+      new ColladaLoader().load(
+        `${RSI_MODELS}/SpaceStation.dae`,
+        (collada) => {
+          if (!collada?.scene) {
+            reject(new Error('RSI station model did not include a scene'));
+            return;
+          }
+          const model = collada.scene;
+          const box = new THREE.Box3().setFromObject(model);
+          const size = box.getSize(new THREE.Vector3());
+          const center = box.getCenter(new THREE.Vector3());
+          const maxDim = Math.max(size.x, size.y, size.z) || 1;
+          model.position.sub(center);
+          const wrapper = new THREE.Group();
+          wrapper.add(model);
+          wrapper.scale.setScalar(1 / maxDim);
+          resolve(wrapper);
+        },
+        undefined,
+        reject,
+      );
+    });
+    // A transient failure (network blip, timing) must not permanently poison
+    // every future call for the rest of the page session — let it retry.
+    stationModelPromise.catch(() => {
+      stationModelPromise = null;
+    });
+  }
   return stationModelPromise;
 }
 
@@ -1379,6 +1386,7 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
 
       // Asteroid belts render as a real particle ring around their parent (the
       // Aaron Halo, the rings of Yela) instead of a sphere.
+      let beltMaterial: THREE.PointsMaterial | null = null;
       if (isAsteroid && node.ring && node.ring.radius > 1) {
         const count = Math.round(clamp(node.ring.radius * 5, 90, 360));
         const positions = new Float32Array(count * 3);
@@ -1396,9 +1404,8 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
         const beltGeo = new THREE.BufferGeometry();
         beltGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         const beltSize = clamp(node.ring.radius * 0.06, 0.35, 0.8);
-        nodeGroup.add(
-          new THREE.Points(beltGeo, new THREE.PointsMaterial({ color: 0xc2a878, size: beltSize, sizeAttenuation: true, transparent: true, opacity: 0.75 })),
-        );
+        beltMaterial = new THREE.PointsMaterial({ color: 0xc2a878, size: beltSize, sizeAttenuation: true, transparent: true, opacity: 0.75 });
+        nodeGroup.add(new THREE.Points(beltGeo, beltMaterial));
       }
 
       // Stations use the real RSI SpaceStation 3D model (placed after load).
@@ -1474,12 +1481,17 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
       if (node.reveal) {
         const meshMaterial = mesh.material as THREE.MeshStandardMaterial;
         meshMaterial.transparent = true;
-        const entries: RevealEntry[] = [{ material: meshMaterial, base: meshMaterial.opacity || 1 }];
+        // Use the material's real current opacity as the reveal base — stations,
+        // asteroids and jumps deliberately set this to 0 above (invisible pick
+        // sphere) and must stay at 0 even when fully "revealed", or they flash
+        // into a visible sphere once the camera gets close to their parent.
+        const entries: RevealEntry[] = [{ material: meshMaterial, base: meshMaterial.opacity }];
         if (glow) {
           const glowMaterial = glow.material as THREE.SpriteMaterial;
           entries.push({ material: glowMaterial, base: glowMaterial.opacity });
         }
         if (labelMaterial) entries.push({ material: labelMaterial, base: 1 });
+        if (beltMaterial) entries.push({ material: beltMaterial, base: beltMaterial.opacity });
         revealItems.push({ center: node.reveal, entries });
       }
     }
@@ -1491,7 +1503,10 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
           if (!active) return;
           for (const placement of stationPlacements) {
             const clone = model.clone(true);
-            clone.scale.setScalar(placement.radius * 5.5);
+            // `model` is already normalised to unit size (scale = 1/maxDim); the
+            // clone inherits that, so compose with it instead of overwriting it
+            // or the station ends up rendered at the model's raw, unnormalised size.
+            clone.scale.multiplyScalar(placement.radius * 5.5);
             clone.position.copy(placement.pos);
             clone.rotation.set(0.3, Math.random() * Math.PI * 2, 0.1);
             nodeGroup.add(clone);
