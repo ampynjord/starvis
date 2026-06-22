@@ -30,6 +30,9 @@ interface SceneNode {
   surface?: boolean;
   visible?: boolean;
   label?: boolean;
+  // When set, this body is a satellite revealed only as the camera nears the
+  // given parent (planet) position — the merged system/planet zoom.
+  reveal?: THREE.Vector3;
 }
 
 interface OrbitRing {
@@ -39,6 +42,7 @@ interface OrbitRing {
   opacity: number;
   tiltAxis: THREE.Vector3;
   tiltAngle: number;
+  reveal?: THREE.Vector3;
 }
 
 interface SceneModel {
@@ -50,7 +54,7 @@ interface SceneModel {
   radius: number;
 }
 
-type StarmapLevel = 'galaxy' | 'system' | 'body';
+type StarmapLevel = 'galaxy' | 'system';
 type StarmapPositionsResponse = StarmapPosition[] | { data?: unknown };
 
 const FACTIONS: FactionStyle[] = [
@@ -97,7 +101,6 @@ const TYPE_ORDER = new Map<string, number>([
 const IMAGE_EXT = /\.(png|jpe?g|webp|avif)(\?|$)/i;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const SYSTEM_SCENE_RADIUS = 170;
-const ORBITABLE_TYPES = new Set(['planet', 'dwarfplanet', 'moon', 'satellite']);
 
 function typeKey(type: string | null | undefined) {
   return String(type ?? '')
@@ -711,13 +714,6 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function shouldDrawOrbit(object: StarmapPosition, level: 'system' | 'body', depth: number) {
-  const key = typeKey(object.type);
-  // System view: only planetary orbits. Body (planet) view: only moon orbits.
-  if (level === 'system') return depth === 1 && (key === 'planet' || key === 'dwarfplanet');
-  return depth === 1 && (key === 'moon' || key === 'satellite');
-}
-
 // Derive an orbit ring that actually passes through the body: a circle of radius
 // |offset| tilted out of the horizontal plane by the body's own elevation, so
 // inclined orbits read as the official map's tilted ellipses (bodies stay put).
@@ -739,15 +735,12 @@ function modelRadius(nodes: SceneNode[]) {
 
 function cameraFor(level: StarmapLevel, radius: number) {
   if (level === 'galaxy') return new THREE.Vector3(120, 90, 200);
-  if (level === 'system') return new THREE.Vector3(0, radius * 0.62, radius * 1.18);
-  return new THREE.Vector3(0, radius * 0.78, radius * 1.35);
+  return new THREE.Vector3(0, radius * 0.6, radius * 1.15);
 }
 
-function nodeLabelEnabled(object: StarmapPosition, level: 'system' | 'body', depth: number) {
+function nodeLabelEnabled(object: StarmapPosition) {
   const key = typeKey(object.type);
-  if (depth === 0) return true;
-  if (level === 'body') return depth <= 1 && ORBITABLE_TYPES.has(key);
-  return depth <= 1 && ['star', 'planet', 'dwarfplanet', 'jumppoint', 'jump_point'].includes(key);
+  return ['star', 'planet', 'dwarfplanet', 'moon', 'satellite', 'jumppoint', 'jump_point', 'station'].includes(key);
 }
 
 function buildGalaxyModel(objects: StarmapPosition[]): SceneModel {
@@ -806,35 +799,31 @@ function buildGalaxyModel(objects: StarmapPosition[]): SceneModel {
   };
 }
 
-function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], allObjects: StarmapPosition[], level: 'system' | 'body'): SceneModel {
-  const rootStyle = objectStyle(root.type);
-  const rootColor = isSystemObject(root) ? factionStyle(root.faction_name) : rootStyle;
-  const physicalRoot = !(level === 'system' && typeKey(root.type) === 'system');
-  const rootRadius = physicalRoot ? (isSystemObject(root) ? 3.5 : Math.max(2.2, rootStyle.size * 1.35)) : 0.01;
+// Bodies orbiting the star sit far out (AU scale); satellites orbiting a planet
+// sit very close (< ~0.05 AU).
+const SATELLITE_THRESHOLD = 0.05;
+
+function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], allObjects: StarmapPosition[]): SceneModel {
+  // The system root is an invisible origin; the star sits at the centre as a child.
+  const rootColor = factionStyle(root.faction_name);
   const rootNode: SceneNode = {
     object: root,
     position: new THREE.Vector3(0, 0, 0),
-    radius: rootRadius,
+    radius: 0.01,
     css: rootColor.css,
     color: rootColor.color,
-    visible: physicalRoot,
-    label: physicalRoot,
+    visible: false,
+    label: false,
   };
 
   const nodes: SceneNode[] = [rootNode];
   const rings: OrbitRing[] = [];
   const placed = new Set<number>([root.id]);
-  const rootChildren = level === 'system'
-    ? systemChildren(root, allObjects)
-    : childrenOf(root, objects);
+  const rootChildren = systemChildren(root, allObjects);
 
-  // Real RSI coordinates are polar offsets relative to each parent. Derive two
-  // scales — one for primary bodies (around the star), one for satellites
-  // (around a planet) — so real angular positions are preserved while distances
+  // Real RSI coordinates are polar offsets relative to each parent. Scale each
+  // tier independently so real angular positions are preserved while distances
   // stay readable.
-  // Bodies orbiting the star sit far out (AU scale); satellites orbiting a planet
-  // sit very close (< ~0.05 AU). Scale each tier independently.
-  const SATELLITE_THRESHOLD = 0.05;
   let maxPrimary = 0;
   let maxSecondary = 0;
   for (const object of objects) {
@@ -862,12 +851,11 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
     depth: number,
   ) => {
     const key = typeKey(child.type);
-    const isMoon = isMoonLike(child);
-    // Real position: scale the parent-relative offset by its tier and keep the
-    // true direction (latitude/longitude) from the RSI data.
     const relative = coordinateOf(child);
-    if (relative && relative.length() > 1e-9) {
-      const isSatellite = relative.length() < SATELLITE_THRESHOLD;
+    if (relative) {
+      const distance = relative.length();
+      if (distance < 1e-9) return parentPosition.clone(); // star at system centre
+      const isSatellite = distance < SATELLITE_THRESHOLD;
       const scale = isSatellite ? secondaryScale : primaryScale;
       if (scale > 0) {
         const scaled = relative.clone().multiplyScalar(scale);
@@ -879,15 +867,10 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
       }
     }
     if (isLandingZone(child)) return radialPosition(parentPosition, parentRadius + 0.9, index + depth * 2, 0.25);
-    // Moons hug their parent planet in a tight orbit.
-    if (isMoon) {
+    if (isMoonLike(child)) {
       const radius = parentRadius * 1.9 + 3.4 + index * 2.1;
       return radialPosition(parentPosition, radius, index * 2 + 1, (index % 2) * 0.5 - 0.25);
     }
-    if (level === 'body') {
-      return radialPosition(parentPosition, 10 + index * 5 + depth * 2.5, index + depth * 4, (index % 2) * 0.35);
-    }
-    // System view: concentric category rings around the star.
     if (isPlanetLike(child)) {
       const i = nextIndex('planet');
       return radialPosition(parentPosition, 32 + i * 16, i * 2 + 1, (i % 2) * 1.0 - 0.5);
@@ -909,12 +892,15 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
   };
 
   const placeChildren = (parent: StarmapPosition, parentPosition: THREE.Vector3, parentRadius: number, depth: number) => {
+    // Children of a planet are satellites: revealed as the camera nears the planet.
+    const satelliteTier = isPlanetLike(parent);
     const children = childrenOf(parent, objects).filter((child) => !placed.has(child.id));
     children.forEach((child, index) => {
       const style = objectStyle(child.type);
       const landing = isLandingZone(child);
       const position = positionFor(child, parentPosition, parentRadius, index, depth);
       const orbit = orbitGeometry(parentPosition, position);
+      const reveal = satelliteTier ? parentPosition.clone() : undefined;
       const node: SceneNode = {
         object: child,
         position,
@@ -922,18 +908,23 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
         css: style.css,
         color: style.color,
         surface: landing,
-        label: nodeLabelEnabled(child, level, depth),
+        label: nodeLabelEnabled(child),
+        reveal,
       };
       nodes.push(node);
       placed.add(child.id);
-      if (shouldDrawOrbit(child, level, depth) && orbit.radius > 1) {
+      // Planets get an orbit around the star (always); moons get one around their
+      // planet (revealed on zoom).
+      const drawsOrbit = orbit.radius > 1 && (isPlanetLike(child) || (satelliteTier && isMoonLike(child)));
+      if (drawsOrbit) {
         rings.push({
           center: parentPosition,
           radius: orbit.radius,
           color: style.color,
-          opacity: depth === 1 ? 0.22 : 0.11,
+          opacity: satelliteTier ? 0.16 : 0.22,
           tiltAxis: orbit.tiltAxis,
           tiltAngle: orbit.tiltAngle,
+          reveal,
         });
       }
       placeChildren(child, position, Math.max(1, node.radius), depth + 1);
@@ -944,8 +935,7 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
     if (placed.has(child.id)) return;
     const style = objectStyle(child.type);
     const landing = isLandingZone(child);
-    const position = positionFor(child, rootNode.position, Math.max(1, rootNode.radius), index, 1);
-    const orbit = orbitGeometry(rootNode.position, position);
+    const position = positionFor(child, rootNode.position, 0.01, index, 1);
     const node: SceneNode = {
       object: child,
       position,
@@ -953,27 +943,17 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
       css: style.css,
       color: style.color,
       surface: landing,
-      label: nodeLabelEnabled(child, level, 1),
+      label: nodeLabelEnabled(child),
     };
     nodes.push(node);
     placed.add(child.id);
-    if (shouldDrawOrbit(child, level, 1) && orbit.radius > 1) {
-      rings.push({
-        center: rootNode.position,
-        radius: orbit.radius,
-        color: style.color,
-        opacity: 0.22,
-        tiltAxis: orbit.tiltAxis,
-        tiltAngle: orbit.tiltAngle,
-      });
-    }
-    placeChildren(child, position, Math.max(1, node.radius), 1);
+    placeChildren(child, position, Math.max(1, node.radius), 2);
   });
 
   const leftovers = objects.filter((object) => object.id !== root.id && !placed.has(object.id)).sort(sortObjects);
   leftovers.forEach((child, index) => {
     const style = objectStyle(child.type);
-    const position = positionFor(child, rootNode.position, Math.max(1, rootNode.radius), index + nodes.length, 1);
+    const position = positionFor(child, rootNode.position, 0.01, index + nodes.length, 1);
     nodes.push({ object: child, position, radius: style.size, css: style.css, color: style.color, label: false });
     placed.add(child.id);
   });
@@ -986,7 +966,7 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
     nodes,
     rings,
     jumpLines,
-    camera: cameraFor(level, radius),
+    camera: cameraFor('system', radius),
     target: new THREE.Vector3(0, 0, 0),
     radius,
   };
@@ -1004,7 +984,7 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
   const [selected, setSelected] = useState<StarmapPosition | null>(null);
   const [level, setLevel] = useState<StarmapLevel>('galaxy');
   const [activeSystem, setActiveSystem] = useState<StarmapPosition | null>(null);
-  const [activeBody, setActiveBody] = useState<StarmapPosition | null>(null);
+  const focusRef = useRef<StarmapPosition | null>(null);
   const [hiddenLayers, setHiddenLayers] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [routeOpen, setRouteOpen] = useState(false);
@@ -1048,38 +1028,26 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
 
   const sceneModel = useMemo(() => {
     if (level === 'system' && activeSystem) {
-      return buildNestedModel(activeSystem, systemObjects(activeSystem, objects), objects, 'system');
-    }
-    if (level === 'body' && activeSystem && activeBody) {
-      return buildNestedModel(activeBody, systemObjects(activeSystem, objects), objects, 'body');
+      return buildNestedModel(activeSystem, systemObjects(activeSystem, objects), objects);
     }
     return buildGalaxyModel(objects);
-  }, [activeBody, activeSystem, level, objects]);
+  }, [activeSystem, level, objects]);
 
   const enterSystem = (system: StarmapPosition) => {
     setActiveSystem(system);
-    setActiveBody(null);
     setSelected(null);
     setLevel('system');
   };
 
-  const inspectBody = (body: StarmapPosition) => {
-    if (!activeSystem) return;
-    setActiveBody(body);
-    setSelected(null);
-    setLevel('body');
+  // Smoothly fly the camera to a body within the current system (merged zoom).
+  const focusBody = (body: StarmapPosition) => {
+    focusRef.current = body;
+    setSelected(body);
   };
 
   const backToGalaxy = () => {
     setLevel('galaxy');
     setActiveSystem(null);
-    setActiveBody(null);
-    setSelected(null);
-  };
-
-  const backToSystem = () => {
-    setLevel('system');
-    setActiveBody(null);
     setSelected(null);
   };
 
@@ -1177,6 +1145,11 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
     const animatedNodes: Array<{ mesh: THREE.Mesh; glow: THREE.Sprite; base: number; glowBase: number; phase: number; spin: number }> = [];
     const labels: Array<{ sprite: THREE.Sprite; baseWidth: number; baseHeight: number }> = [];
     const nodePositions = new Map<string, { pos: THREE.Vector3; radius: number }>();
+    // Satellites fade in as the camera nears their parent planet (merged zoom).
+    type RevealEntry = { material: THREE.Material & { opacity: number }; base: number };
+    const revealItems: Array<{ center: THREE.Vector3; entries: RevealEntry[] }> = [];
+    const REVEAL_NEAR = 28;
+    const REVEAL_FAR = 95;
 
     // Reusable selection reticle, repositioned imperatively when the selection
     // changes so picking a body never rebuilds the whole scene.
@@ -1216,7 +1189,13 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
     );
 
     for (const ring of sceneModel.rings) {
-      nodeGroup.add(makeCircle(ring.radius, ring.color, ring.opacity, ring.center, ring.tiltAxis, ring.tiltAngle));
+      const circle = makeCircle(ring.radius, ring.color, ring.opacity, ring.center, ring.tiltAxis, ring.tiltAngle);
+      if (ring.reveal) {
+        const mat = circle.material as THREE.LineBasicMaterial;
+        revealItems.push({ center: ring.reveal, entries: [{ material: mat, base: ring.opacity }] });
+        mat.opacity = 0;
+      }
+      nodeGroup.add(circle);
     }
 
     let jumpEnvTexture: THREE.Texture | null = null;
@@ -1353,26 +1332,44 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
       glow.scale.set(glowBase + node.radius * 2.2, glowBase + node.radius * 2.2, 1);
       glow.position.copy(node.position);
       nodeGroup.add(glow);
-      // Gentle axial rotation — kept slow so it never looks like it's spinning fast.
-      const spin = isStar
-        ? 0.004
-        : tkey.includes('asteroid')
-          ? 0.02
-          : isPlanetLike(node.object) || isMoonLike(node.object)
-            ? 0.014 + (hashString(node.object.name) % 30) / 2200
-            : 0;
+      // Axial rotation: derive a slow, real-relative speed from the RSI orbital
+      // period (shorter period -> a touch faster), and tilt by the real axial tilt.
+      const orbitPeriod = Number(node.object.orbit_period);
+      let spin: number;
+      if (isStar) spin = 0.004;
+      else if (tkey.includes('asteroid')) spin = 0.02;
+      else if (isPlanetLike(node.object) || isMoonLike(node.object)) {
+        spin = Number.isFinite(orbitPeriod) && orbitPeriod > 0
+          ? clamp(0.02 * (500 / orbitPeriod), 0.006, 0.05)
+          : 0.014 + (hashString(node.object.name) % 30) / 2200;
+      } else spin = 0;
       mesh.rotation.y = (hashString(node.object.name) % 628) / 100;
+      mesh.rotation.z = ((Number(node.object.axial_tilt) || 0) * Math.PI) / 180;
       animatedNodes.push({ mesh, glow, base: node.radius, glowBase, phase: Math.random() * Math.PI * 2, spin });
 
+      let labelMaterial: (THREE.Material & { opacity: number }) | null = null;
       const shouldLabel = node.label ?? (
         level === 'galaxy' && ['system', 'star'].includes(typeKey(node.object.type))
       );
       if (shouldLabel) {
-        const labelHeight = level === 'galaxy' ? 4 : level === 'system' ? 2.35 : 1.45;
+        const labelHeight = level === 'galaxy' ? 4 : 2.35;
         const label = makeLabelSprite(node.object.name, node.css, labelHeight);
         label.position.copy(node.position).add(new THREE.Vector3(0, labelHeight * 0.65 + node.radius, 0));
         labels.push({ sprite: label, baseWidth: label.scale.x, baseHeight: label.scale.y });
         nodeGroup.add(label);
+        labelMaterial = label.material as THREE.SpriteMaterial;
+      }
+
+      if (node.reveal) {
+        const meshMaterial = mesh.material as THREE.MeshStandardMaterial;
+        meshMaterial.transparent = true;
+        const glowMaterial = glow.material as THREE.SpriteMaterial;
+        const entries: RevealEntry[] = [
+          { material: meshMaterial, base: 1 },
+          { material: glowMaterial, base: glowMaterial.opacity },
+        ];
+        if (labelMaterial) entries.push({ material: labelMaterial, base: 1 });
+        revealItems.push({ center: node.reveal, entries });
       }
     }
 
@@ -1500,7 +1497,26 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
         const base = Number(reticle.userData.baseScale ?? 4);
         reticle.scale.setScalar(base * (1 + Math.sin(t * 3.4) * 0.08));
       }
-      const labelReferenceDistance = level === 'galaxy' ? 260 : level === 'system' ? 210 : 120;
+      // Progressive satellite reveal: fade moons/orbits in as the camera nears
+      // their parent planet.
+      for (const item of revealItems) {
+        const distance = camera.position.distanceTo(item.center);
+        const factor = clamp((REVEAL_FAR - distance) / (REVEAL_FAR - REVEAL_NEAR), 0, 1);
+        for (const entry of item.entries) entry.material.opacity = entry.base * factor;
+      }
+      // Smoothly fly to a focused body, then settle so moons reveal around it.
+      if (focusRef.current) {
+        const target = nodePositions.get(objectId(focusRef.current));
+        if (target) {
+          const desired = target.pos.clone().add(new THREE.Vector3(0, target.radius * 3 + 8, target.radius * 6 + 16));
+          camera.position.lerp(desired, 0.08);
+          controls.target.lerp(target.pos, 0.1);
+          if (camera.position.distanceTo(desired) < 1.5) focusRef.current = null;
+        } else {
+          focusRef.current = null;
+        }
+      }
+      const labelReferenceDistance = level === 'galaxy' ? 260 : 210;
       for (const label of labels) {
         const distance = camera.position.distanceTo(label.sprite.position);
         const factor = clamp(distance / labelReferenceDistance, 0.42, 1.05);
@@ -1569,11 +1585,9 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
   const selectedCanInspect = selected && !isSystemObject(selected) && (selectedHasChildren || isPlanetLike(selected) || isMoonLike(selected));
   const browserObjects = level === 'galaxy'
     ? systems
-    : level === 'system' && activeSystem
-      ? systemChildren(activeSystem, objects)
-      : activeBody
-        ? childrenOf(activeBody, currentObjects.length > 0 ? currentObjects : objects)
-        : [];
+    : activeSystem
+      ? systemObjects(activeSystem, objects)
+      : [];
 
   const searchTerm = search.trim().toLowerCase();
   const listObjects = browserObjects.filter((object) => {
@@ -1596,21 +1610,14 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
         <span className="font-orbitron text-xs uppercase tracking-widest text-slate-200">{levelTitle(level)}</span>
         <span className="font-mono-sc text-[10px] text-cyan-500">{sceneModel.nodes.filter((node) => node.visible !== false).length} objects</span>
         {activeSystem && (
-          <span className="font-mono-sc text-[10px] text-slate-500">
-            / {activeSystem.name}{activeBody ? ` / ${activeBody.name}` : ''}
-          </span>
+          <span className="font-mono-sc text-[10px] text-slate-500">/ {activeSystem.name}</span>
         )}
       </div>
 
       <div className="absolute left-3 top-14 z-10 flex flex-wrap gap-2">
         {level !== 'galaxy' && (
-          <button type="button" onClick={level === 'body' ? backToSystem : backToGalaxy} className="sci-btn-ghost flex items-center gap-1.5 px-2.5 py-1.5 text-[10px]">
+          <button type="button" onClick={backToGalaxy} className="sci-btn-ghost flex items-center gap-1.5 px-2.5 py-1.5 text-[10px]">
             <ChevronLeft size={12} />
-            {level === 'body' ? 'System' : 'Galaxy'}
-          </button>
-        )}
-        {level !== 'galaxy' && (
-          <button type="button" onClick={backToGalaxy} className="sci-btn-ghost px-2.5 py-1.5 text-[10px]">
             Galaxy
           </button>
         )}
@@ -1907,9 +1914,9 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
                 </button>
               )}
               {selectedCanInspect && (
-                <button type="button" onClick={() => inspectBody(selected)} className="sci-btn-primary flex items-center gap-1.5 px-3 py-2 text-xs">
+                <button type="button" onClick={() => focusBody(selected)} className="sci-btn-primary flex items-center gap-1.5 px-3 py-2 text-xs">
                   <MapPin size={13} />
-                  Inspect body
+                  Focus
                 </button>
               )}
             </div>
