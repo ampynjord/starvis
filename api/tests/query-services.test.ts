@@ -955,6 +955,36 @@ describe('TradeService', () => {
       expect((prisma as any).$queryRawUnsafe).toHaveBeenCalledTimes(1);
     });
 
+    it('includes stable UEX entity and terminal identifiers in price rows', async () => {
+      const prisma = createMockPrisma([
+        [
+          row({
+            id: 10,
+            entity_kind: 'commodity',
+            entity_uuid: 'commodity-uuid',
+            entity_uex_id: 456,
+            entity_name: 'Agricium',
+            terminal_uex_id: 88,
+            source_id: 'uex:88',
+            buy_price: 42,
+            shop_id: 88,
+            shop_name: 'UEX Terminal',
+            source: 'uex',
+          }),
+        ],
+      ]);
+      const svc = new TradeService(createGetClient(prisma));
+
+      const result = await svc.getCommodityPriceResult('commodity-uuid');
+
+      expect(result.data[0]).toMatchObject({
+        entity_uuid: 'commodity-uuid',
+        entity_uex_id: 456,
+        terminal_uex_id: 88,
+        source_id: 'uex:88',
+      });
+    });
+
     it('also returns UEX item prices for non-commodity UUIDs', async () => {
       const prisma = createMockPrisma([
         [
@@ -1052,6 +1082,43 @@ describe('TradeService', () => {
       expect(result.sources.uex).toMatchObject({ status: 'unavailable', count: null, error: 'query_failed' });
       expect(result.sources.p4k).toMatchObject({ status: 'empty', count: 0 });
       expect(result.data).toEqual([]);
+    });
+  });
+
+  describe('findBestRoutes', () => {
+    it('includes stable entity and terminal identifiers for UEX routes', async () => {
+      const prisma = createMockPrisma([
+        [
+          row({
+            entity_uuid: 'commodity-uuid',
+            entity_kind: 'commodity',
+            commodity_name: 'Agricium',
+            commodity_uuid: 'commodity-uuid',
+            occupancy_scu: 1,
+            buy_price: 100,
+            buy_terminal_uex_id: 10,
+            buy_shop: 'Buy Terminal',
+            buy_system: 'Stanton',
+            buy_city: 'Area18',
+            sell_price: 150,
+            sell_terminal_uex_id: 20,
+            sell_shop: 'Sell Terminal',
+            sell_system: 'Pyro',
+            sell_city: 'Checkmate',
+          }),
+        ],
+      ]);
+      const svc = new TradeService(createGetClient(prisma));
+
+      const result = await svc.findBestRoutes({ scu: 10 });
+
+      expect(result[0]).toMatchObject({
+        entityUuid: 'commodity-uuid',
+        entityKind: 'commodity',
+        commodityUuid: 'commodity-uuid',
+        buyTerminalUexId: 10,
+        sellTerminalUexId: 20,
+      });
     });
   });
 });

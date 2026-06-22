@@ -5,12 +5,19 @@ import type { PrismaLike as PrismaClient } from '@starvis/db';
 import { convertBigIntToNumber, type Row, toPostgres } from './shared.js';
 
 export interface TradeRoute {
+  entityUuid: string | null;
+  entityKind: string | null;
   buyCommodity: string;
+  commodityUuid: string | null;
   buyShop: string;
+  buyShopId: number | null;
+  buyTerminalUexId: number | null;
   buyLocation: string;
   buySystem: string | null;
   buyPrice: number;
   sellShop: string;
+  sellShopId: number | null;
+  sellTerminalUexId: number | null;
   sellLocation: string;
   sellSystem: string | null;
   sellPrice: number;
@@ -46,25 +53,33 @@ export class TradeService {
 
   async getTradeSystems(env = 'live'): Promise<string[]> {
     const prisma = this.getClient(env);
-    try {
-      const uexRows = await prisma.$queryRawUnsafe<Row[]>(
-        toPostgres(`SELECT DISTINCT t.star_system as system
-         FROM game.uex_market_prices p
-         LEFT JOIN game.uex_terminals t ON t.uex_id = p.terminal_uex_id AND t.env = p.env
-         WHERE p.env = ? AND p.entity_kind = 'commodity' AND t.star_system IS NOT NULL AND t.star_system != ''
-         ORDER BY t.star_system`),
-        env,
-      );
-      if (uexRows.length) return uexRows.map((r) => String(r.system));
-    } catch {
-      // Older deployments without UEX generic prices fall back to local reports.
-    }
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT DISTINCT s.system
-       FROM game.shops s
-       INNER JOIN game.commodity_prices cp ON cp.shop_id = s.id AND cp.commodity_env = s.env
-       WHERE s.env = ? AND s.system IS NOT NULL AND s.system != ''
-       ORDER BY s.system`),
+      toPostgres(`WITH systems AS (
+        SELECT DISTINCT t.star_system as system_name
+          FROM game.uex_terminals t
+          WHERE t.env = ? AND t.star_system IS NOT NULL AND t.star_system != ''
+        UNION
+        SELECT DISTINCT s.system as system_name
+          FROM game.shops s
+          WHERE s.env = ? AND s.system IS NOT NULL AND s.system != ''
+        UNION
+        SELECT DISTINCT COALESCE(sl.name, sl.system_name, l.system_code) as system_name
+          FROM game.locations l
+          LEFT JOIN rsi.starmap_locations sl
+            ON sl.system_code = l.system_code
+           AND LOWER(sl.type) = 'system'
+          WHERE l.env = ? AND l.system_code IS NOT NULL AND l.system_code != ''
+        UNION
+        SELECT DISTINCT COALESCE(name, system_name, system_code) as system_name
+          FROM rsi.starmap_locations
+          WHERE LOWER(type) = 'system' AND COALESCE(name, system_name, system_code) IS NOT NULL
+      )
+      SELECT DISTINCT system_name as system
+        FROM systems
+        WHERE system_name IS NOT NULL AND system_name != ''
+        ORDER BY system_name`),
+      env,
+      env,
       env,
     );
     return rows.map((r) => String(r.system));
@@ -72,10 +87,13 @@ export class TradeService {
 
   async getTradeLocations(env = 'live'): Promise<Row[]> {
     const prisma = this.getClient(env);
-    try {
-      const uexRows = await prisma.$queryRawUnsafe<Row[]>(
-        toPostgres(`SELECT DISTINCT
-              t.uex_id as id,
+    const rows = await prisma.$queryRawUnsafe<Row[]>(
+      toPostgres(`WITH locations AS (
+        SELECT DISTINCT
+              t.uex_id::text as id,
+              t.uex_id as uex_id,
+              NULL::integer as p4k_shop_id,
+              ('uex:' || t.uex_id)::text as source_id,
               t.name,
               COALESCE(t.city, t.outpost, t.space_station, t.moon, t.planet, t.star_system) as location,
               t.star_system as system,
@@ -83,22 +101,28 @@ export class TradeService {
               t.city,
               t.type as shop_type,
               'uex' as source
-         FROM game.uex_market_prices p
-         LEFT JOIN game.uex_terminals t ON t.uex_id = p.terminal_uex_id AND t.env = p.env
-         WHERE p.env = ? AND p.entity_kind = 'commodity' AND t.uex_id IS NOT NULL
-         ORDER BY t.star_system, t.city, t.name`),
-        env,
-      );
-      if (uexRows.length) return convertBigIntToNumber(uexRows);
-    } catch {
-      // Fallback below.
-    }
-    const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT DISTINCT s.id, s.name, s.location, s.system, s.planet_moon, s.city, s.shop_type
-       FROM game.shops s
-       INNER JOIN game.commodity_prices cp ON cp.shop_id = s.id AND cp.commodity_env = s.env
-       WHERE s.env = ?
-       ORDER BY s.system, s.city, s.name`),
+         FROM game.uex_terminals t
+         WHERE t.env = ? AND t.uex_id IS NOT NULL
+        UNION
+        SELECT DISTINCT
+              s.id::text as id,
+              NULL::integer as uex_id,
+              s.id as p4k_shop_id,
+              ('p4k:' || s.id)::text as source_id,
+              s.name,
+              s.location,
+              s.system,
+              s.planet_moon,
+              s.city,
+              s.shop_type,
+              'p4k' as source
+         FROM game.shops s
+         WHERE s.env = ?
+       )
+       SELECT *
+       FROM locations
+       ORDER BY system, city, name, source`),
+      env,
       env,
     );
     return convertBigIntToNumber(rows);
@@ -115,8 +139,10 @@ export class TradeService {
     try {
       const uexRows = await prisma.$queryRawUnsafe<Row[]>(
         toPostgres(`SELECT p.id, p.entity_kind, p.entity_name,
+              p.entity_uuid, p.entity_uex_id, p.terminal_uex_id,
               p.price_buy as buy_price, p.price_sell as sell_price, p.date_modified as reported_at,
-              t.uex_id as shop_id, COALESCE(t.name, p.terminal_name) as shop_name,
+              t.uex_id as shop_id, t.uex_id, ('uex:' || t.uex_id)::text as source_id,
+              COALESCE(t.name, p.terminal_name) as shop_name,
               t.star_system as system, COALESCE(t.moon, t.planet, t.orbit) as planet_moon, t.city,
               'uex' as source
        FROM game.uex_market_prices p
@@ -169,10 +195,15 @@ export class TradeService {
       uexStatus = { status: 'unavailable', count: null, error: 'query_failed' };
     }
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`SELECT cp.id, cp.buy_price, cp.sell_price, cp.reported_at,
-              s.id as shop_id, s.name as shop_name, s.system, s.planet_moon, s.city
+      toPostgres(`SELECT cp.id, 'commodity' as entity_kind, c.name as entity_name,
+              cp.commodity_uuid as entity_uuid, NULL::integer as entity_uex_id, NULL::integer as terminal_uex_id,
+              cp.buy_price, cp.sell_price, cp.reported_at,
+              s.id as shop_id, NULL::integer as uex_id, ('p4k:' || s.id)::text as source_id,
+              s.name as shop_name, s.system, s.planet_moon, s.city,
+              'p4k' as source
        FROM game.commodity_prices cp
        INNER JOIN game.shops s ON s.id = cp.shop_id AND s.env = cp.commodity_env
+       INNER JOIN game.commodities c ON c.uuid = cp.commodity_uuid AND c.env = cp.commodity_env
        WHERE cp.commodity_env = ? AND cp.commodity_uuid = ?
        ORDER BY s.system, s.city`),
       env,
@@ -315,11 +346,16 @@ export class TradeService {
 
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT
+        c.uuid as entity_uuid,
+        'commodity' as entity_kind,
         c.name as commodity_name,
+        c.uuid as commodity_uuid,
         c.occupancy_scu,
         buy_cp.buy_price,
+        buy_s.id as buy_shop_id,
         buy_s.name as buy_shop, buy_s.system as buy_system, buy_s.city as buy_city,
        sell_cp.sell_price,
+       sell_s.id as sell_shop_id,
        sell_s.name as sell_shop, sell_s.system as sell_system, sell_s.city as sell_city
        FROM game.commodity_prices buy_cp
        INNER JOIN game.commodities c ON c.uuid = buy_cp.commodity_uuid AND c.env = buy_cp.commodity_env
@@ -350,12 +386,19 @@ export class TradeService {
       const totalProfit = units * profitPerUnit;
 
       routes.push({
+        entityUuid: String(r.entity_uuid ?? r.commodity_uuid ?? '') || null,
+        entityKind: String(r.entity_kind ?? 'commodity'),
         buyCommodity: r.commodity_name,
+        commodityUuid: String(r.commodity_uuid ?? r.entity_uuid ?? '') || null,
         buyShop: r.buy_shop,
+        buyShopId: r.buy_shop_id == null ? null : Number(r.buy_shop_id),
+        buyTerminalUexId: null,
         buyLocation: [r.buy_city, r.buy_system].filter(Boolean).join(', '),
         buySystem: r.buy_system ?? null,
         buyPrice,
         sellShop: r.sell_shop,
+        sellShopId: r.sell_shop_id == null ? null : Number(r.sell_shop_id),
+        sellTerminalUexId: null,
         sellLocation: [r.sell_city, r.sell_system].filter(Boolean).join(', '),
         sellSystem: r.sell_system ?? null,
         sellPrice,
@@ -410,13 +453,18 @@ export class TradeService {
 
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT
+        buy_p.entity_uuid,
+        buy_p.entity_kind,
         buy_p.entity_name as commodity_name,
+        buy_p.entity_uuid as commodity_uuid,
         c.occupancy_scu,
         buy_p.price_buy as buy_price,
+        buy_t.uex_id as buy_terminal_uex_id,
         COALESCE(buy_t.name, buy_p.terminal_name) as buy_shop,
         buy_t.star_system as buy_system,
         buy_t.city as buy_city,
         sell_p.price_sell as sell_price,
+        sell_t.uex_id as sell_terminal_uex_id,
         COALESCE(sell_t.name, sell_p.terminal_name) as sell_shop,
         sell_t.star_system as sell_system,
         sell_t.city as sell_city
@@ -444,12 +492,19 @@ export class TradeService {
       if (budget && totalCost > budget) continue;
       const profitPerUnit = sellPrice - buyPrice;
       routes.push({
+        entityUuid: String(r.entity_uuid ?? r.commodity_uuid ?? '') || null,
+        entityKind: String(r.entity_kind ?? 'commodity'),
         buyCommodity: r.commodity_name,
+        commodityUuid: String(r.commodity_uuid ?? r.entity_uuid ?? '') || null,
         buyShop: r.buy_shop,
+        buyShopId: null,
+        buyTerminalUexId: r.buy_terminal_uex_id == null ? null : Number(r.buy_terminal_uex_id),
         buyLocation: [r.buy_city, r.buy_system].filter(Boolean).join(', '),
         buySystem: r.buy_system ?? null,
         buyPrice,
         sellShop: r.sell_shop,
+        sellShopId: null,
+        sellTerminalUexId: r.sell_terminal_uex_id == null ? null : Number(r.sell_terminal_uex_id),
         sellLocation: [r.sell_city, r.sell_system].filter(Boolean).join(', '),
         sellSystem: r.sell_system ?? null,
         sellPrice,
