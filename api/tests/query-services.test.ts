@@ -928,6 +928,20 @@ describe('CommodityQueryService', () => {
 // --- TradeService -----------------------------------------------------------
 
 describe('TradeService', () => {
+  describe('getTradeSystems', () => {
+    it('deduplicates RSI/P4K/UEX system name variants', async () => {
+      const prisma = createMockPrisma([[row({ system: 'Nyx' }), row({ system: 'Stanton' }), row({ system: 'Pyro' })]]);
+      const svc = new TradeService(createGetClient(prisma));
+
+      const result = await svc.getTradeSystems('live');
+
+      expect(result).toEqual(['Nyx', 'Stanton', 'Pyro']);
+      const sql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
+      expect(sql).toContain('DISTINCT ON (system_key)');
+      expect(sql).toContain("REGEXP_REPLACE(system_name, '\\s+System$'");
+    });
+  });
+
   describe('getCommodityPriceResult', () => {
     it('uses UEX commodity prices before P4K fallback', async () => {
       const prisma = createMockPrisma([

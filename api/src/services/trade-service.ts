@@ -54,30 +54,41 @@ export class TradeService {
   async getTradeSystems(env = 'live'): Promise<string[]> {
     const prisma = this.getClient(env);
     const rows = await prisma.$queryRawUnsafe<Row[]>(
-      toPostgres(`WITH systems AS (
-        SELECT DISTINCT t.star_system as system_name
+      toPostgres(`WITH raw_systems AS (
+        SELECT DISTINCT t.star_system as system_name, 0 as priority
           FROM game.uex_terminals t
           WHERE t.env = ? AND t.star_system IS NOT NULL AND t.star_system != ''
         UNION
-        SELECT DISTINCT s.system as system_name
+        SELECT DISTINCT s.system as system_name, 0 as priority
           FROM game.shops s
           WHERE s.env = ? AND s.system IS NOT NULL AND s.system != ''
         UNION
-        SELECT DISTINCT COALESCE(sl.name, sl.system_name, l.system_code) as system_name
+        SELECT DISTINCT COALESCE(sl.name, sl.system_name, l.system_code) as system_name, 1 as priority
           FROM game.locations l
           LEFT JOIN rsi.starmap_locations sl
             ON sl.system_code = l.system_code
            AND LOWER(sl.type) = 'system'
           WHERE l.env = ? AND l.system_code IS NOT NULL AND l.system_code != ''
         UNION
-        SELECT DISTINCT COALESCE(name, system_name, system_code) as system_name
+        SELECT DISTINCT COALESCE(name, system_name, system_code) as system_name, 1 as priority
           FROM rsi.starmap_locations
           WHERE LOWER(type) = 'system' AND COALESCE(name, system_name, system_code) IS NOT NULL
-      )
-      SELECT DISTINCT system_name as system
-        FROM systems
+      ), normalized AS (
+        SELECT
+          TRIM(REGEXP_REPLACE(system_name, '\\s+System$', '', 'i')) as system_name,
+          REGEXP_REPLACE(LOWER(REGEXP_REPLACE(system_name, '\\s+System$', '', 'i')), '[^a-z0-9]+', '', 'g') as system_key,
+          priority
+        FROM raw_systems
         WHERE system_name IS NOT NULL AND system_name != ''
-        ORDER BY system_name`),
+      ), ranked AS (
+        SELECT DISTINCT ON (system_key) system_name as system
+        FROM normalized
+        WHERE system_key != ''
+        ORDER BY system_key, priority, LENGTH(system_name), system_name
+      )
+      SELECT system
+        FROM ranked
+        ORDER BY system`),
       env,
       env,
       env,
