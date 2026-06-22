@@ -579,50 +579,62 @@ function makeNebulaTexture(level: StarmapLevel): THREE.CanvasTexture {
     ctx.fillStyle = '#03050d';
     ctx.fillRect(0, 0, w, h);
 
-    const clouds: Array<{ hue: number; alpha: number }> = level === 'galaxy'
-      ? [
-          { hue: 205, alpha: 0.22 },
-          { hue: 230, alpha: 0.18 },
-          { hue: 275, alpha: 0.14 },
-          { hue: 190, alpha: 0.12 },
-          { hue: 320, alpha: 0.08 },
-        ]
-      : [
-          { hue: 210, alpha: 0.14 },
-          { hue: 245, alpha: 0.1 },
-          { hue: 190, alpha: 0.08 },
-        ];
-
     let seed = 99173;
     const rand = () => {
       seed = (seed * 1103515245 + 12345) & 0x7fffffff;
       return seed / 0x7fffffff;
     };
 
-    for (const cloud of clouds) {
-      const blobs = 22;
+    // A single hazy galactic band running across the middle of the sphere
+    // (the ARK Starmap's signature dusty Milky-Way streak), built from wide,
+    // horizontally-stretched blobs so it reads as one continuous band rather
+    // than scattered spots. Dust-brown/green core with a cooler cyan rim.
+    const bandCenter = h * 0.52;
+    const bandHues: Array<{ hue: number; sat: number; alpha: number; spread: number }> = level === 'galaxy'
+      ? [
+          { hue: 32, sat: 38, alpha: 0.16, spread: 0.16 },
+          { hue: 95, sat: 28, alpha: 0.1, spread: 0.22 },
+          { hue: 195, sat: 55, alpha: 0.12, spread: 0.3 },
+          { hue: 210, sat: 60, alpha: 0.07, spread: 0.42 },
+        ]
+      : [
+          { hue: 32, sat: 30, alpha: 0.09, spread: 0.18 },
+          { hue: 195, sat: 45, alpha: 0.07, spread: 0.3 },
+        ];
+
+    for (const band of bandHues) {
+      const bandHeight = h * band.spread;
+      const blobs = 26;
       for (let i = 0; i < blobs; i += 1) {
         const cx = rand() * w;
-        const cy = h * (0.25 + rand() * 0.5);
-        const radius = 120 + rand() * 420;
-        const light = 38 + rand() * 22;
-        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-        grad.addColorStop(0, `hsla(${cloud.hue}, 70%, ${light}%, ${cloud.alpha})`);
+        const cy = bandCenter + (rand() - 0.5) * bandHeight;
+        const rx = 220 + rand() * 460;
+        const ry = rx * (0.22 + rand() * 0.18);
+        const light = 30 + rand() * 18;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(1, ry / rx);
+        const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+        grad.addColorStop(0, `hsla(${band.hue}, ${band.sat}%, ${light}%, ${band.alpha})`);
         grad.addColorStop(1, 'hsla(0,0%,0%,0)');
         ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.arc(0, 0, rx, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
       }
     }
 
-    // Sprinkle faint distant stars directly into the backdrop for depth.
-    for (let i = 0; i < 1400; i += 1) {
+    // Sprinkle faint distant stars directly into the backdrop for depth,
+    // denser near the galactic band and sparser away from it.
+    const starCount = level === 'galaxy' ? 2200 : 1100;
+    for (let i = 0; i < starCount; i += 1) {
       const x = rand() * w;
-      const y = rand() * h;
-      const a = 0.25 + rand() * 0.6;
-      const s = rand() < 0.96 ? 1 : 2;
-      ctx.fillStyle = `rgba(${200 + Math.floor(rand() * 55)},${210 + Math.floor(rand() * 45)},255,${a})`;
+      const distFromBand = Math.abs(rand() - 0.5) * 2;
+      const y = clamp(bandCenter + (rand() - 0.5) * h * (0.35 + distFromBand * 0.5), 0, h);
+      const a = 0.15 + rand() * 0.45;
+      const s = rand() < 0.97 ? 1 : 2;
+      ctx.fillStyle = `rgba(${205 + Math.floor(rand() * 50)},${210 + Math.floor(rand() * 40)},255,${a})`;
       ctx.fillRect(x, y, s, s);
     }
   }
@@ -1212,9 +1224,9 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
     composer.addPass(new RenderPass(scene, camera));
     const bloomPass = new UnrealBloomPass(
       new THREE.Vector2(width, height),
-      level === 'galaxy' ? 0.45 : 0.4, // strength
+      level === 'galaxy' ? 0.32 : 0.4, // strength
       0.6, // radius
-      level === 'galaxy' ? 0.2 : 0.28, // threshold
+      level === 'galaxy' ? 0.4 : 0.28, // threshold
     );
     composer.addPass(bloomPass);
     composer.addPass(new OutputPass());
@@ -1318,7 +1330,7 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
         materialOptions.emissiveMap = undefined;
         materialOptions.color = 0x000000;
         materialOptions.emissive = 0xffffff;
-        materialOptions.emissiveIntensity = 1.3;
+        materialOptions.emissiveIntensity = 0.95;
         materialOptions.roughness = 1;
         materialOptions.metalness = 0;
       } else if (sunUrl) {
@@ -1446,7 +1458,7 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
             blending: THREE.AdditiveBlending,
           }),
         );
-        glowBase = node.surface ? 1.6 : level === 'galaxy' ? 4.4 : 3;
+        glowBase = node.surface ? 1.6 : level === 'galaxy' ? 2.9 : 3;
         glow.scale.set(glowBase + node.radius * 2.2, glowBase + node.radius * 2.2, 1);
         glow.position.copy(node.position);
         nodeGroup.add(glow);
@@ -1953,7 +1965,8 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
         </div>
       </div>
 
-      <div className="pointer-events-auto absolute right-3 bottom-3 z-10 flex w-[min(48vw,180px)] flex-col gap-1 rounded-sm border border-slate-800/60 bg-slate-950/82 p-2 backdrop-blur sm:w-44">
+      <div className="pointer-events-auto absolute right-3 bottom-24 z-10 flex w-[min(48vw,180px)] flex-col gap-1 rounded-sm border border-slate-800/60 bg-slate-950/82 p-2 backdrop-blur sm:w-44">
+        {/* Sits above the floating AI chat button (fixed bottom-right, 56px + margin) so the two never overlap. */}
         <p className="mb-0.5 flex items-center gap-1.5 font-mono-sc text-[10px] uppercase tracking-widest text-slate-400">
           <Layers size={11} /> Layers
         </p>
