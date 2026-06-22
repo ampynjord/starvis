@@ -10,6 +10,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { Lensflare, LensflareElement } from 'three/addons/objects/Lensflare.js';
+import { ColladaLoader } from 'three/addons/loaders/ColladaLoader.js';
 import { createVisibilityTracker, disposeObject3D, getThreePixelRatio } from '@/lib/three-performance';
 import { api } from '@/services/api';
 import type { StarmapPosition } from '@/types/api';
@@ -184,7 +185,43 @@ const RSI_SOURCEIMAGES = 'https://cdn.robertsspaceindustries.com/static/starmap/
 const SUN_TEXTURE_BASE = `${RSI_SOURCEIMAGES}/suns`;
 const SUN_TEXTURE_COUNT = 9;
 
-const STATION_TEXTURE_URL = proxiedAssetUrl(`${RSI_SOURCEIMAGES}/SpaceStation.png`);
+const RSI_MODELS = 'https://cdn.robertsspaceindustries.com/static/starmap/models';
+// Real RSI nebula art used to compose the skybox.
+const NEBULA_TEXTURES = [
+  { url: `${RSI_SOURCEIMAGES}/Nebula-006-Dark-01-GlitteryBlue.png`, color: 0x6ea8ff },
+  { url: `${RSI_SOURCEIMAGES}/Nebula-007-Medium-06-DarkMatterPurple.png`, color: 0xb084ff },
+  { url: `${RSI_SOURCEIMAGES}/Nebula-001-CloudyBlueGreen-Medium-02.png`, color: 0x67e8c0 },
+  { url: `${RSI_SOURCEIMAGES}/Middle_Nebula.png`, color: 0x8ea2ff },
+];
+
+// The RSI station 3D model (Collada), loaded once and normalised to unit size.
+let stationModelPromise: Promise<THREE.Object3D> | null = null;
+function loadStationModel(): Promise<THREE.Object3D> {
+  stationModelPromise ??= new Promise((resolve, reject) => {
+    new ColladaLoader().load(
+      `${RSI_MODELS}/SpaceStation.dae`,
+      (collada) => {
+        if (!collada?.scene) {
+          reject(new Error('RSI station model did not include a scene'));
+          return;
+        }
+        const model = collada.scene;
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z) || 1;
+        model.position.sub(center);
+        const wrapper = new THREE.Group();
+        wrapper.add(model);
+        wrapper.scale.setScalar(1 / maxDim);
+        resolve(wrapper);
+      },
+      undefined,
+      reject,
+    );
+  });
+  return stationModelPromise;
+}
 
 function hashString(value: string) {
   let hash = 2166136261;
@@ -822,7 +859,7 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
     if (distance > 0 && distance < SATELLITE_THRESHOLD) maxSecondary = Math.max(maxSecondary, distance);
     else maxPrimary = Math.max(maxPrimary, distance);
   }
-  const secondaryScale = maxSecondary > 0 ? 22 / maxSecondary : 0;
+  const secondaryScale = maxSecondary > 0 ? 46 / maxSecondary : 0;
 
   // Per-category counters for the radial fallback (objects without real coords).
   const categoryCounts: Record<string, number> = {};
@@ -846,7 +883,9 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
       const isSatellite = distance < SATELLITE_THRESHOLD;
       if (isSatellite && secondaryScale > 0) {
         const scaled = relative.clone().multiplyScalar(secondaryScale);
-        const minRadius = parentRadius * 1.9 + 3;
+        // Fan satellites out a little by index so a planet's moons and stations
+        // don't pile on top of each other.
+        const minRadius = parentRadius * 2.6 + 6 + index * 3.4;
         if (scaled.length() < minRadius) scaled.setLength(minRadius);
         return parentPosition.clone().add(scaled);
       }
@@ -1095,6 +1134,29 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
     );
     scene.add(nebula);
 
+    // Real RSI nebula art as huge additive clouds in the far background.
+    const nebulaLoader = new THREE.TextureLoader();
+    nebulaLoader.setCrossOrigin('anonymous');
+    const farRadius = nebulaRadius * 0.82;
+    const nebulaCloudTextures: THREE.Texture[] = [];
+    NEBULA_TEXTURES.forEach((neb, index) => {
+      const url = proxiedAssetUrl(neb.url);
+      if (!url) return;
+      const tex = nebulaLoader.load(url, (loaded) => {
+        loaded.colorSpace = THREE.SRGBColorSpace;
+      });
+      nebulaCloudTextures.push(tex);
+      const cloud = new THREE.Sprite(
+        new THREE.SpriteMaterial({ map: tex, color: neb.color, transparent: true, opacity: 0.42, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending, fog: false }),
+      );
+      const angle = (index / NEBULA_TEXTURES.length) * Math.PI * 2 + 0.7;
+      const elevation = index % 2 === 0 ? 0.35 : -0.28;
+      cloud.position.set(Math.cos(angle) * farRadius, elevation * farRadius, Math.sin(angle) * farRadius);
+      const size = nebulaRadius * (0.85 + (index % 2) * 0.35);
+      cloud.scale.set(size, size, 1);
+      scene.add(cloud);
+    });
+
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(getThreePixelRatio());
     renderer.setSize(width, height);
@@ -1216,9 +1278,11 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
       nodeGroup.add(circle);
     }
 
-    let stationTexture: THREE.Texture | null = null;
+    let active = true;
     const billboards: THREE.Object3D[] = [];
     const swirls: THREE.Sprite[] = [];
+    const spinModels: THREE.Object3D[] = [];
+    const stationPlacements: Array<{ pos: THREE.Vector3; radius: number }> = [];
 
     for (const node of sceneModel.nodes) {
       if (node.visible === false) continue;
@@ -1337,25 +1401,9 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
         );
       }
 
-      // Stations render as a billboarded RSI station icon, not a sphere.
+      // Stations use the real RSI SpaceStation 3D model (placed after load).
       if (isStation) {
-        if (!stationTexture && STATION_TEXTURE_URL) {
-          stationTexture = textureLoader.load(STATION_TEXTURE_URL, (loaded) => {
-            loaded.colorSpace = THREE.SRGBColorSpace;
-          });
-          loadedTextures.push(stationTexture);
-        }
-        if (stationTexture) {
-          // SpaceStation.png has no alpha (square on a dark bg); additive blending
-          // drops the background so only the glowing station structure shows.
-          const icon = new THREE.Sprite(
-            new THREE.SpriteMaterial({ map: stationTexture, color: 0xbfe6ff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }),
-          );
-          const size = Math.max(2.2, node.radius * 3.2);
-          icon.scale.set(size, size, 1);
-          icon.position.copy(node.position);
-          nodeGroup.add(icon);
-        }
+        stationPlacements.push({ pos: node.position.clone(), radius: Math.max(node.radius, 0.9) });
       }
 
       // Jump points are 3D wormholes: a billboarded glowing ring with a swirling core.
@@ -1434,6 +1482,25 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
         if (labelMaterial) entries.push({ material: labelMaterial, base: 1 });
         revealItems.push({ center: node.reveal, entries });
       }
+    }
+
+    // Place the real RSI station 3D model at each station once it has loaded.
+    if (stationPlacements.length > 0) {
+      loadStationModel()
+        .then((model) => {
+          if (!active) return;
+          for (const placement of stationPlacements) {
+            const clone = model.clone(true);
+            clone.scale.setScalar(placement.radius * 5.5);
+            clone.position.copy(placement.pos);
+            clone.rotation.set(0.3, Math.random() * Math.PI * 2, 0.1);
+            nodeGroup.add(clone);
+            spinModels.push(clone);
+          }
+        })
+        .catch(() => {
+          // Model unavailable — stations keep their (invisible) pick sphere.
+        });
     }
 
     // Galaxy-level jump network: faint static links between connected systems.
@@ -1534,6 +1601,8 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
     const introStart = performance.now();
     const introDuration = 1100;
 
+    let focusTrackedId: string | null = null;
+    let focusStart = 0;
     let frame = 0;
     const animate = () => {
       frame = requestAnimationFrame(animate);
@@ -1548,6 +1617,7 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
       }
 
       if (level === 'galaxy') nodeGroup.rotation.y = Math.sin(t * 0.08) * 0.015;
+      for (const model of spinModels) model.rotation.y += 0.0025;
       for (const node of animatedNodes) {
         const pulse = 1 + Math.sin(t * 1.8 + node.phase) * 0.045;
         node.mesh.scale.setScalar(node.base * pulse);
@@ -1570,16 +1640,30 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
       // Wormhole portals: face the camera and swirl.
       for (const billboard of billboards) billboard.quaternion.copy(camera.quaternion);
       for (const swirl of swirls) swirl.material.rotation += 0.02;
-      // Smoothly fly to a focused body, then settle so moons reveal around it.
+      // Fly to a focused body over a fixed time, then hand control back so the
+      // view stays freely orbitable (no spring-back fighting OrbitControls).
       if (focusRef.current) {
-        const target = nodePositions.get(objectId(focusRef.current));
-        if (target) {
-          const desired = target.pos.clone().add(new THREE.Vector3(0, target.radius * 3 + 8, target.radius * 6 + 16));
-          camera.position.lerp(desired, 0.08);
-          controls.target.lerp(target.pos, 0.1);
-          if (camera.position.distanceTo(desired) < 1.5) focusRef.current = null;
-        } else {
+        const id = objectId(focusRef.current);
+        const target = nodePositions.get(id);
+        if (!target) {
           focusRef.current = null;
+          controls.enabled = true;
+        } else {
+          if (focusTrackedId !== id) {
+            focusTrackedId = id;
+            focusStart = performance.now();
+            controls.enabled = false;
+          }
+          const k = clamp((performance.now() - focusStart) / 900, 0, 1);
+          const desired = target.pos.clone().add(new THREE.Vector3(0, target.radius * 3 + 10, target.radius * 6 + 18));
+          camera.position.lerp(desired, 0.16);
+          controls.target.lerp(target.pos, 0.18);
+          if (k >= 1) {
+            controls.target.copy(target.pos);
+            controls.enabled = true;
+            focusRef.current = null;
+            focusTrackedId = null;
+          }
         }
       }
       const labelReferenceDistance = level === 'galaxy' ? 260 : 210;
@@ -1609,6 +1693,7 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
     ro.observe(container);
 
     return () => {
+      active = false;
       cancelAnimationFrame(frame);
       sceneApiRef.current = null;
       ro.disconnect();
@@ -1623,6 +1708,7 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
       flareMainTexture.dispose();
       flareGhostTexture.dispose();
       nebulaTexture.dispose();
+      nebulaCloudTextures.forEach((texture) => texture.dispose());
       loadedTextures.forEach((texture) => texture.dispose());
       composer.dispose();
       renderer.dispose();
@@ -1673,15 +1759,18 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
       <div ref={containerRef} className="absolute inset-0" style={{ cursor: 'grab' }} />
 
       <style>{`
-        @keyframes starmapWarpTunnel { 0% { transform: scale(0.12); opacity: 0; } 28% { opacity: 1; } 100% { transform: scale(4.2); opacity: 0.95; } }
-        @keyframes starmapWarpStreaks { 0% { opacity: 0; transform: scale(0.6) rotate(0deg); } 35% { opacity: 0.85; } 100% { opacity: 0; transform: scale(2.6) rotate(8deg); } }
-        .starmap-warp-tunnel { background: radial-gradient(circle at center, rgba(255,255,255,0.95) 0%, rgba(103,232,249,0.6) 16%, rgba(34,211,238,0.18) 42%, transparent 70%); animation: starmapWarpTunnel 1.15s ease-in forwards; mix-blend-mode: screen; }
-        .starmap-warp-streaks { background: repeating-conic-gradient(from 0deg at 50% 50%, rgba(255,255,255,0) 0deg, rgba(103,232,249,0.35) 2deg, rgba(255,255,255,0) 4deg); animation: starmapWarpStreaks 1.15s ease-in forwards; }
+        @keyframes starmapWarpTunnel { 0% { transform: scale(0.08); opacity: 0; } 22% { opacity: 1; } 58% { transform: scale(2.2); opacity: 1; } 100% { transform: scale(5.4); opacity: 0; } }
+        @keyframes starmapWarpStreaks { 0% { opacity: 0; transform: scale(0.35) rotate(0deg); } 30% { opacity: 0.9; } 68% { opacity: 0.9; transform: scale(2.4) rotate(10deg); } 100% { opacity: 0; transform: scale(3.6) rotate(14deg); } }
+        @keyframes starmapWarpFlash { 0%, 52% { opacity: 0; } 62% { opacity: 1; } 78% { opacity: 0; } 100% { opacity: 0; } }
+        .starmap-warp-tunnel { background: radial-gradient(circle at center, rgba(255,255,255,0.95) 0%, rgba(103,232,249,0.6) 16%, rgba(34,211,238,0.18) 42%, transparent 70%); animation: starmapWarpTunnel 1.15s cubic-bezier(0.55,0,0.85,0.35) forwards; mix-blend-mode: screen; }
+        .starmap-warp-streaks { background: repeating-conic-gradient(from 0deg at 50% 50%, rgba(255,255,255,0) 0deg, rgba(190,240,255,0.55) 0.6deg, rgba(255,255,255,0) 1.6deg); animation: starmapWarpStreaks 1.15s cubic-bezier(0.55,0,0.85,0.35) forwards; mix-blend-mode: screen; }
+        .starmap-warp-flash { background: radial-gradient(circle at center, #ffffff 0%, rgba(210,240,255,0.9) 35%, transparent 75%); animation: starmapWarpFlash 1.15s ease-out forwards; mix-blend-mode: screen; }
       `}</style>
       {warpTo && (
         <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden">
           <div className="starmap-warp-streaks absolute inset-[-30%]" />
           <div className="starmap-warp-tunnel absolute inset-0" />
+          <div className="starmap-warp-flash absolute inset-0" />
           <div className="absolute inset-0 flex items-center justify-center">
             <span className="font-orbitron text-sm uppercase tracking-[0.3em] text-cyan-100 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]">
               Jumping to {warpTo.name}…
