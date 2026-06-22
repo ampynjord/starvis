@@ -105,18 +105,18 @@ async function mockStarmap(page: import('@playwright/test').Page) {
 
 test('starmap renders the native 3D galactic map (no RSI iframe)', async ({ page }) => {
   await mockStarmap(page);
-  const assetRequest = page.waitForRequest(
-    (request) => request.url().includes('/api/rsi-assets') && request.url().includes('static%2Fstarmap'),
-  );
   await gotoApp(page, '/starmap');
 
   await expect(page.locator('iframe[title="RSI Ark Starmap"]')).toHaveCount(0);
   await expect(page.getByText(/Galactic Map|Loading RSI starmap objects|No RSI starmap objects/i).first()).toBeVisible({ timeout: 15000 });
-  await assetRequest;
 });
 
 test('starmap enters a system and focuses a body (merged view)', async ({ page }) => {
   await mockStarmap(page);
+  // Entering a system loads real RSI surface textures (e.g. the star's sun texture).
+  const assetRequest = page.waitForRequest(
+    (request) => request.url().includes('/api/rsi-assets') && request.url().includes('static%2Fstarmap'),
+  );
   await gotoApp(page, '/starmap');
 
   await page
@@ -125,6 +125,7 @@ test('starmap enters a system and focuses a body (merged view)', async ({ page }
     .click();
   await expect(page.getByText('System Map')).toBeVisible();
   await expect(page.getByText('System contents')).toBeVisible();
+  await assetRequest;
 
   // The merged system view lists every body, including a planet's satellites.
   await expect(page.getByRole('button', { name: /Lorville/i })).toBeVisible();

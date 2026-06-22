@@ -102,7 +102,7 @@ const TYPE_ORDER = new Map<string, number>([
 
 const IMAGE_EXT = /\.(png|jpe?g|webp|avif)(\?|$)/i;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
-const SYSTEM_SCENE_RADIUS = 170;
+const SYSTEM_SCENE_RADIUS = 240;
 
 function typeKey(type: string | null | undefined) {
   return String(type ?? '')
@@ -470,6 +470,18 @@ function findJumpRoute(graph: Map<string, Set<string>>, from: string, to: string
   return path;
 }
 
+// Resolve the system a jump point connects to, from its "Origin - Destination" name.
+function jumpDestinationSystem(jumpPoint: StarmapPosition, systems: StarmapPosition[]): StarmapPosition | null {
+  const origin = normSys(jumpPoint.system_name) || normSys(jumpPoint.system_code);
+  const parts = String(jumpPoint.name ?? '')
+    .split(/\s[-–—]\s/)
+    .map(normSys)
+    .filter(Boolean);
+  if (parts.length < 2) return null;
+  const destination = parts.find((part) => part !== origin) ?? parts[1];
+  return systems.find((system) => normSys(system.name) === destination) ?? null;
+}
+
 function makeGlowTexture(): THREE.Texture {
   const size = 128;
   const canvas = document.createElement('canvas');
@@ -810,8 +822,7 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
     if (distance > 0 && distance < SATELLITE_THRESHOLD) maxSecondary = Math.max(maxSecondary, distance);
     else maxPrimary = Math.max(maxPrimary, distance);
   }
-  const primaryScale = maxPrimary > 0 ? (SYSTEM_SCENE_RADIUS * 0.8) / maxPrimary : 0;
-  const secondaryScale = maxSecondary > 0 ? 16 / maxSecondary : 0;
+  const secondaryScale = maxSecondary > 0 ? 22 / maxSecondary : 0;
 
   // Per-category counters for the radial fallback (objects without real coords).
   const categoryCounts: Record<string, number> = {};
@@ -833,14 +844,17 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
       const distance = relative.length();
       if (distance < 1e-9) return parentPosition.clone(); // star at system centre
       const isSatellite = distance < SATELLITE_THRESHOLD;
-      const scale = isSatellite ? secondaryScale : primaryScale;
-      if (scale > 0) {
-        const scaled = relative.clone().multiplyScalar(scale);
-        if (isSatellite) {
-          const minRadius = parentRadius * 1.8 + 2.5;
-          if (scaled.length() < minRadius) scaled.setLength(minRadius);
-        }
+      if (isSatellite && secondaryScale > 0) {
+        const scaled = relative.clone().multiplyScalar(secondaryScale);
+        const minRadius = parentRadius * 1.9 + 3;
+        if (scaled.length() < minRadius) scaled.setLength(minRadius);
         return parentPosition.clone().add(scaled);
+      }
+      if (!isSatellite && maxPrimary > 0) {
+        // Ease the radial distance (real systems span Mercury->Neptune): inner
+        // bodies spread out so the system breathes instead of bunching at the star.
+        const eased = (distance / maxPrimary) ** 0.5 * (SYSTEM_SCENE_RADIUS * 0.86) + 18;
+        return parentPosition.clone().add(relative.clone().setLength(eased));
       }
     }
     if (isLandingZone(child)) return radialPosition(parentPosition, parentRadius + 0.9, index + depth * 2, 0.25);
@@ -888,7 +902,16 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
         surface: landing,
         label: nodeLabelEnabled(child),
         reveal,
-        ring: isBelt ? { center: parentPosition.clone(), radius: orbit.radius, tiltAxis: orbit.tiltAxis, tiltAngle: orbit.tiltAngle } : undefined,
+        // Belts with no real distance (e.g. the rings of Yela) get a small ring
+        // hugging their parent rather than no ring at all.
+        ring: isBelt
+          ? {
+              center: parentPosition.clone(),
+              radius: orbit.radius > 2 ? orbit.radius : Math.max(2.4, parentRadius * 3),
+              tiltAxis: orbit.radius > 2 ? orbit.tiltAxis : new THREE.Vector3(0.15, 1, 0.1),
+              tiltAngle: orbit.radius > 2 ? orbit.tiltAngle : 0.18,
+            }
+          : undefined,
       };
       nodes.push(node);
       placed.add(child.id);
@@ -967,6 +990,7 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
   const [level, setLevel] = useState<StarmapLevel>('galaxy');
   const [activeSystem, setActiveSystem] = useState<StarmapPosition | null>(null);
   const focusRef = useRef<StarmapPosition | null>(null);
+  const [warpTo, setWarpTo] = useState<StarmapPosition | null>(null);
   const [hiddenLayers, setHiddenLayers] = useState<Set<string>>(new Set());
   const [search, setSearch] = useState('');
   const [routeOpen, setRouteOpen] = useState(false);
@@ -1025,6 +1049,18 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
   const focusBody = (body: StarmapPosition) => {
     focusRef.current = body;
     setSelected(body);
+  };
+
+  // Dive into a jump point: rush the camera in, play a warp distortion, then
+  // arrive in the connected system.
+  const enterJump = (jumpPoint: StarmapPosition, destination: StarmapPosition) => {
+    focusRef.current = jumpPoint;
+    setSelected(null);
+    setWarpTo(destination);
+    window.setTimeout(() => {
+      enterSystem(destination);
+      setWarpTo(null);
+    }, 1150);
   };
 
   const backToGalaxy = () => {
@@ -1205,24 +1241,18 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
       };
 
       if (isGalaxySystem) {
-        // Self-lit star marker using the real RSI sun texture: uniformly bright,
-        // so no directional shading and no "eclipse" look. Faction tint comes from
-        // the surrounding glow sprite.
-        const galaxySunUrl = sunTextureUrl(node.object);
-        if (galaxySunUrl) {
-          const tex = textureLoader.load(galaxySunUrl, () => {
-            tex.colorSpace = THREE.SRGBColorSpace;
-          });
-          loadedTextures.push(tex);
-          materialOptions.emissiveMap = tex;
-        }
+        // Galaxy markers are glowing star points (no surface texture, so they
+        // never read as planets). The faction tint comes from the glow sprite.
+        materialOptions.map = undefined;
+        materialOptions.emissiveMap = undefined;
         materialOptions.color = 0x000000;
         materialOptions.emissive = 0xffffff;
-        materialOptions.emissiveIntensity = 1.15;
+        materialOptions.emissiveIntensity = 1.3;
         materialOptions.roughness = 1;
         materialOptions.metalness = 0;
       } else if (sunUrl) {
-        // Real RSI sun surface texture, self-lit so it reads as a light source.
+        // Star: real RSI sun texture, strongly self-lit so it blooms and reads as
+        // a star (not a planet).
         const tex = textureLoader.load(sunUrl, () => {
           tex.colorSpace = THREE.SRGBColorSpace;
         });
@@ -1231,7 +1261,7 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
         materialOptions.emissiveMap = tex;
         materialOptions.color = 0xffffff;
         materialOptions.emissive = 0xffffff;
-        materialOptions.emissiveIntensity = 1.0;
+        materialOptions.emissiveIntensity = 2.4;
         materialOptions.roughness = 1;
         materialOptions.metalness = 0;
       } else if (planetUrl) {
@@ -1286,13 +1316,13 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
       // Asteroid belts render as a real particle ring around their parent (the
       // Aaron Halo, the rings of Yela) instead of a sphere.
       if (isAsteroid && node.ring && node.ring.radius > 1) {
-        const count = 240;
+        const count = Math.round(clamp(node.ring.radius * 5, 90, 360));
         const positions = new Float32Array(count * 3);
         const quaternion = new THREE.Quaternion().setFromAxisAngle(node.ring.tiltAxis.clone().normalize(), node.ring.tiltAngle);
         for (let i = 0; i < count; i += 1) {
           const angle = Math.random() * Math.PI * 2;
-          const r = node.ring.radius * (0.9 + Math.random() * 0.18);
-          const point = new THREE.Vector3(Math.cos(angle) * r, (Math.random() - 0.5) * node.ring.radius * 0.05, Math.sin(angle) * r)
+          const r = node.ring.radius * (0.92 + Math.random() * 0.14);
+          const point = new THREE.Vector3(Math.cos(angle) * r, (Math.random() - 0.5) * node.ring.radius * 0.04, Math.sin(angle) * r)
             .applyQuaternion(quaternion)
             .add(node.ring.center);
           positions[i * 3] = point.x;
@@ -1301,8 +1331,9 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
         }
         const beltGeo = new THREE.BufferGeometry();
         beltGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const beltSize = clamp(node.ring.radius * 0.06, 0.35, 0.8);
         nodeGroup.add(
-          new THREE.Points(beltGeo, new THREE.PointsMaterial({ color: 0xc2a878, size: 0.7, sizeAttenuation: true, transparent: true, opacity: 0.75 })),
+          new THREE.Points(beltGeo, new THREE.PointsMaterial({ color: 0xc2a878, size: beltSize, sizeAttenuation: true, transparent: true, opacity: 0.75 })),
         );
       }
 
@@ -1315,8 +1346,12 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
           loadedTextures.push(stationTexture);
         }
         if (stationTexture) {
-          const icon = new THREE.Sprite(new THREE.SpriteMaterial({ map: stationTexture, transparent: true, depthWrite: false }));
-          const size = Math.max(2.6, node.radius * 3.6);
+          // SpaceStation.png has no alpha (square on a dark bg); additive blending
+          // drops the background so only the glowing station structure shows.
+          const icon = new THREE.Sprite(
+            new THREE.SpriteMaterial({ map: stationTexture, color: 0xbfe6ff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }),
+          );
+          const size = Math.max(2.2, node.radius * 3.2);
           icon.scale.set(size, size, 1);
           icon.position.copy(node.position);
           nodeGroup.add(icon);
@@ -1614,6 +1649,7 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
   const selectedHasChildren = selected ? hasChildren(selected, currentObjects.length > 0 ? currentObjects : objects) : false;
   const selectedSystem = selected && isSystemObject(selected) ? selected : null;
   const selectedCanInspect = selected && !isSystemObject(selected) && (selectedHasChildren || isPlanetLike(selected) || isMoonLike(selected));
+  const selectedJumpDest = selected && typeKey(selected.type).includes('jump') ? jumpDestinationSystem(selected, systems) : null;
   const browserObjects = level === 'galaxy'
     ? systems
     : activeSystem
@@ -1635,6 +1671,24 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
   return (
     <div className="relative h-full w-full overflow-hidden bg-[#030712]">
       <div ref={containerRef} className="absolute inset-0" style={{ cursor: 'grab' }} />
+
+      <style>{`
+        @keyframes starmapWarpTunnel { 0% { transform: scale(0.12); opacity: 0; } 28% { opacity: 1; } 100% { transform: scale(4.2); opacity: 0.95; } }
+        @keyframes starmapWarpStreaks { 0% { opacity: 0; transform: scale(0.6) rotate(0deg); } 35% { opacity: 0.85; } 100% { opacity: 0; transform: scale(2.6) rotate(8deg); } }
+        .starmap-warp-tunnel { background: radial-gradient(circle at center, rgba(255,255,255,0.95) 0%, rgba(103,232,249,0.6) 16%, rgba(34,211,238,0.18) 42%, transparent 70%); animation: starmapWarpTunnel 1.15s ease-in forwards; mix-blend-mode: screen; }
+        .starmap-warp-streaks { background: repeating-conic-gradient(from 0deg at 50% 50%, rgba(255,255,255,0) 0deg, rgba(103,232,249,0.35) 2deg, rgba(255,255,255,0) 4deg); animation: starmapWarpStreaks 1.15s ease-in forwards; }
+      `}</style>
+      {warpTo && (
+        <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden">
+          <div className="starmap-warp-streaks absolute inset-[-30%]" />
+          <div className="starmap-warp-tunnel absolute inset-0" />
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="font-orbitron text-sm uppercase tracking-[0.3em] text-cyan-100 drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]">
+              Jumping to {warpTo.name}…
+            </span>
+          </div>
+        </div>
+      )}
 
       <div className="pointer-events-none absolute left-3 top-3 z-10 flex max-w-[calc(100vw-1.5rem)] flex-wrap items-center gap-2 rounded-sm border border-cyan-900/40 bg-slate-950/70 px-3 py-1.5 backdrop-blur">
         <Compass size={14} className="text-cyan-400" />
@@ -1948,6 +2002,18 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
                 <button type="button" onClick={() => focusBody(selected)} className="sci-btn-primary flex items-center gap-1.5 px-3 py-2 text-xs">
                   <MapPin size={13} />
                   Focus
+                </button>
+              )}
+              {selected && typeKey(selected.type).includes('jump') && (
+                <button type="button" onClick={() => focusBody(selected)} className="sci-btn-ghost flex items-center gap-1.5 px-3 py-2 text-xs">
+                  <MapPin size={13} />
+                  Focus
+                </button>
+              )}
+              {selectedJumpDest && selected && (
+                <button type="button" onClick={() => enterJump(selected, selectedJumpDest)} className="sci-btn-primary flex items-center gap-1.5 px-3 py-2 text-xs">
+                  <Route size={13} />
+                  Enter wormhole → {selectedJumpDest.name}
                 </button>
               )}
             </div>
