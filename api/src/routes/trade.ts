@@ -34,8 +34,19 @@ export function mountTradeRoutes(router: Router, deps: RouteDependencies): void 
     requireGameData,
     asyncHandler(async (req, res) => {
       const env = getQueryString(req, 'env') ?? 'live';
-      const prices = await gameDataService!.trade.getCommodityPrices(req.params.commodityUuid, env);
-      sendDataWithETag(req, res, prices);
+      const result = await gameDataService!.trade.getCommodityPriceResult(req.params.commodityUuid, env);
+      sendWithETag(req, res, {
+        success: true,
+        count: result.data.length,
+        data: result.data,
+        meta: {
+          source: result.source,
+          sourcePriority: result.sourcePriority,
+          fallbackUsed: result.fallbackUsed,
+          reason: result.reason,
+          sources: result.sources,
+        },
+      });
     }),
   );
 

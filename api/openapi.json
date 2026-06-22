@@ -6393,10 +6393,148 @@
         ],
         "responses": {
           "200": {
-            "description": "Buy/sell prices per location"
-          },
-          "404": {
-            "$ref": "#/components/responses/NotFound"
+            "description": "Buy/sell prices per location. UEX is the primary source; P4K ShopInventories are used as fallback when UEX has no price rows or is unavailable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": ["success", "count", "data", "meta"],
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ]
+                          },
+                          "buy_price": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "sell_price": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "reported_at": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "shop_id": {
+                            "oneOf": [
+                              {
+                                "type": "integer"
+                              },
+                              {
+                                "type": "string"
+                              }
+                            ],
+                            "nullable": true
+                          },
+                          "shop_name": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "system": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "planet_moon": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "city": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": ["uex", "p4k"]
+                          }
+                        }
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "required": ["source", "sourcePriority", "fallbackUsed", "sources"],
+                      "properties": {
+                        "source": {
+                          "type": "string",
+                          "enum": ["uex", "p4k", "none"]
+                        },
+                        "sourcePriority": {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": ["uex", "p4k"]
+                          }
+                        },
+                        "fallbackUsed": {
+                          "type": "boolean"
+                        },
+                        "reason": {
+                          "type": "string",
+                          "enum": ["uex_available", "uex_empty_p4k_available", "uex_unavailable_p4k_available", "no_uex_or_p4k_price_found"]
+                        },
+                        "sources": {
+                          "type": "object",
+                          "properties": {
+                            "uex": {
+                              "type": "object",
+                              "properties": {
+                                "status": {
+                                  "type": "string",
+                                  "enum": ["available", "empty", "unavailable", "not_checked"]
+                                },
+                                "count": {
+                                  "type": "integer",
+                                  "nullable": true
+                                },
+                                "error": {
+                                  "type": "string",
+                                  "enum": ["query_failed"]
+                                }
+                              }
+                            },
+                            "p4k": {
+                              "type": "object",
+                              "properties": {
+                                "status": {
+                                  "type": "string",
+                                  "enum": ["available", "empty", "unavailable", "not_checked"]
+                                },
+                                "count": {
+                                  "type": "integer",
+                                  "nullable": true
+                                },
+                                "error": {
+                                  "type": "string",
+                                  "enum": ["query_failed"]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }

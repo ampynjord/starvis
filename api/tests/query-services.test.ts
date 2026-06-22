@@ -12,14 +12,16 @@ import { LocationQueryService } from '../src/services/location-query-service.js'
 import { MissionService } from '../src/services/mission-service.js';
 import { ShipQueryService } from '../src/services/ship-query-service.js';
 import { ShopService } from '../src/services/shop-service.js';
+import { TradeService } from '../src/services/trade-service.js';
 
 // ── Mock PrismaClient Factory ────────────────────────────
 
-function createMockPrisma(responses: Array<any[]> = []): PrismaClient {
+function createMockPrisma(responses: Array<any[] | Error> = []): PrismaClient {
   let callIndex = 0;
   const $queryRawUnsafe = vi.fn(async () => {
     const response = responses[callIndex] || [];
     callIndex++;
+    if (response instanceof Error) throw response;
     return response;
   });
   return { $queryRawUnsafe } as unknown as PrismaClient;
@@ -859,6 +861,75 @@ describe('CommodityQueryService', () => {
 });
 
 // ── LocationQueryService ─────────────────────────────────
+
+// --- TradeService -----------------------------------------------------------
+
+describe('TradeService', () => {
+  describe('getCommodityPriceResult', () => {
+    it('uses UEX commodity prices before P4K fallback', async () => {
+      const prisma = createMockPrisma([
+        [
+          row({
+            id: 10,
+            buy_price: 42,
+            sell_price: 55,
+            shop_id: 99,
+            shop_name: 'UEX Terminal',
+            source: 'uex',
+          }),
+        ],
+      ]);
+      const svc = new TradeService(createGetClient(prisma));
+
+      const result = await svc.getCommodityPriceResult('commodity-1');
+
+      expect(result.source).toBe('uex');
+      expect(result.fallbackUsed).toBe(false);
+      expect(result.sources.uex).toMatchObject({ status: 'available', count: 1 });
+      expect(result.sources.p4k).toMatchObject({ status: 'not_checked', count: null });
+      expect(result.data[0]).toMatchObject({ shop_name: 'UEX Terminal', buy_price: 42 });
+      expect((prisma as any).$queryRawUnsafe).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to P4K shop inventory prices when UEX has no row', async () => {
+      const prisma = createMockPrisma([
+        [],
+        [
+          row({
+            id: 20,
+            buy_price: 35,
+            sell_price: 48,
+            shop_id: 5,
+            shop_name: 'Legacy Shop',
+          }),
+        ],
+      ]);
+      const svc = new TradeService(createGetClient(prisma));
+
+      const result = await svc.getCommodityPriceResult('commodity-1');
+
+      expect(result.source).toBe('p4k');
+      expect(result.fallbackUsed).toBe(true);
+      expect(result.reason).toBe('uex_empty_p4k_available');
+      expect(result.sources.uex).toMatchObject({ status: 'empty', count: 0 });
+      expect(result.sources.p4k).toMatchObject({ status: 'available', count: 1 });
+      expect(result.data[0]).toMatchObject({ shop_name: 'Legacy Shop', sell_price: 48 });
+    });
+
+    it('reports UEX as unavailable when the UEX query fails and no P4K price exists', async () => {
+      const prisma = createMockPrisma([new Error('relation "game.uex_market_prices" does not exist'), []]);
+      const svc = new TradeService(createGetClient(prisma));
+
+      const result = await svc.getCommodityPriceResult('commodity-1');
+
+      expect(result.source).toBe('none');
+      expect(result.reason).toBe('no_uex_or_p4k_price_found');
+      expect(result.sources.uex).toMatchObject({ status: 'unavailable', count: null, error: 'query_failed' });
+      expect(result.sources.p4k).toMatchObject({ status: 'empty', count: 0 });
+      expect(result.data).toEqual([]);
+    });
+  });
+});
 
 describe('LocationQueryService', () => {
   describe('getLocationTypes', () => {

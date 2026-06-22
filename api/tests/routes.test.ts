@@ -119,6 +119,17 @@ function makeGameDataService() {
     trade: {
       getTradeLocations: fn([]),
       getCommodityPrices: fn([]),
+      getCommodityPriceResult: fn({
+        data: [],
+        source: 'none',
+        sourcePriority: ['uex', 'p4k'],
+        fallbackUsed: true,
+        reason: 'no_uex_or_p4k_price_found',
+        sources: {
+          uex: { status: 'empty', count: 0 },
+          p4k: { status: 'empty', count: 0 },
+        },
+      }),
       getLocationPrices: fn([]),
       reportPrice: fn({ success: true }),
       getTradeSystems: fn([]),
@@ -727,6 +738,10 @@ describe('GET /api/v1/trade/prices/:commodityUuid', () => {
     const res = await request(app).get('/api/v1/trade/prices/00000000-0000-0000-0000-000000000000');
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
+    expect(res.body.data).toEqual([]);
+    expect(res.body.count).toBe(0);
+    expect(res.body.meta.sourcePriority).toEqual(['uex', 'p4k']);
+    expect(res.body.meta.source).toBe('none');
   });
 });
 
