@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS "game"."canonical_entities" (
   "confidence"        VARCHAR(30)  NOT NULL DEFAULT 'computed',
   "metadata"          JSONB,
   "created_at"        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updated_at"        TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at"        TIMESTAMP(3) NOT NULL,
   CONSTRAINT "canonical_entities_pkey" PRIMARY KEY ("id")
 );
 
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS "game"."canonical_entity_links" (
   "is_primary"    BOOLEAN      NOT NULL DEFAULT false,
   "metadata"      JSONB,
   "created_at"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "updated_at"    TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updated_at"    TIMESTAMP(3) NOT NULL,
   CONSTRAINT "canonical_entity_links_pkey" PRIMARY KEY ("id")
 );
 

@@ -853,7 +853,7 @@ model CanonicalEntityLink {
 
   canonical CanonicalEntity @relation(fields: [canonicalId], references: [id], onDelete: Cascade)
 
-  @@unique([env, domain, source, sourceTable, sourceId, sourceUuid])
+  @@unique([env, domain, source, sourceTable, sourceId, sourceUuid], map: "canonical_entity_links_source_unique_idx")
   @@index([canonicalId])
   @@index([source, sourceTable])
   @@index([sourceUuid])
