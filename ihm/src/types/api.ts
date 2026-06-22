@@ -1470,6 +1470,7 @@ export interface StarmapPosition {
   rsi_id: string | null;
   name: string;
   type: string;
+  designation?: string | null;
   system_code: string | null;
   system_name: string | null;
   parent_id?: string | null;
