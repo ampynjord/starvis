@@ -123,9 +123,30 @@ export class TradeService {
        LEFT JOIN game.uex_terminals t ON t.uex_id = p.terminal_uex_id AND t.env = p.env
        WHERE p.env = ?
          AND p.entity_kind IN ('commodity', 'item', 'component')
-         AND p.entity_uuid = ?
+         AND (
+           p.entity_uuid = ?
+           OR p.entity_uuid IN (
+             SELECT i.uuid
+             FROM game.commodities c
+             JOIN game.items i
+               ON i.env = c.env
+              AND LOWER(i.class_name) = LOWER(REGEXP_REPLACE(c.class_name, '^Commodities_', ''))
+             WHERE c.env = ? AND c.uuid = ?
+             UNION
+             SELECT comp.uuid
+             FROM game.commodities c
+             JOIN game.components comp
+               ON comp.env = c.env
+              AND LOWER(comp.class_name) = LOWER(REGEXP_REPLACE(c.class_name, '^Commodities_', ''))
+             WHERE c.env = ? AND c.uuid = ?
+           )
+         )
          AND p.is_available = TRUE
        ORDER BY p.entity_kind, t.star_system, t.city, t.name`),
+        env,
+        commodityUuid,
+        env,
+        commodityUuid,
         env,
         commodityUuid,
       );

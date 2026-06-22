@@ -986,6 +986,36 @@ describe('TradeService', () => {
       expect((prisma as any).$queryRawUnsafe).toHaveBeenCalledTimes(1);
     });
 
+    it('resolves legacy commodity UUIDs to matching UEX item prices', async () => {
+      const prisma = createMockPrisma([
+        [
+          row({
+            id: 4707,
+            entity_kind: 'item',
+            entity_name: 'ReadyMeal (Vegetarian)',
+            buy_price: 18,
+            sell_price: 0,
+            shop_id: 113,
+            shop_name: 'Cubby Area 18',
+            source: 'uex',
+          }),
+        ],
+      ]);
+      const svc = new TradeService(createGetClient(prisma));
+
+      const result = await svc.getCommodityPriceResult('548c4c7b-2ac4-7653-5d1e-351ec2afb5ab');
+
+      expect(result.source).toBe('uex');
+      expect(result.data[0]).toMatchObject({
+        entity_kind: 'item',
+        entity_name: 'ReadyMeal (Vegetarian)',
+        buy_price: 18,
+      });
+      const sql: string = ((prisma as any).$queryRawUnsafe as any).mock.calls[0][0];
+      expect(sql).toContain('REGEXP_REPLACE');
+      expect(sql).toContain('game.items');
+    });
+
     it('falls back to P4K shop inventory prices when UEX has no row', async () => {
       const prisma = createMockPrisma([
         [],
