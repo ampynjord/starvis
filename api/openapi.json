@@ -2311,6 +2311,14 @@
             "type": "string",
             "nullable": true
           },
+          "appearance": {
+            "type": "string",
+            "nullable": true
+          },
+          "texture_url": {
+            "type": "string",
+            "nullable": true
+          },
           "orbit_period": {
             "type": "string",
             "nullable": true
