@@ -3,7 +3,7 @@
   "info": {
     "title": "Starvis API",
     "version": "2.0.0",
-    "description": "Star Citizen game data, RSI website data, accounts, corporations, chat and admin REST API.\n\nData sources:\n- **P4K game data** (ships, components, items, commodities, shops, missions, mining, crafting, locations)\n- **RSI Website** (ship matrix, galactapedia, comm-links, starmap, organizations)\n\n### Authentication\nThe documented external `/api/v1` API is protected and requires a Bearer JWT generated from a user session or API token. The public web interface uses an internal server-side proxy and does not expose anonymous `/api/v1` access. Authenticated endpoints support:\n- **Bearer JWT** (`Authorization: Bearer <token>`): obtained via `POST /auth/login` or `POST /auth/api-token`. Required for `/auth/me`, chat, corporation workspace and admin routes.\n- **Auth cookie** (`starvis_token` by default): used by the Starvis web app and accepted by protected API and Swagger routes.\n- **API Key** (`X-API-Key` header): accepted for trusted Starvis server-to-server calls only, including admin tools and the public IHM proxy. Do not expose it to browsers or third-party clients.\n\n### Swagger access\n- Anonymous users and standard `user` accounts cannot access Swagger.\n- `developer` accounts can access `/api-docs` with all non-admin routes.\n- `admin` accounts can access `/api-docs` with all routes, including admin routes.\n\n### User Roles\n| Role | Description |\n|---|---|\n| `user` | Standard account — access to public data and authenticated user features |\n| `developer` | Developer account — can access API documentation and developer tools |\n| `admin` | Full access including user management and admin API |\n\nRoles are assigned by an admin via `PUT /admin/users/{id}/role`.\n\n### Pagination\nList endpoints generally support `page` and `limit` query parameters and return `{ data, total, page, limit, pages }`.\n\n### Filters\nDomain `/filters` endpoints return `{ filters: { fieldName: [{ value, label, count? }] } }` when available.\n\n### Game environments\nUse the `env` query parameter to select the game environment: `live` (default), `ptu`, `eptu`, `tech-preview`, `custom`."
+    "description": "Star Citizen game data, RSI website data, accounts, corporations, chat and admin REST API.\n\nData sources:\n- **P4K game data** (ships, components, items, commodities, shops, missions, mining, crafting, locations)\n- **RSI Website** (ship matrix, galactapedia, comm-links, starmap, organizations)\n- **UEX Corp** (live economy prices, terminals, vehicle market data)\n\nStarvis exposes canonical correlation endpoints to link equivalent records across P4K, RSI and UEX without changing existing resource IDs.\n\n### Authentication\nThe documented external `/api/v1` API is protected and requires a Bearer JWT generated from a user session or API token. The public web interface uses an internal server-side proxy and does not expose anonymous `/api/v1` access. Authenticated endpoints support:\n- **Bearer JWT** (`Authorization: Bearer <token>`): obtained via `POST /auth/login` or `POST /auth/api-token`. Required for `/auth/me`, chat, corporation workspace and admin routes.\n- **Auth cookie** (`starvis_token` by default): used by the Starvis web app and accepted by protected API and Swagger routes.\n- **API Key** (`X-API-Key` header): accepted for trusted Starvis server-to-server calls only, including admin tools and the public IHM proxy. Do not expose it to browsers or third-party clients.\n\n### Swagger access\n- Anonymous users and standard `user` accounts cannot access Swagger.\n- `developer` accounts can access `/api-docs` with all non-admin routes.\n- `admin` accounts can access `/api-docs` with all routes, including admin routes.\n\n### User Roles\n| Role | Description |\n|---|---|\n| `user` | Standard account — access to public data and authenticated user features |\n| `developer` | Developer account — can access API documentation and developer tools |\n| `admin` | Full access including user management and admin API |\n\nRoles are assigned by an admin via `PUT /admin/users/{id}/role`.\n\n### Pagination\nList endpoints generally support `page` and `limit` query parameters and return `{ data, total, page, limit, pages }`.\n\n### Filters\nDomain `/filters` endpoints return `{ filters: { fieldName: [{ value, label, count? }] } }` when available.\n\n### Game environments\nUse the `env` query parameter to select the game environment: `live` (default), `ptu`, `eptu`, `tech-preview`, `custom`."
   },
   "components": {
     "securitySchemes": {
@@ -3156,6 +3156,103 @@
             }
           }
         }
+      },
+      "CorrelationSourceLink": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": ["rsi", "p4k", "uex"]
+          },
+          "sourceTable": {
+            "type": "string"
+          },
+          "sourceId": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceUuid": {
+            "type": "string",
+            "nullable": true
+          },
+          "sourceName": {
+            "type": "string",
+            "nullable": true
+          },
+          "matchMethod": {
+            "type": "string"
+          },
+          "matchScore": {
+            "type": "integer"
+          },
+          "isPrimary": {
+            "type": "boolean"
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "CanonicalCorrelation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Stable Starvis canonical identifier, formatted as domain:key."
+          },
+          "env": {
+            "type": "string"
+          },
+          "domain": {
+            "type": "string",
+            "enum": ["system", "location", "shop", "ship", "commodity", "item", "component"]
+          },
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "primarySource": {
+            "type": "string",
+            "enum": ["rsi", "p4k", "uex"]
+          },
+          "confidence": {
+            "type": "string",
+            "enum": ["single_source", "correlated"]
+          },
+          "sourcePriority": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["rsi", "p4k", "uex"]
+            }
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CorrelationSourceLink"
+            }
+          }
+        }
+      },
+      "CorrelationSummary": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "object",
+          "properties": {
+            "total": {
+              "type": "integer"
+            },
+            "correlated": {
+              "type": "integer"
+            },
+            "singleSource": {
+              "type": "integer"
+            }
+          }
+        }
       }
     },
     "responses": {
@@ -3269,6 +3366,10 @@
     {
       "name": "Trade",
       "description": "Commodity prices, trade routes and profit calculator"
+    },
+    {
+      "name": "Correlations",
+      "description": "Canonical identity links across P4K, RSI and UEX sources."
     },
     {
       "name": "Crafting",
@@ -14996,6 +15097,162 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          }
+        }
+      }
+    },
+    "/api/v1/correlations/domains": {
+      "get": {
+        "tags": ["Correlations"],
+        "summary": "List supported canonical correlation domains",
+        "operationId": "getCorrelationDomains",
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/correlations/summary": {
+      "get": {
+        "tags": ["Correlations"],
+        "summary": "Summarize canonical source correlation coverage",
+        "operationId": "getCorrelationSummary",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/env"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Correlation coverage by domain",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/CorrelationSummary"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          }
+        }
+      }
+    },
+    "/api/v1/correlations/{domain}": {
+      "get": {
+        "tags": ["Correlations"],
+        "summary": "List canonical entities and their source links for one domain",
+        "operationId": "getCorrelationsByDomain",
+        "parameters": [
+          {
+            "name": "domain",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": ["system", "location", "shop", "ship", "commodity", "item", "component"]
+            }
+          },
+          {
+            "$ref": "#/components/parameters/env"
+          },
+          {
+            "$ref": "#/components/parameters/search"
+          },
+          {
+            "$ref": "#/components/parameters/limit"
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["rsi", "p4k", "uex"]
+            },
+            "description": "Only return canonical entities with a link from this source."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "count": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/CanonicalCorrelation"
+                      }
+                    },
+                    "meta": {
+                      "type": "object",
+                      "additionalProperties": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
           }
         }
       }

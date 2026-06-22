@@ -6,6 +6,7 @@ import { mountChatRoutes } from './chat.js';
 import { mountCommodityRoutes } from './commodities.js';
 import { mountComponentRoutes } from './components.js';
 import { mountCorporationRoutes } from './corporations.js';
+import { mountCorrelationRoutes } from './correlations.js';
 import { mountCraftingRoutes } from './crafting.js';
 import { mountFactionRoutes } from './factions.js';
 import { mountItemRoutes } from './items.js';
@@ -59,6 +60,7 @@ export const routeGroups = [
       mountSearchRoutes,
       mountCalculateRoutes,
       mountTradeRoutes,
+      mountCorrelationRoutes,
     ],
   },
   {

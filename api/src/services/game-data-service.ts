@@ -11,6 +11,7 @@
 import type { PrismaLike as PrismaClient } from '@starvis/db';
 import { CommodityQueryService } from './commodity-query-service.js';
 import { ComponentQueryService } from './component-query-service.js';
+import { CorrelationService } from './correlation-service.js';
 import { CraftingService } from './crafting-service.js';
 import { ItemQueryService } from './item-query-service.js';
 import { LoadoutService } from './loadout-service.js';
@@ -66,6 +67,7 @@ export class GameDataService {
   readonly crafting: CraftingService;
   readonly trade: TradeService;
   readonly locations: LocationQueryService;
+  readonly correlations: CorrelationService;
 
   private statsCache = new TtlCache<Record<string, unknown>>(60_000);
   private publicStatsCache = new TtlCache<Record<string, unknown>>(60_000);
@@ -86,6 +88,7 @@ export class GameDataService {
     this.crafting = new CraftingService(getClient);
     this.trade = new TradeService(getClient);
     this.locations = new LocationQueryService(getClient);
+    this.correlations = new CorrelationService(getClient);
   }
 
   // ── Unified search (cross-cutting — queries ships + components + items) ──

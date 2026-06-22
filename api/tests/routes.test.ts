@@ -164,6 +164,10 @@ function makeGameDataService() {
       getLocation: fn(null),
       getLocationChildren: fn([]),
     },
+    correlations: {
+      getSummary: fn({}),
+      getCorrelations: fn([]),
+    },
     unifiedSearch: fn({ ships: [], components: [], items: [], commodities: [], missions: [], recipes: [] }),
     getObjectDetail: fn(null),
     getChangelogSummary: fn([]),
@@ -806,6 +810,27 @@ describe('GET /api/v1/trade/routes', () => {
 });
 
 // ── Crafting ──────────────────────────────────────────────
+
+describe('GET /api/v1/correlations', () => {
+  it('GET /api/v1/correlations/domains returns supported identity domains', async () => {
+    const res = await request(app).get('/api/v1/correlations/domains');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data).toContain('ship');
+  });
+
+  it('GET /api/v1/correlations/summary returns canonical identity summary', async () => {
+    const res = await request(app).get('/api/v1/correlations/summary');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+
+  it('GET /api/v1/correlations/:domain returns canonical source links', async () => {
+    const res = await request(app).get('/api/v1/correlations/ship?limit=20');
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+  });
+});
 
 describe('GET /api/v1/crafting/categories', () => {
   it('returns 200', async () => {
