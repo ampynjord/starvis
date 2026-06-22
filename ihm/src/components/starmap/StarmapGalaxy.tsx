@@ -37,6 +37,8 @@ interface OrbitRing {
   radius: number;
   color: number;
   opacity: number;
+  tiltAxis: THREE.Vector3;
+  tiltAngle: number;
 }
 
 interface SceneModel {
@@ -604,11 +606,18 @@ function makeLabelSprite(text: string, css: string, worldHeight: number): THREE.
   return sprite;
 }
 
-function makeCircle(radius: number, color: number, opacity: number, center: THREE.Vector3) {
+function makeCircle(
+  radius: number,
+  color: number,
+  opacity: number,
+  center: THREE.Vector3,
+  tiltAxis?: THREE.Vector3,
+  tiltAngle?: number,
+) {
   const points: THREE.Vector3[] = [];
   for (let i = 0; i <= 128; i++) {
     const a = (i / 128) * Math.PI * 2;
-    points.push(new THREE.Vector3(center.x + Math.cos(a) * radius, center.y, center.z + Math.sin(a) * radius));
+    points.push(new THREE.Vector3(Math.cos(a) * radius, 0, Math.sin(a) * radius));
   }
   const geometry = new THREE.BufferGeometry().setFromPoints(points);
   const material = new THREE.LineBasicMaterial({
@@ -618,7 +627,10 @@ function makeCircle(radius: number, color: number, opacity: number, center: THRE
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });
-  return new THREE.Line(geometry, material);
+  const line = new THREE.Line(geometry, material);
+  line.position.copy(center);
+  if (tiltAxis && tiltAngle) line.setRotationFromAxisAngle(tiltAxis.clone().normalize(), tiltAngle);
+  return line;
 }
 
 function radialPosition(center: THREE.Vector3, radius: number, index: number, y = 0) {
@@ -635,6 +647,21 @@ function shouldDrawOrbit(object: StarmapPosition, level: 'system' | 'body', dept
   if (!ORBITABLE_TYPES.has(key)) return false;
   if (level === 'body') return depth <= 1;
   return depth <= 2;
+}
+
+// Derive an orbit ring that actually passes through the body: a circle of radius
+// |offset| tilted out of the horizontal plane by the body's own elevation, so
+// inclined orbits read as the official map's tilted ellipses (bodies stay put).
+function orbitGeometry(parentPosition: THREE.Vector3, bodyPosition: THREE.Vector3) {
+  const offset = bodyPosition.clone().sub(parentPosition);
+  const radius = offset.length();
+  const horizontal = Math.hypot(offset.x, offset.z);
+  if (horizontal < 0.0001) {
+    return { radius, tiltAxis: new THREE.Vector3(1, 0, 0), tiltAngle: 0 };
+  }
+  const tiltAxis = new THREE.Vector3(-offset.z, 0, offset.x);
+  const tiltAngle = Math.atan2(offset.y, horizontal);
+  return { radius, tiltAxis, tiltAngle };
 }
 
 function modelRadius(nodes: SceneNode[]) {
@@ -786,7 +813,7 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
       const style = objectStyle(child.type);
       const landing = isLandingZone(child);
       const position = positionFor(child, parentPosition, parentRadius, index, depth);
-      const orbitRadius = position.clone().setY(parentPosition.y).distanceTo(parentPosition);
+      const orbit = orbitGeometry(parentPosition, position);
       const node: SceneNode = {
         object: child,
         position,
@@ -798,8 +825,15 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
       };
       nodes.push(node);
       placed.add(child.id);
-      if (shouldDrawOrbit(child, level, depth) && orbitRadius > 1) {
-        rings.push({ center: parentPosition, radius: orbitRadius, color: style.color, opacity: depth === 1 ? 0.22 : 0.11 });
+      if (shouldDrawOrbit(child, level, depth) && orbit.radius > 1) {
+        rings.push({
+          center: parentPosition,
+          radius: orbit.radius,
+          color: style.color,
+          opacity: depth === 1 ? 0.22 : 0.11,
+          tiltAxis: orbit.tiltAxis,
+          tiltAngle: orbit.tiltAngle,
+        });
       }
       placeChildren(child, position, Math.max(1, node.radius), depth + 1);
     });
@@ -810,7 +844,7 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
     const style = objectStyle(child.type);
     const landing = isLandingZone(child);
     const position = positionFor(child, rootNode.position, Math.max(1, rootNode.radius), index, 1);
-    const orbitRadius = position.clone().setY(rootNode.position.y).distanceTo(rootNode.position);
+    const orbit = orbitGeometry(rootNode.position, position);
     const node: SceneNode = {
       object: child,
       position,
@@ -822,8 +856,15 @@ function buildNestedModel(root: StarmapPosition, objects: StarmapPosition[], all
     };
     nodes.push(node);
     placed.add(child.id);
-    if (shouldDrawOrbit(child, level, 1) && orbitRadius > 1) {
-      rings.push({ center: rootNode.position, radius: orbitRadius, color: style.color, opacity: 0.22 });
+    if (shouldDrawOrbit(child, level, 1) && orbit.radius > 1) {
+      rings.push({
+        center: rootNode.position,
+        radius: orbit.radius,
+        color: style.color,
+        opacity: 0.22,
+        tiltAxis: orbit.tiltAxis,
+        tiltAngle: orbit.tiltAngle,
+      });
     }
     placeChildren(child, position, Math.max(1, node.radius), 1);
   });
@@ -871,6 +912,10 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
   const [routeFrom, setRouteFrom] = useState('');
   const [routeTo, setRouteTo] = useState('');
   const cameraParamRef = useRef<CameraParam | null>(readCameraParam());
+  const sceneApiRef = useRef<{
+    reticle: THREE.Object3D;
+    positions: Map<string, { pos: THREE.Vector3; radius: number }>;
+  } | null>(null);
 
   const toggleLayer = (key: string) =>
     setHiddenLayers((prev) => {
@@ -1033,6 +1078,25 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
     const animatedNodes: Array<{ mesh: THREE.Mesh; glow: THREE.Sprite; base: number; glowBase: number; phase: number; spin: number }> = [];
     const labels: Array<{ sprite: THREE.Sprite; baseWidth: number; baseHeight: number }> = [];
     const jumpComets: Array<{ sprite: THREE.Sprite; curve: THREE.QuadraticBezierCurve3; offset: number; speed: number }> = [];
+    const nodePositions = new Map<string, { pos: THREE.Vector3; radius: number }>();
+
+    // Reusable selection reticle, repositioned imperatively when the selection
+    // changes so picking a body never rebuilds the whole scene.
+    const reticle = new THREE.Mesh(
+      new THREE.RingGeometry(1.35, 1.62, 56),
+      new THREE.MeshBasicMaterial({
+        color: 0x67e8f9,
+        transparent: true,
+        opacity: 0.95,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: false,
+      }),
+    );
+    reticle.visible = false;
+    reticle.renderOrder = 999;
+    nodeGroup.add(reticle);
 
     const starCount = level === 'galaxy' ? 2200 : 760;
     const starGeo = new THREE.BufferGeometry();
@@ -1054,7 +1118,7 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
     );
 
     for (const ring of sceneModel.rings) {
-      nodeGroup.add(makeCircle(ring.radius, ring.color, ring.opacity, ring.center));
+      nodeGroup.add(makeCircle(ring.radius, ring.color, ring.opacity, ring.center, ring.tiltAxis, ring.tiltAngle));
     }
 
     for (const node of sceneModel.nodes) {
@@ -1110,6 +1174,7 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
       mesh.userData.baseEmissiveIntensity = materialOptions.emissiveIntensity ?? 0.28;
       pickables.push(mesh);
       nodeGroup.add(mesh);
+      nodePositions.set(objectId(node.object), { pos: node.position, radius: node.radius });
 
       // Stars cast light and carry a lens flare, like the official ARK suns.
       if (isStar) {
@@ -1208,6 +1273,7 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
     }
 
     scene.add(nodeGroup);
+    sceneApiRef.current = { reticle, positions: nodePositions };
 
     const raycaster = new THREE.Raycaster();
     const pointer = new THREE.Vector2();
@@ -1290,6 +1356,11 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
         const progress = (t * comet.speed + comet.offset) % 1;
         comet.curve.getPointAt(progress, comet.sprite.position);
       }
+      if (reticle.visible) {
+        reticle.quaternion.copy(camera.quaternion);
+        const base = Number(reticle.userData.baseScale ?? 4);
+        reticle.scale.setScalar(base * (1 + Math.sin(t * 3.4) * 0.08));
+      }
       const labelReferenceDistance = level === 'galaxy' ? 260 : level === 'system' ? 210 : 120;
       for (const label of labels) {
         const distance = camera.position.distanceTo(label.sprite.position);
@@ -1318,6 +1389,7 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
 
     return () => {
       cancelAnimationFrame(frame);
+      sceneApiRef.current = null;
       ro.disconnect();
       visibility.dispose();
       renderer.domElement.removeEventListener('pointermove', onPointerMove);
@@ -1336,6 +1408,21 @@ function StarmapScene({ objects }: { objects: StarmapPosition[] }) {
       if (renderer.domElement.parentNode === container) container.removeChild(renderer.domElement);
     };
   }, [level, sceneModel, hiddenLayers, route]);
+
+  // Move/show the selection reticle without rebuilding the scene.
+  useEffect(() => {
+    const api = sceneApiRef.current;
+    if (!api) return;
+    const entry = selected ? api.positions.get(objectId(selected)) : null;
+    if (!entry) {
+      api.reticle.visible = false;
+      return;
+    }
+    api.reticle.position.copy(entry.pos);
+    api.reticle.userData.baseScale = entry.radius * 2.6 + 2.2;
+    api.reticle.scale.setScalar(entry.radius * 2.6 + 2.2);
+    api.reticle.visible = true;
+  }, [selected, sceneModel]);
 
   const selectedStyle = selected ? objectStyle(selected.type) : null;
   const selectedHasChildren = selected ? hasChildren(selected, currentObjects.length > 0 ? currentObjects : objects) : false;
