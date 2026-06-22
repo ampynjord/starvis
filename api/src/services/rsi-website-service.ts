@@ -363,6 +363,8 @@ export class RsiWebsiteService {
               sl.raw_json->>'designation' as designation,
               sl.raw_json->>'orbit_period' as orbit_period,
               sl.raw_json->>'axial_tilt' as axial_tilt,
+              sl.raw_json->>'appearance' as appearance,
+              sl.raw_json->'texture'->>'source' as texture_url,
               sl.raw_json->'subtype'->>'name' as subtype,
               sl.coordinates, sl.aggregated,
               sl.thumbnail,

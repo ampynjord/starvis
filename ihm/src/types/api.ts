@@ -1472,6 +1472,8 @@ export interface StarmapPosition {
   type: string;
   designation?: string | null;
   subtype?: string | null;
+  appearance?: string | null;
+  texture_url?: string | null;
   orbit_period?: string | null;
   axial_tilt?: string | null;
   system_code: string | null;
