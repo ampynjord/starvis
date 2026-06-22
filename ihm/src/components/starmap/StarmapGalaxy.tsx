@@ -1330,7 +1330,10 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
       const isAsteroid = tkey.includes('asteroid');
       const isJump = tkey.includes('jump');
       const sunUrl = isStar ? sunTextureUrl(node.object) : null;
-      const planetUrl = isPlanetLike(node.object) ? planetTextureUrl(node.object) : null;
+      // RSI's own starmap data carries a real surface texture for many moons too
+      // (not just planets) — use it when present, falling back to the procedural
+      // texture below otherwise.
+      const planetUrl = isPlanetLike(node.object) || isMoonLike(node.object) ? planetTextureUrl(node.object) : null;
       const materialOptions: THREE.MeshStandardMaterialParameters = {
         color: node.color,
         emissive: node.color,
