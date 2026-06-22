@@ -21,6 +21,26 @@ export interface TradeRoute {
   scu: number;
 }
 
+type PriceSourceStatus = 'available' | 'empty' | 'unavailable' | 'not_checked';
+
+export interface CommodityPriceSourceMeta {
+  status: PriceSourceStatus;
+  count: number | null;
+  error?: 'query_failed';
+}
+
+export interface CommodityPriceResult {
+  data: Row[];
+  source: 'uex' | 'p4k' | 'none';
+  sourcePriority: ['uex', 'p4k'];
+  fallbackUsed: boolean;
+  reason?: 'uex_available' | 'uex_empty_p4k_available' | 'uex_unavailable_p4k_available' | 'no_uex_or_p4k_price_found';
+  sources: {
+    uex: CommodityPriceSourceMeta;
+    p4k: CommodityPriceSourceMeta;
+  };
+}
+
 export class TradeService {
   constructor(private getClient: (env: string) => PrismaClient) {}
 
@@ -85,7 +105,13 @@ export class TradeService {
   }
 
   async getCommodityPrices(commodityUuid: string, env = 'live'): Promise<Row[]> {
+    const result = await this.getCommodityPriceResult(commodityUuid, env);
+    return result.data;
+  }
+
+  async getCommodityPriceResult(commodityUuid: string, env = 'live'): Promise<CommodityPriceResult> {
     const prisma = this.getClient(env);
+    let uexStatus: CommodityPriceSourceMeta = { status: 'not_checked', count: null };
     try {
       const uexRows = await prisma.$queryRawUnsafe<Row[]>(
         toPostgres(`SELECT p.id, p.price_buy as buy_price, p.price_sell as sell_price, p.date_modified as reported_at,
@@ -99,9 +125,23 @@ export class TradeService {
         env,
         commodityUuid,
       );
-      if (uexRows.length) return convertBigIntToNumber(uexRows);
+      if (uexRows.length) {
+        const data = convertBigIntToNumber(uexRows);
+        return {
+          data,
+          source: 'uex',
+          sourcePriority: ['uex', 'p4k'],
+          fallbackUsed: false,
+          reason: 'uex_available',
+          sources: {
+            uex: { status: 'available', count: data.length },
+            p4k: { status: 'not_checked', count: null },
+          },
+        };
+      }
+      uexStatus = { status: 'empty', count: 0 };
     } catch {
-      // Fallback below.
+      uexStatus = { status: 'unavailable', count: null, error: 'query_failed' };
     }
     const rows = await prisma.$queryRawUnsafe<Row[]>(
       toPostgres(`SELECT cp.id, cp.buy_price, cp.sell_price, cp.reported_at,
@@ -113,7 +153,33 @@ export class TradeService {
       env,
       commodityUuid,
     );
-    return convertBigIntToNumber(rows);
+    const data = convertBigIntToNumber(rows);
+    if (data.length) {
+      const reason = uexStatus.status === 'unavailable' ? 'uex_unavailable_p4k_available' : 'uex_empty_p4k_available';
+      return {
+        data,
+        source: 'p4k',
+        sourcePriority: ['uex', 'p4k'],
+        fallbackUsed: true,
+        reason,
+        sources: {
+          uex: uexStatus,
+          p4k: { status: 'available', count: data.length },
+        },
+      };
+    }
+
+    return {
+      data: [],
+      source: 'none',
+      sourcePriority: ['uex', 'p4k'],
+      fallbackUsed: uexStatus.status !== 'not_checked',
+      reason: 'no_uex_or_p4k_price_found',
+      sources: {
+        uex: uexStatus,
+        p4k: { status: 'empty', count: 0 },
+      },
+    };
   }
 
   async getLocationPrices(shopId: number, env = 'live'): Promise<Row[]> {
