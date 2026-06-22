@@ -194,41 +194,55 @@ const NEBULA_TEXTURES = [
   { url: `${RSI_SOURCEIMAGES}/Middle_Nebula.png`, color: 0x8ea2ff },
 ];
 
-// The RSI station 3D model (Collada), loaded once and normalised to unit size.
-let stationModelPromise: Promise<THREE.Object3D> | null = null;
-function loadStationModel(): Promise<THREE.Object3D> {
-  if (!stationModelPromise) {
-    stationModelPromise = new Promise((resolve, reject) => {
-      new ColladaLoader().load(
-        `${RSI_MODELS}/SpaceStation.dae`,
-        (collada) => {
-          if (!collada?.scene) {
-            reject(new Error('RSI station model did not include a scene'));
-            return;
-          }
-          const model = collada.scene;
-          const box = new THREE.Box3().setFromObject(model);
-          const size = box.getSize(new THREE.Vector3());
-          const center = box.getCenter(new THREE.Vector3());
-          const maxDim = Math.max(size.x, size.y, size.z) || 1;
-          model.position.sub(center);
-          const wrapper = new THREE.Group();
-          wrapper.add(model);
-          wrapper.scale.setScalar(1 / maxDim);
-          resolve(wrapper);
-        },
-        undefined,
-        reject,
-      );
-    });
-    // A transient failure (network blip, timing) must not permanently poison
-    // every future call for the rest of the page session — let it retry.
-    stationModelPromise.catch(() => {
-      stationModelPromise = null;
-    });
-  }
-  return stationModelPromise;
+// The real RSI jump-point shader's tileable speckle/particle noise — used to
+// give the wormhole funnel its grainy, streaming texture instead of a flat ring.
+const JUMP_NOISE_TEXTURE = `${RSI_SOURCEIMAGES}/Noise5Horiz256Jump.png`;
+
+// Loads a Collada model and normalises it to a unit-size, centred wrapper
+// Group so callers can place/scale it purely by their own world radius.
+function loadColladaModel(url: string): Promise<THREE.Object3D> {
+  return new Promise((resolve, reject) => {
+    new ColladaLoader().load(
+      url,
+      (collada) => {
+        if (!collada?.scene) {
+          reject(new Error(`RSI model at ${url} did not include a scene`));
+          return;
+        }
+        const model = collada.scene;
+        const box = new THREE.Box3().setFromObject(model);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z) || 1;
+        model.position.sub(center);
+        const wrapper = new THREE.Group();
+        wrapper.add(model);
+        wrapper.scale.setScalar(1 / maxDim);
+        resolve(wrapper);
+      },
+      undefined,
+      reject,
+    );
+  });
 }
+
+// A transient failure (network blip, timing) must not permanently poison every
+// future call for the rest of the page session, so each cache resets on reject.
+function cachedRetryable<T>(load: () => Promise<T>): () => Promise<T> {
+  let promise: Promise<T> | null = null;
+  return () => {
+    if (!promise) {
+      promise = load();
+      promise.catch(() => {
+        promise = null;
+      });
+    }
+    return promise;
+  };
+}
+
+// The RSI station 3D model, loaded once and normalised to unit size.
+const loadStationModel = cachedRetryable(() => loadColladaModel(`${RSI_MODELS}/SpaceStation.dae`));
 
 function hashString(value: string) {
   let hash = 2166136261;
@@ -1302,6 +1316,8 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
     const swirls: THREE.Sprite[] = [];
     const spinModels: THREE.Object3D[] = [];
     const stationPlacements: Array<{ pos: THREE.Vector3; radius: number }> = [];
+    const jumpFunnels: THREE.Mesh[] = [];
+    const jumpFunnelTextures: THREE.Texture[] = [];
 
     for (const node of sceneModel.nodes) {
       if (node.visible === false) continue;
@@ -1425,20 +1441,44 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
         stationPlacements.push({ pos: node.position.clone(), radius: Math.max(node.radius, 0.9) });
       }
 
-      // Jump points are 3D wormholes: a billboarded glowing ring with a swirling core.
+      // Jump points are 3D wormholes: a receding funnel (streaming RSI noise
+      // texture) capped by a bright mouth ring, with a swirling core glow.
       if (isJump) {
         const portalRadius = level === 'galaxy' ? 3 : 2.2;
-        const ring = new THREE.Mesh(
-          new THREE.RingGeometry(portalRadius * 0.6, portalRadius, 40),
-          new THREE.MeshBasicMaterial({ color: 0x67e8f9, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }),
+
+        const funnelGeometry = new THREE.CylinderGeometry(0, portalRadius, portalRadius * 3.2, 28, 1, true);
+        // CylinderGeometry's apex sits at +Y by default; rotate it so the apex
+        // points along local -Z, which becomes "into the screen" once the mesh
+        // is billboarded to the camera's quaternion every frame.
+        funnelGeometry.rotateX(-Math.PI / 2);
+        const funnel = new THREE.Mesh(
+          funnelGeometry,
+          new THREE.MeshBasicMaterial({
+            color: 0x67e8f9,
+            transparent: true,
+            opacity: 0.55,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+          }),
         );
-        ring.position.copy(node.position);
-        nodeGroup.add(ring);
-        billboards.push(ring);
+        funnel.position.copy(node.position);
+        nodeGroup.add(funnel);
+        billboards.push(funnel);
+        jumpFunnels.push(funnel);
+
+        const mouthRing = new THREE.Mesh(
+          new THREE.RingGeometry(portalRadius * 0.82, portalRadius, 40),
+          new THREE.MeshBasicMaterial({ color: 0x9af2ff, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending }),
+        );
+        mouthRing.position.copy(node.position);
+        nodeGroup.add(mouthRing);
+        billboards.push(mouthRing);
+
         const swirl = new THREE.Sprite(
-          new THREE.SpriteMaterial({ map: glowTexture, color: 0x22d3ee, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending }),
+          new THREE.SpriteMaterial({ map: glowTexture, color: 0x22d3ee, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending }),
         );
-        swirl.scale.set(portalRadius * 1.3, portalRadius * 1.3, 1);
+        swirl.scale.set(portalRadius * 1.1, portalRadius * 1.1, 1);
         swirl.position.copy(node.position);
         nodeGroup.add(swirl);
         swirls.push(swirl);
@@ -1528,6 +1568,27 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
         .catch(() => {
           // Model unavailable — stations keep their (invisible) pick sphere.
         });
+    }
+
+    // Texture the jump funnels with the real RSI wormhole speckle/noise map
+    // once it loads, then let each funnel scroll its own clone independently.
+    const jumpNoiseUrl = proxiedAssetUrl(JUMP_NOISE_TEXTURE);
+    if (jumpFunnels.length > 0 && jumpNoiseUrl) {
+      textureLoader.load(jumpNoiseUrl, (noiseTexture) => {
+        if (!active) return;
+        noiseTexture.colorSpace = THREE.SRGBColorSpace;
+        for (const funnel of jumpFunnels) {
+          const tex = noiseTexture.clone();
+          tex.wrapS = THREE.RepeatWrapping;
+          tex.wrapT = THREE.RepeatWrapping;
+          tex.repeat.set(3, 2);
+          tex.needsUpdate = true;
+          const material = funnel.material as THREE.MeshBasicMaterial;
+          material.map = tex;
+          material.needsUpdate = true;
+          jumpFunnelTextures.push(tex);
+        }
+      });
     }
 
     // Galaxy-level jump network: faint static links between connected systems.
@@ -1664,9 +1725,11 @@ function StarmapScene({ objects: rawObjects }: { objects: StarmapPosition[] }) {
         const factor = clamp((REVEAL_FAR - distance) / (REVEAL_FAR - REVEAL_NEAR), 0, 1);
         for (const entry of item.entries) entry.material.opacity = entry.base * factor;
       }
-      // Wormhole portals: face the camera and swirl.
+      // Wormhole portals: face the camera, swirl the core, and stream noise
+      // down the funnel toward the viewer.
       for (const billboard of billboards) billboard.quaternion.copy(camera.quaternion);
       for (const swirl of swirls) swirl.material.rotation += 0.02;
+      for (const tex of jumpFunnelTextures) tex.offset.y -= 0.015;
       // Fly to a focused body over a fixed time, then hand control back so the
       // view stays freely orbitable (no spring-back fighting OrbitControls).
       if (focusRef.current) {
