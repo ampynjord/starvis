@@ -86,8 +86,8 @@ function resolveClientType(
   if (authMethod === 'admin_key') return 'server_key';
   if (isExternalApiPath(path) && authMethod === 'api_token') return 'external_api';
   if (payload || authMethod === 'session') return 'web_session';
-  if (!isExternalApiPath(path)) return 'anonymous_web';
-  return 'unknown';
+  if (isExternalApiPath(path)) return 'external_api'; // Anonymous external API call
+  return 'anonymous_web';
 }
 
 function isExternalApiLog(path: string, clientType: RequestLogEntry['clientType']): boolean {
@@ -201,7 +201,7 @@ export function listRequestLogsByScope(scope: 'external' | 'web' | 'all', limit 
     scope === 'external'
       ? requestLogs.filter((log) => log.isExternalApi)
       : scope === 'web'
-        ? requestLogs.filter((log) => !log.isExternalApi && ['web_session', 'internal_web_proxy', 'anonymous_web'].includes(log.clientType))
+        ? requestLogs.filter((log) => !log.isExternalApi)
         : requestLogs;
   return filtered.slice(0, safeLimit);
 }
@@ -251,7 +251,7 @@ export async function listPersistedRequestHistory(filters: RequestHistoryFilters
   if (scope === 'external') {
     where.push('is_external_api = true');
   } else if (scope === 'web') {
-    where.push("is_external_api = false AND client_type IN ('web_session', 'internal_web_proxy', 'anonymous_web')");
+    where.push('is_external_api = false');
   }
   if (filters.userId) add('user_id = ?', filters.userId);
   if (filters.role) add('role = ?::meta."UserRole"', filters.role);
