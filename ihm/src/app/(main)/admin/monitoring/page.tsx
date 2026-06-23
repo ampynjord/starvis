@@ -280,12 +280,23 @@ function statusStyle(statusCode: number) {
   return 'border-emerald-800/60 bg-emerald-950/30 text-emerald-300';
 }
 
-function actorLabel(log: RequestLogEntry) {
-  if (log.apiTokenName) return `${log.apiTokenName}${log.username ? ` · ${log.username}` : ''}`;
-  if (log.username) return `${log.username}${log.role ? ` · ${log.role}` : ''}`;
-  if (log.userId) return `${log.role ?? 'user'} #${log.userId}`;
-  if (log.internalClient) return log.internalClient;
-  if (log.authMethod === 'admin_key') return 'Starvis IHM';
+function externalActorLabel(log: RequestLogEntry) {
+  if (log.apiTokenName) {
+    return `${log.apiTokenName}${log.username ? ` (by ${log.username})` : ''}`;
+  }
+  if (log.username) {
+    return `${log.username} (API Token)`;
+  }
+  if (log.authMethod === 'admin_key' || log.clientType === 'server_key') {
+    return 'System Key';
+  }
+  return 'anonymous';
+}
+
+function ihmActorLabel(log: RequestLogEntry) {
+  if (log.username) {
+    return `${log.username}${log.role ? ` · ${log.role}` : ''}`;
+  }
   return 'anonymous';
 }
 
@@ -347,6 +358,7 @@ const REFRESH_INTERVAL_MS = 10_000;
 
 export default function AdminMonitoringPage() {
   const { user: me } = useAuth();
+  const [activeTab, setActiveTab] = useState<'overview' | 'api' | 'system' | 'logs'>('overview');
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [externalRequestLogs, setExternalRequestLogs] = useState<RequestLogEntry[]>([]);
   const [webRequestLogs, setWebRequestLogs] = useState<RequestLogEntry[]>([]);
@@ -472,13 +484,40 @@ export default function AdminMonitoringPage() {
         )}
       />
 
-      <Link
-        href="/admin"
-        className="flex w-fit items-center gap-2 sci-panel border border-slate-800/60 px-3 py-2.5 text-slate-500 transition-colors hover:border-cyan-800/50 hover:text-cyan-400"
-      >
-        <ArrowLeft size={13} />
-        <span className="font-orbitron text-[10px] uppercase tracking-widest">Back to admin</span>
-      </Link>
+      <div className="mb-4 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <Link
+          href="/admin"
+          className="flex w-fit items-center gap-2 sci-panel border border-slate-800/60 px-3 py-2 text-slate-500 transition-colors hover:border-cyan-800/50 hover:text-cyan-400"
+        >
+          <ArrowLeft size={13} />
+          <span className="font-orbitron text-[10px] uppercase tracking-widest">Back to admin</span>
+        </Link>
+
+        {/* Tabs Navigation */}
+        <div className="flex flex-wrap border-b border-slate-800/60 font-orbitron text-xs">
+          {(
+            [
+              { id: 'overview', label: 'Vue d\'ensemble' },
+              { id: 'api', label: 'Accès & Jetons API' },
+              { id: 'system', label: 'Performance & Système' },
+              { id: 'logs', label: 'Journaux d\'activité' },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`-mb-px border-b-2 px-4 py-2 font-semibold uppercase tracking-wider transition-all duration-150 ${
+                activeTab === tab.id
+                  ? 'border-cyan-500 text-cyan-400 bg-cyan-950/10 drop-shadow-[0_0_8px_rgba(6,182,212,0.15)]'
+                  : 'border-transparent text-slate-500 hover:border-slate-800 hover:text-slate-300'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {error && (
         <div className="flex items-center gap-2 rounded-sm border border-rose-800/60 bg-rose-950/20 px-3 py-2.5 font-mono-sc text-xs text-rose-400">
@@ -486,402 +525,401 @@ export default function AdminMonitoringPage() {
         </div>
       )}
 
-      {/* Service health */}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        <ServiceBadge label="API" ok={apiOk} icon={Server} />
-        <ServiceBadge label="PostgreSQL" ok={snapshot?.ready?.checks.database ?? null} icon={Database} />
-        <ServiceBadge label="Redis" ok={snapshot?.ready?.checks.redis ?? (snapshot?.cache?.connected ?? null)} icon={Zap} />
-        <ServiceBadge
-          label="Discord bot"
-          ok={discordBot ? discordBot.configured : null}
-          icon={Bot}
-          okText="CONFIGURED"
-          downText="MISSING"
-        />
-      </div>
-
-      {/* Runtime stats */}
-      <StatGrid>
-        <StatCard icon={Clock} label="Uptime" value={fmtUptime(snapshot?.uptimeSeconds ?? null)} accent="cyan" />
-        <StatCard icon={HardDrive} label="Memory (RSS)" value={fmtBytes(snapshot?.memoryBytes ?? null)} accent="purple" />
-        <StatCard icon={Cpu} label="Heap used" value={fmtBytes(snapshot?.heapUsedBytes ?? null)} accent="purple" />
-        <StatCard icon={Gauge} label="Event loop lag" value={fmtMs(snapshot?.eventLoopLagMs ?? null)} accent={snapshot?.eventLoopLagMs != null && snapshot.eventLoopLagMs > 50 ? 'rose' : 'slate'} />
-      </StatGrid>
-
-      {/* Traffic stats */}
-      <StatGrid>
-        <StatCard icon={Activity} label="Total requests" value={snapshot ? snapshot.totalRequests.toLocaleString() : '—'} accent="cyan" />
-        <StatCard icon={Activity} label="Traffic" value={reqPerSec !== null ? `${reqPerSec.toFixed(1)} req/s` : '—'} accent="emerald" />
-        <StatCard icon={Clock} label="Avg latency" value={fmtMs(snapshot?.avgLatencyMs ?? null)} accent="amber" />
-        <StatCard icon={AlertTriangle} label="5xx errors" value={snapshot ? snapshot.totalErrors.toLocaleString() : '—'} accent={snapshot && snapshot.totalErrors > 0 ? 'rose' : 'slate'} />
-      </StatGrid>
-
-      <StatGrid>
-        <StatCard icon={Globe} label="External API 15m" value={apiSupervision ? apiSupervision.summary.externalApiRequests15m.toLocaleString() : '—'} accent="cyan" />
-        <StatCard icon={User} label="Active users 15m" value={apiSupervision ? apiSupervision.summary.activeUsers15m.toLocaleString() : '—'} accent="emerald" />
-        <StatCard icon={KeyRound} label="Active tokens" value={apiSupervision ? apiSupervision.summary.activeTokens.toLocaleString() : '—'} accent="purple" />
-        <StatCard icon={ShieldCheck} label="Connected projects" value={apiSupervision ? apiSupervision.summary.connectedProjects.toLocaleString() : '—'} accent="amber" />
-      </StatGrid>
-
-      {/* Cache stats */}
-      <StatGrid>
-        <StatCard icon={Zap} label="Cache hits" value={snapshot?.cache ? snapshot.cache.hits.toLocaleString() : '—'} accent="emerald" />
-        <StatCard icon={Zap} label="Cache misses" value={snapshot?.cache ? snapshot.cache.misses.toLocaleString() : '—'} accent="slate" />
-        <StatCard icon={Gauge} label="Hit rate" value={snapshot?.cache ? `${snapshot.cache.hitRate}%` : '—'} accent="cyan" />
-        <StatCard icon={Zap} label="Redis link" value={snapshot?.cache ? (snapshot.cache.connected ? 'CONNECTED' : 'OFFLINE') : '—'} accent={snapshot?.cache?.connected ? 'emerald' : 'rose'} />
-      </StatGrid>
-
-      <div className="sci-panel border border-slate-800/60 p-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <p className="flex items-center gap-2 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-              <Bot size={12} className="text-cyan-500" /> Discord bot
-            </p>
-            <p className="mt-2 text-sm text-slate-400">
-              {discordBot?.configured
-                ? `${discordBot.commandCount} slash commands configured.`
-                : 'Invite link not configured. Set NEXT_PUBLIC_DISCORD_CLIENT_ID or DISCORD_CLIENT_ID.'}
-            </p>
-            {discordBot?.clientId && (
-              <p className="mt-1 font-mono-sc text-[10px] text-slate-600">Client ID {discordBot.clientId}</p>
-            )}
-            {discordBot?.guildId && (
-              <p className="mt-1 font-mono-sc text-[10px] text-slate-600">Community server {discordBot.guildId}</p>
-            )}
+      {activeTab === 'overview' && (
+        <div className="space-y-4 animate-in fade-in duration-200">
+          {/* Service health */}
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <ServiceBadge label="API" ok={apiOk} icon={Server} />
+            <ServiceBadge label="PostgreSQL" ok={snapshot?.ready?.checks.database ?? null} icon={Database} />
+            <ServiceBadge label="Redis" ok={snapshot?.ready?.checks.redis ?? (snapshot?.cache?.connected ?? null)} icon={Zap} />
+            <ServiceBadge
+              label="Discord bot"
+              ok={discordBot ? discordBot.configured : null}
+              icon={Bot}
+              okText="CONFIGURED"
+              downText="MISSING"
+            />
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Link href="/discord" className="rounded-sm border border-slate-800 px-3 py-2 font-mono-sc text-xs text-slate-400 hover:border-cyan-800/70 hover:text-cyan-300">
-              Command help
-            </Link>
-            {discordBot?.serverInviteUrl && (
-              <a href={discordBot.serverInviteUrl} target="_blank" rel="noreferrer" className="rounded-sm border border-cyan-900/70 px-3 py-2 font-mono-sc text-xs text-cyan-300 hover:border-cyan-500 hover:text-cyan-100">
-                Join server
-              </a>
-            )}
-            {discordBot?.inviteUrl && (
-              <a href={discordBot.inviteUrl} target="_blank" rel="noreferrer" className="sci-btn-primary px-3 py-2 text-xs">
-                Invite bot
-              </a>
-            )}
-          </div>
-        </div>
-      </div>
 
-      {/* Status code distribution */}
-      {snapshot && statusTotal > 0 && (
-        <div className="sci-panel border border-slate-800/60 p-3">
-          <p className="mb-2 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">HTTP status distribution</p>
-          <div className="flex h-3 w-full overflow-hidden rounded-sm bg-slate-900">
-            {Object.entries(snapshot.statusCounts).sort().map(([family, count]) => (
-              <div
-                key={family}
-                className={STATUS_FAMILY_STYLE[family] ?? 'bg-slate-600'}
-                style={{ width: `${(count / statusTotal) * 100}%` }}
-                title={`${family}: ${count.toLocaleString()}`}
-              />
-            ))}
-          </div>
-          <div className="mt-2 flex flex-wrap gap-3">
-            {Object.entries(snapshot.statusCounts).sort().map(([family, count]) => (
-              <span key={family} className="flex items-center gap-1.5 font-mono-sc text-[10px] text-slate-500">
-                <span className={`h-2 w-2 rounded-sm ${STATUS_FAMILY_STYLE[family] ?? 'bg-slate-600'}`} />
-                {family} · {count.toLocaleString()} ({((count / statusTotal) * 100).toFixed(1)}%)
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
+          {/* Traffic stats */}
+          <StatGrid>
+            <StatCard icon={Activity} label="Total requests" value={snapshot ? snapshot.totalRequests.toLocaleString() : '—'} accent="cyan" />
+            <StatCard icon={Activity} label="Traffic" value={reqPerSec !== null ? `${reqPerSec.toFixed(1)} req/s` : '—'} accent="emerald" />
+            <StatCard icon={Clock} label="Avg latency" value={fmtMs(snapshot?.avgLatencyMs ?? null)} accent="amber" />
+            <StatCard icon={AlertTriangle} label="5xx errors" value={snapshot ? snapshot.totalErrors.toLocaleString() : '—'} accent={snapshot && snapshot.totalErrors > 0 ? 'rose' : 'slate'} />
+          </StatGrid>
 
-      {/* Top routes */}
-      <div className="sci-panel border border-slate-800/60">
-        <p className="border-b border-slate-800/60 px-3 py-2.5 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-          Top routes by traffic
-        </p>
-        {loading && !snapshot ? (
-          <div className="flex items-center justify-center py-10 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
-        ) : !snapshot || snapshot.routes.length === 0 ? (
-          <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No traffic recorded yet.</p>
-        ) : (
-          <table className="w-full text-left">
-            <thead>
-              <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-                <th className="px-3 py-2 font-normal">Route</th>
-                <th className="px-3 py-2 text-right font-normal">Requests</th>
-                <th className="px-3 py-2 text-right font-normal">Avg</th>
-                <th className="px-3 py-2 text-right font-normal">5xx</th>
-              </tr>
-            </thead>
-            <tbody>
-              {snapshot.routes.map((r) => (
-                <tr key={r.route} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
-                  <td className="max-w-[16rem] truncate px-3 py-2 font-mono-sc text-xs text-slate-300">{r.route}</td>
-                  <td className="px-3 py-2 text-right font-mono-sc text-xs text-cyan-400">{r.requests.toLocaleString()}</td>
-                  <td className="px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{fmtMs(r.avgMs)}</td>
-                  <td className={`px-3 py-2 text-right font-mono-sc text-xs ${r.errors > 0 ? 'text-rose-400' : 'text-slate-700'}`}>{r.errors > 0 ? r.errors.toLocaleString() : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-
-      {apiSupervision && (
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
-          <div className="sci-panel border border-slate-800/60">
-            <div className="flex flex-col gap-1 border-b border-slate-800/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-              <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">External API projects and tokens</p>
-              <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-700">
-                {apiSupervision.summary.tokensUsed24h.toLocaleString()} used in 24h · {apiSupervision.summary.revokedTokens.toLocaleString()} revoked
-              </span>
-            </div>
-            {apiSupervision.projects.length === 0 ? (
-              <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No generated API tokens yet.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[920px] text-left">
-                  <thead>
-                    <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-                      <th className="px-3 py-2 font-normal">Project</th>
-                      <th className="px-3 py-2 font-normal">Owner</th>
-                      <th className="px-3 py-2 font-normal">Status</th>
-                      <th className="px-3 py-2 font-normal">Created</th>
-                      <th className="px-3 py-2 font-normal">Expires</th>
-                      <th className="px-3 py-2 text-right font-normal">Recent</th>
-                      <th className="px-3 py-2 text-right font-normal">Total</th>
-                      <th className="px-3 py-2 font-normal">Last used</th>
-                      <th className="px-3 py-2 text-right font-normal">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {apiSupervision.projects.slice(0, 12).map((project) => (
-                      <tr key={project.tokenId} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
-                        <td className="px-3 py-2">
-                          <div className="min-w-0">
-                            <p className="truncate font-mono-sc text-xs text-slate-300">{project.name}</p>
-                            {project.description && <p className="truncate font-rajdhani text-xs text-slate-600">{project.description}</p>}
-                          </div>
-                        </td>
-                        <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">
-                          {project.owner ? `${project.owner.username} · ${project.owner.role}` : 'Unknown'}
-                        </td>
-                        <td className="px-3 py-2">
-                          <span className={`inline-flex rounded-sm border px-1.5 py-0.5 font-mono-sc text-[10px] font-bold uppercase ${projectStatusStyle(project.status)}`}>
-                            {project.connected ? 'connected' : project.status}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtDateTime(project.createdAt)}</td>
-                        <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtDateTime(project.expiresAt)}</td>
-                        <td className="px-3 py-2 text-right font-mono-sc text-xs text-cyan-400">{project.recentRequests.toLocaleString()}</td>
-                        <td className="px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{project.usageCount.toLocaleString()}</td>
-                        <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtDateTime(project.lastUsedAt)}</td>
-                        <td className="px-3 py-2 text-right">
-                          <button
-                            type="button"
-                            onClick={() => void revokeApiToken(project.tokenId)}
-                            disabled={project.status !== 'active' || revokingTokenId === project.tokenId}
-                            className="inline-flex items-center gap-1.5 rounded-sm border border-rose-900/60 px-2 py-1 font-mono-sc text-[10px] text-rose-300 transition-colors hover:border-rose-600 hover:bg-rose-950/30 disabled:cursor-not-allowed disabled:opacity-35"
-                          >
-                            <Trash2 size={11} />
-                            {revokingTokenId === project.tokenId ? 'Revoking' : 'Revoke'}
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+          {/* Status code distribution */}
+          {snapshot && statusTotal > 0 && (
+            <div className="sci-panel border border-slate-800/60 p-3">
+              <p className="mb-2 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">HTTP status distribution</p>
+              <div className="flex h-3 w-full overflow-hidden rounded-sm bg-slate-900">
+                {Object.entries(snapshot.statusCounts).sort().map(([family, count]) => (
+                  <div
+                    key={family}
+                    className={STATUS_FAMILY_STYLE[family] ?? 'bg-slate-600'}
+                    style={{ width: `${(count / statusTotal) * 100}%` }}
+                    title={`${family}: ${count.toLocaleString()}`}
+                  />
+                ))}
               </div>
-            )}
-          </div>
+              <div className="mt-2 flex flex-wrap gap-3">
+                {Object.entries(snapshot.statusCounts).sort().map(([family, count]) => (
+                  <span key={family} className="flex items-center gap-1.5 font-mono-sc text-[10px] text-slate-500">
+                    <span className={`h-2 w-2 rounded-sm ${STATUS_FAMILY_STYLE[family] ?? 'bg-slate-600'}`} />
+                    {family} · {count.toLocaleString()} ({((count / statusTotal) * 100).toFixed(1)}%)
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
+          {/* Top routes */}
           <div className="sci-panel border border-slate-800/60">
             <p className="border-b border-slate-800/60 px-3 py-2.5 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-              Connected users
+              Top routes by traffic
             </p>
-            {apiSupervision.activeUsers.length === 0 ? (
-              <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No authenticated user activity in the last 15 minutes.</p>
+            {loading && !snapshot ? (
+              <div className="flex items-center justify-center py-10 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
+            ) : !snapshot || snapshot.routes.length === 0 ? (
+              <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No traffic recorded yet.</p>
             ) : (
-              <div className="divide-y divide-slate-800/50">
-                {apiSupervision.activeUsers.slice(0, 10).map((user) => (
-                  <div key={user.userId} className="px-3 py-2.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <p className="truncate font-mono-sc text-xs text-slate-300">{user.username ?? `user #${user.userId}`}</p>
-                      <span className="font-mono-sc text-[10px] text-slate-600">{fmtDateTime(user.lastSeenAt)}</span>
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-2 font-mono-sc text-[10px] text-slate-600">
-                      <span>{user.role ?? 'user'}</span>
-                      <span>{user.requestCount.toLocaleString()} req</span>
-                      <span>{user.externalApiRequests.toLocaleString()} external</span>
-                      <span>{user.webRequests.toLocaleString()} web</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                    <th className="px-3 py-2 font-normal">Route</th>
+                    <th className="px-3 py-2 text-right font-normal">Requests</th>
+                    <th className="px-3 py-2 text-right font-normal">Avg</th>
+                    <th className="px-3 py-2 text-right font-normal">5xx</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {snapshot.routes.map((r) => (
+                    <tr key={r.route} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
+                      <td className="max-w-[16rem] truncate px-3 py-2 font-mono-sc text-xs text-slate-300">{r.route}</td>
+                      <td className="px-3 py-2 text-right font-mono-sc text-xs text-cyan-400">{r.requests.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{fmtMs(r.avgMs)}</td>
+                      <td className={`px-3 py-2 text-right font-mono-sc text-xs ${r.errors > 0 ? 'text-rose-400' : 'text-slate-700'}`}>{r.errors > 0 ? r.errors.toLocaleString() : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         </div>
       )}
 
-      <div className="sci-panel border border-slate-800/60 p-3">
-        <div className="grid gap-3 md:grid-cols-[1fr_180px_160px] md:items-end">
-          <div>
-            <p className="font-orbitron text-sm font-bold uppercase tracking-widest text-slate-200">User request history</p>
-            <p className="mt-1 font-mono-sc text-xs text-slate-600">
-              Persistent API and IHM activity, restricted to admins.
-            </p>
-          </div>
-          <label className="block">
-            <span className="mb-1 block font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Role</span>
-            <select value={historyRole} onChange={(event) => setHistoryRole(event.target.value)} className="sci-input h-9 w-full text-xs">
-              <option value="">All roles</option>
-              <option value="user">User</option>
-              <option value="developer">Developer</option>
-              <option value="admin">Admin</option>
-            </select>
-          </label>
-          <label className="block">
-            <span className="mb-1 block font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">User ID</span>
-            <input
-              value={historyUserId}
-              onChange={(event) => setHistoryUserId(event.target.value.replace(/\D/g, ''))}
-              placeholder="Any"
-              className="sci-input h-9 w-full text-xs"
-            />
-          </label>
-        </div>
-      </div>
+      {activeTab === 'api' && apiSupervision && (
+        <div className="space-y-4 animate-in fade-in duration-200">
+          <StatGrid>
+            <StatCard icon={Globe} label="External API 15m" value={apiSupervision.summary.externalApiRequests15m.toLocaleString()} accent="cyan" />
+            <StatCard icon={User} label="Active users 15m" value={apiSupervision.summary.activeUsers15m.toLocaleString()} accent="emerald" />
+            <StatCard icon={KeyRound} label="Active tokens" value={apiSupervision.summary.activeTokens.toLocaleString()} accent="purple" />
+            <StatCard icon={ShieldCheck} label="Connected projects" value={apiSupervision.summary.connectedProjects.toLocaleString()} accent="amber" />
+          </StatGrid>
 
-      <div className="sci-panel border border-slate-800/60">
-        <div className="flex flex-col gap-1 border-b border-slate-800/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-            External API logs only
-          </p>
-          <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-700">
-            Last {externalRequestLogs.length.toLocaleString()} external requests
-          </span>
-        </div>
-        {loading && externalRequestLogs.length === 0 ? (
-          <div className="flex items-center justify-center py-10 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
-        ) : externalRequestLogs.length === 0 ? (
-          <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No external API logs yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left">
-              <thead>
-                <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-                  <th className="px-3 py-2 font-normal">Time</th>
-                  <th className="px-3 py-2 font-normal">Request</th>
-                  <th className="px-3 py-2 text-right font-normal">Status</th>
-                  <th className="px-3 py-2 text-right font-normal">Duration</th>
-                  <th className="px-3 py-2 font-normal">Project / actor</th>
-                  <th className="px-3 py-2 font-normal">Client</th>
-                </tr>
-              </thead>
-              <tbody>
-                {externalRequestLogs.map((log) => (
-                  <tr key={log.id} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
-                    <td className="whitespace-nowrap px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtTime(log.timestamp)}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="rounded-sm border border-cyan-900/60 bg-cyan-950/20 px-1.5 py-0.5 font-mono-sc text-[10px] font-bold text-cyan-400">
-                          {log.method}
-                        </span>
-                        <span className="max-w-[24rem] truncate font-mono-sc text-xs text-slate-300">{log.path}</span>
-                      </div>
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <span className={`inline-flex rounded-sm border px-1.5 py-0.5 font-mono-sc text-[10px] font-bold ${statusStyle(log.statusCode)}`}>
-                        {log.statusCode}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{fmtMs(log.durationMs)}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-1.5 font-mono-sc text-xs text-slate-500">
-                        <KeyRound size={11} className="text-slate-600" />
-                        {actorLabel(log)}
-                      </div>
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex min-w-0 items-center gap-1.5 font-mono-sc text-xs text-slate-500">
-                        <Globe size={11} className="shrink-0 text-slate-600" />
-                        <span className="max-w-[18rem] truncate" title={log.userAgent ?? undefined}>
-                          {clientLabel(log)} · {log.ip ?? 'unknown'}{log.userAgent ? ` · ${log.userAgent}` : ''}
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)]">
+            <div className="sci-panel border border-slate-800/60">
+              <div className="flex flex-col gap-1 border-b border-slate-800/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">External API projects and tokens</p>
+                <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-700">
+                  {apiSupervision.summary.tokensUsed24h.toLocaleString()} used in 24h · {apiSupervision.summary.revokedTokens.toLocaleString()} revoked
+                </span>
+              </div>
+              {apiSupervision.projects.length === 0 ? (
+                <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No generated API tokens yet.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[920px] text-left">
+                    <thead>
+                      <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                        <th className="px-3 py-2 font-normal">Project</th>
+                        <th className="px-3 py-2 font-normal">Owner</th>
+                        <th className="px-3 py-2 font-normal">Status</th>
+                        <th className="px-3 py-2 font-normal">Created</th>
+                        <th className="px-3 py-2 font-normal">Expires</th>
+                        <th className="px-3 py-2 text-right font-normal">Recent</th>
+                        <th className="px-3 py-2 text-right font-normal">Total</th>
+                        <th className="px-3 py-2 font-normal">Last used</th>
+                        <th className="px-3 py-2 text-right font-normal">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {apiSupervision.projects.slice(0, 12).map((project) => (
+                        <tr key={project.tokenId} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
+                          <td className="px-3 py-2">
+                            <div className="min-w-0">
+                              <p className="truncate font-mono-sc text-xs text-slate-300">{project.name}</p>
+                              {project.description && <p className="truncate font-rajdhani text-xs text-slate-600">{project.description}</p>}
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">
+                            {project.owner ? `${project.owner.username} · ${project.owner.role}` : 'Unknown'}
+                          </td>
+                          <td className="px-3 py-2">
+                            <span className={`inline-flex rounded-sm border px-1.5 py-0.5 font-mono-sc text-[10px] font-bold uppercase ${projectStatusStyle(project.status)}`}>
+                              {project.connected ? 'connected' : project.status}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtDateTime(project.createdAt)}</td>
+                          <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtDateTime(project.expiresAt)}</td>
+                          <td className="px-3 py-2 text-right font-mono-sc text-xs text-cyan-400">{project.recentRequests.toLocaleString()}</td>
+                          <td className="px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{project.usageCount.toLocaleString()}</td>
+                          <td className="px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtDateTime(project.lastUsedAt)}</td>
+                          <td className="px-3 py-2 text-right">
+                            <button
+                              type="button"
+                              onClick={() => void revokeApiToken(project.tokenId)}
+                              disabled={project.status !== 'active' || revokingTokenId === project.tokenId}
+                              className="inline-flex items-center gap-1.5 rounded-sm border border-rose-900/60 px-2 py-1 font-mono-sc text-[10px] text-rose-300 transition-colors hover:border-rose-600 hover:bg-rose-950/30 disabled:cursor-not-allowed disabled:opacity-35"
+                            >
+                              <Trash2 size={11} />
+                              {revokingTokenId === project.tokenId ? 'Revoking' : 'Revoke'}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
 
-      {/* Web request logs */}
-      <div className="sci-panel border border-slate-800/60">
-        <div className="flex flex-col gap-1 border-b border-slate-800/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-          <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-            Starvis IHM logs only
-          </p>
-          <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-700">
-            Last {webRequestLogs.length.toLocaleString()} web requests
-          </span>
-        </div>
-        {loading && webRequestLogs.length === 0 ? (
-          <div className="flex items-center justify-center py-10 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
-        ) : webRequestLogs.length === 0 ? (
-          <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No Starvis IHM request logs yet.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] text-left">
-              <thead>
-                <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
-                  <th className="px-3 py-2 font-normal">Time</th>
-                  <th className="px-3 py-2 font-normal">Request</th>
-                  <th className="px-3 py-2 text-right font-normal">Status</th>
-                  <th className="px-3 py-2 text-right font-normal">Duration</th>
-                  <th className="px-3 py-2 font-normal">Actor</th>
-                  <th className="px-3 py-2 font-normal">Client</th>
-                </tr>
-              </thead>
-              <tbody>
-                {webRequestLogs.map((log) => (
-                  <tr key={log.id} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
-                    <td className="whitespace-nowrap px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtTime(log.timestamp)}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="rounded-sm border border-cyan-900/60 bg-cyan-950/20 px-1.5 py-0.5 font-mono-sc text-[10px] font-bold text-cyan-400">
-                          {log.method}
-                        </span>
-                        <span className="max-w-[24rem] truncate font-mono-sc text-xs text-slate-300">{log.path}</span>
+            <div className="sci-panel border border-slate-800/60">
+              <p className="border-b border-slate-800/60 px-3 py-2.5 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                Connected users
+              </p>
+              {apiSupervision.activeUsers.length === 0 ? (
+                <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No authenticated user activity in the last 15 minutes.</p>
+              ) : (
+                <div className="divide-y divide-slate-800/50">
+                  {apiSupervision.activeUsers.slice(0, 10).map((user) => (
+                    <div key={user.userId} className="px-3 py-2.5">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="truncate font-mono-sc text-xs text-slate-300">{user.username ?? `user #${user.userId}`}</p>
+                        <span className="font-mono-sc text-[10px] text-slate-600">{fmtDateTime(user.lastSeenAt)}</span>
                       </div>
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <span className={`inline-flex rounded-sm border px-1.5 py-0.5 font-mono-sc text-[10px] font-bold ${statusStyle(log.statusCode)}`}>
-                        {log.statusCode}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{fmtMs(log.durationMs)}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center gap-1.5 font-mono-sc text-xs text-slate-500">
-                        <User size={11} className="text-slate-600" />
-                        {actorLabel(log)}
+                      <div className="mt-1 flex flex-wrap gap-2 font-mono-sc text-[10px] text-slate-600">
+                        <span>{user.role ?? 'user'}</span>
+                        <span>{user.requestCount.toLocaleString()} req</span>
+                        <span>{user.externalApiRequests.toLocaleString()} external</span>
+                        <span>{user.webRequests.toLocaleString()} web</span>
                       </div>
-                    </td>
-                    <td className="px-3 py-2">
-                      <div className="flex min-w-0 items-center gap-1.5 font-mono-sc text-xs text-slate-500">
-                        <Globe size={11} className="shrink-0 text-slate-600" />
-                        <span className="max-w-[18rem] truncate" title={log.userAgent ?? undefined}>
-                          {clientLabel(log)} · {log.ip ?? 'unknown'}{log.userAgent ? ` · ${log.userAgent}` : ''}
-                        </span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {activeTab === 'system' && (
+        <div className="space-y-4 animate-in fade-in duration-200">
+          {/* Runtime stats */}
+          <StatGrid>
+            <StatCard icon={Clock} label="Uptime" value={fmtUptime(snapshot?.uptimeSeconds ?? null)} accent="cyan" />
+            <StatCard icon={HardDrive} label="Memory (RSS)" value={fmtBytes(snapshot?.memoryBytes ?? null)} accent="purple" />
+            <StatCard icon={Cpu} label="Heap used" value={fmtBytes(snapshot?.heapUsedBytes ?? null)} accent="purple" />
+            <StatCard icon={Gauge} label="Event loop lag" value={fmtMs(snapshot?.eventLoopLagMs ?? null)} accent={snapshot?.eventLoopLagMs != null && snapshot.eventLoopLagMs > 50 ? 'rose' : 'slate'} />
+          </StatGrid>
+
+          {/* Cache stats */}
+          <StatGrid>
+            <StatCard icon={Zap} label="Cache hits" value={snapshot?.cache ? snapshot.cache.hits.toLocaleString() : '—'} accent="emerald" />
+            <StatCard icon={Zap} label="Cache misses" value={snapshot?.cache ? snapshot.cache.misses.toLocaleString() : '—'} accent="slate" />
+            <StatCard icon={Gauge} label="Hit rate" value={snapshot?.cache ? `${snapshot.cache.hitRate}%` : '—'} accent="cyan" />
+            <StatCard icon={Zap} label="Redis link" value={snapshot?.cache ? (snapshot.cache.connected ? 'CONNECTED' : 'OFFLINE') : '—'} accent={snapshot?.cache?.connected ? 'emerald' : 'rose'} />
+          </StatGrid>
+
+          <div className="sci-panel border border-slate-800/60 p-3">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="flex items-center gap-2 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                  <Bot size={12} className="text-cyan-500" /> Discord bot
+                </p>
+                <p className="mt-2 text-sm text-slate-400">
+                  {discordBot?.configured
+                    ? `${discordBot.commandCount} slash commands configured.`
+                    : 'Invite link not configured. Set NEXT_PUBLIC_DISCORD_CLIENT_ID or DISCORD_CLIENT_ID.'}
+                </p>
+                {discordBot?.clientId && (
+                  <p className="mt-1 font-mono-sc text-[10px] text-slate-600">Client ID {discordBot.clientId}</p>
+                )}
+                {discordBot?.guildId && (
+                  <p className="mt-1 font-mono-sc text-[10px] text-slate-600">Community server {discordBot.guildId}</p>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Link href="/discord" className="rounded-sm border border-slate-800 px-3 py-2 font-mono-sc text-xs text-slate-400 hover:border-cyan-800/70 hover:text-cyan-300">
+                  Command help
+                </Link>
+                {discordBot?.serverInviteUrl && (
+                  <a href={discordBot.serverInviteUrl} target="_blank" rel="noreferrer" className="rounded-sm border border-cyan-900/70 px-3 py-2 font-mono-sc text-xs text-cyan-300 hover:border-cyan-500 hover:text-cyan-100">
+                    Join server
+                  </a>
+                )}
+                {discordBot?.inviteUrl && (
+                  <a href={discordBot.inviteUrl} target="_blank" rel="noreferrer" className="sci-btn-primary px-3 py-2 text-xs">
+                    Invite bot
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'logs' && (
+        <div className="space-y-4 animate-in fade-in duration-200">
+          <div className="sci-panel border border-slate-800/60 p-3">
+            <div className="grid gap-3 md:grid-cols-[1fr_180px_160px] md:items-end">
+              <div>
+                <p className="font-orbitron text-sm font-bold uppercase tracking-widest text-slate-200">User request history</p>
+                <p className="mt-1 font-mono-sc text-xs text-slate-600">
+                  Persistent API and IHM activity, restricted to admins.
+                </p>
+              </div>
+              <label className="block">
+                <span className="mb-1 block font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">Role</span>
+                <select value={historyRole} onChange={(event) => setHistoryRole(event.target.value)} className="sci-input h-9 w-full text-xs">
+                  <option value="">All roles</option>
+                  <option value="user">User</option>
+                  <option value="developer">Developer</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="mb-1 block font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">User ID</span>
+                <input
+                  value={historyUserId}
+                  onChange={(event) => setHistoryUserId(event.target.value.replace(/\D/g, ''))}
+                  placeholder="Any"
+                  className="sci-input h-9 w-full text-xs"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            {/* External API request logs */}
+            <div className="sci-panel border border-slate-800/60">
+              <div className="flex flex-col gap-1 border-b border-slate-800/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                  External API logs only
+                </p>
+                <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-700">
+                  Last {externalRequestLogs.length.toLocaleString()} external requests
+                </span>
+              </div>
+              {loading && externalRequestLogs.length === 0 ? (
+                <div className="flex items-center justify-center py-10 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
+              ) : externalRequestLogs.length === 0 ? (
+                <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No external API logs yet.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                        <th className="px-3 py-2 font-normal">Time</th>
+                        <th className="px-3 py-2 font-normal">Request</th>
+                        <th className="px-3 py-2 text-right font-normal">Status</th>
+                        <th className="px-3 py-2 text-right font-normal">Duration</th>
+                        <th className="px-3 py-2 font-normal">Project / Actor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {externalRequestLogs.map((log) => (
+                        <tr key={log.id} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
+                          <td className="whitespace-nowrap px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtTime(log.timestamp)}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="rounded-sm border border-cyan-900/60 bg-cyan-950/20 px-1.5 py-0.5 font-mono-sc text-[10px] font-bold text-cyan-400">
+                                {log.method}
+                              </span>
+                              <span className="max-w-[12rem] truncate font-mono-sc text-xs text-slate-300" title={log.path}>{log.path}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <span className={`inline-flex rounded-sm border px-1.5 py-0.5 font-mono-sc text-[10px] font-bold ${statusStyle(log.statusCode)}`}>
+                              {log.statusCode}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{fmtMs(log.durationMs)}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-1.5 font-mono-sc text-xs text-slate-500" title={clientLabel(log)}>
+                              <KeyRound size={11} className="text-slate-600" />
+                              <span className="max-w-[10rem] truncate">{externalActorLabel(log)}</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Starvis IHM request logs */}
+            <div className="sci-panel border border-slate-800/60">
+              <div className="flex flex-col gap-1 border-b border-slate-800/60 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                <p className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                  Starvis IHM logs only
+                </p>
+                <span className="font-mono-sc text-[9px] uppercase tracking-widest text-slate-700">
+                  Last {webRequestLogs.length.toLocaleString()} web requests
+                </span>
+              </div>
+              {loading && webRequestLogs.length === 0 ? (
+                <div className="flex items-center justify-center py-10 text-slate-600"><Loader2 size={18} className="animate-spin" /></div>
+              ) : webRequestLogs.length === 0 ? (
+                <p className="px-3 py-8 text-center font-mono-sc text-xs text-slate-700">No Starvis IHM request logs yet.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-slate-800/60 font-mono-sc text-[9px] uppercase tracking-widest text-slate-600">
+                        <th className="px-3 py-2 font-normal">Time</th>
+                        <th className="px-3 py-2 font-normal">Request</th>
+                        <th className="px-3 py-2 text-right font-normal">Status</th>
+                        <th className="px-3 py-2 text-right font-normal">Duration</th>
+                        <th className="px-3 py-2 font-normal">Actor</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {webRequestLogs.map((log) => (
+                        <tr key={log.id} className="border-b border-slate-800/40 last:border-0 hover:bg-cyan-950/10">
+                          <td className="whitespace-nowrap px-3 py-2 font-mono-sc text-xs text-slate-500">{fmtTime(log.timestamp)}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex min-w-0 items-center gap-2">
+                              <span className="rounded-sm border border-cyan-900/60 bg-cyan-950/20 px-1.5 py-0.5 font-mono-sc text-[10px] font-bold text-cyan-400">
+                                {log.method}
+                              </span>
+                              <span className="max-w-[12rem] truncate font-mono-sc text-xs text-slate-300" title={log.path}>{log.path}</span>
+                            </div>
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            <span className={`inline-flex rounded-sm border px-1.5 py-0.5 font-mono-sc text-[10px] font-bold ${statusStyle(log.statusCode)}`}>
+                              {log.statusCode}
+                            </span>
+                          </td>
+                          <td className="whitespace-nowrap px-3 py-2 text-right font-mono-sc text-xs text-slate-400">{fmtMs(log.durationMs)}</td>
+                          <td className="px-3 py-2">
+                            <div className="flex items-center gap-1.5 font-mono-sc text-xs text-slate-500" title={clientLabel(log)}>
+                              <User size={11} className="text-slate-600" />
+                              <span className="max-w-[10rem] truncate">{ihmActorLabel(log)}</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       <p className="font-mono-sc text-[10px] text-slate-700">
         Auto-refresh every {REFRESH_INTERVAL_MS / 1000}s · counters since last API restart
