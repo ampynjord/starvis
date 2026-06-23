@@ -451,6 +451,21 @@ npm run openapi:lint --workspace=@starvis/api
 
 ---
 
+## Notebooks
+
+### Database Explorer Notebook
+An interactive Jupyter Notebook is provided at [`notebooks/db_explorer.ipynb`](file:///notebooks/db_explorer.ipynb) to explore and visualize PostgreSQL data (ship, component, item counts, and category distributions).
+To run it, set up a Python virtual environment and install dependencies:
+```bash
+cd notebooks
+python -m venv .venv
+.venv\Scripts\Activate.ps1   # Windows (Powershell)
+# or: source .venv/bin/activate # Unix/macOS
+pip install -r requirements.txt
+```
+
+---
+
 ## CI/CD
 
 GitHub Actions runs on pushes to any branch and pull requests to `main`.
