@@ -1,5 +1,5 @@
-import { describe, expect, it, beforeAll, afterAll } from 'vitest';
-import { redis, cacheGet, cacheSet, cacheInvalidatePattern } from '../src/services/redis.js';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { cacheGet, cacheInvalidatePattern, cacheSet, redis } from '../src/services/redis.js';
 
 describe('Redis cache services', () => {
   beforeAll(async () => {

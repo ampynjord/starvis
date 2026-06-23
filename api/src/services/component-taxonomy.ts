@@ -1,16 +1,11 @@
 import {
   GAME_COMPONENT_CATEGORIES,
   GAME_COMPONENT_CATEGORY_TYPES,
-  getGameComponentCategory,
   type GameComponentCategory,
+  getGameComponentCategory,
 } from '@starvis/db';
 
-export {
-  GAME_COMPONENT_CATEGORIES,
-  GAME_COMPONENT_CATEGORY_TYPES,
-  getGameComponentCategory,
-  type GameComponentCategory,
-};
+export { GAME_COMPONENT_CATEGORIES, GAME_COMPONENT_CATEGORY_TYPES, type GameComponentCategory, getGameComponentCategory };
 
 export const GAME_COMPONENT_CATEGORY_SLUGS: Record<string, GameComponentCategory> = Object.fromEntries(
   GAME_COMPONENT_CATEGORIES.flatMap((category) => [
@@ -33,7 +28,6 @@ Object.assign(GAME_COMPONENT_CATEGORY_SLUGS, {
   countermeasures: 'CM',
   qed: 'QI',
 });
-
 
 export function getGameComponentCategoryTypes(categoryOrSlug: string): string[] | undefined {
   const category = GAME_COMPONENT_CATEGORY_SLUGS[categoryOrSlug] ?? GAME_COMPONENT_CATEGORY_SLUGS[categoryOrSlug.toLowerCase()];
