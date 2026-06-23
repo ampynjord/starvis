@@ -11,13 +11,15 @@
 // ============================================================
 
 generator client {
-  provider = "prisma-client-js"
-  output   = "../../generated/client"
+  provider        = "prisma-client-js"
+  output          = "../../generated/client"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  schemas  = ["game", "rsi", "meta"]
+  provider   = "postgresql"
+  schemas    = ["game", "rsi", "meta"]
+  extensions = [pg_trgm]
 }
 
 // ╔══════════════════════════════════════════════════════════════╗

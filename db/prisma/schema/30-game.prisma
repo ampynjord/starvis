@@ -287,6 +287,7 @@ model Component {
   @@index([isBespoke])
   @@index([canonicalComponentKey])
   @@index([env])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("components")
   @@schema("game")
 }
@@ -326,6 +327,7 @@ model Item {
   @@index([canonicalItemKey])
   @@index([manufacturerCode])
   @@index([env])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("items")
   @@schema("game")
 }
@@ -353,6 +355,7 @@ model Commodity {
   @@unique([className, env])
   @@index([canonicalCommodityKey])
   @@index([env])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("commodities")
   @@schema("game")
 }
@@ -649,6 +652,7 @@ model Mission {
   @@index([locationSystem])
   @@index([category])
   @@index([env])
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("missions")
   @@schema("game")
 }
@@ -681,6 +685,7 @@ model CraftingRecipe {
   @@unique([className, env])
   @@index([category])
   @@index([env])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("crafting_recipes")
   @@schema("game")
 }
