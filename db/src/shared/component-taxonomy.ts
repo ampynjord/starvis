@@ -37,9 +37,7 @@ export const GAME_COMPONENT_CATEGORY_TYPES: Record<GameComponentCategory, string
 };
 
 const COMPONENT_TYPE_TO_GAME_CATEGORY = Object.fromEntries(
-  Object.entries(GAME_COMPONENT_CATEGORY_TYPES).flatMap(([category, types]) =>
-    types.map((type) => [type, category])
-  )
+  Object.entries(GAME_COMPONENT_CATEGORY_TYPES).flatMap(([category, types]) => types.map((type) => [type, category])),
 ) as Record<string, GameComponentCategory>;
 
 export function getGameComponentCategory(type?: string | null): GameComponentCategory | 'Other' {
