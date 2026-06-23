@@ -19,6 +19,7 @@
   "author": "ampynjord - Dawnstar",
   "license": "UNLICENSED",
   "dependencies": {
+    "@starvis/db": "*",
     "commander": "^15.0.0",
     "dotenv": "^17.4.2",
     "fzstd": "^0.1.1",

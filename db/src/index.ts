@@ -12,3 +12,10 @@ export { getPrisma, initPrisma, PrismaClient } from './client/prisma.js';
 export { resolveEnv } from './env/resolve-env.js';
 export { getGamePrisma, getRsiWebsitePrisma, getStarvisPrisma, initAllPrisma } from './legacy.js';
 export type { GamePrismaClient, PrismaLike, RsiPrismaClient, StarvisPrismaClient } from './types/prisma.js';
+export {
+  GAME_COMPONENT_CATEGORIES,
+  GAME_COMPONENT_CATEGORY_TYPES,
+  getGameComponentCategory,
+} from './shared/component-taxonomy.js';
+export type { GameComponentCategory } from './shared/component-taxonomy.js';
+

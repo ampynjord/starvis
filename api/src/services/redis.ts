@@ -136,6 +136,30 @@ export async function cacheSet<T>(key: string, value: T, ttl: number = DEFAULT_T
 /**
  * Invalidate cache by pattern
  */
+export async function cacheInvalidatePattern(pattern: string): Promise<number> {
+  if (!isRedisAvailable()) {
+    return 0;
+  }
+
+  try {
+    let cursor = '0';
+    let deletedCount = 0;
+    do {
+      const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+      cursor = nextCursor;
+      if (keys.length > 0) {
+        deletedCount += await redis.del(...keys);
+      }
+    } while (cursor !== '0');
+
+    logger.debug('Cache pattern invalidated', { pattern, deletedCount });
+    return deletedCount;
+  } catch (error) {
+    logger.error('Cache invalidate pattern error', { pattern, error });
+    return 0;
+  }
+}
+
 /**
  * Update cache hit rate metric
  */
